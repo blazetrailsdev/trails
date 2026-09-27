@@ -92,12 +92,12 @@ describe("ExecutorTest", () => {
     expect(result).toBeTruthy();
   });
 
-  it("separated calls invoke callbacks", () => {
+  it("separated calls invoke callbacks", async () => {
     const called: string[] = [];
     executor.toRun(() => called.push("run"));
     executor.toComplete(() => called.push("complete"));
 
-    const state = executor.runBang();
+    const state = await executor.runBang();
     called.push("body");
     state.completeBang();
 

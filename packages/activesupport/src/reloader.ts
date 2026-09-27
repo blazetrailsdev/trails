@@ -5,6 +5,14 @@ import { ExecutionWrapper } from "./execution-wrapper.js";
 import type { CompletableExecution } from "./execution-wrapper.js";
 import { Executor } from "./executor.js";
 
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value != null &&
+    (typeof value === "object" || typeof value === "function") &&
+    typeof (value as PromiseLike<unknown>).then === "function"
+  );
+}
+
 export class Reloader extends ExecutionWrapper {
   declare static executor: typeof ExecutionWrapper;
 
@@ -37,19 +45,24 @@ export class Reloader extends ExecutionWrapper {
     });
   }
 
-  static reloadBang(): void {
-    this.executor.wrap(() => {
+  static reloadBang(): void | Promise<void> {
+    const wrapped = this.executor.wrap(() => {
       const instance = new this();
+      let ran: unknown;
       try {
-        instance.runBang();
+        ran = instance.runBang();
       } finally {
-        instance.completeBang();
+        if (!isThenable(ran)) instance.completeBang();
       }
+      if (isThenable(ran)) return Promise.resolve(ran).finally(() => instance.completeBang());
     });
+    if (isThenable(wrapped)) return Promise.resolve(wrapped).then(() => this.prepareBang());
     this.prepareBang();
   }
 
-  static runBang({ reset = false }: { reset?: boolean } = {}): CompletableExecution {
+  static runBang({ reset = false }: { reset?: boolean } = {}):
+    | CompletableExecution
+    | Promise<CompletableExecution> {
     if (this.checkBang()) {
       return super.runBang({ reset });
     } else {
@@ -62,6 +75,16 @@ export class Reloader extends ExecutionWrapper {
 
     return this.executor.wrap(() => {
       const instance = this.runBang();
+      if (isThenable(instance)) {
+        return (async () => {
+          const ran = await instance;
+          try {
+            return await block();
+          } finally {
+            await ran.completeBang();
+          }
+        })() as T;
+      }
       try {
         return block();
       } finally {
@@ -97,8 +120,9 @@ export class Reloader extends ExecutionWrapper {
     }
   }
 
-  runBang(): void {
-    super.runBang();
+  runBang(): unknown {
+    const ran = super.runBang();
+    if (isThenable(ran)) return Promise.resolve(ran).then(() => this.releaseUnloadLockBang());
     this.releaseUnloadLockBang();
   }
 
@@ -107,12 +131,18 @@ export class Reloader extends ExecutionWrapper {
     runCallbacks(this, "class_unload", block);
   }
 
-  completeBang(): void {
+  completeBang(): unknown {
+    let completed: unknown;
     try {
-      super.completeBang();
+      completed = super.completeBang();
+      if (isThenable(completed)) {
+        return Promise.resolve(completed)
+          .then(() => (this.constructor as typeof Reloader).reloadedBang())
+          .finally(() => this.releaseUnloadLockBang());
+      }
       (this.constructor as typeof Reloader).reloadedBang();
     } finally {
-      this.releaseUnloadLockBang();
+      if (!isThenable(completed)) this.releaseUnloadLockBang();
     }
   }
 }

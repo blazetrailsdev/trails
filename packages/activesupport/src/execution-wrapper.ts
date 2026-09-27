@@ -20,7 +20,7 @@ export interface ExecutionHook {
 }
 
 export interface CompletableExecution {
-  completeBang(): void;
+  completeBang(): unknown;
 }
 
 export class ExecutionWrapper {
@@ -29,7 +29,9 @@ export class ExecutionWrapper {
   static CompleteHook: typeof CompleteHook;
 
   static Null: CompletableExecution = {
-    completeBang(): void {},
+    completeBang(): unknown {
+      return undefined;
+    },
   };
 
   static {
@@ -59,7 +61,9 @@ export class ExecutionWrapper {
     }
   }
 
-  static runBang({ reset = false }: { reset?: boolean } = {}): CompletableExecution {
+  static runBang({ reset = false }: { reset?: boolean } = {}):
+    | CompletableExecution
+    | Promise<CompletableExecution> {
     if (reset) {
       const lostInstance = IsolatedExecutionState.delete<CompletableExecution>(this.activeKey());
       lostInstance?.completeBang();
@@ -69,11 +73,22 @@ export class ExecutionWrapper {
 
     const instance = new this();
     let success = null;
+    let deferred = false;
     try {
-      instance.runBang();
+      const ran = instance.runBang();
+      if (isThenable(ran)) {
+        deferred = true;
+        return Promise.resolve(ran).then(
+          () => instance,
+          async (error: unknown) => {
+            await instance.completeBang();
+            throw error;
+          },
+        );
+      }
       success = true;
     } finally {
-      if (success == null) instance.completeBang();
+      if (success == null && !deferred) instance.completeBang();
     }
     return instance;
   }
@@ -82,19 +97,32 @@ export class ExecutionWrapper {
     if (this.active()) return block();
 
     const instance = this.runBang();
+    if (isThenable(instance)) {
+      return (async () => {
+        const ran = await instance;
+        try {
+          return await block();
+        } catch (error) {
+          this.errorReporter().report(error as Error, { handled: false, source });
+          throw error;
+        } finally {
+          await ran.completeBang();
+        }
+      })() as T;
+    }
     let deferred = false;
     try {
       const result = block();
       if (isThenable(result)) {
         deferred = true;
         return Promise.resolve(result).then(
-          (value) => {
-            instance.completeBang();
+          async (value) => {
+            await instance.completeBang();
             return value;
           },
-          (error: unknown) => {
+          async (error: unknown) => {
             this.errorReporter().report(error as Error, { handled: false, source });
-            instance.completeBang();
+            await instance.completeBang();
             throw error;
           },
         ) as T;
@@ -133,26 +161,32 @@ export class ExecutionWrapper {
     return IsolatedExecutionState.isKey(this.activeKey());
   }
 
-  runBang(): void {
+  runBang(): unknown {
     const klass = this.constructor as typeof ExecutionWrapper;
     IsolatedExecutionState.set(klass.activeKey(), this);
-    this.run();
+    return this.run();
   }
 
-  run(): void {
-    runCallbacks(this, "run");
+  run(): unknown {
+    return runCallbacks(this, "run");
   }
 
-  completeBang(): void {
+  completeBang(): unknown {
+    const activeKey = (this.constructor as typeof ExecutionWrapper).activeKey();
+    let completed: unknown;
     try {
-      this.complete();
+      completed = this.complete();
+      if (isThenable(completed)) {
+        return Promise.resolve(completed).finally(() => IsolatedExecutionState.delete(activeKey));
+      }
+      return completed;
     } finally {
-      IsolatedExecutionState.delete((this.constructor as typeof ExecutionWrapper).activeKey());
+      if (!isThenable(completed)) IsolatedExecutionState.delete(activeKey);
     }
   }
 
-  complete(): void {
-    runCallbacks(this, "complete");
+  complete(): unknown {
+    return runCallbacks(this, "complete");
   }
 
   /** @internal */

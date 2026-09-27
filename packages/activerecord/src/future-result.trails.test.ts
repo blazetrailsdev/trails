@@ -150,8 +150,8 @@ describe("DatabaseStatements#select", () => {
 
   let execution: CompletableExecution;
 
-  beforeEach(() => {
-    execution = TestExecutor.runBang();
+  beforeEach(async () => {
+    execution = await TestExecutor.runBang();
   });
 
   afterEach(() => {
