@@ -141,11 +141,27 @@ export class ExecutionWrapper {
 
   static perform<T>(block: () => T): T {
     const instance = new this();
-    instance.run();
+    const ran = instance.run();
+    if (isThenable(ran)) {
+      return (async () => {
+        await ran;
+        try {
+          return await block();
+        } finally {
+          await instance.complete();
+        }
+      })() as T;
+    }
+    let deferred = false;
     try {
-      return block();
+      const result = block();
+      if (isThenable(result)) {
+        deferred = true;
+        return Promise.resolve(result).finally(() => instance.complete()) as T;
+      }
+      return result;
     } finally {
-      instance.complete();
+      if (!deferred) instance.complete();
     }
   }
 
