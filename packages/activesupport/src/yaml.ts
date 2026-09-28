@@ -1,4 +1,5 @@
 import { LoadError } from "@blazetrails/ruby-compat";
+export type { CollectionTag, YAMLMap } from "yaml";
 
 const yaml = await import("yaml").catch(() => {
   const missing = (): never => {

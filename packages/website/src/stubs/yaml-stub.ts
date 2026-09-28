@@ -1,5 +1,6 @@
 // `@blazetrails/activesupport/yaml` uses top-level await — incompatible with Rollup IIFE format.
 export { parse, stringify } from "yaml";
+export type { CollectionTag, YAMLMap } from "yaml";
 
 export class DisallowedClass extends globalThis.Error {
   constructor(action: string, klassName: string) {

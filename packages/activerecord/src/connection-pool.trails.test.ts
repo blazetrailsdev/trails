@@ -670,7 +670,7 @@ describe("ConnectionPool schema cache", () => {
         try {
           const filename = join(dir, "schema_cache.yml");
           await pool.schemaCache.dumpTo(filename);
-          const parsed = yamlParse(await readFile(filename, "utf8")) as {
+          const parsed = yamlParse(await readFile(filename, "utf8"), { maxAliasCount: -1 }) as {
             columns: Record<string, unknown[]>;
           };
           expect(Object.keys(parsed.columns)).toContain("posts");

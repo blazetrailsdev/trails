@@ -1856,7 +1856,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
 
     const cachePath = path.join(tmpDir, "db", "schema_cache.yml");
     expect(fs.existsSync(cachePath)).toBe(true);
-    const parsed = yamlParse(fs.readFileSync(cachePath, "utf8")) as {
+    const parsed = yamlParse(fs.readFileSync(cachePath, "utf8"), { maxAliasCount: -1 }) as {
       columns: Record<string, unknown[]>;
       data_sources: Record<string, boolean>;
     };
@@ -1904,7 +1904,7 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
     await runDb(["schema:cache:dump"]);
 
     const cachePath = path.join(tmpDir, "db", "schema_cache.yml");
-    const parsed = yamlParse(fs.readFileSync(cachePath, "utf8")) as {
+    const parsed = yamlParse(fs.readFileSync(cachePath, "utf8"), { maxAliasCount: -1 }) as {
       indexes: Record<
         string,
         Array<{ table: string; name: string; columns: string[]; unique: boolean }>
@@ -2320,9 +2320,11 @@ export class CreateCats extends Migration {
 
     const primaryCache = yamlParse(
       fs.readFileSync(path.join(tmpDir, "db", "schema_cache.yml"), "utf8"),
+      { maxAliasCount: -1 },
     ) as { columns: Record<string, unknown[]> };
     const animalsCache = yamlParse(
       fs.readFileSync(path.join(tmpDir, "db", "animals_schema_cache.yml"), "utf8"),
+      { maxAliasCount: -1 },
     ) as { columns: Record<string, unknown[]> };
     expect(Object.keys(primaryCache.columns)).toContain("widgets");
     expect(Object.keys(animalsCache.columns)).toContain("dogs");
