@@ -14,9 +14,7 @@ export class TestResponse extends Response {
     const headers =
       response.headers instanceof Headers
         ? response.headers.toHash()
-        : (Object.fromEntries(
-            Object.entries(response.headers).map(([k, v]) => [k, String(v)]),
-          ) as Record<string, string>);
+        : (response.headers as Record<string, string>);
     const body = Array.isArray(response.body)
       ? (response.body as string[])
       : [String(response.body)];

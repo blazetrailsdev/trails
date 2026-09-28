@@ -87,7 +87,7 @@ export function respondTo(
     _processFormat(format: Format): void;
   },
   ...mimes: Array<string | ((collector: Collector & Record<string, MimeMethod>) => void)>
-): void {
+): unknown {
   const last = mimes[mimes.length - 1];
   const block =
     typeof last === "function"
@@ -108,7 +108,7 @@ export function respondTo(
     this._processFormat(format);
     if (!collector.isAnyResponse()) _setRenderedContentType.call(this, format);
     const response = collector.response;
-    if (response) response();
+    if (response) return response();
   } else {
     throw new UnknownFormat();
   }
