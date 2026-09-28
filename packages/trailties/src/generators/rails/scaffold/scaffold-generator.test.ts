@@ -99,7 +99,7 @@ describe("ScaffoldGeneratorTest", () => {
       fs.existsSync(path.join(tmpDir, "test/controllers/product-lines-controller.test.ts")),
     ).toBe(false);
 
-    expect(fs.readdirSync(path.join(tmpDir, "app/views/product_lines"))).toEqual([]);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/product_lines"))).toBe(false);
   });
 
   it.skip("scaffold with namespace on invoke", () => {});

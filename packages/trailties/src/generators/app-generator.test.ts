@@ -92,7 +92,7 @@ describe("AppGenerator", () => {
 
     expect(exists("db/migrate/.gitkeep")).toBe(true);
     expect(exists("db/seeds.ts")).toBe(true);
-    expect(exists("db/schema.ts")).toBe(true);
+    expect(exists("db/schema.ts")).toBe(false);
 
     expect(exists("test/test-helper.ts")).toBe(true);
     expect(exists("test/models/.gitkeep")).toBe(true);
