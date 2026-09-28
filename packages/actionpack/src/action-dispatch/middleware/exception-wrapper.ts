@@ -290,7 +290,8 @@ export class ExceptionWrapper {
   get sourceLocation(): TraceEntry | null {
     const firstTrace = this.backtrace[0];
     if (!firstTrace) return null;
-    return this.extractFileAndLineNumber(firstTrace);
+    const [file, line] = this.extractFileAndLineNumber(firstTrace);
+    return file == null ? null : { file, line };
   }
 
   static statusCodeForException(className: string): number {
@@ -405,10 +406,10 @@ export class ExceptionWrapper {
       return { file: String(trace), line, code };
     }
 
-    const loc = this.extractFileAndLineNumber(trace);
-    if (!loc) return { file: String(trace), line: 0 };
-    const code = this.sourceFragment(loc.file, loc.line);
-    return code ? { ...loc, code } : loc;
+    const [file, lineNumber] = this.extractFileAndLineNumber(trace);
+    if (file == null) return { file: String(trace), line: 0 };
+    const code = this.sourceFragment(file, lineNumber);
+    return code ? { file, line: lineNumber, code } : { file, line: lineNumber };
   }
 
   /** @internal */
@@ -439,9 +440,8 @@ export class ExceptionWrapper {
   }
 
   /** @internal */
-  extractFileAndLineNumber(trace: BacktraceLine): TraceEntry | null {
-    if (trace.path == null) return null;
-    return { file: trace.path, line: trace.lineno };
+  extractFileAndLineNumber(trace: BacktraceLine): [string | null, number] {
+    return [trace.path, trace.lineno];
   }
 
   private computeStatusCode(): number {

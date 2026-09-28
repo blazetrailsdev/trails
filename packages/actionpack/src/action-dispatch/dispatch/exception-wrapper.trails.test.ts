@@ -99,6 +99,9 @@ describe("ExceptionWrapper#backtrace", () => {
     ]);
     expect(wrapper.applicationTrace[0]).toBe(wrapper.fullTrace[0]);
     expect(wrapper.traces["Application Trace"].map((t) => t.id)).toEqual([0]);
-    expect(wrapper.sourceLocation).toEqual({ file: "/app/lib/file.js", line: 42 });
+    expect(wrapper.sourceExtracts.map((e) => [e.file, e.line])).toEqual([
+      ["/app/lib/file.js", 42],
+      ["/app/node_modules/rack.js", 43],
+    ]);
   });
 });
