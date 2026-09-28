@@ -8,6 +8,7 @@ import {
   type PackageManager,
   type SqliteDriver,
 } from "../generators/app-generator.js";
+import { dasherize } from "../generators/base.js";
 import { getPackageManager, packageManagerInstall } from "../package-manager.js";
 
 export function newCommand(): Command {
@@ -54,6 +55,9 @@ export function newCommand(): Command {
         packageManager: pm,
         sqliteDriver: driver,
         skipDocker: options.skipDocker,
+        ...Object.fromEntries(
+          Object.keys(AppGenerator.classOptions()).map((name) => [name, options[name]]),
+        ),
       });
       await gen.run();
 
@@ -82,6 +86,14 @@ export function newCommand(): Command {
       console.log("");
       console.log(`  Done! cd ${name} && trails server`);
     });
+
+  for (const [name, option] of Object.entries(AppGenerator.classOptions())) {
+    if (option.type === "boolean") {
+      cmd.option(`--${dasherize(name)}`, option.desc).option(`--no-${dasherize(name)}`);
+    } else {
+      cmd.option(`--${dasherize(name)} <value>`, option.desc);
+    }
+  }
 
   return cmd;
 }

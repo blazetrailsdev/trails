@@ -126,6 +126,7 @@ export class AppGenerator extends AppBase {
     if (!this.options.skipDocker) {
       this.createDockerFiles();
     }
+    this.createEslintFile();
 
     this.output("");
 
@@ -186,6 +187,9 @@ export class AppGenerator extends AppBase {
             typescript: "^5.7.0",
             vite: "^7.0.0",
             vitest: "^3.0.0",
+            ...(this.skip("Eslint")
+              ? {}
+              : { "@eslint/js": "^10.0.0", eslint: "^10.0.0", "typescript-eslint": "^8.57.0" }),
           },
         },
         null,
@@ -340,6 +344,8 @@ export default defineConfig({
   }
 
   private createBinFiles(): void {
+    const excludePattern = [this.skip("Eslint") ? /eslint/ : null].filter((p) => p != null);
+
     this.createFile(
       "bin/trails",
       `#!/usr/bin/env node
@@ -357,6 +363,27 @@ process.exit(status ?? 1);
 `,
       { mode: 0o755 },
     );
+
+    if (!excludePattern.some((p) => p.test("bin/eslint"))) {
+      this.createFile(
+        "bin/eslint",
+        `#!/usr/bin/env node
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+// explicit eslint config increases performance slightly while avoiding config confusion.
+const { status } = spawnSync(
+  join(root, "node_modules", ".bin", "eslint"),
+  ["--config", join(root, "eslint.config.mjs"), ...process.argv.slice(2)],
+  { stdio: "inherit" },
+);
+process.exit(status ?? 1);
+`,
+        { mode: 0o755 },
+      );
+    }
 
     this.createFile(
       "bin/setup",
@@ -1213,6 +1240,33 @@ tmp/*
 dist
 `,
     );
+  }
+
+  eslint(): void {
+    this.createFile(
+      "eslint.config.mjs",
+      `// Recommended JavaScript and TypeScript styling for trails
+import js from "@eslint/js";
+import { defineConfig } from "eslint/config";
+import tseslint from "typescript-eslint";
+
+export default defineConfig([
+  { ignores: [".trails/", "dist/", "log/", "node_modules/", "public/assets/", "storage/", "tmp/"] },
+  js.configs.recommended,
+  tseslint.configs.recommended,
+
+  // Overwrite or add rules to create your own house style
+  //
+  // // Allow \`let\` for bindings that are never reassigned
+  // { rules: { "prefer-const": "off" } },
+]);
+`,
+    );
+  }
+
+  private createEslintFile(): void {
+    if (this.skip("Eslint")) return;
+    this.eslint();
   }
 
   databaseYml(): void {

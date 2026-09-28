@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { assertNoMatch } from "@blazetrails/activesupport";
+import { ESLint } from "eslint";
 import { AppGenerator, type AppDatabase } from "./app-generator.js";
 import * as Assertions from "./testing/assertions.js";
 
@@ -62,7 +63,9 @@ describe("AppGenerator", () => {
     expect(exists("config.ts")).toBe(true);
     expect(exists("Dockerfile")).toBe(true);
     expect(exists(".dockerignore")).toBe(true);
+    expect(exists("eslint.config.mjs")).toBe(true);
 
+    expect(exists("bin/eslint")).toBe(true);
     expect(exists("bin/trails")).toBe(true);
     expect(exists("bin/setup")).toBe(true);
     expect(exists("bin/dev")).toBe(true);
@@ -351,6 +354,40 @@ describe("AppGenerator", () => {
     expect(exists("Dockerfile")).toBe(false);
     expect(exists(".dockerignore")).toBe(false);
   });
+
+  it("inclusion of eslint", async () => {
+    await makeGen().run();
+    const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf8"));
+    expect(pkg.devDependencies.eslint).toBeDefined();
+    expect(pkg.devDependencies["typescript-eslint"]).toBeDefined();
+    expect(fs.statSync(appPath("bin/eslint")).mode & 0o777).toBe(0o755);
+  });
+
+  it("eslint is skipped if required", async () => {
+    await makeGen("sqlite", { skipEslint: true }).run();
+    const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf8"));
+    expect(pkg.devDependencies.eslint).toBeUndefined();
+    expect(pkg.devDependencies["typescript-eslint"]).toBeUndefined();
+    expect(exists("bin/eslint")).toBe(false);
+    expect(exists("eslint.config.mjs")).toBe(false);
+  });
+
+  it("generated files have no eslint warnings", async () => {
+    await makeGen().run();
+    fs.symlinkSync(
+      new URL("../../../../node_modules", import.meta.url).pathname,
+      appPath("node_modules"),
+    );
+
+    const eslint = new ESLint({ cwd: appPath() });
+    const results = await eslint.lintFiles(["."]);
+    const output = (await eslint.loadFormatter("stylish")).format(results);
+
+    expect(
+      results.every((r) => r.errorCount === 0 && r.warningCount === 0),
+      `bin/eslint did not exit successfully:\n${output}`,
+    ).toBe(true);
+  }, 60_000);
 
   it("includes app name in generated files", async () => {
     await makeGen().run();

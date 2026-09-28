@@ -50,4 +50,11 @@ describe("AppGenerator (trails-only)", () => {
       /this\.config\.logger = TaggedLogging\.logger\(process\.stdout\);/,
     );
   });
+
+  it("keeps skipEslint nil when not passed, distinct from an explicit false", () => {
+    const build = (o: { skipEslint?: boolean } = {}) =>
+      new AppGenerator({ cwd: tmpDir, output: () => {}, appPath: "my-app", ...o });
+    expect(build().options.skipEslint).toBeUndefined();
+    expect(build({ skipEslint: false }).options.skipEslint).toBe(false);
+  });
 });
