@@ -1,6 +1,12 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isPresent } from "@blazetrails/activesupport";
-import { include, prepend, rbInspect, type PrependModule } from "@blazetrails/ruby-compat";
+import {
+  include,
+  prepend,
+  rbInspect,
+  stringDelete,
+  type PrependModule,
+} from "@blazetrails/ruby-compat";
 import { Current, Migration } from "../migration.js";
 import * as Compatibility from "./compatibility.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
@@ -21,7 +27,7 @@ export function find(version: string | number): unknown {
   if (!Object.hasOwn(Compatibility, name)) {
     const versions = Object.keys(Compatibility)
       .filter((s) => /^V[0-9_]+$/.test(s))
-      .map((s) => rbInspect(s.replace("V", "").replaceAll("_", ".")));
+      .map((s) => rbInspect(stringDelete(s, "V").replaceAll("_", ".")));
     throw new ArgumentError(
       `Unknown migration version ${rbInspect(version)}; expected one of ${versions.sort().join(", ")}`,
     );
@@ -207,7 +213,10 @@ export class V7_0 extends V7_1 {
     await super.addForeignKey(fromTable, toTable, options);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs prepend — PERMANENT
+   */
   override compatibleTableDefinition<T>(t: T): T {
     prepend(t as object, V7_0.TableDefinition);
     return super.compatibleTableDefinition(t);
@@ -282,7 +291,10 @@ export class V6_1 extends V7_0 {
     raiseOnIfExistOptions(_super: unknown, _options: Options): void {},
   } as unknown as PrependModule;
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs prepend — PERMANENT
+   */
   override compatibleTableDefinition<T>(t: T): T {
     prepend(t as object, V6_1.TableDefinition);
     return super.compatibleTableDefinition(t);
@@ -339,7 +351,10 @@ export class V6_0 extends V6_1 {
     await this.addReference(tableName, refName, options);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs prepend — PERMANENT
+   */
   override compatibleTableDefinition<T>(t: T): T {
     prepend(t as object, V6_0.TableDefinition);
     return super.compatibleTableDefinition(t);
@@ -384,13 +399,19 @@ export class V5_2 extends V6_0 {
     await super.addTimestamps(tableName, options);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs prepend — PERMANENT
+   */
   override compatibleTableDefinition<T>(t: T): T {
     prepend(t as object, V5_2.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs prepend — PERMANENT
+   */
   override async commandRecorder(): Promise<MigrationCommandRecorder> {
     const recorder = await super.commandRecorder();
     prepend(recorder, V5_2.CommandRecorder);
@@ -544,7 +565,10 @@ export class V5_0 extends V5_1 {
     await this.addReference(tableName, refName, options);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs prepend — PERMANENT
+   */
   override compatibleTableDefinition<T>(t: T): T {
     prepend(t as object, V5_0.TableDefinition);
     return super.compatibleTableDefinition(t);
@@ -624,7 +648,10 @@ export class V4_2 extends V5_0 {
     await super.removeIndex(tableName, columnName ?? undefined, options);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs prepend — PERMANENT
+   */
   override compatibleTableDefinition<T>(t: T): T {
     prepend(t as object, V4_2.TableDefinition);
     return super.compatibleTableDefinition(t);
