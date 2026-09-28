@@ -62,7 +62,7 @@ export {
   type RackApp,
   type RackAppObject,
 } from "./middleware/stack.js";
-export { MimeType } from "./http/mime-type.js";
+export { Mime, MimeType } from "./http/mime-type.js";
 export {
   ContentSecurityPolicy,
   MAPPINGS,
