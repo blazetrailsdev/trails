@@ -138,8 +138,7 @@ export class AuthenticationGenerator extends GeneratorBase {
         pretend: this.options.pretend,
         force: this.options.force || words.includes("--force"),
       });
-      for (const file of await generator.run(words[0], words.slice(1)))
-        this.createdFiles.push(file);
+      this.createdFiles.push(...(await generator.run(words[0], words.slice(1))));
     }
   }
 }

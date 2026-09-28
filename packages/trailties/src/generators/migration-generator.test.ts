@@ -163,7 +163,7 @@ describe("MigrationGeneratorTest", () => {
 
   it("remove migration with references removes foreign keys when primary key uuid", async () => {
     const migration = "remove_references_from_books";
-    makeGen().run(migration, ["author:belongs_to"], { primaryKeyType: "uuid" });
+    await makeGen().run(migration, ["author:belongs_to"], { primaryKeyType: "uuid" });
     await assertMigration(`db/migrate/${migration}.ts`, (content) =>
       assertMethod("change", content, (change) => {
         assertMatch(
@@ -239,7 +239,7 @@ describe("MigrationGeneratorTest", () => {
 
   it("add migration with references adds null false by default", async () => {
     const migration = "add_references_to_books";
-    makeGen().run(migration, ["author:belongs_to", "distributor:references{polymorphic}"]);
+    await makeGen().run(migration, ["author:belongs_to", "distributor:references{polymorphic}"]);
 
     await assertMigration(`db/migrate/${migration}.ts`, (content) =>
       assertMethod("change", content, (change) => {
@@ -256,7 +256,7 @@ describe("MigrationGeneratorTest", () => {
     Trails.application!.config.activeRecord.belongsToRequiredByDefault = false;
 
     const migration = "add_references_to_books";
-    makeGen().run(migration, ["author:belongs_to", "distributor:references{polymorphic}"]);
+    await makeGen().run(migration, ["author:belongs_to", "distributor:references{polymorphic}"]);
 
     await assertMigration(`db/migrate/${migration}.ts`, (content) =>
       assertMethod("change", content, (change) => {
@@ -321,7 +321,7 @@ describe("MigrationGeneratorTest", () => {
 
   it("add migration with references options when primary key uuid", async () => {
     const migration = "add_references_to_books";
-    makeGen().run(migration, ["author:belongs_to"], { primaryKeyType: "uuid" });
+    await makeGen().run(migration, ["author:belongs_to"], { primaryKeyType: "uuid" });
     await assertMigration(`db/migrate/${migration}.ts`, (content) =>
       assertMethod("change", content, (change) => {
         assertMatch(/addReference\("books", "author",.*\sforeignKey: true, type: "uuid"/, change);

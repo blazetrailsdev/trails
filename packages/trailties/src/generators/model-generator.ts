@@ -112,10 +112,8 @@ describe("${className}", () => {
       const tableName = [...classPath.slice(0, -1), pluralize(classPath.at(-1)!)].join("_");
       const migGen = this.createMigrationGenerator();
 
-      const migFiles = await migGen.run(`create_${tableName}`, args, {
-        timestamps,
-        primaryKeyType,
-      });
+      const migOptions = { timestamps, primaryKeyType };
+      const migFiles = await migGen.run(`create_${tableName}`, args, migOptions);
       this.createdFiles.push(...migFiles);
     }
 
