@@ -28,7 +28,7 @@ export class EncodingError extends StandardError {
 }
 
 export class WrongEncodingError extends EncodingError {
-  constructor(string: string, encoding: Encoding | null) {
+  constructor(string: string, encoding: Encoding | string | null) {
     super(
       `Your template was not saved as valid ${encoding ?? ""}. Please ` +
         `either specify ${encoding ?? ""} as the encoding for your template ` +
@@ -242,7 +242,7 @@ export class TemplateError extends Error {
     const num = this.lineNumber();
     if (num == null) return [];
 
-    const sourceCode = this.template.source.split("\n");
+    const sourceCode = this.template.encodeBang().split("\n");
 
     const startOnLine = Math.max(num - TemplateError.SOURCE_CODE_RADIUS - 1, 0);
     const endOnLine = Math.min(num + TemplateError.SOURCE_CODE_RADIUS - 1, sourceCode.length);

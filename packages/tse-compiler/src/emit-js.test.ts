@@ -46,7 +46,7 @@ describe("compileJs", () => {
       { async: true },
     );
     expect(code).toContain("export default async function render(context, locals) {");
-    expect(code).toContain("_ob.append(await ( yield ));");
+    expect(code).toContain("_ob.append(await ( (await yield) ));");
     expect(code).toContain("_ob.append( i );");
     expect(code).toContain("_ob.safeExprAppend(await ( y ));");
   });
@@ -55,7 +55,74 @@ describe("compileJs", () => {
     const { code } = compileJs('<% const s = "a{b"; const t = `}`; %><%= yield %>', {
       async: true,
     });
-    expect(code).toContain("_ob.append(await ( yield ));");
+    expect(code).toContain("_ob.append(await ( (await yield) ));");
+  });
+
+  it("awaits a flow read at the read, whatever expression surrounds it", () => {
+    const { code } = compileJs(
+      '<%= _layoutFor("unknown") || "." %><% if (isContentFor("a")) { %><%= contentFor("a").length %><% } %>',
+      { async: true },
+    );
+    expect(code).toContain('_ob.append(await ( (await _layoutFor("unknown")) || "." ));');
+    expect(code).toContain('if ((await isContentFor("a"))) {');
+    expect(code).toContain('_ob.append(await ( (await contentFor("a")).length ));');
+  });
+
+  it("does not await a flow read inside a function literal of an async render", () => {
+    const { code } = compileJs('<%= items.map((i) => contentFor(i)).join(_layoutFor("s")) %>', {
+      async: true,
+    });
+    expect(code).toContain(
+      '_ob.append(await ( items.map((i) => contentFor(i)).join((await _layoutFor("s"))) ));',
+    );
+  });
+
+  it("does not count braces inside regex literals when deciding what an async render awaits", () => {
+    const { code } = compileJs("<% const re = /}/; %><%= yield %>", { async: true });
+    expect(code).toContain("_ob.append(await ( (await yield) ));");
+  });
+
+  it("does not count braces inside regex literals when closing a block-expr", () => {
+    const src = "<%= forEach(items, (item) => { %><% const re = /{/; %><%= item %><% }) %>after";
+    const { code } = compileJs(src);
+    expect(code).toContain('_ob.safeAppend("after");');
+  });
+
+  it("awaits a yield call nested inside a larger expression as the block call it is", () => {
+    const { code } = compileJs('<%= yield("unknown") || "." %>', { async: true });
+    expect(code).toContain('_ob.append(await ( (await _("unknown")) || "." ));');
+  });
+
+  it("scans a flow read's arguments in the context of the whole expression", () => {
+    const { code } = compileJs('<%= contentFor(/x/.source) + contentFor((a) / 2, "}") %>', {
+      async: true,
+    });
+    expect(code).toContain(
+      '_ob.append(await ( (await contentFor(/x/.source)) + (await contentFor((a) / 2, "}")) ));',
+    );
+  });
+
+  it("awaits a bare yield read inside a larger expression", () => {
+    const { code } = compileJs('<%= "<main>" + yield + "</main>" %>', { async: true });
+    expect(code).toContain('_ob.append(await ( "<main>" + (await yield) + "</main>" ));');
+  });
+
+  it("scans code inside a template literal's interpolation", () => {
+    const { code } = compileJs(
+      '<% const s = `a${ { b: `}` }.b }${contentFor("x")}`; %><%= yield %>',
+      { async: true },
+    );
+    expect(code).toContain('${(await contentFor("x"))}');
+    expect(code).toContain("_ob.append(await ( (await yield) ));");
+  });
+
+  it("reads a slash after an operand as division, not a regex literal", () => {
+    for (const expr of ["(a) / 2", "{ a: 1 }.a / 2", "a++ / b", "b-- / a", "a.b / c"]) {
+      const { code } = compileJs(
+        `<%= forEach(items, (item) => { %><% const q = ${expr}; if (q) { %>x<% } %><% }) %>`,
+      );
+      expect(() => new Function(code.replace("export default ", "return "))).not.toThrow();
+    }
   });
 
   it("emits block-expr with capture wrapper so inner writes go to capture buffer", () => {

@@ -171,6 +171,32 @@ describe("StreamingTemplateRenderer", () => {
       }
     });
 
+    it("suspends a layout on a flow read nested inside a larger expression", async () => {
+      TemplateHandlers.registerTemplateHandler("tse", new Tse());
+      try {
+        const lookup = new LookupContext(null, {}, []);
+        lookup.appendViewPaths([
+          new FixtureResolver({
+            "layouts/application.html.tse":
+              '<%= yield %><%= _layoutFor("unknown").toString() || "." %>',
+            "posts/show.html.tse": "body",
+          }),
+        ]);
+
+        const renderer = new StreamingTemplateRenderer(lookup);
+        const chunks = await collectChunks(
+          renderer.render(makeView(lookup), {
+            template: "posts/show",
+            layout: "layouts/application",
+          }),
+        );
+
+        expect(chunks.join("")).toBe("body.");
+      } finally {
+        TemplateHandlers.clear();
+      }
+    });
+
     it("instruments the whole streamed render as render_template.action_view", async () => {
       const events: Array<Record<string, unknown>> = [];
       const subscriber = Notifications.subscribe(

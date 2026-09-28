@@ -8,6 +8,6 @@ export class File {
   }
 
   toString(): string {
-    return RubyFile.read(this._filename);
+    return RubyFile.binread(this._filename);
   }
 }
