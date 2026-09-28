@@ -1006,9 +1006,7 @@ describe("UrlHelperTest", () => {
     );
     expect(
       String(view.mailTo("david@loudthinking.com", "David Heinemeier Hansson", { class: "admin" })),
-    ).toBe(
-      String(view.mailTo("david@loudthinking.com", "David Heinemeier Hansson", { class: "admin" })),
-    );
+    ).toBe(`<a class="admin" href="mailto:david@loudthinking.com">David Heinemeier Hansson</a>`);
   });
 
   it("mail to with options", () => {
@@ -1102,7 +1100,7 @@ describe("UrlHelperTest", () => {
       view.smsTo("15155555785", "Jim Jones", { class: "admin" }),
     );
     expect(String(view.smsTo("15155555785", "Jim Jones", { class: "admin" }))).toBe(
-      String(view.smsTo("15155555785", "Jim Jones", { class: "admin" })),
+      `<a class="admin" href="sms:15155555785;">Jim Jones</a>`,
     );
   });
 
@@ -1175,7 +1173,7 @@ describe("UrlHelperTest", () => {
       view.phoneTo("1234567890", "Bob", { class: "phoner" }),
     );
     expect(String(view.phoneTo("1234567890", "Bob", { class: "admin" }))).toBe(
-      String(view.phoneTo("1234567890", "Bob", { class: "admin" })),
+      `<a class="admin" href="tel:1234567890">Bob</a>`,
     );
   });
 
