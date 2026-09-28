@@ -9,7 +9,10 @@ let lines: string[];
 
 function setupRoutes() {
   fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
-  fs.writeFileSync(path.join(tmpDir, "config/routes.ts"), "// routes\n");
+  fs.writeFileSync(
+    path.join(tmpDir, "config/routes.ts"),
+    "export function drawRoutes(mapper: Mapper): void {\n}\n",
+  );
 }
 
 beforeEach(() => {
@@ -123,7 +126,24 @@ describe("ScaffoldGeneratorTest", () => {
 
   it.skip("scaffold generator on revoke does not mutilate legacy map parameter", () => {});
 
-  it.skip("scaffold generator on revoke does not mutilate routes", () => {});
+  it("scaffold generator on revoke does not mutilate routes", async () => {
+    await makeGen("product_line").run();
+    expect(readFile("config/routes.ts")).toBe(
+      'export function drawRoutes(mapper: Mapper): void {\n  mapper.resources("product_lines");\n}\n',
+    );
+
+    await new ScaffoldGenerator({
+      cwd: tmpDir,
+      output: () => {},
+      behavior: "revoke",
+      name: "product_line",
+      attributes: [],
+    }).run();
+
+    expect(readFile("config/routes.ts")).toBe(
+      "export function drawRoutes(mapper: Mapper): void {\n}\n",
+    );
+  });
 
   it.skip("scaffold generator ignores commented routes", () => {});
 
@@ -219,6 +239,11 @@ describe("ScaffoldGeneratorTest (JavaScript project)", () => {
 
   beforeEach(() => {
     jsTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-js-test-"));
+    fs.mkdirSync(path.join(jsTmpDir, "config"));
+    fs.writeFileSync(
+      path.join(jsTmpDir, "config/routes.ts"),
+      "export function drawRoutes(mapper: Mapper): void {\n}\n",
+    );
     jsLines = [];
   });
 

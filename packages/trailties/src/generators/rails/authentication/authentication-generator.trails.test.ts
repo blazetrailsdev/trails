@@ -14,7 +14,7 @@ const APP_FILES: Record<string, string> = {
   "app/controllers/application-controller.ts": `import { ActionController } from "@blazetrails/actionpack";\nexport class ApplicationController extends ActionController.Base {}\n`,
   "app/models/application-record.ts": `import { Base } from "@blazetrails/activerecord";\nexport class ApplicationRecord extends Base {}\n`,
   "app/mailers/application-mailer.ts": "export class ApplicationMailer { mail(h: object) {} }",
-  "config/routes.ts": "// routes\n",
+  "config/routes.ts": "export function drawRoutes(mapper: Mapper): void {\n}\n",
 };
 
 describe("AuthenticationGenerator", () => {

@@ -7,6 +7,11 @@ import { ScaffoldGenerator } from "./scaffold-generator.js";
 let tmpDir: string;
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
+  fs.mkdirSync(path.join(tmpDir, "config"));
+  fs.writeFileSync(
+    path.join(tmpDir, "config/routes.ts"),
+    "export function drawRoutes(mapper: Mapper): void {\n}\n",
+  );
 });
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 const read = (relativePath: string) => fs.readFileSync(path.join(tmpDir, relativePath), "utf-8");

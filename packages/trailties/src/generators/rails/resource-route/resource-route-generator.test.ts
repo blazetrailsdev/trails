@@ -2,8 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { ResourceRouteGenerator, emitResourceRouteSnippet } from "./resource-route-generator.js";
-import { assertNoRubySource } from "../../../template-builder/testing.js";
+import { ResourceRouteGenerator } from "./resource-route-generator.js";
 
 let tmpDir: string;
 const mk = (name: string): ResourceRouteGenerator =>
@@ -14,35 +13,26 @@ beforeEach(() => {
   fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
-    "export function drawRoutes(router: any): void {\n  // routes\n}\n",
+    "export function drawRoutes(mapper: Mapper): void {\n}\n",
   );
 });
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
 describe("ResourceRouteGeneratorTest", () => {
-  it("add resource route", () => {
-    mk("product").addResourceRoute();
-    expect(read()).toContain('router.resources("products");');
+  it("add resource route", async () => {
+    await mk("product").addResourceRoute();
+    expect(read()).toContain('mapper.resources("products");');
   });
 
-  it("nests namespaces", () => {
-    mk("admin/users/product").addResourceRoute();
-    const c = read();
-    expect(c).toContain('router.namespace("admin"');
-    expect(c).toContain('router.namespace("users"');
-    expect(c).toContain('router.resources("products");');
+  it("nests namespaces", async () => {
+    await mk("admin/users/product").addResourceRoute();
+    expect(read()).toBe(
+      'export function drawRoutes(mapper: Mapper): void {\n  mapper.namespace("admin", () => {\n    mapper.namespace("users", () => {\n      mapper.resources("products");\n    });\n  });\n}\n',
+    );
   });
 
-  it("skips when actions are present", () => {
-    mk("product").addResourceRoute({ actions: ["index"] });
-    expect(read()).not.toContain("router.resources");
-  });
-
-  it("snippet matrix (snapshot + no-Ruby)", () => {
-    const flat = emitResourceRouteSnippet([], "products");
-    const nested = emitResourceRouteSnippet(["admin", "users"], "products");
-    expect({ flat, nested }).toMatchSnapshot();
-    assertNoRubySource(flat);
-    assertNoRubySource(nested);
+  it("skips when actions are present", async () => {
+    await mk("product").addResourceRoute({ actions: ["index"] });
+    expect(read()).not.toContain("mapper.resources");
   });
 });

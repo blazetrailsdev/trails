@@ -12,7 +12,10 @@ beforeEach(() => {
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   lines = [];
   fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
-  fs.writeFileSync(path.join(tmpDir, "config/routes.ts"), "// routes\n");
+  fs.writeFileSync(
+    path.join(tmpDir, "config/routes.ts"),
+    "export function drawRoutes(mapper: Mapper): void {\n}\n",
+  );
 });
 
 afterEach(() => {
@@ -24,30 +27,30 @@ function makeGen() {
 }
 
 describe("ControllerGenerator view and controller file naming", () => {
-  it("writes the view directory the implicit lookup asks for", () => {
+  it("writes the view directory the implicit lookup asks for", async () => {
     const gen = makeGen();
-    gen.run("RfcPages", ["show"]);
+    await gen.run("RfcPages", ["show"]);
     expect(fs.existsSync(path.join(tmpDir, "app/views/rfc_pages/show.html.tse"))).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, "app/views/rfc-pages"))).toBe(false);
   });
 
-  it("keeps the controller file kebab-cased while its view directory is not", () => {
+  it("keeps the controller file kebab-cased while its view directory is not", async () => {
     const gen = makeGen();
-    gen.run("RfcPages", ["show"]);
+    await gen.run("RfcPages", ["show"]);
     expect(fs.existsSync(path.join(tmpDir, "app/controllers/rfc-pages-controller.ts"))).toBe(true);
   });
 
-  it("draws a multi-word route under the underscored file_name, not a dasherized one", () => {
+  it("draws a multi-word route under the underscored file_name, not a dasherized one", async () => {
     const gen = makeGen();
-    gen.run("AdminUsers", ["index"]);
+    await gen.run("AdminUsers", ["index"]);
     const routes = fs.readFileSync(path.join(tmpDir, "config/routes.ts"), "utf8");
-    expect(routes).toContain('router.get("admin_users/index")');
+    expect(routes).toContain('mapper.get("admin_users/index")');
     expect(routes).not.toContain("admin-users");
   });
 
-  it("camelizes a plural multi-word name without singularizing it", () => {
+  it("camelizes a plural multi-word name without singularizing it", async () => {
     const gen = makeGen();
-    gen.run("rfc_pages", ["show"]);
+    await gen.run("rfc_pages", ["show"]);
     const controller = fs.readFileSync(
       path.join(tmpDir, "app/controllers/rfc-pages-controller.ts"),
       "utf8",
@@ -62,9 +65,9 @@ describe("ControllerGenerator view and controller file naming", () => {
 });
 
 describe("ControllerGenerator --parent", () => {
-  it("classifies a plural parent name, singularizing it as parent_class_name.classify does", () => {
+  it("classifies a plural parent name, singularizing it as parent_class_name.classify does", async () => {
     const gen = makeGen();
-    gen.run("admin/dashboard", ["index"], { parent: "admin_controllers" });
+    await gen.run("admin/dashboard", ["index"], { parent: "admin_controllers" });
     const controller = fs.readFileSync(
       path.join(tmpDir, "app/controllers/admin/dashboard-controller.ts"),
       "utf8",

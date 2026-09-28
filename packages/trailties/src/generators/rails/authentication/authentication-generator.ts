@@ -37,7 +37,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     }
     this.createAuthenticationFiles();
     this.configureApplicationController();
-    this.configureAuthenticationRoutes();
+    await this.configureAuthenticationRoutes();
     this.enableBcrypt();
     await this.addMigrations();
     return this.getCreatedFiles();
@@ -93,17 +93,10 @@ export class AuthenticationGenerator extends GeneratorBase {
     File.write(full, src);
   }
 
-  private configureAuthenticationRoutes(): void {
-    for (const f of ["config/routes.ts", "config/routes.js"]) {
-      if (!this.fileExists(f)) continue;
-      const src = File.read(File.join(this.cwd, f));
-      const lines: string[] = [];
-      if (!src.includes('router.resources("passwords"'))
-        lines.push(`  router.resources("passwords", { param: "token" });`);
-      if (!src.includes('router.resource("session")')) lines.push(`  router.resource("session");`);
-      if (lines.length) this.insertIntoFile(f, "// routes", lines.join("\n") + "\n");
-      return;
-    }
+  /** @missingRailsArgs route — PERMANENT */
+  private async configureAuthenticationRoutes(): Promise<void> {
+    await this.route(`mapper.resources("passwords", { param: "token" });`);
+    await this.route(`mapper.resource("session");`);
   }
 
   private enableBcrypt(): void {

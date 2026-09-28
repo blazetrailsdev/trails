@@ -25,8 +25,8 @@ export class ResourceGenerator extends ModelGenerator {
     this.actions = options.actions ?? [];
   }
 
-  run(): string[] {
-    super.run();
+  async run(): Promise<string[]> {
+    await super.run();
     const route = new ResourceRouteGenerator({
       cwd: this.cwd,
       output: this.output,
@@ -34,7 +34,7 @@ export class ResourceGenerator extends ModelGenerator {
       pretend: this.options.pretend,
       name: this.name,
     });
-    route.addResourceRoute({ actions: this.actions });
+    await route.addResourceRoute({ actions: this.actions });
     return this.getCreatedFiles();
   }
 }

@@ -14,27 +14,27 @@ beforeEach(() => {
   fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
-    "export function drawRoutes(router: any): void {\n  // routes\n}\n",
+    "export function drawRoutes(mapper: Mapper): void {\n}\n",
   );
   ModelHelpers.skipWarn = false;
 });
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
 describe("ResourceGeneratorTest", () => {
-  it("files from inherited invocation", () => {
-    const files = new ResourceGenerator(
+  it("files from inherited invocation", async () => {
+    const files = await new ResourceGenerator(
       opts({ name: "Product", attributes: ["name:string"] }),
     ).run();
     expect(files).toContain("app/models/product.ts");
   });
 
-  it("resource routes are added", () => {
-    new ResourceGenerator(opts({ name: "Account" })).run();
-    expect(routes()).toContain('router.resources("accounts");');
+  it("resource routes are added", async () => {
+    await new ResourceGenerator(opts({ name: "Account" })).run();
+    expect(routes()).toContain('mapper.resources("accounts");');
   });
 
-  it("resource controller with actions", () => {
-    new ResourceGenerator(opts({ name: "Product", actions: ["index"] })).run();
-    expect(routes()).not.toContain("router.resources");
+  it("resource controller with actions", async () => {
+    await new ResourceGenerator(opts({ name: "Product", actions: ["index"] })).run();
+    expect(routes()).not.toContain("mapper.resources");
   });
 });

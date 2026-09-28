@@ -312,25 +312,6 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     this.output(`      append  ${relativePath}`);
   }
 
-  protected insertIntoFile(relativePath: string, marker: string, content: string): void {
-    const fullPath = File.join(this.cwd, relativePath);
-    if (this.behavior === "revoke") {
-      this.revokeInjection(
-        relativePath,
-        `(${regexpEscape(content)})([^]*)(${regexpEscape(marker)})`,
-        "$2$3",
-      );
-      return;
-    }
-    if (!File.isExist(fullPath)) return;
-    const existing = File.read(fullPath);
-    const idx = existing.indexOf(marker);
-    if (idx === -1) return;
-    const updated = existing.slice(0, idx) + content + existing.slice(idx);
-    File.write(fullPath, updated);
-    this.output(`      insert  ${relativePath}`);
-  }
-
   protected revokeInjection(relativePath: string, pattern: string, content: string): void {
     const fullPath = File.join(this.cwd, relativePath);
     this.output(`    subtract  ${relativePath}`);

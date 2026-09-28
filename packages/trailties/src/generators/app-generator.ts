@@ -523,7 +523,6 @@ export function drawRoutes(mapper: Mapper): void {
 
   // Defines the root path route ("/")
   // mapper.root("posts#index");
-  // routes
 }
 `,
     );

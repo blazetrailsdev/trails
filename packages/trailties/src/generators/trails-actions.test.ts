@@ -151,6 +151,49 @@ describe("TrailsActions", () => {
         `${draw}  mapper.namespace("admin", () => {\n    mapper.resources("posts");\n    mapper.resources("users");\n  });\n}\n`,
       );
     });
+
+    it("route with namespace option revokes route without breaking existing namespace blocks", async () => {
+      const revoke = new TestGenerator({ cwd: "/app", output: () => {}, behavior: "revoke" });
+      files.set("/app/config/routes.ts", `${draw}}\n`);
+      await makeGen().route(
+        optimizeIndentation(
+          `mapper.namespace("baz", () => {
+  mapper.get("foo1");
+  mapper.namespace("qux", () => {
+    mapper.get("foo2");
+    mapper.namespace("hoge", () => {
+      mapper.get("foo3");
+    });
+  });
+  mapper.get("bar1");
+});`,
+          0,
+        ).trimEnd(),
+      );
+
+      await revoke.route(`mapper.get("foo2");`, { namespace: ["baz", "qux"] });
+      expect(files.get("/app/config/routes.ts")).toBe(
+        `${draw}  mapper.namespace("baz", () => {
+    mapper.get("foo1");
+    mapper.namespace("qux", () => {
+      mapper.namespace("hoge", () => {
+        mapper.get("foo3");
+      });
+    });
+    mapper.get("bar1");
+  });
+}\n`,
+      );
+
+      await revoke.route(`mapper.get("foo3");`, { namespace: ["baz", "qux", "hoge"] });
+      expect(files.get("/app/config/routes.ts")).toBe(
+        `${draw}  mapper.namespace("baz", () => {
+    mapper.get("foo1");
+    mapper.get("bar1");
+  });
+}\n`,
+      );
+    });
   });
 
   describe("environment", () => {

@@ -19,7 +19,11 @@ export class ControllerGenerator extends GeneratorBase {
     super(options);
   }
 
-  run(name: string, actions: string[], options: ControllerRunOptions = {}): string[] {
+  async run(
+    name: string,
+    actions: string[],
+    options: ControllerRunOptions = {},
+  ): Promise<string[]> {
     const {
       skipHelper = false,
       skipRoutes = false,
@@ -37,6 +41,8 @@ export class ControllerGenerator extends GeneratorBase {
       methods: actions.map((a) => actionMethod(a, ts)),
     });
     this.createFile(`app/controllers/${paths.controllerFile}${ext}`, source);
+
+    await this.addRoutes(paths.namespaceParts, actions, skipRoutes);
 
     if (test) {
       const importPrefix = "../".repeat(depth + 2);
@@ -69,38 +75,21 @@ ${cases}
       this.createFile(`app/views/${paths.viewBase}/.keep`, "");
     }
 
-    if (!skipRoutes && actions.length > 0) {
-      this.addRoutes(paths.namespaceParts, actions);
-    }
     return this.getCreatedFiles();
   }
 
-  private addRoutes(namespaceParts: string[], actions: string[]): void {
-    const routesFile = this.fileExists("config/routes.ts")
-      ? "config/routes.ts"
-      : this.fileExists("config/routes.js")
-        ? "config/routes.js"
-        : null;
-    if (!routesFile) return;
+  private async addRoutes(
+    namespaceParts: string[],
+    actions: string[],
+    skipRoutes: boolean,
+  ): Promise<void> {
+    if (skipRoutes) return;
+    if (actions.length === 0) return;
     const fileName = underscore(namespaceParts[namespaceParts.length - 1]);
-
-    if (namespaceParts.length > 1) {
-      const namespaces = namespaceParts.slice(0, -1).map((p) => underscore(p));
-      const lines: string[] = [];
-      let indent = 1;
-      for (const ns of namespaces) {
-        lines.push(`${"  ".repeat(indent)}router.namespace("${ns}", (router) => {`);
-        indent += 1;
-      }
-      const inner = "  ".repeat(indent);
-      for (const a of actions) {
-        lines.push(`${inner}router.get("${fileName}/${a}");`);
-      }
-      for (let i = namespaces.length; i > 0; i--) lines.push(`${"  ".repeat(i)}});`);
-      this.insertIntoFile(routesFile, "// routes", lines.join("\n") + "\n");
-    } else {
-      const routeLines = actions.map((a) => `  router.get("${fileName}/${a}");`).join("\n");
-      this.insertIntoFile(routesFile, "// routes", routeLines + "\n");
-    }
+    const routingCode = actions
+      .map((action) => `mapper.get(${JSON.stringify(`${fileName}/${action}`)});`)
+      .join("\n");
+    const regularClassPath = namespaceParts.slice(0, -1).map((p) => underscore(p));
+    await this.route(routingCode, { namespace: regularClassPath });
   }
 }

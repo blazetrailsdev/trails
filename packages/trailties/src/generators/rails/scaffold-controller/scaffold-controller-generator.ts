@@ -7,7 +7,7 @@ import { ResourceHelpers } from "../../resource-helpers.js";
 import type { ActiveModel } from "../../active-model.js";
 import { tsBody, tsMethod, type Method } from "../../../template-builder/index.js";
 import { emitControllerClass, parentRefForRelative } from "../controller/controller-paths.js";
-import { emitResourceRouteSnippet } from "../resource-route/resource-route-generator.js";
+import { ResourceRouteGenerator } from "../resource-route/resource-route-generator.js";
 
 export interface ScaffoldControllerGeneratorOptions extends NamedBaseOptions, ModelHelpersOptions {
   api?: boolean;
@@ -33,7 +33,7 @@ export class ScaffoldControllerGenerator extends NamedBase {
     super({ ...options, name: options.name.replace(/[_-]?controller$/i, "") });
   }
 
-  run(): string[] {
+  async run(): Promise<string[]> {
     const { api = false, skipRoutes = false, test = true, helper = true } = this.options;
     const modelClassName = this.className().split("::").join("");
     const singular = this.singularTableName();
@@ -104,18 +104,14 @@ ${skip("index")}${skip("show")}${skip("new")}${skip("create")}${skip("edit")}${s
     }
 
     if (!skipRoutes) {
-      const routesFile = this.fileExists("config/routes.ts")
-        ? "config/routes.ts"
-        : this.fileExists("config/routes.js")
-          ? "config/routes.js"
-          : null;
-      if (routesFile) {
-        this.insertIntoFile(
-          routesFile,
-          "// routes",
-          emitResourceRouteSnippet(this.controllerClassPath(), this.controllerFileName),
-        );
-      }
+      const route = new ResourceRouteGenerator({
+        cwd: this.cwd,
+        output: this.output,
+        behavior: this.behavior,
+        pretend: this.options.pretend,
+        name: this.name,
+      });
+      await route.addResourceRoute();
     }
     return this.getCreatedFiles();
   }

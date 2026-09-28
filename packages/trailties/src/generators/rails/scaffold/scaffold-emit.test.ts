@@ -8,6 +8,11 @@ import { parseTs, assertNoRubySource } from "../../../template-builder/testing.j
 let tmpDir: string;
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-scaffold-emit-"));
+  fs.mkdirSync(path.join(tmpDir, "config"));
+  fs.writeFileSync(
+    path.join(tmpDir, "config/routes.ts"),
+    "export function drawRoutes(mapper: Mapper): void {\n}\n",
+  );
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
 });
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
