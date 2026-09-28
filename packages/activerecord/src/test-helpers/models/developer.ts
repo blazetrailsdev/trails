@@ -159,7 +159,13 @@ export class Developer extends Base {
 
     this.hasMany("auditLogs");
     this.hasMany("requiredAuditLogs", { className: "AuditLogRequired" });
-    this.hasMany("strictLoadingAuditLogs", { strictLoading: true, className: "AuditLog" });
+    this.hasMany(
+      "strictLoadingAuditLogs",
+      function (this: any) {
+        return this.strictLoading();
+      },
+      { className: "AuditLog" },
+    );
     this.hasMany("strictLoadingOptAuditLogs", { strictLoading: true, className: "AuditLog" });
     this.hasMany("contracts");
     this.hasMany("firms", { through: "contracts", source: "firm" });

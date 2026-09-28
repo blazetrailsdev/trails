@@ -152,7 +152,13 @@ export class Book extends Base {
     this.belongsTo("author");
     this.belongsTo("formatRecord", { polymorphic: true });
     this.hasMany("citations", { inverseOf: "book" });
-    this.hasMany("references", { through: "citations", source: "referenceOf" });
+    this.hasMany(
+      "references",
+      function (this: Relation<Reference>) {
+        return this.distinct();
+      },
+      { through: "citations", source: "referenceOf" },
+    );
     this.hasMany("subscriptions");
     this.hasMany("subscribers", { through: "subscriptions" });
     this.hasOne("essay");

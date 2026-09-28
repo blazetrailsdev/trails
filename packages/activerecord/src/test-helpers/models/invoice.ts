@@ -13,7 +13,13 @@ export class Invoice extends Base {
 
   static {
     this.hasMany("lineItems", { autosave: true });
-    this.hasMany("shippingLines", { autosave: true });
+    this.hasMany(
+      "shippingLines",
+      function (this: any) {
+        return this.from("shipping_lines");
+      },
+      { autosave: true },
+    );
     this.beforeSave(async function (this: any, record?: any) {
       const self = record ?? this;
       const lineItems = await association(self, "lineItems");
