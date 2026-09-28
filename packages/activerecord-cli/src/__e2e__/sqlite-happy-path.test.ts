@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { readdir, readFile, writeFile } from "fs/promises";
+import { access, mkdir, readdir, readFile, symlink, writeFile } from "fs/promises";
 import { join } from "path";
-import { pathToFileURL } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 import { Base, DatabaseTasks } from "@blazetrails/activerecord";
 import { run } from "../cli.js";
 import {
@@ -136,5 +136,23 @@ const product = await Product.createBang({ name: "Widget" });
     const runnerCode = await run(["runner", "try-runner.ts"], tmpDir);
     expect(runnerCode, exitReason("ar runner should exit 0", errors)).toBe(0);
     expect((globalThis as Record<string, unknown>).__runnerProduct).toBe("Widget");
+  });
+
+  it("new → typecheck runs trails-tsc in the generated project", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const errors = captureConsoleErrors();
+
+    const newCode = await run(["new", "blog", "--driver", "better-sqlite3"], tmpDir);
+    expect(newCode, exitReason("ar new should exit 0", errors)).toBe(0);
+    const appDir = join(tmpDir, "blog");
+
+    const packagesDir = fileURLToPath(new URL("../../../", import.meta.url));
+    await mkdir(join(appDir, "node_modules", "@blazetrails"), { recursive: true });
+    for (const pkg of ["activerecord", "activerecord-cli", "trails-tsc"]) {
+      await symlink(join(packagesDir, pkg), join(appDir, "node_modules", "@blazetrails", pkg));
+    }
+
+    await run(["typecheck", "-p", join(appDir, "tsconfig.json")], appDir);
+    await expect(access(join(appDir, "dist", "db.js"))).resolves.toBeUndefined();
   });
 });
