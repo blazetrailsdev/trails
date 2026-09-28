@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include CookieAssertions` */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { bodyFromString, Lint, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { include, type Included } from "@blazetrails/activesupport";
@@ -243,6 +242,8 @@ describe("IntegrationTestUsesCorrectClass", () => {
 });
 
 class IntegrationController extends Base {
+  declare actionUrl: (...args: unknown[]) => string;
+
   async get(): Promise<void> {
     await this.respondTo((format) => {
       format.html(() => this.render({ plain: "OK", status: 200 }));
@@ -307,47 +308,55 @@ class IntegrationController extends Base {
     this.head("ok", { c: "3" });
   }
 }
-interface IntegrationController {
-  actionUrl(...args: unknown[]): string;
-}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include CookieAssertions`
 class IntegrationProcessTest extends IntegrationTest {
   static IntegrationController = IntegrationController;
 
-  withDefaultHeaders<T>(headers: Record<string, string>, block: () => Promise<T>): Promise<T> {
+  async withDefaultHeaders<T>(
+    headers: Record<string, string>,
+    block: () => Promise<T>,
+  ): Promise<T> {
     const original = Response.defaultHeaders;
     Response.defaultHeaders = headers;
-    return block().finally(() => {
+    try {
+      return await block();
+    } finally {
       Response.defaultHeaders = original;
-    });
+    }
   }
 
-  withTestRouteSet<T>(block: () => Promise<T>): Promise<T> {
-    return this.withRouting(async (set: RouteSet) => {
-      const https = this.isHttps();
-      const host = this.host;
-      this.resetBang();
-      this.httpsBang(https);
-      this.hostBang(host);
-      const controller = class extends IntegrationProcessTest.IntegrationController {};
-      include(controller, set.urlHelpers());
-      const to = controller as unknown as MountableApp;
+  async withTestRouteSet<T>(block: () => Promise<T>): Promise<T> {
+    const oldApp = this._app;
+    try {
+      return await this.withRouting(async (set: RouteSet) => {
+        const https = this.isHttps();
+        const host = this.host;
+        this.resetBang();
+        this.httpsBang(https);
+        this.hostBang(host);
+        const controller = class extends IntegrationProcessTest.IntegrationController {};
+        include(controller, set.urlHelpers());
+        const to = controller as unknown as MountableApp;
 
-      set.draw((r) => {
-        r.get("moved", { to: r.redirect("/method") });
+        set.draw((r) => {
+          r.get("moved", { to: r.redirect("/method") });
 
-        deprecator().silence(() => {
-          r.match(":action", { to, via: ["get", "post"], as: "action" });
-          r.get("get/:action", { to, as: "get_action" });
+          deprecator().silence(() => {
+            r.match(":action", { to, via: ["get", "post"], as: "action" });
+            r.get("get/:action", { to, as: "get_action" });
+          });
         });
+        include(rbObjSingletonClass(this) as typeof IntegrationProcessTest, set.urlHelpers());
+        this.app = IntegrationTest.buildApp(set);
+        return await block();
       });
-      include(rbObjSingletonClass(this) as typeof IntegrationProcessTest, set.urlHelpers());
-      this.app = IntegrationTest.buildApp(set);
-      return await block();
-    });
+    } finally {
+      this._app = oldApp;
+    }
   }
 }
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- Ruby `include CookieAssertions`
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include CookieAssertions`; the merge is how `include()` types it
 interface IntegrationProcessTest extends Included<typeof CookieAssertions> {}
 include(IntegrationProcessTest, CookieAssertions);
 

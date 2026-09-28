@@ -448,10 +448,9 @@ export class Base extends Metal {
     }
 
     const proposedStatus = responseOptions.status ? statusCode(responseOptions.status) : 302;
-    this.status = proposedStatus;
     this.headers.set("location", options);
-    this.contentType = "text/html; charset=utf-8";
     this.responseBody = "";
+    this.status = proposedStatus;
     this.markPerformed();
   }
 
