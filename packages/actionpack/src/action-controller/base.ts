@@ -127,6 +127,7 @@ import {
 } from "./metal/rendering.js";
 import { Renderers } from "./metal/renderers.js";
 import { urlOptions } from "./metal/url-for.js";
+import { UrlFor } from "../action-dispatch/routing/url-for.js";
 import { Cookies } from "./metal/cookies.js";
 import {
   appendInfoToPayload,
@@ -1016,8 +1017,8 @@ helperMethod(Base as unknown as HelpersClassMethods, "viewCacheDependencies");
 runLoadHooks("action_controller_base", Base);
 runLoadHooks("action_controller", Base);
 
+include(Base, UrlFor);
 Base.prototype.urlOptions = urlOptions;
-classAttribute.call(Base, "defaultUrlOptions", { default: {} });
 
 Base.prototype.sendFileHeadersBang = sendFileHeadersBang;
 
