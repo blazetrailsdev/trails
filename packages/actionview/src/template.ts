@@ -190,7 +190,7 @@ export class Template {
     if (
       !magicEncoding &&
       rbObjRespondTo(this.handler, "handlesEncoding") &&
-      this.handler.handlesEncoding!()
+      this.handler.handlesEncoding?.()
     ) {
       return source;
     } else if (isValidEncoding(bytes, encoding)) {

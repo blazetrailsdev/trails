@@ -130,13 +130,17 @@ function netBraceDepth(code: string): number {
 const FLOW_READ_RE =
   /(?<![\w$.])(?:(_layoutFor|contentFor|isContentFor|_|yield)\s*\(|yield(?![\w$]))/y;
 
-function awaitFlowReads(code: string): string {
-  const mask = codeMask(code);
+function awaitFlowReads(
+  code: string,
+  mask: boolean[] = codeMask(code),
+  start = 0,
+  end = code.length,
+): string {
   let out = "";
   let depth = 0;
   let functionDepth: number | null = null;
-  let i = 0;
-  while (i < code.length) {
+  let i = start;
+  while (i < end) {
     const ch = code[i];
     if (!mask[i]) {
       out += ch;
@@ -157,14 +161,14 @@ function awaitFlowReads(code: string): string {
     }
     if (m !== null) {
       let close = i + m[0].length;
-      for (let d = 1; close < code.length; close++) {
+      for (let d = 1; close < end; close++) {
         if (!mask[close]) continue;
         if (code[close] === "(") d++;
         else if (code[close] === ")" && --d === 0) break;
       }
-      if (close < code.length) {
-        const args = code.slice(i + m[0].length, close);
-        out += `(await ${m[1] === "yield" ? "_(" : m[0]}${awaitFlowReads(args)}))`;
+      if (close < end) {
+        const args = awaitFlowReads(code, mask, i + m[0].length, close);
+        out += `(await ${m[1] === "yield" ? "_(" : m[0]}${args}))`;
         i = close + 1;
         continue;
       }

@@ -93,6 +93,20 @@ describe("compileJs", () => {
     expect(code).toContain('_ob.append(await ( (await _("unknown")) || "." ));');
   });
 
+  it("scans a flow read's arguments in the context of the whole expression", () => {
+    const { code } = compileJs('<%= contentFor(/x/.source) + contentFor((a) / 2, "}") %>', {
+      async: true,
+    });
+    expect(code).toContain(
+      '_ob.append(await ( (await contentFor(/x/.source)) + (await contentFor((a) / 2, "}")) ));',
+    );
+  });
+
+  it("awaits a bare yield read inside a larger expression", () => {
+    const { code } = compileJs('<%= "<main>" + yield + "</main>" %>', { async: true });
+    expect(code).toContain('_ob.append(await ( "<main>" + (await yield) + "</main>" ));');
+  });
+
   it("scans code inside a template literal's interpolation", () => {
     const { code } = compileJs(
       '<% const s = `a${ { b: `}` }.b }${contentFor("x")}`; %><%= yield %>',
