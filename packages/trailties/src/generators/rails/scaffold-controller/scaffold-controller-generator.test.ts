@@ -131,7 +131,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
   it("api controller", () => {
     makeGen("User", ["name:string"], { api: true }).run();
     const c = read("app/controllers/users-controller.ts");
-    expect(c).toContain("renderJson");
+    expect(c).toContain("this.render({ json: users })");
     expect(c).not.toContain("async new_()");
     expect(c).not.toContain("async edit()");
     expect(c).toContain('this.params.expect({ user: ["name"] })');

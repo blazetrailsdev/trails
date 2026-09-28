@@ -60,6 +60,7 @@ export class ScaffoldControllerGenerator extends NamedBase {
               modelClassName,
               singular,
               this.pluralTableName(),
+              routeUrl,
               attrNames,
               ts,
             )
@@ -70,6 +71,7 @@ export class ScaffoldControllerGenerator extends NamedBase {
               singular,
               this.pluralTableName(),
               routeUrl,
+              this.humanName(),
               attrNames,
               ts,
             ),
@@ -157,11 +159,13 @@ function crudMethods(
   singular: string,
   plural: string,
   routeUrl: string,
+  humanName: string,
   attrs: string[],
   ts: boolean,
 ): Method[] {
   const params = `this.${camelize(singular, false)}Params()`;
   const find = `const ${singular} = await ${ormClass.find(model, 'this.params.expect("id")')};`;
+  const resource = `\`${routeUrl}/\${${singular}.id}\``;
   return [
     mk(
       "index",
@@ -176,18 +180,18 @@ function crudMethods(
     ),
     mk(
       "create",
-      `const ${singular} = ${ormClass.build(model, params)};\n\nif (await ${ormInstance.save()}) {\n  this.redirectTo(\`${routeUrl}/\${${singular}.id}\`);\n} else {\n  await this.render({ action: "new", status: "unprocessable_entity", locals: { ${singular} } });\n}`,
+      `const ${singular} = ${ormClass.build(model, params)};\n\nif (await ${ormInstance.save()}) {\n  this.redirectTo(${resource}, { notice: "${humanName} was successfully created." });\n} else {\n  await this.render({ action: "new", status: "unprocessable_entity", locals: { ${singular} } });\n}`,
       ts,
     ),
     mk("edit", `${find}\nawait this.render({ action: "edit", locals: { ${singular} } });`, ts),
     mk(
       "update",
-      `${find}\nif (await ${ormInstance.update(params)}) {\n  this.redirectTo(\`${routeUrl}/\${${singular}.id}\`, { status: "see_other" });\n} else {\n  await this.render({ action: "edit", status: "unprocessable_entity", locals: { ${singular} } });\n}`,
+      `${find}\nif (await ${ormInstance.update(params)}) {\n  this.redirectTo(${resource}, { notice: "${humanName} was successfully updated.", status: "see_other" });\n} else {\n  await this.render({ action: "edit", status: "unprocessable_entity", locals: { ${singular} } });\n}`,
       ts,
     ),
     mk(
       "destroy",
-      `${find}\nawait ${ormInstance.destroy()};\nthis.redirectTo("${routeUrl}", { status: "see_other" });`,
+      `${find}\nawait ${ormInstance.destroy()};\nthis.redirectTo("${routeUrl}", { notice: "${humanName} was successfully destroyed.", status: "see_other" });`,
       ts,
     ),
     paramsMethod(singular, attrs, ts),
@@ -200,6 +204,7 @@ function apiCrudMethods(
   model: string,
   singular: string,
   plural: string,
+  routeUrl: string,
   attrs: string[],
   ts: boolean,
 ): Method[] {
@@ -208,18 +213,18 @@ function apiCrudMethods(
   return [
     mk(
       "index",
-      `const ${plural} = await ${ormClass.all(model)};\n\nthis.renderJson(${plural});`,
+      `const ${plural} = await ${ormClass.all(model)};\n\nawait this.render({ json: ${plural} });`,
       ts,
     ),
-    mk("show", `${find}\nthis.renderJson(${singular});`, ts),
+    mk("show", `${find}\nawait this.render({ json: ${singular} });`, ts),
     mk(
       "create",
-      `const ${singular} = ${ormClass.build(model, params)};\n\nif (await ${ormInstance.save()}) {\n  this.renderJson(${singular}, { status: 201 });\n} else {\n  this.renderJson(${ormInstance.errors()}, { status: 422 });\n}`,
+      `const ${singular} = ${ormClass.build(model, params)};\n\nif (await ${ormInstance.save()}) {\n  await this.render({ json: ${singular}, status: "created", location: \`${routeUrl}/\${${singular}.id}\` });\n} else {\n  await this.render({ json: ${ormInstance.errors()}, status: "unprocessable_entity" });\n}`,
       ts,
     ),
     mk(
       "update",
-      `${find}\nif (await ${ormInstance.update(params)}) {\n  this.renderJson(${singular});\n} else {\n  this.renderJson(${ormInstance.errors()}, { status: 422 });\n}`,
+      `${find}\nif (await ${ormInstance.update(params)}) {\n  await this.render({ json: ${singular} });\n} else {\n  await this.render({ json: ${ormInstance.errors()}, status: "unprocessable_entity" });\n}`,
       ts,
     ),
     mk("destroy", `${find}\nawait ${ormInstance.destroy()};`, ts),
