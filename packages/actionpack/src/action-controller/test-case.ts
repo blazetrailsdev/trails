@@ -1,5 +1,6 @@
 import {
   ActiveSupportJSON,
+  Assertion,
   camelize,
   include,
   isBlank,
@@ -206,15 +207,15 @@ export class TestCase {
     const location =
       this.response?.getHeader("location") ?? this.controller?.headers.get("location");
     if (!location) {
-      throw new Error("Expected a redirect but no Location header was set");
+      throw new Assertion("Expected a redirect but no Location header was set");
     }
     if (typeof expected === "string") {
       if (location !== expected) {
-        throw new Error(`Expected redirect to "${expected}", got "${location}"`);
+        throw new Assertion(`Expected redirect to "${expected}", got "${location}"`);
       }
     } else {
       if (!expected.test(location)) {
-        throw new Error(`Expected redirect matching ${expected}, got "${location}"`);
+        throw new Assertion(`Expected redirect matching ${expected}, got "${location}"`);
       }
     }
   }
@@ -360,16 +361,16 @@ export class TestRequest extends AbstractTestRequest {
   }
 
   /** @internal */
-  private _testControllerClass: unknown = null;
+  private _testControllerClass: unknown;
 
   static create(controllerClass?: unknown): TestRequest {
     const env: Record<string, unknown> = {};
     env["rack.request.cookie_hash"] = {};
-    const session = TestRequest.newSession();
-    env["rack.session"] = session;
-    const req = new TestRequest(merge(TestRequest.defaultEnv(), env));
-    req._testControllerClass = controllerClass ?? null;
-    return req;
+    return new TestRequest(
+      merge(TestRequest.defaultEnv(), env),
+      TestRequest.newSession(),
+      controllerClass ?? null,
+    );
   }
 
   /** @internal */
@@ -378,6 +379,14 @@ export class TestRequest extends AbstractTestRequest {
     const env = { ...base };
     delete (env as Record<string, unknown>)["PATH_INFO"];
     return env;
+  }
+
+  constructor(env: Record<string, unknown>, session: TestSession, controllerClass: unknown) {
+    super(env);
+
+    this.session = session as never;
+    this.sessionOptions = { ...TestSession.DEFAULT_OPTIONS };
+    this._testControllerClass = controllerClass;
   }
 
   get queryString(): string {

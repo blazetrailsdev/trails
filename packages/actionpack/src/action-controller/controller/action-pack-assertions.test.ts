@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { Assertion } from "@blazetrails/activesupport";
 import { TestCase } from "../test-case.js";
 import { Base } from "../base.js";
 
@@ -88,6 +89,7 @@ class AssertResponseWithUnexpectedErrorController extends Base {
 
 describe("ActionPackAssertionsControllerTest", () => {
   let tc: TestCase;
+  const assertRedirectedTo = (expected: string | RegExp): void => tc.assertRedirectedTo(expected);
   beforeEach(() => {
     tc = new TestCase(ActionPackAssertionsController);
   });
@@ -124,7 +126,18 @@ describe("ActionPackAssertionsControllerTest", () => {
   it.skip("assert redirect to nested named route", () => {});
   it.skip("assert redirected to top level named route from nested controller", () => {});
   it.skip("assert redirected to top level named route with same controller name in both namespaces", () => {});
-  it.skip("assert redirect failure message with protocol relative url", () => {});
+  it("assert redirect failure message with protocol relative url", async () => {
+    try {
+      await tc.process("redirectExternalProtocolRelative");
+      assertRedirectedTo("/foo");
+    } catch (ex) {
+      if (!(ex instanceof Assertion)) throw ex;
+      // eslint-disable-next-line vitest/no-conditional-expect -- mirrors Rails' method-level `rescue` (action_pack_assertions_test.rb:285)
+      expect(ex.message, "protocol relative URL was incorrectly normalized").not.toMatch(
+        new RegExp(`${tc.request.protocol}${tc.request.host}//www.rubyonrails.org`),
+      );
+    }
+  });
 
   it("template objects exist", async () => {
     await tc.get("assignThis");
