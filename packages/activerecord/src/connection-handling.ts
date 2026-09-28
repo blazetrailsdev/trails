@@ -15,7 +15,7 @@ import {
 } from "./core.js";
 import { IsolatedExecutionState, TopLevel, getEnv, presence } from "@blazetrails/activesupport";
 import * as ConnectionHandlingModule from "./connection-handling.js";
-import { readingRole, writingRole } from "./active-record.js";
+import { readingRole } from "./active-record.js";
 import { permanentConnectionCheckout } from "./active-record.js";
 import { deprecator } from "./deprecator.js";
 
@@ -217,7 +217,7 @@ export function connectingTo(
   this: typeof Base,
   options: { role?: string; shard?: string; preventWrites?: boolean },
 ): void {
-  const { role = writingRole(), shard = this.defaultShard } = options;
+  const { role = this.defaultRole, shard = this.defaultShard } = options;
   const preventWrites = role === readingRole() || !!options.preventWrites;
   appendToConnectedToStack({
     role,
@@ -233,7 +233,7 @@ export function isConnectedTo(
 ): boolean {
   return (
     coreCurrentRole.call(this as any) === options.role &&
-    coreCurrentShard.call(this as any) === (options.shard ?? "default")
+    coreCurrentShard.call(this as any) === (options.shard ?? ActiveRecord.Base.defaultShard)
   );
 }
 
