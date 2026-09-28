@@ -5,20 +5,26 @@ import {
 import { RespondToMismatchError, UnknownFormat } from "./exceptions.js";
 import { _processFormat } from "../../abstract-controller/rendering.js";
 import { _setRenderedContentType } from "./rendering.js";
-import { ArgumentError, rbEqual, symbolToS } from "@blazetrails/ruby-compat";
+import { ArgumentError, fetch, rbEqual, symbolToS } from "@blazetrails/ruby-compat";
+import { MimeType } from "../../action-dispatch/http/mime-type.js";
 export { type FormatHandler };
 
 type VariantBlock = (variant: VariantCollector) => unknown;
 type Response = FormatHandler | VariantBlock | VariantCollector;
 
 export class Collector extends DispatchCollector<Response, Response, Response | string[]> {
+  private _responses: Record<string, Response | null>;
   #variant: readonly string[] | null;
-  private _response: Response | undefined;
 
   constructor(mimes: string[] = [], variant: readonly string[] | null = null) {
     super();
+    this._responses = {};
     this.#variant = variant;
-    for (const mime of mimes) this.custom(mime);
+
+    for (const mime of mimes) {
+      this._responses[mime] = null;
+      super.on(mime);
+    }
   }
 
   get format(): string | null {
@@ -33,8 +39,7 @@ export class Collector extends DispatchCollector<Response, Response, Response | 
       for (const type of args as string[]) this.custom(type, block);
       return args as string[];
     } else {
-      if (!this.anyHandler) super.any(block ?? new VariantCollector(this.#variant));
-      return this.anyHandler!;
+      return this.custom(MimeType.ALL.ref(), block);
     }
   }
 
@@ -43,11 +48,9 @@ export class Collector extends DispatchCollector<Response, Response, Response | 
   }
 
   custom(mimeType: string, block?: FormatHandler | VariantBlock): Response {
-    let response = this.handlerFor(mimeType);
-    if (!response) {
-      response = block ?? new VariantCollector(this.#variant);
-      super.on(mimeType, response);
-    }
+    const response = (this._responses[mimeType] ||= block ?? new VariantCollector(this.#variant));
+    if (mimeType === MimeType.ALL.ref()) super.any(response);
+    else super.on(mimeType, response);
     return response;
   }
 
@@ -56,7 +59,9 @@ export class Collector extends DispatchCollector<Response, Response, Response | 
   }
 
   isAnyResponse(): boolean {
-    return !this.handlerFor(this.format) && this.hasAnyHandler;
+    return (
+      !fetch(this._responses, this.format!, false) && this._responses[MimeType.ALL.ref()] != null
+    );
   }
 
   negotiateFormat(request: {
@@ -74,13 +79,11 @@ export class Collector extends DispatchCollector<Response, Response, Response | 
           ? symbolToS(request.format.symbol)
           : undefined;
     const result = this.negotiate({ accept: request.accept || undefined, format, variant });
-    this._response = result?.handler;
     return result?.format ?? null;
   }
 
-  /** @missingRailsCall fetch — PERMANENT */
   get response(): FormatHandler | undefined {
-    const response = this._response;
+    const response = fetch(this._responses, this.format!, this._responses[MimeType.ALL.ref()]);
     if (response instanceof VariantCollector) {
       return response.variant;
     } else if (response == null || response.length === 0) {

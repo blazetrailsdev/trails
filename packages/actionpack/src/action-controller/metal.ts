@@ -18,7 +18,6 @@ import type { RackEnv } from "@blazetrails/rack";
 import { includeContent } from "./metal/head.js";
 import { MimeType } from "../action-dispatch/http/mime-type.js";
 import { Renderers } from "./metal/renderers.js";
-import { resolveStatus } from "./metal/status-codes.js";
 import {
   _normalizeOptions as _normalizeOptionsFn,
   _normalizeText as _normalizeTextFn,
@@ -353,8 +352,6 @@ export class Metal extends AbstractController {
   toRackResponse(): RackResponse {
     return this.response.toRack() as RackResponse;
   }
-
-  static resolveStatus = resolveStatus;
 
   /** @internal */
   renderToBody(options: Record<string, unknown> = {}): unknown {

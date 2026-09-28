@@ -13,12 +13,22 @@ export type Block<T> = ((key: string) => T) & { readonly [BLOCK]: true };
 export function block<T>(fn: (key: string) => T): Block<T>;
 /** @noRailsEquivalent PERMANENT — Ruby's `&` block-pass, whose `rb_block_given_p` (`vendor/ruby/v3.3.11/eval.c:866`) TypeScript has no equivalent of. */
 export function block<T>(fn: (key: string, oldValue: T, newValue: T) => T): ConflictBlock<T>;
+/** @noRailsEquivalent PERMANENT — Ruby's `&` block-pass, whose `rb_block_given_p` (`vendor/ruby/v3.3.11/eval.c:866`) TypeScript has no equivalent of; a block yielded something other than a key. */
+export function block<F extends (...args: never[]) => unknown>(
+  fn: F,
+): F & { readonly [BLOCK]: true };
 /** @noRailsEquivalent PERMANENT — Ruby's `&` block-pass, whose `rb_block_given_p` (`vendor/ruby/v3.3.11/eval.c:866`) TypeScript has no equivalent of; one mark serves every yield signature. */
 export function block(fn: (...args: never[]) => unknown): unknown {
   return Object.assign((...args: never[]) => fn(...args), { [BLOCK]: true as const });
 }
 
-function blockGivenP(value: unknown): value is Block<unknown> {
+/**
+ * `rb_block_given_p` (`vendor/ruby/v3.3.11/eval.c:866`): whether a trailing
+ * argument is a {@link block}-marked `&block` rather than a positional callable.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbBlockGivenP(value: unknown): value is Block<unknown> {
   return typeof value === "function" && (value as Partial<Block<unknown>>)[BLOCK] === true;
 }
 
@@ -52,7 +62,7 @@ export function fetch<T>(hash: Record<string, unknown>, key: string, defaultValu
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`).
  */
 export function fetch(hash: Record<string, unknown>, key: string, ...rest: unknown[]): unknown {
-  const blockGiven = blockGivenP(rest[0]);
+  const blockGiven = rbBlockGivenP(rest[0]);
   if (!hasKey(hash, key)) {
     if (blockGiven) {
       return (rest[0] as Block<unknown>)(key);
@@ -147,7 +157,7 @@ export function update<T>(
   hash: Record<string, T>,
   ...others: (Record<string, T> | ConflictBlock<T>)[]
 ): Record<string, T> {
-  const block = blockGivenP(others[others.length - 1])
+  const block = rbBlockGivenP(others[others.length - 1])
     ? (others.pop() as ConflictBlock<T>)
     : undefined;
   for (const other of others as Record<string, T>[]) {

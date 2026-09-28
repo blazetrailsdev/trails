@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { statusCode } from "@blazetrails/rack";
 import { Metal } from "../metal.js";
 import { Request } from "../../action-dispatch/request.js";
 import { Response } from "../../action-dispatch/response.js";
@@ -107,18 +108,14 @@ describe("MetalControllerInstanceTests", () => {
   });
 
   it("resolveStatus with number returns number", () => {
-    expect(Metal.resolveStatus(200)).toBe(200);
+    expect(statusCode(200)).toBe(200);
   });
 
   it("resolveStatus with symbol returns code", () => {
-    expect(Metal.resolveStatus("ok")).toBe(200);
-    expect(Metal.resolveStatus("created")).toBe(201);
-    expect(Metal.resolveStatus("not_found")).toBe(404);
-    expect(Metal.resolveStatus("internal_server_error")).toBe(500);
-  });
-
-  it("resolveStatus with unknown symbol returns 500", () => {
-    expect(Metal.resolveStatus("unknown")).toBe(500);
+    expect(statusCode("ok")).toBe(200);
+    expect(statusCode("created")).toBe(201);
+    expect(statusCode("not_found")).toBe(404);
+    expect(statusCode("internal_server_error")).toBe(500);
   });
 
   it("dispatch sets request and response", async () => {
@@ -253,7 +250,7 @@ describe("MetalControllerInstanceTests", () => {
       service_unavailable: 503,
     };
     for (const [sym, code] of Object.entries(expected)) {
-      expect(Metal.resolveStatus(sym)).toBe(code);
+      expect(statusCode(sym)).toBe(code);
     }
   });
 

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { statusCode } from "@blazetrails/rack";
 import {
   _normalizeOptions,
   _normalizeText,
@@ -136,7 +137,13 @@ describe("_processOptions", () => {
   test("applies status / contentType / location, ignoring missing keys", () => {
     const setHeaderCalls: Array<[string, string]> = [];
     const host = {
-      status: 200,
+      _status: 200,
+      get status(): number {
+        return this._status;
+      },
+      set status(value: number | string) {
+        this._status = statusCode(value);
+      },
       contentType: null as string | null,
       headers: { set: (n: string, v: string) => setHeaderCalls.push([n, v]) },
       urlFor: (s: string) => `/url/${s}`,

@@ -1,4 +1,5 @@
 import { Metal } from "./metal.js";
+import { statusCode } from "@blazetrails/rack";
 import { DoubleRenderError, type RenderOptions } from "./base.js";
 import { renderForApi } from "./api/api-rendering.js";
 import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
@@ -47,7 +48,7 @@ export class API extends Metal {
       throw new DoubleRenderError();
     }
 
-    const status = options.status ? Metal.resolveStatus(options.status) : 302;
+    const status = options.status ? statusCode(options.status) : 302;
     this.status = status;
     this.headers.set("location", url);
     this.responseBody = "";

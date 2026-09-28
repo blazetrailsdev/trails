@@ -1,4 +1,4 @@
-import { Metal } from "../metal.js";
+import { statusCode } from "@blazetrails/rack";
 
 export class UnsafeRedirectError extends Error {
   constructor(message?: string) {
@@ -91,10 +91,10 @@ export function _extractRedirectToStatus(
     const opts = options as Record<string, unknown>;
     const status = opts.status;
     delete opts.status;
-    return Metal.resolveStatus(status as number | string);
+    return statusCode(status as number | string);
   }
   if (Object.hasOwn(responseOptions, "status")) {
-    return Metal.resolveStatus(responseOptions.status as number | string);
+    return statusCode(responseOptions.status as number | string);
   }
   return 302;
 }
