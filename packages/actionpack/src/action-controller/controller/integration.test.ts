@@ -10,7 +10,7 @@ import { Response } from "../../action-dispatch/http/response.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
 import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import type { MountableApp } from "../../action-dispatch/routing/mapper.js";
-import { CookieAssertions } from "../../test-helpers/abstract-unit.js";
+import { CookieAssertions, SharedTestRoutes } from "../../test-helpers/abstract-unit.js";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -327,7 +327,7 @@ class IntegrationProcessTest extends IntegrationTest {
   }
 
   async withTestRouteSet<T>(block: () => Promise<T>): Promise<T> {
-    const oldApp = this._app;
+    const oldIntegrationSession = { ...this };
     try {
       return await this.withRouting(async (set: RouteSet) => {
         const https = this.isHttps();
@@ -352,7 +352,8 @@ class IntegrationProcessTest extends IntegrationTest {
         return await block();
       });
     } finally {
-      this._app = oldApp;
+      const { request, response, controller, _htmlDocument } = this;
+      Object.assign(this, oldIntegrationSession, { request, response, controller, _htmlDocument });
     }
   }
 }
@@ -758,11 +759,14 @@ const Poller = {
   },
 };
 
+class MetalIntegrationTest extends IntegrationTest {}
+include(MetalIntegrationTest, SharedTestRoutes.urlHelpers());
+
 describe("MetalIntegrationTest", () => {
-  let t: IntegrationTest;
+  let t: MetalIntegrationTest;
 
   beforeEach(() => {
-    t = new IntegrationTest();
+    t = new MetalIntegrationTest();
     t.app = Poller;
   });
 
@@ -781,7 +785,9 @@ describe("MetalIntegrationTest", () => {
     expect(t.responseBody).toBe("");
   });
 
-  it.skip("generate url without controller", () => {});
+  it("generate url without controller", () => {
+    expect(t.urlFor({ controller: "foo" })).toBe("http://www.example.com/foo");
+  });
 
   it("pass headers", async () => {
     await t.get("/success", {

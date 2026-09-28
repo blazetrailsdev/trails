@@ -2,7 +2,7 @@ import { Request } from "../http/request.js";
 import { Headers } from "../http/headers.js";
 import { MimeType } from "../http/mime-type.js";
 import { isPresent, runLoadHooks } from "@blazetrails/activesupport";
-import { HTTPS, URI, stringSplit, type Generic } from "@blazetrails/ruby-compat";
+import { HTTPS, URI, include, stringSplit, type Generic } from "@blazetrails/ruby-compat";
 import { TestResponse } from "./test-response.js";
 import { FlashHash } from "../middleware/flash.js";
 import { RouteSet } from "../routing/route-set.js";
@@ -536,6 +536,7 @@ export class IntegrationTest {
   declare parameterize: typeof responseAssertions.parameterize;
   declare normalizeArgumentToRedirection: typeof responseAssertions.normalizeArgumentToRedirection;
   declare assertResponse: typeof responseAssertions.assertResponse;
+  declare assertRedirectedTo: typeof responseAssertions.assertRedirectedTo;
   /** @internal */
   generateResponseMessage(expected: number | string, actual: number): string {
     return responseAssertions.generateResponseMessage(this, expected, actual);
@@ -555,22 +556,6 @@ export class IntegrationTest {
   /** @internal */
   codeWithName(codeOrName: number | string): string {
     return responseAssertions.codeWithName(codeOrName);
-  }
-
-  assertRedirectedTo(expected: string | RegExp): void {
-    const location = this.redirectUrl;
-    if (!location) {
-      throw new Error("Expected a redirect but no Location header was set");
-    }
-    if (typeof expected === "string") {
-      if (location !== expected) {
-        throw new Error(`Expected redirect to "${expected}", got "${location}"`);
-      }
-    } else {
-      if (!expected.test(location)) {
-        throw new Error(`Expected redirect matching ${expected}, got "${location}"`);
-      }
-    }
   }
 
   assertContentType(expected: string): void {
@@ -639,5 +624,7 @@ proto.polymorphicMapping = polymorphicRoutes.polymorphicMapping;
 proto.parameterize = responseAssertions.parameterize;
 proto.normalizeArgumentToRedirection = responseAssertions.normalizeArgumentToRedirection;
 proto.assertResponse = responseAssertions.assertResponse;
+proto.assertRedirectedTo = responseAssertions.assertRedirectedTo;
+include(IntegrationTest, urlForMod.UrlFor);
 
 runLoadHooks("action_dispatch_integration_test", IntegrationTest);
