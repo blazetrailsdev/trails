@@ -189,7 +189,7 @@ export class AppGenerator extends AppBase {
             vitest: "^3.0.0",
             ...(this.skip("Eslint")
               ? {}
-              : { "@eslint/js": "^10.0.0", eslint: "^10.0.0", "typescript-eslint": "^8.57.0" }),
+              : { "@eslint/js": "^10.0.1", eslint: "^10.0.3", "typescript-eslint": "^8.57.0" }),
           },
         },
         null,

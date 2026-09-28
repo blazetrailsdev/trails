@@ -8,7 +8,6 @@ import {
   type PackageManager,
   type SqliteDriver,
 } from "../generators/app-generator.js";
-import { dasherize } from "../generators/base.js";
 import { getPackageManager, packageManagerInstall } from "../package-manager.js";
 
 export function newCommand(): Command {
@@ -28,6 +27,8 @@ export function newCommand(): Command {
     .option("--skip-git", "Skip git init")
     .option("--skip-install", "Skip dependency installation")
     .option("--skip-docker", "Skip Dockerfile creation")
+    .option("--skip-eslint", AppGenerator.classOptions().skipEslint.desc)
+    .option("--no-skip-eslint")
     .action(async (name: string, options) => {
       const pm = options.packageManager as PackageManager;
       const driver = options.sqliteDriver as SqliteDriver;
@@ -55,9 +56,7 @@ export function newCommand(): Command {
         packageManager: pm,
         sqliteDriver: driver,
         skipDocker: options.skipDocker,
-        ...Object.fromEntries(
-          Object.keys(AppGenerator.classOptions()).map((name) => [name, options[name]]),
-        ),
+        skipEslint: options.skipEslint,
       });
       await gen.run();
 
@@ -86,14 +85,6 @@ export function newCommand(): Command {
       console.log("");
       console.log(`  Done! cd ${name} && trails server`);
     });
-
-  for (const [name, option] of Object.entries(AppGenerator.classOptions())) {
-    if (option.type === "boolean") {
-      cmd.option(`--${dasherize(name)}`, option.desc).option(`--no-${dasherize(name)}`);
-    } else {
-      cmd.option(`--${dasherize(name)} <value>`, option.desc);
-    }
-  }
 
   return cmd;
 }

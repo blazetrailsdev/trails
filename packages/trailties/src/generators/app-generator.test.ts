@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { assertNoMatch } from "@blazetrails/activesupport";
-import { ESLint } from "eslint";
+import { execFile } from "node:child_process";
 import { AppGenerator, type AppDatabase } from "./app-generator.js";
 import * as Assertions from "./testing/assertions.js";
 
@@ -376,14 +376,13 @@ describe("AppGenerator", () => {
       appPath("node_modules"),
     );
 
-    const eslint = new ESLint({ cwd: appPath() });
-    const results = await eslint.lintFiles(["."]);
-    const output = (await eslint.loadFormatter("stylish")).format(results);
+    const { success, output } = await new Promise<{ success: boolean; output: string }>((resolve) =>
+      execFile(appPath("bin/eslint"), [], { cwd: appPath() }, (error, stdout, stderr) =>
+        resolve({ success: error === null, output: stdout + stderr }),
+      ),
+    );
 
-    expect(
-      results.every((r) => r.errorCount === 0 && r.warningCount === 0),
-      `bin/eslint did not exit successfully:\n${output}`,
-    ).toBe(true);
+    expect(success, `bin/eslint did not exit successfully:\n${output}`).toBe(true);
   }, 60_000);
 
   it("includes app name in generated files", async () => {
