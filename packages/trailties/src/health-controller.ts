@@ -1,3 +1,4 @@
+import { htmlSafe, type SafeBuffer } from "@blazetrails/activesupport";
 import { ActionController, controllerConstants } from "@blazetrails/actionpack";
 
 export class HealthController extends ActionController.Base {
@@ -20,8 +21,8 @@ export class HealthController extends ActionController.Base {
   }
 
   /** @internal */
-  htmlStatus(color: string): string {
-    return `<!DOCTYPE html><html><body style="background-color: ${color}"></body></html>`;
+  htmlStatus(color: string): SafeBuffer {
+    return htmlSafe(`<!DOCTYPE html><html><body style="background-color: ${color}"></body></html>`);
   }
 }
 

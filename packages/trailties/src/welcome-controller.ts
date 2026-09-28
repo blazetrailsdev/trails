@@ -13,6 +13,6 @@ export class WelcomeController extends ApplicationController {
   index(): void {}
 }
 
-WelcomeController.skipBeforeAction("verifyAuthenticityToken");
+WelcomeController.skipBeforeAction("verifyAuthenticityToken", { raise: false });
 
 controllerConstants.set("rails/welcome", WelcomeController);

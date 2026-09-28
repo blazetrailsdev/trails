@@ -8,6 +8,7 @@ import {
   _normalizeArgs,
   _normalizeOptions,
   _normalizeRender,
+  _processVariant,
   type RenderOptions,
   type RenderingHost,
 } from "./rendering.js";
@@ -17,6 +18,10 @@ function makeHost(opts: Partial<RenderingHost> = {}): RenderingHost {
   return {
     responseBody: null,
     renderToBody: (o: RenderOptions) => (o.html != null ? String(o.html) : "<body>"),
+    _normalizeRender,
+    _normalizeArgs,
+    _processVariant,
+    _normalizeOptions,
     ...opts,
   };
 }
@@ -124,7 +129,19 @@ describe("_normalizeArgs", () => {
 
 describe("_normalizeRender", () => {
   it("composes args normalization, variant processing, and options normalization", () => {
-    expect(_normalizeRender({ template: "x" })).toEqual({ template: "x" });
+    expect(_normalizeRender.call(makeHost(), { template: "x" })).toEqual({ template: "x" });
+  });
+
+  it("dispatches _processVariant through the receiver", () => {
+    const host = makeHost({
+      _processVariant: (options: RenderOptions) => {
+        options.variant = ["phone"];
+      },
+    });
+    expect(_normalizeRender.call(host, { template: "x" })).toEqual({
+      template: "x",
+      variant: ["phone"],
+    });
   });
 
   it("_normalizeOptions is the identity in the abstract layer", () => {

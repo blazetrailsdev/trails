@@ -37,10 +37,18 @@ export interface RenderingHost {
   /** @internal */
   _setVaryHeader?(): void;
   renderedFormat?(): unknown;
+  /** @internal */
+  _normalizeRender(...args: unknown[]): RenderOptions;
+  /** @internal */
+  _normalizeArgs(...args: unknown[]): RenderOptions;
+  /** @internal */
+  _processVariant(options: RenderOptions): void;
+  /** @internal */
+  _normalizeOptions(options: RenderOptions): RenderOptions;
 }
 
 export function render<T extends RenderingHost>(this: T, ...args: unknown[]): void {
-  const options = _normalizeRender(...args);
+  const options = this._normalizeRender(...args);
   const renderedBody = this.renderToBody(options);
   if (options.html != null) {
     this._setHtmlContentType?.();
@@ -52,7 +60,7 @@ export function render<T extends RenderingHost>(this: T, ...args: unknown[]): vo
 }
 
 export function renderToString<T extends RenderingHost>(this: T, ...args: unknown[]): unknown {
-  const options = _normalizeRender(...args);
+  const options = this._normalizeRender(...args);
   return this.renderToBody(options);
 }
 
@@ -88,10 +96,14 @@ export function _processOptions(options: RenderOptions): RenderOptions {
 }
 
 /** @internal */
-export function _normalizeRender(...args: unknown[]): RenderOptions {
-  const options = _normalizeArgs(...(args as [unknown?, RenderOptions?]));
-  _processVariant(options);
-  return _normalizeOptions(options);
+export function _normalizeRender(
+  this: Pick<RenderingHost, "_normalizeArgs" | "_processVariant" | "_normalizeOptions">,
+  ...args: unknown[]
+): RenderOptions {
+  const options = this._normalizeArgs(...args);
+  this._processVariant(options);
+  this._normalizeOptions(options);
+  return options;
 }
 
 /** @internal */

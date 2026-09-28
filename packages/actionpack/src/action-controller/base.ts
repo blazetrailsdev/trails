@@ -121,6 +121,7 @@ import {
   _setRenderedContentType,
   _setVaryHeader,
   _processVariant,
+  _normalizeOptions,
   processAction as _processAction,
 } from "./metal/rendering.js";
 import { Renderers } from "./metal/renderers.js";
@@ -140,6 +141,8 @@ import {
   DEFAULT_PROTECTED_INSTANCE_VARIABLES,
   DoubleRenderError,
   viewAssigns,
+  _normalizeArgs,
+  _normalizeRender,
 } from "../abstract-controller/rendering.js";
 
 export { type ActionCallback, type AroundCallback, type CallbackOptions };
@@ -307,8 +310,8 @@ export class Base extends Metal {
 
   viewRuntime: number | null = null;
 
-  render(options: RenderOptions = {}): void {
-    this._processVariant(options as Record<string, unknown>);
+  render(...args: unknown[]): void {
+    const options = this._normalizeRender(...args) as RenderOptions;
     this.viewRuntime = this.cleanupViewRuntime(() =>
       Benchmark.realtime(":float_millisecond", () => {
         if (this.performed) {
@@ -831,6 +834,12 @@ export class Base extends Metal {
   /** @internal */
   declare _processVariant: typeof _processVariant;
   /** @internal */
+  declare _normalizeRender: typeof _normalizeRender;
+  /** @internal */
+  declare _normalizeArgs: typeof _normalizeArgs;
+  /** @internal */
+  declare _normalizeOptions: typeof _normalizeOptions;
+  /** @internal */
   _renderedFormat?: unknown;
   declare isActionHasLayout: typeof isActionHasLayout;
   /** @internal */
@@ -977,6 +986,9 @@ Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
 Base.prototype._processOptions = _processOptions;
 Base.prototype._renderTemplate = _renderTemplate;
 Base.prototype._processVariant = _processVariant;
+Base.prototype._normalizeRender = _normalizeRender;
+Base.prototype._normalizeArgs = _normalizeArgs;
+Base.prototype._normalizeOptions = _normalizeOptions;
 Base.prototype.isActionHasLayout = isActionHasLayout;
 Base.prototype._isConditionalLayout = _isConditionalLayout;
 Base.prototype._layoutForOption = _layoutForOption;

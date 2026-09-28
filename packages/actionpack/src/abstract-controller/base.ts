@@ -234,10 +234,13 @@ export class AbstractController {
 
   static beforeAction = beforeAction;
   static prependBeforeAction = prependBeforeAction;
+  static appendBeforeAction = beforeAction;
   static afterAction = afterAction;
   static prependAfterAction = prependAfterAction;
+  static appendAfterAction = afterAction;
   static aroundAction = aroundAction;
   static prependAroundAction = prependAroundAction;
+  static appendAroundAction = aroundAction;
   static skipBeforeAction = skipBeforeAction;
   static skipAfterAction = skipAfterAction;
   static skipAroundAction = skipAroundAction;

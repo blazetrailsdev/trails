@@ -1,11 +1,9 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
 import {
   extractOptionsBang,
-  MethodCall,
   defineCallbacks as asDefineCallbacks,
   setCallback as asSetCallback,
+  skipCallback as asSkipCallback,
   runCallbacks as asRunCallbacks,
-  getCallbackChains,
   type CallbackKind,
   type CallbackCondition,
   type CallbackOptions as ASCallbackOptions,
@@ -26,7 +24,6 @@ export interface CallbackPredicateLike {
 }
 
 export interface CallbackOptions {
-  name?: string;
   only?: string | string[];
   except?: string | string[];
   if?:
@@ -36,6 +33,7 @@ export interface CallbackOptions {
     | ((controller: AbstractController) => boolean)
     | Array<((controller: AbstractController) => boolean) | CallbackPredicateLike>;
   prepend?: boolean;
+  raise?: boolean;
 }
 
 /** @internal */
@@ -161,25 +159,15 @@ function _toConditionFns(pred: CallbackOptions["if"]): CallbackCondition[] | und
   );
 }
 
-interface WrappedBefore {
-  (target: object): Promise<unknown>;
-  __originalCb: ActionCallback;
-}
-
-/** @internal */
-function _wrapBefore(callback: ActionCallback): WrappedBefore {
-  const wrapped = async (target: object): Promise<unknown> => {
-    const result = await callback(target as AbstractController);
-    if ((target as AbstractController).performed) kernelThrow(":abort");
-    return result;
-  };
-  (wrapped as WrappedBefore).__originalCb = callback;
-  return wrapped as WrappedBefore;
-}
-
 /** @internal */
 export function _defineActionCallbacks(prototype: object): void {
-  asDefineCallbacks(prototype, PROCESS_ACTION_CHAIN, { skipAfterCallbacksIfTerminated: true });
+  asDefineCallbacks(prototype, PROCESS_ACTION_CHAIN, {
+    terminator: async (controller, resultLambda) => {
+      await resultLambda();
+      return (controller as AbstractController).performed;
+    },
+    skipAfterCallbacksIfTerminated: true,
+  });
 }
 
 /** @internal */
@@ -189,39 +177,13 @@ export function _registerActionCallback(
   callback: CallbackFilter,
   options: CallbackOptions,
 ): void {
-  const opts: CallbackOptionsWithFilters = { ...options, filters: [callback] };
-  _normalizeCallbackOptions(opts);
-  delete opts.filters;
-
-  if (typeof callback === "string") options = { ...options, name: callback };
-
-  if (options.name !== undefined) {
-    const chain = getCallbackChains(prototype).get(PROCESS_ACTION_CHAIN);
-    if (chain) {
-      for (const cb of [...chain.entries]) {
-        if (cb.kind !== kind) continue;
-        const stored = (cb.options as Record<string, unknown>)._trailsName;
-        if (stored === options.name) chain.delete(cb);
-      }
-    }
-  }
-
-  const asOpts: ASCallbackOptions & Record<string, unknown> = {};
-  if (opts.prepend) asOpts.prepend = true;
-  const ifFns = _toConditionFns(opts.if);
-  const unlessFns = _toConditionFns(opts.unless);
+  const asOpts: ASCallbackOptions = {};
+  if (options.prepend) asOpts.prepend = true;
+  const ifFns = _toConditionFns(options.if);
+  const unlessFns = _toConditionFns(options.unless);
   if (ifFns) asOpts.if = ifFns;
   if (unlessFns) asOpts.unless = unlessFns;
-  if (options.name !== undefined) asOpts._trailsName = options.name;
-
-  const filter =
-    typeof callback === "string"
-      ? kind === "before"
-        ? _wrapBefore(new MethodCall(callback).makeLambda() as unknown as ActionCallback)
-        : `:${callback}`
-      : kind === "before"
-        ? _wrapBefore(callback as ActionCallback)
-        : callback;
+  const filter = typeof callback === "string" ? `:${callback}` : callback;
   asSetCallback(
     prototype,
     PROCESS_ACTION_CHAIN,
@@ -238,45 +200,20 @@ export function _skipActionCallback(
   filter: ActionCallback | AroundCallback | string,
   options: CallbackOptions,
 ): void {
-  const namedFilter =
-    typeof filter === "function" ? filter : ({ name: filter } as unknown as ActionCallback);
-  const opts: CallbackOptionsWithFilters = { ...options, filters: [namedFilter] };
-  _normalizeCallbackOptions(opts);
-  delete opts.filters;
-
-  const chain = getCallbackChains(prototype).get(PROCESS_ACTION_CHAIN);
-  if (!chain) return;
-
-  const hasConditional = opts.if !== undefined || opts.unless !== undefined;
-  const ifConds = _toConditionFns(opts.if) ?? [];
-  const unlessConds = _toConditionFns(opts.unless) ?? [];
-
-  for (const cb of [...chain.entries]) {
-    if (cb.kind !== kind) continue;
-    const stored = (cb.options as Record<string, unknown>)._trailsName;
-    let matches: boolean;
-    if (typeof filter === "string") {
-      matches = stored === filter;
-    } else if (kind === "before") {
-      const wrapped = cb.filter as Partial<WrappedBefore>;
-      matches = wrapped.__originalCb === filter || cb.filter === filter;
-    } else {
-      matches = cb.filter === filter;
-    }
-    if (!matches) continue;
-
-    if (hasConditional) {
-      const merged = cb.mergeConditionalOptions(
-        { name: PROCESS_ACTION_CHAIN, config: cb.chainConfig },
-        { ifOption: ifConds, unlessOption: unlessConds },
-      );
-      if (stored !== undefined) {
-        (merged.options as Record<string, unknown>)._trailsName = stored;
-      }
-      chain.insert(chain.index(cb), merged);
-    }
-    chain.delete(cb);
-  }
+  const asOpts: ASCallbackOptions & { raise?: boolean } = {};
+  const ifFns = _toConditionFns(options.if);
+  const unlessFns = _toConditionFns(options.unless);
+  if (ifFns) asOpts.if = ifFns;
+  if (unlessFns) asOpts.unless = unlessFns;
+  if (options.raise !== undefined) asOpts.raise = options.raise;
+  const name = typeof filter === "string" ? `:${filter}` : filter;
+  asSkipCallback(
+    prototype,
+    PROCESS_ACTION_CHAIN,
+    kind,
+    name as unknown as Parameters<typeof asSkipCallback>[2],
+    asOpts,
+  );
 }
 
 export interface ActionCallbackHost {

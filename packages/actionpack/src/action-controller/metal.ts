@@ -22,7 +22,6 @@ import {
   _normalizeOptions as _normalizeOptionsFn,
   _normalizeText as _normalizeTextFn,
   _processOptions as _processOptionsFn,
-  _processVariant as _processVariantFn,
   _renderInPriorities as _renderInPrioritiesFn,
   _setHtmlContentType as _setHtmlContentTypeFn,
   _setRenderedContentType as _setRenderedContentTypeFn,
@@ -369,8 +368,6 @@ export class Metal extends AbstractController {
   static _normalizeText = _normalizeTextFn;
   /** @internal */
   static _processOptions = _processOptionsFn;
-  /** @internal */
-  static _processVariant = _processVariantFn;
   /** @internal */
   static _renderInPriorities = _renderInPrioritiesFn;
   /** @internal */

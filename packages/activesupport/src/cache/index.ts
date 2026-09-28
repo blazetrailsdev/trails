@@ -1,7 +1,8 @@
+import type { Duration } from "../duration.js";
 export { DeserializationError } from "./deserialization-error.js";
 
 export interface CacheOptions {
-  expiresIn?: number;
+  expiresIn?: number | Duration;
   expiresAt?: number;
   expire_in?: number;
   expired_in?: number;

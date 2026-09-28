@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { htmlSafe } from "@blazetrails/activesupport";
 import { Base, DoubleRenderError } from "./base.js";
 import { API } from "./api.js";
 import { Metal } from "./metal.js";
@@ -116,7 +117,7 @@ describe("ActionController rendering", () => {
     it("renders HTML string", async () => {
       class C extends Base {
         async index() {
-          this.render({ html: "<b>bold</b>" });
+          this.render({ html: htmlSafe("<b>bold</b>") });
         }
       }
       const c = new C();
