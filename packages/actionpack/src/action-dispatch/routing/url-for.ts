@@ -1,16 +1,24 @@
-import { classAttribute, Concern, mattrWriter, reverseMerge } from "@blazetrails/activesupport";
+import {
+  camelize,
+  classAttribute,
+  Concern,
+  mattrWriter,
+  reverseMerge,
+} from "@blazetrails/activesupport";
 import {
   extend,
   include,
   initialize as moduleInitialize,
+  isSymbol,
   Module,
+  rbFPublicSend,
   rbObjRespondTo,
+  symbolToS,
 } from "@blazetrails/ruby-compat";
 import { Parameters } from "../../action-controller/metal/strong-parameters.js";
 import {
   HelperMethodBuilder,
   isModelClass,
-  symbolToString,
   type PolymorphicHost,
   type PolymorphicMappingEntry,
   type ToModel,
@@ -50,14 +58,14 @@ export function urlFor(this: UrlForHost, options?: UrlForOptions): string {
   return fullUrlFor.call(this, options);
 }
 
-export type UrlForOptions = null | undefined | string | symbol | object;
+export type UrlForOptions = null | undefined | string | object;
 
 /** @internal */
 export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
   if (options == null) {
     return this._routes!.urlFor({ ...this.urlOptions() });
   }
-  if (typeof options === "string") {
+  if (typeof options === "string" && !isSymbol(options)) {
     return options;
   }
   if (Array.isArray(options)) {
@@ -75,17 +83,13 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
     const mergedUrlOptions = reverseMerge({ ...asHash }, this.urlOptions());
     return this._routes!.urlFor(
       mergedUrlOptions,
-      routeName == null
-        ? null
-        : typeof routeName === "symbol"
-          ? symbolToString(routeName)
-          : String(routeName),
+      routeName == null ? null : isSymbol(routeName) ? symbolToS(routeName) : String(routeName),
     );
   }
   const builder = HelperMethodBuilder.url();
   const target = this as unknown as PolymorphicHost;
-  if (typeof options === "symbol") {
-    return builder.handleStringCall(target, symbolToString(options));
+  if (isSymbol(options)) {
+    return builder.handleStringCall(target, options);
   }
   if (isModelClass(options)) {
     return builder.handleClassCall(target, options);
@@ -94,12 +98,7 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
 }
 
 export function routeFor(this: UrlForHost, name: string, ...args: unknown[]): string {
-  const helper = `${name}_url`;
-  const fn = (this as unknown as Record<string, unknown>)[helper];
-  if (typeof fn !== "function") {
-    throw new Error(`No url helper "${helper}" defined`);
-  }
-  return (fn as (...a: unknown[]) => string).apply(this, args);
+  return rbFPublicSend(this, camelize(`${name}_url`, "lower"), ...args) as string;
 }
 
 /** @internal */

@@ -1,6 +1,12 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
-import { FixtureResolver, MissingTemplate, TemplateHandlers } from "@blazetrails/actionview";
+import {
+  Base as ViewBase,
+  FixtureResolver,
+  MissingTemplate,
+  TemplateHandlers,
+} from "@blazetrails/actionview";
+import { Model } from "@blazetrails/activemodel";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { Base } from "./base.js";
@@ -145,5 +151,27 @@ describe("ActionController::Base bare render", () => {
     await expect(
       new BareController().dispatch("index", makeRequest(), new Response()),
     ).rejects.toBeInstanceOf(MissingTemplate);
+  });
+});
+
+describe("ActionView::Helpers::ControllerHelper#assign_controller", () => {
+  class Post extends Model {}
+
+  class PostsController extends ApplicationController {
+    builder: unknown = null;
+    async new(): Promise<void> {
+      this.viewContext().formWith({ model: new Post(), url: "/posts" }, (f) => {
+        this.builder = f;
+      });
+      this.head("ok");
+    }
+  }
+
+  it("calls the controller's default_form_builder reader for formWith({ model })", async () => {
+    const controller = new PostsController();
+    await controller.dispatch("new", makeRequest(), new Response());
+    expect((controller.builder as object).constructor).toBe(
+      (ViewBase as unknown as { defaultFormBuilder: unknown }).defaultFormBuilder,
+    );
   });
 });
