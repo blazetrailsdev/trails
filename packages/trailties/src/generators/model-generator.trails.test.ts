@@ -4,6 +4,19 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { GeneratorError } from "./generated-attribute.js";
 import { ModelGenerator } from "./model-generator.js";
+import { Application } from "../application.js";
+import { Trails } from "../rails.js";
+import "../trailties/active-record.js";
+
+class ModelGeneratorApp extends Application {}
+
+beforeEach(() => {
+  Trails.application = ModelGeneratorApp.instance();
+});
+
+afterEach(() => {
+  Trails.application = null;
+});
 
 let tmpDir: string;
 

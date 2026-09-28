@@ -27,6 +27,7 @@ export interface ClassOptionConfig {
   enum?: readonly string[];
   banner?: string;
   required?: boolean;
+  group?: string;
 }
 
 export abstract class GeneratorBase implements GeneratorActionsState {
@@ -42,6 +43,31 @@ export abstract class GeneratorBase implements GeneratorActionsState {
       type: "boolean",
       default: false,
       desc: "Skip collision check",
+    });
+
+    this.classOption("force", {
+      type: "boolean",
+      aliases: "-f",
+      group: "runtime",
+      desc: "Overwrite files that already exist",
+    });
+    this.classOption("pretend", {
+      type: "boolean",
+      aliases: "-p",
+      group: "runtime",
+      desc: "Run but do not make any changes",
+    });
+    this.classOption("quiet", {
+      type: "boolean",
+      aliases: "-q",
+      group: "runtime",
+      desc: "Suppress status output",
+    });
+    this.classOption("skip", {
+      type: "boolean",
+      aliases: "-s",
+      group: "runtime",
+      desc: "Skip files that already exist",
     });
   }
 
@@ -350,18 +376,6 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   getCreatedFiles(): string[] {
     return [...this.createdFiles];
   }
-}
-
-export function migrationTimestamp(): string {
-  // boundary: generator timestamp uses local-clock components for the
-  const now = new Date();
-  const y = now.getFullYear().toString();
-  const m = (now.getMonth() + 1).toString().padStart(2, "0");
-  const d = now.getDate().toString().padStart(2, "0");
-  const h = now.getHours().toString().padStart(2, "0");
-  const min = now.getMinutes().toString().padStart(2, "0");
-  const sec = now.getSeconds().toString().padStart(2, "0");
-  return `${y}${m}${d}${h}${min}${sec}`;
 }
 
 export function dasherize(name: string): string {

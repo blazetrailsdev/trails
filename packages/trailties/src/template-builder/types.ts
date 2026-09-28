@@ -33,6 +33,7 @@ export interface Field {
   initializer?: string;
   comment?: string;
   static?: boolean;
+  declare?: boolean;
   inferType?: boolean;
 }
 export interface MethodParam {
@@ -55,6 +56,7 @@ export interface ClassOpts {
   extends?: Ref;
   implements?: Ref[];
   exported?: boolean;
+  staticBlock?: Body;
   body: Array<Field | Method>;
 }
 export type ClassDecl = ClassOpts & { readonly __kind: "class" };

@@ -3,6 +3,19 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { ScaffoldGenerator } from "./scaffold-generator.js";
+import { Application } from "../../../application.js";
+import { Trails } from "../../../rails.js";
+import "../../../trailties/active-record.js";
+
+class ScaffoldGeneratorApp extends Application {}
+
+beforeEach(() => {
+  Trails.application = ScaffoldGeneratorApp.instance();
+});
+
+afterEach(() => {
+  Trails.application = null;
+});
 
 let tmpDir: string;
 let lines: string[];

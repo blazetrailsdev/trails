@@ -25,6 +25,10 @@ export function generateCommand(): Command {
         attributes: string[],
         opts: { migration: boolean; test: boolean; timestamps: boolean },
       ) => {
+        if (APP_PATH != null) {
+          await bootApplicationBang();
+          await loadGenerators();
+        }
         const gen = new ModelGenerator({ cwd: Dir.pwd(), output: console.log });
         await gen.run(name, attributes, {
           migration: opts.migration,
@@ -40,6 +44,10 @@ export function generateCommand(): Command {
     .argument("<name>", "Migration name (e.g. AddEmailToUsers)")
     .argument("[columns...]", "Columns as name:type pairs")
     .action(async (name: string, columns: string[]) => {
+      if (APP_PATH != null) {
+        await bootApplicationBang();
+        await loadGenerators();
+      }
       const gen = new MigrationGenerator({ cwd: Dir.pwd(), output: console.log });
       await gen.run(name, columns);
     });

@@ -140,7 +140,7 @@ export class GeneratedAttribute {
   isRequired(): boolean {
     return (
       this.reference() &&
-      Trails.application?.config.activeRecord?.belongsToRequiredByDefault === true
+      Trails.application!.config.activeRecord.belongsToRequiredByDefault === true
     );
   }
   hasIndex = (): boolean => this._hasIndex;

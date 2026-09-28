@@ -24,6 +24,10 @@ export function emitClass(c: ClassDecl): EmitResult {
       .join(", ")}`;
   }
   const members: string[] = [];
+  if (c.staticBlock) {
+    valueRefs.push(...c.staticBlock.refs);
+    members.push(`  static {\n${indent(c.staticBlock.text)}\n  }`);
+  }
   for (const m of c.body) {
     const e = isMethod(m) ? emitMethod(m) : emitField(m);
     valueRefs.push(...e.valueRefs);
@@ -35,4 +39,11 @@ export function emitClass(c: ClassDecl): EmitResult {
     valueRefs,
     typeRefs,
   };
+}
+
+function indent(text: string): string {
+  return text
+    .split("\n")
+    .map((l) => (l ? `    ${l}` : ""))
+    .join("\n");
 }

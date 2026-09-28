@@ -1,10 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { API } from "typescript/unstable/sync";
 import { registerChildProcessAdapter, childProcessAdapterConfig } from "@blazetrails/ruby-compat";
 import { AuthenticationGenerator } from "./authentication-generator.js";
+import { Application } from "../../../application.js";
+import { Trails } from "../../../rails.js";
+import "../../../trailties/active-record.js";
+
+class AuthenticationGeneratorApp extends Application {}
+
+beforeEach(() => {
+  Trails.application = AuthenticationGeneratorApp.instance();
+});
+
+afterEach(() => {
+  Trails.application = null;
+});
 
 const PACKAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
 const compilerOptions = { strict: true, module: "nodenext", noEmit: true, skipLibCheck: true };

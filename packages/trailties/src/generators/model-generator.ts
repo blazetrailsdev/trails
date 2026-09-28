@@ -39,8 +39,11 @@ export class ModelGenerator extends GeneratorBase {
     } = options;
 
     const singularName = singularize(underscore(name));
-    const className = camelize(singularName);
+    const classPath = singularName.split("/");
+    const regularClassPath = classPath.slice(0, -1);
+    const className = classPath.map((part) => camelize(part)).join("");
     const fileName = dasherize(singularName);
+    const relativeRoot = "../".repeat(regularClassPath.length);
     const attributes = args
       .filter((arg) => !arg.startsWith("-"))
       .map((arg) => GeneratedAttribute.parse(arg));
@@ -48,7 +51,7 @@ export class ModelGenerator extends GeneratorBase {
     const parentClassName = parent ?? "ApplicationRecord";
     const parentClass = classify(parentClassName.replace(/::/g, "_").replace(/\//g, "_"));
     const parentPath = dasherize(parentClassName.replace(/::/g, "/"));
-    const importPath = `import { ${parentClass} } from "./${parentPath}.js";`;
+    const importPath = `import { ${parentClass} } from "${relativeRoot || "./"}${parentPath}.js";`;
 
     const bodyLines: string[] = [];
 
@@ -86,11 +89,23 @@ export class ${className} extends ${parentClass} {${staticBlock}}
 `,
     );
 
+    if (regularClassPath.length > 0 && this.behavior === "invoke") {
+      this.createFile(
+        `app/models/${regularClassPath.map((part) => dasherize(part)).join("/")}${ext}`,
+        `export const ${regularClassPath.map((part) => camelize(part)).join("")} = {
+  tableNamePrefix(): string {
+    return "${regularClassPath.join("_")}_";
+  },
+};
+`,
+      );
+    }
+
     if (test) {
       this.createFile(
         `test/models/${fileName}.test${ext}`,
         `import { describe, it, expect } from "vitest";
-import { ${className} } from "../../app/models/${fileName}.js";
+import { ${className} } from "../../${relativeRoot}app/models/${fileName}.js";
 
 describe("${className}", () => {
   it("exists", () => {
@@ -108,7 +123,6 @@ describe("${className}", () => {
         }
       }
 
-      const classPath = singularName.split("/");
       const tableName = [...classPath.slice(0, -1), pluralize(classPath.at(-1)!)].join("_");
       const migGen = this.createMigrationGenerator();
 

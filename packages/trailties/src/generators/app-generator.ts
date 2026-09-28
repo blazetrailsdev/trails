@@ -28,7 +28,6 @@ export const VALID_SQLITE_DRIVERS: readonly SqliteDriver[] = [
 export interface AppGeneratorOptions extends Omit<AppBaseOptions, "database" | "appPath"> {
   appPath?: string;
   database?: AppDatabase;
-  skipDocker?: boolean;
   packageManager?: PackageManager;
   sqliteDriver?: SqliteDriver;
 }

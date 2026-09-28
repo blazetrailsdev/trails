@@ -5,9 +5,10 @@ import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
 import type { ModelHelpersOptions } from "../../model-helpers.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
 import type { ActiveModel } from "../../active-model.js";
-import { tsBody, tsMethod, type Method } from "../../../template-builder/index.js";
+import { tsBody, tsField, tsMethod, type Method } from "../../../template-builder/index.js";
 import { emitControllerClass, parentRefForRelative } from "../controller/controller-paths.js";
 import { ResourceRouteGenerator } from "../resource-route/resource-route-generator.js";
+import * as Tse from "../../tse/scaffold/scaffold-generator.js";
 
 export interface ScaffoldControllerGeneratorOptions extends NamedBaseOptions, ModelHelpersOptions {
   api?: boolean;
@@ -53,6 +54,17 @@ export class ScaffoldControllerGenerator extends NamedBase {
         imports: [
           { from: `${modelPath}${this.filePath()}.js`, named: { [modelClassName]: "named" } },
         ],
+        ...(api
+          ? {}
+          : {
+              staticBlock: tsBody`this.beforeAction("set${camelize(singular)}", { only: ["show", "edit", "update", "destroy"] });`,
+              fields: ts
+                ? [
+                    tsField(this.pluralTableName(), `${modelClassName}[]`, { declare: true }),
+                    tsField(singular, modelClassName, { declare: true }),
+                  ]
+                : [],
+            }),
         methods: api
           ? apiCrudMethods(
               this.ormClass(),
@@ -78,6 +90,22 @@ export class ScaffoldControllerGenerator extends NamedBase {
       }),
     );
 
+    if (!api) {
+      this.createdFiles.push(
+        ...new Tse.ScaffoldGenerator({ ...this.options, behavior: this.behavior }).run(),
+      );
+    }
+
+    if (!skipRoutes) {
+      const route = new ResourceRouteGenerator({
+        cwd: this.cwd,
+        output: this.output,
+        behavior: this.behavior,
+        pretend: this.options.pretend,
+        name: this.name,
+      });
+      await route.addResourceRoute();
+    }
     if (test) {
       const skip = (a: string) =>
         api && (a === "new" || a === "edit") ? "" : `  it("${a}", () => {});\n`;
@@ -103,16 +131,6 @@ ${skip("index")}${skip("show")}${skip("new")}${skip("create")}${skip("edit")}${s
       );
     }
 
-    if (!skipRoutes) {
-      const route = new ResourceRouteGenerator({
-        cwd: this.cwd,
-        output: this.output,
-        behavior: this.behavior,
-        pretend: this.options.pretend,
-        name: this.name,
-      });
-      await route.addResourceRoute();
-    }
     return this.getCreatedFiles();
   }
 }
@@ -142,6 +160,7 @@ function paramsMethod(singular: string, attrs: string[], ts: boolean): Method {
       : `return this.params.expect({ ${singular}: [${attrs.map((a) => `"${a}"`).join(", ")}] });`;
   return tsMethod({
     name: `${camelize(singular, false)}Params`,
+    visibility: "private",
     params: [],
     returnType: ts ? "unknown" : undefined,
     body: tsBody`${list}`,
@@ -160,36 +179,35 @@ function crudMethods(
   ts: boolean,
 ): Method[] {
   const params = `this.${camelize(singular, false)}Params()`;
-  const find = `const ${singular} = await ${ormClass.find(model, 'this.params.expect("id")')};`;
-  const resource = `\`${routeUrl}/\${${singular}.id}\``;
+  const resource = `\`${routeUrl}/\${this.${singular}.id}\``;
   return [
-    mk(
-      "index",
-      `const ${plural} = await ${ormClass.all(model)};\nawait this.render({ action: "index", locals: { ${plural} } });`,
-      ts,
-    ),
-    mk("show", `${find}\nawait this.render({ action: "show", locals: { ${singular} } });`, ts),
-    mk(
-      "new_",
-      `const ${singular} = ${ormClass.build(model)};\nawait this.render({ action: "new", locals: { ${singular} } });`,
-      ts,
-    ),
+    mk("index", `this.${plural} = await ${ormClass.all(model)};`, ts),
+    mk("show", "", ts),
+    mk("new", `this.${singular} = ${ormClass.build(model)};`, ts),
+    mk("edit", "", ts),
     mk(
       "create",
-      `const ${singular} = ${ormClass.build(model, params)};\n\nif (await ${ormInstance.save()}) {\n  this.redirectTo(${resource}, { notice: "${humanName} was successfully created." });\n} else {\n  await this.render({ action: "new", status: "unprocessable_entity", locals: { ${singular} } });\n}`,
+      `this.${singular} = ${ormClass.build(model, params)};\n\nif (await this.${ormInstance.save()}) {\n  this.redirectTo(${resource}, { notice: "${humanName} was successfully created." });\n} else {\n  await this.render({ action: "new", status: "unprocessable_entity" });\n}`,
       ts,
     ),
-    mk("edit", `${find}\nawait this.render({ action: "edit", locals: { ${singular} } });`, ts),
     mk(
       "update",
-      `${find}\nif (await ${ormInstance.update(params)}) {\n  this.redirectTo(${resource}, { notice: "${humanName} was successfully updated.", status: "see_other" });\n} else {\n  await this.render({ action: "edit", status: "unprocessable_entity", locals: { ${singular} } });\n}`,
+      `if (await this.${ormInstance.update(params)}) {\n  this.redirectTo(${resource}, { notice: "${humanName} was successfully updated.", status: "see_other" });\n} else {\n  await this.render({ action: "edit", status: "unprocessable_entity" });\n}`,
       ts,
     ),
     mk(
       "destroy",
-      `${find}\nawait ${ormInstance.destroy()};\nthis.redirectTo("${routeUrl}", { notice: "${humanName} was successfully destroyed.", status: "see_other" });`,
+      `await this.${ormInstance.destroy()};\nthis.redirectTo("${routeUrl}", { notice: "${humanName} was successfully destroyed.", status: "see_other" });`,
       ts,
     ),
+    {
+      ...mk(
+        `set${camelize(singular)}`,
+        `this.${singular} = await ${ormClass.find(model, 'this.params.expect("id")')};`,
+        ts,
+      ),
+      visibility: "private",
+    },
     paramsMethod(singular, attrs, ts),
   ];
 }

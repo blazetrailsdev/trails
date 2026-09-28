@@ -7,6 +7,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { GeneratorBase } from "./base.js";
 import { optimizeIndentation } from "./actions.js";
+import { GeneratorError } from "./generated-attribute.js";
 
 class TestGenerator extends GeneratorBase {}
 
@@ -131,6 +132,15 @@ describe("TrailsActions", () => {
       await makeGen().route(`mapper.resources("posts");`);
       await makeGen().route(`mapper.resources("posts");`);
       expect(files.get("/app/config/routes.ts")).toBe(`${draw}  mapper.resources("posts");\n}\n`);
+    });
+
+    it("raises Thor's missing-file error unless pretending", async () => {
+      await expect(makeGen().route(`mapper.resources("posts");`)).rejects.toThrow(
+        new GeneratorError("The file /app/config/routes.ts does not appear to exist"),
+      );
+      const pretend = new TestGenerator({ cwd: "/app", output: () => {}, pretend: true });
+      await expect(pretend.route(`mapper.resources("posts");`)).resolves.toBeUndefined();
+      expect(files.has("/app/config/routes.ts")).toBe(false);
     });
 
     it("wraps code in the given namespaces", async () => {

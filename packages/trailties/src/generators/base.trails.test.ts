@@ -57,3 +57,20 @@ describe("GeneratorBase.classOption defaults from Generators.options / Generator
     }
   });
 });
+
+describe("GeneratorBase runtime options (Thor's add_runtime_options!)", () => {
+  it("parses --pretend / -f / -q / -s as options, not attributes", async () => {
+    let seen: { options: Record<string, unknown>; attributes: string[] } | undefined;
+    class RecordingGenerator extends GeneratorBase {
+      run(_name: string, attributes: string[]): void {
+        seen = { options: { ...this.options }, attributes };
+      }
+    }
+    await RecordingGenerator.start(["post", "title:string", "--pretend", "-f", "-q", "-s"], {
+      cwd: "/app",
+      output: () => {},
+    });
+    expect(seen!.attributes).toEqual(["title:string"]);
+    expect(seen!.options).toMatchObject({ pretend: true, force: true, quiet: true, skip: true });
+  });
+});

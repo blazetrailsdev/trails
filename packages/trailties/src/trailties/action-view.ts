@@ -1,4 +1,10 @@
-import { include, onLoad, type Deprecators, type Reloader } from "@blazetrails/activesupport";
+import {
+  include,
+  onLoad,
+  TopLevel,
+  type Deprecators,
+  type Reloader,
+} from "@blazetrails/activesupport";
 import { UrlFor } from "@blazetrails/actionpack";
 import {
   Base,
@@ -180,6 +186,12 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("action_view.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("actionView", deprecator());
+    });
+
+    this.initializer("action_view.logger", () => {
+      onLoad("action_view", (base: typeof Base) => {
+        base.logger ??= TopLevel.Trails!.logger;
+      });
     });
 
     this.initializer("action_view.caching", (app) => {

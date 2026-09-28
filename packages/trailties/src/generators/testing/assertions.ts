@@ -66,7 +66,7 @@ export async function assertInstanceMethod(
   block?: (body: string) => unknown,
 ): Promise<void> {
   const match = new RegExp(
-    `(\\s+)(?:async )?${method}(\\(.*?\\))?[^{\\n]*\\{(.*?)\\n\\1\\}`,
+    `(\\s+)(?:(?:private|protected) )?(?:async )?${method}(\\(.*?\\))?[^{\\n]*\\{(.*?)\\n\\1\\}`,
     "s",
   ).exec(content);
   assert(match, `Expected to have method ${method}`);
