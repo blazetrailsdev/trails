@@ -114,8 +114,8 @@ export class RoutesProxy implements UrlForHost {
     const options: Record<string, unknown> = { ...this.urlOptions(), ...inlineOptions };
 
     if (this._scriptNamer) {
-      options["script_name"] = mergeScriptNames(
-        options["script_name"] as string | null | undefined,
+      options["scriptName"] = mergeScriptNames(
+        options["scriptName"] as string | null | undefined,
         this._scriptNamer(options),
       );
     }

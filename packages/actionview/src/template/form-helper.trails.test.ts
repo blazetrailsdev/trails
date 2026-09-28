@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { Base } from "../base.js";
+import { FormBuilder } from "../helpers/form-helper.js";
 import { LookupContext } from "../lookup-context.js";
 
 class Post {
@@ -32,5 +33,21 @@ describe("FormHelper includes RecordIdentifier (form_helper.rb:120)", () => {
       locals: { post: new Post(1) },
     });
     expect(String(rendered)).toBe("post edit_post");
+  });
+});
+
+describe("FormHelper attr_internal :default_form_builder (form_helper.rb:122)", () => {
+  class SpecializedFormBuilder extends FormBuilder {}
+
+  it("hands a controller's default_form_builder to form_with", () => {
+    const view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, null);
+    view.assignController({ defaultFormBuilder: () => SpecializedFormBuilder });
+
+    let builder: unknown;
+    view.formWith({ url: "/posts" }, (f: unknown) => {
+      builder = f;
+      return "";
+    });
+    expect(builder).toBeInstanceOf(SpecializedFormBuilder);
   });
 });

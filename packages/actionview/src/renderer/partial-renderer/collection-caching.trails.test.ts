@@ -75,7 +75,7 @@ describe("CollectionCaching", () => {
 
     expect(store.readMultiCalls).toBe(1);
     expect(store.writeMultiCalls).toBe(1);
-    expect(rendered.body).toBe("<david><mary>");
+    expect(String(rendered.body)).toBe("<david><mary>");
   });
 
   it("collapses items with equal cache keys into one render and one written entry", async () => {
@@ -94,7 +94,7 @@ describe("CollectionCaching", () => {
 
     expect(template.render).toHaveBeenCalledTimes(1);
     expect((writeMulti.mock.calls[0][0] as Map<unknown, unknown>).size).toBe(1);
-    expect(rendered.body).toBe("<david><david>");
+    expect(String(rendered.body)).toBe("<david><david>");
   });
 
   it("serves a second render from the cache without re-rendering the partial", async () => {
@@ -117,7 +117,7 @@ describe("CollectionCaching", () => {
     const rendered = await second.result;
 
     expect(second.template.render).not.toHaveBeenCalled();
-    expect(rendered.body).toBe("<david><mary>");
+    expect(String(rendered.body)).toBe("<david><mary>");
   });
 
   it("keys on the template digest, so a changed partial misses the cache", async () => {
@@ -140,7 +140,7 @@ describe("CollectionCaching", () => {
     );
 
     expect(second.render).toHaveBeenCalledTimes(1);
-    expect(rendered.body).toBe("<new>");
+    expect(String(rendered.body)).toBe("<new>");
   });
 
   it("renders without touching the cache when the controller is not caching", async () => {
@@ -156,7 +156,7 @@ describe("CollectionCaching", () => {
     );
 
     expect(store.readMultiCalls).toBe(0);
-    expect(rendered.body).toBe("<david>");
+    expect(String(rendered.body)).toBe("<david>");
   });
 
   it("instruments render_collection.action_view with Rails' payload", async () => {

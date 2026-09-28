@@ -361,9 +361,11 @@ export class Session {
   ): Promise<MockResponse> {
     env["HTTP_COOKIE"] ??= this.cookieJar.for(uri);
     this._lastRequest = new Request(env);
-    const [status, headers, rackBody] = await (typeof this.app === "function"
-      ? this.app(env)
-      : this.app.call(env));
+    const app = this.app;
+    const [status, headers, rackBody] = await (typeof app === "function" &&
+    Object.getOwnPropertyDescriptor(app, "prototype")?.writable !== false
+      ? app(env)
+      : (app as RackMiddleware).call(env));
     const body: string[] = [];
     for await (const chunk of rackBody) body.push(String(chunk));
 

@@ -8,7 +8,8 @@ import { DebugExceptions } from "../middleware/debug-exceptions.js";
 import { ShowExceptions } from "../middleware/show-exceptions.js";
 import type { MiddlewareFactory, MiddlewareStack } from "../middleware/stack.js";
 import { CookieStore } from "../middleware/session/cookie-store.js";
-import "../../test-helpers/abstract-unit.js";
+import { include } from "@blazetrails/activesupport";
+import { SharedTestRoutes } from "../../test-helpers/abstract-unit.js";
 
 const Generator = new KeyGenerator("a".repeat(64), { iterations: 2 });
 const Rotations = new RotationConfiguration();
@@ -123,6 +124,8 @@ class PostsController extends Base {
     });
   }
 }
+
+include(PostsController, SharedTestRoutes.urlHelpers());
 
 class CommentsController extends Base {
   async index() {

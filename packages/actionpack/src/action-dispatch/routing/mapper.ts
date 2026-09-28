@@ -1,6 +1,6 @@
 import { Redirect, redirect as redirectFactory } from "./redirection.js";
 import { Endpoint } from "./endpoint.js";
-import { Dispatcher, StaticDispatcher } from "./route-set.js";
+import { Dispatcher, StaticDispatcher, type RouteSet } from "./route-set.js";
 import type { DispatchableControllerClass } from "./dispatcher.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
@@ -48,6 +48,8 @@ export interface RouteConstraints {
 export type MountableApp =
   | ((env: RackEnv) => RackResponse | Promise<RackResponse>)
   | { call: (env: RackEnv) => RackResponse | Promise<RackResponse> };
+
+type RailsApp = MountableApp & { railtieName: string; routes(): RouteSet };
 
 export type CallableConstraint =
   | ((...args: never[]) => unknown)
@@ -1501,7 +1503,7 @@ export class Mapper {
   _mountedApps: Map<string, { app: MountableApp; path: string }> = new Map();
 
   /** @internal */
-  isRailsApp(app: MountableApp): boolean {
+  isRailsApp(app: MountableApp): app is RailsApp {
     return typeof app === "function" && Boolean((app as { railtieName?: unknown }).railtieName);
   }
 
@@ -1520,13 +1522,15 @@ export class Mapper {
   }
 
   /** @internal */
-  defineGeneratePrefix(app: MountableApp, name: string, mountPath: string): void {
+  defineGeneratePrefix(app: RailsApp, name: string, mountPath: string): void {
     const scriptNamer = (options: Record<string, unknown>): string => {
       if (options.originalScriptName) return mountPath;
       const sn = options.scriptName;
       return typeof sn === "string" && sn.length > 0 ? sn : mountPath;
     };
     this._mountedScriptNamers.set(name, { app, scriptNamer });
+
+    app.routes().defineMountedHelper(name, scriptNamer);
   }
 
   /** @internal */

@@ -4,6 +4,7 @@ import {
   assertIncludes,
   assertNotIncludes,
   include,
+  underscore,
   type Included,
 } from "@blazetrails/activesupport";
 import { Module, NoMethodError, rbFSend, rbObjSingletonClass } from "@blazetrails/ruby-compat";
@@ -13,8 +14,11 @@ import { Base } from "../base.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
-import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
-import type { MountableApp } from "../../action-dispatch/routing/mapper.js";
+import { RouteSet } from "../../action-dispatch/routing/route-set.js";
+import { controllerConstants } from "../../action-dispatch/http/request.js";
+import { X_CASCADE } from "../../action-dispatch/constants.js";
+import { Metal } from "../metal.js";
+import type { MountableApp, RouteOptions } from "../../action-dispatch/routing/mapper.js";
 import { CookieAssertions, SharedTestRoutes } from "../../test-helpers/abstract-unit.js";
 
 afterEach(() => vi.restoreAllMocks());
@@ -845,5 +849,447 @@ describe("MetalIntegrationTest", () => {
 
     await t.get("https://test.com:80");
     expect(t.request.env["HTTP_HOST"]).toBe("test.com:80");
+  });
+});
+
+describe("ApplicationIntegrationTest", () => {
+  class MetalController extends Metal {
+    async new(): Promise<void> {
+      this.status = 200;
+    }
+  }
+
+  class TestController extends Base {
+    async index(): Promise<void> {
+      await this.render({ plain: "index" });
+    }
+  }
+
+  class MountedApp {
+    static railtieName = "application_integration_test_mounted_app";
+
+    static _routes?: RouteSet;
+
+    static routes(): RouteSet {
+      return (this._routes ??= new RouteSet());
+    }
+
+    static call(): void {}
+
+    static {
+      this.routes().draw((r) => {
+        r.get("baz", { to: "application_integration_test/test#index", as: "baz" });
+      });
+    }
+  }
+
+  class ApplicationIntegrationTest extends IntegrationTest {
+    static call(env: RackEnv): Promise<RackResponse> {
+      return this.routes.call(env);
+    }
+
+    static _routes?: RouteSet;
+
+    static get routes(): RouteSet {
+      return (this._routes ??= new RouteSet());
+    }
+
+    static {
+      include(TestController, SharedTestRoutes.urlHelpers());
+      controllerConstants.set("application_integration_test/metal", MetalController);
+      controllerConstants.set("application_integration_test/test", TestController);
+      this.routes.draw((r) => {
+        r.get("", { to: "application_integration_test/test#index", as: "empty_string" });
+
+        r.get("metal", { to: "application_integration_test/metal#new", as: "new_metal" });
+
+        r.get("foo", { to: "application_integration_test/test#index", as: "foo" });
+        r.get("bar", { to: "application_integration_test/test#index", as: "bar" });
+
+        r.mount(MountedApp as unknown as MountableApp, { at: "/mounted", as: "mounted" });
+        r.get("fooz", {
+          to: (_env: RackEnv): RackResponse => [
+            200,
+            { [X_CASCADE]: "pass" },
+            bodyFromString("omg"),
+          ],
+          anchor: false,
+        });
+        r.get("fooz", { to: "application_integration_test/test#index" });
+      });
+    }
+
+    override get app(): unknown {
+      return this.constructor;
+    }
+  }
+  type Helpers = Record<string, (...args: unknown[]) => string> & {
+    mounted: Record<string, (...args: unknown[]) => string>;
+  };
+
+  let t: ApplicationIntegrationTest & Helpers;
+  beforeEach(() => {
+    t = new ApplicationIntegrationTest() as ApplicationIntegrationTest & Helpers;
+  });
+
+  it("includes route helpers", () => {
+    expect(t.emptyStringPath()).toBe("/");
+    expect(t.fooPath()).toBe("/foo");
+    expect(t.barPath()).toBe("/bar");
+  });
+
+  it("includes mounted helpers", () => {
+    expect(t.mounted.bazPath()).toBe("/mounted/baz");
+  });
+
+  it("path after cascade pass", async () => {
+    await t.get("/fooz");
+    expect(t.response.body).toBe("index");
+    expect(t.path).toBe("/fooz");
+  });
+
+  it("route helpers after controller access", async () => {
+    await t.get("/");
+    expect(t.emptyStringPath()).toBe("/");
+
+    await t.get("/foo");
+    expect(t.fooPath()).toBe("/foo");
+
+    await t.get("/bar");
+    expect(t.barPath()).toBe("/bar");
+  });
+
+  it("route helpers after metal controller access", async () => {
+    await t.get("/metal");
+    expect(t.fooPath({ q: "solution" })).toBe("/foo?q=solution");
+  });
+
+  it("missing route helper before controller access", () => {
+    expect(() => t.missingPath()).toThrow(TypeError);
+  });
+
+  it("missing route helper after controller access", async () => {
+    await t.get("/foo");
+    expect(() => t.missingPath()).toThrow(TypeError);
+  });
+
+  it("process do not modify the env passed as argument", async () => {
+    const env = { SERVER_NAME: "server", "action_dispatch.custom": "custom" };
+    const oldEnv = { ...env };
+    await t.get("/foo", { env });
+    expect(env).toEqual(oldEnv);
+  });
+});
+
+describe("EnvironmentFilterIntegrationTest", () => {
+  class TestController extends Base {
+    async post(): Promise<void> {
+      await this.render({ plain: "Created", status: 201 });
+    }
+  }
+
+  class EnvironmentFilterIntegrationTest extends IntegrationTest {
+    static call(env: RackEnv): Promise<RackResponse> {
+      env["action_dispatch.parameter_filter"] = ["password"];
+      return this.routes.call(env);
+    }
+
+    static _routes?: RouteSet;
+
+    static get routes(): RouteSet {
+      return (this._routes ??= new RouteSet());
+    }
+
+    static {
+      controllerConstants.set("environment_filter_integration_test/test", TestController);
+      this.routes.draw((r) => {
+        r.match("/post", { to: "environment_filter_integration_test/test#post", via: "post" });
+      });
+    }
+
+    override get app(): unknown {
+      return this.constructor;
+    }
+  }
+
+  it("filters rack request form vars", async () => {
+    const t = new EnvironmentFilterIntegrationTest();
+    await t.post("/post", { params: { username: "cjolly", password: "secret" } });
+
+    expect(t.request.filteredParameters()["username"]).toBe("cjolly");
+    expect(t.request.filteredParameters()["password"]).toBe("[FILTERED]");
+    expect(t.request.filteredEnv()["rack.request.form_vars"]).toBe("[FILTERED]");
+  });
+});
+
+describe("ControllerWithHeadersMethodIntegrationTest", () => {
+  class TestController extends Base {
+    async index(): Promise<void> {
+      await this.render({ plain: "ok" });
+    }
+
+    override get headers(): never {
+      return Object.freeze({}) as never;
+    }
+  }
+
+  let t: IntegrationTest;
+  const assertResponse = (type: number | string): void => t.assertResponse(type);
+
+  it("doesn't call controller's headers method", async () => {
+    t = new IntegrationTest();
+    controllerConstants.set("controller_with_headers_method_integration_test/test", TestController);
+    await t.withRouting(async (routes: RouteSet) => {
+      routes.draw((r) => {
+        r.get("/ok", { to: "controller_with_headers_method_integration_test/test#index" });
+      });
+
+      await t.get("/ok");
+
+      assertResponse(200);
+    });
+  });
+});
+
+describe("UrlOptionsIntegrationTest", () => {
+  class FooController extends Base {
+    async index(): Promise<void> {
+      await this.render({ plain: "foo#index" });
+    }
+
+    async show(): Promise<void> {
+      await this.render({ plain: "foo#show" });
+    }
+
+    async edit(): Promise<void> {
+      await this.render({ plain: "foo#show" });
+    }
+  }
+
+  class BarController extends Base {
+    static {
+      Object.defineProperty(this.prototype, "defaultUrlOptions", {
+        get(): Record<string, unknown> {
+          return { host: "bar.com" };
+        },
+        configurable: true,
+      });
+    }
+
+    async index(): Promise<void> {
+      await this.render({ plain: "foo#index" });
+    }
+  }
+
+  class UrlOptionsIntegrationTest extends IntegrationTest {
+    static _routes?: RouteSet;
+
+    static get routes(): RouteSet {
+      return (this._routes ??= new RouteSet());
+    }
+
+    static call(env: RackEnv): Promise<RackResponse> {
+      return this.routes.call(env);
+    }
+
+    override get app(): unknown {
+      return this.constructor;
+    }
+
+    static {
+      include(FooController, SharedTestRoutes.urlHelpers());
+      include(BarController, SharedTestRoutes.urlHelpers());
+      controllerConstants.set("url_options_integration_test/foo", FooController);
+      controllerConstants.set("url_options_integration_test/bar", BarController);
+      this.routes.draw((r) => {
+        r.defaultUrlOptions = { host: "foo.com" };
+
+        r.scope({ module: "url_options_integration_test" }, () => {
+          r.get("/foo", { to: "foo#index", as: "foos" });
+          r.get("/foo/:id", { to: "foo#show", as: "foo" });
+          r.get("/foo/:id/edit", { to: "foo#edit", as: "edit_foo" });
+          r.get("/bar", { to: "bar#index", as: "bars" });
+        });
+      });
+    }
+  }
+  type Helpers = Record<string, (...args: unknown[]) => string>;
+
+  let t: UrlOptionsIntegrationTest & Helpers;
+  const assertResponse = (type: number | string): void => t.assertResponse(type);
+  beforeEach(() => {
+    t = new UrlOptionsIntegrationTest() as UrlOptionsIntegrationTest & Helpers;
+  });
+
+  it("session uses default URL options from routes", () => {
+    expect(t.foosUrl()).toBe("http://foo.com/foo");
+  });
+
+  it("current host overrides default URL options from routes", async () => {
+    await t.get("/foo");
+    assertResponse("success");
+    expect(t.foosUrl()).toBe("http://www.example.com/foo");
+  });
+
+  it("controller can override default URL options from request", async () => {
+    await t.get("/bar");
+    assertResponse("success");
+    expect(t.foosUrl()).toBe("http://bar.com/foo");
+  });
+
+  it("can override default url options", async () => {
+    const originalHost = { ...t.defaultUrlOptions };
+    try {
+      t.defaultUrlOptions["host"] = "foobar.com";
+      expect(t.foosUrl()).toBe("http://foobar.com/foo");
+
+      await t.get("/bar");
+      assertResponse("success");
+      expect(t.foosUrl()).toBe("http://foobar.com/foo");
+    } finally {
+      t.defaultUrlOptions = originalHost;
+    }
+  });
+
+  it("current request path parameters are recalled", async () => {
+    await t.get("/foo/1");
+    assertResponse("success");
+    expect(t.urlFor({ action: "edit", onlyPath: true })).toBe("/foo/1/edit");
+  });
+});
+
+describe("HeadWithStatusActionIntegrationTest", () => {
+  class FooController extends Base {
+    static {
+      Object.defineProperty(this.prototype, "status", {
+        async value(this: Base): Promise<void> {
+          this.head("ok");
+        },
+        configurable: true,
+        writable: true,
+      });
+    }
+  }
+
+  class HeadWithStatusActionIntegrationTest extends IntegrationTest {
+    static _routes?: RouteSet;
+
+    static get routes(): RouteSet {
+      return (this._routes ??= new RouteSet());
+    }
+
+    static call(env: RackEnv): Promise<RackResponse> {
+      return this.routes.call(env);
+    }
+
+    override get app(): unknown {
+      return this.constructor;
+    }
+
+    static {
+      controllerConstants.set("head_with_status_action_integration_test/foo", FooController);
+      this.routes.draw((r) => {
+        r.get("/foo/status", { to: "head_with_status_action_integration_test/foo#status" });
+      });
+    }
+  }
+
+  let t: HeadWithStatusActionIntegrationTest;
+  const assertResponse = (type: number | string): void => t.assertResponse(type);
+
+  it("get /foo/status with head result does not cause stack overflow error", async () => {
+    t = new HeadWithStatusActionIntegrationTest();
+    await expect(t.get("/foo/status")).resolves.not.toThrow();
+    assertResponse("ok");
+  });
+});
+
+describe("IntegrationWithRoutingTest", () => {
+  class FooController extends Base {
+    async index(): Promise<void> {
+      await this.render({ plain: "ok" });
+    }
+  }
+
+  class IntegrationWithRoutingTest extends IntegrationTest {}
+
+  let t: IntegrationWithRoutingTest;
+  const assertResponse = (type: number | string): void => t.assertResponse(type);
+
+  it("with routing resets session", async () => {
+    t = new IntegrationWithRoutingTest();
+    const klassNamespace = underscore(IntegrationWithRoutingTest.name);
+    controllerConstants.set(`${klassNamespace}/foo`, FooController);
+
+    await t.withRouting(async (routes: RouteSet) => {
+      routes.draw((r) => {
+        r.namespace(klassNamespace, () => {
+          r.resources("foo", { path: "/with" } as RouteOptions);
+        });
+      });
+
+      await t.get("/integration_with_routing_test/with");
+      assertResponse(200);
+      expect(t.response.body).toBe("ok");
+    });
+
+    await t.withRouting(async (routes: RouteSet) => {
+      routes.draw((r) => {
+        r.namespace(klassNamespace, () => {
+          r.resources("foo", { path: "/routing" } as RouteOptions);
+        });
+      });
+
+      await t.get("/integration_with_routing_test/routing");
+      assertResponse(200);
+      expect(t.response.body).toBe("ok");
+    });
+  });
+});
+
+describe("IntegrationRequestsWithoutSetup", () => {
+  class FooController extends Base {
+    async ok(): Promise<void> {
+      this.cookies().set("key", "ok");
+      await this.render({ plain: "ok" });
+    }
+  }
+
+  let t: IntegrationTest;
+  const assertResponse = (type: number | string): void => t.assertResponse(type);
+
+  it("request", async () => {
+    t = new IntegrationTest();
+    await t.withRouting(async (routes: RouteSet) => {
+      routes.draw((r) => {
+        deprecator().silence(() => {
+          r.get(":action", { to: FooController as unknown as MountableApp });
+        });
+      });
+
+      await t.get("/ok");
+
+      assertResponse(200);
+      expect(t.response.body).toBe("ok");
+      expect(t.cookies.get("key")).toBe("ok");
+    });
+  });
+});
+
+describe("IntegrationRequestsWithSessionSetup", () => {
+  class IntegrationRequestsWithSessionSetup extends IntegrationTest {
+    static {
+      this.setup(function (this: IntegrationTest) {
+        this.cookies.set("user_name", "david");
+      });
+    }
+  }
+
+  it("cookies set in setup are persisted through the session", async () => {
+    const t = new IntegrationRequestsWithSessionSetup();
+    t.beforeSetup();
+    t.setup();
+    await t.get("/foo");
+    expect(t.cookies.toHash()).toEqual({ user_name: "david" });
   });
 });

@@ -1,4 +1,5 @@
 import {
+  attrInternal,
   h,
   htmlEscape,
   htmlEscapeOnce,
@@ -192,6 +193,8 @@ export class Base {
 
   _defaultFormBuilder: unknown = null;
 
+  declare defaultFormBuilder: unknown;
+
   get assigns(): Record<string, unknown> {
     return this._assigns;
   }
@@ -372,6 +375,7 @@ for (const [name, value] of Object.entries(TseUtil)) {
 }
 
 Helpers.installControllerInternals(Base.prototype);
+attrInternal.call(Base.prototype, "defaultFormBuilder");
 Helpers.installControllerDelegates(Base.prototype);
 
 for (const [name, value] of Object.entries(Helpers)) {

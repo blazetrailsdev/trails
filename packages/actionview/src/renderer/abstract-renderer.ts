@@ -1,5 +1,5 @@
 import { ArgumentError, File, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { kernelArray, type SafeBuffer } from "@blazetrails/activesupport";
+import { htmlSafe, kernelArray, type SafeBuffer } from "@blazetrails/activesupport";
 import type { LookupContext } from "../lookup-context.js";
 import type { Template } from "../template.js";
 
@@ -91,8 +91,8 @@ export class RenderedCollection {
     private readonly spacer: RenderedTemplate,
   ) {}
 
-  get body(): string {
-    return this.renderedTemplates.map((t) => t.body).join(this.spacer.body.toString());
+  get body(): SafeBuffer {
+    return htmlSafe(this.renderedTemplates.map((t) => t.body).join(this.spacer.body.toString()));
   }
 
   get format(): unknown {

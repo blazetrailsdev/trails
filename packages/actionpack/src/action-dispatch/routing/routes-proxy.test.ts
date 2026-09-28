@@ -97,8 +97,8 @@ describe("RoutesProxy", () => {
       () => "/mounted",
     ) as RoutesProxyInstance;
 
-    proxy.thingUrl({ script_name: "/ctx/old" });
-    expect(captured[0].script_name).toBe("/ctx/mounted");
+    proxy.thingUrl({ scriptName: "/ctx/old" });
+    expect(captured[0].scriptName).toBe("/ctx/mounted");
   });
 
   it("throws on undefined helper when accessed directly", () => {

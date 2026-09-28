@@ -3,11 +3,19 @@ import { Headers } from "../http/headers.js";
 import { MimeType } from "../http/mime-type.js";
 import {
   isPresent,
+  reverseMergeBang,
   runLoadHooks,
   SetupAndTeardown,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
-import { HTTPS, URI, include, stringSplit, type Generic } from "@blazetrails/ruby-compat";
+import {
+  HTTPS,
+  URI,
+  include,
+  rbObjRespondTo,
+  stringSplit,
+  type Generic,
+} from "@blazetrails/ruby-compat";
 import { TestResponse } from "./test-response.js";
 import { FlashHash } from "../middleware/flash.js";
 import { RouteSet } from "../routing/route-set.js";
@@ -43,6 +51,8 @@ export interface IntegrationRequestOptions {
 
 const DEFAULT_HOST = "www.example.com";
 
+const APP_SESSIONS = new Map<unknown, typeof IntegrationTest>();
+
 const DEFAULT_REMOTE_ADDR = "127.0.0.1";
 const DEFAULT_ACCEPT =
   "text/xml,application/xml,application/xhtml+xml," +
@@ -73,6 +83,19 @@ export class IntegrationTest {
 
   constructor() {
     this.resetBang();
+    const app = this.app as { routes?: unknown } | null;
+    if (rbObjRespondTo(app, "routes") && app!.routes instanceof RouteSet) {
+      const session = this.constructor as typeof IntegrationTest;
+      let klass = APP_SESSIONS.get(app);
+      if (klass === undefined || Object.getPrototypeOf(klass) !== session) {
+        klass = class extends session {};
+        klass.prototype.constructor = session;
+        include(klass, app!.routes.urlHelpers());
+        include(klass, app!.routes.mountedHelpers());
+        APP_SESSIONS.set(app, klass);
+      }
+      Object.setPrototypeOf(this, klass.prototype);
+    }
   }
 
   resetBang(): void {
@@ -101,11 +124,24 @@ export class IntegrationTest {
 
   urlOptions(): Record<string, unknown> {
     if (!this._urlOptions) {
-      this._urlOptions = {
-        ...this._defaultUrlOptions,
+      const urlOptions = { ...this.defaultUrlOptions };
+      if (rbObjRespondTo(this.controller, "urlOptions")) {
+        reverseMergeBang(
+          urlOptions,
+          (this.controller as unknown as { urlOptions(): Record<string, unknown> }).urlOptions(),
+        );
+      }
+
+      const app = this.app as { routes?: RouteSet } | null;
+      if (rbObjRespondTo(app, "routes")) {
+        reverseMergeBang(urlOptions, app!.routes!.defaultUrlOptions);
+      }
+
+      reverseMergeBang(urlOptions, {
         host: this.host,
-        protocol: this._https ? "https" : "http",
-      };
+        protocol: this.isHttps() ? "https" : "http",
+      });
+      this._urlOptions = urlOptions;
     }
     return this._urlOptions;
   }
