@@ -29,10 +29,12 @@ function read(rel: string): string {
 
 describe("ControllerGenerator emit", () => {
   it("matches snapshot for simple controller", async () => {
-    await new ControllerGenerator({ cwd: tmpDir, output: () => {} }).run("Account", [
-      "index",
-      "show",
-    ]);
+    await new ControllerGenerator({
+      cwd: tmpDir,
+      output: () => {},
+      name: "Account",
+      actions: ["index", "show"],
+    }).run();
     const src = read("app/controllers/account-controller.ts");
     expect(src).toMatchSnapshot();
     expect(parseTs(src).diagnostics).toEqual([]);
@@ -40,13 +42,13 @@ describe("ControllerGenerator emit", () => {
   });
 
   it("matches snapshot for namespaced controller with parent", async () => {
-    await new ControllerGenerator({ cwd: tmpDir, output: () => {} }).run(
-      "admin/dashboard",
-      ["index"],
-      {
-        parent: "admin_controller",
-      },
-    );
+    await new ControllerGenerator({
+      cwd: tmpDir,
+      output: () => {},
+      name: "admin/dashboard",
+      actions: ["index"],
+      parent: "admin_controller",
+    }).run();
     const src = read("app/controllers/admin/dashboard-controller.ts");
     expect(src).toMatchSnapshot();
     expect(parseTs(src).diagnostics).toEqual([]);

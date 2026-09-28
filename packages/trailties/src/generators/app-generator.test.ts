@@ -389,6 +389,19 @@ describe("AppGenerator", () => {
     });
   });
 
+  it("inclusion of ci files", async () => {
+    await makeGen().run();
+    await assertFile("my-app/.github/workflows/ci.yml");
+    await assertFile("my-app/.github/dependabot.yml");
+  });
+
+  it("ci files are skipped if required", async () => {
+    await makeGen("sqlite", { skipCi: true }).run();
+
+    assertNoFile("my-app/.github/workflows/ci.yml");
+    assertNoFile("my-app/.github/dependabot.yml");
+  });
+
   it("generated files have no eslint warnings", async () => {
     await makeGen().run();
     fs.symlinkSync(

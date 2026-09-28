@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { ControllerGenerator } from "./controller-generator.js";
+import { ControllerGenerator, type ControllerGeneratorOptions } from "./controller-generator.js";
 
 let tmpDir: string;
 let lines: string[];
@@ -23,7 +23,16 @@ afterEach(() => {
 });
 
 function makeGen() {
-  return new ControllerGenerator({ cwd: tmpDir, output: (m) => lines.push(m) });
+  return {
+    run: (name: string, actions: string[], opts: Partial<ControllerGeneratorOptions> = {}) =>
+      new ControllerGenerator({
+        cwd: tmpDir,
+        output: (m) => lines.push(m),
+        name,
+        actions,
+        ...opts,
+      }).run(),
+  };
 }
 
 describe("ControllerGenerator view and controller file naming", () => {

@@ -95,4 +95,25 @@ describe("AppGenerator (trails-only)", () => {
     await new AppGenerator({ cwd: tmpDir, output: () => {}, appPath: "my-app" }).run();
     expect(File.stat(File.join(tmpDir, "my-app", "bin", "eslint")).mode & 0o777).toBe(0o755);
   });
+
+  it("the generated CI workflow lints with ESLint unless --skip-eslint", async () => {
+    const ci = async (opts: Record<string, unknown>): Promise<string> => {
+      const dir = File.join(tmpDir, SecureRandom.hex(4));
+      FileUtils.mkdirP(dir);
+      await new AppGenerator({
+        cwd: dir,
+        output: () => {},
+        appPath: "my-app",
+        database: "postgresql",
+        ...opts,
+      }).run();
+      return File.read(File.join(dir, "my-app", ".github", "workflows", "ci.yml"));
+    };
+
+    const content = await ci({});
+    expect(content).toMatch(/ {2}lint:\n[^]*run: bin\/eslint --format stylish\n\n {2}test:/);
+    expect(content).toMatch(/DATABASE_URL: postgres:\/\/postgres:postgres@localhost:5432/);
+    expect(await ci({ skipEslint: true })).not.toMatch(/lint:|eslint/);
+    expect(await ci({ skipTest: true })).not.toMatch(/test:\s*runs-on/);
+  });
 });

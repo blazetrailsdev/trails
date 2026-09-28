@@ -105,6 +105,7 @@ export abstract class AppBase extends GeneratorBase {
       desc: "Skip system test files",
     });
     this.classOption("skipEslint", { type: "boolean", default: null, desc: "Skip ESLint setup" });
+    this.classOption("skipCi", { type: "boolean", default: null, desc: "Skip GitHub CI files" });
     this.classOption("dev", {
       type: "boolean",
       default: null,

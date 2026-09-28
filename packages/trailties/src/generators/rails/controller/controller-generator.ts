@@ -1,5 +1,4 @@
-import { GeneratorBase, type GeneratorOptions } from "../../base.js";
-import { underscore } from "@blazetrails/activesupport";
+import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
 import {
   actionMethod,
   controllerPathHelpers,
@@ -7,29 +6,41 @@ import {
   parentRefForRelative,
 } from "./controller-paths.js";
 
-export interface ControllerRunOptions {
-  skipHelper?: boolean;
+export interface ControllerGeneratorOptions extends NamedBaseOptions {
+  actions?: string[];
   skipRoutes?: boolean;
-  test?: boolean;
+  helper?: boolean;
   parent?: string;
+  test?: boolean;
 }
 
-export class ControllerGenerator extends GeneratorBase {
-  constructor(options: GeneratorOptions) {
-    super(options);
+export class ControllerGenerator extends NamedBase {
+  declare options: ControllerGeneratorOptions;
+  actions: string[];
+
+  static {
+    this.classOption("skipRoutes", {
+      type: "boolean",
+      desc: "Don't add routes to config/routes.rb.",
+    });
+    this.classOption("helper", { type: "boolean" });
+    this.classOption("parent", {
+      type: "string",
+      default: "ApplicationController",
+      desc: "The parent class for the generated controller",
+    });
   }
 
-  async run(
-    name: string,
-    actions: string[],
-    options: ControllerRunOptions = {},
-  ): Promise<string[]> {
-    const {
-      skipHelper = false,
-      skipRoutes = false,
-      test = true,
-      parent = "ApplicationController",
-    } = options;
+  constructor(options: ControllerGeneratorOptions) {
+    super({ ...options, attributes: [] });
+    this.actions = options.actions ?? options.attributes ?? [];
+    this.fileName = this.removePossibleSuffix(this.fileName);
+  }
+
+  async run(): Promise<string[]> {
+    const name = this.name;
+    const actions = this.actions;
+    const test = this.options.test ?? true;
     const paths = controllerPathHelpers(name);
     const ts = this.isTypeScript();
     const ext = this.ext();
@@ -37,12 +48,12 @@ export class ControllerGenerator extends GeneratorBase {
 
     const source = emitControllerClass({
       className: paths.className,
-      parent: parentRefForRelative(parent, depth),
+      parent: parentRefForRelative(this.parentClassName(), depth),
       methods: actions.map((a) => actionMethod(a, ts)),
     });
     this.createFile(`app/controllers/${paths.controllerFile}${ext}`, source);
 
-    await this.addRoutes(paths.namespaceParts, actions, skipRoutes);
+    await this.addRoutes();
 
     if (test) {
       const importPrefix = "../".repeat(depth + 2);
@@ -61,7 +72,7 @@ ${cases}
       );
     }
 
-    if (!skipHelper) {
+    if (this.options.helper !== false) {
       this.createFile(
         `app/helpers/${paths.helperFile}${ext}`,
         `export const ${paths.helperName} = {\n};\n`,
@@ -78,18 +89,22 @@ ${cases}
     return this.getCreatedFiles();
   }
 
-  private async addRoutes(
-    namespaceParts: string[],
-    actions: string[],
-    skipRoutes: boolean,
-  ): Promise<void> {
-    if (skipRoutes) return;
-    if (actions.length === 0) return;
-    const fileName = underscore(namespaceParts[namespaceParts.length - 1]);
-    const routingCode = actions
-      .map((action) => `mapper.get(${JSON.stringify(`${fileName}/${action}`)});`)
+  async addRoutes(): Promise<void> {
+    if (this.options.skipRoutes) return;
+    if (this.actions.length === 0) return;
+    const routingCode = this.actions
+      .map((action) => `mapper.get(${JSON.stringify(`${this.fileName}/${action}`)});`)
       .join("\n");
-    const regularClassPath = namespaceParts.slice(0, -1).map((p) => underscore(p));
-    await this.route(routingCode, { namespace: regularClassPath });
+    await this.route(routingCode, { namespace: this.regularClassPath() });
+  }
+
+  /** @internal */
+  private parentClassName(): string {
+    return this.options.parent!;
+  }
+
+  /** @internal */
+  private removePossibleSuffix(name: string): string {
+    return name.replace(/_?controller$/i, "");
   }
 }

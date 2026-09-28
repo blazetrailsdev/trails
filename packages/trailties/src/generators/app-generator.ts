@@ -126,6 +126,7 @@ export class AppGenerator extends AppBase {
       this.createDockerFiles();
     }
     this.createEslintFile();
+    this.createCifiles();
 
     this.output("");
 
@@ -1305,6 +1306,109 @@ export default defineConfig([
   private createEslintFile(): void {
     if (this.skip("Eslint")) return;
     this.eslint();
+  }
+
+  cifiles(): void {
+    this.emptyDirectory(".github/workflows");
+    const database = this.database.name;
+    const install = `corepack enable && ${this.packageManager} install`;
+    const checkoutAndSetup = `      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Install dependencies
+        run: ${install}
+`;
+    const lint = this.skip("Eslint")
+      ? ""
+      : `  lint:
+    runs-on: ubuntu-latest
+    steps:
+${checkoutAndSetup}
+      - name: Lint code for consistent style
+        run: bin/eslint --format stylish
+
+`;
+    const services =
+      database === "sqlite3"
+        ? ""
+        : database === "postgresql"
+          ? `    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=3
+
+`
+          : `    services:
+      mysql:
+        image: mysql
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: true
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+`;
+    const databaseUrl =
+      database === "postgres"
+        ? "\n          DATABASE_URL: postgres://postgres:postgres@localhost:5432"
+        : database === "sqlite3"
+          ? ""
+          : "\n          DATABASE_URL: mysql2://127.0.0.1:3306";
+    const test = this.options.skipTest
+      ? ""
+      : `  test:
+    runs-on: ubuntu-latest
+
+${services}    steps:
+${checkoutAndSetup}
+      - name: Run tests
+        env:
+          TRAILS_ENV: test${databaseUrl}
+        run: ${this.packageManager} test
+`;
+    this.createFile(
+      ".github/workflows/ci.yml",
+      `name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+${lint}${test}`,
+    );
+    this.createFile(
+      ".github/dependabot.yml",
+      `version: 2
+updates:
+- package-ecosystem: npm
+  directory: "/"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10
+- package-ecosystem: github-actions
+  directory: "/"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10
+`,
+    );
+  }
+
+  private createCifiles(): void {
+    if (this.options.skipCi) return;
+    this.cifiles();
   }
 
   databaseYml(): void {

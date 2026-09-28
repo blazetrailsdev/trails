@@ -128,3 +128,60 @@ describe("GeneratorsTest", () => {
     ).rejects.toThrow(`Expected '--database' to be one of ${DATABASES.join(", ")}; got "oracle"`);
   });
 });
+
+describe("Rails::Generators.find_by_namespace fallbacks", () => {
+  it("find_by_namespace falls back from a missing base through fallbacks[base]", async () => {
+    Generators.fallbacks()["remarkable"] = "rails";
+    try {
+      const klass = await Generators.findByNamespace("model", "remarkable");
+      expect(klass).toBeTruthy();
+      expect(klass!.namespace).toEqual("rails:model");
+    } finally {
+      delete Generators.fallbacks()["remarkable"];
+    }
+  });
+
+  it("find_by_namespace falls back from a context through fallbacks[name]", async () => {
+    Generators.fallbacks()["remarkable"] = "rails";
+    try {
+      const klass = await Generators.findByNamespace("remarkable", "rails", "model");
+      expect(klass).toBeTruthy();
+      expect(klass!.namespace).toEqual("rails:model");
+    } finally {
+      delete Generators.fallbacks()["remarkable"];
+    }
+  });
+});
+
+describe("Rails::Generators.configure!", () => {
+  it("applies api_only!, fallbacks and templates_path from the app config", async () => {
+    const { Generators: GeneratorsConfiguration } = await import("./configuration.js");
+    const rails = { ...Generators.options()["rails"] };
+    const hidden = [...Generators.hiddenNamespaces()];
+    const config = new GeneratorsConfiguration();
+    config.apiOnly = true;
+    config.fallbacks = { shoulda: "test_unit" };
+    config.templates = ["lib/templates", "lib/templates"];
+    try {
+      Generators.configureBang(config);
+      expect(Generators.options()["rails"]).toMatchObject({
+        api: true,
+        assets: false,
+        helper: false,
+        templateEngine: null,
+      });
+      expect(Generators.options()["mailer"]["templateEngine"]).toBe("tse");
+      expect(Generators.hiddenNamespaces()).toEqual(
+        expect.arrayContaining(["assets", "helper", "css", "js"]),
+      );
+      expect(Generators.fallbacks()["shoulda"]).toBe("test_unit");
+      expect(Generators.templatesPath()).toEqual(["lib/templates"]);
+    } finally {
+      Generators.options()["rails"] = rails;
+      delete Generators.options()["mailer"];
+      Generators.hiddenNamespaces().splice(0, Infinity, ...hidden);
+      delete Generators.fallbacks()["shoulda"];
+      Generators.templatesPath().splice(0);
+    }
+  });
+});

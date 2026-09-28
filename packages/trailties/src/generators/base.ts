@@ -16,7 +16,7 @@ export interface GeneratorOptions {
   force?: boolean;
   skip?: boolean;
   pretend?: boolean;
-  behavior?: "invoke" | "revoke";
+  behavior?: "invoke" | "revoke" | "force" | "skip";
 }
 
 export interface ClassOptionConfig {
@@ -103,8 +103,25 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     )) {
       if (option.default != null && opts[name] === undefined) opts[name] = option.default;
     }
+    switch (String(options.behavior)) {
+      case "force":
+      case "skip":
+        this._cleanupOptionsAndSet(opts, options.behavior!);
+        this.behavior = "invoke";
+        break;
+      case "revoke":
+        this.behavior = "revoke";
+        break;
+      default:
+        this.behavior = "invoke";
+    }
     this.options = opts as unknown as GeneratorOptions;
-    this.behavior = options.behavior === "revoke" ? "revoke" : "invoke";
+  }
+
+  /** @internal */
+  private _cleanupOptionsAndSet(options: Record<string, unknown>, key: string): void {
+    for (const i of ["force", "skip"]) delete options[i];
+    options[key] = true;
   }
 
   /** @noRailsEquivalent PERMANENT */

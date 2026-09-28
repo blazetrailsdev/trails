@@ -239,7 +239,16 @@ describe("ModelGeneratorTest", () => {
     expect(lines.join("\n")).toMatch(/identical\s+db\/migrate\/\d+_create_accounts\.ts/);
   });
 
-  it.skip("migration is skipped on skip behavior", () => {});
+  it("migration is skipped on skip behavior", async () => {
+    await makeGen().run("Account", ["name:string", "age:integer"]);
+    const gen = new ModelGenerator({
+      cwd: tmpDir,
+      output: (m) => lines.push(m),
+      behavior: "skip",
+    });
+    await gen.run("Account", []);
+    expect(lines.join("\n")).toMatch(/skip\s+db\/migrate\/\d+_create_accounts\.ts/);
+  });
 
   it("migration error is not shown on revoke", async () => {
     await makeGen().run("Account", []);
