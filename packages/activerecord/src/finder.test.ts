@@ -1761,43 +1761,43 @@ describe("FinderTest", () => {
 
   it("include when non AR object passed on unloaded relation", async () => {
     await assertNoQueries(false, async () => {
-      expect(await Customer.where({ name: "David" }).include("I'm not an AR object" as never)).toBe(
-        false,
-      );
+      expect(
+        await Customer.where({ name: "David" }).isInclude("I'm not an AR object" as never),
+      ).toBe(false);
     });
   });
 
   it("include when non AR object passed on loaded relation", async () => {
     const custs = await Customer.where({ name: "David" }).load();
     await assertNoQueries(false, async () => {
-      expect(await custs.include("I'm not an AR object" as never)).toBe(false);
+      expect(await custs.isInclude("I'm not an AR object" as never)).toBe(false);
     });
   });
 
   it("member when non AR object passed on unloaded relation", async () => {
     await assertNoQueries(false, async () => {
-      expect(await Customer.where({ name: "David" }).member("I'm not an AR object" as never)).toBe(
-        false,
-      );
+      expect(
+        await Customer.where({ name: "David" }).isMember("I'm not an AR object" as never),
+      ).toBe(false);
     });
   });
 
   it("member when non AR object passed on loaded relation", async () => {
     const custs = await Customer.where({ name: "David" }).load();
     await assertNoQueries(false, async () => {
-      expect(await custs.member("I'm not an AR object" as never)).toBe(false);
+      expect(await custs.isMember("I'm not an AR object" as never)).toBe(false);
     });
   });
 
   it("include on unloaded relation with match", async () => {
     await assertQueriesMatch(oneLimitRe, undefined, false, async () => {
-      expect(await Customer.where({ name: "David" }).include(customers("david"))).toBe(true);
+      expect(await Customer.where({ name: "David" }).isInclude(customers("david"))).toBe(true);
     });
   });
 
   it("include on unloaded relation without match", async () => {
     await assertQueriesMatch(oneLimitRe, undefined, false, async () => {
-      expect(await Customer.where({ name: "David" }).include(customers("mary"))).toBe(false);
+      expect(await Customer.where({ name: "David" }).isInclude(customers("mary"))).toBe(false);
     });
   });
 
@@ -1806,13 +1806,13 @@ describe("FinderTest", () => {
     expect(await Customer.isExists(topic.id)).toBeTruthy();
 
     await assertNoQueries(false, async () => {
-      expect(await Customer.where({ name: "David" }).include(topic as never)).toBe(false);
+      expect(await Customer.where({ name: "David" }).isInclude(topic as never)).toBe(false);
     });
   });
 
   it("include on unloaded relation with offset", async () => {
     await assertQueriesMatch(/ORDER BY name ASC/, undefined, false, async () => {
-      expect(await Customer.offset(1).order("name ASC").include(customers("mary"))).toBe(true);
+      expect(await Customer.offset(1).order("name ASC").isInclude(customers("mary"))).toBe(true);
     });
   });
 
@@ -1821,9 +1821,9 @@ describe("FinderTest", () => {
     const barney = customers("barney");
     const david = customers("david");
 
-    expect(await Customer.order({ id: "desc" }).limit(2).include(david)).toBe(false);
-    expect(await Customer.order({ id: "desc" }).limit(2).include(barney)).toBe(true);
-    expect(await Customer.order({ id: "desc" }).limit(2).include(mary)).toBe(true);
+    expect(await Customer.order({ id: "desc" }).limit(2).isInclude(david)).toBe(false);
+    expect(await Customer.order({ id: "desc" }).limit(2).isInclude(barney)).toBe(true);
+    expect(await Customer.order({ id: "desc" }).limit(2).isInclude(mary)).toBe(true);
   });
 
   it.skipIf(adapterType === "postgres")(
@@ -1837,14 +1837,14 @@ describe("FinderTest", () => {
           .joins(":posts")
           .group("id")
           .having("total_posts > 2")
-          .include(bob),
+          .isInclude(bob),
       ).toBe(false);
       expect(
         await Author.select("COUNT(*) as total_posts", "authors.*")
           .joins(":posts")
           .group("id")
           .having("total_posts > 2")
-          .include(mary),
+          .isInclude(mary),
       ).toBe(true);
     },
   );
@@ -1854,7 +1854,7 @@ describe("FinderTest", () => {
     const david = customers("david");
 
     await assertNoQueries(false, async () => {
-      expect(await custs.include(david)).toBe(true);
+      expect(await custs.isInclude(david)).toBe(true);
     });
   });
 
@@ -1863,14 +1863,14 @@ describe("FinderTest", () => {
     const mary = customers("mary");
 
     await assertNoQueries(false, async () => {
-      expect(await custs.include(mary)).toBe(false);
+      expect(await custs.isInclude(mary)).toBe(false);
     });
   });
 
   it("include on unloaded relation with composite primary key", async () => {
     await assertQueriesMatch(oneLimitRe, undefined, false, async () => {
       const book = cpkBooks("cpk_great_author_first_book");
-      expect(await CpkBook.where({ title: "The first book" }).include(book)).toBeTruthy();
+      expect(await CpkBook.where({ title: "The first book" }).isInclude(book)).toBeTruthy();
     });
   });
 
@@ -1879,19 +1879,19 @@ describe("FinderTest", () => {
     const greatAuthorBook = cpkBooks("cpk_great_author_first_book");
 
     await assertNoQueries(false, async () => {
-      expect(await books.include(greatAuthorBook)).toBeTruthy();
+      expect(await books.isInclude(greatAuthorBook)).toBeTruthy();
     });
   });
 
   it("member on unloaded relation with match", async () => {
     await assertQueriesMatch(oneLimitRe, undefined, false, async () => {
-      expect(await Customer.where({ name: "David" }).member(customers("david"))).toBe(true);
+      expect(await Customer.where({ name: "David" }).isMember(customers("david"))).toBe(true);
     });
   });
 
   it("member on unloaded relation without match", async () => {
     await assertQueriesMatch(oneLimitRe, undefined, false, async () => {
-      expect(await Customer.where({ name: "David" }).member(customers("mary"))).toBe(false);
+      expect(await Customer.where({ name: "David" }).isMember(customers("mary"))).toBe(false);
     });
   });
 
@@ -1900,13 +1900,13 @@ describe("FinderTest", () => {
     expect(await Customer.isExists(topic.id)).toBeTruthy();
 
     await assertNoQueries(false, async () => {
-      expect(await Customer.where({ name: "David" }).member(topic as never)).toBe(false);
+      expect(await Customer.where({ name: "David" }).isMember(topic as never)).toBe(false);
     });
   });
 
   it("member on unloaded relation with offset", async () => {
     await assertQueriesMatch(/ORDER BY name ASC/, undefined, false, async () => {
-      expect(await Customer.offset(1).order("name ASC").member(customers("mary"))).toBe(true);
+      expect(await Customer.offset(1).order("name ASC").isMember(customers("mary"))).toBe(true);
     });
   });
 
@@ -1915,9 +1915,9 @@ describe("FinderTest", () => {
     const barney = customers("barney");
     const david = customers("david");
 
-    expect(await Customer.order({ id: "desc" }).limit(2).member(david)).toBe(false);
-    expect(await Customer.order({ id: "desc" }).limit(2).member(barney)).toBe(true);
-    expect(await Customer.order({ id: "desc" }).limit(2).member(mary)).toBe(true);
+    expect(await Customer.order({ id: "desc" }).limit(2).isMember(david)).toBe(false);
+    expect(await Customer.order({ id: "desc" }).limit(2).isMember(barney)).toBe(true);
+    expect(await Customer.order({ id: "desc" }).limit(2).isMember(mary)).toBe(true);
   });
 
   it("member on loaded relation with match", async () => {
@@ -1925,7 +1925,7 @@ describe("FinderTest", () => {
     const david = customers("david");
 
     await assertNoQueries(false, async () => {
-      expect(await custs.member(david)).toBe(true);
+      expect(await custs.isMember(david)).toBe(true);
     });
   });
 
@@ -1934,14 +1934,14 @@ describe("FinderTest", () => {
     const mary = customers("mary");
 
     await assertNoQueries(false, async () => {
-      expect(await custs.member(mary)).toBe(false);
+      expect(await custs.isMember(mary)).toBe(false);
     });
   });
 
   it("member on unloaded relation with composite primary key", async () => {
     await assertQueriesMatch(oneLimitRe, undefined, false, async () => {
       const book = cpkBooks("cpk_great_author_first_book");
-      expect(await CpkBook.where({ title: "The first book" }).member(book)).toBeTruthy();
+      expect(await CpkBook.where({ title: "The first book" }).isMember(book)).toBeTruthy();
     });
   });
 
@@ -1950,7 +1950,7 @@ describe("FinderTest", () => {
     const greatAuthorBook = cpkBooks("cpk_great_author_first_book");
 
     await assertNoQueries(false, async () => {
-      expect(await books.member(greatAuthorBook)).toBeTruthy();
+      expect(await books.isMember(greatAuthorBook)).toBeTruthy();
     });
   });
 });

@@ -1,128 +1,124 @@
-import { ExecutionContext } from "@blazetrails/activesupport";
-import { ConfigurationError } from "./errors.js";
+import {
+  ArgumentError,
+  ExecutionContext,
+  isBlank,
+  isPresent,
+  threadMattrAccessor,
+} from "@blazetrails/activesupport";
 import { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
 import type { TagValue, QueryLogsFormatter } from "./query-logs-formatter.js";
-import type { QueryTransformer } from "./query-transformers.js";
 
 export { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
 export type { TagValue, QueryLogsFormatter } from "./query-logs-formatter.js";
 
 export type TagHandler = (context?: Record<string, TagValue>) => TagValue;
-export type TagDefinition = string | TagHandler | Record<string, TagValue | TagHandler>;
+export type TagDefinition = string | Record<string, TagValue | TagHandler>;
 
 export class GetKeyHandler {
-  constructor(private readonly name: string) {}
+  #name: string;
+
+  constructor(name: string) {
+    this.#name = name;
+  }
 
   call(context: Record<string, TagValue>): TagValue {
-    return context[this.name];
+    return context[this.#name];
   }
 }
 
-export class QueryLogs implements QueryTransformer {
-  private _taggings: Record<string, TagValue | TagHandler> = {};
-  private _tags: TagDefinition[] = [];
-  private _tagsFormatter: "legacy" | "sqlcommenter" = "legacy";
-  private _formatter: QueryLogsFormatter = LegacyFormatter;
-  private _prependComment = false;
-  private _cacheEnabled = false;
-  private _cachedComment: string | null | undefined = undefined;
-  private _keyHandlers: Map<string, GetKeyHandler> = new Map();
+export class IdentityHandler {
+  #value: TagValue;
 
-  get tags(): TagDefinition[] {
-    return this._tags;
+  constructor(value: TagValue) {
+    this.#value = value;
   }
 
-  get tagsFormatter(): "legacy" | "sqlcommenter" {
-    return this._tagsFormatter;
+  call(_context: Record<string, TagValue>): TagValue {
+    return this.#value;
+  }
+}
+
+export class ZeroArityHandler {
+  #proc: () => TagValue;
+
+  constructor(proc: () => TagValue) {
+    this.#proc = proc;
   }
 
-  set tags(tags: TagDefinition[]) {
-    this._tags = tags;
-    this._keyHandlers = new Map<string, GetKeyHandler>();
-    for (const tag of tags) {
-      if (typeof tag === "string") {
-        this._keyHandlers.set(tag, new GetKeyHandler(tag));
-      }
+  call(_context: Record<string, TagValue>): TagValue {
+    return this.#proc();
+  }
+}
+
+type Handler = GetKeyHandler | IdentityHandler | ZeroArityHandler | TagHandler;
+
+export class QueryLogs {
+  static #taggings: Record<string, TagValue | TagHandler> = Object.freeze({});
+  static #tags: TagDefinition[] = Object.freeze(["application"]) as TagDefinition[];
+  static prependComment = false;
+  static cacheQueryLogTags = false;
+  static #tagsFormatter: string | false = false;
+  static #formatter: QueryLogsFormatter;
+  static #handlers: [string, Handler][];
+  declare static cachedComment: string | null;
+
+  static {
+    threadMattrAccessor.call(this, "cachedComment", { instanceAccessor: false });
+  }
+
+  static get tags(): TagDefinition[] {
+    return this.#tags;
+  }
+
+  static get taggings(): Record<string, TagValue | TagHandler> {
+    return this.#taggings;
+  }
+
+  static get tagsFormatter(): string | false {
+    return this.#tagsFormatter;
+  }
+
+  static set taggings(taggings: Record<string, TagValue | TagHandler>) {
+    this.#taggings = Object.freeze(taggings);
+    this.#handlers = this.rebuildHandlers();
+  }
+
+  static set tags(tags: TagDefinition[]) {
+    this.#tags = Object.freeze(tags) as TagDefinition[];
+    this.#handlers = this.rebuildHandlers();
+  }
+
+  static set tagsFormatter(format: string) {
+    switch (format) {
+      case "legacy":
+        this.#formatter = LegacyFormatter;
+        break;
+      case "sqlcommenter":
+        this.#formatter = SQLCommenter;
+        break;
+      default:
+        throw new ArgumentError(`Formatter is unsupported: ${format}`);
     }
-    this._cachedComment = undefined;
+    this.#tagsFormatter = format;
   }
 
-  get taggings(): Record<string, TagValue | TagHandler> {
-    return this._taggings;
-  }
-
-  set taggings(taggings: Record<string, TagValue | TagHandler>) {
-    this._taggings = Object.freeze({ ...taggings });
-    this._cachedComment = undefined;
-  }
-
-  get prependComment(): boolean {
-    return this._prependComment;
-  }
-
-  set prependComment(value: boolean) {
-    this._prependComment = value;
-  }
-
-  get cacheQueryLogTags(): boolean {
-    return this._cacheEnabled;
-  }
-
-  set cacheQueryLogTags(value: boolean) {
-    this._cacheEnabled = value;
-    if (!value) this._cachedComment = undefined;
-  }
-
-  set tagsFormatter(format: "legacy" | "sqlcommenter" | QueryLogsFormatter) {
-    if (format === "legacy") {
-      this._tagsFormatter = "legacy";
-      this._formatter = LegacyFormatter;
-    } else if (format === "sqlcommenter") {
-      this._tagsFormatter = "sqlcommenter";
-      this._formatter = SQLCommenter;
-    } else if (
-      format !== null &&
-      (typeof format === "object" || typeof format === "function") &&
-      typeof format.format === "function" &&
-      typeof format.join === "function"
-    ) {
-      if (format === SQLCommenter) {
-        this._tagsFormatter = "sqlcommenter";
-      } else if (format === LegacyFormatter) {
-        this._tagsFormatter = "legacy";
-      } else {
-        this._tagsFormatter = "legacy";
-      }
-      this._formatter = format;
-    } else {
-      const describe = (v: unknown): string => {
-        if (v === null) return "null";
-        if (v === undefined) return "undefined";
-        if (typeof v === "function") return `class/function ${v.name || "<anonymous>"}`;
-        if (typeof v === "object") {
-          const name = (v as { constructor?: { name?: string } })?.constructor?.name;
-          return `${typeof v}${name ? ` (${name})` : ""}`;
-        }
-        return `${typeof v} ${String(v)}`;
-      };
-      throw new ConfigurationError(
-        `Formatter is unsupported: ${describe(format)} — expected "legacy", "sqlcommenter", or an object/class with callable \`format\` and \`join\``,
-      );
-    }
-    this._cachedComment = undefined;
-  }
-
-  call(sql: string, connection?: unknown): string {
+  static call(sql: string, connection?: unknown): string {
     const comment = this.comment(connection);
-    if (!comment) return sql;
-    return this._prependComment ? `${comment} ${sql}` : `${sql} ${comment}`;
+
+    if (isBlank(comment)) {
+      return sql;
+    } else if (this.prependComment) {
+      return `${comment} ${sql}`;
+    } else {
+      return `${sql} ${comment}`;
+    }
   }
 
-  clearCache(): void {
-    this._cachedComment = undefined;
+  static clearCache(): void {
+    this.cachedComment = null;
   }
 
-  querySourceLocation(): string | null {
+  static querySourceLocation(): string | null {
     const stack = new Error().stack;
     if (!stack) return null;
     const lines = stack.split("\n").slice(2);
@@ -140,110 +136,81 @@ export class QueryLogs implements QueryTransformer {
     return null;
   }
 
-  /** @internal */
-  tagContent(connection?: unknown): string | null {
-    const context: Record<string, TagValue> = ExecutionContext.toH() as Record<string, TagValue>;
-    if (connection !== undefined && context.connection == null) {
-      (context as Record<string, unknown>).connection = connection;
-    }
-    const entries: [string, TagValue][] = [];
-    for (const tag of this._tags) {
-      if (typeof tag === "string") {
-        let handler = this._keyHandlers.get(tag);
-        if (!handler) {
-          handler = new GetKeyHandler(tag);
-          this._keyHandlers.set(tag, handler);
+  static {
+    ExecutionContext.afterChange(() => QueryLogs.clearCache());
+  }
+
+  private static rebuildHandlers(): [string, Handler][] {
+    const handlers: [string, Handler][] = [];
+    for (const i of this.#tags) {
+      if (typeof i === "object" && i !== null) {
+        for (const [k, v] of Object.entries(i)) {
+          handlers.push([k, this.buildHandler(k, v)]);
         }
-        const value =
-          this._taggings[tag] == null
-            ? handler.call(context)
-            : buildHandler(tag, this._taggings[tag])(context);
-        if (value != null) {
-          entries.push([tag, value]);
-        }
-      } else if (typeof tag === "function") {
-        const value = tag(context);
-        if (value != null) {
-          entries.push(["custom", value]);
-        }
-      } else if (typeof tag === "object") {
-        for (const [key, handler] of Object.entries(tag)) {
-          const value = typeof handler === "function" ? handler(context) : handler;
-          if (value != null) {
-            entries.push([key, value]);
-          }
-        }
+      } else {
+        handlers.push([i, this.buildHandler(i)]);
       }
     }
-    if (entries.length === 0) return null;
-    entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-    const pairs = entries.map(([key, val]) => this._formatter.format(key, val));
-    return this._formatter.join(pairs);
+    return handlers.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   }
 
-  /** @internal */
-  comment(connection?: unknown): string | null {
-    if (this._cacheEnabled && this._cachedComment !== undefined) {
-      return this._cachedComment;
-    }
-    const result = this.uncachedComment(connection);
-    if (this._cacheEnabled) {
-      this._cachedComment = result;
-    }
-    return result;
-  }
-
-  private uncachedComment(connection?: unknown): string | null {
-    const content = this.tagContent(connection);
-    if (!content) return null;
-    return `/*${this.escapeSqlComment(content)}*/`;
-  }
-
-  private escapeSqlComment(content: string): string {
-    return String(content)
-      .replace(/^\s*\/\*\+?\s?|\s?\*\/\s*$/g, "")
-      .replace(/\*\//g, "* /")
-      .replace(/\/\*/g, "/ *");
-  }
-}
-
-/** @internal */
-export function rebuildHandlers(
-  tags: TagDefinition[],
-): [string, (ctx: Record<string, TagValue>) => TagValue][] {
-  const handlers: [string, (ctx: Record<string, TagValue>) => TagValue][] = [];
-  for (const i of tags) {
-    if (typeof i === "function") {
-      const fn = i;
-      handlers.push(["custom", (ctx) => fn(ctx)]);
-    } else if (typeof i === "object" && i !== null) {
-      for (const [k, v] of Object.entries(i)) {
-        handlers.push([k, buildHandler(k, v)]);
+  private static buildHandler(name: string, handler?: TagValue | TagHandler): Handler {
+    if (handler == null || handler === false) handler = this.#taggings[name];
+    if (handler == null) {
+      return new GetKeyHandler(name);
+    } else if (typeof handler === "function") {
+      if (handler.length === 0) {
+        return new ZeroArityHandler(handler as () => TagValue);
+      } else {
+        return handler;
       }
     } else {
-      handlers.push([i, buildHandler(i)]);
+      return new IdentityHandler(handler);
     }
   }
-  handlers.sort((a, b) => a[0].localeCompare(b[0]));
-  return handlers;
-}
 
-/** @internal */
-export function buildHandler(
-  name: string,
-  handler?: TagValue | TagHandler,
-): (ctx: Record<string, TagValue>) => TagValue {
-  if (handler == null) {
-    const h = new GetKeyHandler(name);
-    return (ctx) => h.call(ctx);
-  }
-  if (typeof handler === "function") {
-    if (handler.length === 0) {
-      const fn = handler as () => TagValue;
-      return () => fn();
+  /** @internal */
+  static comment(connection?: unknown): string | null {
+    if (this.cacheQueryLogTags) {
+      return (this.cachedComment ??= this.uncachedComment(connection));
+    } else {
+      return this.uncachedComment(connection);
     }
-    return handler as (ctx: Record<string, TagValue>) => TagValue;
   }
-  const val = handler;
-  return () => val;
+
+  private static uncachedComment(connection?: unknown): string | null {
+    const content = this.tagContent(connection);
+
+    if (isPresent(content)) {
+      return `/*${this.escapeSqlComment(content)}*/`;
+    }
+    return null;
+  }
+
+  private static escapeSqlComment(content: string): string {
+    let comment = String(content);
+    comment = comment.replace(/^\s*\/\*\+?\s?|\s?\*\/\s*$/g, "");
+    comment = comment.replaceAll("*/", "* /");
+    comment = comment.replaceAll("/*", "/ *");
+    return comment;
+  }
+
+  /** @internal */
+  static tagContent(connection?: unknown): string {
+    const context = ExecutionContext.toH() as Record<string, TagValue>;
+    if (context.connection == null || (context.connection as unknown) === false) {
+      (context as Record<string, unknown>).connection = connection;
+    }
+
+    const pairs = this.#handlers.flatMap(([key, handler]) => {
+      const val = typeof handler === "function" ? handler(context) : handler.call(context);
+      return val == null ? [] : [this.#formatter.format(key, val)];
+    });
+    return this.#formatter.join(pairs);
+  }
+
+  static {
+    this.#handlers = this.rebuildHandlers();
+    this.tagsFormatter = "legacy";
+  }
 }

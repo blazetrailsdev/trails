@@ -347,3 +347,29 @@ describe("ARRAY_DELEGATES on DelegationRelationTest and DelegationRecordsTest ta
     });
   }
 });
+
+describe("Enumerable members answered over the loaded records", () => {
+  fixtures(["comments"]);
+
+  it("loads records for all?, collect, each_cons, each_with_index, exclude?, find_all, to_set", async () => {
+    const rel = Comment.order("id") as unknown as {
+      isAll(fn: (c: Comment) => boolean): Promise<boolean>;
+      collect(fn: (c: Comment) => unknown): Promise<unknown[]>;
+      findAll(fn: (c: Comment) => boolean): Promise<Comment[]>;
+      eachCons(n: number): Promise<Comment[][]>;
+      eachWithIndex(fn: (c: Comment, i: number) => unknown): Promise<Comment[]>;
+      isExclude(c: Comment): Promise<boolean>;
+      toSet(): Promise<Set<Comment>>;
+    };
+    const comments: Comment[] = await Comment.order("id");
+    expect(await rel.isAll((c: Comment) => c.id != null)).toBe(true);
+    expect(await rel.collect((c: Comment) => c.id)).toEqual(comments.map((c) => c.id));
+    expect(await rel.findAll((c: Comment) => c.id === comments[0].id)).toHaveLength(1);
+    expect(await rel.eachCons(2)).toHaveLength(comments.length - 1);
+    const indexes: number[] = [];
+    await rel.eachWithIndex((_: Comment, i: number) => indexes.push(i));
+    expect(indexes).toEqual(comments.map((_, i) => i));
+    expect(await rel.isExclude(comments[0])).toBe(false);
+    expect(await rel.toSet()).toBeInstanceOf(Set);
+  });
+});

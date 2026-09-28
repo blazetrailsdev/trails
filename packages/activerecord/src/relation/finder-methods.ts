@@ -319,7 +319,7 @@ export async function isExists(
   );
 }
 
-export async function include(this: FinderRelation, record: any): Promise<boolean> {
+export async function isInclude(this: FinderRelation, record: any): Promise<boolean> {
   if (!(record instanceof (this.model as unknown as new (...args: any[]) => any))) return false;
   if (
     this.isLoaded ||
@@ -340,7 +340,7 @@ export async function include(this: FinderRelation, record: any): Promise<boolea
   return this.isExists(id);
 }
 
-export const member = include;
+export const isMember = isInclude;
 
 /**
  * @missingRailsCall size — PERMANENT
@@ -424,8 +424,8 @@ export const FinderMethods = {
   thirdToLast,
   thirdToLastBang,
   isExists,
-  include,
-  member,
+  isInclude,
+  isMember,
   raiseRecordNotFoundExceptionBang,
   constructRelationForExists,
   usingLimitableReflections,

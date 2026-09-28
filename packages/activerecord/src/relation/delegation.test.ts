@@ -272,27 +272,15 @@ describe("DelegationTest", () => {
     "intersect?",
   ] as const;
 
-  const RELATION_ENUMERABLE_GAPS = [
-    "all?",
-    "collect",
-    "each_cons",
-    "each_with_index",
-    "exclude?",
-    "find_all",
-    "to_set",
-    "to_yaml",
-  ] as const;
-
   describe("DelegationAssociationTest", () => {
     for (const method of ARRAY_DELEGATES) {
-      if ((RELATION_ENUMERABLE_GAPS as readonly string[]).includes(method)) continue;
+      if (method === "to_yaml") {
+        it.skip(`delegates ${method.replaceAll("_", " ")} to Array`, () => {});
+        continue;
+      }
       it(`delegates ${method.replaceAll("_", " ")} to Array`, () => {
         assertRespondTo(new Post().comments, tsName(method));
       });
-    }
-
-    for (const method of RELATION_ENUMERABLE_GAPS) {
-      it.skip(`delegates ${method.replaceAll("_", " ")} to Array`, () => {});
     }
 
     it("delegates sort to Array loading records on call", async () => {
