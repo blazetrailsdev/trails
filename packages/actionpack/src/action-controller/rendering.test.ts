@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { htmlSafe } from "@blazetrails/activesupport";
-import { FixtureResolver, MissingTemplate } from "@blazetrails/actionview";
+import { FixtureResolver } from "@blazetrails/actionview";
 import { Base, DoubleRenderError } from "./base.js";
 import { API } from "./api.js";
 import { Metal } from "./metal.js";
@@ -359,18 +359,6 @@ describe("ActionController rendering", () => {
       const c = new TemplateController();
       await c.dispatch("index", makeRequest(), makeResponse());
       expect(c.responseBody).toBe("<div>index</div>");
-    });
-
-    it("raises MissingTemplate for a bare render with no view paths", async () => {
-      class C extends Base {
-        async index() {
-          this.render();
-        }
-      }
-      const c = new C();
-      await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toBeInstanceOf(
-        MissingTemplate,
-      );
     });
   });
 

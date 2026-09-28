@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
-import { FixtureResolver, TemplateHandlers } from "@blazetrails/actionview";
+import { FixtureResolver, MissingTemplate, TemplateHandlers } from "@blazetrails/actionview";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { Base } from "./base.js";
@@ -131,5 +131,19 @@ describe("ActionController::Streaming#_render_template", () => {
     expect(renderBody).toHaveBeenCalledOnce();
     expect(controller.responseBody).toBe("streamed row");
     expect(controller.response.getHeader("cache-control")).toBe("no-cache");
+  });
+});
+
+describe("ActionController::Base bare render", () => {
+  class BareController extends ApplicationController {
+    async index(): Promise<void> {
+      this.render();
+    }
+  }
+
+  it("raises MissingTemplate for a bare render with no view paths", async () => {
+    await expect(
+      new BareController().dispatch("index", makeRequest(), new Response()),
+    ).rejects.toBeInstanceOf(MissingTemplate);
   });
 });
