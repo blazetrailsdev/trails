@@ -685,7 +685,7 @@ export function assertEqual(
   msg: string | (() => string) | null = null,
 ): true {
   msg = message(msg, E, () => diff(exp, act));
-  const result = assert(deepEqual(exp, act), msg);
+  const result = assert(rbEqual(exp, act), msg);
 
   if (exp == null) {
     if (Minitest.VERSION >= "6") {
@@ -700,7 +700,7 @@ export function assertEqual(
 
 function refuteEqual(exp: unknown, act: unknown, msg: string | (() => string) | null = null): true {
   msg = message(msg, null, () => `Expected ${inspect(act)} to not be equal to ${inspect(exp)}`);
-  return refute(deepEqual(exp, act), msg);
+  return refute(rbEqual(exp, act), msg);
 }
 
 export function assertNotEqual(
@@ -764,13 +764,7 @@ export function assertNoMatch(
 function caseEqual(expected: unknown, actual: unknown): boolean {
   if (expected instanceof RegExp) return typeof actual === "string" && expected.test(actual);
   if (typeof expected === "function") return actual instanceof (expected as new () => unknown);
-  return deepEqual(expected, actual);
-}
-
-function deepEqual(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) return true;
-  if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
-  return JSON.stringify(a) === JSON.stringify(b);
+  return rbEqual(expected, actual);
 }
 
 function inspect(value: unknown): string {

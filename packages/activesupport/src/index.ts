@@ -625,6 +625,7 @@ export {
 } from "./testing/assertions.js";
 export { beforeSetup, setTaggedLogger } from "./testing/tagged-logging.js";
 export { silenceStream, quietly, capture } from "./testing/stream.js";
+export * as SetupAndTeardown from "./testing/setup-and-teardown.js";
 export { currentTime } from "./time-travel.js";
 export { currentTimeInstant } from "./time-travel.js";
 

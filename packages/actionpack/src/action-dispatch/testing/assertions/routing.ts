@@ -1,7 +1,22 @@
-import { deleteIf, hasKey, InvalidURIError, URI } from "@blazetrails/ruby-compat";
-import { RouteSet } from "../../routing/route-set.js";
+import {
+  deleteIf,
+  extend,
+  hasKey,
+  include,
+  InvalidURIError,
+  Module,
+  rbObjClone,
+  rbObjMethod,
+  rbObjRespondTo,
+  rbObjSingletonClass,
+  URI,
+  type Method,
+} from "@blazetrails/ruby-compat";
+import { Assertion, assertEqual } from "@blazetrails/activesupport";
+import { RouteSet, type Config } from "../../routing/route-set.js";
 import { RoutingError } from "../../../action-controller/metal/exceptions.js";
 import { TestRequest } from "../../../action-controller/test-case.js";
+import type { IntegrationTest } from "../integration.js";
 
 export interface RoutingAssertionsHost {
   routes?: RouteSet;
@@ -17,58 +32,144 @@ type Options = Record<string, unknown>;
 
 const URL_FORM_RE = /:\/\//;
 
+interface TestClass<H> {
+  setup(...args: ((this: H) => void)[]): void;
+  teardown(...args: ((this: H) => void)[]): void;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-namespace -- Ruby `module WithIntegrationRouting` (`testing/assertions/routing.rb:18`) nests its own `ClassMethods`; a namespace keeps both at their Rails names beside RoutingAssertions' same-named members.
+export namespace WithIntegrationRouting {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- `WithIntegrationRouting::ClassMethods` (`routing.rb:21`).
+  export namespace ClassMethods {
+    export function withRouting(
+      this: TestClass<IntegrationTest>,
+      block: (routes: RouteSet) => unknown,
+    ): void {
+      let oldRoutes: RouteSet | undefined;
+      let oldRoutesCallMethod: Method | undefined;
+      let oldIntegrationSession: IntegrationTest | undefined;
+
+      this.setup(function () {
+        oldRoutes = (this.app as { routes: RouteSet }).routes;
+        oldRoutesCallMethod = rbObjMethod(oldRoutes, "call");
+        oldIntegrationSession = this.integrationSession;
+        createRoutes.call(this, block);
+      });
+
+      this.teardown(function () {
+        resetRoutes.call(this, oldRoutes!, oldRoutesCallMethod!, oldIntegrationSession!);
+      });
+    }
+  }
+
+  export function withRouting<T>(this: IntegrationTest, block: (routes: RouteSet) => T): T {
+    const oldRoutes = (this.app as { routes: RouteSet }).routes;
+    const oldRoutesCallMethod = rbObjMethod(oldRoutes, "call");
+    const oldIntegrationSession = this.integrationSession;
+    let result: T;
+    try {
+      result = createRoutes.call<IntegrationTest, [(r: RouteSet) => T], T>(this, block);
+    } catch (e) {
+      resetRoutes.call(this, oldRoutes, oldRoutesCallMethod, oldIntegrationSession);
+      throw e;
+    }
+    if (typeof (result as { then?: unknown } | null)?.then === "function") {
+      return Promise.resolve(result).finally(() =>
+        resetRoutes.call(this, oldRoutes, oldRoutesCallMethod, oldIntegrationSession),
+      ) as T;
+    }
+    resetRoutes.call(this, oldRoutes, oldRoutesCallMethod, oldIntegrationSession);
+    return result;
+  }
+
+  /**
+   * @internal
+   * @missingRailsCall new — CONVERGEABLE integration-runner-merged-into-session
+   */
+  export function createRoutes<T>(this: IntegrationTest, block: (routes: RouteSet) => T): T {
+    const app = this.app as { routes: RouteSet };
+    const routes = new RouteSet();
+
+    this._originalRoutes ??= app.routes;
+    const routesCallMethod = rbObjMethod(routes, "call");
+    (rbObjSingletonClass(this._originalRoutes).prototype as { call: unknown }).call = (
+      ...args: unknown[]
+    ) => routesCallMethod.call(...args);
+
+    const https = this.integrationSession.isHttps();
+    const host = this.integrationSession.host;
+
+    app.routes = routes;
+    this.integrationSession.httpsBang(https);
+    this.integrationSession.hostBang(host);
+    this.routes = routes;
+
+    return block(routes);
+  }
+
+  /** @internal */
+  export function resetRoutes(
+    this: IntegrationTest,
+    oldRoutes: RouteSet,
+    oldRoutesCallMethod: Method,
+    _oldIntegrationSession: IntegrationTest,
+  ): void {
+    (this.app as { routes: RouteSet }).routes = oldRoutes;
+    (rbObjSingletonClass(this._originalRoutes!).prototype as { call: unknown }).call = (
+      ...args: unknown[]
+    ) => oldRoutesCallMethod.call(...args);
+    this.routes = oldRoutes;
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-namespace -- `RoutingAssertions::ClassMethods` (`routing.rb:79`), whose `with_routing` shares its name with the instance method.
+export namespace ClassMethods {
+  export function withRouting(
+    this: TestClass<RoutingAssertionsHost>,
+    block: (routes: RouteSet) => unknown,
+  ): void {
+    let oldRoutes: RouteSet | undefined;
+    let oldController: unknown;
+
+    this.setup(function () {
+      [oldRoutes, oldController] = [this.routes, this.controller];
+      createRoutes.call(this, null, block);
+    });
+
+    this.teardown(function () {
+      resetRoutes.call(this, oldRoutes, oldController);
+    });
+  }
+}
+
 export function setup(this: RoutingAssertionsHost): void {
   if (this.routes == null) this.routes = undefined;
 }
 
 export function withRouting<T>(
   this: RoutingAssertionsHost,
-  config: unknown,
+  config: Config | null | ((routes: RouteSet) => T),
   block?: (routes: RouteSet) => T,
 ): T {
-  let cb: (routes: RouteSet) => T;
-  let configHash: unknown;
-  if (typeof config === "function") {
-    cb = config as (routes: RouteSet) => T;
-  } else {
-    configHash = config;
-    if (typeof block !== "function") {
-      throw new TypeError("withRouting requires a callback block");
-    }
-    cb = block;
-  }
-  const oldRoutes = this.routes;
-  const oldController = this.controller;
-  const restore = () => resetRoutes.call(this, oldRoutes, oldController);
+  if (typeof config === "function") [config, block] = [null, config];
+  const [oldRoutes, oldController] = [this.routes, this.controller];
   let result: T;
   try {
-    result = createRoutes.call<RoutingAssertionsHost, [(r: RouteSet) => T, unknown], T>(
+    result = createRoutes.call<RoutingAssertionsHost, [Config | null, (r: RouteSet) => T], T>(
       this,
-      cb,
-      configHash,
+      config,
+      block!,
     );
   } catch (e) {
-    restore();
+    resetRoutes.call(this, oldRoutes, oldController);
     throw e;
   }
-  if (result != null && typeof (result as { then?: unknown }).then === "function") {
-    try {
-      return (result as unknown as PromiseLike<unknown>).then(
-        (v) => {
-          restore();
-          return v;
-        },
-        (e) => {
-          restore();
-          throw e;
-        },
-      ) as T;
-    } catch (e) {
-      restore();
-      throw e;
-    }
+  if (typeof (result as { then?: unknown } | null)?.then === "function") {
+    return Promise.resolve(result).finally(() =>
+      resetRoutes.call(this, oldRoutes, oldController),
+    ) as T;
   }
-  restore();
+  resetRoutes.call(this, oldRoutes, oldController);
   return result;
 }
 
@@ -86,14 +187,14 @@ export function assertRecognizes(
     return;
   }
   const request = recognizedRequestFor.call(this, path, extras, msg);
-  const expected = { ...expectedOptions };
-  const actual = request.pathParameters as unknown as Options;
-  if (!deepEqual(expected, actual)) {
-    throw new Error(
-      msg ??
-        `The recognized options <${inspect(actual)}> did not match <${inspect(expected)}>, difference:`,
-    );
-  }
+  expectedOptions = { ...expectedOptions };
+
+  const message =
+    msg ??
+    (() =>
+      `The recognized options <${inspect(request.pathParameters)}> did not match <${inspect(expectedOptions)}>, difference:`);
+
+  assertEqual(expectedOptions, request.pathParameters, message);
 }
 
 export function assertGenerates(
@@ -120,12 +221,11 @@ export function assertGenerates(
   for (const k of queryStringKeys) {
     if (Object.hasOwn(opts, k)) foundExtras[k] = opts[k];
   }
-  if (!deepEqual(extras, foundExtras)) {
-    throw new Error(message ?? `found extras <${inspect(foundExtras)}>, not <${inspect(extras)}>`);
-  }
-  if (generatedPath !== path) {
-    throw new Error(message ?? `The generated path <${generatedPath}> did not match <${path}>`);
-  }
+  let msg = message ?? `found extras <${inspect(foundExtras)}>, not <${inspect(extras)}>`;
+  assertEqual(extras, foundExtras, msg);
+
+  msg = message ?? `The generated path <${generatedPath}> did not match <${path}>`;
+  assertEqual(path, generatedPath, msg);
 }
 
 export function assertRouting(
@@ -188,13 +288,32 @@ export function recognizedRequestFor(
 /** @internal */
 export function createRoutes<T>(
   this: RoutingAssertionsHost,
+  config: Config | null,
   block: (routes: RouteSet) => T,
-
-  _config?: unknown,
 ): T {
-  const routes = new RouteSet();
-  this.routes = routes;
-  return block(routes);
+  this.routes = new RouteSet(config ?? RouteSet.DEFAULT_CONFIG);
+  if (this.controller != null) {
+    this.controller = rbObjClone(this.controller as object);
+    const _routes = this.routes;
+
+    include(
+      rbObjSingletonClass(this.controller as object) as new () => object,
+      _routes.urlHelpers(),
+    );
+
+    if (rbObjRespondTo(this.controller, "viewContextClass")) {
+      const viewContextClass = class extends (
+        this.controller as { viewContextClass(): new (...args: never[]) => object }
+      ).viewContextClass() {};
+      include(viewContextClass, _routes.urlHelpers());
+
+      const customViewContext = new Module((mod) => {
+        mod.defineMethod("viewContextClass", () => viewContextClass);
+      });
+      extend(this.controller as object, customViewContext);
+    }
+  }
+  return block(this.routes);
 }
 
 /** @internal */
@@ -204,7 +323,9 @@ export function resetRoutes(
   oldController: unknown,
 ): void {
   this.routes = oldRoutes;
-  if (this.controller != null) this.controller = oldController;
+  if (this.controller != null) {
+    this.controller = oldController;
+  }
 }
 
 /** @internal */
@@ -217,7 +338,7 @@ export function failOn<T>(
     return block();
   } catch (e) {
     if (e instanceof exceptionClass) {
-      throw new Error(message ?? e.message, { cause: e });
+      throw new Assertion(message ?? e.message);
     }
     throw e;
   }
@@ -228,20 +349,6 @@ function requireRoutes(host: RoutingAssertionsHost): RouteSet {
     throw new Error("No routes available — set `this.routes` to a RouteSet first.");
   }
   return host.routes;
-}
-
-function deepEqual(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) return true;
-  if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
-  if (Array.isArray(a) !== Array.isArray(b)) return false;
-  const ao = a as Options;
-  const bo = b as Options;
-  const ak = Object.keys(ao);
-  if (ak.length !== Object.keys(bo).length) return false;
-  for (const k of ak) {
-    if (!Object.hasOwn(bo, k) || !deepEqual(ao[k], bo[k])) return false;
-  }
-  return true;
 }
 
 const inspect = (v: unknown): string => {
