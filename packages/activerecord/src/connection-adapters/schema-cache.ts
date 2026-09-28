@@ -19,55 +19,49 @@ export type Pool = {
   withConnection<T>(callback: (connection: any) => T | Promise<T>): T | Promise<T>;
 };
 
-function serializeColumn(col: Column): ColumnCoder {
-  const coder: ColumnCoder = {};
-  coder["class"] = Object.keys(COLUMN_CLASSES)
-    .reverse()
-    .find((name) => Object.prototype.isPrototypeOf.call(COLUMN_CLASSES[name].prototype, col));
-  col.encodeWith(coder);
-  const metadata = coder["sql_type_metadata"];
-  if (metadata instanceof SqlTypeMetadata) {
-    coder["sql_type_metadata"] = {
-      class: Object.keys(TYPE_METADATA_CLASSES)
-        .reverse()
-        .find((name) =>
-          Object.prototype.isPrototypeOf.call(TYPE_METADATA_CLASSES[name].prototype, metadata),
-        ),
-      ...metadata,
-    };
-  }
-  return coder;
-}
-
-const COLUMN_CLASSES: Record<string, { prototype: Column }> = {
-  Column,
-  "MySQL::Column": MysqlColumn,
-  "PostgreSQL::Column": PostgresqlColumn,
-  "SQLite3::Column": Sqlite3Column,
+type RubyObjectTag = {
+  tag: string;
+  collection: "map";
+  default: false;
+  identify: (value: unknown) => boolean;
+  createNode: (schema: never, value: object, ctx: never) => unknown;
+  resolve: (map: { toJSON(): Record<string, unknown> }) => object;
 };
 
-const TYPE_METADATA_CLASSES: Record<string, { prototype: SqlTypeMetadata }> = {
-  SqlTypeMetadata,
-  "MySQL::TypeMetadata": MysqlTypeMetadata,
-  "PostgreSQL::TypeMetadata": PostgresqlTypeMetadata,
+const RUBY_OBJECT_CLASSES: Record<string, { prototype: object }> = {
+  "ActiveRecord::ConnectionAdapters::Column": Column,
+  "ActiveRecord::ConnectionAdapters::MySQL::Column": MysqlColumn,
+  "ActiveRecord::ConnectionAdapters::PostgreSQL::Column": PostgresqlColumn,
+  "ActiveRecord::ConnectionAdapters::SQLite3::Column": Sqlite3Column,
+  "ActiveRecord::ConnectionAdapters::SqlTypeMetadata": SqlTypeMetadata,
+  "ActiveRecord::ConnectionAdapters::MySQL::TypeMetadata": MysqlTypeMetadata,
+  "ActiveRecord::ConnectionAdapters::PostgreSQL::TypeMetadata": PostgresqlTypeMetadata,
 };
 
-function rehydrateColumn(data: unknown): Column {
-  let coder = data as ColumnCoder;
-  const klass = COLUMN_CLASSES[coder["class"] as string] ?? Column;
-  const column = Object.create(klass.prototype) as Column;
-  const metadata = coder["sql_type_metadata"];
-  if (metadata != null && !(metadata instanceof SqlTypeMetadata)) {
-    const { class: metadataClass, ...ivars } = metadata as { class?: string };
-    const metadataKlass = TYPE_METADATA_CLASSES[metadataClass as string] ?? SqlTypeMetadata;
-    coder = {
-      ...coder,
-      sql_type_metadata: Object.assign(Object.create(metadataKlass.prototype), ivars),
-    };
-  }
-  column.initWith(coder);
-  return column;
-}
+const RUBY_OBJECT_TAGS: RubyObjectTag[] = Object.entries(RUBY_OBJECT_CLASSES).map(
+  ([name, klass]) => ({
+    tag: `!ruby/object:${name}`,
+    collection: "map",
+    default: false,
+    identify: (value) => value != null && Object.getPrototypeOf(value) === klass.prototype,
+    createNode: (schema, value, ctx) => {
+      const coder: ColumnCoder = {};
+      if (value instanceof Column) value.encodeWith(coder);
+      else Object.assign(coder, value);
+      const mapTag = (
+        schema as { tags: { tag: string; createNode: (...args: unknown[]) => unknown }[] }
+      ).tags.find((t) => t.tag === "tag:yaml.org,2002:map")!;
+      return mapTag.createNode(schema, coder, ctx);
+    },
+    resolve: (map) => {
+      const object = Object.create(klass.prototype) as object;
+      const coder = map.toJSON();
+      if (object instanceof Column) object.initWith(coder);
+      else Object.assign(object, coder);
+      return object;
+    },
+  }),
+);
 
 function expandIndexOption<T>(
   columns: string | string[],
@@ -120,16 +114,14 @@ export class SchemaCache {
     try {
       if (!File.isFile(filename)) return null;
       const data = await SchemaCache.read(filename, (content) => content);
-      const parsed = yamlParse(data) as Record<string, Record<string, unknown[]> | null>;
+      const parsed = yamlParse(data, { customTags: RUBY_OBJECT_TAGS as never }) as Record<
+        string,
+        Record<string, unknown[]> | null
+      >;
       const cache = new SchemaCache();
       cache.initWith({
         ...parsed,
-        columns: new Map(
-          Object.entries(parsed["columns"] ?? {}).map(([table, cols]) => [
-            table,
-            cols.map((c) => rehydrateColumn(c)),
-          ]),
-        ),
+        columns: new Map(Object.entries(parsed["columns"] ?? {}) as [string, Column[]][]),
         primary_keys: new Map(Object.entries(parsed["primary_keys"] ?? {})),
         data_sources: new Map(Object.entries(parsed["data_sources"] ?? {})),
         indexes: new Map(
@@ -359,13 +351,12 @@ export class SchemaCache {
     await this.open(filename, (f) => {
       const coder: Record<string, unknown> = {};
       this.encodeWith(coder);
-      coder["columns"] = new Map(
-        [...(coder["columns"] as Map<string, Column[]>)].map(([table, cols]) => [
-          table,
-          cols.map((c) => serializeColumn(c)),
-        ]),
+      f.write(
+        yamlStringify(coder, {
+          customTags: RUBY_OBJECT_TAGS as never,
+          aliasDuplicateObjects: false,
+        }),
       );
-      f.write(yamlStringify(coder));
     });
   }
 

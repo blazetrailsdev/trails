@@ -135,27 +135,26 @@ describe("SchemaCacheDeepDeduplicateTest", () => {
 
   it("_load_from rehydrates plain coder rows into Column and IndexDefinition instances", async () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "schema-cache-rehydrate-test-"));
-    const filename = path.join(tmpDir, "schema_cache.json");
+    const filename = path.join(tmpDir, "schema_cache.yml");
     fs.writeFileSync(
       filename,
-      JSON.stringify({
-        columns: {
-          people: [
-            {
-              name: "id",
-              default: null,
-              sql_type_metadata: { sqlType: "integer", type: "integer" },
-              null: true,
-            },
-          ],
-        },
-        primary_keys: {},
-        data_sources: {},
-        indexes: {
-          people: [{ table: "people", name: "index_people_on_id", unique: true, columns: ["id"] }],
-        },
-        version: null,
-      }),
+      [
+        "columns:",
+        "  people:",
+        "    - !ruby/object:ActiveRecord::ConnectionAdapters::Column",
+        "      name: id",
+        "      default: null",
+        "      sql_type_metadata: !ruby/object:ActiveRecord::ConnectionAdapters::SqlTypeMetadata",
+        "        sqlType: integer",
+        "        type: integer",
+        "      null: true",
+        "primary_keys: {}",
+        "data_sources: {}",
+        "indexes:",
+        "  people:",
+        "    - { table: people, name: index_people_on_id, unique: true, columns: [id] }",
+        "version: null",
+      ].join("\n"),
     );
     const cache = (await SchemaCache._loadFrom(filename))!;
     fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -294,5 +293,22 @@ describe("SchemaCacheColumnClassRoundTripTest", () => {
 
     expect(column).toBeInstanceOf(MysqlColumn);
     expect((column as MysqlColumn).isAutoIncrement()).toBe(true);
+  });
+
+  it("the dump carries the column class as a ruby/object tag, not a coder key", async () => {
+    const cache = new SchemaCache();
+    cache.setColumns("people", [
+      new MysqlColumn("id", null, new MysqlTypeMetadata({ sqlType: "int", type: "integer" })),
+    ]);
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "schema-cache-tag-test-"));
+    const filename = path.join(tmpDir, "schema_cache.yml");
+    await cache.dumpTo(filename);
+    const dump = fs.readFileSync(filename, "utf8");
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+
+    expect(dump).toContain("!ruby/object:ActiveRecord::ConnectionAdapters::MySQL::Column");
+    expect(dump).toContain("!ruby/object:ActiveRecord::ConnectionAdapters::MySQL::TypeMetadata");
+    expect(dump).not.toMatch(/^\s*class:/m);
   });
 });
