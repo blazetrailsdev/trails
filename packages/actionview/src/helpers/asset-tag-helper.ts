@@ -5,6 +5,7 @@ import {
   isBlank,
   isPlainObject,
   isPresent,
+  presenceIn,
   stringifyKeys,
 } from "@blazetrails/activesupport";
 import {
@@ -19,13 +20,14 @@ import { Template } from "../template.js";
 import {
   pathToAsset,
   pathToImage,
+  pathToJavascript,
   pathToStylesheet,
   type AssetPathOptions,
   type AssetUrlHelperHost,
 } from "./asset-url-helper.js";
 import { capture, type CaptureHelperHost } from "./capture-helper.js";
 import { safeJoin } from "./output-safety-helper.js";
-import { contentTag, tag } from "./tag-helper.js";
+import { contentTag, tag, type TagBuilder, type TagHelperHost } from "./tag-helper.js";
 
 export let imageLoading: string | null = null;
 
@@ -62,11 +64,74 @@ interface PreloadHeaderHost {
 }
 
 export type AssetTagHelperHost = AssetUrlHelperHost &
+  TagHelperHost &
   PreloadHeaderHost & {
     contentSecurityPolicyNonce?(): string | null;
     polymorphicUrl?(record: unknown): string;
     urlFor(options: unknown): string;
   };
+
+export function javascriptIncludeTag(this: AssetTagHelperHost, ...sources: unknown[]): SafeBuffer {
+  const options = stringifyKeys(extractOptionsBang(sources));
+  const pathOptions = extractBang(options, [
+    "protocol",
+    "extname",
+    "host",
+    "skipPipeline",
+  ]) as AssetPathOptions;
+  const preloadLinks: string[] = [];
+  const usePreloadLinksHeader =
+    options["preloadLinksHeader"] === null || options["preloadLinksHeader"] === undefined
+      ? preloadLinksHeader
+      : (deleteKey(options, "preloadLinksHeader") as boolean);
+  const nopush =
+    options["nopush"] === null || options["nopush"] === undefined
+      ? true
+      : deleteKey(options, "nopush");
+  let crossorigin = deleteKey(options, "crossorigin");
+  if (crossorigin === true) crossorigin = "anonymous";
+  const integrity = options["integrity"];
+  const rel = options["type"] === "module" ? "modulepreload" : "preload";
+
+  const sourcesTags = htmlSafe(
+    [...new Set(sources)]
+      .map((source) => {
+        const href = pathToJavascript.call(this, source as string, pathOptions);
+        if (
+          rtest(usePreloadLinksHeader) &&
+          !rtest(options["defer"]) &&
+          isPresent(href) &&
+          !href.startsWith("data:")
+        ) {
+          let preloadLink = `<${href}>; rel=${rel}; as=script`;
+          if (crossorigin !== null && crossorigin !== undefined) {
+            preloadLink += `; crossorigin=${String(crossorigin)}`;
+          }
+          if (integrity !== null && integrity !== undefined) {
+            preloadLink += `; integrity=${String(integrity)}`;
+          }
+          if (rtest(nopush)) preloadLink += "; nopush";
+          preloadLinks.push(preloadLink);
+        }
+        const tagOptions: Record<string, unknown> = {
+          src: href,
+          crossorigin,
+          ...options,
+        };
+        if (tagOptions["nonce"] === true) {
+          tagOptions["nonce"] = this.contentSecurityPolicyNonce?.() ?? null;
+        }
+        return String(contentTag.call(this, "script", "", tagOptions));
+      })
+      .join("\n"),
+  );
+
+  if (rtest(usePreloadLinksHeader)) {
+    sendPreloadLinksHeader.call(this, preloadLinks);
+  }
+
+  return sourcesTags;
+}
 
 export function stylesheetLinkTag(this: AssetTagHelperHost, ...sources: unknown[]): SafeBuffer {
   const extracted = extractOptionsBang(sources);
@@ -169,6 +234,49 @@ export function faviconLinkTag(
     }),
     ...options,
   }) as SafeBuffer;
+}
+
+export function preloadLinkTag(
+  this: AssetTagHelperHost,
+  source: string,
+  options: Record<string, unknown> = {},
+): SafeBuffer {
+  const href = pathToAsset.call(this, source, {
+    skipPipeline: deleteKey(options, "skipPipeline") as boolean | undefined,
+  });
+  const extname = File.extname(source).toLowerCase().replaceAll(".", "");
+  const type = deleteKey(options, "type") as string | false | null | undefined;
+  const mimeType = rtest(type) ? (type as string) : Template.Types.get(extname)?.toString();
+  const as = deleteKey(options, "as") as string | false | null | undefined;
+  const asType = rtest(as) ? (as as string) : resolveLinkAs.call(this, extname, mimeType);
+  let crossorigin = deleteKey(options, "crossorigin");
+  if (crossorigin === true || (isBlank(crossorigin) && asType === "font")) {
+    crossorigin = "anonymous";
+  }
+  const integrity = options["integrity"];
+  const nopush = deleteKey(options, "nopush") ?? false;
+  const rel = mimeType === "module" ? "modulepreload" : "preload";
+
+  const linkTag = (tag.call(this) as TagBuilder & { link(options: object): SafeBuffer }).link({
+    rel,
+    href,
+    as: asType,
+    type: mimeType,
+    crossorigin,
+    ...options,
+  });
+
+  let preloadLink = `<${href}>; rel=${rel}; as=${asType ?? ""}`;
+  if (mimeType != null) preloadLink += `; type=${mimeType}`;
+  if (rtest(crossorigin)) {
+    preloadLink += `; crossorigin=${String(crossorigin)}`;
+  }
+  if (rtest(integrity)) preloadLink += `; integrity=${String(integrity)}`;
+  if (rtest(nopush)) preloadLink += "; nopush";
+
+  sendPreloadLinksHeader.call(this, [preloadLink]);
+
+  return linkTag;
 }
 
 export function imageTag(
@@ -289,6 +397,24 @@ export function checkForImageTagErrors(
       (options["width"] != null && options["width"] !== false))
   ) {
     throw new ArgumentError("Cannot pass a :size option with a :height or :width option");
+  }
+}
+
+/** @internal */
+export function resolveLinkAs(
+  this: AssetTagHelperHost,
+  extname: string,
+  mimeType: string | null | undefined,
+): string | null {
+  switch (extname) {
+    case "js":
+      return "script";
+    case "css":
+      return "style";
+    case "vtt":
+      return "track";
+    default:
+      return presenceIn(String(mimeType ?? "").split("/")[0], ["audio", "video", "font", "image"]);
   }
 }
 
