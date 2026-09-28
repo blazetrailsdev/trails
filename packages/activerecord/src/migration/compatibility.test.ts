@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertRaises } from "@blazetrails/activesupport";
 import { StandardError } from "@blazetrails/ruby-compat";
+import { Time as RubyTime } from "@blazetrails/date";
 import { Base, Migration, Migrator } from "../index.js";
 import type { MigrationProxy } from "../migration.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
@@ -195,6 +196,31 @@ describe("Migration", () => {
       ).toBeTruthy();
       expect(
         await connection.columnExists("more_testings", "updated_at", null, {
+          null: false,
+          ...precisionImplicitDefault(),
+        }),
+      ).toBeTruthy();
+    });
+
+    it("timestamps doesnt set precision on change table", async () => {
+      const migration = new (class extends Migration.get(5.2) {
+        override async migrate(_x: unknown): Promise<void> {
+          await this.changeTable("testings", async (t) => {
+            await t.timestamps({ default: RubyTime.now() });
+          });
+        }
+      })();
+
+      await migrate(migration);
+
+      expect(
+        await connection.columnExists("testings", "created_at", null, {
+          null: false,
+          ...precisionImplicitDefault(),
+        }),
+      ).toBeTruthy();
+      expect(
+        await connection.columnExists("testings", "updated_at", null, {
           null: false,
           ...precisionImplicitDefault(),
         }),
