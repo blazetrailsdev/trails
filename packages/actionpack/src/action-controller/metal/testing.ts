@@ -1,11 +1,7 @@
-export function recycle(controller: Record<string, unknown>): void {
-  controller._urlOptions = null;
-  controller.formats = undefined;
-  controller.params = undefined;
-}
-
-export function recycleBang(controller: Record<string, unknown>): void {
-  recycle(controller);
+export function recycleBang(this: Record<string, unknown>): void {
+  this._urlOptions = null;
+  this.formats = null;
+  this.params = null;
 }
 
 export function clearInstanceVariablesBetweenRequests(

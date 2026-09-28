@@ -219,55 +219,6 @@ export class TestCase {
     }
   }
 
-  assertContentType(expected: string): void {
-    const actual = this.response?.getHeader("content-type") ?? this.controller?.contentType ?? "";
-    if (!actual.includes(expected)) {
-      throw new Error(`Expected content type to include "${expected}", got "${actual}"`);
-    }
-  }
-
-  assertHeader(name: string, expected: string | RegExp): void {
-    const actual = this.response?.getHeader(name) ?? this.controller?.headers.get(name);
-    if (actual === undefined) {
-      throw new Error(`Expected header "${name}" to be set`);
-    }
-    if (typeof expected === "string") {
-      if (actual !== expected) {
-        throw new Error(`Expected header "${name}" to be "${expected}", got "${actual}"`);
-      }
-    } else {
-      if (!expected.test(actual)) {
-        throw new Error(`Expected header "${name}" to match ${expected}, got "${actual}"`);
-      }
-    }
-  }
-
-  assertFlash(key: string, expected?: string | RegExp): void {
-    const flash = this.flash;
-    const value = flash.get(key);
-    if (value === undefined) {
-      throw new Error(`Expected flash[:${key}] to be set`);
-    }
-    if (expected !== undefined) {
-      if (typeof expected === "string") {
-        if (value !== expected) {
-          throw new Error(`Expected flash[:${key}] to be "${expected}", got "${value}"`);
-        }
-      } else {
-        if (!expected.test(value as string)) {
-          throw new Error(`Expected flash[:${key}] to match ${expected}, got "${value}"`);
-        }
-      }
-    }
-  }
-
-  assertNoFlash(key: string): void {
-    const flash = this.flash;
-    if (flash.has(key)) {
-      throw new Error(`Expected no flash[:${key}], but got "${flash.get(key)}"`);
-    }
-  }
-
   /** @internal */
   assertTemplate(_options: unknown = {}, _message?: string): never {
     throw new Error(
