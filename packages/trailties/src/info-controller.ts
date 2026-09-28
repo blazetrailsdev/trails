@@ -29,27 +29,27 @@ export class InfoController extends ApplicationController {
     this.redirectTo("/rails/info/routes");
   }
 
-  properties(): void {
-    this.render({ html: htmlSafe(Info.toHtml()) });
+  async properties(): Promise<void> {
+    await this.render({ html: htmlSafe(Info.toHtml()) });
   }
 
-  routes(): void {
+  async routes(): Promise<void> {
     let query = this.params.get("query") as string | undefined;
     if (query != null) {
       query = RFC2396_PARSER.escape(query);
-      this.render({
+      await this.render({
         json: {
           exact: this.matchingRoutes({ query, exactMatch: true }),
           fuzzy: this.matchingRoutes({ query, exactMatch: false }),
         },
       });
     } else {
-      this.render({ json: { exact: [], fuzzy: [] } });
+      await this.render({ json: { exact: [], fuzzy: [] } });
     }
   }
 
-  notes(): void {
-    this.render({ json: [] });
+  async notes(): Promise<void> {
+    await this.render({ json: [] });
   }
 
   private matchingRoutes({ query, exactMatch }: { query: string; exactMatch: boolean }): string[] {

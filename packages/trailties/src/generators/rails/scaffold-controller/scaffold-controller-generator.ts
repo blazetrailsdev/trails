@@ -134,15 +134,15 @@ function crudMethods(
   return [
     mk(
       "index",
-      `// const ${plural} = await ${model}.all();\nconst ${plural}${anyArr} = [];\nthis.render({ action: "index", locals: { ${plural} } });`,
+      `// const ${plural} = await ${model}.all();\nconst ${plural}${anyArr} = [];\nawait this.render({ action: "index", locals: { ${plural} } });`,
       ts,
     ),
     mk(
       "show",
-      `// const ${singular} = await ${model}.find(this.params.get("id"));\nthis.render({ action: "show", locals: { ${singular}: { id: this.params.get("id") } } });`,
+      `// const ${singular} = await ${model}.find(this.params.get("id"));\nawait this.render({ action: "show", locals: { ${singular}: { id: this.params.get("id") } } });`,
       ts,
     ),
-    mk("new_", `this.render({ action: "new", locals: { ${singular}: {} } });`, ts),
+    mk("new_", `await this.render({ action: "new", locals: { ${singular}: {} } });`, ts),
     mk(
       "create",
       `// const ${singular} = await ${model}.create(${params});\nthis.redirectTo("${routeUrl}");`,
@@ -150,7 +150,7 @@ function crudMethods(
     ),
     mk(
       "edit",
-      `// const ${singular} = await ${model}.find(this.params.get("id"));\nthis.render({ action: "edit", locals: { ${singular}: { id: this.params.get("id") } } });`,
+      `// const ${singular} = await ${model}.find(this.params.get("id"));\nawait this.render({ action: "edit", locals: { ${singular}: { id: this.params.get("id") } } });`,
       ts,
     ),
     mk(

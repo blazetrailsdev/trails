@@ -125,8 +125,10 @@ import {
   _processVariant,
   _normalizeOptions,
   processAction as _processAction,
+  render as metalRender,
+  renderToString,
 } from "./metal/rendering.js";
-import { Renderers } from "./metal/renderers.js";
+import { _renderToBodyWithRenderer } from "./metal/renderers.js";
 import { urlOptions } from "./metal/url-for.js";
 import { UrlFor, type UrlForOptions } from "../action-dispatch/routing/url-for.js";
 import type {
@@ -159,7 +161,6 @@ export type RenderOptions = {
   plain?: string;
   html?: string | SafeBuffer;
   body?: string;
-  text?: string;
   action?: string;
   template?: string;
   inline?: string;
@@ -325,63 +326,22 @@ export class Base extends Metal {
 
   viewRuntime: number | null = null;
 
-  render(...args: unknown[]): void {
-    const options = this._normalizeRender(...args) as RenderOptions;
-    this.viewRuntime = this.cleanupViewRuntime(() =>
-      Benchmark.realtime(":float_millisecond", () => {
-        if (this.performed) {
-          throw new DoubleRenderError(
-            "Render and/or redirect were called multiple times in this action.",
-          );
-        }
-
-        if (options.status) {
-          this.status = options.status;
-        }
-
-        if (options.json !== undefined) {
-          const jsonStr =
-            typeof options.json === "string" ? options.json : JSON.stringify(options.json);
-          if (options.callback && JSONP_CALLBACK_RE.test(options.callback)) {
-            const jsonPayload =
-              typeof options.json === "string" ? JSON.stringify(options.json) : jsonStr;
-            const safeJson = escapeJsonForJs(jsonPayload);
-            this.contentType = options.contentType ?? "text/javascript; charset=utf-8";
-            this.responseBody = `/**/\n${options.callback}(${safeJson})`;
-          } else {
-            this.contentType = options.contentType ?? "application/json; charset=utf-8";
-            this.responseBody = jsonStr;
-          }
-        } else if (options.plain !== undefined) {
-          this.contentType = options.contentType ?? "text/plain; charset=utf-8";
-          this.responseBody = options.plain;
-        } else if (options.html !== undefined) {
-          this.contentType = options.contentType ?? "text/html; charset=utf-8";
-          this.responseBody = options.html.toString();
-        } else if (options.body !== undefined) {
-          if (options.contentType != null) {
-            this.contentType = String(options.contentType);
-          } else if (!this.response.mediaType) {
-            this.contentType = "text/plain";
-          }
-          this.responseBody = options.body;
-        } else if (options.text !== undefined) {
-          this.contentType = options.contentType ?? "text/plain; charset=utf-8";
-          this.responseBody = options.text;
-        } else if (options.partial !== undefined) {
-          this._pendingRender = { type: "partial", options };
-          return;
-        } else {
-          this._pendingRender = { type: "template", options };
-          return;
-        }
-
-        this.markPerformed();
-      }),
-    );
+  render(...args: unknown[]): void | Promise<void> {
+    let renderOutput: void | Promise<void>;
+    const viewRuntime = this.cleanupViewRuntime(() =>
+      Benchmark.realtime(
+        ":float_millisecond",
+        () => (renderOutput = metalRender.call(this, ...args)),
+      ),
+    ) as number | Promise<number>;
+    if (typeof viewRuntime === "number") {
+      this.viewRuntime = viewRuntime;
+      return renderOutput!;
+    }
+    return viewRuntime.then((ms) => {
+      this.viewRuntime = ms;
+    });
   }
-
-  _pendingRender: { type: string; options: RenderOptions } | null = null;
 
   /** @internal */
   _prefixes = _prefixes;
@@ -420,67 +380,32 @@ export class Base extends Metal {
   /** @internal */
   override async _dispatchAction(action: string, ...args: unknown[]): Promise<void> {
     await super._dispatchAction(action, ...args);
-    if (!this.performed && !this._pendingRender) this.defaultRender();
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE response-carries-async-streaming-body */
-  async renderAsync(options: RenderOptions): Promise<void> {
-    if (this.performed) {
-      throw new DoubleRenderError(
-        "Render and/or redirect were called multiple times in this action.",
-      );
-    }
-
-    if (options.status) {
-      this.status = options.status;
-    }
-
-    const renderedBody = await this.renderToBody({ ...options });
-    if (options.html != null && (options.html as unknown) !== false) {
-      _setHtmlContentType.call(this);
-    } else {
-      _setRenderedContentType.call(this, this._renderedFormat as string | null | undefined);
-    }
-    _setVaryHeader.call(this as never);
-    let body = renderedBody;
-    if (!Array.isArray(body) && typeof (body as StreamingBody | null)?.each === "function") {
-      const chunks: string[] = [];
-      await (body as StreamingBody).each((chunk) => chunks.push(chunk));
-      body = chunks;
-    }
-    this.responseBody = body as string;
-    this.markPerformed();
+    if (!this.performed) await this.defaultRender();
   }
 
   /** @internal */
-  override async renderToBody(options: Record<string, unknown> = {}): Promise<unknown> {
+  renderToBody(options: Record<string, unknown> = {}): unknown {
     const truthy = (v: unknown): boolean => v != null && v !== false;
-    const renderer = Renderers._renderToBodyWithRenderer(options);
+    const renderer = this._renderToBodyWithRenderer(options);
     if (truthy(renderer)) return renderer;
-    const body = await actionViewRenderToBody.call(this as never, options);
-    if (truthy(body)) return body;
-    const priority = _renderInPriorities(options);
-    if (truthy(priority)) return priority;
-    return " ";
+    return actionViewRenderToBody.call(this as never, options).then(async (body) => {
+      if (
+        !Array.isArray(body) &&
+        typeof (body as unknown as StreamingBody | null)?.each === "function"
+      ) {
+        const chunks: string[] = [];
+        await (body as unknown as StreamingBody).each((chunk) => chunks.push(chunk));
+        return chunks;
+      }
+      if (truthy(body)) return body;
+      const priority = _renderInPriorities(options);
+      if (truthy(priority)) return priority;
+      return " ";
+    });
   }
 
-  renderToString(options: RenderOptions = {}): string {
-    const oldBody = this._responseBody;
-    const oldPerformed = this._performed;
-    const oldStatus = this.response.status;
-    const oldHeaders = this.response.headers.toHash();
-    try {
-      this.render(options);
-      return this.responseBody;
-    } finally {
-      this._responseBody = oldBody;
-      this._performed = oldPerformed;
-      this.response.status = oldStatus;
-      for (const key of Object.keys(this.response.headers.toHash())) {
-        this.response.deleteHeader(key);
-      }
-      for (const [key, value] of Object.entries(oldHeaders)) this.response.setHeader(key, value);
-    }
+  renderedFormat(): unknown {
+    return this._renderedFormat;
   }
 
   redirectTo(
@@ -757,18 +682,6 @@ export class Base extends Metal {
           });
         }
         await super.processAction(action, ...args);
-
-        if (this._pendingRender && !this.performed) {
-          const { options } = this._pendingRender;
-          this._pendingRender = null;
-          this.viewRuntime =
-            (this.viewRuntime ?? 0) +
-            (await this.cleanupViewRuntime(async () =>
-              Benchmark.realtime(":float_millisecond", async () => {
-                await this.renderAsync(options);
-              }),
-            ));
-        }
       } catch (error) {
         if (error instanceof Error) {
           const match = this._findRescueHandler(error);
@@ -849,6 +762,14 @@ export class Base extends Metal {
   declare _normalizeArgs: typeof _normalizeArgs;
   /** @internal */
   declare _normalizeOptions: typeof _normalizeOptions;
+  declare renderToString: typeof renderToString;
+  /** @internal */
+  declare _setHtmlContentType: typeof _setHtmlContentType;
+  /** @internal */
+  declare _setRenderedContentType: typeof _setRenderedContentType;
+  /** @internal */
+  declare _setVaryHeader: typeof _setVaryHeader;
+  declare _renderToBodyWithRenderer: typeof _renderToBodyWithRenderer;
   /** @internal */
   _renderedFormat?: unknown;
   declare isActionHasLayout: typeof isActionHasLayout;
@@ -906,9 +827,9 @@ export class Base extends Metal {
   }
 
   /** @missingRailsCall merge — PERMANENT */
-  sendData(data: string | Buffer, options: SendDataOptions = {}): void {
+  sendData(data: string | Buffer, options: SendDataOptions = {}): void | Promise<void> {
     this.sendFileHeadersBang(options);
-    this.render({
+    return this.render({
       status: options.status,
       contentType: options.contentType,
       body: Buffer.isBuffer(data) ? data.toString("latin1") : data,
@@ -987,6 +908,11 @@ Base.prototype._processVariant = _processVariant;
 Base.prototype._normalizeRender = _normalizeRender;
 Base.prototype._normalizeArgs = _normalizeArgs;
 Base.prototype._normalizeOptions = _normalizeOptions;
+Base.prototype.renderToString = renderToString;
+Base.prototype._setHtmlContentType = _setHtmlContentType;
+Base.prototype._setRenderedContentType = _setRenderedContentType;
+Base.prototype._setVaryHeader = _setVaryHeader;
+Base.prototype._renderToBodyWithRenderer = _renderToBodyWithRenderer;
 Base.prototype.isActionHasLayout = isActionHasLayout;
 Base.prototype._isConditionalLayout = _isConditionalLayout;
 Base.prototype._layoutForOption = _layoutForOption;
@@ -1056,24 +982,3 @@ helperMethod(
 );
 
 export { DoubleRenderError };
-
-const JSONP_CALLBACK_RE = /^[a-zA-Z_$][0-9a-zA-Z_$]*(?:\.[a-zA-Z_$][0-9a-zA-Z_$]*)*$/;
-
-function escapeJsonForJs(json: string): string {
-  return json.replace(/[<>&\u2028\u2029]/g, (c) => {
-    switch (c) {
-      case "<":
-        return "\\u003c";
-      case ">":
-        return "\\u003e";
-      case "&":
-        return "\\u0026";
-      case "\u2028":
-        return "\\u2028";
-      case "\u2029":
-        return "\\u2029";
-      default:
-        return c;
-    }
-  });
-}

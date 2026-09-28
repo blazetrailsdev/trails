@@ -47,16 +47,22 @@ export interface RenderingHost {
   _normalizeOptions(options: RenderOptions): RenderOptions;
 }
 
-export function render<T extends RenderingHost>(this: T, ...args: unknown[]): void {
+export function render<T extends RenderingHost>(this: T, ...args: unknown[]): void | Promise<void> {
   const options = this._normalizeRender(...args);
   const renderedBody = this.renderToBody(options);
-  if (options.html != null) {
-    this._setHtmlContentType?.();
-  } else {
-    this._setRenderedContentType?.(this.renderedFormat?.());
+  const set = (renderedBody: unknown): void => {
+    if (options.html != null && options.html !== false) {
+      this._setHtmlContentType?.();
+    } else {
+      this._setRenderedContentType?.(this.renderedFormat?.());
+    }
+    this._setVaryHeader?.();
+    this.responseBody = renderedBody;
+  };
+  if (typeof (renderedBody as PromiseLike<unknown> | null)?.then === "function") {
+    return Promise.resolve(renderedBody).then(set);
   }
-  this._setVaryHeader?.();
-  this.responseBody = renderedBody;
+  set(renderedBody);
 }
 
 export function renderToString<T extends RenderingHost>(this: T, ...args: unknown[]): unknown {

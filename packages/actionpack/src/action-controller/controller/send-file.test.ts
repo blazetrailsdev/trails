@@ -72,7 +72,7 @@ describe("SendFileTest", () => {
   it("data", async () => {
     class C extends Base {
       async data() {
-        this.sendData(testFileData);
+        await this.sendData(testFileData);
       }
     }
     const c = new C();
@@ -83,7 +83,7 @@ describe("SendFileTest", () => {
   it("headers after send shouldnt include charset", async () => {
     class C extends Base {
       async data() {
-        this.sendData(testFileData);
+        await this.sendData(testFileData);
       }
     }
     const c = new C();
@@ -95,7 +95,7 @@ describe("SendFileTest", () => {
   it("send file headers bang", async () => {
     class C extends Base {
       async action() {
-        this.sendData("foo", {
+        await this.sendData("foo", {
           type: "image/png",
           disposition: "disposition",
           filename: "filename",
@@ -112,7 +112,7 @@ describe("SendFileTest", () => {
   it("send file headers with disposition as a symbol", async () => {
     class C extends Base {
       async action() {
-        this.sendData("foo", {
+        await this.sendData("foo", {
           type: "image/png",
           disposition: "disposition",
           filename: "filename",
@@ -128,7 +128,7 @@ describe("SendFileTest", () => {
   it("send file headers with mime lookup with symbol", async () => {
     class C extends Base {
       async action() {
-        this.sendData("foo", { type: "image/png" });
+        await this.sendData("foo", { type: "image/png" });
       }
     }
     const c = new C();
@@ -139,7 +139,7 @@ describe("SendFileTest", () => {
   it("send file headers with bad symbol", async () => {
     class C extends Base {
       async action() {
-        this.sendData("foo", { type: "application/octet-stream" });
+        await this.sendData("foo", { type: "application/octet-stream" });
       }
     }
     const c = new C();
@@ -150,7 +150,7 @@ describe("SendFileTest", () => {
   it("send file headers with nil content type", async () => {
     class C extends Base {
       async action() {
-        this.sendData("foo");
+        await this.sendData("foo");
       }
     }
     const c = new C();
@@ -172,7 +172,7 @@ describe("SendFileTest", () => {
     for (const [filename, expectedType] of Object.entries(expectations)) {
       class C extends Base {
         async action() {
-          this.sendData("foo", { filename });
+          await this.sendData("foo", { filename });
         }
       }
       const c = new C();
@@ -184,7 +184,7 @@ describe("SendFileTest", () => {
   it("send file with default content disposition header", async () => {
     class C extends Base {
       async data() {
-        this.sendData(testFileData, { filename: "test.dat" });
+        await this.sendData(testFileData, { filename: "test.dat" });
       }
     }
     const c = new C();
@@ -195,7 +195,7 @@ describe("SendFileTest", () => {
   it("send file without content disposition header", async () => {
     class C extends Base {
       async data() {
-        this.sendData(testFileData, { disposition: null });
+        await this.sendData(testFileData, { disposition: null });
       }
     }
     const c = new C();
@@ -268,7 +268,7 @@ describe("SendFileController", () => {
   it("send file headers bang", async () => {
     class C extends Base {
       async action() {
-        this.sendData("foo", {
+        await this.sendData("foo", {
           type: "image/png",
           disposition: "disposition",
           filename: "filename",
@@ -285,7 +285,7 @@ describe("SendFileController", () => {
   it("send file headers with disposition as a symbol", async () => {
     class C extends Base {
       async action() {
-        this.sendData("foo", {
+        await this.sendData("foo", {
           type: "image/png",
           disposition: "disposition",
           filename: "filename",
@@ -300,7 +300,7 @@ describe("SendFileController", () => {
   it("send file headers with mime lookup with symbol", async () => {
     class C extends Base {
       async action() {
-        this.sendData("foo", { type: "image/png" });
+        await this.sendData("foo", { type: "image/png" });
       }
     }
     const c = new C();
@@ -311,7 +311,7 @@ describe("SendFileController", () => {
   it("send file headers with bad symbol", async () => {
     class C extends Base {
       async action() {
-        this.sendData("foo", { type: "application/octet-stream" });
+        await this.sendData("foo", { type: "application/octet-stream" });
       }
     }
     const c = new C();
@@ -322,7 +322,7 @@ describe("SendFileController", () => {
   it("send file headers with nil content type", async () => {
     class C extends Base {
       async action() {
-        this.sendData("foo");
+        await this.sendData("foo");
       }
     }
     const c = new C();
@@ -333,7 +333,7 @@ describe("SendFileController", () => {
   it("send file headers guess type from extension", async () => {
     class C extends Base {
       async action() {
-        this.sendData("foo", { filename: "image.png" });
+        await this.sendData("foo", { filename: "image.png" });
       }
     }
     const c = new C();

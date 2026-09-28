@@ -142,7 +142,7 @@ describe("RedirectTest", () => {
     const log: string[] = [];
     class C extends Base {
       async index() {
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
         log.push("action");
       }
     }

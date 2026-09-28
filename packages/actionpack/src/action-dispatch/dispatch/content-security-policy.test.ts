@@ -418,7 +418,7 @@ class CspIntegrationController extends Base {
     this.head("ok");
   }
   async api() {
-    this.render({ json: {} });
+    await this.render({ json: {} });
   }
   async notModified() {
     this.head("not_modified");

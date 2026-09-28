@@ -8,19 +8,19 @@ class TestController extends ActionController.Base {
   }
 
   async accessingParamsInTemplate(): Promise<void> {
-    this.render({ inline: "Hello: <%= params.get('name') %>" });
+    await this.render({ inline: "Hello: <%= params.get('name') %>" });
   }
 
   async accessingLocalAssignsInInlineTemplate(): Promise<void> {
     const name = this.params.get("local_name");
-    this.render({
+    await this.render({
       inline: "<%= 'Goodbye, ' + local_name %>",
       locals: { local_name: name },
     });
   }
 
   async inlineRenderedFormatWithoutFormat(): Promise<void> {
-    this.render({ inline: "test" });
+    await this.render({ inline: "test" });
   }
 
   determineLayout(): string {

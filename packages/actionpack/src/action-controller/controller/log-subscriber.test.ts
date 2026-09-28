@@ -12,29 +12,31 @@ import type { CachingClassMethods } from "../../abstract-controller/caching.js";
 
 class LogSubscribersController extends Base {
   async withFragmentCache() {
-    this.render({ inline: '<%= context.cache("foo", {}, () => { %>bar<% }) %>' });
+    await this.render({ inline: '<%= context.cache("foo", {}, () => { %>bar<% }) %>' });
   }
 
   async withFragmentCacheAndPercentInKey() {
-    this.render({
+    await this.render({
       inline: '<%= context.cache("foo%bar", {}, () => { %>Contains % sign in key<% }) %>',
     });
   }
 
   async withFragmentCacheIfWithTrueCondition() {
-    this.render({ inline: '<%= context.cacheIf(true, "foo", {}, () => { %>bar<% }) %>' });
+    await this.render({ inline: '<%= context.cacheIf(true, "foo", {}, () => { %>bar<% }) %>' });
   }
 
   async withFragmentCacheIfWithFalseCondition() {
-    this.render({ inline: '<%= context.cacheIf(false, "foo", {}, () => { %>bar<% }) %>' });
+    await this.render({ inline: '<%= context.cacheIf(false, "foo", {}, () => { %>bar<% }) %>' });
   }
 
   async withFragmentCacheUnlessWithFalseCondition() {
-    this.render({ inline: '<%= context.cacheUnless(false, "foo", {}, () => { %>bar<% }) %>' });
+    await this.render({
+      inline: '<%= context.cacheUnless(false, "foo", {}, () => { %>bar<% }) %>',
+    });
   }
 
   async withFragmentCacheUnlessWithTrueCondition() {
-    this.render({ inline: '<%= context.cacheUnless(true, "foo", {}, () => { %>bar<% }) %>' });
+    await this.render({ inline: '<%= context.cacheUnless(true, "foo", {}, () => { %>bar<% }) %>' });
   }
 }
 

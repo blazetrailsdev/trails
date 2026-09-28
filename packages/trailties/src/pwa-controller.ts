@@ -8,12 +8,12 @@ export class PWAController extends ApplicationController {
     return "rails/pwa";
   }
 
-  serviceWorker(): void {
-    this.render({ template: "pwa/service-worker", layout: false } as PWARenderOptions);
+  async serviceWorker(): Promise<void> {
+    await this.render({ template: "pwa/service-worker", layout: false } as PWARenderOptions);
   }
 
-  manifest(): void {
-    this.render({ template: "pwa/manifest", layout: false } as PWARenderOptions);
+  async manifest(): Promise<void> {
+    await this.render({ template: "pwa/manifest", layout: false } as PWARenderOptions);
   }
 }
 

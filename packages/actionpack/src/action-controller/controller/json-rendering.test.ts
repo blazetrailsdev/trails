@@ -15,7 +15,7 @@ describe("Controller JSON rendering integration", () => {
   it("renders JSON from a controller action", async () => {
     class PostsController extends Base {
       async index() {
-        this.render({ json: { posts: [{ id: 1, title: "Hello" }] } });
+        await this.render({ json: { posts: [{ id: 1, title: "Hello" }] } });
       }
     }
 
@@ -34,7 +34,7 @@ describe("Controller JSON rendering integration", () => {
     class PostsController extends Base {
       async show() {
         const id = this.params.get("id");
-        this.render({ json: { id } });
+        await this.render({ json: { id } });
       }
     }
 
@@ -60,7 +60,7 @@ describe("Controller JSON rendering integration", () => {
     class PostsController extends Base {
       async index() {
         const page = this.params.get("page");
-        this.render({ json: { page } });
+        await this.render({ json: { page } });
       }
     }
 
@@ -82,7 +82,7 @@ describe("Controller JSON rendering integration", () => {
     class PostsController extends Base {
       async create() {
         const title = this.params.get("title");
-        this.render({ json: { title }, status: "created" });
+        await this.render({ json: { title }, status: "created" });
       }
     }
 
@@ -106,7 +106,7 @@ describe("Controller JSON rendering integration", () => {
     class PostsController extends Base {
       async show() {
         const id = this.params.get("id");
-        this.render({ json: { id, found: true } });
+        await this.render({ json: { id, found: true } });
       }
     }
 
@@ -144,7 +144,7 @@ describe("Controller JSON rendering integration", () => {
   it("API controller renders JSON", async () => {
     class ApiPostsController extends API {
       async index() {
-        this.render({ json: [{ id: 1 }, { id: 2 }] });
+        await this.render({ json: [{ id: 1 }, { id: 2 }] });
       }
     }
 
@@ -158,7 +158,7 @@ describe("Controller JSON rendering integration", () => {
   it("renders with custom status codes", async () => {
     class PostsController extends Base {
       async create() {
-        this.render({ json: { created: true }, status: 201 });
+        await this.render({ json: { created: true }, status: 201 });
       }
       async destroy() {
         this.head("no_content");
@@ -178,7 +178,7 @@ describe("Controller JSON rendering integration", () => {
   it("merges path params, query params, and body params", async () => {
     class PostsController extends Base {
       async update() {
-        this.render({
+        await this.render({
           json: {
             id: this.params.get("id"),
             title: this.params.get("title"),
@@ -216,7 +216,7 @@ describe("Controller JSON rendering integration", () => {
   it("path params take precedence over query/body params", async () => {
     class PostsController extends Base {
       async show() {
-        this.render({ json: { id: this.params.get("id") } });
+        await this.render({ json: { id: this.params.get("id") } });
       }
     }
 
@@ -243,7 +243,7 @@ describe("Controller JSON rendering integration", () => {
     class PostsController extends Base {
       async index() {
         const user = this.params.get("user");
-        this.render({ json: { user } });
+        await this.render({ json: { user } });
       }
     }
 

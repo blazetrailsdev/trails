@@ -11,6 +11,7 @@ import {
   _setVaryHeader,
   processAction,
   render,
+  renderToBody,
   renderToString,
   RENDER_FORMATS_IN_PRIORITY,
 } from "./rendering.js";
@@ -96,7 +97,7 @@ describe("_setRenderedContentType", () => {
   test("assigns format only when response has no media type and format is truthy", () => {
     const host = (responseCt?: string) => ({
       contentType: null as string | null,
-      response: { contentType: responseCt },
+      response: { mediaType: responseCt },
     });
 
     const a = host();
@@ -203,23 +204,19 @@ describe("Metal wiring", () => {
     expect(Metal._processOptions).toBe(_processOptions);
   });
 
-  test("renderToBody routes through _renderInPriorities and falls back to ' '", async () => {
-    const { Metal } = await import("../metal.js");
-    const instance = Object.create(Metal.prototype) as InstanceType<typeof Metal>;
-    expect(instance.renderToBody({ body: "hi" })).toBe("hi");
-    expect(instance.renderToBody({ plain: "p", html: "h" })).toBe("p");
-    expect(instance.renderToBody({ html: "h" })).toBe("h");
-    expect(instance.renderToBody({})).toBe(" ");
-    expect(instance.renderToBody({ json: "{}" })).toBe(" ");
+  test("renderToBody routes through _renderInPriorities and falls back to ' '", () => {
+    expect(renderToBody({ body: "hi" })).toBe("hi");
+    expect(renderToBody({ plain: "p", html: "h" })).toBe("p");
+    expect(renderToBody({ html: "h" })).toBe("h");
+    expect(renderToBody({})).toBe(" ");
+    expect(renderToBody({ json: "{}" })).toBe(" ");
   });
 
-  test("renderToBody preserves '' / 0 (Ruby-truthy) and falls through on false/null", async () => {
-    const { Metal } = await import("../metal.js");
-    const instance = Object.create(Metal.prototype) as InstanceType<typeof Metal>;
-    expect(instance.renderToBody({ body: "" })).toBe("");
-    expect(instance.renderToBody({ plain: 0 })).toBe(0);
-    expect(instance.renderToBody({ body: false })).toBe(" ");
-    expect(instance.renderToBody({ body: null })).toBe(" ");
+  test("renderToBody preserves '' / 0 (Ruby-truthy) and falls through on false/null", () => {
+    expect(renderToBody({ body: "" })).toBe("");
+    expect(renderToBody({ plain: 0 })).toBe(0);
+    expect(renderToBody({ body: false })).toBe(" ");
+    expect(renderToBody({ body: null })).toBe(" ");
   });
 
   test("render throws DoubleRenderError when performed is already set", () => {
@@ -279,17 +276,5 @@ describe("Metal wiring", () => {
     };
     processAction.call(host);
     expect(host.formats).toEqual(["html", "json"]);
-  });
-
-  test("renderToBody dispatches to a registered renderer before the priority resolver", async () => {
-    const { Metal } = await import("../metal.js");
-    const { Renderers } = await import("../metal/renderers.js");
-    Renderers.add("csvBody", (v) => `csv:${String(v)}`);
-    try {
-      const instance = Object.create(Metal.prototype) as InstanceType<typeof Metal>;
-      expect(instance.renderToBody({ csvBody: "a,b" })).toBe("csv:a,b");
-    } finally {
-      Renderers.remove("csvBody");
-    }
   });
 });

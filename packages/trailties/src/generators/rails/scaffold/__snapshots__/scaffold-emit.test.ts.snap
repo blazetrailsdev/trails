@@ -7,18 +7,18 @@ export class PostsController extends ApplicationController {
   async index(): Promise<void> {
     // const posts = await Post.all();
     const posts: any[] = [];
-    this.render({ action: "index", locals: { posts } });
+    await this.render({ action: "index", locals: { posts } });
   }
 
   async show(): Promise<void> {
     // const post = await Post.find(this.params.get("id"));
     const post = { id: this.params.get("id") };
-    this.render({ action: "show", locals: { post } });
+    await this.render({ action: "show", locals: { post } });
   }
 
   async new_(): Promise<void> {
     const post = {};
-    this.render({ action: "new", locals: { post } });
+    await this.render({ action: "new", locals: { post } });
   }
 
   async create(): Promise<void> {
@@ -29,7 +29,7 @@ export class PostsController extends ApplicationController {
   async edit(): Promise<void> {
     // const post = await Post.find(this.params.get("id"));
     const post = { id: this.params.get("id") };
-    this.render({ action: "edit", locals: { post } });
+    await this.render({ action: "edit", locals: { post } });
   }
 
   async update(): Promise<void> {

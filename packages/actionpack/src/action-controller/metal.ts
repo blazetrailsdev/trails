@@ -17,7 +17,6 @@ import {
 import type { RackEnv } from "@blazetrails/rack";
 import { includeContent } from "./metal/head.js";
 import { MimeType } from "../action-dispatch/http/mime-type.js";
-import { Renderers } from "./metal/renderers.js";
 import {
   _normalizeOptions as _normalizeOptionsFn,
   _normalizeText as _normalizeTextFn,
@@ -350,16 +349,6 @@ export class Metal extends AbstractController {
 
   toRackResponse(): RackResponse {
     return this.response.toRack() as RackResponse;
-  }
-
-  /** @internal */
-  renderToBody(options: Record<string, unknown> = {}): unknown {
-    const truthy = (v: unknown): boolean => v != null && v !== false;
-    const renderer = Renderers._renderToBodyWithRenderer(options);
-    if (truthy(renderer)) return renderer;
-    const priority = _renderInPrioritiesFn(options);
-    if (truthy(priority)) return priority;
-    return " ";
   }
 
   /** @internal */

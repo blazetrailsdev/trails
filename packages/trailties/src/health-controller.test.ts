@@ -18,7 +18,7 @@ describe("HealthController", () => {
 
   it("health controller renders red internal server error page", async () => {
     class FailingController extends HealthController {
-      override renderUp(): void {
+      override async renderUp(): Promise<void> {
         throw new Error("some exception");
       }
     }

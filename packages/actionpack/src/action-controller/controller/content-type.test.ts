@@ -21,7 +21,7 @@ describe("ContentTypeTest", () => {
   it("test render defaults", async () => {
     class C extends Base {
       async action() {
-        this.render({ body: "hello world!" });
+        await this.render({ body: "hello world!" });
       }
     }
     const c = new C();
@@ -36,7 +36,7 @@ describe("ContentTypeTest", () => {
       Response.defaultCharset = "utf-16";
       class C extends Base {
         async action() {
-          this.render({ body: "hello world!" });
+          await this.render({ body: "hello world!" });
         }
       }
       const c = new C();
@@ -52,7 +52,7 @@ describe("ContentTypeTest", () => {
     class C extends Base {
       async action() {
         this.response.contentType = Mime.fetch("rss").toString();
-        this.render({ body: "hello world!" });
+        await this.render({ body: "hello world!" });
       }
     }
     const c = new C();
@@ -64,7 +64,7 @@ describe("ContentTypeTest", () => {
   it("test content type from render", async () => {
     class C extends Base {
       async action() {
-        this.render({ body: "hello world!", contentType: Mime.fetch("rss").toString() });
+        await this.render({ body: "hello world!", contentType: Mime.fetch("rss").toString() });
       }
     }
     const c = new C();
@@ -77,7 +77,7 @@ describe("ContentTypeTest", () => {
     class C extends Base {
       async action() {
         this.response.charset = "utf-16";
-        this.render({ body: "hello world!" });
+        await this.render({ body: "hello world!" });
       }
     }
     const c = new C();
@@ -90,7 +90,7 @@ describe("ContentTypeTest", () => {
     class C extends Base {
       async action() {
         this.response.charset = undefined;
-        this.render({ body: "hello world!" });
+        await this.render({ body: "hello world!" });
       }
     }
     const c = new C();
@@ -111,7 +111,7 @@ describe("ContentTypeTest", () => {
     class C extends Base {
       async action() {
         this.response.contentType = "text/html; fragment; charset=utf-16";
-        this.render({ body: "hello world!" });
+        await this.render({ body: "hello world!" });
       }
     }
     const c = new C();

@@ -211,9 +211,9 @@ class PollerController extends Base {
   async call() {
     const path = this.request?.env?.PATH_INFO as string;
     if (path?.startsWith("/success")) {
-      this.render({ plain: "Hello World!", status: 200 });
+      await this.render({ plain: "Hello World!", status: 200 });
     } else {
-      this.render({ plain: "", status: 404 });
+      await this.render({ plain: "", status: 404 });
     }
   }
 }

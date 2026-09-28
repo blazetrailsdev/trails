@@ -328,8 +328,8 @@ describe("RescueControllerTest", () => {
         throw new InvalidRequest();
       }
     }
-    C.rescueFrom(InvalidRequest, function (this: Base, err: Error) {
-      this.render({ plain: err.message });
+    C.rescueFrom(InvalidRequest, async function (this: Base, err: Error) {
+      await this.render({ plain: err.message });
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -347,8 +347,8 @@ describe("RescueControllerTest", () => {
         throw new InvalidRequestStr();
       }
     }
-    C.rescueFrom(InvalidRequestStr, function (this: Base, err: Error) {
-      this.render({ plain: err.message });
+    C.rescueFrom(InvalidRequestStr, async function (this: Base, err: Error) {
+      await this.render({ plain: err.message });
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -396,8 +396,8 @@ describe("RescueControllerTest", () => {
         throw new ResourceUnavailable();
       }
     }
-    C.rescueFrom(ResourceUnavailable, function (this: Base, err: Error) {
-      this.render({ plain: err.message });
+    C.rescueFrom(ResourceUnavailable, async function (this: Base, err: Error) {
+      await this.render({ plain: err.message });
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -415,8 +415,8 @@ describe("RescueControllerTest", () => {
         throw new ResourceUnavailableStr();
       }
     }
-    C.rescueFrom(ResourceUnavailableStr, function (this: Base, err: Error) {
-      this.render({ plain: err.message });
+    C.rescueFrom(ResourceUnavailableStr, async function (this: Base, err: Error) {
+      await this.render({ plain: err.message });
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -488,8 +488,8 @@ describe("RescueControllerTest", () => {
         throw new ParseError();
       }
     }
-    C.rescueFrom(ParseError, function (this: Base) {
-      this.render({ plain: "parse error", status: 400 });
+    C.rescueFrom(ParseError, async function (this: Base) {
+      await this.render({ plain: "parse error", status: 400 });
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -598,7 +598,7 @@ describe("RescueTest", () => {
   it("normal request", async () => {
     class C extends Base {
       async foo() {
-        this.render({ plain: "foo" });
+        await this.render({ plain: "foo" });
       }
     }
     const c = new C();
@@ -617,8 +617,8 @@ describe("RescueTest", () => {
         throw new RecordInvalid();
       }
     }
-    C.rescueFrom(RecordInvalid, function (this: Base, err: Error) {
-      this.render({ plain: err.message });
+    C.rescueFrom(RecordInvalid, async function (this: Base, err: Error) {
+      await this.render({ plain: err.message });
     });
     const c = new C();
     await c.dispatch("invalid", makeRequest(), makeResponse());

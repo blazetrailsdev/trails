@@ -83,7 +83,7 @@ export function respondTo(
     };
     mediaType?: string | null;
     contentType: string | null;
-    response: { contentType?: string };
+    response: { contentType?: string; mediaType?: string | null };
     _processFormat(format: Format): void;
   },
   ...mimes: Array<string | ((collector: Collector & Record<string, MimeMethod>) => void)>

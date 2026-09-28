@@ -106,9 +106,9 @@ describe("LayoutAutoDiscoveryTest", () => {
 class DefaultLayoutController extends LayoutTest {}
 
 class StreamingLayoutController extends LayoutTest {
-  override render(...args: unknown[]): void {
+  override render(...args: unknown[]): void | Promise<void> {
     const options = extractOptionsBang(args);
-    super.render(...args, { ...options, stream: true });
+    return super.render(...args, { ...options, stream: true });
   }
 }
 
@@ -143,7 +143,7 @@ class HasNilLayoutProc extends LayoutTest {
 class PrependsViewPathController extends LayoutTest {
   override async hello(): Promise<void> {
     this.prependViewPath(new FixtureResolver({ "layouts/alt.tse": "alt.erb <%= yield %>" }));
-    this.render({ layout: "alt" });
+    await this.render({ layout: "alt" });
   }
 }
 
@@ -161,13 +161,13 @@ class ExceptLayoutController extends LayoutTest {
 
 class SetsLayoutInRenderController extends LayoutTest {
   override async hello(): Promise<void> {
-    this.render({ layout: "third_party_template_library" });
+    await this.render({ layout: "third_party_template_library" });
   }
 }
 
 class RendersNoLayoutController extends LayoutTest {
   override async hello(): Promise<void> {
-    this.render({ layout: false });
+    await this.render({ layout: false });
   }
 }
 
@@ -243,7 +243,7 @@ describe("LayoutExceptionRaisedTest", () => {
 
 class LayoutStatusIsRendered extends LayoutTest {
   override async hello(): Promise<void> {
-    this.render({ status: 401 });
+    await this.render({ status: 401 });
   }
 }
 

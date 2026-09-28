@@ -20,7 +20,7 @@ describe("ActionView::Rendering::ClassMethods#build_view_context_class", () => {
     });
     class FooController extends ActionController.Base {
       async other(): Promise<void> {
-        this.render({ plain: "" });
+        await this.render({ plain: "" });
       }
     }
     AbstractController.withRoutesHelpers(routes as never)(FooController as never);
