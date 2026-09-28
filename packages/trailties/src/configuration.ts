@@ -1,6 +1,13 @@
 import type { MiddlewareStack } from "@blazetrails/actionpack";
 import { deepDup, isPlainObject } from "@blazetrails/activesupport";
-import { File, Hash, RuntimeError, getChildProcess, hashDelete } from "@blazetrails/ruby-compat";
+import {
+  File,
+  Hash,
+  RuntimeError,
+  getChildProcess,
+  hashDelete,
+  stdout,
+} from "@blazetrails/ruby-compat";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 
 type MiddlewareOperation = (middleware: any) => void;
@@ -170,6 +177,7 @@ export class Generators {
           ...parsableFiles,
         ]);
         if (result.error) throw result.error;
+        stdout.write(result.stdout);
         if (result.status !== 0) {
           throw new RuntimeError(`Command failed with exit ${result.status}: bin/eslint`);
         }
