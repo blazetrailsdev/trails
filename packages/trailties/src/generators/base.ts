@@ -308,25 +308,25 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     return this.isTypeScript() ? ".ts" : ".js";
   }
 
-  protected createFile(relativePath: string, content: string, options?: { mode?: number }): void {
+  protected createFile(relativePath: string, content: string, options?: { mode?: number }): string {
     const fullPath = File.join(this.cwd, relativePath);
     if (this.behavior === "revoke") {
       this.output(`      remove  ${relativePath}`);
       if (!this.options.pretend && File.isExist(fullPath)) FileUtils.rmRf(fullPath);
-      return;
+      return relativePath;
     }
     let status = "create";
     if (File.isExist(fullPath)) {
       if (File.read(fullPath) === content) {
         this.sayStatus("identical", relativePath);
         this.createdFiles.push(relativePath);
-        return;
+        return relativePath;
       }
       if (this.options.force) {
         status = "force";
       } else if (this.options.skip) {
         this.sayStatus("skip", relativePath);
-        return;
+        return relativePath;
       } else {
         this.sayStatus("conflict", relativePath);
         status = "force";
@@ -340,6 +340,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     Generators.addGeneratedFile(fullPath);
     this.createdFiles.push(relativePath);
     this.output(`${status.padStart(12)}  ${relativePath}`);
+    return relativePath;
   }
 
   protected emptyDirectory(destination: string, config: { verbose?: boolean } = {}): string {

@@ -141,13 +141,14 @@ describe("AppGenerator (trails-only)", () => {
   });
 
   it("includes ActionMethods into a top-level AppBuilder that does not subclass trails' AppBuilder", async () => {
+    let kept: string | null = null;
     TopLevel.AppBuilder = class {
       cifiles(this: {
         emptyDirectory(d: string): string;
-        emptyDirectoryWithKeepFile(d: string): void;
+        emptyDirectoryWithKeepFile(d: string): string | null;
       }): void {
         this.emptyDirectory("custom-ci");
-        this.emptyDirectoryWithKeepFile("custom-keep");
+        kept = this.emptyDirectoryWithKeepFile("custom-keep");
       }
     };
     try {
@@ -162,6 +163,7 @@ describe("AppGenerator (trails-only)", () => {
     }
     expect(File.isDirectory(File.join(tmpDir, "my-app", "custom-ci"))).toBe(true);
     expect(File.isExist(File.join(tmpDir, "my-app", "custom-keep", ".keep"))).toBe(true);
+    expect(kept).toBe("custom-keep/.keep");
     expect(File.isExist(File.join(tmpDir, "my-app", ".github"))).toBe(false);
   });
 });

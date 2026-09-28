@@ -221,13 +221,13 @@ export abstract class AppBase extends GeneratorBase {
   protected emptyDirectoryWithKeepFile(
     destination: string,
     config: { verbose?: boolean } = {},
-  ): void {
+  ): string | null {
     this.emptyDirectory(destination, config);
-    this.keepFile(destination);
+    return this.keepFile(destination);
   }
 
   /** @internal */
-  protected keepFile(destination: string): void {
-    if (this.keeps()) this.createFile(`${destination}/.keep`, "");
+  protected keepFile(destination: string): string | null {
+    return this.keeps() ? this.createFile(`${destination}/.keep`, "") : null;
   }
 }
