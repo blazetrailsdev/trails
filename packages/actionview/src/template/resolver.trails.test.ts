@@ -9,6 +9,7 @@ import { FixtureResolver } from "../testing/resolvers.js";
 import { TemplateHandlers } from "./handlers.js";
 import type { Template } from "../template.js";
 import { Tse } from "./handlers/tse.js";
+import { Base } from "../base.js";
 
 describe("FileSystemResolver", () => {
   let dir: string;
@@ -34,6 +35,32 @@ describe("FileSystemResolver", () => {
     TemplateHandlers.clear();
     const fs = getFs();
     fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("renders a UTF-8 and a magic-comment-encoded template file", async () => {
+    const write = (name: string, bytes: number[]) =>
+      getFs().writeFile!(getPath().join(dir, "posts", name), Uint8Array.from(bytes));
+    const umlat = [0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20];
+    await write("utf8.html.tse", [...umlat, 0xc3, 0xbc, 0x6d, 0x6c, 0x61, 0x74]);
+    await write("latin1.html.tse", [
+      ...Array.from("# encoding: ISO-8859-1\n", (c) => c.charCodeAt(0)),
+      ...umlat,
+      0xfc,
+      0x6d,
+      0x6c,
+      0x61,
+      0x74,
+    ]);
+    const ctx = new LookupContext(null, {}, []);
+    ctx.appendViewPaths([new FileSystemResolver(dir)]);
+    const render = (name: string) =>
+      (ctx.findTemplate(name, ["posts"]) as Template).render(
+        new (Base.withEmptyTemplateCache())(null, {}, null),
+        {},
+      );
+
+    expect(render("utf8")).toBe("hello \u{fc}mlat");
+    expect(render("latin1")).toBe("\nhello \u{fc}mlat");
   });
 
   it("resolves a template through the same paths as exists?", () => {

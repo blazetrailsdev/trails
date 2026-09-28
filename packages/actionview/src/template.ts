@@ -5,7 +5,8 @@ import {
   SafeBuffer,
   toSentence,
 } from "@blazetrails/activesupport";
-import { ArgumentError, Encoding } from "@blazetrails/ruby-compat";
+import { ArgumentError, Encoding, forceEncoding, isValidEncoding } from "@blazetrails/ruby-compat";
+import { ENCODING_FLAG } from "./action-view.js";
 import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
 import { OutputBuffer, StreamingBuffer } from "./buffers.js";
 import { SyntaxErrorInTemplate, TemplateError, WrongEncodingError } from "./template/error.js";
@@ -14,7 +15,7 @@ import { Html } from "./template/handlers/html.js";
 import { Raw } from "./template/handlers/raw.js";
 import { Tse } from "./template/handlers/tse.js";
 import { SimpleType } from "./template/types.js";
-import type { File as SourcesFile } from "./template/sources/file.js";
+import { File as SourcesFile } from "./template/sources/file.js";
 import {
   sourceLines,
   type BacktraceLocation,
@@ -36,6 +37,7 @@ type TypesImplementation = {
 };
 
 const STRICT_LOCALS_REGEX = /#\s+locals:\s+\((.*)\)/;
+const LEADING_ENCODING_REGEXP = new RegExp(`^${ENCODING_FLAG}`);
 const VARIABLE_FROM_BASENAME = /^_?(.*?)(?:\.\w+)*$/;
 const NONE = Symbol("Template::NONE");
 
@@ -159,6 +161,38 @@ export class Template {
 
   get source(): string {
     return this._source.toString();
+  }
+
+  encodeBang(): string {
+    let source = this.source;
+
+    if (!(this._source instanceof SourcesFile)) return source;
+
+    let encoding: string | Encoding;
+    let magicEncoding: string | null = null;
+    const match = LEADING_ENCODING_REGEXP.exec(source);
+    if (match) {
+      source = source.replace(LEADING_ENCODING_REGEXP, "");
+      encoding = magicEncoding = match[1];
+    } else {
+      encoding = Encoding.defaultExternal;
+    }
+
+    const bytes = source;
+    source = forceEncoding(source, encoding);
+
+    const handler = this.handler as { handlesEncoding?: () => boolean };
+    if (
+      !magicEncoding &&
+      typeof handler.handlesEncoding === "function" &&
+      handler.handlesEncoding()
+    ) {
+      return source;
+    } else if (isValidEncoding(bytes, encoding)) {
+      return source;
+    } else {
+      throw new WrongEncodingError(source, encoding);
+    }
   }
 
   get locals(): readonly string[] | null {
@@ -340,7 +374,7 @@ export class Template {
   /** @internal */
   private compiledSource(streaming = false): string {
     const setStrictLocals = this.strictLocalsBang();
-    let source = this.source;
+    let source = this.encodeBang();
     const handler = this.handler;
     let code: string;
     this._streaming = streaming;
