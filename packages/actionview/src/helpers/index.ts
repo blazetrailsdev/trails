@@ -142,6 +142,8 @@ export {
   faviconLinkTag,
   imageTag,
   pictureTag,
+  videoTag,
+  audioTag,
   sendPreloadLinksHeader,
   imageLoading,
   imageDecoding,

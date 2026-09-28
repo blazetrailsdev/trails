@@ -13,6 +13,7 @@ import { Metal } from "./metal.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import { RequestForgeryProtection } from "../action-dispatch/request-forgery-protection.js";
 import { respondTo } from "./metal/mime-responds.js";
+import { actionMethods, addFlashTypes } from "./metal/flash.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
 import { MissingFile } from "./metal/exceptions.js";
 import { defaultRender } from "./metal/implicit-render.js";
@@ -273,6 +274,8 @@ export class Base extends Metal {
   declare static _layout: Parameters<typeof layout>[0];
   declare static _layoutConditions: Record<string, string[]>;
   declare static _flashTypes: string[];
+  static addFlashTypes = addFlashTypes;
+  static override actionMethods = actionMethods;
 
   static _routes: ViewContextRoutes | null = null;
 
@@ -463,21 +466,8 @@ export class Base extends Metal {
 
   respondTo = respondTo;
 
-  set notice(value: string) {
-    this.flash.notice = value;
-  }
-
-  get notice(): unknown {
-    return this.flash.notice;
-  }
-
-  set alert(value: string) {
-    this.flash.alert = value;
-  }
-
-  get alert(): unknown {
-    return this.flash.alert;
-  }
+  declare readonly notice: unknown;
+  declare readonly alert: unknown;
 
   private static _csrfProtection: RequestForgeryProtection | null = null;
 
@@ -935,7 +925,7 @@ classAttribute.call(Base, "_layoutConditions", {
 });
 Base._writeLayoutMethod();
 classAttribute.call(Base, "_flashTypes", { instanceAccessor: false, default: [] });
-Base._flashTypes = [...Base._flashTypes, "alert", "notice"];
+Base.addFlashTypes("alert", "notice");
 Base.prototype.viewCacheDependencies = viewCacheDependencies;
 Base.prototype.cache = cache;
 Base.prototype.combinedFragmentCacheKey = combinedFragmentCacheKey;

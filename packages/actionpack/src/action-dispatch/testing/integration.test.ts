@@ -3,23 +3,36 @@ import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotat
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { IntegrationTest } from "./integration.js";
 import { Base } from "../../action-controller/base.js";
-import type { RackApp, RackEnv } from "@blazetrails/rack";
-import type { RouteSet } from "../routing/route-set.js";
 import { controllerConstants } from "../http/request.js";
-import { Cookies } from "../middleware/cookies.js";
+import { DebugExceptions } from "../middleware/debug-exceptions.js";
+import { ShowExceptions } from "../middleware/show-exceptions.js";
+import type { MiddlewareFactory, MiddlewareStack } from "../middleware/stack.js";
 import { CookieStore } from "../middleware/session/cookie-store.js";
+import "../../test-helpers/abstract-unit.js";
 
-function buildApp(routes: RouteSet): RackApp {
-  const store = new CookieStore((e: RackEnv) => routes.call(e), { key: "_session" });
-  const cookies = new Cookies((e: RackEnv) => store.call(e));
-  return (e: RackEnv) => {
-    e["action_dispatch.key_generator"] = new KeyGenerator("a".repeat(64), { iterations: 2 });
-    e["action_dispatch.cookies_rotations"] = new RotationConfiguration();
-    e["action_dispatch.signed_cookie_salt"] = "signed cookie";
-    e["action_dispatch.encrypted_cookie_salt"] = "encrypted cookie";
-    e["action_dispatch.encrypted_signed_cookie_salt"] = "signed encrypted cookie";
-    return cookies.call(e);
-  };
+const Generator = new KeyGenerator("a".repeat(64), { iterations: 2 });
+const Rotations = new RotationConfiguration();
+
+class IntegrationTestWithSession extends IntegrationTest {
+  override async process(
+    method: string,
+    path: string,
+    options: Parameters<IntegrationTest["process"]>[2] = {},
+  ): Promise<number> {
+    const env: Record<string, unknown> = { ...(options.env ?? {}) };
+    env["action_dispatch.key_generator"] ??= Generator;
+    env["action_dispatch.cookies_rotations"] ??= Rotations;
+    env["action_dispatch.signed_cookie_salt"] ??= "signed cookie";
+    env["action_dispatch.encrypted_cookie_salt"] ??= "encrypted cookie";
+    env["action_dispatch.encrypted_signed_cookie_salt"] ??= "signed encrypted cookie";
+    return super.process(method, path, { ...options, env });
+  }
+}
+
+function useCookieStore(middleware: MiddlewareStack): void {
+  middleware.use(CookieStore as MiddlewareFactory, { key: "_session" });
+  middleware.delete(ShowExceptions as MiddlewareFactory);
+  middleware.delete(DebugExceptions as MiddlewareFactory);
 }
 
 class PostsController extends Base {
@@ -151,7 +164,7 @@ describe("ActionDispatch::IntegrationTest", () => {
   let app: IntegrationTest;
 
   beforeEach(() => {
-    app = new IntegrationTest();
+    app = new IntegrationTestWithSession();
     app.routes.draw((r) => {
       r.get("/posts/xml", { to: "posts#renderXml", as: "posts_xml" });
       r.get("/posts/xml2", { to: "posts#renderXml2", as: "posts_xml2" });
@@ -175,7 +188,7 @@ describe("ActionDispatch::IntegrationTest", () => {
       });
       r.resource("session");
     });
-    app.app = buildApp(app.routes);
+    app.app = IntegrationTest.buildApp(app.routes, useCookieStore);
     controllerConstants.set("posts", PostsController);
     controllerConstants.set("comments", CommentsController);
     controllerConstants.set("admin/posts", AdminPostsController);
@@ -262,7 +275,7 @@ describe("ActionDispatch::IntegrationTest", () => {
       app.routes.draw((r) => {
         r.get("/unknown", { to: "unknown#index" });
       });
-      app.app = buildApp(app.routes);
+      app.app = IntegrationTest.buildApp(app.routes, useCookieStore);
       await expect(app.get("/unknown")).rejects.toThrow(/uninitialized constant UnknownController/);
     });
   });
@@ -502,7 +515,7 @@ describe("ActionDispatch::IntegrationTest", () => {
     });
 
     it("createSession propagates routes/controllers/app; app falls back to class default", async () => {
-      const sentinel = buildApp(app.routes);
+      const sentinel = IntegrationTest.buildApp(app.routes, useCookieStore);
       app.app = sentinel;
       const sess = app.createSession();
       expect(sess.routes).toBe(app.routes);
@@ -511,7 +524,7 @@ describe("ActionDispatch::IntegrationTest", () => {
       sess.assertResponse("success");
 
       const fresh = new IntegrationTest();
-      expect(fresh.app).toBe(null);
+      expect(fresh.app).toBe(IntegrationTest.app);
       const Stub = class extends IntegrationTest {};
       Stub.app = { name: "class-default" };
       const stubbed = new Stub();
@@ -624,7 +637,7 @@ describe("ActionDispatch::IntegrationTest", () => {
     let redirectApp: IntegrationTest;
 
     beforeEach(() => {
-      redirectApp = new IntegrationTest();
+      redirectApp = new IntegrationTestWithSession();
     });
 
     afterEach(() => {
@@ -640,7 +653,7 @@ describe("ActionDispatch::IntegrationTest", () => {
       redirectApp.routes.draw((r) => {
         r.get("/redirect-to-missing", { to: "redirector#index", as: "redirector" });
       });
-      redirectApp.app = buildApp(redirectApp.routes);
+      redirectApp.app = IntegrationTest.buildApp(redirectApp.routes, useCookieStore);
       controllerConstants.set("redirector", RedirectToMissingController);
 
       await redirectApp.get("/redirect-to-missing");
@@ -662,7 +675,7 @@ describe("ActionDispatch::IntegrationTest", () => {
       redirectApp.routes.draw((r) => {
         r.get("/redirect-to-missing2", { to: "redirector2#index", as: "redirector2" });
       });
-      redirectApp.app = buildApp(redirectApp.routes);
+      redirectApp.app = IntegrationTest.buildApp(redirectApp.routes, useCookieStore);
       controllerConstants.set("redirector2", RedirectToMissing2Controller);
 
       await redirectApp.get("/redirect-to-missing2");

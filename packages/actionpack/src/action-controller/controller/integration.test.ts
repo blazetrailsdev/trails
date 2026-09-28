@@ -1,27 +1,7 @@
-import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
-import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { bodyFromString, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
-import { Base } from "../base.js";
-import type { RackApp, RackEnv } from "@blazetrails/rack";
-import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
-import { controllerConstants } from "../../action-dispatch/http/request.js";
-import { Cookies } from "../../action-dispatch/middleware/cookies.js";
-import { CookieStore } from "../../action-dispatch/middleware/session/cookie-store.js";
 import "../../test-helpers/abstract-unit.js";
-
-function buildApp(routes: RouteSet): RackApp {
-  const store = new CookieStore((e: RackEnv) => routes.call(e), { key: "_session" });
-  const cookies = new Cookies((e: RackEnv) => store.call(e));
-  return (e: RackEnv) => {
-    e["action_dispatch.key_generator"] = new KeyGenerator("a".repeat(64), { iterations: 2 });
-    e["action_dispatch.cookies_rotations"] = new RotationConfiguration();
-    e["action_dispatch.signed_cookie_salt"] = "signed cookie";
-    e["action_dispatch.encrypted_cookie_salt"] = "encrypted cookie";
-    e["action_dispatch.encrypted_signed_cookie_salt"] = "signed encrypted cookie";
-    return cookies.call(e);
-  };
-}
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -207,28 +187,26 @@ describe("IntegrationTestUsesCorrectClass", () => {
   });
 });
 
-class PollerController extends Base {
-  async call() {
-    const path = this.request?.env?.PATH_INFO as string;
-    if (path?.startsWith("/success")) {
-      await this.render({ plain: "Hello World!", status: 200 });
+const Poller = {
+  async call(env: RackEnv): Promise<RackResponse> {
+    if (/^\/success/.test(env["PATH_INFO"] as string)) {
+      return [
+        200,
+        { "Content-Type": "text/plain", "Content-Length": "12" },
+        bodyFromString("Hello World!"),
+      ];
     } else {
-      await this.render({ plain: "", status: 404 });
+      return [404, { "Content-Type": "text/plain", "Content-Length": "0" }, bodyFromString("")];
     }
-  }
-}
+  },
+};
 
 describe("MetalIntegrationTest", () => {
   let t: IntegrationTest;
 
   beforeEach(() => {
     t = new IntegrationTest();
-    t.routes.draw((r) => {
-      r.get("/success", { to: "poller#call" });
-      r.get("/failure", { to: "poller#call" });
-    });
-    t.app = buildApp(t.routes);
-    controllerConstants.set("poller", PollerController);
+    t.app = Poller;
   });
 
   it("successful get", async () => {

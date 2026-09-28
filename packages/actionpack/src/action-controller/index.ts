@@ -88,7 +88,6 @@ export {
   modulesForHelpers,
 } from "./metal/helpers.js";
 export { RescueRegistry } from "./metal/rescue.js";
-export { FlashTypeRegistry } from "./metal/flash.js";
 export { ParameterEncodingRegistry } from "./metal/parameter-encoding.js";
 export {
   MemoryRateLimitStore,

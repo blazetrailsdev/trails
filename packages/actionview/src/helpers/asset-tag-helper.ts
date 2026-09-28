@@ -350,6 +350,55 @@ export function pictureTag(
   });
 }
 
+export function videoTag(this: AssetTagHelperHost, ...sources: unknown[]): SafeBuffer {
+  const options = { ...extractOptionsBang(sources) };
+  const publicPosterFolder = deleteKey(options, "posterSkipPipeline") as boolean | undefined;
+  sources.push(options);
+  return multipleSourcesTagBuilder.call(this, "video", sources, (tagOptions) => {
+    if (tagOptions["poster"] != null && tagOptions["poster"] !== false) {
+      tagOptions["poster"] = pathToImage.call(this, tagOptions["poster"] as string, {
+        skipPipeline: publicPosterFolder,
+      });
+    }
+    if (tagOptions["size"] != null && tagOptions["size"] !== false) {
+      const dimensions = extractDimensions.call(this, deleteKey(tagOptions, "size"));
+      tagOptions["width"] = dimensions?.[0];
+      tagOptions["height"] = dimensions?.[1];
+    }
+  });
+}
+
+export function audioTag(this: AssetTagHelperHost, ...sources: unknown[]): SafeBuffer {
+  return multipleSourcesTagBuilder.call(this, "audio", sources);
+}
+
+/** @internal */
+export function multipleSourcesTagBuilder(
+  this: AssetTagHelperHost,
+  type: string,
+  sources: unknown[],
+  block?: (options: Record<string, unknown>) => void,
+): SafeBuffer {
+  const options = { ...extractOptionsBang(sources) };
+  const skipPipeline = deleteKey(options, "skipPipeline") as boolean | undefined;
+  sources = sources.flat(Infinity);
+
+  if (block) block(options);
+
+  if (sources.length > 1) {
+    return contentTag.call(this, type, options, null, undefined, () =>
+      safeJoin(
+        sources.map((source) =>
+          tag("source", { src: resolveAssetSource.call(this, type, source, skipPipeline) }),
+        ),
+      ),
+    );
+  } else {
+    options["src"] = resolveAssetSource.call(this, type, sources[0], skipPipeline);
+    return contentTag.call(this, type, null, options);
+  }
+}
+
 /** @internal */
 export function resolveAssetSource(
   this: AssetTagHelperHost,

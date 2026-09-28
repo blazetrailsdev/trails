@@ -1,44 +1,40 @@
-export class FlashTypeRegistry {
-  private _types: Set<string> = new Set(["alert", "notice"]);
+import { AbstractController } from "../../abstract-controller/base.js";
+import { helperMethod, type HelpersClassMethods } from "../../abstract-controller/helpers.js";
+import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
 
-  addFlashTypes(...types: string[]): void {
-    for (const type of types) {
-      this._types.add(type);
-    }
-  }
+/** @internal */
+export interface FlashClassHost extends HelpersClassMethods {
+  prototype: object;
+  _flashTypes: string[];
+}
 
-  get types(): ReadonlySet<string> {
-    return new Set(this._types);
-  }
+export function addFlashTypes(this: FlashClassHost, ...types: string[]): void {
+  for (const type of types) {
+    if (this._flashTypes.includes(type)) continue;
 
-  has(type: string): boolean {
-    return this._types.has(type);
-  }
+    Object.defineProperty(this.prototype, type, {
+      get(this: { request: { flash: FlashHash } }) {
+        return this.request.flash.get(type);
+      },
+      configurable: true,
+    });
+    helperMethod(this, type);
 
-  extractFlashFromOptions(
-    flash: Record<string, unknown>,
-    options: Record<string, unknown>,
-  ): Record<string, unknown> {
-    const remaining = { ...options };
-    for (const type of this._types) {
-      if (type in remaining) {
-        flash[type] = remaining[type];
-        delete remaining[type];
-      }
-    }
-    if (remaining.flash && typeof remaining.flash === "object" && !Array.isArray(remaining.flash)) {
-      Object.assign(flash, remaining.flash as Record<string, unknown>);
-      delete remaining.flash;
-    }
-    return remaining;
+    this._flashTypes = [...this._flashTypes, type];
   }
+}
 
-  /** @internal */
-  actionMethods(superMethods: Set<string>): Set<string> {
-    const result = new Set(superMethods);
-    for (const type of this._types) {
-      result.delete(type);
-    }
-    return result;
+export function actionMethods(this: FlashClassHost): string[] {
+  const host = this as FlashClassHost & { _actionMethodCache?: Set<string> };
+  if (
+    !Object.prototype.hasOwnProperty.call(host, "_actionMethodCache") ||
+    !host._actionMethodCache
+  ) {
+    const flashTypes = new Set(host._flashTypes.map(String));
+    const methods = AbstractController.actionMethods.call(
+      host as unknown as typeof AbstractController,
+    );
+    host._actionMethodCache = new Set(methods.filter((name) => !flashTypes.has(name)));
   }
+  return [...host._actionMethodCache];
 }

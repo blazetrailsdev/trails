@@ -46,6 +46,7 @@ import {
   faviconLinkTag,
   imageDecoding,
   imageLoading,
+  audioTag,
   imageTag,
   javascriptIncludeTag,
   preloadLinkTag,
@@ -55,6 +56,7 @@ import {
   setImageLoading,
   setPreloadLinksHeader,
   stylesheetLinkTag,
+  videoTag,
   type AssetTagHelperHost,
 } from "../helpers/asset-tag-helper.js";
 import type { CaptureHelperHost } from "../helpers/capture-helper.js";
@@ -390,10 +392,122 @@ const PathToVideoToTag = table(pathToVideo, media("videos", "ogg"));
 const VideoUrlToTag = table(videoUrl, urls(media("videos", "ogg")));
 const UrlToVideoToTag = table(urlToVideo, urls(media("videos", "ogg")));
 
+const video = (...args: unknown[]): unknown => videoTag.call(host, ...args);
+
+const VideoLinkToTag: [() => unknown, string][] = [
+  [() => video("xml.ogg"), `<video src="/videos/xml.ogg"></video>`],
+  [
+    () => video("rss.m4v", { autoplay: true, controls: true }),
+    `<video autoplay="autoplay" controls="controls" src="/videos/rss.m4v"></video>`,
+  ],
+  [
+    () => video("rss.m4v", { preload: "none" }),
+    `<video preload="none" src="/videos/rss.m4v"></video>`,
+  ],
+  [
+    () => video("gold.m4v", { size: "160x120" }),
+    `<video height="120" src="/videos/gold.m4v" width="160"></video>`,
+  ],
+  [
+    () => video("gold.m4v", { size: "320x240" }),
+    `<video height="240" src="/videos/gold.m4v" width="320"></video>`,
+  ],
+  [
+    () => video("silver.m4v", { size: "100.3x200.6" }),
+    `<video height="200.6" src="/videos/silver.m4v" width="100.3"></video>`,
+  ],
+  [
+    () => video("silver.m4v", { size: "100.3x200.6" }),
+    `<video height="200.6" src="/videos/silver.m4v" width="100.3"></video>`,
+  ],
+  [
+    () => video("bronze.m4v", { size: "50x12.7" }),
+    `<video height="12.7" src="/videos/bronze.m4v" width="50"></video>`,
+  ],
+  [
+    () => video("bronze.m4v", { size: "50x12.7" }),
+    `<video height="12.7" src="/videos/bronze.m4v" width="50"></video>`,
+  ],
+  [
+    () => video("platinum.m4v", { size: "10.1x24" }),
+    `<video height="24" src="/videos/platinum.m4v" width="10.1"></video>`,
+  ],
+  [
+    () => video("platinum.m4v", { size: "10.1x24" }),
+    `<video height="24" src="/videos/platinum.m4v" width="10.1"></video>`,
+  ],
+  [
+    () => video("trailer.ogg", { poster: "screenshot.png" }),
+    `<video poster="/images/screenshot.png" src="/videos/trailer.ogg"></video>`,
+  ],
+  [
+    () => video("error.avi", { size: "100" }),
+    `<video height="100" src="/videos/error.avi" width="100"></video>`,
+  ],
+  [
+    () => video("error.avi", { size: 100 }),
+    `<video height="100" src="/videos/error.avi" width="100"></video>`,
+  ],
+  [() => video("error.avi", { size: "100 x 100" }), `<video src="/videos/error.avi"></video>`],
+  [() => video("error.avi", { size: "1,024x768" }), `<video src="/videos/error.avi"></video>`],
+  [() => video("error.avi", { size: "768x1,024" }), `<video src="/videos/error.avi"></video>`],
+  [() => video("error.avi", { size: "x" }), `<video src="/videos/error.avi"></video>`],
+  [
+    () => video("http://media.rubyonrails.org/video/rails_blog_2.mov"),
+    `<video src="http://media.rubyonrails.org/video/rails_blog_2.mov"></video>`,
+  ],
+  [
+    () => video("//media.rubyonrails.org/video/rails_blog_2.mov"),
+    `<video src="//media.rubyonrails.org/video/rails_blog_2.mov"></video>`,
+  ],
+  [
+    () => video("multiple.ogg", "multiple.avi"),
+    `<video><source src="/videos/multiple.ogg" /><source src="/videos/multiple.avi" /></video>`,
+  ],
+  [
+    () => video(["multiple.ogg", "multiple.avi"]),
+    `<video><source src="/videos/multiple.ogg" /><source src="/videos/multiple.avi" /></video>`,
+  ],
+  [
+    () => video(["multiple.ogg", "multiple.avi"], { size: "160x120", controls: true }),
+    `<video controls="controls" height="120" width="160"><source src="/videos/multiple.ogg" /><source src="/videos/multiple.avi" /></video>`,
+  ],
+];
+
 const AudioPathToTag = table(audioPath, media("audios", "wav"));
 const PathToAudioToTag = table(pathToAudio, media("audios", "wav"));
 const AudioUrlToTag = table(audioUrl, urls(media("audios", "wav")));
 const UrlToAudioToTag = table(urlToAudio, urls(media("audios", "wav")));
+
+const audio = (...args: unknown[]): unknown => audioTag.call(host, ...args);
+
+const AudioLinkToTag: [() => unknown, string][] = [
+  [() => audio("xml.wav"), `<audio src="/audios/xml.wav"></audio>`],
+  [
+    () => audio("rss.wav", { autoplay: true, controls: true }),
+    `<audio autoplay="autoplay" controls="controls" src="/audios/rss.wav"></audio>`,
+  ],
+  [
+    () => audio("http://media.rubyonrails.org/audio/rails_blog_2.mov"),
+    `<audio src="http://media.rubyonrails.org/audio/rails_blog_2.mov"></audio>`,
+  ],
+  [
+    () => audio("//media.rubyonrails.org/audio/rails_blog_2.mov"),
+    `<audio src="//media.rubyonrails.org/audio/rails_blog_2.mov"></audio>`,
+  ],
+  [
+    () => audio("audio.mp3", "audio.ogg"),
+    `<audio><source src="/audios/audio.mp3" /><source src="/audios/audio.ogg" /></audio>`,
+  ],
+  [
+    () => audio(["audio.mp3", "audio.ogg"]),
+    `<audio><source src="/audios/audio.mp3" /><source src="/audios/audio.ogg" /></audio>`,
+  ],
+  [
+    () => audio(["audio.mp3", "audio.ogg"], { preload: "none", controls: true }),
+    `<audio preload="none" controls="controls"><source src="/audios/audio.mp3" /><source src="/audios/audio.ogg" /></audio>`,
+  ],
+];
 
 const fonts: [string, string][] = [
   ["font.eot", "/fonts/font.eot"],
@@ -964,6 +1078,10 @@ describe("AssetTagHelperTest", () => {
     UrlToVideoToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
   });
 
+  it("video tag", () => {
+    VideoLinkToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
   it("audio path", () => {
     AudioPathToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
   });
@@ -980,6 +1098,10 @@ describe("AssetTagHelperTest", () => {
     UrlToAudioToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
   });
 
+  it("audio tag", () => {
+    AudioLinkToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
   it("font path", () => {
     FontPathToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
   });
@@ -990,6 +1112,14 @@ describe("AssetTagHelperTest", () => {
 
   it("url to font alias for font url", () => {
     UrlToFontToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("video audio tag does not modify options", () => {
+    const options = { autoplay: true };
+    videoTag.call(host, "video", options);
+    assertEqual({ autoplay: true }, options);
+    audioTag.call(host, "audio", options);
+    assertEqual({ autoplay: true }, options);
   });
 
   it("image tag interpreting email cid correctly", () => {
