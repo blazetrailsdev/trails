@@ -423,6 +423,7 @@ export class Base extends Metal {
     if (!this.performed && !this._pendingRender) this.defaultRender();
   }
 
+  /** @noRailsEquivalent CONVERGEABLE response-carries-async-streaming-body */
   async renderAsync(options: RenderOptions): Promise<void> {
     if (this.performed) {
       throw new DoubleRenderError(
