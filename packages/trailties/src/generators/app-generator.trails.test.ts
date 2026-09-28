@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Dir, File, FileUtils, SecureRandom } from "@blazetrails/ruby-compat";
-import { AppGenerator } from "./app-generator.js";
+import { AppBuilder, AppGenerator } from "./app-generator.js";
+import { TopLevel } from "@blazetrails/activesupport";
 import { Generators } from "../generators.js";
 
 describe("AppGenerator (trails-only)", () => {
@@ -94,5 +95,75 @@ describe("AppGenerator (trails-only)", () => {
   it("writes bin/eslint executable, as bin/trails is", async () => {
     await new AppGenerator({ cwd: tmpDir, output: () => {}, appPath: "my-app" }).run();
     expect(File.stat(File.join(tmpDir, "my-app", "bin", "eslint")).mode & 0o777).toBe(0o755);
+  });
+
+  it("the generated CI workflow lints with ESLint unless --skip-eslint", async () => {
+    const ci = async (opts: Record<string, unknown>): Promise<string> => {
+      const dir = File.join(tmpDir, SecureRandom.hex(4));
+      FileUtils.mkdirP(dir);
+      await new AppGenerator({
+        cwd: dir,
+        output: () => {},
+        appPath: "my-app",
+        database: "postgresql",
+        ...opts,
+      }).run();
+      return File.read(File.join(dir, "my-app", ".github", "workflows", "ci.yml"));
+    };
+
+    const content = await ci({});
+    expect(content).toMatch(/ {2}lint:\n[^]*run: bin\/eslint --format stylish\n\n {2}test:/);
+    expect(content).toMatch(/DATABASE_URL: postgres:\/\/postgres:postgres@localhost:5432/);
+    expect(content).toMatch(/run: bin\/trails db test:prepare && \w+ test\n/);
+    expect(await ci({ skipEslint: true })).not.toMatch(/lint:|eslint/);
+    expect(await ci({ skipTest: true })).not.toMatch(/test:\s*runs-on/);
+  });
+
+  it("dispatches cifiles through a top-level AppBuilder when one is defined", async () => {
+    const calls: string[] = [];
+    TopLevel.AppBuilder = class extends AppBuilder {
+      override cifiles(): void {
+        calls.push("cifiles", (this as unknown as { appPath: string }).appPath);
+      }
+    };
+    try {
+      await new AppGenerator({
+        cwd: tmpDir,
+        output: () => {},
+        appPath: "my-app",
+        database: "sqlite",
+      }).run();
+    } finally {
+      delete TopLevel.AppBuilder;
+    }
+    expect(calls).toEqual(["cifiles", "my-app"]);
+    expect(File.isExist(File.join(tmpDir, "my-app", ".github", "workflows", "ci.yml"))).toBe(false);
+  });
+
+  it("includes ActionMethods into a top-level AppBuilder that does not subclass trails' AppBuilder", async () => {
+    let kept: string | null = null;
+    TopLevel.AppBuilder = class {
+      cifiles(this: {
+        emptyDirectory(d: string): string;
+        emptyDirectoryWithKeepFile(d: string): string | null;
+      }): void {
+        this.emptyDirectory("custom-ci");
+        kept = this.emptyDirectoryWithKeepFile("custom-keep");
+      }
+    };
+    try {
+      await new AppGenerator({
+        cwd: tmpDir,
+        output: () => {},
+        appPath: "my-app",
+        database: "sqlite",
+      }).run();
+    } finally {
+      delete TopLevel.AppBuilder;
+    }
+    expect(File.isDirectory(File.join(tmpDir, "my-app", "custom-ci"))).toBe(true);
+    expect(File.isExist(File.join(tmpDir, "my-app", "custom-keep", ".keep"))).toBe(true);
+    expect(kept).toBe("custom-keep/.keep");
+    expect(File.isExist(File.join(tmpDir, "my-app", ".github"))).toBe(false);
   });
 });

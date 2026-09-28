@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { GeneratorBase } from "./base.js";
+import { Dir, File, FileUtils, SecureRandom } from "@blazetrails/ruby-compat";
+import { GeneratorBase, type GeneratorOptions } from "./base.js";
 import { Generators } from "../generators.js";
 
 class Host extends GeneratorBase {}
@@ -72,5 +73,39 @@ describe("GeneratorBase runtime options (Thor's add_runtime_options!)", () => {
     });
     expect(seen!.attributes).toEqual(["title:string"]);
     expect(seen!.options).toMatchObject({ pretend: true, force: true, quiet: true, skip: true });
+  });
+});
+
+describe("GeneratorBase#createFile conflict behavior (Thor's CreateFile#invoke!)", () => {
+  class Writer extends GeneratorBase {
+    write(content: string): void {
+      this.createFile("app/x.ts", content);
+    }
+  }
+
+  it("keeps a changed file under behavior: :skip, reports identical files, and forces through a conflict", () => {
+    const cwd = File.join(Dir.tmpdir(), `trails-create-file-${SecureRandom.hex(8)}`);
+    const lines: string[] = [];
+    const make = (opts: Partial<GeneratorOptions> = {}) =>
+      new Writer({ cwd, output: (m) => lines.push(m), ...opts });
+    try {
+      make().write("one ✓\n");
+      make({ behavior: "skip" }).write("two\n");
+      make({ behavior: "skip" }).write("one ✓\n");
+      expect(File.read(File.join(cwd, "app/x.ts"))).toBe("one ✓\n");
+      make({ behavior: "force" }).write("two\n");
+      make().write("three\n");
+      expect(File.read(File.join(cwd, "app/x.ts"))).toBe("three\n");
+      expect(lines.map((l) => l.trim())).toEqual([
+        "create  app/x.ts",
+        "skip  app/x.ts",
+        "identical  app/x.ts",
+        "force  app/x.ts",
+        "conflict  app/x.ts",
+        "force  app/x.ts",
+      ]);
+    } finally {
+      FileUtils.rmRf(cwd);
+    }
   });
 });

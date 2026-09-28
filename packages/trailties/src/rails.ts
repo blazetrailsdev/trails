@@ -10,6 +10,7 @@ import { Engine } from "./engine.js";
 import type { Configuration } from "./application/configuration.js";
 import { resolveEnv } from "./database.js";
 import type { InitializerGroup } from "./initializable.js";
+import type { ActionMethods } from "./generators/app-generator.js";
 import { VERSION } from "./version.js";
 import "./info-controller.js";
 import "./welcome-controller.js";
@@ -33,6 +34,8 @@ export class Trails {
   static get Engine(): typeof Engine {
     return Engine;
   }
+
+  declare static ActionMethods: typeof ActionMethods;
 
   static get application(): Application | null {
     if (_application) return _application;

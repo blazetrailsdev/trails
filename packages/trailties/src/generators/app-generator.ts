@@ -1,7 +1,8 @@
 import { File } from "@blazetrails/ruby-compat";
-import { camelize, parameterize, underscore } from "@blazetrails/activesupport";
+import { TopLevel, camelize, parameterize, underscore } from "@blazetrails/activesupport";
 import { ref, tsClass, tsField, tsModule, tsRaw } from "../template-builder/index.js";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
+import { Trails } from "../rails.js";
 import { GeneratorError } from "./generated-attribute.js";
 import { type DatabaseName } from "./database.js";
 import { TEMPLATES } from "./rails/app/templates.js";
@@ -35,6 +36,60 @@ export interface AppGeneratorOptions extends Omit<AppBaseOptions, "database" | "
 const TRAILS_LOADER = "tsx";
 const TRAILS_CLI = "node_modules/@blazetrails/trailties/bin/trails.js";
 const TRAILS = `${TRAILS_LOADER} ${TRAILS_CLI}`;
+
+export class ActionMethods {
+  declare readonly options: AppBaseOptions;
+  /** @internal */
+  declare private generator: AppGenerator;
+
+  constructor(generator: AppGenerator) {
+    this.generator = generator;
+    this.options = generator.options;
+    return new Proxy(this, {
+      get: (target, key, receiver) =>
+        key in target ? Reflect.get(target, key, receiver) : target.methodMissing(key),
+    });
+  }
+
+  /** @internal */
+  protected template(source: string, destination: string): void {
+    this.generator["template"](source, destination);
+  }
+
+  /** @internal */
+  protected emptyDirectory(destination: string, config: { verbose?: boolean } = {}): string {
+    return this.generator["emptyDirectory"](destination, config);
+  }
+
+  /** @internal */
+  protected emptyDirectoryWithKeepFile(
+    destination: string,
+    config: { verbose?: boolean } = {},
+  ): string | null {
+    return this.generator["emptyDirectoryWithKeepFile"](destination, config);
+  }
+
+  /** @internal */
+  protected createFile(relativePath: string, content: string): string {
+    return this.generator["createFile"](relativePath, content);
+  }
+
+  /** @internal */
+  private methodMissing(key: string | symbol): unknown {
+    const value = (this.generator as unknown as Record<string | symbol, unknown>)[key];
+    return typeof value === "function" ? value.bind(this.generator) : value;
+  }
+}
+
+Trails.ActionMethods = ActionMethods;
+
+export class AppBuilder extends ActionMethods {
+  cifiles(): void {
+    this.emptyDirectory(".github/workflows");
+    this.template("github/ci.yml", ".github/workflows/ci.yml");
+    this.template("github/dependabot.yml", ".github/dependabot.yml");
+  }
+}
 
 export class AppGenerator extends AppBase {
   readonly packageManager: PackageManager;
@@ -126,6 +181,7 @@ export class AppGenerator extends AppBase {
       this.createDockerFiles();
     }
     this.createEslintFile();
+    this.createCifiles();
 
     this.output("");
 
@@ -1307,8 +1363,18 @@ export default defineConfig([
     this.eslint();
   }
 
+  private createCifiles(): void {
+    if (this.options.skipCi) return;
+    this.build("cifiles");
+  }
+
   databaseYml(): void {
     this.template(this.database.template, "config/database.ts");
+  }
+
+  /** @internal */
+  protected getBuilderClass(): new (generator: never) => object {
+    return TopLevel.AppBuilder !== undefined ? TopLevel.AppBuilder : AppBuilder;
   }
 
   private template(source: string, destination: string): void {
@@ -1318,6 +1384,9 @@ export default defineConfig([
         appName: this.appName(),
         database: this.database,
         sqliteDriver: this.sqliteDriver,
+        packageManager: this.packageManager,
+        skipEslint: this.skip("Eslint"),
+        skipTest: !!this.options.skipTest,
       }),
     );
   }
