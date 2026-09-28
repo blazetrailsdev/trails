@@ -63,7 +63,7 @@ export function assignController(
 
 export function logger(this: ControllerHelperHost): unknown {
   const controller = this._controller;
-  return controller && "logger" in controller ? controller.logger : undefined;
+  return controller && rbObjRespondTo(controller, "logger") ? controller.logger : undefined;
 }
 
 export function installControllerDelegates(prototype: object): void {

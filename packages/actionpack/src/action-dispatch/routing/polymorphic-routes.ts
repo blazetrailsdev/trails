@@ -37,8 +37,7 @@ export type PolymorphicArg =
   | ToModel
   | ModelClass
   | string
-  | symbol
-  | ReadonlyArray<ToModel | ModelClass | string | symbol | RoutesProxy | null | undefined>
+  | ReadonlyArray<ToModel | ModelClass | string | RoutesProxy | null | undefined>
   | Record<string, unknown>;
 
 export interface PolymorphicOptions {
