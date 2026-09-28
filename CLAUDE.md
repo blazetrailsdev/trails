@@ -1282,8 +1282,9 @@ dispatches through `method_missing`; that is decided per class.
 ## Ruby protocol methods with a different JS mechanism
 
 Five Ruby protocol names are neither portable by name nor meaningless: JS has
-the capability, in a different place. Each is its own `SKIP_GROUPS` entry in
-`scripts/parity/conventions.ts`, decided here:
+the capability, in a different place. Each is decided here, and each but
+`hash` / `eql?` is its own `SKIP_GROUPS` entry in
+`scripts/parity/conventions.ts`:
 
 - **`is_a?` / `kind_of?` — `instanceof`.** JS customises it with
   `static [Symbol.hasInstance]` on the class tested _against_, so
@@ -1296,8 +1297,9 @@ the capability, in a different place. Each is its own `SKIP_GROUPS` entry in
 - **`hash` / `eql?` — live, scored by their consumers.** `Map` and `Set` call no
   hook, but ruby-compat's `rbHash` and `rbEqual` dispatch to a TS `hash()` /
   `eql()`, and so do `Deduplicable#deduplicate` and the preloader's batch
-  grouping (`associations/preloader/batch.ts`). The members are not dead code.
-  Scoring them is a comparer change and has its own story.
+  grouping (`associations/preloader/batch.ts`). The members are not dead code,
+  and they are scored by name like any ported method: `hash` is `hash`, `eql?`
+  is `eql`.
 - **`method_missing` / `respond_to_missing?` / `respond_to?` — per class.**
   `respond_to?` is `rbObjRespondTo`, a function; `in` cannot see a name a
   `respond_to_missing?` answers. A class that overrides `respond_to?` spells

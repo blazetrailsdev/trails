@@ -580,14 +580,6 @@ export const SKIP_GROUPS: SkipGroup[] = [
   },
   {
     reason:
-      "Skipped until scored by their consumers: JS `Map`/`Set` call no hook, but " +
-      "`rbHash` / `rbEqual` (ruby-compat) dispatch to a TS `hash()` / `eql()`, as do " +
-      "`Deduplicable#deduplicate` and the preloader's batch grouping, so the members " +
-      'are live (CLAUDE.md § "Ruby protocol methods with a different JS mechanism").',
-    names: ["hash", "eql?"],
-  },
-  {
-    reason:
       "Decided per class — the JS mechanism is a `Proxy` trap, or typed forwarders, and " +
       "`respond_to?` is `rbObjRespondTo`, a function; `in` sees no name a " +
       '`respond_to_missing?` answers (CLAUDE.md § "Ruby protocol methods with a ' +
