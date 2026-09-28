@@ -15,6 +15,7 @@ import {
   ConditionalGet,
   ETag,
   Head,
+  Lock,
   MethodOverride,
   MockRequest,
   Runtime,
@@ -27,6 +28,7 @@ import "../trailties/action-dispatch.js";
 import { Application } from "../application.js";
 import { Root } from "../paths.js";
 import { Logger } from "../rack/logger.js";
+import { SilenceRequest } from "../rack/silence-request.js";
 import { Configuration } from "./configuration.js";
 import { DefaultMiddlewareStack } from "./default-middleware-stack.js";
 
@@ -89,6 +91,22 @@ describe("DefaultMiddlewareStack (trails)", () => {
     expect(klasses).not.toContain(Flash);
     expect(klasses).not.toContain(TempfileReaper);
     expect(klasses).toEqual(expect.arrayContaining([Head, ConditionalGet, ETag]));
+  });
+
+  it("uses Rack::Lock only when allow_concurrency is false", () => {
+    expect(buildStack()).not.toContain(Lock);
+    const klasses = buildStack((c) => (c.allowConcurrency = false));
+    expect(klasses.indexOf(Lock)).toBe(klasses.indexOf(Executor) - 1);
+  });
+
+  it("uses SilenceRequest before the Logger when silence_healthcheck_path is set", () => {
+    expect(buildStack()).not.toContain(SilenceRequest);
+    const stack = defaultStack((c) => (c.silenceHealthcheckPath = "/up"));
+    const klasses = [...stack].map((entry) => entry.klass);
+    expect(klasses.indexOf(SilenceRequest)).toBe(klasses.indexOf(Logger) - 1);
+    expect([...stack].find((entry) => entry.klass === SilenceRequest)?.args).toEqual([
+      { path: "/up" },
+    ]);
   });
 
   it("honours _method=patch on a POST", async () => {

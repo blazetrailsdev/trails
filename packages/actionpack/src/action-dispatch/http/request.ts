@@ -1000,7 +1000,7 @@ export interface Request {
 export interface Request extends CspRequest {}
 include(Request, CspRequest);
 
-/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Env` (`action_dispatch/http/request.rb:29`), whose `initialize_copy` (`rack/request.rb:144-146`) is what `dup` runs. */
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export interface Request {
   dup(): Request;
 }
