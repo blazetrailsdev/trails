@@ -61,9 +61,7 @@ function setupFiberedBase() {
     state.view = Base.withEmptyTemplateCache().withViewPaths(viewPaths, state.assigns);
   });
 
-  afterEach(() => {
-    TemplateHandlers.clear();
-  });
+  afterEach(() => TemplateHandlers.clear());
 
   const renderBody = (options: Record<string, unknown>) =>
     state.view.viewRenderer.renderBody(state.view as unknown as ViewContext, {
@@ -74,9 +72,7 @@ function setupFiberedBase() {
   const bufferedRender = async (options: Record<string, unknown>): Promise<string> => {
     const body = await renderBody(options);
     let string = "";
-    const each = (piece: string | SafeBuffer | null) => {
-      string += String(piece ?? "");
-    };
+    const each = (piece: string | SafeBuffer | null) => void (string += String(piece ?? ""));
     if (Array.isArray(body)) body.forEach(each);
     else await body.each(each);
     return string;
