@@ -3,6 +3,13 @@ import { Module } from "@blazetrails/ruby-compat/include";
 
 export type MethodSource = (mod: Record<string, unknown>) => void;
 
+type Owner = Module | { prototype: object };
+
+function classEval(owner: Owner, block: (mod: Record<string, unknown>) => void): void {
+  if (owner instanceof Module) owner.moduleEval(block);
+  else block(owner.prototype as Record<string, unknown>);
+}
+
 export class MethodSet {
   static METHOD_CACHES = new Map<string, Module>();
 
@@ -38,7 +45,7 @@ export class MethodSet {
     return canonicalName;
   }
 
-  apply(owner: Module, _path: string, _line: number): void {
+  apply(owner: Owner, _path: string, _line: number): void {
     if (this.sources.length !== 0) {
       this.cache.moduleEval((mod) => {
         for (const source of this.sources) source(mod);
@@ -51,14 +58,14 @@ export class MethodSet {
       if (instanceMethod === undefined) {
         throw new NameError(`undefined method '${canonicalName}' for module`, canonicalName);
       }
-      owner.moduleEval((mod) => Object.defineProperty(mod, as, instanceMethod));
+      classEval(owner, (mod) => Object.defineProperty(mod, as, instanceMethod));
     }
   }
 }
 
 export class CodeGenerator {
   static batch<T>(
-    owner: Module | CodeGenerator,
+    owner: Owner | CodeGenerator,
     path: string,
     line: number,
     block: (codeGenerator: CodeGenerator) => T,
@@ -73,13 +80,13 @@ export class CodeGenerator {
     }
   }
 
-  private owner: Module;
+  private owner: Owner;
   private path: string;
   private line: number;
   private namespaces = new Map<string, MethodSet>();
   private sources: MethodSource[] = [];
 
-  constructor(owner: Module, path: string, line: number) {
+  constructor(owner: Owner, path: string, line: number) {
     this.owner = owner;
     this.path = path;
     this.line = line;
@@ -108,7 +115,7 @@ export class CodeGenerator {
     }
 
     if (this.sources.length !== 0) {
-      this.owner.moduleEval((mod) => {
+      classEval(this.owner, (mod) => {
         for (const source of this.sources) source(mod);
       });
     }

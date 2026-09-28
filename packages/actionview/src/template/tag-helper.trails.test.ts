@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from "vitest";
+import { CodeGenerator } from "@blazetrails/activesupport";
 import {
   tag as _tag,
   TagBuilder,
@@ -42,19 +43,25 @@ describe("TagHelperTest", () => {
     });
 
     it("defineVoidElement registers a void element", () => {
-      TagBuilder.defineVoidElement("custom-void");
+      CodeGenerator.batch(TagBuilder, "", 0, (codeGenerator) =>
+        TagBuilder.defineVoidElement("custom-void", { codeGenerator }),
+      );
       const t = tag() as any;
       expect(t["custom-void"]().toString()).toBe("<custom-void>");
     });
 
     it("defineSelfClosingElement registers a self-closing element", () => {
-      TagBuilder.defineSelfClosingElement("custom-selfclose");
+      CodeGenerator.batch(TagBuilder, "", 0, (codeGenerator) =>
+        TagBuilder.defineSelfClosingElement("custom-selfclose", { codeGenerator }),
+      );
       const t = tag() as any;
       expect(t["custom-selfclose"]().toString()).toBe("<custom-selfclose />");
     });
 
     it("defineElement with methodName aliases", () => {
-      TagBuilder.defineElement("my-elem", { methodName: "my_alias" });
+      CodeGenerator.batch(TagBuilder, "", 0, (codeGenerator) =>
+        TagBuilder.defineElement("my-elem", { codeGenerator, methodName: "my_alias" }),
+      );
       const t = tag() as any;
       expect(t.my_alias("x").toString()).toBe("<my-elem>x</my-elem>");
     });

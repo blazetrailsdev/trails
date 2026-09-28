@@ -5,6 +5,7 @@ import {
   htmlEscapeOnce,
   xmlNameEscape,
   extractOptionsBang,
+  CodeGenerator,
 } from "@blazetrails/activesupport";
 import {
   raw as _raw,
@@ -20,6 +21,9 @@ export interface TagHelperHost extends CaptureHelperHost {
 }
 
 type TagBlock = (tagBuilder: TagBuilder) => unknown;
+
+const __FILE__ = import.meta.url;
+const __LINE__ = 0;
 
 const BOOLEAN_ATTRIBUTES = new Set([
   "allowfullscreen",
@@ -374,192 +378,203 @@ export function escapeOnce(html: string): SafeBuffer {
 }
 
 export class TagBuilder {
-  static defineElement(name: string, { methodName = name }: { methodName?: string } = {}): void {
+  static defineElement(
+    name: string,
+    { codeGenerator, methodName = name }: { codeGenerator: CodeGenerator; methodName?: string },
+  ): void {
     if (name in this.prototype) return;
 
-    Object.defineProperty(this.prototype, methodName, {
-      value(this: TagBuilder, ...args: unknown[]): SafeBuffer {
-        const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
-          | TagBlock
-          | undefined;
-        const { escape = true, ...options } = extractOptionsBang(args);
-        const [content = null] = args;
-        return this.tagString(name, content, options, { escape: escape as boolean, block });
-      },
-      writable: true,
-      configurable: true,
+    codeGenerator.classEval((batch) => {
+      batch.push((mod) => {
+        mod[methodName] = function (this: TagBuilder, ...args: unknown[]): SafeBuffer {
+          const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
+            | TagBlock
+            | undefined;
+          const { escape = true, ...options } = extractOptionsBang(args);
+          const [content = null] = args;
+          return this.tagString(name, content, options, { escape: escape as boolean, block });
+        };
+      });
     });
   }
 
   static defineVoidElement(
     name: string,
-    { methodName = name }: { methodName?: string } = {},
+    { codeGenerator, methodName = name }: { codeGenerator: CodeGenerator; methodName?: string },
   ): void {
-    Object.defineProperty(this.prototype, methodName, {
-      value(this: TagBuilder, ...args: unknown[]): SafeBuffer {
-        if (typeof args[args.length - 1] === "function") args.pop();
-        const { escape = true, ...options } = extractOptionsBang(args);
-        if (args.length > 0) {
-          throw new ArgumentError(`wrong number of arguments (given ${args.length}, expected 0)`);
-        }
-        return this.selfClosingTagString(name, options, escape as boolean, ">");
-      },
-      writable: true,
-      configurable: true,
+    codeGenerator.classEval((batch) => {
+      batch.push((mod) => {
+        mod[methodName] = function (this: TagBuilder, ...args: unknown[]): SafeBuffer {
+          if (typeof args[args.length - 1] === "function") args.pop();
+          const { escape = true, ...options } = extractOptionsBang(args);
+          if (args.length > 0) {
+            throw new ArgumentError(`wrong number of arguments (given ${args.length}, expected 0)`);
+          }
+          return this.selfClosingTagString(name, options, escape as boolean, ">");
+        };
+      });
     });
   }
 
   static defineSelfClosingElement(
     name: string,
-    { methodName = name }: { methodName?: string } = {},
+    { codeGenerator, methodName = name }: { codeGenerator: CodeGenerator; methodName?: string },
   ): void {
-    Object.defineProperty(this.prototype, methodName, {
-      value(this: TagBuilder, ...args: unknown[]): SafeBuffer {
-        const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
-          | TagBlock
-          | undefined;
-        const { escape = true, ...options } = extractOptionsBang(args);
-        const [content = null] = args;
-        if ((content != null && content !== false) || block) {
-          return this.tagString(name, content, options, { escape: escape as boolean, block });
-        } else {
-          return this.selfClosingTagString(name, options, escape as boolean);
-        }
-      },
-      writable: true,
-      configurable: true,
+    codeGenerator.classEval((batch) => {
+      batch.push((mod) => {
+        mod[methodName] = function (this: TagBuilder, ...args: unknown[]): SafeBuffer {
+          const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
+            | TagBlock
+            | undefined;
+          const { escape = true, ...options } = extractOptionsBang(args);
+          const [content = null] = args;
+          if ((content != null && content !== false) || block) {
+            return this.tagString(name, content, options, { escape: escape as boolean, block });
+          } else {
+            return this.selfClosingTagString(name, options, escape as boolean);
+          }
+        };
+      });
     });
   }
 
   static {
-    this.defineVoidElement("area");
-    this.defineVoidElement("base");
-    this.defineVoidElement("br");
-    this.defineVoidElement("col");
-    this.defineVoidElement("embed");
-    this.defineVoidElement("hr");
-    this.defineVoidElement("img");
-    this.defineVoidElement("input");
-    this.defineVoidElement("keygen");
-    this.defineVoidElement("link");
-    this.defineVoidElement("meta");
-    this.defineVoidElement("source");
-    this.defineVoidElement("track");
-    this.defineVoidElement("wbr");
-    this.defineSelfClosingElement("animate");
-    this.defineSelfClosingElement("animateMotion", { methodName: "animate_motion" });
-    this.defineSelfClosingElement("animateTransform", { methodName: "animate_transform" });
-    this.defineSelfClosingElement("circle");
-    this.defineSelfClosingElement("ellipse");
-    this.defineSelfClosingElement("line");
-    this.defineSelfClosingElement("path");
-    this.defineSelfClosingElement("polygon");
-    this.defineSelfClosingElement("polyline");
-    this.defineSelfClosingElement("rect");
-    this.defineSelfClosingElement("set");
-    this.defineSelfClosingElement("stop");
-    this.defineSelfClosingElement("use");
-    this.defineSelfClosingElement("view");
-    this.defineElement("a");
-    this.defineElement("abbr");
-    this.defineElement("address");
-    this.defineElement("article");
-    this.defineElement("aside");
-    this.defineElement("audio");
-    this.defineElement("b");
-    this.defineElement("bdi");
-    this.defineElement("bdo");
-    this.defineElement("blockquote");
-    this.defineElement("body");
-    this.defineElement("button");
-    this.defineElement("canvas");
-    this.defineElement("caption");
-    this.defineElement("cite");
-    this.defineElement("code");
-    this.defineElement("colgroup");
-    this.defineElement("data");
-    this.defineElement("datalist");
-    this.defineElement("dd");
-    this.defineElement("del");
-    this.defineElement("details");
-    this.defineElement("dfn");
-    this.defineElement("dialog");
-    this.defineElement("div");
-    this.defineElement("dl");
-    this.defineElement("dt");
-    this.defineElement("em");
-    this.defineElement("fieldset");
-    this.defineElement("figcaption");
-    this.defineElement("figure");
-    this.defineElement("footer");
-    this.defineElement("form");
-    this.defineElement("h1");
-    this.defineElement("h2");
-    this.defineElement("h3");
-    this.defineElement("h4");
-    this.defineElement("h5");
-    this.defineElement("h6");
-    this.defineElement("head");
-    this.defineElement("header");
-    this.defineElement("hgroup");
-    this.defineElement("html");
-    this.defineElement("i");
-    this.defineElement("iframe");
-    this.defineElement("ins");
-    this.defineElement("kbd");
-    this.defineElement("label");
-    this.defineElement("legend");
-    this.defineElement("li");
-    this.defineElement("main");
-    this.defineElement("map");
-    this.defineElement("mark");
-    this.defineElement("menu");
-    this.defineElement("meter");
-    this.defineElement("nav");
-    this.defineElement("noscript");
-    this.defineElement("object");
-    this.defineElement("ol");
-    this.defineElement("optgroup");
-    this.defineElement("option");
-    this.defineElement("output");
-    this.defineElement("p");
-    this.defineElement("picture");
-    this.defineElement("portal");
-    this.defineElement("pre");
-    this.defineElement("progress");
-    this.defineElement("q");
-    this.defineElement("rp");
-    this.defineElement("rt");
-    this.defineElement("ruby");
-    this.defineElement("s");
-    this.defineElement("samp");
-    this.defineElement("script");
-    this.defineElement("search");
-    this.defineElement("section");
-    this.defineElement("select");
-    this.defineElement("slot");
-    this.defineElement("small");
-    this.defineElement("span");
-    this.defineElement("strong");
-    this.defineElement("style");
-    this.defineElement("sub");
-    this.defineElement("summary");
-    this.defineElement("sup");
-    this.defineElement("table");
-    this.defineElement("tbody");
-    this.defineElement("td");
-    this.defineElement("template");
-    this.defineElement("textarea");
-    this.defineElement("tfoot");
-    this.defineElement("th");
-    this.defineElement("thead");
-    this.defineElement("time");
-    this.defineElement("title");
-    this.defineElement("tr");
-    this.defineElement("u");
-    this.defineElement("ul");
-    this.defineElement("var");
-    this.defineElement("video");
+    CodeGenerator.batch(this, __FILE__, __LINE__, (codeGenerator) => {
+      this.defineVoidElement("area", { codeGenerator });
+      this.defineVoidElement("base", { codeGenerator });
+      this.defineVoidElement("br", { codeGenerator });
+      this.defineVoidElement("col", { codeGenerator });
+      this.defineVoidElement("embed", { codeGenerator });
+      this.defineVoidElement("hr", { codeGenerator });
+      this.defineVoidElement("img", { codeGenerator });
+      this.defineVoidElement("input", { codeGenerator });
+      this.defineVoidElement("keygen", { codeGenerator });
+      this.defineVoidElement("link", { codeGenerator });
+      this.defineVoidElement("meta", { codeGenerator });
+      this.defineVoidElement("source", { codeGenerator });
+      this.defineVoidElement("track", { codeGenerator });
+      this.defineVoidElement("wbr", { codeGenerator });
+      this.defineSelfClosingElement("animate", { codeGenerator });
+      this.defineSelfClosingElement("animateMotion", {
+        codeGenerator,
+        methodName: "animate_motion",
+      });
+      this.defineSelfClosingElement("animateTransform", {
+        codeGenerator,
+        methodName: "animate_transform",
+      });
+      this.defineSelfClosingElement("circle", { codeGenerator });
+      this.defineSelfClosingElement("ellipse", { codeGenerator });
+      this.defineSelfClosingElement("line", { codeGenerator });
+      this.defineSelfClosingElement("path", { codeGenerator });
+      this.defineSelfClosingElement("polygon", { codeGenerator });
+      this.defineSelfClosingElement("polyline", { codeGenerator });
+      this.defineSelfClosingElement("rect", { codeGenerator });
+      this.defineSelfClosingElement("set", { codeGenerator });
+      this.defineSelfClosingElement("stop", { codeGenerator });
+      this.defineSelfClosingElement("use", { codeGenerator });
+      this.defineSelfClosingElement("view", { codeGenerator });
+      this.defineElement("a", { codeGenerator });
+      this.defineElement("abbr", { codeGenerator });
+      this.defineElement("address", { codeGenerator });
+      this.defineElement("article", { codeGenerator });
+      this.defineElement("aside", { codeGenerator });
+      this.defineElement("audio", { codeGenerator });
+      this.defineElement("b", { codeGenerator });
+      this.defineElement("bdi", { codeGenerator });
+      this.defineElement("bdo", { codeGenerator });
+      this.defineElement("blockquote", { codeGenerator });
+      this.defineElement("body", { codeGenerator });
+      this.defineElement("button", { codeGenerator });
+      this.defineElement("canvas", { codeGenerator });
+      this.defineElement("caption", { codeGenerator });
+      this.defineElement("cite", { codeGenerator });
+      this.defineElement("code", { codeGenerator });
+      this.defineElement("colgroup", { codeGenerator });
+      this.defineElement("data", { codeGenerator });
+      this.defineElement("datalist", { codeGenerator });
+      this.defineElement("dd", { codeGenerator });
+      this.defineElement("del", { codeGenerator });
+      this.defineElement("details", { codeGenerator });
+      this.defineElement("dfn", { codeGenerator });
+      this.defineElement("dialog", { codeGenerator });
+      this.defineElement("div", { codeGenerator });
+      this.defineElement("dl", { codeGenerator });
+      this.defineElement("dt", { codeGenerator });
+      this.defineElement("em", { codeGenerator });
+      this.defineElement("fieldset", { codeGenerator });
+      this.defineElement("figcaption", { codeGenerator });
+      this.defineElement("figure", { codeGenerator });
+      this.defineElement("footer", { codeGenerator });
+      this.defineElement("form", { codeGenerator });
+      this.defineElement("h1", { codeGenerator });
+      this.defineElement("h2", { codeGenerator });
+      this.defineElement("h3", { codeGenerator });
+      this.defineElement("h4", { codeGenerator });
+      this.defineElement("h5", { codeGenerator });
+      this.defineElement("h6", { codeGenerator });
+      this.defineElement("head", { codeGenerator });
+      this.defineElement("header", { codeGenerator });
+      this.defineElement("hgroup", { codeGenerator });
+      this.defineElement("html", { codeGenerator });
+      this.defineElement("i", { codeGenerator });
+      this.defineElement("iframe", { codeGenerator });
+      this.defineElement("ins", { codeGenerator });
+      this.defineElement("kbd", { codeGenerator });
+      this.defineElement("label", { codeGenerator });
+      this.defineElement("legend", { codeGenerator });
+      this.defineElement("li", { codeGenerator });
+      this.defineElement("main", { codeGenerator });
+      this.defineElement("map", { codeGenerator });
+      this.defineElement("mark", { codeGenerator });
+      this.defineElement("menu", { codeGenerator });
+      this.defineElement("meter", { codeGenerator });
+      this.defineElement("nav", { codeGenerator });
+      this.defineElement("noscript", { codeGenerator });
+      this.defineElement("object", { codeGenerator });
+      this.defineElement("ol", { codeGenerator });
+      this.defineElement("optgroup", { codeGenerator });
+      this.defineElement("option", { codeGenerator });
+      this.defineElement("output", { codeGenerator });
+      this.defineElement("p", { codeGenerator });
+      this.defineElement("picture", { codeGenerator });
+      this.defineElement("portal", { codeGenerator });
+      this.defineElement("pre", { codeGenerator });
+      this.defineElement("progress", { codeGenerator });
+      this.defineElement("q", { codeGenerator });
+      this.defineElement("rp", { codeGenerator });
+      this.defineElement("rt", { codeGenerator });
+      this.defineElement("ruby", { codeGenerator });
+      this.defineElement("s", { codeGenerator });
+      this.defineElement("samp", { codeGenerator });
+      this.defineElement("script", { codeGenerator });
+      this.defineElement("search", { codeGenerator });
+      this.defineElement("section", { codeGenerator });
+      this.defineElement("select", { codeGenerator });
+      this.defineElement("slot", { codeGenerator });
+      this.defineElement("small", { codeGenerator });
+      this.defineElement("span", { codeGenerator });
+      this.defineElement("strong", { codeGenerator });
+      this.defineElement("style", { codeGenerator });
+      this.defineElement("sub", { codeGenerator });
+      this.defineElement("summary", { codeGenerator });
+      this.defineElement("sup", { codeGenerator });
+      this.defineElement("table", { codeGenerator });
+      this.defineElement("tbody", { codeGenerator });
+      this.defineElement("td", { codeGenerator });
+      this.defineElement("template", { codeGenerator });
+      this.defineElement("textarea", { codeGenerator });
+      this.defineElement("tfoot", { codeGenerator });
+      this.defineElement("th", { codeGenerator });
+      this.defineElement("thead", { codeGenerator });
+      this.defineElement("time", { codeGenerator });
+      this.defineElement("title", { codeGenerator });
+      this.defineElement("tr", { codeGenerator });
+      this.defineElement("u", { codeGenerator });
+      this.defineElement("ul", { codeGenerator });
+      this.defineElement("var", { codeGenerator });
+      this.defineElement("video", { codeGenerator });
+    });
   }
 
   /** @internal */
