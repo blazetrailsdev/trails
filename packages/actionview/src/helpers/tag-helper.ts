@@ -4,6 +4,8 @@ import {
   htmlSafe,
   htmlEscapeOnce,
   xmlNameEscape,
+  extractOptionsBang,
+  CodeGenerator,
 } from "@blazetrails/activesupport";
 import {
   raw as _raw,
@@ -17,6 +19,11 @@ import { capture, type CaptureHelperHost } from "./capture-helper.js";
 export interface TagHelperHost extends CaptureHelperHost {
   _tagBuilder?: TagBuilder;
 }
+
+type TagBlock = (tagBuilder: TagBuilder) => unknown;
+
+const __FILE__ = import.meta.url;
+const __LINE__ = 0;
 
 const BOOLEAN_ATTRIBUTES = new Set([
   "allowfullscreen",
@@ -70,45 +77,6 @@ const ARIA_PREFIXES = new Set(["aria"]);
 
 const PRE_CONTENT_STRINGS: Record<string, string> = {
   textarea: "\n",
-};
-
-const VOID_ELEMENTS = new Set([
-  "area",
-  "base",
-  "br",
-  "col",
-  "embed",
-  "hr",
-  "img",
-  "input",
-  "keygen",
-  "link",
-  "meta",
-  "source",
-  "track",
-  "wbr",
-]);
-
-const SELF_CLOSING_ELEMENTS = new Set([
-  "animate",
-  "animateMotion",
-  "animateTransform",
-  "circle",
-  "ellipse",
-  "line",
-  "path",
-  "polygon",
-  "polyline",
-  "rect",
-  "set",
-  "stop",
-  "use",
-  "view",
-]);
-
-const METHOD_TO_TAG_NAME: Record<string, string> = {
-  animate_motion: "animateMotion",
-  animate_transform: "animateTransform",
 };
 
 /** @internal */
@@ -410,6 +378,219 @@ export function escapeOnce(html: string): SafeBuffer {
 }
 
 export class TagBuilder {
+  static defineElement(
+    name: string,
+    { codeGenerator, methodName = name }: { codeGenerator: CodeGenerator; methodName?: string },
+  ): void {
+    if (name in this.prototype) return;
+
+    codeGenerator.classEval((batch) => {
+      batch.push((mod) => {
+        Object.defineProperty(mod, methodName, {
+          writable: true,
+          configurable: true,
+          value(this: TagBuilder, ...args: unknown[]): SafeBuffer {
+            const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
+              | TagBlock
+              | undefined;
+            const { escape = true, ...options } = extractOptionsBang(args);
+            const [content = null] = args;
+            return this.tagString(name, content, options, { escape: escape as boolean, block });
+          },
+        });
+      });
+    });
+  }
+
+  static defineVoidElement(
+    name: string,
+    { codeGenerator, methodName = name }: { codeGenerator: CodeGenerator; methodName?: string },
+  ): void {
+    codeGenerator.classEval((batch) => {
+      batch.push((mod) => {
+        Object.defineProperty(mod, methodName, {
+          writable: true,
+          configurable: true,
+          value(this: TagBuilder, ...args: unknown[]): SafeBuffer {
+            if (typeof args[args.length - 1] === "function") args.pop();
+            const { escape = true, ...options } = extractOptionsBang(args);
+            if (args.length > 0) {
+              throw new ArgumentError(
+                `wrong number of arguments (given ${args.length}, expected 0)`,
+              );
+            }
+            return this.selfClosingTagString(name, options, escape as boolean, ">");
+          },
+        });
+      });
+    });
+  }
+
+  static defineSelfClosingElement(
+    name: string,
+    { codeGenerator, methodName = name }: { codeGenerator: CodeGenerator; methodName?: string },
+  ): void {
+    codeGenerator.classEval((batch) => {
+      batch.push((mod) => {
+        Object.defineProperty(mod, methodName, {
+          writable: true,
+          configurable: true,
+          value(this: TagBuilder, ...args: unknown[]): SafeBuffer {
+            const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
+              | TagBlock
+              | undefined;
+            const { escape = true, ...options } = extractOptionsBang(args);
+            const [content = null] = args;
+            if ((content != null && content !== false) || block) {
+              return this.tagString(name, content, options, { escape: escape as boolean, block });
+            } else {
+              return this.selfClosingTagString(name, options, escape as boolean);
+            }
+          },
+        });
+      });
+    });
+  }
+
+  static {
+    CodeGenerator.batch(this, __FILE__, __LINE__, (codeGenerator) => {
+      this.defineVoidElement("area", { codeGenerator });
+      this.defineVoidElement("base", { codeGenerator });
+      this.defineVoidElement("br", { codeGenerator });
+      this.defineVoidElement("col", { codeGenerator });
+      this.defineVoidElement("embed", { codeGenerator });
+      this.defineVoidElement("hr", { codeGenerator });
+      this.defineVoidElement("img", { codeGenerator });
+      this.defineVoidElement("input", { codeGenerator });
+      this.defineVoidElement("keygen", { codeGenerator });
+      this.defineVoidElement("link", { codeGenerator });
+      this.defineVoidElement("meta", { codeGenerator });
+      this.defineVoidElement("source", { codeGenerator });
+      this.defineVoidElement("track", { codeGenerator });
+      this.defineVoidElement("wbr", { codeGenerator });
+      this.defineSelfClosingElement("animate", { codeGenerator });
+      this.defineSelfClosingElement("animateMotion", {
+        codeGenerator,
+        methodName: "animate_motion",
+      });
+      this.defineSelfClosingElement("animateTransform", {
+        codeGenerator,
+        methodName: "animate_transform",
+      });
+      this.defineSelfClosingElement("circle", { codeGenerator });
+      this.defineSelfClosingElement("ellipse", { codeGenerator });
+      this.defineSelfClosingElement("line", { codeGenerator });
+      this.defineSelfClosingElement("path", { codeGenerator });
+      this.defineSelfClosingElement("polygon", { codeGenerator });
+      this.defineSelfClosingElement("polyline", { codeGenerator });
+      this.defineSelfClosingElement("rect", { codeGenerator });
+      this.defineSelfClosingElement("set", { codeGenerator });
+      this.defineSelfClosingElement("stop", { codeGenerator });
+      this.defineSelfClosingElement("use", { codeGenerator });
+      this.defineSelfClosingElement("view", { codeGenerator });
+      this.defineElement("a", { codeGenerator });
+      this.defineElement("abbr", { codeGenerator });
+      this.defineElement("address", { codeGenerator });
+      this.defineElement("article", { codeGenerator });
+      this.defineElement("aside", { codeGenerator });
+      this.defineElement("audio", { codeGenerator });
+      this.defineElement("b", { codeGenerator });
+      this.defineElement("bdi", { codeGenerator });
+      this.defineElement("bdo", { codeGenerator });
+      this.defineElement("blockquote", { codeGenerator });
+      this.defineElement("body", { codeGenerator });
+      this.defineElement("button", { codeGenerator });
+      this.defineElement("canvas", { codeGenerator });
+      this.defineElement("caption", { codeGenerator });
+      this.defineElement("cite", { codeGenerator });
+      this.defineElement("code", { codeGenerator });
+      this.defineElement("colgroup", { codeGenerator });
+      this.defineElement("data", { codeGenerator });
+      this.defineElement("datalist", { codeGenerator });
+      this.defineElement("dd", { codeGenerator });
+      this.defineElement("del", { codeGenerator });
+      this.defineElement("details", { codeGenerator });
+      this.defineElement("dfn", { codeGenerator });
+      this.defineElement("dialog", { codeGenerator });
+      this.defineElement("div", { codeGenerator });
+      this.defineElement("dl", { codeGenerator });
+      this.defineElement("dt", { codeGenerator });
+      this.defineElement("em", { codeGenerator });
+      this.defineElement("fieldset", { codeGenerator });
+      this.defineElement("figcaption", { codeGenerator });
+      this.defineElement("figure", { codeGenerator });
+      this.defineElement("footer", { codeGenerator });
+      this.defineElement("form", { codeGenerator });
+      this.defineElement("h1", { codeGenerator });
+      this.defineElement("h2", { codeGenerator });
+      this.defineElement("h3", { codeGenerator });
+      this.defineElement("h4", { codeGenerator });
+      this.defineElement("h5", { codeGenerator });
+      this.defineElement("h6", { codeGenerator });
+      this.defineElement("head", { codeGenerator });
+      this.defineElement("header", { codeGenerator });
+      this.defineElement("hgroup", { codeGenerator });
+      this.defineElement("html", { codeGenerator });
+      this.defineElement("i", { codeGenerator });
+      this.defineElement("iframe", { codeGenerator });
+      this.defineElement("ins", { codeGenerator });
+      this.defineElement("kbd", { codeGenerator });
+      this.defineElement("label", { codeGenerator });
+      this.defineElement("legend", { codeGenerator });
+      this.defineElement("li", { codeGenerator });
+      this.defineElement("main", { codeGenerator });
+      this.defineElement("map", { codeGenerator });
+      this.defineElement("mark", { codeGenerator });
+      this.defineElement("menu", { codeGenerator });
+      this.defineElement("meter", { codeGenerator });
+      this.defineElement("nav", { codeGenerator });
+      this.defineElement("noscript", { codeGenerator });
+      this.defineElement("object", { codeGenerator });
+      this.defineElement("ol", { codeGenerator });
+      this.defineElement("optgroup", { codeGenerator });
+      this.defineElement("option", { codeGenerator });
+      this.defineElement("output", { codeGenerator });
+      this.defineElement("p", { codeGenerator });
+      this.defineElement("picture", { codeGenerator });
+      this.defineElement("portal", { codeGenerator });
+      this.defineElement("pre", { codeGenerator });
+      this.defineElement("progress", { codeGenerator });
+      this.defineElement("q", { codeGenerator });
+      this.defineElement("rp", { codeGenerator });
+      this.defineElement("rt", { codeGenerator });
+      this.defineElement("ruby", { codeGenerator });
+      this.defineElement("s", { codeGenerator });
+      this.defineElement("samp", { codeGenerator });
+      this.defineElement("script", { codeGenerator });
+      this.defineElement("search", { codeGenerator });
+      this.defineElement("section", { codeGenerator });
+      this.defineElement("select", { codeGenerator });
+      this.defineElement("slot", { codeGenerator });
+      this.defineElement("small", { codeGenerator });
+      this.defineElement("span", { codeGenerator });
+      this.defineElement("strong", { codeGenerator });
+      this.defineElement("style", { codeGenerator });
+      this.defineElement("sub", { codeGenerator });
+      this.defineElement("summary", { codeGenerator });
+      this.defineElement("sup", { codeGenerator });
+      this.defineElement("table", { codeGenerator });
+      this.defineElement("tbody", { codeGenerator });
+      this.defineElement("td", { codeGenerator });
+      this.defineElement("template", { codeGenerator });
+      this.defineElement("textarea", { codeGenerator });
+      this.defineElement("tfoot", { codeGenerator });
+      this.defineElement("th", { codeGenerator });
+      this.defineElement("thead", { codeGenerator });
+      this.defineElement("time", { codeGenerator });
+      this.defineElement("title", { codeGenerator });
+      this.defineElement("tr", { codeGenerator });
+      this.defineElement("u", { codeGenerator });
+      this.defineElement("ul", { codeGenerator });
+      this.defineElement("var", { codeGenerator });
+      this.defineElement("video", { codeGenerator });
+    });
+  }
+
   /** @internal */
   viewContext: TagHelperHost;
 
@@ -427,7 +608,7 @@ export class TagBuilder {
     name: string,
     content: unknown,
     options?: Record<string, unknown> | null,
-    opts?: { escape?: boolean; block?: (tagBuilder: TagBuilder) => unknown },
+    opts?: { escape?: boolean; block?: TagBlock },
   ): SafeBuffer {
     const escape = opts?.escape !== false;
     let actualContent: unknown = content;
@@ -440,24 +621,29 @@ export class TagBuilder {
     return contentTagString(name, actualContent, options ?? undefined, escape);
   }
 
-  static defineElement(name: string, opts?: { methodName?: string }): void {
-    if (opts?.methodName && opts.methodName !== name) {
-      METHOD_TO_TAG_NAME[opts.methodName] = name;
-    }
+  selfClosingTagString(
+    name: string,
+    options: Record<string, unknown>,
+    escape: boolean = true,
+    tagSuffix: string = " />",
+  ): SafeBuffer {
+    return htmlSafe(`<${name}${tagOptions(options, escape)}${tagSuffix}`);
   }
 
-  static defineVoidElement(name: string, opts?: { methodName?: string }): void {
-    VOID_ELEMENTS.add(name);
-    if (opts?.methodName && opts.methodName !== name) {
-      METHOD_TO_TAG_NAME[opts.methodName] = name;
-    }
-  }
+  private methodMissing(called: string, ...args: unknown[]): SafeBuffer {
+    const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
+      | TagBlock
+      | undefined;
+    const { escape = true, ...options } = extractOptionsBang(args);
+    const name = dasherize(called);
 
-  static defineSelfClosingElement(name: string, opts?: { methodName?: string }): void {
-    SELF_CLOSING_ELEMENTS.add(name);
-    if (opts?.methodName && opts.methodName !== name) {
-      METHOD_TO_TAG_NAME[opts.methodName] = name;
-    }
+    ensureValidHtml5TagName(name);
+
+    const [content = null] = args;
+    return this.tagString(name, content, options, {
+      escape: escape as boolean,
+      block,
+    });
   }
 
   [key: string]: unknown;
@@ -485,113 +671,19 @@ function createTagBuilderProxy(viewContext: TagHelperHost): TagBuilder {
 
   return new Proxy(builder, {
     get(target, prop, receiver) {
-      if (typeof prop === "symbol") {
+      if (typeof prop === "symbol" || prop in target) {
         return Reflect.get(target, prop, receiver);
       }
+      if (prop === "then" || prop === "catch" || prop === "finally") return undefined;
 
-      if (prop === "then" || prop === "catch" || prop === "finally") {
-        return undefined;
-      }
-
-      if (
-        prop === "attributes" ||
-        prop === "tagString" ||
-        prop === "viewContext" ||
-        prop === "constructor" ||
-        prop === "publicMethods" ||
-        prop === "public_methods"
-      ) {
-        return Reflect.get(target, prop, receiver);
-      }
-
-      const methodName = String(prop);
-      const tagName = METHOD_TO_TAG_NAME[methodName] ?? dasherize(methodName);
-
-      return (contentOrOpts?: unknown, optsOrBlock?: Record<string, unknown> | (() => unknown)) => {
-        ensureValidHtml5TagName(tagName);
-        let content: unknown = undefined;
-        let options: Record<string, unknown> = {};
-        let escape = true;
-        let block: ((tagBuilder?: unknown) => unknown) | undefined;
-
-        if (typeof contentOrOpts === "function") {
-          block = contentOrOpts as () => unknown;
-        } else if (
-          typeof contentOrOpts === "object" &&
-          contentOrOpts !== null &&
-          !(contentOrOpts instanceof SafeBuffer) &&
-          !Array.isArray(contentOrOpts)
-        ) {
-          options = { ...contentOrOpts } as Record<string, unknown>;
-          if (typeof optsOrBlock === "function") {
-            block = optsOrBlock;
-          }
-        } else {
-          content = contentOrOpts;
-          if (typeof optsOrBlock === "function") {
-            block = optsOrBlock;
-          } else if (typeof optsOrBlock === "object" && optsOrBlock !== null) {
-            options = { ...optsOrBlock };
-          }
-        }
-
-        if (typeof options.escape === "boolean") {
-          escape = options.escape;
-          delete options.escape;
-        }
-
-        const hasOptions = Object.keys(options).length > 0;
-
-        if (VOID_ELEMENTS.has(tagName)) {
-          if (content !== undefined || block) {
-            throw new ArgumentError(`No content allowed for void element "${tagName}"`);
-          }
-          return selfClosingTagString(tagName, options, escape, ">");
-        }
-
-        if (SELF_CLOSING_ELEMENTS.has(tagName) || SELF_CLOSING_ELEMENTS.has(methodName)) {
-          const actualTagName = SELF_CLOSING_ELEMENTS.has(methodName) ? methodName : tagName;
-          if (content !== undefined || block) {
-            return (receiver as TagBuilder).tagString(
-              actualTagName,
-              content,
-              hasOptions ? options : undefined,
-              { escape, block },
-            );
-          }
-          return selfClosingTagString(actualTagName, options, escape);
-        }
-
-        if (block) {
-          return (receiver as TagBuilder).tagString(
-            tagName,
-            undefined,
-            hasOptions ? options : undefined,
-            { escape, block },
-          );
-        }
-
-        return contentTagString(
-          tagName,
-          content !== undefined ? content : "",
-          hasOptions ? options : undefined,
-          escape,
-        );
+      const { methodMissing } = target as unknown as {
+        methodMissing(called: string, ...args: unknown[]): SafeBuffer;
       };
+      return (...args: unknown[]) => methodMissing.call(receiver, prop, ...args);
     },
 
     has() {
       return true;
     },
   });
-}
-
-function selfClosingTagString(
-  name: string,
-  options: Record<string, unknown>,
-  escape: boolean = true,
-  tagSuffix: string = " />",
-): SafeBuffer {
-  const opts = Object.keys(options).length > 0 ? tagOptions(options, escape) : "";
-  return htmlSafe(`<${name}${opts}${tagSuffix}`);
 }

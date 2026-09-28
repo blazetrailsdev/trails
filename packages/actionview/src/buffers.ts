@@ -82,11 +82,12 @@ export class OutputBuffer {
     return copy.initializeCopy(this);
   }
 
-  capture<TArgs extends unknown[]>(args: TArgs, fn: (...args: TArgs) => void): SafeBuffer {
+  capture<TArgs extends unknown[]>(...args: [...TArgs, (...args: TArgs) => void]): SafeBuffer {
+    const block = args.pop() as (...args: unknown[]) => void;
     const saved = this._raw;
     this._raw = "";
     try {
-      fn(...args);
+      block(...args);
       return htmlSafe(this._raw);
     } finally {
       this._raw = saved;
