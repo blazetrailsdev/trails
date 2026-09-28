@@ -1576,9 +1576,7 @@ class ApiExtractor
   # - cattr/mattr (activesupport core_ext/module/attribute_accessors.rb): class
   #   reader/writer always; instance reader/writer only when BOTH
   #   `instance_<x>` and `instance_accessor` are truthy (AND, both default
-  #   true); no predicate. The per-thread `thread_mattr_*` / `thread_cattr_*`
-  #   family (core_ext/module/attribute_accessors_per_thread.rb:41-114) gates
-  #   its instance accessors identically.
+  #   true); no predicate.
   #
   # All generated methods are public — class_attribute defines them via a fresh
   # `class_eval` string, and mattr/cattr document them as public "even if this

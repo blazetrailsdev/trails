@@ -274,7 +274,6 @@ describe("DelegationTest", () => {
 
   describe("DelegationAssociationTest", () => {
     for (const method of ARRAY_DELEGATES) {
-      // BLOCKED: to_yaml is Psych's Object#to_yaml over Relation#encode_with (story psych-object-protocol-for-record-yaml-round-trip)
       if (method === "to_yaml") {
         it.skip(`delegates ${method.replaceAll("_", " ")} to Array`, () => {});
         continue;
