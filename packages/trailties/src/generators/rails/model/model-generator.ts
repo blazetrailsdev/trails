@@ -25,7 +25,7 @@ export function emitModelSource(className: string, fields: Array<[string, string
 }
 
 export class ModelGenerator extends NamedBase {
-  run(): string[] {
+  async run(): Promise<string[]> {
     const filename = `app/models/${this.filePath()}${this.ext()}`;
     const className = [...this.classPathParts, this.fileName].map((p) => camelize(p)).join("");
     const fields: Array<[string, string]> = this.attributes

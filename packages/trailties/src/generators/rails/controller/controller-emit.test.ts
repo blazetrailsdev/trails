@@ -14,6 +14,11 @@ import { parseTs, assertNoRubySource } from "../../../template-builder/testing.j
 let tmpDir: string;
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-ctrl-emit-"));
+  fs.mkdirSync(path.join(tmpDir, "config"));
+  fs.writeFileSync(
+    path.join(tmpDir, "config/routes.ts"),
+    "export function drawRoutes(mapper: Mapper): void {\n}\n",
+  );
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
 });
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
@@ -23,18 +28,25 @@ function read(rel: string): string {
 }
 
 describe("ControllerGenerator emit", () => {
-  it("matches snapshot for simple controller", () => {
-    new ControllerGenerator({ cwd: tmpDir, output: () => {} }).run("Account", ["index", "show"]);
+  it("matches snapshot for simple controller", async () => {
+    await new ControllerGenerator({ cwd: tmpDir, output: () => {} }).run("Account", [
+      "index",
+      "show",
+    ]);
     const src = read("app/controllers/account-controller.ts");
     expect(src).toMatchSnapshot();
     expect(parseTs(src).diagnostics).toEqual([]);
     assertNoRubySource(src);
   });
 
-  it("matches snapshot for namespaced controller with parent", () => {
-    new ControllerGenerator({ cwd: tmpDir, output: () => {} }).run("admin/dashboard", ["index"], {
-      parent: "admin_controller",
-    });
+  it("matches snapshot for namespaced controller with parent", async () => {
+    await new ControllerGenerator({ cwd: tmpDir, output: () => {} }).run(
+      "admin/dashboard",
+      ["index"],
+      {
+        parent: "admin_controller",
+      },
+    );
     const src = read("app/controllers/admin/dashboard-controller.ts");
     expect(src).toMatchSnapshot();
     expect(parseTs(src).diagnostics).toEqual([]);
@@ -43,7 +55,7 @@ describe("ControllerGenerator emit", () => {
 });
 
 describe("controllerPathHelpers", () => {
-  it("derives canonical names for a flat controller", () => {
+  it("derives canonical names for a flat controller", async () => {
     expect(controllerPathHelpers("Account")).toMatchObject({
       className: "AccountController",
       displayName: "AccountController",
@@ -55,7 +67,7 @@ describe("controllerPathHelpers", () => {
     });
   });
 
-  it("flattens namespace for the TS class name but preserves :: for display", () => {
+  it("flattens namespace for the TS class name but preserves :: for display", async () => {
     expect(controllerPathHelpers("admin/dashboard")).toMatchObject({
       className: "AdminDashboardController",
       displayName: "Admin::DashboardController",
@@ -63,13 +75,13 @@ describe("controllerPathHelpers", () => {
     });
   });
 
-  it("strips a trailing Controller suffix", () => {
+  it("strips a trailing Controller suffix", async () => {
     expect(controllerPathHelpers("account_controller").controllerFile).toBe("account-controller");
   });
 });
 
 describe("emitControllerClass (direct helper surface)", () => {
-  it("emits a relative parent import when parent ref is provided", () => {
+  it("emits a relative parent import when parent ref is provided", async () => {
     const parent = parentRefForRelative("admin_controller", 0);
     const src = emitControllerClass({
       className: "PostsController",

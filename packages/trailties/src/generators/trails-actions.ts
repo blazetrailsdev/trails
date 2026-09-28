@@ -115,6 +115,25 @@ export async function route(
   }
 
   await injectIntoFile(this, "config/routes.ts", routingCode, { after: namespacePattern });
+
+  if (this.behavior === "revoke" && namespace.length > 0 && namespaceMatch) {
+    const emptyBlockPattern = new RegExp(
+      `(${namespacePattern.source})((?:\\s*\\}\\);\\n){1,${namespace.length}})`,
+    );
+    await gsubFile(this, "config/routes.ts", emptyBlockPattern, (matched) => {
+      let [beginning, ending] = emptyBlockPattern.exec(matched)!.slice(1);
+      let stripped: string;
+      while (
+        ending !== "" &&
+        (stripped = beginning.replace(/^[ ]*mapper\.namespace\(.+ \{\n\s*(?![^])/m, "")) !==
+          beginning
+      ) {
+        beginning = stripped;
+        ending = ending.replace(/^\s*\}\);\n/, "");
+      }
+      return beginning + ending;
+    });
+  }
 }
 
 export interface EnvironmentOptions {
@@ -219,6 +238,22 @@ async function injectIntoFile(
   await fs.writeFile(
     full,
     content.replace(flag, (match) => match + replacement),
+  );
+}
+
+async function gsubFile(
+  host: TrailsActionsHost,
+  relPath: string,
+  flag: RegExp,
+  block: (match: string) => string,
+): Promise<void> {
+  const fs = await requireAsyncFs(["readFile", "writeFile"]);
+  const full = getPath().join(host.cwd, relPath);
+  if (host.options?.pretend) return;
+  const content = await fs.readFile(full, "utf-8");
+  await fs.writeFile(
+    full,
+    content.replace(new RegExp(flag.source, `${flag.flags.replace("g", "")}g`), block),
   );
 }
 

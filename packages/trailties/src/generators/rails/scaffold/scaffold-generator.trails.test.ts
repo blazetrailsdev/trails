@@ -14,6 +14,11 @@ const read = (relativePath: string) => fs.readFileSync(path.join(tmpDir, relativ
 describe("ScaffoldGenerator (namespaced)", () => {
   it("names a namespaced scaffold's migration create_<table_name> and routes it under /admin/accounts", async () => {
     fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
+    fs.mkdirSync(path.join(tmpDir, "config"));
+    fs.writeFileSync(
+      path.join(tmpDir, "config/routes.ts"),
+      "export function drawRoutes(mapper: Mapper): void {\n}\n",
+    );
     const options = { cwd: tmpDir, output: () => {}, name: "admin/account" };
     const files = await new ScaffoldGenerator({ ...options, attributes: ["name:string"] }).run();
     const migration = files.find((f) => f.startsWith("db/migrate/"))!;

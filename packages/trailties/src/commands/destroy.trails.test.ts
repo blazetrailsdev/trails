@@ -28,7 +28,7 @@ describe("DestroyCommand", () => {
   it("revokes everything a scaffold generate created, including views and the routes line", async () => {
     fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
     fs.mkdirSync(path.join(tmpDir, "config"));
-    const routes = "export default (mapper) => {\n  // routes\n};\n";
+    const routes = "export function drawRoutes(mapper: Mapper): void {\n}\n";
     fs.writeFileSync(path.join(tmpDir, "config", "routes.ts"), routes);
     fs.mkdirSync(path.join(tmpDir, "app", "views", "layouts"), { recursive: true });
     fs.writeFileSync(path.join(tmpDir, "app", "views", "layouts", "application.html.tse"), "");
@@ -57,7 +57,10 @@ describe("DestroyCommand", () => {
   it("a pretended revoke reports but leaves files and the routes line in place", async () => {
     fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
     fs.mkdirSync(path.join(tmpDir, "config"));
-    fs.writeFileSync(path.join(tmpDir, "config", "routes.ts"), "// routes\n");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "routes.ts"),
+      "export function drawRoutes(mapper: Mapper): void {\n}\n",
+    );
     await Generators.invoke("scaffold", ["Post"], { cwd: tmpDir, output: () => {} });
     const generated = listFiles(tmpDir);
     const routes = fs.readFileSync(path.join(tmpDir, "config", "routes.ts"), "utf-8");
