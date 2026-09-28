@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { registerConstant, unregisterConstant } from "@blazetrails/activesupport";
+import { ActiveModel } from "../../active-model.js";
 import { ScaffoldControllerGenerator } from "./scaffold-controller-generator.js";
 import type { ScaffoldControllerGeneratorOptions as Options } from "./scaffold-controller-generator.js";
 import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
@@ -78,6 +80,32 @@ describe("ScaffoldControllerGeneratorTest", () => {
   it("skip routes", () => {
     makeGen("User", [], { skipRoutes: true }).run();
     expect(read("config/routes.ts")).not.toContain('router.resources("users")');
+  });
+
+  it("default orm is used", () => {
+    makeGen("User", [], { orm: "unknown" }).run();
+    const c = read("app/controllers/users-controller.ts");
+    expect(c).toMatch(/class UsersController extends ApplicationController/);
+    expect(c).toMatch(/const users = await User\.all\(\)/);
+  });
+
+  it("customized orm is used", () => {
+    const klass = class extends ActiveModel {
+      static override all(klass: string): string {
+        return `${klass}.find("all")`;
+      }
+    };
+
+    registerConstant("Unknown::Generators::ActiveModel", klass);
+    try {
+      makeGen("User", [], { orm: "unknown" }).run();
+      const c = read("app/controllers/users-controller.ts");
+      expect(c).toMatch(/class UsersController extends ApplicationController/);
+      expect(c).toMatch(/const users = await User\.find\("all"\)/);
+      expect(c).not.toMatch(/const users = await User\.all\(\)/);
+    } finally {
+      unregisterConstant("Unknown::Generators::ActiveModel", klass);
+    }
   });
 
   it("permits the parameters passed", () => {

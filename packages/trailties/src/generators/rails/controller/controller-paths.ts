@@ -55,11 +55,15 @@ export function controllerPathHelpers(name: string): ControllerPaths {
 export interface EmitControllerClassOpts {
   className: string;
   parent: { ref: Ref; import?: Import };
+  imports?: Import[];
   methods: Method[];
 }
 
 export function emitControllerClass(opts: EmitControllerClassOpts): string {
-  const imports: Import[] = opts.parent.import ? [opts.parent.import] : [];
+  const imports: Import[] = [
+    ...(opts.parent.import ? [opts.parent.import] : []),
+    ...(opts.imports ?? []),
+  ];
   return tsModule({
     imports,
     declarations: [tsClass({ name: opts.className, extends: opts.parent.ref, body: opts.methods })],

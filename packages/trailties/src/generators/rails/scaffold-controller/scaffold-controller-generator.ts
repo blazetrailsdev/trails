@@ -4,6 +4,7 @@ import { dasherize, parseColumns } from "../../base.js";
 import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
 import type { ModelHelpersOptions } from "../../model-helpers.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
+import type { ActiveModel } from "../../active-model.js";
 import { tsBody, tsMethod, type Method } from "../../../template-builder/index.js";
 import { emitControllerClass, parentRefForRelative } from "../controller/controller-paths.js";
 import { emitResourceRouteSnippet } from "../resource-route/resource-route-generator.js";
@@ -14,6 +15,7 @@ export interface ScaffoldControllerGeneratorOptions extends NamedBaseOptions, Mo
   test?: boolean;
   helper?: boolean;
   modelName?: string;
+  orm?: string | false;
 }
 
 export interface ScaffoldControllerGenerator extends Included<typeof ResourceHelpers> {}
@@ -41,15 +43,36 @@ export class ScaffoldControllerGenerator extends NamedBase {
     const ext = this.ext();
     const ts = this.isTypeScript();
     const attrNames = parseColumns(this.options.attributes ?? []).map((c) => c.name);
+    const modelPath = "../".repeat(this.controllerClassPath().length + 1) + "models/";
 
     this.createFile(
       `app/controllers/${controllerFileName}${ext}`,
       emitControllerClass({
         className: controllerClassName,
         parent: parentRefForRelative("ApplicationController", this.controllerClassPath().length),
+        imports: [
+          { from: `${modelPath}${this.filePath()}.js`, named: { [modelClassName]: "named" } },
+        ],
         methods: api
-          ? apiCrudMethods(modelClassName, singular, this.pluralTableName(), attrNames, ts)
-          : crudMethods(modelClassName, singular, this.pluralTableName(), routeUrl, attrNames, ts),
+          ? apiCrudMethods(
+              this.ormClass(),
+              this.ormInstance(),
+              modelClassName,
+              singular,
+              this.pluralTableName(),
+              attrNames,
+              ts,
+            )
+          : crudMethods(
+              this.ormClass(),
+              this.ormInstance(),
+              modelClassName,
+              singular,
+              this.pluralTableName(),
+              routeUrl,
+              attrNames,
+              ts,
+            ),
       }),
     );
 
@@ -97,6 +120,12 @@ ${skip("index")}${skip("show")}${skip("new")}${skip("create")}${skip("edit")}${s
 }
 
 include(ScaffoldControllerGenerator, ResourceHelpers);
+ScaffoldControllerGenerator.classOption("orm", {
+  banner: "NAME",
+  type: "string",
+  required: true,
+  desc: "ORM to generate the controller for",
+});
 
 function mk(name: string, body: string, ts: boolean): Method {
   return tsMethod({
@@ -122,6 +151,8 @@ function paramsMethod(singular: string, attrs: string[], ts: boolean): Method {
 }
 
 function crudMethods(
+  ormClass: typeof ActiveModel,
+  ormInstance: ActiveModel,
   model: string,
   singular: string,
   plural: string,
@@ -129,38 +160,34 @@ function crudMethods(
   attrs: string[],
   ts: boolean,
 ): Method[] {
-  const anyArr = ts ? ": any[]" : "";
   const params = `this.${camelize(singular, false)}Params()`;
+  const find = `const ${singular} = await ${ormClass.find(model, 'this.params.expect("id")')};`;
   return [
     mk(
       "index",
-      `// const ${plural} = await ${model}.all();\nconst ${plural}${anyArr} = [];\nawait this.render({ action: "index", locals: { ${plural} } });`,
+      `const ${plural} = await ${ormClass.all(model)};\nawait this.render({ action: "index", locals: { ${plural} } });`,
       ts,
     ),
+    mk("show", `${find}\nawait this.render({ action: "show", locals: { ${singular} } });`, ts),
     mk(
-      "show",
-      `// const ${singular} = await ${model}.find(this.params.get("id"));\nawait this.render({ action: "show", locals: { ${singular}: { id: this.params.get("id") } } });`,
+      "new_",
+      `const ${singular} = ${ormClass.build(model)};\nawait this.render({ action: "new", locals: { ${singular} } });`,
       ts,
     ),
-    mk("new_", `await this.render({ action: "new", locals: { ${singular}: {} } });`, ts),
     mk(
       "create",
-      `// const ${singular} = await ${model}.create(${params});\nthis.redirectTo("${routeUrl}");`,
+      `const ${singular} = ${ormClass.build(model, params)};\n\nif (await ${ormInstance.save()}) {\n  this.redirectTo(\`${routeUrl}/\${${singular}.id}\`);\n} else {\n  await this.render({ action: "new", status: "unprocessable_entity", locals: { ${singular} } });\n}`,
       ts,
     ),
-    mk(
-      "edit",
-      `// const ${singular} = await ${model}.find(this.params.get("id"));\nawait this.render({ action: "edit", locals: { ${singular}: { id: this.params.get("id") } } });`,
-      ts,
-    ),
+    mk("edit", `${find}\nawait this.render({ action: "edit", locals: { ${singular} } });`, ts),
     mk(
       "update",
-      `// const ${singular} = await ${model}.find(this.params.get("id"));\n// await ${singular}.update(${params});\nthis.redirectTo("${routeUrl}/" + this.params.get("id"));`,
+      `${find}\nif (await ${ormInstance.update(params)}) {\n  this.redirectTo(\`${routeUrl}/\${${singular}.id}\`, { status: "see_other" });\n} else {\n  await this.render({ action: "edit", status: "unprocessable_entity", locals: { ${singular} } });\n}`,
       ts,
     ),
     mk(
       "destroy",
-      `// const ${singular} = await ${model}.find(this.params.get("id"));\n// await ${singular}.destroy();\nthis.redirectTo("${routeUrl}");`,
+      `${find}\nawait ${ormInstance.destroy()};\nthis.redirectTo("${routeUrl}", { status: "see_other" });`,
       ts,
     ),
     paramsMethod(singular, attrs, ts),
@@ -168,40 +195,34 @@ function crudMethods(
 }
 
 function apiCrudMethods(
+  ormClass: typeof ActiveModel,
+  ormInstance: ActiveModel,
   model: string,
   singular: string,
   plural: string,
   attrs: string[],
   ts: boolean,
 ): Method[] {
-  const anyArr = ts ? ": any[]" : "";
   const params = `this.${camelize(singular, false)}Params()`;
+  const find = `const ${singular} = await ${ormClass.find(model, 'this.params.expect("id")')};`;
   return [
     mk(
       "index",
-      `// const ${plural} = await ${model}.all();\nconst ${plural}${anyArr} = [];\nthis.renderJson(${plural});`,
+      `const ${plural} = await ${ormClass.all(model)};\n\nthis.renderJson(${plural});`,
       ts,
     ),
-    mk(
-      "show",
-      `// const ${singular} = await ${model}.find(this.params.get("id"));\nthis.renderJson({ id: this.params.get("id") });`,
-      ts,
-    ),
+    mk("show", `${find}\nthis.renderJson(${singular});`, ts),
     mk(
       "create",
-      `// const ${singular} = await ${model}.create(${params});\nthis.renderJson(${params}, { status: 201 });`,
+      `const ${singular} = ${ormClass.build(model, params)};\n\nif (await ${ormInstance.save()}) {\n  this.renderJson(${singular}, { status: 201 });\n} else {\n  this.renderJson(${ormInstance.errors()}, { status: 422 });\n}`,
       ts,
     ),
     mk(
       "update",
-      `// const ${singular} = await ${model}.find(this.params.get("id"));\n// await ${singular}.update(${params});\nthis.renderJson({ id: this.params.get("id") });`,
+      `${find}\nif (await ${ormInstance.update(params)}) {\n  this.renderJson(${singular});\n} else {\n  this.renderJson(${ormInstance.errors()}, { status: 422 });\n}`,
       ts,
     ),
-    mk(
-      "destroy",
-      `// const ${singular} = await ${model}.find(this.params.get("id"));\n// await ${singular}.destroy();\nthis.head(204);`,
-      ts,
-    ),
+    mk("destroy", `${find}\nawait ${ormInstance.destroy()};`, ts),
     paramsMethod(singular, attrs, ts),
   ];
 }

@@ -25,6 +25,8 @@ export interface ClassOptionConfig {
   desc?: string;
   aliases?: string | string[];
   enum?: readonly string[];
+  banner?: string;
+  required?: boolean;
 }
 
 export abstract class GeneratorBase implements GeneratorActionsState {
