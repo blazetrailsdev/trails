@@ -48,11 +48,11 @@ export class PostsController extends ApplicationController {
     this.redirectTo("/posts", { notice: "Post was successfully destroyed.", status: "see_other" });
   }
 
-  protected async setPost(): Promise<void> {
+  private async setPost(): Promise<void> {
     this.post = await Post.find(this.params.expect("id"));
   }
 
-  protected postParams(): unknown {
+  private postParams(): unknown {
     return this.params.expect({ post: ["title", "views"] });
   }
 }

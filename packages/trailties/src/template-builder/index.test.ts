@@ -286,6 +286,24 @@ describe("template-builder", () => {
     expect(parseTs(out).diagnostics).toEqual([]);
   });
 
+  it("emits a static block ahead of the body, carrying its refs, and declare fields", () => {
+    const { refs } = tsImport("./concerns.js", { Tracked: "named" });
+    const out = tsModule({
+      declarations: [
+        tsClass({
+          name: "C",
+          staticBlock: tsBody`this.beforeAction("setUp");\ninclude(this, ${refs.Tracked});`,
+          body: [tsField("post", "unknown", { declare: true })],
+        }),
+      ],
+    });
+    expect(out).toContain('import { Tracked } from "./concerns.js";');
+    expect(out).toContain(
+      `export class C {\n  static {\n    this.beforeAction("setUp");\n    include(this, Tracked);\n  }\n\n  declare post: unknown;\n}`,
+    );
+    expect(parseTs(out).diagnostics).toEqual([]);
+  });
+
   it("rejects inferType without an initializer", () => {
     expect(() =>
       tsModule({

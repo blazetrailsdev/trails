@@ -160,7 +160,7 @@ function paramsMethod(singular: string, attrs: string[], ts: boolean): Method {
       : `return this.params.expect({ ${singular}: [${attrs.map((a) => `"${a}"`).join(", ")}] });`;
   return tsMethod({
     name: `${camelize(singular, false)}Params`,
-    visibility: "protected",
+    visibility: "private",
     params: [],
     returnType: ts ? "unknown" : undefined,
     body: tsBody`${list}`,
@@ -206,7 +206,7 @@ function crudMethods(
         `this.${singular} = await ${ormClass.find(model, 'this.params.expect("id")')};`,
         ts,
       ),
-      visibility: "protected",
+      visibility: "private",
     },
     paramsMethod(singular, attrs, ts),
   ];
