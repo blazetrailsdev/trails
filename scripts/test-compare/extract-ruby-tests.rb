@@ -344,6 +344,24 @@ class TestExtractor
       end
     end
 
+    # `def self.included(test_case) test_case.test "..." do ... end end` inside a
+    # mixin module (actionview/test/buffers_test.rb:5-54) defines each test on the
+    # including class, so it is collected like the module's own `def test_*`.
+    if @module_collect && inner.is_a?(Array) && inner[0] == :command_call &&
+        ident_name(inner[3]) == "test"
+      desc = extract_first_string(inner[4])
+      if desc
+        assertion_kinds, assertion_values = collect_assertion_kinds(node)
+        @module_collect << {
+          description: desc, line: extract_line(node), assertions: assertion_kinds.uniq,
+          assertion_count: assertion_kinds.length, assertion_kinds: assertion_kinds,
+          assertion_values: assertion_values,
+          body_gate: body_skip_gate(node)
+        }
+        return
+      end
+    end
+
     # `[A, B].each do |klass| define_method("test_#{...}") do ... end end`.
     # Any iterator taking a block qualifies, not just `each` — the loop is only
     # claimed once its body is found to define test methods.

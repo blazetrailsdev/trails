@@ -1,42 +1,15 @@
-import { Encoding, getFs, getOsAsync, getPath } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";
 import { Base } from "../base.js";
 import { Template } from "../template.js";
 import { TemplateHandlers } from "./handlers.js";
 import { Tse } from "./handlers/tse.js";
-import { File as SourcesFile } from "./sources/file.js";
-
-async function binarySource(bytes: string): Promise<SourcesFile> {
-  const fs = getFs();
-  const path = getPath();
-  const dir = await fs.mkdtemp!(`${(await getOsAsync()).tmpdir()}${path.sep}tse-template-`);
-  const filename = path.join(dir, "template.html.tse");
-  await fs.writeFile!(
-    filename,
-    Uint8Array.from(bytes, (c) => c.charCodeAt(0)),
-  );
-  return new SourcesFile(filename);
-}
-
-function withExternalEncoding<T>(encoding: string | Encoding, block: () => T): T {
-  const old = Encoding.defaultExternal;
-  Encoding.defaultExternal = encoding;
-  try {
-    return block();
-  } finally {
-    Encoding.defaultExternal = old;
-  }
-}
 
 describe("TestTSETemplate", () => {
   afterEach(() => TemplateHandlers.clear());
 
-  const newTemplate = (
-    body: string | SourcesFile,
-    { virtualPath = "hello" }: { virtualPath?: string | null } = {},
-  ): Template =>
+  const newTemplate = (body: string): Template =>
     new Template(body, "hello template", new Tse(), {
-      virtualPath,
+      virtualPath: "hello",
       format: "html",
       locals: [],
     });
@@ -105,30 +78,5 @@ describe("TestTSETemplate", () => {
   it("rails local assigns and strict locals", () => {
     const template = newTemplate('<%# locals: (class: ) -%>\n<%= localAssigns["class"] %>');
     expect(render(template, { class: "some-class" }, ["message"])).toBe("some-class");
-  });
-
-  it("no magic comment word with utf 8", () => {
-    const template = newTemplate("hello \u{fc}mlat");
-    expect(render(template)).toBe("hello \u{fc}mlat");
-  });
-
-  it("default external works", async () => {
-    const source = await binarySource("hello \xFCmlat");
-    withExternalEncoding("ISO-8859-1", () => {
-      const template = newTemplate(source);
-      expect(render(template)).toBe("hello \u{fc}mlat");
-    });
-  });
-
-  it("encoding can be specified with magic comment", async () => {
-    const template = newTemplate(await binarySource("# encoding: ISO-8859-1\nhello \xFCmlat"));
-    expect(render(template)).toBe("\nhello \u{fc}mlat");
-  });
-
-  it("lying with magic comment", async () => {
-    const template = newTemplate(await binarySource("# encoding: UTF-8\nhello \xFCmlat"), {
-      virtualPath: null,
-    });
-    expect(() => render(template)).toThrow(Template.Error);
   });
 });

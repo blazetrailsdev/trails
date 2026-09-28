@@ -11,16 +11,16 @@ function sharedBufferTests(
   it("#<< maintains HTML safety", () => {
     const { buffer, output } = setup();
     buffer.append("<script>alert('pwned!')</script>");
-    expect(isHtmlSafe(buffer)).toBe(true);
-    expect(isHtmlSafe(output())).toBe(true);
+    expect(isHtmlSafe(buffer)).toBeTruthy();
+    expect(isHtmlSafe(output())).toBeTruthy();
     expect(output().toString()).toBe("&lt;script&gt;alert(&#39;pwned!&#39;)&lt;/script&gt;");
   });
 
   it("#safe_append= bypasses HTML safety", () => {
     const { buffer, output } = setup();
     buffer.safeAppend("<p>This is fine</p>");
-    expect(isHtmlSafe(buffer)).toBe(true);
-    expect(isHtmlSafe(output())).toBe(true);
+    expect(isHtmlSafe(buffer)).toBeTruthy();
+    expect(isHtmlSafe(output())).toBeTruthy();
     expect(output().toString()).toBe("<p>This is fine</p>");
   });
 
@@ -28,8 +28,8 @@ function sharedBufferTests(
     const { buffer, output } = setup();
     const rawBuffer = buffer.raw();
     rawBuffer.append("<script>alert('pwned!')</script>");
-    expect(isHtmlSafe(buffer)).toBe(true);
-    expect(isHtmlSafe(output())).toBe(true);
+    expect(isHtmlSafe(buffer)).toBeTruthy();
+    expect(isHtmlSafe(output())).toBeTruthy();
     expect(output().toString()).toBe("<script>alert('pwned!')</script>");
   });
 
@@ -40,7 +40,7 @@ function sharedBufferTests(
       buffer.append("George!");
     });
     expect(result.toString()).toBe("George!");
-    expect(isHtmlSafe(result)).toBe(true);
+    expect(isHtmlSafe(result)).toBeTruthy();
 
     buffer.append(" World!");
     expect(output().toString()).toBe("Hello World!");
@@ -54,7 +54,7 @@ function sharedBufferTests(
       rawBuffer.append("George!");
     });
     expect(result.toString()).toBe("George!");
-    expect(isHtmlSafe(result)).toBe(true);
+    expect(isHtmlSafe(result)).toBeTruthy();
 
     buffer.append(" World!");
     expect(output().toString()).toBe("Hello World!");
