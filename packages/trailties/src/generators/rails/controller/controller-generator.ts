@@ -42,6 +42,8 @@ export class ControllerGenerator extends GeneratorBase {
     });
     this.createFile(`app/controllers/${paths.controllerFile}${ext}`, source);
 
+    await this.addRoutes(paths.namespaceParts, actions, skipRoutes);
+
     if (test) {
       const importPrefix = "../".repeat(depth + 2);
       const cases = actions
@@ -73,7 +75,6 @@ ${cases}
       this.createFile(`app/views/${paths.viewBase}/.keep`, "");
     }
 
-    await this.addRoutes(paths.namespaceParts, actions, skipRoutes);
     return this.getCreatedFiles();
   }
 

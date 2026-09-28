@@ -103,14 +103,16 @@ ${skip("index")}${skip("show")}${skip("new")}${skip("create")}${skip("edit")}${s
       );
     }
 
-    const route = new ResourceRouteGenerator({
-      cwd: this.cwd,
-      output: this.output,
-      behavior: this.behavior,
-      pretend: this.options.pretend,
-      name: this.name,
-    });
-    if (!skipRoutes) await route.addResourceRoute();
+    if (!skipRoutes) {
+      const route = new ResourceRouteGenerator({
+        cwd: this.cwd,
+        output: this.output,
+        behavior: this.behavior,
+        pretend: this.options.pretend,
+        name: this.name,
+      });
+      await route.addResourceRoute();
+    }
     return this.getCreatedFiles();
   }
 }
