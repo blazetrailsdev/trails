@@ -75,15 +75,12 @@ describe("namesMember", () => {
 });
 
 describe("storySkipConflicts", () => {
-  const body =
-    "`active_record/migration/compatibility.rb` and `lib/rack/headers.rb` `Headers#key?`";
+  const body = "`active_record/marshalling.rb` and `lib/rack/headers.rb` `Headers#key?`";
   const rows = (status: string) =>
     storySkipConflicts([{ id: "s", status, body }]).map((c) => [c.register, c.pkg, c.rubyFile]);
 
   it("lists an unported file, and no scoped skip the register mirrors in TS", () => {
-    expect(rows("ready")).toEqual([
-      ["unported-file", "activerecord", "migration/compatibility.rb"],
-    ]);
+    expect(rows("ready")).toEqual([["unported-file", "activerecord", "marshalling.rb"]]);
   });
 
   it("skips a done or closed story", () => {

@@ -6595,7 +6595,7 @@ export class DateTime extends DateWithoutParseStatics {
   override toTime(): Temporal.ZonedDateTime {
     const self: DateTime = this.isJulian ? this.gregorian() : this;
     const ns = Number(self.#sf.numerator / self.#sf.denominator);
-    return new Temporal.PlainDateTime(
+    const plain = new Temporal.PlainDateTime(
       realYearToLong(self.year),
       self.mon,
       self.day,
@@ -6605,7 +6605,14 @@ export class DateTime extends DateWithoutParseStatics {
       Math.floor(ns / 1000000),
       Math.floor(ns / 1000) % 1000,
       ns % 1000,
-    ).toZonedDateTime(of2str(self.#of));
+    );
+    if (self.#of % 60 !== 0) {
+      return new SubMinuteOffsetZonedDateTime(
+        plain.toZonedDateTime("UTC").toInstant().subtract({ seconds: self.#of }),
+        self.#of,
+      );
+    }
+    return plain.toZonedDateTime(of2str(self.#of));
   }
 
   override toDate(): Temporal.PlainDate {

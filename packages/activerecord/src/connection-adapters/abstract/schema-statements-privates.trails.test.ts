@@ -44,6 +44,7 @@ function makeStatements(
       )) as Record<string, unknown>[],
     );
   adapter["supportsCheckConstraints"] ??= async () => true;
+  adapter["supportsDatetimeWithPrecision"] ??= () => true;
   adapter["supportsIndexesInCreate"] ??= () => false;
   adapter["supportsPartialIndex"] ??= () => true;
   adapter["supportsIndexInclude"] ??= async () => false;

@@ -66,6 +66,7 @@ export type TableDefinitionConn = SchemaQuoter &
   CheckConstraintOptionsAdapter & {
     /** @internal */
     validColumnDefinitionOptions(): string[];
+    supportsDatetimeWithPrecision(): boolean;
   };
 
 export class ColumnDefinition {
@@ -827,8 +828,10 @@ export class TableDefinition {
       type = this.integerLikePrimaryKeyType(type, options);
     }
     type = this.aliasedTypes(type, type) as ColumnType;
-    if (type === "datetime" && !("precision" in options)) {
-      options = { ...options, precision: 6 };
+    if (this.conn.supportsDatetimeWithPrecision()) {
+      if (type === "datetime" && !("precision" in options)) {
+        options = { ...options, precision: 6 };
+      }
     }
     options.primaryKey ||= type === "primary_key";
     if (options.primaryKey) options.null = false;
@@ -975,10 +978,14 @@ export class TableDefinition {
   timestamps(
     options: Omit<ColumnOptions, "index"> & { index?: boolean | AddIndexOptions } = {},
   ): this {
-    const { null: nullOption, ...rest } = options;
-    const opts = { ...rest, null: nullOption ?? false };
-    this.column("created_at", "datetime", opts);
-    this.column("updated_at", "datetime", opts);
+    if (options.null == null) options = { ...options, null: false };
+
+    if (!("precision" in options) && this.conn.supportsDatetimeWithPrecision()) {
+      options = { ...options, precision: 6 };
+    }
+
+    this.column("created_at", "datetime", options);
+    this.column("updated_at", "datetime", options);
     return this;
   }
 

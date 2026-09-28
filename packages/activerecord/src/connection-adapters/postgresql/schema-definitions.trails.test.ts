@@ -502,6 +502,7 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
       quoteDefaultExpression: (v: unknown) => ` DEFAULT ${String(v)}`,
       typeToSql: (type: string) => type,
       validColumnDefinitionOptions: () => ColumnDefinition.OPTION_NAMES,
+      supportsDatetimeWithPrecision: () => true,
       supportsCheckConstraints: async () => true,
       supportsIndexesInCreate: () => false,
       supportsPartialIndex: () => true,
