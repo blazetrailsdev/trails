@@ -174,7 +174,7 @@ function writeFragmentFor(
   options: Record<string, unknown> | null | undefined,
   block?: () => unknown,
 ): unknown {
-  const fragment: SafeBuffer = this.outputBuffer.capture([], () => {
+  const fragment: SafeBuffer = this.outputBuffer.capture(() => {
     block?.();
   });
   return this.controller.writeFragment(name, fragment, options ?? undefined);

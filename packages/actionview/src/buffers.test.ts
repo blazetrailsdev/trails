@@ -6,7 +6,7 @@ function sharedBufferTests(
   setup: () => { buffer: OutputBuffer | StreamingBuffer; output: () => SafeBuffer },
 ): void {
   const capture = (buffer: OutputBuffer | StreamingBuffer, fn: () => void): SafeBuffer =>
-    buffer instanceof OutputBuffer ? buffer.capture([], fn) : buffer.capture(fn);
+    buffer.capture(fn);
 
   it("#<< maintains HTML safety", () => {
     const { buffer, output } = setup();
