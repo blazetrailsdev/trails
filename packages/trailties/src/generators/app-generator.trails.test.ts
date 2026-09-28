@@ -139,4 +139,24 @@ describe("AppGenerator (trails-only)", () => {
     expect(calls).toEqual(["cifiles", "my-app"]);
     expect(File.isExist(File.join(tmpDir, "my-app", ".github", "workflows", "ci.yml"))).toBe(false);
   });
+
+  it("includes ActionMethods into a top-level AppBuilder that does not subclass trails' AppBuilder", async () => {
+    TopLevel.AppBuilder = class {
+      cifiles(this: { emptyDirectory(d: string): string }): void {
+        this.emptyDirectory("custom-ci");
+      }
+    };
+    try {
+      await new AppGenerator({
+        cwd: tmpDir,
+        output: () => {},
+        appPath: "my-app",
+        database: "sqlite",
+      }).run();
+    } finally {
+      delete TopLevel.AppBuilder;
+    }
+    expect(File.isDirectory(File.join(tmpDir, "my-app", "custom-ci"))).toBe(true);
+    expect(File.isExist(File.join(tmpDir, "my-app", ".github"))).toBe(false);
+  });
 });

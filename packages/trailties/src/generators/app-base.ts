@@ -1,4 +1,5 @@
-import { Dir, File, rbFPublicSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Dir, File, include, rbFPublicSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Trails } from "../rails.js";
 import { Generators } from "../generators.js";
 import { GeneratorBase, type GeneratorOptions } from "./base.js";
 import { Database, type DatabaseName } from "./database.js";
@@ -129,7 +130,11 @@ export abstract class AppBase extends GeneratorBase {
       const builderClass = (
         this as unknown as { getBuilderClass(): new (generator: never) => object }
       ).getBuilderClass();
-      this._builder = new builderClass(this as never);
+      include(builderClass, Trails.ActionMethods);
+      this._builder =
+        builderClass.prototype instanceof Trails.ActionMethods
+          ? new builderClass(this as never)
+          : (Reflect.construct(Trails.ActionMethods, [this], builderClass) as object);
     }
     return this._builder;
   }

@@ -2,6 +2,7 @@ import { File } from "@blazetrails/ruby-compat";
 import { TopLevel, camelize, parameterize, underscore } from "@blazetrails/activesupport";
 import { ref, tsClass, tsField, tsModule, tsRaw } from "../template-builder/index.js";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
+import { Trails } from "../rails.js";
 import { GeneratorError } from "./generated-attribute.js";
 import { type DatabaseName } from "./database.js";
 import { TEMPLATES } from "./rails/app/templates.js";
@@ -71,6 +72,8 @@ export class ActionMethods {
     return typeof value === "function" ? value.bind(this.generator) : value;
   }
 }
+
+Trails.ActionMethods = ActionMethods;
 
 export class AppBuilder extends ActionMethods {
   cifiles(): void {
