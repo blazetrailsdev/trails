@@ -90,18 +90,18 @@ export class Configuration extends EngineConfiguration {
   loadDefaults(targetVersion: string | number): void {
     switch (String(targetVersion)) {
       case "5.0": {
-        if (this.respondTo("actionController")) {
+        if (this.isRespondTo("actionController")) {
           const actionController = this.get("actionController") as Record<string, unknown>;
           actionController.perFormCsrfTokens = true;
           actionController.forgeryProtectionOriginCheck = true;
         }
 
-        if (this.respondTo("activeSupport")) {
+        if (this.isRespondTo("activeSupport")) {
           const activeSupport = this.get("activeSupport") as Record<string, unknown>;
           activeSupport.toTimePreservesTimezone = ":offset";
         }
 
-        if (this.respondTo("activeRecord")) {
+        if (this.isRespondTo("activeRecord")) {
           const activeRecord = this.get("activeRecord") as Record<string, unknown>;
           activeRecord.belongsToRequiredByDefault = true;
         }
@@ -112,12 +112,12 @@ export class Configuration extends EngineConfiguration {
       case "5.1": {
         this.loadDefaults("5.0");
 
-        if (this.respondTo("assets")) {
+        if (this.isRespondTo("assets")) {
           const assets = this.get("assets") as Record<string, unknown>;
           assets.unknownAssetFallback = false;
         }
 
-        if (this.respondTo("actionView")) {
+        if (this.isRespondTo("actionView")) {
           const actionView = this.get("actionView") as Record<string, unknown>;
           actionView.formWithGeneratesRemoteForms = true;
         }
@@ -126,28 +126,28 @@ export class Configuration extends EngineConfiguration {
       case "5.2": {
         this.loadDefaults("5.1");
 
-        if (this.respondTo("activeRecord")) {
+        if (this.isRespondTo("activeRecord")) {
           const activeRecord = this.get("activeRecord") as Record<string, unknown>;
           activeRecord.cacheVersioning = true;
         }
 
-        if (this.respondTo("actionDispatch")) {
+        if (this.isRespondTo("actionDispatch")) {
           const actionDispatch = this.get("actionDispatch") as Record<string, unknown>;
           actionDispatch.useAuthenticatedCookieEncryption = true;
         }
 
-        if (this.respondTo("activeSupport")) {
+        if (this.isRespondTo("activeSupport")) {
           const activeSupport = this.get("activeSupport") as Record<string, unknown>;
           activeSupport.useAuthenticatedMessageEncryption = true;
           activeSupport.hashDigestClass = OpenSSL.Digest.SHA1;
         }
 
-        if (this.respondTo("actionController")) {
+        if (this.isRespondTo("actionController")) {
           const actionController = this.get("actionController") as Record<string, unknown>;
           actionController.defaultProtectFromForgery = true;
         }
 
-        if (this.respondTo("actionView")) {
+        if (this.isRespondTo("actionView")) {
           const actionView = this.get("actionView") as Record<string, unknown>;
           actionView.formWithGeneratesIds = true;
         }
@@ -156,28 +156,28 @@ export class Configuration extends EngineConfiguration {
       case "6.0": {
         this.loadDefaults("5.2");
 
-        if (this.respondTo("actionView")) {
+        if (this.isRespondTo("actionView")) {
           const actionView = this.get("actionView") as Record<string, unknown>;
           actionView.defaultEnforceUtf8 = false;
         }
 
-        if (this.respondTo("actionDispatch")) {
+        if (this.isRespondTo("actionDispatch")) {
           const actionDispatch = this.get("actionDispatch") as Record<string, unknown>;
           actionDispatch.useCookiesWithMetadata = true;
         }
 
-        if (this.respondTo("actionMailer")) {
+        if (this.isRespondTo("actionMailer")) {
           const actionMailer = this.get("actionMailer") as Record<string, unknown>;
           actionMailer.deliveryJob = "ActionMailer::MailDeliveryJob";
         }
 
-        if (this.respondTo("activeStorage")) {
+        if (this.isRespondTo("activeStorage")) {
           const activeStorage = this.get("activeStorage") as { queues: Record<string, unknown> };
           activeStorage.queues.analysis = ":active_storage_analysis";
           activeStorage.queues.purge = ":active_storage_purge";
         }
 
-        if (this.respondTo("activeRecord")) {
+        if (this.isRespondTo("activeRecord")) {
           const activeRecord = this.get("activeRecord") as Record<string, unknown>;
           activeRecord.collectionCacheVersioning = true;
         }
@@ -186,29 +186,29 @@ export class Configuration extends EngineConfiguration {
       case "6.1": {
         this.loadDefaults("6.0");
 
-        if (this.respondTo("activeRecord")) {
+        if (this.isRespondTo("activeRecord")) {
           const activeRecord = this.get("activeRecord") as Record<string, unknown>;
           activeRecord.hasManyInversing = true;
         }
 
-        if (this.respondTo("activeJob")) {
+        if (this.isRespondTo("activeJob")) {
           const activeJob = this.get("activeJob") as Record<string, unknown>;
           activeJob.retryJitter = 0.15;
         }
 
-        if (this.respondTo("actionDispatch")) {
+        if (this.isRespondTo("actionDispatch")) {
           const actionDispatch = this.get("actionDispatch") as Record<string, unknown>;
           actionDispatch.cookiesSameSiteProtection = ":lax";
           actionDispatch.sslDefaultRedirectStatus = 308;
         }
 
-        if (this.respondTo("actionView")) {
+        if (this.isRespondTo("actionView")) {
           const actionView = this.get("actionView") as Record<string, unknown>;
           actionView.formWithGeneratesRemoteForms = false;
           actionView.preloadLinksHeader = true;
         }
 
-        if (this.respondTo("activeStorage")) {
+        if (this.isRespondTo("activeStorage")) {
           const activeStorage = this.get("activeStorage") as {
             trackVariants?: unknown;
             queues: Record<string, unknown>;
@@ -219,13 +219,13 @@ export class Configuration extends EngineConfiguration {
           activeStorage.queues.purge = null;
         }
 
-        if (this.respondTo("actionMailbox")) {
+        if (this.isRespondTo("actionMailbox")) {
           const actionMailbox = this.get("actionMailbox") as { queues: Record<string, unknown> };
           actionMailbox.queues.incineration = null;
           actionMailbox.queues.routing = null;
         }
 
-        if (this.respondTo("actionMailer")) {
+        if (this.isRespondTo("actionMailer")) {
           const actionMailer = this.get("actionMailer") as Record<string, unknown>;
           actionMailer.deliverLaterQueueName = null;
         }
@@ -236,7 +236,7 @@ export class Configuration extends EngineConfiguration {
       case "7.0": {
         this.loadDefaults("6.1");
 
-        if (this.respondTo("actionDispatch")) {
+        if (this.isRespondTo("actionDispatch")) {
           const actionDispatch = this.get("actionDispatch") as Record<string, unknown>;
           actionDispatch.defaultHeaders = {
             "X-Frame-Options": "SAMEORIGIN",
@@ -249,13 +249,13 @@ export class Configuration extends EngineConfiguration {
           actionDispatch.cookiesSerializer = ":json";
         }
 
-        if (this.respondTo("actionView")) {
+        if (this.isRespondTo("actionView")) {
           const actionView = this.get("actionView") as Record<string, unknown>;
           actionView.buttonToGeneratesButtonTag = true;
           actionView.applyStylesheetMediaDefault = false;
         }
 
-        if (this.respondTo("activeSupport")) {
+        if (this.isRespondTo("activeSupport")) {
           const activeSupport = this.get("activeSupport") as Record<string, unknown>;
           activeSupport.hashDigestClass = OpenSSL.Digest.SHA256;
           activeSupport.keyGeneratorHashDigestClass = OpenSSL.Digest.SHA256;
@@ -263,12 +263,12 @@ export class Configuration extends EngineConfiguration {
           activeSupport.executorAroundTestCase = true;
         }
 
-        if (this.respondTo("actionMailer")) {
+        if (this.isRespondTo("actionMailer")) {
           const actionMailer = this.get("actionMailer") as Record<string, unknown>;
           actionMailer.smtpTimeout = 5;
         }
 
-        if (this.respondTo("activeStorage")) {
+        if (this.isRespondTo("activeStorage")) {
           const activeStorage = this.get("activeStorage") as Record<string, unknown>;
           activeStorage.videoPreviewArguments =
             "-vf 'select=eq(n\\,0)+eq(key\\,1)+gt(scene\\,0.015),loop=loop=-1:size=2,trim=start_frame=1'" +
@@ -278,14 +278,14 @@ export class Configuration extends EngineConfiguration {
           activeStorage.multipleFileFieldIncludeHidden = true;
         }
 
-        if (this.respondTo("activeRecord")) {
+        if (this.isRespondTo("activeRecord")) {
           const activeRecord = this.get("activeRecord") as Record<string, unknown>;
           activeRecord.verifyForeignKeysForFixtures = true;
           activeRecord.partialInserts = false;
           activeRecord.automaticScopeInversing = true;
         }
 
-        if (this.respondTo("actionController")) {
+        if (this.isRespondTo("actionController")) {
           const actionController = this.get("actionController") as Record<string, unknown>;
           actionController.raiseOnOpenRedirects = true;
           actionController.wrapParametersByDefault = true;
@@ -303,7 +303,7 @@ export class Configuration extends EngineConfiguration {
           this.logFileSize = 100 * 1024 * 1024;
         }
 
-        if (this.respondTo("activeRecord")) {
+        if (this.isRespondTo("activeRecord")) {
           const activeRecord = this.get("activeRecord") as Record<string, unknown> & {
             encryption: Record<string, unknown>;
           };
@@ -321,7 +321,7 @@ export class Configuration extends EngineConfiguration {
           activeRecord.generateSecureTokenOn = "initialize";
         }
 
-        if (this.respondTo("actionDispatch")) {
+        if (this.isRespondTo("actionDispatch")) {
           const actionDispatch = this.get("actionDispatch") as Record<string, unknown>;
           actionDispatch.defaultHeaders = {
             "X-Frame-Options": "SAMEORIGIN",
@@ -333,7 +333,7 @@ export class Configuration extends EngineConfiguration {
           actionDispatch.debugExceptionLogLevel = ":error";
         }
 
-        if (this.respondTo("activeSupport")) {
+        if (this.isRespondTo("activeSupport")) {
           const activeSupport = this.get("activeSupport") as Record<string, unknown>;
           activeSupport.cacheFormatVersion = 7.1;
           activeSupport.messageSerializer = ":json_allow_marshal";
@@ -341,11 +341,11 @@ export class Configuration extends EngineConfiguration {
           activeSupport.raiseOnInvalidCacheExpirationTime = true;
         }
 
-        if (this.respondTo("actionView")) {
+        if (this.isRespondTo("actionView")) {
           /** @empty */
         }
 
-        if (this.respondTo("actionText")) {
+        if (this.isRespondTo("actionText")) {
           /** @empty */
         }
         break;
@@ -355,7 +355,7 @@ export class Configuration extends EngineConfiguration {
 
         this.yjit = true;
 
-        if (this.respondTo("activeStorage")) {
+        if (this.isRespondTo("activeStorage")) {
           const activeStorage = this.get("activeStorage") as Record<string, unknown>;
           activeStorage.webImageContentTypes = [
             "image/png",
@@ -365,7 +365,7 @@ export class Configuration extends EngineConfiguration {
           ];
         }
 
-        if (this.respondTo("activeRecord")) {
+        if (this.isRespondTo("activeRecord")) {
           const activeRecord = this.get("activeRecord") as Record<string, unknown>;
           activeRecord.postgresqlAdapterDecodeDates = true;
           activeRecord.validateMigrationTimestamps = true;
@@ -375,12 +375,12 @@ export class Configuration extends EngineConfiguration {
       case "8.0": {
         this.loadDefaults("7.2");
 
-        if (this.respondTo("activeSupport")) {
+        if (this.isRespondTo("activeSupport")) {
           const activeSupport = this.get("activeSupport") as Record<string, unknown>;
           activeSupport.toTimePreservesTimezone = ":zone";
         }
 
-        if (this.respondTo("actionDispatch")) {
+        if (this.isRespondTo("actionDispatch")) {
           const actionDispatch = this.get("actionDispatch") as Record<string, unknown>;
           actionDispatch.strictFreshness = true;
         }

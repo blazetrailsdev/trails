@@ -6,10 +6,10 @@ describe("Railtie::Configuration (trails)", () => {
   it("respondTo answers true for a real method as well as a stored option", () => {
     const config = new Configuration();
     config.set("someDynamicOption", 1);
-    expect(config.respondTo("someDynamicOption")).toBe(true);
-    expect(config.respondTo("toPrepare")).toBe(true);
-    expect(config.respondTo("eagerLoadNamespaces")).toBe(true);
-    expect(config.respondTo("neverSet")).toBe(false);
+    expect(config.isRespondTo("someDynamicOption")).toBe(true);
+    expect(config.isRespondTo("toPrepare")).toBe(true);
+    expect(config.isRespondTo("eagerLoadNamespaces")).toBe(true);
+    expect(config.isRespondTo("neverSet")).toBe(false);
   });
 
   it("stores a key naming TS-only implementation surface, as Ruby has no such method", () => {

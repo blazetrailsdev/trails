@@ -16,7 +16,7 @@ import { NoMethodError } from "./attribute-assignment.js";
 export interface AttributeMethods {
   methodMissing(method: string, ...args: unknown[]): unknown;
   attributeMissing(match: AttributeMethod, ...args: unknown[]): unknown;
-  respondTo(method: string): boolean;
+  isRespondTo(method: string): boolean;
 }
 
 const __FILE__ = import.meta.url;
@@ -485,7 +485,7 @@ export const InstanceMethods = {
     return basicObjRespondTo(this, method, !includePrivateMethods);
   },
 
-  respondTo(
+  isRespondTo(
     this: InstanceMethodsHost,
     method: string,
     includePrivateMethods: boolean = false,

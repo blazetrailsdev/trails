@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { FixtureResolver, TemplateHandlers } from "@blazetrails/actionview";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { Base } from "./base.js";
 import { Request } from "../action-dispatch/http/request.js";
@@ -82,5 +83,33 @@ describe("ActionController::Cookies#cookies", () => {
     expect((CookiesController as unknown as { _helperMethods: string[] })._helperMethods).toContain(
       "cookies",
     );
+  });
+});
+
+describe("ActionController::Base#respond_to?", () => {
+  class BackController extends ApplicationController {
+    back = "";
+    async show(): Promise<void> {
+      this.back = this.viewContext().urlFor(":back");
+      this.head("ok");
+    }
+  }
+
+  it("answers respond_to? without negotiating MimeResponds#respond_to", async () => {
+    const controller = new BackController();
+    await controller.dispatch("show", makeRequest(), new Response());
+    expect(rbObjRespondTo(controller, "request")).toBe(true);
+  });
+
+  it("lets the view context answer url_for(:back) with the referer", async () => {
+    const request = new Request({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/",
+      HTTP_HOST: "localhost",
+      HTTP_REFERER: "http://localhost/previous",
+    });
+    const controller = new BackController();
+    await controller.dispatch("show", request, new Response());
+    expect(controller.back).toBe("http://localhost/previous");
   });
 });

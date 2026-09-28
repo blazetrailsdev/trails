@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { DebugExceptions } from "../middleware/debug-exceptions.js";
+import { DebugExceptions, type Logger } from "../middleware/debug-exceptions.js";
+import { NotImplemented } from "../../action-controller/metal/exceptions.js";
 import { Request } from "../http/request.js";
 import { MimeType } from "../http/mime-type.js";
 import { HASH_CONVERSIONS } from "@blazetrails/activesupport";
@@ -88,5 +89,28 @@ describe("DebugExceptions API body conversions", () => {
       delete HASH_CONVERSIONS.toWibble;
       MimeType.unregister(":wibble");
     }
+  });
+});
+
+describe("DebugExceptions#log_error rescue_response? gate", () => {
+  async function logged(app: (env: RackEnv) => Promise<RackResponse>): Promise<string[]> {
+    const messages: string[] = [];
+    const logger: Logger = { error: (msg) => messages.push(msg) };
+    await new DebugExceptions(app, { logger, logRescuedResponses: false }).call({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/test",
+    });
+    return messages;
+  }
+
+  it("skips a 5xx rescue response when log_rescued_responses is false", async () => {
+    const notImplementedApp = async (): Promise<RackResponse> => {
+      throw new NotImplemented();
+    };
+    expect(await logged(notImplementedApp)).toEqual([]);
+  });
+
+  it("logs an exception with no rescue response when log_rescued_responses is false", async () => {
+    expect((await logged(errorApp)).length).toBeGreaterThan(0);
   });
 });

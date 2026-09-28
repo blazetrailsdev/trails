@@ -7,7 +7,7 @@ import {
   include,
   runLoadHooks,
 } from "@blazetrails/activesupport";
-import { File, getCrypto, symbolToS } from "@blazetrails/ruby-compat";
+import { File, getCrypto } from "@blazetrails/ruby-compat";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Metal } from "./metal.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
@@ -240,8 +240,6 @@ export class Base extends Metal {
     return this.request.flash!;
   }
 
-  static templateResolver?: (controller: string, action: string, format: string) => string | null;
-
   static _viewPaths: {
     (): PathSet;
     (paths: PathSet): void;
@@ -357,23 +355,9 @@ export class Base extends Metal {
         } else if (options.partial !== undefined) {
           this._pendingRender = { type: "partial", options };
           return;
-        } else if (
-          options.template !== undefined ||
-          options.inline !== undefined ||
-          options.action !== undefined ||
-          options.collection !== undefined
-        ) {
-          this._pendingRender = { type: "template", options };
-          return;
-        } else if (this.lookupContext.viewPaths.size > 0) {
-          this._pendingRender = { type: "template", options };
-          return;
         } else {
-          this._resolveTemplate(this.actionName, options);
-          if (!this.performed) {
-            this.contentType = "text/html; charset=utf-8";
-            this.responseBody = "";
-          }
+          this._pendingRender = { type: "template", options };
+          return;
         }
 
         this.markPerformed();
@@ -906,20 +890,6 @@ export class Base extends Metal {
       contentType: options.contentType,
       body: Buffer.isBuffer(data) ? data.toString("latin1") : data,
     });
-  }
-
-  private _resolveTemplate(action: string, _options: RenderOptions): void {
-    const resolver = (this.constructor as typeof Base).templateResolver;
-    if (!resolver) return;
-
-    const controllerPrefix = this.controllerPath();
-    const format = symbolToS(this.request?.format?.symbol ?? ":html");
-    const template = resolver(controllerPrefix, action, format);
-    if (template) {
-      this.contentType = "text/html; charset=utf-8";
-      this.responseBody = template;
-      this.markPerformed();
-    }
   }
 
   private _findRescueHandler(error: Error): { handler: RescueHandler; error: Error } | null {

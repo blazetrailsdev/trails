@@ -160,7 +160,7 @@ export class TimeWithZone {
     return this.utc().toZonedDateTime().toPlainDateTime();
   }
 
-  respondTo(sym: string, includePriv: boolean = false): boolean {
+  isRespondTo(sym: string, includePriv: boolean = false): boolean {
     if (sym === "toStr") return false;
     return basicObjRespondTo(this, sym, !includePriv);
   }

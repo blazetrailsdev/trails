@@ -57,7 +57,7 @@ describe("Object#respond_to?", () => {
 
   it("sends an overridden respond_to? and otherwise falls back to the default", () => {
     // vendor/ruby/v3.3.11/vm_method.c:2882 vm_respond_to, :2945 the basic_obj_respond_to fallback.
-    const overriding = { respondTo: (mid: string) => mid === "name" };
+    const overriding = { isRespondTo: (mid: string) => mid === "name" };
     expect(rbObjRespondTo(overriding, "name")).toBe(true);
     expect(rbObjRespondTo(overriding, "respondTo")).toBe(false);
     expect(rbObjRespondTo({ id: 1 }, "id")).toBe(true);

@@ -8,9 +8,9 @@ export class BodyProxy {
     this.block = block;
     return new Proxy(this, {
       has: (target, prop) =>
-        Reflect.has(target, prop) || (typeof prop === "string" && target.respondTo(prop)),
+        Reflect.has(target, prop) || (typeof prop === "string" && target.isRespondTo(prop)),
       get: (target, prop, receiver) => {
-        if (Reflect.has(target, prop) || typeof prop !== "string" || !target.respondTo(prop)) {
+        if (Reflect.has(target, prop) || typeof prop !== "string" || !target.isRespondTo(prop)) {
           return Reflect.get(target, prop, receiver);
         }
         return (...args: unknown[]) => target.delegate(prop, ...args);
@@ -67,7 +67,7 @@ export class BodyProxy {
     }
   }
 
-  respondTo(method: string): boolean {
+  isRespondTo(method: string): boolean {
     if (method === "toStr" || method === "to_str") return false;
     if (method === "toArray" || method === "to_ary") {
       return (

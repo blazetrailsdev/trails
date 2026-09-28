@@ -807,7 +807,7 @@ describe("AttributeMethodsTest", () => {
     topicClass.defineAttributeMethods();
     expect(basicObjRespondTo(topicClass.prototype, "subject_to_be_undefined")).toBe(true);
 
-    expect(topic.respondTo("subject_to_be_undefined")).toBe(true);
+    expect(topic.isRespondTo("subject_to_be_undefined")).toBe(true);
     expect(basicObjRespondTo(topicClass.prototype, "subject_to_be_undefined")).toBe(true);
   });
   it("#define_attribute_methods brings back undefined aliases", () => {
