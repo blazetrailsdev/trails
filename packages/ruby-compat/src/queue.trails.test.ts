@@ -54,4 +54,15 @@ describe("Thread::SizedQueue", () => {
     expect(pushedTwo).toBe(true);
     expect(await q.pop()).toBe(3);
   });
+
+  it("a push arriving after sleeping pushers are woken does not overtake them", async () => {
+    const q = new SizedQueue<number>(1);
+    void q.push(1);
+    void q.push(2);
+    await tick();
+    q.clear();
+    void q.push(3);
+    expect(await q.pop()).toBe(2);
+    expect(await q.pop()).toBe(3);
+  });
 });

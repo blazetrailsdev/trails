@@ -5,6 +5,7 @@ interface QueueData<T> {
   waitq: Array<() => void>;
   max: number;
   pushq: Array<() => void>;
+  numWaitingPush: number;
 }
 
 const QUEUE_DATA = new WeakMap<object, QueueData<unknown>>();
@@ -45,7 +46,7 @@ async function queueDoPop<T>(q: QueueData<T>): Promise<T> {
  */
 export class Queue<T = unknown> {
   constructor() {
-    QUEUE_DATA.set(this, { que: [], waitq: [], max: Infinity, pushq: [] });
+    QUEUE_DATA.set(this, { que: [], waitq: [], max: Infinity, pushq: [], numWaitingPush: 0 });
   }
 
   /**
@@ -120,7 +121,8 @@ export class SizedQueue<T = unknown> extends Queue<T> {
    * holds `max` objects the pusher sleeps on the push queue until a `pop` wakes
    * it. A Ruby pusher blocks its own thread, so its next push cannot overtake
    * it; a JS caller may leave the promise pending and push again, so a push
-   * also waits while earlier pushers are still asleep, keeping arrival order.
+   * also waits while `num_waiting_push` is nonzero, and a pusher that leaves
+   * room wakes the next, keeping arrival order.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Thread::SizedQueue#push`
    * (`vendor/ruby/v3.3.11/thread_sync.c:1338`).
@@ -128,12 +130,22 @@ export class SizedQueue<T = unknown> extends Queue<T> {
   override async push(object: T): Promise<this> {
     const sq = queuePtr<T>(this);
 
-    while (sq.que.length >= sq.max || sq.pushq.length > 0) {
-      await queueSleep(sq.pushq);
-      if (sq.que.length < sq.max) break;
+    if (sq.que.length >= sq.max || sq.numWaitingPush > 0) {
+      sq.numWaitingPush++;
+      try {
+        do {
+          await queueSleep(sq.pushq);
+        } while (sq.que.length >= sq.max);
+      } finally {
+        sq.numWaitingPush--;
+      }
     }
 
-    return queueDoPush(this, sq, object) as this;
+    queueDoPush(this, sq, object);
+    if (sq.que.length < sq.max) {
+      wakeupOne(sq.pushq);
+    }
+    return this;
   }
 
   /**
