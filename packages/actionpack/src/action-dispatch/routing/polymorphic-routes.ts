@@ -64,17 +64,6 @@ function isHash(x: unknown): boolean {
   return proto === Object.prototype || proto === null;
 }
 
-/** @internal */
-export function symbolToString(s: symbol): string {
-  const name = s.description;
-  if (!name) {
-    throw new ArgumentError(
-      'Cannot build a polymorphic route from a description-less Symbol. Use Symbol.for("name") or a string.',
-    );
-  }
-  return name;
-}
-
 export function polymorphicUrl(
   this: PolymorphicHost,
   recordOrHashOrArray: PolymorphicArg,

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { include, RuntimeError } from "@blazetrails/ruby-compat";
 
 import { _routes as abstractControllerRoutes } from "../../abstract-controller/url-for.js";
 import { Parameters } from "../../action-controller/metal/strong-parameters.js";
@@ -77,14 +77,8 @@ describe("ActionDispatch::Routing::UrlFor", () => {
   it("use_route accepts Symbol (Rails parity) → uses description", () => {
     const host = makeHost();
     const routes = host._routes as ReturnType<typeof makeRoutes>;
-    fullUrlFor.call(host, { useRoute: Symbol("post") });
+    fullUrlFor.call(host, { useRoute: ":post" });
     expect(routes.calls[0][1]).toBe("post");
-  });
-
-  it("use_route Symbol() without description throws ArgumentError", () => {
-    expect(() => fullUrlFor.call(makeHost(), { useRoute: Symbol() })).toThrow(
-      /description-less Symbol/,
-    );
   });
 
   it("explicit option wins over urlOptions default", () => {
@@ -98,7 +92,7 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     const userUrl = vi.fn(() => "/users");
     const host = makeHost();
     (host as unknown as Record<string, unknown>)["userUrl"] = userUrl;
-    const result = fullUrlFor.call(host, Symbol("user"));
+    const result = fullUrlFor.call(host, ":user");
     expect(result).toBe("/users");
     expect(userUrl).toHaveBeenCalledOnce();
   });
@@ -148,15 +142,15 @@ describe("ActionDispatch::Routing::UrlFor", () => {
   });
 
   it("routeFor calls `${name}_url` on the host (matches generateRouteHelpers)", () => {
-    const user_url = vi.fn(() => "/users/42");
+    const userUrl = vi.fn(() => "/users/42");
     const host = makeHost();
-    (host as unknown as Record<string, unknown>)["user_url"] = user_url;
+    (host as unknown as Record<string, unknown>)["userUrl"] = userUrl;
     expect(routeFor.call(host, "user", { id: 42 })).toBe("/users/42");
-    expect(user_url).toHaveBeenCalledWith({ id: 42 });
+    expect(userUrl).toHaveBeenCalledWith({ id: 42 });
   });
 
   it("routeFor throws when helper missing", () => {
-    expect(() => routeFor.call(makeHost(), "missing")).toThrow(/missing_url/);
+    expect(() => routeFor.call(makeHost(), "missing")).toThrow(/missingUrl/);
   });
 
   it("permitted ActionController::Parameters route through hash branch", () => {
@@ -259,5 +253,18 @@ describe("ActionDispatch::Routing::UrlFor", () => {
     Object.defineProperty(host, "_routes", { get: abstractControllerRoutes });
     expect(() => fullUrlFor.call(host, null)).toThrow(RuntimeError);
     expect(() => fullUrlFor.call(host, null)).toThrow(/include routing helpers explicitly/);
+  });
+});
+
+describe("ActionDispatch::Routing::UrlFor#route_for against a drawn RouteSet", () => {
+  it("dispatches to the named route's url helper", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/users/:id", { to: "users#show", as: "user" });
+    });
+    class Host {}
+    include(Host, routes.urlHelpers());
+    const host = new Host() as unknown as { routeFor(name: string, ...args: unknown[]): string };
+    expect(host.routeFor("user", 42, { host: "example.com" })).toBe("http://example.com/users/42");
   });
 });
