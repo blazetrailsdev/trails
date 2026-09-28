@@ -7,9 +7,8 @@ import { LookupContext } from "../lookup-context.js";
 describe("ControllerHelperTest", () => {
   class SpecializedFormBuilder extends FormBuilder {}
 
-  const view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, null);
-
   it("assign controller sets default form builder", () => {
+    const view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, null);
     const controller = { defaultFormBuilder: () => SpecializedFormBuilder };
     view.assignController(controller);
 

@@ -1064,9 +1064,13 @@ describe("UrlOptionsIntegrationTest", () => {
   }
 
   class BarController extends Base {
-    // @ts-expect-error TS2611: Rails overrides the default_url_options class_attribute reader with a method
-    override get defaultUrlOptions(): Record<string, unknown> {
-      return { host: "bar.com" };
+    static {
+      Object.defineProperty(this.prototype, "defaultUrlOptions", {
+        get(): Record<string, unknown> {
+          return { host: "bar.com" };
+        },
+        configurable: true,
+      });
     }
 
     async index(): Promise<void> {
@@ -1152,9 +1156,14 @@ describe("UrlOptionsIntegrationTest", () => {
 
 describe("HeadWithStatusActionIntegrationTest", () => {
   class FooController extends Base {
-    // @ts-expect-error TS2426: the Rails action is named status, which Metal answers as an accessor
-    override async status(): Promise<void> {
-      this.head("ok");
+    static {
+      Object.defineProperty(this.prototype, "status", {
+        async value(this: Base): Promise<void> {
+          this.head("ok");
+        },
+        configurable: true,
+        writable: true,
+      });
     }
   }
 
