@@ -8,6 +8,7 @@ import type {
 } from "../sqlite-adapter.js";
 import { SQLite3Constants } from "../sqlite-adapter.js";
 import { Pragmas } from "../sqlite/pragmas.js";
+import { BusyException, CantOpenException } from "../sqlite/errors.js";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
@@ -591,8 +592,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   ): SqliteConnection | Promise<SqliteConnection> {
     const rescue = (error: unknown): never => {
       if (
-        error instanceof Error &&
-        (error as { code?: unknown }).code === "SQLITE_CANTOPEN" &&
+        error instanceof CantOpenException &&
         (error.message.includes("No such file or directory") ||
           !File.isExist(String(config.database)))
       ) {
@@ -1331,7 +1331,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       return new InvalidForeignKey(message, { sql, binds, connectionPool: this.pool });
     } else if (/called on a closed database/i.test(exceptionMessage)) {
       return new ConnectionNotEstablished(exception as Error, { connectionPool: this.pool });
-    } else if ((exception as { code?: string })?.code === "SQLITE_BUSY") {
+    } else if (exception instanceof BusyException) {
       return new StatementTimeout(message, { sql, binds, connectionPool: this.pool });
     } else {
       return super.translateException(exception, { message, sql, binds });

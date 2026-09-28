@@ -6,6 +6,7 @@ import type { ConnectionPool } from "../../connection-adapters/abstract/connecti
 import { isInMemoryDatabase } from "../../sqlite/sqlite-uri.js";
 import { fixtures } from "../../test-fixtures.js";
 import { File, FileUtils } from "@blazetrails/ruby-compat";
+import { BusyException } from "../../sqlite/errors.js";
 import {
   ActiveRecordError,
   NoDatabaseError,
@@ -284,7 +285,7 @@ describe("SQLite3 translateException", () => {
     adapter.translateException(exception, { message: "msg", sql: "SELECT 1", binds: [] });
 
   it("classifies a busy database as StatementTimeout", () => {
-    const busy = Object.assign(new Error("database is locked"), { code: "SQLITE_BUSY" });
+    const busy = new BusyException("database is locked");
     expect(translate(busy)).toBeInstanceOf(StatementTimeout);
   });
 

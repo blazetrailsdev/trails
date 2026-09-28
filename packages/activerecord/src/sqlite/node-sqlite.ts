@@ -16,6 +16,7 @@ import {
   type SyncSqliteStatement,
 } from "../sqlite-adapter.js";
 import { resolveUriDatabasePath } from "./sqlite-uri.js";
+import { rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
 
 type NodeSqliteModule = typeof import("node:sqlite");
 let nodeSqlite: NodeSqliteModule | undefined;
@@ -42,9 +43,13 @@ class NodeSqliteStatement implements SqliteStatement, SyncSqliteStatement {
   }
 
   private call<T>(method: string, binds: SqliteBinds | undefined): T {
-    return (this.stmt as unknown as Record<string, (...a: unknown[]) => T>)[method](
-      ...expandBinds(binds),
-    );
+    try {
+      return (this.stmt as unknown as Record<string, (...a: unknown[]) => T>)[method](
+        ...expandBinds(binds),
+      );
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   run(binds?: SqliteBinds): RunResult {
@@ -114,7 +119,11 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
   }
 
   prepare(sql: string): NodeSqliteStatement {
-    return new NodeSqliteStatement(this.raw.prepare(sql));
+    try {
+      return new NodeSqliteStatement(this.raw.prepare(sql));
+    } catch (e) {
+      rbSqlite3RaiseWithSql(e, sql);
+    }
   }
 
   isOpen(): boolean {
@@ -122,7 +131,11 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
   }
 
   exec(sql: string): void {
-    this.raw.exec(sql);
+    try {
+      this.raw.exec(sql);
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   execute(sql: string, bindVars?: SqliteBinds): readonly unknown[];
@@ -202,7 +215,11 @@ function openDatabase(config: SqliteOpenConfig): import("node:sqlite").DatabaseS
   };
   if (config.timeout !== undefined) opts.timeout = config.timeout;
   opts.enableDoubleQuotedStringLiterals = !(config.strict ?? false);
-  return new nodeSqlite.DatabaseSync(sharedCacheDatabase(config), opts);
+  try {
+    return new nodeSqlite.DatabaseSync(sharedCacheDatabase(config), opts);
+  } catch (e) {
+    rbSqlite3Raise(e);
+  }
 }
 
 function sharedCacheDatabase(config: SqliteOpenConfig): string {

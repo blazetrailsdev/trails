@@ -28,6 +28,7 @@ import {
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
 import { StatementInvalid, StatementTimeout } from "../../errors.js";
+import { BusyException } from "../../sqlite/errors.js";
 import type { ConnectionPool } from "../../connection-adapters/abstract/connection-pool.js";
 
 let adapter: SQLite3Adapter;
@@ -1102,7 +1103,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       "CREATE TABLE statement_test (number integer not null)",
     );
     const step = () => {
-      throw Object.assign(new Error("busy"), { code: "SQLITE_BUSY" });
+      throw new BusyException("busy");
     };
     const all = vi.spyOn(statement, "all").mockImplementation(step);
     const run = vi.spyOn(statement, "run").mockImplementation(step);
@@ -1148,8 +1149,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     await conn.disconnectBang();
   });
 
-  // BLOCKED: drivers raise SqliteError, not SQLite3::ReadOnlyException (story sqlite-drivers-raise-sqlite3-gem-exception-classes)
-  it.skip("writes are not permitted to readonly databases", async () => {
+  it("writes are not permitted to readonly databases", async () => {
     const conn = new BetterSQLite3Adapter({ database: ":memory:", readonly: true });
     await conn.connectBang();
 

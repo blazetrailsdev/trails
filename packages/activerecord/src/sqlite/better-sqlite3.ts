@@ -2,6 +2,7 @@
 import Database from "better-sqlite3";
 import { File } from "@blazetrails/ruby-compat";
 import { ConfigurationError } from "../errors.js";
+import { rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
 import {
   type ColumnInfo,
   type RunResult,
@@ -50,8 +51,12 @@ class BetterSqlite3Statement implements SqliteStatement, SyncSqliteStatement {
 
   private bind<T>(binds: SqliteBinds | undefined, call: (args: unknown[]) => T): T {
     const args = bindArgs(binds);
-    if (binds !== undefined && !Array.isArray(binds)) return call(args);
-    return withNullBinds(this.stmt.source, args, call);
+    try {
+      if (binds !== undefined && !Array.isArray(binds)) return call(args);
+      return withNullBinds(this.stmt.source, args, call);
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   run(binds?: SqliteBinds): RunResult {
@@ -128,7 +133,11 @@ class BetterSqlite3Connection implements SqliteConnection, SyncSqliteConnection 
   }
 
   prepare(sql: string): BetterSqlite3Statement {
-    return new BetterSqlite3Statement(this.raw.prepare(sql));
+    try {
+      return new BetterSqlite3Statement(this.raw.prepare(sql));
+    } catch (e) {
+      rbSqlite3RaiseWithSql(e, sql);
+    }
   }
 
   isOpen(): boolean {
@@ -136,7 +145,11 @@ class BetterSqlite3Connection implements SqliteConnection, SyncSqliteConnection 
   }
 
   exec(sql: string): void {
-    this.raw.exec(sql);
+    try {
+      this.raw.exec(sql);
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   execute(sql: string, bindVars?: SqliteBinds): readonly unknown[];
@@ -213,10 +226,14 @@ function openDatabase(config: SqliteOpenConfig): Database.Database {
     readonly: config.readOnly ?? false,
   };
   if (config.timeout !== undefined) opts.timeout = config.timeout;
-  if (opts.readonly && config.database === ":memory:") {
-    return new Database(new Database(":memory:").serialize(), opts);
+  try {
+    if (opts.readonly && config.database === ":memory:") {
+      return new Database(new Database(":memory:").serialize(), opts);
+    }
+    return new Database(config.database, opts);
+  } catch (e) {
+    rbSqlite3Raise(e);
   }
-  return new Database(config.database, opts);
 }
 
 const capabilities: SqliteDriverCapabilities = {

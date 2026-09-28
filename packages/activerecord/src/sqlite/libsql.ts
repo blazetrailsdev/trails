@@ -17,6 +17,7 @@ import {
   type SyncSqliteStatement,
 } from "../sqlite-adapter.js";
 import { isRemoteLibsqlUrl, resolveUriDatabasePath } from "./sqlite-uri.js";
+import { rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
 
 /** @internal */
 function bindArgs(binds?: SqliteBinds): unknown[] {
@@ -29,21 +30,29 @@ function bindArgs(binds?: SqliteBinds): unknown[] {
 class LibsqlStatement implements SqliteStatement, SyncSqliteStatement {
   constructor(private readonly stmt: Database.Statement) {}
 
+  private call<T>(fn: () => T): T {
+    try {
+      return fn();
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
+  }
+
   run(binds?: SqliteBinds): RunResult {
-    const result = this.stmt.run(...bindArgs(binds));
+    const result = this.call(() => this.stmt.run(...bindArgs(binds)));
     return { changes: result.changes, lastInsertRowid: result.lastInsertRowid };
   }
 
   get(binds?: SqliteBinds): unknown {
-    return this.stmt.get(...bindArgs(binds));
+    return this.call(() => this.stmt.get(...bindArgs(binds)));
   }
 
   all(binds?: SqliteBinds): unknown[] {
-    return this.stmt.all(...bindArgs(binds));
+    return this.call(() => this.stmt.all(...bindArgs(binds)));
   }
 
   iterate(binds?: SqliteBinds): IterableIterator<unknown> {
-    return this.stmt.iterate(...bindArgs(binds));
+    return this.call(() => this.stmt.iterate(...bindArgs(binds)));
   }
 
   private boundParams: SqliteBinds | undefined;
@@ -55,7 +64,7 @@ class LibsqlStatement implements SqliteStatement, SyncSqliteStatement {
   toA(): unknown[][] {
     this.stmt.raw(true);
     try {
-      return this.stmt.all(...bindArgs(this.boundParams)) as unknown[][];
+      return this.call(() => this.stmt.all(...bindArgs(this.boundParams)) as unknown[][]);
     } finally {
       this.stmt.raw(false);
     }
@@ -99,7 +108,11 @@ class LibsqlConnection implements SqliteConnection, SyncSqliteConnection {
   }
 
   prepare(sql: string): LibsqlStatement {
-    return new LibsqlStatement(this.raw.prepare(sql));
+    try {
+      return new LibsqlStatement(this.raw.prepare(sql));
+    } catch (e) {
+      rbSqlite3RaiseWithSql(e, sql);
+    }
   }
 
   isOpen(): boolean {
@@ -107,7 +120,11 @@ class LibsqlConnection implements SqliteConnection, SyncSqliteConnection {
   }
 
   exec(sql: string): void {
-    this.raw.exec(sql);
+    try {
+      this.raw.exec(sql);
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   execute(sql: string, bindVars?: SqliteBinds): readonly unknown[];
@@ -189,7 +206,11 @@ function openDatabase(config: SqliteOpenConfig): Database.Database {
     readonly: config.readOnly ?? false,
   };
   if (config.timeout !== undefined) opts.timeout = config.timeout;
-  return new Database(sharedCacheDatabase(config), opts);
+  try {
+    return new Database(sharedCacheDatabase(config), opts);
+  } catch (e) {
+    rbSqlite3Raise(e);
+  }
 }
 
 export { isRemoteLibsqlUrl };
