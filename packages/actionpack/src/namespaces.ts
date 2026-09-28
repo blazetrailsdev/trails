@@ -2,7 +2,6 @@ import { Autoload, TopLevel, extend, onLoad, type Extended } from "@blazetrails/
 import { Base, DetailsKey, Template } from "@blazetrails/actionview";
 import { Mime, MimeType } from "./action-dispatch/http/mime-type.js";
 import type { Parameters } from "./action-controller/metal/strong-parameters.js";
-import type { TestRequest } from "./action-controller/test-case.js";
 import type { Request } from "./action-dispatch/http/request.js";
 import type * as PolymorphicRoutes from "./action-dispatch/routing/polymorphic-routes.js";
 import type { RoutesProxy } from "./action-dispatch/routing/routes-proxy.js";
@@ -10,7 +9,6 @@ import type { RoutesProxy } from "./action-dispatch/routing/routes-proxy.js";
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 const loadPath: Record<string, () => Promise<unknown>> = {
-  "action_controller/test_case": () => import("./action-controller/test-case.js"),
   "action_dispatch/http/request": () => import("./action-dispatch/http/request.js"),
   "action_dispatch/routing/polymorphic_routes": () =>
     import("./action-dispatch/routing/polymorphic-routes.js"),
@@ -46,12 +44,8 @@ ActionDispatch.Routing = Routing;
 
 export const ActionController = { name: "ActionController", loadPath } as AutoloadModule & {
   Parameters: typeof Parameters;
-  TestRequest: typeof TestRequest;
 };
 extend(ActionController, Autoload);
-ActionController.autoloadAt("action_controller/test_case", () => {
-  ActionController.autoload("TestRequest");
-});
 
 TopLevel.ActionDispatch = ActionDispatch;
 TopLevel.ActionController = ActionController;

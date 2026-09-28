@@ -21,7 +21,6 @@ import {
   type TestProcessHost,
 } from "./test-process.js";
 import * as routingAssertions from "./assertions/routing.js";
-import "../../action-controller/test-case.js";
 import * as responseAssertions from "./assertions/response.js";
 import { htmlDocument as parseHtmlDocument } from "./assertions.js";
 import type { XmlDocument } from "@blazetrails/nokogiri";

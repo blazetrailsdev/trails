@@ -32,7 +32,6 @@ import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import type { RouteSet } from "../action-dispatch/routing/route-set.js";
 import * as routingAssertions from "../action-dispatch/testing/assertions/routing.js";
-import { ActionController } from "../namespaces.js";
 import type { Metal } from "./metal.js";
 
 type ControllerClass = new () => Metal;
@@ -133,7 +132,12 @@ export class TestCase {
     SetupAndTeardown.teardown.call(this.prototype, ...args);
   }
 
-  static withRouting = routingAssertions.ClassMethods.withRouting;
+  static withRouting(
+    this: ThisParameterType<typeof routingAssertions.ClassMethods.withRouting>,
+    block: (routes: RouteSet) => unknown,
+  ): void {
+    routingAssertions.ClassMethods.withRouting.call(this, block);
+  }
 
   /** @internal */
   beforeSetup(): void {
@@ -546,8 +550,6 @@ export class TestRequest extends AbstractTestRequest {
     return merge<unknown>(base, this._customParamParsers) as ParameterParsers;
   }
 }
-
-ActionController.TestRequest = TestRequest;
 
 export class LiveTestResponse extends Response {
   get isSuccess(): boolean {

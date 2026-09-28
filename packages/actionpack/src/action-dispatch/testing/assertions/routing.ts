@@ -15,8 +15,7 @@ import {
 import { Assertion, assertEqual, message } from "@blazetrails/activesupport";
 import { RouteSet, type Config } from "../../routing/route-set.js";
 import { RoutingError } from "../../../action-controller/metal/exceptions.js";
-import type { TestRequest } from "../../../action-controller/test-case.js";
-import { ActionController } from "../../../namespaces.js";
+import { TestRequest } from "../../../action-controller/test-case.js";
 import type { IntegrationTest } from "../integration.js";
 
 export interface RoutingAssertionsHost {
@@ -265,9 +264,7 @@ export function recognizedRequestFor(
   let pathStr = typeof path === "string" ? path : path.path;
 
   const controller = this.controller;
-  const request = ActionController.TestRequest.create(
-    (controller as object | undefined)?.constructor,
-  );
+  const request = TestRequest.create((controller as object | undefined)?.constructor);
   if (URL_FORM_RE.test(pathStr)) {
     failOn(InvalidURIError, msg, () => {
       const uri = URI.parse(pathStr);
