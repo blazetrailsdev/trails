@@ -155,7 +155,7 @@ export class QueryLogs {
   }
 
   private static buildHandler(name: string, handler?: TagValue | TagHandler): Handler {
-    handler ??= this.#taggings[name];
+    if (handler == null || handler === false) handler = this.#taggings[name];
     if (handler == null) {
       return new GetKeyHandler(name);
     } else if (typeof handler === "function") {

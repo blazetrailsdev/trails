@@ -417,6 +417,12 @@ describe("QueryLogs handlers", () => {
     expect(received).toEqual([0]);
   });
 
+  it("resolves a false hash tag like Ruby's ||=", () => {
+    QueryLogs.tags = [{ controller: false }];
+    ExecutionContext.setKey("controller", "Users");
+    expect(QueryLogs.tagContent()).toBe("controller:Users");
+  });
+
   it("rebuilds handlers when taggings change", () => {
     const saved = QueryLogs.taggings;
     try {
