@@ -1,7 +1,8 @@
 import { File, FileUtils, Zlib, sort } from "@blazetrails/ruby-compat";
 import { atomicWrite } from "@blazetrails/activesupport";
 import { parse as yamlParse, stringify as yamlStringify } from "@blazetrails/activesupport/yaml";
-import { Column } from "./column.js";
+import type { CollectionTag, YAMLMap } from "@blazetrails/activesupport/yaml";
+import { Column, NullColumn } from "./column.js";
 import { deduplicate } from "./deduplicable.js";
 import type { Deduplicable } from "./deduplicable.js";
 import type { ColumnCoder } from "./column.js";
@@ -19,59 +20,52 @@ export type Pool = {
   withConnection<T>(callback: (connection: any) => T | Promise<T>): T | Promise<T>;
 };
 
-type RubyObjectTag = {
-  tag: string;
-  collection: "map";
-  default: false;
-  identify: (value: unknown) => boolean;
-  createNode: (schema: never, value: object, ctx: never) => unknown;
-  resolve: (map: YamlMap) => YamlMap;
-};
-
-type ToJsContext = { onCreate?: (res: unknown) => void };
-
-type YamlMap = { toJSON(arg?: unknown, ctx?: ToJsContext): unknown };
+type ToJSContext = Parameters<YAMLMap["toJSON"]>[1];
 
 const RUBY_OBJECT_CLASSES: Record<string, { prototype: object }> = {
   "ActiveRecord::ConnectionAdapters::Column": Column,
   "ActiveRecord::ConnectionAdapters::MySQL::Column": MysqlColumn,
   "ActiveRecord::ConnectionAdapters::PostgreSQL::Column": PostgresqlColumn,
   "ActiveRecord::ConnectionAdapters::SQLite3::Column": Sqlite3Column,
+  "ActiveRecord::ConnectionAdapters::NullColumn": NullColumn,
   "ActiveRecord::ConnectionAdapters::SqlTypeMetadata": SqlTypeMetadata,
   "ActiveRecord::ConnectionAdapters::MySQL::TypeMetadata": MysqlTypeMetadata,
   "ActiveRecord::ConnectionAdapters::PostgreSQL::TypeMetadata": PostgresqlTypeMetadata,
 };
 
-const RUBY_OBJECT_TAGS: RubyObjectTag[] = Object.entries(RUBY_OBJECT_CLASSES).map(
-  ([name, klass]) => ({
-    tag: `!ruby/object:${name}`,
-    collection: "map",
-    default: false,
-    identify: (value) => value != null && Object.getPrototypeOf(value) === klass.prototype,
-    createNode: (schema, value, ctx) => {
-      const coder: ColumnCoder = {};
-      if (value instanceof Column) value.encodeWith(coder);
-      else Object.assign(coder, value);
-      const mapTag = (
-        schema as { tags: { tag: string; createNode: (...args: unknown[]) => unknown }[] }
-      ).tags.find((t) => t.tag === "tag:yaml.org,2002:map")!;
-      return mapTag.createNode(schema, coder, ctx);
-    },
-    resolve: (map) => {
-      const YAMLMap = map.constructor as new () => YamlMap;
-      class RubyObject extends YAMLMap {
-        override toJSON(arg?: unknown, ctx?: ToJsContext): object {
-          const object = Object.create(klass.prototype) as object;
-          ctx?.onCreate?.(object);
-          const coder = super.toJSON(arg, ctx) as ColumnCoder;
-          if (object instanceof Column) object.initWith(coder);
-          else Object.assign(object, coder);
-          return object;
-        }
-      }
-      return Object.assign(new RubyObject(), map);
-    },
-  }),
+const RUBY_OBJECT_TAGS: CollectionTag[] = Object.entries(RUBY_OBJECT_CLASSES).map(
+  ([name, klass]) => {
+    let RubyObject: (new () => YAMLMap) | undefined;
+    return {
+      tag: `!ruby/object:${name}`,
+      collection: "map",
+      default: false,
+      identify: (value) => value != null && Object.getPrototypeOf(value) === klass.prototype,
+      createNode: (schema, value, ctx) => {
+        const coder: ColumnCoder = {};
+        if (value instanceof Column) value.encodeWith(coder);
+        else Object.assign(coder, value);
+        return schema.tags.find((t) => t.tag === "tag:yaml.org,2002:map")!.createNode!(
+          schema,
+          coder,
+          ctx,
+        );
+      },
+      resolve: (map) => {
+        const nodeClass = (RubyObject ??= class extends (map.constructor as typeof YAMLMap) {
+          override toJSON(arg?: unknown, ctx?: ToJSContext): object {
+            const object = Object.create(klass.prototype) as object;
+            ctx?.onCreate?.(object);
+            const coder = super.toJSON(arg, ctx) as ColumnCoder;
+            if (object instanceof Column) object.initWith(coder);
+            else Object.assign(object, coder);
+            return object;
+          }
+        });
+        return Object.assign(new nodeClass(), map);
+      },
+    };
+  },
 );
 
 function expandIndexOption<T>(
@@ -126,7 +120,7 @@ export class SchemaCache {
       if (!File.isFile(filename)) return null;
       const data = await SchemaCache.read(filename, (content) => content);
       const parsed = yamlParse(data, {
-        customTags: RUBY_OBJECT_TAGS as never,
+        customTags: RUBY_OBJECT_TAGS,
         maxAliasCount: -1,
       }) as Record<string, Record<string, unknown[]> | null>;
       const cache = new SchemaCache();
@@ -362,7 +356,7 @@ export class SchemaCache {
     await this.open(filename, (f) => {
       const coder: Record<string, unknown> = {};
       this.encodeWith(coder);
-      f.write(yamlStringify(coder, { customTags: RUBY_OBJECT_TAGS as never }));
+      f.write(yamlStringify(coder, { customTags: RUBY_OBJECT_TAGS }));
     });
   }
 
