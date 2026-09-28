@@ -62,6 +62,11 @@ export class ActionMethods {
   }
 
   /** @internal */
+  protected emptyDirectoryWithKeepFile(destination: string): void {
+    this.generator["emptyDirectoryWithKeepFile"](destination);
+  }
+
+  /** @internal */
   protected createFile(relativePath: string, content: string): void {
     this.generator["createFile"](relativePath, content);
   }

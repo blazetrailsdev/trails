@@ -216,4 +216,15 @@ export abstract class AppBase extends GeneratorBase {
     }
     return out as unknown as AppBaseOptions;
   }
+
+  /** @internal */
+  protected emptyDirectoryWithKeepFile(destination: string): void {
+    this.emptyDirectory(destination);
+    this.keepFile(destination);
+  }
+
+  /** @internal */
+  protected keepFile(destination: string): void {
+    if (this.keeps()) this.createFile(`${destination}/.keep`, "");
+  }
 }
