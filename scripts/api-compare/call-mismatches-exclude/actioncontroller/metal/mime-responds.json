@@ -1,9 +1,0 @@
-[
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/mime-responds.ts",
-    "rubyName": "any_response?",
-    "call": "fetch",
-    "reason": "Ruby `@responses.fetch(format, false)`; the port calls the protected `handlerFor(format)` helper on the ActionDispatch Collector, which does the Map lookup internally. Same semantics, no `fetch` call at this site."
-  }
-]

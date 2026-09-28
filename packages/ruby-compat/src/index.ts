@@ -60,6 +60,7 @@ export {
   inspect,
   merge,
   mergeBang,
+  rbBlockGivenP,
   reject,
   slice,
   transformValues,

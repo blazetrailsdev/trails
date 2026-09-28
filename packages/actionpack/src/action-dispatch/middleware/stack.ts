@@ -1,3 +1,5 @@
+import { rbBlockGivenP } from "@blazetrails/ruby-compat";
+import { Notifications } from "@blazetrails/activesupport";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 export type RackApp = (env: RackEnv) => Promise<RackResponse>;
@@ -40,6 +42,32 @@ export class Middleware {
     const mw = new this.klass(app, ...this.args, ...(this.block ? [this.block] : []));
     return (env: RackEnv) => mw.call(env);
   }
+
+  buildInstrumented(app: RackApp): RackApp {
+    const proxy = new InstrumentationProxy(this.build(app), this.inspect());
+    return (env: RackEnv) => proxy.call(env);
+  }
+}
+
+export class InstrumentationProxy {
+  static readonly EVENT_NAME = "process_middleware.action_dispatch";
+
+  private _middleware: RackApp;
+  private _payload: { middleware: string };
+
+  constructor(middleware: RackApp, className: string) {
+    this._middleware = middleware;
+
+    this._payload = {
+      middleware: className,
+    };
+  }
+
+  call(env: RackEnv): Promise<RackResponse> {
+    return Notifications.instrument(InstrumentationProxy.EVENT_NAME, this._payload, () =>
+      this._middleware(env),
+    );
+  }
 }
 
 export class MiddlewareStack implements Iterable<Middleware> {
@@ -81,20 +109,19 @@ export class MiddlewareStack implements Iterable<Middleware> {
     return this.entries[this.entries.length - 1];
   }
 
-  /** @missingRailsArgs build_middleware — PERMANENT */
-  use(klass: MiddlewareFactory, ...args: unknown[]): void {
-    this.entries.push(this.buildMiddleware(klass, args));
-  }
-
-  /** @missingRailsArgs build_middleware — PERMANENT */
   unshift(klass: MiddlewareFactory, ...args: unknown[]): void {
-    this.entries.unshift(this.buildMiddleware(klass, args));
+    const block = rbBlockGivenP(args[args.length - 1])
+      ? (args.pop() as MiddlewareBlock)
+      : undefined;
+    this.middlewares.unshift(this.buildMiddleware(klass, args, block));
   }
 
-  /** @missingRailsArgs build_middleware — PERMANENT */
   insert(index: MiddlewareFactory | number, klass: MiddlewareFactory, ...args: unknown[]): void {
+    const block = rbBlockGivenP(args[args.length - 1])
+      ? (args.pop() as MiddlewareBlock)
+      : undefined;
     index = this.assertIndex(index, "before");
-    this.middlewares.splice(index, 0, this.buildMiddleware(klass, args));
+    this.middlewares.splice(index, 0, this.buildMiddleware(klass, args, block));
   }
 
   insertBefore(
@@ -155,6 +182,13 @@ export class MiddlewareStack implements Iterable<Middleware> {
     this.entries.splice(targetIndex + 1, 0, sourceMiddleware);
   }
 
+  use(klass: MiddlewareFactory, ...args: unknown[]): void {
+    const block = rbBlockGivenP(args[args.length - 1])
+      ? (args.pop() as MiddlewareBlock)
+      : undefined;
+    this.middlewares.push(this.buildMiddleware(klass, args, block));
+  }
+
   includes(klass: MiddlewareFactory): boolean {
     return this.indexOf(klass) !== -1;
   }
@@ -173,9 +207,15 @@ export class MiddlewareStack implements Iterable<Middleware> {
   }
 
   build(app: RackApp | RackAppObject): RackApp {
+    const instrumenting = Notifications.notifier.listening(InstrumentationProxy.EVENT_NAME);
+    const middlewares = Object.freeze(this.middlewares);
     let current: RackApp = typeof app === "function" ? app : (env: RackEnv) => app.call(env);
-    for (let i = this.entries.length - 1; i >= 0; i--) {
-      current = this.entries[i].build(current);
+    for (let i = middlewares.length - 1; i >= 0; i--) {
+      if (instrumenting) {
+        current = middlewares[i].buildInstrumented(current);
+      } else {
+        current = middlewares[i].build(current);
+      }
     }
     return current;
   }

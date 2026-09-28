@@ -6,7 +6,7 @@ import {
   type RenderingHost as AbstractRenderHost,
 } from "../../abstract-controller/rendering.js";
 import { Renderer } from "../renderer.js";
-import { resolveStatus } from "./status-codes.js";
+import { statusCode } from "@blazetrails/rack";
 
 export const RENDER_FORMATS_IN_PRIORITY = ["body", "plain", "html"] as const;
 
@@ -37,7 +37,7 @@ export function _normalizeOptions(options: Record<string, unknown>): Record<stri
     options.html = htmlEscape(options.html);
   }
   if (options.status != null && options.status !== false) {
-    options.status = resolveStatus(options.status as number | string);
+    options.status = statusCode(options.status as number | string);
   }
   return options;
 }
@@ -95,11 +95,11 @@ export function _setVaryHeader(this: Pick<RenderingHost, "request" | "response">
 
 /** @internal */
 export function _processOptions(
-  this: Pick<RenderingHost, "status" | "contentType" | "headers" | "urlFor">,
+  this: Pick<RenderingHost, "contentType" | "headers" | "urlFor"> & { status: number | string },
   options: Record<string, unknown>,
 ): void {
   if (options.status != null && options.status !== false) {
-    this.status = resolveStatus(options.status as number | string);
+    this.status = options.status as number | string;
   }
   if (options.contentType != null && options.contentType !== false) {
     this.contentType = String(options.contentType);

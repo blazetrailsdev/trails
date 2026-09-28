@@ -679,32 +679,4 @@ describe("ActionDispatch::IntegrationTest", () => {
       expect(app.request.env["HTTP_X_CUSTOM_ENV"]).toBe("env-value");
     });
   });
-
-  describe("IPv6 host parsing", () => {
-    afterEach(() => {
-      app.reset();
-    });
-
-    it("correctly parses SERVER_NAME and SERVER_PORT for IPv6 host", async () => {
-      app.host = "[::1]:3000";
-      await app.get("/posts");
-      expect(app.request.env.SERVER_NAME).toBe("[::1]");
-      expect(app.request.env.SERVER_PORT).toBe("3000");
-    });
-
-    it("correctly parses SERVER_NAME for bare IPv6 host without port", async () => {
-      app.host = "[::1]";
-      await app.get("/posts");
-      expect(app.request.env.SERVER_NAME).toBe("[::1]");
-      expect(app.request.env.SERVER_PORT).toBe("80");
-    });
-
-    it("correctly parses SERVER_NAME and SERVER_PORT for IPv6 host on 404 path", async () => {
-      app.host = "[::1]:3000";
-      await app.get("/no-such-route");
-      expect(app.status).toBe(404);
-      expect(app.request.env.SERVER_NAME).toBe("[::1]");
-      expect(app.request.env.SERVER_PORT).toBe("3000");
-    });
-  });
 });

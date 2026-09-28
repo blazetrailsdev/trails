@@ -1,4 +1,4 @@
-import { Metal } from "../metal.js";
+import { statusCode } from "@blazetrails/rack";
 
 /** @internal */
 export function includeContent(status: number): boolean {
@@ -26,5 +26,5 @@ export function headResponse(
       headers[headerName] = String(value);
     }
   }
-  return { status: Metal.resolveStatus(status), headers, body: "" };
+  return { status: statusCode(status), headers, body: "" };
 }

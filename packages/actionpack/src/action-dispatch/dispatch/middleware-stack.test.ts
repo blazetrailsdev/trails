@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { MiddlewareStack } from "../middleware/stack.js";
+import { Notifications, type NotificationEvent as Event } from "@blazetrails/activesupport";
+import { block } from "@blazetrails/ruby-compat";
+import { MiddlewareStack, type MiddlewareBlock } from "../middleware/stack.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 
@@ -57,6 +59,18 @@ class QuxMiddleware {
   }
 }
 
+class BlockMiddleware {
+  private app: RackApp;
+  readonly block?: MiddlewareBlock;
+  constructor(app: RackApp, block?: MiddlewareBlock) {
+    this.app = app;
+    this.block = block;
+  }
+  async call(env: RackEnv): Promise<RackResponse> {
+    return this.app(env);
+  }
+}
+
 describe("MiddlewareStackTest", () => {
   it("use should push middleware as class onto the stack", () => {
     const stack = new MiddlewareStack();
@@ -70,6 +84,15 @@ describe("MiddlewareStackTest", () => {
     stack.use(QuxMiddleware, "prefix");
     expect(stack.length).toBe(1);
     expect(stack.get(0)?.args).toEqual(["prefix"]);
+  });
+
+  it("use should push middleware class with block arguments onto the stack", () => {
+    const stack = new MiddlewareStack();
+    const proc = block(() => {});
+    stack.use(BlockMiddleware, proc);
+    expect(stack.length).toBe(1);
+    expect(stack.last()?.klass).toBe(BlockMiddleware);
+    expect(stack.last()?.block).toBe(proc);
   });
 
   it("insert inserts middleware at the integer index", () => {
@@ -254,6 +277,25 @@ describe("MiddlewareStackTest", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);
     expect(stack.includes(FooMiddleware)).toBe(true);
+  });
+
+  it("instruments the execution of middlewares", async () => {
+    const stack = new MiddlewareStack();
+    stack.use(FooMiddleware);
+    stack.use(BarMiddleware);
+    const events: Event[] = [];
+
+    const subscriber = (event: Event): void => {
+      events.push(event);
+    };
+
+    await Notifications.subscribed(subscriber, "process_middleware.action_dispatch", async () => {
+      const app = stack.build(async () => [200, {}, bodyFromString("")]);
+      await app({} as RackEnv);
+    });
+
+    expect(events.length).toBe(2);
+    expect(events.map((e) => e.payload.middleware)).toEqual(["BarMiddleware", "FooMiddleware"]);
   });
 
   it("includes a middleware", () => {

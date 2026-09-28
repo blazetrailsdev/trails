@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { MockRequest } from "@blazetrails/rack";
+import { block } from "@blazetrails/ruby-compat";
 import { Metal } from "../metal.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
@@ -50,9 +51,12 @@ class MyController extends Metal {
     this.responseBody = "Hello World";
   }
 }
-MyController.use(BlockMiddleware, (config: BlockMiddleware) => {
-  config.configurableMessage = "Configured by block.";
-});
+MyController.use(
+  BlockMiddleware,
+  block((config: BlockMiddleware) => {
+    config.configurableMessage = "Configured by block.";
+  }),
+);
 MyController.use(MyMiddleware, { kw: 1 });
 MyController.middleware().insertBefore(MyMiddleware, ExclaimerMiddleware, { kw: 1 });
 

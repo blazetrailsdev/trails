@@ -2,7 +2,7 @@ import { Request } from "../http/request.js";
 import { Headers } from "../http/headers.js";
 import { MimeType } from "../http/mime-type.js";
 import { isPresent, runLoadHooks } from "@blazetrails/activesupport";
-import { HTTPS, URI, type Generic } from "@blazetrails/ruby-compat";
+import { HTTPS, URI, stringSplit, type Generic } from "@blazetrails/ruby-compat";
 import { TestResponse } from "./test-response.js";
 import { FlashHash } from "../middleware/flash.js";
 import { RouteSet } from "../routing/route-set.js";
@@ -44,20 +44,6 @@ const STATUS_RANGES: Record<string, [number, number]> = {
 };
 
 const DEFAULT_HOST = "www.example.com";
-
-/** @internal */
-function splitHostPort(host: string): [string, string | undefined] {
-  if (host.startsWith("[")) {
-    const close = host.indexOf("]");
-    if (close === -1) return [host, undefined];
-    const rest = host.slice(close + 1);
-    return [host.slice(0, close + 1), rest.startsWith(":") ? rest.slice(1) : undefined];
-  }
-  const colons = (host.match(/:/g) ?? []).length;
-  if (colons > 1) return [host, undefined];
-  const idx = host.indexOf(":");
-  return idx === -1 ? [host, undefined] : [host.slice(0, idx), host.slice(idx + 1)];
-}
 
 const DEFAULT_REMOTE_ADDR = "127.0.0.1";
 const DEFAULT_ACCEPT =
@@ -191,7 +177,7 @@ export class IntegrationTest {
       });
     }
 
-    const [hostname, port] = splitHostPort(this.host);
+    const [hostname, port] = stringSplit(this.host, ":");
 
     const requestEnv: Record<string, unknown> = {
       ":method": method,

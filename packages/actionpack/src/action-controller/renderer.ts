@@ -1,7 +1,7 @@
 import { dup, hasKey, merge, mergeBang } from "@blazetrails/ruby-compat";
 
 import type { RouteSetLike } from "../abstract-controller/url-for.js";
-import { resolveStatus } from "./metal/status-codes.js";
+import { statusCode } from "@blazetrails/rack";
 
 export class Renderer {
   private _controller: unknown;
@@ -37,7 +37,7 @@ export class Renderer {
     const merged = { ...this._defaults, ...options };
     this._lastStatus =
       merged.status !== undefined && merged.status !== null
-        ? resolveStatus(merged.status as number | string)
+        ? statusCode(merged.status as number | string)
         : 200;
     const explicitContentType =
       typeof merged.contentType === "string" ? merged.contentType : undefined;

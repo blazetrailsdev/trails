@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { MiddlewareStack } from "../middleware/stack.js";
+import { block } from "@blazetrails/ruby-compat";
+import { MiddlewareStack, type MiddlewareBlock } from "../middleware/stack.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
@@ -24,7 +25,44 @@ class BarMiddleware {
   }
 }
 
+const builtBlocks: unknown[] = [];
+
+class BlockMiddleware {
+  private app: RackApp;
+  constructor(app: RackApp, block?: MiddlewareBlock) {
+    this.app = app;
+    builtBlocks.push(block);
+  }
+  async call(env: RackEnv): Promise<RackResponse> {
+    return this.app(env);
+  }
+}
+
 describe("MiddlewareStackTest", () => {
+  it("unshift and insert forward a trailing block to the middleware", () => {
+    const stack = new MiddlewareStack();
+    stack.use(FooMiddleware);
+    const unshifted = block(() => "unshift");
+    const inserted = block(() => "insert");
+    stack.unshift(BlockMiddleware, unshifted);
+    stack.insert(FooMiddleware, BlockMiddleware, inserted);
+    expect(stack.get(0)?.block).toBe(unshifted);
+    expect(stack.get(1)?.block).toBe(inserted);
+    expect(stack.get(1)?.args).toEqual([]);
+
+    builtBlocks.length = 0;
+    stack.build(async () => [200, {}, []] as unknown as RackResponse);
+    expect(builtBlocks).toEqual([inserted, unshifted]);
+  });
+
+  it("keeps an unmarked trailing callable positional, as Ruby keeps a Proc argument", () => {
+    const stack = new MiddlewareStack();
+    const proc = (): void => {};
+    stack.use(BlockMiddleware, proc);
+    expect(stack.last()?.args).toEqual([proc]);
+    expect(stack.last()?.block).toBeUndefined();
+  });
+
   it("delete rejects every entry whose name matches, not just the first", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);
