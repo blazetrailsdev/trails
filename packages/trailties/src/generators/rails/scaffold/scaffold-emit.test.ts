@@ -17,8 +17,8 @@ function read(rel: string): string {
 }
 
 describe("ScaffoldGenerator emit", () => {
-  it("matches snapshot for the controller and validates as TS without Ruby", () => {
-    new ScaffoldGenerator({
+  it("matches snapshot for the controller and validates as TS without Ruby", async () => {
+    await new ScaffoldGenerator({
       cwd: tmpDir,
       output: () => {},
       name: "Post",

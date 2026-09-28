@@ -42,7 +42,6 @@ export const OPTION_IMPLICATIONS: Record<string, ReadonlyArray<keyof AppBaseOpti
 
 export abstract class AppBase extends GeneratorBase {
   readonly appPath: string;
-  readonly destinationRoot: string;
   readonly options: AppBaseOptions;
   private _database?: Database;
 

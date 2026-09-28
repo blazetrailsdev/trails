@@ -20,21 +20,24 @@ export class ScaffoldGenerator extends NamedBase {
   declare controllerFileName: string;
   declare _controllerClassPath: string[];
 
-  run(): string[] {
+  async run(): Promise<string[]> {
     const args = (this.options as ScaffoldGeneratorOptions).attributes ?? [];
     const className = this.className().split("::").join("");
     const singular = this.singularTableName();
     const plural = this.pluralTableName();
     const viewsPath = `app/views/${this.controllerFilePath()}`;
     const columns = parseColumns(args);
+    const routeUrl = this.routeUrl();
 
     const modelGen = new ModelGenerator({
       cwd: this.cwd,
       output: this.output,
       behavior: this.behavior,
       pretend: this.options.pretend,
+      force: this.options.force,
+      skip: this.options.skip,
     });
-    this.createdFiles.push(...modelGen.run(this.name, args));
+    this.createdFiles.push(...(await modelGen.run(this.name, args)));
 
     const controllerClassName = this.controllerClassName().split("::").join("") + "Controller";
     const controllerFileName = dasherize(this.controllerFilePath()) + "-controller";
@@ -46,7 +49,7 @@ export class ScaffoldGenerator extends NamedBase {
       emitControllerClass({
         className: controllerClassName,
         parent: parentRefForRelative("ApplicationController", this.controllerClassPath().length),
-        methods: crudMethods(className, singular, plural, this.routeUrl(), ts),
+        methods: crudMethods(className, singular, plural, routeUrl, ts),
       }),
     );
     this.createFile(
@@ -55,10 +58,10 @@ export class ScaffoldGenerator extends NamedBase {
     );
 
     this.emptyDirectory(viewsPath);
-    this.createFile(`${viewsPath}/index.html.tse`, indexView(plural, singular, columns));
+    this.createFile(`${viewsPath}/index.html.tse`, indexView(plural, singular, columns, routeUrl));
     this.createFile(`${viewsPath}/show.html.tse`, showView(singular, columns));
-    this.createFile(`${viewsPath}/new.html.tse`, newView(singular, plural));
-    this.createFile(`${viewsPath}/edit.html.tse`, editView(singular, plural));
+    this.createFile(`${viewsPath}/new.html.tse`, newView(singular, routeUrl));
+    this.createFile(`${viewsPath}/edit.html.tse`, editView(singular, routeUrl));
     this.createFile(`${viewsPath}/_form.html.tse`, formPartial(singular, columns));
 
     const routesFile = this.fileExists("config/routes.ts")
@@ -149,12 +152,12 @@ describe("${className}", () => {
 `;
 }
 
-function indexView(plural: string, singular: string, cols: Col[]): string {
+function indexView(plural: string, singular: string, cols: Col[], routeUrl: string): string {
   const heads = cols.map((c) => `        <th>${humanize(c.name)}</th>`).join("\n");
   const cells = cols.map((c) => `          <td><%= ${singular}.${c.name} %></td>`).join("\n");
   return `<h1>${pluralize(humanize(singular))}</h1>
 
-<p><a href="/${plural}/new">New ${humanize(singular).toLowerCase()}</a></p>
+<p><a href="${routeUrl}/new">New ${humanize(singular).toLowerCase()}</a></p>
 
 <table>
   <thead>
@@ -168,8 +171,8 @@ ${heads}
       <tr>
 ${cells}
         <td>
-          <a href="/${plural}/<%= ${singular}.id %>">Show</a>
-          <a href="/${plural}/<%= ${singular}.id %>/edit">Edit</a>
+          <a href="${routeUrl}/<%= ${singular}.id %>">Show</a>
+          <a href="${routeUrl}/<%= ${singular}.id %>/edit">Edit</a>
         </td>
       </tr>
     <% } %>
@@ -194,24 +197,24 @@ ${fields}
 `;
 }
 
-function newView(singular: string, plural: string): string {
+function newView(singular: string, routeUrl: string): string {
   return `<h1>New ${humanize(singular).toLowerCase()}</h1>
 
 <%= yield %>
 
-<p><a href="/${plural}">Back</a></p>
+<p><a href="${routeUrl}">Back</a></p>
 `;
 }
 
-function editView(singular: string, plural: string): string {
+function editView(singular: string, routeUrl: string): string {
   return `<h1>Editing ${humanize(singular).toLowerCase()}</h1>
 
 <%= yield %>
 
 <p>
-  <a href="/${plural}/<%= ${singular}.id %>">Show</a>
+  <a href="${routeUrl}/<%= ${singular}.id %>">Show</a>
   |
-  <a href="/${plural}">Back</a>
+  <a href="${routeUrl}">Back</a>
 </p>
 `;
 }

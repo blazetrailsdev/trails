@@ -44,6 +44,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   }
 
   cwd: string;
+  destinationRoot: string;
   output: (msg: string) => void;
   options: GeneratorOptions;
   behavior: "invoke" | "revoke";
@@ -66,6 +67,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
 
   constructor(options: GeneratorOptions) {
     this.cwd = options.cwd;
+    this.destinationRoot = options.cwd;
     this.output = options.output;
     const opts: Record<string, unknown> = { ...options };
     for (const [name, option] of Object.entries(

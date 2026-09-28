@@ -7,12 +7,9 @@ import {
   tsModule,
 } from "../../../template-builder/index.js";
 import { NamedBase } from "../../named-base.js";
-import { migrationTimestamp } from "../../base.js";
-import { camelize } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
-import { CreateMigration } from "../../actions/create-migration.js";
-
-let lastTimestamp: string | null = null;
+import { migrationTemplate } from "../../migration.js";
+import { nextMigrationNumber } from "../../active-record/migration.js";
 
 export function emitMigrationSource(className: string, timestamp: string): string {
   const { refs } = tsImport("@blazetrails/activerecord", { Migration: "named" });
@@ -41,28 +38,27 @@ export function emitMigrationSource(className: string, timestamp: string): strin
 }
 
 export class MigrationGenerator extends NamedBase {
+  declare ["constructor"]: typeof MigrationGenerator;
+  migrationNumber = "";
   migrationFileName = "";
+  migrationClassName = "";
 
   static exitOnFailure(): boolean {
     return true;
   }
 
-  run(): string[] {
+  static nextMigrationNumber = nextMigrationNumber;
+
+  async run(): Promise<string[]> {
     if (!/^\w+$/.test(this.name)) {
       throw new Error(`Illegal name for a migration: ${this.name}`);
     }
-    let timestamp = migrationTimestamp();
-    if (lastTimestamp && timestamp <= lastTimestamp) {
-      timestamp = (parseInt(lastTimestamp, 10) + 1).toString();
-    }
-    lastTimestamp = timestamp;
-    const filename = `db/migrate/${timestamp}_${this.fileName}${this.ext()}`;
-    if (this.behavior === "revoke") {
-      this.migrationFileName = this.fileName;
-      new CreateMigration(this, File.join(this.cwd, filename), "").revoke();
-      return this.getCreatedFiles();
-    }
-    this.createFile(filename, emitMigrationSource(camelize(this.fileName), timestamp));
+    const file = await migrationTemplate(
+      this,
+      () => emitMigrationSource(this.migrationClassName, this.migrationNumber),
+      File.join("db/migrate", `${this.fileName}${this.ext()}`),
+    );
+    if (file) this.createdFiles.push(this.relativeToOriginalDestinationRoot(file));
     return this.getCreatedFiles();
   }
 }

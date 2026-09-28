@@ -317,3 +317,14 @@ describe("ActiveRecord::Railtie rescue_responses", () => {
     expect(new ExceptionWrapper(null, new RecordNotFound("gone")).statusCode).toBe(404);
   });
 });
+describe("ActiveRecord::ConnectionHandling::RAILS_ENV", () => {
+  it("reads Trails.env before TRAILS_ENV, so a booted app resolves its own environment's config", () => {
+    const originalEnv = Trails.env;
+    Trails.env = "staging";
+    try {
+      expect(ActiveRecord.ConnectionHandling.DEFAULT_ENV()).toBe("staging");
+    } finally {
+      Trails.env = originalEnv;
+    }
+  });
+});

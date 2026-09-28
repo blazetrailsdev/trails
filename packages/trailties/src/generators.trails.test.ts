@@ -82,7 +82,7 @@ describe("GeneratorsTest", () => {
       this: AuthenticationGenerator,
     ) {
       seen.push(this.options.api);
-      return [];
+      return Promise.resolve([]);
     });
     const gen = vi.spyOn(GeneratorGenerator.prototype, "run").mockImplementation(function (
       this: GeneratorGenerator,

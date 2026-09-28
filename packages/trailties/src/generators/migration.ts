@@ -12,12 +12,6 @@ import { migrationLookupAt } from "./migration-lookup.js";
 export { NotImplementedError };
 export { migrationLookupAt, migrationExists } from "./migration-lookup.js";
 
-export interface MigrationAssigns {
-  migrationNumber: string;
-  migrationFileName: string;
-  migrationClassName: string;
-}
-
 export function currentMigrationNumber(dirname: string): number {
   let max = 0;
   for (const file of migrationLookupAt(dirname)) {
@@ -30,42 +24,40 @@ export function nextMigrationNumber(): never {
   throw new NotImplementedError("nextMigrationNumber must be implemented");
 }
 
-export function buildMigrationAssigns(destination: string, nextNumber: string): MigrationAssigns {
-  const base = File.basename(destination).replace(/\.(ts|js|rb)$/, "");
-  return {
-    migrationNumber: nextNumber,
-    migrationFileName: base,
-    migrationClassName: camelize(base),
-  };
-}
-
 export async function createMigration(
   host: CreateMigrationHost,
   destination: string,
   data: MigrationRenderer,
   config: CreateMigrationConfig = {},
-): Promise<string> {
-  return new CreateMigration(host, destination, data, config).invoke();
+): Promise<string | undefined> {
+  const instance = new CreateMigration(host, destination, data, config);
+  return host.behavior === "revoke" ? instance.revoke() : instance.invoke();
 }
 
 export interface MigrationTemplateHost extends CreateMigrationHost {
   destinationRoot: string;
-  nextMigrationNumber(dirname: string): Promise<string> | string;
-  setMigrationAssigns(assigns: MigrationAssigns): void;
+  constructor: { nextMigrationNumber(dirname: string): string };
+  migrationNumber: string;
+  migrationClassName: string;
+}
+
+export function setMigrationAssigns(this: MigrationTemplateHost, destination: string): void {
+  destination = File.expandPath(destination, this.destinationRoot);
+  const migrationDir = File.dirname(destination);
+  this.migrationNumber = this.constructor.nextMigrationNumber(migrationDir);
+  this.migrationFileName = File.basename(destination).replace(/\.(ts|js|rb)$/, "");
+  this.migrationClassName = camelize(this.migrationFileName);
 }
 
 export async function migrationTemplate(
   host: MigrationTemplateHost,
-  source: (assigns: MigrationAssigns) => string | Promise<string>,
+  source: () => string | Promise<string>,
   destination: string,
   config: CreateMigrationConfig = {},
-): Promise<string> {
+): Promise<string | undefined> {
+  setMigrationAssigns.call(host, destination);
   const resolved = File.expandPath(destination, host.destinationRoot);
-  const dir = File.dirname(resolved);
-  const nextNumber = String(await host.nextMigrationNumber(dir));
-  const assigns = buildMigrationAssigns(resolved, nextNumber);
-  host.setMigrationAssigns(assigns);
-  const numbered = File.join(dir, `${nextNumber}_${File.basename(resolved)}`);
-  const wrapped: CreateMigrationHost = { ...host, migrationFileName: assigns.migrationFileName };
-  return createMigration(wrapped, numbered, () => source(assigns), config);
+  const [dir, base] = [File.dirname(resolved), File.basename(resolved)];
+  const numberedDestination = File.join(dir, [host.migrationNumber, base].join("_"));
+  return createMigration(host, numberedDestination, source, config);
 }
