@@ -207,10 +207,10 @@ describe("PROTOCOL_DEFINITION_NAMES", () => {
   const enrolled = [...PROTOCOL_DEFINITION_ENROLLED_PACKAGES][0];
 
   it("is scored per definition in an enrolled package only", () => {
-    expect(PROTOCOL_DEFINITION_ENROLLED_PACKAGES.has("activemodel")).toBe(false);
+    expect(PROTOCOL_DEFINITION_ENROLLED_PACKAGES.has("date")).toBe(false);
     for (const name of PROTOCOL_DEFINITION_NAMES) {
       expect(rubyMethodToTs(name)).toBeNull();
-      expect(rubyMethodToTs(name, undefined, "activemodel")).toBeNull();
+      expect(rubyMethodToTs(name, undefined, "date")).toBeNull();
       expect(rubyMethodToTs(name, undefined, enrolled)).toEqual(rubyMethodToTsIgnoringSkip(name));
     }
     expect(rubyMethodToTs("clone", undefined, enrolled)).toBeNull();

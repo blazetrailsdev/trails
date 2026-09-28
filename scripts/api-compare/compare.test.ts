@@ -1863,7 +1863,7 @@ describe("dedupeRubyMethodInto", () => {
     dedupeRubyMethodInto(scored, rm("initialize_dup"), "Foo", "x.rb", false, enrolled);
     expect([...scored.keys()]).toEqual(["initialize_dup"]);
     const skipped = new Map<string, SeenRubyMethod>();
-    dedupeRubyMethodInto(skipped, rm("initialize_dup"), "Foo", "x.rb", false, "activemodel");
+    dedupeRubyMethodInto(skipped, rm("initialize_dup"), "Foo", "x.rb", false, "date");
     expect(skipped.size).toBe(0);
   });
 

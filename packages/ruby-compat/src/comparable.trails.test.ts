@@ -9,6 +9,7 @@ import {
   lessThan,
   lessThanOrEqual,
   max,
+  min,
   rubyClass,
 } from "./comparable.js";
 
@@ -135,5 +136,34 @@ describe("Array#max", () => {
     const now = instant(1n);
     expect(() => max([now, null])).toThrow("comparison of Time with nil failed");
     expect(() => max([null, now])).toThrow("comparison of NilClass with Time failed");
+  });
+});
+
+describe("Array#min", () => {
+  it("returns nil for an empty array, as rb_ary_min does", () => {
+    expect(min([])).toBeNull();
+  });
+
+  it("returns the smallest element", () => {
+    expect(min([5, 11])).toBe(5);
+    expect(min(["b", "a", "c"])).toBe("a");
+  });
+
+  it("raises rb_cmperr's ArgumentError when the elements do not compare", () => {
+    expect(() => min(["5", 11])).toThrow("comparison of String with 11 failed");
+  });
+});
+
+describe("Array#<=>", () => {
+  it("orders by the first element pair whose <=> is not 0, then by length", () => {
+    expect(cmp(["a", 2], ["b", 1])).toBe(-1);
+    expect(cmp(["a", 2], ["a", 1])).toBe(1);
+    expect(cmp(["a"], ["a", 1])).toBe(-1);
+    expect(cmp(["a", 1], ["a", 1])).toBe(0);
+  });
+
+  it("answers nil for a non-Array operand or an uncomparable element pair", () => {
+    expect(cmp(["a"], "a")).toBeNull();
+    expect(cmp(["a", 1], ["a", "x"])).toBeNull();
   });
 });

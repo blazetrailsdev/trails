@@ -6,6 +6,8 @@ import {
   include,
   rbEql,
   rbHash,
+  rbModSingletonP,
+  rbModToS,
   rbObjHash,
 } from "@blazetrails/ruby-compat";
 import { getApplicationRecordClass } from "./inheritance.js";
@@ -36,11 +38,12 @@ import { TableMetadata } from "./table-metadata.js";
 import type { PrettyPrinter } from "./pretty-print.js";
 import { Table } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
-import { columnsHash } from "./model-schema.js";
+import { cachedTableExists, columnsHash, isSchemaLoaded } from "./model-schema.js";
 import { StatementCache } from "./statement-cache.js";
 import { withConnection } from "./connection-handling.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { classAttribute, included, runCallbacks } from "@blazetrails/activesupport";
+import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 
 export interface Core {
   inspect(): string;
@@ -67,14 +70,50 @@ export const Core = {
       instancePredicate: false,
       default: null,
     });
+    classAttribute.call(base, "defaultConnectionHandler", { instanceWriter: false });
     classAttribute.call(base, "defaultRole", { instanceWriter: false });
+    classAttribute.call(base, "defaultShard", { instanceWriter: false });
 
+    (base as { defaultConnectionHandler: ConnectionHandler }).defaultConnectionHandler =
+      new ConnectionHandler();
     (base as { defaultRole: string }).defaultRole = writingRole();
+    (base as { defaultShard: string }).defaultShard = "default";
   },
 };
 
 import { ActiveRecord } from "./namespaces.js";
 import { actionOnStrictLoadingViolation, writingRole } from "./active-record.js";
+
+export const ClassMethods = {
+  /** @missingRailsCall table_exists? — PERMANENT */
+  inspect(
+    this: (abstract new (...args: never) => unknown) & {
+      abstractClass: boolean;
+      isConnected(): boolean;
+      attributeTypes(): Record<string, { type(): string | null | undefined } | null>;
+    },
+  ): string {
+    const name = rbModSingletonP(this)
+      ? rbModToS(this)
+      : this === ActiveRecord.Base
+        ? "ActiveRecord::Base"
+        : this.name;
+    if (this === ActiveRecord.Base || rbModSingletonP(this)) {
+      return name;
+    } else if (this.abstractClass) {
+      return `${name}(abstract)`;
+    } else if (!isSchemaLoaded.call(this as never) && !this.isConnected()) {
+      return `${name} (call '${name}.load_schema' to load schema informations)`;
+    } else if (cachedTableExists.call(this as never)) {
+      const attrList = Object.entries(this.attributeTypes())
+        .map(([name, type]) => `${name}: ${type!.type() ?? ""}`)
+        .join(", ");
+      return `${name}(${attrList})`;
+    } else {
+      return `${name}(Table doesn't exist)`;
+    }
+  },
+};
 
 interface CoreRecord {
   id: unknown;
@@ -298,7 +337,6 @@ interface CoreHost {
   _filterAttributes?: (string | RegExp | ((key: string, value: unknown) => unknown))[];
   _inspectionFilter?: any;
   _connectionClass?: boolean;
-  _connectionHandler?: any;
   _destroyAssociationAsyncJob?: any;
   _findByStatementCache?: Map<boolean, Map<unknown, any>>;
   _generatedAssociationMethods?: Module;
@@ -396,11 +434,7 @@ export function currentShard(this: CoreHost): string {
     if (hash.shard && hash.klasses.includes(connectionClassForSelf.call(this))) return hash.shard;
   }
 
-  return defaultShard.call(this);
-}
-
-export function defaultShard(this: CoreHost): string {
-  return (connectionClassForSelf.call(this) as any)._defaultShard ?? "default";
+  return (this as CoreHost & { defaultShard: string }).defaultShard;
 }
 
 export function currentPreventingWrites(this: CoreHost): boolean {
@@ -572,13 +606,18 @@ export function inspectionFilter(this: CoreHost): ParameterFilter {
   })());
 }
 
-export function connectionHandler(this: CoreHost, value?: any): any {
-  if (value !== undefined) {
-    this._connectionHandler = value;
-    return value;
-  }
-  return this._connectionHandler;
+export function connectionHandler(this: CoreHost): ConnectionHandler {
+  return (
+    IsolatedExecutionState.get<ConnectionHandler>(ACTIVE_RECORD_CONNECTION_HANDLER_KEY) ??
+    (this as CoreHost & { defaultConnectionHandler: ConnectionHandler }).defaultConnectionHandler
+  );
 }
+
+export function setConnectionHandler(this: CoreHost, handler: ConnectionHandler): void {
+  IsolatedExecutionState.set(ACTIVE_RECORD_CONNECTION_HANDLER_KEY, handler);
+}
+
+const ACTIVE_RECORD_CONNECTION_HANDLER_KEY = "active_record_connection_handler";
 
 export function arelTable(this: CoreHost): Table {
   return new Table((this as any).tableName, { klass: this as any });

@@ -70,8 +70,8 @@ describe("FindFromTarget", () => {
 
   it("is true for a strict_loading reflection", async () => {
     const developer = (await Developer.first())!;
-    const proxy = (developer as unknown as { strictLoadingAuditLogs: ProxyLike })
-      .strictLoadingAuditLogs;
+    const proxy = (developer as unknown as { strictLoadingOptAuditLogs: ProxyLike })
+      .strictLoadingOptAuditLogs;
 
     expect(proxy.loaded).toBe(false);
     expect(proxy.isFindFromTarget()).toBe(true);

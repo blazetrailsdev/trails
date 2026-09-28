@@ -576,8 +576,8 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     for (const [key, value] of this) {
       copy.set(key, value);
     }
-    for (const [key, value] of copy) {
-      copy.set(key, this.convertValueToHash(value as V));
+    for (const [key, v] of copy) {
+      copy.set(key, this.convertValueToHash(v as V));
     }
     this.setDefaults(copy);
     return copy;

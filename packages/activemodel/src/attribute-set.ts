@@ -181,11 +181,12 @@ export class AttributeSet {
     return this;
   }
 
-  initializeDup(_other: AttributeSet): void {
+  /** @missingRailsName attributes — PERMANENT */
+  initializeDup(_: AttributeSet): void {
     this._attributes = frozenErrorRaisingStore(dup(this._attributes));
   }
 
-  initializeClone(_other: AttributeSet): void {
+  initializeClone(_: AttributeSet): void {
     this._attributes = frozenErrorRaisingStore(dup(this._attributes));
   }
 

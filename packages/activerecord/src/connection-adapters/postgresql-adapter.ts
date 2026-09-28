@@ -5,7 +5,7 @@ import type {
 import pg from "pg";
 import { block, fetch, setEnv } from "@blazetrails/ruby-compat";
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
-import { singularize, runLoadHooks, include } from "@blazetrails/activesupport";
+import { classAttribute, singularize, runLoadHooks, include } from "@blazetrails/activesupport";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import { rtest } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
@@ -355,7 +355,12 @@ export class PostgreSQLAdapter
     pgDatetimeConfig.datetimeType = v;
   }
 
-  static createUnloggedTables = false;
+  declare static createUnloggedTables: boolean;
+  declare static isCreateUnloggedTables: () => boolean;
+
+  static {
+    classAttribute.call(this, "createUnloggedTables", { default: false });
+  }
 
   static decodeDates = true;
 

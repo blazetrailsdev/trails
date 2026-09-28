@@ -1,4 +1,4 @@
-import { File, FileUtils, Zlib } from "@blazetrails/ruby-compat";
+import { File, FileUtils, Zlib, sort } from "@blazetrails/ruby-compat";
 import { atomicWrite } from "@blazetrails/activesupport";
 import { parse as yamlParse, stringify as yamlStringify } from "@blazetrails/activesupport/yaml";
 import { Column } from "./column.js";
@@ -164,12 +164,10 @@ export class SchemaCache {
   }
 
   encodeWith(coder: Record<string, unknown>): void {
-    const byKey = (a: [string, unknown], b: [string, unknown]) =>
-      a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0;
-    coder["columns"] = new Map([...this._columns].sort(byKey));
-    coder["primary_keys"] = new Map([...this._primaryKeys].sort(byKey));
-    coder["data_sources"] = new Map([...this._dataSources].sort(byKey));
-    coder["indexes"] = new Map([...this._indexes].sort(byKey));
+    coder["columns"] = new Map(sort([...this._columns]));
+    coder["primary_keys"] = new Map(sort([...this._primaryKeys]));
+    coder["data_sources"] = new Map(sort([...this._dataSources]));
+    coder["indexes"] = new Map(sort([...this._indexes]));
     coder["version"] = this._version;
   }
 

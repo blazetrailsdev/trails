@@ -223,6 +223,7 @@ export abstract class Attribute {
     return this.dup();
   }
 
+  /** @missingRailsName value — PERMANENT */
   private initializeDup(_other: Attribute): void {
     if (isDuplicable(this._value)) {
       this._value = dupValue(this._value);

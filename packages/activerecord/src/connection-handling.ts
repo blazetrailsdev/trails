@@ -10,13 +10,12 @@ import {
   connectedToStack,
   currentRole as coreCurrentRole,
   currentShard as coreCurrentShard,
-  defaultShard,
   isApplicationRecordClass as coreIsApplicationRecordClass,
   configurations as baseConfigurations,
 } from "./core.js";
 import { IsolatedExecutionState, TopLevel, getEnv, presence } from "@blazetrails/activesupport";
 import * as ConnectionHandlingModule from "./connection-handling.js";
-import { readingRole, writingRole } from "./active-record.js";
+import { readingRole } from "./active-record.js";
 import { permanentConnectionCheckout } from "./active-record.js";
 import { deprecator } from "./deprecator.js";
 
@@ -71,7 +70,7 @@ export async function connectsTo(
   const shardEntries: Record<string, Record<string, unknown>> = Object.keys(shards).length > 0
     ? shards
     : { default: database };
-  (this as any)._defaultShard = Object.keys(shardEntries)[0];
+  this.defaultShard = Object.keys(shardEntries)[0];
 
   for (const [shard, dbKeys] of Object.entries(shardEntries)) {
     for (const [role, dbKey] of Object.entries(dbKeys)) {
@@ -218,7 +217,7 @@ export function connectingTo(
   this: typeof Base,
   options: { role?: string; shard?: string; preventWrites?: boolean },
 ): void {
-  const { role = writingRole(), shard = defaultShard.call(this) } = options;
+  const { role = this.defaultRole, shard = this.defaultShard } = options;
   const preventWrites = role === readingRole() || !!options.preventWrites;
   appendToConnectedToStack({
     role,
@@ -234,7 +233,7 @@ export function isConnectedTo(
 ): boolean {
   return (
     coreCurrentRole.call(this as any) === options.role &&
-    coreCurrentShard.call(this as any) === (options.shard ?? "default")
+    coreCurrentShard.call(this as any) === (options.shard ?? ActiveRecord.Base.defaultShard)
   );
 }
 

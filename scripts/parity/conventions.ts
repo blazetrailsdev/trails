@@ -484,14 +484,19 @@ export const PROTOCOL_DEFINITION_NAMES = [
 export const PROTOCOL_DEFINITION_ENROLLED_PACKAGES: ReadonlySet<string> = new Set<string>([
   "abstractcontroller",
   "actioncontroller",
+  "actiondispatch",
   "actionview",
+  "activemodel",
+  "activerecord",
   "activerecord-test-support",
+  "activesupport",
   "arel",
   "did-you-mean",
   "globalid",
   "i18n",
   "rack",
   "rack-session",
+  "rack-test",
   "ruby-compat",
   "sqlite3",
   "trailties",
@@ -572,14 +577,6 @@ export const SKIP_GROUPS: SkipGroup[] = [
       'judged against its Rails body per class (CLAUDE.md § "Ruby protocol methods ' +
       'with a different JS mechanism").',
     names: ["is_a?", "kind_of?"],
-  },
-  {
-    reason:
-      "Skipped until scored by their consumers: JS `Map`/`Set` call no hook, but " +
-      "`rbHash` / `rbEqual` (ruby-compat) dispatch to a TS `hash()` / `eql()`, as do " +
-      "`Deduplicable#deduplicate` and the preloader's batch grouping, so the members " +
-      'are live (CLAUDE.md § "Ruby protocol methods with a different JS mechanism").',
-    names: ["hash", "eql?"],
   },
   {
     reason:

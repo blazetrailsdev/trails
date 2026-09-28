@@ -1,7 +1,7 @@
 import { STDOUT, StringIO, rbObjAsString, type IO } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { Column } from "./connection-adapters/column.js";
-import { isBlank, isPresent } from "@blazetrails/activesupport";
+import { cattrAccessor, isBlank, isPresent } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
 import type {
@@ -139,10 +139,17 @@ export abstract class SchemaDumper {
   static ignoreTables: (string | RegExp)[] = [];
   /** @noRailsEquivalent PERMANENT */
   static language: SchemaDumpLanguage = "ts";
-  static fkIgnorePattern: RegExp = /^fk_rails_[0-9a-f]{10}$/;
-  static chkIgnorePattern: RegExp = /^chk_rails_[0-9a-f]{10}$/;
-  static exclIgnorePattern: RegExp = /^excl_rails_[0-9a-f]{10}$/;
-  static uniqueIgnorePattern: RegExp = /^uniq_rails_[0-9a-f]{10}$/;
+  declare static fkIgnorePattern: RegExp;
+  declare static chkIgnorePattern: RegExp;
+  declare static exclIgnorePattern: RegExp;
+  declare static uniqueIgnorePattern: RegExp;
+
+  static {
+    cattrAccessor.call(this, "fkIgnorePattern", { default: /^fk_rails_[0-9a-f]{10}$/ });
+    cattrAccessor.call(this, "chkIgnorePattern", { default: /^chk_rails_[0-9a-f]{10}$/ });
+    cattrAccessor.call(this, "exclIgnorePattern", { default: /^excl_rails_[0-9a-f]{10}$/ });
+    cattrAccessor.call(this, "uniqueIgnorePattern", { default: /^uniq_rails_[0-9a-f]{10}$/ });
+  }
 
   protected connection?: unknown;
   private _source: SchemaSource;

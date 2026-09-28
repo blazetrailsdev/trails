@@ -589,7 +589,7 @@ export class Author extends Base {
       afterAdd: (owner: any, r: any) => owner.postLog.push(`after_adding${r.id ?? ""}`),
     });
 
-    this.hasMany("categorizations");
+    this.hasMany("categorizations", function (this: any) {});
     this.hasMany("categories", { through: "categorizations" });
     this.hasMany("namedCategories", { through: "categorizations" });
 
