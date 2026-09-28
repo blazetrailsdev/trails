@@ -1,4 +1,4 @@
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { assertRespondTo } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeEach } from "vitest";
 import { TestCase } from "../test-case.js";
 import { Base } from "../base.js";
@@ -603,7 +603,7 @@ describe("TestCaseTest", () => {
       FILES_DIR + "/ruby_on_rails.jpg",
       "image/jpeg",
     );
-    expect(rbObjRespondTo(file, "tempfile")).toBe(true);
+    assertRespondTo(file, "tempfile");
   });
 
   it.skip("session is cleared from controller after reset session", async () => {});

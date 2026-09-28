@@ -9,11 +9,11 @@ import { GamesHelper } from "./fixtures/helpers/fun/games-helper.js";
 
 class FixtureLoadPathController extends Base {
   async helloWorldWithLayout(): Promise<void> {
-    this.render({ template: "test/hello_world", layout: "layouts/standard" });
+    await this.render({ template: "test/hello_world", layout: "layouts/standard" });
   }
 
   async renderHelloWorld(): Promise<void> {
-    this.render({ inline: "hello: <%= stratego() %>" });
+    await this.render({ inline: "hello: <%= stratego() %>" });
   }
 }
 FixtureLoadPathController.prependViewPath(FIXTURE_LOAD_PATH);
