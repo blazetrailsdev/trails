@@ -1,7 +1,7 @@
 import { deleteIf, hasKey, InvalidURIError, URI } from "@blazetrails/ruby-compat";
 import { RouteSet } from "../../routing/route-set.js";
 import { RoutingError } from "../../../action-controller/metal/exceptions.js";
-import { TestRequest } from "../test-request.js";
+import { TestRequest } from "../../../action-controller/test-case.js";
 
 export interface RoutingAssertionsHost {
   routes?: RouteSet;
@@ -162,7 +162,8 @@ export function recognizedRequestFor(
   const method = typeof path === "string" ? "get" : String(path.method ?? "get");
   let pathStr = typeof path === "string" ? path : path.path;
 
-  const request = new TestRequest();
+  const controller = this.controller;
+  const request = TestRequest.create((controller as object | undefined)?.constructor);
   if (URL_FORM_RE.test(pathStr)) {
     failOn(InvalidURIError, msg, () => {
       const uri = URI.parse(pathStr);

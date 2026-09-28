@@ -11,7 +11,7 @@
  */
 
 import { include, KeyError, rbEqual } from "@blazetrails/ruby-compat";
-import { extractOptionsBang, isPresent } from "@blazetrails/activesupport";
+import { extractOptionsBang, isPlainObject, isPresent } from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import {
@@ -218,20 +218,26 @@ export class CookieJar implements Iterable<[string, string]> {
     return result;
   }
 
-  set(name: string, options: string | SetCookieOptions): string | undefined {
-    let value: string | undefined;
-    if (typeof options === "string") {
-      value = options;
-      options = { value };
+  update(otherHash: Record<string, string>): this {
+    for (const [k, v] of Object.entries(otherHash)) this._cookies.set(k, v);
+    return this;
+  }
+
+  set(name: string, options: string | SetCookieOptions | null): string | undefined {
+    let value: string;
+    if (isPlainObject(options)) {
+      value = (options as SetCookieOptions).value;
     } else {
-      value = options.value;
+      value = options as string;
+      options = { value };
     }
+    const opts = options as SetCookieOptions;
 
-    this.handleOptions(options);
+    this.handleOptions(opts);
 
-    if (this._cookies.get(name) !== value || options.expires) {
+    if (this._cookies.get(name) !== value || opts.expires) {
       this._cookies.set(name, value);
-      this._setCookies.set(name, options);
+      this._setCookies.set(name, opts);
       this._deletedCookies.delete(name);
     }
 
@@ -301,6 +307,10 @@ export class CookieJar implements Iterable<[string, string]> {
   isDeleted(name: string, options: { path?: string; domain?: string } = {}): boolean {
     this.handleOptions(options);
     return hashEqual(this._deletedCookies.get(name), options);
+  }
+
+  clear(options: { path?: string; domain?: string } = {}): void {
+    for (const k of [...this._cookies.keys()]) this.delete(k, options);
   }
 
   each(fn: (key: string, value: string) => void): this {

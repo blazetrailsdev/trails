@@ -1,9 +1,0 @@
-[
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/assertions/routing.ts",
-    "rubyName": "recognized_request_for",
-    "call": "create",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  }
-]

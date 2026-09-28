@@ -360,16 +360,16 @@ export class TestRequest extends AbstractTestRequest {
   }
 
   /** @internal */
-  private _testControllerClass: unknown = null;
+  private _testControllerClass: unknown;
 
   static create(controllerClass?: unknown): TestRequest {
     const env: Record<string, unknown> = {};
     env["rack.request.cookie_hash"] = {};
-    const session = TestRequest.newSession();
-    env["rack.session"] = session;
-    const req = new TestRequest(merge(TestRequest.defaultEnv(), env));
-    req._testControllerClass = controllerClass ?? null;
-    return req;
+    return new TestRequest(
+      merge(TestRequest.defaultEnv(), env),
+      TestRequest.newSession(),
+      controllerClass ?? null,
+    );
   }
 
   /** @internal */
@@ -378,6 +378,14 @@ export class TestRequest extends AbstractTestRequest {
     const env = { ...base };
     delete (env as Record<string, unknown>)["PATH_INFO"];
     return env;
+  }
+
+  constructor(env: Record<string, unknown>, session: TestSession, controllerClass: unknown) {
+    super(env);
+
+    this.session = session as never;
+    this.sessionOptions = { ...TestSession.DEFAULT_OPTIONS };
+    this._testControllerClass = controllerClass;
   }
 
   get queryString(): string {
