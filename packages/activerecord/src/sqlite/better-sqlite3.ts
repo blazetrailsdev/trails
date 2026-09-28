@@ -183,24 +183,40 @@ class BetterSqlite3Connection implements SqliteConnection, SyncSqliteConnection 
   }
 
   pragma(source: string, opts?: { simple?: boolean }): unknown {
-    return this.raw.pragma(source, opts);
+    try {
+      return this.raw.pragma(source, opts);
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   changes(): number {
-    this.#changesStmt ??= this.raw.prepare("SELECT changes() AS v");
-    return (this.#changesStmt.get() as { v: number }).v;
+    try {
+      this.#changesStmt ??= this.raw.prepare("SELECT changes() AS v");
+      return (this.#changesStmt.get() as { v: number }).v;
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   lastInsertRowId(): number | bigint {
-    this.#lastInsertRowIdStmt ??= this.raw.prepare("SELECT last_insert_rowid() AS v");
-    return (this.#lastInsertRowIdStmt.get() as { v: number | bigint }).v;
+    try {
+      this.#lastInsertRowIdStmt ??= this.raw.prepare("SELECT last_insert_rowid() AS v");
+      return (this.#lastInsertRowIdStmt.get() as { v: number | bigint }).v;
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   #changesStmt?: Database.Statement;
   #lastInsertRowIdStmt?: Database.Statement;
 
   close(): void {
-    this.raw.close();
+    try {
+      this.raw.close();
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 }
 

@@ -169,34 +169,50 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
   }
 
   pragma(source: string, opts?: { simple?: boolean }): unknown {
-    const stmt = this.raw.prepare(`PRAGMA ${source}`);
-    if (source.includes("=")) {
-      stmt.run();
-      return [];
+    try {
+      const stmt = this.raw.prepare(`PRAGMA ${source}`);
+      if (source.includes("=")) {
+        stmt.run();
+        return [];
+      }
+      if (opts?.simple) {
+        const row = stmt.get() as Record<string, unknown> | undefined;
+        return row !== undefined ? Object.values(row)[0] : undefined;
+      }
+      return stmt.all();
+    } catch (e) {
+      rbSqlite3Raise(e);
     }
-    if (opts?.simple) {
-      const row = stmt.get() as Record<string, unknown> | undefined;
-      return row !== undefined ? Object.values(row)[0] : undefined;
-    }
-    return stmt.all();
   }
 
   changes(): number {
-    this.#changesStmt ??= this.raw.prepare("SELECT changes() AS v");
-    return (this.#changesStmt.get() as { v: number }).v;
+    try {
+      this.#changesStmt ??= this.raw.prepare("SELECT changes() AS v");
+      return (this.#changesStmt.get() as { v: number }).v;
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   lastInsertRowId(): number | bigint {
-    this.#lastInsertRowIdStmt ??= this.raw.prepare("SELECT last_insert_rowid() AS v");
-    return (this.#lastInsertRowIdStmt.get() as { v: number | bigint }).v;
+    try {
+      this.#lastInsertRowIdStmt ??= this.raw.prepare("SELECT last_insert_rowid() AS v");
+      return (this.#lastInsertRowIdStmt.get() as { v: number | bigint }).v;
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   #changesStmt?: import("node:sqlite").StatementSync;
   #lastInsertRowIdStmt?: import("node:sqlite").StatementSync;
 
   close(): void {
-    this._open = false;
-    this.raw.close();
+    try {
+      this._open = false;
+      this.raw.close();
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 }
 

@@ -209,6 +209,7 @@ export function rbSqlite3Raise(error: unknown): never {
 
   const exception = new klass((error as Error).message);
   exception.code = status;
+  exception.cause = error;
 
   throw exception;
 }
@@ -221,7 +222,8 @@ export function rbSqlite3RaiseWithSql(error: unknown, sql: string | null): never
 
   const exception = new klass((error as Error).message);
   exception.code = status;
-  if (sql) {
+  exception.cause = error;
+  if (sql != null) {
     exception.sql = sql;
     exception.sqlOffset = -1;
   }
