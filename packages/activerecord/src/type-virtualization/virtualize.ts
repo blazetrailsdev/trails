@@ -52,12 +52,22 @@ export function virtualize(
     lineCount: number;
   }
   const edits: Edit[] = [];
+  const relationScopeLines: string[] = [];
+  const isModule = sf.statements.some(
+    (st) =>
+      ts.isImportDeclaration(st) ||
+      ts.isExportDeclaration(st) ||
+      ts.isExportAssignment(st) ||
+      ((st as { modifiers?: readonly ts.ModifierLike[] }).modifiers ?? []).some(
+        (m) => m.kind === ts.SyntaxKind.ExportKeyword,
+      ),
+  );
 
   for (const info of classes) {
     if (info.skip) continue;
     if (info.openBracePos < 0) continue;
     const mergeAttributeInterface = canMergeInterface(info.classDecl);
-    const { classLines, interfaceLines } = synthesizeDeclares(info, {
+    const synthesized = synthesizeDeclares(info, {
       mergeAttributeInterface,
       schemaColumnsByTable: options.schemaColumnsByTable,
       classNameAliases: options.classNameAliases,
@@ -68,6 +78,10 @@ export function virtualize(
       ancestors: ancestorsOf.get(info),
       superNameOf,
     });
+    const { classLines, interfaceLines } = synthesized;
+    if (isModule && info.classDecl.parent === sf && !typeParamsText(sf, info.classDecl)) {
+      relationScopeLines.push(...synthesized.relationScopeLines);
+    }
     if (classLines.length > 0) {
       const block = "\n" + classLines.join("\n") + "\n";
       edits.push({
@@ -89,6 +103,24 @@ export function virtualize(
         lineCount: interfaceLines.length + 3,
       });
     }
+  }
+
+  if (relationScopeLines.length > 0) {
+    const block = [
+      "",
+      `declare module "@blazetrails/activerecord" {`,
+      `  interface RelationScopes<T extends import("@blazetrails/activerecord").Base> {`,
+      ...relationScopeLines.map((l) => `    ${l}`),
+      "  }",
+      "}",
+      "",
+    ].join("\n");
+    edits.push({
+      pos: originalText.length,
+      text: originalText.endsWith("\n") ? block.slice(1) : block,
+      originalLine: sf.getLineAndCharacterOfPosition(originalText.length).line,
+      lineCount: relationScopeLines.length + 5,
+    });
   }
 
   edits.sort((a, b) => b.pos - a.pos);

@@ -133,6 +133,12 @@ export class AppGenerator extends AppBase {
     return this.getCreatedFiles();
   }
 
+  private railsGemfileEntries(names: string[]): Record<string, string> {
+    return Object.fromEntries(
+      names.map((n) => [n, this.railsGemfileEntry(n, this.packageManager)]),
+    );
+  }
+
   private createRootFiles(name: string): void {
     const dep = this.database.pkgDependency;
     const dbDep =
@@ -168,20 +174,24 @@ export class AppGenerator extends AppBase {
             prepare: "trails-tsc-views build --views app/views",
           },
           dependencies: {
-            "@blazetrails/activerecord": "*",
-            "@blazetrails/activemodel": "*",
-            "@blazetrails/date": "*",
-            "@blazetrails/activesupport": "*",
-            "@blazetrails/rack": "*",
-            "@blazetrails/ruby-compat": "*",
-            "@blazetrails/actionpack": "*",
-            "@blazetrails/actionview": "*",
-            "@blazetrails/trailties": "*",
+            ...this.railsGemfileEntries([
+              "@blazetrails/activerecord",
+              "@blazetrails/activemodel",
+              "@blazetrails/date",
+              "@blazetrails/activesupport",
+              "@blazetrails/rack",
+              "@blazetrails/ruby-compat",
+              "@blazetrails/actionpack",
+              "@blazetrails/actionview",
+              "@blazetrails/trailties",
+            ]),
             ...dbDep,
           },
           devDependencies: {
-            "@blazetrails/activerecord-cli": "*",
-            "@blazetrails/trails-tsc": "*",
+            ...this.railsGemfileEntries([
+              "@blazetrails/activerecord-cli",
+              "@blazetrails/trails-tsc",
+            ]),
             "@types/node": "^22.0.0",
             tsx: "^4.20.0",
             typescript: "^5.7.0",
@@ -191,11 +201,34 @@ export class AppGenerator extends AppBase {
               ? {}
               : { "@eslint/js": "^10.0.1", eslint: "^10.0.3", "typescript-eslint": "^8.57.0" }),
           },
+          ...(this.options.dev && this.packageManager !== "pnpm"
+            ? {
+                [this.packageManager === "yarn" ? "resolutions" : "overrides"]:
+                  this.railsGemfileEntries(Object.keys(this.railsDevPackages())),
+              }
+            : {}),
         },
         null,
         2,
       ) + "\n",
     );
+
+    if (this.options.dev && this.packageManager === "pnpm") {
+      const overrides = this.railsGemfileEntries(Object.keys(this.railsDevPackages()));
+      this.createFile(
+        "pnpm-workspace.yaml",
+        [
+          "overrides:",
+          ...Object.entries(overrides).map(
+            ([k, v]) => `  ${JSON.stringify(k)}: ${JSON.stringify(v)}`,
+          ),
+          "allowBuilds:",
+          "  better-sqlite3: true",
+          "  esbuild: true",
+          "",
+        ].join("\n"),
+      );
+    }
 
     this.createFile(
       "tsconfig.json",

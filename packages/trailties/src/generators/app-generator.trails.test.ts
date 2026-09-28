@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Dir, File, FileUtils, SecureRandom } from "@blazetrails/ruby-compat";
 import { AppGenerator } from "./app-generator.js";
+import { Generators } from "../generators.js";
 
 describe("AppGenerator (trails-only)", () => {
   let tmpDir: string;
@@ -26,6 +27,38 @@ describe("AppGenerator (trails-only)", () => {
     expect(pkg.scripts.build).toBe("trails-tsc --schema db/schema.ts");
     expect(pkg.devDependencies["@blazetrails/activerecord-cli"]).toBeDefined();
     expect(File.isExist(File.join(tmpDir, "my-app", "db", "schema.ts"))).toBe(false);
+  });
+
+  it("--dev points every @blazetrails package at the local checkout", async () => {
+    await new AppGenerator({
+      cwd: tmpDir,
+      output: () => {},
+      appPath: "my-app",
+      database: "sqlite",
+      dev: true,
+    }).run();
+
+    const trailties = File.join(Generators.RAILS_DEV_PATH, "packages", "trailties");
+    const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
+    expect(pkg.dependencies["@blazetrails/trailties"]).toBe(`link:${trailties}`);
+    expect(pkg.devDependencies["@blazetrails/trails-tsc"]).toMatch(/^link:.*trails-tsc$/);
+    const workspace = File.read(File.join(tmpDir, "my-app", "pnpm-workspace.yaml"));
+    expect(workspace).toContain(`  "@blazetrails/trailties": "link:${trailties}"`);
+    expect(workspace).toContain(`  "@blazetrails/arel": "link:`);
+    expect(workspace).toContain("allowBuilds:\n  better-sqlite3: true\n  esbuild: true\n");
+  });
+
+  it("without --dev keeps the version entries and writes no pnpm-workspace.yaml", async () => {
+    await new AppGenerator({
+      cwd: tmpDir,
+      output: () => {},
+      appPath: "my-app",
+      database: "sqlite",
+    }).run();
+
+    const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
+    expect(pkg.dependencies["@blazetrails/trailties"]).toBe("*");
+    expect(File.isExist(File.join(tmpDir, "my-app", "pnpm-workspace.yaml"))).toBe(false);
   });
 
   it("guards each namespaced environment setting the way the Rails templates do", async () => {

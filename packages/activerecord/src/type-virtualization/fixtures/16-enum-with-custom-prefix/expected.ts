@@ -14,7 +14,15 @@ export class Task extends Base {
   }
 }
 export interface Task {
-  get status(): number;
+  get status(): "low" | "high";
   set status(value: unknown);
 }
 
+declare module "@blazetrails/activerecord" {
+  interface RelationScopes<T extends import("@blazetrails/activerecord").Base> {
+    tierLow(this: import("@blazetrails/activerecord").Relation<Task>): import("@blazetrails/activerecord").Relation<Task>;
+    notTierLow(this: import("@blazetrails/activerecord").Relation<Task>): import("@blazetrails/activerecord").Relation<Task>;
+    tierHigh(this: import("@blazetrails/activerecord").Relation<Task>): import("@blazetrails/activerecord").Relation<Task>;
+    notTierHigh(this: import("@blazetrails/activerecord").Relation<Task>): import("@blazetrails/activerecord").Relation<Task>;
+  }
+}

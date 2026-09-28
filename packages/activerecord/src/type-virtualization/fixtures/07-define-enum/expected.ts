@@ -13,9 +13,17 @@ export class Article extends Base {
   }
 }
 export interface Article {
-  get status(): number;
+  get status(): "draft" | "published";
   set status(value: unknown);
 }
 
 
 Article.enum("status", { draft: 0, published: 1 });
+declare module "@blazetrails/activerecord" {
+  interface RelationScopes<T extends import("@blazetrails/activerecord").Base> {
+    draft(this: import("@blazetrails/activerecord").Relation<Article>): import("@blazetrails/activerecord").Relation<Article>;
+    notDraft(this: import("@blazetrails/activerecord").Relation<Article>): import("@blazetrails/activerecord").Relation<Article>;
+    published(this: import("@blazetrails/activerecord").Relation<Article>): import("@blazetrails/activerecord").Relation<Article>;
+    notPublished(this: import("@blazetrails/activerecord").Relation<Article>): import("@blazetrails/activerecord").Relation<Article>;
+  }
+}

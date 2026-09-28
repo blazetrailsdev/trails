@@ -207,6 +207,27 @@ describe("trails-tsc transitive extends — Phase 1b.3", () => {
   });
 });
 
+describe("trails-tsc scopes and enums", () => {
+  const DIR = path.resolve(FIXTURES_DIR, "relation-scopes");
+
+  it("chains scopes off a Relation and types an enum attribute as its keys", () => {
+    const { program } = createProgramWithArPlugin(path.join(DIR, "tsconfig.json"));
+    expect(getPreEmitDiagnostics(program)).toHaveLength(0);
+
+    const checker = program.getProject().checker;
+    const consumer = program.getSourceFile(path.join(DIR, "consumer.ts"))!;
+    const probed: Record<string, string> = {};
+    consumer.forEachChild(function visit(node: ts.Node): void {
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+        probed[node.name.text] = checker.typeToString(checker.getTypeAtLocation(node.initializer));
+      }
+      node.forEachChild(visit);
+    });
+    expect(probed["chained"]).toBe("Relation<Post>");
+    expect(probed["status"]).toBe('"archived" | "draft"');
+  });
+});
+
 describe("trails-tsc auto-import — Phase 1b.4", () => {
   const AUTO_IMPORT_DIR = path.resolve(FIXTURES_DIR, "auto-import");
 

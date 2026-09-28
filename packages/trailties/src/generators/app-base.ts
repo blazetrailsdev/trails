@@ -1,4 +1,5 @@
-import { File } from "@blazetrails/ruby-compat";
+import { Dir, File } from "@blazetrails/ruby-compat";
+import { Generators } from "../generators.js";
 import { GeneratorBase, type GeneratorOptions } from "./base.js";
 import { Database, type DatabaseName } from "./database.js";
 
@@ -24,6 +25,7 @@ export type AppBaseOptions = GeneratorOptions & {
   database?: DatabaseName;
   api?: boolean;
   devcontainer?: boolean;
+  dev?: boolean;
   [k: `skip${string}`]: boolean | undefined;
 };
 
@@ -48,6 +50,11 @@ export abstract class AppBase extends GeneratorBase {
 
   static {
     this.classOption("skipEslint", { type: "boolean", default: null, desc: "Skip ESLint setup" });
+    this.classOption("dev", {
+      type: "boolean",
+      default: null,
+      desc: "Set up the application with package.json pointing to your Trails checkout",
+    });
   }
 
   constructor(options: AppBaseOptions) {
@@ -87,6 +94,29 @@ export abstract class AppBase extends GeneratorBase {
   /** @internal */
   dependsOnSystemTest(): boolean {
     return !(this.skip("SystemTest") || this.skip("Test") || this.options.api);
+  }
+
+  /** @internal */
+  railsGemfileEntry(name: string, packageManager: string): string {
+    if (this.options.dev) {
+      const path = this.railsDevPackages()[name];
+      return `${packageManager === "pnpm" ? "link" : "file"}:${path}`;
+    } else {
+      return "*";
+    }
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  railsDevPackages(): Record<string, string> {
+    const packages = File.join(Generators.RAILS_DEV_PATH, "packages");
+    const out: Record<string, string> = {};
+    for (const dir of Dir.children(packages).sort()) {
+      const manifest = File.join(packages, dir, "package.json");
+      if (!File.isExist(manifest)) continue;
+      const { name } = JSON.parse(File.read(manifest)) as { name?: string };
+      if (name?.startsWith("@blazetrails/")) out[name] = File.join(packages, dir);
+    }
+    return out;
   }
 
   protected deduceImpliedOptions(opts: AppBaseOptions): AppBaseOptions {

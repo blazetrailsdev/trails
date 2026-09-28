@@ -1,6 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  Dir,
+  File,
+  FileUtils,
+  SecureRandom,
+  childProcessAdapterConfig,
+  registerChildProcessAdapter,
+} from "@blazetrails/ruby-compat";
 import { Configuration } from "./configuration.js";
 import type { Generators } from "../configuration.js";
+import { Generators as RailsGenerators } from "../generators.js";
 
 type ConfiguredGenerators = Generators & Record<string, unknown>;
 
@@ -73,6 +82,70 @@ describe("GeneratorsTest", () => {
       };
 
       expect(toHash(c.generators().options)).toEqual(expected);
+    });
+  });
+
+  describe("with an app", () => {
+    let appRoot: string;
+    let spawns: Array<{ cmd: string; args: string[] }>;
+    let previousAdapter: string | null;
+
+    beforeEach(() => {
+      appRoot = File.join(Dir.tmpdir(), `trails-generators-${SecureRandom.hex(8)}`);
+      FileUtils.mkdirP(appRoot);
+      spawns = [];
+      registerChildProcessAdapter("application-generators-test", {
+        spawnSync(cmd, args) {
+          spawns.push({ cmd, args });
+          return { status: 0, signal: null, stdout: "", stderr: "" };
+        },
+      });
+      previousAdapter = childProcessAdapterConfig.adapter;
+      childProcessAdapterConfig.adapter = "application-generators-test";
+    });
+
+    afterEach(() => {
+      childProcessAdapterConfig.adapter = previousAdapter;
+      RailsGenerators.afterGenerateCallbacks().length = 0;
+      FileUtils.rmRf(appRoot);
+    });
+
+    function rails(...args: string[]): Promise<string[]> {
+      const pretend = args.includes("--pretend");
+      const [, namespace, ...rest] = args.filter((a) => a !== "--pretend");
+      return RailsGenerators.invoke(namespace, rest, {
+        cwd: appRoot,
+        output: () => {},
+        behavior: "invoke",
+        pretend,
+      });
+    }
+
+    it("generators with applyEslintAutocorrectAfterGenerateBang", async () => {
+      withBareConfig((c) => {
+        c.generators().applyEslintAutocorrectAfterGenerateBang();
+        RailsGenerators.configureBang(c.generators());
+      });
+
+      const files = await rails("generate", "model", "post", "title:string", "body:string");
+
+      expect(spawns).toHaveLength(1);
+      const [{ cmd, args }] = spawns;
+      expect(cmd).toBe("bin/eslint");
+      expect(args.slice(0, 2)).toEqual(["--fix", "--quiet"]);
+      expect(args.slice(2)).toEqual(files.map((f) => File.join(appRoot, f)));
+    });
+
+    it("generators with applyEslintAutocorrectAfterGenerateBang and pretend", async () => {
+      withBareConfig((c) => {
+        c.generators().applyEslintAutocorrectAfterGenerateBang();
+        RailsGenerators.configureBang(c.generators());
+      });
+
+      await expect(
+        rails("generate", "model", "post", "title:string", "body:string", "--pretend"),
+      ).resolves.toBeDefined();
+      expect(spawns).toEqual([]);
     });
   });
 });

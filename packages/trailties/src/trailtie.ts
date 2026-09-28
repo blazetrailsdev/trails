@@ -1,5 +1,11 @@
 import { underscore } from "@blazetrails/activesupport";
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import {
+  NoMethodError,
+  RuntimeError,
+  rbFPublicSend,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
+import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 import { Initializable } from "./initializable.js";
 import { Configuration } from "./trailtie/configuration.js";
 import { ownState, readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
@@ -100,6 +106,20 @@ export class Trailtie extends Initializable {
     return readOwnState<TrailtieBlock[]>(this, blockKey(kind)) ?? [];
   }
 
+  static respondToMissing(name: string, _includePrivate: boolean = false): boolean {
+    if (this.isAbstractRailtie()) return false;
+
+    return rbObjRespondTo(this.instance(), name) || false;
+  }
+
+  static methodMissing(name: string, ...args: unknown[]): unknown {
+    if (!this.isAbstractRailtie() && rbObjRespondTo(this.instance(), name)) {
+      return rbFPublicSend(this.instance(), name, ...args);
+    } else {
+      throw new NoMethodError(`undefined method '${name}' for class ${this.name}`, name);
+    }
+  }
+
   get config(): Configuration {
     if (!this._config) this._config = new Configuration();
     return this._config;
@@ -177,3 +197,25 @@ export function resetTrailtieRegistry(): () => void {
 }
 
 Object.defineProperty(Trailtie, "name", { value: "Rails::Railtie" });
+
+Object.setPrototypeOf(
+  Trailtie,
+  new Proxy(Object.getPrototypeOf(Trailtie) as object, {
+    get(target, prop, receiver: typeof Trailtie) {
+      const value = Reflect.get(target, prop, receiver);
+      if (
+        value !== undefined ||
+        typeof prop === "symbol" ||
+        PROTOCOL_PROBES.has(prop) ||
+        Reflect.has(target, prop) ||
+        !(receiver === Trailtie || Object.prototype.isPrototypeOf.call(Trailtie, receiver))
+      ) {
+        return value;
+      }
+      if (receiver.respondToMissing(prop)) {
+        return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
+      }
+      return value;
+    },
+  }),
+);

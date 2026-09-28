@@ -1,6 +1,10 @@
-import { dasherize, underscore } from "@blazetrails/activesupport";
+import { dasherize, deepMergeBang, underscore } from "@blazetrails/activesupport";
 import { Dir, File, LoadError, getPath, regexpEscape } from "@blazetrails/ruby-compat";
 import type { GeneratorBase, GeneratorOptions } from "./generators/base.js";
+import type {
+  AfterGenerateCallback,
+  Generators as GeneratorsConfiguration,
+} from "./configuration.js";
 
 export type GeneratorClass = Omit<typeof GeneratorBase, "prototype" | "start"> & {
   readonly prototype: GeneratorBase;
@@ -25,6 +29,8 @@ let _commandType: string | undefined;
 let _lookupPaths: URL[] | undefined;
 let _aliases: Record<string, Record<string, unknown>> | undefined;
 let _options: Record<string, Record<string, unknown>> | undefined;
+let _afterGenerateCallbacks: AfterGenerateCallback[] | undefined;
+let _generatedFiles: string[] | undefined;
 
 const EXTENSION = /\.[cm]?[tj]s$/.exec(import.meta.url)![0];
 
@@ -68,8 +74,20 @@ export class Generators {
     },
   };
 
+  static readonly RAILS_DEV_PATH: string = File.expandPath(
+    "../../..",
+    urlToPath(new URL(".", import.meta.url)),
+  );
+
   private constructor() {
     throw new Error("Generators is a static-only namespace; do not instantiate.");
+  }
+
+  static configureBang(config: GeneratorsConfiguration): void {
+    deepMergeBang(Generators.aliases(), config.aliases as never);
+    deepMergeBang(Generators.options(), config.options as never);
+    Generators.hideNamespaces(...config.hiddenNamespaces);
+    Generators.afterGenerateCallbacks().splice(0, Infinity, ...config.afterGenerateCallbacks);
   }
 
   static aliases(): Record<string, Record<string, unknown>> {
@@ -78,6 +96,10 @@ export class Generators {
 
   static options(): Record<string, Record<string, unknown>> {
     return (_options ??= { ...Generators.DEFAULT_OPTIONS });
+  }
+
+  static afterGenerateCallbacks(): AfterGenerateCallback[] {
+    return (_afterGenerateCallbacks ??= []);
   }
 
   static subclasses(): readonly GeneratorClass[] {
@@ -173,7 +195,14 @@ export class Generators {
           "Run `bin/trails generate --help` for more options.\n",
       );
     }
-    return klass.start(args, config);
+    const files = await klass.start(args, config);
+    if (config.behavior === "invoke") Generators.runAfterGenerateCallback();
+    return files;
+  }
+
+  static addGeneratedFile(file: string): string {
+    (_generatedFiles ??= []).push(file);
+    return file;
   }
 
   static async publicNamespaces(): Promise<string[]> {
@@ -234,6 +263,15 @@ export class Generators {
   static async printGenerators(output: (msg: string) => void): Promise<void> {
     for (const [base, namespaces] of await Generators.sortedGroups()) {
       Generators.printList(base, namespaces, output);
+    }
+  }
+
+  private static runAfterGenerateCallback(): void {
+    if (_generatedFiles !== undefined && _generatedFiles.length !== 0) {
+      for (const callback of Generators.afterGenerateCallbacks()) {
+        callback(_generatedFiles);
+      }
+      _generatedFiles = [];
     }
   }
 

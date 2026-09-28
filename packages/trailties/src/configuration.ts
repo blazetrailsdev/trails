@@ -1,6 +1,6 @@
 import type { MiddlewareStack } from "@blazetrails/actionpack";
 import { deepDup, isPlainObject } from "@blazetrails/activesupport";
-import { Hash, hashDelete } from "@blazetrails/ruby-compat";
+import { File, Hash, RuntimeError, getChildProcess, hashDelete } from "@blazetrails/ruby-compat";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 
 type MiddlewareOperation = (middleware: any) => void;
@@ -156,6 +156,25 @@ export class Generators {
 
   afterGenerate(block: AfterGenerateCallback): void {
     this._afterGenerateCallbacks.push(block);
+  }
+
+  applyEslintAutocorrectAfterGenerateBang(): void {
+    this.afterGenerate((files) => {
+      const parsableFiles = files.filter(
+        (file) => File.isExist(file) && /\.[cm]?[jt]s$/.test(file),
+      );
+      if (parsableFiles.length !== 0) {
+        const result = getChildProcess().spawnSync("bin/eslint", [
+          "--fix",
+          "--quiet",
+          ...parsableFiles,
+        ]);
+        if (result.error) throw result.error;
+        if (result.status !== 0) {
+          throw new RuntimeError(`Command failed with exit ${result.status}: bin/eslint`);
+        }
+      }
+    });
   }
 
   methodMissing(method: string, ...args: unknown[]): unknown {

@@ -39,6 +39,7 @@ export interface SynthesizeOptions {
 export interface SynthesizedDeclares {
   classLines: string[];
   interfaceLines: string[];
+  relationScopeLines: string[];
 }
 
 export function synthesizeDeclares(
@@ -47,8 +48,13 @@ export function synthesizeDeclares(
 ): SynthesizedDeclares {
   const out: string[] = [];
   const interfaceLines: string[] = [];
+  const relationScopeLines: string[] = [];
   const mergeAttributeInterface = opts.mergeAttributeInterface ?? true;
+  const enumKeys = enumKeyUnions(info);
   const emit = (l: RenderedLine): void => {
+    const keys = l.attribute && enumKeys.get(l.declaredName);
+    if (keys) l = enumAttributeLine(l, keys);
+    if (l.relationScope) relationScopeLines.push(l.relationScope);
     if (mergeAttributeInterface && l.attribute) {
       interfaceLines.push(
         `${INDENT}get ${l.attribute.memberName}(): ${l.attribute.readerType};`,
@@ -94,7 +100,22 @@ export function synthesizeDeclares(
   for (const line of renderSchemaColumnDeclares(info, synthesizedInstanceNames, opts)) {
     emit(line);
   }
-  return { classLines: out, interfaceLines };
+  return { classLines: out, interfaceLines, relationScopeLines };
+}
+
+function enumKeyUnions(info: ClassInfo): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const call of info.calls) {
+    if (call.kind === "enum" && call.values.length > 0) {
+      out.set(call.attr, call.values.map((v) => JSON.stringify(v)).join(" | "));
+    }
+  }
+  return out;
+}
+
+function enumAttributeLine(l: RenderedLine, keys: string): RenderedLine {
+  const nullable = / \| null$/.test(l.attribute!.readerType);
+  return attributeLine(l.attribute!.memberName, nullable ? `${keys} | null` : keys, l.declaredName);
 }
 
 function boundKnownTarget(
@@ -239,6 +260,7 @@ interface RenderedLine {
   isStatic: boolean;
   skipIfPresent: boolean;
   attribute?: { memberName: string; readerType: string; writerType?: string };
+  relationScope?: string;
 }
 
 function renderCall(
@@ -316,14 +338,16 @@ function renderSingularAssoc(
 }
 
 function renderScope(info: ClassInfo, call: ScopeCall): RenderedLine[] {
-  const argList = call.paramsAfterThis.length === 0 ? "" : call.paramsAfterThis.join(", ");
-  return [
-    line(
-      `declare static ${call.name}: (${argList}) => ${AR_IMPORT}.Relation<${info.name}>;`,
-      call.name,
-      true,
-    ),
-  ];
+  return [scopeLine(info, call.name, call.paramsAfterThis)];
+}
+
+function scopeLine(info: ClassInfo, name: string, params: readonly string[]): RenderedLine {
+  const argList = params.join(", ");
+  const relation = `${AR_IMPORT}.Relation<${info.name}>`;
+  return {
+    ...line(`declare static ${name}: (${argList}) => ${relation};`, name, true),
+    relationScope: `${name}(${[`this: ${relation}`, ...params].join(", ")}): ${relation};`,
+  };
 }
 
 function renderEnum(info: ClassInfo, call: EnumCall): RenderedLine[] {
@@ -337,20 +361,8 @@ function renderEnum(info: ClassInfo, call: EnumCall): RenderedLine[] {
     const notScope = `not${pascal(methodBase)}`;
     out.push(line(`declare ${predicate}: () => boolean;`, predicate, false));
     out.push(line(`declare ${bang}: () => Promise<true | undefined>;`, bang, false));
-    out.push(
-      line(
-        `declare static ${scopeName}: () => ${AR_IMPORT}.Relation<${info.name}>;`,
-        scopeName,
-        true,
-      ),
-    );
-    out.push(
-      line(
-        `declare static ${notScope}: () => ${AR_IMPORT}.Relation<${info.name}>;`,
-        notScope,
-        true,
-      ),
-    );
+    out.push(scopeLine(info, scopeName, []));
+    out.push(scopeLine(info, notScope, []));
   }
   return out;
 }
