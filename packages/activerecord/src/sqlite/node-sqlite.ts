@@ -16,6 +16,7 @@ import {
   type SyncSqliteStatement,
 } from "../sqlite-adapter.js";
 import { resolveUriDatabasePath } from "./sqlite-uri.js";
+import { rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
 
 type NodeSqliteModule = typeof import("node:sqlite");
 let nodeSqlite: NodeSqliteModule | undefined;
@@ -42,9 +43,13 @@ class NodeSqliteStatement implements SqliteStatement, SyncSqliteStatement {
   }
 
   private call<T>(method: string, binds: SqliteBinds | undefined): T {
-    return (this.stmt as unknown as Record<string, (...a: unknown[]) => T>)[method](
-      ...expandBinds(binds),
-    );
+    try {
+      return (this.stmt as unknown as Record<string, (...a: unknown[]) => T>)[method](
+        ...expandBinds(binds),
+      );
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   run(binds?: SqliteBinds): RunResult {
@@ -114,7 +119,11 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
   }
 
   prepare(sql: string): NodeSqliteStatement {
-    return new NodeSqliteStatement(this.raw.prepare(sql));
+    try {
+      return new NodeSqliteStatement(this.raw.prepare(sql));
+    } catch (e) {
+      rbSqlite3RaiseWithSql(e, sql);
+    }
   }
 
   isOpen(): boolean {
@@ -122,7 +131,11 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
   }
 
   exec(sql: string): void {
-    this.raw.exec(sql);
+    try {
+      this.raw.exec(sql);
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   execute(sql: string, bindVars?: SqliteBinds): readonly unknown[];
@@ -156,34 +169,50 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
   }
 
   pragma(source: string, opts?: { simple?: boolean }): unknown {
-    const stmt = this.raw.prepare(`PRAGMA ${source}`);
-    if (source.includes("=")) {
-      stmt.run();
-      return [];
+    try {
+      const stmt = this.raw.prepare(`PRAGMA ${source}`);
+      if (source.includes("=")) {
+        stmt.run();
+        return [];
+      }
+      if (opts?.simple) {
+        const row = stmt.get() as Record<string, unknown> | undefined;
+        return row !== undefined ? Object.values(row)[0] : undefined;
+      }
+      return stmt.all();
+    } catch (e) {
+      rbSqlite3Raise(e);
     }
-    if (opts?.simple) {
-      const row = stmt.get() as Record<string, unknown> | undefined;
-      return row !== undefined ? Object.values(row)[0] : undefined;
-    }
-    return stmt.all();
   }
 
   changes(): number {
-    this.#changesStmt ??= this.raw.prepare("SELECT changes() AS v");
-    return (this.#changesStmt.get() as { v: number }).v;
+    try {
+      this.#changesStmt ??= this.raw.prepare("SELECT changes() AS v");
+      return (this.#changesStmt.get() as { v: number }).v;
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   lastInsertRowId(): number | bigint {
-    this.#lastInsertRowIdStmt ??= this.raw.prepare("SELECT last_insert_rowid() AS v");
-    return (this.#lastInsertRowIdStmt.get() as { v: number | bigint }).v;
+    try {
+      this.#lastInsertRowIdStmt ??= this.raw.prepare("SELECT last_insert_rowid() AS v");
+      return (this.#lastInsertRowIdStmt.get() as { v: number | bigint }).v;
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   #changesStmt?: import("node:sqlite").StatementSync;
   #lastInsertRowIdStmt?: import("node:sqlite").StatementSync;
 
   close(): void {
-    this._open = false;
-    this.raw.close();
+    try {
+      this._open = false;
+      this.raw.close();
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 }
 
@@ -202,7 +231,11 @@ function openDatabase(config: SqliteOpenConfig): import("node:sqlite").DatabaseS
   };
   if (config.timeout !== undefined) opts.timeout = config.timeout;
   opts.enableDoubleQuotedStringLiterals = !(config.strict ?? false);
-  return new nodeSqlite.DatabaseSync(sharedCacheDatabase(config), opts);
+  try {
+    return new nodeSqlite.DatabaseSync(sharedCacheDatabase(config), opts);
+  } catch (e) {
+    rbSqlite3Raise(e);
+  }
 }
 
 function sharedCacheDatabase(config: SqliteOpenConfig): string {
