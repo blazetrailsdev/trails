@@ -9,7 +9,7 @@ import {
   escapeOnce,
   TagBuilder,
 } from "../helpers/tag-helper.js";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo, publicInstanceMethods } from "@blazetrails/ruby-compat";
 import { htmlSafe, SafeBuffer } from "@blazetrails/activesupport";
 import { raw } from "../helpers/output-safety-helper.js";
 import { Base } from "../base.js";
@@ -90,7 +90,7 @@ describe("TagHelperTest", () => {
   it("tag builder defines methods to build html elements", () => {
     const t = tag() as any;
     expect(rbObjRespondTo(t, "div")).toBe(true);
-    expect(Object.getOwnPropertyNames(TagBuilder.prototype)).toContain("div");
+    expect(publicInstanceMethods(t.constructor as typeof TagBuilder)).toContain("div");
   });
 
   it("tag builder renders unknown html elements", () => {

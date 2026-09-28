@@ -386,14 +386,18 @@ export class TagBuilder {
 
     codeGenerator.classEval((batch) => {
       batch.push((mod) => {
-        mod[methodName] = function (this: TagBuilder, ...args: unknown[]): SafeBuffer {
-          const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
-            | TagBlock
-            | undefined;
-          const { escape = true, ...options } = extractOptionsBang(args);
-          const [content = null] = args;
-          return this.tagString(name, content, options, { escape: escape as boolean, block });
-        };
+        Object.defineProperty(mod, methodName, {
+          writable: true,
+          configurable: true,
+          value(this: TagBuilder, ...args: unknown[]): SafeBuffer {
+            const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
+              | TagBlock
+              | undefined;
+            const { escape = true, ...options } = extractOptionsBang(args);
+            const [content = null] = args;
+            return this.tagString(name, content, options, { escape: escape as boolean, block });
+          },
+        });
       });
     });
   }
@@ -404,14 +408,20 @@ export class TagBuilder {
   ): void {
     codeGenerator.classEval((batch) => {
       batch.push((mod) => {
-        mod[methodName] = function (this: TagBuilder, ...args: unknown[]): SafeBuffer {
-          if (typeof args[args.length - 1] === "function") args.pop();
-          const { escape = true, ...options } = extractOptionsBang(args);
-          if (args.length > 0) {
-            throw new ArgumentError(`wrong number of arguments (given ${args.length}, expected 0)`);
-          }
-          return this.selfClosingTagString(name, options, escape as boolean, ">");
-        };
+        Object.defineProperty(mod, methodName, {
+          writable: true,
+          configurable: true,
+          value(this: TagBuilder, ...args: unknown[]): SafeBuffer {
+            if (typeof args[args.length - 1] === "function") args.pop();
+            const { escape = true, ...options } = extractOptionsBang(args);
+            if (args.length > 0) {
+              throw new ArgumentError(
+                `wrong number of arguments (given ${args.length}, expected 0)`,
+              );
+            }
+            return this.selfClosingTagString(name, options, escape as boolean, ">");
+          },
+        });
       });
     });
   }
@@ -422,18 +432,22 @@ export class TagBuilder {
   ): void {
     codeGenerator.classEval((batch) => {
       batch.push((mod) => {
-        mod[methodName] = function (this: TagBuilder, ...args: unknown[]): SafeBuffer {
-          const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
-            | TagBlock
-            | undefined;
-          const { escape = true, ...options } = extractOptionsBang(args);
-          const [content = null] = args;
-          if ((content != null && content !== false) || block) {
-            return this.tagString(name, content, options, { escape: escape as boolean, block });
-          } else {
-            return this.selfClosingTagString(name, options, escape as boolean);
-          }
-        };
+        Object.defineProperty(mod, methodName, {
+          writable: true,
+          configurable: true,
+          value(this: TagBuilder, ...args: unknown[]): SafeBuffer {
+            const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
+              | TagBlock
+              | undefined;
+            const { escape = true, ...options } = extractOptionsBang(args);
+            const [content = null] = args;
+            if ((content != null && content !== false) || block) {
+              return this.tagString(name, content, options, { escape: escape as boolean, block });
+            } else {
+              return this.selfClosingTagString(name, options, escape as boolean);
+            }
+          },
+        });
       });
     });
   }

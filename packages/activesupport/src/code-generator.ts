@@ -5,11 +5,6 @@ export type MethodSource = (mod: Record<string, unknown>) => void;
 
 type Owner = Module | { prototype: object };
 
-function classEval(owner: Owner, block: (mod: Record<string, unknown>) => void): void {
-  if (owner instanceof Module) owner.moduleEval(block);
-  else block(owner.prototype as Record<string, unknown>);
-}
-
 export class MethodSet {
   static METHOD_CACHES = new Map<string, Module>();
 
@@ -58,7 +53,9 @@ export class MethodSet {
       if (instanceMethod === undefined) {
         throw new NameError(`undefined method '${canonicalName}' for module`, canonicalName);
       }
-      classEval(owner, (mod) => Object.defineProperty(mod, as, instanceMethod));
+      if (owner instanceof Module) {
+        owner.moduleEval((mod) => Object.defineProperty(mod, as, instanceMethod));
+      } else Object.defineProperty(owner.prototype, as, instanceMethod);
     }
   }
 }
@@ -115,9 +112,13 @@ export class CodeGenerator {
     }
 
     if (this.sources.length !== 0) {
-      classEval(this.owner, (mod) => {
-        for (const source of this.sources) source(mod);
-      });
+      if (this.owner instanceof Module) {
+        this.owner.moduleEval((mod) => {
+          for (const source of this.sources) source(mod);
+        });
+      } else {
+        for (const source of this.sources) source(this.owner.prototype as Record<string, unknown>);
+      }
     }
   }
 }
