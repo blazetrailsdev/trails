@@ -1,6 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { SafeBuffer, assertRaise } from "@blazetrails/activesupport";
+import {
+  assertEqual,
+  assertNil,
+  assertNothingRaised,
+  assertPredicate,
+  assertRaise,
+  SafeBuffer,
+  isHtmlSafe,
+} from "@blazetrails/activesupport";
 import {
   assetPath,
   computeAssetPath,
@@ -28,9 +36,13 @@ import {
   imageDecoding,
   imageLoading,
   imageTag,
+  javascriptIncludeTag,
+  preloadLinkTag,
+  preloadLinksHeader,
   pictureTag,
   setImageDecoding,
   setImageLoading,
+  setPreloadLinksHeader,
   stylesheetLinkTag,
   type AssetTagHelperHost,
 } from "../helpers/asset-tag-helper.js";
@@ -39,12 +51,29 @@ import { tag } from "../helpers/tag-helper.js";
 
 Template.mimeTypesImplementation = Mime;
 
-const request = { baseUrl: "http://www.example.com", protocol: "http://" };
+const withPreloadLinksHeader = (fn: () => void, newPreloadLinksHeader: boolean = true): void => {
+  const originalPreloadLinksHeader = preloadLinksHeader;
+  setPreloadLinksHeader(newPreloadLinksHeader);
+  try {
+    fn();
+  } finally {
+    setPreloadLinksHeader(originalPreloadLinksHeader);
+  }
+};
+
+const request = {
+  baseUrl: "http://www.example.com",
+  protocol: "http://",
+  sendEarlyHints() {},
+};
+const response = { headers: new Map<string, string>(), isSending: false };
 const host = {
   computeAssetPath,
   publicComputeAssetPath,
   request,
   urlFor: (..._args: unknown[]) => "http://www.example.com",
+  response,
+  contentSecurityPolicyNonce: () => "iyhD0Yc0W+c=",
 } as unknown as AssetTagHelperHost & CaptureHelperHost;
 
 const normalizeDom = (html: unknown): string =>
@@ -458,7 +487,88 @@ const PictureLinkToTag: [() => unknown, string][] = [
   ],
 ];
 
+const script = (...args: unknown[]): unknown => javascriptIncludeTag.call(host, ...args);
+
+const JavascriptIncludeToTag: [() => unknown, string][] = [
+  [() => script("bank"), '<script src="/javascripts/bank.js"></script>'],
+  [() => script("bank.js"), '<script src="/javascripts/bank.js"></script>'],
+  [
+    () => script("bank", { lang: "vbscript" }),
+    '<script src="/javascripts/bank.js" lang="vbscript"></script>',
+  ],
+  [
+    () => script("bank", { host: "assets.example.com" }),
+    '<script src="http://assets.example.com/javascripts/bank.js"></script>',
+  ],
+  [() => script("http://example.com/all"), '<script src="http://example.com/all"></script>'],
+  [() => script("http://example.com/all.js"), '<script src="http://example.com/all.js"></script>'],
+  [() => script("//example.com/all.js"), '<script src="//example.com/all.js"></script>'],
+];
+
+const preload = (source: string, options?: Record<string, unknown>): unknown =>
+  preloadLinkTag.call(host, source, options);
+
+const PreloadLinkToTag: [() => unknown, string][] = [
+  [
+    () => preload("/application.js", { type: "module" }),
+    '<link rel="modulepreload" href="/application.js" as="script" type="module">',
+  ],
+  [
+    () => preload("/styles/custom_theme.css"),
+    '<link rel="preload" href="/styles/custom_theme.css" as="style" type="text/css">',
+  ],
+  [
+    () => preload("/videos/video.webm"),
+    '<link rel="preload" href="/videos/video.webm" as="video" type="video/webm">',
+  ],
+  [
+    () => preload("/posts.json", { as: "fetch" }),
+    '<link rel="preload" href="/posts.json" as="fetch" type="application/json">',
+  ],
+  [
+    () => preload("/users", { as: "fetch", type: "application/json" }),
+    '<link rel="preload" href="/users" as="fetch" type="application/json">',
+  ],
+  [
+    () =>
+      preload("//example.com/map?callback=initMap", {
+        as: "fetch",
+        type: "application/javascript",
+      }),
+    '<link rel="preload" href="//example.com/map?callback=initMap" as="fetch" type="application/javascript">',
+  ],
+  [
+    () => preload("//example.com/font.woff2"),
+    '<link rel="preload" href="//example.com/font.woff2" as="font" type="font/woff2" crossorigin="anonymous">',
+  ],
+  [
+    () => preload("//example.com/font.woff2", { crossorigin: "use-credentials" }),
+    '<link rel="preload" href="//example.com/font.woff2" as="font" type="font/woff2" crossorigin="use-credentials">',
+  ],
+  [
+    () => preload("/media/audio.ogg", { nopush: true }),
+    '<link rel="preload" href="/media/audio.ogg" as="audio" type="audio/ogg">',
+  ],
+  [
+    () =>
+      preload("/style.css", { integrity: "sha256-AbpHGcgLb+kRsJGnwFEktk7uzpZOCcBY74+YBdrKVGs" }),
+    '<link rel="preload" href="/style.css" as="style" type="text/css" integrity="sha256-AbpHGcgLb+kRsJGnwFEktk7uzpZOCcBY74+YBdrKVGs">',
+  ],
+  [
+    () => preload("/sprite.svg"),
+    '<link rel="preload" href="/sprite.svg" as="image" type="image/svg+xml">',
+  ],
+  [
+    () => preload("/mb-icon.png"),
+    '<link rel="preload" href="/mb-icon.png" as="image" type="image/png">',
+  ],
+];
+
 describe("AssetTagHelperTest", () => {
+  beforeEach(() => {
+    response.headers.clear();
+  });
+
   it("autodiscovery link tag with unknown type but not pass type option key", async () => {
     await assertRaise([ArgumentError], {}, () => autoDiscoveryLinkTag.call(host, ":xml"));
   });
@@ -535,8 +645,181 @@ describe("AssetTagHelperTest", () => {
     UrlToStyleToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
   });
 
+  it("javascript include tag", () => {
+    JavascriptIncludeToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("javascript include tag with missing source", async () => {
+    await assertNothingRaised(() => {
+      javascriptIncludeTag.call(host, "missing_security_guard");
+    });
+
+    await assertNothingRaised(() => {
+      javascriptIncludeTag.call(host, "http://example.com/css/missing_security_guard");
+    });
+  });
+
+  it("javascript include tag is html safe", () => {
+    assertPredicate(javascriptIncludeTag.call(host, "prototype"), isHtmlSafe);
+  });
+
+  it("javascript include tag relative protocol", () => {
+    const withAssetHost = { ...host, config: { assetHost: "assets.example.com" } };
+    assertDomEqual(
+      '<script src="//assets.example.com/javascripts/prototype.js"></script>',
+      javascriptIncludeTag.call(withAssetHost, "prototype", { protocol: ":relative" }),
+    );
+  });
+
+  it("javascript include tag default protocol", () => {
+    const withAssetHost = {
+      ...host,
+      config: { assetHost: "assets.example.com", defaultAssetHostProtocol: ":relative" },
+    };
+    assertDomEqual(
+      '<script src="//assets.example.com/javascripts/prototype.js"></script>',
+      javascriptIncludeTag.call(withAssetHost, "prototype"),
+    );
+  });
+
+  it("javascript include tag nonce", () => {
+    assertDomEqual(
+      '<script src="/javascripts/bank.js" nonce="iyhD0Yc0W+c="></script>',
+      javascriptIncludeTag.call(host, "bank", { nonce: true }),
+    );
+  });
+
   it("stylesheet link tag", () => {
     StyleLinkToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("javascript include tag without default extension applied", () => {
+    assertDomEqual(
+      '<script src="/javascripts/foo.jsx"></script>',
+      javascriptIncludeTag.call(host, "foo.jsx", { extname: false }),
+    );
+  });
+
+  it("javascript include tag without request", () => {
+    const withoutRequest = { ...host, request: null };
+    assertDomEqual(
+      '<script src="/javascripts/foo.js"></script>',
+      javascriptIncludeTag.call(withoutRequest, "foo.js"),
+    );
+  });
+
+  it("should set preload links", () => {
+    withPreloadLinksHeader(() => {
+      stylesheetLinkTag.call(host, "http://example.com/style.css");
+      javascriptIncludeTag.call(host, "http://example.com/all.js");
+      const expected =
+        "<http://example.com/style.css>; rel=preload; as=style; nopush,<http://example.com/all.js>; rel=preload; as=script; nopush";
+      assertEqual(expected, response.headers.get("link"));
+    });
+  });
+
+  it("should not set preload links for data url", () => {
+    withPreloadLinksHeader(() => {
+      stylesheetLinkTag.call(host, "data:text/css;base64,YWxlcnQoIkhlbGxvIik7");
+      javascriptIncludeTag.call(host, "data:text/javascript;base64,YWxlcnQoIkhlbGxvIik7");
+      assertNil(response.headers.get("link"));
+    });
+  });
+
+  it("should not set preload links if opted out at invokation", () => {
+    withPreloadLinksHeader(() => {
+      stylesheetLinkTag.call(host, "http://example.com/style.css", { preloadLinksHeader: false });
+      javascriptIncludeTag.call(host, "http://example.com/all.js", { preloadLinksHeader: false });
+      assertNil(response.headers.get("link"));
+    });
+  });
+
+  it("should set preload links if opted in at invokation", () => {
+    withPreloadLinksHeader(() => {
+      stylesheetLinkTag.call(host, "http://example.com/style.css", { preloadLinksHeader: true });
+      javascriptIncludeTag.call(host, "http://example.com/all.js", { preloadLinksHeader: true });
+      const expected =
+        "<http://example.com/style.css>; rel=preload; as=style; nopush,<http://example.com/all.js>; rel=preload; as=script; nopush";
+      assertEqual(expected, response.headers.get("link"));
+    }, false);
+  });
+
+  it("should generate links under the max size", () => {
+    withPreloadLinksHeader(() => {
+      for (let i = 0; i < 100; i++) {
+        stylesheetLinkTag.call(host, `http://example.com/style.css?${i}`);
+        javascriptIncludeTag.call(host, `http://example.com/all.js?${i}`);
+      }
+      const links = response.headers.get("link")!.split(",").length - 1;
+      assertEqual(14, links);
+    });
+  });
+
+  it("should not preload links with defer", () => {
+    withPreloadLinksHeader(() => {
+      javascriptIncludeTag.call(host, "http://example.com/all.js", { defer: true });
+      assertNil(response.headers.get("link"));
+    });
+  });
+
+  it("should allow caller to remove nopush", () => {
+    withPreloadLinksHeader(() => {
+      stylesheetLinkTag.call(host, "http://example.com/style.css", { nopush: false });
+      javascriptIncludeTag.call(host, "http://example.com/all.js", { nopush: false });
+      const expected =
+        "<http://example.com/style.css>; rel=preload; as=style,<http://example.com/all.js>; rel=preload; as=script";
+      assertEqual(expected, response.headers.get("link"));
+    });
+  });
+
+  it("should set preload links with cross origin", () => {
+    withPreloadLinksHeader(() => {
+      stylesheetLinkTag.call(host, "http://example.com/style.css", {
+        crossorigin: "use-credentials",
+      });
+      javascriptIncludeTag.call(host, "http://example.com/all.js", { crossorigin: true });
+      const expected =
+        "<http://example.com/style.css>; rel=preload; as=style; crossorigin=use-credentials; nopush,<http://example.com/all.js>; rel=preload; as=script; crossorigin=anonymous; nopush";
+      assertEqual(expected, response.headers.get("link"));
+    });
+  });
+
+  it("should set preload links with rel modulepreload", () => {
+    withPreloadLinksHeader(() => {
+      javascriptIncludeTag.call(host, "http://example.com/all.js", { type: "module" });
+      const expected = "<http://example.com/all.js>; rel=modulepreload; as=script; nopush";
+      assertEqual(expected, response.headers.get("link"));
+    });
+  });
+
+  it("should set preload early hints with rel modulepreload", () => {
+    withPreloadLinksHeader(() => {
+      preloadLinkTag.call(host, "http://example.com/all.js", { type: "module" });
+      const expected = "<http://example.com/all.js>; rel=modulepreload; as=script; type=module";
+      assertEqual(expected, response.headers.get("link"));
+    });
+  });
+
+  it("should set preload links with integrity hashes", () => {
+    withPreloadLinksHeader(() => {
+      stylesheetLinkTag.call(host, "http://example.com/style.css", {
+        integrity: "sha256-AbpHGcgLb+kRsJGnwFEktk7uzpZOCcBY74+YBdrKVGs",
+      });
+      javascriptIncludeTag.call(host, "http://example.com/all.js", {
+        integrity: "sha256-AbpHGcgLb+kRsJGnwFEktk7uzpZOCcBY74+YBdrKVGs",
+      });
+      const expected =
+        "<http://example.com/style.css>; rel=preload; as=style; integrity=sha256-AbpHGcgLb+kRsJGnwFEktk7uzpZOCcBY74+YBdrKVGs; nopush,<http://example.com/all.js>; rel=preload; as=script; integrity=sha256-AbpHGcgLb+kRsJGnwFEktk7uzpZOCcBY74+YBdrKVGs; nopush";
+      assertEqual(expected, response.headers.get("link"));
+    });
+  });
+
+  it("should not preload links when disabled", () => {
+    withPreloadLinksHeader(() => {
+      stylesheetLinkTag.call(host, "http://example.com/style.css");
+      javascriptIncludeTag.call(host, "http://example.com/all.js");
+      assertNil(response.headers.get("link"));
+    }, false);
   });
 
   it("image path", () => {
@@ -557,6 +840,10 @@ describe("AssetTagHelperTest", () => {
 
   it("image tag", () => {
     ImageLinkToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("preload link tag", () => {
+    PreloadLinkToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
   });
 
   it("image tag does not modify options", () => {
@@ -642,5 +929,27 @@ describe("AssetTagHelperTest", () => {
     const copy = source;
     imageTag.call(host, source);
     expect(source).toEqual(copy);
+  });
+});
+
+describe("AssetTagHelperWithoutRequestTest", () => {
+  it("javascript include tag without request", () => {
+    const withoutRequest = { computeAssetPath, publicComputeAssetPath } as AssetTagHelperHost;
+    assertDomEqual(
+      '<script src="/javascripts/foo.js"></script>',
+      javascriptIncludeTag.call(withoutRequest, "foo.js"),
+    );
+  });
+});
+
+describe("AssetTagHelperWithStreamingRequest", () => {
+  it("javascript include tag with streaming", () => {
+    const streaming = { ...host, response: { ...response, isSending: true } };
+    withPreloadLinksHeader(() => {
+      assertDomEqual(
+        '<script src="/javascripts/foo.js"></script>',
+        javascriptIncludeTag.call(streaming, "foo.js"),
+      );
+    });
   });
 });
