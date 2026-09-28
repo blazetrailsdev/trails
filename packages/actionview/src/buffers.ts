@@ -72,6 +72,16 @@ export class OutputBuffer {
     return this;
   }
 
+  initializeCopy(other: OutputBuffer): this {
+    this._raw = other.toStr();
+    return this;
+  }
+
+  dup(): this {
+    const copy = Object.assign(Object.create(Object.getPrototypeOf(this) as object), this) as this;
+    return copy.initializeCopy(this);
+  }
+
   capture<TArgs extends unknown[]>(args: TArgs, fn: (...args: TArgs) => void): SafeBuffer {
     const saved = this._raw;
     this._raw = "";
