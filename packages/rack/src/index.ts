@@ -53,7 +53,7 @@ export {
 export { Headers } from "./headers.js";
 export { BodyProxy } from "./body-proxy.js";
 export { DEFAULT_PORTS, Request, Helpers as RequestHelpers } from "./request.js";
-export { Response, ResponseRaw } from "./response.js";
+export { Response, ResponseRaw, Helpers as ResponseHelpers } from "./response.js";
 export {
   CONTENT_TYPE,
   CONTENT_LENGTH,
@@ -65,6 +65,8 @@ export { BadRequest } from "./bad-request.js";
 export { Runtime } from "./runtime.js";
 export { Files } from "./files.js";
 export { Lint, LintError } from "./lint.js";
+export { Head } from "./head.js";
+export { MethodOverride } from "./method-override.js";
 export { Multipart, type UploadedFileInfo } from "./multipart.js";
 export { MockRequest, FatalWarning } from "./mock-request.js";
 export { MockResponse } from "./mock-response.js";

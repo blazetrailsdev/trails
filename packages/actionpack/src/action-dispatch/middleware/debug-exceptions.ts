@@ -108,11 +108,13 @@ export class DebugExceptions {
 
   /** @internal */
   logError(request: Request, wrapper: ExceptionWrapper): void {
-    const logger =
+    const logger: Logger | null =
       (request.logger as Logger | undefined) ??
       (request.getHeader("rack.logger") as Logger | undefined) ??
       this.logger ??
       this.stderrLogger();
+
+    if (logger == null) return;
     if (!this.isLogRescuedResponses(request) && wrapper.rescueResponse()) return;
 
     const lines: string[] = ["  "];
@@ -155,7 +157,7 @@ export class DebugExceptions {
   }
 
   /** @internal */
-  stderrLogger(): Logger {
+  stderrLogger(): Logger | null {
     if (this._stderrLogger) return this._stderrLogger;
     this._stderrLogger = {
       error: (m: string) => stderr.write(`${m}\n`),

@@ -8,6 +8,7 @@ import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { controllerConstants } from "../../action-dispatch/http/request.js";
 import { Cookies } from "../../action-dispatch/middleware/cookies.js";
 import { CookieStore } from "../../action-dispatch/middleware/session/cookie-store.js";
+import "../../test-helpers/abstract-unit.js";
 
 function buildApp(routes: RouteSet): RackApp {
   const store = new CookieStore((e: RackEnv) => routes.call(e), { key: "_session" });
@@ -41,7 +42,7 @@ describe("SessionTest", () => {
 
   it("host!", () => {
     expect(session.host).not.toBe("glu.ttono.us");
-    session.host = "rubyonrails.com";
+    session.hostBang("rubyonrails.com");
     expect(session.host).toBe("rubyonrails.com");
   });
 
@@ -192,6 +193,18 @@ describe("IntegrationTestTest", () => {
 
 describe("RackLintIntegrationTest", () => {
   it.skip("integration test follows rack SPEC", () => {});
+});
+
+describe("IntegrationTestUsesCorrectClass", () => {
+  it("integration methods called", async () => {
+    const t = new IntegrationTest();
+    t.resetBang();
+    const headers = { Origin: "*" };
+
+    for (const verb of ["get", "post", "head", "patch", "put", "delete", "options"] as const) {
+      await expect(t[verb]("/", { headers })).resolves.not.toThrow();
+    }
+  });
 });
 
 class PollerController extends Base {

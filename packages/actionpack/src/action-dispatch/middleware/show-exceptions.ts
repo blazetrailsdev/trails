@@ -1,14 +1,15 @@
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { ExceptionWrapper } from "./exception-wrapper.js";
+import type { RackAppObject } from "./stack.js";
 
 export type ShowExceptionsMode = "all" | "rescuable" | "none";
 
 export class ShowExceptions {
   private app: RackApp;
-  private exceptionsApp: RackApp;
+  private exceptionsApp: RackApp | RackAppObject;
 
-  constructor(app: RackApp, exceptionsApp: RackApp) {
+  constructor(app: RackApp, exceptionsApp: RackApp | RackAppObject) {
     this.app = app;
     this.exceptionsApp = exceptionsApp;
   }
@@ -53,7 +54,9 @@ export class ShowExceptions {
     request["REQUEST_METHOD"] = "GET";
     try {
       try {
-        const response = await this.exceptionsApp(request);
+        const response = await (typeof this.exceptionsApp === "function"
+          ? this.exceptionsApp(request)
+          : this.exceptionsApp.call(request));
         const cascade = response[1]["x-cascade"] ?? response[1]["X-Cascade"];
         return cascade === "pass" ? this.passResponse(status) : response;
       } catch {
