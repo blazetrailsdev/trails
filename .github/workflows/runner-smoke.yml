@@ -1,0 +1,32 @@
+name: Runner smoke
+
+on:
+  push:
+    branches: [runner-smoke]
+
+jobs:
+  build-and-typecheck:
+    name: Build & Type Check (debian)
+    runs-on: [self-hosted, debian]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+        with:
+          store-dir: /home/claude/.local/share/pnpm/store
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - run: pnpm build
+      - run: pnpm typecheck
+
+  lint:
+    name: Lint (debian)
+    needs: build-and-typecheck
+    runs-on: [self-hosted, debian]
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+        with:
+          store-dir: /home/claude/.local/share/pnpm/store
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - run: pnpm lint
