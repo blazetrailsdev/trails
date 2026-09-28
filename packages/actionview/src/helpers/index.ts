@@ -129,6 +129,7 @@ export {
   autoDiscoveryLinkTag,
   faviconLinkTag,
   imageTag,
+  pictureTag,
   sendPreloadLinksHeader,
   imageLoading,
   imageDecoding,
