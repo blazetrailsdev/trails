@@ -3,7 +3,7 @@ import { Notifications, type NotificationEvent as Event } from "@blazetrails/act
 import { Request } from "../../http/request.js";
 import type { Mapper } from "../../routing/mapper.js";
 import { IntegrationTest } from "../../testing/integration.js";
-import { RoutedRackApp, stubControllers } from "../../../test-helpers/abstract-unit.js";
+import { RoutedRackApp } from "../../../test-helpers/abstract-unit.js";
 
 describe("RoutingInstrumentationTest", () => {
   let t: IntegrationTest;
@@ -25,7 +25,7 @@ describe("RoutingInstrumentationTest", () => {
   });
 
   function draw(block: (r: Mapper) => void): void {
-    stubControllers((routes) => {
+    IntegrationTest.stubControllers((routes) => {
       routes.defaultUrlOptions = { host: "www.example.com" };
       routes.draw(block);
       t.app = new RoutedRackApp(routes);

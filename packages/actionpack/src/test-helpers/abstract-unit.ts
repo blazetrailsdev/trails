@@ -74,7 +74,7 @@ export class RoutedRackApp {
   }
 }
 
-export function buildApp(
+function buildApp(
   routes?: RouteSet | null,
   block?: (middleware: MiddlewareStack) => void,
 ): RoutedRackApp {
@@ -94,7 +94,9 @@ export function buildApp(
   });
 }
 
-IntegrationTest.app = buildApp();
+IntegrationTest.buildApp = buildApp;
+
+IntegrationTest.app = IntegrationTest.buildApp();
 
 (IntegrationTest.app as RoutedRackApp).routes.draw((r) => {
   deprecator().silence(() => {
@@ -106,7 +108,7 @@ class NullController extends Metal {
   static override async dispatch(
     action: string,
     req: Request,
-    _res: Response,
+    res: Response,
   ): Promise<RackResponse> {
     return [
       200,
@@ -131,12 +133,25 @@ export class DeadEndRoutes extends RouteSet {
   }
 }
 
-export function stubControllers<T>(
+function stubControllers<T>(
   config: RouteSetConfig | ((routes: DeadEndRoutes) => T),
   block?: (routes: DeadEndRoutes) => T,
 ): T {
   if (typeof config === "function") return config(new DeadEndRoutes());
   return block!(new DeadEndRoutes(config));
+}
+
+IntegrationTest.stubControllers = stubControllers;
+
+type BuildApp = typeof buildApp;
+type StubControllers = typeof stubControllers;
+
+declare module "../action-dispatch/testing/integration.js" {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- Ruby reopens `class ActionDispatch::IntegrationTest` (`abstract_unit.rb:118`) to add `self.build_app` and `self.stub_controllers`; a namespace merged onto the class is how an added static surfaces on the type side.
+  namespace IntegrationTest {
+    let buildApp: BuildApp;
+    let stubControllers: StubControllers;
+  }
 }
 
 (DebugExceptions.prototype as { stderrLogger(): null }).stderrLogger = function () {
