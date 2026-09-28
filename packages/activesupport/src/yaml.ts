@@ -1,4 +1,5 @@
 import { LoadError } from "@blazetrails/ruby-compat";
+export type { CollectionTag, YAMLMap } from "yaml";
 
 const yaml = await import("yaml").catch(() => {
   const missing = (): never => {
@@ -9,7 +10,6 @@ const yaml = await import("yaml").catch(() => {
 
 export const parse: typeof import("yaml").parse = yaml.parse;
 export const stringify: typeof import("yaml").stringify = yaml.stringify;
-export type { CollectionTag, YAMLMap } from "yaml";
 
 export class DisallowedClass extends globalThis.Error {
   constructor(action: string, klassName: string) {
