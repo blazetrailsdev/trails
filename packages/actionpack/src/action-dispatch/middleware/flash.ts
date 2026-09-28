@@ -1,4 +1,4 @@
-import type { RackEnv } from "@blazetrails/rack";
+import type { RackApp, RackEnv } from "@blazetrails/rack";
 
 /** @internal */
 export const KEY = "action_dispatch.request.flash_hash";
@@ -60,12 +60,12 @@ export function resetSession(this: FlashRequestHost): void {
 
 export class FlashHash {
   private _flashes: Map<string, unknown> = new Map();
-  private _discard: Set<string> = new Set();
+  private _discard: Set<string>;
   private _keep: Set<string> = new Set();
   private _now: Map<string, unknown> = new Map();
 
   constructor(flashes: Record<string, unknown> = {}, discard: readonly string[] = []) {
-    for (const k of discard) this._discard.add(k);
+    this._discard = new Set(discard);
     for (const [k, v] of Object.entries(flashes)) {
       this._flashes.set(k, v);
     }
@@ -231,5 +231,11 @@ export class FlashHash {
       out._discard.add(k);
     }
     return out;
+  }
+}
+
+export class Flash {
+  constructor(app: RackApp) {
+    return app as unknown as Flash;
   }
 }

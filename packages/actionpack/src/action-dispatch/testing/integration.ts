@@ -172,7 +172,7 @@ export class IntegrationTest {
         if (urlHost != null) {
           const dflt = DEFAULT_PORTS[location.scheme!];
           if (dflt !== location.port) urlHost += `:${location.port}`;
-          this.host = urlHost;
+          this.hostBang(urlHost);
         }
       });
     }
@@ -249,10 +249,12 @@ export class IntegrationTest {
     return response.status;
   }
 
+  hostBang(host: string): void {
+    this.host = host;
+  }
+
   async followRedirectBang(options: IntegrationRequestOptions = {}): Promise<number> {
-    if (!this.response || this.status < 300 || this.status >= 400) {
-      throw new Error(`not a redirect! ${this.status}`);
-    }
+    if (!this.isRedirect) throw new Error(`not a redirect! ${this.status} ${this.statusMessage}`);
     const location = this.redirectUrl;
     if (!location) throw new Error("not a redirect! (no Location header)");
 
@@ -288,6 +290,26 @@ export class IntegrationTest {
 
   get status(): number {
     return this.response?.statusCode ?? this.controller?.status ?? 0;
+  }
+
+  get statusMessage(): string | null {
+    return this.response == null ? null : this.response.statusMessage;
+  }
+
+  get headers(): TestResponse["headers"] | null {
+    return this.response == null ? null : this.response.headers;
+  }
+
+  get body(): string | null {
+    return this.response == null ? null : this.response.body;
+  }
+
+  get isRedirect(): boolean | null {
+    return this.response == null ? null : this.response.isRedirect;
+  }
+
+  get path(): string | null {
+    return this.request == null ? null : this.request.path;
   }
 
   get responseBody(): string {

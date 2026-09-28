@@ -39,8 +39,12 @@ export class Middleware {
   }
 
   build(app: RackApp): RackApp {
-    const mw = new this.klass(app, ...this.args, ...(this.block ? [this.block] : []));
-    return (env: RackEnv) => mw.call(env);
+    const mw: RackApp | RackAppObject = new this.klass(
+      app,
+      ...this.args,
+      ...(this.block ? [this.block] : []),
+    );
+    return typeof mw === "function" ? mw : (env: RackEnv) => mw.call(env);
   }
 
   buildInstrumented(app: RackApp): RackApp {
@@ -73,7 +77,9 @@ export class InstrumentationProxy {
 export class MiddlewareStack implements Iterable<Middleware> {
   private entries: Middleware[] = [];
 
-  constructor() {}
+  constructor(block?: (stack: MiddlewareStack) => void) {
+    if (block) block(this);
+  }
 
   get middlewares(): Middleware[] {
     return this.entries;

@@ -1,8 +1,9 @@
-import { presence } from "@blazetrails/activesupport";
+import { include, presence } from "@blazetrails/activesupport";
 import { File, IO, IOError } from "@blazetrails/ruby-compat";
 import {
   deleteSetCookieHeaderBang,
   Headers,
+  ResponseHelpers as RackResponseHelpers,
   setCookieHeader,
   statusCode,
   unescape,
@@ -167,6 +168,7 @@ export class FileBody {
   }
 }
 
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Response::Helpers` (`action_dispatch/http/response.rb:91`); the class/interface merge is how a mixin surfaces on the type side. */
 export class Response {
   static defaultCharset = "utf-8";
 
@@ -659,6 +661,13 @@ Response.prototype.isLocationFilterMatch = function (this: Response) {
 Response.prototype.parameterFilteredLocation = function (this: Response) {
   return _parameterFilteredLocation.call(this);
 };
+
+include(Response, RackResponseHelpers);
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Response::Helpers` (`action_dispatch/http/response.rb:91`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface Response extends Omit<
+  RackResponseHelpers,
+  "status" | "headers" | "mediaType" | "contentLength" | "cacheControl"
+> {}
 export interface CookieOptions {
   value: string;
   path?: string;
