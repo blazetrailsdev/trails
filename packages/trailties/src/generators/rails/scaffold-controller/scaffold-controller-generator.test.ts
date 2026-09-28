@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { registerConstant, unregisterConstant } from "@blazetrails/activesupport";
+import { ActiveModel } from "../../active-model.js";
 import { ScaffoldControllerGenerator } from "./scaffold-controller-generator.js";
 import type { ScaffoldControllerGeneratorOptions as Options } from "./scaffold-controller-generator.js";
 import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
@@ -80,6 +82,32 @@ describe("ScaffoldControllerGeneratorTest", () => {
     expect(read("config/routes.ts")).not.toContain('router.resources("users")');
   });
 
+  it("default orm is used", () => {
+    makeGen("User", [], { orm: "unknown" }).run();
+    const c = read("app/controllers/users-controller.ts");
+    expect(c).toMatch(/class UsersController extends ApplicationController/);
+    expect(c).toMatch(/const users = await User\.all\(\)/);
+  });
+
+  it("customized orm is used", () => {
+    const klass = class extends ActiveModel {
+      static override all(klass: string): string {
+        return `${klass}.find("all")`;
+      }
+    };
+
+    registerConstant("Unknown::Generators::ActiveModel", klass);
+    try {
+      makeGen("User", [], { orm: "unknown" }).run();
+      const c = read("app/controllers/users-controller.ts");
+      expect(c).toMatch(/class UsersController extends ApplicationController/);
+      expect(c).toMatch(/const users = await User\.find\("all"\)/);
+      expect(c).not.toMatch(/const users = await User\.all\(\)/);
+    } finally {
+      unregisterConstant("Unknown::Generators::ActiveModel", klass);
+    }
+  });
+
   it("permits the parameters passed", () => {
     makeGen("User", ["name:string", "age:integer"]).run();
     const c = read("app/controllers/users-controller.ts");
@@ -103,7 +131,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
   it("api controller", () => {
     makeGen("User", ["name:string"], { api: true }).run();
     const c = read("app/controllers/users-controller.ts");
-    expect(c).toContain("renderJson");
+    expect(c).toContain("this.render({ json: users })");
     expect(c).not.toContain("async new_()");
     expect(c).not.toContain("async edit()");
     expect(c).toContain('this.params.expect({ user: ["name"] })');

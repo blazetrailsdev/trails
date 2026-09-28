@@ -33,4 +33,10 @@ describe("applyResourceHelpers", () => {
     build("posts", "comments", (m) => messages.push(m));
     expect(messages.filter((m) => m.includes("recognized as a plural"))).toHaveLength(1);
   });
+
+  it("ormClass raises without an :orm class option", () => {
+    expect(() => build("post").ormClass()).toThrow(
+      "You need to have :orm as class option to invoke orm_class and orm_instance",
+    );
+  });
 });
