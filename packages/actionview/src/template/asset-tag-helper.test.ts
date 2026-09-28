@@ -16,6 +16,17 @@ import {
   stylesheetUrl,
   urlToImage,
   urlToJavascript,
+  videoPath,
+  pathToVideo,
+  videoUrl,
+  urlToVideo,
+  audioPath,
+  pathToAudio,
+  audioUrl,
+  urlToAudio,
+  fontPath,
+  fontUrl,
+  urlToFont,
   urlToStylesheet,
   type AssetPathOptions,
   type AssetUrlHelperHost,
@@ -345,6 +356,31 @@ const PathToPictureToTag = table(pathToImage, media("images", "webp"));
 const PictureUrlToTag = table(imageUrl, urls(media("images", "webp")));
 const UrlToPictureToTag = table(urlToImage, urls(media("images", "webp")));
 
+const VideoPathToTag = table(videoPath, media("videos", "ogg"));
+const PathToVideoToTag = table(pathToVideo, media("videos", "ogg"));
+const VideoUrlToTag = table(videoUrl, urls(media("videos", "ogg")));
+const UrlToVideoToTag = table(urlToVideo, urls(media("videos", "ogg")));
+
+const AudioPathToTag = table(audioPath, media("audios", "wav"));
+const PathToAudioToTag = table(pathToAudio, media("audios", "wav"));
+const AudioUrlToTag = table(audioUrl, urls(media("audios", "wav")));
+const UrlToAudioToTag = table(urlToAudio, urls(media("audios", "wav")));
+
+const fonts: [string, string][] = [
+  ["font.eot", "/fonts/font.eot"],
+  ["font.eot#iefix", "/fonts/font.eot#iefix"],
+  ["font.woff", "/fonts/font.woff"],
+  ["font.ttf", "/fonts/font.ttf"],
+  ["font.ttf?123", "/fonts/font.ttf?123"],
+];
+const fontUrls: [string, string, AssetPathOptions?][] = [
+  ...urls(fonts),
+  ["font.ttf", "http://assets.example.com/fonts/font.ttf", { host: "http://assets.example.com" }],
+];
+const FontPathToTag = table(fontPath, fonts);
+const FontUrlToTag = table(fontUrl, fontUrls);
+const UrlToFontToTag = table(urlToFont, fontUrls);
+
 const pic = (...args: unknown[]): unknown => pictureTag.call(host, ...args);
 const picImg = (
   source: string,
@@ -623,6 +659,50 @@ describe("AssetTagHelperTest", () => {
 
   it("picture tag", () => {
     PictureLinkToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("video path", () => {
+    VideoPathToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("path to video alias for video path", () => {
+    PathToVideoToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("video url", () => {
+    VideoUrlToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("url to video alias for video url", () => {
+    UrlToVideoToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("audio path", () => {
+    AudioPathToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("path to audio alias for audio path", () => {
+    PathToAudioToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("audio url", () => {
+    AudioUrlToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("url to audio alias for audio url", () => {
+    UrlToAudioToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("font path", () => {
+    FontPathToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("font url", () => {
+    FontUrlToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("url to font alias for font url", () => {
+    UrlToFontToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
   });
 
   it("image tag interpreting email cid correctly", () => {
