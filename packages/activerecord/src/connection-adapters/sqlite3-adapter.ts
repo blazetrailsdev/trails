@@ -46,7 +46,13 @@ import { deprecator } from "../deprecator.js";
 import { TypeMap } from "../type/type-map.js";
 import { DateTime as ARDateTimeType } from "../type/date-time.js";
 import { IntegerType } from "@blazetrails/activemodel";
-import { camelize, isBlank, runLoadHooks, trailsRoot } from "@blazetrails/activesupport";
+import {
+  camelize,
+  classAttribute,
+  isBlank,
+  runLoadHooks,
+  trailsRoot,
+} from "@blazetrails/activesupport";
 import { File, FileUtils } from "@blazetrails/ruby-compat";
 import {
   returningColumnValues as sqliteReturningColumnValues,
@@ -128,7 +134,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return new SQLite3TableDefinition(this, name, options);
   }
 
-  static strictStringsByDefault: boolean = false;
+  declare static strictStringsByDefault: boolean;
+  declare static isStrictStringsByDefault: () => boolean;
+
+  static {
+    classAttribute.call(this, "strictStringsByDefault", { default: false });
+  }
 
   static columnNameMatcher(): RegExp {
     const id = String.raw`(?:\w+|"(?:[^"]|"")*")`;
