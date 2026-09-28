@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { assertRaise } from "@blazetrails/activesupport";
+import { SafeBuffer, assertRaise } from "@blazetrails/activesupport";
 import {
   assetPath,
   computeAssetPath,
@@ -28,11 +28,14 @@ import {
   imageDecoding,
   imageLoading,
   imageTag,
+  pictureTag,
   setImageDecoding,
   setImageLoading,
   stylesheetLinkTag,
   type AssetTagHelperHost,
 } from "../helpers/asset-tag-helper.js";
+import type { CaptureHelperHost } from "../helpers/capture-helper.js";
+import { tag } from "../helpers/tag-helper.js";
 
 Template.mimeTypesImplementation = Mime;
 
@@ -42,10 +45,16 @@ const host = {
   publicComputeAssetPath,
   request,
   urlFor: (..._args: unknown[]) => "http://www.example.com",
-} as unknown as AssetTagHelperHost;
+} as unknown as AssetTagHelperHost & CaptureHelperHost;
+
+const normalizeDom = (html: unknown): string =>
+  String(html).replace(/<(\w+)((?:\s+[\w-]+="[^"]*")*)\s*(\/?)>/g, (_m, name, attrs, close) => {
+    const sorted = (attrs.match(/[\w-]+="[^"]*"/g) ?? []).sort().join(" ");
+    return `<${name}${sorted ? " " + sorted : ""}${close}>`;
+  });
 
 const assertDomEqual = (expected: string, actual: unknown): void => {
-  expect(String(actual)).toEqual(expected);
+  expect(normalizeDom(actual)).toEqual(normalizeDom(expected));
 };
 
 type PathHelper = (this: AssetUrlHelperHost, source: string, options?: AssetPathOptions) => string;
@@ -238,6 +247,217 @@ const StyleLinkToTag: [() => unknown, string][] = [
   ],
 ];
 
+const img = (...args: [unknown, Record<string, unknown>?]): unknown => imageTag.call(host, ...args);
+const gif = "data:image/gif;base64,R0lGODlhAQABAID/AMDAwAAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==";
+
+const ImageLinkToTag: [() => unknown, string][] = [
+  [() => img("xml.png"), `<img src="/images/xml.png" />`],
+  [
+    () => img("rss.gif", { alt: "RSS syndication" }),
+    `<img alt="RSS syndication" src="/images/rss.gif" />`,
+  ],
+  [() => img("gold.png", { size: "20" }), `<img height="20" src="/images/gold.png" width="20" />`],
+  [() => img("gold.png", { size: 20 }), `<img height="20" src="/images/gold.png" width="20" />`],
+  [
+    () => img("silver.png", { size: "90.9" }),
+    `<img height="90.9" src="/images/silver.png" width="90.9" />`,
+  ],
+  [
+    () => img("silver.png", { size: 90.9 }),
+    `<img height="90.9" src="/images/silver.png" width="90.9" />`,
+  ],
+  [
+    () => img("gold.png", { size: "45x70" }),
+    `<img height="70" src="/images/gold.png" width="45" />`,
+  ],
+  [
+    () => img("gold.png", { size: "45x70" }),
+    `<img height="70" src="/images/gold.png" width="45" />`,
+  ],
+  [
+    () => img("silver.png", { size: "67.12x74.09" }),
+    `<img height="74.09" src="/images/silver.png" width="67.12" />`,
+  ],
+  [
+    () => img("silver.png", { size: "67.12x74.09" }),
+    `<img height="74.09" src="/images/silver.png" width="67.12" />`,
+  ],
+  [
+    () => img("bronze.png", { size: "10x15.7" }),
+    `<img height="15.7" src="/images/bronze.png" width="10" />`,
+  ],
+  [
+    () => img("bronze.png", { size: "10x15.7" }),
+    `<img height="15.7" src="/images/bronze.png" width="10" />`,
+  ],
+  [
+    () => img("platinum.png", { size: "4.9x20" }),
+    `<img height="20" src="/images/platinum.png" width="4.9" />`,
+  ],
+  [
+    () => img("platinum.png", { size: "4.9x20" }),
+    `<img height="20" src="/images/platinum.png" width="4.9" />`,
+  ],
+  [() => img("error.png", { size: "45 x 70" }), `<img src="/images/error.png" />`],
+  [() => img("error.png", { size: "1,024x768" }), `<img src="/images/error.png" />`],
+  [() => img("error.png", { size: "768x1,024" }), `<img src="/images/error.png" />`],
+  [() => img("error.png", { size: "x" }), `<img src="/images/error.png" />`],
+  [() => img("google.com.png"), `<img src="/images/google.com.png" />`],
+  [() => img("slash..png"), `<img src="/images/slash..png" />`],
+  [() => img(".pdf.png"), `<img src="/images/.pdf.png" />`],
+  [
+    () => img("http://www.rubyonrails.com/images/rails.png"),
+    `<img src="http://www.rubyonrails.com/images/rails.png" />`,
+  ],
+  [
+    () => img("//www.rubyonrails.com/images/rails.png"),
+    `<img src="//www.rubyonrails.com/images/rails.png" />`,
+  ],
+  [() => img("mouse.png", { alt: null }), `<img src="/images/mouse.png" />`],
+  [() => img(gif, { alt: null }), `<img src="${gif}" />`],
+  [() => img(""), `<img src="" />`],
+  [
+    () => img("gold.png", { data: { title: "Rails Application" } }),
+    `<img data-title="Rails Application" src="/images/gold.png" />`,
+  ],
+  [
+    () => img("rss.gif", { srcset: "/assets/pic_640.jpg 640w, /assets/pic_1024.jpg 1024w" }),
+    `<img srcset="/assets/pic_640.jpg 640w, /assets/pic_1024.jpg 1024w" src="/images/rss.gif" />`,
+  ],
+  [
+    () => img("rss.gif", { srcset: { "pic_640.jpg": "640w", "pic_1024.jpg": "1024w" } }),
+    `<img srcset="/images/pic_640.jpg 640w, /images/pic_1024.jpg 1024w" src="/images/rss.gif" />`,
+  ],
+  [
+    () =>
+      img("rss.gif", {
+        srcset: [
+          ["pic_640.jpg", "640w"],
+          ["pic_1024.jpg", "1024w"],
+        ],
+      }),
+    `<img srcset="/images/pic_640.jpg 640w, /images/pic_1024.jpg 1024w" src="/images/rss.gif" />`,
+  ],
+];
+
+const PicturePathToTag = table(imagePath, media("images", "webp"));
+const PathToPictureToTag = table(pathToImage, media("images", "webp"));
+const PictureUrlToTag = table(imageUrl, urls(media("images", "webp")));
+const UrlToPictureToTag = table(urlToImage, urls(media("images", "webp")));
+
+const pic = (...args: unknown[]): unknown => pictureTag.call(host, ...args);
+const picImg = (
+  source: string,
+  image: Record<string, unknown>,
+  img: string,
+): [() => unknown, string] => [() => pic(source, { image }), `<picture>${img}</picture>`];
+const sources = `<source srcset="/images/picture.webp" type="image/webp" /><source srcset="/images/picture.png" type="image/png" />`;
+
+const PictureLinkToTag: [() => unknown, string][] = [
+  [() => pic("picture.webp"), `<picture><img src="/images/picture.webp" /></picture>`],
+  picImg("gold.png", { size: "20" }, `<img height="20" src="/images/gold.png" width="20" />`),
+  picImg("gold.png", { size: 20 }, `<img height="20" src="/images/gold.png" width="20" />`),
+  picImg(
+    "silver.png",
+    { size: "90.9" },
+    `<img height="90.9" src="/images/silver.png" width="90.9" />`,
+  ),
+  picImg(
+    "silver.png",
+    { size: 90.9 },
+    `<img height="90.9" src="/images/silver.png" width="90.9" />`,
+  ),
+  picImg("gold.png", { size: "45x70" }, `<img height="70" src="/images/gold.png" width="45" />`),
+  picImg("gold.png", { size: "45x70" }, `<img height="70" src="/images/gold.png" width="45" />`),
+  picImg(
+    "silver.png",
+    { size: "67.12x74.09" },
+    `<img height="74.09" src="/images/silver.png" width="67.12" />`,
+  ),
+  picImg(
+    "silver.png",
+    { size: "67.12x74.09" },
+    `<img height="74.09" src="/images/silver.png" width="67.12" />`,
+  ),
+  picImg(
+    "bronze.png",
+    { size: "10x15.7" },
+    `<img height="15.7" src="/images/bronze.png" width="10" />`,
+  ),
+  picImg(
+    "bronze.png",
+    { size: "10x15.7" },
+    `<img height="15.7" src="/images/bronze.png" width="10" />`,
+  ),
+  picImg(
+    "platinum.png",
+    { size: "4.9x20" },
+    `<img height="20" src="/images/platinum.png" width="4.9" />`,
+  ),
+  picImg(
+    "platinum.png",
+    { size: "4.9x20" },
+    `<img height="20" src="/images/platinum.png" width="4.9" />`,
+  ),
+  picImg("error.png", { size: "45 x 70" }, `<img src="/images/error.png" />`),
+  picImg("error.png", { size: "1,024x768" }, `<img src="/images/error.png" />`),
+  picImg("error.png", { size: "768x1,024" }, `<img src="/images/error.png" />`),
+  picImg("error.png", { size: "x" }, `<img src="/images/error.png" />`),
+  [() => pic("google.com.png"), `<picture><img src="/images/google.com.png" /></picture>`],
+  [() => pic("slash..png"), `<picture><img src="/images/slash..png" /></picture>`],
+  [() => pic(".pdf.png"), `<picture><img src="/images/.pdf.png" /></picture>`],
+  [
+    () => pic("http://www.rubyonrails.com/images/rails.png"),
+    `<picture><img src="http://www.rubyonrails.com/images/rails.png" /></picture>`,
+  ],
+  [
+    () => pic("//www.rubyonrails.com/images/rails.png"),
+    `<picture><img src="//www.rubyonrails.com/images/rails.png" /></picture>`,
+  ],
+  picImg("mouse.png", { alt: null }, `<img src="/images/mouse.png" />`),
+  picImg(gif, { alt: null }, `<img src="${gif}" />`),
+  [() => pic(""), `<picture><img src="" /></picture>`],
+  [
+    () => pic("picture.webp", "picture.png"),
+    `<picture>${sources}<img src="/images/picture.png" /></picture>`,
+  ],
+  [
+    () => pic("picture.webp", "picture.png", { class: "my-class" }),
+    `<picture class="my-class">${sources}<img src="/images/picture.png" /></picture>`,
+  ],
+  [
+    () => pic("picture.webp", "picture.png", { image: { alt: "Image" } }),
+    `<picture>${sources}<img alt="Image" src="/images/picture.png" /></picture>`,
+  ],
+  [
+    () => pic(["picture.webp", "picture.png"], { image: { alt: "Image" } }),
+    `<picture>${sources}<img alt="Image" src="/images/picture.png" /></picture>`,
+  ],
+  [
+    () =>
+      pic({ class: "my-class" }, () =>
+        (tag("source", { srcset: imagePath.call(host, "picture.webp") }) as SafeBuffer).plus(
+          img("picture.png", { alt: "Image" }),
+        ),
+      ),
+    `<picture class="my-class"><source srcset="/images/picture.webp" /><img alt="Image" src="/images/picture.png" /></picture>`,
+  ],
+  [
+    () =>
+      pic(() =>
+        (
+          tag("source", {
+            srcset: imagePath.call(host, "picture-small.webp"),
+            media: "(min-width: 600px)",
+          }) as SafeBuffer
+        )
+          .plus(tag("source", { srcset: imagePath.call(host, "picture-big.webp") }))
+          .plus(img("picture.png", { alt: "Image" })),
+      ),
+    `<picture><source srcset="/images/picture-small.webp" media="(min-width: 600px)" /><source srcset="/images/picture-big.webp" /><img alt="Image" src="/images/picture.png" /></picture>`,
+  ],
+];
+
 describe("AssetTagHelperTest", () => {
   it("autodiscovery link tag with unknown type but not pass type option key", async () => {
     await assertRaise([ArgumentError], {}, () => autoDiscoveryLinkTag.call(host, ":xml"));
@@ -335,6 +555,10 @@ describe("AssetTagHelperTest", () => {
     UrlToImageToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
   });
 
+  it("image tag", () => {
+    ImageLinkToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
   it("image tag does not modify options", () => {
     const options = { size: "16x10" };
     imageTag.call(host, "icon", options);
@@ -355,7 +579,7 @@ describe("AssetTagHelperTest", () => {
     try {
       assertDomEqual(`<img src="" loading="lazy" />`, imageTag.call(host, ""));
       assertDomEqual(
-        `<img loading="eager" src="" />`,
+        `<img src="" loading="eager" />`,
         imageTag.call(host, "", { loading: "eager" }),
       );
     } finally {
@@ -373,11 +597,50 @@ describe("AssetTagHelperTest", () => {
     try {
       assertDomEqual(`<img src="" decoding="async" />`, imageTag.call(host, ""));
       assertDomEqual(
-        `<img decoding="sync" src="" />`,
+        `<img src="" decoding="sync" />`,
         imageTag.call(host, "", { decoding: "sync" }),
       );
     } finally {
       setImageDecoding(originalImageDecoding);
     }
+  });
+
+  it("picture path", () => {
+    PicturePathToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("path to picture alias for picture path", () => {
+    PathToPictureToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("picture url", () => {
+    PictureUrlToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("url to picture alias for picture url", () => {
+    UrlToPictureToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("picture tag", () => {
+    PictureLinkToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("image tag interpreting email cid correctly", () => {
+    expect(String(imageTag.call(host, "cid:thi%25%25sis@acontentid"))).toEqual(
+      '<img src="cid:thi%25%25sis@acontentid" />',
+    );
+  });
+
+  it("image tag interpreting email adding optional alt tag", () => {
+    expect(String(imageTag.call(host, "cid:thi%25%25sis@acontentid", { alt: "Image" }))).toEqual(
+      '<img alt="Image" src="cid:thi%25%25sis@acontentid" />',
+    );
+  });
+
+  it("should not modify source string", () => {
+    const source = "/images/rails.png";
+    const copy = source;
+    imageTag.call(host, source);
+    expect(source).toEqual(copy);
   });
 });

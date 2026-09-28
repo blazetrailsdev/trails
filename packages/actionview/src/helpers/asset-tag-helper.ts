@@ -9,6 +9,7 @@ import {
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
+  File,
   NoMethodError,
   rtest,
   stringToSym,
@@ -22,7 +23,9 @@ import {
   type AssetPathOptions,
   type AssetUrlHelperHost,
 } from "./asset-url-helper.js";
-import { tag } from "./tag-helper.js";
+import { capture, type CaptureHelperHost } from "./capture-helper.js";
+import { safeJoin } from "./output-safety-helper.js";
+import { contentTag, tag } from "./tag-helper.js";
 
 export let imageLoading: string | null = null;
 
@@ -205,6 +208,38 @@ export function imageTag(
   }
 
   return tag("img", options) as SafeBuffer;
+}
+
+export function pictureTag(
+  this: AssetTagHelperHost & CaptureHelperHost,
+  ...sources: unknown[]
+): SafeBuffer {
+  const block =
+    typeof sources[sources.length - 1] === "function"
+      ? (sources.pop() as () => unknown)
+      : undefined;
+  sources = sources.flat(Infinity);
+  const options = { ...extractOptionsBang(sources) };
+  const image = deleteKey(options, "image");
+  const imageOptions = (image != null && image !== false ? image : {}) as Record<string, unknown>;
+  const skipPipeline = deleteKey(options, "skipPipeline") as boolean | undefined;
+
+  return contentTag.call(this, "picture", options, null, undefined, () => {
+    if (isPresent(block)) {
+      return htmlSafe(capture.call(this, block!)!.toString());
+    } else if (sources.length <= 1) {
+      return imageTag.call(this, sources[sources.length - 1], imageOptions);
+    } else {
+      const sourceTags: unknown[] = sources.map((source) =>
+        tag("source", {
+          srcset: resolveAssetSource.call(this, "image", source, skipPipeline),
+          type: Template.Types.get(File.extname(source as string).slice(1))?.toString(),
+        }),
+      );
+      sourceTags.push(imageTag.call(this, sources[sources.length - 1], imageOptions));
+      return safeJoin(sourceTags);
+    }
+  });
 }
 
 /** @internal */
