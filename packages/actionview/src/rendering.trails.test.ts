@@ -1,12 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { ActionController, Request, Response, RouteSet, UrlFor } from "@blazetrails/actionpack";
-import { include, Module } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat";
 import { RoutingUrlFor } from "./routing-url-for.js";
 
-include(
-  RoutingUrlFor as unknown as new (...args: never[]) => unknown,
-  new Module((mod) => mod.include(UrlFor)),
-);
+include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
 
 describe("ActionView::Rendering::ClassMethods#build_view_context_class", () => {
   it("includes RoutingUrlFor through routes.url_helpers' UrlFor included hook", async () => {

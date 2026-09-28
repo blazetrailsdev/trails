@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RouteSet, UrlFor } from "@blazetrails/actionpack";
-import { include, Module } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat";
 import { RoutingUrlFor } from "../routing-url-for.js";
 import { Base } from "../base.js";
 import { setPrependContentExfiltrationPrevention } from "../helpers/content-exfiltration-prevention-helper.js";
@@ -23,10 +23,7 @@ const assertDomEqual = (expected: string, actual: unknown): void => {
   expect(normalizeDom(actual)).toEqual(normalizeDom(expected));
 };
 
-include(
-  RoutingUrlFor as unknown as new (...args: never[]) => unknown,
-  new Module((mod) => mod.include(UrlFor)),
-);
+include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
 
 const routes = new RouteSet();
 routes.draw((r) => {
