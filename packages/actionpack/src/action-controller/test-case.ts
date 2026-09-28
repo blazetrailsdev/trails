@@ -16,7 +16,7 @@ import {
   SessionId,
   type PersistedRequest,
 } from "@blazetrails/rack-session";
-import { buildNestedQuery } from "@blazetrails/rack";
+import { buildNestedQuery, statusCode } from "@blazetrails/rack";
 import {
   MULTIPART_BOUNDARY,
   UploadedFile as RackTestUploadedFile,
@@ -196,33 +196,10 @@ export class TestCase {
       return;
     }
 
-    const SYMBOLS: Record<string, number> = {
-      ok: 200,
-      created: 201,
-      accepted: 202,
-      no_content: 204,
-      moved_permanently: 301,
-      found: 302,
-      see_other: 303,
-      not_modified: 304,
-      bad_request: 400,
-      unauthorized: 401,
-      forbidden: 403,
-      not_found: 404,
-      method_not_allowed: 405,
-      unprocessable_entity: 422,
-      internal_server_error: 500,
-      service_unavailable: 503,
-    };
-    const code = SYMBOLS[expected];
-    if (code !== undefined) {
-      if (actual !== code) {
-        throw new Error(`Expected response status :${expected} (${code}), got ${actual}`);
-      }
-      return;
+    const code = statusCode(expected);
+    if (actual !== code) {
+      throw new Error(`Expected response status :${expected} (${code}), got ${actual}`);
     }
-
-    throw new Error(`Unknown response assertion: "${expected}"`);
   }
 
   assertRedirectedTo(expected: string | RegExp): void {

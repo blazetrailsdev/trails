@@ -223,7 +223,7 @@ describe("TestCaseTest", () => {
 
     it("throws on unknown symbol", async () => {
       await tc.get("index");
-      expect(() => tc.assertResponse("banana")).toThrow(/Unknown response assertion/);
+      expect(() => tc.assertResponse("banana")).toThrow(/Unrecognized status code :banana/);
     });
 
     it("accepts 'missing' for 4xx", async () => {
