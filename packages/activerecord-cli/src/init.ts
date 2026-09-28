@@ -78,6 +78,17 @@ const AR_DEPS = {
 
 const AR_DEV_DEPS = {
   "@blazetrails/trails-tsc": "*",
+  tsx: "^4.20.0",
+};
+
+const AR = "tsx node_modules/@blazetrails/activerecord-cli/bin/ar.js";
+
+export const AR_SCRIPTS = {
+  ar: AR,
+  migrate: `${AR} db:migrate`,
+  seed: `${AR} db:seed`,
+  console: `${AR} console`,
+  runner: `${AR} runner`,
 };
 
 function freshPackageJson(name: string, driver: string): string {
@@ -88,7 +99,7 @@ function freshPackageJson(name: string, driver: string): string {
         version: "0.1.0",
         private: true,
         type: "module",
-        scripts: { migrate: "ar db:migrate", seed: "ar db:seed", console: "ar console" },
+        scripts: AR_SCRIPTS,
         dependencies: {
           ...AR_DEPS,
           ...(INIT_DRIVER_DEPS[driver] ?? INIT_DRIVER_DEPS["better-sqlite3"]),

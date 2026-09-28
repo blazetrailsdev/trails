@@ -24,7 +24,8 @@ import {
   schemaFormat,
   setSchemaFormat,
 } from "@blazetrails/activerecord";
-import { MigrationProxy } from "@blazetrails/activerecord";
+import { DatabaseTasks, MigrationProxy } from "@blazetrails/activerecord";
+import { Trails, _resetTrailsEnv } from "../rails.js";
 import { parse as yamlParse } from "@blazetrails/activesupport/yaml";
 
 function discoverMigrations(migrationsPath: string): MigrationProxy[] {
@@ -987,6 +988,28 @@ describe("db subcommand CLI actions", { timeout: 30_000 }, () => {
     expect(at).toBeGreaterThan(0);
     expect(logs[at - 1]).toMatch(/^\ndatabase: /);
     expect(logs[at + 1]).toBe("");
+  });
+
+  it("db version reads Trails.env, not the process env", async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ":memory:" },
+  staging: { adapter: "sqlite3", database: "db/staging.sqlite3" },
+};`,
+    );
+    const origTrailsEnv = env.TRAILS_ENV;
+    setEnv("TRAILS_ENV", undefined);
+    Trails.env = "staging";
+    DatabaseTasks.env = null;
+    try {
+      await runDb(["version"]);
+    } finally {
+      setEnv("TRAILS_ENV", origTrailsEnv);
+      _resetTrailsEnv();
+      DatabaseTasks.env = null;
+    }
+    expect(logs.join("\n")).toMatch(/database: .*staging\.sqlite3/);
   });
 
   it("db abort_if_pending_migrations is a no-op when no migrations exist", async () => {

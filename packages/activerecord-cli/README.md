@@ -28,8 +28,13 @@ ar db:create
 ar generate:migration AddUsers name:string email:string
 # edit db/migrate/<ts>_add_users.ts
 ar db:migrate
-ar console
+pnpm console
 ```
+
+Commands that load app code (`console`, `runner`, `db:migrate`, `db:seed`)
+must run under the `tsx` loader, because models import each other with `.js`
+specifiers. The generated `package.json` scripts do this: `pnpm console`,
+`pnpm runner <script.ts>`, or `pnpm ar <command>` for any other command.
 
 ## Project layout
 

@@ -229,9 +229,11 @@ export class Application extends Engine {
     const c = this.config.credentials;
     await this.root();
     const def = await this.config.credentialsDefaults();
-    return (this._credentials = await this.encrypted(c.contentPath ?? def.contentPath, {
+    const credentials = await this.encrypted(c.contentPath ?? def.contentPath, {
       keyPath: c.keyPath ?? def.keyPath,
-    }));
+    });
+    await credentials.config();
+    return (this._credentials = credentials);
   }
 
   async encrypted(

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readdir, readFile, writeFile } from "fs/promises";
 import { join } from "path";
+import { DatabaseTasks } from "@blazetrails/activerecord";
 import { run } from "../cli.js";
 import {
   captureConsoleErrors,
@@ -81,5 +82,53 @@ describe.skipIf(process.platform === "win32")("sqlite-happy-path E2E", () => {
     const schema = await readFile(join(tmpDir, "db", "schema.ts"), "utf8");
     expect(schema).toContain("createTable");
     expect(schema).toContain("users");
+  });
+
+  it("db:create → db:migrate target development with TRAILS_ENV and NODE_ENV unset", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const errors = captureConsoleErrors();
+    const origNodeEnv = process.env.NODE_ENV;
+    delete process.env.TRAILS_ENV;
+    delete process.env.NODE_ENV;
+    DatabaseTasks.env = null;
+    try {
+      expect(await run(["init", "--driver", "better-sqlite3"], tmpDir)).toBe(0);
+      const createCode = await run(["db:create"], tmpDir);
+      expect(createCode, exitReason("ar db:create should exit 0", errors)).toBe(0);
+      const migrateCode = await run(["db:migrate"], tmpDir);
+      expect(migrateCode, exitReason("ar db:migrate should exit 0", errors)).toBe(0);
+      expect(DatabaseTasks.env).toBe("development");
+    } finally {
+      process.env.NODE_ENV = origNodeEnv;
+      DatabaseTasks.env = null;
+    }
+  });
+
+  it("runner loads a generated model through the tsx-backed scripts", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const errors = captureConsoleErrors();
+
+    expect(await run(["init", "--driver", "better-sqlite3"], tmpDir)).toBe(0);
+    const pkg = JSON.parse(await readFile(join(tmpDir, "package.json"), "utf8"));
+    expect(pkg.devDependencies.tsx).toBeDefined();
+    expect(pkg.scripts.runner).toMatch(/^tsx .*\/bin\/ar\.js runner$/);
+
+    const genCode = await run(["generate:model", "Product", "name:string"], tmpDir);
+    expect(genCode, exitReason("ar generate:model should exit 0", errors)).toBe(0);
+    expect(await run(["generate:manifest"], tmpDir)).toBe(0);
+    expect(await run(["db:create"], tmpDir)).toBe(0);
+    const migrateCode = await run(["db:migrate"], tmpDir);
+    expect(migrateCode, exitReason("ar db:migrate should exit 0", errors)).toBe(0);
+
+    await writeFile(
+      join(tmpDir, "try-runner.ts"),
+      `import { Product } from "./app/models/index.js";
+const product = await Product.createBang({ name: "Widget" });
+(globalThis as Record<string, unknown>).__runnerProduct = product.name;
+`,
+    );
+    const runnerCode = await run(["runner", "try-runner.ts"], tmpDir);
+    expect(runnerCode, exitReason("ar runner should exit 0", errors)).toBe(0);
+    expect((globalThis as Record<string, unknown>).__runnerProduct).toBe("Widget");
   });
 });

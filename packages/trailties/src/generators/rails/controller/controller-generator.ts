@@ -1,4 +1,4 @@
-import { GeneratorBase, type GeneratorOptions, dasherize } from "../../base.js";
+import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 import { underscore } from "@blazetrails/activesupport";
 import {
   actionMethod,
@@ -77,7 +77,7 @@ ${cases}
         ? "config/routes.js"
         : null;
     if (!routesFile) return;
-    const controllerSegment = dasherize(underscore(namespaceParts[namespaceParts.length - 1]));
+    const fileName = underscore(namespaceParts[namespaceParts.length - 1]);
 
     if (namespaceParts.length > 1) {
       const namespaces = namespaceParts.slice(0, -1).map((p) => underscore(p));
@@ -89,14 +89,12 @@ ${cases}
       }
       const inner = "  ".repeat(indent);
       for (const a of actions) {
-        lines.push(`${inner}router.get("${controllerSegment}/${a}");`);
+        lines.push(`${inner}router.get("${fileName}/${a}");`);
       }
       for (let i = namespaces.length; i > 0; i--) lines.push(`${"  ".repeat(i)}});`);
       this.insertIntoFile(routesFile, "// routes", lines.join("\n") + "\n");
     } else {
-      const routeLines = actions
-        .map((a) => `  router.get("${controllerSegment}/${a}");`)
-        .join("\n");
+      const routeLines = actions.map((a) => `  router.get("${fileName}/${a}");`).join("\n");
       this.insertIntoFile(routesFile, "// routes", routeLines + "\n");
     }
   }

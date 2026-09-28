@@ -273,15 +273,18 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_record_encryption.configuration", async (app) => {
-      const credentials = await (await (app as TrailtieApp).credentials()).config();
+      const credentials = await (app as TrailtieApp).credentials();
       onLoad("active_record_encryption", () => {
-        const activeRecordEncryption = credentials["active_record_encryption"] as
-          | Record<string, string | undefined>
-          | undefined;
         Encryption.configure({
-          primaryKey: activeRecordEncryption?.["primary_key"],
-          deterministicKey: activeRecordEncryption?.["deterministic_key"],
-          keyDerivationSalt: activeRecordEncryption?.["key_derivation_salt"],
+          primaryKey: credentials.dig("active_record_encryption", "primary_key") as string,
+          deterministicKey: credentials.dig(
+            "active_record_encryption",
+            "deterministic_key",
+          ) as string,
+          keyDerivationSalt: credentials.dig(
+            "active_record_encryption",
+            "key_derivation_salt",
+          ) as string,
           ...(this.config.get("activeRecord") as ActiveRecordConfig).encryption,
         });
 

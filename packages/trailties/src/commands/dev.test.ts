@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Dir, File, FileUtils, chdir, stdout } from "@blazetrails/ruby-compat";
-import { devCommand } from "./dev.js";
+import { invoke } from "../command.js";
 
 let appPath: string;
 let originalCwd: string;
@@ -24,7 +24,7 @@ function appFile(path: string, contents: string): void {
 
 async function runDevCacheCommand(): Promise<string> {
   const write = vi.spyOn(stdout, "write").mockReturnValue(true as never);
-  await devCommand().parseAsync(["cache"], { from: "user" });
+  await invoke("dev:cache");
   const output = write.mock.calls.map((args) => String(args[0])).join("");
   write.mockRestore();
   return output;

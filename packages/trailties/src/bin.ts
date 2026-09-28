@@ -3,7 +3,7 @@ import "@blazetrails/activesupport/node";
 import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { Dir, argv } from "@blazetrails/ruby-compat";
 import { setAppPath } from "./app-path.js";
-import { createProgram } from "./cli.js";
+import { invoke } from "./command.js";
 import { Generators } from "./generators.js";
 
 const root = Dir.pwd();
@@ -21,5 +21,5 @@ for (const candidate of [
 
 await Generators.lookupBang();
 
-const program = createProgram();
-await program.parseAsync([...argv]);
+const [, , command = "", ...args] = argv;
+await invoke(command, args);

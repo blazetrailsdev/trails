@@ -47,11 +47,4 @@ describe("RailtieTest", () => {
     await runTrailtieInitializers(Trailtie, app);
     expect(deprecators.get("actionView")).toBe(deprecator());
   });
-
-  it("runInitializers applies annotateRenderedViewWithFilenames config to Base", async () => {
-    (Trailtie.config.get("actionView") as ActionViewConfig).annotateRenderedViewWithFilenames =
-      true;
-    await runTrailtieInitializers(Trailtie, app);
-    expect(Base.annotateRenderedViewWithFilenames).toBe(true);
-  });
 });

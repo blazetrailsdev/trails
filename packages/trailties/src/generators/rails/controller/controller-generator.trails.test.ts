@@ -37,6 +37,14 @@ describe("ControllerGenerator view and controller file naming", () => {
     expect(fs.existsSync(path.join(tmpDir, "app/controllers/rfc-pages-controller.ts"))).toBe(true);
   });
 
+  it("draws a multi-word route under the underscored file_name, not a dasherized one", () => {
+    const gen = makeGen();
+    gen.run("AdminUsers", ["index"]);
+    const routes = fs.readFileSync(path.join(tmpDir, "config/routes.ts"), "utf8");
+    expect(routes).toContain('router.get("admin_users/index")');
+    expect(routes).not.toContain("admin-users");
+  });
+
   it("camelizes a plural multi-word name without singularizing it", () => {
     const gen = makeGen();
     gen.run("rfc_pages", ["show"]);

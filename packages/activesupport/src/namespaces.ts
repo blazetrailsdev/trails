@@ -32,7 +32,11 @@ export const TopLevel: {
     logger: Logger | null;
     cache: CacheStore | null;
     application: {
-      config: { considerAllRequestsLocal: boolean };
+      config: {
+        considerAllRequestsLocal: boolean;
+        root?: string | null;
+        paths(): { get(path: string): { toAry(): string[] } | undefined };
+      };
       reloadRoutesUnlessLoaded(): Promise<boolean> | undefined;
     } | null;
     Application: abstract new (...args: never[]) => unknown;

@@ -11,7 +11,7 @@ import { DEFAULT_ENV } from "../connection-handling.js";
 import { _setDatabaseTasks } from "./database-tasks-slot.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import type { BoundSchemaReflection } from "../connection-adapters/schema-cache.js";
-import { getEnv, isBlank, trailsRoot } from "@blazetrails/activesupport";
+import { getEnv, isBlank, TopLevel, trailsRoot } from "@blazetrails/activesupport";
 import {
   getCryptoAsync,
   getOs,
@@ -44,7 +44,7 @@ export class DatabaseTasks {
   private static _env: string | null = null;
 
   static get env(): string {
-    return (this._env ??= DEFAULT_ENV());
+    return (this._env ??= TopLevel.Trails ? TopLevel.Trails.env.toString() : DEFAULT_ENV());
   }
 
   static set env(value: string | null) {
@@ -62,7 +62,20 @@ export class DatabaseTasks {
     setConfigurationsStore(value ?? new DatabaseConfigurations({}));
   }
 
-  static dbDir: string = "db";
+  private static _dbDir: string | null = null;
+
+  /** @missingRailsCall first — PERMANENT */
+  static get dbDir(): string {
+    if (this._dbDir !== null) return this._dbDir;
+    const application = TopLevel.Trails?.application;
+    const root = application?.config.root;
+    if (!application || root == null) return "db";
+    return (this._dbDir = File.expandPath(application.config.paths().get("db")!.toAry()[0], root));
+  }
+
+  static set dbDir(value: string) {
+    this._dbDir = value;
+  }
   private static _migrationsPaths: string[] = ["db/migrate"];
 
   static get migrationsPaths(): string[] {
@@ -78,6 +91,8 @@ export class DatabaseTasks {
 
   static get root(): string {
     if (this._root !== null) return this._root;
+    const root = TopLevel.Trails?.application?.config.root;
+    if (root != null) return (this._root = root);
     return DatabaseTasks._resolveCwd();
   }
 
