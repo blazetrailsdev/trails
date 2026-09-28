@@ -390,7 +390,7 @@ export class Base extends Metal {
     if (truthy(renderer)) return renderer;
     return actionViewRenderToBody
       .call(this as never, options)
-      .then((body) => this._drainStreamingBody(body))
+      .then((body) => this.drainStreamingBody(body))
       .then((body) => {
         if (truthy(body)) return body;
         const priority = _renderInPriorities(options);
@@ -403,7 +403,7 @@ export class Base extends Metal {
    * @internal
    * @noRailsEquivalent CONVERGEABLE response-carries-async-streaming-body
    */
-  async _drainStreamingBody(body: unknown): Promise<unknown> {
+  async drainStreamingBody(body: unknown): Promise<unknown> {
     if (!Array.isArray(body) && typeof (body as StreamingBody | null)?.each === "function") {
       const chunks: string[] = [];
       await (body as StreamingBody).each((chunk) => chunks.push(chunk));
