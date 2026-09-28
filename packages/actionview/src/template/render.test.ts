@@ -65,7 +65,7 @@ describe("CachedViewRenderTest", () => {
 
   it("render partial with nil collection should return nil", () => {
     expect(
-      view.viewRenderer.render(view, { partial: "test/customer", collection: null }),
+      view.viewRenderer.render(view, { partial: "test/customer", collection: null as never }),
     ).toBeNull();
   });
 });
