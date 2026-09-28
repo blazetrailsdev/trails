@@ -7,6 +7,7 @@ import {
   assertRouting,
   type RoutingAssertionsHost,
 } from "../../action-dispatch/testing/assertions/routing.js";
+import "../test-case.js";
 
 type Options = Record<string, unknown>;
 

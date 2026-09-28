@@ -11,6 +11,7 @@ import {
   withRouting,
   type RoutingAssertionsHost,
 } from "./routing.js";
+import "../../../action-controller/test-case.js";
 
 function buildHost(): RoutingAssertionsHost {
   const routes = new RouteSet();
