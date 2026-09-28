@@ -79,7 +79,7 @@ export const KERNEL_METHODS = new Set([
   "yieldSelf",
   "send",
   "publicSend",
-  "respondTo",
+  "isRespondTo",
   "method",
   "publicMethod",
   "singletonMethod",

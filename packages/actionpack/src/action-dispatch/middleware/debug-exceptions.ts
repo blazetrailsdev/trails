@@ -113,7 +113,7 @@ export class DebugExceptions {
       (request.getHeader("rack.logger") as Logger | undefined) ??
       this.logger ??
       this.stderrLogger();
-    if (!this.isLogRescuedResponses(request) && wrapper.statusCode < 500) return;
+    if (!this.isLogRescuedResponses(request) && wrapper.rescueResponse()) return;
 
     const lines: string[] = ["  "];
     if (wrapper.hasCause()) {

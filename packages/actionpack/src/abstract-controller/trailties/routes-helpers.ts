@@ -4,15 +4,6 @@ import { Module } from "@blazetrails/ruby-compat";
 
 import type { HelperMethodsModule, HelpersClassMethods } from "../helpers.js";
 
-const URL_HELPERS_SINGLETON_METHODS = new Set([
-  "urlFor",
-  "fullUrlFor",
-  "routeFor",
-  "optimizeRoutesGeneration",
-  "polymorphicUrl",
-  "polymorphicPath",
-]);
-
 export interface UrlHelpersRouteSet {
   urlHelpers(includePathHelpers?: boolean): HelperMethodsModule;
 }
@@ -38,10 +29,21 @@ export function withRoutesHelpers(
       new Proxy(Object.getPrototypeOf(proto) as object, {
         get(target, key, receiver) {
           if (typeof key === "string") {
+            const accessor = includedAccessor(urlHelpersModule(), key);
+            if (accessor) return accessor.get!.call(receiver);
             const member = includedMember(urlHelpersModule(), key);
             if (member !== undefined) return member;
           }
           return Reflect.get(target, key, receiver);
+        },
+        set(target, key, value, receiver) {
+          const accessor =
+            typeof key === "string" ? includedAccessor(urlHelpersModule(), key) : undefined;
+          if (accessor?.set) {
+            accessor.set.call(receiver, value);
+            return true;
+          }
+          return Reflect.set(target, key, value, receiver);
         },
         has(target, key) {
           if (typeof key === "string" && includedMember(urlHelpersModule(), key) !== undefined) {
@@ -59,11 +61,15 @@ export interface RoutesHelpersControllerClass extends RoutesHelpersClassMethods 
   prototype: object;
 }
 
+function includedAccessor(mod: HelperMethodsModule, key: string): PropertyDescriptor | undefined {
+  if (!(mod instanceof Module)) return undefined;
+  const descriptor = mod.instanceMethod(key);
+  return descriptor?.get ? descriptor : undefined;
+}
+
 function includedMember(mod: HelperMethodsModule, key: string): unknown {
   let current: object | null = mod;
   if (mod instanceof Module) {
-    if (key === "_routes") return mod[key];
-    if (URL_HELPERS_SINGLETON_METHODS.has(key)) return mod[key].bind(mod);
     current = Object.getPrototypeOf(mod) as object | null;
   }
   while (current && current !== Object.prototype) {

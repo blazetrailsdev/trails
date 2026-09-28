@@ -17,9 +17,12 @@ import {
   responseBody,
 } from "./live.js";
 import { IOError, RuntimeError } from "@blazetrails/ruby-compat";
+import { Request } from "../../action-dispatch/http/request.js";
 
 function makeResponse() {
-  return new Response();
+  const response = new Response();
+  response.request = new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "localhost" });
+  return response;
 }
 
 describe("ActionController::Live::Buffer", () => {
@@ -195,7 +198,7 @@ describe("ActionController::Live::Response", () => {
   });
 
   it("stream writes flow through the live Buffer", () => {
-    const res = new Response();
+    const res = makeResponse();
     res.stream.write("a");
     res.stream.write("b");
     res.stream.close();
@@ -203,35 +206,29 @@ describe("ActionController::Live::Response", () => {
   });
 
   it("inherits DispatchResponse.create factory shape (status/headers/body args)", () => {
-    const res = new Response(201, { "x-test": "1" }, ["seed"]);
+    const res = new Response(201, { "x-test": "1" }, []);
+    res.request = makeResponse().request;
+    res.stream.write("seed");
     expect(res.status).toBe(201);
     expect(res.headers.get("x-test")).toBe("1");
     expect(res.body).toBe("seed");
     expect(res.stream).toBeInstanceOf(Buffer);
   });
 
-  it("beforeCommitted (via close) flushes accumulated cookies into a set-cookie header", () => {
-    const res = new Response();
-    res.setCookie("session", "abc");
-    res.setCookie("flash", "hi");
+  it("before_committed writes the request's cookie jar onto the response", () => {
+    const res = makeResponse();
+    res.request!.cookieJar().set("hello", "world");
+    res.stream.write("a");
     res.stream.close();
-    expect(res.headers.get("set-cookie")).toBe("session=abc\nflash=hi");
     expect(res.committed).toBe(true);
-  });
-
-  it("beforeCommitted does not overwrite an explicit set-cookie header", () => {
-    const res = new Response();
-    res.setCookie("session", "abc");
-    res.setHeader("set-cookie", "manual=1");
-    res.stream.close();
-    expect(res.headers.get("set-cookie")).toBe("manual=1");
+    expect(res.cookies).toEqual({ hello: "world" });
   });
 });
 
 function makeHost() {
   return {
     request: { getHeader: () => undefined as string | undefined },
-    response: new Response(),
+    response: makeResponse(),
   };
 }
 

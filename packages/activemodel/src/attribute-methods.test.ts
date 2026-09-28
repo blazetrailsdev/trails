@@ -424,12 +424,12 @@ describe("AttributeMethodsTest", () => {
     m.attributes = { private_method: "<3", protected_method: "O_o" };
 
     assertNotRespondTo(m, "private_method");
-    expect(m.respondTo("private_method", true)).toBeTruthy();
+    expect(m.isRespondTo("private_method", true)).toBeTruthy();
 
     const c = new ClassWithProtected();
 
-    expect(m.respondTo("protected_method")).toEqual(rbObjRespondTo(c, "protected_method"));
-    expect(m.respondTo("protected_method", true)).toBeTruthy();
+    expect(m.isRespondTo("protected_method")).toEqual(rbObjRespondTo(c, "protected_method"));
+    expect(m.isRespondTo("protected_method", true)).toBeTruthy();
   });
 
   it("should use attribute_missing to dispatch a missing attribute", () => {

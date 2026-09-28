@@ -40,6 +40,7 @@ export {
   renderToBody,
   isInheritViewContextClass,
   viewContext,
+  viewRenderer,
   viewContextClass,
 } from "./rendering.js";
 

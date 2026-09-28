@@ -176,7 +176,7 @@ describe("AttributeMethodsTest (trails)", () => {
 
     expect(person.methodMissing("name")).toBe("Alexander");
     expect(person._readAttribute("name")).toBe("Alexander");
-    expect(person.respondTo("name")).toBe(true);
+    expect(person.isRespondTo("name")).toBe(true);
   });
 
   it("assigns through a generated writer when the class body defines the reader", () => {
@@ -315,8 +315,8 @@ describe("respondTo", () => {
     interface User extends Attributes {}
 
     const u = new User({ name: "Alice" });
-    expect(u.respondTo("_readAttribute")).toBe(true);
-    expect(u.respondTo("isValid")).toBe(true);
+    expect(u.isRespondTo("_readAttribute")).toBe(true);
+    expect(u.isRespondTo("isValid")).toBe(true);
   });
 
   it("returns true for attributes", () => {
@@ -331,7 +331,7 @@ describe("respondTo", () => {
     interface User extends Attributes {}
 
     const u = new User({ name: "Alice" });
-    expect(u.respondTo("name")).toBe(true);
+    expect(u.isRespondTo("name")).toBe(true);
   });
 
   it("returns false for non-existent methods/attributes", () => {
@@ -346,7 +346,7 @@ describe("respondTo", () => {
     interface User extends Attributes {}
 
     const u = new User({ name: "Alice" });
-    expect(u.respondTo("nonExistentMethod")).toBe(false);
+    expect(u.isRespondTo("nonExistentMethod")).toBe(false);
   });
 });
 

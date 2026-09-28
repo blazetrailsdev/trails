@@ -7,7 +7,7 @@ import {
   include,
   runLoadHooks,
 } from "@blazetrails/activesupport";
-import { File, getCrypto, symbolToS } from "@blazetrails/ruby-compat";
+import { File, getCrypto } from "@blazetrails/ruby-compat";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Metal } from "./metal.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
@@ -48,13 +48,14 @@ import {
 import {
   Base as ActionViewBase,
   _processFormat,
-  _renderTemplate,
   buildViewContextClass,
   isInheritViewContextClass,
   renderToBody as actionViewRenderToBody,
   viewContext,
   viewContextClass,
+  viewRenderer,
 } from "@blazetrails/actionview";
+import { _renderTemplate } from "./metal/streaming.js";
 import type {
   PathSet,
   ViewPathsInput,
@@ -127,6 +128,11 @@ import {
 } from "./metal/rendering.js";
 import { Renderers } from "./metal/renderers.js";
 import { urlOptions } from "./metal/url-for.js";
+import { UrlFor, type UrlForOptions } from "../action-dispatch/routing/url-for.js";
+import type {
+  PolymorphicArg,
+  PolymorphicOptions,
+} from "../action-dispatch/routing/polymorphic-routes.js";
 import { Cookies } from "./metal/cookies.js";
 import {
   appendInfoToPayload,
@@ -166,7 +172,10 @@ export type RenderOptions = {
   contentType?: string;
   layout?: boolean | string;
   formats?: string;
+  stream?: boolean;
 };
+
+type StreamingBody = { each(block: (chunk: string) => void): Promise<unknown> };
 
 export type RescueHandler = (error: Error) => void | Promise<void>;
 
@@ -232,6 +241,11 @@ export const PROTECTED_IVARS: readonly string[] = [
 export interface Base {
   get params(): StrongParameters;
   set params(value: StrongParameters | Record<string, unknown>);
+  urlFor(options?: UrlForOptions): string;
+  fullUrlFor(options?: UrlForOptions): string;
+  routeFor(name: string, ...args: unknown[]): string;
+  polymorphicUrl(recordOrHashOrArray: PolymorphicArg, options?: PolymorphicOptions): string;
+  polymorphicPath(recordOrHashOrArray: PolymorphicArg, options?: PolymorphicOptions): string;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -239,8 +253,6 @@ export class Base extends Metal {
   get flash(): FlashHash {
     return this.request.flash!;
   }
-
-  static templateResolver?: (controller: string, action: string, format: string) => string | null;
 
   static _viewPaths: {
     (): PathSet;
@@ -293,6 +305,8 @@ export class Base extends Metal {
   viewContext(): ActionViewBase {
     return viewContext.call(this as unknown as ViewContextHost);
   }
+
+  declare viewRenderer: typeof viewRenderer;
 
   private static _rescueHandlers: Array<{
     errorClass: new (...args: any[]) => Error;
@@ -357,23 +371,9 @@ export class Base extends Metal {
         } else if (options.partial !== undefined) {
           this._pendingRender = { type: "partial", options };
           return;
-        } else if (
-          options.template !== undefined ||
-          options.inline !== undefined ||
-          options.action !== undefined ||
-          options.collection !== undefined
-        ) {
-          this._pendingRender = { type: "template", options };
-          return;
-        } else if (this.lookupContext.viewPaths.size > 0) {
-          this._pendingRender = { type: "template", options };
-          return;
         } else {
-          this._resolveTemplate(this.actionName, options);
-          if (!this.performed) {
-            this.contentType = "text/html; charset=utf-8";
-            this.responseBody = "";
-          }
+          this._pendingRender = { type: "template", options };
+          return;
         }
 
         this.markPerformed();
@@ -423,6 +423,7 @@ export class Base extends Metal {
     if (!this.performed && !this._pendingRender) this.defaultRender();
   }
 
+  /** @noRailsEquivalent CONVERGEABLE response-carries-async-streaming-body */
   async renderAsync(options: RenderOptions): Promise<void> {
     if (this.performed) {
       throw new DoubleRenderError(
@@ -441,7 +442,13 @@ export class Base extends Metal {
       _setRenderedContentType.call(this, this._renderedFormat as string | null | undefined);
     }
     _setVaryHeader.call(this as never);
-    this.responseBody = renderedBody as string;
+    let body = renderedBody;
+    if (!Array.isArray(body) && typeof (body as StreamingBody | null)?.each === "function") {
+      const chunks: string[] = [];
+      await (body as StreamingBody).each((chunk) => chunks.push(chunk));
+      body = chunks;
+    }
+    this.responseBody = body as string;
     this.markPerformed();
   }
 
@@ -908,20 +915,6 @@ export class Base extends Metal {
     });
   }
 
-  private _resolveTemplate(action: string, _options: RenderOptions): void {
-    const resolver = (this.constructor as typeof Base).templateResolver;
-    if (!resolver) return;
-
-    const controllerPrefix = this.controllerPath();
-    const format = symbolToS(this.request?.format?.symbol ?? ":html");
-    const template = resolver(controllerPrefix, action, format);
-    if (template) {
-      this.contentType = "text/html; charset=utf-8";
-      this.responseBody = template;
-      this.markPerformed();
-    }
-  }
-
   private _findRescueHandler(error: Error): { handler: RescueHandler; error: Error } | null {
     const hierarchy: Array<typeof Base> = [];
     let klass = this.constructor as typeof Base;
@@ -988,6 +981,7 @@ include(Base, StrongParametersModule);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
 Base.prototype._processOptions = _processOptions;
 Base.prototype._renderTemplate = _renderTemplate;
+Base.prototype.viewRenderer = viewRenderer;
 Base.prototype._processFormat = _processFormat;
 Base.prototype._processVariant = _processVariant;
 Base.prototype._normalizeRender = _normalizeRender;
@@ -1046,8 +1040,8 @@ helperMethod(Base as unknown as HelpersClassMethods, "viewCacheDependencies");
 runLoadHooks("action_controller_base", Base);
 runLoadHooks("action_controller", Base);
 
+include(Base, UrlFor);
 Base.prototype.urlOptions = urlOptions;
-classAttribute.call(Base, "defaultUrlOptions", { default: {} });
 
 Base.prototype.sendFileHeadersBang = sendFileHeadersBang;
 

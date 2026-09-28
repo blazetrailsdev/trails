@@ -8,9 +8,13 @@ export class BodyProxy {
     this.block = block;
     return new Proxy(this, {
       has: (target, prop) =>
-        Reflect.has(target, prop) || (typeof prop === "string" && target.respondTo(prop)),
+        Reflect.has(target, prop) || (typeof prop === "string" && target.respondToMissing(prop)),
       get: (target, prop, receiver) => {
-        if (Reflect.has(target, prop) || typeof prop !== "string" || !target.respondTo(prop)) {
+        if (
+          Reflect.has(target, prop) ||
+          typeof prop !== "string" ||
+          !target.respondToMissing(prop)
+        ) {
           return Reflect.get(target, prop, receiver);
         }
         return (...args: unknown[]) => target.delegate(prop, ...args);
@@ -67,19 +71,19 @@ export class BodyProxy {
     }
   }
 
-  respondTo(method: string): boolean {
-    if (method === "toStr" || method === "to_str") return false;
-    if (method === "toArray" || method === "to_ary") {
+  respondToMissing(methodName: string): boolean {
+    if (methodName === "toStr" || methodName === "to_str") return false;
+    if (methodName === "toArray" || methodName === "to_ary") {
       return (
         Array.isArray(this.body) ||
         typeof this.body?.toArray === "function" ||
         typeof this.body?.to_ary === "function"
       );
     }
-    if (method === "toPath" || method === "to_path") {
+    if (methodName === "toPath" || methodName === "to_path") {
       return typeof this.body?.toPath === "function" || typeof this.body?.to_path === "function";
     }
-    return typeof this.body?.[method] === "function";
+    return typeof this.body?.[methodName] === "function";
   }
 
   delegate(method: string, ...args: unknown[]): any {

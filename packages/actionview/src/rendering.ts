@@ -4,6 +4,7 @@ import type { SafeBuffer } from "@blazetrails/activesupport";
 import { include } from "@blazetrails/ruby-compat/include";
 import { Base } from "./base.js";
 import { DetailsKey, type LookupContext } from "./lookup-context.js";
+import { Renderer } from "./renderer.js";
 import { Template } from "./template.js";
 
 export interface RenderOptions {
@@ -121,6 +122,17 @@ export function viewContext(this: ViewContextHost): Base {
     this.viewAssigns(),
     this as unknown as null,
   );
+}
+
+/** @internal */
+export interface ViewRendererHost {
+  lookupContext: LookupContext;
+  /** @internal */
+  _viewRenderer?: Renderer;
+}
+
+export function viewRenderer(this: ViewRendererHost): Renderer {
+  return (this._viewRenderer ??= new Renderer(this.lookupContext));
 }
 
 /** @internal */

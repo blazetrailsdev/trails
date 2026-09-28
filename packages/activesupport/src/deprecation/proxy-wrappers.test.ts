@@ -66,12 +66,12 @@ describe("ProxyWrappersTest", () => {
 
   it("proxy delegates respond_to? and hash to target without warning", async () => {
     const proxy = DeprecatedConstantProxy.new("OldWaffleModule", "WaffleModule", deprecator) as {
-      respondTo(method: string): boolean;
+      isRespondTo(method: string): boolean;
       hash(): unknown;
     };
     await assertNotDeprecated(deprecator, () => {
-      expect(proxy.respondTo("isWaffle")).toBe(true);
-      expect(proxy.respondTo("isPancake")).toBe(false);
+      expect(proxy.isRespondTo("isWaffle")).toBe(true);
+      expect(proxy.isRespondTo("isPancake")).toBe(false);
       proxy.hash();
     });
   });

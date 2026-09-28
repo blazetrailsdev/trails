@@ -314,7 +314,9 @@ type AnyFunction = (...args: unknown[]) => unknown;
  * only where `priv` asks for it (`vm_method.c:2896-2905`) — and otherwise
  * falls back to {@link basicObjRespondTo} (`vm_method.c:2945`). Like
  * `method_entry_get` there, `respond_to?` is found by descriptor lookup, never
- * by a property read a `method_missing` Proxy's `get` trap would answer.
+ * by a property read a `method_missing` Proxy's `get` trap would answer. An
+ * overridden `respond_to?` is spelled `isRespondTo`, never `respondTo`, which
+ * is a Rails method of its own (`MimeResponds#respond_to`).
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_respond_to`
  * (`vendor/ruby/v3.3.11/vm_method.c:2934`).
@@ -326,13 +328,13 @@ export function rbObjRespondTo(obj: unknown, mid: string, priv: boolean = false)
     o && !me;
     o = Object.getPrototypeOf(o) as object | null
   ) {
-    me = Object.getOwnPropertyDescriptor(o, "respondTo");
+    me = Object.getOwnPropertyDescriptor(o, "isRespondTo");
   }
-  const respondTo = me?.value;
-  if (typeof respondTo === "function") {
+  const isRespondTo = me?.value;
+  if (typeof isRespondTo === "function") {
     const result = priv
-      ? (respondTo as (mid: string, priv: boolean) => unknown).call(obj, mid, true)
-      : (respondTo as (mid: string) => unknown).call(obj, mid);
+      ? (isRespondTo as (mid: string, priv: boolean) => unknown).call(obj, mid, true)
+      : (isRespondTo as (mid: string) => unknown).call(obj, mid);
     return result != null && result !== false;
   }
   return basicObjRespondTo(obj, mid, !priv);

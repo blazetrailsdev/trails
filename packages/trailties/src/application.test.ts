@@ -473,6 +473,31 @@ describe("Trails.application integration (boot-app fixture)", () => {
     });
   });
 
+  it("resolves a controller's url_for through its own url_options, not the url_helpers singleton", async () => {
+    const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
+    class BootAppUrlFor extends BootApp {}
+    Application.register(BootAppUrlFor);
+    runLoadHooks("action_controller", ActionController.Base);
+    const app = Trails.application!;
+    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+
+    await Trails.initialize();
+
+    const [status, , body] = await app.app()({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/posts/canonical",
+      HTTP_HOST: "blog.example.com:8080",
+      "rack.url_scheme": "https",
+    });
+    expect(status).toBe(200);
+    expect(JSON.parse(await bodyToString(body))).toEqual({
+      href: "https://blog.example.com:8080/posts",
+    });
+    expect(
+      app.routes().urlHelpers().urlFor({ controller: "posts", action: "index", onlyPath: true }),
+    ).toBe("/posts");
+  });
+
   it("renders the dev error page through DebugExceptions rather than an ad-hoc catch", async () => {
     const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
     class BootAppDebug extends BootApp {}
@@ -602,7 +627,7 @@ describe("Application::Configuration", () => {
   it("config.load_defaults skips a framework that has not registered its config", () => {
     const c = new Configuration();
     expect(() => c.loadDefaults("8.0")).not.toThrow();
-    expect(c.respondTo("assets")).toBe(false);
+    expect(c.isRespondTo("assets")).toBe(false);
   });
 
   it("config.load_defaults raises on an unknown version", () => {

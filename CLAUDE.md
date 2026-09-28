@@ -1300,8 +1300,14 @@ the capability, in a different place. Each is its own `SKIP_GROUPS` entry in
   Scoring them is a comparer change and has its own story.
 - **`method_missing` / `respond_to_missing?` / `respond_to?` — per class.**
   `respond_to?` is `rbObjRespondTo`, a function; `in` cannot see a name a
-  `respond_to_missing?` answers. § "Records are not Proxies" decides records;
-  every other Rails definer is decided per class from this table:
+  `respond_to_missing?` answers. A class that overrides `respond_to?` spells
+  the override `isRespondTo` (the `is*` spelling for a predicate whose bare
+  camel name is taken), and `rbObjRespondTo` dispatches to that name only:
+  `respondTo` is `ActionController::MimeResponds#respond_to`
+  (`mime_responds.rb:211`), a different Rails method, and a controller's
+  `respond_to?` must not negotiate a format. § "Records are not Proxies"
+  decides records; every other Rails definer is decided per class from this
+  table:
 
 | Rails file (`method_missing` / `respond_to_missing?`) | trails status         |
 | ----------------------------------------------------- | --------------------- |

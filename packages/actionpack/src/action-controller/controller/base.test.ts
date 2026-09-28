@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { htmlSafe } from "@blazetrails/activesupport";
+import { FixtureResolver } from "@blazetrails/actionview";
 import { Base, DoubleRenderError, MODULES, PROTECTED_IVARS } from "../base.js";
 import { API } from "../api.js";
 import { Request } from "../../action-dispatch/request.js";
@@ -129,6 +130,7 @@ describe("ControllerInstanceTests", () => {
         this.render();
       }
     }
+    ImplicitController.prependViewPath(new FixtureResolver({ "implicit/index.html.tse": "" }));
     const c = new ImplicitController();
     await c.dispatch("index", makeRequest(), makeResponse());
     expect(c.contentType).toBe("text/html; charset=utf-8");
@@ -140,9 +142,11 @@ describe("ControllerInstanceTests", () => {
         this.render();
       }
     }
-    TemplateController.templateResolver = (controller, action, _format) => {
-      return `<p>${controller}#${action}</p>`;
-    };
+    TemplateController.prependViewPath(
+      new FixtureResolver({
+        "template/index.html.tse": "<p>template#index</p>",
+      }),
+    );
 
     const c = new TemplateController();
     await c.dispatch("index", makeRequest(), makeResponse());

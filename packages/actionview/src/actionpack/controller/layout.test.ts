@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { underscore } from "@blazetrails/activesupport";
+import { extractOptionsBang, underscore } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { ActionController, Request, Response } from "@blazetrails/actionpack";
 import { FixtureResolver } from "../../testing/resolvers.js";
@@ -105,6 +105,13 @@ describe("LayoutAutoDiscoveryTest", () => {
 
 class DefaultLayoutController extends LayoutTest {}
 
+class StreamingLayoutController extends LayoutTest {
+  override render(...args: unknown[]): void {
+    const options = extractOptionsBang(args);
+    super.render(...args, { ...options, stream: true });
+  }
+}
+
 class AbsolutePathLayoutController extends LayoutTest {
   static {
     this.layout("/fixtures/actionpack/layout_tests/layouts/layout_test");
@@ -167,6 +174,10 @@ class RendersNoLayoutController extends LayoutTest {
 describe("LayoutSetInResponseTest", () => {
   test("layout set when using default layout", async () => {
     expect(await get(new DefaultLayoutController(), "hello")).toContain("layout_test.erb");
+  });
+
+  test("layout set when using streaming layout", async () => {
+    expect(await get(new StreamingLayoutController(), "hello")).toContain("layout_test.erb");
   });
 
   test("layout set when set in controller", async () => {

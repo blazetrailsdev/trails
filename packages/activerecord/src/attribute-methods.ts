@@ -57,12 +57,12 @@ export interface InstanceMethodHost {
   _readAttribute(name: string, block?: (name: string) => unknown): unknown;
 }
 
-export function respondTo(
+export function isRespondTo(
   this: AttributeRecord & InstanceMethodHost,
   name: string,
   includePrivate: boolean = false,
 ): boolean {
-  if (!AMAttributeMethods.InstanceMethods.respondTo.call(this as never, name, includePrivate))
+  if (!AMAttributeMethods.InstanceMethods.isRespondTo.call(this as never, name, includePrivate))
     return false;
 
   if (this._attributes) {

@@ -111,7 +111,7 @@ export class Configuration {
     this.methodMissing(`${key}=`, value);
   }
 
-  respondTo(key: string): boolean {
+  isRespondTo(key: string): boolean {
     if (!key.startsWith("_")) {
       for (let proto = Object.getPrototypeOf(this); proto; proto = Object.getPrototypeOf(proto)) {
         if (Object.prototype.hasOwnProperty.call(proto, key)) return true;
@@ -122,7 +122,7 @@ export class Configuration {
 
   private _actualMethod(key: string): boolean {
     return (
-      !Object.prototype.hasOwnProperty.call(Configuration._options, key) && this.respondTo(key)
+      !Object.prototype.hasOwnProperty.call(Configuration._options, key) && this.isRespondTo(key)
     );
   }
 

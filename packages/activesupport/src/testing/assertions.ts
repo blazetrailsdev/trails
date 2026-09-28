@@ -441,7 +441,7 @@ function respondsTo(object: object, name: string, includeAll: boolean): boolean 
   if (Object.getPrototypeOf(object) === String.prototype) {
     return rbStrRespondTo(object.valueOf() as string, name, includeAll);
   }
-  const override = findDescriptor(object, "respondTo");
+  const override = findDescriptor(object, "isRespondTo");
   if (override && typeof override.value === "function") {
     const result = includeAll
       ? (override.value as (name: string, includeAll: boolean) => unknown).call(object, name, true)

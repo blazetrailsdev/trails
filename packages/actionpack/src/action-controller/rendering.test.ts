@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { htmlSafe } from "@blazetrails/activesupport";
+import { FixtureResolver } from "@blazetrails/actionview";
 import { Base, DoubleRenderError } from "./base.js";
 import { API } from "./api.js";
 import { Metal } from "./metal.js";
@@ -339,6 +340,7 @@ describe("ActionController rendering", () => {
           this.render();
         }
       }
+      C.prependViewPath(new FixtureResolver({ "c/index.html.tse": "" }));
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
       expect(c.contentType).toBe("text/html; charset=utf-8");
@@ -351,7 +353,9 @@ describe("ActionController rendering", () => {
           this.render();
         }
       }
-      TemplateController.templateResolver = (_ctrl, action, _fmt) => `<div>${action}</div>`;
+      TemplateController.prependViewPath(
+        new FixtureResolver({ "template/index.html.tse": "<div>index</div>" }),
+      );
       const c = new TemplateController();
       await c.dispatch("index", makeRequest(), makeResponse());
       expect(c.responseBody).toBe("<div>index</div>");

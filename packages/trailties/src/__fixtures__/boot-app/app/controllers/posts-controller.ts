@@ -17,6 +17,10 @@ export class PostsController extends ApplicationController {
     this.render({ json: { href: (this as unknown as { postsUrl(): string }).postsUrl() } });
   }
 
+  async canonical(): Promise<void> {
+    this.render({ json: { href: this.urlFor({ controller: "posts", action: "index" }) } });
+  }
+
   async boom(): Promise<void> {
     throw new Error("kaboom");
   }
