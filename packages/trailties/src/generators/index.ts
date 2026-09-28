@@ -4,7 +4,7 @@ export { ModelGenerator } from "./model-generator.js";
 export { MigrationGenerator } from "./migration-generator.js";
 export type { MigrationRunOptions } from "./migration-generator.js";
 export { ControllerGenerator } from "./rails/controller/controller-generator.js";
-export type { ControllerGeneratorOptions } from "./rails/controller/controller-generator.js";
+export type { ControllerRunOptions } from "./rails/controller/controller-generator.js";
 export { ScaffoldGenerator } from "./rails/scaffold/scaffold-generator.js";
 export { GeneratorBase } from "./base.js";
 export type { GeneratorOptions } from "./base.js";

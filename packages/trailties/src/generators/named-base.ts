@@ -20,12 +20,7 @@ export class NamedBase extends GeneratorBase {
   attributes: GeneratedAttribute[];
   classPathParts!: string[];
   /** @internal */
-  protected _fileName!: string;
-
-  /** @internal */
-  get fileName(): string {
-    return this._fileName;
-  }
+  fileName!: string;
 
   constructor(options: NamedBaseOptions) {
     super(options);
@@ -127,7 +122,7 @@ export class NamedBase extends GeneratorBase {
   assignNamesBang(name: string): void {
     this.classPathParts = name.includes("/") ? name.split("/") : name.split("::");
     this.classPathParts = this.classPathParts.map((p) => underscore(p));
-    this._fileName = this.classPathParts.pop()!;
+    this.fileName = this.classPathParts.pop()!;
   }
 
   regularClassPath(): string[] {

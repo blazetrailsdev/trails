@@ -1,4 +1,4 @@
-import { Dir, File } from "@blazetrails/ruby-compat";
+import { Dir, File, rbFPublicSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Generators } from "../generators.js";
 import { GeneratorBase, type GeneratorOptions } from "./base.js";
 import { Database, type DatabaseName } from "./database.js";
@@ -47,6 +47,8 @@ export abstract class AppBase extends GeneratorBase {
   readonly appPath: string;
   readonly options: AppBaseOptions;
   private _database?: Database;
+  /** @internal */
+  private _builder?: object;
 
   static {
     this.classOption("skipDocker", {
@@ -119,6 +121,23 @@ export abstract class AppBase extends GeneratorBase {
     this.destinationRoot = File.expandPath(options.appPath, options.cwd);
     this.cwd = this.destinationRoot;
     this.options = this.deduceImpliedOptions({ ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS, ...options });
+  }
+
+  /** @internal */
+  protected builder(): object {
+    if (this._builder === undefined) {
+      const builderClass = (
+        this as unknown as { getBuilderClass(): new (generator: never) => object }
+      ).getBuilderClass();
+      this._builder = new builderClass(this as never);
+    }
+    return this._builder;
+  }
+
+  /** @internal */
+  protected build(meth: string, ...args: unknown[]): unknown {
+    if (rbObjRespondTo(this.builder(), meth)) return rbFPublicSend(this.builder(), meth, ...args);
+    return undefined;
   }
 
   /** @internal */

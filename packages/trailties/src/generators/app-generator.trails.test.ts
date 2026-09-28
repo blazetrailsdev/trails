@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Dir, File, FileUtils, SecureRandom } from "@blazetrails/ruby-compat";
-import { AppGenerator } from "./app-generator.js";
+import { AppBuilder, AppGenerator } from "./app-generator.js";
+import { TopLevel } from "@blazetrails/activesupport";
 import { Generators } from "../generators.js";
 
 describe("AppGenerator (trails-only)", () => {
@@ -115,5 +116,26 @@ describe("AppGenerator (trails-only)", () => {
     expect(content).toMatch(/DATABASE_URL: postgres:\/\/postgres:postgres@localhost:5432/);
     expect(await ci({ skipEslint: true })).not.toMatch(/lint:|eslint/);
     expect(await ci({ skipTest: true })).not.toMatch(/test:\s*runs-on/);
+  });
+
+  it("dispatches cifiles through a top-level AppBuilder when one is defined", async () => {
+    const calls: string[] = [];
+    TopLevel.AppBuilder = class extends AppBuilder {
+      override cifiles(): void {
+        calls.push("cifiles");
+      }
+    };
+    try {
+      await new AppGenerator({
+        cwd: tmpDir,
+        output: () => {},
+        appPath: "my-app",
+        database: "sqlite",
+      }).run();
+    } finally {
+      delete TopLevel.AppBuilder;
+    }
+    expect(calls).toEqual(["cifiles"]);
+    expect(File.isExist(File.join(tmpDir, "my-app", ".github", "workflows", "ci.yml"))).toBe(false);
   });
 });

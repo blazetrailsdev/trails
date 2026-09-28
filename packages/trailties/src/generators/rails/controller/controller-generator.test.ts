@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { ControllerGenerator, type ControllerGeneratorOptions } from "./controller-generator.js";
+import { ControllerGenerator } from "./controller-generator.js";
 
 let tmpDir: string;
 let lines: string[];
@@ -27,16 +27,7 @@ afterEach(() => {
 });
 
 function makeGen() {
-  return {
-    run: (name: string, actions: string[], opts: Partial<ControllerGeneratorOptions> = {}) =>
-      new ControllerGenerator({
-        cwd: tmpDir,
-        output: (m) => lines.push(m),
-        name,
-        actions,
-        ...opts,
-      }).run(),
-  };
+  return new ControllerGenerator({ cwd: tmpDir, output: (m) => lines.push(m) });
 }
 
 function readFile(relativePath: string): string {
@@ -63,7 +54,7 @@ describe("ControllerGeneratorTest", () => {
 
   it("does not invoke helper if required", async () => {
     const gen = makeGen();
-    await gen.run("Account", ["foo"], { helper: false });
+    await gen.run("Account", ["foo"], { skipHelper: true });
     expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper.ts"))).toBe(false);
   });
 
@@ -204,15 +195,7 @@ describe("ControllerGeneratorTest (JavaScript project)", () => {
   });
 
   function makeJsGen() {
-    return {
-      run: (name: string, actions: string[]) =>
-        new ControllerGenerator({
-          cwd: jsTmpDir,
-          output: (m) => jsLines.push(m),
-          name,
-          actions,
-        }).run(),
-    };
+    return new ControllerGenerator({ cwd: jsTmpDir, output: (m) => jsLines.push(m) });
   }
 
   it("generates .js controller and test files", async () => {

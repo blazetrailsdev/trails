@@ -1,5 +1,5 @@
 import { File } from "@blazetrails/ruby-compat";
-import { camelize, parameterize, underscore } from "@blazetrails/activesupport";
+import { TopLevel, camelize, parameterize, underscore } from "@blazetrails/activesupport";
 import { ref, tsClass, tsField, tsModule, tsRaw } from "../template-builder/index.js";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 import { GeneratorError } from "./generated-attribute.js";
@@ -35,6 +35,40 @@ export interface AppGeneratorOptions extends Omit<AppBaseOptions, "database" | "
 const TRAILS_LOADER = "tsx";
 const TRAILS_CLI = "node_modules/@blazetrails/trailties/bin/trails.js";
 const TRAILS = `${TRAILS_LOADER} ${TRAILS_CLI}`;
+
+export class ActionMethods {
+  readonly options: AppBaseOptions;
+  /** @internal */
+  private generator: AppGenerator;
+
+  constructor(generator: AppGenerator) {
+    this.generator = generator;
+    this.options = generator.options;
+  }
+
+  /** @internal */
+  protected template(source: string, destination: string): void {
+    this.generator["template"](source, destination);
+  }
+
+  /** @internal */
+  protected emptyDirectory(destination: string): string {
+    return this.generator["emptyDirectory"](destination);
+  }
+
+  /** @internal */
+  protected createFile(relativePath: string, content: string): void {
+    this.generator["createFile"](relativePath, content);
+  }
+}
+
+export class AppBuilder extends ActionMethods {
+  cifiles(): void {
+    this.emptyDirectory(".github/workflows");
+    this.template("github/ci.yml", ".github/workflows/ci.yml");
+    this.template("github/dependabot.yml", ".github/dependabot.yml");
+  }
+}
 
 export class AppGenerator extends AppBase {
   readonly packageManager: PackageManager;
@@ -1308,19 +1342,18 @@ export default defineConfig([
     this.eslint();
   }
 
-  cifiles(): void {
-    this.emptyDirectory(".github/workflows");
-    this.template("github/ci.yml", ".github/workflows/ci.yml");
-    this.template("github/dependabot.yml", ".github/dependabot.yml");
-  }
-
   private createCifiles(): void {
     if (this.options.skipCi) return;
-    this.cifiles();
+    this.build("cifiles");
   }
 
   databaseYml(): void {
     this.template(this.database.template, "config/database.ts");
+  }
+
+  /** @internal */
+  protected getBuilderClass(): new (generator: never) => object {
+    return TopLevel.AppBuilder !== undefined ? TopLevel.AppBuilder : AppBuilder;
   }
 
   private template(source: string, destination: string): void {

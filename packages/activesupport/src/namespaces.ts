@@ -53,4 +53,5 @@ export const TopLevel: {
   };
   ActionController?: { Parameters: new (...args: never[]) => ParametersInstance };
   ActionCable?: { Engine?: unknown };
+  AppBuilder?: new (generator: never) => object;
 } = {};

@@ -83,23 +83,27 @@ describe("GeneratorBase#createFile conflict behavior (Thor's CreateFile#invoke!)
     }
   }
 
-  it("keeps a changed file under behavior: :skip and reports identical files", () => {
+  it("keeps a changed file under behavior: :skip, reports identical files, and forces through a conflict", () => {
     const cwd = File.join(Dir.tmpdir(), `trails-create-file-${SecureRandom.hex(8)}`);
     const lines: string[] = [];
     const make = (opts: Partial<GeneratorOptions> = {}) =>
       new Writer({ cwd, output: (m) => lines.push(m), ...opts });
     try {
-      make().write("one\n");
+      make().write("one ✓\n");
       make({ behavior: "skip" }).write("two\n");
-      make({ behavior: "skip" }).write("one\n");
-      expect(File.read(File.join(cwd, "app/x.ts"))).toBe("one\n");
+      make({ behavior: "skip" }).write("one ✓\n");
+      expect(File.read(File.join(cwd, "app/x.ts"))).toBe("one ✓\n");
+      make({ behavior: "force" }).write("two\n");
+      make().write("three\n");
+      expect(File.read(File.join(cwd, "app/x.ts"))).toBe("three\n");
       expect(lines.map((l) => l.trim())).toEqual([
         "create  app/x.ts",
         "skip  app/x.ts",
         "identical  app/x.ts",
+        "force  app/x.ts",
+        "conflict  app/x.ts",
+        "force  app/x.ts",
       ]);
-      make({ behavior: "force" }).write("two\n");
-      expect(File.read(File.join(cwd, "app/x.ts"))).toBe("two\n");
     } finally {
       FileUtils.rmRf(cwd);
     }

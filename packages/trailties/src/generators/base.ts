@@ -315,15 +315,21 @@ export abstract class GeneratorBase implements GeneratorActionsState {
       if (!this.options.pretend && File.isExist(fullPath)) FileUtils.rmRf(fullPath);
       return;
     }
+    let status = "create";
     if (File.isExist(fullPath)) {
-      if (File.binread(fullPath) === content) {
+      if (File.read(fullPath) === content) {
         this.sayStatus("identical", relativePath);
         this.createdFiles.push(relativePath);
         return;
       }
-      if (!this.options.force && this.options.skip) {
+      if (this.options.force) {
+        status = "force";
+      } else if (this.options.skip) {
         this.sayStatus("skip", relativePath);
         return;
+      } else {
+        this.sayStatus("conflict", relativePath);
+        status = "force";
       }
     }
     if (!this.options.pretend) {
@@ -333,7 +339,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     }
     Generators.addGeneratedFile(fullPath);
     this.createdFiles.push(relativePath);
-    this.output(`      create  ${relativePath}`);
+    this.output(`${status.padStart(12)}  ${relativePath}`);
   }
 
   protected emptyDirectory(destination: string): string {

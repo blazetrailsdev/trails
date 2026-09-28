@@ -1,4 +1,5 @@
-import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
+import { GeneratorBase, type GeneratorOptions } from "../../base.js";
+import { underscore } from "@blazetrails/activesupport";
 import {
   actionMethod,
   controllerPathHelpers,
@@ -6,47 +7,42 @@ import {
   parentRefForRelative,
 } from "./controller-paths.js";
 
-export interface ControllerGeneratorOptions extends NamedBaseOptions {
-  actions?: string[];
+export interface ControllerRunOptions {
+  skipHelper?: boolean;
   skipRoutes?: boolean;
-  helper?: boolean;
-  parent?: string;
   test?: boolean;
+  parent?: string;
 }
 
-export class ControllerGenerator extends NamedBase {
-  declare options: ControllerGeneratorOptions;
-  actions: string[];
-  /** @internal */
-  private _memoFileName?: string;
-
-  static {
-    this.classOption("skipRoutes", {
-      type: "boolean",
-      desc: "Don't add routes to config/routes.rb.",
-    });
-    this.classOption("helper", { type: "boolean" });
-    this.classOption("parent", {
-      type: "string",
-      default: "ApplicationController",
-      desc: "The parent class for the generated controller",
-    });
+export class ControllerGenerator extends GeneratorBase {
+  constructor(options: GeneratorOptions) {
+    super(options);
   }
 
-  constructor(options: ControllerGeneratorOptions) {
-    super({ ...options, attributes: [] });
-    this.actions = options.actions ?? options.attributes ?? [];
-  }
-
-  async run(): Promise<string[]> {
-    const actions = this.actions;
-    const test = this.options.test ?? true;
-    const paths = controllerPathHelpers(this.name);
+  async run(
+    name: string,
+    actions: string[],
+    options: ControllerRunOptions = {},
+  ): Promise<string[]> {
+    const {
+      skipHelper = false,
+      skipRoutes = false,
+      test = true,
+      parent = "ApplicationController",
+    } = options;
+    const paths = controllerPathHelpers(name);
+    const ts = this.isTypeScript();
     const ext = this.ext();
     const depth = paths.namespaceParts.length > 1 ? paths.namespaceParts.length - 1 : 0;
 
-    this.createControllerFiles();
-    await this.addRoutes();
+    const source = emitControllerClass({
+      className: paths.className,
+      parent: parentRefForRelative(parent, depth),
+      methods: actions.map((a) => actionMethod(a, ts)),
+    });
+    this.createFile(`app/controllers/${paths.controllerFile}${ext}`, source);
+
+    await this.addRoutes(paths.namespaceParts, actions, skipRoutes);
 
     if (test) {
       const importPrefix = "../".repeat(depth + 2);
@@ -65,7 +61,7 @@ ${cases}
       );
     }
 
-    if (this.options.helper !== false) {
+    if (!skipHelper) {
       this.createFile(
         `app/helpers/${paths.helperFile}${ext}`,
         `export const ${paths.helperName} = {\n};\n`,
@@ -82,41 +78,18 @@ ${cases}
     return this.getCreatedFiles();
   }
 
-  /** @missingRailsCall template — CONVERGEABLE generators-have-no-thor-source-paths-or-template-files */
-  createControllerFiles(): void {
-    const paths = controllerPathHelpers(this.name);
-    const depth = paths.namespaceParts.length > 1 ? paths.namespaceParts.length - 1 : 0;
-    this.createFile(
-      `app/controllers/${paths.controllerFile}${this.ext()}`,
-      emitControllerClass({
-        className: paths.className,
-        parent: parentRefForRelative(this.parentClassName(), depth),
-        methods: this.actions.map((a) => actionMethod(a, this.isTypeScript())),
-      }),
-    );
-  }
-
-  async addRoutes(): Promise<void> {
-    if (this.options.skipRoutes) return;
-    if (this.actions.length === 0) return;
-    const routingCode = this.actions
-      .map((action) => `mapper.get(${JSON.stringify(`${this.fileName}/${action}`)});`)
+  private async addRoutes(
+    namespaceParts: string[],
+    actions: string[],
+    skipRoutes: boolean,
+  ): Promise<void> {
+    if (skipRoutes) return;
+    if (actions.length === 0) return;
+    const fileName = underscore(namespaceParts[namespaceParts.length - 1]);
+    const routingCode = actions
+      .map((action) => `mapper.get(${JSON.stringify(`${fileName}/${action}`)});`)
       .join("\n");
-    await this.route(routingCode, { namespace: this.regularClassPath() });
-  }
-
-  /** @internal */
-  private parentClassName(): string {
-    return this.options.parent!;
-  }
-
-  /** @internal */
-  override get fileName(): string {
-    return (this._memoFileName ??= this.removePossibleSuffix(super.fileName));
-  }
-
-  /** @internal */
-  private removePossibleSuffix(name: string): string {
-    return name.replace(/_?controller$/i, "");
+    const regularClassPath = namespaceParts.slice(0, -1).map((p) => underscore(p));
+    await this.route(routingCode, { namespace: regularClassPath });
   }
 }
