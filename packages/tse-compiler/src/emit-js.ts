@@ -43,12 +43,37 @@ const REGEX_PRECEDING_KEYWORD_RE =
 
 function codeMask(code: string): boolean[] {
   const mask = new Array<boolean>(code.length).fill(false);
+  const templateDepths: number[] = [];
+  let inTemplate = false;
+  let depth = 0;
   let prev = "";
   let i = 0;
   while (i < code.length) {
     const ch = code[i];
     const next = code[i + 1];
-    if (ch === '"' || ch === "'" || ch === "`") {
+    if (inTemplate) {
+      if (ch === "\\") {
+        i += 2;
+      } else if (ch === "`") {
+        inTemplate = false;
+        prev = "`";
+        i++;
+      } else if (ch === "$" && next === "{") {
+        templateDepths.push(depth);
+        inTemplate = false;
+        prev = "{";
+        i += 2;
+      } else {
+        i++;
+      }
+    } else if (ch === "`") {
+      inTemplate = true;
+      i++;
+    } else if (ch === "}" && templateDepths[templateDepths.length - 1] === depth) {
+      templateDepths.pop();
+      inTemplate = true;
+      i++;
+    } else if (ch === '"' || ch === "'") {
       i++;
       while (i < code.length && code[i] !== ch) i += code[i] === "\\" ? 2 : 1;
       i++;
@@ -58,12 +83,7 @@ function codeMask(code: string): boolean[] {
     } else if (ch === "/" && next === "*") {
       const end = code.indexOf("*/", i + 2);
       i = end === -1 ? code.length : end + 2;
-    } else if (
-      ch === "/" &&
-      (prev === "" ||
-        /[(,=:[!&|?{};+\-*%<>~^]/.test(prev) ||
-        REGEX_PRECEDING_KEYWORD_RE.test(code.slice(0, i).trimEnd()))
-    ) {
+    } else if (ch === "/" && isRegexStart(code, i, prev)) {
       let inClass = false;
       i++;
       while (i < code.length && (code[i] !== "/" || inClass)) {
@@ -77,11 +97,23 @@ function codeMask(code: string): boolean[] {
       prev = "/";
     } else {
       mask[i] = true;
+      if (ch === "{") depth++;
+      else if (ch === "}") depth--;
       if (!/\s/.test(ch)) prev = ch;
       i++;
     }
   }
   return mask;
+}
+
+function isRegexStart(code: string, i: number, prev: string): boolean {
+  if (prev === "") return true;
+  if (prev === "+" || prev === "-") {
+    const before = code.slice(0, i).trimEnd();
+    return before[before.length - 2] !== prev;
+  }
+  if (/[(,=:[!&|?{;*%<>~^]/.test(prev)) return true;
+  return REGEX_PRECEDING_KEYWORD_RE.test(code.slice(0, i).trimEnd());
 }
 
 function netBraceDepth(code: string): number {
@@ -95,7 +127,8 @@ function netBraceDepth(code: string): number {
   return depth;
 }
 
-const FLOW_READ_RE = /(?<![\w$.])(?:(_layoutFor|contentFor|isContentFor|_)\s*\(|yield(?![\w$]))/y;
+const FLOW_READ_RE =
+  /(?<![\w$.])(?:(_layoutFor|contentFor|isContentFor|_|yield)\s*\(|yield(?![\w$]))/y;
 
 function awaitFlowReads(code: string): string {
   const mask = codeMask(code);
@@ -131,7 +164,7 @@ function awaitFlowReads(code: string): string {
       }
       if (close < code.length) {
         const args = code.slice(i + m[0].length, close);
-        out += `(await ${m[0]}${awaitFlowReads(args)}))`;
+        out += `(await ${m[1] === "yield" ? "_(" : m[0]}${awaitFlowReads(args)}))`;
         i = close + 1;
         continue;
       }
