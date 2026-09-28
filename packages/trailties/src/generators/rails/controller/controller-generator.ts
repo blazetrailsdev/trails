@@ -17,6 +17,8 @@ export interface ControllerGeneratorOptions extends NamedBaseOptions {
 export class ControllerGenerator extends NamedBase {
   declare options: ControllerGeneratorOptions;
   actions: string[];
+  /** @internal */
+  private _memoFileName?: string;
 
   static {
     this.classOption("skipRoutes", {
@@ -34,7 +36,6 @@ export class ControllerGenerator extends NamedBase {
   constructor(options: ControllerGeneratorOptions) {
     super({ ...options, attributes: [] });
     this.actions = options.actions ?? options.attributes ?? [];
-    this.fileName = this.removePossibleSuffix(this.fileName);
   }
 
   async run(): Promise<string[]> {
@@ -101,6 +102,11 @@ ${cases}
   /** @internal */
   private parentClassName(): string {
     return this.options.parent!;
+  }
+
+  /** @internal */
+  override get fileName(): string {
+    return (this._memoFileName ??= this.removePossibleSuffix(super.fileName));
   }
 
   /** @internal */

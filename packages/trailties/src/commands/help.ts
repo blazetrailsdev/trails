@@ -34,8 +34,8 @@ export class HelpCommand extends Base {
     this.say((this.constructor as typeof HelpCommand).classUsage());
   }
 
-  helpExtended(...args: string[]): void {
-    this.help(...args);
+  helpExtended(..._args: string[]): void {
+    this.help();
 
     this.say("");
     this.say("In addition to those commands, there are:");
@@ -51,8 +51,10 @@ export class HelpCommand extends Base {
 
   /** @internal */
   private printingCommandsNotInUsage(): Array<[string, string]> {
-    return this.options.program.commands
-      .filter((command) => !(command as unknown as { _hidden: boolean })._hidden)
+    const program = this.options.program;
+    return program
+      .createHelp()
+      .visibleCommands(program)
       .map((command): [string, string] => [command.name(), command.description()])
       .filter(([command]) => !COMMANDS_IN_USAGE.includes(command));
   }
