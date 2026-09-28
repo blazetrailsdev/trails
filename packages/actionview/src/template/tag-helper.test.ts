@@ -7,7 +7,9 @@ import {
   classNames,
   cdataSection,
   escapeOnce,
+  TagBuilder,
 } from "../helpers/tag-helper.js";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { htmlSafe, SafeBuffer } from "@blazetrails/activesupport";
 import { raw } from "../helpers/output-safety-helper.js";
 import { Base } from "../base.js";
@@ -83,6 +85,12 @@ describe("TagHelperTest", () => {
     expect(t.svg(() => t.circle({ r: "5" }, () => t.desc("A circle"))).toString()).toBe(
       '<svg><circle r="5"><desc>A circle</desc></circle></svg>',
     );
+  });
+
+  it("tag builder defines methods to build html elements", () => {
+    const t = tag() as any;
+    expect(rbObjRespondTo(t, "div")).toBe(true);
+    expect(Object.getOwnPropertyNames(TagBuilder.prototype)).toContain("div");
   });
 
   it("tag builder renders unknown html elements", () => {

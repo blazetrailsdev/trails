@@ -29,6 +29,18 @@ describe("TagHelperTest", () => {
       );
     });
 
+    it("generates prototype methods for Rails' element list", () => {
+      for (const name of ["div", "br", "circle", "animate_motion"]) {
+        expect(Object.prototype.hasOwnProperty.call(TagBuilder.prototype, name)).toBe(true);
+      }
+      const t = tag() as any;
+      expect(t.div).toBe(TagBuilder.prototype.div);
+      expect(t.br).toBe(TagBuilder.prototype.br);
+      expect(t.circle).toBe(TagBuilder.prototype.circle);
+      expect(Object.prototype.hasOwnProperty.call(TagBuilder.prototype, "svg")).toBe(false);
+      expect(t.svg().toString()).toBe("<svg></svg>");
+    });
+
     it("defineVoidElement registers a void element", () => {
       TagBuilder.defineVoidElement("custom-void");
       const t = tag() as any;

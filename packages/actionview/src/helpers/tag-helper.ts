@@ -4,6 +4,7 @@ import {
   htmlSafe,
   htmlEscapeOnce,
   xmlNameEscape,
+  extractOptionsBang,
 } from "@blazetrails/activesupport";
 import {
   raw as _raw,
@@ -17,6 +18,8 @@ import { capture, type CaptureHelperHost } from "./capture-helper.js";
 export interface TagHelperHost extends CaptureHelperHost {
   _tagBuilder?: TagBuilder;
 }
+
+type TagBlock = (tagBuilder: TagBuilder) => unknown;
 
 const BOOLEAN_ATTRIBUTES = new Set([
   "allowfullscreen",
@@ -70,45 +73,6 @@ const ARIA_PREFIXES = new Set(["aria"]);
 
 const PRE_CONTENT_STRINGS: Record<string, string> = {
   textarea: "\n",
-};
-
-const VOID_ELEMENTS = new Set([
-  "area",
-  "base",
-  "br",
-  "col",
-  "embed",
-  "hr",
-  "img",
-  "input",
-  "keygen",
-  "link",
-  "meta",
-  "source",
-  "track",
-  "wbr",
-]);
-
-const SELF_CLOSING_ELEMENTS = new Set([
-  "animate",
-  "animateMotion",
-  "animateTransform",
-  "circle",
-  "ellipse",
-  "line",
-  "path",
-  "polygon",
-  "polyline",
-  "rect",
-  "set",
-  "stop",
-  "use",
-  "view",
-]);
-
-const METHOD_TO_TAG_NAME: Record<string, string> = {
-  animate_motion: "animateMotion",
-  animate_transform: "animateTransform",
 };
 
 /** @internal */
@@ -410,6 +374,194 @@ export function escapeOnce(html: string): SafeBuffer {
 }
 
 export class TagBuilder {
+  static defineElement(name: string, { methodName = name }: { methodName?: string } = {}): void {
+    if (name in this.prototype) return;
+
+    Object.defineProperty(this.prototype, methodName, {
+      value(this: TagBuilder, ...args: unknown[]): SafeBuffer {
+        const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
+          | TagBlock
+          | undefined;
+        const { escape = true, ...options } = extractOptionsBang(args);
+        const [content = null] = args;
+        return this.tagString(name, content, options, { escape: escape as boolean, block });
+      },
+      writable: true,
+      configurable: true,
+    });
+  }
+
+  static defineVoidElement(
+    name: string,
+    { methodName = name }: { methodName?: string } = {},
+  ): void {
+    Object.defineProperty(this.prototype, methodName, {
+      value(this: TagBuilder, ...args: unknown[]): SafeBuffer {
+        if (typeof args[args.length - 1] === "function") args.pop();
+        const { escape = true, ...options } = extractOptionsBang(args);
+        if (args.length > 0) {
+          throw new ArgumentError(`wrong number of arguments (given ${args.length}, expected 0)`);
+        }
+        return this.selfClosingTagString(name, options, escape as boolean, ">");
+      },
+      writable: true,
+      configurable: true,
+    });
+  }
+
+  static defineSelfClosingElement(
+    name: string,
+    { methodName = name }: { methodName?: string } = {},
+  ): void {
+    Object.defineProperty(this.prototype, methodName, {
+      value(this: TagBuilder, ...args: unknown[]): SafeBuffer {
+        const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
+          | TagBlock
+          | undefined;
+        const { escape = true, ...options } = extractOptionsBang(args);
+        const [content = null] = args;
+        if ((content != null && content !== false) || block) {
+          return this.tagString(name, content, options, { escape: escape as boolean, block });
+        } else {
+          return this.selfClosingTagString(name, options, escape as boolean);
+        }
+      },
+      writable: true,
+      configurable: true,
+    });
+  }
+
+  static {
+    this.defineVoidElement("area");
+    this.defineVoidElement("base");
+    this.defineVoidElement("br");
+    this.defineVoidElement("col");
+    this.defineVoidElement("embed");
+    this.defineVoidElement("hr");
+    this.defineVoidElement("img");
+    this.defineVoidElement("input");
+    this.defineVoidElement("keygen");
+    this.defineVoidElement("link");
+    this.defineVoidElement("meta");
+    this.defineVoidElement("source");
+    this.defineVoidElement("track");
+    this.defineVoidElement("wbr");
+    this.defineSelfClosingElement("animate");
+    this.defineSelfClosingElement("animateMotion", { methodName: "animate_motion" });
+    this.defineSelfClosingElement("animateTransform", { methodName: "animate_transform" });
+    this.defineSelfClosingElement("circle");
+    this.defineSelfClosingElement("ellipse");
+    this.defineSelfClosingElement("line");
+    this.defineSelfClosingElement("path");
+    this.defineSelfClosingElement("polygon");
+    this.defineSelfClosingElement("polyline");
+    this.defineSelfClosingElement("rect");
+    this.defineSelfClosingElement("set");
+    this.defineSelfClosingElement("stop");
+    this.defineSelfClosingElement("use");
+    this.defineSelfClosingElement("view");
+    this.defineElement("a");
+    this.defineElement("abbr");
+    this.defineElement("address");
+    this.defineElement("article");
+    this.defineElement("aside");
+    this.defineElement("audio");
+    this.defineElement("b");
+    this.defineElement("bdi");
+    this.defineElement("bdo");
+    this.defineElement("blockquote");
+    this.defineElement("body");
+    this.defineElement("button");
+    this.defineElement("canvas");
+    this.defineElement("caption");
+    this.defineElement("cite");
+    this.defineElement("code");
+    this.defineElement("colgroup");
+    this.defineElement("data");
+    this.defineElement("datalist");
+    this.defineElement("dd");
+    this.defineElement("del");
+    this.defineElement("details");
+    this.defineElement("dfn");
+    this.defineElement("dialog");
+    this.defineElement("div");
+    this.defineElement("dl");
+    this.defineElement("dt");
+    this.defineElement("em");
+    this.defineElement("fieldset");
+    this.defineElement("figcaption");
+    this.defineElement("figure");
+    this.defineElement("footer");
+    this.defineElement("form");
+    this.defineElement("h1");
+    this.defineElement("h2");
+    this.defineElement("h3");
+    this.defineElement("h4");
+    this.defineElement("h5");
+    this.defineElement("h6");
+    this.defineElement("head");
+    this.defineElement("header");
+    this.defineElement("hgroup");
+    this.defineElement("html");
+    this.defineElement("i");
+    this.defineElement("iframe");
+    this.defineElement("ins");
+    this.defineElement("kbd");
+    this.defineElement("label");
+    this.defineElement("legend");
+    this.defineElement("li");
+    this.defineElement("main");
+    this.defineElement("map");
+    this.defineElement("mark");
+    this.defineElement("menu");
+    this.defineElement("meter");
+    this.defineElement("nav");
+    this.defineElement("noscript");
+    this.defineElement("object");
+    this.defineElement("ol");
+    this.defineElement("optgroup");
+    this.defineElement("option");
+    this.defineElement("output");
+    this.defineElement("p");
+    this.defineElement("picture");
+    this.defineElement("portal");
+    this.defineElement("pre");
+    this.defineElement("progress");
+    this.defineElement("q");
+    this.defineElement("rp");
+    this.defineElement("rt");
+    this.defineElement("ruby");
+    this.defineElement("s");
+    this.defineElement("samp");
+    this.defineElement("script");
+    this.defineElement("search");
+    this.defineElement("section");
+    this.defineElement("select");
+    this.defineElement("slot");
+    this.defineElement("small");
+    this.defineElement("span");
+    this.defineElement("strong");
+    this.defineElement("style");
+    this.defineElement("sub");
+    this.defineElement("summary");
+    this.defineElement("sup");
+    this.defineElement("table");
+    this.defineElement("tbody");
+    this.defineElement("td");
+    this.defineElement("template");
+    this.defineElement("textarea");
+    this.defineElement("tfoot");
+    this.defineElement("th");
+    this.defineElement("thead");
+    this.defineElement("time");
+    this.defineElement("title");
+    this.defineElement("tr");
+    this.defineElement("u");
+    this.defineElement("ul");
+    this.defineElement("var");
+    this.defineElement("video");
+  }
+
   /** @internal */
   viewContext: TagHelperHost;
 
@@ -427,7 +579,7 @@ export class TagBuilder {
     name: string,
     content: unknown,
     options?: Record<string, unknown> | null,
-    opts?: { escape?: boolean; block?: (tagBuilder: TagBuilder) => unknown },
+    opts?: { escape?: boolean; block?: TagBlock },
   ): SafeBuffer {
     const escape = opts?.escape !== false;
     let actualContent: unknown = content;
@@ -440,24 +592,29 @@ export class TagBuilder {
     return contentTagString(name, actualContent, options ?? undefined, escape);
   }
 
-  static defineElement(name: string, opts?: { methodName?: string }): void {
-    if (opts?.methodName && opts.methodName !== name) {
-      METHOD_TO_TAG_NAME[opts.methodName] = name;
-    }
+  selfClosingTagString(
+    name: string,
+    options: Record<string, unknown>,
+    escape: boolean = true,
+    tagSuffix: string = " />",
+  ): SafeBuffer {
+    return htmlSafe(`<${name}${tagOptions(options, escape)}${tagSuffix}`);
   }
 
-  static defineVoidElement(name: string, opts?: { methodName?: string }): void {
-    VOID_ELEMENTS.add(name);
-    if (opts?.methodName && opts.methodName !== name) {
-      METHOD_TO_TAG_NAME[opts.methodName] = name;
-    }
-  }
+  private methodMissing(called: string, ...args: unknown[]): SafeBuffer {
+    const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
+      | TagBlock
+      | undefined;
+    const { escape = true, ...options } = extractOptionsBang(args);
+    const name = dasherize(called);
 
-  static defineSelfClosingElement(name: string, opts?: { methodName?: string }): void {
-    SELF_CLOSING_ELEMENTS.add(name);
-    if (opts?.methodName && opts.methodName !== name) {
-      METHOD_TO_TAG_NAME[opts.methodName] = name;
-    }
+    ensureValidHtml5TagName(name);
+
+    const [content = null] = args;
+    return this.tagString(name, content, options, {
+      escape: escape as boolean,
+      block,
+    });
   }
 
   [key: string]: unknown;
@@ -485,113 +642,19 @@ function createTagBuilderProxy(viewContext: TagHelperHost): TagBuilder {
 
   return new Proxy(builder, {
     get(target, prop, receiver) {
-      if (typeof prop === "symbol") {
+      if (typeof prop === "symbol" || prop in target) {
         return Reflect.get(target, prop, receiver);
       }
+      if (prop === "then" || prop === "catch" || prop === "finally") return undefined;
 
-      if (prop === "then" || prop === "catch" || prop === "finally") {
-        return undefined;
-      }
-
-      if (
-        prop === "attributes" ||
-        prop === "tagString" ||
-        prop === "viewContext" ||
-        prop === "constructor" ||
-        prop === "publicMethods" ||
-        prop === "public_methods"
-      ) {
-        return Reflect.get(target, prop, receiver);
-      }
-
-      const methodName = String(prop);
-      const tagName = METHOD_TO_TAG_NAME[methodName] ?? dasherize(methodName);
-
-      return (contentOrOpts?: unknown, optsOrBlock?: Record<string, unknown> | (() => unknown)) => {
-        ensureValidHtml5TagName(tagName);
-        let content: unknown = undefined;
-        let options: Record<string, unknown> = {};
-        let escape = true;
-        let block: ((tagBuilder?: unknown) => unknown) | undefined;
-
-        if (typeof contentOrOpts === "function") {
-          block = contentOrOpts as () => unknown;
-        } else if (
-          typeof contentOrOpts === "object" &&
-          contentOrOpts !== null &&
-          !(contentOrOpts instanceof SafeBuffer) &&
-          !Array.isArray(contentOrOpts)
-        ) {
-          options = { ...contentOrOpts } as Record<string, unknown>;
-          if (typeof optsOrBlock === "function") {
-            block = optsOrBlock;
-          }
-        } else {
-          content = contentOrOpts;
-          if (typeof optsOrBlock === "function") {
-            block = optsOrBlock;
-          } else if (typeof optsOrBlock === "object" && optsOrBlock !== null) {
-            options = { ...optsOrBlock };
-          }
-        }
-
-        if (typeof options.escape === "boolean") {
-          escape = options.escape;
-          delete options.escape;
-        }
-
-        const hasOptions = Object.keys(options).length > 0;
-
-        if (VOID_ELEMENTS.has(tagName)) {
-          if (content !== undefined || block) {
-            throw new ArgumentError(`No content allowed for void element "${tagName}"`);
-          }
-          return selfClosingTagString(tagName, options, escape, ">");
-        }
-
-        if (SELF_CLOSING_ELEMENTS.has(tagName) || SELF_CLOSING_ELEMENTS.has(methodName)) {
-          const actualTagName = SELF_CLOSING_ELEMENTS.has(methodName) ? methodName : tagName;
-          if (content !== undefined || block) {
-            return (receiver as TagBuilder).tagString(
-              actualTagName,
-              content,
-              hasOptions ? options : undefined,
-              { escape, block },
-            );
-          }
-          return selfClosingTagString(actualTagName, options, escape);
-        }
-
-        if (block) {
-          return (receiver as TagBuilder).tagString(
-            tagName,
-            undefined,
-            hasOptions ? options : undefined,
-            { escape, block },
-          );
-        }
-
-        return contentTagString(
-          tagName,
-          content !== undefined ? content : "",
-          hasOptions ? options : undefined,
-          escape,
-        );
+      const { methodMissing } = target as unknown as {
+        methodMissing(called: string, ...args: unknown[]): SafeBuffer;
       };
+      return (...args: unknown[]) => methodMissing.call(receiver, prop, ...args);
     },
 
     has() {
       return true;
     },
   });
-}
-
-function selfClosingTagString(
-  name: string,
-  options: Record<string, unknown>,
-  escape: boolean = true,
-  tagSuffix: string = " />",
-): SafeBuffer {
-  const opts = Object.keys(options).length > 0 ? tagOptions(options, escape) : "";
-  return htmlSafe(`<${name}${opts}${tagSuffix}`);
 }
