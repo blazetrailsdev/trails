@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { FixtureResolver, TemplateHandlers } from "@blazetrails/actionview";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
@@ -111,5 +111,25 @@ describe("ActionController::Base#respond_to?", () => {
     const controller = new BackController();
     await controller.dispatch("show", request, new Response());
     expect(controller.back).toBe("http://localhost/previous");
+  });
+});
+
+describe("ActionController::Streaming#_render_template", () => {
+  class StreamController extends ApplicationController {
+    async show(): Promise<void> {
+      this.render({ partial: "row", stream: true });
+    }
+  }
+  StreamController.prependViewPath(
+    new FixtureResolver({ "stream/_row.html.html": "streamed row" }),
+  );
+
+  it("renders a stream: true template through view_renderer.render_body with no-cache", async () => {
+    const controller = new StreamController();
+    const renderBody = vi.spyOn(controller.viewRenderer(), "renderBody");
+    await controller.dispatch("show", makeRequest(), new Response());
+    expect(renderBody).toHaveBeenCalledOnce();
+    expect(controller.responseBody).toBe("streamed row");
+    expect(controller.response.getHeader("cache-control")).toBe("no-cache");
   });
 });

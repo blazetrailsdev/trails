@@ -48,13 +48,14 @@ import {
 import {
   Base as ActionViewBase,
   _processFormat,
-  _renderTemplate,
   buildViewContextClass,
   isInheritViewContextClass,
   renderToBody as actionViewRenderToBody,
   viewContext,
   viewContextClass,
+  viewRenderer,
 } from "@blazetrails/actionview";
+import { _renderTemplate } from "./metal/streaming.js";
 import type {
   PathSet,
   ViewPathsInput,
@@ -127,7 +128,11 @@ import {
 } from "./metal/rendering.js";
 import { Renderers } from "./metal/renderers.js";
 import { urlOptions } from "./metal/url-for.js";
-import { UrlFor } from "../action-dispatch/routing/url-for.js";
+import { UrlFor, type UrlForOptions } from "../action-dispatch/routing/url-for.js";
+import type {
+  PolymorphicArg,
+  PolymorphicOptions,
+} from "../action-dispatch/routing/polymorphic-routes.js";
 import { Cookies } from "./metal/cookies.js";
 import {
   appendInfoToPayload,
@@ -167,7 +172,10 @@ export type RenderOptions = {
   contentType?: string;
   layout?: boolean | string;
   formats?: string;
+  stream?: boolean;
 };
+
+type StreamingBody = { each(block: (chunk: string) => void): Promise<unknown> };
 
 export type RescueHandler = (error: Error) => void | Promise<void>;
 
@@ -233,6 +241,11 @@ export const PROTECTED_IVARS: readonly string[] = [
 export interface Base {
   get params(): StrongParameters;
   set params(value: StrongParameters | Record<string, unknown>);
+  urlFor(options?: UrlForOptions): string;
+  fullUrlFor(options?: UrlForOptions): string;
+  routeFor(name: string, ...args: unknown[]): string;
+  polymorphicUrl(recordOrHashOrArray: PolymorphicArg, options?: PolymorphicOptions): string;
+  polymorphicPath(recordOrHashOrArray: PolymorphicArg, options?: PolymorphicOptions): string;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -292,6 +305,8 @@ export class Base extends Metal {
   viewContext(): ActionViewBase {
     return viewContext.call(this as unknown as ViewContextHost);
   }
+
+  declare viewRenderer: typeof viewRenderer;
 
   private static _rescueHandlers: Array<{
     errorClass: new (...args: any[]) => Error;
@@ -426,7 +441,13 @@ export class Base extends Metal {
       _setRenderedContentType.call(this, this._renderedFormat as string | null | undefined);
     }
     _setVaryHeader.call(this as never);
-    this.responseBody = renderedBody as string;
+    let body = renderedBody;
+    if (!Array.isArray(body) && typeof (body as StreamingBody | null)?.each === "function") {
+      const chunks: string[] = [];
+      await (body as StreamingBody).each((chunk) => chunks.push(chunk));
+      body = chunks;
+    }
+    this.responseBody = body as string;
     this.markPerformed();
   }
 
@@ -959,6 +980,7 @@ include(Base, StrongParametersModule);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
 Base.prototype._processOptions = _processOptions;
 Base.prototype._renderTemplate = _renderTemplate;
+Base.prototype.viewRenderer = viewRenderer;
 Base.prototype._processFormat = _processFormat;
 Base.prototype._processVariant = _processVariant;
 Base.prototype._normalizeRender = _normalizeRender;
