@@ -29,6 +29,7 @@ let _commandType: string | undefined;
 let _lookupPaths: URL[] | undefined;
 let _aliases: Record<string, Record<string, unknown>> | undefined;
 let _options: Record<string, Record<string, unknown>> | undefined;
+let _fallbacks: Record<string, unknown> | undefined;
 let _afterGenerateCallbacks: AfterGenerateCallback[] | undefined;
 let _generatedFiles: string[] | undefined;
 
@@ -86,6 +87,7 @@ export class Generators {
   static configureBang(config: GeneratorsConfiguration): void {
     deepMergeBang(Generators.aliases(), config.aliases as never);
     deepMergeBang(Generators.options(), config.options as never);
+    Object.assign(Generators.fallbacks(), config.fallbacks);
     Generators.hideNamespaces(...config.hiddenNamespaces);
     Generators.afterGenerateCallbacks().splice(0, Infinity, ...config.afterGenerateCallbacks);
   }
@@ -100,6 +102,10 @@ export class Generators {
 
   static afterGenerateCallbacks(): AfterGenerateCallback[] {
     return (_afterGenerateCallbacks ??= []);
+  }
+
+  static fallbacks(): Record<string, unknown> {
+    return (_fallbacks ??= {});
   }
 
   static subclasses(): readonly GeneratorClass[] {
@@ -158,16 +164,23 @@ export class Generators {
     return [...new Set(paths)];
   }
 
-  static async findByNamespace(name: string, base?: string): Promise<GeneratorClass | undefined> {
+  static async findByNamespace(
+    name: string,
+    base: string | null = null,
+    context: string | null = null,
+  ): Promise<GeneratorClass | null> {
     const lookups: string[] = [];
-    if (base) lookups.push(`${base}:${name}`);
-    if (!base) {
+    if (base != null) lookups.push(`${base}:${name}`);
+    if (context != null) lookups.push(`${name}:${context}`);
+
+    if (!(base != null || context != null)) {
       if (!name.includes(":")) {
         lookups.push(`${name}:${name}`);
         lookups.push(`rails:${name}`);
       }
       lookups.push(name);
     }
+
     await Generators.lookup(lookups);
 
     const namespaces = new Map(Generators.subclasses().map((k) => [k.namespace, k]));
@@ -175,7 +188,11 @@ export class Generators {
       const klass = namespaces.get(namespace);
       if (klass) return klass;
     }
-    return undefined;
+
+    return (
+      (await Generators.invokeFallbacksFor(name, base)) ??
+      (await Generators.invokeFallbacksFor(context, name))
+    );
   }
 
   static async invoke(
@@ -185,10 +202,7 @@ export class Generators {
   ): Promise<string[]> {
     const names = namespace.split(":");
     const name = names.pop()!;
-    const klass = await Generators.findByNamespace(
-      name,
-      names.length ? names.join(":") : undefined,
-    );
+    const klass = await Generators.findByNamespace(name, names.length ? names.join(":") : null);
     if (!klass) {
       throw new Error(
         `Could not find generator '${namespace}'.\n` +
@@ -273,6 +287,25 @@ export class Generators {
       }
       _generatedFiles = [];
     }
+  }
+
+  private static async invokeFallbacksFor(
+    name: string | null,
+    base: string | null,
+  ): Promise<GeneratorClass | null> {
+    const fallbacks = base != null ? Generators.fallbacks()[base] : null;
+    if (!(fallbacks != null && fallbacks !== false)) return null;
+    const invokedFallbacks: unknown[] = [];
+
+    for (const fallback of [fallbacks].flat()) {
+      if (invokedFallbacks.includes(fallback)) continue;
+      invokedFallbacks.push(fallback);
+
+      const klass = await Generators.findByNamespace(name!, fallback as string);
+      if (klass) return klass;
+    }
+
+    return null;
   }
 
   private static commandType(): string {

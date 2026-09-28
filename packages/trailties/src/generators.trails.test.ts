@@ -128,3 +128,29 @@ describe("GeneratorsTest", () => {
     ).rejects.toThrow(`Expected '--database' to be one of ${DATABASES.join(", ")}; got "oracle"`);
   });
 });
+
+describe("Generators.findByNamespace fallbacks and context", () => {
+  it("falls back to another generator group for a missing base", async () => {
+    Generators.fallbacks()["remarkable"] = "rails";
+    try {
+      const klass = await Generators.findByNamespace("model", "remarkable");
+      expect(klass?.namespace).toBe("rails:model");
+    } finally {
+      delete Generators.fallbacks()["remarkable"];
+    }
+  });
+
+  it("falls back through the context when the base misses", async () => {
+    Generators.fallbacks()["remarkable"] = "rails";
+    try {
+      const klass = await Generators.findByNamespace("remarkable", "rails", "model");
+      expect(klass?.namespace).toBe("rails:model");
+    } finally {
+      delete Generators.fallbacks()["remarkable"];
+    }
+  });
+
+  it("answers null when neither the lookups nor a fallback resolve", async () => {
+    expect(await Generators.findByNamespace("nope", null, "model")).toBeNull();
+  });
+});
