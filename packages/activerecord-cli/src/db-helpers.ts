@@ -1,9 +1,14 @@
 import { join, resolve } from "path";
 import { File } from "@blazetrails/ruby-compat";
 import { DatabaseTasks, DatabaseConfigurations, Migrator } from "@blazetrails/activerecord";
-import { establishEnvironmentConnection, normalizeSqlitePaths } from "./environment.js";
+import {
+  establishEnvironmentConnection,
+  normalizeSqlitePaths,
+  seedDefaultEnv,
+} from "./environment.js";
 
 export async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigurations> {
+  seedDefaultEnv();
   const configPath = resolve(join(cwd, "config", "database.ts"));
   if (!File.isExist(configPath)) {
     throw new Error(`config/database.ts not found at ${configPath}`);
