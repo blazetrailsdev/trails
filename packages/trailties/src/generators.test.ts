@@ -54,36 +54,6 @@ describe("GeneratorsTest", () => {
     expect(klass!.namespace).toEqual("rails:model");
   });
 
-  it("fallbacks for generators on invoke", async () => {
-    Generators.fallbacks()["shoulda"] = "rails";
-    const klass = (await Generators.findByNamespace("rails:helper"))!;
-    const config = { cwd: "/tmp", output: () => {} };
-    const start = vi.spyOn(klass, "start").mockResolvedValue([]);
-    try {
-      await Generators.invoke("shoulda:helper", ["Account"], config);
-      expect(start).toHaveBeenCalledWith(["Account"], config);
-    } finally {
-      start.mockRestore();
-      delete Generators.fallbacks()["shoulda"];
-    }
-  });
-
-  it("nested fallbacks for generators", async () => {
-    Generators.fallbacks()["shoulda"] = "rails";
-    Generators.fallbacks()["super_shoulda"] = "shoulda";
-    const klass = (await Generators.findByNamespace("rails:helper"))!;
-    const config = { cwd: "/tmp", output: () => {} };
-    const start = vi.spyOn(klass, "start").mockResolvedValue([]);
-    try {
-      await Generators.invoke("super_shoulda:helper", ["Account"], config);
-      expect(start).toHaveBeenCalledWith(["Account"], config);
-    } finally {
-      start.mockRestore();
-      delete Generators.fallbacks()["shoulda"];
-      delete Generators.fallbacks()["super_shoulda"];
-    }
-  });
-
   it("find by namespace with base", async () => {
     const klass = await Generators.findByNamespace("model", "rails");
     expect(klass).toBeTruthy();

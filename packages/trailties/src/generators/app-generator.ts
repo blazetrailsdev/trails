@@ -37,13 +37,17 @@ const TRAILS_CLI = "node_modules/@blazetrails/trailties/bin/trails.js";
 const TRAILS = `${TRAILS_LOADER} ${TRAILS_CLI}`;
 
 export class ActionMethods {
-  readonly options: AppBaseOptions;
+  declare readonly options: AppBaseOptions;
   /** @internal */
-  private generator: AppGenerator;
+  declare private generator: AppGenerator;
 
   constructor(generator: AppGenerator) {
     this.generator = generator;
     this.options = generator.options;
+    return new Proxy(this, {
+      get: (target, key, receiver) =>
+        key in target ? Reflect.get(target, key, receiver) : target.methodMissing(key),
+    });
   }
 
   /** @internal */
@@ -59,6 +63,12 @@ export class ActionMethods {
   /** @internal */
   protected createFile(relativePath: string, content: string): void {
     this.generator["createFile"](relativePath, content);
+  }
+
+  /** @internal */
+  private methodMissing(key: string | symbol): unknown {
+    const value = (this.generator as unknown as Record<string | symbol, unknown>)[key];
+    return typeof value === "function" ? value.bind(this.generator) : value;
   }
 }
 

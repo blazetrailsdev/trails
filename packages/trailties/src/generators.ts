@@ -29,8 +29,6 @@ let _commandType: string | undefined;
 let _lookupPaths: URL[] | undefined;
 let _aliases: Record<string, Record<string, unknown>> | undefined;
 let _options: Record<string, Record<string, unknown>> | undefined;
-let _templatesPath: string[] | undefined;
-let _fallbacks: Record<string, unknown> | undefined;
 let _afterGenerateCallbacks: AfterGenerateCallback[] | undefined;
 let _generatedFiles: string[] | undefined;
 
@@ -86,19 +84,10 @@ export class Generators {
   }
 
   static configureBang(config: GeneratorsConfiguration): void {
-    if (config.apiOnly) Generators.apiOnlyBang();
     deepMergeBang(Generators.aliases(), config.aliases as never);
     deepMergeBang(Generators.options(), config.options as never);
-    Object.assign(Generators.fallbacks(), config.fallbacks);
-    const templatesPath = Generators.templatesPath();
-    templatesPath.push(...config.templates);
-    templatesPath.splice(0, Infinity, ...new Set(templatesPath));
     Generators.hideNamespaces(...config.hiddenNamespaces);
     Generators.afterGenerateCallbacks().splice(0, Infinity, ...config.afterGenerateCallbacks);
-  }
-
-  static templatesPath(): string[] {
-    return (_templatesPath ??= []);
   }
 
   static aliases(): Record<string, Record<string, unknown>> {
@@ -111,24 +100,6 @@ export class Generators {
 
   static afterGenerateCallbacks(): AfterGenerateCallback[] {
     return (_afterGenerateCallbacks ??= []);
-  }
-
-  static fallbacks(): Record<string, unknown> {
-    return (_fallbacks ??= {});
-  }
-
-  static apiOnlyBang(): void {
-    Generators.hideNamespaces("assets", "helper", "css", "js");
-
-    Object.assign(Generators.options()["rails"], {
-      api: true,
-      assets: false,
-      helper: false,
-      templateEngine: null,
-    });
-
-    Generators.options()["mailer"] ??= {};
-    Generators.options()["mailer"]["templateEngine"] ??= "tse";
   }
 
   static subclasses(): readonly GeneratorClass[] {
@@ -187,16 +158,10 @@ export class Generators {
     return [...new Set(paths)];
   }
 
-  static async findByNamespace(
-    name: string,
-    base?: string,
-    context?: string,
-  ): Promise<GeneratorClass | undefined> {
+  static async findByNamespace(name: string, base?: string): Promise<GeneratorClass | undefined> {
     const lookups: string[] = [];
     if (base) lookups.push(`${base}:${name}`);
-    if (context) lookups.push(`${name}:${context}`);
-
-    if (!(base || context)) {
+    if (!base) {
       if (!name.includes(":")) {
         lookups.push(`${name}:${name}`);
         lookups.push(`rails:${name}`);
@@ -210,11 +175,7 @@ export class Generators {
       const klass = namespaces.get(namespace);
       if (klass) return klass;
     }
-
-    return (
-      (await Generators.invokeFallbacksFor(name, base)) ??
-      (await Generators.invokeFallbacksFor(context, name))
-    );
+    return undefined;
   }
 
   static async invoke(
@@ -312,24 +273,6 @@ export class Generators {
       }
       _generatedFiles = [];
     }
-  }
-
-  private static async invokeFallbacksFor(
-    name: string | undefined,
-    base: string | undefined,
-  ): Promise<GeneratorClass | undefined> {
-    if (!(base && Generators.fallbacks()[base])) return undefined;
-    const invokedFallbacks: string[] = [];
-
-    for (const fallback of [Generators.fallbacks()[base]].flat() as string[]) {
-      if (invokedFallbacks.includes(fallback)) continue;
-      invokedFallbacks.push(fallback);
-
-      const klass = await Generators.findByNamespace(name!, fallback);
-      if (klass) return klass;
-    }
-
-    return undefined;
   }
 
   private static commandType(): string {

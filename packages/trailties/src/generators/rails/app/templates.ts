@@ -105,7 +105,7 @@ ${ciSetup(packageManager)}
                 ? ""
                 : "\n          DATABASE_URL: mysql2://127.0.0.1:3306"
           }
-        run: ${packageManager} test
+        run: bin/trails db test:prepare && ${packageManager} test
 `
   }`,
 

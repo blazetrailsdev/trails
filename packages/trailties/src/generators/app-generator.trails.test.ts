@@ -114,6 +114,7 @@ describe("AppGenerator (trails-only)", () => {
     const content = await ci({});
     expect(content).toMatch(/ {2}lint:\n[^]*run: bin\/eslint --format stylish\n\n {2}test:/);
     expect(content).toMatch(/DATABASE_URL: postgres:\/\/postgres:postgres@localhost:5432/);
+    expect(content).toMatch(/run: bin\/trails db test:prepare && \w+ test\n/);
     expect(await ci({ skipEslint: true })).not.toMatch(/lint:|eslint/);
     expect(await ci({ skipTest: true })).not.toMatch(/test:\s*runs-on/);
   });
@@ -122,7 +123,7 @@ describe("AppGenerator (trails-only)", () => {
     const calls: string[] = [];
     TopLevel.AppBuilder = class extends AppBuilder {
       override cifiles(): void {
-        calls.push("cifiles");
+        calls.push("cifiles", (this as unknown as { appPath: string }).appPath);
       }
     };
     try {
@@ -135,7 +136,7 @@ describe("AppGenerator (trails-only)", () => {
     } finally {
       delete TopLevel.AppBuilder;
     }
-    expect(calls).toEqual(["cifiles"]);
+    expect(calls).toEqual(["cifiles", "my-app"]);
     expect(File.isExist(File.join(tmpDir, "my-app", ".github", "workflows", "ci.yml"))).toBe(false);
   });
 });
