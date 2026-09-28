@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { bodyFromString, Lint, type RackEnv, type RackResponse } from "@blazetrails/rack";
-import { include, type Included } from "@blazetrails/activesupport";
+import {
+  assertIncludes,
+  assertNotIncludes,
+  include,
+  type Included,
+} from "@blazetrails/activesupport";
 import { Module, NoMethodError, rbFSend, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { XML } from "@blazetrails/nokogiri";
 import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
@@ -363,6 +368,10 @@ include(IntegrationProcessTest, CookieAssertions);
 
 describe("IntegrationProcessTest", () => {
   let t: IntegrationProcessTest;
+  const assertResponse = (type: number | string): void => t.assertResponse(type);
+  const assertRedirectedTo = (url: string): void => t.assertRedirectedTo(url);
+  const assertSetCookieHeader = (expected: string, header?: string): void =>
+    t.assertSetCookieHeader(expected, header);
 
   beforeEach(() => {
     t = new IntegrationProcessTest();
@@ -373,9 +382,9 @@ describe("IntegrationProcessTest", () => {
       await t.get("/get");
       expect(t.status).toBe(200);
       expect(t.statusMessage).toBe("OK");
-      t.assertResponse(200);
-      t.assertResponse("success");
-      t.assertResponse("ok");
+      assertResponse(200);
+      assertResponse("success");
+      assertResponse("ok");
       expect(t.cookies.toHash()).toEqual({});
       expect(t.body).toBe("OK");
       expect(t.response.body).toBe("OK");
@@ -390,9 +399,9 @@ describe("IntegrationProcessTest", () => {
         await t.get("/get", { headers: { HTTP_ACCEPT: mimeString } });
         expect(t.status).toBe(200);
         expect(t.statusMessage).toBe("OK");
-        t.assertResponse(200);
-        t.assertResponse("success");
-        t.assertResponse("ok");
+        assertResponse(200);
+        assertResponse("success");
+        assertResponse("ok");
         expect(t.cookies.toHash()).toEqual({});
         expect(t.body).toBe("<root></root>");
         expect(t.response.body).toBe("<root></root>");
@@ -407,9 +416,9 @@ describe("IntegrationProcessTest", () => {
       await t.post("/post");
       expect(t.status).toBe(201);
       expect(t.statusMessage).toBe("Created");
-      t.assertResponse(201);
-      t.assertResponse("success");
-      t.assertResponse("created");
+      assertResponse(201);
+      assertResponse("success");
+      assertResponse("created");
       expect(t.cookies.toHash()).toEqual({});
       expect(t.body).toBe("Created");
       expect(t.response.body).toBe("Created");
@@ -423,7 +432,7 @@ describe("IntegrationProcessTest", () => {
       t.cookies.set("cookie_1", "sugar");
       t.cookies.set("cookie_2", "oatmeal");
       await t.get("/cookieMonster");
-      t.assertSetCookieHeader(
+      assertSetCookieHeader(
         "cookie_1=; path=/\ncookie_3=chocolate; path=/",
         t.headers!.get("Set-Cookie"),
       );
@@ -438,13 +447,13 @@ describe("IntegrationProcessTest", () => {
   it("cookie persist to next request", async () => {
     await t.withTestRouteSet(async () => {
       await t.get("/setCookie");
-      t.assertResponse("success");
+      assertResponse("success");
 
       expect(t.headers!.get("Set-Cookie")).toBe("foo=bar; path=/");
       expect(t.cookies.toHash()).toEqual({ foo: "bar" });
 
       await t.get("/getCookie");
-      t.assertResponse("success");
+      assertResponse("success");
       expect(t.body).toBe("bar");
 
       expect(t.headers!.get("Set-Cookie")).toBeUndefined();
@@ -457,13 +466,13 @@ describe("IntegrationProcessTest", () => {
       t.hostBang("37s.backpack.test");
 
       await t.get("/setCookie");
-      t.assertResponse("success");
+      assertResponse("success");
 
       expect(t.headers!.get("Set-Cookie")).toBe("foo=bar; path=/");
       expect(t.cookies.toHash()).toEqual({ foo: "bar" });
 
       await t.get("/getCookie");
-      t.assertResponse("success");
+      assertResponse("success");
       expect(t.body).toBe("bar");
 
       expect(t.headers!.get("Set-Cookie")).toBeUndefined();
@@ -476,21 +485,21 @@ describe("IntegrationProcessTest", () => {
       await t.get("/redirect");
       expect(t.status).toBe(302);
       expect(t.statusMessage).toBe("Found");
-      t.assertResponse(302);
-      t.assertResponse("redirect");
-      t.assertResponse("found");
+      assertResponse(302);
+      assertResponse("redirect");
+      assertResponse("found");
       expect(t.response.body).toBe("");
       expect(t.htmlDocument).toBeInstanceOf(XML.Document);
       expect(t.requestCount).toBe(1);
 
       await t.followRedirectBang();
       expect(t.request.referer).toBe("http://www.example.com/redirect");
-      t.assertResponse("success");
+      assertResponse("success");
       expect(t.path).toBe("/get");
 
       await t.get("/moved");
-      t.assertResponse("redirect");
-      t.assertRedirectedTo("/method");
+      assertResponse("redirect");
+      assertRedirectedTo("/method");
     });
   });
 
@@ -519,7 +528,7 @@ describe("IntegrationProcessTest", () => {
 
       await t.followRedirectBang();
 
-      t.assertResponse("ok");
+      assertResponse("ok");
       expect(t.htmlDocument).not.toBe(previousHtmlDocument);
     });
   });
@@ -529,7 +538,7 @@ describe("IntegrationProcessTest", () => {
       await t.get("/redirect");
       await t.followRedirectBang({ params: { foo: "bar" } });
 
-      t.assertResponse("ok");
+      assertResponse("ok");
       expect(t.request.parameters["foo"]).toBe("bar");
     });
   });
@@ -539,9 +548,9 @@ describe("IntegrationProcessTest", () => {
       await t.get("/get", { xhr: true });
       expect(t.status).toBe(200);
       expect(t.statusMessage).toBe("OK");
-      t.assertResponse(200);
-      t.assertResponse("success");
-      t.assertResponse("ok");
+      assertResponse(200);
+      assertResponse("success");
+      assertResponse("ok");
       expect(t.response.body).toBe("JS OK");
     });
   });
@@ -550,8 +559,8 @@ describe("IntegrationProcessTest", () => {
     await t.withTestRouteSet(async () => {
       await t.get("/get.php", { xhr: true });
       expect(t.status).toBe(406);
-      t.assertResponse(406);
-      t.assertResponse("not_acceptable");
+      assertResponse(406);
+      assertResponse("not_acceptable");
     });
   });
 
@@ -689,9 +698,13 @@ describe("IntegrationProcessTest", () => {
       });
     });
 
-    expect(t.response.headers.has("a")).toBe(false);
-    expect(t.response.headers.has("b")).toBe(true);
-    expect(t.response.headers.has("c")).toBe(true);
+    assertNotIncludes(
+      t.response.headers,
+      "a",
+      "Response should not include default header removed by the controller action",
+    );
+    assertIncludes(t.response.headers, "b");
+    assertIncludes(t.response.headers, "c");
   });
 
   it("accept not overridden when xhr true", async () => {
@@ -764,6 +777,7 @@ include(MetalIntegrationTest, SharedTestRoutes.urlHelpers());
 
 describe("MetalIntegrationTest", () => {
   let t: MetalIntegrationTest;
+  const assertResponse = (type: number | string): void => t.assertResponse(type);
 
   beforeEach(() => {
     t = new MetalIntegrationTest();
@@ -772,16 +786,16 @@ describe("MetalIntegrationTest", () => {
 
   it("successful get", async () => {
     await t.get("/success");
-    t.assertResponse(200);
-    t.assertResponse("success");
-    t.assertResponse("ok");
+    assertResponse(200);
+    assertResponse("success");
+    assertResponse("ok");
     expect(t.responseBody).toBe("Hello World!");
   });
 
   it("failed get", async () => {
     await t.get("/failure");
-    t.assertResponse(404);
-    t.assertResponse("not_found");
+    assertResponse(404);
+    assertResponse("not_found");
     expect(t.responseBody).toBe("");
   });
 
