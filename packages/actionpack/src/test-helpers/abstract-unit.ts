@@ -68,6 +68,14 @@ await ActionPackTestSuiteUtils.requireHelpers(
 
 export const FIXTURE_LOAD_PATH = new URL("./fixtures", import.meta.url).pathname;
 
+export const SharedTestRoutes = new RouteSet();
+
+SharedTestRoutes.draw((r) => {
+  deprecator().silence(() => {
+    r.get(":controller(/:action)");
+  });
+});
+
 class Config {
   middleware: MiddlewareStack;
 

@@ -2,7 +2,7 @@ import { Request } from "../http/request.js";
 import { Headers } from "../http/headers.js";
 import { MimeType } from "../http/mime-type.js";
 import { isPresent, runLoadHooks } from "@blazetrails/activesupport";
-import { HTTPS, URI, stringSplit, type Generic } from "@blazetrails/ruby-compat";
+import { HTTPS, URI, include, stringSplit, type Generic } from "@blazetrails/ruby-compat";
 import { TestResponse } from "./test-response.js";
 import { FlashHash } from "../middleware/flash.js";
 import { RouteSet } from "../routing/route-set.js";
@@ -35,13 +35,6 @@ export interface IntegrationRequestOptions {
   env?: Record<string, unknown>;
   as?: string;
 }
-
-const STATUS_RANGES: Record<string, [number, number]> = {
-  success: [200, 299],
-  redirect: [300, 399],
-  missing: [400, 499],
-  error: [500, 599],
-};
 
 const DEFAULT_HOST = "www.example.com";
 
@@ -123,7 +116,9 @@ export class IntegrationTest {
 
   /** @internal */
   get _routes(): UrlForRoutes {
-    return this._routesOverride ?? this.routes._routes;
+    if (this._routesOverride) return this._routesOverride;
+    const app = this.app as { routes?: unknown } | null;
+    return app?.routes instanceof RouteSet ? app.routes._routes : this.routes._routes;
   }
 
   set _routes(value: UrlForRoutes | null) {
@@ -540,6 +535,8 @@ export class IntegrationTest {
   declare polymorphicMapping: typeof polymorphicRoutes.polymorphicMapping;
   declare parameterize: typeof responseAssertions.parameterize;
   declare normalizeArgumentToRedirection: typeof responseAssertions.normalizeArgumentToRedirection;
+  declare assertResponse: typeof responseAssertions.assertResponse;
+  declare assertRedirectedTo: typeof responseAssertions.assertRedirectedTo;
   /** @internal */
   generateResponseMessage(expected: number | string, actual: number): string {
     return responseAssertions.generateResponseMessage(this, expected, actual);
@@ -559,70 +556,6 @@ export class IntegrationTest {
   /** @internal */
   codeWithName(codeOrName: number | string): string {
     return responseAssertions.codeWithName(codeOrName);
-  }
-
-  assertResponse(expected: number | string): void {
-    const actual = this.status;
-    if (typeof expected === "number") {
-      if (actual !== expected) {
-        throw new Error(`Expected response status ${expected}, got ${actual}`);
-      }
-      return;
-    }
-
-    const range = STATUS_RANGES[expected];
-    if (range) {
-      if (actual < range[0] || actual > range[1]) {
-        throw new Error(
-          `Expected response to be "${expected}" (${range[0]}-${range[1]}), got ${actual}`,
-        );
-      }
-      return;
-    }
-
-    const SYMBOLS: Record<string, number> = {
-      ok: 200,
-      created: 201,
-      accepted: 202,
-      no_content: 204,
-      moved_permanently: 301,
-      found: 302,
-      see_other: 303,
-      not_modified: 304,
-      bad_request: 400,
-      unauthorized: 401,
-      forbidden: 403,
-      not_found: 404,
-      method_not_allowed: 405,
-      unprocessable_entity: 422,
-      internal_server_error: 500,
-      service_unavailable: 503,
-    };
-    const code = SYMBOLS[expected];
-    if (code !== undefined) {
-      if (actual !== code) {
-        throw new Error(`Expected response status :${expected} (${code}), got ${actual}`);
-      }
-      return;
-    }
-
-    throw new Error(`Unknown response assertion: "${expected}"`);
-  }
-
-  assertRedirectedTo(expected: string | RegExp): void {
-    const location = this.redirectUrl;
-    if (!location) {
-      throw new Error("Expected a redirect but no Location header was set");
-    }
-    if (typeof expected === "string") {
-      if (location !== expected) {
-        throw new Error(`Expected redirect to "${expected}", got "${location}"`);
-      }
-    } else {
-      if (!expected.test(location)) {
-        throw new Error(`Expected redirect matching ${expected}, got "${location}"`);
-      }
-    }
   }
 
   assertContentType(expected: string): void {
@@ -690,5 +623,8 @@ proto.polymorphicPathForAction = polymorphicRoutes.polymorphicPathForAction;
 proto.polymorphicMapping = polymorphicRoutes.polymorphicMapping;
 proto.parameterize = responseAssertions.parameterize;
 proto.normalizeArgumentToRedirection = responseAssertions.normalizeArgumentToRedirection;
+proto.assertResponse = responseAssertions.assertResponse;
+proto.assertRedirectedTo = responseAssertions.assertRedirectedTo;
+include(IntegrationTest, urlForMod.UrlFor);
 
 runLoadHooks("action_dispatch_integration_test", IntegrationTest);

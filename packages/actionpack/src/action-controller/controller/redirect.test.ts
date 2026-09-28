@@ -62,19 +62,6 @@ describe("RedirectTest", () => {
     expect(c.status).toBe(303);
   });
 
-  it("redirect_to sets HTML body with link", async () => {
-    class C extends Base {
-      async index() {
-        this.redirectTo("/target");
-      }
-    }
-    const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toContain("/target");
-    expect(c.responseBody).toContain("redirected");
-    expect(c.contentType).toBe("text/html; charset=utf-8");
-  });
-
   it("redirect_to marks as performed", async () => {
     class C extends Base {
       async index() {

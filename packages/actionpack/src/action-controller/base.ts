@@ -13,6 +13,7 @@ import { Metal } from "./metal.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import { RequestForgeryProtection } from "../action-dispatch/request-forgery-protection.js";
 import { respondTo } from "./metal/mime-responds.js";
+import { DefaultHeaders } from "./metal/default-headers.js";
 import { actionMethods, addFlashTypes, Flash } from "./metal/flash.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
 import { MissingFile } from "./metal/exceptions.js";
@@ -447,10 +448,9 @@ export class Base extends Metal {
     }
 
     const proposedStatus = responseOptions.status ? statusCode(responseOptions.status) : 302;
-    this.status = proposedStatus;
     this.headers.set("location", options);
-    this.contentType = "text/html; charset=utf-8";
-    this.responseBody = `<html><body>You are being <a href="${options}">redirected</a>.</body></html>`;
+    this.responseBody = "";
+    this.status = proposedStatus;
     this.markPerformed();
   }
 
@@ -943,6 +943,7 @@ classAttribute.call(Base, "fragmentCacheKeys", { default: [] });
 helperMethod(Base as unknown as HelpersClassMethods, "combinedFragmentCacheKey");
 
 extend(Base, ConfigMethods);
+extend(Base, DefaultHeaders.ClassMethods);
 
 const _Configurable = Base as unknown as {
   configAccessor(...names: string[]): void;
