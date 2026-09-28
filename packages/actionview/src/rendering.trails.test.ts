@@ -23,11 +23,7 @@ describe("ActionView::Rendering::ClassMethods#build_view_context_class", () => {
         this.render({ plain: "" });
       }
     }
-    AbstractController.withRoutesHelpers(routes)(
-      FooController as unknown as Parameters<
-        ReturnType<typeof AbstractController.withRoutesHelpers>
-      >[0],
-    );
+    AbstractController.withRoutesHelpers(routes as never)(FooController as never);
     const controller = new FooController();
     await controller.dispatch(
       "other",
