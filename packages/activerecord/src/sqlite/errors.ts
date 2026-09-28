@@ -203,7 +203,14 @@ function nativeStatus(error: unknown): number | null {
 
 /** @noRailsEquivalent PERMANENT */
 export function rbSqlite3Raise(error: unknown): never {
-  rbSqlite3RaiseWithSql(error, null);
+  const status = nativeStatus(error);
+  const klass = status == null ? null : status2klass(status);
+  if (klass == null) throw error;
+
+  const exception = new klass((error as Error).message);
+  exception.code = status;
+
+  throw exception;
 }
 
 /** @noRailsEquivalent PERMANENT */
