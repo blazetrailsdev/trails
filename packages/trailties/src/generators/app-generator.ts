@@ -57,13 +57,16 @@ export class ActionMethods {
   }
 
   /** @internal */
-  protected emptyDirectory(destination: string): string {
-    return this.generator["emptyDirectory"](destination);
+  protected emptyDirectory(destination: string, config: { verbose?: boolean } = {}): string {
+    return this.generator["emptyDirectory"](destination, config);
   }
 
   /** @internal */
-  protected emptyDirectoryWithKeepFile(destination: string): void {
-    this.generator["emptyDirectoryWithKeepFile"](destination);
+  protected emptyDirectoryWithKeepFile(
+    destination: string,
+    config: { verbose?: boolean } = {},
+  ): void {
+    this.generator["emptyDirectoryWithKeepFile"](destination, config);
   }
 
   /** @internal */

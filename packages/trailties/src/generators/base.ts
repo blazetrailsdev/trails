@@ -342,18 +342,19 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     this.output(`${status.padStart(12)}  ${relativePath}`);
   }
 
-  protected emptyDirectory(destination: string): string {
+  protected emptyDirectory(destination: string, config: { verbose?: boolean } = {}): string {
+    const verbose = config.verbose ?? true;
     const fullPath = File.join(this.cwd, destination);
     if (this.behavior === "revoke") {
-      this.sayStatus("remove", destination);
+      this.sayStatus("remove", destination, verbose);
       if (!this.options.pretend && File.isExist(fullPath)) FileUtils.rmRf(fullPath);
       return destination;
     }
     if (File.isExist(fullPath)) {
-      this.sayStatus("exist", destination);
+      this.sayStatus("exist", destination, verbose);
     } else {
       if (!this.options.pretend) FileUtils.mkdirP(fullPath);
-      this.sayStatus("create", destination);
+      this.sayStatus("create", destination, verbose);
     }
     return fullPath;
   }

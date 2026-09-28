@@ -218,8 +218,11 @@ export abstract class AppBase extends GeneratorBase {
   }
 
   /** @internal */
-  protected emptyDirectoryWithKeepFile(destination: string): void {
-    this.emptyDirectory(destination);
+  protected emptyDirectoryWithKeepFile(
+    destination: string,
+    config: { verbose?: boolean } = {},
+  ): void {
+    this.emptyDirectory(destination, config);
     this.keepFile(destination);
   }
 
