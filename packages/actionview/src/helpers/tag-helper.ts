@@ -304,14 +304,14 @@ function tagOptions(options: Record<string, unknown> | undefined, escape: boolea
 }
 
 export function tag(
-  this: TagHelperHost | void,
+  this: TagHelperHost,
   name?: string,
   options?: Record<string, unknown> | null,
   open?: boolean,
   escape?: boolean,
 ): SafeBuffer | TagBuilder {
   if (name === undefined) {
-    return tagBuilder.call(this as TagHelperHost);
+    return tagBuilder.call(this);
   }
   ensureValidHtml5TagName(name);
   const esc = escape !== undefined ? escape : true;
@@ -321,7 +321,7 @@ export function tag(
 }
 
 export function contentTag(
-  this: TagHelperHost | void,
+  this: TagHelperHost,
   name: string,
   contentOrOptionsWithBlock?: unknown,
   options?: Record<string, unknown> | null,
@@ -338,12 +338,7 @@ export function contentTag(
       !(contentOrOptionsWithBlock instanceof SafeBuffer) &&
       !Array.isArray(contentOrOptionsWithBlock);
     const opts = isPlainOpts ? (contentOrOptionsWithBlock as Record<string, unknown>) : options;
-    return contentTagString(
-      name,
-      capture.call(this as TagHelperHost, block),
-      opts ?? undefined,
-      esc,
-    );
+    return contentTagString(name, capture.call(this, block), opts ?? undefined, esc);
   }
 
   return contentTagString(name, contentOrOptionsWithBlock, options ?? undefined, esc);

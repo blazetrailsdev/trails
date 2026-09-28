@@ -185,7 +185,7 @@ export function stylesheetLinkTag(this: AssetTagHelperHost, ...sources: unknown[
           tagOptions["media"] = "screen";
         }
 
-        return String(tag("link", tagOptions));
+        return String(tag.call(this, "link", tagOptions));
       })
       .join("\n"),
   );
@@ -209,7 +209,7 @@ export function autoDiscoveryLinkTag(
     );
   }
 
-  return tag("link", {
+  return tag.call(this, "link", {
     rel: rtest(tagOptions["rel"]) ? tagOptions["rel"] : "alternate",
     type: rtest(tagOptions["type"])
       ? tagOptions["type"]
@@ -226,7 +226,7 @@ export function faviconLinkTag(
   source: string = "favicon.ico",
   options: Record<string, unknown> = {},
 ): SafeBuffer {
-  return tag("link", {
+  return tag.call(this, "link", {
     rel: "icon",
     type: "image/x-icon",
     href: pathToImage.call(this, source, {
@@ -315,7 +315,7 @@ export function imageTag(
     options["decoding"] = imageDecoding;
   }
 
-  return tag("img", options) as SafeBuffer;
+  return tag.call(this, "img", options) as SafeBuffer;
 }
 
 export function pictureTag(
@@ -339,7 +339,7 @@ export function pictureTag(
       return imageTag.call(this, sources[sources.length - 1], imageOptions);
     } else {
       const sourceTags: unknown[] = sources.map((source) =>
-        tag("source", {
+        tag.call(this, "source", {
           srcset: resolveAssetSource.call(this, "image", source, skipPipeline),
           type: Template.Types.get(File.extname(source as string).slice(1))?.toString(),
         }),
@@ -389,7 +389,9 @@ export function multipleSourcesTagBuilder(
     return contentTag.call(this, type, options, null, undefined, () =>
       safeJoin(
         sources.map((source) =>
-          tag("source", { src: resolveAssetSource.call(this, type, source, skipPipeline) }),
+          tag.call(this, "source", {
+            src: resolveAssetSource.call(this, type, source, skipPipeline),
+          }),
         ),
       ),
     );

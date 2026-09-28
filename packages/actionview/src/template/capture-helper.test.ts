@@ -197,10 +197,10 @@ describe("CaptureHelperTest", () => {
 
   it("content for should be html safe after flush empty", () => {
     expect(av.isContentFor("title")).toBe(false);
-    av.contentFor("title", undefined, undefined, () => contentTag("p", "title"));
+    av.contentFor("title", undefined, undefined, () => contentTag.call(av, "p", "title"));
     expect((av.contentFor("title") as SafeBuffer).htmlSafe).toBe(true);
     av.contentFor("title", "", { flush: true });
-    av.contentFor("title", undefined, undefined, () => contentTag("p", "title"));
+    av.contentFor("title", undefined, undefined, () => contentTag.call(av, "p", "title"));
     expect((av.contentFor("title") as SafeBuffer).htmlSafe).toBe(true);
   });
 

@@ -8,7 +8,7 @@ import {
 } from "@blazetrails/activesupport";
 import { OutputBuffer } from "../buffers.js";
 import { chomp, regexpEscape } from "@blazetrails/ruby-compat";
-import { contentTag } from "./tag-helper.js";
+import { contentTag, type TagHelperHost } from "./tag-helper.js";
 import { sanitize } from "./sanitize-helper.js";
 import { raw } from "./output-safety-helper.js";
 
@@ -224,6 +224,7 @@ export interface SimpleFormatOptions {
 }
 
 export function simpleFormat(
+  this: TagHelperHost,
   text: string | SafeBuffer | null | undefined,
   htmlOptions: Record<string, unknown> = {},
   options: SimpleFormatOptions = {},
@@ -240,11 +241,11 @@ export function simpleFormat(
   const paragraphs = splitParagraphs(working);
 
   if (paragraphs.length === 0) {
-    return contentTag(wrapperTag, null, htmlOptions);
+    return contentTag.call(this, wrapperTag, null, htmlOptions);
   }
 
   const wrapped = paragraphs.map((paragraph) =>
-    contentTag(wrapperTag, raw(paragraph), htmlOptions).toString(),
+    contentTag.call(this, wrapperTag, raw(paragraph), htmlOptions).toString(),
   );
   return htmlSafe(wrapped.join("\n\n"));
 }

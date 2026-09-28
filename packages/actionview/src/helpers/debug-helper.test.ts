@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { SafeBuffer } from "@blazetrails/activesupport";
-import { debug } from "./debug-helper.js";
+import { debug as _debug } from "./debug-helper.js";
+import { Base } from "../base.js";
+
+const view = new (Base.withEmptyTemplateCache())(null, {}, null);
+const debug = _debug.bind(view);
 import * as yaml from "@blazetrails/activesupport/yaml";
 
 describe("DebugHelperTest", () => {
