@@ -245,6 +245,38 @@ export function rbModProtected(
   setMethodVisibility(module, mids, "protected");
 }
 
+function checkDefinitionVisibility(
+  mod: { prototype: object },
+  mid: string,
+): MethodVisibility | undefined {
+  for (
+    let o: object | null = mod.prototype;
+    o && o !== Object.prototype;
+    o = Object.getPrototypeOf(o) as object | null
+  ) {
+    const visi = methodVisibilities.get(o)?.get(mid);
+    if (visi !== undefined) return visi;
+    const me = Object.getOwnPropertyDescriptor(o, mid);
+    if (me) return typeof me.value === "function" || me.get ? "public" : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * `Module#public_method_defined?` (`rb_mod_public_method_defined`,
+ * `vendor/ruby/v3.3.11/vm_method.c:2098`, through `check_definition_visibility`,
+ * `:1988`): whether `mod`'s instances have a PUBLIC method `mid`, reading the
+ * visibility {@link rbModPrivate} / {@link rbModProtected} recorded. A JS method
+ * or accessor is a method entry; a data property is not, and neither is an
+ * `Object.prototype` member, which no Ruby class defines.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Module#public_method_defined?`
+ * (`vendor/ruby/v3.3.11/vm_method.c:2098`).
+ */
+export function rbModPublicMethodDefined(mod: { prototype: object }, mid: string): boolean {
+  return checkDefinitionVisibility(mod, mid) === "public";
+}
+
 /**
  * `Kernel#public_send` (`rb_f_public_send`, `vendor/ruby/v3.3.11/vm_eval.c:1350`): `send`
  * restricted to public methods, so a PRIVATE or PROTECTED entry raises

@@ -6,13 +6,13 @@ import {
   Response as DispatchResponse,
   ResponseBuffer,
 } from "../../action-dispatch/http/response.js";
-import { RuntimeError, merge } from "@blazetrails/ruby-compat";
+import { Queue, RuntimeError, SizedQueue, merge } from "@blazetrails/ruby-compat";
 
 export class ClientDisconnected extends RuntimeError {}
 
 type ErrorCallback = () => void;
 
-export class Buffer extends ResponseBuffer {
+export class Buffer extends ResponseBuffer<Queue<string | null>> {
   static queueSize: number | null = 10;
 
   ignoreDisconnect: boolean;
@@ -41,7 +41,7 @@ export class Buffer extends ResponseBuffer {
     super.write(string);
 
     if (!this.isConnected) {
-      this._buf.length = 0;
+      this._buf.clear();
 
       if (!this.ignoreDisconnect) {
         throw new ClientDisconnected("client disconnected");
@@ -55,12 +55,12 @@ export class Buffer extends ResponseBuffer {
 
   override close(): void {
     super.close();
-    this._buf.push(null);
+    void this._buf.push(null);
   }
 
   override abort(): void {
     this._aborted = true;
-    this._buf.length = 0;
+    this._buf.clear();
   }
 
   get isConnected(): boolean {
@@ -76,17 +76,17 @@ export class Buffer extends ResponseBuffer {
   }
 
   /** @internal */
-  protected override eachChunk(block: (chunk: unknown) => void): void {
+  protected override async eachChunk(block: (chunk: unknown) => void): Promise<void> {
     while (true) {
-      const str = this._buf.shift() as string | null | undefined;
-      if (str === null || str === undefined) break;
+      const str = await this._buf.pop();
+      if (str === null) break;
       block(str);
     }
   }
 
   /** @internal */
-  protected buildQueue(_queueSize: number | null): Array<string | null> {
-    return [];
+  protected buildQueue(queueSize: number | null): Queue<string | null> {
+    return queueSize ? new SizedQueue(queueSize) : new Queue();
   }
 }
 

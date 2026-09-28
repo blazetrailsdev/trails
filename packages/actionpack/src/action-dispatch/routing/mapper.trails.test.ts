@@ -297,3 +297,17 @@ describe("ActionDispatch::Routing::Mapper::Resources inflection", () => {
     expect(routes.fromRequirements({ controller: "people", action: "show" })?.name).toBe("person");
   });
 });
+
+describe("Mapper::Mapping#build_conditions", () => {
+  it("keeps only constraints naming a public Request method", () => {
+    const set = new RouteSet();
+    new Mapper(set).get("/foo", {
+      to: "posts#index",
+      constraints: { ip: "127.0.0.1", checkMethod: "GET", hasOwnProperty: "x" },
+    });
+    const [route] = set.routes.routes;
+    expect(Object.keys(route.conditions)).toContain("ip");
+    expect(Object.keys(route.conditions)).not.toContain("checkMethod");
+    expect(Object.keys(route.conditions)).not.toContain("hasOwnProperty");
+  });
+});

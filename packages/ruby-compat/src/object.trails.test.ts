@@ -9,6 +9,7 @@ import {
   rbFPublicSend,
   rbFSend,
   rbModPrivate,
+  rbModPublicMethodDefined,
 } from "./object.js";
 import { NoMethodError } from "./no-method-error.js";
 
@@ -142,5 +143,21 @@ describe("rbFSend", () => {
 
   it("raises NoMethodError for an unbound name", () => {
     expect(() => rbFSend(new Req(), "nope")).toThrow(NoMethodError);
+  });
+});
+
+describe("rbModPublicMethodDefined", () => {
+  it("answers a public method or accessor, inherited or own", () => {
+    class SubReq extends Req {}
+    expect(rbModPublicMethodDefined(Req, "subdomain")).toBe(true);
+    expect(rbModPublicMethodDefined(Req, "host")).toBe(true);
+    expect(rbModPublicMethodDefined(SubReq, "subdomain")).toBe(true);
+  });
+
+  it("does not answer a private method, a field, an Object.prototype member, or an unknown name", () => {
+    expect(rbModPublicMethodDefined(Req, "secret")).toBe(false);
+    expect(rbModPublicMethodDefined(Req, "field")).toBe(false);
+    expect(rbModPublicMethodDefined(Req, "hasOwnProperty")).toBe(false);
+    expect(rbModPublicMethodDefined(Req, "nope")).toBe(false);
   });
 });

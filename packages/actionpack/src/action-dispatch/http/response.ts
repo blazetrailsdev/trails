@@ -49,17 +49,17 @@ interface ContentTypeHeader {
 const NULL_CONTENT_TYPE_HEADER: ContentTypeHeader = { mimeType: undefined, charset: undefined };
 const BODY_METHODS = ["toAry", "call", "toPath"] as const;
 
-export class ResponseBuffer {
+export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>> {
   /** @internal */
   protected _response: Response;
   /** @internal */
-  protected _buf: Array<unknown>;
+  protected _buf: Buf;
   /** @internal */
   protected _closed = false;
   /** @internal */
   protected _strBody: string | null = null;
 
-  constructor(response: Response, buf: Array<unknown>) {
+  constructor(response: Response, buf: Buf) {
     this._response = response;
     this._buf = buf;
   }
@@ -90,6 +90,35 @@ export class ResponseBuffer {
     }
   }
 
+  async *[Symbol.asyncIterator](): AsyncIterableIterator<unknown> {
+    if (this._strBody !== null) {
+      yield this._strBody;
+    } else {
+      const chunks: unknown[] = [];
+      let wake: (() => void) | null = null;
+      let done = false;
+      const eachChunk = Promise.resolve(
+        this.eachChunk((chunk) => {
+          chunks.push(chunk);
+          wake?.();
+        }),
+      ).finally(() => {
+        done = true;
+        wake?.();
+      });
+      eachChunk.catch(() => {});
+      while (chunks.length > 0 || !done) {
+        if (chunks.length === 0) {
+          await new Promise<void>((resolve) => (wake = resolve));
+          wake = null;
+        } else {
+          yield chunks.shift();
+        }
+      }
+      await eachChunk;
+    }
+  }
+
   abort(): void {}
 
   close(): void {
@@ -102,8 +131,8 @@ export class ResponseBuffer {
   }
 
   /** @internal */
-  protected eachChunk(block: (chunk: unknown) => void): void {
-    this._buf.forEach(block);
+  protected eachChunk(block: (chunk: unknown) => void): void | Promise<void> {
+    (this._buf as unknown as Array<unknown>).forEach(block);
   }
 }
 
@@ -138,7 +167,7 @@ export class RackBody {
   }
 
   async *[Symbol.asyncIterator](): AsyncIterableIterator<string | Uint8Array> {
-    for (const chunk of this.each()) yield chunk as string | Uint8Array;
+    for await (const chunk of this.response) yield chunk as string | Uint8Array;
   }
 }
 
@@ -414,6 +443,19 @@ export class Response {
     const stream = this.stream as { each(): IterableIterator<unknown> };
     this.sendingBang();
     for (const chunk of stream.each()) yield chunk;
+    this.sentBang();
+  }
+
+  async *[Symbol.asyncIterator](): AsyncIterableIterator<unknown> {
+    const stream = this.stream as Partial<AsyncIterable<unknown>> & {
+      each(): IterableIterator<unknown>;
+    };
+    this.sendingBang();
+    if (typeof stream[Symbol.asyncIterator] === "function") {
+      for await (const chunk of stream as AsyncIterable<unknown>) yield chunk;
+    } else {
+      for (const chunk of stream.each()) yield chunk;
+    }
     this.sentBang();
   }
 
