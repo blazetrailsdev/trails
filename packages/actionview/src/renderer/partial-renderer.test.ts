@@ -140,8 +140,8 @@ describe("CollectionRenderer", () => {
   it("renders each element in a collection", async () => {
     const fake = makeFakeTemplate();
     (fake.render as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce("Alice")
-      .mockResolvedValueOnce("Bob");
+      .mockReturnValueOnce("Alice")
+      .mockReturnValueOnce("Bob");
     vi.spyOn(lc, "find").mockReturnValue(fake);
     const result = await new CollectionRenderer(lc).renderCollectionWithPartial(
       ["a", "b"],
@@ -207,9 +207,7 @@ describe("CollectionRenderer", () => {
 
   it("renders spacer_template between items", async () => {
     const itemTmpl = makeFakeTemplate();
-    (itemTmpl.render as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce("A")
-      .mockResolvedValueOnce("B");
+    (itemTmpl.render as ReturnType<typeof vi.fn>).mockReturnValueOnce("A").mockReturnValueOnce("B");
     const spacerTmpl = makeFakeTemplate("|");
     vi.spyOn(lc, "find").mockImplementation((name) => (name === "spacer" ? spacerTmpl : itemTmpl));
     const result = await new CollectionRenderer(lc, {
@@ -220,9 +218,7 @@ describe("CollectionRenderer", () => {
 
   it("derives partial from toPartialPath() for homogeneous collection", async () => {
     const fake = makeFakeTemplate();
-    (fake.render as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce("P1")
-      .mockResolvedValueOnce("P2");
+    (fake.render as ReturnType<typeof vi.fn>).mockReturnValueOnce("P1").mockReturnValueOnce("P2");
     vi.spyOn(lc, "find").mockReturnValue(fake);
     const posts = [{ toPartialPath: () => "posts/post" }, { toPartialPath: () => "posts/post" }];
     const result = await new CollectionRenderer(lc).renderCollectionDerivePartial(

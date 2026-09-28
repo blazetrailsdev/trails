@@ -38,7 +38,7 @@ function buildView(digest = "abc"): ViewContext {
 
 function buildTemplate(bodies: string[]): RenderableTemplate {
   const render = vi.fn();
-  for (const body of bodies) render.mockResolvedValueOnce(body);
+  for (const body of bodies) render.mockReturnValueOnce(body);
   return {
     identifier: "customers/_customer.html.tse",
     format: "html",

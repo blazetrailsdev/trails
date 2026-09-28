@@ -7,7 +7,7 @@
  * process-wide hook that runs at capture time. A reader holding the error
  * later cannot ask for them. So a `Location` is parsed back out of the one
  * `Error#stack` line `Exception#backtrace` answers for the same frame, and
- * `toS` returns that line, as MRI's `location_to_str` formats the frame it
+ * `toString` returns that line, as MRI's `location_to_str` formats the frame it
  * came from (`vm_backtrace.c:405`).
  *
  * A frame with no position answers `lineno` 0, as MRI's `location_lineno`
@@ -17,6 +17,13 @@
  * @noRailsEquivalent PERMANENT
  */
 export class Location {
+  /**
+   * `Thread::Backtrace::Location#path` (`vendor/ruby/v3.3.11/vm_backtrace.c:314`),
+   * nil for a V8 frame whose position is not a plain file (an `eval` frame).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  readonly path: string | null;
   /** @noRailsEquivalent PERMANENT */
   readonly lineno: number;
   /** @noRailsEquivalent PERMANENT */
@@ -32,6 +39,9 @@ export class Location {
     const label = /^at\s+(?:async\s+)?([^\s(]+)\s*\(/.exec(this._frame);
     this.label = label ? label[1].slice(label[1].lastIndexOf(".") + 1) : null;
 
+    const path = /(?:\(|^at\s+(?:async\s+)?)([^()\s][^()]*?):\d+:\d+\)?$/.exec(this._frame);
+    this.path = path ? path[1] : null;
+
     const position = /:(\d+):(\d+)\)?$/.exec(this._frame);
     this.lineno = position ? Number(position[1]) : 0;
     this.column = position ? Number(position[2]) : 0;
@@ -42,7 +52,7 @@ export class Location {
    *
    * @noRailsEquivalent PERMANENT
    */
-  toS(): string {
+  toString(): string {
     return this._frame;
   }
 }

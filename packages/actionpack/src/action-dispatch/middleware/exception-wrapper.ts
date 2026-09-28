@@ -6,16 +6,31 @@ import { PathRegistry, type Spot, type Template } from "@blazetrails/actionview"
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
 /** @noRailsEquivalent PERMANENT */
-export type BacktraceLine = string | SourceMapLocation;
+export type BacktraceLine = Location | SourceMapLocation;
 
-class SourceMapLocation extends String {
+class SourceMapLocation {
   private location: Location;
   private template: Template;
 
   constructor(location: Location, template: Template) {
-    super(location.toS());
     this.location = location;
     this.template = template;
+  }
+
+  get path(): string | null {
+    return this.location.path;
+  }
+
+  get lineno(): number {
+    return this.location.lineno;
+  }
+
+  get label(): string | null {
+    return this.location.label;
+  }
+
+  toString(): string {
+    return this.location.toString();
   }
 
   /** @missingRailsCall super — PERMANENT */
@@ -118,6 +133,8 @@ export class ExceptionWrapper {
   readonly wrappedCauses: ExceptionWrapper[];
   readonly statusCode: number;
   readonly statusText: string;
+  /** @internal */
+  readonly backtrace: BacktraceLine[];
 
   constructor(exception: Error);
   constructor(backtraceCleaner: BacktraceCleaner | null, exception: Error);
@@ -130,6 +147,7 @@ export class ExceptionWrapper {
     this.wrappedCauses = this.wrappedCausesFor(exception, backtraceCleaner);
     this.statusCode = this.computeStatusCode();
     this.statusText = STATUS_TEXTS[this.statusCode] ?? "Internal Server Error";
+    this.backtrace = this.buildBacktrace();
   }
 
   get unwrappedException(): Error {
@@ -235,19 +253,19 @@ export class ExceptionWrapper {
     };
   }
 
-  get applicationTrace(): BacktraceLine[] {
+  get applicationTrace(): Array<BacktraceLine | string> {
     return this.cleanBacktrace("silent");
   }
 
-  get frameworkTrace(): BacktraceLine[] {
+  get frameworkTrace(): Array<BacktraceLine | string> {
     return this.cleanBacktrace("noise");
   }
 
-  get fullTrace(): BacktraceLine[] {
+  get fullTrace(): Array<BacktraceLine | string> {
     return this.cleanBacktrace("all");
   }
 
-  exceptionTrace(): BacktraceLine[] {
+  exceptionTrace(): Array<BacktraceLine | string> {
     const app = this.applicationTrace;
     if (app.length === 0 && !this.silentExceptions.includes(this.exceptionClassName)) {
       return this.frameworkTrace;
@@ -270,7 +288,7 @@ export class ExceptionWrapper {
   }
 
   get sourceLocation(): TraceEntry | null {
-    const firstTrace = this.backtrace()[0];
+    const firstTrace = this.backtrace[0];
     if (!firstTrace) return null;
     return this.extractFileAndLineNumber(firstTrace);
   }
@@ -302,7 +320,7 @@ export class ExceptionWrapper {
   }
 
   get sourceExtracts(): SourceExtract[] {
-    return this.backtrace().map((trace) => this.extractSource(trace));
+    return this.backtrace.map((trace) => this.extractSource(trace));
   }
 
   toResponse(): [number, Record<string, string>, string] {
@@ -311,11 +329,6 @@ export class ExceptionWrapper {
       { "content-type": "text/plain; charset=utf-8" },
       `${this.statusCode} ${this.statusText}\n${this.message}\n`,
     ];
-  }
-
-  /** @internal */
-  backtrace(): BacktraceLine[] {
-    return this.buildBacktrace();
   }
 
   /** @internal */
@@ -332,7 +345,7 @@ export class ExceptionWrapper {
       if (builtMethods.has(loc.label ?? "")) {
         return new SourceMapLocation(loc, builtMethods.get(loc.label ?? "")!);
       } else {
-        return loc.toS();
+        return loc;
       }
     });
   }
@@ -359,8 +372,8 @@ export class ExceptionWrapper {
   }
 
   /** @internal */
-  cleanBacktrace(args: "silent" | "noise" | "all"): BacktraceLine[] {
-    const lines = this.backtrace();
+  cleanBacktrace(args: "silent" | "noise" | "all"): Array<BacktraceLine | string> {
+    const lines = this.backtrace;
     const partitioned =
       args === "silent"
         ? lines.filter((l) => !String(l).includes("node_modules"))
@@ -427,13 +440,8 @@ export class ExceptionWrapper {
 
   /** @internal */
   extractFileAndLineNumber(trace: BacktraceLine): TraceEntry | null {
-    const text = String(trace);
-    const match =
-      text.match(/\((.+):(\d+):\d+\)/) ??
-      text.match(/at\s+(.+):(\d+):\d+/) ??
-      text.match(/(.+):(\d+):\d+/);
-    if (!match) return null;
-    return { file: match[1], line: parseInt(match[2], 10) };
+    if (trace.path == null) return null;
+    return { file: trace.path, line: trace.lineno };
   }
 
   private computeStatusCode(): number {

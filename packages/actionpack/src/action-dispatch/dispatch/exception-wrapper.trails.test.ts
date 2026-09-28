@@ -85,3 +85,20 @@ describe("ExceptionWrapper tables keyed on qualified class names", () => {
     expect(wrapper.exceptionTrace()).toEqual([]);
   });
 });
+
+describe("ExceptionWrapper#backtrace", () => {
+  it("is built once, at construction, from the exception's backtrace locations", () => {
+    const error = new Error("boom");
+    error.stack =
+      "Error: boom\n    at index (/app/lib/file.js:42:7)\n    at x (/app/node_modules/rack.js:43:1)";
+    const wrapper = new ExceptionWrapper(null, error);
+    expect(wrapper.backtrace).toBe(wrapper.backtrace);
+    expect(wrapper.backtrace.map((loc) => [loc.path, loc.lineno])).toEqual([
+      ["/app/lib/file.js", 42],
+      ["/app/node_modules/rack.js", 43],
+    ]);
+    expect(wrapper.applicationTrace[0]).toBe(wrapper.fullTrace[0]);
+    expect(wrapper.traces["Application Trace"].map((t) => t.id)).toEqual([0]);
+    expect(wrapper.sourceLocation).toEqual({ file: "/app/lib/file.js", line: 42 });
+  });
+});
