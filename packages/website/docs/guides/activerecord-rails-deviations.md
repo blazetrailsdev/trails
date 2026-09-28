@@ -145,8 +145,10 @@ locals when you spawn a new thread.
 ## 4. Connection handling: no implicit global
 
 Rails leans on `ActiveRecord::Base.connection` as a near-global. In
-Trails, each `Base` subclass holds its own `_connectionHandler`, and
-pools are acquired per query rather than checked out per thread.
+Trails, `connectionHandler` reads the execution-state handler or falls
+back to the inherited `defaultConnectionHandler` class attribute, as
+Rails does, and pools are acquired per query rather than checked out
+per thread.
 `establishConnection` / `connectsTo` shape mirrors Rails; the
 underlying pool model is different because there are no threads to
 pool over. See `packages/activerecord/src/connection-handling.ts`.
