@@ -27,6 +27,8 @@ export function newCommand(): Command {
     .option("--skip-git", "Skip git init")
     .option("--skip-install", "Skip dependency installation")
     .option("--skip-docker", "Skip Dockerfile creation")
+    .option("--skip-eslint", AppGenerator.classOptions().skipEslint.desc)
+    .option("--no-skip-eslint")
     .action(async (name: string, options) => {
       const pm = options.packageManager as PackageManager;
       const driver = options.sqliteDriver as SqliteDriver;
@@ -54,6 +56,7 @@ export function newCommand(): Command {
         packageManager: pm,
         sqliteDriver: driver,
         skipDocker: options.skipDocker,
+        skipEslint: options.skipEslint,
       });
       await gen.run();
 

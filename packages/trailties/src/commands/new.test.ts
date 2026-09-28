@@ -19,4 +19,13 @@ describe("NewCommand", () => {
     const dbOpt = cmd?.options.find((o) => o.long === "--database");
     expect(dbOpt).toBeDefined();
   });
+
+  it("has --skip-eslint option from the AppBase class option", () => {
+    const program = createProgram();
+    const cmd = program.commands.find((c) => c.name() === "new");
+    expect(cmd?.options.find((o) => o.long === "--skip-eslint")?.description).toBe(
+      "Skip ESLint setup",
+    );
+    expect(cmd?.options.find((o) => o.long === "--no-skip-eslint")).toBeDefined();
+  });
 });

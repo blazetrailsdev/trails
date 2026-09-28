@@ -15,7 +15,8 @@ type Skip =
   | "Solid"
   | "Test"
   | "SystemTest"
-  | "Keeps";
+  | "Keeps"
+  | "Eslint";
 
 export type AppBaseOptions = GeneratorOptions & {
   appPath: string;
@@ -44,6 +45,10 @@ export abstract class AppBase extends GeneratorBase {
   readonly appPath: string;
   readonly options: AppBaseOptions;
   private _database?: Database;
+
+  static {
+    this.classOption("skipEslint", { type: "boolean", default: null, desc: "Skip ESLint setup" });
+  }
 
   constructor(options: AppBaseOptions) {
     super(options);
