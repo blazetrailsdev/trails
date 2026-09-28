@@ -1,10 +1,23 @@
 import {
   underscore as _underscore,
   dasherize as _dasherize,
+  extractOptionsBang,
   humanize,
 } from "@blazetrails/activesupport";
-import { File, FileUtils, hasKey, rbInspect, regexpEscape } from "@blazetrails/ruby-compat";
-import { Generators } from "../generators.js";
+import {
+  ArgumentError,
+  File,
+  NameError,
+  NoMethodError,
+  rbObjRespondTo,
+  FileUtils,
+  hasKey,
+  hashDelete,
+  rbInspect,
+  regexpEscape,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
+import { Generators, type GeneratorClass } from "../generators.js";
 import * as Actions from "./actions.js";
 import type { GeneratorActionsState } from "./actions.js";
 import * as TrailsActions from "./trails-actions.js";
@@ -30,8 +43,31 @@ export interface ClassOptionConfig {
   group?: string;
 }
 
+export interface HookForOptions extends ClassOptionConfig {
+  in?: string;
+  as?: string;
+  verbose?: string | boolean;
+}
+
+type HookYield = (
+  instance: GeneratorBase,
+  klass: GeneratorClass,
+  command?: string | null,
+) => unknown;
+type HookExec = (this: GeneratorBase, klass: GeneratorClass) => unknown;
+
+export type HookBlock = HookYield | HookExec;
+
+type Invocations = Map<unknown, string[]>;
+
+type GeneratorConstructor = Pick<typeof GeneratorBase, "classOptions"> &
+  (new (options: GeneratorOptions & { name: string; attributes: string[] }) => GeneratorBase);
+
 export abstract class GeneratorBase implements GeneratorActionsState {
   declare private static _classOptions: Record<string, ClassOptionConfig>;
+  declare private static _hooks: Record<string, [string | undefined, string | undefined]>;
+  declare private static _invocations: Record<string, boolean>;
+  declare private static _invocationBlocks: Record<string, HookBlock>;
 
   static {
     this.classOption("skipNamespace", {
@@ -79,6 +115,14 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   protected createdFiles: string[] = [];
   pendingGenerators: Array<{ what: string; args: string[] }> = [];
   afterInstallCallbacks: Array<() => void | Promise<void>> = [];
+  private _initializer?: [
+    unknown[],
+    unknown[] | Record<string, unknown>,
+    GeneratorOptions & { invocations?: Invocations },
+  ];
+  private _invocations?: Invocations;
+  /** @noRailsEquivalent PERMANENT */
+  parentOptions?: Record<string, unknown>;
 
   log = Actions.log;
   generate = Actions.generate;
@@ -149,6 +193,65 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     return !!this.options.quiet;
   }
 
+  static hookFor(...names: Array<string | HookForOptions | HookBlock>): void {
+    const block = typeof names.at(-1) === "function" ? (names.pop() as HookBlock) : undefined;
+    const options = extractOptionsBang(names) as HookForOptions;
+    const inBase = hashDelete(options as Record<string, unknown>, "in") ?? this.baseName();
+    const asHook = hashDelete(options as Record<string, unknown>, "as") ?? this.generatorName();
+
+    for (const name of names as string[]) {
+      if (!hasKey(this.classOptions(), name)) {
+        let defaults: ClassOptionConfig;
+        if (options.type === "boolean") {
+          defaults = {};
+        } else if ([true, false].includes(this.defaultValueForOption(name, options) as boolean)) {
+          defaults = { banner: "" };
+        } else {
+          defaults = {
+            desc: `${humanize(_underscore(name))} to be invoked`,
+            banner: "NAME",
+          };
+        }
+
+        this.classOption(name, Object.assign(defaults, options));
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-this-alias -- `klass = self` (`generators/base.rb:192`).
+      const klass = this;
+
+      Object.defineProperty(this, `${name}Generator`, {
+        value: function (this: typeof GeneratorBase) {
+          const value = this.classOptions()[name].default;
+          return Generators.findByNamespace(klass.generatorName()!, value as string);
+        },
+        configurable: true,
+        writable: true,
+      });
+
+      this.hooks()[name] = [inBase as string | undefined, asHook as string | undefined];
+      this.invokeFromOption(name, options, block);
+    }
+  }
+
+  static removeHookFor(...names: string[]): void {
+    this.removeInvocation(...names);
+
+    for (const name of names) {
+      if (!rbObjRespondTo(this, `${name}Generator`)) {
+        throw new NameError(
+          `undefined method \`${name}Generator' for class \`#<Class:${this.name}>'`,
+          `${name}Generator`,
+        );
+      }
+      Object.defineProperty(this, `${name}Generator`, {
+        value: undefined,
+        configurable: true,
+        writable: true,
+      });
+      hashDelete(this.hooks(), name);
+    }
+  }
+
   static classOption(name: string, options: ClassOptionConfig = {}): void {
     if (!("desc" in options))
       options.desc = `Indicates when to generate ${humanize(_underscore(name)).toLowerCase()}`;
@@ -194,57 +297,311 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   static async start(
     this: Pick<typeof GeneratorBase, "classOptions"> &
       (new (options: GeneratorOptions & { name: string; attributes: string[] }) => GeneratorBase),
-    args: string[],
+    givenArgs: string[],
     config: GeneratorOptions,
   ): Promise<string[]> {
-    const options: Record<string, unknown> = {};
-    const switches = new Map<string, [string, ClassOptionConfig]>();
-    for (const [name, option] of Object.entries(this.classOptions())) {
-      switches.set(`--${dasherize(name)}`, [name, option]);
-      for (const alias of [option.aliases ?? []].flat()) switches.set(alias, [name, option]);
+    return GeneratorBase.dispatch.call(this, null, [...givenArgs], null, config);
+  }
+
+  /**
+   * @missingRailsCall help — CONVERGEABLE generator-dispatch-help-mappings-arm
+   * @missingRailsArgs new — CONVERGEABLE generator-base-thor-initialize-arguments-and-options-parse
+   */
+  private static async dispatch(
+    this: GeneratorConstructor,
+    command: string | null,
+    givenArgs: unknown[],
+    givenOpts: unknown[] | Record<string, unknown> | null,
+    config: GeneratorOptions & { invocations?: Invocations },
+    block?: (instance: GeneratorBase) => void,
+  ): Promise<string[]> {
+    const argumentsList: unknown[] = [];
+    for (const item of givenArgs) {
+      if (typeof item === "string" && /^-/.test(item)) break;
+      argumentsList.push(item);
     }
-    const remaining: string[] = [];
-    for (let i = 0; i < args.length; i++) {
-      const match = /^(--?[^=]+)(?:=([^]*))?$/.exec(args[i]);
-      if (!match) {
-        remaining.push(args[i]);
-        continue;
+    const args = argumentsList;
+    const opts = givenOpts ?? givenArgs.slice(argumentsList.length);
+
+    const { invocations, ...rest } = config;
+    let toParse = args;
+    let options: Record<string, unknown>;
+    if (Array.isArray(opts)) {
+      const arrayOptions = opts as string[];
+      options = {};
+      const switches = new Map<string, [string, ClassOptionConfig]>();
+      for (const [name, option] of Object.entries(this.classOptions())) {
+        switches.set(`--${dasherize(name)}`, [name, option]);
+        for (const alias of [option.aliases ?? []].flat()) switches.set(alias, [name, option]);
       }
-      let sw = match[1].replace(/_/g, "-");
-      let value: unknown = match[2];
-      if (!switches.has(sw)) {
-        const negated = /^--(?:no|skip)-(.+)$/.exec(sw);
-        if (negated && switches.get(`--${negated[1]}`)?.[1].type === "boolean") {
-          sw = `--${negated[1]}`;
-          value = false;
-        } else {
-          remaining.push(args[i]);
+      const remaining: string[] = [];
+      for (let i = 0; i < arrayOptions.length; i++) {
+        const match = /^(--?[^=]+)(?:=([^]*))?$/.exec(arrayOptions[i]);
+        if (!match) {
+          remaining.push(arrayOptions[i]);
           continue;
         }
+        let sw = match[1].replace(/_/g, "-");
+        let value: unknown = match[2];
+        if (!switches.has(sw)) {
+          const negated = /^--(?:no|skip)-(.+)$/.exec(sw);
+          if (negated && switches.get(`--${negated[1]}`)?.[1].type === "boolean") {
+            sw = `--${negated[1]}`;
+            value = false;
+          } else {
+            remaining.push(arrayOptions[i]);
+            continue;
+          }
+        }
+        const [name, option] = switches.get(sw)!;
+        if (option.type === "boolean") {
+          if (value === undefined && /^(true|false)$/.test(arrayOptions[i + 1] ?? ""))
+            value = arrayOptions[++i];
+          value = value === undefined || value === true || value === "true";
+        } else if (value === undefined) value = arrayOptions[++i];
+        if (option.type === "numeric") value = Number(value);
+        if (option.enum && !option.enum.includes(value as string))
+          throw new Error(
+            `Expected '${sw}' to be one of ${option.enum.join(", ")}; got ${rbInspect(value)}`,
+          );
+        options[name] = value;
       }
-      const [name, option] = switches.get(sw)!;
-      if (option.type === "boolean") {
-        if (value === undefined && /^(true|false)$/.test(args[i + 1] ?? "")) value = args[++i];
-        value = value === undefined || value === true || value === "true";
-      } else if (value === undefined) value = args[++i];
-      if (option.type === "numeric") value = Number(value);
-      if (option.enum && !option.enum.includes(value as string))
-        throw new Error(
-          `Expected '${sw}' to be one of ${option.enum.join(", ")}; got ${rbInspect(value)}`,
-        );
-      options[name] = value;
+      toParse = [...args, ...remaining];
+    } else {
+      options = opts;
     }
 
-    const generator = new this({
-      ...config,
+    const attributes = Array.isArray(toParse[1]) ? toParse[1] : toParse.slice(1);
+    const instance = new this({
+      ...rest,
       ...options,
-      name: remaining[0] ?? "",
-      attributes: remaining.slice(1),
+      name: (toParse[0] as string | undefined) ?? "",
+      attributes: attributes as string[],
     });
-    const run = (generator as { run?: (...a: unknown[]) => unknown }).run;
-    if (typeof run === "function")
-      await run.call(generator, remaining[0] ?? "", remaining.slice(1));
-    return generator.getCreatedFiles();
+    instance._initializer = [args, opts, config];
+    instance._invocations = invocations ?? new Map();
+    block?.(instance);
+
+    if (command != null) {
+      await instance.invokeCommand(
+        (this as unknown as typeof GeneratorBase).allCommands().includes(command) ? command : null,
+      );
+    } else {
+      await instance.invokeAll();
+    }
+    return instance.getCreatedFiles();
+  }
+
+  private static allCommands(): string[] {
+    const commands: string[] = [];
+    if (typeof (this.prototype as { run?: unknown }).run === "function") commands.push("run");
+    for (const name of Object.keys(this.invocations()))
+      commands.push(
+        `_invokeFromOption${name.charAt(0).toUpperCase()}${name.slice(1).replace(/\W/g, "_")}`,
+      );
+    return commands;
+  }
+
+  private static invocations(): Record<string, boolean> {
+    if (!Object.prototype.hasOwnProperty.call(this, "_invocations")) {
+      const superclass = Object.getPrototypeOf(this) as typeof GeneratorBase;
+      this._invocations = { ...(superclass.invocations?.() ?? {}) };
+    }
+    return this._invocations;
+  }
+
+  private static invocationBlocks(): Record<string, HookBlock> {
+    if (!Object.prototype.hasOwnProperty.call(this, "_invocationBlocks")) {
+      const superclass = Object.getPrototypeOf(this) as typeof GeneratorBase;
+      this._invocationBlocks = { ...(superclass.invocationBlocks?.() ?? {}) };
+    }
+    return this._invocationBlocks;
+  }
+
+  private static invokeFromOption(name: string, options: HookForOptions, block?: HookBlock): void {
+    const verbose = hasKey(options, "verbose")
+      ? (options as { verbose?: string | boolean }).verbose!
+      : "white";
+
+    if (!hasKey(this.classOptions(), name)) {
+      throw new ArgumentError(
+        `You have to define the option ${rbInspect(name)} before setting invoke_from_option.`,
+      );
+    }
+
+    this.invocations()[name] = true;
+    if (block) this.invocationBlocks()[name] = block;
+
+    Object.defineProperty(
+      this.prototype,
+      `_invokeFromOption${name.charAt(0).toUpperCase()}${name.slice(1).replace(/\W/g, "_")}`,
+      {
+        async value(this: GeneratorBase): Promise<void> {
+          const options = this.options as unknown as Record<string, unknown>;
+          if (!(options[name] != null && options[name] !== false)) return;
+
+          let value = options[name];
+          if (value === true) value = name;
+          const ctor = this.constructor as typeof GeneratorBase;
+          const klass = await ctor.prepareForInvocation(name, value);
+
+          if (klass) {
+            this.sayStatus("invoke", value, verbose);
+            const block = ctor.invocationBlocks()[name];
+            await this._invokeForClassMethod(klass, null, block);
+          } else {
+            this.sayStatus("error", `${String(value)} [not found]`, "red");
+          }
+        },
+        configurable: true,
+        writable: true,
+      },
+    );
+  }
+
+  private static removeInvocation(...names: string[]): void {
+    for (const name of names) {
+      delete this.classOptions()[name];
+      delete this.invocations()[name];
+      delete this.invocationBlocks()[name];
+    }
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  async invoke(
+    name: string | GeneratorClass | null = null,
+    ...args: unknown[]
+  ): Promise<string[] | void> {
+    if (name == null) {
+      console.warn(
+        "[Thor] Calling invoke() without argument is deprecated. Please use invoke_all instead.",
+      );
+      return this.invokeAll();
+    }
+
+    if (Array.isArray(args[0]) || args[0] == null) args.unshift(null);
+    const [sentCommand, givenArgs, givenOpts, givenConfig] = args as [
+      string | null,
+      unknown[] | null | undefined,
+      unknown[] | Record<string, unknown> | null | undefined,
+      Partial<GeneratorOptions> | null | undefined,
+    ];
+
+    const [klass, command] = await this._retrieveClassAndCommand(name, sentCommand);
+    if (!klass) throw new RuntimeError(`Missing Thor class for invoke ${String(name)}`);
+    if (!(klass === (GeneratorBase as unknown) || klass.prototype instanceof GeneratorBase)) {
+      throw new RuntimeError(
+        `Expected Thor class, got ${String((klass as { name?: string }).name ?? klass)}`,
+      );
+    }
+
+    const [parsedArgs, parsedOpts, config] = this._parseInitializationOptions(
+      givenArgs ?? null,
+      givenOpts ?? null,
+      givenConfig ?? null,
+    );
+    return GeneratorBase.dispatch.call(
+      klass as unknown as GeneratorConstructor,
+      command,
+      parsedArgs,
+      parsedOpts,
+      config,
+      (instance) => {
+        instance.parentOptions = this.options as unknown as Record<string, unknown>;
+      },
+    );
+  }
+
+  /**
+   * @missingRailsArgs run — CONVERGEABLE generator-base-thor-initialize-arguments-and-options-parse
+   * @noRailsEquivalent PERMANENT
+   */
+  async invokeCommand(command: string | null): Promise<void> {
+    if (command == null) throw new NoMethodError("undefined method `name' for nil", "name");
+    const current = this._invocations!.get(this.constructor) ?? [];
+    this._invocations!.set(this.constructor, current);
+
+    if (!current.includes(command)) {
+      current.push(command);
+      const method = (this as unknown as Record<string, (...a: unknown[]) => unknown>)[command];
+      if (command === "run") {
+        const { name, attributes } = this.options as unknown as {
+          name: string;
+          attributes: string[];
+        };
+        await method.call(this, name, attributes);
+      } else {
+        await method.call(this);
+      }
+    }
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  async invokeAll(): Promise<void> {
+    for (const command of (this.constructor as typeof GeneratorBase).allCommands())
+      await this.invokeCommand(command);
+  }
+
+  private async _retrieveClassAndCommand(
+    name: string | GeneratorClass | null,
+    sentCommand: string | null = null,
+  ): Promise<[GeneratorClass | null, string | null]> {
+    const ctor = this.constructor as typeof GeneratorBase;
+    if (name == null) {
+      return [ctor as unknown as GeneratorClass, null];
+    } else if (typeof name === "string" && ctor.allCommands().includes(name)) {
+      return [ctor as unknown as GeneratorClass, name];
+    } else {
+      const klass = await ctor.prepareForInvocation(null, name);
+      return [klass, sentCommand];
+    }
+  }
+
+  private _parseInitializationOptions(
+    args: unknown[] | null,
+    opts: unknown[] | Record<string, unknown> | null,
+    config: Partial<GeneratorOptions> | null,
+  ): [
+    unknown[],
+    unknown[] | Record<string, unknown>,
+    GeneratorOptions & { invocations?: Invocations },
+  ] {
+    const [storedArgs, storedOpts, storedConfig] = this._initializer!;
+
+    args ??= [...storedArgs];
+    opts ??= Array.isArray(storedOpts) ? [...storedOpts] : { ...storedOpts };
+
+    config ??= {};
+    const merged = { ...storedConfig, ...this._sharedConfiguration(), ...config };
+
+    return [args, opts, merged];
+  }
+
+  private _sharedConfiguration(): { invocations: Invocations } {
+    return { invocations: this._invocations! };
+  }
+
+  /** @missingRailsCall with_padding — CONVERGEABLE generator-invoke-for-class-method-with-padding */
+  private async _invokeForClassMethod(
+    klass: GeneratorClass,
+    command: string | null = null,
+    block?: HookBlock,
+  ): Promise<void> {
+    if (block) {
+      switch (block.length) {
+        case 3:
+          await (block as HookYield)(this, klass, command);
+          break;
+        case 2:
+          await (block as HookYield)(this, klass);
+          break;
+        case 1:
+          await (block as HookExec).call(this, klass);
+          break;
+      }
+    } else {
+      await this.invoke(klass, command);
+    }
   }
 
   /** @internal */
@@ -297,6 +654,38 @@ export abstract class GeneratorBase implements GeneratorActionsState {
       return config["rails"][name];
     } else {
       return defaultValue;
+    }
+  }
+
+  /** @internal */
+  static hooks(): Record<string, [string | undefined, string | undefined]> {
+    if (!Object.prototype.hasOwnProperty.call(this, "_hooks")) {
+      const superclass = Object.getPrototypeOf(this) as typeof GeneratorBase;
+      this._hooks = { ...(superclass.hooks?.() ?? {}) };
+    }
+    return this._hooks;
+  }
+
+  /** @internal */
+  static async prepareForInvocation(
+    name: string | null,
+    value: unknown,
+  ): Promise<GeneratorClass | null> {
+    if (typeof value !== "string") return value as GeneratorClass | null;
+
+    let constants: [string | undefined, string | undefined] | undefined;
+    let klass: GeneratorClass | null;
+    if (value != null && (constants = this.hooks()[name as string])) {
+      if ((value as unknown) === true) value = name;
+      return Generators.findByNamespace(
+        value as string,
+        constants[0] ?? null,
+        constants[1] ?? null,
+      );
+    } else if ((klass = await Generators.findByNamespace(value))) {
+      return klass;
+    } else {
+      return null;
     }
   }
 
