@@ -351,7 +351,9 @@ export interface TimeNewOptions {
 
 /** @noRailsEquivalent PERMANENT */
 let seatedTime: {
-  zoned: Temporal.ZonedDateTime;
+  zoned: Temporal.ZonedDateTime | null;
+  plain: Temporal.PlainDateTime | null;
+  utcOffset: number | null;
   instant: Temporal.Instant;
   timeZoneId: string | null;
   tzmodeUtc: boolean;
@@ -486,13 +488,30 @@ export class Time {
     if (zone instanceof Timezone) zone = zone.identifier;
     if (maybeTzobjP(zone))
       return Time.#zoneLocaltime(zone, Time.#atInstant(instant, "UTC", false, subnano))!;
-    const timeZoneId =
-      zone == null ? nowTimeZoneId() : typeof zone === "number" ? of2str(zone) : zone;
+    if (typeof zone === "number") {
+      seatedTime = {
+        zoned: null,
+        plain: instant
+          .add({ nanoseconds: Math.round(zone * 1_000_000_000) })
+          .toZonedDateTimeISO("UTC")
+          .toPlainDateTime(),
+        utcOffset: zone,
+        instant,
+        timeZoneId: null,
+        tzmodeUtc: tzmodeUtc ?? false,
+        localZone: false,
+        subnano,
+      };
+      return new Time(0);
+    }
+    const timeZoneId = zone == null ? nowTimeZoneId() : zone;
     const zoned = instant.toZonedDateTimeISO(timeZoneId);
     seatedTime = {
       zoned,
+      plain: null,
+      utcOffset: null,
       instant,
-      timeZoneId: typeof zone === "number" ? null : timeZoneId,
+      timeZoneId,
       tzmodeUtc: tzmodeUtc ?? (zone != null && zoned.timeZoneId === "UTC"),
       localZone: zone == null,
       subnano,
@@ -1222,8 +1241,8 @@ export class Time {
     if (seatedTime !== null) {
       const seat = seatedTime;
       seatedTime = null;
-      this.#plainMemo = null;
-      this.#utcOffsetMemo = null;
+      this.#plainMemo = seat.plain;
+      this.#utcOffsetMemo = seat.utcOffset;
       this.#zoned = seat.zoned;
       this.#instant = seat.instant;
       this.#timeZoneId = seat.timeZoneId;

@@ -1,5 +1,5 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { hexdigest, isBlank, isPresent, toFs } from "@blazetrails/activesupport";
+import { eachCons, hexdigest, isBlank, isPresent, toFs } from "@blazetrails/activesupport";
 import {
   except,
   extend,
@@ -622,6 +622,10 @@ export class Relation<T extends Base> {
 
   async compactBlank(): Promise<T[]> {
     return ENUMERABLE_DELEGATES.compactBlank(await this.toArray());
+  }
+
+  async isExclude(object: T): Promise<boolean> {
+    return !(await this.isInclude(object));
   }
 
   async load(block?: (record: T) => void): Promise<LoadedRelation<this>> {
@@ -1952,8 +1956,8 @@ export interface Relation<T extends Base>
   secondToLastBang(): Promise<T>;
   thirdToLastBang(): Promise<T>;
   isExists(conditions?: Record<string, unknown> | unknown): Promise<boolean>;
-  include(record: T): Promise<boolean>;
-  member(record: T): Promise<boolean>;
+  isInclude(record: T): Promise<boolean>;
+  isMember(record: T): Promise<boolean>;
   raiseRecordNotFoundExceptionBang(
     ids?: unknown,
     resultSize?: number,
@@ -2140,7 +2144,21 @@ const ENUMERABLE_METHODS: Record<string, (records: any[], args: any[]) => unknow
     records.forEach((record, index) => (fn(record, index) ? matched : unmatched).push(record));
     return [matched, unmatched];
   },
+  isAll: (records, [fn]) => records.every(fn ?? ((record) => record != null && record !== false)),
+  eachCons: (records, [n, fn]) => {
+    const slices = eachCons(records, n);
+    if (fn === undefined) return slices;
+    slices.forEach(fn);
+    return records;
+  },
+  eachWithIndex: (records, [fn]) => {
+    records.forEach(fn);
+    return records;
+  },
+  toSet: (records) => new Set(records),
 };
+ENUMERABLE_METHODS.collect = (records, args) => records.map(...(args as [any]));
+ENUMERABLE_METHODS.findAll = (records, args) => records.filter(...(args as [any]));
 for (const name of [
   "forEach",
   "at",

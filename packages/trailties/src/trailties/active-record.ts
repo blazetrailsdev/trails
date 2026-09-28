@@ -26,7 +26,7 @@ import {
   Migration,
   UniquenessValidator,
   deprecator,
-  queryLogs,
+  QueryLogs,
   type AutoFilteredParametersApp,
 } from "@blazetrails/activerecord";
 import type { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
@@ -309,9 +309,9 @@ export class Trailtie extends BaseTrailtie {
       this.config.afterInitialize(() => {
         const cfg = (app as TrailtieApp).config.get("activeRecord") as ActiveRecordConfig;
         if (cfg.queryLogTagsEnabled) {
-          ActiveRecord.queryTransformers().push(queryLogs);
-          queryLogs.taggings = {
-            ...queryLogs.taggings,
+          ActiveRecord.queryTransformers().push(QueryLogs);
+          QueryLogs.taggings = {
+            ...QueryLogs.taggings,
             application: TopLevel.Trails!.application!.constructor.name.split("::")[0],
             pid: () => Process.pid.toString(),
             socket: (context) =>
@@ -320,20 +320,20 @@ export class Trailtie extends BaseTrailtie {
               (context as unknown as QueryLogsContext).connection.pool.dbConfig.host,
             database: (context) =>
               (context as unknown as QueryLogsContext).connection.pool.dbConfig.database,
-            source_location: () => queryLogs.querySourceLocation(),
+            source_location: () => QueryLogs.querySourceLocation(),
           };
           ActiveRecord.setDisablePreparedStatements(true);
 
           if (isPresent(cfg.queryLogTags)) {
-            queryLogs.tags = cfg.queryLogTags;
+            QueryLogs.tags = cfg.queryLogTags;
           }
 
           if (cfg.queryLogTagsFormat) {
-            queryLogs.tagsFormatter = cfg.queryLogTagsFormat;
+            QueryLogs.tagsFormatter = cfg.queryLogTagsFormat;
           }
 
           if (cfg.cacheQueryLogTags) {
-            queryLogs.cacheQueryLogTags = true;
+            QueryLogs.cacheQueryLogTags = true;
           }
         }
       });

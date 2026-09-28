@@ -936,11 +936,11 @@ class ApiExtractor
       process_define_method(args, nil)
     when "class_attribute"
       process_mattr(args, reader: true, writer: true, predicate: true, class_attr: true)
-    when "cattr_accessor", "mattr_accessor"
+    when "cattr_accessor", "mattr_accessor", "thread_cattr_accessor", "thread_mattr_accessor"
       process_mattr(args, reader: true, writer: true, predicate: false, class_attr: false)
-    when "cattr_reader", "mattr_reader"
+    when "cattr_reader", "mattr_reader", "thread_cattr_reader", "thread_mattr_reader"
       process_mattr(args, reader: true, writer: false, predicate: false, class_attr: false)
-    when "cattr_writer", "mattr_writer"
+    when "cattr_writer", "mattr_writer", "thread_cattr_writer", "thread_mattr_writer"
       process_mattr(args, reader: false, writer: true, predicate: false, class_attr: false)
     when "scope"
       process_scope(args)
@@ -1008,11 +1008,11 @@ class ApiExtractor
         process_define_model_callbacks(node[2])
       when "class_attribute"
         process_mattr(node[2], reader: true, writer: true, predicate: true, class_attr: true)
-      when "cattr_accessor", "mattr_accessor"
+      when "cattr_accessor", "mattr_accessor", "thread_cattr_accessor", "thread_mattr_accessor"
         process_mattr(node[2], reader: true, writer: true, predicate: false, class_attr: false)
-      when "cattr_reader", "mattr_reader"
+      when "cattr_reader", "mattr_reader", "thread_cattr_reader", "thread_mattr_reader"
         process_mattr(node[2], reader: true, writer: false, predicate: false, class_attr: false)
-      when "cattr_writer", "mattr_writer"
+      when "cattr_writer", "mattr_writer", "thread_cattr_writer", "thread_mattr_writer"
         process_mattr(node[2], reader: false, writer: true, predicate: false, class_attr: false)
       when "delegate"
         process_delegate(node[2])
@@ -1576,7 +1576,9 @@ class ApiExtractor
   # - cattr/mattr (activesupport core_ext/module/attribute_accessors.rb): class
   #   reader/writer always; instance reader/writer only when BOTH
   #   `instance_<x>` and `instance_accessor` are truthy (AND, both default
-  #   true); no predicate.
+  #   true); no predicate. The per-thread `thread_mattr_*` / `thread_cattr_*`
+  #   family (core_ext/module/attribute_accessors_per_thread.rb:41-114) gates
+  #   its instance accessors identically.
   #
   # All generated methods are public — class_attribute defines them via a fresh
   # `class_eval` string, and mattr/cattr document them as public "even if this

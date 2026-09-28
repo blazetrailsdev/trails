@@ -30,7 +30,7 @@ import {
   RuntimeRegistry,
   disablePreparedStatements,
   generateSecureTokenOn,
-  queryLogs,
+  QueryLogs,
   queryTransformers,
   setDisablePreparedStatements,
   setGenerateSecureTokenOn,
@@ -242,9 +242,9 @@ describe("RailtieTest (trails-only)", () => {
       const saved = Trailtie.config.get("activeRecord") as ActiveRecordConfig;
       const savedTransformers = queryTransformers();
       const savedDisable = disablePreparedStatements();
-      const savedTags = queryLogs.tags;
-      const savedFormatter = queryLogs.tagsFormatter;
-      const savedTaggings = queryLogs.taggings;
+      const savedTags = QueryLogs.tags;
+      const savedFormatter = QueryLogs.tagsFormatter;
+      const savedTaggings = QueryLogs.taggings;
       setQueryTransformers([]);
       resetLoadHooks();
       class BlogApplication {}
@@ -259,18 +259,18 @@ describe("RailtieTest (trails-only)", () => {
         return {
           transformers: [...queryTransformers()],
           disablePreparedStatements: disablePreparedStatements(),
-          tagsFormatter: queryLogs.tagsFormatter,
-          application: queryLogs.taggings.application,
-          taggingKeys: Object.keys(queryLogs.taggings),
+          tagsFormatter: QueryLogs.tagsFormatter,
+          application: QueryLogs.taggings.application,
+          taggingKeys: Object.keys(QueryLogs.taggings),
         };
       } finally {
         Trails.application = null;
         Trailtie.config.set("activeRecord", saved);
         setQueryTransformers(savedTransformers);
         setDisablePreparedStatements(savedDisable);
-        queryLogs.tags = savedTags;
-        queryLogs.tagsFormatter = savedFormatter;
-        queryLogs.taggings = savedTaggings;
+        QueryLogs.tags = savedTags;
+        QueryLogs.tagsFormatter = savedFormatter as string;
+        QueryLogs.taggings = savedTaggings;
         resetLoadHooks();
       }
     };
@@ -278,13 +278,13 @@ describe("RailtieTest (trails-only)", () => {
     it("does not modify the query execution path by default", async () => {
       const booted = await boot({});
 
-      expect(booted.transformers).not.toContain(queryLogs);
+      expect(booted.transformers).not.toContain(QueryLogs);
     });
 
     it("appends QueryLogs to the query transformers and disables prepared statements when enabled", async () => {
       const booted = await boot({ queryLogTagsEnabled: true });
 
-      expect(booted.transformers).toContain(queryLogs);
+      expect(booted.transformers).toContain(QueryLogs);
       expect(booted.disablePreparedStatements).toBe(true);
       expect(booted.application).toBe("BlogApplication");
       expect(booted.taggingKeys).toEqual([

@@ -30,10 +30,10 @@ describe("queryTransformers", () => {
   });
 
   it("QueryLogs satisfies the QueryTransformer contract", () => {
-    const logs = new QueryLogs();
-    logs.tags = [{ app: "MyApp" }];
-    const transformer: QueryTransformer = logs;
+    QueryLogs.tags = [{ app: "MyApp" }];
+    const transformer: QueryTransformer = QueryLogs;
     queryTransformers().push(transformer);
     expect(transformer.call("SELECT 1", null)).toContain("MyApp");
+    QueryLogs.tags = [];
   });
 });

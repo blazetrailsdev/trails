@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { ExecutionContext } from "@blazetrails/activesupport";
+import { ArgumentError, ExecutionContext } from "@blazetrails/activesupport";
 import "./index.js";
 import { Base } from "./base.js";
 import { QueryLogs, GetKeyHandler } from "./query-logs.js";
 import { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
-import { queryLogs } from "./query-logs-instance.js";
 import type { QueryTransformer } from "./query-transformers.js";
 import { assertQueriesMatch } from "./testing/query-assertions.js";
 import { fixtures } from "./test-fixtures.js";
@@ -21,62 +20,62 @@ describe("QueryLogsTest", () => {
     ExecutionContext.clear();
     originalTransformers = [...queryTransformers()];
     queryTransformers().length = 0;
-    queryTransformers().push(queryLogs);
-    queryLogs.prependComment = false;
-    queryLogs.cacheQueryLogTags = false;
-    queryLogs.clearCache();
+    queryTransformers().push(QueryLogs);
+    QueryLogs.prependComment = false;
+    QueryLogs.cacheQueryLogTags = false;
+    QueryLogs.clearCache();
     ExecutionContext.clear();
-    queryLogs.tags = [];
-    queryLogs.tagsFormatter = "legacy";
+    QueryLogs.tags = [];
+    QueryLogs.tagsFormatter = "legacy";
     ExecutionContext.setKey("application", "active_record");
   });
 
   afterEach(() => {
     queryTransformers().length = 0;
     queryTransformers().push(...originalTransformers);
-    queryLogs.prependComment = false;
-    queryLogs.cacheQueryLogTags = false;
-    queryLogs.tags = [];
+    QueryLogs.prependComment = false;
+    QueryLogs.cacheQueryLogTags = false;
+    QueryLogs.tags = [];
     ExecutionContext.clear();
-    queryLogs.clearCache();
-    queryLogs.tagsFormatter = "legacy";
+    QueryLogs.clearCache();
+    QueryLogs.tagsFormatter = "legacy";
     ExecutionContext.clear();
   });
 
   it("escaping good comment", () => {
-    expect(Reflect.apply(Reflect.get(queryLogs, "escapeSqlComment"), queryLogs, ["app:foo"])).toBe(
+    expect(Reflect.apply(Reflect.get(QueryLogs, "escapeSqlComment"), QueryLogs, ["app:foo"])).toBe(
       "app:foo",
     );
   });
 
   it("escaping good comment with custom separator", () => {
-    queryLogs.tagsFormatter = "sqlcommenter";
+    QueryLogs.tagsFormatter = "sqlcommenter";
 
     expect(
-      Reflect.apply(Reflect.get(queryLogs, "escapeSqlComment"), queryLogs, ["app='foo'"]),
+      Reflect.apply(Reflect.get(QueryLogs, "escapeSqlComment"), QueryLogs, ["app='foo'"]),
     ).toBe("app='foo'");
   });
 
   it("escaping bad comments", () => {
     expect(
-      Reflect.apply(Reflect.get(queryLogs, "escapeSqlComment"), queryLogs, [
+      Reflect.apply(Reflect.get(QueryLogs, "escapeSqlComment"), QueryLogs, [
         "*/; DROP TABLE USERS;/*",
       ]),
     ).toBe("* /; DROP TABLE USERS;/ *");
     expect(
-      Reflect.apply(Reflect.get(queryLogs, "escapeSqlComment"), queryLogs, [
+      Reflect.apply(Reflect.get(QueryLogs, "escapeSqlComment"), QueryLogs, [
         "**//; DROP TABLE USERS;/*",
       ]),
     ).toBe("** //; DROP TABLE USERS;/ *");
     expect(
-      Reflect.apply(Reflect.get(queryLogs, "escapeSqlComment"), queryLogs, [
+      Reflect.apply(Reflect.get(QueryLogs, "escapeSqlComment"), QueryLogs, [
         "* *//; DROP TABLE USERS;//* *",
       ]),
     ).toBe("* * //; DROP TABLE USERS;// * *");
   });
 
   it("basic commenting", async () => {
-    queryLogs.tags = ["application"];
+    QueryLogs.tags = ["application"];
     await assertQueriesMatch(
       /select dashboard_id from dashboards \/\*application:active_record\*\/$/,
       undefined,
@@ -88,8 +87,8 @@ describe("QueryLogsTest", () => {
   });
 
   it("add comments to beginning of query", async () => {
-    queryLogs.tags = ["application"];
-    queryLogs.prependComment = true;
+    QueryLogs.tags = ["application"];
+    QueryLogs.prependComment = true;
     await assertQueriesMatch(
       /^\/\*application:active_record\*\/ select dashboard_id from dashboards$/,
       undefined,
@@ -101,14 +100,14 @@ describe("QueryLogsTest", () => {
   });
 
   it("exists is commented", async () => {
-    queryLogs.tags = ["application"];
+    QueryLogs.tags = ["application"];
     await assertQueriesMatch(/\/\*application:active_record\*\//, undefined, false, async () => {
       await Dashboard.isExists();
     });
   });
 
   it("delete is commented", async () => {
-    queryLogs.tags = ["application"];
+    QueryLogs.tags = ["application"];
     const record = await Dashboard.first();
     await assertQueriesMatch(/\/\*application:active_record\*\//, undefined, false, async () => {
       await record!.destroy();
@@ -116,7 +115,7 @@ describe("QueryLogsTest", () => {
   });
 
   it("update is commented", async () => {
-    queryLogs.tags = ["application"];
+    QueryLogs.tags = ["application"];
     await assertQueriesMatch(/\/\*application:active_record\*\//, undefined, false, async () => {
       const dash = (await Dashboard.first()) as (Dashboard & { name: string }) | null;
       dash!.name = "New name";
@@ -125,23 +124,23 @@ describe("QueryLogsTest", () => {
   });
 
   it("create is commented", async () => {
-    queryLogs.tags = ["application"];
+    QueryLogs.tags = ["application"];
     await assertQueriesMatch(/\/\*application:active_record\*\//, undefined, false, async () => {
       await Dashboard.create({ name: "Another dashboard" });
     });
   });
 
   it("select is commented", async () => {
-    queryLogs.tags = ["application"];
+    QueryLogs.tags = ["application"];
     await assertQueriesMatch(/\/\*application:active_record\*\//, undefined, false, async () => {
       await Dashboard.all();
     });
   });
 
   it("retrieves comment from cache when enabled and set", async () => {
-    queryLogs.cacheQueryLogTags = true;
+    QueryLogs.cacheQueryLogTags = true;
     let i = 0;
-    queryLogs.tags = [{ query_counter: () => ++i }];
+    QueryLogs.tags = [{ query_counter: () => ++i }];
 
     await assertQueriesMatch(/SELECT 1 \/\*query_counter:1\*\//, undefined, false, async () => {
       await (await Base.leaseConnection()).execute("SELECT 1");
@@ -152,9 +151,9 @@ describe("QueryLogsTest", () => {
   });
 
   it("resets cache on context update", async () => {
-    queryLogs.cacheQueryLogTags = true;
+    QueryLogs.cacheQueryLogTags = true;
     ExecutionContext.setKey("temporary", "value");
-    queryLogs.tags = [
+    QueryLogs.tags = [
       { temporary_tag: (ctx) => (ctx as Record<string, unknown>).temporary as string },
     ];
 
@@ -175,7 +174,7 @@ describe("QueryLogsTest", () => {
   });
 
   it("default tag behavior", async () => {
-    queryLogs.tags = ["application", "foo"];
+    QueryLogs.tags = ["application", "foo"];
     ExecutionContext.setKey("foo", "bar");
     await assertQueriesMatch(
       /\/\*application:active_record,foo:bar\*\//,
@@ -195,7 +194,7 @@ describe("QueryLogsTest", () => {
 
   it("connection is passed to tagging proc", async () => {
     const connection = await Base.leaseConnection();
-    queryLogs.tags = [
+    QueryLogs.tags = [
       {
         same_connection: (ctx) =>
           (ctx as Record<string, unknown>).connection === connection ? "true" : "false",
@@ -214,7 +213,7 @@ describe("QueryLogsTest", () => {
   it("connection does not override already existing connection in context", async () => {
     const fakeConnection = {};
     ExecutionContext.setKey("connection", fakeConnection);
-    queryLogs.tags = [
+    QueryLogs.tags = [
       {
         fake_connection: (ctx) =>
           (ctx as Record<string, unknown>).connection === fakeConnection ? "true" : "false",
@@ -231,22 +230,22 @@ describe("QueryLogsTest", () => {
   });
 
   it("empty comments are not added", async () => {
-    queryLogs.tags = [{ empty: () => null }];
+    QueryLogs.tags = [{ empty: () => null }];
     await assertQueriesMatch(/SELECT 1$/, undefined, false, async () => {
       await (await Base.leaseConnection()).execute("SELECT 1");
     });
   });
 
   it("sql commenter format", async () => {
-    queryLogs.tagsFormatter = "sqlcommenter";
-    queryLogs.tags = ["application"];
+    QueryLogs.tagsFormatter = "sqlcommenter";
+    QueryLogs.tags = ["application"];
     await assertQueriesMatch(/\/\*application='active_record'\*\//, undefined, false, async () => {
       await Dashboard.first();
     });
   });
 
   it("custom basic tags", async () => {
-    queryLogs.tags = ["application", { custom_string: "test content" }];
+    QueryLogs.tags = ["application", { custom_string: "test content" }];
     await assertQueriesMatch(
       /\/\*application:active_record,custom_string:test content\*\//,
       undefined,
@@ -258,7 +257,7 @@ describe("QueryLogsTest", () => {
   });
 
   it("custom proc tags", async () => {
-    queryLogs.tags = ["application", { custom_proc: () => "test content" }];
+    QueryLogs.tags = ["application", { custom_proc: () => "test content" }];
     await assertQueriesMatch(
       /\/\*application:active_record,custom_proc:test content\*\//,
       undefined,
@@ -270,7 +269,7 @@ describe("QueryLogsTest", () => {
   });
 
   it("multiple custom tags", async () => {
-    queryLogs.tags = [
+    QueryLogs.tags = [
       "application",
       { custom_proc: () => "test content", another_proc: () => "more test content" },
     ];
@@ -285,8 +284,8 @@ describe("QueryLogsTest", () => {
   });
 
   it("sqlcommenter format value", async () => {
-    queryLogs.tagsFormatter = "sqlcommenter";
-    queryLogs.tags = [
+    QueryLogs.tagsFormatter = "sqlcommenter";
+    QueryLogs.tags = [
       "application",
       { tracestate: "congo=t61rcWkgMzE,rojo=00f067aa0ba902b7", custom_proc: () => "Joe's Shack" },
     ];
@@ -301,8 +300,8 @@ describe("QueryLogsTest", () => {
   });
 
   it("sqlcommenter format allows string keys", async () => {
-    queryLogs.tagsFormatter = "sqlcommenter";
-    queryLogs.tags = [
+    QueryLogs.tagsFormatter = "sqlcommenter";
+    QueryLogs.tags = [
       "application",
       {
         string: "value",
@@ -321,15 +320,15 @@ describe("QueryLogsTest", () => {
   });
 
   it("sqlcommenter format value string coercible", async () => {
-    queryLogs.tagsFormatter = "sqlcommenter";
-    queryLogs.tags = ["application", { custom_proc: () => 1234 }];
+    QueryLogs.tagsFormatter = "sqlcommenter";
+    QueryLogs.tags = ["application", { custom_proc: () => 1234 }];
     await assertQueriesMatch(/custom_proc='1234'\*\//, undefined, false, async () => {
       await Dashboard.first();
     });
   });
 
   it.skipIf(adapterType === "postgres")("invalid encoding query", async () => {
-    queryLogs.tags = ["application"];
+    QueryLogs.tags = ["application"];
     await expect(
       (await Base.leaseConnection()).execute("select 1 as '\uD800'"),
     ).resolves.not.toThrow();
@@ -337,7 +336,7 @@ describe("QueryLogsTest", () => {
 
   it("custom proc context tags", async () => {
     ExecutionContext.setKey("foo", "bar");
-    queryLogs.tags = [
+    QueryLogs.tags = [
       "application",
       { custom_context_proc: (ctx) => (ctx as Record<string, unknown>).foo as string },
     ];
@@ -363,19 +362,10 @@ describe("GetKeyHandler", () => {
   });
 
   it("is used by QueryLogs string-tag resolution", () => {
-    const logs = new QueryLogs();
-    logs.tags = ["controller"];
+    QueryLogs.tags = ["controller"];
     ExecutionContext.setKey("controller", "UsersController");
-    expect(logs.tagContent()).toBe("controller:UsersController");
-  });
-
-  it("lazy-creates a handler if a tag is pushed without going through tags=", () => {
-    const logs = new QueryLogs();
-    logs.tags = ["controller"];
-    logs.tags.push("action");
-    ExecutionContext.setKey("controller", "Users");
-    ExecutionContext.setKey("action", "index");
-    expect(logs.tagContent()).toBe("action:index,controller:Users");
+    expect(QueryLogs.tagContent()).toBe("controller:UsersController");
+    QueryLogs.tags = [];
   });
 });
 
@@ -389,67 +379,53 @@ describe("LegacyFormatter", () => {
   });
 });
 
-describe("QueryLogs.formatter =", () => {
-  it("accepts a static-method class (LegacyFormatter / SQLCommenter) directly", () => {
-    const logs = new QueryLogs();
-    expect(() => (logs.tagsFormatter = SQLCommenter)).not.toThrow();
-    expect(() => (logs.tagsFormatter = LegacyFormatter)).not.toThrow();
+describe("QueryLogs.tagsFormatter", () => {
+  afterEach(() => {
+    QueryLogs.tagsFormatter = "legacy";
   });
 
-  it("still accepts instance-shaped formatters", () => {
-    const logs = new QueryLogs();
-    const custom = {
-      format: (k: string, v: unknown) => `${k}=${v}`,
-      join: (pairs: string[]) => pairs.join(";"),
-    };
-    expect(() => (logs.tagsFormatter = custom)).not.toThrow();
+  it("tracks the formatter name", () => {
+    QueryLogs.tagsFormatter = "sqlcommenter";
+    expect(QueryLogs.tagsFormatter).toBe("sqlcommenter");
   });
 
-  it("rejects values missing format/join methods", () => {
-    const logs = new QueryLogs();
-    expect(() => (logs.tagsFormatter = { foo: 1 } as any)).toThrow(/unsupported/i);
+  it("raises ArgumentError for an unsupported formatter", () => {
+    expect(() => (QueryLogs.tagsFormatter = "bogus")).toThrow(ArgumentError);
+    expect(() => (QueryLogs.tagsFormatter = "bogus")).toThrow("Formatter is unsupported: bogus");
+    expect(QueryLogs.tagsFormatter).toBe("legacy");
   });
 });
 
-describe("QueryLogs.tagsFormatter", () => {
-  it("defaults to legacy", () => {
-    expect(new QueryLogs().tagsFormatter).toBe("legacy");
+describe("QueryLogs handlers", () => {
+  afterEach(() => {
+    QueryLogs.tags = [];
+    ExecutionContext.clear();
   });
 
-  it("tracks formatter = 'sqlcommenter'", () => {
-    const logs = new QueryLogs();
-    logs.tagsFormatter = "sqlcommenter";
-    expect(logs.tagsFormatter).toBe("sqlcommenter");
+  it("calls an arity-0 hash tag with no context argument", () => {
+    const received: number[] = [];
+    QueryLogs.tags = [
+      {
+        zero: function () {
+          received.push(arguments.length);
+          return "z";
+        },
+        one: (ctx) => String(ctx !== undefined),
+      },
+    ];
+    expect(QueryLogs.tagContent()).toBe("one:true,zero:z");
+    expect(received).toEqual([0]);
   });
 
-  it("tracks formatter = 'legacy'", () => {
-    const logs = new QueryLogs();
-    logs.tagsFormatter = "sqlcommenter";
-    logs.tagsFormatter = "legacy";
-    expect(logs.tagsFormatter).toBe("legacy");
-  });
-
-  it("tracks formatter = SQLCommenter (class value)", () => {
-    const logs = new QueryLogs();
-    logs.tagsFormatter = SQLCommenter;
-    expect(logs.tagsFormatter).toBe("sqlcommenter");
-  });
-
-  it("tracks formatter = LegacyFormatter (class value)", () => {
-    const logs = new QueryLogs();
-    logs.tagsFormatter = SQLCommenter;
-    logs.tagsFormatter = LegacyFormatter;
-    expect(logs.tagsFormatter).toBe("legacy");
-  });
-
-  it("falls back to 'legacy' for unknown custom formatters", () => {
-    const logs = new QueryLogs();
-    logs.tagsFormatter = SQLCommenter;
-    logs.tagsFormatter = {
-      format: (k: string, v: unknown) => `${k}=${v}`,
-      join: (pairs: string[]) => pairs.join(";"),
-    };
-    expect(logs.tagsFormatter).toBe("legacy");
+  it("rebuilds handlers when taggings change", () => {
+    const saved = QueryLogs.taggings;
+    try {
+      QueryLogs.tags = ["application"];
+      QueryLogs.taggings = { ...saved, application: "tagged" };
+      expect(QueryLogs.tagContent()).toBe("application:tagged");
+    } finally {
+      QueryLogs.taggings = saved;
+    }
   });
 });
 

@@ -406,6 +406,16 @@ describe("Time", () => {
       expect(t.getlocal(18000).utcOffset).toBe(18000);
     });
 
+    it("keeps a sub-minute fixed offset exact (`time_fixoff`)", () => {
+      const local = Time.utc(2020, 1, 1, 12).getlocal(-17762);
+      expect([local.utcOffset, local.hour, local.min, local.sec]).toEqual([-17762, 7, 3, 58]);
+      const later = local.plus(1);
+      expect([later.utcOffset, later.sec]).toEqual([-17762, 59]);
+      const lmt = { utcToLocal: (tm: Time) => tm.getlocal(-17762) };
+      const zoned = Time.utc(2020, 1, 1, 12).getlocal(lmt);
+      expect([zoned.utcOffset, zoned.hour, zoned.min, zoned.sec]).toEqual([-17762, 7, 3, 58]);
+    });
+
     it("an offset-built time has no zone, as MRI's has none", () => {
       const t = Time.utc(2020, 1, 1, 12, 0, 0);
       expect(t.getlocal("+05:00").zone).toBeNull();
