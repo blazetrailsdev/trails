@@ -288,7 +288,7 @@ class TestSetRequest extends DelegateClass(Request) {
     const helpers = this._helpers;
     const block = this._block;
     const klass = class extends (this._strict ? (super.controllerClass() as typeof Base) : Base) {
-      override async process(_name: string): Promise<void> {
+      override async process(name: string): Promise<void> {
         block(this);
       }
 
@@ -463,8 +463,12 @@ export const CookieAssertions = {
 
   assertSetCookieHeader(
     this: CookieAssertionsHost,
-    expected: string | string[],
-    header: string | string[] | undefined = this.response.headers.get("Set-Cookie"),
+    expected: string | string[] | Hash<string, SetCookieAttributes>,
+    header:
+      | string
+      | string[]
+      | undefined
+      | Hash<string, SetCookieAttributes> = this.response.headers.get("Set-Cookie"),
   ): void {
     if (typeof header === "string") {
       header = stringSplit(header, "\n").sort();
@@ -474,18 +478,22 @@ export const CookieAssertions = {
       expected = stringSplit(expected, "\n").sort();
     }
 
-    const parsedHeader = this.parseSetCookiesHeaders(header);
-    const parsedExpected = this.parseSetCookiesHeaders(expected);
+    header = this.parseSetCookiesHeaders(header as string[] | undefined);
+    expected = this.parseSetCookiesHeaders(expected as string[]);
 
-    for (const [key, value] of parsedExpected) {
-      assertEqual(value, parsedHeader.get(key));
+    for (const [key, value] of expected) {
+      assertEqual(value, header.get(key));
     }
   },
 
   assertNotSetCookieHeader(
     this: CookieAssertionsHost,
     expected: string | string[],
-    header: string | string[] | undefined = this.response.headers.get("Set-Cookie"),
+    header:
+      | string
+      | string[]
+      | undefined
+      | Hash<string, SetCookieAttributes> = this.response.headers.get("Set-Cookie"),
   ): void {
     if (typeof header === "string") {
       header = stringSplit(header, "\n").sort();
@@ -495,10 +503,10 @@ export const CookieAssertions = {
       expected = stringSplit(expected, "\n").sort();
     }
 
-    const parsedHeader = this.parseSetCookiesHeaders(header);
+    header = this.parseSetCookiesHeaders(header as string[] | undefined);
 
     for (const name of expected) {
-      assertNotIncludes(parsedHeader, name);
+      assertNotIncludes(header, name);
     }
   },
 };
