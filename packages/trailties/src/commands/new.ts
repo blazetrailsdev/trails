@@ -26,7 +26,7 @@ export function newCommand(): Command {
     )
     .option("--skip-git", "Skip git init")
     .option("--skip-install", "Skip dependency installation")
-    .option("--skip-docker", "Skip Dockerfile creation")
+    .option("--skip-docker", AppGenerator.classOptions().skipDocker.desc)
     .option("--skip-eslint", AppGenerator.classOptions().skipEslint.desc)
     .option("--no-skip-eslint")
     .option("--dev", AppGenerator.classOptions().dev.desc)

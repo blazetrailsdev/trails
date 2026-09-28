@@ -4,6 +4,13 @@ import * as path from "node:path";
 import * as os from "node:os";
 import { ModelGenerator } from "./model-generator.js";
 import * as Assertions from "./testing/assertions.js";
+import { assertMatch } from "@blazetrails/activesupport";
+import { Application } from "../application.js";
+import { Trails } from "../rails.js";
+import "../trailties/active-record.js";
+
+class ModelGeneratorTestApp extends Application {}
+let oldBelongsToRequiredByDefault: boolean | undefined;
 
 let tmpDir: string;
 let lines: string[];
@@ -11,15 +18,23 @@ const destination = { destinationRoot: "" };
 const assertNoMigration = Assertions.assertNoMigration.bind(destination);
 const assertNoFile = Assertions.assertNoFile.bind(destination);
 const assertMigration = Assertions.assertMigration.bind(destination);
+const assertFile = Assertions.assertFile.bind(destination);
+const { assertMethod } = Assertions;
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   destination.destinationRoot = tmpDir;
   lines = [];
+  Trails.application = ModelGeneratorTestApp.instance();
+  oldBelongsToRequiredByDefault = Trails.application.config.activeRecord.belongsToRequiredByDefault;
+  Trails.application.config.activeRecord.belongsToRequiredByDefault = true;
 });
 
 afterEach(() => {
+  Trails.application!.config.activeRecord.belongsToRequiredByDefault =
+    oldBelongsToRequiredByDefault;
+  Trails.application = null;
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
@@ -91,7 +106,16 @@ describe("ModelGeneratorTest", () => {
 
   it.skip("model with underscored parent option", () => {});
 
-  it.skip("model with namespace", () => {});
+  it("model with namespace", async () => {
+    await makeGen().run("admin/account", []);
+    await assertFile("app/models/admin.ts", /export const Admin = \{/);
+    await assertFile("app/models/admin.ts", /tableNamePrefix\(\)/);
+    await assertFile("app/models/admin.ts", /"admin_"/);
+    await assertFile(
+      "app/models/admin/account.ts",
+      /export class AdminAccount extends ApplicationRecord/,
+    );
+  });
 
   it("migration", async () => {
     const gen = makeGen();
@@ -329,11 +353,37 @@ describe("ModelGeneratorTest", () => {
     expect(content).toContain('this.belongsTo("supplier", { polymorphic: true })');
   });
 
-  it.skip("null false is added for references by default", () => {});
+  it("null false is added for references by default", async () => {
+    await makeGen().run("account", ["user:references"]);
 
-  it.skip("null false is added for belongs to by default", () => {});
+    await assertMigration("db/migrate/create_accounts.ts", (m) =>
+      assertMethod("change", m, (up) => {
+        assertMatch(/t\.references\("user",.*\snull: false/, up);
+      }),
+    );
+  });
 
-  it.skip("null false is not added when belongs to required by default global config is false", () => {});
+  it("null false is added for belongs to by default", async () => {
+    await makeGen().run("account", ["user:belongs_to"]);
+
+    await assertMigration("db/migrate/create_accounts.ts", (m) =>
+      assertMethod("change", m, (up) => {
+        assertMatch(/t\.belongsTo\("user",.*\snull: false/, up);
+      }),
+    );
+  });
+
+  it("null false is not added when belongs to required by default global config is false", async () => {
+    Trails.application!.config.activeRecord.belongsToRequiredByDefault = false;
+
+    await makeGen().run("account", ["user:belongs_to"]);
+
+    await assertMigration("db/migrate/create_accounts.ts", (m) =>
+      assertMethod("change", m, (up) => {
+        assertMatch(/t\.belongsTo\("user"/, up);
+      }),
+    );
+  });
 
   it("foreign key is not added for non references", async () => {
     const gen = makeGen();

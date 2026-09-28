@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { ScaffoldGenerator } from "./scaffold-generator.js";
+import { parseTs } from "../../../template-builder/testing.js";
 
 let tmpDir: string;
 beforeEach(() => {
@@ -25,8 +26,14 @@ describe("ScaffoldGenerator (namespaced)", () => {
     expect(migration).toMatch(/^db\/migrate\/\d+_create_admin_accounts\.ts$/);
     expect(read(migration)).toContain('this.createTable("admin_accounts"');
     const controller = read("app/controllers/admin/accounts-controller.ts");
-    expect(controller).toContain('this.redirectTo("/admin/accounts")');
-    expect(controller).toContain('this.redirectTo("/admin/accounts/" + this.params.get("id"))');
+    const model = read("app/models/admin/account.ts");
+    expect(model).toContain('import { ApplicationRecord } from "../application-record.js";');
+    expect(model).toContain("export class AdminAccount extends ApplicationRecord");
+    expect(controller).toContain('import { AdminAccount } from "../../models/admin/account.js";');
+    for (const source of [model, controller, read("app/models/admin.ts")])
+      expect(parseTs(source).diagnostics).toEqual([]);
+    expect(controller).toContain('this.redirectTo("/admin/accounts"');
+    expect(controller).toContain("this.redirectTo(`/admin/accounts/${this.admin_account.id}`");
     expect(read("app/views/admin/accounts/index.html.tse")).toContain(
       'linkTo("New account", newAdminAccountPath())',
     );

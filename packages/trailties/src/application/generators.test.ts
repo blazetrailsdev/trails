@@ -109,14 +109,12 @@ describe("GeneratorsTest", () => {
   });
 
   function rails(...args: string[]): Promise<string> {
-    const pretend = args.includes("--pretend");
-    const [, namespace, ...rest] = args.filter((a) => a !== "--pretend");
+    const [, namespace, ...rest] = args;
     return capture(":stdout", () =>
       RailsGenerators.invoke(namespace, rest, {
         cwd: appRoot,
         output: console.log,
         behavior: "invoke",
-        pretend,
       }),
     );
   }

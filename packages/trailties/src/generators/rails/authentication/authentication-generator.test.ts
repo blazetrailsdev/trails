@@ -6,6 +6,19 @@ import { registerChildProcessAdapter, childProcessAdapterConfig } from "@blazetr
 import { TopLevel } from "@blazetrails/activesupport";
 import { AuthenticationGenerator } from "./authentication-generator.js";
 import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
+import { Application } from "../../../application.js";
+import { Trails } from "../../../rails.js";
+import "../../../trailties/active-record.js";
+
+class AuthenticationGeneratorApp extends Application {}
+
+beforeEach(() => {
+  Trails.application = AuthenticationGeneratorApp.instance();
+});
+
+afterEach(() => {
+  Trails.application = null;
+});
 
 // prettier-ignore
 const TS_EMIT = ["app/models/session.ts","app/models/user.ts","app/models/current.ts","app/controllers/sessions-controller.ts","app/controllers/concerns/authentication.ts","app/controllers/passwords-controller.ts","app/channels/application-cable/connection.ts","app/mailers/passwords-mailer.ts","test/mailers/previews/passwords-mailer-preview.ts"];

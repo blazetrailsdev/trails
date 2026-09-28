@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { registerConstant, unregisterConstant } from "@blazetrails/activesupport";
+import { assertMatch, registerConstant, unregisterConstant } from "@blazetrails/activesupport";
+import * as Assertions from "../../testing/assertions.js";
 import { ActiveModel } from "../../active-model.js";
 import { ScaffoldControllerGenerator } from "./scaffold-controller-generator.js";
 import type { ScaffoldControllerGeneratorOptions as Options } from "./scaffold-controller-generator.js";
@@ -31,12 +32,64 @@ function read(rel: string): string {
   return fs.readFileSync(path.join(tmpDir, rel), "utf-8");
 }
 
+const { assertInstanceMethod } = Assertions;
+
 describe("ScaffoldControllerGeneratorTest", () => {
+  it("controller skeleton is created", async () => {
+    await makeGen("User", ["name:string", "age:integer"]).run();
+
+    await Assertions.assertFile.call(
+      { destinationRoot: tmpDir },
+      "app/controllers/users-controller.ts",
+      async (content) => {
+        assertMatch(/class UsersController extends ApplicationController/, content);
+
+        await assertInstanceMethod("index", content, (m) => {
+          assertMatch(/this\.users = await User\.all\(\)/, m);
+        });
+
+        await assertInstanceMethod("show", content);
+
+        await assertInstanceMethod("new", content, (m) => {
+          assertMatch(/this\.user = User\.new\(\)/, m);
+        });
+
+        await assertInstanceMethod("edit", content);
+
+        await assertInstanceMethod("create", content, (m) => {
+          assertMatch(/this\.user = User\.new\(this\.userParams\(\)\)/, m);
+          assertMatch(/this\.user\.save\(\)/, m);
+          assertMatch(/this\.redirectTo\(`\/users\/\$\{this\.user\.id\}`/, m);
+        });
+
+        await assertInstanceMethod("update", content, (m) => {
+          assertMatch(/this\.user\.update\(this\.userParams\(\)\)/, m);
+          assertMatch(/this\.redirectTo\(`\/users\/\$\{this\.user\.id\}`/, m);
+          assertMatch(/status: "see_other"/, m);
+        });
+
+        await assertInstanceMethod("destroy", content, (m) => {
+          assertMatch(/this\.user\.destroy/, m);
+          assertMatch(/User was successfully destroyed/, m);
+          assertMatch(/this\.redirectTo\("\/users"/, m);
+          assertMatch(/status: "see_other"/, m);
+        });
+
+        await assertInstanceMethod("setUser", content, (m) => {
+          assertMatch(/this\.user = await User\.find\(this\.params\.expect\("id"\)\)/, m);
+        });
+
+        assertMatch(/userParams\(\)/, content);
+        assertMatch(/this\.params\.expect\(\{ user: \["name", "age"\] \}\)/, content);
+      },
+    );
+  });
+
   it("controller content", async () => {
     await makeGen("User", ["name:string", "age:integer"]).run();
     const c = read("app/controllers/users-controller.ts");
     expect(c).toContain("class UsersController extends ApplicationController");
-    for (const action of ["index", "show", "new_", "create", "edit", "update", "destroy"]) {
+    for (const action of ["index", "show", "new", "create", "edit", "update", "destroy"]) {
       expect(c).toContain(`async ${action}()`);
     }
   });
@@ -89,7 +142,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
     await makeGen("User", [], { orm: "unknown" }).run();
     const c = read("app/controllers/users-controller.ts");
     expect(c).toMatch(/class UsersController extends ApplicationController/);
-    expect(c).toMatch(/const users = await User\.all\(\)/);
+    expect(c).toMatch(/this\.users = await User\.all\(\)/);
   });
 
   it("customized orm is used", async () => {
@@ -104,8 +157,8 @@ describe("ScaffoldControllerGeneratorTest", () => {
       await makeGen("User", [], { orm: "unknown" }).run();
       const c = read("app/controllers/users-controller.ts");
       expect(c).toMatch(/class UsersController extends ApplicationController/);
-      expect(c).toMatch(/const users = await User\.find\("all"\)/);
-      expect(c).not.toMatch(/const users = await User\.all\(\)/);
+      expect(c).toMatch(/this\.users = await User\.find\("all"\)/);
+      expect(c).not.toMatch(/this\.users = await User\.all\(\)/);
     } finally {
       unregisterConstant("Unknown::Generators::ActiveModel", klass);
     }
@@ -135,7 +188,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
     await makeGen("User", ["name:string"], { api: true }).run();
     const c = read("app/controllers/users-controller.ts");
     expect(c).toContain("this.render({ json: users })");
-    expect(c).not.toContain("async new_()");
+    expect(c).not.toContain("async new()");
     expect(c).not.toContain("async edit()");
     expect(c).toContain('this.params.expect({ user: ["name"] })');
     expect(parseTs(c).diagnostics).toEqual([]);

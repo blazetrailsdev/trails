@@ -1,47 +1,59 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`ScaffoldGenerator emit > matches snapshot for the controller and validates as TS without Ruby 1`] = `
-"import { ApplicationController } from "./application-controller.js";
+"import { Post } from "../models/post.js";
+import { ApplicationController } from "./application-controller.js";
 
 export class PostsController extends ApplicationController {
+  static {
+    this.beforeAction("setPost", { only: ["show", "edit", "update", "destroy"] });
+  }
+
+  declare posts: Post[];
+
+  declare post: Post;
+
   async index(): Promise<void> {
-    // const posts = await Post.all();
-    const posts: any[] = [];
-    await this.render({ action: "index", locals: { posts } });
+    this.posts = await Post.all();
   }
 
-  async show(): Promise<void> {
-    // const post = await Post.find(this.params.get("id"));
-    const post = { id: this.params.get("id") };
-    await this.render({ action: "show", locals: { post } });
+  async show(): Promise<void> {}
+
+  async new(): Promise<void> {
+    this.post = Post.new();
   }
 
-  async new_(): Promise<void> {
-    const post = {};
-    await this.render({ action: "new", locals: { post } });
-  }
+  async edit(): Promise<void> {}
 
   async create(): Promise<void> {
-    // const post = await Post.create(this.params.get("post"));
-    this.redirectTo("/posts");
-  }
+    this.post = Post.new(this.postParams());
 
-  async edit(): Promise<void> {
-    // const post = await Post.find(this.params.get("id"));
-    const post = { id: this.params.get("id") };
-    await this.render({ action: "edit", locals: { post } });
+    if (await this.post.save()) {
+      this.redirectTo(\`/posts/\${this.post.id}\`, { notice: "Post was successfully created." });
+    } else {
+      await this.render({ action: "new", status: "unprocessable_entity" });
+    }
   }
 
   async update(): Promise<void> {
-    // const post = await Post.find(this.params.get("id"));
-    // await post.update(this.params.get("post"));
-    this.redirectTo("/posts/" + this.params.get("id"));
+    if (await this.post.update(this.postParams())) {
+      this.redirectTo(\`/posts/\${this.post.id}\`, { notice: "Post was successfully updated.", status: "see_other" });
+    } else {
+      await this.render({ action: "edit", status: "unprocessable_entity" });
+    }
   }
 
   async destroy(): Promise<void> {
-    // const post = await Post.find(this.params.get("id"));
-    // await post.destroy();
-    this.redirectTo("/posts");
+    await this.post.destroyBang();
+    this.redirectTo("/posts", { notice: "Post was successfully destroyed.", status: "see_other" });
+  }
+
+  protected async setPost(): Promise<void> {
+    this.post = await Post.find(this.params.expect("id"));
+  }
+
+  postParams(): unknown {
+    return this.params.expect({ post: ["title", "views"] });
   }
 }
 "

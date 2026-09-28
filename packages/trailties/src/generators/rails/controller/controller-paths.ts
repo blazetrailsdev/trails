@@ -6,6 +6,8 @@ import {
   tsClass,
   tsMethod,
   tsModule,
+  type Body,
+  type Field,
   type Import,
   type Method,
   type Ref,
@@ -56,6 +58,8 @@ export interface EmitControllerClassOpts {
   className: string;
   parent: { ref: Ref; import?: Import };
   imports?: Import[];
+  staticBlock?: Body;
+  fields?: Field[];
   methods: Method[];
 }
 
@@ -66,7 +70,14 @@ export function emitControllerClass(opts: EmitControllerClassOpts): string {
   ];
   return tsModule({
     imports,
-    declarations: [tsClass({ name: opts.className, extends: opts.parent.ref, body: opts.methods })],
+    declarations: [
+      tsClass({
+        name: opts.className,
+        extends: opts.parent.ref,
+        staticBlock: opts.staticBlock,
+        body: [...(opts.fields ?? []), ...opts.methods],
+      }),
+    ],
   });
 }
 

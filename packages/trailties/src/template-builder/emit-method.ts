@@ -41,7 +41,7 @@ export function emitField(f: Field): EmitResult {
   const suffix = f.nullable ? "?" : f.definite ? "!" : "";
   const init = f.initializer ? ` = ${f.initializer}` : "";
   const head = f.comment ? emitJsDoc(f.comment) : "";
-  const staticPrefix = f.static ? "static " : "";
+  const staticPrefix = `${f.declare ? "declare " : ""}${f.static ? "static " : ""}`;
   if (f.inferType) {
     return {
       text: `${head}${staticPrefix}${f.name}${suffix}${init};`,

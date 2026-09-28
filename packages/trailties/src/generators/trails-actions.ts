@@ -1,6 +1,7 @@
 import { getFs, getPath, type FsAdapter } from "@blazetrails/ruby-compat";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import { assertNoRubySource } from "../template-builder/no-ruby-source.js";
+import { GeneratorError } from "./generated-attribute.js";
 import { optimizeIndentation, rebaseIndentation } from "./actions.js";
 
 type AsyncFs = FsAdapter & {
@@ -221,24 +222,30 @@ async function injectIntoFile(
   replacement: string,
   { after }: { after: string | RegExp },
 ): Promise<void> {
-  const fs = await requireAsyncFs(["readFile", "writeFile"]);
+  const fs = await requireAsyncFs(["exists", "readFile", "writeFile"]);
   const full = getPath().join(host.cwd, relPath);
-  const content = await fs.readFile(full, "utf-8");
   if (host.behavior === "revoke") {
+    const content = await fs.readFile(full, "utf-8");
     const flag = typeof after === "string" ? regexpEscape(after) : after.source;
     const regexp = new RegExp(`(${flag})([^]*)(${regexpEscape(replacement)})`, "g");
     if (!host.options?.pretend) await fs.writeFile(full, content.replace(regexp, "$1$2"));
     return;
   }
-  if (content.includes(replacement)) return;
-  const flag =
-    typeof after === "string"
-      ? new RegExp(regexpEscape(after), "g")
-      : new RegExp(after.source, after.flags.includes("g") ? after.flags : `${after.flags}g`);
-  await fs.writeFile(
-    full,
-    content.replace(flag, (match) => match + replacement),
-  );
+  if (await fs.exists(full)) {
+    const content = await fs.readFile(full, "utf-8");
+    if (content.includes(replacement)) return;
+    const flag =
+      typeof after === "string"
+        ? new RegExp(regexpEscape(after), "g")
+        : new RegExp(after.source, after.flags.includes("g") ? after.flags : `${after.flags}g`);
+    if (!host.options?.pretend)
+      await fs.writeFile(
+        full,
+        content.replace(flag, (match) => match + replacement),
+      );
+  } else if (!host.options?.pretend) {
+    throw new GeneratorError(`The file ${full} does not appear to exist`);
+  }
 }
 
 async function gsubFile(

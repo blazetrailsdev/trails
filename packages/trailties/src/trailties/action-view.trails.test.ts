@@ -5,6 +5,7 @@ import * as path from "node:path";
 import {
   Deprecators,
   FileUpdateChecker,
+  Logger,
   Reloader,
   runLoadHooks,
   resetLoadHooks,
@@ -21,6 +22,7 @@ import {
   type UrlHelperHost,
 } from "@blazetrails/actionview";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
+import { Trails } from "../rails.js";
 import {
   applyStylesheetMediaDefault,
   computeAssetPath,
@@ -172,6 +174,30 @@ describe("action_view.setup_action_pack", () => {
     const proto = RoutingUrlFor.prototype as unknown as Record<string, unknown>;
     for (const name of ["routeFor", "fullUrlFor", "polymorphicUrl", "polymorphicPath"]) {
       expect(typeof proto[name], name).toBe("function");
+    }
+  });
+
+  it("action_view.logger seeds Base.logger from Trails.logger only when unset", async () => {
+    const previous = Base.logger;
+    const logger = new Logger(null);
+    const prevTrailsLogger = Trails.logger;
+    Trails.logger = logger;
+    try {
+      Base.logger = null;
+      await runTrailtieInitializers(Trailtie, {
+        config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
+        deprecators: new Deprecators(),
+      });
+      runLoadHooks("action_view", Base);
+      expect(Base.logger).toBe(logger);
+
+      const own = new Logger(null);
+      Base.logger = own;
+      runLoadHooks("action_view", Base);
+      expect(Base.logger).toBe(own);
+    } finally {
+      Base.logger = previous;
+      Trails.logger = prevTrailsLogger;
     }
   });
 

@@ -49,6 +49,61 @@ export abstract class AppBase extends GeneratorBase {
   private _database?: Database;
 
   static {
+    this.classOption("skipDocker", {
+      type: "boolean",
+      default: null,
+      desc: "Skip Dockerfile, .dockerignore and bin/docker-entrypoint",
+    });
+    this.classOption("skipKeeps", {
+      type: "boolean",
+      default: null,
+      desc: "Skip source control .keep files",
+    });
+    this.classOption("skipActionMailer", {
+      type: "boolean",
+      aliases: "-M",
+      default: null,
+      desc: "Skip Action Mailer files",
+    });
+    this.classOption("skipActionMailbox", {
+      type: "boolean",
+      default: null,
+      desc: "Skip Action Mailbox gem",
+    });
+    this.classOption("skipActionText", {
+      type: "boolean",
+      default: null,
+      desc: "Skip Action Text gem",
+    });
+    this.classOption("skipActiveRecord", {
+      type: "boolean",
+      aliases: "-O",
+      default: null,
+      desc: "Skip Active Record files",
+    });
+    this.classOption("skipActiveJob", { type: "boolean", default: null, desc: "Skip Active Job" });
+    this.classOption("skipActiveStorage", {
+      type: "boolean",
+      default: null,
+      desc: "Skip Active Storage files",
+    });
+    this.classOption("skipActionCable", {
+      type: "boolean",
+      aliases: "-C",
+      default: null,
+      desc: "Skip Action Cable files",
+    });
+    this.classOption("skipTest", {
+      type: "boolean",
+      aliases: "-T",
+      default: null,
+      desc: "Skip test files",
+    });
+    this.classOption("skipSystemTest", {
+      type: "boolean",
+      default: null,
+      desc: "Skip system test files",
+    });
     this.classOption("skipEslint", { type: "boolean", default: null, desc: "Skip ESLint setup" });
     this.classOption("dev", {
       type: "boolean",
