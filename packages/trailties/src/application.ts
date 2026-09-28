@@ -182,6 +182,11 @@ export class Application extends Engine {
     return defaultStack.buildStack();
   }
 
+  override async loadGenerators(app: Engine = this): Promise<this> {
+    await (app as Application).ensureGeneratorTemplatesAdded();
+    return super.loadGenerators(app);
+  }
+
   /** @internal */
   async ensureGeneratorTemplatesAdded(): Promise<void> {
     const configuredPaths = this.config.generators().templates;

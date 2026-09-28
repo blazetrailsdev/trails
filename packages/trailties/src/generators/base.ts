@@ -272,9 +272,12 @@ export abstract class GeneratorBase implements GeneratorActionsState {
       if (!this.options.pretend && File.isExist(fullPath)) FileUtils.rmRf(fullPath);
       return;
     }
-    FileUtils.mkdirP(File.dirname(fullPath));
-    File.write(fullPath, content);
-    if (options?.mode !== undefined) File.chmod(options.mode, fullPath);
+    if (!this.options.pretend) {
+      FileUtils.mkdirP(File.dirname(fullPath));
+      File.write(fullPath, content);
+      if (options?.mode !== undefined) File.chmod(options.mode, fullPath);
+    }
+    Generators.addGeneratedFile(fullPath);
     this.createdFiles.push(relativePath);
     this.output(`      create  ${relativePath}`);
   }

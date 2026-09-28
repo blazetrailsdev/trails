@@ -13,9 +13,13 @@ const mountedRackApp = MountedRackApp as unknown as MountableApp;
 
 class Engine {}
 
-function engineClass(): typeof Engine & { routes: RouteSet } {
+function engineClass(): typeof Engine & { routes(): RouteSet } {
   return class extends Engine {
-    static routes = new RouteSet();
+    static _routes = new RouteSet();
+
+    static routes(): RouteSet {
+      return this._routes;
+    }
 
     static inspect(): string {
       return "Blog::Engine";
@@ -50,7 +54,7 @@ describe("RoutesInspectorTest", () => {
 
   it("displaying routes for engines", () => {
     const engine = engineClass();
-    engine.routes.draw((r) => {
+    engine.routes().draw((r) => {
       r.get("/cart", { to: "cart#show" });
     });
 
@@ -71,7 +75,7 @@ describe("RoutesInspectorTest", () => {
 
   it("displaying routes for engines without routes", () => {
     const engine = engineClass();
-    engine.routes.draw(() => {});
+    engine.routes().draw(() => {});
 
     const output = draw((r) => {
       r.mount(engine as unknown as MountableApp, { at: "/blog", as: "blog" });

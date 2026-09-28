@@ -21,3 +21,8 @@ export interface Post {
   set author(value: Author | null);
 }
 
+declare module "@blazetrails/activerecord" {
+  interface RelationScopes<T extends import("@blazetrails/activerecord").Base> {
+    published(this: import("@blazetrails/activerecord").Relation<Post>): import("@blazetrails/activerecord").Relation<Post>;
+  }
+}

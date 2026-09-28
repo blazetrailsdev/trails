@@ -30,3 +30,30 @@ describe("Engine#buildRequest", () => {
     expect(env["ORIGINAL_SCRIPT_NAME"]).toBe("/app");
   });
 });
+
+describe("Railtie class-level method_missing", () => {
+  it("forwards routes and call to the instance, so RoutesInspector prints a mounted Engine's routes", async () => {
+    await import("./rails.js");
+    const { RouteSet, RoutesInspector, ConsoleFormatter } = await import("@blazetrails/actionpack");
+    class BlogEngine extends Engine {
+      static inspect(): string {
+        return "Blog::Engine";
+      }
+    }
+    Trailtie.register(BlogEngine);
+    const blog = BlogEngine as unknown as typeof BlogEngine & Pick<Engine, "routes">;
+    expect(blog.routes()).toBe(BlogEngine.instance().routes());
+    blog.routes().draw((r) => {
+      r.get("/cart", { to: "cart#show" });
+    });
+
+    const set = new RouteSet();
+    set.draw((r) => {
+      r.mount(BlogEngine as never, { at: "/blog", as: "blog" });
+    });
+    const output = new RoutesInspector(set.routes.routes).format(new ConsoleFormatter.Sheet());
+
+    expect(output).toContain("Routes for Blog::Engine:");
+    expect(output).toContain("cart GET  /cart(.:format) cart#show");
+  });
+});

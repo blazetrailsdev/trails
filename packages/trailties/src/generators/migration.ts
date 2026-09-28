@@ -8,6 +8,7 @@ import {
   type MigrationRenderer,
 } from "./actions/create-migration.js";
 import { migrationLookupAt } from "./migration-lookup.js";
+import { Generators } from "../generators.js";
 
 export { NotImplementedError };
 export { migrationLookupAt, migrationExists } from "./migration-lookup.js";
@@ -59,5 +60,6 @@ export async function migrationTemplate(
   const resolved = File.expandPath(destination, host.destinationRoot);
   const [dir, base] = [File.dirname(resolved), File.basename(resolved)];
   const numberedDestination = File.join(dir, [host.migrationNumber, base].join("_"));
-  return createMigration(host, numberedDestination, source, config);
+  const file = await createMigration(host, numberedDestination, source, config);
+  return Generators.addGeneratedFile(file!);
 }

@@ -222,7 +222,7 @@ export class RoutesInspector {
     if (!route.isEngine()) return;
     if (this.engines[name]) return;
 
-    const routes = (route.rackApp as { routes: unknown }).routes;
+    const routes = (route.rackApp as { routes(): unknown }).routes();
     if (routes instanceof RouteSet) {
       this.engines[name] = this.collectRoutes(routes.routes.routes);
     }

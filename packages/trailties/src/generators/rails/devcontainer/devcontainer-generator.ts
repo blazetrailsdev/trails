@@ -1,7 +1,7 @@
 import { File } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../database.js";
-export const TRAILS_DEV_PATH = "/workspaces/trails";
+import { Generators } from "../../../generators.js";
 export type SqliteDriver = "better-sqlite3" | "node-sqlite" | "expo-sqlite";
 export interface DevcontainerGeneratorOptions extends GeneratorOptions {
   appName?: string;
@@ -153,7 +153,10 @@ export class DevcontainerGenerator extends GeneratorBase {
     };
     if (Object.keys(env).length > 0) json.containerEnv = env;
     json.forwardPorts = ports;
-    if (dev) json.mounts = [{ type: "bind", source: TRAILS_DEV_PATH, target: TRAILS_DEV_PATH }];
+    if (dev)
+      json.mounts = [
+        { type: "bind", source: Generators.RAILS_DEV_PATH, target: Generators.RAILS_DEV_PATH },
+      ];
     json.postCreateCommand = "bin/setup --skip-server";
     return JSON.stringify(json, null, 2) + "\n";
   }

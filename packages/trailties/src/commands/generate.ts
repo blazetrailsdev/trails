@@ -3,6 +3,8 @@ import { Command } from "commander";
 import { ModelGenerator } from "../generators/model-generator.js";
 import { MigrationGenerator } from "../generators/migration-generator.js";
 import { Generators } from "../generators.js";
+import { bootApplicationBang, loadGenerators } from "../command/actions.js";
+import { APP_PATH } from "../app-path.js";
 
 export function generateCommand(): Command {
   const cmd = new Command("generate");
@@ -56,7 +58,16 @@ export function generateCommand(): Command {
         return lines.join("\n");
       })
       .action(async (args: string[]) => {
-        await Generators.invoke(namespace, args, { cwd: Dir.pwd(), output: console.log });
+        if (APP_PATH != null) {
+          await bootApplicationBang();
+          await loadGenerators();
+        }
+
+        await Generators.invoke(namespace, args, {
+          cwd: Dir.pwd(),
+          output: console.log,
+          behavior: "invoke",
+        });
       });
   }
 

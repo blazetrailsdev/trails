@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { DevcontainerGenerator, TRAILS_DEV_PATH } from "./devcontainer-generator.js";
+import { DevcontainerGenerator } from "./devcontainer-generator.js";
+import { Generators } from "../../../generators.js";
 let tmpDir: string;
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-devcontainer-"));
@@ -89,7 +90,11 @@ describe("DevcontainerGeneratorTest", () => {
   it("test_dev_option", () => {
     run({ dev: true });
     const m = (dc().mounts as Array<Record<string, string>>)[0];
-    expect(m).toEqual({ type: "bind", source: TRAILS_DEV_PATH, target: TRAILS_DEV_PATH });
+    expect(m).toEqual({
+      type: "bind",
+      source: Generators.RAILS_DEV_PATH,
+      target: Generators.RAILS_DEV_PATH,
+    });
   });
   it("test_node_option_default", () => {
     run();

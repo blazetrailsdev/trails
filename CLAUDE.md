@@ -1335,6 +1335,7 @@ the capability, in a different place. Each is decided here, and each but
 | `active_support/ordered_options.rb`                   | Proxy                 |
 | `active_support/string_inquirer.rb`                   | Proxy                 |
 | `active_support/time_with_zone.rb`                    | Proxy                 |
+| `rails/railtie.rb`                                    | Proxy (class chain)   |
 | `rails/railtie/configuration.rb`                      | Proxy                 |
 | `action_controller/metal/mime_responds.rb`            | Proxy                 |
 
@@ -1368,6 +1369,13 @@ parent, which ~20 chain walkers terminate on. The name is untyped (a static
 `typeof Base`), so a call site reaches it through a cast — `(Topic as any).findByTitle(...)`,
 or a narrower structural type where the file bans `any` — and `in`
 still cannot see it (`finder-respond-to-dynamic-finders-invisible-to-in`).
+
+`rails/railtie.rb`'s class-level pair (`railtie.rb:216-230`) is the same
+splice, directly above `Trailtie` in `trailtie.ts`: a static read that missed
+every class below it forwards to `instance()` when the railtie is not abstract
+and the instance answers the name, so `Blog::Engine.routes` reaches
+`Engine#routes`. `Function.prototype.call` answers `call` before the trap can,
+so `Engine` forwards that one name with an explicit `static call`.
 
 ## `inherited` is deferred to own-property memo guards (`ModelSchema.inherited`)
 

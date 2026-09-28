@@ -47,6 +47,10 @@ export class Engine extends Trailtie {
     return readOwnState<RackApp | RackAppObject>(this, "_endpoint");
   }
 
+  static call(env: RackEnv): unknown {
+    return this.methodMissing("call", env);
+  }
+
   static isolated(value?: boolean): boolean {
     if (value !== undefined) writeOwnState(this, "_isolated", value);
     return readOwnState<boolean>(this, "_isolated") === true;
@@ -152,6 +156,13 @@ export class Engine extends Trailtie {
   }
   hasRoutes(): boolean {
     return this._routes !== undefined;
+  }
+
+  async loadGenerators(app: Engine = this): Promise<this> {
+    const { Generators } = await import("./generators.js");
+    this.runGeneratorsBlocks(app);
+    Generators.configureBang(app.config.generators());
+    return this;
   }
 
   loadServer(app: unknown = this): this {
