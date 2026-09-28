@@ -1,0 +1,1 @@
+<%= render({ partial: 'customers/customer', collection: this.customers, cached: true }) %>

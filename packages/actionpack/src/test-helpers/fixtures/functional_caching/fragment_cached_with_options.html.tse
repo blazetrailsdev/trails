@@ -1,0 +1,3 @@
+<body>
+<%= cache('with_options', { skipDigest: true, expiresIn: 10 }, () => { %><p>ERB</p><% }) %>
+</body>

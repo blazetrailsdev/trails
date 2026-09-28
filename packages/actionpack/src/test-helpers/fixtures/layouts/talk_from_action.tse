@@ -1,0 +1,2 @@
+<title><%= this.title ?? yield("title") %></title>
+<%= yield -%>

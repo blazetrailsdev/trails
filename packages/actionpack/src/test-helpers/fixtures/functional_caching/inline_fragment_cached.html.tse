@@ -1,0 +1,2 @@
+<%= render({ inline: 'Some inline content' }) %>
+<%= cache({}, {}, () => { %>Some cached content<% }) %>

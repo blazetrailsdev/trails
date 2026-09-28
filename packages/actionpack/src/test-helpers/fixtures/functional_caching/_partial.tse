@@ -1,0 +1,3 @@
+<% cache({}, {}, () => { %>
+Old fragment caching in a partial
+<% }) %>

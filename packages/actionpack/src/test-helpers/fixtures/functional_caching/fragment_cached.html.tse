@@ -1,0 +1,3 @@
+Hello
+<%= cache("fragment", {}, () => { %>This bit's fragment cached<% }) %>
+<%= 'Ciao' %>

@@ -1,0 +1,4 @@
+<% cache(customer, {}, () => { %>
+  <% controller.partialRenderedTimes += 1 %>
+  <%= customer.name %>, <%= customer.id %>
+<% }) %>

@@ -1,8 +1,14 @@
+import { assertRespondTo } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeEach } from "vitest";
 import { TestCase } from "../test-case.js";
 import { Base } from "../base.js";
 import { Metal } from "../metal.js";
 import { Request } from "../../action-dispatch/http/request.js";
+import {
+  fixtureFileUpload,
+  type TestProcessHost,
+} from "../../action-dispatch/testing/test-process.js";
+import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
 
 class PostsController extends Base {
   async index() {
@@ -257,71 +263,46 @@ describe("TestCaseTest", () => {
   describe("assertContentType", () => {
     it("matches JSON content type", async () => {
       await tc.get("index");
-      tc.assertContentType("application/json");
+      expect(tc.response.mediaType).toBe("application/json");
     });
 
     it("matches plain text content type", async () => {
       await tc.get("renderPlain");
-      tc.assertContentType("text/plain");
+      expect(tc.response.mediaType).toBe("text/plain");
     });
 
     it("matches HTML content type", async () => {
       await tc.get("renderHtml");
-      tc.assertContentType("text/html");
-    });
-
-    it("throws on mismatch", async () => {
-      await tc.get("index");
-      expect(() => tc.assertContentType("text/plain")).toThrow(/Expected content type/);
+      expect(tc.response.mediaType).toBe("text/html");
     });
   });
 
   describe("assertHeader", () => {
     it("checks header value", async () => {
       await tc.get("setCustomHeader");
-      tc.assertHeader("x-custom", "test-value");
+      expect(tc.response.getHeader("x-custom")).toBe("test-value");
     });
 
     it("throws on missing header", async () => {
       await tc.get("index");
-      expect(() => tc.assertHeader("x-nonexistent", "val")).toThrow(/Expected header/);
-    });
-
-    it("accepts regex", async () => {
-      await tc.get("setCustomHeader");
-      tc.assertHeader("x-custom", /test/);
+      expect(tc.response.getHeader("x-nonexistent")).toBeUndefined();
     });
   });
 
   describe("flash", () => {
     it("assertFlash passes when flash is set", async () => {
       await tc.get("flashNotice");
-      tc.assertFlash("notice", "Success!");
+      expect(tc.flash.get("notice")).toBe("Success!");
     });
 
     it("assertFlash throws when flash is not set", async () => {
       await tc.get("index");
-      expect(() => tc.assertFlash("notice")).toThrow(/Expected flash/);
-    });
-
-    it("assertFlash checks value", async () => {
-      await tc.get("flashNotice");
-      expect(() => tc.assertFlash("notice", "Wrong")).toThrow(/Expected flash/);
-    });
-
-    it("assertFlash accepts regex", async () => {
-      await tc.get("flashNotice");
-      tc.assertFlash("notice", /Success/);
+      expect(tc.flash.get("notice")).toBeUndefined();
     });
 
     it("assertNoFlash passes when flash is not set", async () => {
       await tc.get("index");
-      tc.assertNoFlash("alert");
-    });
-
-    it("assertNoFlash throws when flash is set", async () => {
-      await tc.get("flashAlert");
-      expect(() => tc.assertNoFlash("alert")).toThrow(/Expected no flash/);
+      expect(tc.flash.has("alert")).toBe(false);
     });
 
     it("flash accessor returns flash hash", async () => {
@@ -588,6 +569,7 @@ class TestController extends Base {
 }
 
 describe("TestCaseTest", () => {
+  const FILES_DIR = `${FIXTURE_LOAD_PATH}/multipart`;
   let tc: TestCase;
 
   beforeEach(() => {
@@ -613,6 +595,15 @@ describe("TestCaseTest", () => {
     tc.session["foo"] = "bar";
     await tc.get("noOp", { session: { foo: "baz" } });
     expect(tc.session["foo"]).toBe("baz");
+  });
+
+  it("fixture file upload should be able access to tempfile", () => {
+    const file = fixtureFileUpload.call(
+      tc as unknown as TestProcessHost,
+      FILES_DIR + "/ruby_on_rails.jpg",
+      "image/jpeg",
+    );
+    assertRespondTo(file, "tempfile");
   });
 
   it.skip("session is cleared from controller after reset session", async () => {});

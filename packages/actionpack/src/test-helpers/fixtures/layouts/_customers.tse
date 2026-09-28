@@ -1,0 +1,1 @@
+<title><%= yield({ name: "David" }) %></title>
