@@ -21,36 +21,36 @@ function makeGen() {
 }
 
 describe("ModelGeneratorTest", () => {
-  it("password digest attribute adds has secure password as the last line", () => {
-    makeGen().run("User", ["account:references", "token:token", "password:digest"]);
+  it("password digest attribute adds has secure password as the last line", async () => {
+    await makeGen().run("User", ["account:references", "token:token", "password:digest"]);
     const content = fs.readFileSync(path.join(tmpDir, "app/models/user.ts"), "utf-8");
     expect(content).toContain(
       '    this.belongsTo("account");\n    this.hasSecureToken();\n    this.hasSecurePassword();\n  }',
     );
   });
 
-  it("password digest attribute creates password_digest string column", () => {
-    const files = makeGen().run("User", ["name", "password:digest"]);
+  it("password digest attribute creates password_digest string column", async () => {
+    const files = await makeGen().run("User", ["name", "password:digest"]);
     const migFile = files.find((f) => f.startsWith("db/migrate/"));
     const content = fs.readFileSync(path.join(tmpDir, migFile!), "utf-8");
     expect(content).toContain('t.string("password_digest");');
     expect(content).not.toContain("t.digest");
   });
 
-  it("digest attribute not named password does not add has secure password", () => {
-    makeGen().run("User", ["recovery:digest"]);
+  it("digest attribute not named password does not add has secure password", async () => {
+    await makeGen().run("User", ["recovery:digest"]);
     const content = fs.readFileSync(path.join(tmpDir, "app/models/user.ts"), "utf-8");
     expect(content).not.toContain("hasSecurePassword");
   });
 
-  it("unknown attribute type raises GeneratedAttribute's error", () => {
-    expect(() => makeGen().run("User", ["name:unknown"])).toThrow(
+  it("unknown attribute type raises GeneratedAttribute's error", async () => {
+    await expect(makeGen().run("User", ["name:unknown"])).rejects.toThrow(
       new GeneratorError("Could not generate field 'name' with unknown type 'unknown'."),
     );
   });
 
-  it("unknown attribute index raises GeneratedAttribute's error", () => {
-    expect(() => makeGen().run("User", ["name:string:unknown"])).toThrow(
+  it("unknown attribute index raises GeneratedAttribute's error", async () => {
+    await expect(makeGen().run("User", ["name:string:unknown"])).rejects.toThrow(
       new GeneratorError("Could not generate field 'name' with unknown index 'unknown'."),
     );
   });

@@ -3,9 +3,7 @@ import * as fs from "node:fs";
 import * as nodePath from "node:path";
 import * as os from "node:os";
 import {
-  buildMigrationAssigns,
   currentMigrationNumber,
-  type MigrationAssigns,
   migrationExists,
   migrationLookupAt,
   migrationTemplate,
@@ -38,11 +36,6 @@ describe("migration", () => {
     expect(migrationExists(d, "create_posts")).toBe(`${d}/20260101000000_create_posts.ts`);
     expect(migrationExists(d, "missing")).toBeUndefined();
     expect(currentMigrationNumber(d)).toBe(20260103000000);
-    expect(buildMigrationAssigns("db/migrate/create_posts.ts", "20260101000000")).toEqual({
-      migrationNumber: "20260101000000",
-      migrationFileName: "create_posts",
-      migrationClassName: "CreatePosts",
-    });
   });
 
   it("nextMigrationNumber raises NotImplementedError", () => {
@@ -50,23 +43,25 @@ describe("migration", () => {
   });
 
   it("migrationTemplate prepends migration_number, sets assigns, and renders", async () => {
-    let captured: MigrationAssigns | undefined;
     const host = {
       output: () => undefined,
       options: {},
-      migrationFileName: "create_articles",
+      migrationNumber: "",
+      migrationFileName: "",
+      migrationClassName: "",
       destinationRoot: tmpDir,
       relativeToOriginalDestinationRoot: (p: string) => p,
-      nextMigrationNumber: () => "20260101000000",
-      setMigrationAssigns: (a: MigrationAssigns) => void (captured = a),
+      constructor: { nextMigrationNumber: () => "20260101000000" },
     };
     const dest = await migrationTemplate(
       host,
-      (a) => `class ${a.migrationClassName} {}`,
+      () => `class ${host.migrationClassName} {}`,
       "db/migrate/create_articles.rb",
     );
     expect(dest).toBe(`${tmpDir}/db/migrate/20260101000000_create_articles.rb`);
-    expect(captured?.migrationClassName).toBe("CreateArticles");
-    expect(fs.readFileSync(dest, "utf-8")).toBe("class CreateArticles {}");
+    expect(host.migrationNumber).toBe("20260101000000");
+    expect(host.migrationFileName).toBe("create_articles");
+    expect(host.migrationClassName).toBe("CreateArticles");
+    expect(fs.readFileSync(dest!, "utf-8")).toBe("class CreateArticles {}");
   });
 });

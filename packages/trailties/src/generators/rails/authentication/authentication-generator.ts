@@ -23,7 +23,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     super(options);
   }
 
-  run(): string[] {
+  async run(): Promise<string[]> {
     if (!this.isTypeScript())
       throw new Error("AuthenticationGenerator currently emits TypeScript only.");
     if (!this.options.api) {
@@ -39,7 +39,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.configureApplicationController();
     this.configureAuthenticationRoutes();
     this.enableBcrypt();
-    this.addMigrations();
+    await this.addMigrations();
     return this.getCreatedFiles();
   }
 
@@ -117,17 +117,17 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.executeCommand(json.packageManager?.split("@")[0] ?? "pnpm", "install --silent");
   }
 
-  private addMigrations(): void {
+  private async addMigrations(): Promise<void> {
     this.generate(
       "migration CreateUsers email_address:string!:uniq password_digest:string! --force",
     );
     this.generate(
       "migration CreateSessions user:references ip_address:string user_agent:string --force",
     );
-    this.runPendingGenerators();
+    await this.runPendingGenerators();
   }
 
-  private runPendingGenerators(): void {
+  private async runPendingGenerators(): Promise<void> {
     for (const { what, args } of this.pendingGenerators.splice(0)) {
       const words = [...what.split(/\s+/), ...args].filter(Boolean);
       if (words.shift() !== "migration") continue;
@@ -136,8 +136,10 @@ export class AuthenticationGenerator extends GeneratorBase {
         output: this.output,
         behavior: this.behavior,
         pretend: this.options.pretend,
+        force: this.options.force || words.includes("--force"),
       });
-      for (const file of generator.run(words[0], words.slice(1))) this.createdFiles.push(file);
+      for (const file of await generator.run(words[0], words.slice(1)))
+        this.createdFiles.push(file);
     }
   }
 }

@@ -1,6 +1,7 @@
 import { File } from "@blazetrails/ruby-compat";
-import { GeneratorBase, GeneratorOptions, migrationTimestamp } from "./base.js";
-import { CreateMigration } from "./actions/create-migration.js";
+import { GeneratorBase, GeneratorOptions } from "./base.js";
+import { migrationTemplate } from "./migration.js";
+import { nextMigrationNumber } from "./active-record/migration.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
 import { Base } from "@blazetrails/activerecord";
 import {
@@ -28,16 +29,19 @@ function kwargs(...options: Array<string | undefined>): string {
   return pairs === "" ? "" : `, { ${pairs.slice(2)} }`;
 }
 
-let lastTimestamp: string | null = null;
-
 export class MigrationGenerator extends GeneratorBase {
+  declare ["constructor"]: typeof MigrationGenerator;
+  migrationNumber = "";
   migrationFileName = "";
+  migrationClassName = "";
 
   constructor(options: GeneratorOptions) {
     super(options);
   }
 
   static exitOnFailure = true;
+
+  static nextMigrationNumber = nextMigrationNumber;
 
   private attributes: GeneratedAttribute[] = [];
   private runOptions: MigrationRunOptions = {};
@@ -46,7 +50,7 @@ export class MigrationGenerator extends GeneratorBase {
   private tableName = "";
   private joinTables: string[] = [];
 
-  run(name: string, args: string[], options: MigrationRunOptions = {}): string[] {
+  async run(name: string, args: string[], options: MigrationRunOptions = {}): Promise<string[]> {
     if (!/^\w+$/.test(name)) {
       throw new Error(
         `Illegal migration name: ${name} (only letters, numbers, and underscores allowed)`,
@@ -57,40 +61,27 @@ export class MigrationGenerator extends GeneratorBase {
     this.attributes = args
       .filter((arg) => !arg.startsWith("-"))
       .map((arg) => GeneratedAttribute.parse(arg));
-    const className = camelize(underscore(name));
     this.setLocalAssignsBang(underscore(name));
     const body =
       this.migrationTemplate === "create_table_migration.rb"
         ? this.createTableMigration()
         : this.migration();
-    let timestamp = migrationTimestamp();
-    if (lastTimestamp && timestamp <= lastTimestamp) {
-      timestamp = (parseInt(lastTimestamp, 10) + 1).toString();
-    }
-    lastTimestamp = timestamp;
-    const ext = this.ext();
-    const filename = `db/migrate/${timestamp}_${underscore(name)}${ext}`;
     const ts = this.isTypeScript();
     const returnType = ts ? ": Promise<void>" : "";
 
-    if (this.behavior === "revoke") {
-      this.migrationFileName = underscore(name);
-      new CreateMigration(this, File.join(this.cwd, filename), "").revoke();
-      return this.getCreatedFiles();
-    }
+    const file = await migrationTemplate(
+      this,
+      () => `import { Migration } from "@blazetrails/activerecord";
 
-    this.createFile(
-      filename,
-      `import { Migration } from "@blazetrails/activerecord";
-
-export class ${className} extends Migration {
+export class ${this.migrationClassName} extends Migration {
   async change()${returnType} {
 ${body}
   }
 }
 `,
+      File.join("db/migrate", `${underscore(name)}${this.ext()}`),
     );
-
+    if (file) this.createdFiles.push(this.relativeToOriginalDestinationRoot(file));
     return this.getCreatedFiles();
   }
 

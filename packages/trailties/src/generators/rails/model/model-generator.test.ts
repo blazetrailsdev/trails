@@ -15,8 +15,8 @@ beforeEach(() => {
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
 describe("ModelGeneratorTest", () => {
-  it("invokes default orm", () => {
-    const files = new ModelGenerator({
+  it("invokes default orm", async () => {
+    const files = await new ModelGenerator({
       cwd: tmpDir,
       output: () => {},
       name: "Post",
@@ -29,14 +29,14 @@ describe("ModelGeneratorTest", () => {
     expect(content).toContain("views!: number;");
   });
 
-  it("plural names are singularized", () => {
+  it("plural names are singularized", async () => {
     const gen = new ModelGenerator({ cwd: tmpDir, output: () => {}, name: "posts" });
-    expect(gen.run()).toContain("app/models/post.ts");
+    expect(await gen.run()).toContain("app/models/post.ts");
   });
 
-  it("model with namespace", () => {
+  it("model with namespace", async () => {
     const gen = new ModelGenerator({ cwd: tmpDir, output: () => {}, name: "admin/user" });
-    const files = gen.run();
+    const files = await gen.run();
     expect(files).toContain("app/models/admin/user.ts");
     expect(fs.readFileSync(path.join(tmpDir, files[0]), "utf-8")).toContain(
       "export class AdminUser extends Base",

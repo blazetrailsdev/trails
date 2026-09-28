@@ -18,13 +18,13 @@ export function generateCommand(): Command {
     .option("--no-test", "Skip test file generation")
     .option("--no-timestamps", "Skip timestamps in migration")
     .action(
-      (
+      async (
         name: string,
         attributes: string[],
         opts: { migration: boolean; test: boolean; timestamps: boolean },
       ) => {
         const gen = new ModelGenerator({ cwd: Dir.pwd(), output: console.log });
-        gen.run(name, attributes, {
+        await gen.run(name, attributes, {
           migration: opts.migration,
           test: opts.test,
           timestamps: opts.timestamps,
@@ -37,9 +37,9 @@ export function generateCommand(): Command {
     .description("Generate a database migration")
     .argument("<name>", "Migration name (e.g. AddEmailToUsers)")
     .argument("[columns...]", "Columns as name:type pairs")
-    .action((name: string, columns: string[]) => {
+    .action(async (name: string, columns: string[]) => {
       const gen = new MigrationGenerator({ cwd: Dir.pwd(), output: console.log });
-      gen.run(name, columns);
+      await gen.run(name, columns);
     });
 
   const registered = new Set(cmd.commands.map((c) => c.name()));

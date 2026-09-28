@@ -14,7 +14,7 @@ import {
   isApplicationRecordClass as coreIsApplicationRecordClass,
   configurations as baseConfigurations,
 } from "./core.js";
-import { IsolatedExecutionState, getEnv, presence } from "@blazetrails/activesupport";
+import { IsolatedExecutionState, TopLevel, getEnv, presence } from "@blazetrails/activesupport";
 import * as ConnectionHandlingModule from "./connection-handling.js";
 import { readingRole, writingRole } from "./active-record.js";
 import { permanentConnectionCheckout } from "./active-record.js";
@@ -482,9 +482,8 @@ export function appendToConnectedToStack(entry: {
   connectedToStack().push(entry);
 }
 
-/** @missingRailsCall Rails.env — PERMANENT */
 export const RAILS_ENV = (): string | undefined =>
-  presence(getEnv("TRAILS_ENV")) ?? presence(getEnv("NODE_ENV"));
+  TopLevel.Trails?.env.toString() ?? presence(getEnv("TRAILS_ENV")) ?? presence(getEnv("NODE_ENV"));
 
 /** @missingRailsCall call — PERMANENT */
 export const DEFAULT_ENV = (): string => RAILS_ENV() || "default_env";

@@ -32,8 +32,8 @@ function readFile(relativePath: string): string {
 }
 
 describe("ScaffoldGeneratorTest", () => {
-  it("scaffold on invoke", () => {
-    const files = makeGen("product_line", [
+  it("scaffold on invoke", async () => {
+    const files = await makeGen("product_line", [
       "title:string",
       "approved:boolean",
       "product:belongs_to",
@@ -72,9 +72,9 @@ describe("ScaffoldGeneratorTest", () => {
 
   it.skip("system tests without attributes", () => {});
 
-  it("scaffold on revoke", () => {
-    makeGen("product_line").run();
-    new ScaffoldGenerator({
+  it("scaffold on revoke", async () => {
+    await makeGen("product_line").run();
+    await new ScaffoldGenerator({
       cwd: tmpDir,
       output: () => {},
       behavior: "revoke",
@@ -120,8 +120,8 @@ describe("ScaffoldGeneratorTest", () => {
 
   it.skip("scaffold generator outputs error message on missing attribute type", () => {});
 
-  it("scaffold generator belongs to and references", () => {
-    const files = makeGen("LineItem", ["product:belongs_to", "cart:references"]).run();
+  it("scaffold generator belongs to and references", async () => {
+    const files = await makeGen("LineItem", ["product:belongs_to", "cart:references"]).run();
     const model = readFile("app/models/line-item.ts");
     expect(model).toContain('this.belongsTo("product")');
     expect(model).toContain('this.belongsTo("cart")');
@@ -132,14 +132,14 @@ describe("ScaffoldGeneratorTest", () => {
     expect(migContent).toContain('t.references("cart"');
   });
 
-  it("scaffold generator attachments", () => {
-    makeGen("Message", ["photos:attachments"]).run();
+  it("scaffold generator attachments", async () => {
+    await makeGen("Message", ["photos:attachments"]).run();
     const model = readFile("app/models/message.ts");
     expect(model).toContain('this.hasManyAttached("photos")');
   });
 
-  it("scaffold generator rich text", () => {
-    makeGen("Message", ["content:rich_text"]).run();
+  it("scaffold generator rich text", async () => {
+    await makeGen("Message", ["content:rich_text"]).run();
     const model = readFile("app/models/message.ts");
     expect(model).toContain('this.hasRichText("content")');
   });
@@ -178,8 +178,8 @@ describe("ScaffoldGeneratorTest (JavaScript project)", () => {
     fs.rmSync(jsTmpDir, { recursive: true, force: true });
   });
 
-  it("generates .js controller and model files", () => {
-    const files = new ScaffoldGenerator({
+  it("generates .js controller and model files", async () => {
+    const files = await new ScaffoldGenerator({
       cwd: jsTmpDir,
       output: (m) => jsLines.push(m),
       name: "Post",
@@ -191,8 +191,8 @@ describe("ScaffoldGeneratorTest (JavaScript project)", () => {
     expect(migFile).toMatch(/\.js$/);
   });
 
-  it("omits TypeScript annotations in controller", () => {
-    new ScaffoldGenerator({
+  it("omits TypeScript annotations in controller", async () => {
+    await new ScaffoldGenerator({
       cwd: jsTmpDir,
       output: (m) => jsLines.push(m),
       name: "Post",

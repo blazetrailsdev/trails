@@ -2,6 +2,7 @@ import { File, FileUtils } from "@blazetrails/ruby-compat";
 import { migrationExists } from "../migration-lookup.js";
 
 export interface CreateMigrationHost {
+  behavior?: "invoke" | "revoke";
   output: (msg: string) => void;
   options: { force?: boolean; skip?: boolean; pretend?: boolean };
   migrationFileName: string;

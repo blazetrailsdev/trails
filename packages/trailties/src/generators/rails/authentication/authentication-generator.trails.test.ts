@@ -18,7 +18,7 @@ const APP_FILES: Record<string, string> = {
 };
 
 describe("AuthenticationGenerator", () => {
-  it("the generated app type-checks under --strict", () => {
+  it("the generated app type-checks under --strict", async () => {
     registerChildProcessAdapter("trailties-auth-strict-test", {
       spawnSync: () => ({ status: 0, signal: null, stdout: "", stderr: "" }),
     });
@@ -30,7 +30,7 @@ describe("AuthenticationGenerator", () => {
         fs.mkdirSync(path.dirname(path.join(appDir, rel)), { recursive: true });
         fs.writeFileSync(path.join(appDir, rel), content);
       }
-      new AuthenticationGenerator({ cwd: appDir, output: () => {} }).run();
+      await new AuthenticationGenerator({ cwd: appDir, output: () => {} }).run();
 
       const configPath = path.join(appDir, "tsconfig.json");
       const program = api

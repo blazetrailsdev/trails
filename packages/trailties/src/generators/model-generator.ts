@@ -1,7 +1,7 @@
 import { GeneratorBase, GeneratorOptions, dasherize } from "./base.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
 import { MigrationGenerator } from "./migration-generator.js";
-import { camelize, classify, singularize, tableize, underscore } from "@blazetrails/activesupport";
+import { camelize, classify, pluralize, singularize, underscore } from "@blazetrails/activesupport";
 
 interface ModelOptions {
   migration?: boolean;
@@ -23,10 +23,12 @@ export class ModelGenerator extends GeneratorBase {
       output: this.output,
       behavior: this.behavior,
       pretend: this.options.pretend,
+      force: this.options.force,
+      skip: this.options.skip,
     });
   }
 
-  run(name: string, args: string[], options: ModelOptions = {}): string[] {
+  async run(name: string, args: string[], options: ModelOptions = {}): Promise<string[]> {
     const {
       migration = true,
       test = true,
@@ -106,10 +108,14 @@ describe("${className}", () => {
         }
       }
 
-      const tableName = camelize(tableize(className));
+      const classPath = singularName.split("/");
+      const tableName = [...classPath.slice(0, -1), pluralize(classPath.at(-1)!)].join("_");
       const migGen = this.createMigrationGenerator();
 
-      const migFiles = migGen.run(`Create${tableName}`, args, { timestamps, primaryKeyType });
+      const migFiles = await migGen.run(`create_${tableName}`, args, {
+        timestamps,
+        primaryKeyType,
+      });
       this.createdFiles.push(...migFiles);
     }
 
