@@ -1,6 +1,7 @@
 import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
 import { MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { Request } from "../../action-dispatch/http/request.js";
+import type { CookieResponse } from "../../action-dispatch/middleware/cookies.js";
 import {
   Response as DispatchResponse,
   ResponseBuffer,
@@ -146,7 +147,7 @@ export class Response extends DispatchResponse {
   protected override beforeCommitted(): void {
     super.beforeCommitted();
     const jar = this.request!.cookieJar();
-    if (!this.committed) jar.write(this);
+    if (!this.committed) jar.write(this as unknown as CookieResponse);
   }
 
   /** @internal */
