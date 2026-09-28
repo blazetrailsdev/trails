@@ -125,7 +125,6 @@ import {
   _processVariant,
   _normalizeOptions,
   processAction as _processAction,
-  render as metalRender,
   renderToString,
 } from "./metal/rendering.js";
 import { _renderToBodyWithRenderer } from "./metal/renderers.js";
@@ -149,6 +148,7 @@ import {
 import {
   DEFAULT_PROTECTED_INSTANCE_VARIABLES,
   DoubleRenderError,
+  render as abstractRender,
   viewAssigns,
   _normalizeArgs,
   _normalizeRender,
@@ -329,10 +329,10 @@ export class Base extends Metal {
   render(...args: unknown[]): void | Promise<void> {
     let renderOutput: void | Promise<void>;
     const viewRuntime = this.cleanupViewRuntime(() =>
-      Benchmark.realtime(
-        ":float_millisecond",
-        () => (renderOutput = metalRender.call(this, ...args)),
-      ),
+      Benchmark.realtime(":float_millisecond", () => {
+        if (this.performed) throw new DoubleRenderError();
+        return (renderOutput = abstractRender.call(this, ...args));
+      }),
     ) as number | Promise<number>;
     if (typeof viewRuntime === "number") {
       this.viewRuntime = viewRuntime;
