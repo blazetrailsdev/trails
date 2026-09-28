@@ -42,7 +42,7 @@ describe("ScaffoldOrmTest", () => {
   it("orm instance returns orm class instance with name", () => {
     const g = generator("Foo");
     const ormInstance = g.ormInstance();
-    expect(ormInstance).toBeInstanceOf(g.ormClass());
+    expect(ormInstance instanceof g.ormClass()).toBeTruthy();
     expect(ormInstance.name).toBe("foo");
   });
 });
