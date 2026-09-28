@@ -1,4 +1,5 @@
 import { DelegationError } from "@blazetrails/activesupport";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 export interface ControllerHelperHost {
   _controller: ControllerLike | null;
@@ -10,7 +11,7 @@ export interface ControllerHelperHost {
 interface ControllerLike {
   request?: unknown;
   config?(): { inheritableCopy(): unknown };
-  defaultFormBuilder?: unknown;
+  defaultFormBuilder?(): unknown;
   logger?: unknown;
   [key: string]: unknown;
 }
@@ -49,10 +50,10 @@ export function assignController(
 ): void {
   this._controller = controller;
   if (controller) {
-    if ("request" in controller) this._request = controller.request;
-    if ("config" in controller) this._config = controller.config!().inheritableCopy();
-    if ("defaultFormBuilder" in controller)
-      this._defaultFormBuilder = controller.defaultFormBuilder;
+    if (rbObjRespondTo(controller, "request")) this._request = controller.request;
+    if (rbObjRespondTo(controller, "config")) this._config = controller.config!().inheritableCopy();
+    if (rbObjRespondTo(controller, "defaultFormBuilder"))
+      this._defaultFormBuilder = controller.defaultFormBuilder!();
   } else {
     this._request ??= null;
     this._config ??= null;
