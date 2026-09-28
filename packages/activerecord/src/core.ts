@@ -43,6 +43,7 @@ import { StatementCache } from "./statement-cache.js";
 import { withConnection } from "./connection-handling.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { classAttribute, included, runCallbacks } from "@blazetrails/activesupport";
+import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 
 export interface Core {
   inspect(): string;
@@ -69,9 +70,14 @@ export const Core = {
       instancePredicate: false,
       default: null,
     });
+    classAttribute.call(base, "defaultConnectionHandler", { instanceWriter: false });
     classAttribute.call(base, "defaultRole", { instanceWriter: false });
+    classAttribute.call(base, "defaultShard", { instanceWriter: false });
 
+    (base as { defaultConnectionHandler: ConnectionHandler }).defaultConnectionHandler =
+      new ConnectionHandler();
     (base as { defaultRole: string }).defaultRole = writingRole();
+    (base as { defaultShard: string }).defaultShard = "default";
   },
 };
 
@@ -331,7 +337,6 @@ interface CoreHost {
   _filterAttributes?: (string | RegExp | ((key: string, value: unknown) => unknown))[];
   _inspectionFilter?: any;
   _connectionClass?: boolean;
-  _connectionHandler?: any;
   _destroyAssociationAsyncJob?: any;
   _findByStatementCache?: Map<boolean, Map<unknown, any>>;
   _generatedAssociationMethods?: Module;
@@ -429,11 +434,7 @@ export function currentShard(this: CoreHost): string {
     if (hash.shard && hash.klasses.includes(connectionClassForSelf.call(this))) return hash.shard;
   }
 
-  return defaultShard.call(this);
-}
-
-export function defaultShard(this: CoreHost): string {
-  return (connectionClassForSelf.call(this) as any)._defaultShard ?? "default";
+  return (this as CoreHost & { defaultShard: string }).defaultShard;
 }
 
 export function currentPreventingWrites(this: CoreHost): boolean {
@@ -605,13 +606,18 @@ export function inspectionFilter(this: CoreHost): ParameterFilter {
   })());
 }
 
-export function connectionHandler(this: CoreHost, value?: any): any {
-  if (value !== undefined) {
-    this._connectionHandler = value;
-    return value;
-  }
-  return this._connectionHandler;
+export function connectionHandler(this: CoreHost): ConnectionHandler {
+  return (
+    IsolatedExecutionState.get<ConnectionHandler>(ACTIVE_RECORD_CONNECTION_HANDLER_KEY) ??
+    (this as CoreHost & { defaultConnectionHandler: ConnectionHandler }).defaultConnectionHandler
+  );
 }
+
+export function setConnectionHandler(this: CoreHost, handler: ConnectionHandler): void {
+  IsolatedExecutionState.set(ACTIVE_RECORD_CONNECTION_HANDLER_KEY, handler);
+}
+
+const ACTIVE_RECORD_CONNECTION_HANDLER_KEY = "active_record_connection_handler";
 
 export function arelTable(this: CoreHost): Table {
   return new Table((this as any).tableName, { klass: this as any });

@@ -10,7 +10,6 @@ import {
   connectedToStack,
   currentRole as coreCurrentRole,
   currentShard as coreCurrentShard,
-  defaultShard,
   isApplicationRecordClass as coreIsApplicationRecordClass,
   configurations as baseConfigurations,
 } from "./core.js";
@@ -71,7 +70,7 @@ export async function connectsTo(
   const shardEntries: Record<string, Record<string, unknown>> = Object.keys(shards).length > 0
     ? shards
     : { default: database };
-  (this as any)._defaultShard = Object.keys(shardEntries)[0];
+  this.defaultShard = Object.keys(shardEntries)[0];
 
   for (const [shard, dbKeys] of Object.entries(shardEntries)) {
     for (const [role, dbKey] of Object.entries(dbKeys)) {
@@ -218,7 +217,7 @@ export function connectingTo(
   this: typeof Base,
   options: { role?: string; shard?: string; preventWrites?: boolean },
 ): void {
-  const { role = writingRole(), shard = defaultShard.call(this) } = options;
+  const { role = writingRole(), shard = this.defaultShard } = options;
   const preventWrites = role === readingRole() || !!options.preventWrites;
   appendToConnectedToStack({
     role,

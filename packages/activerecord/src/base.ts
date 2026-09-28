@@ -597,8 +597,6 @@ export class Base extends Model {
     return _Core.inspectionFilter.call(this);
   }
 
-  /** @internal */
-  static _connectionHandler: ConnectionHandler = new ConnectionHandler();
   static _abstractClass = false;
   static _connectionClass = false;
   declare static automaticScopeInversing: boolean;
@@ -798,6 +796,10 @@ export class Base extends Model {
     return _Core.connectionHandler.call(this);
   }
 
+  static set connectionHandler(handler: ConnectionHandler) {
+    _Core.setConnectionHandler.call(this, handler);
+  }
+
   static async establishConnection(
     configOrEnv?:
       | string
@@ -849,9 +851,6 @@ export class Base extends Model {
   declare static clearCacheBang: typeof ConnectionHandling.clearCacheBang;
   declare static shardKeys: typeof ConnectionHandling.shardKeys;
   declare static isSharded: typeof ConnectionHandling.isSharded;
-  static defaultShard(): string {
-    return _Core.defaultShard.call(this);
-  }
   /** @internal */
   declare static withRoleAndShard: typeof ConnectionHandling.withRoleAndShard;
   /** @internal */
@@ -2048,15 +2047,11 @@ export class Base extends Model {
     this._runCommitCallbacksOnFirstSavedInstancesInTransaction = value;
   }
 
-  static get defaultConnectionHandler(): ConnectionHandler {
-    return this._connectionHandler;
-  }
-
-  static set defaultConnectionHandler(value: ConnectionHandler) {
-    this._connectionHandler = value;
-  }
-
+  declare static defaultConnectionHandler: ConnectionHandler;
+  declare static isDefaultConnectionHandler: () => boolean;
   declare static defaultRole: string;
+  declare static defaultShard: string;
+  declare static isDefaultShard: () => boolean;
 
   static belongsToRequiredByDefault = false;
 

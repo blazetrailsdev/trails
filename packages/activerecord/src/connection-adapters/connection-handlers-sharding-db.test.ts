@@ -58,7 +58,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
       });
     }
     await rm(dbDir, { recursive: true, force: true });
-    (Base as any)._defaultShard = undefined;
+    Base.defaultShard = "default";
     (Base as any).connectionClass = undefined;
   });
 
@@ -488,8 +488,8 @@ describe("ConnectionHandlersShardingDbTest", () => {
       await SomeOtherBase.connectsTo({
         database: { writing: { database: ":memory:", adapter: "sqlite3" } },
       });
-      expect(SecondaryBase.defaultShard()).toBe("not_default");
-      expect(SomeOtherBase.defaultShard()).toBe("default");
+      expect(SecondaryBase.defaultShard).toBe("not_default");
+      expect(SomeOtherBase.defaultShard).toBe("default");
     } finally {
       await Base.connectionHandler.clearAllConnectionsBang();
     }
@@ -506,7 +506,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
     } finally {
       await Base.connectionHandler.clearAllConnectionsBang();
     }
-    expect(ShardedAbstractBase.defaultShard()).toBe("not_default");
+    expect(ShardedAbstractBase.defaultShard).toBe("not_default");
 
     ShardedAbstractBase.connectingTo({ role: "writing" });
     try {
