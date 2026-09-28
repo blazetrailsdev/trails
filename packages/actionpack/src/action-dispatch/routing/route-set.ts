@@ -26,7 +26,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Mapper } from "./mapper.js";
 import { deprecator } from "../deprecator.js";
-import { journeyRecognize as recognizeViaJourney, type JourneyMatch } from "./journey-bridge.js";
 import {
   Router as JourneyRouter,
   type RackishResponse,
@@ -1259,10 +1258,6 @@ export class RouteSet {
     const generator = this.generate(routeName, options, recall);
     const pathInfo = this.pathFor(options, routeName ?? null, []);
     return [URI.parse(pathInfo).path!, Object.keys(except(generator.params, "_recall"))];
-  }
-
-  recognize(method: string, path: string): JourneyMatch | null {
-    return recognizeViaJourney(this.router, method, path);
   }
 
   setDefaultUrlOptions(options: { host?: string }): void {

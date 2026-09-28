@@ -9,7 +9,86 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { assertDeprecated } from "@blazetrails/activesupport";
 import { deprecator } from "../deprecator.js";
 import { IntegrationTest } from "../testing/integration.js";
-import { UrlGenerationError } from "../../action-controller/metal/exceptions.js";
+import { RoutingError, UrlGenerationError } from "../../action-controller/metal/exceptions.js";
+
+class StubController {}
+
+beforeEach(() => {
+  for (const name of [
+    "a",
+    "account",
+    "account/account",
+    "account/subscriptions",
+    "accounts",
+    "admin",
+    "admin/users",
+    "api/tokens",
+    "api/v1/articles",
+    "api/v1/users",
+    "api/v2/articles",
+    "articles",
+    "assets",
+    "attachments",
+    "b",
+    "bar/comments",
+    "bar/posts",
+    "bookmarks",
+    "chat",
+    "clubs",
+    "comments",
+    "companies",
+    "content",
+    "customers",
+    "foo",
+    "foo/bar/baz",
+    "foo/comments",
+    "foo/posts",
+    "forum/products",
+    "global",
+    "goodbye",
+    "google/accounts",
+    "google/secret/infos",
+    "hello",
+    "home",
+    "images",
+    "infos",
+    "internal",
+    "involvements",
+    "journey",
+    "local",
+    "managers",
+    "medical/taxises",
+    "mes",
+    "movies",
+    "my_controller",
+    "openid",
+    "pagemarks",
+    "pages",
+    "participants",
+    "people",
+    "pooh",
+    "posts",
+    "products",
+    "profiles",
+    "projects",
+    "purchases",
+    "replies",
+    "rooms",
+    "search",
+    "sessions",
+    "sheep",
+    "songs",
+    "status",
+    "tasks",
+    "test",
+    "tickets",
+    "todos",
+    "transport/taxis",
+    "users",
+  ]) {
+    controllerConstants.set(name, StubController as unknown as DispatchableControllerClass);
+  }
+});
 
 afterEach(() => {
   controllerConstants.delete("posts");
@@ -23,8 +102,7 @@ async function verifyRedirect(
   return { status, location: (headers as Record<string, string>)["location"] };
 }
 
-const routeSpec = (match: ReturnType<RouteSet["recognize"]>): string =>
-  `${match!.route.defaults.controller}#${match!.route.defaults.action}`;
+const routeSpec = (match: Record<string, unknown>): string => `${match.controller}#${match.action}`;
 
 class EchoParamsController {
   static makeResponseBang(request: Request): Response {
@@ -48,10 +126,9 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.delete("/logout", { to: "sessions#destroy", as: "logout" });
     });
-    const m = routes.recognize("DELETE", "/logout");
-    expect(m).not.toBeNull();
-    expect(m!.route.defaults.controller).toBe("sessions");
-    expect(m!.route.defaults.action).toBe("destroy");
+    const m = routes.recognizePath("/logout", { method: "delete" });
+    expect(m.controller).toBe("sessions");
+    expect(m.action).toBe("destroy");
     expect(routes.pathFor({}, "logout")).toBe("/logout");
   });
 
@@ -61,10 +138,10 @@ describe("TestRoutingMapper", () => {
       r.get("/login", { to: "sessions#new", as: "login" });
       r.post("/login", { to: "sessions#create" });
     });
-    const getM = routes.recognize("GET", "/login");
-    expect(getM!.route.defaults.action).toBe("new");
-    const postM = routes.recognize("POST", "/login");
-    expect(postM!.route.defaults.action).toBe("create");
+    const getM = routes.recognizePath("/login");
+    expect(getM.action).toBe("new");
+    const postM = routes.recognizePath("/login", { method: "post" });
+    expect(postM.action).toBe("create");
     expect(routes.pathFor({}, "login")).toBe("/login");
   });
 
@@ -74,13 +151,13 @@ describe("TestRoutingMapper", () => {
       r.resource("session");
     });
 
-    expect(routes.recognize("GET", "/session")!.route.defaults.action).toBe("show");
-    expect(routes.recognize("POST", "/session")!.route.defaults.action).toBe("create");
-    expect(routes.recognize("PUT", "/session")!.route.defaults.action).toBe("update");
-    expect(routes.recognize("PATCH", "/session")!.route.defaults.action).toBe("update");
-    expect(routes.recognize("DELETE", "/session")!.route.defaults.action).toBe("destroy");
-    expect(routes.recognize("GET", "/session/new")!.route.defaults.action).toBe("new");
-    expect(routes.recognize("GET", "/session/edit")!.route.defaults.action).toBe("edit");
+    expect(routes.recognizePath("/session").action).toBe("show");
+    expect(routes.recognizePath("/session", { method: "post" }).action).toBe("create");
+    expect(routes.recognizePath("/session", { method: "put" }).action).toBe("update");
+    expect(routes.recognizePath("/session", { method: "patch" }).action).toBe("update");
+    expect(routes.recognizePath("/session", { method: "delete" }).action).toBe("destroy");
+    expect(routes.recognizePath("/session/new").action).toBe("new");
+    expect(routes.recognizePath("/session/edit").action).toBe("edit");
 
     expect(routes.pathFor({}, "session")).toBe("/session");
     expect(routes.pathFor({}, "new_session")).toBe("/session/new");
@@ -93,14 +170,14 @@ describe("TestRoutingMapper", () => {
       r.resources("projects");
     });
 
-    expect(routes.recognize("GET", "/projects")!.route.defaults.action).toBe("index");
-    expect(routes.recognize("GET", "/projects/new")!.route.defaults.action).toBe("new");
-    expect(routes.recognize("POST", "/projects")!.route.defaults.action).toBe("create");
-    expect(routes.recognize("GET", "/projects/1")!.route.defaults.action).toBe("show");
-    expect(routes.recognize("GET", "/projects/1/edit")!.route.defaults.action).toBe("edit");
-    expect(routes.recognize("PUT", "/projects/1")!.route.defaults.action).toBe("update");
-    expect(routes.recognize("PATCH", "/projects/1")!.route.defaults.action).toBe("update");
-    expect(routes.recognize("DELETE", "/projects/1")!.route.defaults.action).toBe("destroy");
+    expect(routes.recognizePath("/projects").action).toBe("index");
+    expect(routes.recognizePath("/projects/new").action).toBe("new");
+    expect(routes.recognizePath("/projects", { method: "post" }).action).toBe("create");
+    expect(routes.recognizePath("/projects/1").action).toBe("show");
+    expect(routes.recognizePath("/projects/1/edit").action).toBe("edit");
+    expect(routes.recognizePath("/projects/1", { method: "put" }).action).toBe("update");
+    expect(routes.recognizePath("/projects/1", { method: "patch" }).action).toBe("update");
+    expect(routes.recognizePath("/projects/1", { method: "delete" }).action).toBe("destroy");
 
     expect(routes.pathFor({}, "projects")).toBe("/projects");
     expect(routes.pathFor({}, "new_project")).toBe("/projects/new");
@@ -116,8 +193,8 @@ describe("TestRoutingMapper", () => {
       });
     });
 
-    expect(routes.recognize("GET", "/admin/users")!.route.defaults.action).toBe("index");
-    expect(routes.recognize("GET", "/admin/users/1")!.route.defaults.action).toBe("show");
+    expect(routes.recognizePath("/admin/users").action).toBe("index");
+    expect(routes.recognizePath("/admin/users/1").action).toBe("show");
     expect(routes.pathFor({}, "admin_users")).toBe("/admin/users");
     expect(routes.pathFor({ id: 1 }, "admin_user")).toBe("/admin/users/1");
   });
@@ -127,10 +204,9 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.root("pages#home");
     });
-    const m = routes.recognize("GET", "/");
-    expect(m).not.toBeNull();
-    expect(m!.route.defaults.controller).toBe("pages");
-    expect(m!.route.defaults.action).toBe("home");
+    const m = routes.recognizePath("/");
+    expect(m.controller).toBe("pages");
+    expect(m.action).toBe("home");
     expect(routes.pathFor({}, "root")).toBe("/");
   });
 
@@ -141,7 +217,7 @@ describe("TestRoutingMapper", () => {
         r.get("/status", { to: "status#show", as: "status" });
       });
     });
-    expect(routes.recognize("GET", "/api/status")).not.toBeNull();
+    expect(() => routes.recognizePath("/api/status")).not.toThrow();
     expect(routes.pathFor({}, "api_status")).toBe("/api/status");
   });
 
@@ -154,7 +230,7 @@ describe("TestRoutingMapper", () => {
         });
       });
     });
-    expect(routes.recognize("GET", "/api/v1/articles")!.route.defaults.action).toBe("index");
+    expect(routes.recognizePath("/api/v1/articles").action).toBe("index");
     expect(routes.pathFor({}, "api_v1_articles")).toBe("/api/v1/articles");
     expect(routes.pathFor({ id: 5 }, "api_v1_article")).toBe("/api/v1/articles/5");
   });
@@ -166,10 +242,9 @@ describe("TestRoutingMapper", () => {
         r.resources("comments");
       });
     });
-    const m = routes.recognize("GET", "/posts/3/comments/7");
-    expect(m).not.toBeNull();
-    expect(m!.route.defaults.controller).toBe("comments");
-    expect(m!.route.defaults.action).toBe("show");
+    const m = routes.recognizePath("/posts/3/comments/7");
+    expect(m.controller).toBe("comments");
+    expect(m.action).toBe("show");
   });
 
   it("match with multiple via", () => {
@@ -177,9 +252,9 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.match("/search", { to: "search#index", via: ["GET", "POST"], as: "search" });
     });
-    expect(routes.recognize("GET", "/search")).not.toBeNull();
-    expect(routes.recognize("POST", "/search")).not.toBeNull();
-    expect(routes.recognize("DELETE", "/search")).toBeNull();
+    expect(() => routes.recognizePath("/search")).not.toThrow();
+    expect(() => routes.recognizePath("/search", { method: "post" })).not.toThrow();
+    expect(() => routes.recognizePath("/search", { method: "delete" })).toThrow(RoutingError);
   });
 
   it("multiple draw calls append routes", () => {
@@ -190,8 +265,8 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/b", { to: "b#index" });
     });
-    expect(routes.recognize("GET", "/a")).not.toBeNull();
-    expect(routes.recognize("GET", "/b")).not.toBeNull();
+    expect(() => routes.recognizePath("/a")).not.toThrow();
+    expect(() => routes.recognizePath("/b")).not.toThrow();
   });
 
   it("constraints on dynamic segments", () => {
@@ -199,8 +274,8 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", as: "post", constraints: { id: /\d+/ } });
     });
-    expect(routes.recognize("GET", "/posts/42")).not.toBeNull();
-    expect(routes.recognize("GET", "/posts/abc")).toBeNull();
+    expect(() => routes.recognizePath("/posts/42")).not.toThrow();
+    expect(() => routes.recognizePath("/posts/abc")).toThrow(RoutingError);
   });
 
   it("named routes", () => {
@@ -251,6 +326,7 @@ describe("TestRoutingMapper", () => {
   });
 
   it("sets action_dispatch.request.path_parameters", async () => {
+    controllerConstants.delete("posts");
     const routes = new RouteSet();
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show" });
@@ -271,11 +347,11 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resource("session", { except: ["new", "edit"] });
     });
-    expect(routes.recognize("GET", "/session")!.route.defaults.action).toBe("show");
-    expect(routes.recognize("POST", "/session")!.route.defaults.action).toBe("create");
-    expect(routes.recognize("DELETE", "/session")!.route.defaults.action).toBe("destroy");
-    expect(routes.recognize("GET", "/session/new")).toBeNull();
-    expect(routes.recognize("GET", "/session/edit")).toBeNull();
+    expect(routes.recognizePath("/session").action).toBe("show");
+    expect(routes.recognizePath("/session", { method: "post" }).action).toBe("create");
+    expect(routes.recognizePath("/session", { method: "delete" }).action).toBe("destroy");
+    expect(() => routes.recognizePath("/session/new")).toThrow(RoutingError);
+    expect(() => routes.recognizePath("/session/edit")).toThrow(RoutingError);
   });
 
   it("resource routes with only and except", () => {
@@ -283,12 +359,12 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resource("post", { only: ["show", "update", "destroy"] });
     });
-    expect(routes.recognize("GET", "/post")!.route.defaults.action).toBe("show");
-    expect(routes.recognize("PUT", "/post")!.route.defaults.action).toBe("update");
-    expect(routes.recognize("DELETE", "/post")!.route.defaults.action).toBe("destroy");
-    expect(routes.recognize("POST", "/post")).toBeNull();
-    expect(routes.recognize("GET", "/post/new")).toBeNull();
-    expect(routes.recognize("GET", "/post/edit")).toBeNull();
+    expect(routes.recognizePath("/post").action).toBe("show");
+    expect(routes.recognizePath("/post", { method: "put" }).action).toBe("update");
+    expect(routes.recognizePath("/post", { method: "delete" }).action).toBe("destroy");
+    expect(() => routes.recognizePath("/post", { method: "post" })).toThrow(RoutingError);
+    expect(() => routes.recognizePath("/post/new")).toThrow(RoutingError);
+    expect(() => routes.recognizePath("/post/edit")).toThrow(RoutingError);
   });
 
   it("resource routes only create update destroy", () => {
@@ -296,10 +372,10 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resource("profile", { only: ["create", "update", "destroy"] });
     });
-    expect(routes.recognize("POST", "/profile")!.route.defaults.action).toBe("create");
-    expect(routes.recognize("PUT", "/profile")!.route.defaults.action).toBe("update");
-    expect(routes.recognize("DELETE", "/profile")!.route.defaults.action).toBe("destroy");
-    expect(routes.recognize("GET", "/profile")).toBeNull();
+    expect(routes.recognizePath("/profile", { method: "post" }).action).toBe("create");
+    expect(routes.recognizePath("/profile", { method: "put" }).action).toBe("update");
+    expect(routes.recognizePath("/profile", { method: "delete" }).action).toBe("destroy");
+    expect(() => routes.recognizePath("/profile")).toThrow(RoutingError);
   });
 
   it("resources routes only create update destroy", () => {
@@ -307,11 +383,11 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resources("products", { only: ["create", "update", "destroy"] });
     });
-    expect(routes.recognize("POST", "/products")!.route.defaults.action).toBe("create");
-    expect(routes.recognize("PUT", "/products/1")!.route.defaults.action).toBe("update");
-    expect(routes.recognize("DELETE", "/products/1")!.route.defaults.action).toBe("destroy");
-    expect(routes.recognize("GET", "/products")).toBeNull();
-    expect(routes.recognize("GET", "/products/1")).toBeNull();
+    expect(routes.recognizePath("/products", { method: "post" }).action).toBe("create");
+    expect(routes.recognizePath("/products/1", { method: "put" }).action).toBe("update");
+    expect(routes.recognizePath("/products/1", { method: "delete" }).action).toBe("destroy");
+    expect(() => routes.recognizePath("/products")).toThrow(RoutingError);
+    expect(() => routes.recognizePath("/products/1")).toThrow(RoutingError);
   });
 
   it("projects involvements (nested resources)", () => {
@@ -322,16 +398,15 @@ describe("TestRoutingMapper", () => {
         r.resources("attachments");
       });
     });
-    const m = routes.recognize("GET", "/projects/1/involvements");
-    expect(m).not.toBeNull();
-    expect(m!.route.defaults.controller).toBe("involvements");
-    expect(m!.route.defaults.action).toBe("index");
+    const m = routes.recognizePath("/projects/1/involvements");
+    expect(m.controller).toBe("involvements");
+    expect(m.action).toBe("index");
 
-    const m2 = routes.recognize("GET", "/projects/1/involvements/2");
-    expect(m2!.route.defaults.action).toBe("show");
+    const m2 = routes.recognizePath("/projects/1/involvements/2");
+    expect(m2.action).toBe("show");
 
-    const m3 = routes.recognize("GET", "/projects/1/attachments");
-    expect(m3!.route.defaults.controller).toBe("attachments");
+    const m3 = routes.recognizePath("/projects/1/attachments");
+    expect(m3.controller).toBe("attachments");
   });
 
   it("projects attachments", () => {
@@ -341,9 +416,7 @@ describe("TestRoutingMapper", () => {
         r.resources("attachments");
       });
     });
-    expect(routes.recognize("GET", "/projects/1/attachments")!.route.defaults.controller).toBe(
-      "attachments",
-    );
+    expect(routes.recognizePath("/projects/1/attachments").controller).toBe("attachments");
   });
 
   it("openid", () => {
@@ -351,8 +424,8 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.match("openid/login", { to: "openid#login", via: ["GET", "POST"] });
     });
-    expect(routes.recognize("GET", "/openid/login")!.route.defaults.controller).toBe("openid");
-    expect(routes.recognize("POST", "/openid/login")!.route.defaults.controller).toBe("openid");
+    expect(routes.recognizePath("/openid/login").controller).toBe("openid");
+    expect(routes.recognizePath("/openid/login", { method: "post" }).controller).toBe("openid");
   });
 
   it("namespace with options", () => {
@@ -364,7 +437,7 @@ describe("TestRoutingMapper", () => {
         });
       });
     });
-    expect(routes.recognize("GET", "/api/v1/users")!.route.defaults.action).toBe("index");
+    expect(routes.recognizePath("/api/v1/users").action).toBe("index");
     expect(routes.pathFor({}, "api_v1_users")).toBe("/api/v1/users");
   });
 
@@ -377,7 +450,7 @@ describe("TestRoutingMapper", () => {
         });
       });
     });
-    expect(routes.recognize("GET", "/api/v2/articles")!.route.defaults.action).toBe("index");
+    expect(routes.recognizePath("/api/v2/articles").action).toBe("index");
     expect(routes.pathFor({}, "api_v2_articles")).toBe("/api/v2/articles");
   });
 
@@ -388,7 +461,7 @@ describe("TestRoutingMapper", () => {
         r.root("account#index");
       });
     });
-    expect(routes.recognize("GET", "/account")!.route.defaults.action).toBe("index");
+    expect(routes.recognizePath("/account").action).toBe("index");
     expect(routes.pathFor({}, "account_root")).toBe("/account");
   });
 
@@ -427,9 +500,9 @@ describe("TestRoutingMapper", () => {
         r.resources("posts");
       });
     });
-    expect(routes.recognize("GET", "/projects/1/posts")!.route.defaults.controller).toBe("posts");
-    expect(routes.recognize("GET", "/projects/1/posts/2")!.route.defaults.action).toBe("show");
-    expect(routes.recognize("POST", "/projects/1/posts")!.route.defaults.action).toBe("create");
+    expect(routes.recognizePath("/projects/1/posts").controller).toBe("posts");
+    expect(routes.recognizePath("/projects/1/posts/2").action).toBe("show");
+    expect(routes.recognizePath("/projects/1/posts", { method: "post" }).action).toBe("create");
   });
 
   it("root works in the resources scope", () => {
@@ -439,7 +512,7 @@ describe("TestRoutingMapper", () => {
         r.root({ to: "products#root" });
       });
     });
-    expect(routeSpec(routes.recognize("GET", "/products"))).toBe("products#root");
+    expect(routeSpec(routes.recognizePath("/products"))).toBe("products#root");
     expect(routes.pathFor({}, "products_root")).toBe("/products");
   });
 
@@ -450,7 +523,7 @@ describe("TestRoutingMapper", () => {
         r.resource("token");
       });
     });
-    expect(routes.recognize("GET", "/token")!.route.defaults.action).toBe("show");
+    expect(routes.recognizePath("/token").action).toBe("show");
     expect(routes.pathFor({}, "token")).toBe("/token");
   });
 
@@ -461,7 +534,7 @@ describe("TestRoutingMapper", () => {
         r.resource("me");
       });
     });
-    expect(routes.recognize("GET", "/api/me")!.route.defaults.action).toBe("show");
+    expect(routes.recognizePath("/api/me").action).toBe("show");
     expect(routes.pathFor({}, "me")).toBe("/api/me");
   });
 
@@ -480,7 +553,7 @@ describe("TestRoutingMapper", () => {
         r.resources("comments");
       });
     });
-    expect(routes.recognize("GET", "/posts/1/comments")).not.toBeNull();
+    expect(() => routes.recognizePath("/posts/1/comments")).not.toThrow();
   });
 
   it("index", () => {
@@ -489,8 +562,8 @@ describe("TestRoutingMapper", () => {
       r.get("/info", { to: "projects#info", as: "info" });
     });
     expect(routes.pathFor({}, "info")).toBe("/info");
-    expect(routes.recognize("GET", "/info")!.route.defaults.controller).toBe("projects");
-    expect(routes.recognize("GET", "/info")!.route.defaults.action).toBe("info");
+    expect(routes.recognizePath("/info").controller).toBe("projects");
+    expect(routes.recognizePath("/info").action).toBe("info");
   });
 
   it("normalize namespaced matches", () => {
@@ -501,10 +574,9 @@ describe("TestRoutingMapper", () => {
       });
     });
     expect(routes.pathFor({}, "account_description")).toBe("/account/description");
-    const m = routes.recognize("GET", "/account/description");
-    expect(m).not.toBeNull();
-    expect(m!.route.defaults.controller).toBe("account");
-    expect(m!.route.defaults.action).toBe("description");
+    const m = routes.recognizePath("/account/description");
+    expect(m.controller).toBe("account");
+    expect(m.action).toBe("description");
   });
 
   it("session info nested singleton resource", () => {
@@ -514,7 +586,7 @@ describe("TestRoutingMapper", () => {
         r.resource("info");
       });
     });
-    expect(routes.recognize("GET", "/session/info")!.route.defaults.action).toBe("show");
+    expect(routes.recognizePath("/session/info").action).toBe("show");
   });
 
   it("member on resource", () => {
@@ -527,13 +599,11 @@ describe("TestRoutingMapper", () => {
         });
       });
     });
-    const putM = routes.recognize("PUT", "/replies/1/answer");
-    expect(putM).not.toBeNull();
-    expect(putM!.route.defaults.action).toBe("mark_as_answer");
+    const putM = routes.recognizePath("/replies/1/answer", { method: "put" });
+    expect(putM.action).toBe("mark_as_answer");
 
-    const delM = routes.recognize("DELETE", "/replies/1/answer");
-    expect(delM).not.toBeNull();
-    expect(delM!.route.defaults.action).toBe("unmark_as_answer");
+    const delM = routes.recognizePath("/replies/1/answer", { method: "delete" });
+    expect(delM.action).toBe("unmark_as_answer");
   });
 
   it("replies", () => {
@@ -546,10 +616,10 @@ describe("TestRoutingMapper", () => {
         });
       });
     });
-    expect(routes.recognize("PUT", "/replies/1/answer")!.route.defaults.action).toBe(
+    expect(routes.recognizePath("/replies/1/answer", { method: "put" }).action).toBe(
       "mark_as_answer",
     );
-    expect(routes.recognize("DELETE", "/replies/1/answer")!.route.defaults.action).toBe(
+    expect(routes.recognizePath("/replies/1/answer", { method: "delete" }).action).toBe(
       "unmark_as_answer",
     );
   });
@@ -561,12 +631,8 @@ describe("TestRoutingMapper", () => {
         r.resources("participants");
       });
     });
-    expect(routes.recognize("GET", "/projects/1/participants")!.route.defaults.controller).toBe(
-      "participants",
-    );
-    expect(routes.recognize("GET", "/projects/1/participants/2")!.route.defaults.action).toBe(
-      "show",
-    );
+    expect(routes.recognizePath("/projects/1/participants").controller).toBe("participants");
+    expect(routes.recognizePath("/projects/1/participants/2").action).toBe("show");
   });
 
   it("projects companies", () => {
@@ -576,10 +642,8 @@ describe("TestRoutingMapper", () => {
         r.resources("companies");
       });
     });
-    expect(routes.recognize("GET", "/projects/1/companies")!.route.defaults.controller).toBe(
-      "companies",
-    );
-    expect(routes.recognize("GET", "/projects/1/companies/2")!.route.defaults.action).toBe("show");
+    expect(routes.recognizePath("/projects/1/companies").controller).toBe("companies");
+    expect(routes.recognizePath("/projects/1/companies/2").action).toBe("show");
   });
 
   it("project manager", () => {
@@ -589,7 +653,7 @@ describe("TestRoutingMapper", () => {
         r.resource("manager");
       });
     });
-    expect(routes.recognize("GET", "/projects/1/manager")!.route.defaults.action).toBe("show");
+    expect(routes.recognizePath("/projects/1/manager").action).toBe("show");
   });
 
   it("project images", () => {
@@ -599,9 +663,9 @@ describe("TestRoutingMapper", () => {
         r.resources("images");
       });
     });
-    expect(routes.recognize("GET", "/projects/1/images")!.route.defaults.controller).toBe("images");
-    expect(routes.recognize("GET", "/projects/1/images/2")!.route.defaults.action).toBe("show");
-    expect(routes.recognize("POST", "/projects/1/images")!.route.defaults.action).toBe("create");
+    expect(routes.recognizePath("/projects/1/images").controller).toBe("images");
+    expect(routes.recognizePath("/projects/1/images/2").action).toBe("show");
+    expect(routes.recognizePath("/projects/1/images", { method: "post" }).action).toBe("create");
   });
 
   it("projects people", () => {
@@ -611,8 +675,8 @@ describe("TestRoutingMapper", () => {
         r.resources("people");
       });
     });
-    expect(routes.recognize("GET", "/projects/1/people")!.route.defaults.controller).toBe("people");
-    expect(routes.recognize("GET", "/projects/1/people/2")!.route.defaults.action).toBe("show");
+    expect(routes.recognizePath("/projects/1/people").controller).toBe("people");
+    expect(routes.recognizePath("/projects/1/people/2").action).toBe("show");
   });
 
   it("account namespace", () => {
@@ -622,7 +686,7 @@ describe("TestRoutingMapper", () => {
         r.resources("subscriptions");
       });
     });
-    expect(routes.recognize("GET", "/account/subscriptions")!.route.defaults.action).toBe("index");
+    expect(routes.recognizePath("/account/subscriptions").action).toBe("index");
     expect(routes.pathFor({}, "account_subscriptions")).toBe("/account/subscriptions");
     expect(routes.pathFor({ id: 1 }, "account_subscription")).toBe("/account/subscriptions/1");
   });
@@ -632,8 +696,8 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resources("products", { constraints: { id: /\d{4}/ } });
     });
-    expect(routes.recognize("GET", "/products/1234")!.route.defaults.action).toBe("show");
-    expect(routes.recognize("GET", "/products/abc")).toBeNull();
+    expect(routes.recognizePath("/products/1234").action).toBe("show");
+    expect(() => routes.recognizePath("/products/abc")).toThrow(RoutingError);
   });
 
   it("url generator for generic route", () => {
@@ -641,7 +705,7 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("whatever/:controller/:action", { to: "foo#bar" });
     });
-    expect(routes.recognize("GET", "/whatever/foo/bar")).not.toBeNull();
+    expect(() => routes.recognizePath("/whatever/foo/bar")).not.toThrow();
   });
 
   it("url generator for namespaced generic route", () => {
@@ -649,8 +713,8 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("whatever/:controller/:action/:id", { to: "foo#bar", constraints: { id: /\d+/ } });
     });
-    expect(routes.recognize("GET", "/whatever/foo/show/1")).not.toBeNull();
-    expect(routes.recognize("GET", "/whatever/foo/show/abc")).toBeNull();
+    expect(() => routes.recognizePath("/whatever/foo/show/1")).not.toThrow();
+    expect(() => routes.recognizePath("/whatever/foo/show/abc")).toThrow(RoutingError);
   });
 
   it("resources merges options from scope", () => {
@@ -660,11 +724,11 @@ describe("TestRoutingMapper", () => {
         r.resources("images", { only: ["index"] });
       });
     });
-    expect(routes.recognize("GET", "/products")).not.toBeNull();
-    expect(routes.recognize("GET", "/products/1")).not.toBeNull();
-    expect(routes.recognize("GET", "/products/1/edit")).toBeNull();
-    expect(routes.recognize("POST", "/products")).toBeNull();
-    expect(routes.recognize("GET", "/products/1/images")).not.toBeNull();
+    expect(() => routes.recognizePath("/products")).not.toThrow();
+    expect(() => routes.recognizePath("/products/1")).not.toThrow();
+    expect(() => routes.recognizePath("/products/1/edit")).toThrow(RoutingError);
+    expect(() => routes.recognizePath("/products", { method: "post" })).toThrow(RoutingError);
+    expect(() => routes.recognizePath("/products/1/images")).not.toThrow();
   });
 
   it("resource merges options from scope", () => {
@@ -672,9 +736,9 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resource("account", { only: ["show"] });
     });
-    expect(routes.recognize("GET", "/account")!.route.defaults.action).toBe("show");
-    expect(routes.recognize("GET", "/account/new")).toBeNull();
-    expect(routes.recognize("GET", "/account/edit")).toBeNull();
+    expect(routes.recognizePath("/account").action).toBe("show");
+    expect(() => routes.recognizePath("/account/new")).toThrow(RoutingError);
+    expect(() => routes.recognizePath("/account/edit")).toThrow(RoutingError);
   });
 
   it("resource merges options from scope hash", () => {
@@ -682,8 +746,8 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resource("account", { only: ["show"] });
     });
-    expect(routes.recognize("GET", "/account")!.route.defaults.action).toBe("show");
-    expect(routes.recognize("GET", "/account/new")).toBeNull();
+    expect(routes.recognizePath("/account").action).toBe("show");
+    expect(() => routes.recognizePath("/account/new")).toThrow(RoutingError);
   });
 
   it("match without via", () => {
@@ -700,7 +764,7 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", constraints: { id: /\d+?/ } });
     });
-    expect(routes.recognize("GET", "/posts/1")).not.toBeNull();
+    expect(() => routes.recognizePath("/posts/1")).not.toThrow();
   });
 
   it("default string params", () => {
@@ -708,7 +772,7 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/posts", { to: "posts#index", defaults: { format: "json" } });
     });
-    expect(routes.recognize("GET", "/posts")!.route.defaults.format).toBe("json");
+    expect(routes.recognizePath("/posts").format).toBe("json");
   });
 
   it("default integer params", () => {
@@ -716,7 +780,7 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/posts", { to: "posts#index", defaults: { page: "1" } });
     });
-    expect(routes.recognize("GET", "/posts")!.route.defaults.page).toBe("1");
+    expect(routes.recognizePath("/posts").page).toBe("1");
   });
 
   it("symbol scope", () => {
@@ -728,7 +792,7 @@ describe("TestRoutingMapper", () => {
         });
       });
     });
-    expect(routes.recognize("GET", "/api/v2/me")!.route.defaults.action).toBe("show");
+    expect(routes.recognizePath("/api/v2/me").action).toBe("show");
   });
 
   it("update person route", () => {
@@ -736,8 +800,8 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resources("people");
     });
-    expect(routes.recognize("PUT", "/people/1")!.route.defaults.action).toBe("update");
-    expect(routes.recognize("PATCH", "/people/1")!.route.defaults.action).toBe("update");
+    expect(routes.recognizePath("/people/1", { method: "put" }).action).toBe("update");
+    expect(routes.recognizePath("/people/1", { method: "patch" }).action).toBe("update");
   });
 
   it("update project person", () => {
@@ -747,7 +811,7 @@ describe("TestRoutingMapper", () => {
         r.resources("people");
       });
     });
-    expect(routes.recognize("PUT", "/projects/1/people/2")!.route.defaults.action).toBe("update");
+    expect(routes.recognizePath("/projects/1/people/2", { method: "put" }).action).toBe("update");
   });
 
   it("forum products", () => {
@@ -757,7 +821,7 @@ describe("TestRoutingMapper", () => {
         r.resources("products");
       });
     });
-    expect(routes.recognize("GET", "/forum/products")!.route.defaults.action).toBe("index");
+    expect(routes.recognizePath("/forum/products").action).toBe("index");
     expect(routes.pathFor({}, "forum_products")).toBe("/forum/products");
   });
 
@@ -766,7 +830,7 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resources("articles");
     });
-    expect(routes.recognize("GET", "/articles/1")!.route.defaults.action).toBe("show");
+    expect(routes.recognizePath("/articles/1").action).toBe("show");
     expect(routes.pathFor({ id: 1 }, "article")).toBe("/articles/1");
   });
 
@@ -775,8 +839,8 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resources("articles", { constraints: { id: /\d+/ } });
     });
-    expect(routes.recognize("GET", "/articles/42")!.route.defaults.action).toBe("show");
-    expect(routes.recognize("GET", "/articles/abc")).toBeNull();
+    expect(routes.recognizePath("/articles/42").action).toBe("show");
+    expect(() => routes.recognizePath("/articles/abc")).toThrow(RoutingError);
   });
 
   it("appending routes", () => {
@@ -787,9 +851,9 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/goodbye", { to: "goodbye#index" });
     });
-    expect(routes.recognize("GET", "/hello")).not.toBeNull();
-    expect(routes.recognize("GET", "/goodbye")).not.toBeNull();
-    expect(routes.recognize("GET", "/random")).toBeNull();
+    expect(() => routes.recognizePath("/hello")).not.toThrow();
+    expect(() => routes.recognizePath("/goodbye")).not.toThrow();
+    expect(() => routes.recognizePath("/random")).toThrow(RoutingError);
   });
 
   it("controller option with nesting and leading slash", () => {
@@ -801,7 +865,7 @@ describe("TestRoutingMapper", () => {
         });
       });
     });
-    expect(routes.recognize("GET", "/foo/bar/baz")!.route.defaults.action).toBe("index");
+    expect(routes.recognizePath("/foo/bar/baz").action).toBe("index");
   });
 
   it("multiple nested controller", () => {
@@ -814,8 +878,8 @@ describe("TestRoutingMapper", () => {
       });
       r.get("pooh", { to: "pooh#index" });
     });
-    expect(routes.recognize("GET", "/foo/bar/baz")).not.toBeNull();
-    expect(routes.recognize("GET", "/pooh")).not.toBeNull();
+    expect(() => routes.recognizePath("/foo/bar/baz")).not.toThrow();
+    expect(() => routes.recognizePath("/pooh")).not.toThrow();
   });
 
   it("sprockets", () => {
@@ -823,7 +887,7 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/assets/*path", { to: "assets#show", as: "asset" });
     });
-    expect(routes.recognize("GET", "/assets/application.js")).not.toBeNull();
+    expect(() => routes.recognizePath("/assets/application.js")).not.toThrow();
     expect(routes.pathFor({ path: "application.js" }, "asset")).toBe("/assets/application.js");
   });
 
@@ -832,7 +896,7 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/projects/status", { to: "projects#status" });
     });
-    expect(routes.recognize("GET", "/projects/status")!.route.defaults.action).toBe("status");
+    expect(routes.recognizePath("/projects/status").action).toBe("status");
   });
 
   it("access token rooms", () => {
@@ -842,9 +906,7 @@ describe("TestRoutingMapper", () => {
         r.resources("rooms");
       });
     });
-    expect(routes.recognize("GET", "/access_tokens/1/rooms")!.route.defaults.controller).toBe(
-      "rooms",
-    );
+    expect(routes.recognizePath("/access_tokens/1/rooms").controller).toBe("rooms");
   });
 
   it("resources controller name is not pluralized", () => {
@@ -852,7 +914,7 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resources("content");
     });
-    expect(routes.recognize("GET", "/content")!.route.defaults.controller).toBe("content");
+    expect(routes.recognizePath("/content").controller).toBe("content");
   });
 
   it("resources are not pluralized", () => {
@@ -862,13 +924,13 @@ describe("TestRoutingMapper", () => {
         r.resources("taxis");
       });
     });
-    expect(routes.recognize("GET", "/transport/taxis")!.route.defaults.action).toBe("index");
+    expect(routes.recognizePath("/transport/taxis").action).toBe("index");
     expect(routes.pathFor({}, "transport_taxis")).toBe("/transport/taxis");
-    expect(routes.recognize("GET", "/transport/taxis/1")!.route.defaults.action).toBe("show");
+    expect(routes.recognizePath("/transport/taxis/1").action).toBe("show");
     expect(routes.pathFor({ id: 1 }, "transport_taxi")).toBe("/transport/taxis/1");
-    expect(routes.recognize("GET", "/transport/taxis/new")!.route.defaults.action).toBe("new");
+    expect(routes.recognizePath("/transport/taxis/new").action).toBe("new");
     expect(routes.pathFor({}, "transport_new_taxi")).toBe("/transport/taxis/new");
-    expect(routes.recognize("GET", "/transport/taxis/1/edit")!.route.defaults.action).toBe("edit");
+    expect(routes.recognizePath("/transport/taxis/1/edit").action).toBe("edit");
     expect(routes.pathFor({ id: 1 }, "transport_edit_taxi")).toBe("/transport/taxis/1/edit");
   });
 
@@ -879,10 +941,10 @@ describe("TestRoutingMapper", () => {
         r.resource("taxis");
       });
     });
-    expect(routes.recognize("GET", "/medical/taxis")!.route.defaults.action).toBe("show");
-    expect(routes.recognize("POST", "/medical/taxis")!.route.defaults.action).toBe("create");
-    expect(routes.recognize("GET", "/medical/taxis/new")!.route.defaults.action).toBe("new");
-    expect(routes.recognize("GET", "/medical/taxis/edit")!.route.defaults.action).toBe("edit");
+    expect(routes.recognizePath("/medical/taxis").action).toBe("show");
+    expect(routes.recognizePath("/medical/taxis", { method: "post" }).action).toBe("create");
+    expect(routes.recognizePath("/medical/taxis/new").action).toBe("new");
+    expect(routes.recognizePath("/medical/taxis/edit").action).toBe("edit");
   });
 
   it("router removes invalid conditions", () => {
@@ -890,7 +952,7 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/tickets", { to: "tickets#index", as: "tickets" });
     });
-    expect(routes.recognize("GET", "/tickets")).not.toBeNull();
+    expect(() => routes.recognizePath("/tickets")).not.toThrow();
     expect(routes.pathFor({}, "tickets")).toBe("/tickets");
   });
 
@@ -901,7 +963,7 @@ describe("TestRoutingMapper", () => {
         r.get("export", { to: "customers#export" });
       });
     });
-    expect(routes.recognize("GET", "/customers/1/export")!.route.defaults.action).toBe("export");
+    expect(routes.recognizePath("/customers/1/export").action).toBe("export");
   });
 
   it("only should be read from scope", () => {
@@ -909,10 +971,10 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resources("clubs", { only: ["index", "show"] });
     });
-    expect(routes.recognize("GET", "/clubs")).not.toBeNull();
-    expect(routes.recognize("GET", "/clubs/1")).not.toBeNull();
-    expect(routes.recognize("GET", "/clubs/1/edit")).toBeNull();
-    expect(routes.recognize("POST", "/clubs")).toBeNull();
+    expect(() => routes.recognizePath("/clubs")).not.toThrow();
+    expect(() => routes.recognizePath("/clubs/1")).not.toThrow();
+    expect(() => routes.recognizePath("/clubs/1/edit")).toThrow(RoutingError);
+    expect(() => routes.recognizePath("/clubs", { method: "post" })).toThrow(RoutingError);
   });
 
   it("except should be read from scope", () => {
@@ -920,10 +982,10 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resources("clubs", { except: ["new", "edit"] });
     });
-    expect(routes.recognize("GET", "/clubs")).not.toBeNull();
-    expect(routes.recognize("GET", "/clubs/1")).not.toBeNull();
-    expect(routes.recognize("GET", "/clubs/new")!.route.defaults.action).toBe("show");
-    expect(routes.recognize("GET", "/clubs/1/edit")).toBeNull();
+    expect(() => routes.recognizePath("/clubs")).not.toThrow();
+    expect(() => routes.recognizePath("/clubs/1")).not.toThrow();
+    expect(routes.recognizePath("/clubs/new").action).toBe("show");
+    expect(() => routes.recognizePath("/clubs/1/edit")).toThrow(RoutingError);
   });
 
   it("only option should override scope", () => {
@@ -931,8 +993,8 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resources("posts", { only: ["index"] });
     });
-    expect(routes.recognize("GET", "/posts")).not.toBeNull();
-    expect(routes.recognize("GET", "/posts/1")).toBeNull();
+    expect(() => routes.recognizePath("/posts")).not.toThrow();
+    expect(() => routes.recognizePath("/posts/1")).toThrow(RoutingError);
   });
 
   it("except option should override scope", () => {
@@ -940,8 +1002,8 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resources("posts", { except: ["destroy"] });
     });
-    expect(routes.recognize("DELETE", "/posts/1")).toBeNull();
-    expect(routes.recognize("GET", "/posts")).not.toBeNull();
+    expect(() => routes.recognizePath("/posts/1", { method: "delete" })).toThrow(RoutingError);
+    expect(() => routes.recognizePath("/posts")).not.toThrow();
   });
 
   it("only option should not inherit", () => {
@@ -951,9 +1013,9 @@ describe("TestRoutingMapper", () => {
         r.resources("comments");
       });
     });
-    expect(routes.recognize("GET", "/posts/1/comments")).not.toBeNull();
-    expect(routes.recognize("POST", "/posts/1/comments")).not.toBeNull();
-    expect(routes.recognize("GET", "/posts/1/comments/new")).not.toBeNull();
+    expect(() => routes.recognizePath("/posts/1/comments")).not.toThrow();
+    expect(() => routes.recognizePath("/posts/1/comments", { method: "post" })).not.toThrow();
+    expect(() => routes.recognizePath("/posts/1/comments/new")).not.toThrow();
   });
 
   it("except option should not inherit", () => {
@@ -963,7 +1025,7 @@ describe("TestRoutingMapper", () => {
         r.resources("comments");
       });
     });
-    expect(routes.recognize("DELETE", "/posts/1/comments/2")).not.toBeNull();
+    expect(() => routes.recognizePath("/posts/1/comments/2", { method: "delete" })).not.toThrow();
   });
 
   it("projects for api app", () => {
@@ -971,10 +1033,10 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resources("projects", { except: ["new", "edit"] });
     });
-    expect(routes.recognize("GET", "/projects")).not.toBeNull();
-    expect(routes.recognize("GET", "/projects/1")).not.toBeNull();
-    expect(routes.recognize("GET", "/projects/new")!.route.defaults.action).toBe("show");
-    expect(routes.recognize("GET", "/projects/1/edit")).toBeNull();
+    expect(() => routes.recognizePath("/projects")).not.toThrow();
+    expect(() => routes.recognizePath("/projects/1")).not.toThrow();
+    expect(routes.recognizePath("/projects/new").action).toBe("show");
+    expect(() => routes.recognizePath("/projects/1/edit")).toThrow(RoutingError);
   });
 
   it("constraints are merged from scope", () => {
@@ -982,8 +1044,8 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resources("movies", { constraints: { id: /\d{4}/ } });
     });
-    expect(routes.recognize("GET", "/movies/0001")!.route.defaults.action).toBe("show");
-    expect(routes.recognize("GET", "/movies/00001")).toBeNull();
+    expect(routes.recognizePath("/movies/0001").action).toBe("show");
+    expect(() => routes.recognizePath("/movies/00001")).toThrow(RoutingError);
   });
 
   it("nested resource constraints", () => {
@@ -993,8 +1055,8 @@ describe("TestRoutingMapper", () => {
         r.resources("todos", { constraints: { id: /\d+/ } });
       });
     });
-    expect(routes.recognize("GET", "/lists/1/todos/2")).not.toBeNull();
-    expect(routes.recognize("GET", "/lists/abc/todos/2")).toBeNull();
+    expect(() => routes.recognizePath("/lists/1/todos/2")).not.toThrow();
+    expect(() => routes.recognizePath("/lists/abc/todos/2")).toThrow(RoutingError);
   });
 
   it("URL helpers raise a missing keys error for a nil param", () => {
@@ -1010,8 +1072,8 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resources("posts", { constraints: { id: /[a-z0-9-]+/ } });
     });
-    expect(routes.recognize("GET", "/posts/hello-world")!.route.defaults.action).toBe("show");
-    expect(routes.recognize("GET", "/posts/123-abc")!.params.id).toBe("123-abc");
+    expect(routes.recognizePath("/posts/hello-world").action).toBe("show");
+    expect(routes.recognizePath("/posts/123-abc").id).toBe("123-abc");
   });
 
   it("named character classes in regexp constraints", () => {
@@ -1023,7 +1085,7 @@ describe("TestRoutingMapper", () => {
         as: "purchase",
       });
     });
-    expect(routes.recognize("GET", "/purchases/315004be7e/Ruby_on_Rails.pdf")).not.toBeNull();
+    expect(() => routes.recognizePath("/purchases/315004be7e/Ruby_on_Rails.pdf")).not.toThrow();
     expect(routes.pathFor({ token: "315004be7e", filename: "Ruby_on_Rails.pdf" }, "purchase")).toBe(
       "/purchases/315004be7e/Ruby_on_Rails.pdf",
     );
@@ -1077,7 +1139,7 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: r.redirect("/articles/%{id}"), constraints: { id: /\d+/ } });
     });
-    expect(routes.recognize("GET", "/posts/abc")).toBeNull();
+    expect(() => routes.recognizePath("/posts/abc")).toThrow(RoutingError);
   });
 
   it("redirect with passing constraint", async () => {
@@ -1196,8 +1258,8 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resources("sheep");
     });
-    expect(routes.recognize("GET", "/sheep")).not.toBeNull();
-    expect(routes.recognize("GET", "/sheep/1")).not.toBeNull();
+    expect(() => routes.recognizePath("/sheep")).not.toThrow();
+    expect(() => routes.recognizePath("/sheep/1")).not.toThrow();
   });
 
   it("path names", () => {
@@ -1205,10 +1267,10 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resources("posts", { pathNames: { new: "novo", edit: "editar" } });
     });
-    expect(routes.recognize("GET", "/posts/novo")).not.toBeNull();
-    expect(routes.recognize("GET", "/posts/novo")!.route.defaults.action).toBe("new");
-    expect(routes.recognize("GET", "/posts/1/editar")).not.toBeNull();
-    expect(routes.recognize("GET", "/posts/1/editar")!.route.defaults.action).toBe("edit");
+    expect(() => routes.recognizePath("/posts/novo")).not.toThrow();
+    expect(routes.recognizePath("/posts/novo").action).toBe("new");
+    expect(() => routes.recognizePath("/posts/1/editar")).not.toThrow();
+    expect(routes.recognizePath("/posts/1/editar").action).toBe("edit");
   });
 
   it("projects with resources path names", () => {
@@ -1218,8 +1280,8 @@ describe("TestRoutingMapper", () => {
         r.resources("tasks", { pathNames: { new: "nueva" } });
       });
     });
-    expect(routes.recognize("GET", "/projects/nuevo")!.route.defaults.action).toBe("new");
-    expect(routes.recognize("GET", "/projects/1/tasks/nueva")!.route.defaults.action).toBe("new");
+    expect(routes.recognizePath("/projects/nuevo").action).toBe("new");
+    expect(routes.recognizePath("/projects/1/tasks/nueva").action).toBe("new");
   });
 
   it("shallow nested resources", () => {
@@ -1229,11 +1291,11 @@ describe("TestRoutingMapper", () => {
         r.resources("comments", { shallow: true });
       });
     });
-    expect(routes.recognize("GET", "/posts/1/comments")).not.toBeNull();
-    expect(routes.recognize("POST", "/posts/1/comments")).not.toBeNull();
-    expect(routes.recognize("GET", "/comments/1")).not.toBeNull();
-    expect(routes.recognize("GET", "/comments/1")!.route.defaults.action).toBe("show");
-    expect(routes.recognize("DELETE", "/comments/1")).not.toBeNull();
+    expect(() => routes.recognizePath("/posts/1/comments")).not.toThrow();
+    expect(() => routes.recognizePath("/posts/1/comments", { method: "post" })).not.toThrow();
+    expect(() => routes.recognizePath("/comments/1")).not.toThrow();
+    expect(routes.recognizePath("/comments/1").action).toBe("show");
+    expect(() => routes.recognizePath("/comments/1", { method: "delete" })).not.toThrow();
   });
 
   it("shallow nested resources inside resource", () => {
@@ -1243,9 +1305,9 @@ describe("TestRoutingMapper", () => {
         r.resources("posts", { shallow: true });
       });
     });
-    expect(routes.recognize("GET", "/account/posts")).not.toBeNull();
-    expect(routes.recognize("GET", "/posts/1")).not.toBeNull();
-    expect(routes.recognize("GET", "/posts/1")!.route.defaults.action).toBe("show");
+    expect(() => routes.recognizePath("/account/posts")).not.toThrow();
+    expect(() => routes.recognizePath("/posts/1")).not.toThrow();
+    expect(routes.recognizePath("/posts/1").action).toBe("show");
   });
 
   it("custom resource routes are scoped", () => {
@@ -1255,9 +1317,8 @@ describe("TestRoutingMapper", () => {
         r.get("preview", { to: "posts#preview", as: "preview" });
       });
     });
-    const m = routes.recognize("GET", "/posts/1/preview");
-    expect(m).not.toBeNull();
-    expect(m!.route.defaults.action).toBe("preview");
+    const m = routes.recognizePath("/posts/1/preview");
+    expect(m.action).toBe("preview");
   });
 
   it("glob parameter accepts regexp", () => {
@@ -1265,9 +1326,8 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/posts/*path", { to: "posts#show" });
     });
-    const m = routes.recognize("GET", "/posts/2024/01/hello");
-    expect(m).not.toBeNull();
-    expect(m!.params.path).toBe("2024/01/hello");
+    const m = routes.recognizePath("/posts/2024/01/hello");
+    expect(m.path).toBe("2024/01/hello");
   });
 
   it("optional scoped root hierarchy", () => {
@@ -1276,9 +1336,9 @@ describe("TestRoutingMapper", () => {
       r.get("(/:locale)/posts", { to: "posts#index" });
       r.get("(/:locale)/posts/:id", { to: "posts#show" });
     });
-    expect(routeSpec(routes.recognize("GET", "/posts"))).toBe("posts#index");
-    expect(routeSpec(routes.recognize("GET", "/posts/1"))).toBe("posts#show");
-    expect(routes.recognize("GET", "/en/posts/1")!.params.locale).toBe("en");
+    expect(routeSpec(routes.recognizePath("/posts"))).toBe("posts#index");
+    expect(routeSpec(routes.recognizePath("/posts/1"))).toBe("posts#show");
+    expect(routes.recognizePath("/en/posts/1").locale).toBe("en");
   });
 
   it("optional part of segment", () => {
@@ -1286,8 +1346,8 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/posts(/:id)", { to: "posts#index" });
     });
-    expect(routes.recognize("GET", "/posts")).not.toBeNull();
-    expect(routes.recognize("GET", "/posts/1")!.params.id).toBe("1");
+    expect(() => routes.recognizePath("/posts")).not.toThrow();
+    expect(routes.recognizePath("/posts/1").id).toBe("1");
   });
 
   it("url generator for optional prefix dynamic segment", () => {
@@ -1316,8 +1376,8 @@ describe("TestRoutingMapper", () => {
       });
       r.get("/articles/:id", { to: "articles#show" });
     });
-    expect(routes.recognize("GET", "/posts/123")).not.toBeNull();
-    expect(routes.recognize("GET", "/articles/abc")).not.toBeNull();
+    expect(() => routes.recognizePath("/posts/123")).not.toThrow();
+    expect(() => routes.recognizePath("/articles/abc")).not.toThrow();
   });
 
   it("concerns", () => {
@@ -1330,16 +1390,16 @@ describe("TestRoutingMapper", () => {
         r.concerns("commentable");
       });
     });
-    expect(routes.recognize("GET", "/posts/1/comments")).not.toBeNull();
-    expect(routes.recognize("POST", "/posts/1/comments")).not.toBeNull();
-    expect(routes.recognize("GET", "/posts/1/comments/2")).not.toBeNull();
+    expect(() => routes.recognizePath("/posts/1/comments")).not.toThrow();
+    expect(() => routes.recognizePath("/posts/1/comments", { method: "post" })).not.toThrow();
+    expect(() => routes.recognizePath("/posts/1/comments/2")).not.toThrow();
   });
   it("trailing slash", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
       r.get("/posts", { to: "posts#index", as: "posts" });
     });
-    expect(routes.recognize("GET", "/posts/")).not.toBeNull();
+    expect(() => routes.recognizePath("/posts/")).not.toThrow();
   });
 
   it.skip("accepts a constraint object responding to call", () => {});
@@ -1353,9 +1413,8 @@ describe("TestRoutingMapper", () => {
         r.get("hello/:controllers/:action");
       });
     });
-    const m = routes.recognize("GET", "/admin/hello/foo/new");
-    expect(m).not.toBeNull();
-    expect(m!.params["controllers"]).toBe("foo");
+    const m = routes.recognizePath("/admin/hello/foo/new");
+    expect(m["controllers"]).toBe("foo");
   });
 
   it("websocket", () => {
@@ -1363,8 +1422,8 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.connect("chat/live", { to: "chat#live" });
     });
-    expect(routes.recognize("GET", "/chat/live")!.route.defaults.action).toBe("live");
-    expect(routes.recognize("CONNECT", "/chat/live")!.route.defaults.action).toBe("live");
+    expect(routes.recognizePath("/chat/live").action).toBe("live");
+    expect(routes.recognizePath("/chat/live", { method: "connect" }).action).toBe("live");
   });
 
   it("bookmarks", () => {
@@ -1377,16 +1436,16 @@ describe("TestRoutingMapper", () => {
         r.get("remove", { action: "destroy", as: "remove" });
       });
     });
-    expect(routes.recognize("GET", "/bookmark/build")!.route.defaults.controller).toBe("bookmarks");
-    expect(routes.recognize("GET", "/bookmark/build")!.route.defaults.action).toBe("new");
+    expect(routes.recognizePath("/bookmark/build").controller).toBe("bookmarks");
+    expect(routes.recognizePath("/bookmark/build").action).toBe("new");
     expect(routes.pathFor({}, "bookmark_new")).toBe("/bookmark/build");
-    expect(routes.recognize("POST", "/bookmark/create")!.route.defaults.controller).toBe(
+    expect(routes.recognizePath("/bookmark/create", { method: "post" }).controller).toBe(
       "bookmarks",
     );
-    expect(routes.recognize("POST", "/bookmark/create")!.route.defaults.action).toBe("create");
-    expect(routes.recognize("PUT", "/bookmark/update")!.route.defaults.action).toBe("update");
+    expect(routes.recognizePath("/bookmark/create", { method: "post" }).action).toBe("create");
+    expect(routes.recognizePath("/bookmark/update", { method: "put" }).action).toBe("update");
     expect(routes.pathFor({}, "bookmark_update")).toBe("/bookmark/update");
-    expect(routes.recognize("GET", "/bookmark/remove")!.route.defaults.action).toBe("destroy");
+    expect(routes.recognizePath("/bookmark/remove").action).toBe("destroy");
     expect(routes.pathFor({}, "bookmark_remove")).toBe("/bookmark/remove");
   });
 
@@ -1401,17 +1460,17 @@ describe("TestRoutingMapper", () => {
         r.get("", { action: "show", as: "show" });
       });
     });
-    expect(routes.recognize("GET", "/pagemark/build")!.route.defaults.controller).toBe("pagemarks");
-    expect(routes.recognize("GET", "/pagemark/build")!.route.defaults.action).toBe("new");
+    expect(routes.recognizePath("/pagemark/build").controller).toBe("pagemarks");
+    expect(routes.recognizePath("/pagemark/build").action).toBe("new");
     expect(routes.pathFor({}, "pagemark_new")).toBe("/pagemark/build");
-    expect(routes.recognize("POST", "/pagemark/create")!.route.defaults.controller).toBe(
+    expect(routes.recognizePath("/pagemark/create", { method: "post" }).controller).toBe(
       "pagemarks",
     );
-    expect(routes.recognize("POST", "/pagemark/create")!.route.defaults.action).toBe("create");
-    expect(routes.recognize("PUT", "/pagemark/update")!.route.defaults.action).toBe("update");
-    expect(routes.recognize("GET", "/pagemark/remove")!.route.defaults.action).toBe("destroy");
+    expect(routes.recognizePath("/pagemark/create", { method: "post" }).action).toBe("create");
+    expect(routes.recognizePath("/pagemark/update", { method: "put" }).action).toBe("update");
+    expect(routes.recognizePath("/pagemark/remove").action).toBe("destroy");
     expect(routes.pathFor({}, "pagemark_remove")).toBe("/pagemark/remove");
-    expect(routes.recognize("GET", "/pagemark")!.route.defaults.action).toBe("show");
+    expect(routes.recognizePath("/pagemark").action).toBe("show");
     expect(routes.pathFor({}, "pagemark_show")).toBe("/pagemark");
   });
 
@@ -1430,15 +1489,11 @@ describe("TestRoutingMapper", () => {
         });
       });
     });
-    expect(routes.recognize("GET", "/global/export")!.route.defaults.controller).toBe("global");
-    expect(routes.recognize("GET", "/global/export")!.route.defaults.action).toBe("export");
-    expect(routes.recognize("GET", "/global/hide_notice")!.route.defaults.controller).toBe(
-      "global",
-    );
-    expect(routes.recognize("GET", "/global/hide_notice")!.route.defaults.action).toBe(
-      "hide_notice",
-    );
-    expect(routes.recognize("GET", "/export/123/foo.txt")!.route.defaults.action).toBe("export");
+    expect(routes.recognizePath("/global/export").controller).toBe("global");
+    expect(routes.recognizePath("/global/export").action).toBe("export");
+    expect(routes.recognizePath("/global/hide_notice").controller).toBe("global");
+    expect(routes.recognizePath("/global/hide_notice").action).toBe("hide_notice");
+    expect(routes.recognizePath("/export/123/foo.txt").action).toBe("export");
     expect(routes.pathFor({}, "export_request")).toBe("/global/export");
     expect(routes.pathFor({}, "global_hide_notice")).toBe("/global/hide_notice");
     expect(routes.pathFor({ id: "123", file: "foo.txt" }, "export_download")).toBe(
@@ -1451,7 +1506,7 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/local/dashboard", { to: "local#dashboard" });
     });
-    expect(routes.recognize("GET", "/local/dashboard")!.route.defaults.action).toBe("dashboard");
+    expect(routes.recognizePath("/local/dashboard").action).toBe("dashboard");
   });
 
   it("url for with no side effects", () => {
@@ -1459,7 +1514,7 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/projects/status(.:format)", { to: "projects#status" });
     });
-    expect(routes.recognize("GET", "/projects/status")).not.toBeNull();
+    expect(() => routes.recognizePath("/projects/status")).not.toThrow();
   });
 
   it("url for does not modify controller", () => {
@@ -1467,7 +1522,7 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/projects/status(.:format)", { to: "projects#status" });
     });
-    expect(routes.recognize("GET", "/projects/status")).not.toBeNull();
+    expect(() => routes.recognizePath("/projects/status")).not.toThrow();
   });
 
   it("named route with no side effects", () => {
@@ -1479,7 +1534,7 @@ describe("TestRoutingMapper", () => {
         });
       });
     });
-    expect(routes.recognize("GET", "/customers/1/profile")).not.toBeNull();
+    expect(() => routes.recognizePath("/customers/1/profile")).not.toThrow();
   });
 
   it.skip("projects", () => {});
@@ -1505,15 +1560,13 @@ describe("TestRoutingMapper", () => {
         });
       });
     });
-    expect(routes.recognize("GET", "/clients/1/google/account")!.route.defaults.controller).toBe(
-      "google/accounts",
-    );
+    expect(routes.recognizePath("/clients/1/google/account").controller).toBe("google/accounts");
     expect(routes.pathFor({ client_id: "1" }, "client_google_account")).toBe(
       "/clients/1/google/account",
     );
-    expect(
-      routes.recognize("GET", "/clients/1/google/account/secret/info")!.route.defaults.controller,
-    ).toBe("google/secret/infos");
+    expect(routes.recognizePath("/clients/1/google/account/secret/info").controller).toBe(
+      "google/secret/infos",
+    );
     expect(routes.pathFor({ client_id: "1" }, "client_google_account_secret_info")).toBe(
       "/clients/1/google/account/secret/info",
     );
@@ -1529,13 +1582,13 @@ describe("TestRoutingMapper", () => {
       });
     });
     expect(routes.pathFor({}, "foo_posts")).toBe("/foo/posts");
-    expect(routeSpec(routes.recognize("GET", "/foo/posts"))).toBe("bar/posts#index");
+    expect(routeSpec(routes.recognizePath("/foo/posts"))).toBe("bar/posts#index");
     expect(routes.pathFor({ id: "1" }, "foo_post")).toBe("/foo/posts/1");
-    expect(routeSpec(routes.recognize("GET", "/foo/posts/1"))).toBe("bar/posts#show");
+    expect(routeSpec(routes.recognizePath("/foo/posts/1"))).toBe("bar/posts#show");
     expect(routes.pathFor({ post_id: "1" }, "foo_post_comments")).toBe("/foo/posts/1/comments");
-    expect(routeSpec(routes.recognize("GET", "/foo/posts/1/comments"))).toBe("bar/comments#index");
+    expect(routeSpec(routes.recognizePath("/foo/posts/1/comments"))).toBe("bar/comments#index");
     expect(routes.pathFor({ id: "2" }, "foo_comment")).toBe("/foo/comments/2");
-    expect(routeSpec(routes.recognize("GET", "/foo/comments/2"))).toBe("bar/comments#show");
+    expect(routeSpec(routes.recognizePath("/foo/comments/2"))).toBe("bar/comments#show");
   });
 
   it("namespaced shallow routes with path option", () => {
@@ -1548,13 +1601,13 @@ describe("TestRoutingMapper", () => {
       });
     });
     expect(routes.pathFor({}, "foo_posts")).toBe("/bar/posts");
-    expect(routeSpec(routes.recognize("GET", "/bar/posts"))).toBe("foo/posts#index");
+    expect(routeSpec(routes.recognizePath("/bar/posts"))).toBe("foo/posts#index");
     expect(routes.pathFor({ id: "1" }, "foo_post")).toBe("/bar/posts/1");
-    expect(routeSpec(routes.recognize("GET", "/bar/posts/1"))).toBe("foo/posts#show");
+    expect(routeSpec(routes.recognizePath("/bar/posts/1"))).toBe("foo/posts#show");
     expect(routes.pathFor({ post_id: "1" }, "foo_post_comments")).toBe("/bar/posts/1/comments");
-    expect(routeSpec(routes.recognize("GET", "/bar/posts/1/comments"))).toBe("foo/comments#index");
+    expect(routeSpec(routes.recognizePath("/bar/posts/1/comments"))).toBe("foo/comments#index");
     expect(routes.pathFor({ id: "2" }, "foo_comment")).toBe("/bar/comments/2");
-    expect(routeSpec(routes.recognize("GET", "/bar/comments/2"))).toBe("foo/comments#show");
+    expect(routeSpec(routes.recognizePath("/bar/comments/2"))).toBe("foo/comments#show");
   });
 
   it("namespaced shallow routes with as option", () => {
@@ -1567,13 +1620,13 @@ describe("TestRoutingMapper", () => {
       });
     });
     expect(routes.pathFor({}, "bar_posts")).toBe("/foo/posts");
-    expect(routeSpec(routes.recognize("GET", "/foo/posts"))).toBe("foo/posts#index");
+    expect(routeSpec(routes.recognizePath("/foo/posts"))).toBe("foo/posts#index");
     expect(routes.pathFor({ id: "1" }, "bar_post")).toBe("/foo/posts/1");
-    expect(routeSpec(routes.recognize("GET", "/foo/posts/1"))).toBe("foo/posts#show");
+    expect(routeSpec(routes.recognizePath("/foo/posts/1"))).toBe("foo/posts#show");
     expect(routes.pathFor({ post_id: "1" }, "bar_post_comments")).toBe("/foo/posts/1/comments");
-    expect(routeSpec(routes.recognize("GET", "/foo/posts/1/comments"))).toBe("foo/comments#index");
+    expect(routeSpec(routes.recognizePath("/foo/posts/1/comments"))).toBe("foo/comments#index");
     expect(routes.pathFor({ id: "2" }, "bar_comment")).toBe("/foo/comments/2");
-    expect(routeSpec(routes.recognize("GET", "/foo/comments/2"))).toBe("foo/comments#show");
+    expect(routeSpec(routes.recognizePath("/foo/comments/2"))).toBe("foo/comments#show");
   });
 
   it("namespaced shallow routes with shallow path option", () => {
@@ -1586,13 +1639,13 @@ describe("TestRoutingMapper", () => {
       });
     });
     expect(routes.pathFor({}, "foo_posts")).toBe("/foo/posts");
-    expect(routeSpec(routes.recognize("GET", "/foo/posts"))).toBe("foo/posts#index");
+    expect(routeSpec(routes.recognizePath("/foo/posts"))).toBe("foo/posts#index");
     expect(routes.pathFor({ id: "1" }, "foo_post")).toBe("/foo/posts/1");
-    expect(routeSpec(routes.recognize("GET", "/foo/posts/1"))).toBe("foo/posts#show");
+    expect(routeSpec(routes.recognizePath("/foo/posts/1"))).toBe("foo/posts#show");
     expect(routes.pathFor({ post_id: "1" }, "foo_post_comments")).toBe("/foo/posts/1/comments");
-    expect(routeSpec(routes.recognize("GET", "/foo/posts/1/comments"))).toBe("foo/comments#index");
+    expect(routeSpec(routes.recognizePath("/foo/posts/1/comments"))).toBe("foo/comments#index");
     expect(routes.pathFor({ id: "2" }, "foo_comment")).toBe("/bar/comments/2");
-    expect(routeSpec(routes.recognize("GET", "/bar/comments/2"))).toBe("foo/comments#show");
+    expect(routeSpec(routes.recognizePath("/bar/comments/2"))).toBe("foo/comments#show");
   });
 
   it("namespaced shallow routes with shallow prefix option", () => {
@@ -1605,13 +1658,13 @@ describe("TestRoutingMapper", () => {
       });
     });
     expect(routes.pathFor({}, "foo_posts")).toBe("/foo/posts");
-    expect(routeSpec(routes.recognize("GET", "/foo/posts"))).toBe("foo/posts#index");
+    expect(routeSpec(routes.recognizePath("/foo/posts"))).toBe("foo/posts#index");
     expect(routes.pathFor({ id: "1" }, "foo_post")).toBe("/foo/posts/1");
-    expect(routeSpec(routes.recognize("GET", "/foo/posts/1"))).toBe("foo/posts#show");
+    expect(routeSpec(routes.recognizePath("/foo/posts/1"))).toBe("foo/posts#show");
     expect(routes.pathFor({ post_id: "1" }, "foo_post_comments")).toBe("/foo/posts/1/comments");
-    expect(routeSpec(routes.recognize("GET", "/foo/posts/1/comments"))).toBe("foo/comments#index");
+    expect(routeSpec(routes.recognizePath("/foo/posts/1/comments"))).toBe("foo/comments#index");
     expect(routes.pathFor({ id: "2" }, "bar_comment")).toBe("/foo/comments/2");
-    expect(routeSpec(routes.recognize("GET", "/foo/comments/2"))).toBe("foo/comments#show");
+    expect(routeSpec(routes.recognizePath("/foo/comments/2"))).toBe("foo/comments#show");
   });
 
   it.skip("optional scoped root multiple choice", () => {});
@@ -1658,10 +1711,9 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("sign_in", { to: "sessions#new", as: "sign_in" });
     });
-    const m = routes.recognize("GET", "/sign_in");
-    expect(m).not.toBeNull();
-    expect(m!.route.defaults.controller).toBe("sessions");
-    expect(m!.route.defaults.action).toBe("new");
+    const m = routes.recognizePath("/sign_in");
+    expect(m.controller).toBe("sessions");
+    expect(m.action).toBe("new");
     expect(routes.pathFor({}, "sign_in")).toBe("/sign_in");
   });
 
@@ -1677,10 +1729,9 @@ describe("TestRoutingMapper", () => {
       });
     });
     expect(routes.pathFor({ locale: "en" }, "root")).toBe("/en");
-    const m = routes.recognize("GET", "/en");
-    expect(m).not.toBeNull();
-    expect(m!.route.defaults.controller).toBe("projects");
-    expect(m!.route.defaults.action).toBe("index");
+    const m = routes.recognizePath("/en");
+    expect(m.controller).toBe("projects");
+    expect(m.action).toBe("index");
   });
 
   it.skip("optional scoped path", () => {});
@@ -1694,9 +1745,8 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.match("/", { to: "pages#show", via: "get", defaults: { id: "home" } });
     });
-    const m = routes.recognize("GET", "/");
-    expect(m).not.toBeNull();
-    expect(m!.route.defaults?.id).toBe("home");
+    const m = routes.recognizePath("/");
+    expect(m.id).toBe("home");
   });
 
   it.skip("default string params with match", () => {});
@@ -1706,9 +1756,8 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.match("/", { to: "pages#show", via: "get", as: "root", defaults: { id: "home" } });
     });
-    const m = routes.recognize("GET", "/");
-    expect(m).not.toBeNull();
-    expect(m!.route.defaults?.id).toBe("home");
+    const m = routes.recognizePath("/");
+    expect(m.id).toBe("home");
   });
 
   it.skip("default string params with root", () => {});
@@ -1835,9 +1884,8 @@ describe("ActionController::Routing", () => {
     routes.draw((r) => {
       r.get("/journey/:id", { to: "journey#show" });
     });
-    const m = routes.recognize("GET", "/journey/faithfully-omg");
-    expect(m).not.toBeNull();
-    expect(m!.params.id).toBe("faithfully-omg");
+    const m = routes.recognizePath("/journey/faithfully-omg");
+    expect(m.id).toBe("faithfully-omg");
   });
 
   it("regexp precedence", () => {
@@ -1846,10 +1894,10 @@ describe("ActionController::Routing", () => {
       r.get("/posts/:id", { to: "posts#show", constraints: { id: /\d+/ } });
       r.get("/posts/:slug", { to: "posts#show_by_slug" });
     });
-    const m1 = routes.recognize("GET", "/posts/123");
-    expect(m1!.route.defaults.action).toBe("show");
-    const m2 = routes.recognize("GET", "/posts/hello");
-    expect(m2!.route.defaults.action).toBe("show_by_slug");
+    const m1 = routes.recognizePath("/posts/123");
+    expect(m1.action).toBe("show");
+    const m2 = routes.recognizePath("/posts/hello");
+    expect(m2.action).toBe("show_by_slug");
   });
 
   it("route generation escapes unsafe path characters", () => {
@@ -1865,8 +1913,8 @@ describe("ActionController::Routing", () => {
     routes.draw((r) => {
       r.get("/journey/:id", { to: "journey#show", constraints: { id: /\d+/ } });
     });
-    expect(routes.recognize("GET", "/journey/123")).not.toBeNull();
-    expect(routes.recognize("GET", "/journey/abc")).toBeNull();
+    expect(() => routes.recognizePath("/journey/123")).not.toThrow();
+    expect(() => routes.recognizePath("/journey/abc")).toThrow(RoutingError);
   });
 
   it("pre dash", () => {
@@ -1874,8 +1922,8 @@ describe("ActionController::Routing", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show" });
     });
-    const m = routes.recognize("GET", "/posts/omg-faithfully");
-    expect(m!.params.id).toBe("omg-faithfully");
+    const m = routes.recognizePath("/posts/omg-faithfully");
+    expect(m.id).toBe("omg-faithfully");
   });
 
   it("pre dash with custom regexp", () => {
@@ -1883,8 +1931,8 @@ describe("ActionController::Routing", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", constraints: { id: /\d+/ } });
     });
-    expect(routes.recognize("GET", "/posts/123")).not.toBeNull();
-    expect(routes.recognize("GET", "/posts/omg-123")).toBeNull();
+    expect(() => routes.recognizePath("/posts/123")).not.toThrow();
+    expect(() => routes.recognizePath("/posts/omg-123")).toThrow(RoutingError);
   });
 
   it("empty string match", () => {
@@ -1892,7 +1940,7 @@ describe("ActionController::Routing", () => {
     routes.draw((r) => {
       r.get("/", { to: "home#index" });
     });
-    expect(routes.recognize("GET", "/")!.route.defaults.action).toBe("index");
+    expect(routes.recognizePath("/").action).toBe("index");
   });
 
   it("symbols with dashes", () => {
@@ -1900,9 +1948,8 @@ describe("ActionController::Routing", () => {
     routes.draw((r) => {
       r.get("/my-route/:id", { to: "my_controller#show" });
     });
-    const m = routes.recognize("GET", "/my-route/123");
-    expect(m).not.toBeNull();
-    expect(m!.params.id).toBe("123");
+    const m = routes.recognizePath("/my-route/123");
+    expect(m.id).toBe("123");
   });
 
   it("id encoding", () => {
@@ -1910,9 +1957,8 @@ describe("ActionController::Routing", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show" });
     });
-    const m = routes.recognize("GET", "/posts/hello%20world");
-    expect(m).not.toBeNull();
-    expect(m!.params.id).toBe("hello world");
+    const m = routes.recognizePath("/posts/hello%20world");
+    expect(m.id).toBe("hello world");
   });
 });
 
@@ -1925,7 +1971,7 @@ describe("TestAppendingRoutes", () => {
     routes.draw((r) => {
       r.get("/hello", { to: "hello#index" });
     });
-    expect(routes.recognize("GET", "/goodbye")).not.toBeNull();
+    expect(() => routes.recognizePath("/goodbye")).not.toThrow();
   });
 
   it("hello should not be overwritten", () => {
@@ -1936,7 +1982,7 @@ describe("TestAppendingRoutes", () => {
     routes.draw((r) => {
       r.get("/hello", { to: "hello#second" });
     });
-    expect(routes.recognize("GET", "/hello")!.route.defaults.action).toBe("first");
+    expect(routes.recognizePath("/hello").action).toBe("first");
   });
 
   it("missing routes are still missing", () => {
@@ -1944,7 +1990,7 @@ describe("TestAppendingRoutes", () => {
     routes.draw((r) => {
       r.get("/hello", { to: "hello#index" });
     });
-    expect(routes.recognize("GET", "/random")).toBeNull();
+    expect(() => routes.recognizePath("/random")).toThrow(RoutingError);
   });
 });
 
@@ -1956,7 +2002,7 @@ describe("TestDefaultScope", () => {
         r.resources("posts");
       });
     });
-    expect(routes.recognize("GET", "/api/posts")).not.toBeNull();
+    expect(() => routes.recognizePath("/api/posts")).not.toThrow();
     expect(routes.pathFor({}, "api_posts")).toBe("/api/posts");
   });
 });
@@ -1968,10 +2014,9 @@ describe("TestRecognizePath", () => {
       r.get("/hash/:foo", { to: "pages#show", constraints: { foo: /foo/ } });
       r.get("/hash/:bar", { to: "pages#show_bar" });
     });
-    const m = routes.recognize("GET", "/hash/bar");
-    expect(m).not.toBeNull();
-    expect(m!.route.defaults.action).toBe("show_bar");
-    expect(m!.params.bar).toBe("bar");
+    const m = routes.recognizePath("/hash/bar");
+    expect(m.action).toBe("show_bar");
+    expect(m.bar).toBe("bar");
   });
 
   it.skip("proc constraints dont leak between routes", () => {});
@@ -1985,7 +2030,7 @@ describe("TestTildeAndMinusPaths", () => {
     routes.draw((r) => {
       r.get("/~user", { to: "users#show" });
     });
-    expect(routes.recognize("GET", "/~user")).not.toBeNull();
+    expect(() => routes.recognizePath("/~user")).not.toThrow();
   });
 
   it("recognizes minus path", () => {
@@ -1993,7 +2038,7 @@ describe("TestTildeAndMinusPaths", () => {
     routes.draw((r) => {
       r.get("/young-and-fine", { to: "pages#show" });
     });
-    expect(routes.recognize("GET", "/young-and-fine")).not.toBeNull();
+    expect(() => routes.recognizePath("/young-and-fine")).not.toThrow();
   });
 });
 
@@ -2003,7 +2048,7 @@ describe("TestUnicodePaths", () => {
     routes.draw((r) => {
       r.get("/ほげ", { to: "pages#show" });
     });
-    expect(routes.recognize("GET", "/%E3%81%BB%E3%81%92")).not.toBeNull();
+    expect(() => routes.recognizePath("/%E3%81%BB%E3%81%92")).not.toThrow();
   });
 });
 
@@ -2296,20 +2341,16 @@ describe("TestPartialDynamicPathSegments", () => {
       r.get("/:artist/song-:song", { to: "songs#artist_show" });
       r.get("/:artist/:song-song", { to: "songs#artist_show2" });
     });
-    let m = routes.recognize("GET", "/songs/song-changes");
-    expect(m).not.toBeNull();
-    expect(m!.params.song).toBe("changes");
-    m = routes.recognize("GET", "/songs/changes-song");
-    expect(m).not.toBeNull();
-    expect(m!.params.song).toBe("changes");
-    m = routes.recognize("GET", "/david-bowie/song-changes");
-    expect(m).not.toBeNull();
-    expect(m!.params.artist).toBe("david-bowie");
-    expect(m!.params.song).toBe("changes");
-    m = routes.recognize("GET", "/david-bowie/changes-song");
-    expect(m).not.toBeNull();
-    expect(m!.params.artist).toBe("david-bowie");
-    expect(m!.params.song).toBe("changes");
+    let m = routes.recognizePath("/songs/song-changes");
+    expect(m.song).toBe("changes");
+    m = routes.recognizePath("/songs/changes-song");
+    expect(m.song).toBe("changes");
+    m = routes.recognizePath("/david-bowie/song-changes");
+    expect(m.artist).toBe("david-bowie");
+    expect(m.song).toBe("changes");
+    m = routes.recognizePath("/david-bowie/changes-song");
+    expect(m.artist).toBe("david-bowie");
+    expect(m.song).toBe("changes");
   });
 });
 
@@ -2328,11 +2369,10 @@ describe("TestInternalRoutingParams", () => {
     routes.draw((r) => {
       r.get("/test_internal/:internal", { to: "internal#internal" });
     });
-    const m = routes.recognize("GET", "/test_internal/123");
-    expect(m).not.toBeNull();
-    expect(m!.params.internal).toBe("123");
-    expect(m!.route.defaults.controller).toBe("internal");
-    expect(m!.route.defaults.action).toBe("internal");
+    const m = routes.recognizePath("/test_internal/123");
+    expect(m.internal).toBe("123");
+    expect(m.controller).toBe("internal");
+    expect(m.action).toBe("internal");
   });
 });
 
@@ -2363,8 +2403,8 @@ describe("TestUriPathEscaping", () => {
     routes.draw((r) => {
       r.get("/:segment", { to: "test#show", as: "segment" });
     });
-    const m = routes.recognize("GET", "/a%20b%2Fc+d");
-    expect(m?.params.segment).toBe("a b/c+d");
+    const m = routes.recognizePath("/a%20b%2Fc+d");
+    expect(m.segment).toBe("a b/c+d");
   });
 
   it("does not escape slash in generated path splat", () => {
@@ -2380,8 +2420,8 @@ describe("TestUriPathEscaping", () => {
     routes.draw((r) => {
       r.get("/*splat", { to: "test#show", as: "splat" });
     });
-    const m = routes.recognize("GET", "/a%20b/c+d");
-    expect(m?.params.splat).toBe("a b/c+d");
+    const m = routes.recognizePath("/a%20b/c+d");
+    expect(m.splat).toBe("a b/c+d");
   });
 });
 
