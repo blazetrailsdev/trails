@@ -1,10 +1,13 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { ScaffoldGenerator } from "./scaffold-generator.js";
 
-const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
+let tmpDir: string;
+beforeEach(() => {
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
+});
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 const read = (relativePath: string) => fs.readFileSync(path.join(tmpDir, relativePath), "utf-8");
 
@@ -19,10 +22,40 @@ describe("ScaffoldGenerator (namespaced)", () => {
     const controller = read("app/controllers/admin/accounts-controller.ts");
     expect(controller).toContain('this.redirectTo("/admin/accounts")');
     expect(controller).toContain('this.redirectTo("/admin/accounts/" + this.params.get("id"))');
-    expect(read("app/views/admin/accounts/index.html.tse")).toContain('href="/admin/accounts/new"');
+    expect(read("app/views/admin/accounts/index.html.tse")).toContain(
+      'linkTo("New account", newAdminAccountPath())',
+    );
     for (const view of ["new", "edit"])
-      expect(read(`app/views/admin/accounts/${view}.html.tse`)).toContain('href="/admin/accounts"');
+      expect(read(`app/views/admin/accounts/${view}.html.tse`)).toContain(
+        'linkTo("Back to accounts", adminAccountsPath())',
+      );
     const rerun = new ScaffoldGenerator({ ...options, force: true }).run();
     await expect(rerun).resolves.toContain("app/models/admin/account.ts");
+  });
+
+  it("emits Rails' scaffold copy and a record partial that show and index render", async () => {
+    fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
+    await new ScaffoldGenerator({
+      cwd: tmpDir,
+      output: () => {},
+      name: "post",
+      attributes: ["title:string"],
+    }).run();
+    const index = read("app/views/posts/index.html.tse");
+    expect(index).toContain('<%= linkTo("Show this post", post) %>');
+    expect(index).toContain("<%= render(post) %>");
+    const show = read("app/views/posts/show.html.tse");
+    expect(show).toContain("<%= render(this.post) %>");
+    expect(show).toContain('<%= linkTo("Back to posts", postsPath()) %>');
+    expect(show).toContain('<%= buttonTo("Destroy this post", this.post, { method: "delete" }) %>');
+    expect(read("app/views/posts/edit.html.tse")).toContain("<h1>Editing post</h1>");
+    expect(read("app/views/posts/_post.html.tse")).toBe(`<div id="<%= domId(post) %>">
+  <p>
+    <strong>Title:</strong>
+    <%= post.title %>
+  </p>
+
+</div>
+`);
   });
 });

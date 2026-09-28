@@ -1,8 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { NamedBase } from "./named-base.js";
+import { ScaffoldControllerGenerator } from "./rails/scaffold-controller/scaffold-controller-generator.js";
 
 function build(name: string, attributes: string[] = []): NamedBase {
   return new NamedBase({ cwd: "/", output: () => {}, name, attributes });
+}
+
+function generator(name: string, options: { modelName?: string } = {}) {
+  return new ScaffoldControllerGenerator({ cwd: "/", output: () => {}, name, ...options });
 }
 
 describe("NamedBase", () => {
@@ -33,5 +38,25 @@ describe("NamedBase", () => {
       "posts",
       "post",
     ]);
+  });
+
+  it("test_index_helper", () => {
+    expect(generator("Post").indexHelper()).toBe("posts");
+  });
+
+  it("test_index_helper_to_pluralize_once", () => {
+    expect(generator("Stadium").indexHelper()).toBe("stadia");
+  });
+
+  it("test_index_helper_with_uncountable", () => {
+    expect(generator("Sheep").indexHelper()).toBe("sheepIndex");
+  });
+
+  it("test_scaffold_plural_names_with_model_name_option", () => {
+    const g = generator("Admin::Foo", { modelName: "User" });
+    expect(g.singularRouteName()).toBe("admin_user");
+    expect(g.pluralRouteName()).toBe("admin_users");
+    expect(g.modelResourceName()).toBe('["admin", user]');
+    expect(g.indexHelper()).toBe("adminUsers");
   });
 });

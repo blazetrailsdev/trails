@@ -62,8 +62,23 @@ describe("ScaffoldGeneratorTest", () => {
     expect(controller).toContain("async update()");
     expect(controller).toContain("async destroy()");
 
-    expect(files.some((f) => f.includes("views/product_lines/index.html"))).toBe(true);
-    expect(files.some((f) => f.includes("views/product_lines/show.html"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/layouts/product_lines.html.tse"))).toBe(
+      false,
+    );
+
+    for (const view of ["index", "show"]) {
+      expect(files).toContain(`app/views/product_lines/${view}.html.tse`);
+    }
+
+    for (const view of ["edit", "new"]) {
+      expect(readFile(`app/views/product_lines/${view}.html.tse`)).toMatch(
+        /render\("form", \{ product_line: this\.product_line \}\)/,
+      );
+    }
+
+    const form = readFile("app/views/product_lines/_form.html.tse");
+    expect(form).toContain("product_line");
+    expect(form).not.toContain("this.product_line");
   });
 
   it.skip("api scaffold on invoke", () => {});
@@ -130,18 +145,51 @@ describe("ScaffoldGeneratorTest", () => {
     const migContent = readFile(migration);
     expect(migContent).toContain('t.belongsTo("product"');
     expect(migContent).toContain('t.references("cart"');
+
+    const form = readFile("app/views/line_items/_form.html.tse");
+    expect(form).toMatch(/^\W{4}<%= form\.textField\("product_id"\) %>/m);
+    expect(form).toMatch(/^\W{4}<%= form\.textField\("cart_id"\) %>/m);
+
+    const index = readFile("app/views/line_items/index.html.tse");
+    expect(index).toMatch(/^\W{2}<% for \(const line_item of this\.line_items\) \{ %>/m);
+    expect(index).toMatch(/^\W{4}<%= render\(line_item\) %>/m);
+    expect(index).toMatch(/<%= linkTo\("Show this line item", line_item\) %>/);
+
+    const show = readFile("app/views/line_items/show.html.tse");
+    expect(show).toMatch(/<%= render\(this\.line_item\) %>/);
+    expect(show).toMatch(/linkTo\("Edit this line item"/);
+    expect(show).toMatch(/buttonTo\("Destroy this line item"/);
+    expect(show).toMatch(/linkTo\("Back to line items"/);
   });
 
   it("scaffold generator attachments", async () => {
-    await makeGen("Message", ["photos:attachments"]).run();
+    await makeGen("Message", [
+      "video:attachment",
+      "photos:attachments",
+      "images:attachments",
+    ]).run();
     const model = readFile("app/models/message.ts");
     expect(model).toContain('this.hasManyAttached("photos")');
+
+    const form = readFile("app/views/messages/_form.html.tse");
+    expect(form).toMatch(/^\W{4}<%= form\.fileField\("video"\) %>/m);
+    expect(form).toMatch(/^\W{4}<%= form\.fileField\("photos", \{ multiple: true \}\) %>/m);
+
+    const partial = readFile("app/views/messages/_message.html.tse");
+    expect(partial).toMatch(
+      /^\W{4}<%= message\.video\.isAttached\(\) \? linkTo\(message\.video\.filename, message\.video\) : null %>/m,
+    );
+    expect(partial).toMatch(/^\W{6}<div><%= linkTo\(photo\.filename, photo\) %>/m);
   });
 
   it("scaffold generator rich text", async () => {
     await makeGen("Message", ["content:rich_text"]).run();
     const model = readFile("app/models/message.ts");
     expect(model).toContain('this.hasRichText("content")');
+
+    expect(readFile("app/views/messages/_form.html.tse")).toMatch(
+      /^\W{4}<%= form\.richTextarea\("content"\) %>/m,
+    );
   });
 
   it.skip("scaffold generator multi db abstract class", () => {});
