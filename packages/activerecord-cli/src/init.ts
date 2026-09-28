@@ -29,20 +29,22 @@ const CONFIG_DATABASE = configDatabase("sqlite3");
 
 const MODELS_INDEX = renderManifest([]);
 
-const DB_GLUE = `import { loadDatabaseConfig } from "@blazetrails/activerecord-cli";
+const DB_GLUE = `import { Base, DatabaseTasks } from "@blazetrails/activerecord";
+import { loadDatabaseConfig } from "@blazetrails/activerecord-cli";
 import { models } from "./app/models/index.js";
 
 let connected = false;
 
 /**
  * Establish the connection and reflect each model's columns (idempotent).
- * \`loadDatabaseConfig\` reads \`config/database.ts\` and connects to the
- * \`TRAILS_ENV\` entry ("development" when unset). Run after migrating, before
- * any read/write.
+ * \`loadDatabaseConfig\` reads \`config/database.ts\` and resolves
+ * \`DatabaseTasks.env\` (\`TRAILS_ENV\`, or "development" when unset). Run after
+ * migrating, before any read/write.
  */
 export async function connect(): Promise<void> {
   if (connected) return;
   await loadDatabaseConfig(import.meta.dirname);
+  await Base.establishConnection(\`:\${DatabaseTasks.env}\`);
   await Promise.all(models.map((m) => m.loadSchema()));
   connected = true;
 }

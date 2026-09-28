@@ -1,6 +1,5 @@
 import { join, resolve } from "path";
 import { File } from "@blazetrails/ruby-compat";
-import { getEnv, isBlank } from "@blazetrails/activesupport";
 import { DatabaseTasks, DatabaseConfigurations, Migrator } from "@blazetrails/activerecord";
 import { establishEnvironmentConnection, normalizeSqlitePaths } from "./environment.js";
 
@@ -17,9 +16,7 @@ export async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigura
   DatabaseTasks.root = cwd;
   DatabaseTasks.dbDir = resolve(join(cwd, "db"));
   Migrator.migrationsPaths = DatabaseTasks.migrationsPaths.map((p) => resolve(join(cwd, p)));
-  if (isBlank(getEnv("TRAILS_ENV")) && isBlank(getEnv("NODE_ENV"))) {
-    DatabaseTasks.env = "development";
-  }
+  if (DatabaseTasks.env === "default_env") DatabaseTasks.env = "development";
   await establishEnvironmentConnection(DatabaseTasks.env);
   return configs;
 }
