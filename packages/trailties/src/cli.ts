@@ -14,8 +14,6 @@ import { statsCommand } from "./commands/stats.js";
 import { credentialsCommand } from "./commands/credentials.js";
 import { encryptedCommand } from "./commands/encrypted.js";
 import { devCommand } from "./commands/dev.js";
-import { helpCommand } from "./commands/help.js";
-import { versionCommand } from "./commands/version.js";
 
 export { Trails } from "./rails.js";
 export { Application } from "./application.js";
@@ -38,8 +36,7 @@ export function createProgram(): Command {
     .name("trails")
     .description("TypeScript framework inspired by Ruby on Rails")
     .enablePositionalOptions()
-    .version(VERSION, "-v, --version")
-    .helpCommand(false);
+    .version(VERSION, "-v, --version");
 
   program.addCommand(newCommand());
   program.addCommand(generateCommand());
@@ -55,8 +52,6 @@ export function createProgram(): Command {
   program.addCommand(credentialsCommand());
   program.addCommand(encryptedCommand());
   program.addCommand(devCommand());
-  program.addCommand(helpCommand(), { hidden: true });
-  program.addCommand(versionCommand());
 
   return program;
 }

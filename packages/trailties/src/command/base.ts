@@ -1,10 +1,6 @@
 export class Base {
   options: object;
 
-  static classUsage(): string | undefined {
-    return undefined;
-  }
-
   constructor(options: object = {}) {
     this.options = options;
   }

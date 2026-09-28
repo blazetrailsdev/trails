@@ -39,21 +39,13 @@ export class ControllerGenerator extends NamedBase {
   }
 
   async run(): Promise<string[]> {
-    const name = this.name;
     const actions = this.actions;
     const test = this.options.test ?? true;
-    const paths = controllerPathHelpers(name);
-    const ts = this.isTypeScript();
+    const paths = controllerPathHelpers(this.name);
     const ext = this.ext();
     const depth = paths.namespaceParts.length > 1 ? paths.namespaceParts.length - 1 : 0;
 
-    const source = emitControllerClass({
-      className: paths.className,
-      parent: parentRefForRelative(this.parentClassName(), depth),
-      methods: actions.map((a) => actionMethod(a, ts)),
-    });
-    this.createFile(`app/controllers/${paths.controllerFile}${ext}`, source);
-
+    this.createControllerFiles();
     await this.addRoutes();
 
     if (test) {
@@ -88,6 +80,20 @@ ${cases}
     }
 
     return this.getCreatedFiles();
+  }
+
+  /** @missingRailsCall template — CONVERGEABLE generators-have-no-thor-source-paths-or-template-files */
+  createControllerFiles(): void {
+    const paths = controllerPathHelpers(this.name);
+    const depth = paths.namespaceParts.length > 1 ? paths.namespaceParts.length - 1 : 0;
+    this.createFile(
+      `app/controllers/${paths.controllerFile}${this.ext()}`,
+      emitControllerClass({
+        className: paths.className,
+        parent: parentRefForRelative(this.parentClassName(), depth),
+        methods: this.actions.map((a) => actionMethod(a, this.isTypeScript())),
+      }),
+    );
   }
 
   async addRoutes(): Promise<void> {
