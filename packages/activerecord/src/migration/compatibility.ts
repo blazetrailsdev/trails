@@ -291,10 +291,7 @@ export class V6_1 extends V7_0 {
     raiseOnIfExistOptions(_super: unknown, _options: Options): void {},
   } as unknown as PrependModule;
 
-  /**
-   * @internal
-   * @missingRailsArgs prepend — PERMANENT
-   */
+  /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
     prepend(t as object, V6_1.TableDefinition);
     return super.compatibleTableDefinition(t);
@@ -351,10 +348,7 @@ export class V6_0 extends V6_1 {
     await this.addReference(tableName, refName, options);
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs prepend — PERMANENT
-   */
+  /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
     prepend(t as object, V6_0.TableDefinition);
     return super.compatibleTableDefinition(t);
@@ -399,10 +393,7 @@ export class V5_2 extends V6_0 {
     await super.addTimestamps(tableName, options);
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs prepend — PERMANENT
-   */
+  /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
     prepend(t as object, V5_2.TableDefinition);
     return super.compatibleTableDefinition(t);
@@ -565,10 +556,7 @@ export class V5_0 extends V5_1 {
     await this.addReference(tableName, refName, options);
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs prepend — PERMANENT
-   */
+  /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
     prepend(t as object, V5_0.TableDefinition);
     return super.compatibleTableDefinition(t);
@@ -648,10 +636,7 @@ export class V4_2 extends V5_0 {
     await super.removeIndex(tableName, columnName ?? undefined, options);
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs prepend — PERMANENT
-   */
+  /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
     prepend(t as object, V4_2.TableDefinition);
     return super.compatibleTableDefinition(t);
