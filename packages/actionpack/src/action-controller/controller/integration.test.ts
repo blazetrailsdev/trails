@@ -353,7 +353,6 @@ class IntegrationProcessTest extends IntegrationTest {
           });
         });
         include(rbObjSingletonClass(this) as typeof IntegrationProcessTest, set.urlHelpers());
-        this.app = IntegrationTest.buildApp(set);
         return await block();
       });
     } finally {
