@@ -16,6 +16,8 @@ import {
   isPlainObject,
   isPresent,
   kernelArray,
+  pluralize,
+  singularize,
   transformKeys,
   underscore,
 } from "@blazetrails/activesupport";
@@ -2234,18 +2236,4 @@ function allowedActions(options: RouteOptions, all: ResourceAction[]): Set<Resou
     return new Set(all.filter((a) => !except.includes(a)));
   }
   return new Set(all);
-}
-
-function singularize(word: string): string {
-  if (word.endsWith("ies")) return word.slice(0, -3) + "y";
-  if (word.endsWith("ses") || word.endsWith("xes") || word.endsWith("zes"))
-    return word.slice(0, -2);
-  if (word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
-  return word;
-}
-
-function pluralize(word: string): string {
-  if (word.endsWith("y") && !/[aeiou]y$/.test(word)) return word.slice(0, -1) + "ies";
-  if (word.endsWith("s") || word.endsWith("x") || word.endsWith("z")) return word + "es";
-  return word + "s";
 }

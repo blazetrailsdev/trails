@@ -250,7 +250,7 @@ export class MimeType {
 
   static lookupByExtension(extension: string | null): MimeType | undefined {
     const ext = extension == null ? "" : isSymbol(extension) ? symbolToS(extension) : extension;
-    return MimeType.extensionMap.get(ext.replace(/^\./, ""));
+    return MimeType.extensionMap.get(ext);
   }
 
   static all(): MimeType[] {

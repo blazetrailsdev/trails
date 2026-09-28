@@ -275,3 +275,25 @@ describe("Mapper::Scope", () => {
     expect([...Scope.ROOT]).toEqual([]);
   });
 });
+
+describe("ActionDispatch::Routing::Mapper::Resources inflection", () => {
+  it("singularizes resources :people through the ActiveSupport inflector (mapper.rb:1228-1230)", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.resources("people");
+    });
+    expect(routes.namedRoutes.isKey("person")).toBe(true);
+    expect(routes.namedRoutes.isKey("people")).toBe(true);
+    expect(routes.namedRoutes.isKey("edit_person")).toBe(true);
+    expect(routes.namedRoutes.isKey("people_index")).toBe(false);
+    expect(routes.fromRequirements({ controller: "people", action: "index" })?.name).toBe("people");
+  });
+
+  it("pluralizes a singleton resource's controller through the ActiveSupport inflector (mapper.rb:1298-1300)", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.resource("person");
+    });
+    expect(routes.fromRequirements({ controller: "people", action: "show" })?.name).toBe("person");
+  });
+});

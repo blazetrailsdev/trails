@@ -37,3 +37,10 @@ describe("ActionView::Template::Types once Action Dispatch loads", () => {
     );
   });
 });
+
+describe("Mime::Type.lookup_by_extension", () => {
+  it("reads EXTENSION_LOOKUP with no leading-dot normalization (mime_type.rb:175-177)", () => {
+    expect(MimeType.lookupByExtension("html")).toBe(MimeType.HTML);
+    expect(MimeType.lookupByExtension(".html")).toBeUndefined();
+  });
+});
