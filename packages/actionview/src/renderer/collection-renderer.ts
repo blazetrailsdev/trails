@@ -290,8 +290,8 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
 
           return this.buildRenderedCollection(body, spacer);
         };
-        return isThenable(collectionBody)
-          ? Promise.resolve(collectionBody).then(build)
+        return collectionBody instanceof Promise
+          ? collectionBody.then(build)
           : build(collectionBody);
       },
     );
@@ -327,6 +327,6 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
       partialIteration.iterateBang();
       rendered.push(this.buildRenderedTemplate(content, _template));
     });
-    return isThenable(each) ? Promise.resolve(each).then(() => rendered) : rendered;
+    return each instanceof Promise ? each.then(() => rendered) : rendered;
   }
 }

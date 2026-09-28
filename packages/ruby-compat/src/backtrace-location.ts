@@ -39,7 +39,10 @@ export class Location {
     const label = /^at\s+(?:async\s+)?([^\s(]+)\s*\(/.exec(this._frame);
     this.label = label ? label[1].slice(label[1].lastIndexOf(".") + 1) : null;
 
-    const path = /(?:\(|^at\s+(?:async\s+)?)([^()\s][^()]*?):\d+:\d+\)?$/.exec(this._frame);
+    const body = this._frame.replace(/^at\s+(?:async\s+)?/, "");
+    const location =
+      body.endsWith(")") && body.includes(" (") ? body.slice(body.indexOf(" (") + 2, -1) : body;
+    const path = location.startsWith("eval at ") ? null : /^(.+):\d+:\d+$/.exec(location);
     this.path = path ? path[1] : null;
 
     const position = /:(\d+):(\d+)\)?$/.exec(this._frame);

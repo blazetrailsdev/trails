@@ -166,18 +166,17 @@ if (pending.length > 0) {
 The bootstrap every project puts in `db.ts`:
 
 ```ts
-import { Base } from "@blazetrails/activerecord";
 import { loadDatabaseConfig } from "@blazetrails/activerecord-cli";
 import "./app/models/index.js"; // side-effect: registers all models
 
 await loadDatabaseConfig(import.meta.dirname);
-await Base.establishConnection();
 ```
 
 `loadDatabaseConfig` reads `config/database.ts` into `Base.configurations`, the
-way Rails' railtie loads `config/database.yml`. `establishConnection()` with no
-arguments resolves only through that registry: it picks the entry for
-`TRAILS_ENV` (default `"development"`) and opens the connection pool. The manifest import must happen before any AR query so models
+way Rails' railtie loads `config/database.yml`. It then connects to the
+`DatabaseTasks.env` entry: `TRAILS_ENV` (or `NODE_ENV`), or `"development"` when
+neither is set, which is `Rails.env`'s default. A bare `Base.establishConnection()`
+resolves `DEFAULT_ENV`, which is `default_env` when both are unset, as in Rails. The manifest import must happen before any AR query so models
 are registered in the inheritance tracker.
 
 ## Architecture / design choices

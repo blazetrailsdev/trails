@@ -1,5 +1,5 @@
-import { File } from "@blazetrails/ruby-compat";
-import { seedDefaultEnv } from "./environment.js";
+import { File, setEnv } from "@blazetrails/ruby-compat";
+import { getEnv, isBlank } from "@blazetrails/activesupport";
 import { init, detectPackageManager } from "./init.js";
 import { generateManifest } from "./generate-manifest.js";
 import { generateMigration, migrationTimestamp, parseFields } from "./generate-migration.js";
@@ -222,7 +222,9 @@ function readRootFlag(args: string[]): { value: string | undefined } | null {
 }
 
 export async function run(argv: string[], cwd: string): Promise<number> {
-  seedDefaultEnv();
+  if (isBlank(getEnv("TRAILS_ENV")) && isBlank(getEnv("NODE_ENV"))) {
+    setEnv("TRAILS_ENV", "development");
+  }
   const [command, ...rest] = argv;
   if (!command || command === "help" || command === "--help" || command === "-h") {
     console.log(HELP);

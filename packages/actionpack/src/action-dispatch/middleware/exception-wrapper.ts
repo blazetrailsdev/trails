@@ -381,9 +381,7 @@ export class ExceptionWrapper {
         : args === "noise"
           ? lines.filter((l) => String(l).includes("node_modules"))
           : lines;
-    return this.backtraceCleaner
-      ? this.backtraceCleaner.clean(partitioned.map(String))
-      : partitioned;
+    return this.backtraceCleaner ? this.backtraceCleaner.clean(partitioned) : partitioned;
   }
 
   /** @internal */

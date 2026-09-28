@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { BacktraceCleaner } from "@blazetrails/activesupport";
 import {
   Base,
   MissingTemplate,
@@ -103,5 +104,15 @@ describe("ExceptionWrapper#backtrace", () => {
       ["/app/lib/file.js", 42],
       ["/app/node_modules/rack.js", 43],
     ]);
+  });
+});
+
+describe("ExceptionWrapper#clean_backtrace", () => {
+  it("hands the memoized locations to the backtrace cleaner", () => {
+    const error = new Error("boom");
+    error.stack = "Error: boom\n    at index (/app/lib/file.js:42:7)";
+    const wrapper = new ExceptionWrapper(new BacktraceCleaner().removeFilters(), error);
+    expect(wrapper.fullTrace[0]).toBe(wrapper.backtrace[0]);
+    expect(wrapper.traces["Full Trace"][0].trace).toBe("at index (/app/lib/file.js:42:7)");
   });
 });

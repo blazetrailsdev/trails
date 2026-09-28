@@ -1,6 +1,4 @@
 import { isAbsolute, resolve } from "path";
-import { getEnv, isBlank } from "@blazetrails/activesupport";
-import { setEnv } from "@blazetrails/ruby-compat";
 import {
   Base,
   DatabaseConfigurations,
@@ -36,12 +34,6 @@ export function normalizeSqlitePaths(
     });
   });
   return new DatabaseConfigurations(normalized);
-}
-
-export function seedDefaultEnv(): void {
-  if (isBlank(getEnv("TRAILS_ENV")) && isBlank(getEnv("NODE_ENV"))) {
-    setEnv("TRAILS_ENV", "development");
-  }
 }
 
 export function environmentDbConfig(env: string): HashConfig | null {
