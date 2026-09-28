@@ -1,4 +1,9 @@
-import { TopLevel, extractOptionsBang, isPlainObject } from "@blazetrails/activesupport";
+import {
+  SafeBuffer,
+  TopLevel,
+  extractOptionsBang,
+  isPlainObject,
+} from "@blazetrails/activesupport";
 import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 
 import type { UrlHelperHost } from "./helpers/url-helper.js";
@@ -23,8 +28,8 @@ interface UrlFor {
 
 export class RoutingUrlFor extends (Object as unknown as new () => UrlFor) {
   urlFor(this: Host, options: UrlForOptions = null): string {
-    if (typeof options === "string" && !isSymbol(options)) {
-      return options;
+    if ((typeof options === "string" && !isSymbol(options)) || options instanceof SafeBuffer) {
+      return options as unknown as string;
     } else if (options == null) {
       return super.urlFor({ onlyPath: this._generatePathsByDefault() });
     } else if (isPlainObject(options)) {

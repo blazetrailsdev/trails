@@ -67,6 +67,10 @@ export class Headers {
     return this._req.hasHeader(envName(String(key)));
   }
 
+  isInclude(key: string): boolean {
+    return this.isKey(key);
+  }
+
   fetch(key: string, ...defaultValue: unknown[]): unknown {
     return this._req.fetchHeader(envName(String(key)), () => {
       if (defaultValue.length > 0) {
@@ -83,7 +87,7 @@ export class Headers {
   }
 
   merge(headersOrEnv: Record<string, unknown>): Headers {
-    const headers = Headers.fromHash(this.env);
+    const headers = this._req.dup().headers;
     headers.mergeBang(headersOrEnv);
     return headers;
   }
