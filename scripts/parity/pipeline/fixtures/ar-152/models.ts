@@ -1,12 +1,18 @@
-import { Base, Relation, registerModel } from "@blazetrails/activerecord";
+import { Base, registerModel } from "@blazetrails/activerecord";
 
 export class Author extends Base {
   static {
     this.tableName = "authors";
     this.hasMany("books");
-    this.hasMany("publishedBooks", (rel: Relation<any>) => rel.where({ status: "published" }), {
-      className: "Book",
-    });
+    this.hasMany(
+      "publishedBooks",
+      function (this: any) {
+        return this.where({ status: "published" });
+      },
+      {
+        className: "Book",
+      },
+    );
     registerModel(this);
   }
 }
