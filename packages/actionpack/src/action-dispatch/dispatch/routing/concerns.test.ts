@@ -1,22 +1,11 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Base } from "../../../action-controller/base.js";
 import { controllerConstants } from "../../http/request.js";
 import type { Mapper } from "../../routing/mapper.js";
 import { RouteSet } from "../../routing/route-set.js";
 import { IntegrationTest } from "../../testing/integration.js";
+import { ResourcesController } from "../../../test-helpers/abstract-unit.js";
 
-class ResourcesController extends Base {
-  index(): void {
-    this.head("ok");
-  }
-  show(): void {
-    this.index();
-  }
-}
-
-class CommentsController extends ResourcesController {}
-class ImagesController extends ResourcesController {}
 class ReviewsController extends ResourcesController {}
 
 class Reviewable {
@@ -59,8 +48,6 @@ describe("RoutingConcernsTest", () => {
   let session: IntegrationTest;
 
   beforeAll(() => {
-    controllerConstants.set("comments", CommentsController);
-    controllerConstants.set("images", ImagesController);
     controllerConstants.set("reviews", ReviewsController);
   });
 

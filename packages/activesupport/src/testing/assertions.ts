@@ -703,6 +703,14 @@ function refuteEqual(exp: unknown, act: unknown, msg: string | (() => string) | 
   return refute(deepEqual(exp, act), msg);
 }
 
+export function assertNotEqual(
+  exp: unknown,
+  act: unknown,
+  msg: string | (() => string) | null = null,
+): true {
+  return refuteEqual(exp, act, msg);
+}
+
 /** @noRailsEquivalent PERMANENT */
 export function assertNil(obj: unknown, msg: string | (() => string) | null = null): true {
   msg = message(msg, null, () => `Expected ${inspect(obj)} to be nil`);
