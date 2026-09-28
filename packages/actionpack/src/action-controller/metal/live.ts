@@ -142,19 +142,11 @@ export class SSE {
 export class Response extends DispatchResponse {
   declare stream: Buffer;
 
-  close(): void {
-    this.beforeCommitted();
-    super.close();
-  }
-
   /** @internal */
-  protected beforeCommitted(): void {
-    if (this.committed) return;
-    const cookies = this.cookies;
-    const names = Object.keys(cookies);
-    if (names.length === 0) return;
-    if (this.headers.get("set-cookie") !== undefined) return;
-    this.setHeader("set-cookie", names.map((n) => `${n}=${cookies[n]}`).join("\n"));
+  protected override beforeCommitted(): void {
+    super.beforeCommitted();
+    const jar = this.request!.cookieJar();
+    if (!this.committed) jar.write(this);
   }
 
   /** @internal */
