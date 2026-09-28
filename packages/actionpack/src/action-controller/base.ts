@@ -13,7 +13,7 @@ import { Metal } from "./metal.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import { RequestForgeryProtection } from "../action-dispatch/request-forgery-protection.js";
 import { respondTo } from "./metal/mime-responds.js";
-import { actionMethods, addFlashTypes } from "./metal/flash.js";
+import { actionMethods, addFlashTypes, Flash } from "./metal/flash.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
 import { MissingFile } from "./metal/exceptions.js";
 import { defaultRender } from "./metal/implicit-render.js";
@@ -896,6 +896,7 @@ export class Base extends Metal {
 
 include(Base, ConfigMethods);
 include(Base, Cookies);
+include(Base, Flash);
 include(Base, StrongParametersModule);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
 Base.prototype._processOptions = _processOptions;
@@ -924,8 +925,6 @@ classAttribute.call(Base, "_layoutConditions", {
   default: {},
 });
 Base._writeLayoutMethod();
-classAttribute.call(Base, "_flashTypes", { instanceAccessor: false, default: [] });
-Base.addFlashTypes("alert", "notice");
 Base.prototype.viewCacheDependencies = viewCacheDependencies;
 Base.prototype.cache = cache;
 Base.prototype.combinedFragmentCacheKey = combinedFragmentCacheKey;

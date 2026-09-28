@@ -1,3 +1,4 @@
+import { classAttribute, included } from "@blazetrails/activesupport";
 import { AbstractController } from "../../abstract-controller/base.js";
 import { helperMethod, type HelpersClassMethods } from "../../abstract-controller/helpers.js";
 import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
@@ -6,6 +7,13 @@ import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
 export interface FlashClassHost extends HelpersClassMethods {
   prototype: object;
   _flashTypes: string[];
+}
+
+export class Flash {
+  static [included](base: FlashClassHost & { addFlashTypes(...types: string[]): void }): void {
+    classAttribute.call(base, "_flashTypes", { instanceAccessor: false, default: [] });
+    base.addFlashTypes("alert", "notice");
+  }
 }
 
 export function addFlashTypes(this: FlashClassHost, ...types: string[]): void {
