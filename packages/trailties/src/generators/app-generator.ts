@@ -407,11 +407,17 @@ Trails.application.loadServer();
 
     this.createFile(
       "vite.config.ts",
-      `import { fileURLToPath } from "node:url";
+      `/// <reference types="vitest/config" />
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
 export default defineConfig({
   root: "app",
+  test: {
+    root: fileURLToPath(new URL(".", import.meta.url)),
+    include: ["test/**/*.test.ts"],
+    exclude: ["test/{system,dummy,fixtures}/**/*.test.ts"],
+  },
   publicDir: false,
   build: {
     outDir: "../public/assets",
