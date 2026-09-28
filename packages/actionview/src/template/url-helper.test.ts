@@ -4,7 +4,7 @@ import { ActionController, Request, RouteSet, UrlFor } from "@blazetrails/action
 import { Conversion, Naming } from "@blazetrails/activemodel";
 import { extend, isPresent } from "@blazetrails/activesupport";
 import { MockRequest } from "@blazetrails/rack";
-import { include } from "@blazetrails/ruby-compat";
+import { ArgumentError, include } from "@blazetrails/ruby-compat";
 import { RoutingUrlFor } from "../routing-url-for.js";
 import { Base } from "../base.js";
 import { setPrependContentExfiltrationPrevention } from "../helpers/content-exfiltration-prevention-helper.js";
@@ -63,6 +63,7 @@ function viewWith(controller: unknown): Base {
 const normalizeDom = (html: unknown): string =>
   String(html)
     .replaceAll("&amp;", "&")
+    .replaceAll("&#39;", "'")
     .replace(/<(\w+)((?:\s+[\w-]+="[^"]*")*)\s*(\/?)>/g, (_m, name, attrs, close) => {
       const sorted = (attrs.match(/[\w-]+="[^"]*"/g) ?? []).sort().join(" ");
       return `<${name}${sorted ? " " + sorted : ""}${close}>`;
@@ -195,6 +196,32 @@ describe("UrlHelperTest", () => {
     ]);
   });
 
+  it("to form params with hash having symbol and string keys", () => {
+    expect(UrlHelper.toFormParams({ name: "David", nationality: "Danish" })).toEqual([
+      { name: "name", value: "David" },
+      { name: "nationality", value: "Danish" },
+    ]);
+  });
+
+  it("to form params with nested hash", () => {
+    expect(UrlHelper.toFormParams({ country: { name: "Denmark" } })).toEqual([
+      { name: "country[name]", value: "Denmark" },
+    ]);
+  });
+
+  it("to form params with array nested in hash", () => {
+    expect(UrlHelper.toFormParams({ countries: ["Denmark", "Sweden"] })).toEqual([
+      { name: "countries[]", value: "Denmark" },
+      { name: "countries[]", value: "Sweden" },
+    ]);
+  });
+
+  it("to form params with namespace", () => {
+    expect(UrlHelper.toFormParams({ name: "Denmark" }, "country")).toEqual([
+      { name: "country[name]", value: "Denmark" },
+    ]);
+  });
+
   it("button to without protect against forgery method", () => {
     delete view.isProtectAgainstForgery;
     assertDomEqual(
@@ -211,11 +238,41 @@ describe("UrlHelperTest", () => {
     );
   });
 
+  it("button to with authenticity token true", () => {
+    requestForgery = true;
+    assertDomEqual(
+      `<form method="post" action="http://www.example.com" class="button_to"><button type="submit">Hello</button><input name="form_token" type="hidden" value="secret" autocomplete="off" /></form>`,
+      view.buttonTo("Hello", "http://www.example.com", { authenticity_token: true }),
+    );
+  });
+
+  it("button to with authenticity token false", () => {
+    requestForgery = true;
+    assertDomEqual(
+      `<form method="post" action="http://www.example.com" class="button_to"><button type="submit">Hello</button></form>`,
+      view.buttonTo("Hello", "http://www.example.com", { authenticity_token: false }),
+    );
+  });
+
+  it("button to with straight url", () => {
+    assertDomEqual(
+      `<form method="post" action="http://www.example.com" class="button_to"><button type="submit">Hello</button></form>`,
+      view.buttonTo("Hello", "http://www.example.com"),
+    );
+  });
+
   it("button to with path", () => {
     const routed = UrlHelperView.withViewPaths([]) as any;
     assertDomEqual(
       `<form method="post" action="/article/Hello" class="button_to"><button type="submit">Hello</button></form>`,
       routed.buttonTo("Hello", routed.articlePath("Hello")),
+    );
+  });
+
+  it("button to with false url", () => {
+    assertDomEqual(
+      `<form method="post" class="button_to"><button type="submit">Hello</button></form>`,
+      view.buttonTo("Hello", false),
     );
   });
 
@@ -290,6 +347,62 @@ describe("UrlHelperTest", () => {
     );
   });
 
+  it("button to with form class", () => {
+    assertDomEqual(
+      `<form method="post" action="http://www.example.com" class="custom-class"><button type="submit">Hello</button></form>`,
+      view.buttonTo("Hello", "http://www.example.com", { form_class: "custom-class" }),
+    );
+  });
+
+  it("button to with form class escapes", () => {
+    assertDomEqual(
+      `<form method="post" action="http://www.example.com" class="&lt;script&gt;evil_js&lt;/script&gt;"><button type="submit">Hello</button></form>`,
+      view.buttonTo("Hello", "http://www.example.com", { form_class: "<script>evil_js</script>" }),
+    );
+  });
+
+  it("button to with query", () => {
+    assertDomEqual(
+      `<form method="post" action="http://www.example.com/q1=v1&amp;q2=v2" class="button_to"><button type="submit">Hello</button></form>`,
+      view.buttonTo("Hello", "http://www.example.com/q1=v1&q2=v2"),
+    );
+  });
+
+  it("button to with value", () => {
+    assertDomEqual(
+      `<form method="post" action="http://www.example.com" class="button_to"><button type="submit" name="key" value="value">Hello</button></form>`,
+      view.buttonTo("Hello", "http://www.example.com", { name: "key", value: "value" }),
+    );
+  });
+
+  it("button to with html safe URL", () => {
+    assertDomEqual(
+      `<form method="post" action="http://www.example.com/q1=v1&amp;q2=v2" class="button_to"><button type="submit">Hello</button></form>`,
+      view.buttonTo("Hello", raw("http://www.example.com/q1=v1&amp;q2=v2")),
+    );
+  });
+
+  it("button to with query and no name", () => {
+    assertDomEqual(
+      `<form method="post" action="http://www.example.com?q1=v1&amp;q2=v2" class="button_to"><button type="submit">http://www.example.com?q1=v1&amp;q2=v2</button></form>`,
+      view.buttonTo(null, "http://www.example.com?q1=v1&q2=v2"),
+    );
+  });
+
+  it("button to with javascript confirm", () => {
+    assertDomEqual(
+      `<form method="post" action="http://www.example.com" class="button_to"><button data-confirm="Are you sure?" type="submit">Hello</button></form>`,
+      view.buttonTo("Hello", "http://www.example.com", { data: { confirm: "Are you sure?" } }),
+    );
+  });
+
+  it("button to with javascript disable with", () => {
+    assertDomEqual(
+      `<form method="post" action="http://www.example.com" class="button_to"><button data-disable-with="Greeting..." type="submit">Hello</button></form>`,
+      view.buttonTo("Hello", "http://www.example.com", { data: { disable_with: "Greeting..." } }),
+    );
+  });
+
   it("button to with remote and form options", () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="custom-class" data-remote="true" data-type="json"><button type="submit">Hello</button></form>`,
@@ -297,6 +410,44 @@ describe("UrlHelperTest", () => {
         remote: true,
         form: { class: "custom-class", "data-type": "json" },
       }),
+    );
+  });
+
+  it("button to with remote and javascript confirm", () => {
+    assertDomEqual(
+      `<form method="post" action="http://www.example.com" class="button_to" data-remote="true"><button data-confirm="Are you sure?" type="submit">Hello</button></form>`,
+      view.buttonTo("Hello", "http://www.example.com", {
+        remote: true,
+        data: { confirm: "Are you sure?" },
+      }),
+    );
+  });
+
+  it("button to with remote and javascript disable with", () => {
+    assertDomEqual(
+      `<form method="post" action="http://www.example.com" class="button_to" data-remote="true"><button data-disable-with="Greeting..." type="submit">Hello</button></form>`,
+      view.buttonTo("Hello", "http://www.example.com", {
+        remote: true,
+        data: { disable_with: "Greeting..." },
+      }),
+    );
+  });
+
+  it("button to with remote false", () => {
+    assertDomEqual(
+      `<form method="post" action="http://www.example.com" class="button_to"><button type="submit">Hello</button></form>`,
+      view.buttonTo("Hello", "http://www.example.com", { remote: false }),
+    );
+  });
+
+  it("button to enabled disabled", () => {
+    assertDomEqual(
+      `<form method="post" action="http://www.example.com" class="button_to"><button type="submit">Hello</button></form>`,
+      view.buttonTo("Hello", "http://www.example.com", { disabled: false }),
+    );
+    assertDomEqual(
+      `<form method="post" action="http://www.example.com" class="button_to"><button disabled="disabled" type="submit">Hello</button></form>`,
+      view.buttonTo("Hello", "http://www.example.com", { disabled: true }),
     );
   });
 
@@ -331,6 +482,20 @@ describe("UrlHelperTest", () => {
     );
   });
 
+  it("button to with method get", () => {
+    assertDomEqual(
+      `<form method="get" action="http://www.example.com" class="button_to"><button type="submit">Hello</button></form>`,
+      view.buttonTo("Hello", "http://www.example.com", { method: "get" }),
+    );
+  });
+
+  it("button to with block", () => {
+    assertDomEqual(
+      `<form method="post" action="http://www.example.com" class="button_to"><button type="submit"><span>Hello</span></button></form>`,
+      view.buttonTo("http://www.example.com", null, null, () => view.contentTag("span", "Hello")),
+    );
+  });
+
   it("button to with params", () => {
     assertDomEqual(
       `<form action="http://www.example.com" class="button_to" method="post"><button type="submit">Hello</button><input type="hidden" name="baz" value="quux" autocomplete="off" /><input type="hidden" name="foo" value="bar" autocomplete="off" /></form>`,
@@ -351,6 +516,60 @@ describe("UrlHelperTest", () => {
     }
   });
 
+  class FakeParams {
+    #permitted: boolean;
+
+    constructor(permitted = true) {
+      this.#permitted = permitted;
+    }
+
+    isPermitted(): boolean {
+      return this.#permitted;
+    }
+
+    toH(): Record<string, unknown> {
+      if (this.isPermitted()) {
+        return { foo: "bar", baz: "quux" };
+      } else {
+        throw new ArgumentError();
+      }
+    }
+  }
+
+  it("button to with permitted strong params", () => {
+    assertDomEqual(
+      `<form action="http://www.example.com" class="button_to" method="post"><button type="submit">Hello</button><input type="hidden" name="baz" value="quux" autocomplete="off" /><input type="hidden" name="foo" value="bar" autocomplete="off" /></form>`,
+      view.buttonTo("Hello", "http://www.example.com", { params: new FakeParams() }),
+    );
+  });
+
+  it("button to with unpermitted strong params", () => {
+    expect(() =>
+      view.buttonTo("Hello", "http://www.example.com", { params: new FakeParams(false) }),
+    ).toThrow(ArgumentError);
+  });
+
+  it("button to with nested hash params", () => {
+    assertDomEqual(
+      `<form action="http://www.example.com" class="button_to" method="post"><button type="submit">Hello</button><input type="hidden" name="foo[bar]" value="baz" autocomplete="off" /></form>`,
+      view.buttonTo("Hello", "http://www.example.com", { params: { foo: { bar: "baz" } } }),
+    );
+  });
+
+  it("button to with nested array params", () => {
+    assertDomEqual(
+      `<form action="http://www.example.com" class="button_to" method="post"><button type="submit">Hello</button><input type="hidden" name="foo[]" value="bar" autocomplete="off" /></form>`,
+      view.buttonTo("Hello", "http://www.example.com", { params: { foo: ["bar"] } }),
+    );
+  });
+
+  it("link tag with straight url", () => {
+    assertDomEqual(
+      `<a href="http://www.example.com">Hello</a>`,
+      view.linkTo("Hello", "http://www.example.com"),
+    );
+  });
+
   it("link tag without host option", () => {
     const routed = UrlHelperView.withViewPaths([]) as any;
     assertDomEqual(`<a href="/">Test Link</a>`, routed.linkTo("Test Link", urlHash()));
@@ -361,6 +580,11 @@ describe("UrlHelperTest", () => {
     const hash = hashFor({ host: "www.example.com" });
     const expected = `<a href="http://www.example.com/">Test Link</a>`;
     assertDomEqual(expected, routed.linkTo("Test Link", hash));
+  });
+
+  it("link tag with query", () => {
+    const expected = `<a href="http://www.example.com?q1=v1&amp;q2=v2">Hello</a>`;
+    assertDomEqual(expected, view.linkTo("Hello", "http://www.example.com?q1=v1&q2=v2"));
   });
 
   it("link tag with query and no name", () => {
@@ -376,9 +600,60 @@ describe("UrlHelperTest", () => {
     assertDomEqual(`<a href="${env.HTTP_REFERER}">go back</a>`, view.linkTo("go back", ":back"));
   });
 
+  it("link tag with back and no referer", () => {
+    view = viewWith(controllerWithReferer({}));
+    const link = view.linkTo("go back", ":back");
+    assertDomEqual(`<a href="javascript:history.back()">go back</a>`, link);
+  });
+
+  it("link tag with img", () => {
+    const link = view.linkTo(raw("<img src='/favicon.jpg' />"), "/");
+    const expected = `<a href="/"><img src='/favicon.jpg' /></a>`;
+    assertDomEqual(expected, link);
+  });
+
   it("link with nil html options", () => {
     const link = view.linkTo("Hello", urlHash(), null);
     assertDomEqual(`<a href="/">Hello</a>`, link);
+  });
+
+  it("link tag with custom onclick", () => {
+    const link = view.linkTo("Hello", "http://www.example.com", { onclick: "alert('yay!')" });
+    const expected = `<a href="http://www.example.com" onclick="alert(&#39;yay!&#39;)">Hello</a>`;
+    assertDomEqual(expected, link);
+  });
+
+  it("link tag with javascript confirm", () => {
+    assertDomEqual(
+      `<a href="http://www.example.com" data-confirm="Are you sure?">Hello</a>`,
+      view.linkTo("Hello", "http://www.example.com", { data: { confirm: "Are you sure?" } }),
+    );
+    assertDomEqual(
+      `<a href="http://www.example.com" data-confirm="You can't possibly be sure, can you?">Hello</a>`,
+      view.linkTo("Hello", "http://www.example.com", {
+        data: { confirm: "You can't possibly be sure, can you?" },
+      }),
+    );
+    assertDomEqual(
+      `<a href="http://www.example.com" data-confirm="You can't possibly be sure,\n can you?">Hello</a>`,
+      view.linkTo("Hello", "http://www.example.com", {
+        data: { confirm: "You can't possibly be sure,\n can you?" },
+      }),
+    );
+  });
+
+  it("link to with remote", () => {
+    assertDomEqual(
+      `<a href="http://www.example.com" data-remote="true">Hello</a>`,
+      view.linkTo("Hello", "http://www.example.com", { remote: true }),
+    );
+  });
+
+  it("link to with remote false", () => {
+    assertDomEqual(
+      `<a href="http://www.example.com">Hello</a>`,
+      view.linkTo("Hello", "http://www.example.com", { remote: false }),
+    );
   });
 
   it("link to with symbolic remote in non html options", () => {
@@ -395,6 +670,27 @@ describe("UrlHelperTest", () => {
     );
   });
 
+  it("link tag using post javascript", () => {
+    assertDomEqual(
+      `<a href="http://www.example.com" data-method="post" rel="nofollow">Hello</a>`,
+      view.linkTo("Hello", "http://www.example.com", { method: "post" }),
+    );
+  });
+
+  it("link tag using delete javascript", () => {
+    assertDomEqual(
+      `<a href="http://www.example.com" rel="nofollow" data-method="delete">Destroy</a>`,
+      view.linkTo("Destroy", "http://www.example.com", { method: "delete" }),
+    );
+  });
+
+  it("link tag using delete javascript and href", () => {
+    assertDomEqual(
+      `<a href="#" rel="nofollow" data-method="delete">Destroy</a>`,
+      view.linkTo("Destroy", "http://www.example.com", { method: "delete", href: "#" }),
+    );
+  });
+
   it("link tag using post javascript and rel", () => {
     assertDomEqual(
       `<a href="http://www.example.com" data-method="post" rel="example nofollow">Hello</a>`,
@@ -407,6 +703,16 @@ describe("UrlHelperTest", () => {
     );
   });
 
+  it("link tag using post javascript and confirm", () => {
+    assertDomEqual(
+      `<a href="http://www.example.com" data-method="post" rel="nofollow" data-confirm="Are you serious?">Hello</a>`,
+      view.linkTo("Hello", "http://www.example.com", {
+        method: "post",
+        data: { confirm: "Are you serious?" },
+      }),
+    );
+  });
+
   it("link tag using delete javascript and href and confirm", () => {
     assertDomEqual(
       `<a href="#" rel="nofollow" data-confirm="Are you serious?" data-method="delete">Destroy</a>`,
@@ -415,6 +721,13 @@ describe("UrlHelperTest", () => {
         href: "#",
         data: { confirm: "Are you serious?" },
       }),
+    );
+  });
+
+  it("link tag with block", () => {
+    assertDomEqual(
+      `<a href="/"><span>Example site</span></a>`,
+      view.linkTo("/", null, null, () => view.contentTag("span", "Example site")),
     );
   });
 
@@ -441,6 +754,20 @@ describe("UrlHelperTest", () => {
     assertDomEqual(
       `<a href="/article/Gerd_M%C3%BCller">Gerd Müller</a>`,
       view.linkTo("Gerd Müller", view.articlePath("Gerd_Müller")),
+    );
+  });
+
+  it("link tag escapes content", () => {
+    assertDomEqual(
+      `<a href="/">Malicious &lt;script&gt;content&lt;/script&gt;</a>`,
+      view.linkTo("Malicious <script>content</script>", "/"),
+    );
+  });
+
+  it("link tag does not escape html safe content", () => {
+    assertDomEqual(
+      `<a href="/">Malicious <script>content</script></a>`,
+      view.linkTo(raw("Malicious <script>content</script>"), "/"),
     );
   });
 

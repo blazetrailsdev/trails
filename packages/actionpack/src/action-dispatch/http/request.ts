@@ -1000,6 +1000,12 @@ export interface Request {
 export interface Request extends CspRequest {}
 include(Request, CspRequest);
 
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Env` (`action_dispatch/http/request.rb:29`), whose `initialize_copy` (`rack/request.rb:144-146`) is what `dup` runs. */
+export interface Request {
+  dup(): Request;
+}
+Request.prototype.dup = RackRequest.prototype.dup as unknown as () => Request;
+
 type MimeHost = MimeNegotiationHost & _MimeNegotiation;
 const MIME_HOSTS = new WeakMap<Request, MimeHost>();
 function mimeHost(req: Request): MimeHost {

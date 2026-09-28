@@ -12,12 +12,14 @@ import {
   ContentSecurityPolicy,
   ExceptionWrapper,
   type NonceGenerator,
+  type CustomProxies,
 } from "@blazetrails/actionpack";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 export interface ActionDispatchConfig {
   xSendfileHeader: string | null;
   ipSpoofingCheck: boolean;
+  trustedProxies?: CustomProxies | null;
   showExceptions: "all" | "rescuable" | "none";
   tldLength: number;
   ignoreAcceptHeader: boolean;

@@ -84,7 +84,9 @@ describe("HeaderTest", () => {
   it("key?", () => {
     const headers = setup();
     expect(headers.isKey("CONTENT_TYPE")).toBe(true);
+    expect(headers.isInclude("CONTENT_TYPE")).toBe(true);
     expect(headers.isKey("Content-Type")).toBe(true);
+    expect(headers.isInclude("Content-Type")).toBe(true);
   });
 
   it("fetch with block", () => {

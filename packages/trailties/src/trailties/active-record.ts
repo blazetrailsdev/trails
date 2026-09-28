@@ -67,6 +67,11 @@ export interface ActiveRecordConfig {
   verboseQueryLogs?: boolean;
   dumpSchemaAfterMigration?: boolean;
   attributesForInspect?: string[] | "all";
+  databaseSelector?: Record<string, unknown> | null;
+  databaseResolver?: unknown;
+  databaseResolverContext?: unknown;
+  shardSelector?: { lock?: boolean } | null;
+  shardResolver?: ((request: unknown) => unknown) | null;
 }
 
 declare module "../trailtie/configuration.js" {
