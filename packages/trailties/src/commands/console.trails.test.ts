@@ -27,6 +27,7 @@ async function evaluate(line: string): Promise<void> {
 describe("ConsoleCommand (trails)", () => {
   it("evaluates input in the main realm and keeps bindings across lines", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
+    const globalsBefore = new Set(Reflect.ownKeys(globalThis));
     await createProgram().parseAsync(["node", "trails", "console"]);
     const g = globalThis as Record<string, unknown>;
     try {
@@ -36,7 +37,9 @@ describe("ConsoleCommand (trails)", () => {
       expect(isPlainObject(g.consoleRealmHash)).toBe(true);
     } finally {
       io.server!.close();
-      delete g.consoleRealmHash;
+      for (const key of Reflect.ownKeys(globalThis)) {
+        if (!globalsBefore.has(key)) Reflect.deleteProperty(globalThis, key);
+      }
       vi.restoreAllMocks();
     }
   });
