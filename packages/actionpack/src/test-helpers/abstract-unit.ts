@@ -28,7 +28,7 @@ import { IntegrationTest } from "../action-dispatch/testing/integration.js";
 export const ActionPackTestSuiteUtils = {
   async requireHelpers(helpersDirs: string | string[]): Promise<void> {
     for (const helpersDir of ([] as string[]).concat(helpersDirs)) {
-      for (const helperFile of Dir.glob(`${helpersDir}/**/*_helper.ts`)) {
+      for (const helperFile of Dir.glob(`${helpersDir}/**/*-helper.ts`)) {
         await import(helperFile);
       }
     }
@@ -39,7 +39,7 @@ await ActionPackTestSuiteUtils.requireHelpers(
   new URL("./fixtures/helpers", import.meta.url).pathname,
 );
 await ActionPackTestSuiteUtils.requireHelpers(
-  new URL("./fixtures/alternate_helpers", import.meta.url).pathname,
+  new URL("./fixtures/alternate-helpers", import.meta.url).pathname,
 );
 
 export const FIXTURE_LOAD_PATH = new URL("./fixtures", import.meta.url).pathname;

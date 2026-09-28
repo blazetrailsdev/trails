@@ -5,7 +5,7 @@ import { Base } from "../action-controller/base.js";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import { FIXTURE_LOAD_PATH } from "./abstract-unit.js";
-import { GamesHelper } from "./fixtures/helpers/fun/games_helper.js";
+import { GamesHelper } from "./fixtures/helpers/fun/games-helper.js";
 
 class FixtureLoadPathController extends Base {
   async helloWorldWithLayout(): Promise<void> {
