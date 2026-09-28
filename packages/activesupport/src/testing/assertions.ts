@@ -660,7 +660,7 @@ function muPpForDiff(obj: unknown): string {
   return str.replace(/\\?\\n/g, process).replace(/:0x[a-fA-F0-9]{4,}/gm, ":0xXXXXXX");
 }
 
-function message(
+export function message(
   msg: string | (() => string) | null,
   ending: string | null,
   defaultMessage: () => string,

@@ -12,7 +12,7 @@ import {
   URI,
   type Method,
 } from "@blazetrails/ruby-compat";
-import { Assertion, assertEqual } from "@blazetrails/activesupport";
+import { Assertion, assertEqual, message } from "@blazetrails/activesupport";
 import { RouteSet, type Config } from "../../routing/route-set.js";
 import { RoutingError } from "../../../action-controller/metal/exceptions.js";
 import { TestRequest } from "../../../action-controller/test-case.js";
@@ -180,21 +180,26 @@ export function assertRecognizes(
   extras: Options = {},
   msg?: string,
 ): void {
-  if (typeof path !== "string" && String(path.method ?? "").toLowerCase() === "all") {
+  if (typeof path !== "string" && String(path.method ?? "") === "all") {
     for (const method of ["get", "post", "put", "delete"] as const) {
       assertRecognizes.call(this, expectedOptions, { ...path, method }, extras, msg);
     }
     return;
   }
   const request = recognizedRequestFor.call(this, path, extras, msg);
+
   expectedOptions = { ...expectedOptions };
 
-  const message =
-    msg ??
-    (() =>
-      `The recognized options <${inspect(request.pathParameters)}> did not match <${inspect(expectedOptions)}>, difference:`);
-
-  assertEqual(expectedOptions, request.pathParameters, message);
+  assertEqual(
+    expectedOptions,
+    request.pathParameters,
+    message(
+      msg ?? null,
+      "",
+      () =>
+        `The recognized options <${inspect(request.pathParameters)}> did not match <${inspect(expectedOptions)}>, difference:`,
+    ),
+  );
 }
 
 export function assertGenerates(
@@ -217,10 +222,9 @@ export function assertGenerates(
   const routes = requireRoutes(this);
   const opts = { ...options };
   const [generatedPath, queryStringKeys] = routes.generateExtras(opts, defaults);
-  const foundExtras: Options = Object.create(null);
-  for (const k of queryStringKeys) {
-    if (Object.hasOwn(opts, k)) foundExtras[k] = opts[k];
-  }
+  const foundExtras = Object.fromEntries(
+    Object.entries(opts).filter(([k]) => queryStringKeys.includes(k)),
+  );
   let msg = message ?? `found extras <${inspect(foundExtras)}>, not <${inspect(extras)}>`;
   assertEqual(extras, foundExtras, msg);
 
