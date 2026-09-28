@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { RouteSet, UrlFor } from "@blazetrails/actionpack";
+import { include } from "@blazetrails/ruby-compat";
+import { RoutingUrlFor } from "../routing-url-for.js";
 import { Base } from "../base.js";
 import { setPrependContentExfiltrationPrevention } from "../helpers/content-exfiltration-prevention-helper.js";
 import * as UrlHelper from "../helpers/url-helper.js";
@@ -19,6 +22,26 @@ const normalizeDom = (html: unknown): string =>
 const assertDomEqual = (expected: string, actual: unknown): void => {
   expect(normalizeDom(actual)).toEqual(normalizeDom(expected));
 };
+
+include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
+
+const routes = new RouteSet();
+routes.draw((r) => {
+  r.get("/", { to: "foo#bar" });
+  r.get("/other", { to: "foo#other" });
+  r.get("/article/:id", { to: "foo#article", as: "article" });
+  r.get("/category/:category", { to: "foo#category" });
+});
+
+class UrlHelperView extends Base {}
+include(UrlHelperView, routes.urlHelpers());
+
+const hashFor = (options: Record<string, unknown> = {}): Record<string, unknown> => ({
+  controller: "foo",
+  action: "bar",
+  ...options,
+});
+const urlHash = hashFor;
 
 function controllerWithReferer(env: Record<string, unknown>): unknown {
   return { request: { env } };
@@ -46,6 +69,11 @@ describe("UrlHelperTest", () => {
     const referer = "javascript:alert(document.cookie)";
     const view = viewWith(controllerWithReferer({ HTTP_REFERER: referer }));
     expect(view.urlFor(":back")).toBe("javascript:history.back()");
+  });
+
+  it("url for does not include empty hashes", () => {
+    const view = UrlHelperView.withViewPaths([]) as any;
+    expect(view.urlFor(hashFor({ a: {} }))).toBe("/");
   });
 
   it("url for with invalid referer", () => {
@@ -101,6 +129,14 @@ describe("UrlHelperTest", () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="button_to"><button type="submit">Hello</button><input name="form_token" type="hidden" value="token" autocomplete="off" /></form>`,
       view.buttonTo("Hello", "http://www.example.com", { authenticity_token: "token" }),
+    );
+  });
+
+  it("button to with path", () => {
+    const routed = UrlHelperView.withViewPaths([]) as any;
+    assertDomEqual(
+      `<form method="post" action="/article/Hello" class="button_to"><button type="submit">Hello</button></form>`,
+      routed.buttonTo("Hello", routed.articlePath("Hello")),
     );
   });
 
@@ -166,6 +202,18 @@ describe("UrlHelperTest", () => {
     } finally {
       UrlHelper.setButtonToGeneratesButtonTag(oldValue);
     }
+  });
+
+  it("link tag without host option", () => {
+    const routed = UrlHelperView.withViewPaths([]) as any;
+    assertDomEqual(`<a href="/">Test Link</a>`, routed.linkTo("Test Link", urlHash()));
+  });
+
+  it("link tag with host option", () => {
+    const routed = UrlHelperView.withViewPaths([]) as any;
+    const hash = hashFor({ host: "www.example.com" });
+    const expected = `<a href="http://www.example.com/">Test Link</a>`;
+    assertDomEqual(expected, routed.linkTo("Test Link", hash));
   });
 
   it("link tag with query and no name", () => {

@@ -26,6 +26,13 @@ import { FrozenError } from "./frozen-error.js";
 import { IndexError } from "./index-error.js";
 
 describe("Hash#fetch", () => {
+  it("looks up an object key in a Map, keeping a stored nil or false", () => {
+    const key = {};
+    expect(fetch(new Map([[key, null]]), key, 0)).toBeNull();
+    expect(fetch(new Map([[key, false]]), key, true)).toBe(false);
+    expect(fetch(new Map<object, number>(), key, 0)).toBe(0);
+  });
+
   it("returns a stored null rather than the default", () => {
     expect(fetch({ offset: null }, "offset", 0)).toBeNull();
     expect(fetch({ offset: undefined }, "offset", 0)).toBeUndefined();

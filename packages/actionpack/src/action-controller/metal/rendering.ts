@@ -77,7 +77,7 @@ export function _setHtmlContentType(this: Pick<RenderingHost, "contentType">): v
 /** @internal */
 export function _setRenderedContentType(
   this: { contentType: string | null; response: { contentType?: string } },
-  format: string | null | undefined,
+  format: { toString(): string } | null | undefined,
 ): void {
   if (format && !this.response.contentType) {
     this.contentType = String(format);

@@ -171,6 +171,14 @@ export async function _renderTemplate(
 }
 
 /** @internal */
+export function _processFormat(
+  this: { lookupContext: LookupContext },
+  format: { toSym?(): string | null; toString(): string },
+): void {
+  if (format.toSym?.() != null) this.lookupContext.formats = [format.toSym() as string];
+}
+
+/** @internal */
 export function _processRenderTemplateOptions(
   this: { actionName: string; _prefixes(): string[] },
   options: Record<string, unknown>,

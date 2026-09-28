@@ -47,6 +47,7 @@ import {
 } from "@blazetrails/actionview";
 import {
   Base as ActionViewBase,
+  _processFormat,
   _renderTemplate,
   buildViewContextClass,
   isInheritViewContextClass,
@@ -832,6 +833,8 @@ export class Base extends Metal {
   /** @internal */
   declare _renderTemplate: typeof _renderTemplate;
   /** @internal */
+  declare _processFormat: typeof _processFormat;
+  /** @internal */
   declare _processVariant: typeof _processVariant;
   /** @internal */
   declare _normalizeRender: typeof _normalizeRender;
@@ -985,6 +988,7 @@ include(Base, StrongParametersModule);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
 Base.prototype._processOptions = _processOptions;
 Base.prototype._renderTemplate = _renderTemplate;
+Base.prototype._processFormat = _processFormat;
 Base.prototype._processVariant = _processVariant;
 Base.prototype._normalizeRender = _normalizeRender;
 Base.prototype._normalizeArgs = _normalizeArgs;
