@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { isHtmlSafe } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
 import { TemplateHandlers } from "../template/handlers.js";
@@ -55,6 +56,18 @@ describe("PartialRenderer render blocks", () => {
       layout: "test/layout_for_partial",
       locals: { name: "Foo!" },
     });
-    expect(body).toBe("Before (Foo!)\npartial html\nAfterBefore (Foo!)\npartial html\nAfter");
+    expect(String(body)).toBe(
+      "Before (Foo!)\npartial html\nAfterBefore (Foo!)\npartial html\nAfter",
+    );
+  });
+
+  it("marks a collection's joined body html_safe", async () => {
+    const body = await renderer.renderPartial(view, {
+      partial: "test/partial",
+      collection: [1, 2],
+      spacerTemplate: "test/partial",
+    });
+    expect(isHtmlSafe(body)).toBe(true);
+    expect(String(body)).toBe("partial htmlpartial htmlpartial html");
   });
 });

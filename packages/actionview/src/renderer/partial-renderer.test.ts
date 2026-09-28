@@ -149,7 +149,7 @@ describe("CollectionRenderer", () => {
       ctx,
       undefined,
     );
-    expect(result.body).toBe("AliceBob");
+    expect(String(result.body)).toBe("AliceBob");
   });
 
   it("returns empty body for an empty collection", async () => {
@@ -215,7 +215,7 @@ describe("CollectionRenderer", () => {
     const result = await new CollectionRenderer(lc, {
       spacerTemplate: "spacer",
     }).renderCollectionWithPartial(["a", "b"], "users/user", ctx, undefined);
-    expect(result.body).toBe("A|B");
+    expect(String(result.body)).toBe("A|B");
   });
 
   it("derives partial from toPartialPath() for homogeneous collection", async () => {
@@ -230,7 +230,7 @@ describe("CollectionRenderer", () => {
       ctx,
       undefined,
     );
-    expect(result.body).toBe("P1P2");
+    expect(String(result.body)).toBe("P1P2");
   });
 });
 
