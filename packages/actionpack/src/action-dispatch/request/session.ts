@@ -1,4 +1,4 @@
-import { hasKey, KeyError } from "@blazetrails/ruby-compat";
+import { deleteIf, hasKey, KeyError } from "@blazetrails/ruby-compat";
 import { stringifyKeys } from "@blazetrails/activesupport";
 
 /** @noRailsEquivalent PERMANENT */
@@ -235,11 +235,7 @@ export class Session {
 
   toHash(): Record<string, unknown> {
     this.loadForReadBang();
-    const dup = { ...this.delegate };
-    for (const [k, v] of Object.entries(dup)) {
-      if (v == null) delete dup[k];
-    }
-    return dup;
+    return deleteIf({ ...this.delegate }, (_, v) => v == null);
   }
 
   toH(): Record<string, unknown> {

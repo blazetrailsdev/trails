@@ -683,8 +683,17 @@ describe("RequestFormData", () => {
 
 describe("RequestInspectTest", () => {
   it("inspect", () => {
-    const req = new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/posts" });
-    expect(req.inspect()).toBe('#<ActionDispatch::Request GET "/posts">');
+    const request = new Request({
+      REQUEST_METHOD: "POST",
+      REMOTE_ADDR: "1.2.3.4",
+      HTTP_X_FORWARDED_PROTO: "https",
+      HTTP_X_FORWARDED_HOST: "example.com:443",
+      PATH_INFO: "/path/",
+      QUERY_STRING: "q=1",
+    });
+    expect(request.inspect()).toMatch(
+      /#<ActionDispatch::Request POST "https:\/\/example.com\/path\/\?q=1" for 1.2.3.4>/,
+    );
   });
 });
 

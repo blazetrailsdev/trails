@@ -16,7 +16,7 @@ import { Table, SelectManager, Nodes, sql, star } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { ActiveRecordError, RecordNotUnique, UnknownPrimaryKey } from "./errors.js";
 import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
-import { max } from "@blazetrails/ruby-compat";
+import { compact, max, min } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { SerializeOptions } from "@blazetrails/activemodel";
 
@@ -129,14 +129,6 @@ function valuesEqual(a: unknown, b: unknown): boolean {
     (key) =>
       Object.prototype.hasOwnProperty.call(b, key) && valuesEqual((a as any)[key], (b as any)[key]),
   );
-}
-
-function takeLimit(limitValue: number | string | null): number {
-  if (limitValue === null) return 11;
-  if (typeof limitValue !== "number") {
-    throw new ArgumentError("comparison of String with 11 failed");
-  }
-  return Math.min(limitValue, 11);
 }
 
 /** @internal */
@@ -400,22 +392,26 @@ export class Relation<T extends Base> {
   }
 
   inspect(): string | Promise<string> {
-    const max = takeLimit(this.limitValue);
     const inspectEntries = (subject: T[]): string => {
       const entries = subject.map((record) => record.inspect());
       if (entries.length === 11) entries[10] = "...";
       return `#<${(this.constructor as typeof Relation)._railsClassName} [${entries.join(", ")}]>`;
     };
-    if (this.isLoaded && !this.isScheduled) return inspectEntries(this._records.slice(0, max));
-    return this.annotate("loading for inspect").take(max).then(inspectEntries);
+    if (this.isLoaded && !this.isScheduled) {
+      return inspectEntries(this._records.slice(0, min(compact([this.limitValue, 11])) as number));
+    }
+    return this.annotate("loading for inspect")
+      .take(min(compact([this.limitValue, 11])) as number)
+      .then(inspectEntries);
   }
 
   async prettyPrint(pp: PrettyPrinter): Promise<void> {
-    const max = takeLimit(this.limitValue);
-    const subject = this.isLoaded
-      ? await this.records()
-      : await this.annotate("loading for pp").limit(max);
-    const entries = subject.slice(0, max) as (T | string)[];
+    const subject = this.isLoaded ? await this.records() : this.annotate("loading for pp");
+    const entries = (
+      Array.isArray(subject)
+        ? subject.slice(0, min(compact([this.limitValue, 11])) as number)
+        : await subject.take(min(compact([this.limitValue, 11])) as number)
+    ) as (T | string)[];
     if (entries.length === 11) entries[10] = "...";
     await pp.pp(entries);
   }
@@ -1733,13 +1729,13 @@ export class Relation<T extends Base> {
     return this.cacheKey();
   }
 
-  initializeCopy(source: Relation<T>): void {
-    this._table = source._table;
-    this._values = { ...source._values };
-    this._withIsRecursive = source._withIsRecursive;
-    this._isNone = source._isNone;
-    for (const mod of [...source.extendingValues].reverse()) extend(this, mod);
-    this.skipPreloadingValue = source.skipPreloadingValue;
+  initializeCopy(other: Relation<T>): void {
+    this._table = other._table;
+    this._values = { ...other._values };
+    this._withIsRecursive = other._withIsRecursive;
+    this._isNone = other._isNone;
+    for (const mod of [...other.extendingValues].reverse()) extend(this, mod);
+    this.skipPreloadingValue = other.skipPreloadingValue;
   }
 
   clone(): Relation<T> {

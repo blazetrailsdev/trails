@@ -1,4 +1,5 @@
 import { camelize, NameError, presence, toSentence, underscore } from "@blazetrails/activesupport";
+import { rbStrDump } from "@blazetrails/ruby-compat";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
   parseNestedQuery,
@@ -574,7 +575,7 @@ export class Request {
   }
 
   inspect(): string {
-    return `#<ActionDispatch::Request ${this.method} "${this.fullpath}">`;
+    return `#<ActionDispatch::Request ${this.method} ${rbStrDump(this.originalUrl)} for ${this.remoteIp ?? ""}>`;
   }
 
   get session(): Session {

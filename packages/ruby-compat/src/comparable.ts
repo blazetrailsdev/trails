@@ -150,6 +150,22 @@ export function cmp(a: unknown, b: unknown): number | null {
     }
     return a < s ? -1 : a > s ? 1 : 0;
   }
+  if (Array.isArray(a)) {
+    /* `rb_ary_cmp` (`vendor/ruby/v3.3.11/array.c:5303`) and its `recursive_cmp`
+       (`:5252`): the first element pair whose `<=>` is not `0` decides, a nil
+       one included, and a common prefix is ordered by length. */
+    if (!Array.isArray(b)) return null;
+    if (a === b) return 0;
+    const len = Math.min(a.length, b.length);
+    for (let i = 0; i < len; i++) {
+      const v = cmp(a[i], b[i]);
+      if (v !== 0) return v;
+    }
+    const d = a.length - b.length;
+    if (d === 0) return 0;
+    if (d > 0) return 1;
+    return -1;
+  }
   /* `vendor/ruby/v3.3.11/object.c:1665` `rb_obj_cmp` — the inherited `<=>`: `0` for an
      `==` operand and nil otherwise, rather than JS relational coercion, which
      orders `false` before `true` where Ruby answers nil. */
@@ -317,6 +333,32 @@ export function max<T>(ary: readonly T[]): T | null {
   const result = ary[0];
   if (n > 1) return aryMaxGeneric(ary, 1, result);
   return result;
+}
+
+/**
+ * Ruby `Array#min` (`vendor/ruby/v3.3.11/array.c:6016` `rb_ary_min`), the no-argument,
+ * no-block arm — {@link max}'s mirror, carried through `ary_min_generic`
+ * (`vendor/ruby/v3.3.11/array.c:5888`), with the same `CMP_OPTIMIZABLE` fast paths
+ * omitted.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#min` (`vendor/ruby/v3.3.11/array.c:6016`).
+ */
+export function min<T>(ary: readonly T[]): T | null {
+  const n = ary.length;
+  if (n === 0) return null;
+  const result = ary[0];
+  if (n > 1) return aryMinGeneric(ary, 1, result);
+  return result;
+}
+
+function aryMinGeneric<T>(ary: readonly T[], i: number, vmin: T): T {
+  for (; i < ary.length; ++i) {
+    const v = ary[i];
+    if (rbCmpint(cmp(vmin, v), vmin, v) > 0) {
+      vmin = v;
+    }
+  }
+  return vmin;
 }
 
 function aryMaxGeneric<T>(ary: readonly T[], i: number, vmax: T): T {

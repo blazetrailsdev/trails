@@ -1,10 +1,4 @@
-import {
-  basicObjRespondTo,
-  type Hash,
-  rbModSingletonP,
-  rbModToS,
-  rbObjSingletonClass,
-} from "@blazetrails/ruby-compat";
+import { basicObjRespondTo, type Hash, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import "./i18n.js";
 import type { Identification } from "@blazetrails/globalid";
@@ -2347,25 +2341,7 @@ export class Base extends Model {
   }
 
   static inspect(): string {
-    const name = rbModSingletonP(this)
-      ? rbModToS(this)
-      : this === Base
-        ? "ActiveRecord::Base"
-        : this.name;
-    if (this === Base || rbModSingletonP(this)) {
-      return name;
-    } else if (this.abstractClass) {
-      return `${name}(abstract)`;
-    } else if (!ModelSchema.isSchemaLoaded.call(this as never) && !this.isConnected()) {
-      return `${name} (call '${name}.load_schema' to load schema informations)`;
-    } else if (ModelSchema.cachedTableExists.call(this as never)) {
-      const attrList = Object.entries(this.attributeTypes())
-        .map(([name, type]) => `${name}: ${type!.type() ?? ""}`)
-        .join(", ");
-      return `${this.name}(${attrList})`;
-    } else {
-      return `${name}(Table doesn't exist)`;
-    }
+    return _Core.ClassMethods.inspect.call(this);
   }
 
   static hasAttribute(attrName: string): boolean {

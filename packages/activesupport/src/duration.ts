@@ -362,15 +362,12 @@ export class Duration {
   }
 
   inspect(): string {
-    if (isEmpty(this._partKeys)) return `${this.value} seconds`;
+    if (isEmpty(this._parts())) return `${this.value} seconds`;
 
     return toSentence(
-      [...this._partKeys]
-        .sort((a, b) => PARTS.indexOf(a) - PARTS.indexOf(b))
-        .map((unit) => {
-          const val = this.parts[unit];
-          return `${val} ${val === 1 ? unit.slice(0, -1) : unit}`;
-        }),
+      (Object.entries(this._parts()) as [keyof DurationParts, number][])
+        .sort(([a], [b]) => PARTS.indexOf(a) - PARTS.indexOf(b))
+        .map(([unit, val]) => `${val} ${val === 1 ? unit.slice(0, -1) : unit}`),
       { locale: false },
     );
   }

@@ -482,13 +482,7 @@ export class TimeWithZone {
   }
 
   inspect(): string {
-    const l = this._local();
-    const ns = String(l.nsec).padStart(9, "0");
-    return (
-      `${l.year}-${pad2(l.month)}-${pad2(l.day)} ` +
-      `${pad2(l.hour)}:${pad2(l.minute)}:${pad2(l.second)}.${ns} ` +
-      `${this.zone} ${this.formattedOffset()}`
-    );
+    return `${this.time.strftime("%F %H:%M:%S.%9N")} ${this.zone} ${this.formattedOffset()}`;
   }
 
   strftime(format: string): string {

@@ -6,6 +6,8 @@ import {
   include,
   rbEql,
   rbHash,
+  rbModSingletonP,
+  rbModToS,
   rbObjHash,
 } from "@blazetrails/ruby-compat";
 import { getApplicationRecordClass } from "./inheritance.js";
@@ -36,7 +38,7 @@ import { TableMetadata } from "./table-metadata.js";
 import type { PrettyPrinter } from "./pretty-print.js";
 import { Table } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
-import { columnsHash } from "./model-schema.js";
+import { cachedTableExists, columnsHash, isSchemaLoaded } from "./model-schema.js";
 import { StatementCache } from "./statement-cache.js";
 import { withConnection } from "./connection-handling.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
@@ -75,6 +77,37 @@ export const Core = {
 
 import { ActiveRecord } from "./namespaces.js";
 import { actionOnStrictLoadingViolation, writingRole } from "./active-record.js";
+
+export const ClassMethods = {
+  /** @missingRailsCall table_exists? — PERMANENT */
+  inspect(
+    this: (abstract new (...args: never) => unknown) & {
+      abstractClass: boolean;
+      isConnected(): boolean;
+      attributeTypes(): Record<string, { type(): string | null | undefined } | null>;
+    },
+  ): string {
+    const name = rbModSingletonP(this)
+      ? rbModToS(this)
+      : this === ActiveRecord.Base
+        ? "ActiveRecord::Base"
+        : this.name;
+    if (this === ActiveRecord.Base || rbModSingletonP(this)) {
+      return name;
+    } else if (this.abstractClass) {
+      return `${name}(abstract)`;
+    } else if (!isSchemaLoaded.call(this as never) && !this.isConnected()) {
+      return `${name} (call '${name}.load_schema' to load schema informations)`;
+    } else if (cachedTableExists.call(this as never)) {
+      const attrList = Object.entries(this.attributeTypes())
+        .map(([name, type]) => `${name}: ${type!.type() ?? ""}`)
+        .join(", ");
+      return `${name}(${attrList})`;
+    } else {
+      return `${name}(Table doesn't exist)`;
+    }
+  },
+};
 
 interface CoreRecord {
   id: unknown;
