@@ -21,8 +21,6 @@ export interface ControllerPaths {
   namespaceParts: string[];
 }
 
-const ACTIONPACK = "@blazetrails/actionpack";
-
 export function controllerPathHelpers(name: string): ControllerPaths {
   const stripped = name.replace(/[_-]?[Cc]ontroller$/, "");
   const parts = stripped.split("/");
@@ -56,23 +54,15 @@ export function controllerPathHelpers(name: string): ControllerPaths {
 
 export interface EmitControllerClassOpts {
   className: string;
-  parent?: { ref: Ref; import?: Import };
+  parent: { ref: Ref; import?: Import };
   methods: Method[];
 }
 
 export function emitControllerClass(opts: EmitControllerClassOpts): string {
-  let extendsRef: Ref;
-  const imports: Import[] = [];
-  if (opts.parent) {
-    extendsRef = opts.parent.ref;
-    if (opts.parent.import) imports.push(opts.parent.import);
-  } else {
-    extendsRef = ref("ActionController.Base");
-    imports.push({ from: ACTIONPACK, named: { ActionController: "named" } });
-  }
+  const imports: Import[] = opts.parent.import ? [opts.parent.import] : [];
   return tsModule({
     imports,
-    declarations: [tsClass({ name: opts.className, extends: extendsRef, body: opts.methods })],
+    declarations: [tsClass({ name: opts.className, extends: opts.parent.ref, body: opts.methods })],
   });
 }
 

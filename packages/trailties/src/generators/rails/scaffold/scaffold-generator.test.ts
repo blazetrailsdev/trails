@@ -55,7 +55,7 @@ describe("ScaffoldGeneratorTest", () => {
     expect(routes).toContain('resources("product_lines")');
 
     const controller = readFile("app/controllers/product-lines-controller.ts");
-    expect(controller).toContain("class ProductLinesController");
+    expect(controller).toContain("class ProductLinesController extends ApplicationController");
     expect(controller).toContain("async index()");
     expect(controller).toContain("async show()");
     expect(controller).toContain("async create()");

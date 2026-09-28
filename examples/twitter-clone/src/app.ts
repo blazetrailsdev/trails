@@ -60,7 +60,7 @@ export function buildApp() {
     "/users/:handle/tweets",
     wrap(async (req, res) => {
       const user = await User.findByBang({ handle: req.params.handle });
-      const tweets = await user.tweets.order("created_at", "desc");
+      const tweets = await user.tweets.order({ created_at: "desc" });
       res.json(tweets.map((t) => t.attributes));
     }),
   );

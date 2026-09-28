@@ -59,9 +59,9 @@ export class Application extends Engine {
     _appClass = klass;
   }
 
-  static register(subclass: typeof Application): void {
+  static override register(subclass: typeof Application, calledFrom?: string): void {
     const fresh = !_registered.has(subclass);
-    Trailtie.register(subclass);
+    super.register(subclass, calledFrom);
     _appClass = subclass;
     if (fresh) {
       _registered.add(subclass);

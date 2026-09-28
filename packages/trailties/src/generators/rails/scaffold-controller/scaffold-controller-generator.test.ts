@@ -30,7 +30,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
   it("controller content", () => {
     makeGen("User", ["name:string", "age:integer"]).run();
     const c = read("app/controllers/users-controller.ts");
-    expect(c).toContain("class UsersController extends ActionController.Base");
+    expect(c).toContain("class UsersController extends ApplicationController");
     for (const action of ["index", "show", "new_", "create", "edit", "update", "destroy"]) {
       expect(c).toContain(`async ${action}()`);
     }

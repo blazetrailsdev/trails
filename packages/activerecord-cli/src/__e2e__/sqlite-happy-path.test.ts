@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readdir, readFile, writeFile } from "fs/promises";
 import { join } from "path";
-import { DatabaseTasks } from "@blazetrails/activerecord";
+import { pathToFileURL } from "url";
+import { Base, DatabaseTasks } from "@blazetrails/activerecord";
 import { run } from "../cli.js";
 import {
   captureConsoleErrors,
@@ -56,6 +57,11 @@ describe.skipIf(process.platform === "win32")("sqlite-happy-path E2E", () => {
 
     const migrateCode = await run(["db:migrate"], tmpDir);
     expect(migrateCode, exitReason("ar db:migrate should exit 0", errors)).toBe(0);
+
+    DatabaseTasks.databaseConfiguration = null;
+    const { connect } = await import(pathToFileURL(join(tmpDir, "db.ts")).href);
+    await connect();
+    expect(await Base.withConnection((c) => c.tableExists("users"))).toBe(true);
 
     const versionLines: string[] = [];
     vi.spyOn(console, "log").mockImplementation(

@@ -1,6 +1,6 @@
 import { Migration } from "@blazetrails/activerecord";
 
-export default class CreateFollows extends Migration {
+export class CreateFollows extends Migration {
   async change() {
     // follower_id follows followee_id
     await this.createTable("follows", (t) => {

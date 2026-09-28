@@ -82,7 +82,7 @@ export class MyApp extends Application {
   // config.eagerLoadPaths.push("extras");
 }
 
-Application.register(MyApp);
+Application.register(MyApp, import.meta.dirname);
 "
 `;
 

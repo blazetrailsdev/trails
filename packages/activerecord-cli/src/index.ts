@@ -9,3 +9,4 @@ export {
 export type { ModelEntry, ManifestResult } from "./generate-manifest.js";
 export { run } from "./cli.js";
 export { checkPendingMigrations } from "./pending-migrations.js";
+export { loadDatabaseConfig } from "./db-helpers.js";

@@ -888,6 +888,7 @@ export class Base extends Model {
   declare static defineAttributeMethod: AttributeMethodsClassHalf["defineAttributeMethod"];
   declare static defineAttributeMethodPattern: AttributeMethodsClassHalf["defineAttributeMethodPattern"];
   declare static isInstanceMethodAlreadyImplemented: AttributeMethodsClassHalf["isInstanceMethodAlreadyImplemented"];
+  declare static isDangerousAttributeMethod: (methodName: string) => boolean;
   /** @internal */
   declare static _aliasesByAttributeName: Map<string, string[]>;
   /** @internal */

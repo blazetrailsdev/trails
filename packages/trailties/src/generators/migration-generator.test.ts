@@ -6,6 +6,12 @@ import { assertMatch, assertNoMatch } from "@blazetrails/activesupport";
 import { MigrationGenerator } from "./migration-generator.js";
 import * as Assertions from "./testing/assertions.js";
 import { migrationFileName as _migrationFileName } from "./testing/behavior.js";
+import { Application } from "../application.js";
+import { Trails } from "../rails.js";
+import "../trailties/active-record.js";
+
+class MigrationGeneratorTestApp extends Application {}
+let oldBelongsToRequiredByDefault: boolean | undefined;
 
 let tmpDir: string;
 let lines: string[];
@@ -19,9 +25,15 @@ beforeEach(() => {
   destination.destinationRoot = tmpDir;
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   lines = [];
+  Trails.application = MigrationGeneratorTestApp.instance();
+  oldBelongsToRequiredByDefault = Trails.application.config.activeRecord.belongsToRequiredByDefault;
+  Trails.application.config.activeRecord.belongsToRequiredByDefault = true;
 });
 
 afterEach(() => {
+  Trails.application!.config.activeRecord.belongsToRequiredByDefault =
+    oldBelongsToRequiredByDefault;
+  Trails.application = null;
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
@@ -148,7 +160,18 @@ describe("MigrationGeneratorTest", () => {
     );
   });
 
-  it.skip("remove migration with references removes foreign keys when primary key uuid", () => {});
+  it("remove migration with references removes foreign keys when primary key uuid", async () => {
+    const migration = "remove_references_from_books";
+    makeGen().run(migration, ["author:belongs_to"], { primaryKeyType: "uuid" });
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch(
+          /removeReference\("books", "author",.*\sforeignKey: true, type: "uuid"/,
+          change,
+        );
+      }),
+    );
+  });
 
   it("add migration with attributes and indices", async () => {
     const migration = "add_title_with_index_and_body_to_posts";
@@ -213,9 +236,34 @@ describe("MigrationGeneratorTest", () => {
     );
   });
 
-  it.skip("add migration with references adds null false by default", () => {});
+  it("add migration with references adds null false by default", async () => {
+    const migration = "add_references_to_books";
+    makeGen().run(migration, ["author:belongs_to", "distributor:references{polymorphic}"]);
 
-  it.skip("add migration with references does not add belongs to when required by default global config is false", () => {});
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch(/addReference\("books", "author", \{ null: false/, change);
+        assertMatch(
+          /addReference\("books", "distributor", \{ polymorphic: true, null: false/,
+          change,
+        );
+      }),
+    );
+  });
+
+  it("add migration with references does not add belongs to when required by default global config is false", async () => {
+    Trails.application!.config.activeRecord.belongsToRequiredByDefault = false;
+
+    const migration = "add_references_to_books";
+    makeGen().run(migration, ["author:belongs_to", "distributor:references{polymorphic}"]);
+
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch(/addReference\("books", "author"/, change);
+        assertMatch(/addReference\("books", "distributor", \{ polymorphic: true/, change);
+      }),
+    );
+  });
 
   it("add migration with references adds foreign keys", async () => {
     const migration = "add_references_to_books";
@@ -270,7 +318,15 @@ describe("MigrationGeneratorTest", () => {
     expect(content).toMatch(/createTable\("books", \{ id: "uuid" \}/);
   });
 
-  it.skip("add migration with references options when primary key uuid", () => {});
+  it("add migration with references options when primary key uuid", async () => {
+    const migration = "add_references_to_books";
+    makeGen().run(migration, ["author:belongs_to"], { primaryKeyType: "uuid" });
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch(/addReference\("books", "author",.*\sforeignKey: true, type: "uuid"/, change);
+      }),
+    );
+  });
 
   it.skip("database puts migrations in configured folder", () => {});
 

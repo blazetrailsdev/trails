@@ -56,6 +56,13 @@ export class Engine extends Trailtie {
     return this.instance().config;
   }
 
+  static override register(base: typeof Trailtie, calledFrom?: string): void {
+    if (!base.isAbstractRailtie() && calledFrom !== undefined) {
+      (base as typeof Engine).calledFrom(calledFrom);
+    }
+    super.register(base);
+  }
+
   static engineName(name?: string): string {
     return this.railtieName(name);
   }

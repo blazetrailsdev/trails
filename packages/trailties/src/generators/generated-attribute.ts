@@ -1,4 +1,6 @@
 import { humanize, pluralize, singularize } from "@blazetrails/activesupport";
+import { Base } from "@blazetrails/activerecord";
+import { Trails } from "../rails.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 export class GeneratorError extends Error {}
@@ -13,7 +15,6 @@ const DEFAULT_TYPES = new Set(
     " ",
   ),
 );
-const DANGEROUS = new Set(["id", "type", "save", "destroy", "errors", "attributes"]);
 const FIELD_TYPES = Object.fromEntries(
   "integer:number_field time:time_field datetime:datetime_field timestamp:datetime_field date:date_field text:textarea rich_text:rich_textarea boolean:checkbox attachment:file_field attachments:file_field"
     .split(" ")
@@ -39,6 +40,7 @@ export class GeneratedAttribute {
   private _hasIndex: boolean;
   private _hasUniqIndex: boolean;
   private _default: string | number | boolean | null | undefined = undefined;
+  private _indexName: string | string[] | undefined = undefined;
 
   static parse(columnDefinition: string): GeneratedAttribute {
     const [name, rawType, rawIndex] = columnDefinition.split(":");
@@ -51,7 +53,7 @@ export class GeneratedAttribute {
     let attrOptions: AttrOptions;
     // eslint-disable-next-line prefer-const
     [type, attrOptions] = parseTypeAndOptions(type);
-    if (DANGEROUS.has(name)) {
+    if (GeneratedAttribute.isDangerousName(name)) {
       throw new GeneratorError(
         `Could not generate field '${name}', as it is already defined by Active Record.`,
       );
@@ -68,6 +70,10 @@ export class GeneratedAttribute {
       attrOptions.index = { unique: true };
     }
     return new GeneratedAttribute(name, type ?? "string", indexType as IndexType, attrOptions);
+  }
+
+  static isDangerousName(name: string): boolean {
+    return Base.isDangerousAttributeMethod(name);
   }
 
   static validType = (t: string): boolean => DEFAULT_TYPES.has(t);
@@ -118,11 +124,25 @@ export class GeneratedAttribute {
   pluralName = (): string => pluralize(this.name.replace(/_id$/, ""));
   singularName = (): string => singularize(this.name.replace(/_id$/, ""));
   columnName = (): string => (this.reference() ? `${this.name}_id` : this.name);
-  indexName = (): string | string[] =>
-    this.polymorphic() ? [`${this.name}_id`, `${this.name}_type`] : this.columnName();
+  indexName(): string | string[] {
+    return (this._indexName ??= this.polymorphic()
+      ? ["id", "type"].map((t) => `${this.name}_${t}`)
+      : this.columnName());
+  }
+
+  setIndexName(indexName: string | string[]): void {
+    this._indexName = indexName;
+  }
+
   foreignKey = (): boolean => this.name.endsWith("_id");
   reference = (): boolean => GeneratedAttribute.reference(this.type);
   polymorphic = (): boolean => Boolean(this.attrOptions.polymorphic);
+  isRequired(): boolean {
+    return (
+      this.reference() &&
+      Trails.application?.config.activeRecord?.belongsToRequiredByDefault === true
+    );
+  }
   hasIndex = (): boolean => this._hasIndex;
   hasUniqIndex = (): boolean => this._hasUniqIndex;
   passwordDigest = (): boolean => this.name === "password" && this.type === "digest";
@@ -133,17 +153,21 @@ export class GeneratedAttribute {
   virtual = (): boolean => this.richText() || this.attachment() || this.attachments();
 
   injectOptions(): string {
-    const options = Object.entries(this.optionsForMigration());
-    if (options.length === 0) return "";
-    return `, { ${options.map(([k, v]) => `${k}: ${inspectOption(v)}`).join(", ")} }`;
+    return Object.entries(this.optionsForMigration())
+      .map(([k, v]) => `, ${k}: ${inspectOption(v)}`)
+      .join("");
   }
 
   injectIndexOptions(): string {
-    return this.hasUniqIndex() ? ", { unique: true }" : "";
+    return this.hasUniqIndex() ? ", unique: true" : "";
   }
 
   optionsForMigration(): AttrOptions {
     const options = { ...this.attrOptions };
+    if (this.isRequired()) {
+      options.null = false;
+    }
+
     if (this.reference() && !this.polymorphic()) {
       options.foreignKey = true;
     }

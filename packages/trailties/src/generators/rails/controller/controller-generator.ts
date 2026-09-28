@@ -20,7 +20,12 @@ export class ControllerGenerator extends GeneratorBase {
   }
 
   run(name: string, actions: string[], options: ControllerRunOptions = {}): string[] {
-    const { skipHelper = false, skipRoutes = false, test = true, parent } = options;
+    const {
+      skipHelper = false,
+      skipRoutes = false,
+      test = true,
+      parent = "ApplicationController",
+    } = options;
     const paths = controllerPathHelpers(name);
     const ts = this.isTypeScript();
     const ext = this.ext();
@@ -28,7 +33,7 @@ export class ControllerGenerator extends GeneratorBase {
 
     const source = emitControllerClass({
       className: paths.className,
-      parent: parent ? parentRefForRelative(parent, depth) : undefined,
+      parent: parentRefForRelative(parent, depth),
       methods: actions.map((a) => actionMethod(a, ts)),
     });
     this.createFile(`app/controllers/${paths.controllerFile}${ext}`, source);
