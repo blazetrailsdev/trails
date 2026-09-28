@@ -13,7 +13,6 @@ import {
   URI,
   include,
   rbObjRespondTo,
-  rbObjSingletonClass,
   stringSplit,
   type Generic,
 } from "@blazetrails/ruby-compat";
@@ -52,6 +51,8 @@ export interface IntegrationRequestOptions {
 
 const DEFAULT_HOST = "www.example.com";
 
+const APP_SESSIONS = new Map<unknown, typeof IntegrationTest>();
+
 const DEFAULT_REMOTE_ADDR = "127.0.0.1";
 const DEFAULT_ACCEPT =
   "text/xml,application/xml,application/xhtml+xml," +
@@ -84,9 +85,16 @@ export class IntegrationTest {
     this.resetBang();
     const app = this.app as { routes?: unknown } | null;
     if (rbObjRespondTo(app, "routes") && app!.routes instanceof RouteSet) {
-      const klass = rbObjSingletonClass(this) as new () => unknown;
-      include(klass, app!.routes.urlHelpers());
-      include(klass, app!.routes.mountedHelpers());
+      const session = this.constructor as typeof IntegrationTest;
+      let klass = APP_SESSIONS.get(app);
+      if (klass === undefined || Object.getPrototypeOf(klass) !== session) {
+        klass = class extends session {};
+        klass.prototype.constructor = session;
+        include(klass, app!.routes.urlHelpers());
+        include(klass, app!.routes.mountedHelpers());
+        APP_SESSIONS.set(app, klass);
+      }
+      Object.setPrototypeOf(this, klass.prototype);
     }
   }
 
