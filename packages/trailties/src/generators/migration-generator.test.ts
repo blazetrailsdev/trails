@@ -57,12 +57,10 @@ describe("MigrationGeneratorTest", () => {
 
   it("migrations generated simultaneously", async () => {
     const migrations = ["change_title_body_from_posts", "change_email_from_comments"];
-    const numbers: string[] = [];
-    for (const migration of migrations) {
-      await makeGen().run(migration, []);
-      numbers.push(path.basename(migrationFileName(`db/migrate/${migration}.ts`)!).split("_")[0]);
-    }
-    const [firstMigrationNumber, secondMigrationNumber] = numbers;
+    for (const migration of migrations) await makeGen().run(migration, []);
+    const [firstMigrationNumber, secondMigrationNumber] = migrations.map(
+      (migration) => path.basename(migrationFileName(`db/migrate/${migration}.ts`)!).split("_")[0],
+    );
     expect(firstMigrationNumber).not.toBe(secondMigrationNumber);
   });
 

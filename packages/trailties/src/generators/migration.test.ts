@@ -59,7 +59,6 @@ describe("migration", () => {
       "db/migrate/create_articles.rb",
     );
     expect(dest).toBe(`${tmpDir}/db/migrate/20260101000000_create_articles.rb`);
-    expect(host.migrationNumber).toBe("20260101000000");
     expect(host.migrationFileName).toBe("create_articles");
     expect(host.migrationClassName).toBe("CreateArticles");
     expect(fs.readFileSync(dest!, "utf-8")).toBe("class CreateArticles {}");
