@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActionController, Request, RouteSet, UrlFor } from "@blazetrails/actionpack";
 import { Conversion, Naming } from "@blazetrails/activemodel";
-import { extend, isPresent } from "@blazetrails/activesupport";
+import { assertPredicate, extend, isHtmlSafe, isPresent } from "@blazetrails/activesupport";
 import { MockRequest } from "@blazetrails/rack";
 import { ArgumentError, include } from "@blazetrails/ruby-compat";
 import { RoutingUrlFor } from "../routing-url-for.js";
@@ -859,6 +859,12 @@ describe("UrlHelperTest", () => {
     expect(view.isCurrentPage("http://www.example.com/", { checkParameters: true })).toBeFalsy();
   });
 
+  it("current page considering params when options does not respond to to hash", () => {
+    view.request = requestForUrl("/?order=desc&page=1");
+
+    expect(view.isCurrentPage(":back", { checkParameters: false })).toBeFalsy();
+  });
+
   it("current page when options given as keyword arguments", () => {
     view.request = requestForUrl("/");
 
@@ -870,6 +876,12 @@ describe("UrlHelperTest", () => {
 
     expect(view.isCurrentPage(hashFor({ order: "desc", page: "1" }))).toBeTruthy();
     expect(view.isCurrentPage("http://www.example.com/?order=desc&page=1")).toBeTruthy();
+  });
+
+  it("current page with scope that match", () => {
+    view.request = requestForUrl("/engine/");
+
+    expect(view.isCurrentPage("/engine")).toBeTruthy();
   });
 
   it("current page with escaped params", () => {
@@ -904,6 +916,13 @@ describe("UrlHelperTest", () => {
         callback_url: "http://example.com/foo",
       }),
     ).toBeTruthy();
+  });
+
+  it("current page with trailing slash", () => {
+    view.request = requestForUrl("/posts");
+
+    expect(view.isCurrentPage("/posts/")).toBeTruthy();
+    expect(view.isCurrentPage("http://www.example.com/posts/")).toBeTruthy();
   });
 
   it("current page with trailing slash and params", () => {
@@ -972,6 +991,26 @@ describe("UrlHelperTest", () => {
     );
   });
 
+  it("mail to", () => {
+    assertDomEqual(
+      `<a href="mailto:david@loudthinking.com">david@loudthinking.com</a>`,
+      view.mailTo("david@loudthinking.com"),
+    );
+    assertDomEqual(
+      `<a href="mailto:david@loudthinking.com">David Heinemeier Hansson</a>`,
+      view.mailTo("david@loudthinking.com", "David Heinemeier Hansson"),
+    );
+    assertDomEqual(
+      `<a class="admin" href="mailto:david@loudthinking.com">David Heinemeier Hansson</a>`,
+      view.mailTo("david@loudthinking.com", "David Heinemeier Hansson", { class: "admin" }),
+    );
+    expect(
+      String(view.mailTo("david@loudthinking.com", "David Heinemeier Hansson", { class: "admin" })),
+    ).toBe(
+      String(view.mailTo("david@loudthinking.com", "David Heinemeier Hansson", { class: "admin" })),
+    );
+  });
+
   it("mail to with options", () => {
     const opts = {
       cc: "ccaddress@example.com",
@@ -1008,6 +1047,35 @@ describe("UrlHelperTest", () => {
     );
   });
 
+  it("mail to with img", () => {
+    assertDomEqual(
+      `<a href="mailto:feedback@example.com"><img src="/feedback.png" /></a>`,
+      view.mailTo("feedback@example.com", raw('<img src="/feedback.png" />')),
+    );
+  });
+
+  it("mail to with html safe string", () => {
+    assertDomEqual(
+      `<a href="mailto:david@loudthinking.com">david@loudthinking.com</a>`,
+      view.mailTo(raw("david@loudthinking.com")),
+    );
+  });
+
+  it("mail to with nil", () => {
+    assertDomEqual(`<a href="mailto:"></a>`, view.mailTo(null));
+  });
+
+  it("mail to returns html safe string", () => {
+    assertPredicate(view.mailTo("david@loudthinking.com"), isHtmlSafe);
+  });
+
+  it("mail to with block", () => {
+    assertDomEqual(
+      `<a href="mailto:me@example.com"><span>Email me</span></a>`,
+      view.mailTo("me@example.com", null, {}, () => view.contentTag("span", "Email me")),
+    );
+  });
+
   it("mail to with block and options", () => {
     assertDomEqual(
       `<a class="special" href="mailto:me@example.com?cc=ccaddress%40example.com"><span>Email me</span></a>`,
@@ -1021,6 +1089,21 @@ describe("UrlHelperTest", () => {
     const options = { class: "special" };
     view.mailTo("me@example.com", "ME!", options);
     expect(options).toEqual({ class: "special" });
+  });
+
+  it("sms to", () => {
+    assertDomEqual(`<a href="sms:15155555785;">15155555785</a>`, view.smsTo("15155555785"));
+    assertDomEqual(
+      `<a href="sms:15155555785;">Jim Jones</a>`,
+      view.smsTo("15155555785", "Jim Jones"),
+    );
+    assertDomEqual(
+      `<a class="admin" href="sms:15155555785;">Jim Jones</a>`,
+      view.smsTo("15155555785", "Jim Jones", { class: "admin" }),
+    );
+    expect(String(view.smsTo("15155555785", "Jim Jones", { class: "admin" }))).toBe(
+      String(view.smsTo("15155555785", "Jim Jones", { class: "admin" })),
+    );
   });
 
   it("sms to with options", () => {
@@ -1040,6 +1123,62 @@ describe("UrlHelperTest", () => {
     );
   });
 
+  it("sms to with img", () => {
+    assertDomEqual(
+      `<a href="sms:15155555785;"><img src="/feedback.png" /></a>`,
+      view.smsTo("15155555785", raw('<img src="/feedback.png" />')),
+    );
+  });
+
+  it("sms to with html safe string", () => {
+    assertDomEqual(
+      `<a href="sms:1%2B5155555785;">1+5155555785</a>`,
+      view.smsTo(raw("1+5155555785")),
+    );
+  });
+
+  it("sms to with nil", () => {
+    assertDomEqual(`<a href="sms:;"></a>`, view.smsTo(null));
+  });
+
+  it("sms to returns html safe string", () => {
+    assertPredicate(view.smsTo("15155555785"), isHtmlSafe);
+  });
+
+  it("sms to with block", () => {
+    assertDomEqual(
+      `<a href="sms:15155555785;"><span>Text me</span></a>`,
+      view.smsTo("15155555785", null, {}, () => view.contentTag("span", "Text me")),
+    );
+  });
+
+  it("sms to with block and options", () => {
+    assertDomEqual(
+      `<a class="special" href="sms:15155555785;?&body=Hello%20from%20Jim"><span>Text me</span></a>`,
+      view.smsTo("15155555785", { body: "Hello from Jim", class: "special" }, null, () =>
+        view.contentTag("span", "Text me"),
+      ),
+    );
+  });
+
+  it("sms to does not modify html options hash", () => {
+    const options = { class: "special" };
+    view.smsTo("15155555785", "ME!", options);
+    expect(options).toEqual({ class: "special" });
+  });
+
+  it("phone to", () => {
+    assertDomEqual(`<a href="tel:1234567890">1234567890</a>`, view.phoneTo("1234567890"));
+    assertDomEqual(`<a href="tel:1234567890">Bob</a>`, view.phoneTo("1234567890", "Bob"));
+    assertDomEqual(
+      `<a class="phoner" href="tel:1234567890">Bob</a>`,
+      view.phoneTo("1234567890", "Bob", { class: "phoner" }),
+    );
+    expect(String(view.phoneTo("1234567890", "Bob", { class: "admin" }))).toBe(
+      String(view.phoneTo("1234567890", "Bob", { class: "admin" })),
+    );
+  });
+
   it("phone to with options", () => {
     const opts = { class: "example-class", country_code: "01" };
     assertDomEqual(
@@ -1054,5 +1193,46 @@ describe("UrlHelperTest", () => {
       `<a href="tel:+011234567890">Phone</a>`,
       view.phoneTo("1234567890", "Phone", { country_code: "01" }),
     );
+  });
+
+  it("phone to with img", () => {
+    assertDomEqual(
+      `<a href="tel:1234567890"><img src="/feedback.png" /></a>`,
+      view.phoneTo("1234567890", raw('<img src="/feedback.png" />')),
+    );
+  });
+
+  it("phone to with html safe string", () => {
+    assertDomEqual(`<a href="tel:1%2B234567890">1+234567890</a>`, view.phoneTo(raw("1+234567890")));
+  });
+
+  it("phone to with nil", () => {
+    assertDomEqual(`<a href="tel:"></a>`, view.phoneTo(null));
+  });
+
+  it("phone to returns html safe string", () => {
+    assertPredicate(view.phoneTo("1234567890"), isHtmlSafe);
+  });
+
+  it("phone to with block", () => {
+    assertDomEqual(
+      `<a href="tel:1234567890"><span>Phone</span></a>`,
+      view.phoneTo("1234567890", null, {}, () => view.contentTag("span", "Phone")),
+    );
+  });
+
+  it("phone to with block and options", () => {
+    assertDomEqual(
+      `<a class="special" href="tel:+011234567890"><span>Phone</span></a>`,
+      view.phoneTo("1234567890", { country_code: "01", class: "special" }, null, () =>
+        view.contentTag("span", "Phone"),
+      ),
+    );
+  });
+
+  it("phone to does not modify html options hash", () => {
+    const options = { class: "special" };
+    view.phoneTo("1234567890", "ME!", options);
+    expect(options).toEqual({ class: "special" });
   });
 });

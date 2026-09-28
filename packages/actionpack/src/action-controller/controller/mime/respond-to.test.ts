@@ -1,19 +1,108 @@
-import { beforeAll, describe, it, expect } from "vitest";
+import { beforeAll, beforeEach, describe, it, expect } from "vitest";
 import { FixtureResolver } from "@blazetrails/actionview";
 import { respondTo, Collector } from "../../../action-dispatch/respond-to.js";
 import { Request } from "../../../action-dispatch/http/request.js";
 import { Response } from "../../../action-dispatch/http/response.js";
 import { Base } from "../../base.js";
 import { MissingExactTemplate, UnknownFormat } from "../../metal/exceptions.js";
+import type { VariantCollector } from "../../metal/mime-responds.js";
+import { TestCase } from "../../test-case.js";
+
+type Variants = VariantCollector & Record<string, (block?: () => unknown) => void>;
 
 class RespondToController extends Base {
   async variantWithImplicitTemplateRendering(): Promise<void> {}
   async variantWithoutImplicitTemplateRendering(): Promise<void> {}
+
+  async variantWithFormatAndCustomRender(): Promise<void> {
+    this.request.variant = ":mobile";
+
+    await this.respondTo((type) => {
+      type.html(() => this.render({ body: "mobile" }));
+    });
+  }
+
+  async multipleVariantsForFormat(): Promise<void> {
+    await this.respondTo((type) => {
+      type.html((html: VariantCollector) => {
+        (html as Variants).tablet(() => this.render({ body: "tablet" }));
+        (html as Variants).phone(() => this.render({ body: "phone" }));
+      });
+    });
+  }
+
+  async variantPlusNoneForFormat(): Promise<void> {
+    await this.respondTo((format) => {
+      format.html((variant: VariantCollector) => {
+        (variant as Variants).phone(() => this.render({ body: "phone" }));
+        (variant as Variants).none();
+      });
+    });
+  }
+
+  async variantInlineSyntax(): Promise<void> {
+    await this.respondTo((format) => {
+      format.js(() => this.render({ body: "js" }));
+      (format.html() as Variants).none(() => this.render({ body: "none" }));
+      (format.html() as Variants).phone(() => this.render({ body: "phone" }));
+    });
+  }
+
+  async variantAny(): Promise<void> {
+    await this.respondTo((format) => {
+      format.html((variant: VariantCollector) => {
+        variant.any(":tablet", ":phablet", () => this.render({ body: "any" }));
+        (variant as Variants).phone(() => this.render({ body: "phone" }));
+      });
+    });
+  }
+
+  async variantAnyAny(): Promise<void> {
+    await this.respondTo((format) => {
+      format.html((variant: VariantCollector) => {
+        variant.any(() => this.render({ body: "any" }));
+        (variant as Variants).phone(() => this.render({ body: "phone" }));
+      });
+    });
+  }
+
+  async variantInlineAny(): Promise<void> {
+    await this.respondTo((format) => {
+      (format.html() as Variants).any(":tablet", ":phablet", () => this.render({ body: "any" }));
+      (format.html() as Variants).phone(() => this.render({ body: "phone" }));
+    });
+  }
+
+  async variantInlineAnyAny(): Promise<void> {
+    await this.respondTo((format) => {
+      (format.html() as Variants).phone(() => this.render({ body: "phone" }));
+      (format.html() as Variants).any(() => this.render({ body: "any" }));
+    });
+  }
+
+  async variantAnyWithNone(): Promise<void> {
+    await this.respondTo((format) => {
+      (format.html() as Variants).any(":none", ":phone", () =>
+        this.render({ body: "none or phone" }),
+      );
+    });
+  }
+
+  async formatAnyVariantAny(): Promise<void> {
+    await this.respondTo((format) => {
+      format.html(() => this.render({ body: "HTML" }));
+      format.any("js", "xml", (variant: VariantCollector) => {
+        (variant as Variants).phone(() => this.render({ body: "phone" }));
+        variant.any(":tablet", ":phablet", () => this.render({ body: "tablet" }));
+      });
+    });
+  }
 }
 RespondToController.beforeAction((c) => {
   const controller = c as RespondToController;
   const v = controller.params.get("v");
   if (typeof v === "string") controller.request.variant = `:${v}`;
+  else if (Array.isArray(v)) controller.request.variant = v.map((x) => `:${x}`);
 });
 
 async function get(action: string, v: string): Promise<RespondToController> {
@@ -32,6 +121,7 @@ beforeAll(() => {
   RespondToController.prependViewPath(
     new FixtureResolver({
       "respond_to/variantWithImplicitTemplateRendering.html+mobile.tse": "mobile",
+      "respond_to/variantPlusNoneForFormat.html.tse": "none",
     }),
   );
   RespondToController.layout(false);
@@ -48,6 +138,114 @@ describe("RespondToControllerTest", () => {
     await expect(get("variantWithoutImplicitTemplateRendering", "does_not_matter")).rejects.toThrow(
       MissingExactTemplate,
     );
+  });
+
+  let tc: TestCase;
+
+  beforeEach(() => {
+    tc = new TestCase(RespondToController);
+  });
+
+  it("variant with format and custom render", async () => {
+    await tc.get("variantWithFormatAndCustomRender", { params: { v: "phone" } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("mobile");
+  });
+
+  it("multiple variants for format", async () => {
+    await tc.get("multipleVariantsForFormat", { params: { v: "tablet" } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("tablet");
+  });
+
+  it("no variant in variant setup", async () => {
+    await tc.get("variantPlusNoneForFormat");
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("none");
+  });
+
+  it("variant inline syntax", async () => {
+    await tc.get("variantInlineSyntax");
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("none");
+
+    await tc.get("variantInlineSyntax", { params: { v: "phone" } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("phone");
+  });
+
+  it("variant inline syntax with format", async () => {
+    await tc.get("variantInlineSyntax", { format: "js" });
+    expect(tc.response.mediaType).toBe("text/javascript");
+    expect(tc.responseBody).toBe("js");
+  });
+
+  it("variant any", async () => {
+    await tc.get("variantAny", { params: { v: "phone" } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("phone");
+
+    await tc.get("variantAny", { params: { v: "tablet" } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("any");
+
+    await tc.get("variantAny", { params: { v: "phablet" } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("any");
+  });
+
+  it("variant any any", async () => {
+    await tc.get("variantAnyAny");
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("any");
+
+    await tc.get("variantAnyAny", { params: { v: "phone" } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("phone");
+
+    await tc.get("variantAnyAny", { params: { v: "yolo" } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("any");
+  });
+
+  it("variant inline any", async () => {
+    await tc.get("variantAny", { params: { v: "phone" } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("phone");
+
+    await tc.get("variantInlineAny", { params: { v: "tablet" } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("any");
+
+    await tc.get("variantInlineAny", { params: { v: "phablet" } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("any");
+  });
+
+  it("variant inline any any", async () => {
+    await tc.get("variantInlineAnyAny", { params: { v: "phone" } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("phone");
+
+    await tc.get("variantInlineAnyAny", { params: { v: "yolo" } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("any");
+  });
+
+  it("variant any with none", async () => {
+    await tc.get("variantAnyWithNone");
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("none or phone");
+
+    await tc.get("variantAnyWithNone", { params: { v: "phone" } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("none or phone");
+  });
+
+  it("format any variant any", async () => {
+    await tc.get("formatAnyVariantAny", { format: "js", params: { v: "tablet" } });
+    expect(tc.response.mediaType).toBe("text/javascript");
+    expect(tc.responseBody).toBe("tablet");
   });
 
   it("html", () => {

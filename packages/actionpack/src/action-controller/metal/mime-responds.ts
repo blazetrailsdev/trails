@@ -130,7 +130,7 @@ export class VariantCollector {
       if (args.length > 0 && !args.some((a) => rbEqual(a, this._variant))) {
         for (const v of args as string[]) this._variants.set(v, block);
       } else {
-        this._variants.set("any", block);
+        this._variants.set(":any", block);
       }
     }
   }
@@ -140,12 +140,12 @@ export class VariantCollector {
   }
 
   methodMissing(name: string, block?: FormatHandler): void {
-    if (block) this._variants.set(name, block);
+    if (block) this._variants.set(`:${name}`, block);
   }
 
   get variant(): FormatHandler | undefined {
     if (this._variant!.length === 0) {
-      return this._variants.get("none") ?? this._variants.get("any");
+      return this._variants.get(":none") ?? this._variants.get(":any");
     } else {
       return this._variants.get(this.variantKey());
     }
@@ -153,7 +153,7 @@ export class VariantCollector {
 
   /** @internal */
   private variantKey(): string {
-    return this._variant!.find((variant) => this._variants.has(variant)) ?? "any";
+    return this._variant!.find((variant) => this._variants.has(variant)) ?? ":any";
   }
 }
 
