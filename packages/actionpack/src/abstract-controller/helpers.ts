@@ -64,6 +64,21 @@ export function helperMethod(cls: HelpersClassMethods, ...names: HelperMethodNam
   cls._helperMethods = [...(cls._helperMethods ?? []), ...flat];
   const mod = _helpersForModification(cls);
   for (const name of flat) {
+    let proto = (cls as { prototype?: object }).prototype ?? null;
+    let descriptor: PropertyDescriptor | undefined;
+    while (proto && !(descriptor = Object.getOwnPropertyDescriptor(proto, name))) {
+      proto = Object.getPrototypeOf(proto) as object | null;
+    }
+    if (descriptor?.get) {
+      Object.defineProperty(mod, name, {
+        get(this: { controller: Record<string, unknown> }) {
+          return this.controller[name];
+        },
+        configurable: true,
+        enumerable: true,
+      });
+      continue;
+    }
     mod[name] = function (this: { controller: Record<string, unknown> }, ...args: unknown[]) {
       const fn = this.controller[name];
       if (typeof fn !== "function") {

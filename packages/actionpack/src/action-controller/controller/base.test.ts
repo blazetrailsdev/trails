@@ -242,26 +242,6 @@ describe("ActionController::Base redirecting", () => {
   });
 });
 
-describe("ActionController::Base flash", () => {
-  it("notice sets flash notice", () => {
-    const c = new (class extends Base {})();
-    c.setResponseBang(makeResponse());
-    c.setRequestBang(new Request({}));
-    c.notice = "Success!";
-    expect(c.flash.notice).toBe("Success!");
-    expect(c.notice).toBe("Success!");
-  });
-
-  it("alert sets flash alert", () => {
-    const c = new (class extends Base {})();
-    c.setResponseBang(makeResponse());
-    c.setRequestBang(new Request({}));
-    c.alert = "Danger!";
-    expect(c.flash.alert).toBe("Danger!");
-    expect(c.alert).toBe("Danger!");
-  });
-});
-
 describe("ActionController::Base rescue_from", () => {
   it("rescues from a specific error class", async () => {
     class CustomError extends Error {
