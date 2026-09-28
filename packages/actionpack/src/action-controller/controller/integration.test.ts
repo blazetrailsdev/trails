@@ -870,14 +870,14 @@ describe("ApplicationIntegrationTest", () => {
 
     static _routes?: RouteSet;
 
-    static get routes(): RouteSet {
+    static routes(): RouteSet {
       return (this._routes ??= new RouteSet());
     }
 
     static call(): void {}
 
     static {
-      this.routes.draw((r) => {
+      this.routes().draw((r) => {
         r.get("baz", { to: "application_integration_test/test#index", as: "baz" });
       });
     }
@@ -1033,8 +1033,11 @@ describe("ControllerWithHeadersMethodIntegrationTest", () => {
     }
   }
 
+  let t: IntegrationTest;
+  const assertResponse = (type: number | string): void => t.assertResponse(type);
+
   it("doesn't call controller's headers method", async () => {
-    const t = new IntegrationTest();
+    t = new IntegrationTest();
     controllerConstants.set("controller_with_headers_method_integration_test/test", TestController);
     await t.withRouting(async (routes: RouteSet) => {
       routes.draw((r) => {
@@ -1043,7 +1046,7 @@ describe("ControllerWithHeadersMethodIntegrationTest", () => {
 
       await t.get("/ok");
 
-      t.assertResponse(200);
+      assertResponse(200);
     });
   });
 });
@@ -1113,6 +1116,7 @@ describe("UrlOptionsIntegrationTest", () => {
   type Helpers = Record<string, (...args: unknown[]) => string>;
 
   let t: UrlOptionsIntegrationTest & Helpers;
+  const assertResponse = (type: number | string): void => t.assertResponse(type);
   beforeEach(() => {
     t = new UrlOptionsIntegrationTest() as UrlOptionsIntegrationTest & Helpers;
   });
@@ -1123,13 +1127,13 @@ describe("UrlOptionsIntegrationTest", () => {
 
   it("current host overrides default URL options from routes", async () => {
     await t.get("/foo");
-    t.assertResponse("success");
+    assertResponse("success");
     expect(t.foosUrl()).toBe("http://www.example.com/foo");
   });
 
   it("controller can override default URL options from request", async () => {
     await t.get("/bar");
-    t.assertResponse("success");
+    assertResponse("success");
     expect(t.foosUrl()).toBe("http://bar.com/foo");
   });
 
@@ -1140,7 +1144,7 @@ describe("UrlOptionsIntegrationTest", () => {
       expect(t.foosUrl()).toBe("http://foobar.com/foo");
 
       await t.get("/bar");
-      t.assertResponse("success");
+      assertResponse("success");
       expect(t.foosUrl()).toBe("http://foobar.com/foo");
     } finally {
       t.defaultUrlOptions = originalHost;
@@ -1149,7 +1153,7 @@ describe("UrlOptionsIntegrationTest", () => {
 
   it("current request path parameters are recalled", async () => {
     await t.get("/foo/1");
-    t.assertResponse("success");
+    assertResponse("success");
     expect(t.urlFor({ action: "edit", onlyPath: true })).toBe("/foo/1/edit");
   });
 });
@@ -1190,10 +1194,13 @@ describe("HeadWithStatusActionIntegrationTest", () => {
     }
   }
 
+  let t: HeadWithStatusActionIntegrationTest;
+  const assertResponse = (type: number | string): void => t.assertResponse(type);
+
   it("get /foo/status with head result does not cause stack overflow error", async () => {
-    const t = new HeadWithStatusActionIntegrationTest();
+    t = new HeadWithStatusActionIntegrationTest();
     await expect(t.get("/foo/status")).resolves.not.toThrow();
-    t.assertResponse("ok");
+    assertResponse("ok");
   });
 });
 
@@ -1206,8 +1213,11 @@ describe("IntegrationWithRoutingTest", () => {
 
   class IntegrationWithRoutingTest extends IntegrationTest {}
 
+  let t: IntegrationWithRoutingTest;
+  const assertResponse = (type: number | string): void => t.assertResponse(type);
+
   it("with routing resets session", async () => {
-    const t = new IntegrationWithRoutingTest();
+    t = new IntegrationWithRoutingTest();
     const klassNamespace = underscore(IntegrationWithRoutingTest.name);
     controllerConstants.set(`${klassNamespace}/foo`, FooController);
 
@@ -1219,7 +1229,7 @@ describe("IntegrationWithRoutingTest", () => {
       });
 
       await t.get("/integration_with_routing_test/with");
-      t.assertResponse(200);
+      assertResponse(200);
       expect(t.response.body).toBe("ok");
     });
 
@@ -1231,7 +1241,7 @@ describe("IntegrationWithRoutingTest", () => {
       });
 
       await t.get("/integration_with_routing_test/routing");
-      t.assertResponse(200);
+      assertResponse(200);
       expect(t.response.body).toBe("ok");
     });
   });
@@ -1245,8 +1255,11 @@ describe("IntegrationRequestsWithoutSetup", () => {
     }
   }
 
+  let t: IntegrationTest;
+  const assertResponse = (type: number | string): void => t.assertResponse(type);
+
   it("request", async () => {
-    const t = new IntegrationTest();
+    t = new IntegrationTest();
     await t.withRouting(async (routes: RouteSet) => {
       routes.draw((r) => {
         deprecator().silence(() => {
@@ -1256,7 +1269,7 @@ describe("IntegrationRequestsWithoutSetup", () => {
 
       await t.get("/ok");
 
-      t.assertResponse(200);
+      assertResponse(200);
       expect(t.response.body).toBe("ok");
       expect(t.cookies.get("key")).toBe("ok");
     });

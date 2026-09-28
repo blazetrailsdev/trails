@@ -49,7 +49,7 @@ export type MountableApp =
   | ((env: RackEnv) => RackResponse | Promise<RackResponse>)
   | { call: (env: RackEnv) => RackResponse | Promise<RackResponse> };
 
-type RailsApp = MountableApp & { railtieName: string; routes: RouteSet };
+type RailsApp = MountableApp & { railtieName: string; routes(): RouteSet };
 
 export type CallableConstraint =
   | ((...args: never[]) => unknown)
@@ -1530,7 +1530,7 @@ export class Mapper {
     };
     this._mountedScriptNamers.set(name, { app, scriptNamer });
 
-    app.routes.defineMountedHelper(name, scriptNamer);
+    app.routes().defineMountedHelper(name, scriptNamer);
   }
 
   /** @internal */
