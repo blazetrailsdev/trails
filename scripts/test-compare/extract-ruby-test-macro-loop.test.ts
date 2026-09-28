@@ -106,8 +106,6 @@ describe("Ruby extractor test-macro loop expansion", () => {
 
 describe("Ruby extractor included-hook test macros", () => {
   it("collects `test_case.test` in a module's self.included as the module's tests", () => {
-    // actionview/test/buffers_test.rb:5-54 — SharedBufferTests defines its tests
-    // on each including class from `def self.included(test_case)`.
     const { cases } = extract(`
       module SharedTests
         def self.included(test_case)

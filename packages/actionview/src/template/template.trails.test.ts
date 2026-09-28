@@ -6,10 +6,13 @@ import { TemplateHandlers } from "./handlers.js";
 import { Tse } from "./handlers/tse.js";
 import { File as SourcesFile } from "./sources/file.js";
 
+const dirs: string[] = [];
+
 async function binarySource(bytes: string): Promise<SourcesFile> {
   const fs = getFs();
   const path = getPath();
   const dir = await fs.mkdtemp!(`${(await getOsAsync()).tmpdir()}${path.sep}tse-template-`);
+  dirs.push(dir);
   const filename = path.join(dir, "template.html.tse");
   await fs.writeFile!(
     filename,
@@ -29,7 +32,10 @@ function withExternalEncoding<T>(encoding: string | Encoding, block: () => T): T
 }
 
 describe("Template#encode!", () => {
-  afterEach(() => TemplateHandlers.clear());
+  afterEach(() => {
+    TemplateHandlers.clear();
+    for (const dir of dirs.splice(0)) getFs().rmSync(dir, { recursive: true, force: true });
+  });
 
   const newTemplate = (body: string | SourcesFile): Template =>
     new Template(body, "hello template", new Tse(), {

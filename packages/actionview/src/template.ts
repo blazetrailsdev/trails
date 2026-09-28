@@ -5,7 +5,13 @@ import {
   SafeBuffer,
   toSentence,
 } from "@blazetrails/activesupport";
-import { ArgumentError, Encoding, forceEncoding, isValidEncoding } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Encoding,
+  forceEncoding,
+  isValidEncoding,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { ENCODING_FLAG } from "./action-view.js";
 import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
 import { OutputBuffer, StreamingBuffer } from "./buffers.js";
@@ -181,11 +187,10 @@ export class Template {
     const bytes = source;
     source = forceEncoding(source, encoding);
 
-    const handler = this.handler as { handlesEncoding?: () => boolean };
     if (
       !magicEncoding &&
-      typeof handler.handlesEncoding === "function" &&
-      handler.handlesEncoding()
+      rbObjRespondTo(this.handler, "handlesEncoding") &&
+      (this.handler as TemplateHandler & { handlesEncoding(): boolean }).handlesEncoding()
     ) {
       return source;
     } else if (isValidEncoding(bytes, encoding)) {

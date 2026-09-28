@@ -344,9 +344,6 @@ class TestExtractor
       end
     end
 
-    # `def self.included(test_case) test_case.test "..." do ... end end` inside a
-    # mixin module (actionview/test/buffers_test.rb:5-54) defines each test on the
-    # including class, so it is collected like the module's own `def test_*`.
     if @module_collect && inner.is_a?(Array) && inner[0] == :command_call &&
         ident_name(inner[3]) == "test"
       desc = extract_first_string(inner[4])
