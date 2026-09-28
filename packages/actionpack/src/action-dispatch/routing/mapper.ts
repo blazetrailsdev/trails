@@ -1,6 +1,6 @@
 import { Redirect, redirect as redirectFactory } from "./redirection.js";
 import { Endpoint } from "./endpoint.js";
-import { Dispatcher, StaticDispatcher } from "./route-set.js";
+import { Dispatcher, StaticDispatcher, type RouteSet } from "./route-set.js";
 import type { DispatchableControllerClass } from "./dispatcher.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
@@ -1527,6 +1527,8 @@ export class Mapper {
       return typeof sn === "string" && sn.length > 0 ? sn : mountPath;
     };
     this._mountedScriptNamers.set(name, { app, scriptNamer });
+
+    (app as unknown as { routes: RouteSet }).routes.defineMountedHelper(name, scriptNamer);
   }
 
   /** @internal */

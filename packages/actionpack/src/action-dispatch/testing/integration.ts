@@ -3,11 +3,20 @@ import { Headers } from "../http/headers.js";
 import { MimeType } from "../http/mime-type.js";
 import {
   isPresent,
+  reverseMergeBang,
   runLoadHooks,
   SetupAndTeardown,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
-import { HTTPS, URI, include, stringSplit, type Generic } from "@blazetrails/ruby-compat";
+import {
+  HTTPS,
+  URI,
+  include,
+  rbObjRespondTo,
+  rbObjSingletonClass,
+  stringSplit,
+  type Generic,
+} from "@blazetrails/ruby-compat";
 import { TestResponse } from "./test-response.js";
 import { FlashHash } from "../middleware/flash.js";
 import { RouteSet } from "../routing/route-set.js";
@@ -73,6 +82,12 @@ export class IntegrationTest {
 
   constructor() {
     this.resetBang();
+    const app = this.app as { routes?: unknown } | null;
+    if (rbObjRespondTo(app, "routes") && app!.routes instanceof RouteSet) {
+      const klass = rbObjSingletonClass(this) as new () => unknown;
+      include(klass, app!.routes.urlHelpers());
+      include(klass, app!.routes.mountedHelpers());
+    }
   }
 
   resetBang(): void {
@@ -101,11 +116,24 @@ export class IntegrationTest {
 
   urlOptions(): Record<string, unknown> {
     if (!this._urlOptions) {
-      this._urlOptions = {
-        ...this._defaultUrlOptions,
+      const urlOptions = { ...this.defaultUrlOptions };
+      if (rbObjRespondTo(this.controller, "urlOptions")) {
+        reverseMergeBang(
+          urlOptions,
+          (this.controller as unknown as { urlOptions(): Record<string, unknown> }).urlOptions(),
+        );
+      }
+
+      const app = this.app as { routes?: RouteSet } | null;
+      if (rbObjRespondTo(app, "routes")) {
+        reverseMergeBang(urlOptions, app!.routes!.defaultUrlOptions);
+      }
+
+      reverseMergeBang(urlOptions, {
         host: this.host,
-        protocol: this._https ? "https" : "http",
-      };
+        protocol: this.isHttps() ? "https" : "http",
+      });
+      this._urlOptions = urlOptions;
     }
     return this._urlOptions;
   }
