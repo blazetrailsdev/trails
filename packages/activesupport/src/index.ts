@@ -604,6 +604,7 @@ export {
   assertNil,
   assertNotNil,
   assertEqual,
+  assertNotEqual,
   assertMatch,
   assertNoMatch,
   assertSame,
