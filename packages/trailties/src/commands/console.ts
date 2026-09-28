@@ -28,23 +28,11 @@ export function consoleCommand(): Command {
 
     console.log("Loading trails console...");
 
-    const r = repl.start({
-      prompt: "trails> ",
-      useGlobal: true,
-    });
-
-    r.context.require = createRequire(File.join(Dir.pwd(), "package.json"));
-
-    r.on("exit", async () => {
-      if (dbAdapter && typeof dbAdapter.close === "function") {
-        await dbAdapter.close();
-      }
-    });
-
+    const context: Record<string, unknown> = {};
     try {
       const ar = await import("@blazetrails/activerecord");
-      r.context.Base = ar.Base;
-      r.context.Migration = ar.Migration;
+      context.Base = ar.Base;
+      context.Migration = ar.Migration;
     } catch {
       /** @empty */
     }
@@ -60,7 +48,7 @@ export function consoleCommand(): Command {
           const mod = await import(pathToFileURL(File.join(modelsDir, file)).href);
           for (const [name, value] of Object.entries(mod)) {
             if (typeof value === "function") {
-              (r.context as any)[name] = value;
+              context[name] = value;
             }
           }
           loadedCount++;
@@ -76,6 +64,20 @@ export function consoleCommand(): Command {
     console.log("Supports top-level await (e.g., await User.all())");
     console.log('Type ".exit" or Ctrl+D to quit.');
     console.log("");
+
+    const r = repl.start({
+      prompt: "trails> ",
+      useGlobal: true,
+    });
+
+    Object.assign(r.context, context);
+    r.context.require = createRequire(File.join(Dir.pwd(), "package.json"));
+
+    r.on("exit", async () => {
+      if (dbAdapter && typeof dbAdapter.close === "function") {
+        await dbAdapter.close();
+      }
+    });
   });
 
   return cmd;
