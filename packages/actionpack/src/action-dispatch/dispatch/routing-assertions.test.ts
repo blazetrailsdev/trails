@@ -91,6 +91,21 @@ function runTest<T extends Host>(klass: new () => T): () => T {
   return () => t;
 }
 
+function RoutingAssertionsSharedTests(t: () => Host): void {
+  it("with routing", async () => {
+    await t().withRouting(async (routes: RouteSet) => {
+      routes.draw((r) => {
+        r.resources("articles", { path: "artikel" } as RouteOptions);
+      });
+
+      t().assertRouting("/artikel", { controller: "articles", action: "index" });
+      await assertRaise([Assertion], {}, () => {
+        t().assertRouting("/articles", { controller: "articles", action: "index" });
+      });
+    });
+  });
+}
+
 function WithRoutingSharedTests(klass: HostClass, t: () => Host): void {
   const beforeSetup = klass.prototype.beforeSetup;
   klass.prototype.beforeSetup = function (this: Host): void {
@@ -135,6 +150,13 @@ function WithRoutingSharedTests(klass: HostClass, t: () => Host): void {
 }
 
 describe("RoutingAssertionsControllerTest", () => {
+  class RoutingAssertionsControllerTest extends TestCase {
+    constructor() {
+      super(ArticlesController);
+    }
+  }
+  RoutingAssertionsSharedTests(runTest(RoutingAssertionsControllerTest));
+
   describe("WithRoutingTest", () => {
     class WithRoutingTest extends TestCase {
       constructor() {
@@ -163,6 +185,7 @@ describe("RoutingAssertionsControllerTest", () => {
 describe("RoutingAssertionsIntegrationTest", () => {
   class RoutingAssertionsIntegrationTest extends IntegrationTest {}
   const t = runTest(RoutingAssertionsIntegrationTest);
+  RoutingAssertionsSharedTests(t);
 
   it("https and host settings are set on new session", () => {
     t().httpsBang();
