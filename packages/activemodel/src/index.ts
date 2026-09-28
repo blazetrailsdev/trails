@@ -72,7 +72,8 @@ export { NumericalityValidator } from "./validations/numericality.js";
 export { AcceptsMultiparameterTime } from "./type/helpers/accepts-multiparameter-time.js";
 export { MutableModule } from "./type/helpers/mutable.js";
 export type { Mutable } from "./type/helpers/mutable.js";
-export { ModelName } from "./naming.js";
+export { ModelName, Naming } from "./naming.js";
+export { Conversion } from "./conversion.js";
 export type { ModelLike } from "./naming.js";
 /** @noRailsEquivalent PERMANENT */
 export { Dirty, initAttributes as dirtyInitAttributes } from "./dirty.js";

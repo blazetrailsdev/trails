@@ -4,8 +4,17 @@
     "composite": true,
     "outDir": "dist-test",
     "rootDir": "src",
-    "paths": { "@blazetrails/actionpack": ["../actionpack/src/index.ts"] }
+    "paths": {
+      "@blazetrails/actionpack": ["../actionpack/src/index.ts"],
+      "@blazetrails/activemodel": ["../activemodel/src/index.ts"],
+      "@blazetrails/rack": ["../rack/src/index.ts"]
+    }
   },
   "include": ["src/**/*.test.ts"],
-  "references": [{ "path": "./tsconfig.json" }, { "path": "../actionpack" }]
+  "references": [
+    { "path": "./tsconfig.json" },
+    { "path": "../actionpack" },
+    { "path": "../activemodel" },
+    { "path": "../rack" }
+  ]
 }

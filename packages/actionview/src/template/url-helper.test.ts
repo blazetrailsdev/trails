@@ -1,11 +1,60 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { RouteSet, UrlFor } from "@blazetrails/actionpack";
+import { ActionController, Request, RouteSet, UrlFor } from "@blazetrails/actionpack";
+import { Conversion, Naming } from "@blazetrails/activemodel";
+import { extend, isPresent } from "@blazetrails/activesupport";
+import { MockRequest } from "@blazetrails/rack";
 import { include } from "@blazetrails/ruby-compat";
 import { RoutingUrlFor } from "../routing-url-for.js";
 import { Base } from "../base.js";
 import { setPrependContentExfiltrationPrevention } from "../helpers/content-exfiltration-prevention-helper.js";
 import * as UrlHelper from "../helpers/url-helper.js";
+import { raw } from "../helpers/output-safety-helper.js";
+import { Template } from "../template.js";
+import { TemplateHandlers } from "./handlers.js";
+
+class Workshop {
+  static {
+    extend(this, Naming);
+    include(this, Conversion);
+  }
+
+  id: unknown;
+
+  constructor(id: unknown) {
+    this.id = id;
+  }
+
+  isPersisted(): boolean {
+    return isPresent(this.id);
+  }
+
+  toString(): string {
+    return `Workshop ${this.id}`;
+  }
+}
+
+class Session {
+  static {
+    extend(this, Naming);
+    include(this, Conversion);
+  }
+
+  id: unknown;
+  workshopId: unknown;
+
+  constructor(id: unknown) {
+    this.id = id;
+  }
+
+  isPersisted(): boolean {
+    return isPresent(this.id);
+  }
+
+  toString(): string {
+    return String(this.id ?? "");
+  }
+}
 
 function viewWith(controller: unknown): Base {
   return Base.withViewPaths([], {}, controller);
@@ -31,6 +80,14 @@ routes.draw((r) => {
   r.get("/other", { to: "foo#other" });
   r.get("/article/:id", { to: "foo#article", as: "article" });
   r.get("/category/:category", { to: "foo#category" });
+  r.resources("sessions");
+  r.resources("workshops", (r) => {
+    r.resources("sessions");
+  });
+
+  r.scope("engine", (r) => {
+    r.get("/", { to: "foo#bar" });
+  });
 });
 
 class UrlHelperView extends Base {}
@@ -42,6 +99,17 @@ const hashFor = (options: Record<string, unknown> = {}): Record<string, unknown>
   ...options,
 });
 const urlHash = hashFor;
+
+const renderTse = (string: string): string => {
+  const template = new Template(
+    string.trim(),
+    "test template",
+    TemplateHandlers.handlerForExtension("tse")!,
+    { format: ":html", locals: [] },
+  );
+  const view = Base.withEmptyTemplateCache();
+  return String(template.render(view.empty(), {})).trim();
+};
 
 function controllerWithReferer(env: Record<string, unknown>): unknown {
   return { request: { env } };
@@ -71,6 +139,10 @@ describe("UrlHelperTest", () => {
     expect(view.urlFor(":back")).toBe("javascript:history.back()");
   });
 
+  it("url for does not escape urls", () => {
+    expect(view.urlFor(hashFor({ a: "b", c: "d" }))).toBe("/?a=b&c=d");
+  });
+
   it("url for does not include empty hashes", () => {
     const view = UrlHelperView.withViewPaths([]) as any;
     expect(view.urlFor(hashFor({ a: {} }))).toBe("/");
@@ -82,11 +154,22 @@ describe("UrlHelperTest", () => {
     expect(view.urlFor(":back")).toBe("javascript:history.back()");
   });
 
+  it("url for with array defaults to only path true", () => {
+    expect(view.urlFor([":other", { controller: "foo" }])).toBe("/other");
+  });
+
+  it("url for with array and only path set to false", () => {
+    view.defaultUrlOptions["host"] = "http://example.com";
+    expect(view.urlFor([":other", { controller: "foo", onlyPath: false }])).toBe(
+      "http://example.com/other",
+    );
+  });
+
   let requestForgery = false;
   let view: any;
 
   beforeEach(() => {
-    view = viewWith(null);
+    view = UrlHelperView.withViewPaths([], {}, null);
     Object.defineProperties(view, {
       isProtectAgainstForgery: { value: () => requestForgery, configurable: true },
       formAuthenticityToken: { value: () => "secret" },
@@ -100,14 +183,10 @@ describe("UrlHelperTest", () => {
     UrlHelper.setButtonToGeneratesButtonTag(true);
   });
 
-  const requestForUrl = (url: string, { method = "get" } = {}) => ({
-    isGet: () => method === "get",
-    isHead: () => method === "head",
-    path: url.split("?")[0],
-    fullpath: url,
-    protocol: "http://",
-    hostWithPort: "www.example.com",
-  });
+  const requestForUrl = (url: string, opts: Record<string, unknown> = {}): Request => {
+    const env = MockRequest.envFor(`http://www.example.com${url}`, opts);
+    return new Request(env);
+  };
 
   it("to form params with hash", () => {
     expect(UrlHelper.toFormParams({ name: "David", nationality: "Danish" })).toEqual([
@@ -155,6 +234,62 @@ describe("UrlHelperTest", () => {
     );
   });
 
+  it("button to with new record model", () => {
+    const session = new Session(null);
+
+    assertDomEqual(
+      `<form method="post" action="/sessions" class="button_to"><button type="submit">Create Session</button></form>`,
+      view.buttonTo("Create Session", session),
+    );
+  });
+
+  it("button to with new record model and block", () => {
+    const workshop = new Workshop(null);
+
+    assertDomEqual(
+      `<form method="post" action="/workshops" class="button_to"><button type="submit">Create</button></form>`,
+      view.buttonTo(workshop, null, null, () => "Create"),
+    );
+  });
+
+  it("button to with nested new record model and block", () => {
+    const workshop = new Workshop("1");
+    const session = new Session(null);
+
+    assertDomEqual(
+      `<form method="post" action="/workshops/1/sessions" class="button_to"><button type="submit">Create</button></form>`,
+      view.buttonTo([workshop, session], null, null, () => "Create"),
+    );
+  });
+
+  it("button to with persisted model", () => {
+    const workshop = new Workshop("1");
+
+    assertDomEqual(
+      `<form method="post" action="/workshops/1" class="button_to"><input type="hidden" name="_method" value="patch" autocomplete="off" /><button type="submit">Update</button></form>`,
+      view.buttonTo(workshop, null, null, () => "Update"),
+    );
+  });
+
+  it("button to with persisted model and block", () => {
+    const workshop = new Workshop("1");
+
+    assertDomEqual(
+      `<form method="post" action="/workshops/1" class="button_to"><input type="hidden" name="_method" value="patch" autocomplete="off" /><button type="submit">Update</button></form>`,
+      view.buttonTo(workshop, null, null, () => "Update"),
+    );
+  });
+
+  it("button to with nested persisted model and block", () => {
+    const workshop = new Workshop("1");
+    const session = new Session("1");
+
+    assertDomEqual(
+      `<form method="post" action="/workshops/1/sessions/1" class="button_to"><input type="hidden" name="_method" value="patch" autocomplete="off" /><button type="submit">Update</button></form>`,
+      view.buttonTo([workshop, session], null, null, () => "Update"),
+    );
+  });
+
   it("button to with remote and form options", () => {
     assertDomEqual(
       `<form method="post" action="http://www.example.com" class="custom-class" data-remote="true" data-type="json"><button type="submit">Hello</button></form>`,
@@ -162,6 +297,18 @@ describe("UrlHelperTest", () => {
         remote: true,
         form: { class: "custom-class", "data-type": "json" },
       }),
+    );
+  });
+
+  it("button to with block and hash url", () => {
+    assertDomEqual(
+      `<form action="/other" class="button_to" method="post"><button class="button" type="submit">Hello</button></form>`,
+      view.buttonTo(
+        { controller: "foo", action: "other" },
+        { class: "button" },
+        null,
+        () => "Hello",
+      ),
     );
   });
 
@@ -229,6 +376,25 @@ describe("UrlHelperTest", () => {
     assertDomEqual(`<a href="${env.HTTP_REFERER}">go back</a>`, view.linkTo("go back", ":back"));
   });
 
+  it("link with nil html options", () => {
+    const link = view.linkTo("Hello", urlHash(), null);
+    assertDomEqual(`<a href="/">Hello</a>`, link);
+  });
+
+  it("link to with symbolic remote in non html options", () => {
+    assertDomEqual(
+      `<a href="/" data-remote="true">Hello</a>`,
+      view.linkTo("Hello", hashFor({ remote: true }), {}),
+    );
+  });
+
+  it("link to with string remote in non html options", () => {
+    assertDomEqual(
+      `<a href="/" data-remote="true">Hello</a>`,
+      view.linkTo("Hello", hashFor({ remote: true }), {}),
+    );
+  });
+
   it("link tag using post javascript and rel", () => {
     assertDomEqual(
       `<a href="http://www.example.com" data-method="post" rel="example nofollow">Hello</a>`,
@@ -259,6 +425,160 @@ describe("UrlHelperTest", () => {
     );
   });
 
+  it("link tag using block and hash", () => {
+    assertDomEqual(
+      `<a href="/"><span>Example site</span></a>`,
+      view.linkTo(urlHash(), null, null, () => view.contentTag("span", "Example site")),
+    );
+  });
+
+  it("link tag using block in erb", () => {
+    const out = renderTse(`<%= linkTo('/', null, null, () => { %>Example site<% }) %>`);
+    expect(out).toBe('<a href="/">Example site</a>');
+  });
+
+  it("link tag with html safe string", () => {
+    assertDomEqual(
+      `<a href="/article/Gerd_M%C3%BCller">Gerd Müller</a>`,
+      view.linkTo("Gerd Müller", view.articlePath("Gerd_Müller")),
+    );
+  });
+
+  it("link tag using active record model", () => {
+    const workshop = new Workshop((1).toString());
+    const link = view.linkTo(workshop);
+    assertDomEqual(`<a href="/workshops/1">Workshop 1</a>`, link);
+  });
+
+  it("link tag using active record model twice", () => {
+    const workshop = new Workshop((1).toString());
+    const link = view.linkTo(workshop, workshop);
+    assertDomEqual(`<a href="/workshops/1">Workshop 1</a>`, link);
+  });
+
+  it("link to unless", () => {
+    expect(String(view.linkToUnless(true, "Showing", urlHash()))).toBe("Showing");
+
+    assertDomEqual(`<a href="/">Listing</a>`, view.linkToUnless(false, "Listing", urlHash()));
+
+    expect(
+      String(
+        view.linkToUnless(true, "Showing", urlHash(), {}, (name: unknown) =>
+          raw(`<strong>${name}</strong>`),
+        ),
+      ),
+    ).toBe("<strong>Showing</strong>");
+
+    expect(String(view.linkToUnless(true, "Showing", urlHash(), {}, () => "test"))).toBe("test");
+
+    expect(String(view.linkToUnless(true, "<b>Showing</b>", urlHash()))).toBe(
+      "&lt;b&gt;Showing&lt;/b&gt;",
+    );
+    expect(String(view.linkToUnless(false, "<b>Showing</b>", urlHash()))).toBe(
+      `<a href="/">&lt;b&gt;Showing&lt;/b&gt;</a>`,
+    );
+    expect(String(view.linkToUnless(true, raw("<b>Showing</b>"), urlHash()))).toBe(
+      "<b>Showing</b>",
+    );
+    expect(String(view.linkToUnless(false, raw("<b>Showing</b>"), urlHash()))).toBe(
+      `<a href="/"><b>Showing</b></a>`,
+    );
+  });
+
+  it("link to if", () => {
+    expect(String(view.linkToIf(false, "Showing", urlHash()))).toBe("Showing");
+    assertDomEqual(`<a href="/">Listing</a>`, view.linkToIf(true, "Listing", urlHash()));
+  });
+
+  it("link to if with block", () => {
+    expect(String(view.linkToIf(false, "Showing", urlHash(), {}, () => "Fallback"))).toBe(
+      "Fallback",
+    );
+    assertDomEqual(
+      `<a href="/">Listing</a>`,
+      view.linkToIf(true, "Listing", urlHash(), {}, () => "Fallback"),
+    );
+  });
+
+  it("current page with http head method", () => {
+    view.request = requestForUrl("/", { ":method": "head" });
+    expect(view.isCurrentPage(urlHash())).toBeTruthy();
+    expect(view.isCurrentPage("http://www.example.com/")).toBeTruthy();
+  });
+
+  it("current page with simple url", () => {
+    view.request = requestForUrl("/");
+    expect(view.isCurrentPage(urlHash())).toBeTruthy();
+    expect(view.isCurrentPage("http://www.example.com/")).toBeTruthy();
+  });
+
+  it("current page ignoring params", () => {
+    view.request = requestForUrl("/?order=desc&page=1");
+
+    expect(view.isCurrentPage(urlHash())).toBeTruthy();
+    expect(view.isCurrentPage("http://www.example.com/")).toBeTruthy();
+  });
+
+  it("current page considering params", () => {
+    view.request = requestForUrl("/?order=desc&page=1");
+
+    expect(view.isCurrentPage(urlHash(), { checkParameters: true })).toBeFalsy();
+    expect(view.isCurrentPage({ ...urlHash(), checkParameters: true })).toBeFalsy();
+    expect(
+      view.isCurrentPage(
+        new ActionController.Parameters({ ...urlHash(), checkParameters: true }).permitBang(),
+      ),
+    ).toBeFalsy();
+    expect(view.isCurrentPage("http://www.example.com/", { checkParameters: true })).toBeFalsy();
+  });
+
+  it("current page when options given as keyword arguments", () => {
+    view.request = requestForUrl("/");
+
+    expect(view.isCurrentPage(null, { ...urlHash() })).toBeTruthy();
+  });
+
+  it("current page with params that match", () => {
+    view.request = requestForUrl("/?order=desc&page=1");
+
+    expect(view.isCurrentPage(hashFor({ order: "desc", page: "1" }))).toBeTruthy();
+    expect(view.isCurrentPage("http://www.example.com/?order=desc&page=1")).toBeTruthy();
+  });
+
+  it("current page with escaped params", () => {
+    view.request = requestForUrl("/category/administra%c3%a7%c3%a3o");
+
+    expect(
+      view.isCurrentPage({ controller: "foo", action: "category", category: "administração" }),
+    ).toBeTruthy();
+  });
+
+  it("current page with escaped params with different encoding", () => {
+    view.request = requestForUrl("/");
+    Object.defineProperty(view.request, "path", { value: "/category/administra%c3%a7%c3%a3o" });
+    expect(
+      view.isCurrentPage({ controller: "foo", action: "category", category: "administração" }),
+    ).toBeTruthy();
+    expect(
+      view.isCurrentPage("http://www.example.com/category/administra%c3%a7%c3%a3o"),
+    ).toBeTruthy();
+  });
+
+  it("current page with double escaped params", () => {
+    view.request = requestForUrl(
+      "/category/administra%c3%a7%c3%a3o?callback_url=http%3a%2f%2fexample.com%2ffoo",
+    );
+
+    expect(
+      view.isCurrentPage({
+        controller: "foo",
+        action: "category",
+        category: "administração",
+        callback_url: "http://example.com/foo",
+      }),
+    ).toBeTruthy();
+  });
+
   it("current page with trailing slash and params", () => {
     view.request = requestForUrl("/posts?order=desc");
     expect(view.isCurrentPage("/posts/?order=desc")).toBeTruthy();
@@ -266,8 +586,63 @@ describe("UrlHelperTest", () => {
   });
 
   it("current page with not get verb", () => {
-    view.request = requestForUrl("/events", { method: "post" });
+    view.request = requestForUrl("/events", { ":method": "post" });
     expect(view.isCurrentPage("/events")).toBeFalsy();
+  });
+
+  it("link unless current", () => {
+    view.request = requestForUrl("/");
+
+    expect(String(view.linkToUnlessCurrent("Showing", urlHash()))).toBe("Showing");
+    expect(String(view.linkToUnlessCurrent("Showing", "http://www.example.com/"))).toBe("Showing");
+
+    view.request = requestForUrl("/?order=desc");
+
+    expect(String(view.linkToUnlessCurrent("Showing", urlHash()))).toBe("Showing");
+    expect(String(view.linkToUnlessCurrent("Showing", "http://www.example.com/"))).toBe("Showing");
+
+    view.request = requestForUrl("/?order=desc&page=1");
+
+    expect(String(view.linkToUnlessCurrent("Showing", hashFor({ order: "desc", page: "1" })))).toBe(
+      "Showing",
+    );
+    expect(
+      String(view.linkToUnlessCurrent("Showing", "http://www.example.com/?order=desc&page=1")),
+    ).toBe("Showing");
+
+    view.request = requestForUrl("/?order=desc");
+
+    expect(String(view.linkToUnlessCurrent("Showing", hashFor({ order: "asc" })))).toBe(
+      `<a href="/?order=asc">Showing</a>`,
+    );
+    expect(String(view.linkToUnlessCurrent("Showing", "http://www.example.com/?order=asc"))).toBe(
+      `<a href="http://www.example.com/?order=asc">Showing</a>`,
+    );
+
+    view.request = requestForUrl("/?order=desc");
+    expect(String(view.linkToUnlessCurrent("Showing", hashFor({ order: "desc", page: 2 })))).toBe(
+      `<a href="/?order=desc&amp;page=2">Showing</a>`,
+    );
+    expect(
+      String(view.linkToUnlessCurrent("Showing", "http://www.example.com/?order=desc&page=2")),
+    ).toBe(`<a href="http://www.example.com/?order=desc&amp;page=2">Showing</a>`);
+
+    view.request = requestForUrl("/show");
+
+    expect(String(view.linkToUnlessCurrent("Listing", urlHash()))).toBe(`<a href="/">Listing</a>`);
+    expect(String(view.linkToUnlessCurrent("Listing", "http://www.example.com/"))).toBe(
+      `<a href="http://www.example.com/">Listing</a>`,
+    );
+  });
+
+  it("link to unless with block", () => {
+    assertDomEqual(
+      `<a href="/">Showing</a>`,
+      view.linkToUnless(false, "Showing", urlHash(), {}, () => "Fallback"),
+    );
+    expect(String(view.linkToUnless(true, "Listing", urlHash(), {}, () => "Fallback"))).toBe(
+      "Fallback",
+    );
   });
 
   it("mail to with options", () => {

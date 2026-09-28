@@ -1,5 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { ModelName } from "@blazetrails/activemodel";
+import { camelize } from "@blazetrails/activesupport";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 
 import { Routing } from "../../namespaces.js";
 import * as PolymorphicRoutes from "./polymorphic-routes.js";
@@ -11,7 +13,7 @@ export interface ToModel {
 
 export interface PolymorphicModel {
   modelName: ModelName;
-  persisted(): boolean;
+  isPersisted(): boolean;
 }
 
 export interface ModelClass {
@@ -257,8 +259,6 @@ export class HelperMethodBuilder {
       [method, args] = builder.handleList(compact);
     } else if (typeof recordOrHashOrArray === "string") {
       [method, args] = builder.handleString(recordOrHashOrArray);
-    } else if (typeof recordOrHashOrArray === "symbol") {
-      [method, args] = builder.handleString(symbolToString(recordOrHashOrArray));
     } else if (isModelClass(recordOrHashOrArray)) {
       [method, args] = builder.handleClass(recordOrHashOrArray);
     } else if (recordOrHashOrArray == null) {
@@ -307,7 +307,7 @@ export class HelperMethodBuilder {
   handleModel(record: ToModel): [string, unknown[]] {
     const args: unknown[] = [];
     const model = record.toModel();
-    const namedRoute = model.persisted()
+    const namedRoute = model.isPersisted()
       ? (args.push(model), this.getMethodForString(model.modelName.singularRouteKey))
       : this.getMethodForClass(model);
     return [namedRoute, args];
@@ -326,7 +326,7 @@ export class HelperMethodBuilder {
     const args: unknown[] = [];
 
     const route: string[] = recordList.map((parent) => {
-      if (typeof parent === "symbol") return symbolToString(parent);
+      if (isSymbol(parent)) return symbolToS(parent);
       if (typeof parent === "string") {
         throw new ArgumentError("Please use symbols for polymorphic route arguments.");
       }
@@ -340,15 +340,15 @@ export class HelperMethodBuilder {
     });
 
     let tail: string;
-    if (typeof record === "symbol") {
-      tail = symbolToString(record);
+    if (isSymbol(record)) {
+      tail = symbolToS(record);
     } else if (typeof record === "string") {
       throw new ArgumentError("Please use symbols for polymorphic route arguments.");
     } else if (isModelClass(record)) {
       tail = this.keyStrategy(record.modelName);
     } else {
       const model = (record as ToModel).toModel();
-      if (model.persisted()) {
+      if (model.isPersisted()) {
         args.push(model);
         tail = model.modelName.singularRouteKey;
       } else {
@@ -358,7 +358,8 @@ export class HelperMethodBuilder {
     route.push(tail);
     route.push(this.suffix);
 
-    return [this.prefix + route.join("_"), args];
+    const namedRoute = camelize(this.prefix + route.join("_"), "lower");
+    return [namedRoute, args];
   }
 
   private getMethodForClass(klass: ModelClass): string {
@@ -366,7 +367,10 @@ export class HelperMethodBuilder {
   }
 
   private getMethodForString(str: string): string {
-    return `${this.prefix}${str}_${this.suffix}`;
+    return camelize(
+      `${this.prefix}${isSymbol(str) ? symbolToS(str) : str}_${this.suffix}`,
+      "lower",
+    );
   }
 }
 

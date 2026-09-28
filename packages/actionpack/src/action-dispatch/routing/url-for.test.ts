@@ -95,16 +95,16 @@ describe("ActionDispatch::Routing::UrlFor", () => {
   });
 
   it("symbol options delegate to HelperMethodBuilder.url().handleStringCall", () => {
-    const user_url = vi.fn(() => "/users");
+    const userUrl = vi.fn(() => "/users");
     const host = makeHost();
-    (host as unknown as Record<string, unknown>)["user_url"] = user_url;
+    (host as unknown as Record<string, unknown>)["userUrl"] = userUrl;
     const result = fullUrlFor.call(host, Symbol("user"));
     expect(result).toBe("/users");
-    expect(user_url).toHaveBeenCalledOnce();
+    expect(userUrl).toHaveBeenCalledOnce();
   });
 
   it("class options delegate to HelperMethodBuilder.url().handleClassCall", () => {
-    const users_url = vi.fn(() => "/users");
+    const usersUrl = vi.fn(() => "/users");
     class User {
       static modelName = {
         name: "User",
@@ -113,26 +113,26 @@ describe("ActionDispatch::Routing::UrlFor", () => {
       };
     }
     const host = makeHost();
-    (host as unknown as Record<string, unknown>)["users_url"] = users_url;
+    (host as unknown as Record<string, unknown>)["usersUrl"] = usersUrl;
     const result = fullUrlFor.call(host, User);
     expect(result).toBe("/users");
-    expect(users_url).toHaveBeenCalledOnce();
+    expect(usersUrl).toHaveBeenCalledOnce();
   });
 
   it("model instance options delegate to HelperMethodBuilder.url().handleModelCall", () => {
-    const user_url = vi.fn(() => "/users/1");
+    const userUrl = vi.fn(() => "/users/1");
     const modelName = { name: "User", singularRouteKey: "user", routeKey: "users" };
     class UserRecord {
       toModel() {
-        return { modelName, persisted: () => true };
+        return { modelName, isPersisted: () => true };
       }
     }
     const user = new UserRecord();
     const host = makeHost();
-    (host as unknown as Record<string, unknown>)["user_url"] = user_url;
+    (host as unknown as Record<string, unknown>)["userUrl"] = userUrl;
     const result = fullUrlFor.call(host, user);
     expect(result).toBe("/users/1");
-    expect(user_url).toHaveBeenCalledOnce();
+    expect(userUrl).toHaveBeenCalledOnce();
   });
 
   it("array options delegate to host.polymorphicUrl when present", () => {
