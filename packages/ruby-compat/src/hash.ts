@@ -74,7 +74,7 @@ export function fetch(
   const blockGiven = rbBlockGivenP(rest[0]);
   if (!(hash instanceof Map ? hash.has(key) : hasKey(hash, key as string))) {
     if (blockGiven) {
-      return (rest[0] as Block<unknown>)(key as string);
+      return (rest[0] as (key: unknown) => unknown)(key);
     } else if (rest.length === 0) {
       throw new KeyError(`key not found: ${strEllipsize(rbInspect(key), 65)}`, {
         receiver: hash,

@@ -13,7 +13,7 @@ type MimeMethod = (block?: FormatHandler | VariantBlock) => Response;
 
 export class Collector extends AbstractCollector {
   format: Format | null = null;
-  #responses: Map<Format | null, Response | null>;
+  #responses: Map<Format | null | undefined, Response | null>;
   #variant: readonly string[] | null;
 
   constructor(mimes: string[] = [], variant: readonly string[] | null = null) {
@@ -21,7 +21,7 @@ export class Collector extends AbstractCollector {
     this.#responses = new Map();
     this.#variant = variant;
 
-    for (const mime of mimes) this.#responses.set(Mime.get(mime) as MimeType, null);
+    for (const mime of mimes) this.#responses.set(Mime.get(mime), null);
   }
 
   any(...args: (string | FormatHandler | VariantBlock)[]): Response | string[] {
