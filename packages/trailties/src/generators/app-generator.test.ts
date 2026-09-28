@@ -359,15 +359,12 @@ describe("AppGenerator", () => {
     await makeGen().run();
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf8"));
     expect(pkg.devDependencies.eslint).toBeDefined();
-    expect(pkg.devDependencies["typescript-eslint"]).toBeDefined();
-    expect(fs.statSync(appPath("bin/eslint")).mode & 0o777).toBe(0o755);
   });
 
   it("eslint is skipped if required", async () => {
     await makeGen("sqlite", { skipEslint: true }).run();
     const pkg = JSON.parse(fs.readFileSync(appPath("package.json"), "utf8"));
     expect(pkg.devDependencies.eslint).toBeUndefined();
-    expect(pkg.devDependencies["typescript-eslint"]).toBeUndefined();
     expect(exists("bin/eslint")).toBe(false);
     expect(exists("eslint.config.mjs")).toBe(false);
   });

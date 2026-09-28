@@ -57,4 +57,9 @@ describe("AppGenerator (trails-only)", () => {
     expect(build().options.skipEslint).toBeUndefined();
     expect(build({ skipEslint: false }).options.skipEslint).toBe(false);
   });
+
+  it("writes bin/eslint executable, as bin/trails is", async () => {
+    await new AppGenerator({ cwd: tmpDir, output: () => {}, appPath: "my-app" }).run();
+    expect(File.stat(File.join(tmpDir, "my-app", "bin", "eslint")).mode & 0o777).toBe(0o755);
+  });
 });
