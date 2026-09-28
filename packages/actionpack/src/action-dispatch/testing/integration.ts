@@ -1,7 +1,12 @@
 import { Request } from "../http/request.js";
 import { Headers } from "../http/headers.js";
 import { MimeType } from "../http/mime-type.js";
-import { isPresent, runLoadHooks } from "@blazetrails/activesupport";
+import {
+  isPresent,
+  runLoadHooks,
+  SetupAndTeardown,
+  type FilterListEntry,
+} from "@blazetrails/activesupport";
 import { HTTPS, URI, include, stringSplit, type Generic } from "@blazetrails/ruby-compat";
 import { TestResponse } from "./test-response.js";
 import { FlashHash } from "../middleware/flash.js";
@@ -441,7 +446,26 @@ export class IntegrationTest {
   /** @internal */
   beforeSetup(): void {
     this._app = undefined;
+    SetupAndTeardown.beforeSetup.call(this);
   }
+
+  /** @internal */
+  afterTeardown(test: Parameters<typeof SetupAndTeardown.afterTeardown>[0]): void {
+    SetupAndTeardown.afterTeardown.call(this, test);
+  }
+
+  static setup(this: { prototype: object }, ...args: FilterListEntry<object>[]): void {
+    SetupAndTeardown.setup.call(this.prototype, ...args);
+  }
+
+  static teardown(this: { prototype: object }, ...args: FilterListEntry<object>[]): void {
+    SetupAndTeardown.teardown.call(this.prototype, ...args);
+  }
+
+  static withRouting = routingAssertions.WithIntegrationRouting.ClassMethods.withRouting;
+
+  /** @internal */
+  _originalRoutes?: RouteSet;
 
   setup(): void {
     routingAssertions.setup.call(this);
@@ -514,11 +538,11 @@ export class IntegrationTest {
   declare assertRecognizes: typeof routingAssertions.assertRecognizes;
   declare assertGenerates: typeof routingAssertions.assertGenerates;
   declare assertRouting: typeof routingAssertions.assertRouting;
-  declare withRouting: typeof routingAssertions.withRouting;
+  declare withRouting: typeof routingAssertions.WithIntegrationRouting.withRouting;
   /** @internal */
-  declare createRoutes: typeof routingAssertions.createRoutes;
+  declare createRoutes: typeof routingAssertions.WithIntegrationRouting.createRoutes;
   /** @internal */
-  declare resetRoutes: typeof routingAssertions.resetRoutes;
+  declare resetRoutes: typeof routingAssertions.WithIntegrationRouting.resetRoutes;
   declare recognizedRequestFor: typeof routingAssertions.recognizedRequestFor;
   declare failOn: typeof routingAssertions.failOn;
   declare urlFor: typeof urlForMod.urlFor;
@@ -605,9 +629,9 @@ const proto = IntegrationTest.prototype as unknown as Record<string, unknown>;
 proto.assertRecognizes = routingAssertions.assertRecognizes;
 proto.assertGenerates = routingAssertions.assertGenerates;
 proto.assertRouting = routingAssertions.assertRouting;
-proto.withRouting = routingAssertions.withRouting;
-proto.createRoutes = routingAssertions.createRoutes;
-proto.resetRoutes = routingAssertions.resetRoutes;
+proto.withRouting = routingAssertions.WithIntegrationRouting.withRouting;
+proto.createRoutes = routingAssertions.WithIntegrationRouting.createRoutes;
+proto.resetRoutes = routingAssertions.WithIntegrationRouting.resetRoutes;
 proto.recognizedRequestFor = routingAssertions.recognizedRequestFor;
 proto.failOn = routingAssertions.failOn;
 proto.urlFor = urlForMod.urlFor;
@@ -626,5 +650,7 @@ proto.normalizeArgumentToRedirection = responseAssertions.normalizeArgumentToRed
 proto.assertResponse = responseAssertions.assertResponse;
 proto.assertRedirectedTo = responseAssertions.assertRedirectedTo;
 include(IntegrationTest, urlForMod.UrlFor);
+
+SetupAndTeardown.prepended(IntegrationTest.prototype);
 
 runLoadHooks("action_dispatch_integration_test", IntegrationTest);

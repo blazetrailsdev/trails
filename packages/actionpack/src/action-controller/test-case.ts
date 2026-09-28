@@ -6,7 +6,9 @@ import {
   isBlank,
   isPlainObject,
   runLoadHooks,
+  SetupAndTeardown,
   toXml,
+  type FilterListEntry,
   type Included,
 } from "@blazetrails/activesupport";
 import { b, KeyError, merge, SecureRandom, StringIO } from "@blazetrails/ruby-compat";
@@ -28,6 +30,8 @@ import { Response } from "../action-dispatch/http/response.js";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
+import type { RouteSet } from "../action-dispatch/routing/route-set.js";
+import * as routingAssertions from "../action-dispatch/testing/assertions/routing.js";
 import type { Metal } from "./metal.js";
 
 type ControllerClass = new () => Metal;
@@ -119,6 +123,50 @@ export class TestCase {
     const candidate = (globalThis as Record<string, unknown>)[stripped];
     return typeof candidate === "function" ? (candidate as ControllerClass) : null;
   }
+
+  static setup(this: { prototype: object }, ...args: FilterListEntry<object>[]): void {
+    SetupAndTeardown.setup.call(this.prototype, ...args);
+  }
+
+  static teardown(this: { prototype: object }, ...args: FilterListEntry<object>[]): void {
+    SetupAndTeardown.teardown.call(this.prototype, ...args);
+  }
+
+  static withRouting(
+    this: ThisParameterType<typeof routingAssertions.ClassMethods.withRouting>,
+    block: (routes: RouteSet) => unknown,
+  ): void {
+    routingAssertions.ClassMethods.withRouting.call(this, block);
+  }
+
+  /** @internal */
+  beforeSetup(): void {
+    SetupAndTeardown.beforeSetup.call(this);
+  }
+
+  /** @internal */
+  afterTeardown(test: Parameters<typeof SetupAndTeardown.afterTeardown>[0]): void {
+    SetupAndTeardown.afterTeardown.call(this, test);
+  }
+
+  setup(): void {
+    routingAssertions.setup.call(this);
+  }
+
+  routes?: RouteSet;
+
+  declare assertRecognizes: typeof routingAssertions.assertRecognizes;
+  declare assertGenerates: typeof routingAssertions.assertGenerates;
+  declare assertRouting: typeof routingAssertions.assertRouting;
+  declare withRouting: typeof routingAssertions.withRouting;
+  /** @internal */
+  declare createRoutes: typeof routingAssertions.createRoutes;
+  /** @internal */
+  declare resetRoutes: typeof routingAssertions.resetRoutes;
+  /** @internal */
+  declare recognizedRequestFor: typeof routingAssertions.recognizedRequestFor;
+  /** @internal */
+  declare failOn: typeof routingAssertions.failOn;
 
   controllerClassName(): string {
     return (this.constructor as typeof TestCase).controllerClass?.name ?? "";
@@ -346,6 +394,18 @@ export class TestCase {
     return env;
   }
 }
+
+const proto = TestCase.prototype as unknown as Record<string, unknown>;
+proto.assertRecognizes = routingAssertions.assertRecognizes;
+proto.assertGenerates = routingAssertions.assertGenerates;
+proto.assertRouting = routingAssertions.assertRouting;
+proto.withRouting = routingAssertions.withRouting;
+proto.createRoutes = routingAssertions.createRoutes;
+proto.resetRoutes = routingAssertions.resetRoutes;
+proto.recognizedRequestFor = routingAssertions.recognizedRequestFor;
+proto.failOn = routingAssertions.failOn;
+
+SetupAndTeardown.prepended(TestCase.prototype);
 
 runLoadHooks("action_controller_test_case", TestCase);
 

@@ -921,15 +921,16 @@ export class Mapper {
     options = this.applyActionOptions("resources", options);
 
     const shallow = this._scope.get("shallow") === true;
+    const path = String((options as { path?: string }).path ?? name);
     const controller = name;
     const prefix = (this._scope.get("path") as string | undefined) ?? "";
-    const basePath = `${prefix}/${name}`;
+    const basePath = `${prefix}/${path}`;
     const singular = singularize(name);
     const namePrefix = this._scope.get("as") as string | undefined;
     const routeName = (suffix: string) => (namePrefix ? `${namePrefix}_${suffix}` : suffix);
 
     const shallowPath = shallow
-      ? `${(this._scope.get("shallowPath") as string | undefined) ?? ""}/${name}`
+      ? `${(this._scope.get("shallowPath") as string | undefined) ?? ""}/${path}`
       : basePath;
     const outerNamePrefix = shallow
       ? (this._scope.get("shallowPrefix") as string | undefined)
@@ -961,15 +962,15 @@ export class Mapper {
       collectionName: singular === name ? `${name}_index` : name,
       nestedParam: `${singular}_id`,
       param: "id",
-      path: String((options as { path?: string }).path ?? name),
+      path,
       resourceScope: controller,
       actions: Array.from(allowed),
       shallow: () => shallow,
       singleton: () => false,
-      collectionScope: name,
-      memberScope: `${name}/:id`,
-      nestedScope: `${name}/:${singular}_id`,
-      newScope: (newPath) => `${name}/${newPath}`,
+      collectionScope: path,
+      memberScope: `${path}/:id`,
+      nestedScope: `${path}/:${singular}_id`,
+      newScope: (newPath) => `${path}/${newPath}`,
     };
     this.withScopeLevel("resources", () =>
       this.resourceScope(resource, () => {
