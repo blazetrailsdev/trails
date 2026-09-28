@@ -12,7 +12,7 @@ import { Base } from "../base.js";
 import { API } from "../api.js";
 import { Request } from "../../action-dispatch/request.js";
 import { Response } from "../../action-dispatch/response.js";
-import { Notifications } from "@blazetrails/activesupport";
+import { Duration, MemoryStore, Notifications } from "@blazetrails/activesupport";
 import type { CallbackOptions } from "../../abstract-controller/callbacks.js";
 
 describe("isRateLimited", () => {
@@ -150,6 +150,27 @@ describe("rateLimiting (instance helper)", () => {
     const host: RateLimitingHost = { controllerPath: "posts", request: { remoteIp: "" } };
     await rateLimiting.call(host, { to: 10, within: 60, store });
     expect(store.increment).toHaveBeenCalledWith("rate-limit:posts:", 1, { expiresIn: 60 });
+  });
+
+  it("expires a Duration `within` window counted in an ActiveSupport MemoryStore", async () => {
+    vi.useFakeTimers();
+    try {
+      const store = new MemoryStore();
+      const host: RateLimitingHost = {
+        controllerPath: "sessions",
+        request: { remoteIp: "1.2.3.4" },
+        head: vi.fn(),
+      };
+      const options = { to: 1, within: Duration.minutes(3), store };
+      await rateLimiting.call(host, options);
+      await rateLimiting.call(host, options);
+      expect(host.head).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(3 * 60 * 1000 + 1);
+      await rateLimiting.call(host, options);
+      expect(host.head).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("calls `with` (instance_exec) when count exceeds `to`", async () => {

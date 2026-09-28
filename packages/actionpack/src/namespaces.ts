@@ -4,6 +4,7 @@ import { Mime, MimeType } from "./action-dispatch/http/mime-type.js";
 import type { Parameters } from "./action-controller/metal/strong-parameters.js";
 import type { Request } from "./action-dispatch/http/request.js";
 import type * as PolymorphicRoutes from "./action-dispatch/routing/polymorphic-routes.js";
+import type { RoutesProxy } from "./action-dispatch/routing/routes-proxy.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -11,6 +12,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "action_dispatch/http/request": () => import("./action-dispatch/http/request.js"),
   "action_dispatch/routing/polymorphic_routes": () =>
     import("./action-dispatch/routing/polymorphic-routes.js"),
+  "action_dispatch/routing/routes_proxy": () => import("./action-dispatch/routing/routes-proxy.js"),
 };
 
 export const ActionDispatch = {
@@ -31,8 +33,12 @@ ActionDispatch.eagerAutoload(() => {
 
 export const Routing = { name: "ActionDispatch::Routing", loadPath } as AutoloadModule & {
   PolymorphicRoutes: typeof PolymorphicRoutes;
+  RoutesProxy: typeof RoutesProxy;
 };
 extend(Routing, Autoload);
+Routing.eagerAutoload(() => {
+  Routing.autoload("RoutesProxy");
+});
 Routing.autoload("PolymorphicRoutes");
 ActionDispatch.Routing = Routing;
 

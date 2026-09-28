@@ -1,6 +1,7 @@
 import { deflate, inflate } from "../gzip.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { coder } from "./coder.js";
+import type { Duration } from "../duration.js";
 
 /** @internal */
 export class Entry {
@@ -23,7 +24,7 @@ export class Entry {
     options: {
       compressed?: boolean;
       version?: string | null;
-      expiresIn?: number | null;
+      expiresIn?: number | Duration | null;
       expiresAt?: number | null;
     } = {},
   ) {
@@ -33,7 +34,9 @@ export class Entry {
     if (options.expiresAt != null) {
       this._expiresIn = options.expiresAt - this._createdAt;
     } else if (options.expiresIn != null) {
-      this._expiresIn = options.expiresIn * 1000 + Date.now();
+      const expiresIn =
+        typeof options.expiresIn === "number" ? options.expiresIn : options.expiresIn.toF();
+      this._expiresIn = expiresIn * 1000 + Date.now();
     } else {
       this._expiresIn = null;
     }

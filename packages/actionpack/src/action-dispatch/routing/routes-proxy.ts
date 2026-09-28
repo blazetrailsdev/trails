@@ -18,6 +18,7 @@ import {
   type UrlForRoutes,
 } from "./url-for.js";
 import type { PolymorphicHost } from "./polymorphic-routes.js";
+import { Routing } from "../../namespaces.js";
 
 export type RoutesProxyHelpers = Record<string, unknown>;
 
@@ -123,6 +124,8 @@ export class RoutesProxy implements UrlForHost {
     return (fn as (...a: unknown[]) => unknown).apply(this._helpers, args);
   }
 }
+
+Routing.RoutesProxy = RoutesProxy;
 
 /** @internal */
 export function mergeScriptNames(

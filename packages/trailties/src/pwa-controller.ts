@@ -17,6 +17,6 @@ export class PWAController extends ApplicationController {
   }
 }
 
-PWAController.skipBeforeAction("verifyAuthenticityToken");
+PWAController.skipBeforeAction("verifyAuthenticityToken", { raise: false });
 
 controllerConstants.set("rails/pwa", PWAController);

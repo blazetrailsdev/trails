@@ -1,4 +1,5 @@
 import { SpellChecker } from "@blazetrails/did-you-mean";
+import { toSentence } from "@blazetrails/activesupport";
 
 import type { RouteSetLike } from "../../abstract-controller/url-for.js";
 
@@ -69,14 +70,14 @@ export class UrlGenerationError extends ActionControllerError {
 
 export class MethodNotAllowed extends ActionControllerError {
   constructor(...allowedMethods: string[]) {
-    super(`Only ${allowedMethods.join(", ")} requests are allowed.`);
+    super(`Only ${toSentence(allowedMethods)} requests are allowed.`);
     this.name = "ActionController::MethodNotAllowed";
   }
 }
 
-export class NotImplemented extends ActionControllerError {
-  constructor(message?: string) {
-    super(message ?? "Not Implemented");
+export class NotImplemented extends MethodNotAllowed {
+  constructor(...allowedMethods: string[]) {
+    super(...allowedMethods);
     this.name = "ActionController::NotImplemented";
   }
 }
@@ -107,7 +108,7 @@ export class UnknownHttpMethod extends ActionControllerError {
 
 export class UnknownFormat extends ActionControllerError {
   constructor(message?: string) {
-    super(message ?? "Unknown format");
+    super(message ?? "ActionController::UnknownFormat");
     this.name = "ActionController::UnknownFormat";
   }
 }

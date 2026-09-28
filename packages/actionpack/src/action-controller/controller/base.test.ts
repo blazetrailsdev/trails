@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { htmlSafe } from "@blazetrails/activesupport";
 import { Base, DoubleRenderError, MODULES, PROTECTED_IVARS } from "../base.js";
 import { API } from "../api.js";
 import { Request } from "../../action-dispatch/request.js";
@@ -56,7 +57,7 @@ describe("ControllerInstanceTests", () => {
   it("render html", async () => {
     class HtmlController extends Base {
       async index() {
-        this.render({ html: "<h1>Hi</h1>" });
+        this.render({ html: htmlSafe("<h1>Hi</h1>") });
       }
     }
     const c = new HtmlController();

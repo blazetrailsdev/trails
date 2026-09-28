@@ -13,7 +13,18 @@ import {
   renderToString,
   RENDER_FORMATS_IN_PRIORITY,
 } from "./rendering.js";
-import { DoubleRenderError } from "../../abstract-controller/rendering.js";
+import {
+  DoubleRenderError,
+  _normalizeArgs,
+  _normalizeRender,
+} from "../../abstract-controller/rendering.js";
+
+const normalizeRender = {
+  _normalizeRender,
+  _normalizeArgs,
+  _processVariant: () => {},
+  _normalizeOptions,
+};
 
 describe("_renderInPriorities", () => {
   test("returns first present priority key, ignoring prototype chain", () => {
@@ -179,7 +190,6 @@ describe("Metal wiring", () => {
     expect(Metal._renderInPriorities).toBe(_renderInPriorities);
     expect(Metal._normalizeText).toBe(_normalizeText);
     expect(Metal._normalizeOptions).toBe(_normalizeOptions);
-    expect(Metal._processVariant).toBe(_processVariant);
     expect(Metal._setHtmlContentType).toBe(_setHtmlContentType);
     expect(Metal._setRenderedContentType).toBe(_setRenderedContentType);
     expect(Metal._setVaryHeader).toBe(_setVaryHeader);
@@ -210,6 +220,7 @@ describe("Metal wiring", () => {
       performed: true,
       responseBody: null,
       renderToBody: () => "ignored",
+      ...normalizeRender,
     };
     expect(() => render.call(host)).toThrow(DoubleRenderError);
   });
@@ -223,6 +234,7 @@ describe("Metal wiring", () => {
       _setRenderedContentType: () => {},
       _setVaryHeader: () => {},
       renderedFormat: () => null,
+      ...normalizeRender,
     };
     render.call(host, { plain: "hi" });
     expect(host.responseBody).toBe("body:hi");
@@ -232,12 +244,13 @@ describe("Metal wiring", () => {
     const host = {
       responseBody: null as unknown,
       renderToBody: () => ["a", "b", "c"],
+      ...normalizeRender,
     };
     expect(renderToString.call(host, {})).toBe("abc");
   });
 
   test("renderToString passes non-iterable results through unchanged", () => {
-    const host = { responseBody: null as unknown, renderToBody: () => 42 };
+    const host = { responseBody: null as unknown, renderToBody: () => 42, ...normalizeRender };
     expect(renderToString.call(host, {})).toBe(42);
   });
 

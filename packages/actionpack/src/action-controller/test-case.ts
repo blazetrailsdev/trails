@@ -2,6 +2,7 @@ import {
   ActiveSupportJSON,
   camelize,
   include,
+  isBlank,
   isPlainObject,
   runLoadHooks,
   toXml,
@@ -490,8 +491,8 @@ export class TestRequest extends AbstractTestRequest {
 
     delete this.env["action_dispatch.request.request_parameters"];
 
-    if (this.requestMethod === "GET") {
-      if (!this.getHeader("QUERY_STRING")) {
+    if (this.isGet()) {
+      if (isBlank(this.queryString)) {
         this.queryString = buildNestedQuery(nonPathParameters);
       }
     } else {

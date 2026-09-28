@@ -597,6 +597,32 @@ describe("FilterTest", () => {
     expect(ctrl.values).toEqual(["before", "action", "after"]);
   });
 
+  it("prepending and appending around action", async () => {
+    let executionLog = "";
+    class MixedFilterController extends FT_PrependingController {}
+    MixedFilterController.beforeAction(() => {
+      executionLog += " before procfilter ";
+    });
+    MixedFilterController.prependAroundAction(async (_c, next) => {
+      executionLog += " before aroundfilter ";
+      await next();
+      executionLog += " after aroundfilter ";
+    });
+    MixedFilterController.afterAction(() => {
+      executionLog += " after procfilter ";
+    });
+    MixedFilterController.appendAroundAction(async (_c, next) => {
+      executionLog += " before appended aroundfilter ";
+      await next();
+      executionLog += " after appended aroundfilter ";
+    });
+    await run(new MixedFilterController());
+    expect(executionLog).toBe(
+      " before aroundfilter  before procfilter  before appended aroundfilter " +
+        " after appended aroundfilter  after procfilter  after aroundfilter ",
+    );
+  });
+
   it.skip("after actions are not run if around action does not yield", async () => {
     const c = await run(new FT_NonYieldingAroundFilterController(), "index");
     expect((c as any).filters).toEqual(["filter_one", "it didn't yield"]);

@@ -1,4 +1,5 @@
 import { Entry } from "./entry.js";
+import type { Duration } from "../duration.js";
 import {
   ArgumentError,
   NotImplementedError,
@@ -299,7 +300,7 @@ export abstract class Store {
       const entries: Record<string, Entry> = {};
       for (const [name, value] of pairs) {
         entries[this.normalizeKey(name, options)] = new Entry(value, {
-          expiresIn: typeof options.expiresIn === "number" ? options.expiresIn : null,
+          expiresIn: (options.expiresIn as number | Duration | undefined) ?? null,
           version: this.normalizeVersion(name, options) ?? undefined,
         });
       }
@@ -349,7 +350,7 @@ export abstract class Store {
       this.writeEntry(
         key,
         new Entry(value, {
-          expiresIn: typeof options.expiresIn === "number" ? options.expiresIn : null,
+          expiresIn: (options.expiresIn as number | Duration | undefined) ?? null,
           version: this.normalizeVersion(name, options) ?? undefined,
         }),
         options,
@@ -388,7 +389,7 @@ export abstract class Store {
   newEntry(value: unknown, options?: StoreOptions): Entry {
     options = this.mergedOptions(options);
     return new Entry(value, {
-      expiresIn: typeof options.expiresIn === "number" ? options.expiresIn : null,
+      expiresIn: (options.expiresIn as number | Duration | undefined) ?? null,
       version: options.version != null ? String(options.version) : undefined,
     });
   }

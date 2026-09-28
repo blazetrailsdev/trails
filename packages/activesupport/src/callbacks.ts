@@ -20,7 +20,7 @@ export interface CallbackOptions<T extends object = object> {
 }
 
 export interface DefineCallbacksOptions<T extends object = object> {
-  terminator?: ((target: T, fn: () => unknown) => boolean) | false;
+  terminator?: ((target: T, fn: () => unknown) => boolean | Promise<boolean>) | false;
   skipAfterCallbacksIfTerminated?: boolean;
   scope?: string[];
 }
@@ -298,14 +298,19 @@ export interface FilterEnvironment {
 export class Before {
   readonly userCallback: (target: object, value: unknown) => unknown;
   readonly userConditions: Array<(target: object, value: unknown) => boolean>;
-  readonly terminator: ((target: object, fn: () => unknown) => boolean) | false | undefined;
+  readonly terminator:
+    | ((target: object, fn: () => unknown) => boolean | Promise<boolean>)
+    | false
+    | undefined;
   readonly filter: AnyCallback | string | symbol | CallbackObject;
   readonly name: string;
 
   constructor(
     userCallback: (target: object, value: unknown) => unknown,
     userConditions: Array<(target: object, value: unknown) => boolean>,
-    chainConfig: { terminator?: ((target: object, fn: () => unknown) => boolean) | false },
+    chainConfig: {
+      terminator?: ((target: object, fn: () => unknown) => boolean | Promise<boolean>) | false;
+    },
     filter: AnyCallback | string | symbol | CallbackObject = "",
     name: string = "",
   ) {
@@ -345,6 +350,12 @@ export class Before {
         cbResult = resultLambda();
         return cbResult;
       });
+      if (isThenable(halt)) {
+        return Promise.resolve(halt).then((h) => {
+          if (h) this.halt(env);
+          return env;
+        });
+      }
       if (isThenable(cbResult)) {
         swallowRejection(cbResult);
         if (opts?.strict === "sync") {

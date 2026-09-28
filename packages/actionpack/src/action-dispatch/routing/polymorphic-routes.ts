@@ -3,7 +3,7 @@ import type { ModelName } from "@blazetrails/activemodel";
 
 import { Routing } from "../../namespaces.js";
 import * as PolymorphicRoutes from "./polymorphic-routes.js";
-import { RoutesProxy } from "./routes-proxy.js";
+import type { RoutesProxy } from "./routes-proxy.js";
 
 export interface ToModel {
   toModel(): PolymorphicModel;
@@ -251,7 +251,7 @@ export class HelperMethodBuilder {
       if (compact.length === 0) {
         throw new ArgumentError("Nil location provided. Can't build URI.");
       }
-      if (compact[0] instanceof RoutesProxy) {
+      if (compact[0] instanceof Routing.RoutesProxy) {
         target = compact.shift() as unknown as PolymorphicHost;
       }
       [method, args] = builder.handleList(compact);

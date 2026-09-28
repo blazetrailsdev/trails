@@ -1,3 +1,4 @@
+import { htmlSafe } from "@blazetrails/activesupport";
 import { DebugView, controllerConstants } from "@blazetrails/actionpack";
 import { ApplicationController } from "./application-controller.js";
 import { Info } from "./info.js";
@@ -23,7 +24,7 @@ export class InfoController extends ApplicationController {
   }
 
   properties(): void {
-    this.render({ html: Info.toHtml() });
+    this.render({ html: htmlSafe(Info.toHtml()) });
   }
 
   routes(): void {
