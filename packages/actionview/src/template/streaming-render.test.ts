@@ -3,12 +3,12 @@ import { I18n, type SafeBuffer } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { DetailsKey } from "../lookup-context.js";
-import { TemplateHandlers } from "../template/handlers.js";
-import { Tse } from "../template/handlers/tse.js";
-import { Raw } from "../template/handlers/raw.js";
+import { TemplateHandlers } from "./handlers.js";
+import { Tse } from "./handlers/tse.js";
+import { Raw } from "./handlers/raw.js";
 import { FixtureResolver } from "../testing/resolvers.js";
-import type { Body } from "./streaming-template-renderer.js";
-import type { ViewContext } from "./abstract-renderer.js";
+import type { Body } from "../renderer/streaming-template-renderer.js";
+import type { ViewContext } from "../renderer/abstract-renderer.js";
 
 const FIXTURES = {
   "layouts/yield.html.tse": '<title><%= _layoutFor("title") %></title>\n<%= yield %>\n',
