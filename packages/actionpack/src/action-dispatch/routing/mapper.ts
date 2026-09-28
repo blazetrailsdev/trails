@@ -49,6 +49,8 @@ export type MountableApp =
   | ((env: RackEnv) => RackResponse | Promise<RackResponse>)
   | { call: (env: RackEnv) => RackResponse | Promise<RackResponse> };
 
+type RailsApp = MountableApp & { railtieName: string; routes: RouteSet };
+
 export type CallableConstraint =
   | ((...args: never[]) => unknown)
   | { matches(req: Request): unknown }
@@ -1501,7 +1503,7 @@ export class Mapper {
   _mountedApps: Map<string, { app: MountableApp; path: string }> = new Map();
 
   /** @internal */
-  isRailsApp(app: MountableApp): boolean {
+  isRailsApp(app: MountableApp): app is RailsApp {
     return typeof app === "function" && Boolean((app as { railtieName?: unknown }).railtieName);
   }
 
@@ -1520,7 +1522,7 @@ export class Mapper {
   }
 
   /** @internal */
-  defineGeneratePrefix(app: MountableApp, name: string, mountPath: string): void {
+  defineGeneratePrefix(app: RailsApp, name: string, mountPath: string): void {
     const scriptNamer = (options: Record<string, unknown>): string => {
       if (options.originalScriptName) return mountPath;
       const sn = options.scriptName;
@@ -1528,7 +1530,7 @@ export class Mapper {
     };
     this._mountedScriptNamers.set(name, { app, scriptNamer });
 
-    (app as unknown as { routes: RouteSet }).routes.defineMountedHelper(name, scriptNamer);
+    app.routes.defineMountedHelper(name, scriptNamer);
   }
 
   /** @internal */

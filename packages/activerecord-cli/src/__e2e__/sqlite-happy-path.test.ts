@@ -152,7 +152,8 @@ const product = await Product.createBang({ name: "Widget" });
       await symlink(join(packagesDir, pkg), join(appDir, "node_modules", "@blazetrails", pkg));
     }
 
-    await run(["typecheck", "-p", join(appDir, "tsconfig.json")], appDir);
+    const typecheckCode = await run(["typecheck", "-p", join(appDir, "tsconfig.json")], appDir);
+    expect(typecheckCode).toBe(1);
     await expect(access(join(appDir, "dist", "db.js"))).resolves.toBeUndefined();
   });
 });
