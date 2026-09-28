@@ -46,7 +46,7 @@ describe("compileJs", () => {
       { async: true },
     );
     expect(code).toContain("export default async function render(context, locals) {");
-    expect(code).toContain("_ob.append(await ( yield ));");
+    expect(code).toContain("_ob.append(await ( (await yield) ));");
     expect(code).toContain("_ob.append( i );");
     expect(code).toContain("_ob.safeExprAppend(await ( y ));");
   });
@@ -55,7 +55,37 @@ describe("compileJs", () => {
     const { code } = compileJs('<% const s = "a{b"; const t = `}`; %><%= yield %>', {
       async: true,
     });
-    expect(code).toContain("_ob.append(await ( yield ));");
+    expect(code).toContain("_ob.append(await ( (await yield) ));");
+  });
+
+  it("awaits a flow read at the read, whatever expression surrounds it", () => {
+    const { code } = compileJs(
+      '<%= _layoutFor("unknown") || "." %><% if (isContentFor("a")) { %><%= contentFor("a").length %><% } %>',
+      { async: true },
+    );
+    expect(code).toContain('_ob.append(await ( (await _layoutFor("unknown")) || "." ));');
+    expect(code).toContain('if ((await isContentFor("a"))) {');
+    expect(code).toContain('_ob.append(await ( (await contentFor("a")).length ));');
+  });
+
+  it("does not await a flow read inside a function literal of an async render", () => {
+    const { code } = compileJs('<%= items.map((i) => contentFor(i)).join(_layoutFor("s")) %>', {
+      async: true,
+    });
+    expect(code).toContain(
+      '_ob.append(await ( items.map((i) => contentFor(i)).join((await _layoutFor("s"))) ));',
+    );
+  });
+
+  it("does not count braces inside regex literals when deciding what an async render awaits", () => {
+    const { code } = compileJs("<% const re = /}/; %><%= yield %>", { async: true });
+    expect(code).toContain("_ob.append(await ( (await yield) ));");
+  });
+
+  it("does not count braces inside regex literals when closing a block-expr", () => {
+    const src = "<%= forEach(items, (item) => { %><% const re = /{/; %><%= item %><% }) %>after";
+    const { code } = compileJs(src);
+    expect(code).toContain('_ob.safeAppend("after");');
   });
 
   it("emits block-expr with capture wrapper so inner writes go to capture buffer", () => {

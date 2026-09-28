@@ -38,15 +38,116 @@ const ARROW_BLOCK_RE = /=>\s*\{\s*$/;
 
 const FUNCTION_BLOCK_RE = /(?:=>|\bfunction\b[^{]*)\s*\{\s*$/;
 
-const STRING_LITERAL_RE = /(["'`])(?:\\.|(?!\1)[^\\])*\1/g;
+const REGEX_PRECEDING_KEYWORD_RE =
+  /(?:^|[^\w$])(?:return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)$/;
+
+function codeMask(code: string): boolean[] {
+  const mask = new Array<boolean>(code.length).fill(false);
+  let prev = "";
+  let i = 0;
+  while (i < code.length) {
+    const ch = code[i];
+    const next = code[i + 1];
+    if (ch === '"' || ch === "'" || ch === "`") {
+      i++;
+      while (i < code.length && code[i] !== ch) i += code[i] === "\\" ? 2 : 1;
+      i++;
+      prev = ch;
+    } else if (ch === "/" && next === "/") {
+      while (i < code.length && code[i] !== "\n") i++;
+    } else if (ch === "/" && next === "*") {
+      const end = code.indexOf("*/", i + 2);
+      i = end === -1 ? code.length : end + 2;
+    } else if (
+      ch === "/" &&
+      (prev === "" ||
+        /[(,=:[!&|?{};+\-*%<>~^]/.test(prev) ||
+        REGEX_PRECEDING_KEYWORD_RE.test(code.slice(0, i).trimEnd()))
+    ) {
+      let inClass = false;
+      i++;
+      while (i < code.length && (code[i] !== "/" || inClass)) {
+        if (code[i] === "\\") i++;
+        else if (code[i] === "[") inClass = true;
+        else if (code[i] === "]") inClass = false;
+        i++;
+      }
+      i++;
+      while (i < code.length && /[a-z]/.test(code[i])) i++;
+      prev = "/";
+    } else {
+      mask[i] = true;
+      if (!/\s/.test(ch)) prev = ch;
+      i++;
+    }
+  }
+  return mask;
+}
 
 function netBraceDepth(code: string): number {
+  const mask = codeMask(code);
   let depth = 0;
-  for (const ch of code) {
-    if (ch === "{") depth++;
-    else if (ch === "}") depth--;
+  for (let i = 0; i < code.length; i++) {
+    if (!mask[i]) continue;
+    if (code[i] === "{") depth++;
+    else if (code[i] === "}") depth--;
   }
   return depth;
+}
+
+const FLOW_READ_RE = /(?<![\w$.])(?:(_layoutFor|contentFor|isContentFor|_)\s*\(|yield(?![\w$]))/y;
+
+function awaitFlowReads(code: string): string {
+  const mask = codeMask(code);
+  let out = "";
+  let depth = 0;
+  let functionDepth: number | null = null;
+  let i = 0;
+  while (i < code.length) {
+    const ch = code[i];
+    if (!mask[i]) {
+      out += ch;
+      i++;
+      continue;
+    }
+    if (functionDepth === null) {
+      if (code.startsWith("=>", i) || /^function(?![\w$])/.test(code.slice(i))) {
+        if (!/[\w$]/.test(code[i - 1] ?? "")) functionDepth = depth;
+      }
+    }
+    FLOW_READ_RE.lastIndex = i;
+    const m = functionDepth === null ? FLOW_READ_RE.exec(code) : null;
+    if (m !== null && m[1] === undefined) {
+      out += "(await yield)";
+      i += m[0].length;
+      continue;
+    }
+    if (m !== null) {
+      let close = i + m[0].length;
+      for (let d = 1; close < code.length; close++) {
+        if (!mask[close]) continue;
+        if (code[close] === "(") d++;
+        else if (code[close] === ")" && --d === 0) break;
+      }
+      if (close < code.length) {
+        const args = code.slice(i + m[0].length, close);
+        out += `(await ${m[0]}${awaitFlowReads(args)}))`;
+        i = close + 1;
+        continue;
+      }
+    }
+    if (ch === "(" || ch === "[" || ch === "{") depth++;
+    else if (ch === ")" || ch === "]" || ch === "}") depth--;
+    if (
+      functionDepth !== null &&
+      (depth < functionDepth || (depth === functionDepth && (ch === "," || ch === ";")))
+    ) {
+      functionDepth = null;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
 }
 
 function netUnclosedParens(code: string): number {
@@ -119,7 +220,7 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
       }
     } else {
       if (node.kind === "code" && options.async === true) {
-        braceDepth += netBraceDepth(node.value.replace(STRING_LITERAL_RE, '""'));
+        braceDepth += netBraceDepth(node.value);
         while (
           functionDepths.length > 0 &&
           braceDepth < functionDepths[functionDepths.length - 1]
@@ -152,13 +253,16 @@ function blockCall(value: string): string {
 
 function emitNode(node: TseNode, exprAppend: string, bufRef: string, awaits = false): string {
   const expr = node.kind === "expr" || node.kind === "rawExpr" ? blockCall(node.value) : node.value;
-  const value = awaits ? `await (${expr})` : expr;
+  const value = awaits ? `await (${awaitFlowReads(expr)})` : expr;
   switch (node.kind) {
     case "text":
       return `${bufRef}.safeAppend(${JSON.stringify(node.value)});`;
     case "code": {
       const t = node.value.trimEnd();
-      return node.value + (t.endsWith(";") || t.endsWith("{") || t.endsWith("}") ? "" : ";");
+      return (
+        (awaits ? awaitFlowReads(node.value) : node.value) +
+        (t.endsWith(";") || t.endsWith("{") || t.endsWith("}") ? "" : ";")
+      );
     }
     case "expr":
       return `${bufRef}.${exprAppend}(${value});`;
