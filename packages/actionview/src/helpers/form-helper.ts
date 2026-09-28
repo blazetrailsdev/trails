@@ -21,7 +21,7 @@ import {
 } from "./form-tag-helper.js";
 
 export interface FormHelperHost extends FormTagHelperHost, CaptureHelperHost {
-  _defaultFormBuilder: unknown;
+  defaultFormBuilder: unknown;
   polymorphicPath?(record: unknown, options: Record<string, unknown>): string;
 }
 
@@ -165,8 +165,8 @@ export function instantiateBuilder(
 /** @internal */
 export function defaultFormBuilderClass(this: FormHelperHost): typeof FormBuilder {
   const builder =
-    this._defaultFormBuilder != null && this._defaultFormBuilder !== false
-      ? this._defaultFormBuilder
+    this.defaultFormBuilder != null && this.defaultFormBuilder !== false
+      ? this.defaultFormBuilder
       : (ActionView.Base as unknown as { defaultFormBuilder: unknown }).defaultFormBuilder;
   return (typeof builder === "string" ? constantize(builder) : builder) as typeof FormBuilder;
 }
