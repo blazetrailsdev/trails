@@ -6,18 +6,18 @@ export class HealthController extends ActionController.Base {
     return "rails/health";
   }
 
-  show(): void {
-    this.renderUp();
+  async show(): Promise<void> {
+    await this.renderUp();
   }
 
   /** @internal */
-  renderUp(): void {
-    this.render({ html: this.htmlStatus("green") });
+  async renderUp(): Promise<void> {
+    await this.render({ html: this.htmlStatus("green") });
   }
 
   /** @internal */
-  renderDown(): void {
-    this.render({ html: this.htmlStatus("red"), status: 500 });
+  async renderDown(): Promise<void> {
+    await this.render({ html: this.htmlStatus("red"), status: 500 });
   }
 
   /** @internal */
@@ -27,7 +27,7 @@ export class HealthController extends ActionController.Base {
 }
 
 HealthController.rescueFrom(Error, function (this: HealthController) {
-  this.renderDown();
+  return this.renderDown();
 });
 
 controllerConstants.set("rails/health", HealthController);

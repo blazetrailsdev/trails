@@ -110,7 +110,6 @@ export class AbstractController {
     "getHeader",
     "toRackResponse",
     "render",
-    "renderAsync",
     "renderToString",
     "redirectTo",
     "redirectBack",

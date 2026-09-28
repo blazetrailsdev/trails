@@ -2,23 +2,23 @@ import { ApplicationController } from "./application-controller.js";
 
 export class PostsController extends ApplicationController {
   async index(): Promise<void> {
-    this.render({ json: { posts: [] } });
+    await this.render({ json: { posts: [] } });
   }
 
   async show(): Promise<void> {
-    this.render({ template: "posts/show", locals: { title: "Hello from TSE" } });
+    await this.render({ template: "posts/show", locals: { title: "Hello from TSE" } });
   }
 
   async link(): Promise<void> {
-    this.render({ json: { href: (this as unknown as { postsPath(): string }).postsPath() } });
+    await this.render({ json: { href: (this as unknown as { postsPath(): string }).postsPath() } });
   }
 
   async url(): Promise<void> {
-    this.render({ json: { href: (this as unknown as { postsUrl(): string }).postsUrl() } });
+    await this.render({ json: { href: (this as unknown as { postsUrl(): string }).postsUrl() } });
   }
 
   async canonical(): Promise<void> {
-    this.render({ json: { href: this.urlFor({ controller: "posts", action: "index" }) } });
+    await this.render({ json: { href: this.urlFor({ controller: "posts", action: "index" }) } });
   }
 
   async boom(): Promise<void> {

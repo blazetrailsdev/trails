@@ -24,7 +24,7 @@ function buildApp(routes: RouteSet): RackApp {
 
 class PostsController extends Base {
   async index() {
-    this.render({ json: [{ id: 1 }, { id: 2 }] });
+    await this.render({ json: [{ id: 1 }, { id: 2 }] });
   }
 
   async show() {
@@ -32,7 +32,7 @@ class PostsController extends Base {
     if (!id) {
       return this.head(404);
     }
-    this.render({ json: { id } });
+    await this.render({ json: { id } });
   }
 
   async create() {
@@ -40,12 +40,12 @@ class PostsController extends Base {
     this.flash.set("notice", "Post created!");
     this.session.set("lastPost", title);
     this.status = "created";
-    this.render({ json: { title, created: true } });
+    await this.render({ json: { title, created: true } });
   }
 
   async update() {
     const id = this.params.get("id");
-    this.render({ json: { id, updated: true } });
+    await this.render({ json: { id, updated: true } });
   }
 
   async destroy() {
@@ -62,40 +62,40 @@ class PostsController extends Base {
   }
 
   async showFlash() {
-    this.render({ plain: String(this.flash.get("notice") ?? "none") });
+    await this.render({ plain: String(this.flash.get("notice") ?? "none") });
   }
 
   async renderHtml() {
-    this.render({ html: "<h1>Posts</h1>" });
+    await this.render({ html: "<h1>Posts</h1>" });
   }
 
   async serverError() {
     this.status = 500;
-    this.render({ json: { error: "internal" } });
+    await this.render({ json: { error: "internal" } });
   }
 
   async customHeader() {
     this.headers.set("X-Custom", "integration-test");
-    this.render({ plain: "ok" });
+    await this.render({ plain: "ok" });
   }
 
   async readSession() {
     const lastPost = this.session.get("lastPost") ?? "none";
-    this.render({ json: { lastPost } });
+    await this.render({ json: { lastPost } });
   }
 
   async setCookie() {
     this.response.setHeader("set-cookie", "token=abc123; Path=/");
-    this.render({ plain: "cookie set" });
+    await this.render({ plain: "cookie set" });
   }
 
   async readCookie() {
     const cookie = this.request.env.HTTP_COOKIE ?? "none";
-    this.render({ plain: String(cookie) });
+    await this.render({ plain: String(cookie) });
   }
 
   async renderXml() {
-    this.render({
+    await this.render({
       body: "<root><item>1</item></root>",
       contentType: "application/xml",
       status: 200,
@@ -103,7 +103,7 @@ class PostsController extends Base {
   }
 
   async renderXml2() {
-    this.render({
+    await this.render({
       body: "<response><data>2</data></response>",
       contentType: "application/xml",
       status: 200,
@@ -114,19 +114,19 @@ class PostsController extends Base {
 class CommentsController extends Base {
   async index() {
     const postId = this.params.get("post_id");
-    this.render({ json: { postId, comments: [] } });
+    await this.render({ json: { postId, comments: [] } });
   }
 
   async create() {
     const postId = this.params.get("post_id");
     this.status = "created";
-    this.render({ json: { postId, created: true } });
+    await this.render({ json: { postId, created: true } });
   }
 }
 
 class AdminPostsController extends Base {
   async index() {
-    this.render({ json: { admin: true, posts: [] } });
+    await this.render({ json: { admin: true, posts: [] } });
   }
 }
 
@@ -138,7 +138,7 @@ class SessionsController extends Base {
 
   async show() {
     const userId = this.session.get("userId") ?? null;
-    this.render({ json: { userId } });
+    await this.render({ json: { userId } });
   }
 
   async destroy() {

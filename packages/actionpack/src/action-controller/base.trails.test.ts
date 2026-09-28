@@ -11,15 +11,15 @@ class ApplicationController extends Base {}
 
 class BadgeController extends ApplicationController {
   async show(): Promise<void> {
-    await this.renderAsync({ partial: "shared/status-badge", locals: { status: "ready" } });
+    await this.render({ partial: "shared/status-badge", locals: { status: "ready" } });
   }
 
   async row(): Promise<void> {
-    await this.renderAsync({ partial: "row" });
+    await this.render({ partial: "row" });
   }
 
   async footer(): Promise<void> {
-    await this.renderAsync({ partial: "footer" });
+    await this.render({ partial: "footer" });
   }
 }
 
@@ -117,7 +117,7 @@ describe("ActionController::Base#respond_to?", () => {
 describe("ActionController::Streaming#_render_template", () => {
   class StreamController extends ApplicationController {
     async show(): Promise<void> {
-      this.render({ partial: "row", stream: true });
+      await this.render({ partial: "row", stream: true });
     }
   }
   StreamController.prependViewPath(
@@ -137,7 +137,7 @@ describe("ActionController::Streaming#_render_template", () => {
 describe("ActionController::Base bare render", () => {
   class BareController extends ApplicationController {
     async index(): Promise<void> {
-      this.render();
+      await this.render();
     }
   }
 

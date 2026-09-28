@@ -21,7 +21,7 @@ describe("FragmentCachingTest", () => {
     class C extends Base {
       async show() {
         this.freshWhen({ etag: "resource-v1" });
-        if (!this.performed) this.render({ plain: "content" });
+        if (!this.performed) await this.render({ plain: "content" });
       }
     }
     const c = new C();
@@ -34,7 +34,7 @@ describe("FragmentCachingTest", () => {
     class C extends Base {
       async show() {
         this.freshWhen({ lastModified: date });
-        if (!this.performed) this.render({ plain: "content" });
+        if (!this.performed) await this.render({ plain: "content" });
       }
     }
     const c = new C();
@@ -47,7 +47,7 @@ describe("FragmentCachingTest", () => {
     class C extends Base {
       async show() {
         this.freshWhen({ lastModified: instant });
-        if (!this.performed) this.render({ plain: "content" });
+        if (!this.performed) await this.render({ plain: "content" });
       }
     }
     const c = new C();
@@ -59,7 +59,7 @@ describe("FragmentCachingTest", () => {
     class C extends Base {
       async show() {
         this.freshWhen({ etag: "test", public: true });
-        if (!this.performed) this.render({ plain: "content" });
+        if (!this.performed) await this.render({ plain: "content" });
       }
     }
     const c = new C();
@@ -71,7 +71,7 @@ describe("FragmentCachingTest", () => {
     class C extends Base {
       async show() {
         this.freshWhen({ etag: "stable" });
-        if (!this.performed) this.render({ plain: "body" });
+        if (!this.performed) await this.render({ plain: "body" });
       }
     }
     const c1 = new C();
@@ -98,7 +98,7 @@ describe("FragmentCachingTest", () => {
     class C extends Base {
       async show() {
         this.freshWhen({ lastModified: date });
-        if (!this.performed) this.render({ plain: "body" });
+        if (!this.performed) await this.render({ plain: "body" });
       }
     }
     const c = new C();
@@ -119,7 +119,7 @@ describe("FragmentCachingTest", () => {
     class C extends Base {
       async show() {
         this.freshWhen({ etag: "current" });
-        if (!this.performed) this.render({ plain: "body" });
+        if (!this.performed) await this.render({ plain: "body" });
       }
     }
     const c = new C();
@@ -141,7 +141,7 @@ describe("FragmentCachingTest", () => {
     class C extends Base {
       async show() {
         result = this.stale({ etag: "test" });
-        if (result) this.render({ plain: "content" });
+        if (result) await this.render({ plain: "content" });
       }
     }
     const c = new C();
@@ -154,7 +154,7 @@ describe("FragmentCachingTest", () => {
     class C extends Base {
       async show() {
         this.freshWhen({ etag: "match" });
-        if (!this.performed) this.render({ plain: "body" });
+        if (!this.performed) await this.render({ plain: "body" });
       }
     }
     const c1 = new C();
@@ -165,7 +165,7 @@ describe("FragmentCachingTest", () => {
     class C2 extends Base {
       async show() {
         result = this.stale({ etag: "match" });
-        if (result) this.render({ plain: "body" });
+        if (result) await this.render({ plain: "body" });
       }
     }
     const c2 = new C2();
@@ -186,7 +186,7 @@ describe("FragmentCachingTest", () => {
     class C extends Base {
       async index() {
         this.expiresIn(3600);
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
       }
     }
     const c = new C();
@@ -198,7 +198,7 @@ describe("FragmentCachingTest", () => {
     class C extends Base {
       async index() {
         this.expiresIn(600, { public: true });
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
       }
     }
     const c = new C();
@@ -210,7 +210,7 @@ describe("FragmentCachingTest", () => {
     class C extends Base {
       async index() {
         this.expiresIn(300, { mustRevalidate: true });
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
       }
     }
     const c = new C();
@@ -222,7 +222,7 @@ describe("FragmentCachingTest", () => {
     class C extends Base {
       async index() {
         this.expiresIn(60, { public: true, mustRevalidate: true });
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
       }
     }
     const c = new C();
@@ -234,7 +234,7 @@ describe("FragmentCachingTest", () => {
     class C extends Base {
       async index() {
         this.expiresNow();
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
       }
     }
     const c = new C();

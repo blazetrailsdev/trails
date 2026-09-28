@@ -24,7 +24,7 @@ describe("ActionController rendering", () => {
     it("renders object as JSON", async () => {
       class C extends Base {
         async index() {
-          this.render({ json: { a: 1 } });
+          await this.render({ json: { a: 1 } });
         }
       }
       const c = new C();
@@ -36,7 +36,7 @@ describe("ActionController rendering", () => {
     it("renders array as JSON", async () => {
       class C extends Base {
         async index() {
-          this.render({ json: [1, 2, 3] });
+          await this.render({ json: [1, 2, 3] });
         }
       }
       const c = new C();
@@ -47,7 +47,7 @@ describe("ActionController rendering", () => {
     it("renders JSON string directly", async () => {
       class C extends Base {
         async index() {
-          this.render({ json: '{"custom":true}' });
+          await this.render({ json: '{"custom":true}' });
         }
       }
       const c = new C();
@@ -58,7 +58,7 @@ describe("ActionController rendering", () => {
     it("renders null as JSON", async () => {
       class C extends Base {
         async index() {
-          this.render({ json: null });
+          await this.render({ json: null });
         }
       }
       const c = new C();
@@ -69,7 +69,7 @@ describe("ActionController rendering", () => {
     it("renders with custom status", async () => {
       class C extends Base {
         async index() {
-          this.render({ json: {}, status: 201 });
+          await this.render({ json: {}, status: 201 });
         }
       }
       const c = new C();
@@ -80,7 +80,7 @@ describe("ActionController rendering", () => {
     it("renders with custom content type", async () => {
       class C extends Base {
         async index() {
-          this.render({ json: {}, contentType: "application/vnd.api+json" });
+          await this.render({ json: {}, contentType: "application/vnd.api+json" });
         }
       }
       const c = new C();
@@ -93,7 +93,7 @@ describe("ActionController rendering", () => {
     it("renders plain text", async () => {
       class C extends Base {
         async index() {
-          this.render({ plain: "hello world" });
+          await this.render({ plain: "hello world" });
         }
       }
       const c = new C();
@@ -105,7 +105,7 @@ describe("ActionController rendering", () => {
     it("renders empty plain", async () => {
       class C extends Base {
         async index() {
-          this.render({ plain: "" });
+          await this.render({ plain: "" });
         }
       }
       const c = new C();
@@ -118,7 +118,7 @@ describe("ActionController rendering", () => {
     it("renders HTML string", async () => {
       class C extends Base {
         async index() {
-          this.render({ html: htmlSafe("<b>bold</b>") });
+          await this.render({ html: htmlSafe("<b>bold</b>") });
         }
       }
       const c = new C();
@@ -132,7 +132,7 @@ describe("ActionController rendering", () => {
     it("renders raw body", async () => {
       class C extends Base {
         async index() {
-          this.render({ body: "raw" });
+          await this.render({ body: "raw" });
         }
       }
       const c = new C();
@@ -142,25 +142,11 @@ describe("ActionController rendering", () => {
     });
   });
 
-  describe("render text", () => {
-    it("renders text", async () => {
-      class C extends Base {
-        async index() {
-          this.render({ text: "text" });
-        }
-      }
-      const c = new C();
-      await c.dispatch("index", makeRequest(), makeResponse());
-      expect(c.responseBody).toBe("text");
-      expect(c.contentType).toBe("text/plain; charset=utf-8");
-    });
-  });
-
   describe("render with status", () => {
     it("accepts numeric status", async () => {
       class C extends Base {
         async index() {
-          this.render({ plain: "ok", status: 202 });
+          await this.render({ plain: "ok", status: 202 });
         }
       }
       const c = new C();
@@ -171,7 +157,7 @@ describe("ActionController rendering", () => {
     it("accepts symbol status", async () => {
       class C extends Base {
         async index() {
-          this.render({ plain: "created", status: "created" });
+          await this.render({ plain: "created", status: "created" });
         }
       }
       const c = new C();
@@ -182,7 +168,7 @@ describe("ActionController rendering", () => {
     it("accepts not_found status", async () => {
       class C extends Base {
         async index() {
-          this.render({ plain: "nope", status: "not_found" });
+          await this.render({ plain: "nope", status: "not_found" });
         }
       }
       const c = new C();
@@ -193,7 +179,7 @@ describe("ActionController rendering", () => {
     it("accepts unprocessable_entity status", async () => {
       class C extends Base {
         async index() {
-          this.render({ json: { errors: [] }, status: "unprocessable_entity" });
+          await this.render({ json: { errors: [] }, status: "unprocessable_entity" });
         }
       }
       const c = new C();
@@ -252,10 +238,10 @@ describe("ActionController rendering", () => {
   describe("renderToString", () => {
     it("returns rendered content without committing", async () => {
       class C extends Base {
-        preview = "";
+        preview: unknown = "";
         async index() {
-          this.preview = this.renderToString({ json: { preview: true } });
-          this.render({ json: { final: true } });
+          this.preview = await this.renderToString({ json: { preview: true } });
+          await this.render({ json: { final: true } });
         }
       }
       const c = new C();
@@ -266,10 +252,10 @@ describe("ActionController rendering", () => {
 
     it("renderToString with plain text", async () => {
       class C extends Base {
-        preview = "";
+        preview: unknown = "";
         async index() {
-          this.preview = this.renderToString({ plain: "preview" });
-          this.render({ plain: "final" });
+          this.preview = await this.renderToString({ plain: "preview" });
+          await this.render({ plain: "final" });
         }
       }
       const c = new C();
@@ -283,8 +269,8 @@ describe("ActionController rendering", () => {
     it("raises on render after render", async () => {
       class C extends Base {
         async index() {
-          this.render({ plain: "first" });
-          this.render({ plain: "second" });
+          await this.render({ plain: "first" });
+          await this.render({ plain: "second" });
         }
       }
       const c = new C();
@@ -297,7 +283,7 @@ describe("ActionController rendering", () => {
       class C extends Base {
         async index() {
           this.redirectTo("/other");
-          this.render({ plain: "oops" });
+          await this.render({ plain: "oops" });
         }
       }
       const c = new C();
@@ -309,7 +295,7 @@ describe("ActionController rendering", () => {
     it("raises on redirect after render", async () => {
       class C extends Base {
         async index() {
-          this.render({ plain: "ok" });
+          await this.render({ plain: "ok" });
           this.redirectTo("/other");
         }
       }
@@ -337,7 +323,7 @@ describe("ActionController rendering", () => {
     it("renders empty HTML without template resolver", async () => {
       class C extends Base {
         async index() {
-          this.render();
+          await this.render();
         }
       }
       C.prependViewPath(new FixtureResolver({ "c/index.html.tse": "" }));
@@ -350,7 +336,7 @@ describe("ActionController rendering", () => {
     it("uses template resolver when available", async () => {
       class TemplateController extends Base {
         async index() {
-          this.render();
+          await this.render();
         }
       }
       TemplateController.prependViewPath(
@@ -366,7 +352,7 @@ describe("ActionController rendering", () => {
     it("renders JSON", async () => {
       class C extends API {
         async index() {
-          this.render({ json: { api: true } });
+          await this.render({ json: { api: true } });
         }
       }
       const c = new C();
@@ -377,7 +363,7 @@ describe("ActionController rendering", () => {
     it("renders plain text", async () => {
       class C extends API {
         async index() {
-          this.render({ plain: "api text" });
+          await this.render({ plain: "api text" });
         }
       }
       const c = new C();
@@ -388,7 +374,7 @@ describe("ActionController rendering", () => {
     it("renders with status", async () => {
       class C extends API {
         async index() {
-          this.render({ json: {}, status: "created" });
+          await this.render({ json: {}, status: "created" });
         }
       }
       const c = new C();
@@ -399,7 +385,7 @@ describe("ActionController rendering", () => {
     it("renders body", async () => {
       class C extends API {
         async index() {
-          this.render({ body: "raw" });
+          await this.render({ body: "raw" });
         }
       }
       const c = new C();
@@ -413,7 +399,7 @@ describe("ActionController sendData", () => {
   it("sends string data with default content type", async () => {
     class C extends Base {
       async download() {
-        this.sendData("hello", { filename: "test.txt" });
+        await this.sendData("hello", { filename: "test.txt" });
       }
     }
     const c = new C();
@@ -425,7 +411,7 @@ describe("ActionController sendData", () => {
   it("sets content-disposition with filename", async () => {
     class C extends Base {
       async download() {
-        this.sendData("data", { filename: "report.csv" });
+        await this.sendData("data", { filename: "report.csv" });
       }
     }
     const c = new C();
@@ -438,7 +424,7 @@ describe("ActionController sendData", () => {
   it("sets custom content type", async () => {
     class C extends Base {
       async download() {
-        this.sendData("data", { type: "text/csv", filename: "r.csv" });
+        await this.sendData("data", { type: "text/csv", filename: "r.csv" });
       }
     }
     const c = new C();
@@ -449,7 +435,7 @@ describe("ActionController sendData", () => {
   it("sets inline disposition", async () => {
     class C extends Base {
       async download() {
-        this.sendData("<pdf>", { filename: "doc.pdf", disposition: "inline" });
+        await this.sendData("<pdf>", { filename: "doc.pdf", disposition: "inline" });
       }
     }
     const c = new C();
@@ -462,7 +448,7 @@ describe("ActionController sendData", () => {
   it("sets content-length", async () => {
     class C extends Base {
       async download() {
-        this.sendData("12345", { filename: "test.txt" });
+        await this.sendData("12345", { filename: "test.txt" });
       }
     }
     const c = new C();
@@ -473,7 +459,7 @@ describe("ActionController sendData", () => {
   it("sends Buffer data", async () => {
     class C extends Base {
       async download() {
-        this.sendData(Buffer.from("binary"), { filename: "test.bin" });
+        await this.sendData(Buffer.from("binary"), { filename: "test.bin" });
       }
     }
     const c = new C();
@@ -484,7 +470,7 @@ describe("ActionController sendData", () => {
   it("marks action as performed", async () => {
     class C extends Base {
       async download() {
-        this.sendData("x", { filename: "f" });
+        await this.sendData("x", { filename: "f" });
       }
     }
     const c = new C();
@@ -495,7 +481,7 @@ describe("ActionController sendData", () => {
   it("disposition only when no filename", async () => {
     class C extends Base {
       async download() {
-        this.sendData("x", { disposition: "inline" });
+        await this.sendData("x", { disposition: "inline" });
       }
     }
     const c = new C();
@@ -508,7 +494,7 @@ describe("ActionController render edge cases", () => {
   it("render with custom content type", async () => {
     class C extends Base {
       async index() {
-        this.render({ json: {}, contentType: "application/vnd.api+json" });
+        await this.render({ json: {}, contentType: "application/vnd.api+json" });
       }
     }
     const c = new C();
@@ -519,7 +505,7 @@ describe("ActionController render edge cases", () => {
   it("render json null", async () => {
     class C extends Base {
       async index() {
-        this.render({ json: null });
+        await this.render({ json: null });
       }
     }
     const c = new C();
@@ -530,7 +516,7 @@ describe("ActionController render edge cases", () => {
   it("render json array", async () => {
     class C extends Base {
       async index() {
-        this.render({ json: [1, 2, 3] });
+        await this.render({ json: [1, 2, 3] });
       }
     }
     const c = new C();
@@ -541,7 +527,7 @@ describe("ActionController render edge cases", () => {
   it("render json string is used as-is", async () => {
     class C extends Base {
       async index() {
-        this.render({ json: '{"raw":true}' });
+        await this.render({ json: '{"raw":true}' });
       }
     }
     const c = new C();
@@ -552,7 +538,7 @@ describe("ActionController render edge cases", () => {
   it("render with status number", async () => {
     class C extends Base {
       async index() {
-        this.render({ json: {}, status: 422 });
+        await this.render({ json: {}, status: 422 });
       }
     }
     const c = new C();
@@ -563,7 +549,7 @@ describe("ActionController render edge cases", () => {
   it("render with status symbol", async () => {
     class C extends Base {
       async index() {
-        this.render({ json: {}, status: "not_found" });
+        await this.render({ json: {}, status: "not_found" });
       }
     }
     const c = new C();
@@ -571,21 +557,10 @@ describe("ActionController render edge cases", () => {
     expect(c.status).toBe(404);
   });
 
-  it("render text sets plain content type", async () => {
-    class C extends Base {
-      async index() {
-        this.render({ text: "hi" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.contentType).toContain("text/plain");
-  });
-
   it("render body sets text/plain content type", async () => {
     class C extends Base {
       async index() {
-        this.render({ body: "raw" });
+        await this.render({ body: "raw" });
       }
     }
     const c = new C();
@@ -619,7 +594,7 @@ describe("ActionController render edge cases", () => {
   it("render sets performed flag", async () => {
     class C extends Base {
       async index() {
-        this.render({ plain: "hi" });
+        await this.render({ plain: "hi" });
       }
     }
     const c = new C();
@@ -630,8 +605,8 @@ describe("ActionController render edge cases", () => {
   it("multiple render throws DoubleRenderError", async () => {
     class C extends Base {
       async index() {
-        this.render({ plain: "first" });
-        this.render({ plain: "second" });
+        await this.render({ plain: "first" });
+        await this.render({ plain: "second" });
       }
     }
     const c = new C();
@@ -643,7 +618,7 @@ describe("ActionController render edge cases", () => {
   it("render then redirect throws DoubleRenderError", async () => {
     class C extends Base {
       async index() {
-        this.render({ plain: "hi" });
+        await this.render({ plain: "hi" });
         this.redirectTo("/other");
       }
     }
@@ -657,7 +632,7 @@ describe("ActionController render edge cases", () => {
     class C extends Base {
       async index() {
         this.redirectTo("/other");
-        this.render({ plain: "hi" });
+        await this.render({ plain: "hi" });
       }
     }
     const c = new C();

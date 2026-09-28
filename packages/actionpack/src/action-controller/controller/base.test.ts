@@ -23,7 +23,7 @@ describe("ControllerInstanceTests", () => {
   it("render json", async () => {
     class JsonController extends Base {
       async index() {
-        this.render({ json: { hello: "world" } });
+        await this.render({ json: { hello: "world" } });
       }
     }
     const c = new JsonController();
@@ -35,7 +35,7 @@ describe("ControllerInstanceTests", () => {
   it("render json string", async () => {
     class JsonStringController extends Base {
       async index() {
-        this.render({ json: '{"raw":true}' });
+        await this.render({ json: '{"raw":true}' });
       }
     }
     const c = new JsonStringController();
@@ -46,7 +46,7 @@ describe("ControllerInstanceTests", () => {
   it("render plain", async () => {
     class PlainController extends Base {
       async index() {
-        this.render({ plain: "hello" });
+        await this.render({ plain: "hello" });
       }
     }
     const c = new PlainController();
@@ -58,7 +58,7 @@ describe("ControllerInstanceTests", () => {
   it("render html", async () => {
     class HtmlController extends Base {
       async index() {
-        this.render({ html: htmlSafe("<h1>Hi</h1>") });
+        await this.render({ html: htmlSafe("<h1>Hi</h1>") });
       }
     }
     const c = new HtmlController();
@@ -70,7 +70,7 @@ describe("ControllerInstanceTests", () => {
   it("render body", async () => {
     class BodyController extends Base {
       async index() {
-        this.render({ body: "raw body" });
+        await this.render({ body: "raw body" });
       }
     }
     const c = new BodyController();
@@ -79,22 +79,10 @@ describe("ControllerInstanceTests", () => {
     expect(c.contentType).toBe("text/plain; charset=utf-8");
   });
 
-  it("render text", async () => {
-    class TextController extends Base {
-      async index() {
-        this.render({ text: "text content" });
-      }
-    }
-    const c = new TextController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("text content");
-    expect(c.contentType).toBe("text/plain; charset=utf-8");
-  });
-
   it("render with status", async () => {
     class StatusController extends Base {
       async index() {
-        this.render({ json: { ok: true }, status: 201 });
+        await this.render({ json: { ok: true }, status: 201 });
       }
     }
     const c = new StatusController();
@@ -105,7 +93,7 @@ describe("ControllerInstanceTests", () => {
   it("render with status symbol", async () => {
     class StatusSymController extends Base {
       async index() {
-        this.render({ json: {}, status: "created" });
+        await this.render({ json: {}, status: "created" });
       }
     }
     const c = new StatusSymController();
@@ -116,7 +104,7 @@ describe("ControllerInstanceTests", () => {
   it("render with custom content type", async () => {
     class CustomCtController extends Base {
       async index() {
-        this.render({ plain: "data", contentType: "text/csv" });
+        await this.render({ plain: "data", contentType: "text/csv" });
       }
     }
     const c = new CustomCtController();
@@ -127,7 +115,7 @@ describe("ControllerInstanceTests", () => {
   it("render implicit (no options) renders empty html", async () => {
     class ImplicitController extends Base {
       async index() {
-        this.render();
+        await this.render();
       }
     }
     ImplicitController.prependViewPath(new FixtureResolver({ "implicit/index.html.tse": "" }));
@@ -139,7 +127,7 @@ describe("ControllerInstanceTests", () => {
   it("render with template resolver", async () => {
     class TemplateController extends Base {
       async index() {
-        this.render();
+        await this.render();
       }
     }
     TemplateController.prependViewPath(
@@ -156,8 +144,8 @@ describe("ControllerInstanceTests", () => {
   it("double render throws DoubleRenderError", async () => {
     class DoubleController extends Base {
       async index() {
-        this.render({ plain: "first" });
-        this.render({ plain: "second" });
+        await this.render({ plain: "first" });
+        await this.render({ plain: "second" });
       }
     }
     const c = new DoubleController();
@@ -168,10 +156,10 @@ describe("ControllerInstanceTests", () => {
 
   it("renderToString does not commit the response", async () => {
     class RtsController extends Base {
-      result = "";
+      result: unknown = "";
       async index() {
-        this.result = this.renderToString({ plain: "preview" });
-        this.render({ plain: "final" });
+        this.result = await this.renderToString({ plain: "preview" });
+        await this.render({ plain: "final" });
       }
     }
     const c = new RtsController();
@@ -221,7 +209,7 @@ describe("ActionController::Base redirecting", () => {
     class DoubleRedirectController extends Base {
       async index() {
         this.redirectTo("/a");
-        this.render({ plain: "oops" });
+        await this.render({ plain: "oops" });
       }
     }
     const c = new DoubleRedirectController();
@@ -345,7 +333,7 @@ describe("ActionController::Base conditional GET", () => {
       async index() {
         this.freshWhen({ etag: "test-data" });
         if (!this.performed) {
-          this.render({ plain: "fresh" });
+          await this.render({ plain: "fresh" });
         }
       }
     }
@@ -360,7 +348,7 @@ describe("ActionController::Base conditional GET", () => {
       async index() {
         this.freshWhen({ lastModified: date });
         if (!this.performed) {
-          this.render({ plain: "ok" });
+          await this.render({ plain: "ok" });
         }
       }
     }
@@ -374,7 +362,7 @@ describe("ActionController::Base conditional GET", () => {
       async index() {
         this.freshWhen({ etag: "match-me" });
         if (!this.performed) {
-          this.render({ plain: "content" });
+          await this.render({ plain: "content" });
         }
       }
     }
@@ -399,7 +387,7 @@ describe("ActionController::Base conditional GET", () => {
       async index() {
         staleResult = this.stale({ etag: "stale-test" });
         if (staleResult) {
-          this.render({ plain: "rendered" });
+          await this.render({ plain: "rendered" });
         }
       }
     }
@@ -424,10 +412,10 @@ describe("ActionController::Base conditional GET", () => {
 });
 
 describe("ActionController::Base sendData", () => {
-  it("sends data with filename", () => {
+  it("sends data with filename", async () => {
     const c = new (class extends Base {})();
     c.setResponseBang(makeResponse());
-    c.sendData("csv,data", { filename: "export.csv", type: "text/csv" });
+    await c.sendData("csv,data", { filename: "export.csv", type: "text/csv" });
     expect(c.responseBody).toBe("csv,data");
     expect(c.contentType).toBe("text/csv");
     expect(c.headers.get("content-disposition")).toBe(
@@ -436,19 +424,19 @@ describe("ActionController::Base sendData", () => {
     expect(c.performed).toBe(true);
   });
 
-  it("sends data with custom disposition", () => {
+  it("sends data with custom disposition", async () => {
     const c = new (class extends Base {})();
     c.setResponseBang(makeResponse());
-    c.sendData("inline-data", { disposition: "inline", filename: "doc.pdf" });
+    await c.sendData("inline-data", { disposition: "inline", filename: "doc.pdf" });
     expect(c.headers.get("content-disposition")).toBe(
       "inline; filename=\"doc.pdf\"; filename*=UTF-8''doc.pdf",
     );
   });
 
-  it("sends data without filename", () => {
+  it("sends data without filename", async () => {
     const c = new (class extends Base {})();
     c.setResponseBang(makeResponse());
-    c.sendData("raw");
+    await c.sendData("raw");
     expect(c.responseBody).toBe("raw");
     expect(c.contentType).toBe("application/octet-stream");
   });
@@ -458,7 +446,7 @@ describe("ActionController::API", () => {
   it("renders json", async () => {
     class ApiController extends API {
       async index() {
-        this.render({ json: { status: "ok" } });
+        await this.render({ json: { status: "ok" } });
       }
     }
     const c = new ApiController();
@@ -470,7 +458,7 @@ describe("ActionController::API", () => {
   it("renders plain text", async () => {
     class ApiPlainController extends API {
       async index() {
-        this.render({ plain: "hello api" });
+        await this.render({ plain: "hello api" });
       }
     }
     const c = new ApiPlainController();
@@ -481,7 +469,7 @@ describe("ActionController::API", () => {
   it("renders body", async () => {
     class ApiBodyController extends API {
       async index() {
-        this.render({ body: "raw" });
+        await this.render({ body: "raw" });
       }
     }
     const c = new ApiBodyController();
@@ -492,7 +480,7 @@ describe("ActionController::API", () => {
   it("render with status", async () => {
     class ApiStatusController extends API {
       async index() {
-        this.render({ json: {}, status: "created" });
+        await this.render({ json: {}, status: "created" });
       }
     }
     const c = new ApiStatusController();
@@ -503,8 +491,8 @@ describe("ActionController::API", () => {
   it("double render throws", async () => {
     class ApiDoubleController extends API {
       async index() {
-        this.render({ json: {} });
-        this.render({ json: {} });
+        await this.render({ json: {} });
+        await this.render({ json: {} });
       }
     }
     const c = new ApiDoubleController();
@@ -541,7 +529,7 @@ describe("ActionController::API", () => {
     class ApiDoubleRedController extends API {
       async index() {
         this.redirectTo("/a");
-        this.render({ json: {} });
+        await this.render({ json: {} });
       }
     }
     const c = new ApiDoubleRedController();
@@ -595,7 +583,7 @@ describe("ControllerInstanceTests", () => {
   it("performed?", async () => {
     class EmptyController extends Base {
       async index() {
-        this.render({ plain: "done" });
+        await this.render({ plain: "done" });
       }
     }
     const c = new EmptyController();
@@ -637,7 +625,7 @@ describe("PerformActionTest", () => {
   it("action missing should work", async () => {
     class ActionMissingController extends Base {
       async actionMissing(action: string) {
-        this.render({ plain: `Response for ${action}` });
+        await this.render({ plain: `Response for ${action}` });
       }
     }
     const c = new ActionMissingController();

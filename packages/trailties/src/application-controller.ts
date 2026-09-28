@@ -7,9 +7,9 @@ export class ApplicationController extends ActionController.Base {
   }
 
   /** @internal */
-  requireLocalBang(): void {
+  async requireLocalBang(): Promise<void> {
     if (!this.isLocalRequest()) {
-      this.render({
+      await this.render({
         html: htmlSafe(
           "<p>For security purposes, this information is only available to local requests.</p>",
         ),

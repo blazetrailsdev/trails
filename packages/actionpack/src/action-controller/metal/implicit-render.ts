@@ -36,7 +36,7 @@ export interface ImplicitRenderHost {
   ): boolean;
   isAnyTemplates?(action: string, prefixes?: readonly string[]): boolean;
   head(status: number | string): void;
-  render(): void;
+  render(): void | Promise<void>;
   logger?: { info(msg: string): void };
 }
 
@@ -44,15 +44,14 @@ export interface ImplicitRenderHost {
  * @missingRailsArgs inspect — PERMANENT
  * @internal
  */
-export function defaultRender(this: ImplicitRenderHost): void {
+export function defaultRender(this: ImplicitRenderHost): void | Promise<void> {
   const name = this.constructor.name;
   if (
     this.templateExists?.(String(this.actionName), this._prefixes?.(), false, [], {
       variants: variantsFor(this.request?.variant),
     })
   ) {
-    this.render();
-    return;
+    return this.render();
   }
   if (this.isAnyTemplates?.(String(this.actionName), this._prefixes?.())) {
     const message =

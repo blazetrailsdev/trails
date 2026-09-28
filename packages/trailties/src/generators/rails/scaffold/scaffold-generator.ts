@@ -98,20 +98,23 @@ function crudMethods(
   return [
     mk(
       "index",
-      `// const ${plural} = await ${model}.all();\nconst ${plural}${anyArr} = [];\nthis.render({ action: "index", locals: { ${plural} } });`,
+      `// const ${plural} = await ${model}.all();\nconst ${plural}${anyArr} = [];\nawait this.render({ action: "index", locals: { ${plural} } });`,
     ),
     mk(
       "show",
-      `// const ${singular} = await ${model}.find(this.params.get("id"));\nconst ${singular} = { id: this.params.get("id") };\nthis.render({ action: "show", locals: { ${singular} } });`,
+      `// const ${singular} = await ${model}.find(this.params.get("id"));\nconst ${singular} = { id: this.params.get("id") };\nawait this.render({ action: "show", locals: { ${singular} } });`,
     ),
-    mk("new_", `const ${singular} = {};\nthis.render({ action: "new", locals: { ${singular} } });`),
+    mk(
+      "new_",
+      `const ${singular} = {};\nawait this.render({ action: "new", locals: { ${singular} } });`,
+    ),
     mk(
       "create",
       `// const ${singular} = await ${model}.create(this.params.get("${singular}"));\nthis.redirectTo("${routeUrl}");`,
     ),
     mk(
       "edit",
-      `// const ${singular} = await ${model}.find(this.params.get("id"));\nconst ${singular} = { id: this.params.get("id") };\nthis.render({ action: "edit", locals: { ${singular} } });`,
+      `// const ${singular} = await ${model}.find(this.params.get("id"));\nconst ${singular} = { id: this.params.get("id") };\nawait this.render({ action: "edit", locals: { ${singular} } });`,
     ),
     mk(
       "update",

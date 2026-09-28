@@ -21,7 +21,7 @@ describe("FilterTest", () => {
     const log: string[] = [];
     class AppController extends Base {
       async index() {
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
         log.push("action");
       }
     }
@@ -37,11 +37,11 @@ describe("FilterTest", () => {
   it("before_action halts with render", async () => {
     class AuthController extends Base {
       async index() {
-        this.render({ plain: "protected" });
+        await this.render({ plain: "protected" });
       }
     }
-    AuthController.beforeAction(function (this: any, controller: any) {
-      controller.render({ plain: "unauthorized", status: 401 });
+    AuthController.beforeAction(async function (this: any, controller: any) {
+      await controller.render({ plain: "unauthorized", status: 401 });
     });
 
     const c = new AuthController();
@@ -54,7 +54,7 @@ describe("FilterTest", () => {
     const log: string[] = [];
     class LogController extends Base {
       async index() {
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
         log.push("action");
       }
     }
@@ -71,7 +71,7 @@ describe("FilterTest", () => {
     const log: string[] = [];
     class TimingController extends Base {
       async index() {
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
         log.push("action");
       }
     }
@@ -90,11 +90,11 @@ describe("FilterTest", () => {
     const log: string[] = [];
     class OnlyController extends Base {
       async index() {
-        this.render({ plain: "index" });
+        await this.render({ plain: "index" });
         log.push("index");
       }
       async show() {
-        this.render({ plain: "show" });
+        await this.render({ plain: "show" });
         log.push("show");
       }
     }
@@ -119,11 +119,11 @@ describe("FilterTest", () => {
     const log: string[] = [];
     class ExceptController extends Base {
       async index() {
-        this.render({ plain: "index" });
+        await this.render({ plain: "index" });
         log.push("index");
       }
       async show() {
-        this.render({ plain: "show" });
+        await this.render({ plain: "show" });
         log.push("show");
       }
     }
@@ -151,7 +151,7 @@ describe("FilterTest", () => {
     };
     class ParentController extends Base {
       async index() {
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
         log.push("action");
       }
     }
@@ -169,7 +169,7 @@ describe("FilterTest", () => {
     const log: string[] = [];
     class MultiController extends Base {
       async index() {
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
         log.push("action");
       }
     }
@@ -192,7 +192,7 @@ describe("FilterTest", () => {
     const log: string[] = [];
     class PrependController extends Base {
       async index() {
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
         log.push("action");
       }
     }
@@ -216,7 +216,7 @@ describe("FilterTest", () => {
     class IfController extends Base {
       admin = false;
       async index() {
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
         log.push("action");
       }
     }
@@ -244,7 +244,7 @@ describe("FilterTest", () => {
     class UnlessController extends Base {
       skipAuth = false;
       async index() {
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
         log.push("action");
       }
     }
@@ -270,7 +270,7 @@ describe("FilterTest", () => {
     const log: string[] = [];
     class ApplicationController extends Base {
       async index() {
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
         log.push("action");
       }
     }
@@ -280,7 +280,7 @@ describe("FilterTest", () => {
 
     class PostsController extends ApplicationController {
       async index() {
-        this.render({ plain: "posts" });
+        await this.render({ plain: "posts" });
         log.push("posts");
       }
     }
@@ -318,7 +318,7 @@ describe("FilterTest", () => {
     let capturedAction = "";
     class StateController extends Base {
       async index() {
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
       }
     }
     StateController.afterAction((controller) => {
@@ -334,7 +334,7 @@ describe("FilterTest", () => {
     let capturedAction = "";
     class NameController extends Base {
       async index() {
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
       }
     }
     NameController.aroundAction(async (controller, next) => {
@@ -351,7 +351,7 @@ describe("FilterTest", () => {
     const log: string[] = [];
     class BlockController extends Base {
       async index() {
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
         log.push("action");
       }
     }
@@ -368,7 +368,7 @@ describe("FilterTest", () => {
     const log: string[] = [];
     class NoYieldController extends Base {
       async index() {
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
         log.push("action");
       }
     }
@@ -405,7 +405,7 @@ const _ftCleanUp = push("clean_up", "ranAfterAction");
 
 class FT_TestController extends Base {
   async show() {
-    this.render({ plain: "ran action" });
+    await this.render({ plain: "ran action" });
   }
 }
 FT_TestController.beforeAction(_ftEnsureLogin);
@@ -416,7 +416,7 @@ FT_PrependingController.prependBeforeAction(push("wonderful_life"));
 
 class FT_NonYieldingAroundFilterController extends Base {
   async index() {
-    this.render({ plain: "index" });
+    await this.render({ plain: "index" });
   }
 }
 FT_NonYieldingAroundFilterController.beforeAction(push("filter_one", "filters"));
@@ -428,13 +428,13 @@ FT_NonYieldingAroundFilterController.afterAction(push("action_three", "filters")
 
 class FT_ConditionalFilterController extends Base {
   async show() {
-    this.render({ plain: "ran action" });
+    await this.render({ plain: "ran action" });
   }
   async anotherAction() {
-    this.render({ plain: "ran action" });
+    await this.render({ plain: "ran action" });
   }
   async showWithoutAction() {
-    this.render({ plain: "ran action without action" });
+    await this.render({ plain: "ran action without action" });
   }
 }
 
@@ -539,7 +539,7 @@ const _sfuoaEnsureLogin = push("ensure_login");
 const _sfuoaCleanUpTmp = push("clean_up_tmp");
 class FT_SkipFilterUsingOnlyAndIf extends FT_ConditionalFilterController {
   async login() {
-    this.render({ plain: "ok" });
+    await this.render({ plain: "ok" });
   }
 }
 FT_SkipFilterUsingOnlyAndIf.beforeAction(_sfuoaCleanUpTmp);
@@ -554,7 +554,7 @@ const _sfuiaeEnsureLogin = push("ensure_login");
 const _sfuiaeCleanUpTmp = push("clean_up_tmp");
 class FT_SkipFilterUsingIfAndExcept extends FT_ConditionalFilterController {
   async login() {
-    this.render({ plain: "ok" });
+    await this.render({ plain: "ok" });
   }
 }
 FT_SkipFilterUsingIfAndExcept.beforeAction(_sfuiaeCleanUpTmp);
@@ -584,7 +584,7 @@ describe("FilterTest", () => {
       values: string[] = [];
       async index() {
         this.values.push("action");
-        this.render({ plain: "index" });
+        await this.render({ plain: "index" });
       }
     }
     C.aroundAction(async (c, next) => {
@@ -663,7 +663,7 @@ describe("FilterTest", () => {
     }
     class C extends Base {
       async show() {
-        this.render({ plain: "hello" });
+        await this.render({ plain: "hello" });
       }
     }
     C.beforeAction((c) => AuditFilter.before(c as Base));

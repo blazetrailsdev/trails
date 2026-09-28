@@ -35,36 +35,36 @@ class ActionPackAssertionsController extends Base {
   }
   async flashMe() {
     this.flash.set("hello", "my name is inigo montoya...");
-    this.render({ plain: "Inconceivable!" });
+    await this.render({ plain: "Inconceivable!" });
   }
   async flashMeNaked() {
     this.flash.clear();
-    this.render({ plain: "wow!" });
+    await this.render({ plain: "wow!" });
   }
   async assignThis() {
     (this as any).howdy = "ho";
-    this.render({ plain: "Mr. Henke" });
+    await this.render({ plain: "Mr. Henke" });
   }
   async renderBasedOnParameters() {
     const name = this.params.get("name") ?? "";
-    this.render({ plain: `Mr. ${name}` });
+    await this.render({ plain: `Mr. ${name}` });
   }
   async sessionStuffing() {
     this.session.set("xmas", "turkey");
-    this.render({ plain: "ho ho ho" });
+    await this.render({ plain: "ho ho ho" });
   }
   async raiseExceptionOnGet() {
     const method = this.request.method;
     if (method === "GET") throw new Error("get");
-    this.render({ plain: `request method: ${method}` });
+    await this.render({ plain: `request method: ${method}` });
   }
   async raiseExceptionOnPost() {
     const method = this.request.method;
     if (method === "POST") throw new Error("post");
-    this.render({ plain: `request method: ${method}` });
+    await this.render({ plain: `request method: ${method}` });
   }
   async renderTextWithCustomContentType() {
-    this.render({ body: "Hello!", contentType: "application/rss+xml" });
+    await this.render({ body: "Hello!", contentType: "application/rss+xml" });
   }
   async redirectToController() {
     this.redirectTo("http://test.host/elsewhere/flash_me");
@@ -82,7 +82,7 @@ class AssertResponseWithUnexpectedErrorController extends Base {
     throw new Error("FAIL");
   }
   async show() {
-    this.render({ plain: "Boom", status: 500 });
+    await this.render({ plain: "Boom", status: 500 });
   }
 }
 

@@ -110,8 +110,8 @@ describe("ActionController::Instrumentation#process_action", () => {
 
     class WidgetsController extends Base {
       static actions = ["index"];
-      index(): void {
-        this.render({ plain: "hello" });
+      async index(): Promise<void> {
+        await this.render({ plain: "hello" });
       }
     }
     await new WidgetsController().dispatch("index", newRequest(), new Response());
@@ -134,8 +134,8 @@ describe("ActionController::Instrumentation#process_action", () => {
     });
     class SlowWidgetsController extends Base {
       static actions = ["index"];
-      index(): void {
-        this.render({ template: "slow_widgets/index" });
+      async index(): Promise<void> {
+        await this.render({ template: "slow_widgets/index" });
       }
     }
     SlowWidgetsController.layout(false);

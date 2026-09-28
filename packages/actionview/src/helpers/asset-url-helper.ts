@@ -228,3 +228,63 @@ export function imageUrl(
 }
 
 export const urlToImage = imageUrl;
+
+export function videoPath(
+  this: AssetUrlHelperHost,
+  source: string,
+  options: AssetPathOptions = {},
+): string {
+  return pathToAsset.call(this, source, { type: "video", ...options });
+}
+
+export const pathToVideo = videoPath;
+
+export function videoUrl(
+  this: AssetUrlHelperHost,
+  source: string,
+  options: AssetPathOptions = {},
+): string {
+  return urlToAsset.call(this, source, { type: "video", ...options });
+}
+
+export const urlToVideo = videoUrl;
+
+export function audioPath(
+  this: AssetUrlHelperHost,
+  source: string,
+  options: AssetPathOptions = {},
+): string {
+  return pathToAsset.call(this, source, { type: "audio", ...options });
+}
+
+export const pathToAudio = audioPath;
+
+export function audioUrl(
+  this: AssetUrlHelperHost,
+  source: string,
+  options: AssetPathOptions = {},
+): string {
+  return urlToAsset.call(this, source, { type: "audio", ...options });
+}
+
+export const urlToAudio = audioUrl;
+
+export function fontPath(
+  this: AssetUrlHelperHost,
+  source: string,
+  options: AssetPathOptions = {},
+): string {
+  return pathToAsset.call(this, source, { type: "font", ...options });
+}
+
+export const pathToFont = fontPath;
+
+export function fontUrl(
+  this: AssetUrlHelperHost,
+  source: string,
+  options: AssetPathOptions = {},
+): string {
+  return urlToAsset.call(this, source, { type: "font", ...options });
+}
+
+export const urlToFont = fontUrl;

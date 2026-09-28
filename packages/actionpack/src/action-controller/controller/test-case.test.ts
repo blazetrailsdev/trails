@@ -6,12 +6,12 @@ import { Request } from "../../action-dispatch/http/request.js";
 
 class PostsController extends Base {
   async index() {
-    this.render({ json: [{ id: 1, title: "Hello" }] });
+    await this.render({ json: [{ id: 1, title: "Hello" }] });
   }
 
   async show() {
     const id = this.params.get("id");
-    this.render({ json: { id } });
+    await this.render({ json: { id } });
   }
 
   async create() {
@@ -19,12 +19,12 @@ class PostsController extends Base {
     this.flash.set("notice", "Post created!");
     this.session.set("lastCreated", title);
     this.status = 201;
-    this.render({ json: { title } });
+    await this.render({ json: { title } });
   }
 
   async update() {
     const id = this.params.get("id");
-    this.render({ json: { id, updated: true } });
+    await this.render({ json: { id, updated: true } });
   }
 
   async destroy() {
@@ -37,20 +37,20 @@ class PostsController extends Base {
   }
 
   async renderPlain() {
-    this.render({ plain: "hello world" });
+    await this.render({ plain: "hello world" });
   }
 
   async renderHtml() {
-    this.render({ html: "<h1>Hello</h1>" });
+    await this.render({ html: "<h1>Hello</h1>" });
   }
 
   async renderWithStatus() {
-    this.render({ json: { error: "not found" }, status: 404 });
+    await this.render({ json: { error: "not found" }, status: 404 });
   }
 
   async setCustomHeader() {
     this.headers.set("X-Custom", "test-value");
-    this.render({ plain: "ok" });
+    await this.render({ plain: "ok" });
   }
 
   async forbidden() {
@@ -60,17 +60,17 @@ class PostsController extends Base {
   async useSession() {
     const count = ((this.session.get("count") as number) ?? 0) + 1;
     this.session.set("count", count);
-    this.render({ json: { count } });
+    await this.render({ json: { count } });
   }
 
   async flashNotice() {
     this.flash.set("notice", "Success!");
-    this.render({ plain: "ok" });
+    await this.render({ plain: "ok" });
   }
 
   async flashAlert() {
     this.flash.set("alert", "Danger!");
-    this.render({ plain: "ok" });
+    await this.render({ plain: "ok" });
   }
 }
 
@@ -385,30 +385,30 @@ describe("TestCaseTest", () => {
     class FlashSetController extends Base {
       async setFlash() {
         this.flash.set("test", "><");
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
       }
     }
     class FlashPrependController extends Base {
       async setFlash() {
         const pre = this.flash.get("test") ?? "";
         this.flash.set("test", `>${pre}<`);
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
       }
     }
     class SessionController extends Base {
       async noOp() {
-        this.render({ plain: "ok" });
+        await this.render({ plain: "ok" });
       }
     }
     class UriController extends Base {
       async testUri() {
-        this.render({ plain: this.request.path });
+        await this.render({ plain: this.request.path });
       }
     }
     class ParamController extends Base {
       async testOnlyOneParam() {
         const keys = [...this.params.keys].filter((k) => k !== "controller" && k !== "action");
-        this.render({ plain: keys.length === 1 ? "OK" : "FAIL" });
+        await this.render({ plain: keys.length === 1 ? "OK" : "FAIL" });
       }
     }
 
@@ -502,73 +502,75 @@ class TestController extends Base {
   _counter: number | undefined = undefined;
 
   async noOp() {
-    this.render({ plain: "dummy" });
+    await this.render({ plain: "dummy" });
   }
 
   async setFlash() {
     const prev = this.flash.get("test") ?? "";
     this.flash.set("test", `>${prev}<`);
-    this.render({ plain: "ignore me" });
+    await this.render({ plain: "ignore me" });
   }
 
   async deleteFlash() {
     this.flash.delete("test");
-    this.render({ plain: "ignore me" });
+    await this.render({ plain: "ignore me" });
   }
 
   async setSession() {
     this.session.set("string", "A wonder");
     this.session.set("symbol", "it works");
-    this.render({ plain: "Success" });
+    await this.render({ plain: "Success" });
   }
 
   async resetTheSession() {
     this.resetSession();
-    this.render({ plain: "ignore me" });
+    await this.render({ plain: "ignore me" });
   }
 
   async renderBody() {
-    this.render({ plain: this.request.body });
+    await this.render({ plain: this.request.body });
   }
 
   async testParams() {
     const data: Record<string, unknown> = {};
     for (const key of this.params.keys) data[key] = this.params.get(key);
-    this.render({ plain: JSON.stringify(data) });
+    await this.render({ plain: JSON.stringify(data) });
   }
 
   async testQueryParameters() {
-    this.render({ plain: JSON.stringify(this.request.queryParameters) });
+    await this.render({ plain: JSON.stringify(this.request.queryParameters) });
   }
 
   async testQueryString() {
-    this.render({ plain: this.request.queryString });
+    await this.render({ plain: this.request.queryString });
   }
 
   async testUri() {
-    this.render({ plain: this.request.fullpath });
+    await this.render({ plain: this.request.fullpath });
   }
 
   async testFormat() {
-    this.render({ plain: String(this.request.format) });
+    await this.render({ plain: String(this.request.format) });
   }
 
   async testProtocol() {
-    this.render({ plain: this.request.protocol });
+    await this.render({ plain: this.request.protocol });
   }
 
   async testOnlyOneParam() {
     const hasLeft = this.params.get("left") != null;
     const hasRight = this.params.get("right") != null;
-    this.render({ plain: hasLeft && hasRight ? "EEP, Both here!" : "OK" });
+    await this.render({ plain: hasLeft && hasRight ? "EEP, Both here!" : "OK" });
   }
 
   async testRemoteAddr() {
-    this.render({ plain: (this.request.env["REMOTE_ADDR"] as string | undefined) ?? "127.0.0.1" });
+    await this.render({
+      plain: (this.request.env["REMOTE_ADDR"] as string | undefined) ?? "127.0.0.1",
+    });
   }
 
   async renderJson() {
-    this.render({ json: this.request.rawPost });
+    await this.render({ json: this.request.rawPost });
   }
 
   async boom() {
@@ -577,7 +579,7 @@ class TestController extends Base {
 
   async incrementCount() {
     this._counter = (this._counter ?? 0) + 1;
-    this.render({ plain: String(this._counter) });
+    await this.render({ plain: String(this._counter) });
   }
 
   async create() {

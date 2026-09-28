@@ -8,7 +8,7 @@ import { Response } from "../action-dispatch/http/response.js";
 
 class DefaultLayoutController extends Base {
   async withNofile(): Promise<void> {
-    this.render({ action: "hello", layout: "nofile" });
+    await this.render({ action: "hello", layout: "nofile" });
   }
 }
 

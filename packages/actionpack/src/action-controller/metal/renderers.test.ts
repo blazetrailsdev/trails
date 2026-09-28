@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, test } from "vitest";
 
-import { Renderers } from "./renderers.js";
+import { Renderers, _renderToBodyWithRenderer } from "./renderers.js";
 
 describe("Renderers", () => {
+  const host = { contentType: null, mediaType: undefined, _processOptions() {} };
   const keysToCleanup: string[] = [];
 
   afterEach(() => {
@@ -17,7 +18,7 @@ describe("Renderers", () => {
   test("_renderToBodyWithRenderer ignores prototype keys (Hash#key? semantics)", () => {
     keysToCleanup.push("toString");
     Renderers.add("toString", () => "should-not-run");
-    expect(Renderers._renderToBodyWithRenderer({})).toBeNull();
+    expect(_renderToBodyWithRenderer.call(host, {})).toBeNull();
   });
 
   test("add registers a renderer that dispatches by key", () => {
@@ -32,12 +33,12 @@ describe("Renderers", () => {
     keysToCleanup.push("csv");
     Renderers.add("csv", (value, opts) => `csv:${String(value)}:${String(opts.filename)}`);
 
-    const result = Renderers._renderToBodyWithRenderer({ csv: "data", filename: "out" });
+    const result = _renderToBodyWithRenderer.call(host, { csv: "data", filename: "out" });
     expect(result).toBe("csv:data:out");
   });
 
   test("_renderToBodyWithRenderer returns null when no key matches", () => {
-    expect(Renderers._renderToBodyWithRenderer({ html: "x" })).toBeNull();
+    expect(_renderToBodyWithRenderer.call(host, { html: "x" })).toBeNull();
   });
 
   test("remove deregisters both the key and the dispatch method", () => {
@@ -46,6 +47,6 @@ describe("Renderers", () => {
 
     expect(Renderers.RENDERERS.has("xyz")).toBe(false);
     expect(Renderers.get("xyz")).toBeUndefined();
-    expect(Renderers._renderToBodyWithRenderer({ xyz: "v" })).toBeNull();
+    expect(_renderToBodyWithRenderer.call(host, { xyz: "v" })).toBeNull();
   });
 });

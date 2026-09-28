@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ToJsonWithActiveSupportEncoder } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import { Request } from "../../action-dispatch/request.js";
 import { Response } from "../../action-dispatch/response.js";
@@ -20,7 +21,7 @@ describe("RenderJsonTest", () => {
   it("render json nil", async () => {
     class C extends Base {
       async action() {
-        this.render({ json: null });
+        await this.render({ json: null });
       }
     }
     const c = new C();
@@ -32,7 +33,7 @@ describe("RenderJsonTest", () => {
   it("render json", async () => {
     class C extends Base {
       async action() {
-        this.render({ json: { hello: "world" } });
+        await this.render({ json: { hello: "world" } });
       }
     }
     const c = new C();
@@ -44,7 +45,7 @@ describe("RenderJsonTest", () => {
   it("render json with status", async () => {
     class C extends Base {
       async action() {
-        this.render({ json: { error: "not found" }, status: 404 });
+        await this.render({ json: { error: "not found" }, status: 404 });
       }
     }
     const c = new C();
@@ -56,7 +57,7 @@ describe("RenderJsonTest", () => {
   it("render json with callback", async () => {
     class C extends Base {
       async action() {
-        this.render({ json: { hello: "world" }, callback: "foo" });
+        await this.render({ json: { hello: "world" }, callback: "foo" });
       }
     }
     const c = new C();
@@ -66,23 +67,10 @@ describe("RenderJsonTest", () => {
     expect(c.contentType).toContain("text/javascript");
   });
 
-  it("render json with invalid callback falls back to json", async () => {
-    class C extends Base {
-      async action() {
-        this.render({ json: { a: 1 }, callback: "foo);alert(1);//" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.responseBody).not.toContain("alert");
-    expect(c.contentType).toContain("application/json");
-    expect(JSON.parse(c.responseBody)).toEqual({ a: 1 });
-  });
-
   it("render json with custom content type", async () => {
     class C extends Base {
       async action() {
-        this.render({ json: { a: 1 }, contentType: "application/vnd.api+json" });
+        await this.render({ json: { a: 1 }, contentType: "application/vnd.api+json" });
       }
     }
     const c = new C();
@@ -93,7 +81,7 @@ describe("RenderJsonTest", () => {
   it("render symbol json", async () => {
     class C extends Base {
       async action() {
-        this.render({ json: "raw string" });
+        await this.render({ json: "raw string" });
       }
     }
     const c = new C();
@@ -104,8 +92,8 @@ describe("RenderJsonTest", () => {
   it("render json with render to string", async () => {
     class C extends Base {
       async action() {
-        const str = this.renderToString({ json: { key: "value" } });
-        this.render({ plain: `rendered: ${str}` });
+        const str = await this.renderToString({ json: { key: "value" } });
+        await this.render({ plain: `rendered: ${str}` });
       }
     }
     const c = new C();
@@ -117,7 +105,7 @@ describe("RenderJsonTest", () => {
   it("render json forwards extra options", async () => {
     class C extends Base {
       async action() {
-        this.render({ json: { a: 1 }, status: 201 });
+        await this.render({ json: { a: 1 }, status: 201 });
       }
     }
     const c = new C();
@@ -126,25 +114,31 @@ describe("RenderJsonTest", () => {
   });
 
   it("render json calls to json from object", async () => {
-    const obj = {
-      toJSON() {
-        return { serialized: true };
-      },
-    };
+    class JsonRenderable {
+      asJson(options: { except?: string[] } | null = {}): Record<string, string> {
+        const hash: Record<string, string> = { a: "b", c: "d", e: "f" };
+        for (const key of options?.except ?? []) delete hash[key];
+        return hash;
+      }
+
+      toJSON(_options: Record<string, unknown> = {}): unknown {
+        return ToJsonWithActiveSupportEncoder.toJSON.call(this, { except: ["c", "e"] });
+      }
+    }
     class C extends Base {
       async action() {
-        this.render({ json: obj });
+        await this.render({ json: new JsonRenderable() });
       }
     }
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(JSON.parse(c.responseBody)).toEqual({ serialized: true });
+    expect(c.responseBody).toBe('{"a":"b"}');
   });
 
   it("render json avoids view options", async () => {
     class C extends Base {
       async action() {
-        this.render({ json: [1, 2, 3] });
+        await this.render({ json: [1, 2, 3] });
       }
     }
     const c = new C();

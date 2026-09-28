@@ -76,10 +76,10 @@ export function _setHtmlContentType(this: Pick<RenderingHost, "contentType">): v
 
 /** @internal */
 export function _setRenderedContentType(
-  this: { contentType: string | null; response: { contentType?: string } },
+  this: { contentType: string | null; response: { mediaType?: string | null } },
   format: { toString(): string } | null | undefined,
 ): void {
-  if (format && !this.response.contentType) {
+  if (format && !this.response.mediaType) {
     this.contentType = String(format);
   }
 }
@@ -109,33 +109,39 @@ export function _processOptions(
   }
 }
 
-export function renderToBody(options: Record<string, unknown> = {}): string {
+export function renderToBody(options: Record<string, unknown> = {}): unknown {
   const body = _renderInPriorities(options);
-  return body !== null ? String(body) : " ";
+  return body != null && body !== false ? body : " ";
 }
 
 /** @internal */
 export function render<T extends { performed?: boolean } & AbstractRenderHost>(
   this: T,
   ...args: unknown[]
-): void {
+): void | Promise<void> {
   if (this.performed) throw new DoubleRenderError();
-  abstractRender.call(this, ...args);
+  return abstractRender.call(this, ...args);
 }
 
 /** @internal */
 export function renderToString<T extends AbstractRenderHost>(this: T, ...args: unknown[]): unknown {
   const result = abstractRenderToString.call(this, ...args);
-  if (
-    result != null &&
-    typeof result === "object" &&
-    typeof (result as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function"
-  ) {
-    const parts: string[] = [];
-    for (const chunk of result as Iterable<unknown>) parts.push(String(chunk));
-    return parts.join("");
+  const toString = (result: unknown): unknown => {
+    if (
+      result != null &&
+      typeof result === "object" &&
+      typeof (result as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function"
+    ) {
+      let string = "";
+      for (const r of result as Iterable<unknown>) string += String(r);
+      return string;
+    }
+    return result;
+  };
+  if (typeof (result as PromiseLike<unknown> | null)?.then === "function") {
+    return Promise.resolve(result).then(toString);
   }
-  return result;
+  return toString(result);
 }
 
 /** @internal */
