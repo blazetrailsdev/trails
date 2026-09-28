@@ -311,4 +311,28 @@ describe("SchemaCacheColumnClassRoundTripTest", () => {
     expect(dump).toContain("!ruby/object:ActiveRecord::ConnectionAdapters::MySQL::TypeMetadata");
     expect(dump).not.toMatch(/^\s*class:/m);
   });
+
+  it("an object shared across tables is dumped once and revived through its alias", async () => {
+    const metadata = new MysqlTypeMetadata({ sqlType: "int", type: "integer" });
+    const id = new MysqlColumn("id", null, metadata);
+    const cache = new SchemaCache();
+    cache.setColumns("people", [id, new MysqlColumn("parent_id", null, metadata)]);
+    cache.setColumns("places", [id]);
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "schema-cache-alias-test-"));
+    const filename = path.join(tmpDir, "schema_cache.yml");
+    await cache.dumpTo(filename);
+    const dump = fs.readFileSync(filename, "utf8");
+    const loaded = (await SchemaCache._loadFrom(filename))!;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    const columns = (loaded as unknown as { _columns: Map<string, Column[]> })._columns;
+
+    expect(dump).toMatch(/\*\w+/);
+    expect(columns.get("places")![0]).toBeInstanceOf(MysqlColumn);
+    expect(columns.get("places")![0]).toBe(columns.get("people")![0]);
+    expect(columns.get("people")![1].sqlTypeMetadata).toBeInstanceOf(MysqlTypeMetadata);
+    expect(columns.get("people")![1].sqlTypeMetadata).toBe(
+      columns.get("people")![0].sqlTypeMetadata,
+    );
+  });
 });

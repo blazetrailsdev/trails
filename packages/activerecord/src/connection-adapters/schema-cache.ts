@@ -25,8 +25,12 @@ type RubyObjectTag = {
   default: false;
   identify: (value: unknown) => boolean;
   createNode: (schema: never, value: object, ctx: never) => unknown;
-  resolve: (map: { toJSON(): Record<string, unknown> }) => object;
+  resolve: (map: YamlMap) => YamlMap;
 };
+
+type ToJsContext = { onCreate?: (res: unknown) => void };
+
+type YamlMap = { toJSON(arg?: unknown, ctx?: ToJsContext): unknown };
 
 const RUBY_OBJECT_CLASSES: Record<string, { prototype: object }> = {
   "ActiveRecord::ConnectionAdapters::Column": Column,
@@ -54,11 +58,18 @@ const RUBY_OBJECT_TAGS: RubyObjectTag[] = Object.entries(RUBY_OBJECT_CLASSES).ma
       return mapTag.createNode(schema, coder, ctx);
     },
     resolve: (map) => {
-      const object = Object.create(klass.prototype) as object;
-      const coder = map.toJSON();
-      if (object instanceof Column) object.initWith(coder);
-      else Object.assign(object, coder);
-      return object;
+      const YAMLMap = map.constructor as new () => YamlMap;
+      class RubyObject extends YAMLMap {
+        override toJSON(arg?: unknown, ctx?: ToJsContext): object {
+          const object = Object.create(klass.prototype) as object;
+          ctx?.onCreate?.(object);
+          const coder = super.toJSON(arg, ctx) as ColumnCoder;
+          if (object instanceof Column) object.initWith(coder);
+          else Object.assign(object, coder);
+          return object;
+        }
+      }
+      return Object.assign(new RubyObject(), map);
     },
   }),
 );
@@ -114,10 +125,10 @@ export class SchemaCache {
     try {
       if (!File.isFile(filename)) return null;
       const data = await SchemaCache.read(filename, (content) => content);
-      const parsed = yamlParse(data, { customTags: RUBY_OBJECT_TAGS as never }) as Record<
-        string,
-        Record<string, unknown[]> | null
-      >;
+      const parsed = yamlParse(data, {
+        customTags: RUBY_OBJECT_TAGS as never,
+        maxAliasCount: -1,
+      }) as Record<string, Record<string, unknown[]> | null>;
       const cache = new SchemaCache();
       cache.initWith({
         ...parsed,
@@ -351,12 +362,7 @@ export class SchemaCache {
     await this.open(filename, (f) => {
       const coder: Record<string, unknown> = {};
       this.encodeWith(coder);
-      f.write(
-        yamlStringify(coder, {
-          customTags: RUBY_OBJECT_TAGS as never,
-          aliasDuplicateObjects: false,
-        }),
-      );
+      f.write(yamlStringify(coder, { customTags: RUBY_OBJECT_TAGS as never }));
     });
   }
 
