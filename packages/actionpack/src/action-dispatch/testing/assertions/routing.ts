@@ -82,10 +82,7 @@ export namespace WithIntegrationRouting {
     return result;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall new — CONVERGEABLE integration-runner-merged-into-session
-   */
+  /** @internal */
   export function createRoutes<T>(this: IntegrationTest, block: (routes: RouteSet) => T): T {
     const app = this.app as { routes: RouteSet };
     const routes = new RouteSet();
