@@ -32,7 +32,9 @@ describe("ScaffoldGenerator (namespaced)", () => {
     const rerun = new ScaffoldGenerator({ ...options, force: true }).run();
     await expect(rerun).resolves.toContain("app/models/admin/account.ts");
   });
+});
 
+describe("ScaffoldGenerator (views)", () => {
   it("emits Rails' scaffold copy and a record partial that show and index render", async () => {
     fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
     await new ScaffoldGenerator({

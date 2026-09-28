@@ -38,6 +38,10 @@ describe("NamedBase", () => {
       "posts",
       "post",
     ]);
+    const g2 = generator("User");
+    expect(g2.modelResourceName()).toBe("user");
+    expect(g2.singularRouteName()).toBe("user");
+    expect(g2.pluralRouteName()).toBe("users");
   });
 
   it("test_index_helper", () => {
