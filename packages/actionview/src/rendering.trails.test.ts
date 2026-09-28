@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { ActionController, Request, Response, RouteSet, UrlFor } from "@blazetrails/actionpack";
+import {
+  AbstractController,
+  ActionController,
+  Request,
+  Response,
+  RouteSet,
+  UrlFor,
+} from "@blazetrails/actionpack";
 import { include } from "@blazetrails/ruby-compat";
 import { RoutingUrlFor } from "./routing-url-for.js";
 
@@ -16,7 +23,11 @@ describe("ActionView::Rendering::ClassMethods#build_view_context_class", () => {
         this.render({ plain: "" });
       }
     }
-    (FooController as unknown as { _routes: RouteSet })._routes = routes;
+    AbstractController.withRoutesHelpers(routes)(
+      FooController as unknown as Parameters<
+        ReturnType<typeof AbstractController.withRoutesHelpers>
+      >[0],
+    );
     const controller = new FooController();
     await controller.dispatch(
       "other",
