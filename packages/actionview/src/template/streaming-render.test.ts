@@ -56,7 +56,6 @@ function setupFiberedBase() {
     DetailsKey.clear();
 
     const viewPaths = [new FixtureResolver(FIXTURES)];
-
     state.assigns = { secret: "in the sauce", name: null };
     state.view = Base.withEmptyTemplateCache().withViewPaths(viewPaths, state.assigns);
   });
