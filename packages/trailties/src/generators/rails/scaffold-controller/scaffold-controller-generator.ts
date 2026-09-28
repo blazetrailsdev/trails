@@ -8,6 +8,7 @@ import type { ActiveModel } from "../../active-model.js";
 import { tsBody, tsField, tsMethod, type Method } from "../../../template-builder/index.js";
 import { emitControllerClass, parentRefForRelative } from "../controller/controller-paths.js";
 import { ResourceRouteGenerator } from "../resource-route/resource-route-generator.js";
+import * as Tse from "../../tse/scaffold/scaffold-generator.js";
 
 export interface ScaffoldControllerGeneratorOptions extends NamedBaseOptions, ModelHelpersOptions {
   api?: boolean;
@@ -89,6 +90,22 @@ export class ScaffoldControllerGenerator extends NamedBase {
       }),
     );
 
+    if (!api) {
+      this.createdFiles.push(
+        ...new Tse.ScaffoldGenerator({ ...this.options, behavior: this.behavior }).run(),
+      );
+    }
+
+    if (!skipRoutes) {
+      const route = new ResourceRouteGenerator({
+        cwd: this.cwd,
+        output: this.output,
+        behavior: this.behavior,
+        pretend: this.options.pretend,
+        name: this.name,
+      });
+      await route.addResourceRoute();
+    }
     if (test) {
       const skip = (a: string) =>
         api && (a === "new" || a === "edit") ? "" : `  it("${a}", () => {});\n`;
@@ -114,16 +131,6 @@ ${skip("index")}${skip("show")}${skip("new")}${skip("create")}${skip("edit")}${s
       );
     }
 
-    if (!skipRoutes) {
-      const route = new ResourceRouteGenerator({
-        cwd: this.cwd,
-        output: this.output,
-        behavior: this.behavior,
-        pretend: this.options.pretend,
-        name: this.name,
-      });
-      await route.addResourceRoute();
-    }
     return this.getCreatedFiles();
   }
 }
@@ -153,6 +160,7 @@ function paramsMethod(singular: string, attrs: string[], ts: boolean): Method {
       : `return this.params.expect({ ${singular}: [${attrs.map((a) => `"${a}"`).join(", ")}] });`;
   return tsMethod({
     name: `${camelize(singular, false)}Params`,
+    visibility: "protected",
     params: [],
     returnType: ts ? "unknown" : undefined,
     body: tsBody`${list}`,

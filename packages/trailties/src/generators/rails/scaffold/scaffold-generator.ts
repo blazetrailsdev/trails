@@ -6,7 +6,6 @@ import { ResourceHelpers } from "../../resource-helpers.js";
 import { ModelGenerator } from "../../model-generator.js";
 import { ScaffoldControllerGenerator } from "../scaffold-controller/scaffold-controller-generator.js";
 import { ResourceRouteGenerator } from "../resource-route/resource-route-generator.js";
-import * as Tse from "../../tse/scaffold/scaffold-generator.js";
 
 export interface ScaffoldGeneratorOptions extends NamedBaseOptions, ModelHelpersOptions {
   modelName?: string;
@@ -32,6 +31,15 @@ export class ScaffoldGenerator extends NamedBase {
     });
     this.createdFiles.push(...(await modelGen.run(this.name, args)));
 
+    const route = new ResourceRouteGenerator({
+      cwd: this.cwd,
+      output: this.output,
+      behavior: this.behavior,
+      pretend: this.options.pretend,
+      name: this.name,
+    });
+    await route.addResourceRoute();
+
     this.createdFiles.push(
       ...(await new ScaffoldControllerGenerator({
         ...(this.options as ScaffoldGeneratorOptions),
@@ -41,22 +49,6 @@ export class ScaffoldGenerator extends NamedBase {
         skipRoutes: true,
       }).run()),
     );
-
-    this.createdFiles.push(
-      ...new Tse.ScaffoldGenerator({
-        ...(this.options as ScaffoldGeneratorOptions),
-        behavior: this.behavior,
-      }).run(),
-    );
-
-    const route = new ResourceRouteGenerator({
-      cwd: this.cwd,
-      output: this.output,
-      behavior: this.behavior,
-      pretend: this.options.pretend,
-      name: this.name,
-    });
-    await route.addResourceRoute();
     return this.getCreatedFiles();
   }
 }

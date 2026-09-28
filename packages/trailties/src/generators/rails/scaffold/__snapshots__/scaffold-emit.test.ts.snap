@@ -52,7 +52,7 @@ export class PostsController extends ApplicationController {
     this.post = await Post.find(this.params.expect("id"));
   }
 
-  postParams(): unknown {
+  protected postParams(): unknown {
     return this.params.expect({ post: ["title", "views"] });
   }
 }
