@@ -55,4 +55,13 @@ describe("add_flash_types readers", () => {
     expect((t.controller as NoticesController).alert).toBeUndefined();
     expect(t.responseBody).toBe('<p style="color: green">Post was successfully created.</p>');
   });
+
+  it("drops a flash type from action methods cached before add_flash_types", () => {
+    class WarningsController extends Base {
+      async warning(): Promise<void> {}
+    }
+    expect(WarningsController.actionMethods()).toContain("warning");
+    WarningsController.addFlashTypes("warning");
+    expect(WarningsController.actionMethods()).not.toContain("warning");
+  });
 });

@@ -7,6 +7,7 @@ import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
 export interface FlashClassHost extends HelpersClassMethods {
   prototype: object;
   _flashTypes: string[];
+  methodAdded(name: string): void;
 }
 
 export class Flash {
@@ -26,6 +27,7 @@ export function addFlashTypes(this: FlashClassHost, ...types: string[]): void {
       },
       configurable: true,
     });
+    this.methodAdded(type);
     helperMethod(this, type);
 
     this._flashTypes = [...this._flashTypes, type];
