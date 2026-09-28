@@ -1,5 +1,6 @@
 import {
   ActiveSupportJSON,
+  Assertion,
   camelize,
   include,
   isBlank,
@@ -206,15 +207,15 @@ export class TestCase {
     const location =
       this.response?.getHeader("location") ?? this.controller?.headers.get("location");
     if (!location) {
-      throw new Error("Expected a redirect but no Location header was set");
+      throw new Assertion("Expected a redirect but no Location header was set");
     }
     if (typeof expected === "string") {
       if (location !== expected) {
-        throw new Error(`Expected redirect to "${expected}", got "${location}"`);
+        throw new Assertion(`Expected redirect to "${expected}", got "${location}"`);
       }
     } else {
       if (!expected.test(location)) {
-        throw new Error(`Expected redirect matching ${expected}, got "${location}"`);
+        throw new Assertion(`Expected redirect matching ${expected}, got "${location}"`);
       }
     }
   }

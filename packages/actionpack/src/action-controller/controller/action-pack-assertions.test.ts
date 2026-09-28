@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { Assertion } from "@blazetrails/activesupport";
 import { TestCase } from "../test-case.js";
 import { Base } from "../base.js";
 
@@ -130,8 +131,9 @@ describe("ActionPackAssertionsControllerTest", () => {
       await tc.process("redirectExternalProtocolRelative");
       assertRedirectedTo("/foo");
     } catch (ex) {
+      if (!(ex instanceof Assertion)) throw ex;
       // eslint-disable-next-line vitest/no-conditional-expect -- mirrors Rails' method-level `rescue` (action_pack_assertions_test.rb:285)
-      expect((ex as Error).message, "protocol relative URL was incorrectly normalized").not.toMatch(
+      expect(ex.message, "protocol relative URL was incorrectly normalized").not.toMatch(
         new RegExp(`${tc.request.protocol}${tc.request.host}//www.rubyonrails.org`),
       );
     }
