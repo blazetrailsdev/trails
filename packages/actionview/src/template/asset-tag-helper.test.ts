@@ -20,7 +20,11 @@ import {
   type AssetPathOptions,
   type AssetUrlHelperHost,
 } from "../helpers/asset-url-helper.js";
+import { Mime } from "@blazetrails/actionpack";
+import { Template } from "../template.js";
 import {
+  autoDiscoveryLinkTag,
+  faviconLinkTag,
   imageDecoding,
   imageLoading,
   imageTag,
@@ -30,11 +34,14 @@ import {
   type AssetTagHelperHost,
 } from "../helpers/asset-tag-helper.js";
 
+Template.mimeTypesImplementation = Mime;
+
 const request = { baseUrl: "http://www.example.com", protocol: "http://" };
 const host = {
   computeAssetPath,
   publicComputeAssetPath,
   request,
+  urlFor: (..._args: unknown[]) => "http://www.example.com",
 } as unknown as AssetTagHelperHost;
 
 const assertDomEqual = (expected: string, actual: unknown): void => {
@@ -141,6 +148,67 @@ const PathToStyleToTag: [() => string, string][] = [
   [() => pathToStylesheet.call(host, "/dir/file", { extname: ".rcss" }), "/dir/file.rcss"],
 ];
 
+const autoDiscovery = (...args: unknown[]): unknown =>
+  (autoDiscoveryLinkTag as (...a: unknown[]) => unknown).call(host, ...args);
+const adLink = (href: string, title: string, type: string, rel = "alternate") =>
+  `<link rel="${rel}" type="${type}" title="${title}" href="${href}" />`;
+const rssType = "application/rss+xml";
+const atomType = "application/atom+xml";
+
+const AutoDiscoveryToTag: [() => unknown, string][] = [
+  [() => autoDiscovery(), adLink(ex, "RSS", rssType)],
+  [() => autoDiscovery(":rss"), adLink(ex, "RSS", rssType)],
+  [() => autoDiscovery(":atom"), adLink(ex, "ATOM", atomType)],
+  [() => autoDiscovery(":json"), adLink(ex, "JSON", "application/json")],
+  [() => autoDiscovery(":rss", { action: "feed" }), adLink(ex, "RSS", rssType)],
+  [
+    () => autoDiscovery(":rss", "http://localhost/feed"),
+    adLink("http://localhost/feed", "RSS", rssType),
+  ],
+  [() => autoDiscovery(":rss", "//localhost/feed"), adLink("//localhost/feed", "RSS", rssType)],
+  [
+    () => autoDiscovery(":rss", { action: "feed" }, { title: "My RSS" }),
+    adLink(ex, "My RSS", rssType),
+  ],
+  [() => autoDiscovery(":rss", {}, { title: "My RSS" }), adLink(ex, "My RSS", rssType)],
+  [() => autoDiscovery(null, {}, { type: "text/html" }), adLink(ex, "", "text/html")],
+  [
+    () => autoDiscovery(null, {}, { title: "No stream.. really", type: "text/html" }),
+    adLink(ex, "No stream.. really", "text/html"),
+  ],
+  [
+    () => autoDiscovery(":rss", {}, { title: "My RSS", type: "text/html" }),
+    adLink(ex, "My RSS", "text/html"),
+  ],
+  [
+    () => autoDiscovery(":atom", {}, { rel: "Not so alternate" }),
+    adLink(ex, "ATOM", atomType, "Not so alternate"),
+  ],
+];
+
+const favicon = (...args: unknown[]): unknown =>
+  (faviconLinkTag as (...a: unknown[]) => unknown).call(host, ...args);
+
+const FaviconLinkToTag: [() => unknown, string][] = [
+  [() => favicon(), '<link rel="icon" type="image/x-icon" href="/images/favicon.ico" />'],
+  [
+    () => favicon("favicon.ico"),
+    '<link rel="icon" type="image/x-icon" href="/images/favicon.ico" />',
+  ],
+  [
+    () => favicon("favicon.ico", { rel: "foo" }),
+    '<link rel="foo" type="image/x-icon" href="/images/favicon.ico" />',
+  ],
+  [
+    () => favicon("favicon.ico", { rel: "foo", type: "bar" }),
+    '<link rel="foo" type="bar" href="/images/favicon.ico" />',
+  ],
+  [
+    () => favicon("mb-icon.png", { rel: "apple-touch-icon", type: "image/png" }),
+    '<link rel="apple-touch-icon" type="image/png" href="/images/mb-icon.png" />',
+  ],
+];
+
 const link = (...args: unknown[]): unknown => stylesheetLinkTag.call(host, ...args);
 
 const StyleLinkToTag: [() => unknown, string][] = [
@@ -171,6 +239,18 @@ const StyleLinkToTag: [() => unknown, string][] = [
 ];
 
 describe("AssetTagHelperTest", () => {
+  it("autodiscovery link tag with unknown type but not pass type option key", async () => {
+    await assertRaise([ArgumentError], {}, () => autoDiscoveryLinkTag.call(host, ":xml"));
+  });
+
+  it("autodiscovery link tag with unknown type", () => {
+    const result = autoDiscoveryLinkTag.call(host, ":xml", "/feed.xml", {
+      type: "application/xml",
+    });
+    const expected = `<link rel="alternate" type="application/xml" title="XML" href="/feed.xml" />`;
+    assertDomEqual(expected, result);
+  });
+
   it("asset path tag", () => {
     AssetPathToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
   });
@@ -197,6 +277,10 @@ describe("AssetTagHelperTest", () => {
 
     controller.config["relativeUrlRoot"] = "/some/root/";
     assertDomEqual("http://host/some/root/foo", assetPath.call(controller, "foo"));
+  });
+
+  it("auto discovery link tag", () => {
+    AutoDiscoveryToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
   });
 
   it("javascript path", () => {
@@ -277,6 +361,10 @@ describe("AssetTagHelperTest", () => {
     } finally {
       setImageLoading(originalImageLoading);
     }
+  });
+
+  it("favicon link tag", () => {
+    FaviconLinkToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
   });
 
   it("image tag decoding attribute default value", () => {

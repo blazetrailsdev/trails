@@ -126,6 +126,8 @@ export type { AssetPathOptions, AssetUrlHelperHost } from "./asset-url-helper.js
 
 export {
   stylesheetLinkTag,
+  autoDiscoveryLinkTag,
+  faviconLinkTag,
   imageTag,
   sendPreloadLinksHeader,
   imageLoading,

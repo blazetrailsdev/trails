@@ -3,10 +3,18 @@ import {
   extractOptionsBang,
   htmlSafe,
   isBlank,
+  isPlainObject,
   isPresent,
   stringifyKeys,
 } from "@blazetrails/activesupport";
-import { ArgumentError, NoMethodError } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  NoMethodError,
+  rtest,
+  stringToSym,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
+import { Template } from "../template.js";
 import {
   pathToAsset,
   pathToImage,
@@ -54,6 +62,7 @@ export type AssetTagHelperHost = AssetUrlHelperHost &
   PreloadHeaderHost & {
     contentSecurityPolicyNonce?(): string | null;
     polymorphicUrl?(record: unknown): string;
+    urlFor(options: unknown): string;
   };
 
 export function stylesheetLinkTag(this: AssetTagHelperHost, ...sources: unknown[]): SafeBuffer {
@@ -118,6 +127,45 @@ export function stylesheetLinkTag(this: AssetTagHelperHost, ...sources: unknown[
   }
 
   return sourcesTags;
+}
+
+export function autoDiscoveryLinkTag(
+  this: AssetTagHelperHost,
+  type: string | null = ":rss",
+  urlOptions: Record<string, unknown> | string = {},
+  tagOptions: Record<string, unknown> = {},
+): SafeBuffer {
+  if (!(type === ":rss" || type === ":atom" || type === ":json") && isBlank(tagOptions["type"])) {
+    throw new ArgumentError(
+      `You should pass :type tag_option key explicitly, because you have passed ${type == null ? "" : symbolToS(stringToSym(type))} type other than :rss, :atom, or :json.`,
+    );
+  }
+
+  return tag("link", {
+    rel: rtest(tagOptions["rel"]) ? tagOptions["rel"] : "alternate",
+    type: rtest(tagOptions["type"])
+      ? tagOptions["type"]
+      : (Template.Types.get(type)?.toString() ?? ""),
+    title: rtest(tagOptions["title"])
+      ? tagOptions["title"]
+      : (type == null ? "" : symbolToS(stringToSym(type))).toUpperCase(),
+    href: isPlainObject(urlOptions) ? this.urlFor({ ...urlOptions, onlyPath: false }) : urlOptions,
+  }) as SafeBuffer;
+}
+
+export function faviconLinkTag(
+  this: AssetTagHelperHost,
+  source: string = "favicon.ico",
+  options: Record<string, unknown> = {},
+): SafeBuffer {
+  return tag("link", {
+    rel: "icon",
+    type: "image/x-icon",
+    href: pathToImage.call(this, source, {
+      skipPipeline: deleteKey(options, "skipPipeline") as boolean | undefined,
+    }),
+    ...options,
+  }) as SafeBuffer;
 }
 
 export function imageTag(
