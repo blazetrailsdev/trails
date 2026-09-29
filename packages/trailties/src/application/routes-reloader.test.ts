@@ -1,19 +1,35 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { onLoad, resetLoadHooks } from "@blazetrails/activesupport";
+import type { DrawCallback, Mapper } from "@blazetrails/actionpack";
+import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { RoutesReloader, type RouteSetLike } from "./routes-reloader.js";
+import { Trails } from "../rails.js";
 
 type Counted = RouteSetLike & { calls: string[] };
 const makeRouteSet = (): Counted => {
-  const r: Counted = { disableClearAndFinalize: false, calls: [] };
-  r.clear = () => void r.calls.push("clear");
-  r.finalize = () => void r.calls.push("finalize");
-  r.eagerLoad = () => void r.calls.push("eagerLoad");
+  const r: Counted = {
+    disableClearAndFinalize: false,
+    calls: [],
+    clearBang: () => void r.calls.push("clear"),
+    finalizeBang: () => void r.calls.push("finalize"),
+    eagerLoadBang: () => void r.calls.push("eagerLoad"),
+    draw: (block: DrawCallback) =>
+      block({ get: (path: string) => void r.calls.push(`get ${path}`) } as unknown as Mapper),
+  };
   return r;
 };
 
 describe("RoutesReloader", () => {
-  beforeEach(() => resetLoadHooks());
-  afterEach(() => resetLoadHooks());
+  let tmp: string;
+  beforeEach(() => {
+    resetLoadHooks();
+    tmp = Dir.mktmpdir("routes_reloader");
+  });
+  afterEach(() => {
+    resetLoadHooks();
+    FileUtils.rmRf(tmp);
+    Trails.application = null;
+  });
 
   it("test_reload_clears_finalizes_eager_loads_and_runs_after_load_paths", async () => {
     const r = new RoutesReloader();
@@ -22,15 +38,19 @@ describe("RoutesReloader", () => {
     expect(r.loaded).toBe(false);
     const a = makeRouteSet();
     r.routeSets.push(a);
-    r.paths.push("/routes-a", "/routes-b");
+    for (const name of ["a", "b"]) {
+      File.write(
+        `${tmp}/routes-${name}.ts`,
+        `export function drawRoutes(mapper) { mapper.get("/${name}"); }\n`,
+      );
+      r.paths.push(`${tmp}/routes-${name}.ts`);
+    }
     r.eagerLoad = true;
-    const loaded: string[] = [];
     const after = vi.fn();
     r.runAfterLoadPaths = after;
-    await r.reload((p) => void loaded.push(p));
-    expect(loaded).toEqual(["/routes-a", "/routes-b"]);
+    await r.reloadBang();
     expect(after).toHaveBeenCalledOnce();
-    expect(a.calls).toEqual(["clear", "finalize", "eagerLoad"]);
+    expect(a.calls).toEqual(["clear", "get /a", "get /b", "finalize", "eagerLoad"]);
     expect(a.disableClearAndFinalize).toBe(false);
   });
 
@@ -38,11 +58,9 @@ describe("RoutesReloader", () => {
     const r = new RoutesReloader();
     const a = makeRouteSet();
     r.routeSets.push(a);
-    r.paths.push("/boom");
-    const boom = (): never => {
-      throw new Error("load failed");
-    };
-    await expect(r.reload(boom)).rejects.toThrow(/load failed/);
+    File.write(`${tmp}/boom.ts`, `throw new Error("load failed");\n`);
+    r.paths.push(`${tmp}/boom.ts`);
+    await expect(r.reloadBang()).rejects.toThrow(/load failed/);
     expect(a.disableClearAndFinalize).toBe(false);
   });
 
@@ -51,8 +69,9 @@ describe("RoutesReloader", () => {
     const fired: unknown[] = [];
     onLoad("after_routes_loaded", (a) => void fired.push(a));
     const app = { tag: "app" };
-    expect([await r.executeUnlessLoaded(app), r.loaded, fired]).toEqual([true, true, [app]]);
-    expect(await r.executeUnlessLoaded(app)).toBe(false);
+    Trails.application = app as never;
+    expect([await r.executeUnlessLoaded(), r.loaded, fired]).toEqual([true, true, [app]]);
+    expect(await r.executeUnlessLoaded()).toBeNull();
     expect(fired).toEqual([app]);
   });
 });

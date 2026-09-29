@@ -200,12 +200,18 @@ export class Application extends Engine {
     return (this._routesReloader ??= new RoutesReloader());
   }
 
-  async reloadRoutesBang(): Promise<void> {
-    await this.routesReloader().reload();
+  watchableArgs(): [string[], Record<string, string[]>] {
+    const [files, dirs] = [[...this.config.watchableFiles], { ...this.config.watchableDirs }];
+
+    return [files, dirs];
   }
 
-  async reloadRoutesUnlessLoaded(): Promise<boolean> {
-    return this.initialized() && (await this.routesReloader().executeUnlessLoaded(this));
+  async reloadRoutesBang(): Promise<void> {
+    await this.routesReloader().reloadBang();
+  }
+
+  async reloadRoutesUnlessLoaded(): Promise<boolean | null> {
+    return this.initialized() && (await this.routesReloader().executeUnlessLoaded());
   }
 
   secretKeyBase(): string | null {

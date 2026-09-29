@@ -2,7 +2,7 @@ import { RouteSet, type DrawCallback, type Request } from "@blazetrails/actionpa
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { TopLevel } from "@blazetrails/activesupport";
 
-function reloadRoutesUnlessLoaded(): Promise<boolean> | undefined {
+function reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined {
   return TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
 }
 

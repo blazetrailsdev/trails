@@ -331,7 +331,7 @@ describe("Application", () => {
       class IApp6 extends Application {}
       Application.register(IApp6);
       const names = IApp6.instance().initializers.map((i) => i.name);
-      expect(names.slice(-11)).toEqual([
+      expect(names.slice(-12)).toEqual([
         "add_generator_templates",
         "setup_main_autoloader",
         "setup_default_session_store",
@@ -343,6 +343,7 @@ describe("Application", () => {
         "finisher_hook",
         "add_internal_routes",
         "set_routes_reloader_hook",
+        "set_clear_dependencies_hook",
       ]);
     });
 

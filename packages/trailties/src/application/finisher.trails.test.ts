@@ -7,7 +7,8 @@ import {
   type FinisherRoutes,
   type FinisherRoutesReloader,
 } from "./finisher.js";
-import { onLoad, resetLoadHooks } from "@blazetrails/activesupport";
+import { FileUpdateChecker, onLoad, Reloader, resetLoadHooks } from "@blazetrails/activesupport";
+import { Dir, FileUtils } from "@blazetrails/ruby-compat";
 import { Root } from "../paths.js";
 import { Trails } from "../rails.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
@@ -28,7 +29,12 @@ class TestApp extends Finisher {
     isSessionStore: () => (this.sessionStoreArgs === null ? null : this.sessionStoreArgs[0]),
     sessionStore: (newSessionStore?: unknown, options?: Record<string, unknown>) =>
       (this.sessionStoreArgs = [newSessionStore, options]),
+    reloadClassesOnlyOnChange: true,
+    fileWatcher: FileUpdateChecker,
+    isReloadingEnabled: () => this.reloadingEnabled,
   };
+  reloadingEnabled = false;
+  watchableFiles: string[] = [];
   railtieName = "test_app_application";
   calls: string[] = [];
   internalRoutes: string[] = [];
@@ -77,11 +83,17 @@ class TestApp extends Finisher {
     return this._routes;
   }
   toRun: Array<(this: FinisherReloaderInstance) => unknown> = [];
+  toComplete: Array<(this: FinisherReloaderInstance) => unknown> = [];
   reloader: FinisherReloader = {
+    check: () => false,
     toPrepare: (block) => this.toPrepared.push(block),
     toRun: (block) => this.toRun.push(block),
+    toComplete: (block) => this.toComplete.push(block),
     prepareBang: () => this.calls.push("prepare!"),
   };
+  watchableArgs(): [string[], Record<string, string[]>] {
+    return [this.watchableFiles, {}];
+  }
 
   ensureGeneratorTemplatesAdded(): void {
     this.calls.push("generator_templates");
@@ -118,16 +130,13 @@ describe("Finisher", () => {
       "finisher_hook",
       "add_internal_routes",
       "set_routes_reloader_hook",
+      "set_clear_dependencies_hook",
     ]);
   });
 
   it("does not register the intentionally skipped initializers", () => {
     const names = Finisher._ownInitializers().map((i) => i.name);
-    for (const skipped of [
-      "configure_executor_for_concurrency",
-      "set_clear_dependencies_hook",
-      "enable_yjit",
-    ]) {
+    for (const skipped of ["configure_executor_for_concurrency", "enable_yjit"]) {
       expect(names).not.toContain(skipped);
     }
   });
@@ -239,6 +248,7 @@ describe("Finisher", () => {
       requireUnloadLockBang: () => {
         locked = true;
       },
+      classUnloadBang: (block) => block?.(),
     };
     await app.toRun[0].call(instance);
     expect(locked).toBe(true);
@@ -311,5 +321,74 @@ describe("Finisher", () => {
     await run(app, "finisher_hook");
     expect(seen).toEqual([app]);
     resetLoadHooks();
+  });
+
+  describe("set_clear_dependencies_hook", () => {
+    let tmp: string;
+    beforeEach(() => {
+      tmp = Dir.mktmpdir("finisher");
+    });
+    afterEach(() => {
+      FileUtils.rmRf(tmp);
+    });
+
+    it("sets reloader.check to report a watched file change", async () => {
+      const app = new TestApp();
+      app.reloadingEnabled = true;
+      const file = `${tmp}/index.html.tse`;
+      FileUtils.touch(file, { mtime: new Date(Date.now() - 10_000) });
+      const watcher = new FileUpdateChecker([file], {}, () => {});
+      app.reloaders.push(watcher);
+      app.reloader = class extends Reloader {} as unknown as FinisherReloader;
+      await run(app, "set_clear_dependencies_hook");
+
+      expect(app.reloader.check()).toBe(false);
+      FileUtils.touch(file);
+      expect(app.reloader.check()).toBe(true);
+
+      await watcher.execute();
+      expect(app.reloader.check()).toBe(false);
+    });
+
+    it("runs the file watcher under class_unload! before any other to_run block", async () => {
+      const app = new TestApp();
+      app.reloadingEnabled = true;
+      const file = `${tmp}/user.ts`;
+      FileUtils.touch(file, { mtime: new Date(Date.now() - 10_000) });
+      app.watchableFiles = [file];
+      const klass = class extends Reloader {};
+      const order: string[] = [];
+      klass.toRun(() => void order.push("view"));
+      klass.beforeClassUnload(() => void order.push("class_unload"));
+      app.reloader = klass as unknown as FinisherReloader;
+      await run(app, "set_clear_dependencies_hook");
+
+      expect(app.reloaders).toHaveLength(1);
+      expect(klass.check()).toBe(false);
+      FileUtils.touch(file);
+      expect(klass.check()).toBe(true);
+
+      await klass.runBang();
+      expect(order).toEqual(["class_unload", "view"]);
+      expect(klass.check()).toBe(false);
+    });
+
+    it("always reloads when reload_classes_only_on_change is false", async () => {
+      const app = new TestApp();
+      app.reloadingEnabled = true;
+      app.config.reloadClassesOnlyOnChange = false;
+      await run(app, "set_clear_dependencies_hook");
+      expect(app.reloader.check()).toBe(true);
+      expect(app.reloaders).toEqual([]);
+      expect(app.toComplete).toHaveLength(1);
+    });
+
+    it("never reloads when reloading is disabled", async () => {
+      const app = new TestApp();
+      await run(app, "set_clear_dependencies_hook");
+      expect(app.reloader.check()).toBe(false);
+      expect(app.reloaders).toEqual([]);
+      expect(app.toRun).toEqual([]);
+    });
   });
 });

@@ -1,12 +1,12 @@
-import { runLoadHooks } from "@blazetrails/activesupport";
+import { FileUpdateChecker, runLoadHooks, TopLevel } from "@blazetrails/activesupport";
 import { getPath } from "@blazetrails/ruby-compat";
 import type { DrawCallback, Mapper } from "@blazetrails/actionpack";
 
 export interface RouteSetLike {
   disableClearAndFinalize?: boolean;
-  clear?(): void;
-  finalize?(): void;
-  eagerLoad?(): void;
+  clearBang(): void;
+  finalizeBang(): void;
+  eagerLoadBang(): void;
   draw?(block: DrawCallback): void;
 }
 
@@ -18,46 +18,90 @@ export class RoutesReloader {
   loaded = false;
   /** @internal */
   runAfterLoadPaths: () => void | Promise<void> = () => {};
+  private _updater?: FileUpdateChecker;
 
-  async reload(
-    loader: (this: RoutesReloader, path: string) => void | Promise<void> = loadRoutesFile,
-  ): Promise<void> {
+  executeIfUpdated(block?: () => Promise<void> | void): Promise<boolean> {
+    return this.updater().executeIfUpdated(block);
+  }
+
+  isUpdated(): boolean {
+    return this.updater().isUpdated();
+  }
+
+  async reloadBang(): Promise<void> {
     try {
-      for (const s of this.routeSets) {
-        s.disableClearAndFinalize = true;
-        s.clear?.();
-      }
-      for (const p of this.paths) await loader.call(this, p);
-      await this.runAfterLoadPaths();
-      for (const s of this.routeSets) s.finalize?.();
-      if (this.eagerLoad) for (const s of this.routeSets) s.eagerLoad?.();
+      this.clearBang();
+      await this.loadPaths();
+      this.finalizeBang();
+      if (this.eagerLoad) for (const s of this.routeSets) s.eagerLoadBang();
     } finally {
-      for (const s of this.routeSets) s.disableClearAndFinalize = false;
+      this.revert();
     }
   }
 
-  execute(loader?: (this: RoutesReloader, p: string) => void | Promise<void>): Promise<void> {
+  execute(): Promise<void> {
     this.loaded = true;
-    return this.reload(loader);
+    return this.updater().execute();
   }
 
-  async executeUnlessLoaded(
-    application: unknown,
-    loader?: (this: RoutesReloader, p: string) => void | Promise<void>,
-  ): Promise<boolean> {
-    if (this.loaded) return false;
-    await this.execute(loader);
-    runLoadHooks("after_routes_loaded", application);
-    return true;
+  async executeUnlessLoaded(): Promise<true | null> {
+    if (!this.loaded) {
+      await this.execute();
+      runLoadHooks("after_routes_loaded", TopLevel.Trails!.application);
+      return true;
+    }
+    return null;
+  }
+
+  /** @internal */
+  private updater(): FileUpdateChecker {
+    return (this._updater ??= (() => {
+      const dirs = this.externalRoutes.reduce<Record<string, string[]>>((hash, dir) => {
+        hash[String(dir)] = ["ts"];
+        return hash;
+      }, {});
+
+      return new FileUpdateChecker(this.paths, dirs, () => this.reloadBang());
+    })());
+  }
+
+  /** @internal */
+  private clearBang(): void {
+    for (const routes of this.routeSets) {
+      routes.disableClearAndFinalize = true;
+      routes.clearBang();
+    }
+  }
+
+  /** @internal */
+  private async loadPaths(): Promise<void> {
+    for (const path of this.paths) await loadRoutesFile.call(this, path);
+    await this.runAfterLoadPaths();
+  }
+
+  /** @internal */
+  private finalizeBang(): void {
+    for (const s of this.routeSets) s.finalizeBang();
+  }
+
+  /** @internal */
+  private revert(): void {
+    for (const routes of this.routeSets) {
+      routes.disableClearAndFinalize = false;
+    }
   }
 }
+
+let loads = 0;
 
 async function loadRoutesFile(this: RoutesReloader, path: string): Promise<void> {
   const p = getPath();
   if (!p.pathToFileURL) {
     throw new Error("PathAdapter.pathToFileURL() is required to load a routes file.");
   }
-  const mod = (await import(p.pathToFileURL(path).href)) as {
+  const url = p.pathToFileURL(path);
+  url.searchParams.set("load", String(++loads));
+  const mod = (await import(url.href)) as {
     drawRoutes?: (mapper: Mapper) => void;
   };
   const drawRoutes = mod.drawRoutes;
