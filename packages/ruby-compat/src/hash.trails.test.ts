@@ -142,6 +142,14 @@ describe("Hash#update", () => {
   it("is the same body as merge!", () => {
     expect(mergeBang).toBe(update);
   });
+
+  it("applies a Hash argument, as rb_hash_update's rb_to_hash_type does", () => {
+    const defaults: Record<string, unknown> = { type: "submit" };
+    const options = new Hash<string, unknown>();
+    options.set("class", "extra");
+    update(defaults, options);
+    expect(defaults).toEqual({ type: "submit", class: "extra" });
+  });
 });
 
 describe("Hash#merge! with a conflict block", () => {

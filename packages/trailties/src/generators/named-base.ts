@@ -7,6 +7,7 @@ import {
   upcaseFirst,
 } from "@blazetrails/activesupport";
 import { compact, initializeIncludedModules, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { ActiveRecord } from "@blazetrails/activerecord";
 import { GeneratorBase, type GeneratorOptions } from "./base.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
 
@@ -21,6 +22,14 @@ export class NamedBase extends GeneratorBase {
   classPathParts!: string[];
   /** @internal */
   fileName!: string;
+  /** @internal */
+  private _tableName?: string;
+  /** @internal */
+  private _singularTableName?: string;
+  /** @internal */
+  private _pluralTableName?: string;
+  /** @internal */
+  private _fixtureFileName?: string;
 
   constructor(options: NamedBaseOptions) {
     super(options);
@@ -70,11 +79,24 @@ export class NamedBase extends GeneratorBase {
   className = (): string =>
     [...this.classPathParts, this.fileName].map((s) => camelize(s)).join("::");
   i18nScope = (): string => this.filePath().replace(/\//g, ".");
-  tableName = (): string => [...this.classPathParts, this.pluralName()].join("_");
-  singularTableName = (): string => singularize(this.tableName());
-  pluralTableName = (): string => this.tableName();
+  tableName = (): string =>
+    (this._tableName ??= (() => {
+      const base = this.isPluralizeTableNames() ? this.pluralName() : this.singularName();
+      return [...this.classPathParts, base].join("_");
+    })());
+  singularTableName = (): string =>
+    (this._singularTableName ??= this.isPluralizeTableNames()
+      ? singularize(this.tableName())
+      : this.tableName());
+  pluralTableName = (): string =>
+    (this._pluralTableName ??= this.isPluralizeTableNames()
+      ? this.tableName()
+      : pluralize(this.tableName()));
   pluralFileName = (): string => pluralize(this.fileName);
-  fixtureFileName = (): string => this.pluralFileName();
+  fixtureFileName = (): string =>
+    (this._fixtureFileName ??= this.isPluralizeTableNames()
+      ? this.pluralFileName()
+      : this.fileName);
 
   /** @missingRailsArgs join — PERMANENT */
   routeUrl(this: NamedBase & { controllerClassPath(): string[] }): string {
@@ -142,6 +164,11 @@ export class NamedBase extends GeneratorBase {
       if (a.polymorphic()) names.push(`${a.name}_type`);
     }
     return names;
+  }
+
+  /** @internal */
+  private isPluralizeTableNames(): boolean {
+    return ActiveRecord.Base == null || ActiveRecord.Base.pluralizeTableNames;
   }
 
   static checkClassCollision(options: { prefix?: string; suffix?: string } = {}): void {

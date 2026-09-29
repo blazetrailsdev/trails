@@ -435,7 +435,7 @@ interface SaveRecord {
   _attributes: { writeCastValue(key: string, val: unknown): void };
   readAttribute(name: string): unknown;
   _readAttribute(name: string): unknown;
-  errors: { isAny(): boolean };
+  errors: { isAny(): boolean; isEmpty(): boolean };
   isValid(context?: ValidationContextArg): Promise<boolean>;
   constructor: {
     name: string;

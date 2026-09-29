@@ -159,20 +159,20 @@ export function merge<T>(
  * Each argument is applied in turn, so a later one wins — unless a trailing
  * conflict block is given, which `rb_hash_update_block_i`
  * (`vendor/ruby/v3.3.11/hash.c:4012-4022`) yields for a key already in the receiver,
- * storing what it returns.
+ * storing what it returns. Each argument goes through `rb_to_hash_type`, so a
+ * `Hash` (a `Map`) is applied as readily as a plain object.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#update` (`vendor/ruby/v3.3.11/hash.c:4028`).
  */
 export function update<T>(
   hash: Record<string, T>,
-  ...others: (Record<string, T> | ConflictBlock<T>)[]
+  ...others: (Record<string, T> | Map<string, T> | ConflictBlock<T>)[]
 ): Record<string, T> {
   const block = rbBlockGivenP(others[others.length - 1])
     ? (others.pop() as ConflictBlock<T>)
     : undefined;
-  for (const other of others as Record<string, T>[]) {
-    for (const key of Object.keys(other)) {
-      hash[key] =
-        block !== undefined && hasKey(hash, key) ? block(key, hash[key], other[key]) : other[key];
+  for (const other of others as (Record<string, T> | Map<string, T>)[]) {
+    for (const [key, value] of other instanceof Map ? other : Object.entries(other)) {
+      hash[key] = block !== undefined && hasKey(hash, key) ? block(key, hash[key], value) : value;
     }
   }
   return hash;
