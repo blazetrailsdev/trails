@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { rbInspect } from "@blazetrails/ruby-compat";
 
 import {
   ArgumentError,
@@ -87,7 +88,7 @@ describe("I18nExceptionsTest", () => {
   it("MissingInterpolationArgument message contains the missing and given arguments", () => {
     forceMissingInterpolationArgument((exception) => {
       expect(exception.message).toBe(
-        `missing interpolation argument :bar in "%{bar}" ({:baz=>"baz"} given)`,
+        `missing interpolation argument :bar in "%{bar}" (${rbInspect({ ":baz": "baz" })} given)`,
       );
     });
   });
