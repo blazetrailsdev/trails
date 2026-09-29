@@ -428,7 +428,7 @@ export class Request {
     return (this.getHeader("REMOTE_ADDR") as string) || "127.0.0.1";
   }
 
-  set remoteIp(value: string | null) {
+  set remoteIp(value: string | { calculate(): string | null } | null) {
     this.setHeader("action_dispatch.remote_ip", value);
   }
 

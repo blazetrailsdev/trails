@@ -38,6 +38,9 @@ describe("RemoteIp middleware (smoke)", () => {
   it("raises IpSpoofAttackError when Client-Ip and X-Forwarded-For disagree", async () => {
     const req = await callMw({ HTTP_X_FORWARDED_FOR: "1.1.1.1", HTTP_CLIENT_IP: "2.2.2.2" });
     expect(() => req.remoteIp).toThrow(IpSpoofAttackError);
+    expect(() => req.remoteIp).toThrow(
+      'IP spoofing attack?! HTTP_CLIENT_IP="2.2.2.2" HTTP_X_FORWARDED_FOR="1.1.1.1"',
+    );
   });
 
   it("respects ip_spoofing_check = false", async () => {
