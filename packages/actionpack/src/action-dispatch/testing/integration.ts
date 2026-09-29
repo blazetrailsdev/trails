@@ -492,9 +492,7 @@ export class IntegrationTest extends TestCase {
   }
 
   /** @internal */
-  afterTeardown(
-    test: Parameters<typeof SetupAndTeardown.afterTeardown>[0] = { failures: [] },
-  ): unknown {
+  afterTeardown(test: Parameters<typeof SetupAndTeardown.afterTeardown>[0]): unknown {
     SetupAndTeardown.afterTeardown.call(this, test);
     return super.afterTeardown?.(test as never);
   }

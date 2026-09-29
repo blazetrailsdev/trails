@@ -8,7 +8,6 @@ import type { GeneratorClass } from "../../../generators.js";
 import { tsBody, tsField, tsMethod, type Method } from "../../../template-builder/index.js";
 import { emitControllerClass, parentRefForRelative } from "../controller/controller-paths.js";
 import * as Tse from "../../tse/scaffold/scaffold-generator.js";
-import * as TestUnit from "../../test-unit/scaffold/scaffold-generator.js";
 
 export interface ScaffoldControllerGeneratorOptions extends NamedBaseOptions, ModelHelpersOptions {
   api?: boolean;
@@ -49,7 +48,9 @@ export class ScaffoldControllerGenerator extends NamedBase {
         imports: [
           { from: `${modelPath}${this.filePath()}.js`, named: { [modelClassName]: "named" } },
         ],
-        staticBlock: tsBody`this.beforeAction("set${camelize(singular)}", { only: [${(api ? ["show", "update", "destroy"] : ["show", "edit", "update", "destroy"]).map((a) => `"${a}"`).join(", ")}] });`,
+        staticBlock: api
+          ? tsBody`this.beforeAction("set${camelize(singular)}", { only: ["show", "update", "destroy"] });`
+          : tsBody`this.beforeAction("set${camelize(singular)}", { only: ["show", "edit", "update", "destroy"] });`,
         fields: ts
           ? [
               tsField(this.pluralTableName(), `${modelClassName}[]`, { declare: true }),
@@ -68,11 +69,7 @@ export class ScaffoldControllerGenerator extends NamedBase {
       );
     }
 
-    if (test) {
-      this.createdFiles.push(
-        ...new TestUnit.ScaffoldGenerator({ ...this.options, behavior: this.behavior }).run(),
-      );
-    }
+    if (test) await this.invoke("test_unit:scaffold");
 
     if (helper && !api) {
       const helperFileName = dasherize(this.controllerFilePath()) + "-helper";

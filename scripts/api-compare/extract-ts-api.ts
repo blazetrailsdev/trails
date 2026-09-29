@@ -5106,6 +5106,7 @@ function collectCalls(
         if ((prop === "call" || prop === "apply") && ts.isIdentifier(callee.expression)) {
           called.push(resolve(callee.expression.text));
         }
+        if (prop === "new") called.push("constructor");
       } else if (callee.kind === ts.SyntaxKind.SuperKeyword) {
         // Bare `super(...)` (constructor chain) — `super.foo()` is already
         // captured as `foo` by the property-access branch. Record as "super"

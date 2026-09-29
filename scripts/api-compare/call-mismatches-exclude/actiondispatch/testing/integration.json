@@ -1,9 +1,0 @@
-[
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/integration.ts",
-    "rubyName": "process",
-    "call": "order:buildFullUri,constructor",
-    "reason": "Surfaced when IntegrationTest's constructor gained Minitest's `name` (IntegrationTest < ActiveSupport::TestCase, integration.rb:651), which admits `constructor`: trails calls `RackTestSession.new(this._mockSession)` before `buildFullUri` exactly as integration.rb:283-287 does, but the extractor maps only `new X(...)`, not a static `X.new(...)`, to `constructor`, so only the later `new Request(...)` (:300) gets a position — an artifact of the spelling, not a reordering."
-  }
-]

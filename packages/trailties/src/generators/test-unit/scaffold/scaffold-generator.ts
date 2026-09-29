@@ -19,6 +19,13 @@ export class ScaffoldGenerator extends NamedBase {
   /** @internal */
   _fixtureName?: string;
 
+  static {
+    this.checkClassCollision({ suffix: "ControllerTest" });
+    this.classOption("api", { type: "boolean", desc: "Generate API functional tests" });
+    this.classOption("systemTests", { type: "string", desc: "Skip system test files" });
+    this.commands().push("createTestFiles");
+  }
+
   createTestFiles(): void {
     const templateFile = this.options.api ? "api_functional_test" : "functional_test";
     this.createFile(
@@ -33,11 +40,6 @@ export class ScaffoldGenerator extends NamedBase {
 
   fixtureName(): string {
     return (this._fixtureName ??= this.tableName());
-  }
-
-  run(): string[] {
-    this.createTestFiles();
-    return this.getCreatedFiles();
   }
 
   /** @internal */
@@ -77,4 +79,7 @@ export class ScaffoldGenerator extends NamedBase {
   }
 }
 
+Object.defineProperty(ScaffoldGenerator, "name", {
+  value: "TestUnit::Generators::ScaffoldGenerator",
+});
 include(ScaffoldGenerator, ResourceHelpers);

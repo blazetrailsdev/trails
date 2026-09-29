@@ -136,11 +136,11 @@ describe("ScaffoldControllerGeneratorTest", () => {
   });
 
   it("functional tests", async () => {
-    await makeGen("User", [
+    await runGenerator("User", [
       "name:string",
       "age:integer",
       "organization:references{polymorphic}",
-    ]).run();
+    ]);
 
     const content = read("test/controllers/users-controller.test.ts");
     assertMatch(/class UsersControllerTest extends IntegrationTest/, content);
@@ -156,7 +156,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
   });
 
   it("functional tests without attributes", async () => {
-    await makeGen("User").run();
+    await runGenerator("User");
 
     const content = read("test/controllers/users-controller.test.ts");
     assertMatch(/class UsersControllerTest extends IntegrationTest/, content);
@@ -166,7 +166,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
   });
 
   it("model name option", async () => {
-    await makeGen("Admin::User", [], { modelName: "User" }).run();
+    await runGenerator("Admin::User", [], { modelName: "User" });
     await Assertions.assertFile.call(
       { destinationRoot: tmpDir },
       "app/controllers/admin/users-controller.ts",
@@ -194,9 +194,13 @@ describe("ScaffoldControllerGeneratorTest", () => {
   });
 
   it("api controller tests", async () => {
-    await makeGen("User", ["name:string", "age:integer", "organization:references{polymorphic}"], {
-      api: true,
-    }).run();
+    await runGenerator(
+      "User",
+      ["name:string", "age:integer", "organization:references{polymorphic}"],
+      {
+        api: true,
+      },
+    );
 
     const content = read("test/controllers/users-controller.test.ts");
     assertMatch(/class UsersControllerTest extends IntegrationTest/, content);

@@ -108,10 +108,7 @@ export class Aes256Gcm {
     return cipher.randomIv();
   }
 
-  /**
-   * @internal
-   * @missingRailsCall new — PERMANENT
-   */
+  /** @internal */
   private generateDeterministicIv(clearText: Bytes): Bytes {
     return OpenSSL.HMAC.digest(OpenSSL.Digest.SHA256.new(), this.secret, clearText).subarray(
       0,

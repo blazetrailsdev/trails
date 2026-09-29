@@ -140,7 +140,6 @@ export const TimeValue = {
   typeCastForSchema,
   userInputInTimeZone,
   newTime,
-  /** @missingRailsCall new — CONVERGEABLE call-gate-credits-ruby-new-only-as-constructor */
   fastStringToTime,
 };
 
