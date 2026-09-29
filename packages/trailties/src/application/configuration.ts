@@ -1,10 +1,24 @@
-import { Session } from "@blazetrails/actionpack";
+import {
+  ContentSecurityPolicy,
+  PermissionsPolicy,
+  Session,
+  type NonceGenerator,
+} from "@blazetrails/actionpack";
 import {
   FileUpdateChecker,
+  getEnv,
+  isPresent,
   OrderedOptions,
   setUtcToLocalReturnsUtcOffsetTimes,
 } from "@blazetrails/activesupport";
-import { ArgumentError, File, getFs, getPath, OpenSSL } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  File,
+  getFs,
+  getPath,
+  OpenSSL,
+  SecureRandom,
+} from "@blazetrails/ruby-compat";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { EngineConfiguration } from "../engine/configuration.js";
 import { Trails } from "../rails.js";
@@ -36,7 +50,8 @@ export const LOAD_DEFAULTS_VERSION = "8.0";
 export class Configuration extends EngineConfiguration {
   allowConcurrency: boolean | null = null;
   considerAllRequestsLocal = false;
-  filterParameters: Array<string | RegExp> = [];
+  filterParameters: Array<string | RegExp | ((key: string, value: unknown) => unknown)> = [];
+  filterRedirect: Array<string | RegExp> = [];
   precompileFilterParameters: boolean | null = null;
   helpersPaths: string[] = [];
   hosts: Array<string | RegExp> = [];
@@ -64,7 +79,10 @@ export class Configuration extends EngineConfiguration {
   railtiesOrder: Array<string | { instance(): unknown }> = [":all"];
   relativeUrlRoot: string | null = null;
   requireMasterKey = false;
-  secretKeyBase: string | null = null;
+  /** @internal */
+  private _secretKeyBase: string | null = null;
+  /** @internal */
+  private _localSecret?: string;
   credentials: { contentPath: string | null; keyPath: string | null } = {
     contentPath: null,
     keyPath: null,
@@ -78,6 +96,13 @@ export class Configuration extends EngineConfiguration {
   rakeEagerLoad = false;
   serverTiming = false;
   domTestingDefaultHtmlVersion = ":html4";
+  /** @internal */
+  private _contentSecurityPolicy: ContentSecurityPolicy | null = null;
+  contentSecurityPolicyReportOnly = false;
+  contentSecurityPolicyNonceGenerator: NonceGenerator | null = null;
+  contentSecurityPolicyNonceDirectives: readonly string[] | null = null;
+  /** @internal */
+  private _permissionsPolicy: PermissionsPolicy | null = null;
   yjit = false;
 
   /** @internal */
@@ -405,6 +430,34 @@ export class Configuration extends EngineConfiguration {
   /** @internal */
   private _sessionOptions: Record<string, unknown> = {};
 
+  /** @missingRailsCall application — CONVERGEABLE secret-key-base-credentials-arm */
+  get secretKeyBase(): string {
+    return (
+      this._secretKeyBase ??
+      ((this.secretKeyBase =
+        getEnv("SECRET_KEY_BASE_DUMMY") != null
+          ? this._localSecret!
+          : (getEnv("SECRET_KEY_BASE") ??
+            (Trails.env["local?"]() && this._localSecret!))) as string)
+    );
+  }
+
+  set secretKeyBase(newSecretKeyBase: unknown) {
+    if (newSecretKeyBase == null && Trails.env["local?"]()) {
+      this._secretKeyBase = this._localSecret!;
+    } else if (typeof newSecretKeyBase === "string" && isPresent(newSecretKeyBase)) {
+      this._secretKeyBase = newSecretKeyBase;
+    } else if (newSecretKeyBase != null && newSecretKeyBase !== false) {
+      throw new ArgumentError(
+        `\`secret_key_base\` for ${Trails.env} environment must be a type of String\``,
+      );
+    } else {
+      throw new ArgumentError(
+        `Missing \`secret_key_base\` for '${Trails.env}' environment, set this string with \`bin/rails credentials:edit\``,
+      );
+    }
+  }
+
   sessionStore(newSessionStore?: unknown, options?: Record<string, unknown>): unknown {
     if (newSessionStore != null && newSessionStore !== false) {
       this._sessionStore = newSessionStore;
@@ -419,6 +472,24 @@ export class Configuration extends EngineConfiguration {
 
   isSessionStore(): unknown {
     return this._sessionStore;
+  }
+
+  contentSecurityPolicy(
+    block?: (policy: ContentSecurityPolicy) => void,
+  ): ContentSecurityPolicy | null {
+    if (block) {
+      return (this._contentSecurityPolicy = new ContentSecurityPolicy(block));
+    } else {
+      return this._contentSecurityPolicy;
+    }
+  }
+
+  permissionsPolicy(block?: (policy: PermissionsPolicy) => void): PermissionsPolicy | null {
+    if (block) {
+      return (this._permissionsPolicy = new PermissionsPolicy(block));
+    } else {
+      return this._permissionsPolicy;
+    }
   }
 
   get sessionOptions(): Record<string, unknown> {
@@ -473,6 +544,19 @@ export class Configuration extends EngineConfiguration {
     if (!(await getFs().exists(keyPath))) keyPath = getPath().join(root, "config/master.key");
 
     return { contentPath: contentPath, keyPath: keyPath };
+  }
+
+  /** @internal */
+  async generateLocalSecret(): Promise<string> {
+    const keyFile = getPath().join(this.root as string, "tmp/local_secret.txt");
+
+    if (!(await getFs().exists(keyFile))) {
+      const randomKey = SecureRandom.hex(64);
+      await getFs().mkdir!(getPath().dirname(keyFile), { recursive: true });
+      await getFs().writeFile!(keyFile, randomKey);
+    }
+
+    return (this._localSecret = await getFs().readFile(keyFile, "utf8"));
   }
 }
 

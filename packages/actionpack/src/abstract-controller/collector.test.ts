@@ -1,6 +1,6 @@
 import { symbolToS } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
-import { MimeType } from "../action-dispatch/http/mime-type.js";
+import { Mime, MimeType } from "../action-dispatch/http/mime-type.js";
 import { Collector, generateMethodForMime } from "./collector.js";
 
 class MyCollector extends Collector {
@@ -36,7 +36,7 @@ describe("TestCollector", () => {
       c.js();
       expect("js" in c).toBe(true);
     } finally {
-      if (!MimeType.isRegistered("js")) {
+      if (!Mime.get(":js")) {
         MimeType.register("text/javascript", ":js", ["application/javascript"], ["js"]);
       }
     }
@@ -91,7 +91,7 @@ describe("AbstractController::Collector — trails-only Proxy edges", () => {
     const c = new TestCollector() as TestCollector & {
       latefmt?: (...args: unknown[]) => unknown;
     };
-    expect(MimeType.isRegistered("latefmt")).toBe(false);
+    expect(Mime.get(":latefmt")).toBeUndefined();
     MimeType.register("application/latefmt", ":latefmt");
     try {
       expect(c.latefmt!("ok")).toBe("dispatched:latefmt");
@@ -185,7 +185,7 @@ describe("generateMethodForMime", () => {
   });
 
   it("accepts a MimeType instance without throwing", () => {
-    const mime = MimeType.lookup("json");
+    const mime = Mime.get(":json")!;
     expect(() => generateMethodForMime(mime)).not.toThrow();
   });
 

@@ -163,7 +163,12 @@ describe("Trails", () => {
     Application.register(SeamApp);
     SeamApp.findRoot = () => "/discovered/source";
     const app = SeamApp.instance();
-    await Trails.initialize();
+    setEnv("SECRET_KEY_BASE", "b3c631c314c0bbca50c1b2843150fe33");
+    try {
+      await Trails.initialize();
+    } finally {
+      setEnv("SECRET_KEY_BASE", undefined);
+    }
     app.config.setRoot("/srv/override");
     expect(Trails.root()).toBe(trailsRoot());
     expect(trailsRoot()).toBe("/srv/override");

@@ -135,6 +135,9 @@ export class AcceptList {
   }
 }
 
+export const EXTENSION_LOOKUP: Map<string, MimeType> = new Map();
+export const LOOKUP: Map<string, MimeType> = new Map();
+
 const TRAILING_STAR_REGEXP = /^(text|application)\/\*/;
 const PARAMETER_SEPARATOR_REGEXP = /;\s*q="?/;
 const ACCEPT_HEADER_REGEXP = /[^,\s"](?:[^,"]|"[^"]*")*/g;
@@ -146,8 +149,6 @@ export class MimeType {
   /** @internal */
   readonly synonyms: string[];
 
-  private static registry: Map<string, MimeType> = new Map();
-  private static extensionMap: Map<string, MimeType> = new Map();
   private static callbacks: Array<(type: MimeType) => void> = [];
 
   static readonly SET: Mimes = new Mimes();
@@ -196,67 +197,53 @@ export class MimeType {
   static register(
     string: string,
     symbol: string,
-    synonyms: string[] = [],
-    extensions: string[] = [],
+    mimeTypeSynonyms: string[] = [],
+    extensionSynonyms: string[] = [],
+    skipLookup: boolean = false,
   ): MimeType {
-    const type = new MimeType(string, symbol, synonyms);
-    MimeType.SET.push(type);
-    MimeType.registry.set(symbolToS(symbol), type);
-    MimeType.registry.set(string, type);
-    for (const syn of synonyms) {
-      MimeType.registry.set(syn, type);
+    const newMime = new MimeType(string, symbol, mimeTypeSynonyms);
+
+    MimeType.SET.push(newMime);
+
+    if (!skipLookup) for (const str of [string, ...mimeTypeSynonyms]) LOOKUP.set(str, newMime);
+    for (const ext of [symbolToS(symbol), ...extensionSynonyms]) EXTENSION_LOOKUP.set(ext, newMime);
+
+    for (const callback of MimeType.callbacks) {
+      callback(newMime);
     }
-    for (const ext of [symbolToS(symbol), ...extensions]) {
-      MimeType.extensionMap.set(ext, type);
-    }
-    for (const cb of MimeType.callbacks) {
-      cb(type);
-    }
-    return type;
+    return newMime;
   }
 
-  static registerAlias(symbol: string, aliasSymbol: string): void {
-    const type = MimeType.registry.get(symbolToS(symbol));
-    if (type) {
-      MimeType.registry.set(symbolToS(aliasSymbol), type);
-    }
+  static registerAlias(string: string, symbol: string, extensionSynonyms: string[] = []): MimeType {
+    return MimeType.register(string, symbol, [], extensionSynonyms, true);
   }
 
   static unregister(symbol: string): void {
     symbol = symbol.toLowerCase();
-    const type = MimeType.registry.get(symbolToS(symbol));
-    if (!type) return;
-    MimeType.SET.deleteIf((v) => v === type);
-    for (const [key, value] of MimeType.registry) {
-      if (value === type) MimeType.registry.delete(key);
-    }
-    for (const [ext, value] of MimeType.extensionMap) {
-      if (value === type) MimeType.extensionMap.delete(ext);
+    const mime = Mime.get(symbol);
+    if (mime) {
+      MimeType.SET.deleteIf((v) => v === mime);
+      for (const [k, v] of LOOKUP) if (v === mime) LOOKUP.delete(k);
+      for (const [k, v] of EXTENSION_LOOKUP) if (v === mime) EXTENSION_LOOKUP.delete(k);
     }
   }
 
   static lookup(string: string): MimeType {
-    if (MimeType.registry.has(string)) return MimeType.registry.get(string)!;
-    const stripped = string.split(";")[0].trimEnd();
-    return MimeType.registry.get(stripped) ?? new MimeType(stripped);
-  }
+    if (LOOKUP.has(string)) return LOOKUP.get(string)!;
 
-  /** @internal */
-  static isRegistered(symbolOrString: string): boolean {
-    if (MimeType.registry.has(symbolOrString)) return true;
-    const stripped = symbolOrString.split(";")[0].trimEnd();
-    return MimeType.registry.has(stripped);
+    string = string.split(";", 2)[0].trimEnd();
+    return LOOKUP.get(string) ?? new MimeType(string);
   }
 
   static lookupByExtension(extension: string | null): MimeType | undefined {
     const ext = extension == null ? "" : isSymbol(extension) ? symbolToS(extension) : extension;
-    return MimeType.extensionMap.get(ext);
+    return EXTENSION_LOOKUP.get(ext);
   }
 
   static all(): MimeType[] {
     const seen = new Set<MimeType>();
     const out: MimeType[] = [];
-    for (const type of MimeType.registry.values()) {
+    for (const type of LOOKUP.values()) {
       if (!seen.has(type)) {
         seen.add(type);
         out.push(type);
@@ -325,79 +312,79 @@ export class MimeType {
   }
 
   static get HTML(): MimeType {
-    return MimeType.lookup("html");
+    return MimeType.lookupByExtension("html")!;
   }
   static get TEXT(): MimeType {
-    return MimeType.lookup("text");
+    return MimeType.lookupByExtension("text")!;
   }
   static get JS(): MimeType {
-    return MimeType.lookup("js");
+    return MimeType.lookupByExtension("js")!;
   }
   static get CSS(): MimeType {
-    return MimeType.lookup("css");
+    return MimeType.lookupByExtension("css")!;
   }
   static get ICS(): MimeType {
-    return MimeType.lookup("ics");
+    return MimeType.lookupByExtension("ics")!;
   }
   static get CSV(): MimeType {
-    return MimeType.lookup("csv");
+    return MimeType.lookupByExtension("csv")!;
   }
   static get VCF(): MimeType {
-    return MimeType.lookup("vcf");
+    return MimeType.lookupByExtension("vcf")!;
   }
   static get PNG(): MimeType {
-    return MimeType.lookup("png");
+    return MimeType.lookupByExtension("png")!;
   }
   static get JPEG(): MimeType {
-    return MimeType.lookup("jpeg");
+    return MimeType.lookupByExtension("jpeg")!;
   }
   static get GIF(): MimeType {
-    return MimeType.lookup("gif");
+    return MimeType.lookupByExtension("gif")!;
   }
   static get BMP(): MimeType {
-    return MimeType.lookup("bmp");
+    return MimeType.lookupByExtension("bmp")!;
   }
   static get TIFF(): MimeType {
-    return MimeType.lookup("tiff");
+    return MimeType.lookupByExtension("tiff")!;
   }
   static get SVG(): MimeType {
-    return MimeType.lookup("svg");
+    return MimeType.lookupByExtension("svg")!;
   }
   static get WEBP(): MimeType {
-    return MimeType.lookup("webp");
+    return MimeType.lookupByExtension("webp")!;
   }
   static get MPEG(): MimeType {
-    return MimeType.lookup("mpeg");
+    return MimeType.lookupByExtension("mpeg")!;
   }
   static get XML(): MimeType {
-    return MimeType.lookup("xml");
+    return MimeType.lookupByExtension("xml")!;
   }
   static get RSS(): MimeType {
-    return MimeType.lookup("rss");
+    return MimeType.lookupByExtension("rss")!;
   }
   static get ATOM(): MimeType {
-    return MimeType.lookup("atom");
+    return MimeType.lookupByExtension("atom")!;
   }
   static get YAML(): MimeType {
-    return MimeType.lookup("yaml");
+    return MimeType.lookupByExtension("yaml")!;
   }
   static get MULTIPART_FORM(): MimeType {
-    return MimeType.lookup("multipart_form");
+    return MimeType.lookupByExtension("multipart_form")!;
   }
   static get URL_ENCODED_FORM(): MimeType {
-    return MimeType.lookup("url_encoded_form");
+    return MimeType.lookupByExtension("url_encoded_form")!;
   }
   static get JSON(): MimeType {
-    return MimeType.lookup("json");
+    return MimeType.lookupByExtension("json")!;
   }
   static get PDF(): MimeType {
-    return MimeType.lookup("pdf");
+    return MimeType.lookupByExtension("pdf")!;
   }
   static get ZIP(): MimeType {
-    return MimeType.lookup("zip");
+    return MimeType.lookupByExtension("zip")!;
   }
   static get GZIP(): MimeType {
-    return MimeType.lookup("gzip");
+    return MimeType.lookupByExtension("gzip")!;
   }
 
   static readonly ALL = new MimeType("*/*", null);

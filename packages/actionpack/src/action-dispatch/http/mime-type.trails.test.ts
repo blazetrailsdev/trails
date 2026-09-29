@@ -7,7 +7,7 @@ import {
   TseHandler,
 } from "@blazetrails/actionview";
 import "../../namespaces.js";
-import { Mime, MimeType } from "./mime-type.js";
+import { EXTENSION_LOOKUP, LOOKUP, Mime, MimeType } from "./mime-type.js";
 
 describe("ActionView::Template::Types once Action Dispatch loads", () => {
   afterEach(() => {
@@ -56,5 +56,37 @@ describe("Mime::Type.lookup_by_extension", () => {
   it("reads EXTENSION_LOOKUP with no leading-dot normalization (mime_type.rb:175-177)", () => {
     expect(MimeType.lookupByExtension("html")).toBe(MimeType.HTML);
     expect(MimeType.lookupByExtension(".html")).toBeUndefined();
+  });
+});
+
+describe("Mime::Type.register fills LOOKUP and EXTENSION_LOOKUP separately (mime_type.rb:186-198)", () => {
+  afterEach(() => {
+    MimeType.unregister(":foobar");
+  });
+
+  it("keys LOOKUP by the media type and its synonyms, never the symbol", () => {
+    const mime = MimeType.register("text/foobar", ":foobar", ["text/foo"], ["fb"]);
+    expect(LOOKUP.get("text/foobar")).toBe(mime);
+    expect(LOOKUP.get("text/foo")).toBe(mime);
+    expect(LOOKUP.has("foobar")).toBe(false);
+    expect(LOOKUP.has(":foobar")).toBe(false);
+    expect(EXTENSION_LOOKUP.get("foobar")).toBe(mime);
+    expect(EXTENSION_LOOKUP.get("fb")).toBe(mime);
+    expect(EXTENSION_LOOKUP.has("text/foobar")).toBe(false);
+  });
+
+  it("skips LOOKUP for register_alias, so lookup keeps answering the original type", () => {
+    const alias = MimeType.registerAlias("application/xhtml+xml", ":foobar", ["fb"]);
+    expect(Mime.get(":foobar")).toBe(alias);
+    expect(Mime.get("fb")).toBe(alias);
+    expect(MimeType.lookup("application/xhtml+xml")).toBe(MimeType.HTML);
+  });
+
+  it("sweeps both maps on unregister", () => {
+    MimeType.register("text/foobar", ":foobar", ["text/foo"]);
+    MimeType.unregister(":foobar");
+    expect(LOOKUP.has("text/foobar")).toBe(false);
+    expect(LOOKUP.has("text/foo")).toBe(false);
+    expect(EXTENSION_LOOKUP.has("foobar")).toBe(false);
   });
 });

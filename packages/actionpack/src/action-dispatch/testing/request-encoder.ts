@@ -1,5 +1,5 @@
 import { ArgumentError, symbolToS } from "@blazetrails/ruby-compat";
-import { MimeType } from "../http/mime-type.js";
+import { Mime, MimeType } from "../http/mime-type.js";
 
 export type ResponseParser = (body: string) => unknown;
 export type ParamEncoder = (params: unknown) => unknown;
@@ -34,13 +34,14 @@ export class RequestEncoder {
     paramEncoder: ParamEncoder | null,
     responseParser: ResponseParser | null,
   ) {
-    if (!MimeType.isRegistered(mimeName)) {
+    const mime = Mime.get(mimeName);
+    if (!mime) {
       throw new ArgumentError(
         `Can't register a request encoder for unregistered MIME Type: ${mimeName}. ` +
           `See \`MimeType.register\`.`,
       );
     }
-    this._mime = MimeType.lookup(mimeName);
+    this._mime = mime;
     this.responseParser = responseParser ?? ((body) => body);
     this._paramEncoder = paramEncoder ?? ((params) => params);
   }
@@ -59,10 +60,8 @@ export class RequestEncoder {
   }
 
   static parser(contentType: string | undefined): ResponseParser {
-    const type =
-      contentType && MimeType.isRegistered(contentType)
-        ? symbolToS(MimeType.lookup(contentType).symbol ?? "")
-        : undefined;
+    const symbol = contentType ? MimeType.lookup(contentType).symbol : null;
+    const type = symbol != null ? symbolToS(symbol) : undefined;
     return RequestEncoder.encoder(type).responseParser;
   }
 

@@ -1,5 +1,10 @@
 interface MimeTypeRegistrar {
-  register(string: string, symbol: string, synonyms?: string[], extensions?: string[]): unknown;
+  register(
+    string: string,
+    symbol: string,
+    mimeTypeSynonyms?: string[],
+    extensionSynonyms?: string[],
+  ): unknown;
 }
 
 /** @internal */

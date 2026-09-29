@@ -16,7 +16,7 @@ import {
 } from "../action-dispatch/middleware/stack.js";
 import type { RackEnv } from "@blazetrails/rack";
 import { includeContent } from "./metal/head.js";
-import { MimeType } from "../action-dispatch/http/mime-type.js";
+import { Mime, MimeType } from "../action-dispatch/http/mime-type.js";
 import {
   _normalizeOptions as _normalizeOptionsFn,
   _normalizeText as _normalizeTextFn,
@@ -311,10 +311,7 @@ export class Metal extends AbstractController {
     if (includeContent(this.status)) {
       if (!this.mediaType) {
         const f = (this as Metal & { formats?: ReadonlyArray<string | symbol> }).formats;
-        const negotiated =
-          f && f.length > 0 && MimeType.isRegistered(String(f[0]))
-            ? MimeType.lookup(String(f[0])).toString()
-            : undefined;
+        const negotiated = f && f.length > 0 ? Mime.get(String(f[0]))?.toString() : undefined;
         this.contentType =
           contentType != null ? String(contentType) : (negotiated ?? MimeType.HTML.toString());
       }

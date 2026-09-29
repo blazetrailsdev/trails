@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Request, PassNotFound, controllerConstants } from "../request.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { Session } from "../request/session.js";
-import { MimeType } from "../http/mime-type.js";
+import { Mime, MimeType } from "../http/mime-type.js";
 import { X_CASCADE } from "../constants.js";
 import { UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
@@ -308,8 +308,8 @@ describe("RequestMimeType", () => {
       HTTP_ACCEPT: "text/html",
       HTTP_X_REQUESTED_WITH: "XMLHttpRequest",
     });
-    const xml = MimeType.lookup("xml");
-    const json = MimeType.lookup("json");
+    const xml = Mime.get(":xml")!;
+    const json = Mime.get(":json")!;
     expect(req.negotiateMime([xml, json])).toBeNull();
     expect(req.negotiateMime([xml, MimeType.HTML])).toBe(MimeType.HTML);
     const all = MimeType.parse("*/*")[0];
@@ -321,8 +321,8 @@ describe("RequestMimeType", () => {
       CONTENT_TYPE: "application/xml; charset=UTF-8",
       HTTP_X_REQUESTED_WITH: "XMLHttpRequest",
     });
-    const xml = MimeType.lookup("xml");
-    const csv = MimeType.lookup("csv");
+    const xml = Mime.get(":xml")!;
+    const csv = Mime.get(":csv")!;
     expect(req.negotiateMime([xml, csv])).toBe(xml);
     expect(req.contentMimeType?.symbol).toBe(":xml");
   });

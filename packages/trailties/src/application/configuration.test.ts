@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { assertRaises, OrderedOptions, runLoadHooks } from "@blazetrails/activesupport";
@@ -40,7 +40,12 @@ async function app(railsEnv: string): Promise<Application> {
   _resetTrailsEnv();
   class A extends Application {}
   Application.register(A, appPath);
-  return A.instance();
+  const application = A.instance();
+  await application.root();
+  if (env.SECRET_KEY_BASE_DUMMY != null || Trails.env["local?"]()) {
+    await application.config.generateLocalSecret();
+  }
+  return application;
 }
 
 describe("ConfigurationTest", () => {
@@ -202,6 +207,51 @@ describe("ConfigurationTest", () => {
     runLoadHooks("action_view", Base);
 
     expect(Resolver.isCaching()).toBe(true);
+  });
+
+  it("application will generate secret_key_base in tmp file if blank in development", async () => {
+    const application = await app("development");
+    application.config.secretKeyBase = null;
+
+    expect(application.secretKeyBase()).not.toBeNull();
+    await access(join(appPath, "tmp/local_secret.txt"));
+  });
+
+  it("application will generate secret_key_base in tmp file if blank in test", async () => {
+    const application = await app("test");
+    application.config.secretKeyBase = null;
+
+    expect(application.secretKeyBase()).not.toBeNull();
+    await access(join(appPath, "tmp/local_secret.txt"));
+  });
+
+  it("application will use ENV['SECRET_KEY_BASE'] if present in local env", async () => {
+    const envVarSecret = "env_var_secret";
+    setEnv("SECRET_KEY_BASE", envVarSecret);
+    try {
+      const application = await app("development");
+
+      expect(application.secretKeyBase()).toBe(envVarSecret);
+    } finally {
+      setEnv("SECRET_KEY_BASE", undefined);
+    }
+  });
+
+  it("always use tmp file secret when dummy secret_key_base is used in production", async () => {
+    const secret = "tmp_file_secret";
+    setEnv("SECRET_KEY_BASE_DUMMY", "1");
+    setEnv("SECRET_KEY_BASE", "env_secret");
+    try {
+      await mkdir(join(appPath, "tmp"));
+      await writeFile(join(appPath, "tmp/local_secret.txt"), secret);
+
+      const application = await app("production");
+
+      expect(application.secretKeyBase()).toBe(secret);
+    } finally {
+      setEnv("SECRET_KEY_BASE_DUMMY", undefined);
+      setEnv("SECRET_KEY_BASE", undefined);
+    }
   });
 
   it("action_dispatch.log_rescued_responses is true by default", async () => {

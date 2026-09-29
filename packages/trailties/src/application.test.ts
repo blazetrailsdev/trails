@@ -79,6 +79,8 @@ function installFs(dirs: Set<string>, files: Set<string>, cwd = "/"): void {
         if (!files.has(p)) throw new Error("ENOENT");
         return "";
       },
+      mkdir: async (p: string) => void dirs.add(norm(p)),
+      writeFile: async (p: string) => void files.add(norm(p)),
       stat: async (p: string) => {
         if (dirs.has(norm(p))) return stat(true);
         if (files.has(norm(p))) return stat(false);
@@ -827,12 +829,10 @@ describe("Application key/message/credentials wiring", () => {
 
   it("routes_reloader memoized, key_generator/message_verifier work, config_for rejects non-database, Configuration defaults null", async () => {
     expect(new Configuration().credentials).toEqual({ contentPath: null, keyPath: null });
-    expect(new Configuration().secretKeyBase).toBeNull();
     class A extends Application {}
     Application.register(A);
     const app = A.instance();
     expect(app.routesReloader()).toBe(app.routesReloader());
-    expect(() => app.keyGenerator()).toThrow(/secret_key_base/);
     setSecret(app, "test-secret");
     const gen = app.keyGenerator();
     expect(gen.generateKey("salt", 16)).toBeInstanceOf(Buffer);
@@ -888,7 +888,7 @@ describe("Application key/message/credentials wiring", () => {
     Application.register(A, "/app");
     const f = await A.instance().credentials();
     expect([f.contentPath, f.keyPath]).toEqual([`${b}/staging.yml.enc`, "/app/config/master.key"]);
-    expect(() => A.instance().keyGenerator(null)).toThrow(
+    expect(() => A.instance().secretKeyBase()).toThrow(
       "Missing `secret_key_base` for 'staging' environment, set this string with `bin/rails credentials:edit`",
     );
   });
