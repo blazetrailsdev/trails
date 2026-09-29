@@ -161,14 +161,14 @@ export class AssociationScope {
     reflection: AssociationReflection,
     association: AssociationScopeable,
     tracker: AliasTracker,
-  ): Array<AbstractReflection> {
+  ): Array<ChainReflection> {
     const name = reflection.name;
-    const chain: Array<AbstractReflection> = [new RuntimeReflection(reflection, association)];
+    const chain: Array<ChainReflection> = [new RuntimeReflection(reflection, association)];
     for (const refl of drop(reflection.chain, 1)) {
       const aliasedTable = tracker.aliasedTableFor(refl.klass.arelTable, null, () =>
         refl.aliasCandidate(name),
       );
-      chain.push(new ReflectionProxy(refl, aliasedTable) as ReflectionProxy & typeof refl);
+      chain.push(new ReflectionProxy(refl, aliasedTable) as ChainReflection);
     }
     return chain;
   }
@@ -202,15 +202,11 @@ export class AssociationScope {
   }
 
   /** @missingRailsCall empty? — PERMANENT */
-  private addConstraints(scope: unknown, owner: Base, chain: Array<AbstractReflection>): unknown {
+  private addConstraints(scope: unknown, owner: Base, chain: Array<ChainReflection>): unknown {
     const last = chain[chain.length - 1];
-    scope = this.lastChainScope(scope, last as unknown as ChainReflection, owner);
+    scope = this.lastChainScope(scope, last, owner);
     for (let i = 0; i < chain.length - 1; i++) {
-      scope = this.nextChainScope(
-        scope,
-        chain[i] as unknown as ChainReflection,
-        chain[i + 1] as unknown as ChainReflection,
-      );
+      scope = this.nextChainScope(scope, chain[i], chain[i + 1]);
     }
 
     const chainHead = chain[0];
