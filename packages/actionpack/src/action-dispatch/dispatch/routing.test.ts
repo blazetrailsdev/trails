@@ -57,7 +57,7 @@ beforeEach(() => {
     "journey",
     "local",
     "managers",
-    "medical/taxises",
+    "medical/taxis",
     "mes",
     "movies",
     "my_controller",
