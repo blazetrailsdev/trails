@@ -642,7 +642,12 @@ export abstract class GeneratorBase implements GeneratorActionsState {
       const lastName = nesting.pop()!;
       const last = this.extractLastModule(nesting);
 
-      if (last && safeConstantize([...last, camelize(lastName)].join("::")) !== undefined) {
+      if (
+        last &&
+        (last === Object
+          ? safeConstantize(camelize(lastName)) !== undefined
+          : Object.hasOwn(last, camelize(lastName)))
+      ) {
         throw new GeneratorError(
           `The name '${className}' is either already used in your application ` +
             "or reserved by Ruby on Rails. Please choose an alternative or use --skip-collision-check " +
@@ -652,11 +657,19 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     }
   }
 
-  protected extractLastModule(nesting: string[]): string[] | undefined {
-    const lastModule: string[] = [];
+  protected extractLastModule(nesting: string[]): object | undefined {
+    let lastModule: object = Object;
     for (const nest of nesting) {
-      if (safeConstantize([...lastModule, nest].join("::")) === undefined) return undefined;
-      lastModule.push(nest);
+      if (
+        !(lastModule === Object
+          ? safeConstantize(nest) !== undefined
+          : Object.hasOwn(lastModule, nest))
+      )
+        return undefined;
+      lastModule =
+        lastModule === Object
+          ? (safeConstantize(nest) as object)
+          : (lastModule as Record<string, object>)[nest];
     }
     return lastModule;
   }
