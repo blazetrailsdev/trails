@@ -9,7 +9,7 @@ import {
   URI,
   type Bytes,
 } from "@blazetrails/ruby-compat";
-import { ActiveSupportJSON, included, isBlank } from "@blazetrails/activesupport";
+import { ActiveSupportJSON, include, included, isBlank } from "@blazetrails/activesupport";
 import {
   CookieJar,
   cookieJar,
@@ -183,6 +183,7 @@ export function commitCsrfToken(this: CsrfController, request: CsrfRequest): voi
 
 /** @internal */
 export interface RequestForgeryProtectionHost extends ActionCallbackHost, HelpersClassMethods {
+  new (...args: never[]): unknown;
   configAccessor(...names: string[]): void;
   helperMethod: typeof helperMethod;
   beforeAction: typeof beforeAction;
@@ -199,8 +200,24 @@ export interface RequestForgeryProtectionHost extends ActionCallbackHost, Helper
 
 export class RequestForgeryProtection {
   static [included](base: RequestForgeryProtectionHost): void {
+    include(base, {
+      resetCsrfToken,
+      commitCsrfToken,
+      verifyAuthenticityToken,
+      handleUnverifiedRequest,
+      unverifiedRequestWarningMessage,
+      verifySameOriginRequest,
+      markForSameOriginVerificationBang,
+      isVerifiedRequest,
+      formAuthenticityToken,
+      isValidAuthenticityToken,
+      formAuthenticityParam,
+      isProtectAgainstForgery,
+    });
+
     base.configAccessor("requestForgeryProtectionToken");
-    base.requestForgeryProtectionToken ||= "authenticity_token";
+    if (!rtest(base.requestForgeryProtectionToken))
+      base.requestForgeryProtectionToken = "authenticity_token";
 
     base.configAccessor("forgeryProtectionStrategy");
     base.forgeryProtectionStrategy = null;
@@ -236,7 +253,8 @@ export function protectFromForgery(
       ? (options.with as ProtectionMethodName | ProtectionMethodCtor)
       : "null_session",
   );
-  this.requestForgeryProtectionToken ||= "authenticity_token";
+  if (!rtest(this.requestForgeryProtectionToken))
+    this.requestForgeryProtectionToken = "authenticity_token";
 
   this.csrfTokenStorageStrategy = storageStrategy(
     rtest(options.store)
@@ -590,20 +608,6 @@ export function isAnyAuthenticityTokenValid(this: CsrfController): boolean {
 
 export type ProtectionMethodName = "null_session" | "reset_session" | "exception";
 type ProtectionMethodCtor = new (controller: Controller) => ProtectionMethods;
-
-const concernProto = RequestForgeryProtection.prototype as unknown as Record<string, unknown>;
-concernProto.resetCsrfToken = resetCsrfToken;
-concernProto.commitCsrfToken = commitCsrfToken;
-concernProto.verifyAuthenticityToken = verifyAuthenticityToken;
-concernProto.handleUnverifiedRequest = handleUnverifiedRequest;
-concernProto.unverifiedRequestWarningMessage = unverifiedRequestWarningMessage;
-concernProto.markForSameOriginVerificationBang = markForSameOriginVerificationBang;
-concernProto.isVerifiedRequest = isVerifiedRequest;
-concernProto.isValidAuthenticityToken = isValidAuthenticityToken;
-concernProto.verifySameOriginRequest = verifySameOriginRequest;
-concernProto.formAuthenticityToken = formAuthenticityToken;
-concernProto.formAuthenticityParam = formAuthenticityParam;
-concernProto.isProtectAgainstForgery = isProtectAgainstForgery;
 
 /** @internal */
 export function protectionMethodClass(
