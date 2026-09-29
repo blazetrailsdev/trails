@@ -1,8 +1,19 @@
-import { SafeBuffer, constantize, cattrAccessor, onLoad } from "@blazetrails/activesupport";
+import {
+  CodeGenerator,
+  SafeBuffer,
+  classAttribute,
+  constantize,
+  cattrAccessor,
+  extractOptionsBang,
+  onLoad,
+} from "@blazetrails/activesupport";
 import {
   ArgumentError,
+  block,
   except,
+  fetch,
   hashDelete,
+  merge,
   mergeBang,
   rbInspect,
   rbObjRespondTo,
@@ -19,8 +30,28 @@ import {
   htmlOptionsForForm,
   type FormTagHelperHost,
 } from "./form-tag-helper.js";
+import { PasswordField } from "./tags/password-field.js";
+import { HiddenField } from "./tags/hidden-field.js";
+import { TextArea } from "./tags/text-area.js";
+import { ColorField } from "./tags/color-field.js";
+import { TelField } from "./tags/tel-field.js";
+import { DateField } from "./tags/date-field.js";
+import { TimeField } from "./tags/time-field.js";
+import { DatetimeLocalField } from "./tags/datetime-local-field.js";
+import { MonthField } from "./tags/month-field.js";
+import { WeekField } from "./tags/week-field.js";
+import { UrlField } from "./tags/url-field.js";
+import { EmailField } from "./tags/email-field.js";
+import { NumberField } from "./tags/number-field.js";
+import { RangeField } from "./tags/range-field.js";
+import { SearchField } from "./tags/search-field.js";
+import { TextField } from "./tags/text-field.js";
+
+const __FILE__ = import.meta.url;
+const __LINE__ = 0;
 
 export interface FormHelperHost extends FormTagHelperHost, CaptureHelperHost {
+  hiddenField: typeof hiddenField;
   defaultFormBuilder: unknown;
   polymorphicPath?(record: unknown, options: Record<string, unknown>): string;
 }
@@ -37,12 +68,18 @@ export let formWithGeneratesRemoteForms: boolean = true;
 
 export let formWithGeneratesIds: boolean = false;
 
+export let multipleFileFieldIncludeHidden: boolean = false;
+
 export function setFormWithGeneratesRemoteForms(value: boolean): void {
   formWithGeneratesRemoteForms = value;
 }
 
 export function setFormWithGeneratesIds(value: boolean): void {
   formWithGeneratesIds = value;
+}
+
+export function setMultipleFileFieldIncludeHidden(value: boolean): void {
+  multipleFileFieldIncludeHidden = value;
 }
 
 export function formWith(
@@ -88,6 +125,153 @@ export function formWith(
     const htmlOptions = htmlOptionsForFormWith.call(this, url, model, options);
     return formTagHtml.call(this, htmlOptions);
   }
+}
+
+export function textField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new TextField(objectName, method, this, options).render();
+}
+
+export function passwordField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new PasswordField(objectName, method, this, options).render();
+}
+
+export function hiddenField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new HiddenField(objectName, method, this, options).render();
+}
+
+export function textarea(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new TextArea(objectName, method, this, options).render();
+}
+export const textArea = textarea;
+
+export function colorField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new ColorField(objectName, method, this, options).render();
+}
+
+export function searchField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new SearchField(objectName, method, this, options).render();
+}
+
+export function telephoneField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new TelField(objectName, method, this, options).render();
+}
+export const phoneField = telephoneField;
+
+export function dateField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new DateField(objectName, method, this, options).render();
+}
+
+export function timeField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new TimeField(objectName, method, this, options).render();
+}
+
+export function datetimeField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new DatetimeLocalField(objectName, method, this, options).render();
+}
+export const datetimeLocalField = datetimeField;
+
+export function monthField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new MonthField(objectName, method, this, options).render();
+}
+
+export function weekField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new WeekField(objectName, method, this, options).render();
+}
+
+export function urlField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new UrlField(objectName, method, this, options).render();
+}
+
+export function emailField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new EmailField(objectName, method, this, options).render();
+}
+
+export function numberField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new NumberField(objectName, method, this, options).render();
+}
+
+export function rangeField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new RangeField(objectName, method, this, options).render();
 }
 
 export function _objectForFormBuilder(object: unknown): unknown {
@@ -171,7 +355,60 @@ export function defaultFormBuilderClass(this: FormHelperHost): typeof FormBuilde
   return (typeof builder === "string" ? constantize(builder) : builder) as typeof FormBuilder;
 }
 
+type FieldHelper = (method: unknown, options?: Record<string, unknown>) => unknown;
+
 export class FormBuilder {
+  declare static fieldHelpers: string[];
+  declare textField: FieldHelper;
+  declare passwordField: FieldHelper;
+  declare textarea: FieldHelper;
+  declare textArea: FieldHelper;
+  declare colorField: FieldHelper;
+  declare searchField: FieldHelper;
+  declare telephoneField: FieldHelper;
+  declare phoneField: FieldHelper;
+  declare dateField: FieldHelper;
+  declare timeField: FieldHelper;
+  declare datetimeField: FieldHelper;
+  declare datetimeLocalField: FieldHelper;
+  declare monthField: FieldHelper;
+  declare weekField: FieldHelper;
+  declare urlField: FieldHelper;
+  declare emailField: FieldHelper;
+  declare numberField: FieldHelper;
+  declare rangeField: FieldHelper;
+
+  static {
+    classAttribute.call(this, "fieldHelpers", {
+      default: [
+        "fieldsFor",
+        "fields",
+        "label",
+        "textField",
+        "passwordField",
+        "hiddenField",
+        "fileField",
+        "textarea",
+        "checkbox",
+        "radioButton",
+        "colorField",
+        "searchField",
+        "telephoneField",
+        "phoneField",
+        "dateField",
+        "timeField",
+        "datetimeField",
+        "datetimeLocalField",
+        "monthField",
+        "weekField",
+        "urlField",
+        "emailField",
+        "numberField",
+        "rangeField",
+      ],
+    });
+  }
+
   objectName: string | null;
   object: unknown;
   options: Record<string, unknown>;
@@ -182,6 +419,7 @@ export class FormBuilder {
   private _defaultOptions: Record<string, unknown>;
   private _defaultHtmlOptions: Record<string, unknown>;
   private _autoIndex: unknown;
+  private _emittedHiddenId: unknown;
 
   get multipart(): unknown {
     return this._multipart;
@@ -240,6 +478,89 @@ export class FormBuilder {
     this._multipart = null;
     const index = options["index"];
     this.index = index != null && index !== false ? index : options["childIndex"];
+  }
+
+  fieldId(method: unknown, ...suffixes: unknown[]): string {
+    const kwargs = extractOptionsBang(suffixes);
+    const namespace = fetch(
+      kwargs,
+      "namespace",
+      block(() => this.options["namespace"]),
+    );
+    const index = fetch(
+      kwargs,
+      "index",
+      block(() => this.options["index"]),
+    );
+    return this._template.fieldId(this.objectName, method, ...suffixes, {
+      namespace: namespace,
+      index: index,
+    });
+  }
+
+  fieldName(method: unknown, ...methods: unknown[]): string {
+    const kwargs = extractOptionsBang(methods);
+    const multiple = fetch(kwargs, "multiple", false);
+    const index = fetch(
+      kwargs,
+      "index",
+      block(() => this.options["index"]),
+    );
+    const objectName = fetch(
+      this.options,
+      "as",
+      block(() => this.objectName),
+    );
+
+    return this._template.fieldName(objectName, method, ...methods, {
+      index: index,
+      multiple: multiple,
+    });
+  }
+
+  static {
+    CodeGenerator.batch(this, __FILE__, __LINE__, (codeGenerator) => {
+      const excluded = [
+        "label",
+        "checkbox",
+        "radioButton",
+        "fieldsFor",
+        "fields",
+        "hiddenField",
+        "fileField",
+      ];
+      for (const selector of this.fieldHelpers.filter((helper) => !excluded.includes(helper))) {
+        codeGenerator.classEval((batch) => {
+          batch.push((proto) => {
+            proto[selector] = function (
+              this: FormBuilder,
+              method: unknown,
+              options: Record<string, unknown> = {},
+            ): unknown {
+              return (this._template as unknown as Record<string, (...args: unknown[]) => unknown>)[
+                selector
+              ].call(this._template, this.objectName, method, this.objectifyOptions(options));
+            };
+          });
+        });
+      }
+    });
+    this.prototype.textArea = this.prototype.textarea;
+  }
+
+  hiddenField(method: unknown, options: Record<string, unknown> = {}): unknown {
+    if (method === "id") this._emittedHiddenId = true;
+    return this._template.hiddenField(this.objectName, method, this.objectifyOptions(options));
+  }
+
+  isEmittedHiddenId(): unknown {
+    return (this._emittedHiddenId ??= null);
+  }
+
+  private objectifyOptions(options: Record<string, unknown>): Record<string, unknown> {
+    const result = merge(this._defaultOptions, options);
+    result["object"] = this.object;
+    return result;
   }
 
   private nestedChildIndex(name: string): number {

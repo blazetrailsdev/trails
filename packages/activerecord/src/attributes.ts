@@ -8,7 +8,6 @@ import {
 import { registerSubclass } from "@blazetrails/activesupport";
 import { lookup as typeLookup, adapterNameFrom, type AdapterNameSource } from "./type.js";
 import {
-  cachedColumnsHash,
   isSchemaLoaded,
   reloadSchemaFromCache as modelSchemaReloadSchemaFromCache,
   typeForColumn as modelSchemaTypeForColumn,
@@ -52,12 +51,6 @@ export function isReplayingOverColdSchema(): boolean {
 }
 
 export function _defaultAttributes(this: AnyClass): AttributeSet {
-  if (!isSchemaLoaded.call(this) && !this.abstractClass && this.tableName) {
-    try {
-      this.columnsHash();
-    } catch {}
-  }
-
   const cacheHost = this;
 
   if (
@@ -66,35 +59,26 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
   ) {
     registerSubclass(Object.getPrototypeOf(cacheHost), cacheHost);
 
-    const reflected: Record<string, unknown> | undefined =
-      (Object.prototype.hasOwnProperty.call(cacheHost, "_columnsHash")
-        ? cacheHost._columnsHash
-        : undefined) ?? cachedColumnsHash(cacheHost);
-    const columns: Record<string, unknown> = reflected ?? {};
-    const ignored = new Set<string>(cacheHost.ignoredColumns ?? []);
-    const buildAttributesHash = (connection: unknown) => {
+    const attributesHash = cacheHost.connectionPool().withConnectionSync((connection: unknown) => {
       const attributesHash: Record<string, Attribute> = Object.create(null) as Record<
         string,
         Attribute
       >;
-      for (const [name, column] of Object.entries(columns)) {
-        if (ignored.has(name)) continue;
+      for (const [name, column] of Object.entries(
+        cacheHost.columnsHash() as Record<string, { name: string; default?: unknown }>,
+      )) {
         attributesHash[name] = Attribute.fromDatabase(
-          name,
-          (column as { default?: unknown }).default ?? null,
+          column.name,
+          column.default ?? null,
           typeForColumn.call(cacheHost, connection, column),
         );
       }
       return attributesHash;
-    };
-    const attributesHash = cacheHost.connectionPool().withConnectionSync(buildAttributesHash);
+    });
 
     const attributeSet = new AttributeSet(attributesHash);
     const cold =
-      reflected === undefined &&
-      !isSchemaLoaded.call(cacheHost) &&
-      !cacheHost.abstractClass &&
-      !!cacheHost.tableName;
+      !isSchemaLoaded.call(cacheHost) && !cacheHost.abstractClass && !!cacheHost.tableName;
     const wasCold = replayingOverColdSchema;
     replayingOverColdSchema = cold;
     try {

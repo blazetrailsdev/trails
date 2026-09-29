@@ -1,5 +1,12 @@
-import { SafeBuffer, htmlSafe, isBlank, stringifyKeys } from "@blazetrails/activesupport";
-import { hashDelete } from "@blazetrails/ruby-compat";
+import {
+  SafeBuffer,
+  extractOptionsBang,
+  htmlSafe,
+  isBlank,
+  presence,
+  stringifyKeys,
+} from "@blazetrails/activesupport";
+import { hashDelete, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { preventContentExfiltration } from "./content-exfiltration-prevention-helper.js";
 import { tag, type TagHelperHost } from "./tag-helper.js";
@@ -7,6 +14,8 @@ import { methodTag, tokenTag, type UrlHelperHost } from "./url-helper.js";
 
 export interface FormTagHelperHost extends UrlHelperHost, TagHelperHost {
   urlFor(options: unknown): string;
+  fieldId: typeof fieldId;
+  fieldName: typeof fieldName;
 }
 
 export let embedAuthenticityTokenInRemoteForms: boolean | null = null;
@@ -19,6 +28,54 @@ export function setEmbedAuthenticityTokenInRemoteForms(value: boolean | null): v
 
 export function setDefaultEnforceUtf8(value: boolean): void {
   defaultEnforceUtf8 = value;
+}
+
+export function fieldId(
+  this: FormTagHelperHost,
+  objectName: unknown,
+  methodName: unknown,
+  ...suffixes: unknown[]
+): string {
+  const { index = null, namespace = null } = extractOptionsBang(suffixes);
+  if (rbObjRespondTo(objectName, "modelName")) {
+    objectName = (objectName as { modelName: { singular: string } }).modelName.singular;
+  }
+
+  let sanitizedObjectName = String(objectName ?? "").replace(/\]\[|[^-a-zA-Z0-9:.]/g, "_");
+  if (sanitizedObjectName.endsWith("_")) sanitizedObjectName = sanitizedObjectName.slice(0, -1);
+
+  let sanitizedMethodName = String(methodName ?? "");
+  if (sanitizedMethodName.endsWith("?")) sanitizedMethodName = sanitizedMethodName.slice(0, -1);
+
+  return [
+    namespace,
+    presence(sanitizedObjectName),
+    sanitizedObjectName === "" ? null : index,
+    sanitizedMethodName,
+    ...suffixes,
+  ]
+    .filter((part) => part != null)
+    .flat(Infinity)
+    .join("_");
+}
+
+/** @missingRailsArgs join — PERMANENT */
+export function fieldName(
+  this: FormTagHelperHost,
+  objectName: unknown,
+  methodName: unknown,
+  ...methodNames: unknown[]
+): string {
+  const { multiple = false, index = null } = extractOptionsBang(methodNames);
+  const names = methodNames.map((name) => `[${name}]`).join("");
+
+  if (isBlank(objectName)) {
+    return `${methodName}${names}${multiple != null && multiple !== false ? "[]" : ""}`;
+  } else if (index != null && index !== false) {
+    return `${objectName}[${index}][${methodName}]${names}${multiple != null && multiple !== false ? "[]" : ""}`;
+  } else {
+    return `${objectName}[${methodName}]${names}${multiple != null && multiple !== false ? "[]" : ""}`;
+  }
 }
 
 export function utf8EnforcerTag(): SafeBuffer {

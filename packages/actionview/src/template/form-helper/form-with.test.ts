@@ -187,11 +187,13 @@ describe("FormWithActsLikeFormTagTest", () => {
 
 class Post {
   static modelName = { paramKey: "post" };
+  persisted = false;
+  title: string | null = null;
   get modelName(): typeof Post.modelName {
     return Post.modelName;
   }
   isPersisted(): boolean {
-    return false;
+    return this.persisted;
   }
   toModel(): this {
     return this;
@@ -208,12 +210,49 @@ describe("FormWithActsLikeFormForTest", () => {
 
   beforeEach(() => {
     view = buildView();
+    const urlFor = view.urlFor;
+    view.urlFor = function (this: Base, options: unknown): string {
+      if (options != null && typeof options === "object" && !Array.isArray(options)) return "/";
+      return urlFor.call(this, options);
+    } as typeof view.urlFor;
+    (view as unknown as { polymorphicPath(): string }).polymorphicPath = () => "/posts/123";
+
+    const post = new Post();
+    post.persisted = true;
+    post.title = "Hello World";
+    (view as unknown as { post: Post }).post = post;
   });
 
-  function wholeForm(action: string | false = "/"): string {
-    const txt = `<form accept-charset="UTF-8"` + (action ? ` action="${action}"` : "");
-    const utf8 = `<input name="utf8" type="hidden" value="&#x2713;" autocomplete="off" />`;
-    return txt + ` data-remote="true" method="post">` + utf8 + "</form>";
+  const titleField = "<input name='post[title]' type='text' value='Hello World' id='post_title' />";
+
+  function concat(string: unknown): unknown {
+    return (view as unknown as { concat(string: unknown): unknown }).concat(string);
+  }
+
+  function post(): Post {
+    return (view as unknown as { post: Post }).post;
+  }
+
+  function wholeForm(
+    action: string | false = "/",
+    id: string | null = null,
+    htmlClass: string | null = null,
+    options: { local?: boolean; method?: string; skipEnforcingUtf8?: boolean } = {},
+    block?: () => string,
+  ): string {
+    const { local = false, method, skipEnforcingUtf8 = false } = options;
+    let txt = `<form accept-charset="UTF-8"` + (action ? ` action="${action}"` : "");
+    if (!local) txt += ` data-remote="true"`;
+    if (htmlClass) txt += ` class="${htmlClass}"`;
+    if (id) txt += ` id="${id}"`;
+    txt += ` method="${method === "get" ? "get" : "post"}">`;
+    if (!skipEnforcingUtf8) {
+      txt += `<input name="utf8" type="hidden" value="&#x2713;" autocomplete="off" />`;
+    }
+    if (method && !["get", "post"].includes(method)) {
+      txt += `<input name="_method" type="hidden" value="${method}" autocomplete="off" />`;
+    }
+    return txt + (block ? block() : "") + "</form>";
   }
 
   it("form with when given nil model argument", () => {
@@ -228,5 +267,87 @@ describe("FormWithActsLikeFormForTest", () => {
   it("form with model and false url", () => {
     formWith({ model: new Post(), url: false });
     assertDomEqual(wholeForm(false), rendered);
+  });
+
+  it("form with general attributes", () => {
+    formWith({ url: "/posts/123" }, (f) => concat(f.textField("no_model_to_back_this_badboy")));
+
+    const expected = wholeForm(
+      "/posts/123",
+      null,
+      null,
+      {},
+      () =>
+        '<input type="text" name="no_model_to_back_this_badboy" id="no_model_to_back_this_badboy" >',
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form with attribute not on model", () => {
+    formWith({ model: post() }, (f) => concat(f.textField("this_dont_exist_on_post")));
+
+    const expected = wholeForm(
+      "/posts/123",
+      null,
+      null,
+      { method: "patch" },
+      () =>
+        '<input type="text" name="post[this_dont_exist_on_post]" id="post_this_dont_exist_on_post" >',
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form with with search field", () => {
+    formWith({ model: new Post(), url: "/search", id: "search-post", method: "get" }, (f) =>
+      concat(f.searchField("title")),
+    );
+
+    const expected = wholeForm(
+      "/search",
+      "search-post",
+      null,
+      { method: "get" },
+      () => "<input name='post[title]' type='search' id='post_title' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form with skip enforcing utf8 true", () => {
+    formWith({ scope: "post", skipEnforcingUtf8: true }, (f) => concat(f.textField("title")));
+
+    const expected = wholeForm("/", null, null, { skipEnforcingUtf8: true }, () => titleField);
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form with skip enforcing utf8 false", () => {
+    formWith({ scope: "post", skipEnforcingUtf8: false }, (f) => concat(f.textField("title")));
+
+    const expected = wholeForm("/", null, null, { skipEnforcingUtf8: false }, () => titleField);
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form with default enforce utf8 true", () => {
+    withDefaultEnforceUtf8(true, () => {
+      formWith({ scope: "post" }, (f) => concat(f.textField("title")));
+
+      const expected = wholeForm("/", null, null, { skipEnforcingUtf8: false }, () => titleField);
+
+      assertDomEqual(expected, rendered);
+    });
+  });
+
+  it("form with default enforce utf8 false", () => {
+    withDefaultEnforceUtf8(false, () => {
+      formWith({ scope: "post" }, (f) => concat(f.textField("title")));
+
+      const expected = wholeForm("/", null, null, { skipEnforcingUtf8: true }, () => titleField);
+
+      assertDomEqual(expected, rendered);
+    });
   });
 });

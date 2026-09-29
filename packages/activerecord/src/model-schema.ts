@@ -213,44 +213,6 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
 
 type DatabaseAdapterLike = { internalSchemaCache?: unknown };
 
-/**
- * Connection-safe read of the cached column hash for `klass`'s table.
- *
- * Used by `_defaultAttributes` to seed schema columns via `Attribute.fromDatabase`
- * (Rails' `columns_hash.transform_values { Attribute.from_database(...) }`) without
- * ever touching `.connection` — which under the default `permanentConnectionCheckout`
- * would permanently lease a connection on every record construction. Reads the warm
- * schema cache off an already-available connection only: the threaded (in-query)
- * connection, else a connection the pool has already leased. Returns `undefined`
- * when the cache has no entry for the table — no connection was available (a bare
- * `new Model()`), or the table has not been reflected yet — as distinct from a `{}`
- * entry for a table that reflected and genuinely has no columns. Callers that only
- * need to look a column up can `?? {}`; the one that must tell "not reflected yet"
- * from "no such column" — `_defaultAttributes`' seed, feeding decorators that
- * branch on `subtype == Type.default_value` — depends on the difference. Any real
- * DB column whose default matters here has already pinned a connection via the
- * `!_schemaLoaded` reflection in `_defaultAttributes`, so a miss is only reached
- * for columns that carry no client-side default anyway.
- *
- * @internal
- * @noRailsEquivalent CONVERGEABLE connection-free read of ModelSchema#columns_hash (model_schema.rb:427-441); retires with RFC 0073.
- */
-export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike> | undefined {
-  const cachedFrom = (conn: { internalSchemaCache?: unknown } | null | undefined) => {
-    const cache = conn?.internalSchemaCache as
-      | { getCachedColumnsHash?: (t: string | null) => Record<string, ColumnLike> | undefined }
-      | undefined;
-    return cache?.getCachedColumnsHash?.(klass.tableName);
-  };
-  try {
-    const hash = cachedFrom(
-      klass.connectionPool().activeConnection as { internalSchemaCache?: unknown } | null,
-    );
-    if (hash) return hash;
-  } catch {}
-  return undefined;
-}
-
 export function contentColumns(this: typeof Base): any[] {
   const pk = this.primaryKey;
   const inheritance = this.inheritanceColumn;

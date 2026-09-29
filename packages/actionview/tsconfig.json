@@ -10,6 +10,7 @@
   "references": [
     { "path": "../ruby-compat" },
     { "path": "../activesupport" },
+    { "path": "../date" },
     { "path": "../did-you-mean" },
     { "path": "../tse-compiler" }
   ]
