@@ -426,7 +426,13 @@ export async function _loadSingularViaStatementCache(
   reflection: ReflectionLike,
   targetModel: typeof Base,
 ): Promise<Base | null> {
-  let instance: { targetScope?: () => unknown } | undefined;
+  let instance:
+    | {
+        targetScope?: () => unknown;
+        setInverseInstance(record: Base): Base;
+        setStrictLoading(record: Base): Base;
+      }
+    | undefined;
   const assocFn = (record as { association?: (n: string) => unknown }).association;
   if (typeof assocFn === "function") {
     try {
@@ -459,7 +465,10 @@ export async function _loadSingularViaStatementCache(
   const chain = (reflection as unknown as { chain: never[] }).chain;
   const binds = AssociationScope.getBindValues(record, chain);
   const records = await targetModel.withConnection((c) =>
-    sc.execute(binds, c, { allowRetry: true }),
+    sc.execute(binds, c, { allowRetry: true }, (record) => {
+      instance?.setInverseInstance(record);
+      instance?.setStrictLoading(record);
+    }),
   );
   return records[0] ?? null;
 }
