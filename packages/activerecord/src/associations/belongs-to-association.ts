@@ -245,6 +245,7 @@ export class BelongsToAssociation extends SingularAssociation {
     return this.reflection.associationPrimaryKey(klass);
   }
 
+  /** @missingRailsName class — PERMANENT */
   protected replaceKeys(record: Base | null, { force = false }: { force?: boolean } = {}): void {
     const reflectionFk = this.reflection.foreignKey();
     if (Array.isArray(reflectionFk)) {

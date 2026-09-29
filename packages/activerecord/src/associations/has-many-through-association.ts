@@ -123,6 +123,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /**
    * @internal
    * @missingRailsCall map — PERMANENT
+   * @missingRailsName class — PERMANENT
    */
   override buildRecord(
     attributes?: Record<string, unknown>,
