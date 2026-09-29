@@ -133,8 +133,8 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     this._throughScope = this.scope();
     try {
       throughBuildRecord(this, (attributes ??= {}));
-      const record = super.buildRecord(attributes, block);
-      if (!record) return record;
+      const record = super.buildRecord(attributes, block)!;
+
       const sourceReflection = this.sourceReflection() as {
         isPolymorphic(): boolean;
         polymorphicInverseOf(klass: typeof Base): any;
@@ -150,10 +150,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
             this.buildThroughRecord(record)!,
           );
         } else if (inverse.isHasOne()) {
-          const throughRecord = this.buildThroughRecord(record);
-          const inverseAssoc = record.association(inverse.name) as any;
-          inverseAssoc.syncWrite(throughRecord);
-          inverseAssoc.setInverseInstance(throughRecord);
+          (record.association(inverse.name) as any).syncWrite(this.buildThroughRecord(record));
         }
       }
 
