@@ -3948,8 +3948,9 @@ export class SubMinuteOffsetZonedDateTime extends Temporal.ZonedDateTime {
   constructor(instant: Temporal.Instant, utcOffset: number) {
     super(instant.epochNanoseconds, of2str(utcOffset));
     const truncated = Math.sign(utcOffset) * Math.floor(Math.abs(utcOffset) / 60) * 60 || 0;
+    const skew = BigInt(Math.round((utcOffset - truncated) * 1_000_000_000));
     const wallClock = new Temporal.ZonedDateTime(
-      instant.epochNanoseconds + BigInt(Math.round((utcOffset - truncated) * 1_000_000_000)),
+      instant.epochNanoseconds + skew,
       of2str(utcOffset),
     );
     for (const name of SUB_MINUTE_WALL_CLOCK_MEMBERS) {
@@ -3959,8 +3960,41 @@ export class SubMinuteOffsetZonedDateTime extends Temporal.ZonedDateTime {
         configurable: true,
       });
     }
+    const seconds = Math.abs(utcOffset) % 60;
+    const fraction = String(Math.round((seconds % 1) * 1_000_000_000))
+      .padStart(9, "0")
+      .replace(/0+$/, "");
+    Object.defineProperty(this, "offset", {
+      value: `${of2str(utcOffset)}:${String(Math.floor(seconds)).padStart(2, "0")}${fraction === "" ? "" : `.${fraction}`}`,
+      configurable: true,
+    });
+    Object.defineProperty(this, "offsetNanoseconds", {
+      value: Math.round(utcOffset * 1_000_000_000),
+      configurable: true,
+    });
+    for (const name of SUB_MINUTE_WALL_CLOCK_RESULTS) {
+      const method = wallClock[name] as (...args: unknown[]) => Temporal.ZonedDateTime;
+      Object.defineProperty(this, name, {
+        value: (...args: unknown[]) =>
+          new SubMinuteOffsetZonedDateTime(
+            Temporal.Instant.fromEpochNanoseconds(
+              method.apply(wallClock, args).epochNanoseconds - skew,
+            ),
+            utcOffset,
+          ),
+        configurable: true,
+      });
+    }
   }
 }
+
+/** @noRailsEquivalent PERMANENT */
+const SUB_MINUTE_WALL_CLOCK_RESULTS = [
+  "with",
+  "withPlainTime",
+  "round",
+  "startOfDay",
+] as const satisfies readonly (keyof Temporal.ZonedDateTime)[];
 
 /** @noRailsEquivalent PERMANENT */
 const SUB_MINUTE_WALL_CLOCK_MEMBERS = [

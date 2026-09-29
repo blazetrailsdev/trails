@@ -119,6 +119,39 @@ describe("Time", () => {
     expect(time.toZonedDateTime().epochNanoseconds).toBe(BigInt(time.toI()) * 1000000000n);
   });
 
+  it("toTime reports the exact sub-minute offset, as MRI's utc_offset does", () => {
+    const zoned = Time.new("2013-09-04 03:00:00 -00:44:30").toZonedDateTime();
+    expect(zoned.offsetNanoseconds).toBe(-2670_000_000_000);
+    expect(zoned.offset).toBe("-00:44:30");
+    expect(zoned.epochNanoseconds + BigInt(zoned.offsetNanoseconds)).toBe(
+      zoned.toPlainDateTime().toZonedDateTime("UTC").epochNanoseconds,
+    );
+    expect(new Time(2008, 3, 1, 6, 0, 0, 32430.5).toZonedDateTime().offset).toBe("+09:00:30.5");
+  });
+
+  it("toTime derives with/withPlainTime/round/startOfDay from the reported wall clock", () => {
+    const zoned = Time.new("2013-09-04 03:00:00 -00:44:30").toZonedDateTime();
+
+    const withHour = zoned.with({ hour: 5 });
+    expect(withHour.toPlainDateTime().toString()).toBe("2013-09-04T05:00:00");
+    expect(withHour.epochNanoseconds).toBe(1378273470000000000n);
+    expect(withHour.offset).toBe("-00:44:30");
+
+    const withTime = zoned.withPlainTime({ hour: 12, minute: 34, second: 56 });
+    expect(withTime.toPlainDateTime().toString()).toBe("2013-09-04T12:34:56");
+    expect(withTime.epochNanoseconds).toBe(1378300766000000000n);
+
+    const rounded = zoned
+      .withPlainTime({ hour: 3, minute: 0, second: 40 })
+      .round({ smallestUnit: "minute" });
+    expect(rounded.toPlainDateTime().toString()).toBe("2013-09-04T03:01:00");
+    expect(rounded.epochNanoseconds).toBe(1378266330000000000n);
+
+    const midnight = zoned.startOfDay();
+    expect(midnight.toPlainDateTime().toString()).toBe("2013-09-04T00:00:00");
+    expect(midnight.epochNanoseconds).toBe(1378255470000000000n);
+  });
+
   it("toTime moves a sub-minute-offset receiver to another zone by its exact instant", () => {
     const time = Time.new("2013-09-04 03:00:00 -00:44:30");
     expect(time.toZonedDateTime().withTimeZone("UTC").toPlainDateTime().toString()).toBe(
