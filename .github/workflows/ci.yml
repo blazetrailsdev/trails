@@ -1048,6 +1048,47 @@ jobs:
         env:
           ARCONN: sqlite3_mem
 
+  # Experiment: the two sqlite lanes above, unsharded, on the self-hosted arm64
+  # runner (8 cores, so vitest runs 7 AR workers against the hosted runner's 3).
+  # Reporting-only — off the `ci` needs-graph and continue-on-error — so the
+  # timings can be compared against the hosted shards in the same run without
+  # gating a merge. Opt-in by PR label so a single runner isn't queued behind
+  # every AR PR, and never for forks: a self-hosted runner executes the PR's
+  # code on the host. No cache-build: the runner's workspace persists, and
+  # restoring dist/ from the Actions cache is WAN egress on every job.
+  sqlite-tests-self-hosted:
+    name: "Active Record SQLite Tests (self-hosted, experimental)"
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.activerecord_affected == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'self-hosted-experiment')))
+    runs-on: [self-hosted, debian]
+    continue-on-error: true
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        arconn: [sqlite3, sqlite3_mem]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+        with:
+          store-dir: /home/claude/.local/share/pnpm/store
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - run: pnpm build
+      - if: ${{ matrix.arconn == 'sqlite3' }}
+        run: pnpm vitest run scripts/test-deps scripts/parity/pipeline/query/node scripts/mixin-declaration-drift.test.ts
+      - run: pnpm vitest run packages/activerecord/
+        env:
+          ARCONN: ${{ matrix.arconn }}
+      - if: ${{ matrix.arconn == 'sqlite3' }}
+        run: pnpm vitest run packages/activerecord-cli
+
   # Reporting-only AR coverage (story ar-sqlite-lane-coverage-reporting, RFC
   # 0028). Runs the sqlite AR suite (the cheapest backend) with v8 coverage and
   # publishes the numbers to the run UI + lcov/json artifacts. This is a
