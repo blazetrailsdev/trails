@@ -28,9 +28,9 @@ inputs:
     required: false
     default: "24"
   store-dir:
-    description: pnpm store-dir on self-hosted runners. Must be inside the mounted persistent volume.
+    description: pnpm store-dir on self-hosted runners (defaults to $HOME/.local/share/pnpm/store). Must be inside the runner's persistent storage.
     required: false
-    default: /home/runner/.local/share/pnpm/store
+    default: ""
 
 runs:
   using: composite
@@ -88,4 +88,4 @@ runs:
         fi
         # pnpm config writes to ~/.npmrc, which is OUTSIDE the mounted
         # volume — re-run every job. Cheap no-op when already set.
-        pnpm config set store-dir "$STORE_DIR"
+        pnpm config set store-dir "${STORE_DIR:-$HOME/.local/share/pnpm/store}"

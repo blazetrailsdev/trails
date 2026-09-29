@@ -58,6 +58,12 @@ jobs:
     name: Detect changed paths
     runs-on: ubuntu-latest
     outputs:
+      runner: >-
+        ${{ (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        contains(github.event.pull_request.labels.*.name, 'self-hosted-experiment'))
+        && '["self-hosted","debian","ARM64"]'
+        || toJSON(vars.RUNNER || 'ubuntu-latest') }}
       docs_only: ${{ steps.filter.outputs.docs_only }}
       activerecord_affected: ${{ steps.filter.outputs.activerecord_affected }}
       db_adapter_affected: ${{ steps.filter.outputs.db_adapter_affected }}
@@ -344,7 +350,7 @@ jobs:
     name: Build & Type Check
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -357,7 +363,7 @@ jobs:
     name: Lint
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -718,7 +724,7 @@ jobs:
       needs.changes.outputs.guides_affected == 'true' &&
       (github.event_name != 'pull_request' ||
       contains(github.event.pull_request.labels.*.name, 'run-guides'))
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -736,7 +742,7 @@ jobs:
       (needs.changes.outputs.activerecord_affected == 'true' ||
       needs.changes.outputs.trails_tsc_affected == 'true' ||
       needs.changes.outputs.trailties_affected == 'true')
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -750,7 +756,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.unit_tests_affected == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -839,7 +845,7 @@ jobs:
       needs.changes.outputs.tse_compiler_affected == 'true' ||
       needs.changes.outputs.activerecord_affected == 'true' ||
       needs.changes.outputs.trailties_affected == 'true')
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -876,7 +882,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.actionpack_affected == 'true'
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -890,7 +896,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.trailties_affected == 'true'
-    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -967,7 +973,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
     timeout-minutes: 20
     # 2-way file-level shard (RFC 0028 shard-ar-adapter-suites) — see the
     # postgres-tests job below for the rationale. That story left this lane
@@ -1029,7 +1035,7 @@ jobs:
       needs.changes.outputs.activerecord_affected == 'true' &&
       (github.event_name != 'pull_request' ||
       contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem'))
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -1047,39 +1053,6 @@ jobs:
       - run: pnpm vitest run packages/activerecord/ --shard=${{ matrix.shard }}/2
         env:
           ARCONN: sqlite3_mem
-
-  sqlite-tests-self-hosted:
-    name: "Active Record SQLite Tests (self-hosted, experimental)"
-    needs: changes
-    if: >-
-      needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.activerecord_affected == 'true' &&
-      (github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      contains(github.event.pull_request.labels.*.name, 'self-hosted-experiment')))
-    runs-on: [self-hosted, debian]
-    continue-on-error: true
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      max-parallel: 1
-      matrix:
-        arconn: [sqlite3, sqlite3_mem]
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-pnpm
-        with:
-          store-dir: /home/claude/.local/share/pnpm/store
-      - run: pnpm install --frozen-lockfile --prefer-offline
-      - run: pnpm build
-      - if: ${{ matrix.arconn == 'sqlite3' }}
-        run: pnpm vitest run scripts/test-deps scripts/parity/pipeline/query/node scripts/mixin-declaration-drift.test.ts
-      - run: pnpm vitest run packages/activerecord/
-        env:
-          ARCONN: ${{ matrix.arconn }}
-      - if: ${{ matrix.arconn == 'sqlite3' }}
-        run: pnpm vitest run packages/activerecord-cli
 
   # Reporting-only AR coverage (story ar-sqlite-lane-coverage-reporting, RFC
   # 0028). Runs the sqlite AR suite (the cheapest backend) with v8 coverage and
@@ -1190,7 +1163,7 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       (needs.changes.outputs.trails_tsc_affected == 'true' ||
       needs.changes.outputs.tse_compiler_affected == 'true')
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
@@ -1593,13 +1566,14 @@ jobs:
     # Stays on hosted: SvelteKit + VitePress + typedoc build is too slow
     # on the self-hosted box and ties up a runner slot that cheaper jobs
     # could use. Hosted parallelism is free.
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Cache VitePress + Vite build artifacts
+        if: runner.environment == 'github-hosted'
         uses: actions/cache@v4
         with:
           path: |
