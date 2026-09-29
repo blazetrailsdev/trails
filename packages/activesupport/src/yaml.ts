@@ -1,4 +1,11 @@
-import { LoadError, TypeError, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  LoadError,
+  Range,
+  TypeError,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
+import { Date as RubyDate, DateTime, Temporal, Time } from "@blazetrails/date";
 import { constantize, registeredConstantName } from "./inflector.js";
 export type { CollectionTag, YAMLMap } from "yaml";
 
@@ -20,6 +27,9 @@ export class DisallowedClass extends globalThis.Error {
     this.name = "Psych::DisallowedClass";
   }
 }
+
+export const loadTags: Record<string, string> = Object.create(null) as Record<string, string>;
+export const dumpTags = new Map<object, string>();
 
 const coderTag: unique symbol = Symbol("tag");
 
@@ -57,19 +67,35 @@ class YAMLTree {
       return this.dumpCoder(target as { encodeWith(coder: Coder): void });
     }
     if (typeof target === "function") return this.visitClass(target);
+    if (target instanceof DateTime) return this.visitDateTime(target);
+    if (target instanceof RubyDate) return this.visitDate(target);
+    if (
+      target instanceof Time ||
+      target instanceof Temporal.ZonedDateTime ||
+      target instanceof Temporal.Instant
+    ) {
+      return this.visitTime(target);
+    }
+    if (target instanceof Temporal.PlainDate)
+      return this.register(target, this.visitInteger(target));
+    if (target instanceof Range) return this.visitRange(target);
+    if (target instanceof RegExp) return this.visitRegexp(target);
     if (Array.isArray(target)) return this.visitArray(target);
     if (target instanceof Map) return this.visitHash(target);
     if (target !== null && typeof target === "object") {
       return [Object.prototype, null].includes(Object.getPrototypeOf(target) as object | null)
-        ? this.visitHash(new Map(Object.entries(target)))
+        ? this.visitHash(target)
         : this.visitObject(target);
     }
     return this.doc.createNode(target ?? null);
   }
 
   private visitObject(o: object): Node {
-    const klass = o.constructor === Object ? undefined : className(o.constructor);
-    const tag = ["!ruby/object", klass].filter((part) => part !== undefined).join(":");
+    let tag = dumpTags.get(o.constructor);
+    if (tag === undefined) {
+      const klass = o.constructor === Object ? undefined : className(o.constructor);
+      tag = ["!ruby/object", klass].filter((part) => part !== undefined).join(":");
+    }
     const map = new yaml.YAMLMap();
     map.tag = tag;
     this.register(o, map);
@@ -86,10 +112,52 @@ class YAMLTree {
     return this.register(o, scalar);
   }
 
-  private visitHash(o: Map<unknown, unknown>): Node {
+  private visitRegexp(o: RegExp): Node {
+    const scalar = new yaml.Scalar(String(o));
+    scalar.tag = "!ruby/regexp";
+    return this.register(o, scalar);
+  }
+
+  private visitDate(o: RubyDate): Node {
+    return this.register(o, this.visitInteger(o.gregorian()));
+  }
+
+  private visitDateTime(o: DateTime): Node {
+    const t = o.italy();
+    const formatted = this.formatTime(t, t.offset.isZero());
+    const scalar = new yaml.Scalar(formatted);
+    scalar.tag = "!ruby/object:DateTime";
+    return this.register(o, scalar);
+  }
+
+  private visitTime(o: Time | Temporal.ZonedDateTime | Temporal.Instant): Node {
+    return this.register(o, new yaml.Scalar(this.formatTime(o)));
+  }
+
+  private visitInteger(o: { toS(): string } | Temporal.PlainDate): Node {
+    return new yaml.Scalar(o instanceof Temporal.PlainDate ? o.toString() : o.toS());
+  }
+
+  private visitRange(o: Range): Node {
+    const map = new yaml.YAMLMap();
+    map.tag = "!ruby/range";
+    this.register(o, map);
+    for (const [k, v] of [
+      ["begin", o.begin],
+      ["end", o.end],
+      ["excl", o.excludeEnd],
+    ] as const) {
+      map.add(new yaml.Pair(this.accept(k), this.accept(v)));
+    }
+    return map;
+  }
+
+  private visitHash(o: Map<unknown, unknown> | object): Node {
     const map = new yaml.YAMLMap();
     this.register(o, map);
-    for (const [k, v] of o) map.add(new yaml.Pair(this.accept(k), this.accept(v)));
+    for (const [k, v] of o instanceof Map ? o : Object.entries(o)) {
+      map.add(new yaml.Pair(this.accept(k), this.accept(v)));
+    }
     return map;
   }
 
@@ -100,14 +168,33 @@ class YAMLTree {
     return seq;
   }
 
+  private formatTime(
+    time: Time | DateTime | Temporal.ZonedDateTime | Temporal.Instant,
+    utc = time instanceof Time
+      ? time.isUtc()
+      : !(time instanceof Temporal.ZonedDateTime) || time.timeZoneId === "UTC",
+  ): string {
+    if (time instanceof Temporal.Instant) time = time.toZonedDateTimeISO("UTC");
+    if (time instanceof Temporal.ZonedDateTime) {
+      const clock = time.toPlainTime().toString({ fractionalSecondDigits: 9 });
+      return `${time.toPlainDate().toString()} ${clock} ${utc ? "Z" : time.offset}`;
+    }
+    return utc
+      ? time.strftime("%Y-%m-%d %H:%M:%S.%9N Z")
+      : time.strftime("%Y-%m-%d %H:%M:%S.%9N %:z");
+  }
+
   private register(target: object, yamlObj: Node): Node {
     this.st.set(target, yamlObj);
     return yamlObj;
   }
 
   private dumpCoder(o: { encodeWith(coder: Coder): void }): Node {
-    const klass = o.constructor === Object ? undefined : className(o.constructor);
-    const tag = ["!ruby/object", klass].filter((part) => part !== undefined).join(":");
+    let tag = dumpTags.get(o.constructor);
+    if (tag === undefined) {
+      const klass = o.constructor === Object ? undefined : className(o.constructor);
+      tag = ["!ruby/object", klass].filter((part) => part !== undefined).join(":");
+    }
     const c = new Coder(tag);
     o.encodeWith(c);
     return this.emitCoder(c, o);
@@ -141,6 +228,19 @@ function allocate(klass: RubyClass): object {
   return klass.allocate?.() ?? (Object.create(klass.prototype) as object);
 }
 
+const CACHE: Record<string, unknown> = {
+  Date: RubyDate,
+  DateTime,
+  Exception: globalThis.Error,
+  Object,
+  Range,
+  Regexp: RegExp,
+};
+
+const TIME =
+  /^-?\d{4}-\d{1,2}-\d{1,2}(?:[Tt]|\s+)\d{1,2}:\d\d:\d\d(?:\.\d*)?(?:\s*(?:Z|[-+]\d{1,2}:?(?:\d\d)?))?$/;
+const DATE = /^\d{4}-(?:1[012]|0\d|\d)-(?:[12]\d|3[01]|0\d|\d)$/;
+
 class ToRuby {
   private readonly st = new Map<string, unknown>();
 
@@ -153,16 +253,66 @@ class ToRuby {
   }
 
   private deserialize(o: Scalar): unknown {
-    if (o.tag === "!ruby/class" || o.tag === "!ruby/module") {
-      return this.resolveClass(String(o.value));
+    if (!o.tag) {
+      const quoted = o.type === yaml.Scalar.QUOTE_SINGLE || o.type === yaml.Scalar.QUOTE_DOUBLE;
+      return quoted ? o.value : this.tokenize(o.value);
     }
-    return o.value;
+
+    const value = String(o.value);
+    switch (o.tag) {
+      case "!ruby/object:DateTime":
+        return DateTime.parse(value);
+      case "!ruby/class":
+      case "!ruby/module":
+        return this.resolveClass(value);
+      case "!ruby/regexp": {
+        const [, source, options] = /^\/(.*)\/([mixn]*)$/s.exec(value)!;
+        return new RegExp(source, options.replace("x", "").replace("n", "").replace("m", "s"));
+      }
+      case "!ruby/range": {
+        const [begin, dots, end] = value.split(/([.]{2,3})/, 3);
+        const endpoint = (text: string): unknown =>
+          this.accept(yaml.parseDocument(text).contents as Node | null);
+        return new Range(endpoint(begin), endpoint(end), dots === "...");
+      }
+      default:
+        if (/^!ruby\/sym(bol)?:?(.*)?$/.test(o.tag)) return `:${value}`;
+        return this.tokenize(o.value);
+    }
+  }
+
+  private tokenize(value: unknown): unknown {
+    if (typeof value !== "string") return value;
+    try {
+      if (TIME.test(value)) return Time.parse(value);
+      if (DATE.test(value)) return RubyDate.strptime(value, "%F", RubyDate.GREGORIAN);
+    } catch (error) {
+      if (!(error instanceof ArgumentError)) throw error;
+    }
+    return value;
   }
 
   private visitMapping(o: YAMLMap): unknown {
-    if (o.tag?.startsWith("!ruby/object:")) {
-      const klass = this.resolveClass(o.tag.slice("!ruby/object:".length));
-      return this.revive(klass, o);
+    if (o.tag && loadTags[o.tag]) return this.revive(this.resolveClass(loadTags[o.tag]), o);
+    if (!o.tag)
+      return this.reviveHash(this.register(o, Object.create(null) as Record<string, unknown>), o);
+
+    let match: RegExpExecArray | null;
+    if ((match = /^!ruby\/object:?(.*)?$/.exec(o.tag))) {
+      const name = match[1] || "Object";
+      if (name === "Hash")
+        return this.reviveHash(this.register(o, Object.create(null) as Record<string, unknown>), o);
+      return this.revive(this.resolveClass(name), o);
+    }
+    if (o.tag === "!ruby/range") {
+      const h = this.reviveHash(Object.create(null) as Record<string, unknown>, o);
+      return this.register(o, new Range(h["begin"], h["end"], h["excl"] === true));
+    }
+    if ((match = /^!map:(.*)$/.exec(o.tag) ?? /^!ruby\/hash:(.*)$/.exec(o.tag))) {
+      return this.reviveHash(
+        this.register(o, allocate(this.resolveClass(match[1])) as Record<string, unknown>),
+        o,
+      );
     }
     return this.reviveHash(this.register(o, Object.create(null) as Record<string, unknown>), o);
   }
@@ -211,7 +361,7 @@ class ToRuby {
   }
 
   private resolveClass(klassname: string): RubyClass {
-    return constantize(klassname) as RubyClass;
+    return (CACHE[klassname] ?? constantize(klassname)) as RubyClass;
   }
 }
 

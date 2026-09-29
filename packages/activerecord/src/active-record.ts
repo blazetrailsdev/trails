@@ -1,6 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { ActiveSupport, any, Autoload, InheritableOptions } from "@blazetrails/activesupport";
 import { ThreadPoolExecutor } from "@blazetrails/ruby-compat";
+import { loadTags } from "@blazetrails/activesupport/yaml";
 import { ActiveRecord } from "./namespaces.js";
 import type { SQLWarning } from "./errors.js";
 import type { Transaction } from "./connection-adapters/abstract/transaction.js";
@@ -492,3 +493,10 @@ export function allOpenTransactions(): Transaction[] {
   });
   return openTransactions;
 }
+
+loadTags["!ruby/object:ActiveRecord::AttributeSet"] = "ActiveModel::AttributeSet";
+loadTags["!ruby/object:ActiveRecord::Attribute::FromDatabase"] =
+  "ActiveModel::Attribute::FromDatabase";
+loadTags["!ruby/object:ActiveRecord::LazyAttributeHash"] = "ActiveModel::LazyAttributeHash";
+loadTags["!ruby/object:ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter::MysqlString"] =
+  "ActiveRecord::Type::String";
