@@ -132,9 +132,9 @@ export class Reloader extends ExecutionWrapper {
     this.releaseUnloadLockBang();
   }
 
-  classUnloadBang(block?: () => unknown): void {
+  classUnloadBang(block?: () => unknown): unknown {
     this.requireUnloadLockBang();
-    runCallbacks(this, "class_unload", block);
+    return runCallbacks(this, "class_unload", block);
   }
 
   completeBang(): unknown {

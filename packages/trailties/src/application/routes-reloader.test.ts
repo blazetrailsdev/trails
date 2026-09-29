@@ -4,10 +4,13 @@ import { RoutesReloader, type RouteSetLike } from "./routes-reloader.js";
 
 type Counted = RouteSetLike & { calls: string[] };
 const makeRouteSet = (): Counted => {
-  const r: Counted = { disableClearAndFinalize: false, calls: [] };
-  r.clear = () => void r.calls.push("clear");
-  r.finalize = () => void r.calls.push("finalize");
-  r.eagerLoad = () => void r.calls.push("eagerLoad");
+  const r: Counted = {
+    disableClearAndFinalize: false,
+    calls: [],
+    clearBang: () => void r.calls.push("clear"),
+    finalizeBang: () => void r.calls.push("finalize"),
+    eagerLoadBang: () => void r.calls.push("eagerLoad"),
+  };
   return r;
 };
 

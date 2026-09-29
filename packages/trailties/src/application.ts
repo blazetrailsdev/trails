@@ -200,6 +200,12 @@ export class Application extends Engine {
     return (this._routesReloader ??= new RoutesReloader());
   }
 
+  watchableArgs(): [string[], Record<string, string[]>] {
+    const [files, dirs] = [[...this.config.watchableFiles], { ...this.config.watchableDirs }];
+
+    return [files, dirs];
+  }
+
   async reloadRoutesBang(): Promise<void> {
     await this.routesReloader().reload();
   }

@@ -1,12 +1,12 @@
-import { runLoadHooks } from "@blazetrails/activesupport";
+import { FileUpdateChecker, runLoadHooks } from "@blazetrails/activesupport";
 import { getPath } from "@blazetrails/ruby-compat";
 import type { DrawCallback, Mapper } from "@blazetrails/actionpack";
 
 export interface RouteSetLike {
   disableClearAndFinalize?: boolean;
-  clear?(): void;
-  finalize?(): void;
-  eagerLoad?(): void;
+  clearBang(): void;
+  finalizeBang(): void;
+  eagerLoadBang(): void;
   draw?(block: DrawCallback): void;
 }
 
@@ -18,6 +18,15 @@ export class RoutesReloader {
   loaded = false;
   /** @internal */
   runAfterLoadPaths: () => void | Promise<void> = () => {};
+  private _updater?: FileUpdateChecker;
+
+  executeIfUpdated(block?: () => Promise<void> | void): Promise<boolean> {
+    return this.updater().executeIfUpdated(block);
+  }
+
+  isUpdated(): boolean {
+    return this.updater().isUpdated();
+  }
 
   async reload(
     loader: (this: RoutesReloader, path: string) => void | Promise<void> = loadRoutesFile,
@@ -25,30 +34,39 @@ export class RoutesReloader {
     try {
       for (const s of this.routeSets) {
         s.disableClearAndFinalize = true;
-        s.clear?.();
+        s.clearBang();
       }
       for (const p of this.paths) await loader.call(this, p);
       await this.runAfterLoadPaths();
-      for (const s of this.routeSets) s.finalize?.();
-      if (this.eagerLoad) for (const s of this.routeSets) s.eagerLoad?.();
+      for (const s of this.routeSets) s.finalizeBang();
+      if (this.eagerLoad) for (const s of this.routeSets) s.eagerLoadBang();
     } finally {
       for (const s of this.routeSets) s.disableClearAndFinalize = false;
     }
   }
 
-  execute(loader?: (this: RoutesReloader, p: string) => void | Promise<void>): Promise<void> {
+  execute(): Promise<void> {
     this.loaded = true;
-    return this.reload(loader);
+    return this.updater().execute();
   }
 
-  async executeUnlessLoaded(
-    application: unknown,
-    loader?: (this: RoutesReloader, p: string) => void | Promise<void>,
-  ): Promise<boolean> {
+  async executeUnlessLoaded(application: unknown): Promise<boolean> {
     if (this.loaded) return false;
-    await this.execute(loader);
+    await this.execute();
     runLoadHooks("after_routes_loaded", application);
     return true;
+  }
+
+  /** @internal */
+  private updater(): FileUpdateChecker {
+    return (this._updater ??= (() => {
+      const dirs = this.externalRoutes.reduce<Record<string, string[]>>((hash, dir) => {
+        hash[String(dir)] = ["ts"];
+        return hash;
+      }, {});
+
+      return new FileUpdateChecker(this.paths, dirs, () => this.reload());
+    })());
   }
 }
 
