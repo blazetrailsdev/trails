@@ -2,6 +2,8 @@ import { readFile } from "fs/promises";
 import { describe, it, expect } from "vitest";
 import * as YAML from "@blazetrails/activesupport/yaml";
 import { DateTime } from "@blazetrails/date";
+import { assertRaises } from "@blazetrails/activesupport";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { fixtures } from "./test-fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -140,17 +142,15 @@ describe("YamlSerializationTest", () => {
 
   it("deserializing rails 41 yaml", async () => {
     const payload = await yamlFixture("rails_4_1_no_symbol");
-    expect(() => yamlLoad(payload)).toThrow(
-      "Active Record doesn't know how to load YAML with this format.",
-    );
+    const error = await assertRaises([RuntimeError], {}, () => yamlLoad(payload));
+    expect(error.message).toBe("Active Record doesn't know how to load YAML with this format.");
   });
 
   it.skip("deserializing rails 4 2 0 yaml", async () => {
     // BLOCKED: psych-dump-type-constants
     const payload = await yamlFixture("rails_4_2_0");
-    expect(() => yamlLoad(payload)).toThrow(
-      "Active Record doesn't know how to load YAML with this format.",
-    );
+    const error = await assertRaises([RuntimeError], {}, () => yamlLoad(payload));
+    expect(error.message).toBe("Active Record doesn't know how to load YAML with this format.");
   });
 
   it.skip("yaml encoding keeps mutations", async () => {
