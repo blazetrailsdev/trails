@@ -2092,7 +2092,8 @@ export class Base extends Model {
   declare static internalMetadataTableName: string;
   declare static isInternalMetadataTableName: boolean;
 
-  static immutableStringsByDefault = false;
+  declare static immutableStringsByDefault: boolean | null | undefined;
+  declare static isImmutableStringsByDefault: boolean;
 
   static isDescendsFromActiveRecord = _isDescendsFromActiveRecord;
 

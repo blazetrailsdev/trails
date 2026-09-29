@@ -57,8 +57,8 @@ export class CodeStatistics {
   declare static isTestTypes: boolean;
 
   static {
-    classAttribute.call(this, "directories", { default: [...DEFAULT_DIRECTORIES] });
-    classAttribute.call(this, "testTypes", { default: [...DEFAULT_TEST_TYPES] });
+    classAttribute.call(this, "directories", { default: DEFAULT_DIRECTORIES });
+    classAttribute.call(this, "testTypes", { default: DEFAULT_TEST_TYPES });
   }
 
   static registerDirectory(

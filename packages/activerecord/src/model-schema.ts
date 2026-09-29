@@ -793,6 +793,7 @@ export const ModelSchema = {
     });
     classAttribute.call(base, "pluralizeTableNames", { instanceWriter: false, default: true });
     classAttribute.call(base, "implicitOrderColumn", { instanceAccessor: false });
+    classAttribute.call(base, "immutableStringsByDefault", { instanceAccessor: false });
   },
 };
 

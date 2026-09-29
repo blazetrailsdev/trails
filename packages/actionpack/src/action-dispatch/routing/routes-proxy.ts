@@ -14,11 +14,12 @@ import {
   polymorphicUrlForAction,
   routeFor,
   urlFor,
+  UrlFor,
   type UrlForHost,
   type UrlForRoutes,
 } from "./url-for.js";
 import type { PolymorphicHost } from "./polymorphic-routes.js";
-import { classAttribute } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
 import { Routing } from "../../namespaces.js";
 
 export type RoutesProxyHelpers = Record<string, unknown>;
@@ -36,11 +37,6 @@ export class RoutesProxy implements UrlForHost {
   declare static isDefaultUrlOptions: boolean;
   declare defaultUrlOptions: Record<string, unknown>;
   declare isDefaultUrlOptions: boolean;
-
-  static {
-    classAttribute.call(this, "defaultUrlOptions");
-    this.defaultUrlOptions = {};
-  }
   /** @internal */
   private _helpers: RoutesProxyHelpers;
   /** @internal */
@@ -169,3 +165,5 @@ function extractOptions(arr: unknown[]): Record<string, unknown> {
   }
   return {};
 }
+
+include(RoutesProxy, UrlFor);
