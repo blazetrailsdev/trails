@@ -157,6 +157,9 @@ describe("DebugExceptionsTest", () => {
     io.rewind();
     const lines = io.read().split(/(?<=\n)/);
     expect(lines.splice(0, 3)).toEqual(["  \n", "Error (Something went wrong):\n", "  \n"]);
+    for (const line of lines) {
+      expect(line).toMatch(/^at .+\n$/);
+    }
   });
 
   it("logs with non active support loggers", async () => {

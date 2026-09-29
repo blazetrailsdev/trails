@@ -1,4 +1,4 @@
-import { rbInspect, rbObjRespondTo, stderr } from "@blazetrails/ruby-compat";
+import { rbInspect, rbObjRespondTo, rtest, stderr } from "@blazetrails/ruby-compat";
 import {
   camelize,
   HASH_CONVERSIONS,
@@ -108,9 +108,7 @@ export class DebugExceptions {
     const logger = this.logger(request);
 
     if (logger == null) return;
-    const logRescuedResponses = this.isLogRescuedResponses(request);
-    if (!(logRescuedResponses != null && logRescuedResponses !== false) && wrapper.rescueResponse())
-      return;
+    if (!rtest(this.isLogRescuedResponses(request)) && wrapper.rescueResponse()) return;
 
     const lines: string[] = ["  "];
     if (wrapper.hasCause()) {
