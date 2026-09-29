@@ -223,6 +223,6 @@ describe("InfoControllerTest", () => {
   test("index redirects to /rails/info/routes", async () => {
     await get("index");
     expect(tc.response.status).toBe(302);
-    expect(tc.response.getHeader("location")).toBe("/rails/info/routes");
+    expect(tc.response.getHeader("location")).toBe("http://test.host/rails/info/routes");
   });
 });

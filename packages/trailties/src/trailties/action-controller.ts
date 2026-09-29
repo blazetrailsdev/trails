@@ -20,6 +20,7 @@ export interface ActionControllerConfig {
   enableFragmentCacheLogging?: boolean;
   allowForgeryProtection?: boolean;
   raiseOnMissingCallbackActions?: boolean;
+  defaultProtectFromForgery?: boolean;
 }
 
 declare module "../trailtie/configuration.js" {
@@ -64,6 +65,19 @@ export class Trailtie extends BaseTrailtie {
 
         (base as ActionController.HelpersPathControllerClass).includeAllHelpers =
           options.includeAllHelpers;
+
+        const {
+          defaultProtectFromForgery: _defaultProtectFromForgery,
+          logQueryTagsAroundActions: _logQueryTagsAroundActions,
+          wrapParametersByDefault: _wrapParametersByDefault,
+          ...filteredOptions
+        } = options;
+
+        for (const [k, v] of Object.entries(filteredOptions)) {
+          if (rbObjRespondTo(base, k)) {
+            (base as unknown as Record<string, unknown>)[k] = v;
+          }
+        }
       });
     });
 
@@ -91,6 +105,16 @@ export class Trailtie extends BaseTrailtie {
         });
       },
     );
+
+    this.initializer("action_controller.request_forgery_protection", () => {
+      const options = this.config.get("actionController") as ActionControllerConfig;
+
+      onLoad("action_controller_base", (base: typeof ActionController.Base) => {
+        if (options.defaultProtectFromForgery) {
+          base.protectFromForgery({ with: "exception" });
+        }
+      });
+    });
   }
 }
 

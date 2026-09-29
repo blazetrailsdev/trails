@@ -16,6 +16,7 @@ import { respondTo } from "./metal/mime-responds.js";
 import { DefaultHeaders } from "./metal/default-headers.js";
 import { actionMethods, addFlashTypes, Flash } from "./metal/flash.js";
 import { _computeRedirectToLocation, redirectBack, redirectBackOrTo } from "./metal/redirecting.js";
+import { isProtectAgainstForgery } from "./metal/request-forgery-protection.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
 import { MissingFile } from "./metal/exceptions.js";
 import { defaultRender } from "./metal/implicit-render.js";
@@ -253,6 +254,8 @@ export interface Base {
   redirectBack: typeof redirectBack;
   redirectBackOrTo: typeof redirectBackOrTo;
   _computeRedirectToLocation: typeof _computeRedirectToLocation;
+  allowForgeryProtection: boolean;
+  isProtectAgainstForgery(): boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -436,16 +439,21 @@ export class Base extends Metal {
   private static _csrfProtection: RequestForgeryProtection | null = null;
 
   static protectFromForgery(
-    options: { with?: "exception" | "reset_session" | "null_session" } = {},
+    options: { with?: "exception" | "reset_session" | "null_session" } & CallbackOptions = {},
   ): void {
+    options = { prepend: false, ...options };
+
     this._csrfProtection = new RequestForgeryProtection({
-      strategy: options.with ?? "exception",
+      strategy: options.with ?? "null_session",
     });
+
+    this.beforeAction("verifyAuthenticityToken", options);
   }
 
   verifyAuthenticityToken(): void {
     const csrf = (this.constructor as typeof Base)._csrfProtection;
     if (!csrf) return;
+    if (!this.isProtectAgainstForgery()) return;
 
     const token =
       (this.params.get("authenticity_token") as string) ??
@@ -863,6 +871,7 @@ include(Base, Cookies);
 Base.prototype.redirectBack = redirectBack;
 Base.prototype.redirectBackOrTo = redirectBackOrTo;
 Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
+Base.prototype.isProtectAgainstForgery = isProtectAgainstForgery;
 include(Base, Flash);
 include(Base, StrongParametersModule);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
@@ -914,13 +923,18 @@ extend(Base, DefaultHeaders.ClassMethods);
 
 const _Configurable = Base as unknown as {
   configAccessor(...names: string[]): void;
-} & CachingClassMethods;
+} & CachingClassMethods & { allowForgeryProtection?: boolean };
 
 _Configurable.configAccessor("defaultStaticExtension");
 _Configurable.defaultStaticExtension ??= ".html";
 
 _Configurable.configAccessor("performCaching");
 if (_Configurable.performCaching == null) _Configurable.performCaching = true;
+
+_Configurable.configAccessor("allowForgeryProtection");
+_Configurable.allowForgeryProtection ??= true;
+Base.helperMethod("formAuthenticityToken");
+Base.helperMethod("isProtectAgainstForgery");
 
 _Configurable.configAccessor("enableFragmentCacheLogging");
 _Configurable.enableFragmentCacheLogging = false;
