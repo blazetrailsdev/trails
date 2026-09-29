@@ -37,7 +37,7 @@ describe("PartialRenderer render blocks", () => {
       { partial: "layouts/yield_only" },
       () => "Content from block!",
     );
-    expect(body).toBe("Content from block!\n");
+    expect(String(body)).toBe("Content from block!\n");
   });
 
   it("yields a partial's layout to the rendered partial", async () => {
@@ -46,7 +46,7 @@ describe("PartialRenderer render blocks", () => {
       layout: "test/layout_for_partial",
       locals: { name: "Foo!" },
     });
-    expect(body).toBe("Before (Foo!)\npartial html\nAfter");
+    expect(String(body)).toBe("Before (Foo!)\npartial html\nAfter");
   });
 
   it("yields a collection's layout to each rendered partial", async () => {

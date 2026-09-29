@@ -1,4 +1,9 @@
-import { include, ToJsonWithActiveSupportEncoder, type Included } from "@blazetrails/activesupport";
+import {
+  include,
+  ToJsonWithActiveSupportEncoder,
+  type Included,
+  type SafeBuffer,
+} from "@blazetrails/activesupport";
 import { Base, Template, TseHandler } from "@blazetrails/actionview";
 import { ArgumentError, File, getChildProcess, rbObjClass } from "@blazetrails/ruby-compat";
 import { toDot, type DotHost, type DotTransition } from "../nfa/dot.js";
@@ -206,7 +211,7 @@ export class TransitionTable implements TransitionTableLike, DotHost {
   }
 
   /** @missingRailsArgs join — PERMANENT */
-  visualizer(paths: readonly Node[], title = "FSM"): string {
+  visualizer(paths: readonly Node[], title = "FSM"): string | SafeBuffer {
     const vizDir = File.join(__dir__, "..", "visualizer");
     const fsmJs = File.read(File.join(vizDir, "fsm.js"));
     const fsmCss = File.read(File.join(vizDir, "fsm.css"));

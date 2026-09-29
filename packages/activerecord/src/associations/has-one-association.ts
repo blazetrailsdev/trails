@@ -5,11 +5,7 @@ import { DeleteRestrictionError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
 import { underscore, wrap as arrayWrap } from "@blazetrails/activesupport";
 import { _reflectOnAssociation, reflectOnAllAssociations } from "../reflection.js";
-import {
-  ForeignAssociation,
-  foreignKeyPresent,
-  ownerForeignKeyColumns,
-} from "./foreign-association.js";
+import { ForeignAssociation, foreignKeyPresent } from "./foreign-association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { queryConstraintsList } from "../persistence.js";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
@@ -234,11 +230,8 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   private foreignKeyColumns(): string[] {
-    return ownerForeignKeyColumns(
-      this.owner.constructor as typeof Base,
-      this.reflection.name,
-      this.reflection.options as Parameters<typeof ownerForeignKeyColumns>[2],
-    );
+    const foreignKey = this.reflection.foreignKey();
+    return Array.isArray(foreignKey) ? foreignKey : [foreignKey];
   }
 
   private foreignKeyColumn(): string {

@@ -71,7 +71,7 @@ describe("ActionView::Template (smoke)", () => {
     expect(t.render(view(), {})).toBe(42);
 
     const raw = new Template("<b>", "r", new Raw(), { locals: [], format: ":html" });
-    expect(raw.render(view(), {})).toBe("<b>");
+    expect(String(raw.render(view(), {}))).toBe("<b>");
 
     const tse = new Template("hi", "w", new Tse(), { locals: [], format: ":html" });
     const buffer = new OutputBuffer();
@@ -205,7 +205,7 @@ describe("ActionView::Template (smoke)", () => {
     ): string => {
       const view = extra.view ?? new (Base.withEmptyTemplateCache())(null, {}, null);
       if (extra.yield !== undefined) view.viewFlow.set("layout", extra.yield);
-      return template(source).render(view, locals);
+      return String(template(source).render(view, locals));
     };
 
     it("executes the compiled template and returns its output", () => {
@@ -250,7 +250,7 @@ describe("ActionView::Template (smoke)", () => {
       const out = template(
         '<main><%= yield %></main><%= yield "sidebar" %><%= yield("footer") %><%== yield %>',
       ).render(view, {}, null, {}, (...name: unknown[]) => view._layoutFor(...(name as [string?])));
-      expect(out).toBe("<main>body</main>sidefootbody");
+      expect(String(out)).toBe("<main>body</main>sidefootbody");
     });
 
     it("round-trips a named contentFor section", () => {
@@ -351,8 +351,8 @@ describe("ActionView::Template (smoke)", () => {
     it("memoizes the compile, so a second render of the same source reuses it", () => {
       const view = new (Base.withEmptyTemplateCache())(null, {}, null);
       const t = template("<%= n %>");
-      expect(t.render(view, { n: 1 })).toBe("1");
-      expect(t.render(view, { n: 2 })).toBe("2");
+      expect(String(t.render(view, { n: 1 }))).toBe("1");
+      expect(String(t.render(view, { n: 2 }))).toBe("2");
       expect(view.compiledMethodContainer()._compiledMethods.size).toBe(1);
     });
   });

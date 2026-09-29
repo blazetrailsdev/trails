@@ -1,12 +1,13 @@
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
+import type { AssociationReflection } from "../reflection.js";
 import type { AssociationDefinition } from "../associations.js";
 import { HasManyAssociation } from "./has-many-association.js";
 import { Hash, NotImplementedError, rbEqual } from "@blazetrails/ruby-compat";
 import { underscore, singularize, isBlank } from "@blazetrails/activesupport";
 import { collectionProxyFor as collectionProxyFor } from "../associations.js";
 import { ThroughAssociation, sourceReflection, throughBuildRecord } from "./through-association.js";
-import { isThenable } from "./collection-association.js";
+import { isThenable, type CollectionAssociation } from "./collection-association.js";
 import { runCallbacks } from "@blazetrails/activesupport";
 
 export class HasManyThroughAssociation extends HasManyAssociation {
@@ -84,8 +85,8 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     return distribution;
   }
 
-  sourceReflection(): unknown {
-    return sourceReflection(this);
+  sourceReflection(): AssociationReflection {
+    return sourceReflection(this) as AssociationReflection;
   }
 
   /** @internal */
@@ -123,6 +124,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /**
    * @internal
    * @missingRailsCall map — PERMANENT
+   * @missingRailsName class — PERMANENT
    */
   override buildRecord(
     attributes?: Record<string, unknown>,
@@ -132,26 +134,26 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     this._throughScope = this.scope();
     try {
       throughBuildRecord(this, (attributes ??= {}));
-      const record = super.buildRecord(attributes, block);
-      if (!record) return record;
-      const built = buildThroughInverseFor(this, record);
-      if (built) {
-        const inverseAssoc = (
-          record as unknown as { association?: (n: string) => any }
-        ).association?.(built.inverseName);
-        if (inverseAssoc) {
-          if (built.isCollection) {
-            inverseAssoc.addToTarget?.(built.throughRecord);
-          } else if (built.isHasOne) {
-            if (typeof inverseAssoc.syncWrite === "function") {
-              inverseAssoc.syncWrite(built.throughRecord);
-            } else {
-              inverseAssoc.target = built.throughRecord;
+      const record = super.buildRecord(attributes, block)!;
+
+      const inverse = this.sourceReflection().isPolymorphic()
+        ? this.sourceReflection().polymorphicInverseOf(record.constructor as typeof Base)
+        : this.sourceReflection().inverseOf();
+
+      if (inverse) {
+        if (inverse.isCollection()) {
+          (record.association(inverse.name) as CollectionAssociation).addToTarget(
+            this.buildThroughRecord(record)!,
+          );
+        } else if (inverse.isHasOne()) {
+          (
+            record.association(inverse.name) as unknown as {
+              syncWrite(record: Base | null): void;
             }
-            inverseAssoc.setInverseInstance?.(built.throughRecord);
-          }
+          ).syncWrite(this.buildThroughRecord(record));
         }
       }
+
       return record;
     } finally {
       this._throughScope = null;
@@ -264,41 +266,6 @@ interface SourceCounterReflection {
   options?: { counterCache?: unknown };
   counterCacheColumn?: () => string | null;
   klass?: unknown;
-}
-
-export interface BuiltThroughInverse {
-  inverseName: string;
-  isCollection: boolean;
-  isHasOne: boolean;
-  throughRecord: Base;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder-2
- */
-export function buildThroughInverseFor(
-  assoc: HasManyThroughAssociation,
-  record: Base,
-): BuiltThroughInverse | null {
-  const { owner, reflection } = assoc;
-  const ctor = owner.constructor as { _reflectOnAssociation?: (n: string) => any };
-  const refl = ctor._reflectOnAssociation?.(reflection.name);
-  const sourceRefl = refl?.sourceReflection;
-  if (!sourceRefl) return null;
-
-  const inverse = sourceRefl.isPolymorphic?.()
-    ? sourceRefl.polymorphicInverseOf?.(record.constructor as any)
-    : sourceRefl.inverseOf?.();
-  if (!inverse?.name) return null;
-  const isCollection = !!inverse.isCollection?.();
-  const isHasOne = !!inverse.isHasOne?.();
-  if (!isCollection && !isHasOne) return null;
-
-  const throughRecord = assoc.buildThroughRecord(record);
-  if (!throughRecord) return null;
-
-  return { inverseName: inverse.name, isCollection, isHasOne, throughRecord };
 }
 
 /** @internal */

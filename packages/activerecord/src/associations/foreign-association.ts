@@ -1,33 +1,5 @@
-import { NoMethodError } from "@blazetrails/activemodel";
-
 import type { AssociationReflection } from "../reflection.js";
 import type { Base } from "../base.js";
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder-2
- */
-export function ownerForeignKeyColumns(
-  ctor: typeof Base,
-  assocName: string,
-  options: { foreignKey?: string | string[] },
-): string[] {
-  const fk = options.foreignKey;
-  if (typeof fk === "string") return [fk];
-  if (Array.isArray(fk)) return fk;
-
-  const reflectionFk = (
-    ctor as unknown as {
-      _reflectOnAssociation?: (n: string) => { foreignKey?: () => string | string[] } | undefined;
-    }
-  )
-    ._reflectOnAssociation?.(assocName)
-    ?.foreignKey?.();
-  if (typeof reflectionFk === "string") return [reflectionFk];
-  if (Array.isArray(reflectionFk)) return reflectionFk;
-
-  throw new NoMethodError(`undefined method 'foreign_key' for nil`);
-}
 
 interface ForeignAssociationHost {
   reflection: AssociationReflection;

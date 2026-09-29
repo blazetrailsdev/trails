@@ -272,7 +272,7 @@ export class Template {
     buffer?: null,
     options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
     block?: (...name: unknown[]) => unknown,
-  ): string;
+  ): string | SafeBuffer;
   render(
     view: Base,
     locals: Record<string, unknown>,
@@ -296,41 +296,45 @@ export class Template {
       addToStack = true,
     }: { implicitLocals?: readonly string[]; addToStack?: boolean } = {},
     block?: (...name: unknown[]) => unknown,
-  ): string | null | Promise<null> {
+  ): string | SafeBuffer | null | Promise<null> {
     const streaming = buffer instanceof StreamingBuffer;
     try {
-      const rendered = this.instrumentRenderTemplate<string | null | Promise<null>>(() => {
-        this.compileBang(view, streaming);
+      const rendered = this.instrumentRenderTemplate<string | SafeBuffer | null | Promise<null>>(
+        () => {
+          this.compileBang(view, streaming);
 
-        if (this.isStrictLocals() && this._strictLocalKeys && implicitLocals.length > 0) {
-          const localsToIgnore = implicitLocals.filter((l) => !this._strictLocalKeys!.includes(l));
-          for (const key of localsToIgnore) delete locals[key];
-        }
+          if (this.isStrictLocals() && this._strictLocalKeys && implicitLocals.length > 0) {
+            const localsToIgnore = implicitLocals.filter(
+              (l) => !this._strictLocalKeys!.includes(l),
+            );
+            for (const key of localsToIgnore) delete locals[key];
+          }
 
-        if (buffer) {
-          const result = view._run(
-            streaming ? this.streamingMethodName() : this.methodName(),
-            this,
-            locals,
-            buffer as OutputBuffer,
-            { addToStack, hasStrictLocals: this.isStrictLocals() },
-            block,
-          );
-          return streaming ? (result as Promise<unknown>).then(() => null) : null;
-        } else {
-          const result = view._run(
-            this.methodName(),
-            this,
-            locals,
-            new OutputBuffer(),
-            { addToStack, hasStrictLocals: this.isStrictLocals() },
-            block,
-          );
-          return result instanceof OutputBuffer || result instanceof SafeBuffer
-            ? result.toStr()
-            : (result as string);
-        }
-      });
+          if (buffer) {
+            const result = view._run(
+              streaming ? this.streamingMethodName() : this.methodName(),
+              this,
+              locals,
+              buffer as OutputBuffer,
+              { addToStack, hasStrictLocals: this.isStrictLocals() },
+              block,
+            );
+            return streaming ? (result as Promise<unknown>).then(() => null) : null;
+          } else {
+            const result = view._run(
+              this.methodName(),
+              this,
+              locals,
+              new OutputBuffer(),
+              { addToStack, hasStrictLocals: this.isStrictLocals() },
+              block,
+            );
+            return result instanceof OutputBuffer
+              ? result.toString()
+              : (result as string | SafeBuffer);
+          }
+        },
+      );
       return rendered instanceof Promise
         ? rendered.catch((e: unknown) => this.handleRenderError(view, e))
         : rendered;

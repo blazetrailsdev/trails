@@ -1,4 +1,4 @@
-import { Notifications } from "@blazetrails/activesupport";
+import { Notifications, type SafeBuffer } from "@blazetrails/activesupport";
 import { NotImplementedError, hasKey, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import {
@@ -265,7 +265,7 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
             Object.keys(this.locals),
           );
           spacer = this.buildRenderedTemplate(
-            spacerTemplate.render(view, this.locals) as string,
+            spacerTemplate.render(view, this.locals) as string | SafeBuffer,
             spacerTemplate,
           );
         } else {
@@ -322,8 +322,9 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
 
       let content = _template.render(view, locals, null, {
         implicitLocals: [counter, iteration],
-      }) as string;
-      if (layout) content = layout.render(view, locals, null, {}, () => content) as string;
+      }) as string | SafeBuffer;
+      if (layout)
+        content = layout.render(view, locals, null, {}, () => content) as string | SafeBuffer;
       partialIteration.iterateBang();
       rendered.push(this.buildRenderedTemplate(content, _template));
     });

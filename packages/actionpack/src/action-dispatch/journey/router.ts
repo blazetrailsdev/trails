@@ -1,3 +1,4 @@
+import type { SafeBuffer } from "@blazetrails/activesupport";
 import { merge } from "@blazetrails/ruby-compat";
 import { X_CASCADE } from "../constants.js";
 import { Builder } from "./gtg/index.js";
@@ -90,7 +91,7 @@ export class Router {
     }
   }
 
-  visualizer(): string {
+  visualizer(): string | SafeBuffer {
     const ast = this.ast();
     if (!ast) throw new Error("Router#visualizer requires a non-empty route set");
     const tt = new Builder(ast).transitionTable();

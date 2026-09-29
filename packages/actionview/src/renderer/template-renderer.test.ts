@@ -84,7 +84,7 @@ describe("TemplateRenderer", () => {
         inline: "Hello, <%= name %>!",
         locals: { name: "Josh" },
       });
-      expect(result.body).toBe("Hello, Josh!");
+      expect(String(result.body)).toBe("Hello, Josh!");
       expect(result.template!.identifier).toBe("inline template");
     });
 

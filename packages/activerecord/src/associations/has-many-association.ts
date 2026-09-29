@@ -1,6 +1,7 @@
 import { kernelThrow, rbEqual, toI } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
+import { NoMethodError } from "@blazetrails/activemodel";
 import type { AssociationDefinition } from "../associations.js";
 import {
   _builtAssociationScope,
@@ -18,11 +19,7 @@ import {
 } from "./errors.js";
 import { CollectionAssociation, isThenable } from "./collection-association.js";
 import type { Association } from "./association.js";
-import {
-  ForeignAssociation,
-  foreignKeyPresent,
-  ownerForeignKeyColumns,
-} from "./foreign-association.js";
+import { ForeignAssociation, foreignKeyPresent } from "./foreign-association.js";
 import { compositeQueryConstraintsList, queryConstraintsList } from "../persistence.js";
 import { eachSlice, min, selectBang, underscore } from "@blazetrails/activesupport";
 
@@ -378,7 +375,7 @@ async function findTarget(
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder-2
+ * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder-3
  */
 export function scope(
   record: Base,
@@ -391,12 +388,11 @@ export function scope(
 
   const targetModel = record.association(assocName).klass;
 
-  const foreignKeyColumns = ownerForeignKeyColumns(ctor, assocName, options);
-  const foreignKey: string | string[] =
-    foreignKeyColumns.length === 1 ? foreignKeyColumns[0] : foreignKeyColumns;
-
   const reflection = ctor._reflectOnAssociation?.(assocName);
   if (options.through && !reflection) return null;
+
+  if (!reflection) throw new NoMethodError(`undefined method 'foreign_key' for nil`);
+  const foreignKey: string | string[] = reflection.foreignKey();
 
   const reflForOwnerFk = _ownerChainReflection(reflection);
   const fkCheckPks = reflForOwnerFk

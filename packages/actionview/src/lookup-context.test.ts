@@ -13,9 +13,9 @@ import { TemplatePath } from "./template-path.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import { Tse } from "./template/handlers/tse.js";
 
-function render(ctx: LookupContext, options: RenderOptions) {
+async function render(ctx: LookupContext, options: RenderOptions) {
   const view = new (DetailsKey.viewContextClass())(ctx, {}, null);
-  return view.viewRenderer.render(view, options);
+  return String(await view.viewRenderer.render(view, options));
 }
 
 describe("LookupContext", () => {

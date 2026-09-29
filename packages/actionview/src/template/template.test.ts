@@ -19,9 +19,11 @@ describe("TestTSETemplate", () => {
     locals: Record<string, unknown> = {},
     implicitLocals: readonly string[] = [],
   ): string =>
-    template.render(new (Base.withEmptyTemplateCache())(null, {}, null), locals, null, {
-      implicitLocals,
-    });
+    String(
+      template.render(new (Base.withEmptyTemplateCache())(null, {}, null), locals, null, {
+        implicitLocals,
+      }),
+    );
 
   it("locals cannot be specified with positional arguments", () => {
     const template = newTemplate("<%# locals: (argument = 'content') -%>\n<%= argument %>");
