@@ -69,8 +69,10 @@ export function assertRedirectedTo(
   const status = opts.status ?? "redirect";
   assertResponse.call(this, status, message);
 
-  const location = this.response.getHeader?.("location") ?? "";
-  const redirectIs = normalizeArgumentToRedirection.call(this, location);
+  const redirectIs = normalizeArgumentToRedirection.call(
+    this,
+    this.response.getHeader?.("location"),
+  );
   const redirectExpected = normalizeArgumentToRedirection.call(this, urlOptions);
 
   if (redirectExpected instanceof RegExp) {

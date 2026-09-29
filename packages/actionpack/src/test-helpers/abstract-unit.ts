@@ -186,7 +186,7 @@ declare module "../action-dispatch/testing/integration.js" {
   }
 }
 
-(DebugExceptions.prototype as { stderrLogger(): null }).stderrLogger = function () {
+(DebugExceptions.prototype as unknown as { stderrLogger(): null }).stderrLogger = function () {
   return null;
 };
 

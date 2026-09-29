@@ -63,7 +63,7 @@ describe("ActionDispatch::Trailtie", () => {
     expect(c.tldLength).toBe(1);
     expect(c.performDeepMunge).toBe(true);
     expect(c.requestIdHeader).toBe(X_REQUEST_ID);
-    expect(c.debugExceptionLogLevel).toBe("fatal");
+    expect(c.debugExceptionLogLevel).toBe(":fatal");
     expect(c.httpAuthSalt).toBe("http authentication");
     expect(c.defaultHeaders["X-Frame-Options"]).toBe("SAMEORIGIN");
     expect(c.cookiesRotations).toBeInstanceOf(RotationConfiguration);

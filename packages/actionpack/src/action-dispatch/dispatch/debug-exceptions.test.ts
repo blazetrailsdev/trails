@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { DebugExceptions, type Logger } from "../middleware/debug-exceptions.js";
+import { DebugExceptions } from "../middleware/debug-exceptions.js";
+import { Logger } from "@blazetrails/activesupport";
+import { Base } from "@blazetrails/actionview";
+import { StringIO } from "@blazetrails/ruby-compat";
 import { MimeType } from "../http/mime-type.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
@@ -108,76 +111,114 @@ describe("DebugExceptionsTest", () => {
   });
 
   it("uses logger from env", async () => {
-    const messages: string[] = [];
-    const logger: Logger = { error: (msg) => messages.push(msg) };
+    const output = new StringIO();
     const mw = new DebugExceptions(errorApp);
-    await mw.call(makeEnv({ "action_dispatch.logger": logger as unknown }));
-    expect(messages.length).toBeGreaterThan(0);
-    expect(messages[0]).toContain("Something went wrong");
+    await mw.call(makeEnv({ "action_dispatch.logger": new Logger(output) }));
+    output.rewind();
+    expect(output.read()).toMatch(/Something went wrong/);
   });
 
   it("logs at configured log level", async () => {
-    const warnMessages: string[] = [];
-    const logger: Logger = {
-      error: () => {},
-      warn: (msg) => warnMessages.push(msg),
-    };
-    const mw = new DebugExceptions(errorApp, { logger, logLevel: "warn" });
-    await mw.call(makeEnv());
-    expect(warnMessages.length).toBeGreaterThan(0);
+    const output = new StringIO();
+    const logger = new Logger(output);
+    logger.level = Logger.WARN;
+    const mw = new DebugExceptions(errorApp);
+
+    await mw.call(
+      makeEnv({
+        "action_dispatch.logger": logger,
+        "action_dispatch.debug_exception_log_level": Logger.INFO,
+      }),
+    );
+    output.rewind();
+    expect(output.read()).not.toMatch(/Something went wrong/);
+
+    await mw.call(
+      makeEnv({
+        "action_dispatch.logger": logger,
+        "action_dispatch.debug_exception_log_level": Logger.ERROR,
+      }),
+    );
+    output.rewind();
+    expect(output.read()).toMatch(/Something went wrong/);
   });
 
   it("logs only what is necessary", async () => {
-    const messages: string[] = [];
-    const logger: Logger = { error: (msg) => messages.push(msg) };
-    const mw = new DebugExceptions(errorApp, { logger });
-    await mw.call(makeEnv());
-    expect(messages.length).toBe(1);
-    expect(messages[0]).toContain("Error (Something went wrong)");
+    const io = new StringIO();
+    const logger = new Logger(io);
+    const old = Base.logger;
+    Base.logger = logger;
+    try {
+      await new DebugExceptions(errorApp).call(makeEnv({ "action_dispatch.logger": logger }));
+    } finally {
+      Base.logger = old;
+    }
+
+    io.rewind();
+    const lines = io.read().split(/(?<=\n)/);
+    expect(lines.splice(0, 3)).toEqual(["  \n", "Error (Something went wrong):\n", "  \n"]);
+    for (const line of lines) {
+      expect(line).toMatch(/^at .+\n$/);
+    }
   });
 
   it("logs with non active support loggers", async () => {
-    const messages: string[] = [];
-    const logger = { error: (msg: string) => messages.push(msg) };
-    const mw = new DebugExceptions(errorApp, { logger });
-    await mw.call(makeEnv());
-    expect(messages.length).toBeGreaterThan(0);
+    const io = new StringIO();
+    const logger = new Logger(io);
+    const old = Base.logger;
+    Base.logger = logger;
+    try {
+      await new DebugExceptions(errorApp).call(makeEnv({ "action_dispatch.logger": logger }));
+    } finally {
+      Base.logger = old;
+    }
+    io.rewind();
+    expect(io.read()).toMatch(/Something went wrong/);
   });
 
   it("skips logging when rescued and log_rescued_responses is false", async () => {
-    const messages: string[] = [];
-    const logger: Logger = { error: (msg) => messages.push(msg) };
-    const mw = new DebugExceptions(routingErrorApp, {
-      logger,
-      logRescuedResponses: false,
-    });
-    await mw.call(makeEnv());
-    expect(messages.length).toBe(0);
+    const output = new StringIO();
+    const mw = new DebugExceptions(routingErrorApp);
+    await mw.call(
+      makeEnv({
+        "action_dispatch.logger": new Logger(output),
+        "action_dispatch.log_rescued_responses": false,
+      }),
+    );
+    output.rewind();
+    expect(output.read()).toBe("");
   });
 
   it("does not skip logging when rescued and log_rescued_responses is true", async () => {
-    const messages: string[] = [];
-    const logger: Logger = { error: (msg) => messages.push(msg) };
-    const mw = new DebugExceptions(routingErrorApp, {
-      logger,
-      logRescuedResponses: true,
-    });
-    await mw.call(makeEnv());
-    expect(messages.length).toBeGreaterThan(0);
+    const output = new StringIO();
+    const mw = new DebugExceptions(routingErrorApp);
+    await mw.call(
+      makeEnv({
+        "action_dispatch.logger": new Logger(output),
+        "action_dispatch.log_rescued_responses": true,
+      }),
+    );
+    output.rewind();
+    expect(output.read()).not.toBe("");
   });
 
   it("logs exception causes", async () => {
-    const messages: string[] = [];
-    const logger: Logger = { error: (msg) => messages.push(msg) };
+    const output = new StringIO();
     const causedApp = async (): Promise<RackResponse> => {
       const cause = new Error("root cause");
       const err = new Error("wrapper error");
       (err as any).cause = cause;
       throw err;
     };
-    const mw = new DebugExceptions(causedApp, { logger });
-    await mw.call(makeEnv());
-    expect(messages[0]).toContain("Caused by: Error (root cause)");
+    const mw = new DebugExceptions(causedApp);
+    await mw.call(
+      makeEnv({
+        "action_dispatch.logger": new Logger(output),
+        "action_dispatch.log_rescued_responses": true,
+      }),
+    );
+    output.rewind();
+    expect(output.read()).toContain("Caused by: Error (root cause)");
   });
 
   it("display backtrace when error type is SyntaxError", async () => {

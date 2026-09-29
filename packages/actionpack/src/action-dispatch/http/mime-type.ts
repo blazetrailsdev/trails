@@ -1,5 +1,5 @@
 import { registerDefaultMimeTypes } from "./mime-types.js";
-import { isSymbol, KeyError, symbolToS } from "@blazetrails/ruby-compat";
+import { aryDelete, isSymbol, KeyError, symbolToS } from "@blazetrails/ruby-compat";
 
 export class Mimes {
   /** @internal */
@@ -25,19 +25,19 @@ export class Mimes {
     this._symbolsSet.add(sym);
   }
 
-  deleteIf(predicate: (type: MimeType) => boolean): void {
-    const kept: MimeType[] = [];
-    const removed = new Set<string>();
-    for (const m of this._mimes) {
-      if (predicate(m)) {
-        removed.add(m.toSym()!);
+  deleteIf(block: (type: MimeType) => boolean): void {
+    let i = 0;
+    while (i < this._mimes.length) {
+      const x = this._mimes[i];
+      if (block(x)) {
+        const symType = x.toSym()!;
+        aryDelete(this._symbols, symType);
+        this._symbolsSet.delete(symType);
+        this._mimes.splice(i, 1);
       } else {
-        kept.push(m);
+        i++;
       }
     }
-    this._mimes = kept;
-    this._symbols = this._symbols.filter((s) => !removed.has(s));
-    for (const sym of removed) this._symbolsSet.delete(sym);
   }
 
   /** @internal */

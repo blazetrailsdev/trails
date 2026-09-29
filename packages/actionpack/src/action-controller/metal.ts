@@ -267,7 +267,7 @@ export class Metal extends AbstractController {
     this.response.location = value;
   }
 
-  get location(): string {
+  get location(): string | undefined {
     return this.response.location;
   }
 

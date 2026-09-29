@@ -37,7 +37,7 @@ export interface ActionDispatchConfig {
   performDeepMunge: boolean;
   requestIdHeader: string;
   logRescuedResponses: boolean;
-  debugExceptionLogLevel: "debug" | "info" | "warn" | "error" | "fatal";
+  debugExceptionLogLevel: ":debug" | ":info" | ":warn" | ":error" | ":fatal";
   strictFreshness: boolean;
   ignoreLeadingBrackets: boolean | null;
   strictQueryStringSeparator: boolean | null;
@@ -88,7 +88,7 @@ export class Trailtie extends BaseTrailtie {
       performDeepMunge: true,
       requestIdHeader: X_REQUEST_ID,
       logRescuedResponses: true,
-      debugExceptionLogLevel: "fatal",
+      debugExceptionLogLevel: ":fatal",
       strictFreshness: false,
       ignoreLeadingBrackets: null,
       strictQueryStringSeparator: null,

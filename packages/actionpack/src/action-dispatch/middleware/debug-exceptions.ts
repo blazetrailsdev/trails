@@ -1,5 +1,11 @@
-import { rbInspect, stderr } from "@blazetrails/ruby-compat";
-import { camelize, HASH_CONVERSIONS, type BacktraceCleaner } from "@blazetrails/activesupport";
+import { rbInspect, rbObjRespondTo, rtest, stderr } from "@blazetrails/ruby-compat";
+import {
+  camelize,
+  HASH_CONVERSIONS,
+  Logger as ActiveSupportLogger,
+  type BacktraceCleaner,
+} from "@blazetrails/activesupport";
+import { Base } from "@blazetrails/actionview";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { ExceptionWrapper } from "./exception-wrapper.js";
@@ -10,19 +16,9 @@ import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
-/** @noRailsEquivalent PERMANENT */
-export interface Logger {
-  error(message: string): void;
-  warn?(message: string): void;
-  info?(message: string): void;
-}
-
 export interface DebugExceptionsOptions {
   showDetailedExceptions?: boolean;
   showExceptions?: boolean;
-  logLevel?: "error" | "warn" | "info";
-  logger?: Logger;
-  logRescuedResponses?: boolean;
   interceptors?: Interceptor[];
   responseFormat?: "default" | "api";
 }
@@ -40,20 +36,14 @@ export class DebugExceptions {
   private app: RackApp;
   private showDetailedExceptions: boolean;
   private showExceptions: boolean;
-  private logLevel: "error" | "warn" | "info";
-  private logger: Logger | null;
-  private logRescuedResponses: boolean;
   private interceptors: Interceptor[];
   private responseFormat: "default" | "api";
-  private _stderrLogger?: Logger;
+  private _stderrLogger?: ActiveSupportLogger;
 
   constructor(app: RackApp, options: DebugExceptionsOptions = {}) {
     this.app = app;
     this.showDetailedExceptions = options.showDetailedExceptions !== false;
     this.showExceptions = options.showExceptions !== false;
-    this.logLevel = options.logLevel ?? "error";
-    this.logger = options.logger ?? null;
-    this.logRescuedResponses = options.logRescuedResponses !== false;
     this.interceptors = options.interceptors ?? [...DebugExceptions.interceptors];
     this.responseFormat = options.responseFormat ?? "default";
   }
@@ -108,14 +98,10 @@ export class DebugExceptions {
 
   /** @internal */
   logError(request: Request, wrapper: ExceptionWrapper): void {
-    const logger: Logger | null =
-      (request.logger as Logger | undefined) ??
-      (request.getHeader("rack.logger") as Logger | undefined) ??
-      this.logger ??
-      this.stderrLogger();
+    const logger = this.logger(request);
 
     if (logger == null) return;
-    if (!this.isLogRescuedResponses(request) && wrapper.rescueResponse()) return;
+    if (!rtest(this.isLogRescuedResponses(request)) && wrapper.rescueResponse()) return;
 
     const lines: string[] = ["  "];
     if (wrapper.hasCause()) {
@@ -140,31 +126,33 @@ export class DebugExceptions {
   }
 
   /** @internal */
-  logArray(logger: Logger, lines: string[], request: Request): void {
+  logArray(logger: ActiveSupportLogger, lines: string[], request: Request): void {
     if (lines.length === 0) return;
-    const level =
-      (request.getHeader("action_dispatch.debug_exception_log_level") as
-        | typeof this.logLevel
-        | undefined) ?? this.logLevel;
-    const message = lines.join("\n");
-    const fn =
-      level === "warn"
-        ? (logger.warn ?? logger.error)
-        : level === "info"
-          ? (logger.info ?? logger.error)
-          : logger.error;
-    fn.call(logger, message);
+
+    const level = request.getHeader("action_dispatch.debug_exception_log_level") as number | null;
+
+    if (logger.formatter != null && rbObjRespondTo(logger.formatter, "tagsText")) {
+      logger.add(
+        level,
+        lines.join(`\n${(logger.formatter as unknown as { tagsText: string }).tagsText}`),
+      );
+    } else {
+      logger.add(level, lines.join("\n"));
+    }
   }
 
   /** @internal */
-  stderrLogger(): Logger | null {
-    if (this._stderrLogger) return this._stderrLogger;
-    this._stderrLogger = {
-      error: (m: string) => stderr.write(`${m}\n`),
-      warn: (m: string) => stderr.write(`${m}\n`),
-      info: (m: string) => stderr.write(`${m}\n`),
-    };
-    return this._stderrLogger;
+  logger(request: Request): ActiveSupportLogger | null {
+    return (
+      (request.logger as ActiveSupportLogger | null | undefined) ??
+      (Base.logger as ActiveSupportLogger | null) ??
+      this.stderrLogger()
+    );
+  }
+
+  /** @internal */
+  stderrLogger(): ActiveSupportLogger {
+    return (this._stderrLogger ??= new ActiveSupportLogger(stderr));
   }
 
   /** @internal */
@@ -178,9 +166,8 @@ export class DebugExceptions {
   }
 
   /** @internal */
-  isLogRescuedResponses(request: Request): boolean {
-    const flag = request.getHeader("action_dispatch.log_rescued_responses");
-    return flag === undefined ? this.logRescuedResponses : Boolean(flag);
+  isLogRescuedResponses(request: Request): unknown {
+    return request.getHeader("action_dispatch.log_rescued_responses");
   }
 
   async call(env: RackEnv): Promise<RackResponse> {

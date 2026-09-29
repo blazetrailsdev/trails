@@ -456,6 +456,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
     if (!elements) return false;
 
     let names: string[];
+    const nestedNames: (string[] | null)[] = [];
     if (ts.isIdentifier(name)) {
       names = [name.text];
     } else if (ts.isArrayBindingPattern(name)) {
@@ -463,6 +464,13 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       for (const element of name.elements) {
         if (ts.isOmittedExpression(element)) return false;
         names.push(ts.isIdentifier(element.name) ? element.name.text : "");
+        nestedNames.push(
+          ts.isArrayBindingPattern(element.name)
+            ? element.name.elements.map((inner) =>
+                ts.isBindingElement(inner) && ts.isIdentifier(inner.name) ? inner.name.text : "",
+              )
+            : null,
+        );
       }
     } else {
       return false;
@@ -470,17 +478,21 @@ export function extractTestsFromSource(content: string, relativePath: string): T
 
     const guards = continueGuards(node.statement);
     const bind = (element: IterableElement, run: () => void) => {
+      const pairs: [string, BoundValue | null | undefined][] = [];
       const values = ts.isIdentifier(name) ? [element.scalar] : (element.tuple ?? []);
-      const shadowed = names.map((n) => bindings.get(n));
-      names.forEach((n, i) => {
-        if (n === "") return;
-        const value = values[i];
+      names.forEach((n, i) => pairs.push([n, values[i]]));
+      nestedNames.forEach((inner, i) => {
+        const innerValues = element.nested?.[i] ?? [];
+        inner?.forEach((n, j) => pairs.push([n, innerValues[j]]));
+      });
+      const bound = pairs.filter(([n]) => n !== "");
+      const shadowed = bound.map(([n]) => bindings.get(n));
+      for (const [n, value] of bound) {
         if (value === null || value === undefined) bindings.delete(n);
         else bindings.set(n, value);
-      });
+      }
       run();
-      names.forEach((n, i) => {
-        if (n === "") return;
+      bound.forEach(([n], i) => {
         const prior = shadowed[i];
         if (prior === undefined) bindings.delete(n);
         else bindings.set(n, prior);
@@ -889,7 +901,9 @@ function evalBoundExpression(
     }
     const target = unwrapExpression(receiver.arguments[0]);
     const bound = ts.isIdentifier(target) ? bindings.get(target.text) : undefined;
-    return bound !== undefined && typeof bound !== "string" ? bound.keys.join(separator) : null;
+    return bound !== undefined && typeof bound !== "string" && "keys" in bound
+      ? bound.keys.join(separator)
+      : null;
   }
   if (
     ts.isCallExpression(e) &&
@@ -898,7 +912,7 @@ function evalBoundExpression(
     e.arguments.length === 2
   ) {
     const inner = evalBoundExpression(e.expression.expression, bindings);
-    const pattern = literalValue(e.arguments[0]);
+    const pattern = literalValue(e.arguments[0]) ?? regexpLiteralValue(e.arguments[0]);
     const replacement = literalValue(e.arguments[1]);
     if (inner === null || pattern === null || replacement === null) return null;
     return inner.replaceAll(pattern, replacement);
@@ -926,6 +940,38 @@ function evalBoundExpression(
   return null;
 }
 
+/** A global regexp literal's value (`/\W/g`), or null — `replaceAll` rejects a non-global one. */
+function regexpLiteralValue(expr: ts.Expression): RegExp | null {
+  const e = unwrapExpression(expr);
+  if (!ts.isRegularExpressionLiteral(e)) return null;
+  const slash = e.text.lastIndexOf("/");
+  const flags = e.text.slice(slash + 1);
+  return flags.includes("g") ? new RegExp(e.text.slice(1, slash), flags) : null;
+}
+
+/** An array literal's length, or null when the expression is not one. */
+function arrayLiteralLength(expr: ts.Expression): BoundValue | null {
+  const e = unwrapExpression(expr);
+  return ts.isArrayLiteralExpression(e) ? { length: e.elements.length } : null;
+}
+
+/** A numeric literal, or `x.length` of a loop variable bound to an array literal. */
+function evalNumber(expr: ts.Expression, bindings: ReadonlyMap<string, BoundValue>): number | null {
+  const e = unwrapExpression(expr);
+  if (ts.isNumericLiteral(e)) return Number(e.text);
+  if (
+    ts.isPropertyAccessExpression(e) &&
+    e.name.text === "length" &&
+    ts.isIdentifier(e.expression)
+  ) {
+    const bound = bindings.get(e.expression.text);
+    return bound !== undefined && typeof bound !== "string" && "length" in bound
+      ? bound.length
+      : null;
+  }
+  return null;
+}
+
 /** Strip `as const`, `satisfies`, and parentheses down to the real expression. */
 function unwrapExpression(expr: ts.Expression): ts.Expression {
   let e = expr;
@@ -949,9 +995,23 @@ function literalValue(expr: ts.Expression): string | null {
  * not a literal (an arrow function paired with a name) resolves to null and
  * simply binds nothing, so a title naming it stays dynamic.
  */
-type IterableElement = { scalar: string | null; tuple: (BoundValue | null)[] | null };
+type IterableElement = {
+  scalar: string | null;
+  tuple: (BoundValue | null)[] | null;
+  /**
+   * Per tuple position, the tuple that position itself holds, for a nested
+   * binding pattern: `for (const [i, [url, params]] of TABLE.entries())` binds
+   * `url` from position 1's own tuple.
+   */
+  nested?: ((BoundValue | null)[] | null)[];
+};
 
-type BoundValue = string | { readonly keys: readonly string[] };
+/**
+ * A bound loop variable: a literal, an object literal's keys, or an array
+ * literal's length (so an `if (params.length > 1) continue;` guard can skip
+ * the rows a loop does not register).
+ */
+type BoundValue = string | { readonly keys: readonly string[] } | { readonly length: number };
 
 /**
  * The statically-known elements of a `for...of` iterable: an array literal; an
@@ -988,6 +1048,15 @@ function staticIterableElements(
       if (method === "keys") return entries.map(([key]) => ({ scalar: key, tuple: null }));
       return entries.map(([key, value]) => ({ scalar: null, tuple: [key, value] }));
     }
+    if (method === "entries" && e.arguments.length === 0) {
+      const source = staticIterableElements(receiver, decls, seen);
+      if (!source) return null;
+      return source.map((element, i) => ({
+        scalar: null,
+        tuple: [String(i), element.scalar],
+        nested: [null, element.tuple],
+      }));
+    }
     if ((method === "filter" || method === "map") && e.arguments.length === 1) {
       const source = staticIterableElements(receiver, decls, seen);
       const callback = unwrapExpression(e.arguments[0]);
@@ -1019,7 +1088,7 @@ function staticIterableElements(
   for (const element of e.elements) {
     const inner = unwrapExpression(element);
     if (ts.isArrayLiteralExpression(inner)) {
-      const tuple = inner.elements.map(literalValue);
+      const tuple = inner.elements.map((value) => literalValue(value) ?? arrayLiteralLength(value));
       if (tuple.every((value) => value === null)) return null;
       out.push({ scalar: null, tuple });
     } else {
@@ -1108,6 +1177,18 @@ function evalPredicate(
     const notEqual =
       op === ts.SyntaxKind.ExclamationEqualsEqualsToken ||
       op === ts.SyntaxKind.ExclamationEqualsToken;
+    const relational: Partial<Record<ts.SyntaxKind, (a: number, b: number) => boolean>> = {
+      [ts.SyntaxKind.GreaterThanToken]: (a, b) => a > b,
+      [ts.SyntaxKind.GreaterThanEqualsToken]: (a, b) => a >= b,
+      [ts.SyntaxKind.LessThanToken]: (a, b) => a < b,
+      [ts.SyntaxKind.LessThanEqualsToken]: (a, b) => a <= b,
+    };
+    const compare = relational[op];
+    if (compare) {
+      const left = evalNumber(e.left, bindings);
+      const right = evalNumber(e.right, bindings);
+      return left === null || right === null ? null : compare(left, right);
+    }
     if (!equal && !notEqual) return null;
     const left = literalValue(e.left) ?? evalBoundExpression(e.left, bindings);
     const right = literalValue(e.right) ?? evalBoundExpression(e.right, bindings);

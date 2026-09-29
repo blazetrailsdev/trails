@@ -10,7 +10,7 @@ import {
   setTrailsRoot,
   underscore,
 } from "@blazetrails/activesupport";
-import { getFs, getPath, RuntimeError } from "@blazetrails/ruby-compat";
+import { getFs, getPath, rbConstGet, RuntimeError, symbolToS } from "@blazetrails/ruby-compat";
 import { Executor, Reloader } from "@blazetrails/activesupport";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
@@ -27,7 +27,7 @@ import { RoutesReloader } from "./application/routes-reloader.js";
 import "./assets/trailtie.js";
 import { Trails } from "./rails.js";
 import { Collection, type InitializerGroup } from "./initializable.js";
-import type { Logger } from "@blazetrails/activesupport";
+import { Logger } from "@blazetrails/activesupport";
 import type { MiddlewareStack, RackApp, Request } from "@blazetrails/actionpack";
 import type { RackEnv } from "@blazetrails/rack";
 
@@ -40,6 +40,7 @@ export class Application extends Engine {
   private _routesReloader?: RoutesReloader;
   private _orderedRailties?: Array<Trailtie | Trailtie[] | string>;
   private _keyGenerators = new Map<string, CachingKeyGenerator>();
+  private _appEnvConfig?: Record<string, unknown>;
   private _credentials?: EncryptedConfiguration;
   private _deprecators?: Deprecators;
   readonly executor: typeof Executor = class extends Executor {};
@@ -227,6 +228,19 @@ export class Application extends Engine {
 
   messageVerifier(verifierName: string): MessageVerifier {
     return new MessageVerifier(this.keyGenerator().generateKey(verifierName));
+  }
+
+  /** @missingRailsCall key_generator — CONVERGEABLE port-application-env-config-for-action-dispatch-keys */
+  override envConfig(): Record<string, unknown> {
+    return (this._appEnvConfig ??= {
+      ...super.envConfig(),
+      "action_dispatch.log_rescued_responses": this.config.actionDispatch.logRescuedResponses,
+      "action_dispatch.debug_exception_log_level": rbConstGet(
+        Logger,
+        symbolToS(this.config.actionDispatch.debugExceptionLogLevel).toUpperCase(),
+      ),
+      "action_dispatch.logger": Trails.logger,
+    });
   }
 
   async credentials(): Promise<EncryptedConfiguration> {

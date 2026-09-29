@@ -1726,6 +1726,7 @@ describe("extractFromProgram — include() detection", () => {
     const mod = info.modules["predications.ts:Predications"];
     expect(mod).toBeDefined();
     expect(mod.instanceMethods.map((m) => m.name).sort()).toEqual(["eq", "gt", "lt"]);
+    expect(mod.objectLiteral).toBe(true);
   });
 
   it("does not record a SCREAMING_SNAKE method-table constant as a module", () => {

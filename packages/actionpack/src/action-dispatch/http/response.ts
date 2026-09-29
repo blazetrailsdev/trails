@@ -340,8 +340,8 @@ export class Response {
     return this._committed;
   }
 
-  get location(): string {
-    return this.getHeader("location") ?? "";
+  get location(): string | undefined {
+    return this.getHeader("location");
   }
 
   set location(url: string) {
@@ -513,7 +513,7 @@ export class Response {
   get statusMessage(): string {
     return this.message;
   }
-  get redirectUrl(): string {
+  get redirectUrl(): string | undefined {
     return this.location;
   }
   get mediaType(): string | undefined {
