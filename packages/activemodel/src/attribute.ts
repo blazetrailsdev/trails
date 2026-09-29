@@ -235,7 +235,6 @@ export abstract class Attribute {
     this.originalAttribute = coder["original_attribute"] as Attribute | null;
     this._hasValue = Object.hasOwn(coder, "value");
     if (this._hasValue) this._value = coder["value"];
-    this._hasValueForDatabase = false;
   }
 
   encodeWith(coder: Coder): void {

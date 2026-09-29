@@ -39,11 +39,6 @@ function className(klass: { name?: string; [rubyNamespace]?: string }): string |
   return typeof nesting === "string" ? `${nesting}::${klass.name}` : klass.name;
 }
 
-function isHash(o: object): boolean {
-  const proto = Object.getPrototypeOf(o) as object | null;
-  return proto === Object.prototype || proto === null;
-}
-
 class YAMLTree {
   private readonly st = new Map<object, Node>();
   private readonly doc = new yaml.Document();
@@ -63,7 +58,7 @@ class YAMLTree {
     if (Array.isArray(target)) return this.visitArray(target);
     if (target instanceof Map) return this.visitHash(target);
     if (target !== null && typeof target === "object") {
-      return isHash(target)
+      return [Object.prototype, null].includes(Object.getPrototypeOf(target) as object | null)
         ? this.visitHash(new Map(Object.entries(target)))
         : this.visitObject(target);
     }
@@ -71,7 +66,9 @@ class YAMLTree {
   }
 
   private visitObject(o: object): Node {
-    const map = this.startMapping(this.tagFor(o));
+    const klass = o.constructor === Object ? undefined : className(o.constructor);
+    const tag = ["!ruby/object", klass].filter((part) => part !== undefined).join(":");
+    const map = this.startMapping(tag);
     this.register(o, map);
     this.dumpIvars(o, map);
     return map;
@@ -106,7 +103,9 @@ class YAMLTree {
   }
 
   private dumpCoder(o: { encodeWith(coder: Coder): void }): Node {
-    const c = new Coder(this.tagFor(o));
+    const klass = o.constructor === Object ? undefined : className(o.constructor);
+    const tag = ["!ruby/object", klass].filter((part) => part !== undefined).join(":");
+    const c = new Coder(tag);
     o.encodeWith(c);
     return this.emitCoder(c, o);
   }
@@ -124,21 +123,18 @@ class YAMLTree {
     }
   }
 
-  private tagFor(o: object): string {
-    const klass = o.constructor as { name?: string } | undefined;
-    const name = klass === undefined || klass === Object ? undefined : className(klass);
-    return ["!ruby/object", name].filter((part) => part !== undefined).join(":");
-  }
-
   private startMapping(tag: string | null): import("yaml").YAMLMap {
     const map = new yaml.YAMLMap();
     if (tag !== null) map.tag = tag;
     return map;
   }
 
-  tree(o: unknown): string {
-    this.doc.contents = this.accept(o) as typeof this.doc.contents;
-    return this.doc.toString({ directives: true });
+  get tree(): import("yaml").Document {
+    return this.doc;
+  }
+
+  push(object: unknown): void {
+    this.doc.contents = this.accept(object) as typeof this.doc.contents;
   }
 }
 
@@ -195,9 +191,14 @@ class ToRuby {
     hash: Record<string, unknown>,
     o: import("yaml").YAMLMap,
   ): Record<string, unknown> {
-    for (const pair of o.items) {
-      const key = this.accept(pair.key as Node);
-      hash[String(key)] = this.accept(pair.value as Node);
+    for (const { key: k, value: v } of o.items as { key: Node; value: Node }[]) {
+      const key = String(this.accept(k));
+      const val = this.accept(v);
+      if (key === "<<" && k.tag !== "tag:yaml.org,2002:str") {
+        if ((yaml.isAlias(v) || yaml.isMap(v)) && typeof val === "object") Object.assign(hash, val);
+        else if (yaml.isSeq(v)) Object.assign(hash, ...(val as object[]).slice().reverse());
+        else hash[key] = val;
+      } else hash[key] = val;
     }
     return hash;
   }
@@ -210,8 +211,8 @@ class ToRuby {
   private initWith(o: object, h: Record<string, unknown>, node: Node): object {
     const c = Object.assign(new Coder(node.tag ?? null), h);
     const target = o as { initWith?: (coder: Coder) => void } & Record<string, unknown>;
-    if (typeof target.initWith === "function") {
-      target.initWith(c);
+    if (rbObjRespondTo(target, "initWith")) {
+      target.initWith!(c);
     } else {
       for (const [k, v] of Object.entries(h)) target[k] = v;
     }
@@ -224,7 +225,9 @@ class ToRuby {
 }
 
 export function dump(o: unknown): string {
-  return new YAMLTree().tree(o);
+  const visitor = new YAMLTree();
+  visitor.push(o);
+  return visitor.tree.toString({ directives: true });
 }
 
 export function unsafeLoad(yamlString: string): unknown {
