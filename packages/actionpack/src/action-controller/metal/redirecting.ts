@@ -1,6 +1,14 @@
 import { statusCode } from "@blazetrails/rack";
 import { DoubleRenderError } from "../../abstract-controller/rendering.js";
 import { ActionControllerError } from "./exceptions.js";
+import { include, included } from "@blazetrails/activesupport";
+import { Logger, type LoggerIncludingClass } from "../../abstract-controller/logger.js";
+
+export class Redirecting {
+  static [included](base: LoggerIncludingClass): void {
+    include(base, Logger);
+  }
+}
 
 export class UnsafeRedirectError extends Error {
   constructor(message?: string) {

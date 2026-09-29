@@ -1,4 +1,5 @@
 import { Attribute, ValueType } from "@blazetrails/activemodel";
+import { deepDup } from "@blazetrails/activesupport";
 import { Substitute } from "../statement-cache.js";
 
 type CastType = Pick<ValueType, "cast" | "serialize">;
@@ -33,6 +34,14 @@ export class QueryAttribute extends Attribute {
 
   constructor(name: string | null, value: unknown, type: CastType | null) {
     super(name, value, ensureType(type));
+
+    if (this.valueBeforeTypeCast instanceof Substitute) {
+      /** @empty */
+    } else if (this.type!.isSerialized()) {
+      void this.valueForDatabase;
+    } else if (this.type!.isMutable()) {
+      this._valueBeforeTypeCast = deepDup(this.valueBeforeTypeCast);
+    }
   }
 
   typeCast(value: unknown): unknown {

@@ -196,6 +196,11 @@ export class Application extends Engine {
     configuredPaths.unshift(...existent.filter((p) => !configuredPaths.includes(p)));
   }
 
+  async requireEnvironmentBang(): Promise<void> {
+    const environment = (await (await this.paths()).get("config/environment")!.existent())[0];
+    if (environment) await import(getPath().pathToFileURL!(environment).href);
+  }
+
   routesReloader(): RoutesReloader {
     return (this._routesReloader ??= new RoutesReloader());
   }

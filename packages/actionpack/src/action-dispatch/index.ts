@@ -83,13 +83,7 @@ export { Flash, FlashHash } from "./middleware/flash.js";
 export { Static, type StaticOptions } from "./middleware/static.js";
 export * as Session from "./middleware/session/index.js";
 export { InvalidAuthenticityToken } from "../action-controller/metal/request-forgery-protection.js";
-export {
-  RequestForgeryProtection,
-  type CsrfOptions,
-  type CsrfStrategy,
-} from "./request-forgery-protection.js";
 export { UnknownFormat } from "../action-controller/metal/exceptions.js";
-export { respondTo, Collector } from "./respond-to.js";
 export { PermissionsPolicy, type PolicySource } from "./http/permissions-policy.js";
 export { UploadedFile, type UploadedFileOptions } from "./http/upload.js";
 export { ContentDisposition, type ContentDispositionOptions } from "./http/content-disposition.js";

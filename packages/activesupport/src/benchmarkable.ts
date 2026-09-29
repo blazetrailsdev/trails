@@ -90,3 +90,5 @@ export function benchmark<T>(
     return block() as T | Promise<Awaited<T>>;
   }
 }
+
+export const Benchmarkable = { benchmark };

@@ -13,6 +13,11 @@ import { resetI18n } from "./test-helpers/i18n.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 import { include } from "@blazetrails/activesupport";
 
+class Person extends Model {
+  name: string | null = null;
+  age: number | null = null;
+}
+
 describe("Error option value equality", () => {
   const base = {} as never;
 
@@ -67,7 +72,7 @@ describe("Error and Errors surface", () => {
   });
 
   it("full_messages doesn't require the base object to respond to :errors", () => {
-    const errors = new Errors({ name: "test" });
+    const errors = new Errors(new Person());
     errors.add("name", ":blank");
     expect(errors.fullMessages).toEqual(["Name can't be blank"]);
   });
@@ -138,7 +143,7 @@ describe("Error and Errors surface", () => {
   });
 
   it("message with identifier-shaped rawType routes through i18n", () => {
-    const e = new Errors(null);
+    const e = new Errors(new Person());
     e.add("name", ":blank");
     expect(e.messagesFor("name")).toEqual(["can't be blank"]);
   });
@@ -150,7 +155,7 @@ describe("Error and Errors surface", () => {
   });
 
   it("generateMessage with identifier options.message routes through i18n as new type", () => {
-    const e = new Errors(null);
+    const e = new Errors(new Person());
     e.add("name", ":blank", { message: ":tooShort" });
     expect(e.messagesFor("name")[0]).toContain("errors.messages.tooShort");
   });
@@ -167,14 +172,14 @@ describe("Error and Errors surface", () => {
   });
 
   it("fullMessage uses last segment of dotted attribute", () => {
-    const e = new Errors(null);
-    e.add("profile.bio", ":blank");
+    const e = new Errors(new Person());
+    e.add("profile.bio", "can't be blank");
     const msg = e.fullMessages[0];
     expect(msg).toBe("Profile bio can't be blank");
   });
 
   it("fullMessage non-nested attribute behaves as before", () => {
-    const e = new Errors(null);
+    const e = new Errors(new Person());
     e.add("name", ":blank");
     expect(e.fullMessages[0]).toBe("Name can't be blank");
   });

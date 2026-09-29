@@ -26,6 +26,7 @@ import {
   UploadedFile as RackTestUploadedFile,
   Utils as RackTestUtils,
 } from "@blazetrails/rack-test";
+import { Mime } from "../action-dispatch/http/mime-type.js";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
@@ -320,8 +321,6 @@ export class TestCase {
     };
 
     if (as) env["CONTENT_TYPE"] = formatToMime(as);
-    const resolvedFormat = format ?? as;
-    if (resolvedFormat) env.HTTP_ACCEPT = formatToMime(resolvedFormat);
 
     if (headers) {
       for (const [name, value] of Object.entries(headers)) {
@@ -339,13 +338,23 @@ export class TestCase {
 
     if (xhr) {
       env["HTTP_X_REQUESTED_WITH"] = "XMLHttpRequest";
+      env["HTTP_ACCEPT"] ??= [
+        Mime.get("js"),
+        Mime.get("html"),
+        Mime.get("xml"),
+        "text/xml",
+        "*/*",
+      ].join(", ");
     }
 
     this.request = new Request(env);
     this.response = this.buildResponse();
     this.response.request = this.request;
 
-    if (params) (this.request as any).parameters = { ...params };
+    const parameters: Record<string, unknown> = { ...(params ?? {}) };
+    const resolvedFormat = format ?? as;
+    if (resolvedFormat) parameters["format"] = resolvedFormat;
+    if (params || resolvedFormat) (this.request as any).parameters = parameters;
 
     this.controller = new this._controllerClass();
 
@@ -382,10 +391,14 @@ export class TestCase {
   }
   /** @internal */
   private async processControllerResponse(action: string, _xhr: boolean): Promise<void> {
-    await this.wrapExecution(() =>
-      this.controller.dispatch(action, this.request, this.response).then(() => {}),
-    );
-    Object.assign(this.session, (this.request.session as unknown as TestSession).toHash());
+    try {
+      await this.wrapExecution(() =>
+        this.controller.dispatch(action, this.request, this.response).then(() => {}),
+      );
+    } finally {
+      for (const key of Object.keys(this.session)) delete this.session[key];
+      Object.assign(this.session, (this.request.session as unknown as TestSession).toHash());
+    }
   }
 
   /** @internal */

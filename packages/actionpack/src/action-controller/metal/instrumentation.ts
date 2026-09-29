@@ -1,4 +1,11 @@
-import { ExecutionContext, Notifications, toF } from "@blazetrails/activesupport";
+import {
+  ExecutionContext,
+  include,
+  included,
+  Notifications,
+  toF,
+} from "@blazetrails/activesupport";
+import { Logger, type LoggerIncludingClass } from "../../abstract-controller/logger.js";
 import {
   ExceptionWrapper,
   classNameOf,
@@ -6,6 +13,12 @@ import {
 import type { Request } from "../../action-dispatch/http/request.js";
 import type { Response } from "../../action-dispatch/http/response.js";
 import { Flash } from "./flash.js";
+
+export class Instrumentation {
+  static [included](base: LoggerIncludingClass): void {
+    include(base, Logger);
+  }
+}
 
 interface InstrumentationHost {
   actionName?: string;

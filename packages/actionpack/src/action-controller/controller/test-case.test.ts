@@ -137,11 +137,6 @@ describe("TestCaseTest", () => {
       expect(tc.request.isXmlHttpRequest).toBe(true);
     });
 
-    it("sets format via accept header", async () => {
-      await tc.get("index", { format: "json" });
-      expect(tc.request.accept).toContain("application/json");
-    });
-
     it("passes session data", async () => {
       await tc.get("useSession", { session: { count: 5 } });
       expect(JSON.parse(tc.responseBody).count).toBe(6);

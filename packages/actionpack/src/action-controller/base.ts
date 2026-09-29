@@ -8,26 +8,22 @@ import {
   include,
   runLoadHooks,
 } from "@blazetrails/activesupport";
-import { File, getCrypto, rtest } from "@blazetrails/ruby-compat";
+import { File, getCrypto } from "@blazetrails/ruby-compat";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Metal } from "./metal.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
+import {
+  RequestForgeryProtection,
+  commitCsrfToken,
+  protectFromForgery,
+  resetCsrfToken,
+  skipForgeryProtection,
+  type RequestForgeryProtectionHost,
+} from "./metal/request-forgery-protection.js";
 import { respondTo } from "./metal/mime-responds.js";
 import { DefaultHeaders } from "./metal/default-headers.js";
 import { actionMethods, addFlashTypes, Flash } from "./metal/flash.js";
 import { _computeRedirectToLocation, redirectBack, redirectBackOrTo } from "./metal/redirecting.js";
-import {
-  commitCsrfToken,
-  type CsrfTokenStorage,
-  formAuthenticityToken,
-  isProtectAgainstForgery,
-  protectionMethodClass,
-  resetCsrfToken,
-  SessionStore,
-  storageStrategy,
-  verifyAuthenticityToken,
-  verifySameOriginRequest,
-} from "./metal/request-forgery-protection.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
 import { MissingFile } from "./metal/exceptions.js";
 import { defaultRender } from "./metal/implicit-render.js";
@@ -81,7 +77,9 @@ import { BrowserBlocker, type BrowserVersions } from "./metal/allow-browser.js";
 import { permissionsPolicy } from "./metal/permissions-policy.js";
 import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
 import { logAt } from "./metal/logging.js";
-import { logProcessAction } from "./metal/instrumentation.js";
+import type { LoggerHost } from "../abstract-controller/logger.js";
+import { Instrumentation, logProcessAction } from "./metal/instrumentation.js";
+import { Redirecting } from "./metal/redirecting.js";
 import {
   contentSecurityPolicy,
   contentSecurityPolicyNonce,
@@ -253,9 +251,6 @@ export const PROTECTED_IVARS: readonly string[] = [
   "_renderedFormat",
 ];
 
-type ProtectionMethod = Parameters<typeof protectionMethodClass>[0];
-type CsrfStorage = Parameters<typeof storageStrategy>[0];
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base {
   get params(): StrongParameters;
@@ -273,8 +268,8 @@ export interface Base {
   isProtectAgainstForgery(): boolean;
   verifyAuthenticityToken(): void;
   formAuthenticityToken(options?: { formOptions?: { action?: string; method?: string } }): string;
-  resetCsrfToken(request: Request): void;
-  commitCsrfToken(request: Request): void;
+  resetCsrfToken: typeof resetCsrfToken;
+  commitCsrfToken: typeof commitCsrfToken;
   verifySameOriginRequest(): void;
 }
 
@@ -458,34 +453,17 @@ export class Base extends Metal {
   declare readonly notice: unknown;
   declare readonly alert: unknown;
 
-  declare static requestForgeryProtectionToken: string | null;
-  declare static allowForgeryProtection: boolean;
-  declare static logWarningOnCsrfFailure: boolean;
-  declare static forgeryProtectionOriginCheck: boolean;
-  declare static perFormCsrfTokens: boolean;
-  declare static forgeryProtectionStrategy: ReturnType<typeof protectionMethodClass> | null;
-  declare static csrfTokenStorageStrategy: CsrfTokenStorage;
-
-  static protectFromForgery(
-    options: {
-      with?: ProtectionMethod | false | null;
-      store?: CsrfStorage | false | null;
-    } & CallbackOptions = {},
-  ): void {
-    options = { prepend: false, ...options };
-
-    this.forgeryProtectionStrategy = protectionMethodClass(
-      rtest(options.with) ? (options.with as ProtectionMethod) : "null_session",
-    );
-    this.requestForgeryProtectionToken ??= "authenticity_token";
-
-    this.csrfTokenStorageStrategy = storageStrategy(
-      rtest(options.store) ? (options.store as CsrfStorage) : new SessionStore(),
-    );
-
-    this.beforeAction("verifyAuthenticityToken", options);
-    this.appendAfterAction("verifySameOriginRequest");
-  }
+  declare static configAccessor: RequestForgeryProtectionHost["configAccessor"];
+  declare static logger: LoggerHost["logger"] | null;
+  declare static requestForgeryProtectionToken: RequestForgeryProtectionHost["requestForgeryProtectionToken"];
+  declare static forgeryProtectionStrategy: RequestForgeryProtectionHost["forgeryProtectionStrategy"];
+  declare static allowForgeryProtection: RequestForgeryProtectionHost["allowForgeryProtection"];
+  declare static logWarningOnCsrfFailure: RequestForgeryProtectionHost["logWarningOnCsrfFailure"];
+  declare static forgeryProtectionOriginCheck: RequestForgeryProtectionHost["forgeryProtectionOriginCheck"];
+  declare static perFormCsrfTokens: RequestForgeryProtectionHost["perFormCsrfTokens"];
+  declare static csrfTokenStorageStrategy: RequestForgeryProtectionHost["csrfTokenStorageStrategy"];
+  static protectFromForgery = protectFromForgery;
+  static skipForgeryProtection = skipForgeryProtection;
 
   static allowBrowser(options: {
     versions: BrowserVersions;
@@ -883,12 +861,6 @@ include(Base, Cookies);
 Base.prototype.redirectBack = redirectBack;
 Base.prototype.redirectBackOrTo = redirectBackOrTo;
 Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
-Base.prototype.resetCsrfToken = resetCsrfToken as never;
-Base.prototype.commitCsrfToken = commitCsrfToken as never;
-Base.prototype.verifyAuthenticityToken = verifyAuthenticityToken;
-Base.prototype.verifySameOriginRequest = verifySameOriginRequest;
-Base.prototype.formAuthenticityToken = formAuthenticityToken;
-Base.prototype.isProtectAgainstForgery = isProtectAgainstForgery;
 include(Base, Flash);
 Base.prototype.redirectTo = _instrumentRedirectTo;
 include(Base, StrongParametersModule);
@@ -938,6 +910,9 @@ Base.helperMethod("combinedFragmentCacheKey");
 
 extend(Base, ConfigMethods);
 extend(Base, DefaultHeaders.ClassMethods);
+include(Base, Redirecting);
+include(Base, Instrumentation);
+include(Base, RequestForgeryProtection);
 
 const _Configurable = Base as unknown as {
   configAccessor(...names: string[]): void;
@@ -953,23 +928,6 @@ mattrAccessor.call(Base, "raiseOnOpenRedirects", { default: false });
 
 classAttribute.call(Base, "helpersPath", { default: [] });
 classAttribute.call(Base, "includeAllHelpers", { default: true });
-
-_Configurable.configAccessor("requestForgeryProtectionToken");
-Base.requestForgeryProtectionToken ??= "authenticity_token";
-_Configurable.configAccessor("forgeryProtectionStrategy");
-Base.forgeryProtectionStrategy = null;
-_Configurable.configAccessor("allowForgeryProtection");
-Base.allowForgeryProtection ??= true;
-_Configurable.configAccessor("logWarningOnCsrfFailure");
-Base.logWarningOnCsrfFailure = true;
-_Configurable.configAccessor("forgeryProtectionOriginCheck");
-Base.forgeryProtectionOriginCheck = false;
-_Configurable.configAccessor("perFormCsrfTokens");
-Base.perFormCsrfTokens = false;
-_Configurable.configAccessor("csrfTokenStorageStrategy");
-Base.csrfTokenStorageStrategy = new SessionStore();
-Base.helperMethod("formAuthenticityToken");
-Base.helperMethod("isProtectAgainstForgery");
 
 _Configurable.configAccessor("enableFragmentCacheLogging");
 _Configurable.enableFragmentCacheLogging = false;

@@ -3925,10 +3925,7 @@ export function main() {
       sigs.push(m.params);
       tsParamsByName.set(m.name, sigs);
       if (scope === "package") recordTsPortedWithArgs(portedWithArgsMaps, m, file, owner);
-      // A member resolved off another file's declaration (`declaredIn`) is
-      // emitted with `params: []`, so it carries no signature to judge a block
-      // by; its declaring file is where the block is compared.
-      if (scope === "package" && m.declaredIn === undefined) {
+      if (scope === "package") {
         const byName = tsBlockSigsByFileName.get(file) ?? new Map<string, ParamInfo[][]>();
         const blockSigs = byName.get(m.name) ?? [];
         blockSigs.push(m.params);

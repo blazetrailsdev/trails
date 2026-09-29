@@ -385,6 +385,15 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     } else {
       options = opts;
     }
+    const nonAssignedRequired = Object.entries(this.classOptions())
+      .filter(
+        ([name, option]) => option.required && option.default == null && options[name] == null,
+      )
+      .map(([name]) => `--${dasherize(name)}`);
+    if (nonAssignedRequired.length > 0)
+      throw new Error(
+        `No value provided for required options '${nonAssignedRequired.join("', '")}'`,
+      );
 
     const attributes = Array.isArray(toParse[1]) ? toParse[1] : toParse.slice(1);
     const instance = new this({

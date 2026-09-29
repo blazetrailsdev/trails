@@ -19,9 +19,14 @@ import { resetI18n } from "./test-helpers/i18n.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 import { include } from "@blazetrails/activesupport";
 
+class Person extends Model {
+  name: string | null = null;
+  age: number | null = null;
+}
+
 describe("Errors — trails-only coverage", () => {
   it("add creates an error object and returns it", () => {
-    const e = new Errors(null);
+    const e = new Errors(new Person());
     e.add("name", ":blank");
     expect(e.messagesFor("name")).toContain("can't be blank");
   });
@@ -70,13 +75,13 @@ describe("Errors — trails-only coverage", () => {
   });
 
   it("custom message overrides default", () => {
-    const e = new Errors(null);
+    const e = new Errors(new Person());
     e.add("name", ":blank", { message: "is required" });
     expect(e.messagesFor("name")).toContain("is required");
   });
 
   it("message interpolation with %{count}", () => {
-    const e = new Errors(null);
+    const e = new Errors(new Person());
     e.add("name", ":too_short", { count: 3 });
     expect(e.messagesFor("name").length).toBe(1);
   });
@@ -93,7 +98,7 @@ describe("Errors — trails-only coverage", () => {
   });
 
   it("full_message uses default format", () => {
-    const errors = new Errors({});
+    const errors = new Errors(new Person());
     expect(errors.fullMessage("name", "is invalid")).toBe("Name is invalid");
     expect(errors.fullMessage("base", "is invalid")).toBe("is invalid");
   });
@@ -106,7 +111,7 @@ describe("Errors — trails-only coverage", () => {
 
     it("falls back to default format when model-specific keys are missing", () => {
       ActiveModelError.i18nCustomizeFullMessage = true;
-      const errors = new Errors({});
+      const errors = new Errors(new Person());
       expect(errors.fullMessage("name", "is invalid")).toBe("Name is invalid");
     });
 
@@ -168,7 +173,7 @@ describe("Errors — trails-only coverage", () => {
   });
 
   it("full_messages_for returns full messages for an attribute", () => {
-    const errors = new Errors({});
+    const errors = new Errors(new Person());
     errors.add("name", ":blank");
     expect(errors.fullMessagesFor("name")).toEqual(["Name can't be blank"]);
   });
@@ -375,14 +380,14 @@ describe("Errors — trails-only coverage", () => {
     });
 
     it("add with strict: true raises StrictValidationFailed", () => {
-      const errors = new Errors({});
+      const errors = new Errors(new Person());
       expect(() => errors.add("name", ":blank", { strict: true })).toThrow(StrictValidationFailed);
       expect(errors.count).toBe(0);
     });
 
     it("add with strict: CustomErrorClass raises that class", () => {
       class NameIsInvalid extends globalThis.Error {}
-      const errors = new Errors({});
+      const errors = new Errors(new Person());
       expect(() => errors.add("name", ":blank", { strict: NameIsInvalid })).toThrow(NameIsInvalid);
       expect(errors.count).toBe(0);
     });
@@ -408,7 +413,7 @@ describe("Errors — trails-only coverage", () => {
   });
 
   it("delete returns array of removed errors when present", () => {
-    const e = new Errors(null);
+    const e = new Errors(new Person());
     e.add("name", ":blank");
     e.add("name", ":too_short");
     const removed = e.delete("name");
@@ -454,7 +459,7 @@ describe("Errors — trails-only coverage", () => {
   });
 
   it("toHash(true) returns full messages", () => {
-    const e = new Errors(null);
+    const e = new Errors(new Person());
     e.add("name", ":blank");
     const full = e.toHash(true);
     expect(full.get("name")![0]).toContain("Name");
@@ -462,7 +467,7 @@ describe("Errors — trails-only coverage", () => {
   });
 
   it("toHash() with no arg returns short messages", () => {
-    const e = new Errors(null);
+    const e = new Errors(new Person());
     e.add("name", ":blank");
     const short = e.toHash();
     expect(short.get("name")![0]).toBe("can't be blank");
@@ -475,13 +480,13 @@ describe("Errors — trails-only coverage", () => {
   });
 
   it("added returns true for full message string (string branch)", () => {
-    const e = new Errors(null);
+    const e = new Errors(new Person());
     e.add("name", ":blank");
     expect(e.added("name", "can't be blank")).toBe(true);
   });
 
   it("added returns false for nonexistent type or message", () => {
-    const e = new Errors(null);
+    const e = new Errors(new Person());
     e.add("name", ":blank");
     expect(e.added("name", "nonexistent type xyz")).toBe(false);
   });
@@ -493,13 +498,13 @@ describe("Errors — trails-only coverage", () => {
   });
 
   it("ofKind returns true for full message string (string branch)", () => {
-    const e = new Errors(null);
+    const e = new Errors(new Person());
     e.add("name", ":blank");
     expect(e.ofKind("name", "can't be blank")).toBe(true);
   });
 
   it("ofKind returns false for nonexistent type or message", () => {
-    const e = new Errors(null);
+    const e = new Errors(new Person());
     e.add("name", ":blank");
     expect(e.ofKind("name", "nonexistent type xyz")).toBe(false);
   });

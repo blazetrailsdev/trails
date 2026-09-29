@@ -456,6 +456,8 @@ export class Configuration extends EngineConfiguration {
   override paths(): Root {
     const paths = super.paths();
     if (!paths.get("public")) paths.add("public");
+    if (!paths.get("config/environment"))
+      paths.add("config/environment", { with: "config/environment.ts" });
     if (!paths.get("lib/templates")) paths.add("lib/templates");
     return paths;
   }

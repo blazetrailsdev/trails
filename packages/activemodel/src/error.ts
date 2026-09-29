@@ -1,5 +1,5 @@
 import { classAttribute, humanize, deepDup, isPlainObject } from "@blazetrails/activesupport";
-import { except, kernelCatch } from "@blazetrails/ruby-compat";
+import { except, kernelCatch, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { MissingTranslation, type TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 import { ActiveModel } from "./namespaces.js";
@@ -75,10 +75,10 @@ export class Error {
   static fullMessage(attribute: string, message: string | null, base: ModelBase): string | null {
     if (attribute === "base") return message;
 
-    const baseClass = base?.constructor as ModelClass | undefined;
+    const baseClass = base!.constructor as ModelClass;
 
     let defaults: unknown[];
-    if (this.i18nCustomizeFullMessage && baseClass?.i18nScope != null) {
+    if (this.i18nCustomizeFullMessage && rbObjRespondTo(baseClass, "i18nScope")) {
       attribute = attribute.replace(/\[\d+\]/g, "");
       const parts = attribute.split(".");
       const attributeName = parts.pop() as string;
@@ -106,9 +106,10 @@ export class Error {
     defaults.push("%{attribute} %{message}");
 
     let attrName: string = humanize(attribute.replace(/\.base$/, "").replace(/\./g, "_"));
-    attrName = baseClass?.humanAttributeName
-      ? baseClass.humanAttributeName(attribute, { default: attrName, base })
-      : attrName;
+    attrName = baseClass.humanAttributeName!(attribute, {
+      default: attrName,
+      base,
+    });
 
     return I18n.t(defaults.shift() as TranslateKey, {
       default: defaults,
@@ -131,7 +132,7 @@ export class Error {
     }
     const typeName = type.slice(1);
 
-    const baseClass = base?.constructor as ModelClass | undefined;
+    const baseClass = base!.constructor as ModelClass;
     const value =
       attribute !== "base" && base != null
         ? "readAttributeForValidation" in base

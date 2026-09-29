@@ -119,10 +119,10 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
   });
 
   it("raises Psych::DisallowedClass when a previous-scheme candidate reaches the YAML coder", async () => {
-    await expect(PreviousSchemeYamlBook.findBy({ name: "Dune" })).rejects.toThrow(DisallowedClass);
-    await expect(PreviousSchemeYamlBook.where({ name: "Dune" }).first()).rejects.toThrow(
+    await expect(async () => PreviousSchemeYamlBook.findBy({ name: "Dune" })).rejects.toThrow(
       DisallowedClass,
     );
+    expect(() => PreviousSchemeYamlBook.where({ name: "Dune" })).toThrow(DisallowedClass);
 
     const fullType = PreviousSchemeYamlBook.typeForAttribute("name") as {
       serialize(v: unknown): unknown;

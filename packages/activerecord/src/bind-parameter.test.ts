@@ -91,7 +91,7 @@ describe("BindParameterTest", () => {
     return typeof conn.sqlKey === "function" ? conn.sqlKey(sql) : sql;
   }
   function cachedStatement(conn: any, klass: any, key: string[]): string {
-    const cache = klass.cachedFindByStatement(conn, JSON.stringify(key), () => {
+    const cache = klass.cachedFindByStatement(conn, key, () => {
       throw new Error(`${klass.name} has no cached statement by ${JSON.stringify(key)}`);
     });
     return cache._queryBuilder._sql;

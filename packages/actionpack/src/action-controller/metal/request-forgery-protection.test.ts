@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { Parameters } from "./strong-parameters.js";
 import { CookieJar } from "../../action-dispatch/middleware/cookies.js";
 import {
   Exception,
@@ -39,6 +38,15 @@ import {
   type CsrfTokenStorage,
 } from "./request-forgery-protection.js";
 
+const verbs = {
+  isGet(this: { method: string }): boolean {
+    return this.method === "GET";
+  },
+  isHead(this: { method: string }): boolean {
+    return this.method === "HEAD";
+  },
+};
+
 const cookieJar = () => {
   const env: Record<string, unknown> = {};
   return new CookieJar({
@@ -52,7 +60,11 @@ const cookieJar = () => {
 function controller(overrides: Partial<CsrfController> = {}): CsrfController {
   return {
     allowForgeryProtection: true,
+    forgeryProtectionOriginCheck: true,
+    logWarningOnCsrfFailure: true,
+    requestForgeryProtectionToken: "authenticity_token",
     request: {
+      ...verbs,
       method: "POST",
       origin: "https://example.com",
       baseUrl: "https://example.com",
@@ -69,7 +81,7 @@ describe("isProtectAgainstForgery", () => {
   it("returns false when allowForgeryProtection is false", () => {
     expect(isProtectAgainstForgery.call(controller({ allowForgeryProtection: false }))).toBe(false);
   });
-  it("delegates to session.enabled()", () => {
+  it("delegates to session.isEnabled()", () => {
     expect(isProtectAgainstForgery.call(controller({ session: { isEnabled: () => false } }))).toBe(
       false,
     );
@@ -89,7 +101,9 @@ describe("isValidRequestOrigin", () => {
     expect(isValidRequestOrigin.call(controller())).toBe(true);
     expect(
       isValidRequestOrigin.call(
-        controller({ request: { method: "POST", baseUrl: "https://example.com", cookieJar } }),
+        controller({
+          request: { ...verbs, method: "POST", baseUrl: "https://example.com", cookieJar },
+        }),
       ),
     ).toBe(true);
   });
@@ -98,6 +112,7 @@ describe("isValidRequestOrigin", () => {
       isValidRequestOrigin.call(
         controller({
           request: {
+            ...verbs,
             method: "POST",
             origin: "https://evil.com",
             baseUrl: "https://example.com",
@@ -111,7 +126,13 @@ describe("isValidRequestOrigin", () => {
     expect(() =>
       isValidRequestOrigin.call(
         controller({
-          request: { method: "POST", origin: "null", baseUrl: "https://example.com", cookieJar },
+          request: {
+            ...verbs,
+            method: "POST",
+            origin: "null",
+            baseUrl: "https://example.com",
+            cookieJar,
+          },
         }),
       ),
     ).toThrow(InvalidAuthenticityToken);
@@ -121,13 +142,13 @@ describe("isValidRequestOrigin", () => {
 describe("markForSameOriginVerificationBang / isMarkedForSameOriginVerification", () => {
   it("sets the flag based on GET", () => {
     const get = controller({
-      request: { method: "GET", baseUrl: "https://example.com", cookieJar },
+      request: { ...verbs, method: "GET", baseUrl: "https://example.com", cookieJar },
     });
     markForSameOriginVerificationBang.call(get);
     expect(isMarkedForSameOriginVerification.call(get)).toBe(true);
 
     const post = controller({
-      request: { method: "POST", baseUrl: "https://example.com", cookieJar },
+      request: { ...verbs, method: "POST", baseUrl: "https://example.com", cookieJar },
     });
     markForSameOriginVerificationBang.call(post);
     expect(isMarkedForSameOriginVerification.call(post)).toBe(false);
@@ -144,7 +165,7 @@ describe("isNonXhrJavascriptResponse", () => {
         isNonXhrJavascriptResponse.call(
           controller({
             mediaType,
-            request: { method: "GET", baseUrl: "https://example.com", cookieJar },
+            request: { ...verbs, method: "GET", baseUrl: "https://example.com", cookieJar },
           }),
         ),
       ).toBe(true);
@@ -156,6 +177,7 @@ describe("isNonXhrJavascriptResponse", () => {
         controller({
           mediaType: "text/javascript",
           request: {
+            ...verbs,
             method: "GET",
             baseUrl: "https://example.com",
             cookieJar,
@@ -169,6 +191,7 @@ describe("isNonXhrJavascriptResponse", () => {
         controller({
           mediaType: "text/html",
           request: {
+            ...verbs,
             method: "GET",
             baseUrl: "https://example.com",
             cookieJar,
@@ -185,6 +208,7 @@ describe("verifySameOriginRequest", () => {
       _markedForSameOriginVerification: true,
       mediaType: "text/javascript",
       request: {
+        ...verbs,
         method: "GET",
         baseUrl: "https://example.com",
         cookieJar,
@@ -198,6 +222,7 @@ describe("verifySameOriginRequest", () => {
         controller({
           mediaType: "text/javascript",
           request: {
+            ...verbs,
             method: "GET",
             baseUrl: "https://example.com",
             cookieJar,
@@ -213,6 +238,7 @@ describe("verifySameOriginRequest", () => {
       _markedForSameOriginVerification: true,
       mediaType: "text/javascript",
       request: {
+        ...verbs,
         method: "GET",
         baseUrl: "https://example.com",
         cookieJar,
@@ -230,6 +256,7 @@ describe("verifySameOriginRequest", () => {
       _markedForSameOriginVerification: true,
       mediaType: "text/javascript",
       request: {
+        ...verbs,
         method: "GET",
         baseUrl: "https://example.com",
         cookieJar,
@@ -253,6 +280,7 @@ describe("unverifiedRequestWarningMessage", () => {
       unverifiedRequestWarningMessage.call(
         controller({
           request: {
+            ...verbs,
             method: "POST",
             origin: "https://evil.com",
             baseUrl: "https://example.com",
@@ -271,31 +299,53 @@ describe("isVerifiedRequest", () => {
     expect(isVerifiedRequest.call(controller({ allowForgeryProtection: false }))).toBe(true);
     expect(
       isVerifiedRequest.call(
-        controller({ request: { method: "GET", baseUrl: "https://example.com", cookieJar } }),
+        controller({
+          request: { ...verbs, method: "GET", baseUrl: "https://example.com", cookieJar },
+        }),
       ),
     ).toBe(true);
     expect(
       isVerifiedRequest.call(
-        controller({ request: { method: "HEAD", baseUrl: "https://example.com", cookieJar } }),
+        controller({
+          request: { ...verbs, method: "HEAD", baseUrl: "https://example.com", cookieJar },
+        }),
       ),
     ).toBe(true);
   });
   it("requires valid origin and token for POST", () => {
-    expect(isVerifiedRequest.call(controller({ isAnyAuthenticityTokenValid: () => true }))).toBe(
-      true,
-    );
-    expect(isVerifiedRequest.call(controller({ isAnyAuthenticityTokenValid: () => false }))).toBe(
-      false,
-    );
-    expect(isVerifiedRequest.call(controller())).toBe(false);
+    const env = { "action_controller.csrf_token": generateCsrfToken() };
+    const c = controller({
+      request: { ...verbs, method: "POST", baseUrl: "https://example.com", cookieJar, env },
+    });
+    const masked = maskToken(globalCsrfToken.call(c));
+    const withParam = (value: unknown) => ({ get: () => value });
+    expect(
+      isVerifiedRequest.call({
+        ...c,
+        params: withParam(masked),
+        formAuthenticityParam,
+        isValidAuthenticityToken,
+      } as CsrfController),
+    ).toBe(true);
+    expect(
+      isVerifiedRequest.call({
+        ...c,
+        params: withParam("bogus"),
+        formAuthenticityParam,
+        isValidAuthenticityToken,
+      } as CsrfController),
+    ).toBe(false);
   });
 });
 
 describe("P20b/P20c smoke", () => {
   function tokenC(overrides: Partial<CsrfController> = {}): CsrfController {
     return {
-      allowForgeryProtection: true,
+      requestForgeryProtectionToken: "authenticity_token",
+      formAuthenticityParam,
+      isValidAuthenticityToken,
       request: {
+        ...verbs,
         method: "POST",
         baseUrl: "https://example.com",
         cookieJar,
@@ -324,16 +374,21 @@ describe("P20b/P20c smoke", () => {
   it("isAnyAuthenticityTokenValid: masked global via param + X-CSRF; rejects empty", () => {
     const c = tokenC();
     const masked = maskToken(globalCsrfToken.call(c));
+    const params = (hash: Record<string, unknown>) => ({ get: (key: string) => hash[key] });
     expect(
       isAnyAuthenticityTokenValid.call({
         ...c,
-        params: new Parameters({ authenticity_token: masked }),
+        params: params({ authenticity_token: masked }),
       }),
     ).toBe(true);
     expect(
-      isAnyAuthenticityTokenValid.call({ ...c, request: { ...c.request, xCsrfToken: masked } }),
+      isAnyAuthenticityTokenValid.call({
+        ...c,
+        params: params({}),
+        request: { ...c.request, xCsrfToken: masked },
+      }),
     ).toBe(true);
-    expect(isAnyAuthenticityTokenValid.call(c)).toBe(false);
+    expect(isAnyAuthenticityTokenValid.call({ ...c, params: params({}) })).toBe(false);
     expect(isValidAuthenticityToken.call(c, null, "")).toBe(false);
   });
 
@@ -341,6 +396,7 @@ describe("P20b/P20c smoke", () => {
     const c = tokenC({
       perFormCsrfTokens: true,
       request: {
+        ...verbs,
         method: "POST",
         baseUrl: "https://example.com",
         cookieJar,
@@ -353,12 +409,14 @@ describe("P20b/P20c smoke", () => {
     );
     expect(compareWithGlobalToken.call(c, globalCsrfToken.call(c))).toBe(true);
     expect(compareWithRealToken.call(c, realCsrfToken.call(c))).toBe(true);
-    expect(maskedAuthenticityToken.call(c, { action: "/posts", method: "POST" })).toBeTruthy();
+    expect(
+      maskedAuthenticityToken.call(c, { action: "/posts", ...verbs, method: "POST" }),
+    ).toBeTruthy();
   });
 
   it("requestAuthenticityTokens + formAuthenticityParam honor custom token name", () => {
     const c = tokenC({
-      params: new Parameters({ my: "p" }),
+      params: { get: (key: string) => ({ my: "p" })[key] },
       requestForgeryProtectionToken: "my",
       request: { ...tokenC().request, xCsrfToken: "x" },
     });
@@ -396,7 +454,7 @@ describe("P20b/P20c smoke", () => {
 describe("normalizeActionPath / normalizeRelativeActionPath", () => {
   const at = (path: string): CsrfController =>
     ({
-      request: { method: "POST", baseUrl: "https://example.com", cookieJar, path },
+      request: { ...verbs, method: "POST", baseUrl: "https://example.com", cookieJar, path },
     }) as CsrfController;
 
   it("strips trailing slash from absolute paths", () => {
