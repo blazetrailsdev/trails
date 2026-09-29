@@ -1048,14 +1048,6 @@ jobs:
         env:
           ARCONN: sqlite3_mem
 
-  # Experiment: the two sqlite lanes above, unsharded, on the self-hosted arm64
-  # runner (8 cores, so vitest runs 7 AR workers against the hosted runner's 3).
-  # Reporting-only — off the `ci` needs-graph and continue-on-error — so the
-  # timings can be compared against the hosted shards in the same run without
-  # gating a merge. Opt-in by PR label so a single runner isn't queued behind
-  # every AR PR, and never for forks: a self-hosted runner executes the PR's
-  # code on the host. No cache-build: the runner's workspace persists, and
-  # restoring dist/ from the Actions cache is WAN egress on every job.
   sqlite-tests-self-hosted:
     name: "Active Record SQLite Tests (self-hosted, experimental)"
     needs: changes
