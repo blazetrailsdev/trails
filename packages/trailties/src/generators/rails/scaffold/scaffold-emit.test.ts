@@ -23,12 +23,10 @@ function read(rel: string): string {
 
 describe("ScaffoldGenerator emit", () => {
   it("matches snapshot for the controller and validates as TS without Ruby", async () => {
-    await new ScaffoldGenerator({
+    await ScaffoldGenerator.start(["Post", "title:string", "views:integer"], {
       cwd: tmpDir,
       output: () => {},
-      name: "Post",
-      attributes: ["title:string", "views:integer"],
-    }).run();
+    });
     const src = read("app/controllers/posts-controller.ts");
     expect(src).toMatchSnapshot();
     expect(parseTs(src).diagnostics).toEqual([]);

@@ -1,4 +1,9 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
+import { registerConstant, unregisterConstant } from "@blazetrails/activesupport";
+import { ScaffoldControllerGenerator } from "./scaffold-controller-generator.js";
 import { ActionController, RouteSet, controllerConstants } from "@blazetrails/actionpack";
 import { bodyToString } from "@blazetrails/rack";
 
@@ -24,5 +29,52 @@ describe("ScaffoldControllerGenerator (dispatch)", () => {
 
     expect(status).toBe(200);
     expect(await bodyToString(body)).toBe("new post");
+  });
+});
+
+describe("ScaffoldControllerGenerator (class collisions)", () => {
+  let tmpDir: string;
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sc-collision-"));
+    fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, "config/routes.ts"),
+      "export function drawRoutes(mapper: Mapper): void {\n}\n",
+    );
+  });
+  afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+
+  const collision = (name: string) =>
+    ScaffoldControllerGenerator.start([name], { cwd: tmpDir, output: () => {} }).then(
+      () => null,
+      (e: Error) => e.message,
+    );
+
+  it("checks only the namespace's own constants, as const_defined?(name, false) does", async () => {
+    class Parent {
+      static UsersController = class {};
+    }
+    class Admin extends Parent {}
+    registerConstant("Admin", Admin);
+    try {
+      expect(await collision("admin/user")).toBeNull();
+      Object.defineProperty(Admin, "UsersController", { value: class {} });
+      expect(await collision("admin/user")).toMatch(/The name 'Admin::UsersController'/);
+    } finally {
+      unregisterConstant("Admin", Admin);
+    }
+  });
+
+  it("finds a nested constant registered by its full path", async () => {
+    const Admin = class {};
+    const UsersController = class {};
+    registerConstant("Admin", Admin);
+    registerConstant("Admin::UsersController", UsersController);
+    try {
+      expect(await collision("admin/user")).toMatch(/The name 'Admin::UsersController'/);
+    } finally {
+      unregisterConstant("Admin::UsersController", UsersController);
+      unregisterConstant("Admin", Admin);
+    }
   });
 });

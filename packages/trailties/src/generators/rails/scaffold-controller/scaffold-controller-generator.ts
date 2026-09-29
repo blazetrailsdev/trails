@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ResourceHelpers` (`scaffold_controller_generator.rb:8`); the class/interface merge is how a mixin surfaces on the type side. */
 import { camelize, include, type Included } from "@blazetrails/activesupport";
-import { dasherize, parseColumns } from "../../base.js";
+import { dasherize, parseColumns, type GeneratorBase } from "../../base.js";
 import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
 import type { ModelHelpersOptions } from "../../model-helpers.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
+import type { GeneratorClass } from "../../../generators.js";
 import type { ActiveModel } from "../../active-model.js";
 import { tsBody, tsField, tsMethod, type Method } from "../../../template-builder/index.js";
 import { emitControllerClass, parentRefForRelative } from "../controller/controller-paths.js";
-import { ResourceRouteGenerator } from "../resource-route/resource-route-generator.js";
 import * as Tse from "../../tse/scaffold/scaffold-generator.js";
 
 export interface ScaffoldControllerGeneratorOptions extends NamedBaseOptions, ModelHelpersOptions {
@@ -30,12 +30,8 @@ export class ScaffoldControllerGenerator extends NamedBase {
   declare _controllerClassPath: string[];
   declare options: ScaffoldControllerGeneratorOptions;
 
-  constructor(options: ScaffoldControllerGeneratorOptions) {
-    super({ ...options, name: options.name.replace(/[_-]?controller$/i, "") });
-  }
-
   async run(): Promise<string[]> {
-    const { api = false, skipRoutes = false, test = true, helper = true } = this.options;
+    const { api = false, test = true, helper = true } = this.options;
     const modelClassName = this.className().split("::").join("");
     const singular = this.singularTableName();
     const controllerClassName = this.controllerClassName().split("::").join("") + "Controller";
@@ -96,16 +92,6 @@ export class ScaffoldControllerGenerator extends NamedBase {
       );
     }
 
-    if (!skipRoutes) {
-      const route = new ResourceRouteGenerator({
-        cwd: this.cwd,
-        output: this.output,
-        behavior: this.behavior,
-        pretend: this.options.pretend,
-        name: this.name,
-      });
-      await route.addResourceRoute();
-    }
     if (test) {
       const skip = (a: string) =>
         api && (a === "new" || a === "edit") ? "" : `  it("${a}", () => {});\n`;
@@ -135,13 +121,24 @@ ${skip("index")}${skip("show")}${skip("new")}${skip("create")}${skip("edit")}${s
   }
 }
 
+Object.defineProperty(ScaffoldControllerGenerator, "name", {
+  value: "Rails::Generators::ScaffoldControllerGenerator",
+});
 include(ScaffoldControllerGenerator, ResourceHelpers);
+ScaffoldControllerGenerator.checkClassCollision({ suffix: "Controller" });
 ScaffoldControllerGenerator.classOption("orm", {
   banner: "NAME",
   type: "string",
   required: true,
   desc: "ORM to generate the controller for",
 });
+ScaffoldControllerGenerator.hookFor(
+  "resourceRoute",
+  { required: true },
+  function (this: GeneratorBase, route: GeneratorClass) {
+    if (!(this.options as ScaffoldControllerGeneratorOptions).skipRoutes) return this.invoke(route);
+  },
+);
 
 function mk(name: string, body: string, ts: boolean): Method {
   return tsMethod({

@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { assertNoMatch } from "@blazetrails/activesupport";
+import * as Assertions from "../../testing/assertions.js";
 import { ScaffoldGenerator } from "./scaffold-generator.js";
 import { Application } from "../../../application.js";
 import { Trails } from "../../../rails.js";
@@ -39,8 +41,12 @@ afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function makeGen(name: string, attributes: string[] = []) {
-  return new ScaffoldGenerator({ cwd: tmpDir, output: (m) => lines.push(m), name, attributes });
+function runGenerator(name: string, attributes: string[] = [], config: object = {}) {
+  return ScaffoldGenerator.start([name, ...attributes], {
+    cwd: tmpDir,
+    output: (m) => lines.push(m),
+    ...config,
+  });
 }
 
 function readFile(relativePath: string): string {
@@ -49,12 +55,12 @@ function readFile(relativePath: string): string {
 
 describe("ScaffoldGeneratorTest", () => {
   it("scaffold on invoke", async () => {
-    const files = await makeGen("product_line", [
+    const files = await runGenerator("product_line", [
       "title:string",
       "approved:boolean",
       "product:belongs_to",
       "user:references",
-    ]).run();
+    ]);
 
     const model = readFile("app/models/product-line.ts");
     expect(model).toContain("class ProductLine extends ApplicationRecord");
@@ -83,7 +89,9 @@ describe("ScaffoldGeneratorTest", () => {
     );
 
     for (const view of ["index", "show"]) {
-      expect(files).toContain(`app/views/product_lines/${view}.html.tse`);
+      expect(fs.existsSync(path.join(tmpDir, `app/views/product_lines/${view}.html.tse`))).toBe(
+        true,
+      );
     }
 
     for (const view of ["edit", "new"]) {
@@ -104,14 +112,8 @@ describe("ScaffoldGeneratorTest", () => {
   it.skip("system tests without attributes", () => {});
 
   it("scaffold on revoke", async () => {
-    await makeGen("product_line").run();
-    await new ScaffoldGenerator({
-      cwd: tmpDir,
-      output: () => {},
-      behavior: "revoke",
-      name: "product_line",
-      attributes: [],
-    }).run();
+    await runGenerator("product_line");
+    await runGenerator("product_line", [], { behavior: "revoke" });
 
     expect(fs.existsSync(path.join(tmpDir, "app/models/product-line.ts"))).toBe(false);
     expect(fs.existsSync(path.join(tmpDir, "test/models/product-line.test.ts"))).toBe(false);
@@ -140,18 +142,12 @@ describe("ScaffoldGeneratorTest", () => {
   it.skip("scaffold generator on revoke does not mutilate legacy map parameter", () => {});
 
   it("scaffold generator on revoke does not mutilate routes", async () => {
-    await makeGen("product_line").run();
+    await runGenerator("product_line");
     expect(readFile("config/routes.ts")).toBe(
       'export function drawRoutes(mapper: Mapper): void {\n  mapper.resources("product_lines");\n}\n',
     );
 
-    await new ScaffoldGenerator({
-      cwd: tmpDir,
-      output: () => {},
-      behavior: "revoke",
-      name: "product_line",
-      attributes: [],
-    }).run();
+    await runGenerator("product_line", [], { behavior: "revoke" });
 
     expect(readFile("config/routes.ts")).toBe(
       "export function drawRoutes(mapper: Mapper): void {\n}\n",
@@ -160,7 +156,12 @@ describe("ScaffoldGeneratorTest", () => {
 
   it.skip("scaffold generator ignores commented routes", () => {});
 
-  it.skip("scaffold generator with switch resource route false", () => {});
+  it("scaffold generator with switch resource route false", async () => {
+    await runGenerator("posts", ["--resource-route=false"]);
+    await Assertions.assertFile.call({ destinationRoot: tmpDir }, "config/routes.ts", (route) => {
+      assertNoMatch(/resources\("posts"\);$/m, route);
+    });
+  });
 
   it.skip("scaffold generator no helper with switch no helper", () => {});
 
@@ -169,7 +170,7 @@ describe("ScaffoldGeneratorTest", () => {
   it.skip("scaffold generator outputs error message on missing attribute type", () => {});
 
   it("scaffold generator belongs to and references", async () => {
-    const files = await makeGen("LineItem", ["product:belongs_to", "cart:references"]).run();
+    const files = await runGenerator("LineItem", ["product:belongs_to", "cart:references"]);
     const model = readFile("app/models/line-item.ts");
     expect(model).toContain('this.belongsTo("product")');
     expect(model).toContain('this.belongsTo("cart")');
@@ -196,11 +197,7 @@ describe("ScaffoldGeneratorTest", () => {
   });
 
   it("scaffold generator attachments", async () => {
-    await makeGen("Message", [
-      "video:attachment",
-      "photos:attachments",
-      "images:attachments",
-    ]).run();
+    await runGenerator("Message", ["video:attachment", "photos:attachments", "images:attachments"]);
     const model = readFile("app/models/message.ts");
     expect(model).toContain('this.hasManyAttached("photos")');
 
@@ -216,7 +213,7 @@ describe("ScaffoldGeneratorTest", () => {
   });
 
   it("scaffold generator rich text", async () => {
-    await makeGen("Message", ["content:rich_text"]).run();
+    await runGenerator("Message", ["content:rich_text"]);
     const model = readFile("app/models/message.ts");
     expect(model).toContain('this.hasRichText("content")');
 
@@ -265,25 +262,21 @@ describe("ScaffoldGeneratorTest (JavaScript project)", () => {
   });
 
   it("generates .js controller and model files", async () => {
-    const files = await new ScaffoldGenerator({
+    const files = await ScaffoldGenerator.start(["Post", "title:string"], {
       cwd: jsTmpDir,
       output: (m) => jsLines.push(m),
-      name: "Post",
-      attributes: ["title:string"],
-    }).run();
-    expect(files).toContain("app/controllers/posts-controller.js");
+    });
+    expect(fs.existsSync(path.join(jsTmpDir, "app/controllers/posts-controller.js"))).toBe(true);
     expect(files).toContain("app/models/post.js");
     const migFile = files.find((f) => f.startsWith("db/migrate/"));
     expect(migFile).toMatch(/\.js$/);
   });
 
   it("omits TypeScript annotations in controller", async () => {
-    await new ScaffoldGenerator({
+    await ScaffoldGenerator.start(["Post", "title:string"], {
       cwd: jsTmpDir,
       output: (m) => jsLines.push(m),
-      name: "Post",
-      attributes: ["title:string"],
-    }).run();
+    });
     const content = fs.readFileSync(
       path.join(jsTmpDir, "app/controllers/posts-controller.js"),
       "utf-8",

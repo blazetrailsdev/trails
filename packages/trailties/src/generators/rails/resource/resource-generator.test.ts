@@ -3,10 +3,13 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { ResourceGenerator } from "./resource-generator.js";
+import { assertMatch } from "@blazetrails/activesupport";
 import { ModelHelpers } from "../../model-helpers.js";
+import { assertFile, assertInstanceMethod } from "../../testing/assertions.js";
 
 let tmpDir: string;
 const opts = (extra: object = {}): any => ({ cwd: tmpDir, output: () => {}, ...extra });
+const host = () => ({ destinationRoot: tmpDir }) as never;
 const routes = (): string => fs.readFileSync(path.join(tmpDir, "config/routes.ts"), "utf-8");
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-resource-"));
@@ -29,12 +32,30 @@ describe("ResourceGeneratorTest", () => {
   });
 
   it("resource routes are added", async () => {
-    await new ResourceGenerator(opts({ name: "Account" })).run();
+    await ResourceGenerator.start(["Account"], opts());
     expect(routes()).toContain('mapper.resources("accounts");');
   });
 
+  it("resource controller with pluralized class name", async () => {
+    await ResourceGenerator.start(["account"], opts());
+    await assertFile.call(host(), "app/controllers/accounts-controller.ts", (content) =>
+      assertMatch(/class AccountsController extends ApplicationController/, content),
+    );
+    await assertFile.call(host(), "test/controllers/accounts-controller.test.ts");
+    await assertFile.call(host(), "app/helpers/accounts-helper.ts", (content) =>
+      assertMatch(/AccountsHelper/, content),
+    );
+  });
+
   it("resource controller with actions", async () => {
-    await new ResourceGenerator(opts({ name: "Product", actions: ["index"] })).run();
-    expect(routes()).not.toContain("mapper.resources");
+    await ResourceGenerator.start(["account", "--actions", "index", "new"], opts());
+
+    await assertFile.call(host(), "app/controllers/accounts-controller.ts", async (controller) => {
+      await assertInstanceMethod("index", controller);
+      await assertInstanceMethod("new", controller);
+    });
+
+    await assertFile.call(host(), "app/views/accounts/index.html.tse");
+    await assertFile.call(host(), "app/views/accounts/new.html.tse");
   });
 });
