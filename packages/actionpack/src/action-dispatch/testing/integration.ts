@@ -483,18 +483,20 @@ export class IntegrationTest extends TestCase {
   copySessionVariablesBang(): void {}
 
   /** @internal */
-  async beforeSetup(): Promise<void> {
+  beforeSetup(): unknown {
     this._app = undefined;
-    await super.beforeSetup?.();
-    await SetupAndTeardown.beforeSetup.call(this);
+    const result = super.beforeSetup?.();
+    return result instanceof Promise
+      ? result.then(() => SetupAndTeardown.beforeSetup.call(this))
+      : SetupAndTeardown.beforeSetup.call(this);
   }
 
   /** @internal */
-  async afterTeardown(
+  afterTeardown(
     test: Parameters<typeof SetupAndTeardown.afterTeardown>[0] = { failures: [] },
-  ): Promise<void> {
+  ): unknown {
     SetupAndTeardown.afterTeardown.call(this, test);
-    await super.afterTeardown?.(test as never);
+    return super.afterTeardown?.(test as never);
   }
 
   static override setup(this: object, ...args: FilterListEntry<object>[]): void {

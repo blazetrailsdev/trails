@@ -68,9 +68,9 @@ describe("ActionDispatch::Routing::Assertions", () => {
 
 interface Host {
   routes?: RouteSet;
-  beforeSetup(): unknown;
+  beforeSetup(): void;
   setup(): void;
-  afterTeardown(test: { failures: Error[] }): unknown;
+  afterTeardown(test: { failures: Error[] }): void;
   assertRouting: TestCase["assertRouting"];
   withRouting<T>(block: (routes: RouteSet) => T): T;
 }
@@ -78,14 +78,14 @@ type HostClass = (typeof TestCase | typeof IntegrationTest) & (new () => Host);
 
 function runTest<T extends Host>(klass: new () => T): () => T {
   let t: T;
-  beforeEach(async () => {
+  beforeEach(() => {
     t = new klass();
-    await t.beforeSetup();
+    t.beforeSetup();
     t.setup();
   });
-  afterEach(async () => {
+  afterEach(() => {
     const test = { failures: [] as Error[] };
-    await t.afterTeardown(test);
+    t.afterTeardown(test);
     expect(test.failures).toEqual([]);
   });
   return () => t;
@@ -107,14 +107,14 @@ function RoutingAssertionsSharedTests(t: () => Host): void {
 }
 
 function WithRoutingSharedTests(klass: HostClass, t: () => Host): void {
-  const beforeSetup = klass.prototype.beforeSetup as (this: Host) => unknown;
-  klass.prototype.beforeSetup = function (this: Host): unknown {
+  const beforeSetup = klass.prototype.beforeSetup;
+  klass.prototype.beforeSetup = function (this: Host): void {
     this.routes = new RouteSet();
     this.routes.draw((r) => {
       r.resources("articles");
     });
 
-    return beforeSetup.call(this);
+    beforeSetup.call(this);
   };
 
   klass.withRouting((routes: RouteSet) => {
