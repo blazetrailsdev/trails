@@ -456,7 +456,7 @@ export function secureCompare(a: string, b: string): boolean {
 export function statusCode(status: number | string): number {
   if (
     typeof status === "string" &&
-    (isSymbol(status) || (status.trim() !== "" && Number.isNaN(parseInt(status, 10))))
+    ((status.trim() !== "" && Number.isNaN(parseInt(status, 10))) || isSymbol(status))
   ) {
     const symbol = stringToSym(status);
     const name = symbolToS(symbol);
