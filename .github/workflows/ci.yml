@@ -349,7 +349,7 @@ jobs:
           unit_runs_on=$hosted
           if [ "$SAME_REPO" = true ] && [ -n "$GH_TOKEN" ]; then
             idle=$(gh api "repos/$GITHUB_REPOSITORY/actions/runners" \
-              --jq '[.runners[] | select(.status == "online" and (.busy | not) and ([.labels[].name] | index("ARM64")))] | length' \
+              --jq '[.runners[] | select(.status == "online" and (.busy | not) and ([.labels[].name] as $l | all("self-hosted", "debian", "ARM64"; IN($l[]))))] | length' \
               2>/dev/null) || idle=0
             if [[ "$idle" =~ ^[0-9]+$ ]] && [ "$idle" -gt 0 ]; then
               if [ "$AR_AFFECTED" = true ]; then
