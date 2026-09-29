@@ -3972,7 +3972,7 @@ export class SubMinuteOffsetZonedDateTime extends Temporal.ZonedDateTime {
       value: Math.round(utcOffset * 1_000_000_000),
       configurable: true,
     });
-    for (const name of SUB_MINUTE_WALL_CLOCK_RESULTS) {
+    for (const name of ["with", "withPlainTime", "round", "startOfDay"] as const) {
       const method = wallClock[name] as (...args: unknown[]) => Temporal.ZonedDateTime;
       Object.defineProperty(this, name, {
         value: (...args: unknown[]) =>
@@ -3987,14 +3987,6 @@ export class SubMinuteOffsetZonedDateTime extends Temporal.ZonedDateTime {
     }
   }
 }
-
-/** @noRailsEquivalent PERMANENT */
-const SUB_MINUTE_WALL_CLOCK_RESULTS = [
-  "with",
-  "withPlainTime",
-  "round",
-  "startOfDay",
-] as const satisfies readonly (keyof Temporal.ZonedDateTime)[];
 
 /** @noRailsEquivalent PERMANENT */
 const SUB_MINUTE_WALL_CLOCK_MEMBERS = [

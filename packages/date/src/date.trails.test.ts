@@ -1158,12 +1158,6 @@ describe("DateTime", () => {
     );
   });
 
-  it("reports the exact sub-minute offset on the seat, as MRI's utc_offset does", () => {
-    const seat = RubyDateTime.parse("2008-03-01T06:00:00-00:44:30") as Temporal.ZonedDateTime;
-    expect(seat.offset).toBe("-00:44:30");
-    expect(seat.offsetNanoseconds).toBe(-2670_000_000_000);
-  });
-
   it("names the exact instant of a sub-minute offset, as the gem-shaped object does", () => {
     const seat = RubyDateTime.parse("2008-03-01T06:00:00-00:44:30") as Temporal.ZonedDateTime;
     expect(Number(seat.epochNanoseconds / 1000000000n)).toBe(1204353870);

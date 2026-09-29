@@ -6,12 +6,6 @@ import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
 import { TEMPLATES } from "./templates.js";
 
-export interface ScaffoldGeneratorOptions extends NamedBaseOptions {
-  api?: boolean;
-  systemTests?: string;
-  modelName?: string;
-}
-
 export interface ScaffoldGenerator extends Included<typeof ResourceHelpers> {}
 
 export class ScaffoldGenerator extends NamedBase {
@@ -21,7 +15,7 @@ export class ScaffoldGenerator extends NamedBase {
   declare controllerFileName: string;
   /** @internal */
   declare _controllerClassPath: string[];
-  declare options: ScaffoldGeneratorOptions;
+  declare options: NamedBaseOptions & { api?: boolean };
   /** @internal */
   _fixtureName?: string;
 

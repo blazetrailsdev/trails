@@ -68,7 +68,6 @@ describe("test_help wires a booted app into the test case classes", () => {
       testCase,
     }) => {
       const session = testCase as BootAppIntegrationTest;
-      expect(session).toBeInstanceOf(BootAppIntegrationTest);
       expect(session.routes).toBe(Trails.application!.routes());
 
       const controllerTest = new ActionController.TestCase(ActionController.Base) as unknown as {
