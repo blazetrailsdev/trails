@@ -20,13 +20,8 @@ import {
   commitCsrfToken,
   type CsrfTokenStorage,
   formAuthenticityToken,
-  isAnyAuthenticityTokenValid,
-  isMarkedForSameOriginVerification,
-  isNonXhrJavascriptResponse,
   isProtectAgainstForgery,
-  markForSameOriginVerificationBang,
   protectionMethodClass,
-  resetCsrfToken,
   SessionStore,
   storageStrategy,
   verifyAuthenticityToken,
@@ -275,12 +270,7 @@ export interface Base {
   verifyAuthenticityToken(): void;
   formAuthenticityToken(options?: { formOptions?: { action?: string; method?: string } }): string;
   commitCsrfToken(request: Request): void;
-  resetCsrfToken(request: Request): void;
-  isAnyAuthenticityTokenValid(): boolean;
   verifySameOriginRequest(): void;
-  markForSameOriginVerificationBang(): boolean;
-  isMarkedForSameOriginVerification(): boolean;
-  isNonXhrJavascriptResponse(): boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -878,14 +868,9 @@ include(Base, Cookies);
 Base.prototype.redirectBack = redirectBack;
 Base.prototype.redirectBackOrTo = redirectBackOrTo;
 Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
-Base.prototype.resetCsrfToken = resetCsrfToken as never;
 Base.prototype.commitCsrfToken = commitCsrfToken as never;
 Base.prototype.verifyAuthenticityToken = verifyAuthenticityToken;
 Base.prototype.verifySameOriginRequest = verifySameOriginRequest;
-Base.prototype.markForSameOriginVerificationBang = markForSameOriginVerificationBang;
-Base.prototype.isMarkedForSameOriginVerification = isMarkedForSameOriginVerification;
-Base.prototype.isNonXhrJavascriptResponse = isNonXhrJavascriptResponse;
-Base.prototype.isAnyAuthenticityTokenValid = isAnyAuthenticityTokenValid;
 Base.prototype.formAuthenticityToken = formAuthenticityToken;
 Base.prototype.isProtectAgainstForgery = isProtectAgainstForgery;
 include(Base, Flash);
