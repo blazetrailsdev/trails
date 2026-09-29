@@ -445,19 +445,23 @@ export function secureCompare(a: string, b: string): boolean {
 }
 
 export function statusCode(status: number | string | symbol): number {
-  if (typeof status === "number") return status;
-  const s = String(status);
-  const num = parseInt(s, 10);
-  if (!isNaN(num) && String(num) === s) return num;
-  if (Object.hasOwn(SYMBOL_TO_STATUS_CODE, s)) return SYMBOL_TO_STATUS_CODE[s];
-  if (!Object.hasOwn(OBSOLETE_SYMBOLS_TO_STATUS_CODES, s)) {
-    throw new ArgumentError(`Unrecognized status code ${rbInspect(`:${s}`)}`);
+  if (
+    typeof status === "symbol" ||
+    (typeof status === "string" && Number.isNaN(parseInt(status, 10)))
+  ) {
+    const name = String(status);
+    if (Object.hasOwn(SYMBOL_TO_STATUS_CODE, name)) return SYMBOL_TO_STATUS_CODE[name];
+    if (!Object.hasOwn(OBSOLETE_SYMBOLS_TO_STATUS_CODES, name)) {
+      throw new ArgumentError(`Unrecognized status code ${rbInspect(`:${name}`)}`);
+    }
+    const fallbackCode = OBSOLETE_SYMBOLS_TO_STATUS_CODES[name];
+    const message = `Status code ${rbInspect(`:${name}`)} is deprecated and will be removed in a future version of Rack.`;
+    const canonicalSymbol = OBSOLETE_SYMBOL_MAPPINGS[name];
+    if (canonicalSymbol === undefined) console.warn(message);
+    return fallbackCode;
+  } else {
+    return typeof status === "number" ? Math.trunc(status) : parseInt(status, 10);
   }
-  const fallbackCode = OBSOLETE_SYMBOLS_TO_STATUS_CODES[s];
-  const message = `Status code ${rbInspect(`:${s}`)} is deprecated and will be removed in a future version of Rack.`;
-  const canonicalSymbol = OBSOLETE_SYMBOL_MAPPINGS[s];
-  if (canonicalSymbol === undefined) console.warn(message);
-  return fallbackCode;
 }
 
 export const HTTP_STATUS_CODES: Record<number, string> = {

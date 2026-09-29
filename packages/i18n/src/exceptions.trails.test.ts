@@ -89,6 +89,17 @@ describe("exceptions", () => {
     expect(exception.options).toEqual({ scope: "bar" });
   });
 
+  it("InvalidPluralizationData inspects a nested entry with Symbol keys", () => {
+    const exception = new InvalidPluralizationData(
+      { other: { zero: "none" }, few: ["a"] },
+      2,
+      "one",
+    );
+    expect(exception.message).toBe(
+      `translation data {:other=>{:zero=>"none"}, :few=>["a"]} can not be used with :count => 2. key 'one' is missing.`,
+    );
+  });
+
   it("MissingTranslation inspects Proc options", () => {
     const exception = new MissingTranslation("de", "foo", { default: () => "x" });
     expect(exception.options["default"]).toMatch(/^#<Proc:0x[0-9a-f]{16}>$/);

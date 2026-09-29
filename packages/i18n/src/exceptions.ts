@@ -8,9 +8,13 @@ import {
 
 export { NoMethodError };
 
-function symbolizeKeys(hash: unknown): unknown {
-  if (typeof hash !== "object" || hash === null || Array.isArray(hash)) return hash;
-  return Object.fromEntries(Object.entries(hash).map(([k, v]) => [toSym(k), v]));
+function deepSymbolizeKeys(object: unknown): unknown {
+  if (Array.isArray(object)) return object.map(deepSymbolizeKeys);
+  if (typeof object !== "object" || object === null) return object;
+  if (Object.getPrototypeOf(object) !== Object.prototype) return object;
+  return Object.fromEntries(
+    Object.entries(object).map(([key, value]) => [toSym(key), deepSymbolizeKeys(value)]),
+  );
 }
 
 export class ArgumentError extends RubyArgumentError {
@@ -144,7 +148,7 @@ export class InvalidPluralizationData extends ArgumentError {
 
   constructor(entry: unknown, count: unknown, key: TranslationKey) {
     super(
-      `translation data ${rbInspect(symbolizeKeys(entry))} can not be used with :count => ${count}. key '${key}' is missing.`,
+      `translation data ${rbInspect(deepSymbolizeKeys(entry))} can not be used with :count => ${count}. key '${key}' is missing.`,
     );
     this.name = "InvalidPluralizationData";
     this.entry = entry;
@@ -160,7 +164,7 @@ export class MissingInterpolationArgument extends ArgumentError {
 
   constructor(key: string, values: Record<string, unknown>, string: string) {
     super(
-      `missing interpolation argument ${rbInspect(key)} in ${rbInspect(string)} (${rbInspect(symbolizeKeys(values))} given)`,
+      `missing interpolation argument ${rbInspect(key)} in ${rbInspect(string)} (${rbInspect(deepSymbolizeKeys(values))} given)`,
     );
     this.name = "MissingInterpolationArgument";
     this.key = key;

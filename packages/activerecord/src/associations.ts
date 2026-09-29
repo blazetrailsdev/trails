@@ -421,29 +421,24 @@ export function _skipSingularStatementCache(
 }
 
 export async function _loadSingularViaStatementCache(
-  record: Base,
+  owner: Base,
   assocName: string,
   reflection: ReflectionLike,
   targetModel: typeof Base,
 ): Promise<Base | null> {
-  let instance:
-    | {
-        targetScope?: () => unknown;
-        setInverseInstance(record: Base): Base;
-        setStrictLoading(record: Base): Base;
-      }
-    | undefined;
-  const assocFn = (record as { association?: (n: string) => unknown }).association;
+  let instance: AssociationInstance | undefined;
+  const assocFn = (owner as { association?: (n: string) => unknown }).association;
   if (typeof assocFn === "function") {
     try {
-      instance = assocFn.call(record, assocName) as typeof instance;
+      instance = assocFn.call(owner, assocName) as typeof instance;
     } catch (e) {
       if (!(e instanceof AssociationNotFoundError)) throw e;
     }
   }
+  const targetScope = (instance as { targetScope?: () => unknown } | undefined)?.targetScope;
   const baseScope = (): Relation<Base> =>
-    (typeof instance?.targetScope === "function"
-      ? (instance.targetScope() as Relation<Base>)
+    (typeof targetScope === "function"
+      ? (targetScope.call(instance) as Relation<Base>)
       : undefined) ?? _scopeForAssociation(targetModel);
   const sc = (await (
     reflection as unknown as {
@@ -453,17 +448,17 @@ export async function _loadSingularViaStatementCache(
         block: (params: { bind(): unknown }) => unknown,
       ): unknown;
     }
-  ).associationScopeCache(targetModel, record, (params: { bind(): unknown }) => {
+  ).associationScopeCache(targetModel, owner, (params: { bind(): unknown }) => {
     const as = AssociationScope.create(() => params.bind());
     const built = as.scope({
-      owner: record,
+      owner,
       reflection: reflection as never,
       klass: targetModel,
     }) as Relation<Base>;
     return baseScope().merge(built) as never;
   })) as StatementCache;
   const chain = (reflection as unknown as { chain: never[] }).chain;
-  const binds = AssociationScope.getBindValues(record, chain);
+  const binds = AssociationScope.getBindValues(owner, chain);
   const records = await targetModel.withConnection((c) =>
     sc.execute(binds, c, { allowRetry: true }, (record) => {
       instance?.setInverseInstance(record);
