@@ -1,4 +1,6 @@
 import {
+  camelize,
+  safeConstantize,
   underscore as _underscore,
   dasherize as _dasherize,
   extractOptionsBang,
@@ -18,6 +20,7 @@ import {
   RuntimeError,
 } from "@blazetrails/ruby-compat";
 import { Generators, type GeneratorClass } from "../generators.js";
+import { GeneratorError } from "./generated-attribute.js";
 import * as Actions from "./actions.js";
 import type { GeneratorActionsState } from "./actions.js";
 import * as TrailsActions from "./trails-actions.js";
@@ -68,6 +71,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   declare private static _hooks: Record<string, [string | undefined, string | undefined]>;
   declare private static _invocations: Record<string, boolean>;
   declare private static _invocationBlocks: Record<string, HookBlock>;
+  declare private static _commands: string[];
 
   static {
     this.classOption("skipNamespace", {
@@ -392,8 +396,19 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     return instance.getCreatedFiles();
   }
 
+  protected static commands(): string[] {
+    if (!Object.prototype.hasOwnProperty.call(this, "_commands")) this._commands = [];
+    return this._commands;
+  }
+
   private static allCommands(): string[] {
     const commands: string[] = [];
+    for (
+      let proto: GeneratorBase = this.prototype;
+      proto !== GeneratorBase.prototype;
+      proto = Object.getPrototypeOf(proto) as GeneratorBase
+    )
+      commands.unshift(...(proto.constructor as typeof GeneratorBase).commands());
     if (typeof (this.prototype as { run?: unknown }).run === "function") commands.push("run");
     for (const name of Object.keys(this.invocations()))
       commands.push(
@@ -441,7 +456,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
           if (!(options[name] != null && options[name] !== false)) return;
 
           let value = options[name];
-          if (value === true) value = name;
+          if (value === true) value = _underscore(name);
           const ctor = this.constructor as typeof GeneratorBase;
           const klass = await ctor.prepareForInvocation(name, value);
 
@@ -602,6 +617,39 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     } else {
       await this.invoke(klass, command);
     }
+  }
+
+  protected classCollisions(...classNames: Array<string | string[]>): void {
+    if (this.behavior !== "invoke") return;
+    const options = this.options as GeneratorOptions & { skipCollisionCheck?: boolean };
+    if (options.skipCollisionCheck) return;
+    if (options.force) return;
+
+    for (let className of classNames.flat()) {
+      className = String(className);
+      if (className.trim() === "") continue;
+
+      const nesting = className.split("::");
+      const lastName = nesting.pop()!;
+      const last = this.extractLastModule(nesting);
+
+      if (last && safeConstantize([...last, camelize(lastName)].join("::")) !== undefined) {
+        throw new GeneratorError(
+          `The name '${className}' is either already used in your application ` +
+            "or reserved by Ruby on Rails. Please choose an alternative or use --skip-collision-check " +
+            "or --force to skip this check and run this generator again.",
+        );
+      }
+    }
+  }
+
+  protected extractLastModule(nesting: string[]): string[] | undefined {
+    const lastModule: string[] = [];
+    for (const nest of nesting) {
+      if (safeConstantize([...lastModule, nest].join("::")) === undefined) return undefined;
+      lastModule.push(nest);
+    }
+    return lastModule;
   }
 
   /** @internal */

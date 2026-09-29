@@ -6,7 +6,7 @@ import {
   humanize,
   upcaseFirst,
 } from "@blazetrails/activesupport";
-import { compact, initializeIncludedModules } from "@blazetrails/ruby-compat";
+import { compact, initializeIncludedModules, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "./base.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
 
@@ -137,5 +137,20 @@ export class NamedBase extends GeneratorBase {
       if (a.polymorphic()) names.push(`${a.name}_type`);
     }
     return names;
+  }
+
+  static checkClassCollision(options: { prefix?: string; suffix?: string } = {}): void {
+    Object.defineProperty(this.prototype, "checkClassCollision", {
+      value: function (this: NamedBase & { controllerClassName(): string }): void {
+        const name = rbObjRespondTo(this, "controllerClassName", true)
+          ? this.controllerClassName()
+          : this.className();
+
+        this.classCollisions(`${options.prefix ?? ""}${name}${options.suffix ?? ""}`);
+      },
+      configurable: true,
+      writable: true,
+    });
+    this.commands().push("checkClassCollision");
   }
 }

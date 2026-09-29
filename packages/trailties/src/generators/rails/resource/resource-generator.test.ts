@@ -29,12 +29,12 @@ describe("ResourceGeneratorTest", () => {
   });
 
   it("resource routes are added", async () => {
-    await new ResourceGenerator(opts({ name: "Account" })).run();
+    await ResourceGenerator.start(["Account"], opts());
     expect(routes()).toContain('mapper.resources("accounts");');
   });
 
   it("resource controller with actions", async () => {
-    await new ResourceGenerator(opts({ name: "Product", actions: ["index"] })).run();
+    await ResourceGenerator.start(["Product"], opts({ actions: ["index"] }));
     expect(routes()).not.toContain("mapper.resources");
   });
 });

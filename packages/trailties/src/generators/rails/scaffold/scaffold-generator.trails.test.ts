@@ -20,8 +20,8 @@ const read = (relativePath: string) => fs.readFileSync(path.join(tmpDir, relativ
 describe("ScaffoldGenerator (namespaced)", () => {
   it("names a namespaced scaffold's migration create_<table_name> and routes it under /admin/accounts", async () => {
     fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
-    const options = { cwd: tmpDir, output: () => {}, name: "admin/account" };
-    const files = await new ScaffoldGenerator({ ...options, attributes: ["name:string"] }).run();
+    const config = { cwd: tmpDir, output: () => {} };
+    const files = await ScaffoldGenerator.start(["admin/account", "name:string"], config);
     const migration = files.find((f) => f.startsWith("db/migrate/"))!;
     expect(migration).toMatch(/^db\/migrate\/\d+_create_admin_accounts\.ts$/);
     expect(read(migration)).toContain('this.createTable("admin_accounts"');
@@ -41,7 +41,7 @@ describe("ScaffoldGenerator (namespaced)", () => {
       expect(read(`app/views/admin/accounts/${view}.html.tse`)).toContain(
         'linkTo("Back to accounts", adminAccountsPath())',
       );
-    const rerun = new ScaffoldGenerator({ ...options, force: true }).run();
+    const rerun = ScaffoldGenerator.start(["admin/account"], { ...config, force: true });
     await expect(rerun).resolves.toContain("app/models/admin/account.ts");
   });
 });
@@ -49,12 +49,7 @@ describe("ScaffoldGenerator (namespaced)", () => {
 describe("ScaffoldGenerator (views)", () => {
   it("emits Rails' scaffold copy and a record partial that show and index render", async () => {
     fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
-    await new ScaffoldGenerator({
-      cwd: tmpDir,
-      output: () => {},
-      name: "post",
-      attributes: ["title:string"],
-    }).run();
+    await ScaffoldGenerator.start(["post", "title:string"], { cwd: tmpDir, output: () => {} });
     const index = read("app/views/posts/index.html.tse");
     expect(index).toContain('<%= linkTo("Show this post", post) %>');
     expect(index).toContain("<%= render(post) %>");
