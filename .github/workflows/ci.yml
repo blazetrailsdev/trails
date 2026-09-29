@@ -29,6 +29,10 @@ on:
     #                         touch packages/website/
     #   release             — implies `website` (release PRs need the site
     #                         built); reserve other release-only suites here
+    #   self-hosted-experiment — run the jobs that read the `changes` job's
+    #                         `runner` output on the self-hosted arm64 runner.
+    #                         Ignored for fork PRs. Those jobs stay in the `ci`
+    #                         aggregator's `needs:`, so it still gates the merge.
     # `ready_for_review` is what starts the draft-deferred PG/MariaDB suites;
     # without it a PR can reach ready with no adapter coverage and no event
     # left to trigger it.
@@ -343,9 +347,9 @@ jobs:
   # `vars.RUNNER` is a single runner label (e.g. `self-hosted` or
   # `ubuntu-latest`). GitHub treats `runs-on:` as one literal label when given
   # a string, so a comma-separated value like `self-hosted,Linux,X64` will
-  # NOT match any runner. If a multi-label selector is ever needed, switch
-  # this expression to `fromJSON(vars.RUNNER)` and store the variable as a
-  # JSON array. Today the plan is to set it to exactly `self-hosted`.
+  # NOT match any runner. It reaches `runs-on:` through the `changes` job's
+  # `runner` output; if a multi-label selector is ever needed, drop that
+  # output's `toJSON(...)` and store the variable as a JSON array.
   build-and-typecheck:
     name: Build & Type Check
     needs: changes
@@ -1566,14 +1570,13 @@ jobs:
     # Stays on hosted: SvelteKit + VitePress + typedoc build is too slow
     # on the self-hosted box and ties up a runner slot that cheaper jobs
     # could use. Hosted parallelism is free.
-    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Cache VitePress + Vite build artifacts
-        if: runner.environment == 'github-hosted'
         uses: actions/cache@v4
         with:
           path: |
