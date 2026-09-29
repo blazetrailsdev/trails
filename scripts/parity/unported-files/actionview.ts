@@ -41,7 +41,6 @@ export const ACTIONVIEW_UNPORTED_FILES: UnportedFile[] = [
       "support class for a layer trails does not port.",
   },
   { pattern: "helpers/form_options_helper.rb", package: "actionview", reason: FORM_HELPER_REASON },
-  { pattern: "helpers/tags/base.rb", package: "actionview", reason: FORM_HELPER_REASON },
   {
     pattern: "helpers/tags/collection_check_boxes.rb",
     package: "actionview",

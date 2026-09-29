@@ -1,8 +1,19 @@
-import { SafeBuffer, constantize, cattrAccessor, onLoad } from "@blazetrails/activesupport";
+import {
+  CodeGenerator,
+  SafeBuffer,
+  classAttribute,
+  constantize,
+  cattrAccessor,
+  extractOptionsBang,
+  onLoad,
+} from "@blazetrails/activesupport";
 import {
   ArgumentError,
+  block,
   except,
+  fetch,
   hashDelete,
+  merge,
   mergeBang,
   rbInspect,
   rbObjRespondTo,
@@ -19,6 +30,11 @@ import {
   htmlOptionsForForm,
   type FormTagHelperHost,
 } from "./form-tag-helper.js";
+import { SearchField } from "./tags/search-field.js";
+import { TextField } from "./tags/text-field.js";
+
+const __FILE__ = import.meta.url;
+const __LINE__ = 0;
 
 export interface FormHelperHost extends FormTagHelperHost, CaptureHelperHost {
   defaultFormBuilder: unknown;
@@ -88,6 +104,24 @@ export function formWith(
     const htmlOptions = htmlOptionsForFormWith.call(this, url, model, options);
     return formTagHtml.call(this, htmlOptions);
   }
+}
+
+export function textField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new TextField(objectName, method, this, options).render();
+}
+
+export function searchField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new SearchField(objectName, method, this, options).render();
 }
 
 export function _objectForFormBuilder(object: unknown): unknown {
@@ -171,7 +205,49 @@ export function defaultFormBuilderClass(this: FormHelperHost): typeof FormBuilde
   return (typeof builder === "string" ? constantize(builder) : builder) as typeof FormBuilder;
 }
 
+type FieldHelper = (method: unknown, options?: Record<string, unknown>) => unknown;
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the `CodeGenerator.batch` field methods (form_helper.rb:2024-2033) surface on the type side.
+export interface FormBuilder {
+  textField: FieldHelper;
+  searchField: FieldHelper;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class FormBuilder {
+  declare static fieldHelpers: string[];
+
+  static {
+    classAttribute.call(this, "fieldHelpers", {
+      default: [
+        "fieldsFor",
+        "fields",
+        "label",
+        "textField",
+        "passwordField",
+        "hiddenField",
+        "fileField",
+        "textarea",
+        "checkbox",
+        "radioButton",
+        "colorField",
+        "searchField",
+        "telephoneField",
+        "phoneField",
+        "dateField",
+        "timeField",
+        "datetimeField",
+        "datetimeLocalField",
+        "monthField",
+        "weekField",
+        "urlField",
+        "emailField",
+        "numberField",
+        "rangeField",
+      ],
+    });
+  }
+
   objectName: string | null;
   object: unknown;
   options: Record<string, unknown>;
@@ -240,6 +316,67 @@ export class FormBuilder {
     this._multipart = null;
     const index = options["index"];
     this.index = index != null && index !== false ? index : options["childIndex"];
+  }
+
+  fieldId(method: unknown, ...suffixes: unknown[]): string {
+    const kwargs = extractOptionsBang(suffixes);
+    const namespace = fetch(kwargs, "namespace", this.options["namespace"]);
+    const index = fetch(kwargs, "index", this.options["index"]);
+    return this._template.fieldId(this.objectName, method, ...suffixes, {
+      namespace: namespace,
+      index: index,
+    });
+  }
+
+  fieldName(method: unknown, ...methods: unknown[]): string {
+    const kwargs = extractOptionsBang(methods);
+    const multiple = fetch(kwargs, "multiple", false);
+    const index = fetch(kwargs, "index", this.options["index"]);
+    const objectName = fetch(
+      this.options,
+      "as",
+      block(() => this.objectName),
+    );
+
+    return this._template.fieldName(objectName, method, ...methods, {
+      index: index,
+      multiple: multiple,
+    });
+  }
+
+  static {
+    CodeGenerator.batch(this, __FILE__, __LINE__, (codeGenerator) => {
+      const excluded = [
+        "label",
+        "checkbox",
+        "radioButton",
+        "fieldsFor",
+        "fields",
+        "hiddenField",
+        "fileField",
+      ];
+      for (const selector of this.fieldHelpers.filter((helper) => !excluded.includes(helper))) {
+        codeGenerator.classEval((batch) => {
+          batch.push((proto) => {
+            proto[selector] = function (
+              this: FormBuilder,
+              method: unknown,
+              options: Record<string, unknown> = {},
+            ): unknown {
+              return (this._template as unknown as Record<string, (...args: unknown[]) => unknown>)[
+                selector
+              ].call(this._template, this.objectName, method, this.objectifyOptions(options));
+            };
+          });
+        });
+      }
+    });
+  }
+
+  private objectifyOptions(options: Record<string, unknown>): Record<string, unknown> {
+    const result = merge(this._defaultOptions, options);
+    result["object"] = this.object;
+    return result;
   }
 
   private nestedChildIndex(name: string): number {
