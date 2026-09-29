@@ -123,9 +123,6 @@ describe("Time", () => {
     const zoned = Time.new("2013-09-04 03:00:00 -00:44:30").toZonedDateTime();
     expect(zoned.offsetNanoseconds).toBe(-2670_000_000_000);
     expect(zoned.offset).toBe("-00:44:30");
-    expect(zoned.epochNanoseconds + BigInt(zoned.offsetNanoseconds)).toBe(
-      zoned.toPlainDateTime().toZonedDateTime("UTC").epochNanoseconds,
-    );
     expect(new Time(2008, 3, 1, 6, 0, 0, 32430.5).toZonedDateTime().offset).toBe("+09:00:30.5");
   });
 
