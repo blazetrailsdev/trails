@@ -2,10 +2,9 @@ import { ArgumentError, assertValidKeys } from "./hash-utils.js";
 import { I18n } from "./i18n.js";
 import { camelize, pluralize, singularize, underscore } from "./inflector.js";
 import * as XmlMini from "./xml-mini.js";
-import { isPlainObject } from "./hash-utils.js";
 import { rbInspect as inspect, rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { isEmpty } from "@blazetrails/ruby-compat";
-import { rbObjClass } from "@blazetrails/ruby-compat";
+import { rbEqq, rbObjClass } from "@blazetrails/ruby-compat";
 
 export function wrap<T>(object: T | T[] | null | undefined): T[] {
   if (object === null || object === undefined) return [];
@@ -192,7 +191,14 @@ export function toXml(
   options.builder ??= new XmlMini.IndentedXmlStringBuilder("", options.indent);
   options.root ??= (() => {
     const first = self[0];
-    if (!isPlainObject(first) && self.every((e) => rbObjClass(e) === rbObjClass(first))) {
+    if (
+      rbObjClass(first) !== "Hash" &&
+      self.every((e) =>
+        typeof first === "object" && first !== null
+          ? rbEqq(first.constructor, e)
+          : rbObjClass(e) === rbObjClass(first),
+      )
+    ) {
       const underscored = underscore(rbObjClass(first));
       return pluralize(underscored).replaceAll("/", "_");
     } else {
