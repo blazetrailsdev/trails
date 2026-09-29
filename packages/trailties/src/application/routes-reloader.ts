@@ -92,12 +92,16 @@ export class RoutesReloader {
   }
 }
 
+let loads = 0;
+
 async function loadRoutesFile(this: RoutesReloader, path: string): Promise<void> {
   const p = getPath();
   if (!p.pathToFileURL) {
     throw new Error("PathAdapter.pathToFileURL() is required to load a routes file.");
   }
-  const mod = (await import(p.pathToFileURL(path).href)) as {
+  const url = p.pathToFileURL(path);
+  url.searchParams.set("load", String(++loads));
+  const mod = (await import(url.href)) as {
     drawRoutes?: (mapper: Mapper) => void;
   };
   const drawRoutes = mod.drawRoutes;

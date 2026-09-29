@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { onLoad } from "@blazetrails/activesupport";
+import { onLoad, resetLoadHooks } from "@blazetrails/activesupport";
 import { controllerConstants } from "@blazetrails/actionpack";
 import { bodyToString } from "@blazetrails/rack";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
@@ -9,6 +9,7 @@ import { Trails } from "./rails.js";
 describe("a generated app reloads its views in development", () => {
   let tmp: string;
   afterEach(() => {
+    resetLoadHooks();
     FileUtils.rmRf(tmp);
     Trails.application = null;
     Application.appClass = null;

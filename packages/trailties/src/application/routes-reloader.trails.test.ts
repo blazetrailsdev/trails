@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Dir, FileUtils } from "@blazetrails/ruby-compat";
+import type { DrawCallback, Mapper } from "@blazetrails/actionpack";
+import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { RoutesReloader, type RouteSetLike } from "./routes-reloader.js";
 
 type Counted = RouteSetLike & { calls: string[] };
@@ -30,6 +31,30 @@ describe("RoutesReloader", () => {
       await r.execute();
       expect(r.isUpdated()).toBe(false);
       expect(a.calls).toEqual(["clear", "finalize"]);
+    } finally {
+      FileUtils.rmRf(tmp);
+    }
+  });
+
+  it("execute loads the edited routes file, not the previously imported one", async () => {
+    const tmp = Dir.mktmpdir("routes_reloader");
+    try {
+      const routes = `${tmp}/routes.ts`;
+      File.write(routes, `export function drawRoutes(mapper) { mapper.get("/before"); }\n`);
+      const drawn: string[] = [];
+      const r = new RoutesReloader();
+      r.routeSets.push({
+        ...makeRouteSet(),
+        draw: (block: DrawCallback) =>
+          block({ get: (path: string) => void drawn.push(path) } as unknown as Mapper),
+      });
+      r.paths.push(routes);
+
+      await r.execute();
+      File.write(routes, `export function drawRoutes(mapper) { mapper.get("/after"); }\n`);
+      await r.execute();
+
+      expect(drawn).toEqual(["/before", "/after"]);
     } finally {
       FileUtils.rmRf(tmp);
     }
