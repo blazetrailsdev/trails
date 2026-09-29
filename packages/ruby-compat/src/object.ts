@@ -504,11 +504,6 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
   return String(value);
 }
 
-/**
- * `sym_inspect` (`vendor/ruby/v3.3.11/string.c:11692-11720`): the colon, then the
- * name as is when `rb_str_symname_p` (`string.c:11630-11646`) accepts it, else
- * the name's `String#inspect`.
- */
 function symInspect(sym: string): string {
   const name = sym.slice(1);
   return strSymnameP(name) ? sym : `:${stringInspect(name)}`;
@@ -520,13 +515,6 @@ const SYM_PREFIXED_IDENT = /^(?:@@?|\$)[\p{L}_\P{ASCII}][\p{L}\p{N}_\P{ASCII}]*$
 const SYM_IDENT = /^[\p{L}_\P{ASCII}][\p{L}\p{N}_\P{ASCII}]*[?!=]?$/u;
 const SYM_UNPRINTABLE = /[\p{Cc}\p{Cn}\p{Cs}\p{Zl}\p{Zp}]/u;
 
-/**
- * `rb_str_symname_p` (`vendor/ruby/v3.3.11/string.c:11630-11646`) over
- * `rb_enc_symname_type` (`symbol.c:374-413`) with the `IDSET_ATTRSET_FOR_SYNTAX`
- * attrset `rb_enc_symname2_p` passes: an operator, a special or named global,
- * an instance or class variable, or a local / constant name with an optional
- * `?`, `!` or `=` suffix — and printable throughout (`sym_printable`, `:11614`).
- */
 function strSymnameP(name: string): boolean {
   if (SYM_UNPRINTABLE.test(name)) return false;
   return (

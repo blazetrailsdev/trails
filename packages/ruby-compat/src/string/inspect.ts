@@ -21,7 +21,6 @@ export function stringInspect(str: string): string {
     const char = chars[i];
     const c = char.codePointAt(0)!;
 
-    // (`vendor/ruby/v3.3.11/string.c:6810-6820`) meets and writes as `\xXX` each.
     if (c >= 0xd800 && c <= 0xdfff) {
       for (const byte of [0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f)]) {
         result += `\\x${byte.toString(16).toUpperCase()}`;
