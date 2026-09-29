@@ -454,7 +454,10 @@ export function secureCompare(a: string, b: string): boolean {
 }
 
 export function statusCode(status: number | string): number {
-  if (typeof status === "string" && (isSymbol(status) || Number.isNaN(parseInt(status, 10)))) {
+  if (
+    typeof status === "string" &&
+    (isSymbol(status) || (status.trim() !== "" && Number.isNaN(parseInt(status, 10))))
+  ) {
     const symbol = stringToSym(status);
     const name = symbolToS(symbol);
     if (Object.hasOwn(SYMBOL_TO_STATUS_CODE, name)) return SYMBOL_TO_STATUS_CODE[name];
@@ -467,7 +470,7 @@ export function statusCode(status: number | string): number {
     if (canonicalSymbol === undefined) console.warn(message);
     return fallbackCode;
   } else {
-    return typeof status === "number" ? Math.trunc(status) : parseInt(status, 10);
+    return typeof status === "number" ? Math.trunc(status) : parseInt(status, 10) || 0;
   }
 }
 

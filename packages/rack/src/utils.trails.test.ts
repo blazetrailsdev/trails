@@ -19,5 +19,7 @@ describe("Utils.statusCode", () => {
   it("converts a numeric String with to_i", () => {
     expect(Utils.statusCode("200abc")).toBe(200);
     expect(Utils.statusCode(" 42")).toBe(42);
+    expect(Utils.statusCode("")).toBe(0);
+    expect(Utils.statusCode("  ")).toBe(0);
   });
 });
