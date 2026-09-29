@@ -3878,6 +3878,7 @@ export function main() {
       file = m.file ?? "",
       scope: "package" | "dep" = "package",
       owner = "",
+      statesSeat = owner !== "",
     ) => {
       if (scope === "package") {
         const owners = tsOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
@@ -3909,8 +3910,10 @@ export function main() {
           writerOwners.set(m.name, (writerOwners.get(m.name) ?? new Set<string>()).add(owner));
           tsWriterOwnersByFileName.set(file, writerOwners);
         }
-        // A top-level function (`owner === ""`) states no seat — see tsOwnerSeat.
-        if (owner !== "") {
+        // A top-level function (`owner === ""`) states no seat — see tsOwnerSeat —
+        // and neither does a non-static member of an object literal
+        // (`ClassInfo.objectLiteral`).
+        if (statesSeat) {
           const bySeat =
             m.isStatic === true ? tsStaticOwnersByFileName : tsInstanceOwnersByFileName;
           const seatOwners = bySeat.get(file) ?? new Map<string, Set<string>>();
@@ -4034,7 +4037,13 @@ export function main() {
         for (const m of [...cls.instanceMethods, ...cls.classMethods]) {
           if (tsShouldInclude(m)) {
             methods.add(m.name);
-            recordTsParams(m, file, "package", cls.name);
+            recordTsParams(
+              m,
+              file,
+              "package",
+              cls.name,
+              cls.objectLiteral !== true || m.isStatic === true,
+            );
           }
         }
         tsMethodsByFile.set(file, methods);

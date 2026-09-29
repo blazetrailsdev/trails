@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { DebugExceptions, type Logger } from "../middleware/debug-exceptions.js";
+import { DebugExceptions } from "../middleware/debug-exceptions.js";
+import { StringIO } from "@blazetrails/ruby-compat";
 import { NotImplemented } from "../../action-controller/metal/exceptions.js";
 import { Request } from "../http/request.js";
 import { MimeType } from "../http/mime-type.js";
-import { HASH_CONVERSIONS } from "@blazetrails/activesupport";
+import { HASH_CONVERSIONS, Logger, TaggedLogging } from "@blazetrails/activesupport";
 import { bodyToString } from "@blazetrails/rack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
@@ -94,13 +95,18 @@ describe("DebugExceptions API body conversions", () => {
 
 describe("DebugExceptions#log_error rescue_response? gate", () => {
   async function logged(app: (env: RackEnv) => Promise<RackResponse>): Promise<string[]> {
-    const messages: string[] = [];
-    const logger: Logger = { error: (msg) => messages.push(msg) };
-    await new DebugExceptions(app, { logger, logRescuedResponses: false }).call({
+    const output = new StringIO();
+    await new DebugExceptions(app).call({
       REQUEST_METHOD: "GET",
       PATH_INFO: "/test",
+      "action_dispatch.logger": new Logger(output),
+      "action_dispatch.log_rescued_responses": false,
     });
-    return messages;
+    output.rewind();
+    return output
+      .read()
+      .split(/(?<=\n)/)
+      .filter((line) => line !== "");
   }
 
   it("skips a 5xx rescue response when log_rescued_responses is false", async () => {
@@ -112,5 +118,19 @@ describe("DebugExceptions#log_error rescue_response? gate", () => {
 
   it("logs an exception with no rescue response when log_rescued_responses is false", async () => {
     expect((await logged(errorApp)).length).toBeGreaterThan(0);
+  });
+});
+
+describe("DebugExceptions#log_array", () => {
+  it("joins lines with the formatter's tags_text when it answers one (debug_exceptions.rb:177-178)", async () => {
+    const output = new StringIO();
+    const logger = TaggedLogging.new(new Logger(output)).tagged("BCX");
+    await new DebugExceptions(errorApp).call({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/test",
+      "action_dispatch.logger": logger,
+    });
+    output.rewind();
+    expect(output.read()).toContain("\n[BCX] Error (Something went wrong):\n[BCX]   ");
   });
 });

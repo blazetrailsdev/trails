@@ -409,6 +409,15 @@ export interface ClassInfo {
    */
   synthesizedFileModule?: boolean;
   /**
+   * TS-side only: this entry is an exported object literal
+   * (`export const Mime = { symbols() {...} }`). Its members are properties of
+   * the object itself, which is Ruby's module singleton seat (`class << self`,
+   * `action_dispatch/http/mime_type.rb:50-67`) — and also the shape every
+   * `include(Host, Mod)` mixin uses for instance methods. So, like a top-level
+   * function, a member states no seat. See compare.ts#recordTsParams.
+   */
+  objectLiteral?: boolean;
+  /**
    * TS-side only: this entry came from an `interface` declaration rather than a
    * `class`, `namespace`, or synthesized module. Interfaces are type-only, so a
    * container-level `@noRailsEquivalent` on one covers its members too — see

@@ -919,6 +919,7 @@ export function extractFromProgram(
               ...prior.instanceMethods.filter((m) => !bodied.has(m.name)),
             ];
             prior.noRailsEquivalent ??= modReason;
+            prior.objectLiteral = true;
             continue;
           }
           info.modules[modKey] = {
@@ -928,6 +929,7 @@ export function extractFromProgram(
             extends: [],
             instanceMethods: methods,
             classMethods: [],
+            objectLiteral: true,
             ...(modReason !== undefined ? { noRailsEquivalent: modReason } : {}),
           };
           fileHasClassOrModule = true;

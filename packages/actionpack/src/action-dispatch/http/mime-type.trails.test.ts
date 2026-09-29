@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { FixtureResolver, LookupContext, Template, TseHandler } from "@blazetrails/actionview";
+import {
+  Base,
+  FixtureResolver,
+  LookupContext,
+  Template,
+  TseHandler,
+} from "@blazetrails/actionview";
 import "../../namespaces.js";
 import { Mime, MimeType } from "./mime-type.js";
 
@@ -16,6 +22,14 @@ describe("ActionView::Template::Types once Action Dispatch loads", () => {
     MimeType.register("text/foobar", ":foobar");
     expect(Template.Types.symbols()).toContain(":foobar");
     expect(Template.Types.isValidSymbols([":html", ":foobar"])).toBe(true);
+  });
+
+  it("drops an unregistered format from Base.defaultFormats, which aliases Mime::SET.symbols (action_dispatch.rb:150)", () => {
+    MimeType.register("text/foobar", ":foobar");
+    expect(Base.defaultFormats).toBe(MimeType.SET.symbols);
+    expect(Base.defaultFormats).toContain(":foobar");
+    MimeType.unregister(":foobar");
+    expect(Base.defaultFormats).not.toContain(":foobar");
   });
 
   it("resolves a template in a format the registration added", () => {

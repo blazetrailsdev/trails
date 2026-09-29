@@ -79,6 +79,23 @@ describe("statically expanded loop-generated it() titles", () => {
     ]);
   });
 
+  it("expands an array's entries() through a nested pattern and a regexp replaceAll", () => {
+    expect(
+      titles(`
+        const TABLE = [
+          ["/admin/users", [{ useRoute: "admin_users" }]],
+          ["/people/1.xml", [{}, { controller: "people" }, "/people"]],
+        ];
+        for (const [i, [url, params]] of TABLE.entries()) {
+          it(\`\${url.replaceAll(/\\W/g, "_").replaceAll("_", " ")} \${i}\`, () => {});
+        }
+      `),
+    ).toEqual([
+      [" admin users 0", false],
+      [" people 1 xml 1", false],
+    ]);
+  });
+
   it("resolves filter/map chains over an already-resolved const array", () => {
     expect(
       titles(`

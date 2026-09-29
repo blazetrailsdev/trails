@@ -5,7 +5,7 @@ import { Error as URIError, URI } from "@blazetrails/ruby-compat";
 export const FILTERED = "[FILTERED]";
 
 export interface FilterRedirectHost {
-  location: string;
+  location: string | undefined;
   request: FilterRedirectRequest | null | undefined;
 }
 
@@ -33,7 +33,7 @@ export function locationFilters(this: FilterRedirectHost): Array<string | RegExp
 
 /** @internal */
 export function locationFilterMatch(this: FilterRedirectHost): boolean {
-  const loc = this.location;
+  const loc = this.location!;
   return locationFilters.call(this).some((filter) => {
     if (typeof filter === "string") return loc.includes(filter);
     if (filter instanceof RegExp) return filter.test(loc);
@@ -44,7 +44,7 @@ export function locationFilterMatch(this: FilterRedirectHost): boolean {
 /** @internal */
 export function parameterFilteredLocation(this: FilterRedirectHost): string {
   try {
-    const uri = URI.parse(this.location);
+    const uri = URI.parse(this.location!);
     if (!(uri.query == null || uri.query === "")) {
       const parts = uri.query.split(/([&;])/);
       const filteredParts = parts.map((part) => {
