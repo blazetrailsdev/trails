@@ -35,12 +35,12 @@ export class QueryAttribute extends Attribute {
   constructor(name: string | null, value: unknown, type: CastType | null) {
     super(name, value, ensureType(type));
 
-    if (!(this.valueBeforeTypeCast instanceof Substitute)) {
-      if (this.type!.isSerialized()) {
-        void this.valueForDatabase;
-      } else if (this.type!.isMutable()) {
-        this._valueBeforeTypeCast = deepDup(this.valueBeforeTypeCast);
-      }
+    if (this.valueBeforeTypeCast instanceof Substitute) {
+      /** @empty */
+    } else if (this.type!.isSerialized()) {
+      void this.valueForDatabase;
+    } else if (this.type!.isMutable()) {
+      this._valueBeforeTypeCast = deepDup(this.valueBeforeTypeCast);
     }
   }
 

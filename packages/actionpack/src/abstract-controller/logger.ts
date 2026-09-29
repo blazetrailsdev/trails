@@ -1,6 +1,6 @@
 /** @internal */
 
-import { benchmark, include, included } from "@blazetrails/activesupport";
+import { Benchmarkable, include, included } from "@blazetrails/activesupport";
 
 export { benchmark, type BenchmarkLogger as LoggerLike } from "@blazetrails/activesupport";
 
@@ -16,6 +16,6 @@ export type LoggerIncludingClass = (new (...args: never[]) => unknown) & {
 export class Logger {
   static [included](base: LoggerIncludingClass): void {
     base.configAccessor("logger");
-    include(base, { benchmark });
+    include(base, Benchmarkable);
   }
 }

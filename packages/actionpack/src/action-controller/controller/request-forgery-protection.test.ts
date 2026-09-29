@@ -493,6 +493,7 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
 });
 
 describe("RequestForgeryProtectionControllerUsingResetSessionTest", () => {
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("should emit a csrf-param meta tag and a csrf-token meta tag", () => {});
 });
 
@@ -552,19 +553,33 @@ describe("CustomAuthenticityParamControllerTest", () => {
 });
 
 describe("PerFormTokensControllerTest", () => {
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("per form token is same size as global token", () => {});
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("accepts token for correct path and method", () => {});
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("accepts token with path with query params", () => {});
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("rejects token for incorrect path", () => {});
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("rejects token for incorrect method", () => {});
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("accepts global csrf token", () => {});
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("returns hmacd token", () => {});
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("chomps slashes", () => {});
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("ignores trailing slash during generation", () => {});
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("handles empty path as request path", () => {});
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("handles query string", () => {});
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("handles fragment", () => {});
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("ignores trailing slash during validation", () => {});
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("method is case insensitive", () => {});
   it.skip("rejects garbage path", () => {});
   it.skip("rejects token for incorrect method button to", () => {});
@@ -572,11 +587,15 @@ describe("PerFormTokensControllerTest", () => {
   it.skip("Accepts proper token for delete method on button_to tag", () => {});
   it.skip("Accepts proper token for post method on button_to tag", () => {});
   it.skip("Accepts proper token for patch method on button_to tag", () => {});
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("does not return old csrf token", () => {});
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("accepts old csrf token", () => {});
   it.skip("handles relative paths", () => {});
   it.skip("handles relative paths with dot", () => {});
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("ignores origin during generation", () => {});
+  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
   it.skip("ignores origin during generation with protocol-relative url", () => {});
 });
 

@@ -344,8 +344,8 @@ export { classAttribute } from "./class-attribute.js";
 export { onLoad, runLoadHooks, resetLoadHooks } from "./lazy-load-hooks.js";
 export type { ClassAttributeOptions } from "./class-attribute.js";
 
-export { benchmark } from "./benchmarkable.js";
-export type { Benchmarkable, BenchmarkLogger, BenchmarkOptions } from "./benchmarkable.js";
+export { benchmark, Benchmarkable } from "./benchmarkable.js";
+export type { BenchmarkLogger, BenchmarkOptions } from "./benchmarkable.js";
 
 export { Logger, SimpleFormatter } from "./logger.js";
 export { NullLogger, nullLogger } from "./null-logger.js";
