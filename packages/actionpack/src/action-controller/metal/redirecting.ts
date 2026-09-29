@@ -31,6 +31,7 @@ interface RedirectToHost extends PrivateHost {
   status: number | string;
 }
 
+/** @missingRailsCall response_body — CONVERGEABLE double-render-check-reads-performed-not-response-body */
 export function redirectTo(
   this: RedirectToHost,
   options: unknown = {},
