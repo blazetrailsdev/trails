@@ -207,15 +207,10 @@ export function defaultFormBuilderClass(this: FormHelperHost): typeof FormBuilde
 
 type FieldHelper = (method: unknown, options?: Record<string, unknown>) => unknown;
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the `CodeGenerator.batch` field methods (form_helper.rb:2024-2033) surface on the type side.
-export interface FormBuilder {
-  textField: FieldHelper;
-  searchField: FieldHelper;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class FormBuilder {
   declare static fieldHelpers: string[];
+  declare textField: FieldHelper;
+  declare searchField: FieldHelper;
 
   static {
     classAttribute.call(this, "fieldHelpers", {

@@ -223,6 +223,8 @@ describe("FormWithActsLikeFormForTest", () => {
     (view as unknown as { post: Post }).post = post;
   });
 
+  const titleField = "<input name='post[title]' type='text' value='Hello World' id='post_title' />";
+
   function concat(string: unknown): unknown {
     return (view as unknown as { concat(string: unknown): unknown }).concat(string);
   }
@@ -233,12 +235,16 @@ describe("FormWithActsLikeFormForTest", () => {
 
   function wholeForm(
     action: string | false = "/",
-    options: { id?: string; method?: string; skipEnforcingUtf8?: boolean } = {},
+    id: string | null = null,
+    htmlClass: string | null = null,
+    options: { local?: boolean; method?: string; skipEnforcingUtf8?: boolean } = {},
     block?: () => string,
   ): string {
-    const { id, method, skipEnforcingUtf8 = false } = options;
+    const { local = false, method, skipEnforcingUtf8 = false } = options;
     let txt = `<form accept-charset="UTF-8"` + (action ? ` action="${action}"` : "");
-    txt += ` data-remote="true"` + (id ? ` id="${id}"` : "");
+    if (!local) txt += ` data-remote="true"`;
+    if (htmlClass) txt += ` class="${htmlClass}"`;
+    if (id) txt += ` id="${id}"`;
     txt += ` method="${method === "get" ? "get" : "post"}">`;
     if (!skipEnforcingUtf8) {
       txt += `<input name="utf8" type="hidden" value="&#x2713;" autocomplete="off" />`;
@@ -268,6 +274,8 @@ describe("FormWithActsLikeFormForTest", () => {
 
     const expected = wholeForm(
       "/posts/123",
+      null,
+      null,
       {},
       () =>
         '<input type="text" name="no_model_to_back_this_badboy" id="no_model_to_back_this_badboy" >',
@@ -281,6 +289,8 @@ describe("FormWithActsLikeFormForTest", () => {
 
     const expected = wholeForm(
       "/posts/123",
+      null,
+      null,
       { method: "patch" },
       () =>
         '<input type="text" name="post[this_dont_exist_on_post]" id="post_this_dont_exist_on_post" >',
@@ -296,7 +306,9 @@ describe("FormWithActsLikeFormForTest", () => {
 
     const expected = wholeForm(
       "/search",
-      { id: "search-post", method: "get" },
+      "search-post",
+      null,
+      { method: "get" },
       () => "<input name='post[title]' type='search' id='post_title' />",
     );
 
@@ -306,11 +318,7 @@ describe("FormWithActsLikeFormForTest", () => {
   it("form with skip enforcing utf8 true", () => {
     formWith({ scope: "post", skipEnforcingUtf8: true }, (f) => concat(f.textField("title")));
 
-    const expected = wholeForm(
-      "/",
-      { skipEnforcingUtf8: true },
-      () => "<input name='post[title]' type='text' value='Hello World' id='post_title' />",
-    );
+    const expected = wholeForm("/", null, null, { skipEnforcingUtf8: true }, () => titleField);
 
     assertDomEqual(expected, rendered);
   });
@@ -318,11 +326,7 @@ describe("FormWithActsLikeFormForTest", () => {
   it("form with skip enforcing utf8 false", () => {
     formWith({ scope: "post", skipEnforcingUtf8: false }, (f) => concat(f.textField("title")));
 
-    const expected = wholeForm(
-      "/",
-      { skipEnforcingUtf8: false },
-      () => "<input name='post[title]' type='text' value='Hello World' id='post_title' />",
-    );
+    const expected = wholeForm("/", null, null, { skipEnforcingUtf8: false }, () => titleField);
 
     assertDomEqual(expected, rendered);
   });
@@ -331,11 +335,7 @@ describe("FormWithActsLikeFormForTest", () => {
     withDefaultEnforceUtf8(true, () => {
       formWith({ scope: "post" }, (f) => concat(f.textField("title")));
 
-      const expected = wholeForm(
-        "/",
-        { skipEnforcingUtf8: false },
-        () => "<input name='post[title]' type='text' value='Hello World' id='post_title' />",
-      );
+      const expected = wholeForm("/", null, null, { skipEnforcingUtf8: false }, () => titleField);
 
       assertDomEqual(expected, rendered);
     });
@@ -345,11 +345,7 @@ describe("FormWithActsLikeFormForTest", () => {
     withDefaultEnforceUtf8(false, () => {
       formWith({ scope: "post" }, (f) => concat(f.textField("title")));
 
-      const expected = wholeForm(
-        "/",
-        { skipEnforcingUtf8: true },
-        () => "<input name='post[title]' type='text' value='Hello World' id='post_title' />",
-      );
+      const expected = wholeForm("/", null, null, { skipEnforcingUtf8: true }, () => titleField);
 
       assertDomEqual(expected, rendered);
     });

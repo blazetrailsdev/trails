@@ -55,7 +55,7 @@ export class Base {
   }
 
   render(): unknown {
-    // @nie disposition=TODO
+    // @nie disposition=keep-as-strategy-hook rails=actionview/lib/action_view/helpers/tags/base.rb:31
     throw new NotImplementedError("Subclasses must implement a render method");
   }
 
