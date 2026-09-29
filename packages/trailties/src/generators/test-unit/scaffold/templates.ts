@@ -31,20 +31,17 @@ const functionalTest: Template = function () {
   const record = `t["@${singular}"]`;
   return `${header.call(this, testClassName, modelClassName)}
 describe("${testClassName}", () => {
-  it("should get index", async ({ testCase }) => {
-    const t = testCase as ${testClassName};
+  it("should get index", async ({ testCase: t }) => {
     await t.get(t.${this.indexHelper({ type: "url" })}());
     t.assertResponse("success");
   });
 
-  it("should get new", async ({ testCase }) => {
-    const t = testCase as ${testClassName};
+  it("should get new", async ({ testCase: t }) => {
     await t.get(t.${this.newHelper()}());
     t.assertResponse("success");
   });
 
-  it("should create ${singular}", async ({ testCase }) => {
-    const t = testCase as ${testClassName};
+  it("should create ${singular}", async ({ testCase: t }) => {
     await assertDifference(() => ${modelClassName}.count(), async () => {
       await t.post(t.${this.indexHelper({ type: "url" })}(), { params: { ${singular}: ${this.attributesString()} } });
     });
@@ -52,26 +49,22 @@ describe("${testClassName}", () => {
     t.assertRedirectedTo(t.${this.showHelper(`await ${modelClassName}.last()`)});
   });
 
-  it("should show ${singular}", async ({ testCase }) => {
-    const t = testCase as ${testClassName};
+  it("should show ${singular}", async ({ testCase: t }) => {
     await t.get(t.${this.showHelper(record)});
     t.assertResponse("success");
   });
 
-  it("should get edit", async ({ testCase }) => {
-    const t = testCase as ${testClassName};
+  it("should get edit", async ({ testCase: t }) => {
     await t.get(t.${this.editHelper(record)});
     t.assertResponse("success");
   });
 
-  it("should update ${singular}", async ({ testCase }) => {
-    const t = testCase as ${testClassName};
+  it("should update ${singular}", async ({ testCase: t }) => {
     await t.patch(t.${this.showHelper(record)}, { params: { ${singular}: ${this.attributesString()} } });
     t.assertRedirectedTo(t.${this.showHelper(record)});
   });
 
-  it("should destroy ${singular}", async ({ testCase }) => {
-    const t = testCase as ${testClassName};
+  it("should destroy ${singular}", async ({ testCase: t }) => {
     await assertDifference(() => ${modelClassName}.count(), -1, async () => {
       await t.delete(t.${this.showHelper(record)});
     });
@@ -89,14 +82,12 @@ const apiFunctionalTest: Template = function () {
   const record = `t["@${singular}"]`;
   return `${header.call(this, testClassName, modelClassName)}
 describe("${testClassName}", () => {
-  it("should get index", async ({ testCase }) => {
-    const t = testCase as ${testClassName};
+  it("should get index", async ({ testCase: t }) => {
     await t.get(t.${this.indexHelper()}Url(), { as: "json" });
     t.assertResponse("success");
   });
 
-  it("should create ${singular}", async ({ testCase }) => {
-    const t = testCase as ${testClassName};
+  it("should create ${singular}", async ({ testCase: t }) => {
     await assertDifference(() => ${modelClassName}.count(), async () => {
       await t.post(t.${this.indexHelper()}Url(), { params: { ${singular}: ${this.attributesString()} }, as: "json" });
     });
@@ -104,20 +95,17 @@ describe("${testClassName}", () => {
     t.assertResponse("created");
   });
 
-  it("should show ${singular}", async ({ testCase }) => {
-    const t = testCase as ${testClassName};
+  it("should show ${singular}", async ({ testCase: t }) => {
     await t.get(t.${this.showHelper(record)}, { as: "json" });
     t.assertResponse("success");
   });
 
-  it("should update ${singular}", async ({ testCase }) => {
-    const t = testCase as ${testClassName};
+  it("should update ${singular}", async ({ testCase: t }) => {
     await t.patch(t.${this.showHelper(record)}, { params: { ${singular}: ${this.attributesString()} }, as: "json" });
     t.assertResponse("success");
   });
 
-  it("should destroy ${singular}", async ({ testCase }) => {
-    const t = testCase as ${testClassName};
+  it("should destroy ${singular}", async ({ testCase: t }) => {
     await assertDifference(() => ${modelClassName}.count(), -1, async () => {
       await t.delete(t.${this.showHelper(record)}, { as: "json" });
     });

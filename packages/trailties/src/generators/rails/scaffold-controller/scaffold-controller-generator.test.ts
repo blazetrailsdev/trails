@@ -142,40 +142,27 @@ describe("ScaffoldControllerGeneratorTest", () => {
       "organization:references{polymorphic}",
     ]).run();
 
-    await Assertions.assertFile.call(
-      { destinationRoot: tmpDir },
-      "test/controllers/users-controller.test.ts",
-      (content) => {
-        assertMatch(/class UsersControllerTest extends IntegrationTest/, content);
-        assertMatch(/it\("should get index"/, content);
-        assertMatch(
-          /t\.post\(t\.usersUrl\(\), \{ params: \{ user: \{ age: t\["@user"\]\.age, name: t\["@user"\]\.name, organization_id: t\["@user"\]\.organization_id, organization_type: t\["@user"\]\.organization_type \} \} \}\)/,
-          content,
-        );
-        assertMatch(
-          /t\.patch\(t\.userUrl\(t\["@user"\]\), \{ params: \{ user: \{ age: t\["@user"\]\.age, name: t\["@user"\]\.name, organization_id: t\["@user"\]\.organization_id, organization_type: t\["@user"\]\.organization_type \} \} \}\)/,
-          content,
-        );
-      },
+    const content = read("test/controllers/users-controller.test.ts");
+    assertMatch(/class UsersControllerTest extends IntegrationTest/, content);
+    assertMatch(/it\("should get index"/, content);
+    assertMatch(
+      /t\.post\(t\.usersUrl\(\), \{ params: \{ user: \{ age: t\["@user"\]\.age, name: t\["@user"\]\.name, organization_id: t\["@user"\]\.organization_id, organization_type: t\["@user"\]\.organization_type \} \} \}\)/,
+      content,
+    );
+    assertMatch(
+      /t\.patch\(t\.userUrl\(t\["@user"\]\), \{ params: \{ user: \{ age: t\["@user"\]\.age, name: t\["@user"\]\.name, organization_id: t\["@user"\]\.organization_id, organization_type: t\["@user"\]\.organization_type \} \} \}\)/,
+      content,
     );
   });
 
   it("functional tests without attributes", async () => {
     await makeGen("User").run();
 
-    await Assertions.assertFile.call(
-      { destinationRoot: tmpDir },
-      "test/controllers/users-controller.test.ts",
-      (content) => {
-        assertMatch(/class UsersControllerTest extends IntegrationTest/, content);
-        assertMatch(/it\("should get index"/, content);
-        assertMatch(/t\.post\(t\.usersUrl\(\), \{ params: \{ user: \{\} \} \}\)/, content);
-        assertMatch(
-          /t\.patch\(t\.userUrl\(t\["@user"\]\), \{ params: \{ user: \{\} \} \}\)/,
-          content,
-        );
-      },
-    );
+    const content = read("test/controllers/users-controller.test.ts");
+    assertMatch(/class UsersControllerTest extends IntegrationTest/, content);
+    assertMatch(/it\("should get index"/, content);
+    assertMatch(/t\.post\(t\.usersUrl\(\), \{ params: \{ user: \{\} \} \}\)/, content);
+    assertMatch(/t\.patch\(t\.userUrl\(t\["@user"\]\), \{ params: \{ user: \{\} \} \}\)/, content);
   });
 
   it("model name option", async () => {
@@ -198,17 +185,12 @@ describe("ScaffoldControllerGeneratorTest", () => {
       },
     );
 
-    await Assertions.assertFile.call(
-      { destinationRoot: tmpDir },
-      "test/controllers/admin/users-controller.test.ts",
-      (content) => {
-        assertMatch("(t.adminUsersUrl()", content);
-        assertMatch("(t.newAdminUserUrl()", content);
-        assertMatch('(t.editAdminUserUrl(t["@user"])', content);
-        assertMatch('(t.adminUserUrl(t["@user"])', content);
-        assertNoMatch(/\bt\.(new|edit)?[uU]sers?(Path|Url)/, content);
-      },
-    );
+    const content = read("test/controllers/admin/users-controller.test.ts");
+    assertMatch("(t.adminUsersUrl()", content);
+    assertMatch("(t.newAdminUserUrl()", content);
+    assertMatch('(t.editAdminUserUrl(t["@user"])', content);
+    assertMatch('(t.adminUserUrl(t["@user"])', content);
+    assertNoMatch(/\bt\.(new|edit)?[uU]sers?(Path|Url)/, content);
   });
 
   it("api controller tests", async () => {
@@ -216,23 +198,18 @@ describe("ScaffoldControllerGeneratorTest", () => {
       api: true,
     }).run();
 
-    await Assertions.assertFile.call(
-      { destinationRoot: tmpDir },
-      "test/controllers/users-controller.test.ts",
-      (content) => {
-        assertMatch(/class UsersControllerTest extends IntegrationTest/, content);
-        assertMatch(/it\("should get index"/, content);
-        assertMatch(
-          /t\.post\(t\.usersUrl\(\), \{ params: \{ user: \{ age: t\["@user"\]\.age, name: t\["@user"\]\.name, organization_id: t\["@user"\]\.organization_id, organization_type: t\["@user"\]\.organization_type \} \}, as: "json" \}\)/,
-          content,
-        );
-        assertMatch(
-          /t\.patch\(t\.userUrl\(t\["@user"\]\), \{ params: \{ user: \{ age: t\["@user"\]\.age, name: t\["@user"\]\.name, organization_id: t\["@user"\]\.organization_id, organization_type: t\["@user"\]\.organization_type \} \}, as: "json" \}\)/,
-          content,
-        );
-        assertNoMatch(/assertRedirectedTo/, content);
-      },
+    const content = read("test/controllers/users-controller.test.ts");
+    assertMatch(/class UsersControllerTest extends IntegrationTest/, content);
+    assertMatch(/it\("should get index"/, content);
+    assertMatch(
+      /t\.post\(t\.usersUrl\(\), \{ params: \{ user: \{ age: t\["@user"\]\.age, name: t\["@user"\]\.name, organization_id: t\["@user"\]\.organization_id, organization_type: t\["@user"\]\.organization_type \} \}, as: "json" \}\)/,
+      content,
     );
+    assertMatch(
+      /t\.patch\(t\.userUrl\(t\["@user"\]\), \{ params: \{ user: \{ age: t\["@user"\]\.age, name: t\["@user"\]\.name, organization_id: t\["@user"\]\.organization_id, organization_type: t\["@user"\]\.organization_type \} \}, as: "json" \}\)/,
+      content,
+    );
+    assertNoMatch(/assertRedirectedTo/, content);
   });
 
   it("invokes helper", async () => {
