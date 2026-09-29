@@ -1,4 +1,4 @@
-import { Notifications } from "@blazetrails/activesupport";
+import { Notifications, type SafeBuffer } from "@blazetrails/activesupport";
 
 import type { LookupContext } from "../lookup-context.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
@@ -94,9 +94,10 @@ export class PartialRenderer extends AbstractRenderer {
           null,
           { addToStack: block == null },
           (...name) => view._layoutFor!(...name, block),
-        ) as string;
+        ) as string | SafeBuffer;
 
-        if (layout) content = layout.render(view, locals, null, {}, () => content) as string;
+        if (layout)
+          content = layout.render(view, locals, null, {}, () => content) as string | SafeBuffer;
         payload["cache_hit"] = view.viewRenderer.cacheHits[template.virtualPath as string];
         return this.buildRenderedTemplate(content, template);
       },

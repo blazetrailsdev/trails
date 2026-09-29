@@ -1,6 +1,7 @@
 import { kernelThrow, rbEqual, toI } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
+import { NoMethodError } from "@blazetrails/activemodel";
 import type { AssociationDefinition } from "../associations.js";
 import {
   _builtAssociationScope,
@@ -390,7 +391,8 @@ export function scope(
   const reflection = ctor._reflectOnAssociation?.(assocName);
   if (options.through && !reflection) return null;
 
-  const foreignKey: string | string[] = reflection!.foreignKey();
+  if (!reflection) throw new NoMethodError(`undefined method 'foreign_key' for nil`);
+  const foreignKey: string | string[] = reflection.foreignKey();
 
   const reflForOwnerFk = _ownerChainReflection(reflection);
   const fkCheckPks = reflForOwnerFk

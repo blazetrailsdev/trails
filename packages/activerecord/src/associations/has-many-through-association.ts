@@ -1,5 +1,6 @@
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
+import type { AssociationReflection } from "../reflection.js";
 import type { AssociationDefinition } from "../associations.js";
 import { HasManyAssociation } from "./has-many-association.js";
 import { Hash, NotImplementedError, rbEqual } from "@blazetrails/ruby-compat";
@@ -84,8 +85,8 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     return distribution;
   }
 
-  sourceReflection(): unknown {
-    return sourceReflection(this);
+  sourceReflection(): AssociationReflection {
+    return sourceReflection(this) as AssociationReflection;
   }
 
   /** @internal */
@@ -135,14 +136,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       throughBuildRecord(this, (attributes ??= {}));
       const record = super.buildRecord(attributes, block)!;
 
-      const sourceReflection = this.sourceReflection() as {
-        isPolymorphic(): boolean;
-        polymorphicInverseOf(klass: typeof Base): any;
-        inverseOf(): any;
-      };
-      const inverse = sourceReflection.isPolymorphic()
-        ? sourceReflection.polymorphicInverseOf(record.constructor as typeof Base)
-        : sourceReflection.inverseOf();
+      const inverse = this.sourceReflection().isPolymorphic()
+        ? this.sourceReflection().polymorphicInverseOf(record.constructor as typeof Base)
+        : this.sourceReflection().inverseOf();
 
       if (inverse) {
         if (inverse.isCollection()) {
@@ -150,7 +146,11 @@ export class HasManyThroughAssociation extends HasManyAssociation {
             this.buildThroughRecord(record)!,
           );
         } else if (inverse.isHasOne()) {
-          (record.association(inverse.name) as any).syncWrite(this.buildThroughRecord(record));
+          (
+            record.association(inverse.name) as unknown as {
+              syncWrite(record: Base | null): void;
+            }
+          ).syncWrite(this.buildThroughRecord(record));
         }
       }
 
