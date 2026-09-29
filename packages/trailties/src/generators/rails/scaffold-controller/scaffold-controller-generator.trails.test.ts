@@ -64,4 +64,17 @@ describe("ScaffoldControllerGenerator (class collisions)", () => {
       unregisterConstant("Admin", Admin);
     }
   });
+
+  it("finds a nested constant registered by its full path", async () => {
+    const Admin = class {};
+    const UsersController = class {};
+    registerConstant("Admin", Admin);
+    registerConstant("Admin::UsersController", UsersController);
+    try {
+      expect(await collision("admin/user")).toMatch(/The name 'Admin::UsersController'/);
+    } finally {
+      unregisterConstant("Admin::UsersController", UsersController);
+      unregisterConstant("Admin", Admin);
+    }
+  });
 });

@@ -1,6 +1,7 @@
 import {
   camelize,
-  safeConstantize,
+  constantize,
+  isRegisteredConstant,
   underscore as _underscore,
   dasherize as _dasherize,
   extractOptionsBang,
@@ -644,9 +645,8 @@ export abstract class GeneratorBase implements GeneratorActionsState {
 
       if (
         last &&
-        (last === Object
-          ? safeConstantize(camelize(lastName)) !== undefined
-          : Object.hasOwn(last, camelize(lastName)))
+        (isRegisteredConstant([...nesting, camelize(lastName)].join("::")) ||
+          (last !== Object && Object.hasOwn(last, camelize(lastName))))
       ) {
         throw new GeneratorError(
           `The name '${className}' is either already used in your application ` +
@@ -659,17 +659,16 @@ export abstract class GeneratorBase implements GeneratorActionsState {
 
   protected extractLastModule(nesting: string[]): object | undefined {
     let lastModule: object = Object;
+    const path: string[] = [];
     for (const nest of nesting) {
-      if (
-        !(lastModule === Object
-          ? safeConstantize(nest) !== undefined
-          : Object.hasOwn(lastModule, nest))
-      )
+      path.push(nest);
+      if (isRegisteredConstant(path.join("::"))) {
+        lastModule = constantize(path.join("::")) as object;
+      } else if (lastModule !== Object && Object.hasOwn(lastModule, nest)) {
+        lastModule = (lastModule as Record<string, object>)[nest];
+      } else {
         return undefined;
-      lastModule =
-        lastModule === Object
-          ? (safeConstantize(nest) as object)
-          : (lastModule as Record<string, object>)[nest];
+      }
     }
     return lastModule;
   }

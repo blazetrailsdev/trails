@@ -3,7 +3,7 @@ import { ModelGenerator } from "../../model-generator.js";
 import type { NamedBaseOptions } from "../../named-base.js";
 
 export class ScaffoldGenerator extends ResourceGenerator {
-  /** @noRailsEquivalent CONVERGEABLE wire-generators-onto-hook-for */
+  /** @noRailsEquivalent CONVERGEABLE rails-model-generator-hooks-orm-active-record-model */
   override async run(): Promise<string[]> {
     const modelGen = new ModelGenerator({
       cwd: this.cwd,

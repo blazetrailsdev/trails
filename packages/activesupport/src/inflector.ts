@@ -192,6 +192,11 @@ export function unregisterConstant(name: string, expected: unknown): void {
 }
 
 /** @noRailsEquivalent PERMANENT */
+export function isRegisteredConstant(name: string): boolean {
+  return _constants.has(name);
+}
+
+/** @noRailsEquivalent PERMANENT */
 export function registeredConstantName(value: unknown): string | undefined {
   for (const [name, registered] of _constants) {
     if (registered === value) return name;
