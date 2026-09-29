@@ -37,7 +37,7 @@ export const TopLevel: {
         root?: string | null;
         paths(): { get(path: string): { toAry(): string[] } | undefined };
       };
-      reloadRoutesUnlessLoaded(): Promise<boolean> | undefined;
+      reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
     } | null;
     Application: abstract new (...args: never[]) => unknown;
     Engine: abstract new (...args: never[]) => unknown;

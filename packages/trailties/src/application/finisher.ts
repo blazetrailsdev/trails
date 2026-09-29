@@ -43,7 +43,7 @@ export interface FinisherRoutesReloader {
   eagerLoad: boolean;
   runAfterLoadPaths: () => void | Promise<void>;
   execute(): Promise<void>;
-  executeUnlessLoaded(application: unknown): Promise<boolean>;
+  executeUnlessLoaded(): Promise<true | null>;
 }
 
 export interface FinisherHost {
@@ -149,7 +149,7 @@ Finisher.initializer("set_routes_reloader_hook", async function (this: FinisherH
   });
 
   if (!(this.routes() instanceof LazyRouteSet) || this.config.eagerLoad === true) {
-    await reloader.executeUnlessLoaded(this);
+    await reloader.executeUnlessLoaded();
   }
 });
 

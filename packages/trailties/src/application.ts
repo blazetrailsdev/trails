@@ -210,8 +210,8 @@ export class Application extends Engine {
     await this.routesReloader().reloadBang();
   }
 
-  async reloadRoutesUnlessLoaded(): Promise<boolean> {
-    return this.initialized() && (await this.routesReloader().executeUnlessLoaded(this));
+  async reloadRoutesUnlessLoaded(): Promise<boolean | null> {
+    return this.initialized() && (await this.routesReloader().executeUnlessLoaded());
   }
 
   secretKeyBase(): string | null {
