@@ -36,7 +36,7 @@ export interface GeneratorOptions {
 }
 
 export interface ClassOptionConfig {
-  type?: "boolean" | "string" | "numeric";
+  type?: "boolean" | "string" | "numeric" | "array";
   default?: unknown;
   desc?: string;
   aliases?: string | string[];
@@ -256,6 +256,10 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     }
   }
 
+  static removeClassOption(...names: string[]): void {
+    for (const name of names) delete this.classOptions()[name];
+  }
+
   static classOption(name: string, options: ClassOptionConfig = {}): void {
     if (!("desc" in options))
       options.desc = `Indicates when to generate ${humanize(_underscore(name)).toLowerCase()}`;
@@ -362,6 +366,11 @@ export abstract class GeneratorBase implements GeneratorActionsState {
           if (value === undefined && /^(true|false)$/.test(arrayOptions[i + 1] ?? ""))
             value = arrayOptions[++i];
           value = value === undefined || value === true || value === "true";
+        } else if (option.type === "array") {
+          const values = value === undefined ? [] : [value];
+          while (i + 1 < arrayOptions.length && !arrayOptions[i + 1].startsWith("-"))
+            values.push(arrayOptions[++i]);
+          value = values;
         } else if (value === undefined) value = arrayOptions[++i];
         if (option.type === "numeric") value = Number(value);
         if (option.enum && !option.enum.includes(value as string))

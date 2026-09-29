@@ -2,6 +2,8 @@
 import { include, type Included } from "@blazetrails/activesupport";
 import { ModelGenerator, type ModelGeneratorOptions } from "../model/model-generator.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
+import type { GeneratorBase } from "../../base.js";
+import type { GeneratorClass } from "../../../generators.js";
 
 export interface ResourceGeneratorOptions extends ModelGeneratorOptions {
   actions?: string[];
@@ -17,14 +19,24 @@ export class ResourceGenerator extends ModelGenerator {
   declare controllerFileName: string;
   /** @internal */
   declare _controllerClassPath: string[];
-  actions: string[];
-
-  constructor(options: ResourceGeneratorOptions) {
-    super(options);
-    this.actions = options.actions ?? [];
-  }
 }
 
 Object.defineProperty(ResourceGenerator, "name", { value: "Rails::Generators::ResourceGenerator" });
 include(ResourceGenerator, ResourceHelpers);
+ResourceGenerator.hookFor(
+  "resourceController",
+  { required: true },
+  function (this: GeneratorBase, controller: GeneratorClass) {
+    return this.invoke(controller, [
+      (this as ResourceGenerator).controllerName,
+      (this.options as ResourceGeneratorOptions).actions,
+    ]);
+  },
+);
+ResourceGenerator.classOption("actions", {
+  type: "array",
+  banner: "ACTION ACTION",
+  default: [],
+  desc: "Actions for the resource controller",
+});
 ResourceGenerator.hookFor("resourceRoute", { required: true });

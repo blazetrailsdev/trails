@@ -1,9 +1,15 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { ModelHelpers } from "./model-helpers.js";
 import { ResourceGenerator } from "./rails/resource/resource-generator.js";
+import type { ResourceGeneratorOptions } from "./rails/resource/resource-generator.js";
 
 const build = (name: string, modelName?: string, output: (m: string) => void = () => {}) =>
-  new ResourceGenerator({ cwd: "/nonexistent", output, name, modelName });
+  new ResourceGenerator({
+    cwd: "/nonexistent",
+    output,
+    name,
+    modelName,
+  } as ResourceGeneratorOptions);
 
 describe("applyResourceHelpers", () => {
   beforeEach(() => {
