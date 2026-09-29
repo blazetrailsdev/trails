@@ -1656,23 +1656,8 @@ export class Base extends Model {
   declare static _counterCacheColumns: string[];
   declare static counterCachedAssociationNames: string[];
 
-  static _instantiate<T extends typeof Base>(
-    this: T,
-    row: Record<string, unknown>,
-    block?: (record: InstanceType<T>) => void,
-    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-  ): InstanceType<T> {
-    const klass = discriminateClassForRecord(this, row);
-    if (klass !== this) {
-      return klass._instantiate(
-        row,
-        block as ((record: Base) => void) | undefined,
-        columnTypes,
-      ) as InstanceType<T>;
-    }
-
-    (ModelSchema.loadSchema as any).call(this);
-
+  /** @noRailsEquivalent PERMANENT */
+  static allocate<T extends typeof Base>(this: T): InstanceType<T> {
     const hadOwnSuppress = Object.prototype.hasOwnProperty.call(
       this,
       "_suppressInitializeCallback",
@@ -1700,6 +1685,27 @@ export class Base extends Model {
         delete (this as any)._suppressAbstractCheck;
       }
     }
+    return record;
+  }
+
+  static _instantiate<T extends typeof Base>(
+    this: T,
+    row: Record<string, unknown>,
+    block?: (record: InstanceType<T>) => void,
+    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
+  ): InstanceType<T> {
+    const klass = discriminateClassForRecord(this, row);
+    if (klass !== this) {
+      return klass._instantiate(
+        row,
+        block as ((record: Base) => void) | undefined,
+        columnTypes,
+      ) as InstanceType<T>;
+    }
+
+    (ModelSchema.loadSchema as any).call(this);
+
+    const record = this.allocate();
     (record as any).initWithAttributes(
       (this as any).attributesBuilder().buildFromDatabase(row, columnTypes ?? {}),
     );
@@ -2153,6 +2159,8 @@ export class Base extends Model {
   }
 
   declare equals: (other: unknown) => boolean;
+  declare initWith: (coder: Record<string, unknown>) => void;
+  declare encodeWith: (coder: Record<string, unknown>) => void;
 
   declare eql: (other: unknown) => boolean;
 
@@ -2802,7 +2810,9 @@ include(Base, {
   attributeNamesForSerialization: Serialization.attributeNamesForSerialization,
 });
 include(Base, {
+  initWith: _Core.initWith,
   initWithAttributes: _Core.initWithAttributes,
+  encodeWith: _Core.encodeWith,
   initAttributes: _Core.initAttributes,
   fullInspect: _Core.fullInspect,
   destroyAssociationAsyncJob: _Core.destroyAssociationAsyncJob,

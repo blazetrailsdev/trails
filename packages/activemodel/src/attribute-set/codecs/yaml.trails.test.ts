@@ -11,7 +11,7 @@ const integerType = typeRegistry.lookup("integer");
 
 describe("yamlCodec", () => {
   const coder: AttributeSetCoder = {
-    conciseAttributes: [
+    concise_attributes: [
       Attribute.fromUser("name", "Alice", stringType),
       Attribute.fromUser("age", 30, integerType),
     ],
@@ -26,9 +26,9 @@ describe("yamlCodec", () => {
 
   it("decodes a YAML string back to a coder", () => {
     const decoded = yamlCodec.decode(yamlCodec.encode(coder));
-    expect(decoded.conciseAttributes!.map((attr) => attr.name)).toEqual(["name", "age"]);
-    expect(decoded.conciseAttributes![0].type!.type()).toBe("string");
-    expect(decoded.conciseAttributes![0].valueBeforeTypeCast).toBe("Alice");
+    expect(decoded["concise_attributes"]!.map((attr) => attr.name)).toEqual(["name", "age"]);
+    expect(decoded["concise_attributes"]![0].type!.type()).toBe("string");
+    expect(decoded["concise_attributes"]![0].valueBeforeTypeCast).toBe("Alice");
   });
 
   it("round-trips encode/decode", () => {
@@ -51,18 +51,18 @@ describe("yamlCodec", () => {
   it("round-trips with unknown type key (schema drift)", () => {
     const drifted = "v: 1\ntypes:\n  score: future_type\nvalues:\n  score: 42\n";
     const decoded = yamlCodec.decode(drifted);
-    expect(decoded.conciseAttributes![0].type).toBeInstanceOf(ValueType);
-    expect(decoded.conciseAttributes![0].valueBeforeTypeCast).toBe(42);
+    expect(decoded["concise_attributes"]![0].type).toBeInstanceOf(ValueType);
+    expect(decoded["concise_attributes"]![0].valueBeforeTypeCast).toBe(42);
   });
 
   it("encodes bigint values as strings to preserve precision", () => {
     const bigintCoder: AttributeSetCoder = {
-      conciseAttributes: [
+      concise_attributes: [
         Attribute.fromUser("id", BigInt("9007199254740993"), typeRegistry.lookup("big_integer")),
       ],
     };
     const decoded = yamlCodec.decode(yamlCodec.encode(bigintCoder));
-    expect(decoded.conciseAttributes![0].valueBeforeTypeCast).toBe("9007199254740993");
+    expect(decoded["concise_attributes"]![0].valueBeforeTypeCast).toBe("9007199254740993");
   });
 
   it("envelope shape snapshot", () => {

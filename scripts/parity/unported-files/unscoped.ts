@@ -834,12 +834,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "graph serializer that rebuilds a class instance from a tag.",
   },
   {
-    testFile: "yaml_serialization_test.rb",
-    reason:
-      "Tests YAML round-trips of arbitrary Ruby objects (Psych encoding). " +
-      "No Node.js equivalent; JSON is the default column serialization format in Trails.",
-  },
-  {
     // Scoped to activerecord's binary_test.rb: "cases/binary_test.rb" does not
     // match activemodel's "cases/type/binary_test.rb" or arel's
     // "cases/arel/nodes/binary_test.rb", both of which are ported and must stay

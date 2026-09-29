@@ -1,4 +1,5 @@
-import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
+import { Autoload, extend, registerConstant, type Extended } from "@blazetrails/activesupport";
+import type { Attribute } from "./attribute.js";
 import type { Error } from "./error.js";
 import type {
   Errors,
@@ -12,6 +13,7 @@ import type { ValidationError } from "./validations.js";
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 const loadPath: Record<string, () => Promise<unknown>> = {
+  "active_model/attribute": () => import("./attribute.js"),
   "active_model/errors": () => import("./errors.js"),
   "active_model/error": () => import("./error.js"),
   "active_model/validations": () => import("./validations.js"),
@@ -19,6 +21,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
 };
 
 export const ActiveModel = { name: "ActiveModel", loadPath } as AutoloadModule & {
+  Attribute: typeof Attribute;
   Errors: typeof Errors;
   Error: typeof Error;
   RangeError: typeof RangeError;
@@ -27,7 +30,9 @@ export const ActiveModel = { name: "ActiveModel", loadPath } as AutoloadModule &
   ValidationError: typeof ValidationError;
   Serializers: typeof Serializers;
 };
+registerConstant("ActiveModel", ActiveModel);
 extend(ActiveModel, Autoload);
+ActiveModel.autoload("Attribute");
 ActiveModel.eagerAutoload(() => {
   ActiveModel.autoload("Errors");
   ActiveModel.autoload("Error");

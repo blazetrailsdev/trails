@@ -42,6 +42,8 @@ import { cachedTableExists, columnsHash, isSchemaLoaded } from "./model-schema.j
 import { StatementCache } from "./statement-cache.js";
 import { withConnection } from "./connection-handling.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
+import type { AttributeSet, YAMLEncoder } from "@blazetrails/activemodel";
+import { LegacyYamlAdapter } from "./legacy-yaml-adapter.js";
 import { classAttribute, included, runCallbacks } from "@blazetrails/activesupport";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 
@@ -288,6 +290,17 @@ export function strictLoadingBang<T extends StrictLoadingFields>(
   return value;
 }
 
+export function initWith(
+  this: CoreRecord & { initWithAttributes(attributes: unknown, newRecord: boolean): void },
+  coder: Record<string, unknown>,
+): void {
+  coder = LegacyYamlAdapter.convert(coder);
+  const attributes = (this.constructor as unknown as { yamlEncoder(): YAMLEncoder })
+    .yamlEncoder()
+    .decode(coder);
+  this.initWithAttributes(attributes, coder["new_record"] as boolean);
+}
+
 export function initWithAttributes(
   this: CoreRecord & { _attributes: any; _newRecord: boolean },
   attributes: any,
@@ -312,6 +325,18 @@ export function initAttributes(
 }
 
 type StrictLoadingModeHost = CoreRecord & { _strictLoadingMode?: StrictLoadingMode };
+
+/** @missingRailsName attributes — PERMANENT */
+export function encodeWith(
+  this: CoreRecord & { _attributes: AttributeSet; isNewRecord(): boolean },
+  coder: Record<string, unknown>,
+): void {
+  (this.constructor as unknown as { yamlEncoder(): YAMLEncoder })
+    .yamlEncoder()
+    .encode(this._attributes, coder);
+  coder["new_record"] = this.isNewRecord();
+  coder["active_record_yaml_version"] = 2;
+}
 
 export function strictLoadingMode(this: StrictLoadingModeHost): StrictLoadingMode {
   return this._strictLoadingMode ?? "all";

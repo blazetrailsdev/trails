@@ -44,13 +44,13 @@ describe("YAMLEncoder", () => {
 
   it("nils out the type of an attribute whose type is the default type", () => {
     const set = makeSet({ name: stringAttr("name", "Alice") });
-    expect(encodeInto(encoder, set).conciseAttributes![0].type).toBeNull();
+    expect(encodeInto(encoder, set)["concise_attributes"]![0].type).toBeNull();
   });
 
   it("keeps the attribute whose type is not the default type", () => {
     const attr = intAttr("name", 7);
     const set = makeSet({ name: attr });
-    expect(encodeInto(encoder, set).conciseAttributes![0]).toBe(attr);
+    expect(encodeInto(encoder, set)["concise_attributes"]![0]).toBe(attr);
   });
 
   it("returns the attributes key when the coder carries one", () => {
@@ -62,7 +62,7 @@ describe("YAMLEncoder", () => {
     const custom = integerType;
     const localEncoder = new YAMLEncoder({ qty: custom });
     const decoded = localEncoder.decode({
-      conciseAttributes: [Attribute.fromUser("qty", 5, null)],
+      concise_attributes: [Attribute.fromUser("qty", 5, null)],
     });
     expect(decoded.fetchValue("qty")).toBe(5);
     expect(decoded.castTypes().qty).toBe(custom);
@@ -74,7 +74,7 @@ describe("YAMLEncoder", () => {
     const set = makeSet({ score: Attribute.uninitialized("score", intType) });
 
     const coder = encodeInto(localEncoder, set);
-    expect(coder.conciseAttributes![0]).toBeInstanceOf(Uninitialized);
+    expect(coder["concise_attributes"]![0]).toBeInstanceOf(Uninitialized);
 
     const decoded = localEncoder.decode(coder);
     expect(decoded.isKey("score")).toBe(false);
@@ -83,7 +83,7 @@ describe("YAMLEncoder", () => {
 
   it("attr not among the default types is kept with its own type", () => {
     const decoded = encoder.decode({
-      conciseAttributes: [
+      concise_attributes: [
         Attribute.fromUser("name", "Bob", null),
         Attribute.fromUser("extra", "bonus", stringType),
       ],
