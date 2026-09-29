@@ -22,8 +22,10 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import {
+  Enumerable,
   getFs,
   getPath,
+  include,
   RFC2396_PARSER,
   rbInspect,
   rbFSend,
@@ -710,6 +712,7 @@ export type ScopeLevel =
 
 export type ScopeFrameHash = Record<string, unknown>;
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Enumerable` (mapper.rb:2365); the class/interface merge is how `include()` surfaces on the type side.
 export class Scope {
   static readonly OPTIONS: readonly string[] = [
     "path",
@@ -822,15 +825,15 @@ export class Scope {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  [Symbol.iterator](): Iterator<Scope> {
-    const nodes: Scope[] = [];
-    this.each((node) => nodes.push(node));
-    return nodes[Symbol.iterator]();
-  }
-
   static readonly ROOT: Scope = new Scope({}, null);
 }
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Enumerable` (mapper.rb:2365); the class/interface merge is how `include()` surfaces on the type side.
+export interface Scope {
+  findAll(block: (node: Scope) => unknown): Scope[];
+}
+
+include(Scope, Enumerable);
 
 export class Mapper {
   static readonly URL_OPTIONS: readonly string[] = [
@@ -1986,8 +1989,8 @@ export class Mapper {
 
   /** @internal */
   shallowNestingDepth(): number {
-    return [...this._scope]
-      .filter((node) => node.frame.scopeLevelResource)
+    return this._scope
+      .findAll((node) => node.frame.scopeLevelResource)
       .filter((node) => (node.frame.scopeLevelResource as ResourceLike).shallow()).length;
   }
 

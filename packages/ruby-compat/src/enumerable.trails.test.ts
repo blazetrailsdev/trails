@@ -15,6 +15,10 @@ class Bag {
 }
 
 describe("Enumerable", () => {
+  it("findAll keeps each element whose block result RTESTs", () => {
+    expect(Enumerable.findAll.call(new Bag([1, null, 0, false, ""]), (i) => i)).toEqual([1, 0, ""]);
+  });
+
   it("map collects the block's result for each element", () => {
     expect(Enumerable.map.call(new Bag([1, 2, 3]), (i) => (i as number) * 2)).toEqual([2, 4, 6]);
   });
