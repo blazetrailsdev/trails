@@ -6,7 +6,6 @@ import {
   MissingTranslation,
   MissingTranslationData,
   ReservedInterpolationKey,
-  inspect,
   UnknownFileType,
 } from "../exceptions.js";
 import {
@@ -27,6 +26,7 @@ import {
   symbolToS,
   kernelCatch,
   kernelThrow,
+  rbInspect,
 } from "@blazetrails/ruby-compat";
 import { Temporal, strftime } from "@blazetrails/date";
 import { interpolate as interpolateString } from "../interpolate/ruby.js";
@@ -295,7 +295,7 @@ export abstract class Base {
     object = localizable(object);
     if (!respondTo(object, "strftime")) {
       throw new ArgumentError(
-        `Object must be a Date, DateTime or Time object. ${inspect(object)} given.`,
+        `Object must be a Date, DateTime or Time object. ${rbInspect(object)} given.`,
       );
     }
 

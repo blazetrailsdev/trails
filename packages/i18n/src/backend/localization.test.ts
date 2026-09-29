@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { Simple } from "./simple.js";
 import { config, l, resetConfig } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
-import { ArgumentError, MissingTranslationData, inspect } from "../exceptions.js";
+import { ArgumentError, MissingTranslationData } from "../exceptions.js";
+import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, DateTime as RubyDateTime } from "@blazetrails/date";
 import { Time as RubyTime } from "@blazetrails/date";
 
