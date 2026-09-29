@@ -1,16 +1,133 @@
-import { beforeAll, beforeEach, describe, it, expect } from "vitest";
-import { FixtureResolver } from "@blazetrails/actionview";
-import { respondTo, Collector } from "../../../action-dispatch/respond-to.js";
+import { afterEach, beforeAll, beforeEach, describe, it, expect } from "vitest";
+import { DetailsKey, FixtureResolver } from "@blazetrails/actionview";
+import { MimeType } from "../../../action-dispatch/http/mime-type.js";
 import { Request } from "../../../action-dispatch/http/request.js";
 import { Response } from "../../../action-dispatch/http/response.js";
 import { Base } from "../../base.js";
-import { MissingExactTemplate, UnknownFormat } from "../../metal/exceptions.js";
+import {
+  MissingExactTemplate,
+  RespondToMismatchError,
+  UnknownFormat,
+} from "../../metal/exceptions.js";
 import type { VariantCollector } from "../../metal/mime-responds.js";
 import { TestCase } from "../../test-case.js";
 
 type Variants = VariantCollector & Record<string, (block?: () => unknown) => void>;
 
 class RespondToController extends Base {
+  async htmlXmlOrRss(): Promise<void> {
+    await this.respondTo((type) => {
+      type.html(() => this.render({ body: "HTML" }));
+      type.xml(() => this.render({ body: "XML" }));
+      type.rss(() => this.render({ body: "RSS" }));
+      type.all(() => this.render({ body: "Nothing" }));
+    });
+  }
+
+  async jsOrHtml(): Promise<void> {
+    await this.respondTo((type) => {
+      type.html(() => this.render({ body: "HTML" }));
+      type.js(() => this.render({ body: "JS" }));
+      type.all(() => this.render({ body: "Nothing" }));
+    });
+  }
+
+  async jsonOrYaml(): Promise<void> {
+    await this.respondTo((type) => {
+      type.json(() => this.render({ body: "JSON" }));
+      type.yaml(() => this.render({ body: "YAML" }));
+    });
+  }
+
+  async htmlOrXml(): Promise<void> {
+    await this.respondTo((type) => {
+      type.html(() => this.render({ body: "HTML" }));
+      type.xml(() => this.render({ body: "XML" }));
+      type.all(() => this.render({ body: "Nothing" }));
+    });
+  }
+
+  async jsonXmlOrHtml(): Promise<void> {
+    await this.respondTo((type) => {
+      type.json(() => this.render({ body: "JSON" }));
+      type.xml(() => this.render({ xml: "XML" }));
+      type.html(() => this.render({ body: "HTML" }));
+    });
+  }
+
+  async justXml(): Promise<void> {
+    await this.respondTo((type) => {
+      type.xml(() => this.render({ body: "XML" }));
+    });
+  }
+
+  async usingDefaults(): Promise<void> {
+    await this.respondTo((type) => {
+      type.html();
+      type.xml();
+    });
+  }
+
+  async usingDefaultsWithTypeList(): Promise<void> {
+    await this.respondTo("html", "xml");
+  }
+
+  async madeForContentType(): Promise<void> {
+    await this.respondTo((type) => {
+      type.rss(() => this.render({ body: "RSS" }));
+      type.atom(() => this.render({ body: "ATOM" }));
+      type.all(() => this.render({ body: "Nothing" }));
+    });
+  }
+
+  async usingConflictingNestedJsThenHtml(): Promise<void> {
+    await this.respondTo((outerType) => {
+      outerType.js(() =>
+        this.respondTo((innerType) => {
+          innerType.html(() => this.render({ body: "HTML" }));
+        }),
+      );
+    });
+  }
+
+  async usingNonConflictingNestedJsThenJs(): Promise<void> {
+    await this.respondTo((outerType) => {
+      outerType.js(() =>
+        this.respondTo((innerType) => {
+          innerType.js(() => this.render({ body: "JS" }));
+        }),
+      );
+    });
+  }
+
+  async customConstantHandling(): Promise<void> {
+    await this.respondTo((type) => {
+      type.html(() => this.render({ body: "HTML" }));
+      type.mobile(() => this.render({ body: "Mobile" }));
+    });
+  }
+
+  async customConstantHandlingWithoutBlock(): Promise<void> {
+    await this.respondTo((type) => {
+      type.html(() => this.render({ body: "HTML" }));
+      type.mobile();
+    });
+  }
+
+  async handleAny(): Promise<void> {
+    await this.respondTo((type) => {
+      type.html(() => this.render({ body: "HTML" }));
+      type.any("js", "xml", () => this.render({ body: "Either JS or XML" }));
+    });
+  }
+
+  async handleAnyAny(): Promise<void> {
+    await this.respondTo((type) => {
+      type.html(() => this.render({ body: "HTML" }));
+      type.any(() => this.render({ body: "Whatever you ask for, I got it" }));
+    });
+  }
+
   async variantWithImplicitTemplateRendering(): Promise<void> {}
   async variantWithoutImplicitTemplateRendering(): Promise<void> {}
 
@@ -122,6 +239,11 @@ beforeAll(() => {
     new FixtureResolver({
       "respond_to/variantWithImplicitTemplateRendering.html+mobile.tse": "mobile",
       "respond_to/variantPlusNoneForFormat.html.tse": "none",
+      "respond_to/customConstantHandlingWithoutBlock.mobile.tse": "Mobile",
+      "respond_to/usingDefaults.html.tse": "Hello world!",
+      "respond_to/usingDefaults.xml.tse": "<p>Hello world!</p>\n",
+      "respond_to/usingDefaultsWithTypeList.html.tse": "Hello world!",
+      "respond_to/usingDefaultsWithTypeList.xml.tse": "<p>Hello world!</p>\n",
     }),
   );
   RespondToController.layout(false);
@@ -144,6 +266,17 @@ describe("RespondToControllerTest", () => {
 
   beforeEach(() => {
     tc = new TestCase(RespondToController);
+    MimeType.register("text/x-mobile", ":mobile");
+    MimeType.register("application/fancy-xml", ":fancy_xml");
+    MimeType.register("text/html; fragment", ":html_fragment");
+    DetailsKey.clear();
+  });
+
+  afterEach(() => {
+    MimeType.unregister(":mobile");
+    MimeType.unregister(":fancy_xml");
+    MimeType.unregister(":html_fragment");
+    DetailsKey.clear();
   });
 
   it("variant with format and custom render", async () => {
@@ -248,408 +381,234 @@ describe("RespondToControllerTest", () => {
     expect(tc.responseBody).toBe("tablet");
   });
 
-  it("html", () => {
-    const result = respondTo(
-      (format) => {
-        format.html(() => "html content");
-        format.xml(() => "xml content");
-      },
-      { accept: "text/html" },
+  it("custom constant", async () => {
+    await tc.get("customConstantHandling", { params: { format: "mobile" } });
+    expect(tc.response.mediaType).toBe("text/x-mobile");
+    expect(tc.responseBody).toBe("Mobile");
+  });
+
+  it("custom constant handling without block", async () => {
+    await tc.get("customConstantHandlingWithoutBlock", { params: { format: "mobile" } });
+    expect(tc.response.mediaType).toBe("text/x-mobile");
+    expect(tc.responseBody).toBe("Mobile");
+  });
+
+  const accept = (value: string) => ({ headers: { Accept: value } });
+
+  it("html", async () => {
+    await tc.get("jsOrHtml", accept("text/html"));
+    expect(tc.responseBody).toBe("HTML");
+
+    await tc.get("htmlOrXml", accept("text/html"));
+    expect(tc.responseBody).toBe("HTML");
+
+    await expect(tc.get("justXml", accept("text/html"))).rejects.toThrow(UnknownFormat);
+  });
+
+  it("all", async () => {
+    await tc.get("jsOrHtml", accept("*/*"));
+    expect(tc.responseBody).toBe("HTML");
+
+    await tc.get("htmlOrXml", accept("*/*"));
+    expect(tc.responseBody).toBe("HTML");
+
+    await tc.get("justXml", accept("*/*"));
+    expect(tc.responseBody).toBe("XML");
+  });
+
+  it("xml", async () => {
+    await tc.get("htmlXmlOrRss", accept("application/xml"));
+    expect(tc.responseBody).toBe("XML");
+  });
+
+  it("js or html", async () => {
+    await tc.get("jsOrHtml", { ...accept("text/javascript, text/html"), xhr: true });
+    expect(tc.responseBody).toBe("JS");
+
+    await tc.get("htmlOrXml", { ...accept("text/javascript, text/html"), xhr: true });
+    expect(tc.responseBody).toBe("HTML");
+
+    await expect(
+      tc.get("justXml", { ...accept("text/javascript, text/html"), xhr: true }),
+    ).rejects.toThrow(UnknownFormat);
+  });
+
+  it("json or yaml with leading star star", async () => {
+    await tc.get("jsonXmlOrHtml", accept("*/*, application/json"));
+    expect(tc.responseBody).toBe("HTML");
+
+    await tc.get("jsonXmlOrHtml", accept("*/* , application/json"));
+    expect(tc.responseBody).toBe("HTML");
+  });
+
+  it("json or yaml", async () => {
+    await tc.get("jsonOrYaml", { xhr: true });
+    expect(tc.responseBody).toBe("JSON");
+
+    await tc.get("jsonOrYaml", { params: { format: "json" } });
+    expect(tc.responseBody).toBe("JSON");
+
+    await tc.get("jsonOrYaml", { params: { format: "yaml" } });
+    expect(tc.responseBody).toBe("YAML");
+
+    for (const [body, contentTypes] of [
+      ["YAML", ["text/yaml"]],
+      ["JSON", ["application/json", "text/x-json"]],
+    ] as const) {
+      for (const contentType of contentTypes) {
+        await tc.get("jsonOrYaml", accept(contentType));
+        expect(tc.responseBody).toBe(body);
+      }
+    }
+  });
+
+  it("js or anything", async () => {
+    await tc.get("jsOrHtml", { ...accept("text/javascript, */*"), xhr: true });
+    expect(tc.responseBody).toBe("JS");
+
+    await tc.get("htmlOrXml", { ...accept("text/javascript, */*"), xhr: true });
+    expect(tc.responseBody).toBe("HTML");
+
+    await tc.get("justXml", { ...accept("text/javascript, */*"), xhr: true });
+    expect(tc.responseBody).toBe("XML");
+  });
+
+  it("using defaults", async () => {
+    await tc.get("usingDefaults", accept("*/*"));
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("Hello world!");
+
+    await tc.get("usingDefaults", accept("application/xml"));
+    expect(tc.response.mediaType).toBe("application/xml");
+    expect(tc.responseBody).toBe("<p>Hello world!</p>\n");
+  });
+
+  it("using defaults with type list", async () => {
+    await tc.get("usingDefaultsWithTypeList", accept("*/*"));
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.responseBody).toBe("Hello world!");
+
+    await tc.get("usingDefaultsWithTypeList", accept("application/xml"));
+    expect(tc.response.mediaType).toBe("application/xml");
+    expect(tc.responseBody).toBe("<p>Hello world!</p>\n");
+  });
+
+  it("using conflicting nested js then html", async () => {
+    await expect(tc.get("usingConflictingNestedJsThenHtml", accept("*/*"))).rejects.toThrow(
+      RespondToMismatchError,
     );
-    expect(result).toBe("html content");
   });
 
-  it("all", () => {
-    const result = respondTo(
-      (format) => {
-        format.html(() => "html");
-        format.xml(() => "xml");
-      },
-      { accept: "*/*" },
-    );
-    expect(result).toBe("html");
+  it("using non conflicting nested js then js", async () => {
+    await tc.get("usingNonConflictingNestedJsThenJs", accept("*/*"));
+    expect(tc.response.mediaType).toBe("text/javascript");
+    expect(tc.responseBody).toBe("JS");
   });
 
-  it("xml", () => {
-    const result = respondTo(
-      (format) => {
-        format.html(() => "html");
-        format.xml(() => "xml");
-      },
-      { accept: "application/xml" },
-    );
-    expect(result).toBe("xml");
+  it("with atom content type", async () => {
+    await tc.get("madeForContentType", {
+      ...accept(""),
+      env: { CONTENT_TYPE: "application/atom+xml" },
+      xhr: true,
+    });
+    expect(tc.responseBody).toBe("ATOM");
   });
 
-  it("js or html", () => {
-    const result = respondTo(
-      (format) => {
-        format.html(() => "html");
-        format.js(() => "js");
-      },
-      { accept: "text/javascript" },
-    );
-    expect(result).toBe("js");
+  it("with rss content type", async () => {
+    await tc.get("madeForContentType", {
+      ...accept(""),
+      env: { CONTENT_TYPE: "application/rss+xml" },
+      xhr: true,
+    });
+    expect(tc.responseBody).toBe("RSS");
   });
 
-  it("json or yaml", () => {
-    const result = respondTo(
-      (format) => {
-        format.json(() => "json");
-        format.yaml(() => "yaml");
-      },
-      { accept: "application/json" },
-    );
-    expect(result).toBe("json");
+  it("synonyms", async () => {
+    await tc.get("jsOrHtml", accept("application/javascript"));
+    expect(tc.responseBody).toBe("JS");
+
+    await tc.get("htmlXmlOrRss", accept("application/x-xml"));
+    expect(tc.responseBody).toBe("XML");
   });
 
-  it("json or yaml with leading star star", () => {
-    const result = respondTo(
-      (format) => {
-        format.json(() => "json");
-        format.yaml(() => "yaml");
-      },
-      { accept: "*/*" },
-    );
-    expect(result).toBe("json");
+  it("xhtml alias", async () => {
+    await tc.get("htmlOrXml", accept("application/xhtml+xml,application/xml"));
+    expect(tc.responseBody).toBe("HTML");
   });
 
-  it("using defaults", () => {
-    const result = respondTo((format) => {
-      format.html(() => "html");
-      format.json(() => "json");
-    }, {});
-    expect(result).toBe("html");
-  });
-
-  it("with atom content type", () => {
-    const result = respondTo(
-      (format) => {
-        format.html(() => "html");
-        format.atom(() => "atom");
-      },
-      { accept: "application/atom+xml" },
-    );
-    expect(result).toBe("atom");
-  });
-
-  it("with rss content type", () => {
-    const result = respondTo(
-      (format) => {
-        format.html(() => "html");
-        format.rss(() => "rss");
-      },
-      { accept: "application/rss+xml" },
-    );
-    expect(result).toBe("rss");
-  });
-
-  it("handle any", () => {
-    const result = respondTo(
-      (format) => {
-        format.html(() => "html");
-        format.any(() => "any");
-      },
-      { accept: "application/json" },
-    );
-    expect(result).toBe("any");
-  });
-
-  it("handle any any", () => {
-    const result = respondTo(
-      (format) => {
-        format.any(() => "any");
-      },
-      { accept: "*/*" },
-    );
-    expect(result).toBe("any");
-  });
-
-  it("handle any any parameter format", () => {
-    const result = respondTo(
-      (format) => {
-        format.any(() => "any");
-      },
-      { format: "json" },
-    );
-    expect(result).toBe("any");
-  });
-
-  it("handle any any explicit html", () => {
-    const result = respondTo(
-      (format) => {
-        format.any(() => "any");
-      },
-      { format: "html" },
-    );
-    expect(result).toBe("any");
-  });
-
-  it("handle any any javascript", () => {
-    const result = respondTo(
-      (format) => {
-        format.any(() => "any");
-      },
-      { accept: "text/javascript" },
-    );
-    expect(result).toBe("any");
-  });
-
-  it("handle any any xml", () => {
-    const result = respondTo(
-      (format) => {
-        format.any(() => "any");
-      },
-      { accept: "application/xml" },
-    );
-    expect(result).toBe("any");
-  });
-
-  it("forced format", () => {
-    const result = respondTo(
-      (format) => {
-        format.html(() => "html");
-        format.json(() => "json");
-      },
-      { format: "json" },
-    );
-    expect(result).toBe("json");
-  });
-
-  it("explicit format overrides accept header", () => {
-    const result = respondTo(
-      (format) => {
-        format.html(() => "html");
-        format.json(() => "json");
-      },
-      { format: "json", accept: "text/html" },
-    );
-    expect(result).toBe("json");
-  });
-
-  it("invalid format", () => {
-    expect(() =>
-      respondTo(
-        (format) => {
-          format.html(() => "html");
-        },
-        { format: "json" },
+  it("firefox simulation", async () => {
+    await tc.get(
+      "htmlOrXml",
+      accept(
+        "text/xml,application/xml,application/xhtml+xml,text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5",
       ),
-    ).toThrow(UnknownFormat);
-  });
-
-  it("custom constant", () => {
-    const result = respondTo(
-      (format) => {
-        format.on("custom", () => "custom");
-      },
-      { format: "custom" },
     );
-    expect(result).toBe("custom");
+    expect(tc.responseBody).toBe("HTML");
   });
 
-  it("custom constant handling without block", () => {
-    const result = respondTo(
-      (format) => {
-        format.on("custom");
-      },
-      { format: "custom" },
+  it("handle any", async () => {
+    await tc.get("handleAny", accept("*/*"));
+    expect(tc.responseBody).toBe("HTML");
+
+    await tc.get("handleAny", accept("text/javascript"));
+    expect(tc.responseBody).toBe("Either JS or XML");
+
+    await tc.get("handleAny", accept("text/xml"));
+    expect(tc.responseBody).toBe("Either JS or XML");
+  });
+
+  it("handle any any", async () => {
+    await tc.get("handleAnyAny", accept("*/*"));
+    expect(tc.responseBody).toBe("HTML");
+  });
+
+  it("handle any any parameter format", async () => {
+    await tc.get("handleAnyAny", { params: { format: "html" } });
+    expect(tc.responseBody).toBe("HTML");
+  });
+
+  it("handle any any explicit html", async () => {
+    await tc.get("handleAnyAny", accept("text/html"));
+    expect(tc.responseBody).toBe("HTML");
+  });
+
+  it("handle any any javascript", async () => {
+    await tc.get("handleAnyAny", accept("text/javascript"));
+    expect(tc.responseBody).toBe("Whatever you ask for, I got it");
+  });
+
+  it("handle any any xml", async () => {
+    await tc.get("handleAnyAny", accept("text/xml"));
+    expect(tc.responseBody).toBe("Whatever you ask for, I got it");
+  });
+
+  it("handle any any unknown format", async () => {
+    await tc.get("handleAnyAny", { params: { format: "php" } });
+    expect(tc.responseBody).toBe("Whatever you ask for, I got it");
+  });
+
+  it("forced format", async () => {
+    await tc.get("htmlXmlOrRss");
+    expect(tc.responseBody).toBe("HTML");
+
+    await tc.get("htmlXmlOrRss", { params: { format: "html" } });
+    expect(tc.responseBody).toBe("HTML");
+
+    await tc.get("htmlXmlOrRss", { params: { format: "xml" } });
+    expect(tc.responseBody).toBe("XML");
+
+    await tc.get("htmlXmlOrRss", { params: { format: "rss" } });
+    expect(tc.responseBody).toBe("RSS");
+  });
+
+  it("extension synonyms", async () => {
+    await tc.get("htmlXmlOrRss", { params: { format: "xhtml" } });
+    expect(tc.responseBody).toBe("HTML");
+  });
+
+  it("invalid format", async () => {
+    await expect(tc.get("usingDefaults", { params: { format: "invalidformat" } })).rejects.toThrow(
+      UnknownFormat,
     );
-    expect(result).toBeUndefined();
-  });
-
-  it("js or anything", () => {
-    const result = respondTo(
-      (format) => {
-        format.js(() => "js");
-        format.any(() => "any");
-      },
-      { accept: "text/html" },
-    );
-    expect(result).toBe("any");
-  });
-
-  it("collector formats", () => {
-    const c = new Collector();
-    c.html().json().xml();
-    expect(c.formats).toEqual(["html", "json", "xml"]);
-  });
-
-  it("collector hasFormat", () => {
-    const c = new Collector();
-    c.html();
-    expect(c.hasFormat("html")).toBe(true);
-    expect(c.hasFormat("json")).toBe(false);
-  });
-
-  it("collector with any has all formats", () => {
-    const c = new Collector();
-    c.any();
-    expect(c.hasFormat("json")).toBe(true);
-    expect(c.hasFormat("anything")).toBe(true);
-  });
-
-  it("negotiate returns null when no match", () => {
-    const c = new Collector();
-    c.html();
-    const result = c.negotiate({ accept: "application/json" });
-    expect(result).toBeNull();
-  });
-
-  it("negotiate with quality parameter", () => {
-    const c = new Collector();
-    c.html(() => "html");
-    c.json(() => "json");
-    const result = c.negotiate({ accept: "text/html;q=0.5, application/json;q=1.0" });
-    expect(result?.format).toBe("json");
-  });
-
-  it("resolved format after negotiation", () => {
-    const c = new Collector();
-    c.html(() => "html");
-    c.json(() => "json");
-    c.negotiate({ accept: "application/json" });
-    expect(c.resolvedFormat).toBe("json");
-  });
-
-  it("text format", () => {
-    const result = respondTo(
-      (format) => {
-        format.text(() => "plain text");
-      },
-      { format: "text" },
-    );
-    expect(result).toBe("plain text");
-  });
-
-  it("csv format", () => {
-    const result = respondTo(
-      (format) => {
-        format.csv(() => "a,b,c");
-      },
-      { format: "csv" },
-    );
-    expect(result).toBe("a,b,c");
-  });
-
-  it("pdf format", () => {
-    const result = respondTo(
-      (format) => {
-        format.pdf(() => "pdf-data");
-      },
-      { format: "pdf" },
-    );
-    expect(result).toBe("pdf-data");
-  });
-
-  it("multiple formats with accept header preference", () => {
-    const result = respondTo(
-      (format) => {
-        format.html(() => "html");
-        format.json(() => "json");
-        format.xml(() => "xml");
-      },
-      { accept: "application/xml, text/html;q=0.9, application/json;q=0.8" },
-    );
-    expect(result).toBe("xml");
-  });
-
-  it("no handlers throws UnknownFormat", () => {
-    expect(() => respondTo(() => {}, { format: "html" })).toThrow(UnknownFormat);
-  });
-
-  it("format handler without callback returns undefined", () => {
-    const result = respondTo(
-      (format) => {
-        format.html();
-      },
-      { format: "html" },
-    );
-    expect(result).toBeUndefined();
-  });
-
-  it("using defaults with type list", () => {
-    const result = respondTo(
-      (format) => {
-        format.html(() => "html");
-        format.js(() => "js");
-      },
-      { accept: "text/javascript, text/html" },
-    );
-    expect(result).toBe("js");
-  });
-
-  it("synonyms", () => {
-    const result = respondTo(
-      (format) => {
-        format.xml(() => "xml content");
-      },
-      { accept: "text/xml" },
-    );
-    expect(result).toBe("xml content");
-  });
-
-  it("xhtml alias", () => {
-    const result = respondTo(
-      (format) => {
-        format.html(() => "html content");
-      },
-      { accept: "application/xhtml+xml" },
-    );
-    expect(result).toBe("html content");
-  });
-
-  it("using conflicting nested js then html", () => {
-    const result = respondTo(
-      (format) => {
-        format.js(() => "js");
-        format.html(() => "html");
-      },
-      { accept: "text/html" },
-    );
-    expect(result).toBe("html");
-  });
-
-  it("using non conflicting nested js then js", () => {
-    const result = respondTo(
-      (format) => {
-        format.js(() => "js1");
-      },
-      { accept: "text/javascript" },
-    );
-    expect(result).toBe("js1");
-  });
-
-  it("handle any any unknown format", () => {
-    const result = respondTo(
-      (format) => {
-        format.any(() => "fallback");
-      },
-      { format: "unknown_format" },
-    );
-    expect(result).toBe("fallback");
-  });
-
-  it("extension synonyms", () => {
-    const result = respondTo(
-      (format) => {
-        format.html(() => "html");
-      },
-      { accept: "text/html" },
-    );
-    expect(result).toBe("html");
-  });
-
-  it("firefox simulation", () => {
-    const result = respondTo(
-      (format) => {
-        format.html(() => "html");
-        format.json(() => "json");
-      },
-      {
-        accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
-    );
-    expect(result).toBe("html");
   });
 });

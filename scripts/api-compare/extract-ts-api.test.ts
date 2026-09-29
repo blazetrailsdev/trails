@@ -3033,6 +3033,34 @@ describe("extractFromProgram — interface extends from another file", () => {
     )!;
     expect(own.declaredIn).toBeUndefined();
   });
+
+  it("carries the declaration's params onto an inherited member", () => {
+    const info = extractFromFiles("/p", {
+      "tag-helper.ts": `
+        export class TagHelper {
+          contentTag(name: string, content?: unknown, block?: () => unknown): string {
+            return name;
+          }
+        }
+      `,
+      "base.ts": `
+        import { TagHelper } from "./tag-helper.js";
+
+        export interface Base extends TagHelper {}
+
+        export class Base {}
+      `,
+    });
+    const inherited = info.modules["base.ts:Base"].instanceMethods.find(
+      (m) => m.name === "contentTag",
+    )!;
+    expect(inherited.declaredIn).toBe("tag-helper.ts");
+    expect(inherited.params.map((p) => [p.name, p.kind])).toEqual([
+      ["name", "required"],
+      ["content", "optional"],
+      ["block", "optional"],
+    ]);
+  });
 });
 
 describe("extractFromProgram — file-level @noRailsEquivalent JSDoc", () => {

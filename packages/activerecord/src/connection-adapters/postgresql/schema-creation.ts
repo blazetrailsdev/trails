@@ -83,20 +83,27 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal */
   protected async visitUniqueConstraintDefinition(o: UniqueConstraintDefinition): Promise<string> {
-    const p: string[] = [];
-    if (o.name) p.push("CONSTRAINT", this.conn.quoteColumnName(o.name));
-    p.push("UNIQUE");
-    if ((await this.supportsNullsNotDistinct()) && o.nullsNotDistinct) p.push("NULLS NOT DISTINCT");
+    const columnName = wrap(o.column)
+      .map((column) => this.conn.quoteColumnName(column))
+      .join(", ");
+
+    const sql = ["CONSTRAINT"];
+    sql.push(this.conn.quoteColumnName(o.name!));
+    sql.push("UNIQUE");
+    if ((await this.supportsNullsNotDistinct()) && o.nullsNotDistinct)
+      sql.push("NULLS NOT DISTINCT");
+
     if (o.usingIndex) {
-      p.push(`USING INDEX ${this.conn.quoteColumnName(o.usingIndex)}`);
+      sql.push(`USING INDEX ${this.conn.quoteColumnName(o.usingIndex)}`);
     } else {
-      const cols = wrap(o.column)
-        .map((column) => this.conn.quoteColumnName(column))
-        .join(", ");
-      p.push(`(${cols})`);
+      sql.push(`(${columnName})`);
     }
-    if (o.deferrable) p.push(`DEFERRABLE INITIALLY ${String(o.deferrable).toUpperCase()}`);
-    return p.join(" ");
+
+    if (o.deferrable) {
+      sql.push(`DEFERRABLE INITIALLY ${String(o.deferrable).toUpperCase()}`);
+    }
+
+    return sql.join(" ");
   }
 
   /** @internal */

@@ -7,8 +7,8 @@ describe("Rails::Command::Actions", () => {
     setAppPath(undefined);
   });
 
-  it("raises when no application path was resolved", async () => {
+  it("skips require_environment! when no application path was resolved", async () => {
     setAppPath(undefined);
-    await expect(bootApplicationBang()).rejects.toThrow(/No config\/application\.ts found in /);
+    await expect(bootApplicationBang()).resolves.toBeUndefined();
   });
 });

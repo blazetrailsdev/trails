@@ -2449,9 +2449,16 @@ export function paramsOfCallableRef(
 ): ParamInfo[] | null {
   const signatures = checker.getTypeAtLocation(expr).getCallSignatures();
   if (signatures.length === 0) return null;
-  // An overloaded target exposes one signature per overload; take the widest so
-  // the recorded arity spans every call the alias admits rather than silently
-  // truncating to whichever overload was declared first.
+  return paramsOfSignatures(signatures);
+}
+
+/**
+ * Params of the widest of a callable's signatures. An overloaded target exposes
+ * one signature per overload; taking the widest makes the recorded arity span
+ * every call it admits rather than silently truncating to whichever overload
+ * was declared first. `[]` for a signature with no reachable declaration.
+ */
+function paramsOfSignatures(signatures: readonly ts.Signature[]): ParamInfo[] {
   const widest = signatures.reduce((a, b) => (b.parameters.length > a.parameters.length ? b : a));
   const decl = widest.declaration;
   return decl && ts.isFunctionLike(decl) ? extractParameters(decl.parameters) : [];
@@ -4067,7 +4074,7 @@ function extractInterface(
                 instanceMethods.push({
                   name: propName,
                   visibility: propVisibility,
-                  params: [],
+                  params: paramsOfSignatures(signatures),
                   line: 0,
                   file,
                   bodyless: true,

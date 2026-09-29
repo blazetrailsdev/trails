@@ -129,6 +129,7 @@ export class Model {
   /** @internal */
   declare static _parseValidatesOptions: Extended<typeof Validates>["_parseValidatesOptions"];
 
+  /** @missingRailsCall assign_attributes — PERMANENT */
   constructor(attributes: Record<string, unknown> = {}) {
     const ctor = this.constructor as typeof Model;
 

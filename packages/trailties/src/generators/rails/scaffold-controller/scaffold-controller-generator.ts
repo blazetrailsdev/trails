@@ -31,7 +31,7 @@ export class ScaffoldControllerGenerator extends NamedBase {
   declare options: ScaffoldControllerGeneratorOptions;
 
   async run(): Promise<string[]> {
-    const { api = false, test = true, helper = true } = this.options;
+    const { api, test = true, helper } = this.options;
     const modelClassName = this.className().split("::").join("");
     const singular = this.singularTableName();
     const controllerClassName = this.controllerClassName().split("::").join("") + "Controller";
@@ -126,11 +126,20 @@ Object.defineProperty(ScaffoldControllerGenerator, "name", {
 });
 include(ScaffoldControllerGenerator, ResourceHelpers);
 ScaffoldControllerGenerator.checkClassCollision({ suffix: "Controller" });
+ScaffoldControllerGenerator.classOption("helper", { type: "boolean" });
 ScaffoldControllerGenerator.classOption("orm", {
   banner: "NAME",
   type: "string",
   required: true,
   desc: "ORM to generate the controller for",
+});
+ScaffoldControllerGenerator.classOption("api", {
+  type: "boolean",
+  desc: "Generate API controller",
+});
+ScaffoldControllerGenerator.classOption("skipRoutes", {
+  type: "boolean",
+  desc: "Don't add routes to config/routes.rb.",
 });
 ScaffoldControllerGenerator.hookFor(
   "resourceRoute",

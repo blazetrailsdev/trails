@@ -167,13 +167,6 @@ describe("PostgreSQL SchemaCreation", () => {
     expect(sql).not.toContain("CONSTRAINT");
   });
 
-  it("visitUniqueConstraintDefinition: unnamed constraint omits CONSTRAINT prefix", async () => {
-    const uc = new UniqueConstraintDefinition("t", "col", {});
-    const sql = await s().visitUniqueConstraintDefinition(uc);
-    expect(sql).toMatch(/^UNIQUE/);
-    expect(sql).not.toContain("CONSTRAINT");
-  });
-
   it("visitAlterTable: appends constraint validations after the FK adds (Rails parity)", async () => {
     const fk = new ForeignKeyDefinition("users", "posts", {
       column: "post_id",

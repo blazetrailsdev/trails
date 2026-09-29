@@ -3,7 +3,7 @@ import { useInMemoryDatabaseUrl } from "./support/in-memory-database-url.js";
 import { Trailtie as BaseTrailtie } from "./trailtie.js";
 import { Trailtie as ActiveRecordTrailtie } from "./trailties/active-record.js";
 import { Logger } from "@blazetrails/activesupport";
-import { NameError } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, NameError, SecureRandom } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 
 describe("Application framework railtie initializers", () => {
@@ -102,5 +102,46 @@ describe("Application#env_config", () => {
     expect(() => app.envConfig()).toThrow(
       new NameError("uninitialized constant Logger::LOUD", "LOUD"),
     );
+  });
+});
+
+describe("Application#requireEnvironmentBang", () => {
+  function tmpRoot(): string {
+    const root = File.join(Dir.tmpdir(), `trails-require-environment-${SecureRandom.hex(8)}`);
+    FileUtils.mkdirP(File.join(root, "config"));
+    return root;
+  }
+
+  it("imports config/environment.ts when the application has one", async () => {
+    const root = tmpRoot();
+    const flag = `__trailsRequireEnvironment${SecureRandom.hex(4)}`;
+    File.write(File.join(root, "config/environment.ts"), `globalThis.${flag} = true;\n`);
+    try {
+      class EnvironmentApp extends Application {}
+      Application.register(EnvironmentApp);
+      const app = EnvironmentApp.instance();
+      app.config.setRoot(root);
+
+      await app.requireEnvironmentBang();
+
+      expect((globalThis as Record<string, unknown>)[flag]).toBe(true);
+    } finally {
+      FileUtils.rmRf(root);
+    }
+  });
+
+  it("requires nothing when config/environment.ts does not exist", async () => {
+    const root = tmpRoot();
+    try {
+      class NoEnvironmentApp extends Application {}
+      Application.register(NoEnvironmentApp);
+      const app = NoEnvironmentApp.instance();
+      app.config.setRoot(root);
+
+      await expect(app.requireEnvironmentBang()).resolves.toBeUndefined();
+      expect(app.initialized()).toBe(false);
+    } finally {
+      FileUtils.rmRf(root);
+    }
   });
 });

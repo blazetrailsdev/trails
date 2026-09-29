@@ -832,8 +832,7 @@ function respondsTo(value: unknown, name: string): boolean {
 /** @internal */
 async function cachedFindBy(this: CoreHost, keys: string[], values: unknown[]): Promise<any> {
   return withConnection.call(this as any, async (connection: any) => {
-    const cacheKey = JSON.stringify(keys);
-    const statement = cachedFindByStatement.call(this, connection, cacheKey, (params: any) => {
+    const statement = cachedFindByStatement.call(this, connection, keys, (params: any) => {
       const wheres: Record<string, unknown> = {};
       for (const key of keys) wheres[key] = params.bind();
       return (this as any).where(wheres).limit(1);

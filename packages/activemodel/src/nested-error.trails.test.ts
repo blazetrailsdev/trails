@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Error as ModelError, NestedError } from "./index.js";
+import { Person } from "./test-helpers/models/person.js";
 
 describe("NestedErrorTest", () => {
   it("NestedError initialize", () => {
@@ -19,7 +20,7 @@ describe("NestedErrorTest", () => {
   });
 
   it("NestedError full message", () => {
-    const base = {};
+    const base = new Person();
     const innerError = { attribute: "name", type: "blank", message: "can't be blank" };
     const nested = new NestedError(base, innerError);
     expect(nested.fullMessage).toBe("Name can't be blank");

@@ -186,6 +186,20 @@ describe("GeneratorBase.hookFor", () => {
     expect(lines).toEqual(["       error  nope [not found]"]);
   });
 
+  it("raises when a required class option has neither a value nor a default", async () => {
+    class RequiredGenerator extends GeneratorBase {
+      static {
+        this.classOption("widget", { type: "string", required: true });
+      }
+    }
+    await expect(
+      RequiredGenerator.start(["Account"], { cwd: "/tmp", output: () => {} }),
+    ).rejects.toThrow("No value provided for required options '--widget'");
+    await expect(
+      RequiredGenerator.start(["Account", "--widget=x"], { cwd: "/tmp", output: () => {} }),
+    ).resolves.toEqual([]);
+  });
+
   it("yields the instance and the hooked class to a block instead of invoking it", async () => {
     const yielded: unknown[] = [];
     class BlockGenerator extends GeneratorBase {

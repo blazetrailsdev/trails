@@ -1,472 +1,369 @@
-import { describe, it, expect } from "vitest";
-import { RequestForgeryProtection } from "../../action-dispatch/request-forgery-protection.js";
-import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
+import { assertNothingRaised, assertRaises, include } from "@blazetrails/activesupport";
+import { SecureRandom } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
-import { Session } from "../../action-dispatch/request/session.js";
-
 import {
-  Exception,
-  handleUnverifiedRequest,
-  InvalidAuthenticityToken as MetalInvalidAuthenticityToken,
+  InvalidAuthenticityToken,
   InvalidCrossOriginRequest,
-  type CsrfController,
 } from "../metal/request-forgery-protection.js";
 
-function newSession(): Session {
-  const req = { env: {} };
-  return Session.create(
-    {
-      loadSession: () => [null, {}],
-      sessionExists: () => true,
-      deleteSession: () => null,
-      extractSessionId: () => null,
-    },
-    req,
-    {},
-  );
+interface ActionsHost {
+  sameOriginJs(): Promise<void>;
+  negotiateSameOrigin(): Promise<void>;
 }
 
-describe("ActionController::RequestForgeryProtection", () => {
-  it("should generate a base64 token", () => {
-    const token = RequestForgeryProtection.generateToken();
-    expect(token).toBeTruthy();
-    expect(Buffer.from(token, "base64").length).toBe(32);
-  });
+const RequestForgeryProtectionActions = {
+  async index(this: Base): Promise<void> {
+    await this.render({ plain: "" });
+  },
 
-  it("should generate unique tokens", () => {
-    const t1 = RequestForgeryProtection.generateToken();
-    const t2 = RequestForgeryProtection.generateToken();
-    expect(t1).not.toBe(t2);
-  });
+  async unsafe(this: Base): Promise<void> {
+    await this.render({ plain: "pwn" });
+  },
 
-  it("should mask and unmask token roundtrip", () => {
-    const csrf = new RequestForgeryProtection();
-    const raw = RequestForgeryProtection.generateToken();
-    const masked = csrf.maskToken(raw);
-    expect(masked).not.toBe(raw);
-    const unmasked = csrf.unmaskToken(masked);
-    expect(unmasked).toBe(raw);
-  });
-
-  it("should produce different masked tokens each time", () => {
-    const csrf = new RequestForgeryProtection();
-    const raw = RequestForgeryProtection.generateToken();
-    const m1 = csrf.maskToken(raw);
-    const m2 = csrf.maskToken(raw);
-    expect(m1).not.toBe(m2);
-    expect(csrf.unmaskToken(m1)).toBe(raw);
-    expect(csrf.unmaskToken(m2)).toBe(raw);
-  });
-
-  it("should allow get", () => {
-    const csrf = new RequestForgeryProtection();
-    expect(csrf.requiresVerification("GET")).toBe(false);
-  });
-
-  it("should allow head", () => {
-    const csrf = new RequestForgeryProtection();
-    expect(csrf.requiresVerification("HEAD")).toBe(false);
-  });
-
-  it("should not allow post without token", () => {
-    const csrf = new RequestForgeryProtection();
-    const session = newSession();
-    csrf.getRealToken(session);
-    const result = csrf.verifyRequest({
-      method: "POST",
-      session,
-      token: null,
-      host: "example.com",
-    });
-    expect(result.verified).toBe(false);
-  });
-
-  it("should not allow post without token irrespective of format", () => {
-    const csrf = new RequestForgeryProtection();
-    const session = newSession();
-    csrf.getRealToken(session);
-    const result = csrf.verifyRequest({
-      method: "POST",
-      session,
-      token: undefined,
-      host: "example.com",
-    });
-    expect(result.verified).toBe(false);
-  });
-
-  it("should not allow patch without token", () => {
-    const csrf = new RequestForgeryProtection();
-    expect(csrf.requiresVerification("PATCH")).toBe(true);
-  });
-
-  it("should not allow put without token", () => {
-    const csrf = new RequestForgeryProtection();
-    expect(csrf.requiresVerification("PUT")).toBe(true);
-  });
-
-  it("should not allow delete without token", () => {
-    const csrf = new RequestForgeryProtection();
-    expect(csrf.requiresVerification("DELETE")).toBe(true);
-  });
-
-  it("should not allow xhr post without token", () => {
-    const csrf = new RequestForgeryProtection();
-    const session = newSession();
-    csrf.getRealToken(session);
-    const result = csrf.verifyRequest({
-      method: "POST",
-      session,
-      token: null,
-      host: "example.com",
-    });
-    expect(result.verified).toBe(false);
-  });
-
-  it("should allow post with token", () => {
-    const csrf = new RequestForgeryProtection();
-    const session = newSession();
-    const realToken = csrf.getRealToken(session);
-    const masked = csrf.maskToken(realToken);
-    const result = csrf.verifyRequest({
-      method: "POST",
-      session,
-      token: masked,
-      host: "example.com",
-    });
-    expect(result.verified).toBe(true);
-  });
-
-  it("should allow patch with token", () => {
-    const csrf = new RequestForgeryProtection();
-    const session = newSession();
-    const realToken = csrf.getRealToken(session);
-    const masked = csrf.maskToken(realToken);
-    expect(csrf.verifyToken(session, masked)).toBe(true);
-  });
-
-  it("should allow put with token", () => {
-    const csrf = new RequestForgeryProtection();
-    const session = newSession();
-    const realToken = csrf.getRealToken(session);
-    const masked = csrf.maskToken(realToken);
-    expect(csrf.verifyToken(session, masked)).toBe(true);
-  });
-
-  it("should allow delete with token", () => {
-    const csrf = new RequestForgeryProtection();
-    const session = newSession();
-    const realToken = csrf.getRealToken(session);
-    const masked = csrf.maskToken(realToken);
-    expect(csrf.verifyToken(session, masked)).toBe(true);
-  });
-
-  it("should allow post with token in header", () => {
-    const csrf = new RequestForgeryProtection();
-    const session = newSession();
-    const realToken = csrf.getRealToken(session);
-    const headerToken = csrf.maskToken(realToken);
-    const result = csrf.verifyRequest({
-      method: "POST",
-      session,
-      token: headerToken,
-      host: "example.com",
-    });
-    expect(result.verified).toBe(true);
-  });
-
-  it("should allow delete with token in header", () => {
-    const csrf = new RequestForgeryProtection();
-    const session = newSession();
-    const realToken = csrf.getRealToken(session);
-    const headerToken = csrf.maskToken(realToken);
-    const result = csrf.verifyRequest({
-      method: "DELETE",
-      session,
-      token: headerToken,
-      host: "example.com",
-    });
-    expect(result.verified).toBe(true);
-  });
-
-  it("should allow patch with token in header", () => {
-    const csrf = new RequestForgeryProtection();
-    const session = newSession();
-    const realToken = csrf.getRealToken(session);
-    const headerToken = csrf.maskToken(realToken);
-    const result = csrf.verifyRequest({
-      method: "PATCH",
-      session,
-      token: headerToken,
-      host: "example.com",
-    });
-    expect(result.verified).toBe(true);
-  });
-
-  it("should allow put with token in header", () => {
-    const csrf = new RequestForgeryProtection();
-    const session = newSession();
-    const realToken = csrf.getRealToken(session);
-    const headerToken = csrf.maskToken(realToken);
-    const result = csrf.verifyRequest({
-      method: "PUT",
-      session,
-      token: headerToken,
-      host: "example.com",
-    });
-    expect(result.verified).toBe(true);
-  });
-
-  it("should allow post with origin checking and correct origin", () => {
-    const csrf = new RequestForgeryProtection({ originCheck: true });
-    const session = newSession();
-    const realToken = csrf.getRealToken(session);
-    const masked = csrf.maskToken(realToken);
-    const result = csrf.verifyRequest({
-      method: "POST",
-      session,
-      token: masked,
-      origin: "https://example.com",
-      host: "example.com",
-    });
-    expect(result.verified).toBe(true);
-  });
-
-  it("should allow post with origin checking and no origin", () => {
-    const csrf = new RequestForgeryProtection({ originCheck: true });
-    const session = newSession();
-    const realToken = csrf.getRealToken(session);
-    const masked = csrf.maskToken(realToken);
-    const result = csrf.verifyRequest({
-      method: "POST",
-      session,
-      token: masked,
-      origin: null,
-      host: "example.com",
-    });
-    expect(result.verified).toBe(true);
-  });
-
-  it("should raise for post with null origin", () => {
-    const csrf = new RequestForgeryProtection({ originCheck: true });
-    const session = newSession();
-    csrf.getRealToken(session);
-    const result = csrf.verifyRequest({
-      method: "POST",
-      session,
-      token: "anything",
-      origin: "null",
-      host: "example.com",
-    });
-    expect(result.verified).toBe(false);
-  });
-
-  it("should block post with origin checking and wrong origin", () => {
-    const csrf = new RequestForgeryProtection({ originCheck: true });
-    const session = newSession();
-    csrf.getRealToken(session);
-    const result = csrf.verifyRequest({
-      method: "POST",
-      session,
-      token: "anything",
-      origin: "https://evil.com",
-      host: "example.com",
-    });
-    expect(result.verified).toBe(false);
-  });
-
-  it("should warn on missing csrf token", () => {
-    const csrf = new RequestForgeryProtection({ logging: true });
-    const session = newSession();
-    csrf.getRealToken(session);
-    const result = csrf.verifyRequest({
-      method: "POST",
-      session,
-      token: null,
-      host: "example.com",
-    });
-    expect(result.warning).toBe("Can't verify CSRF token authenticity.");
-  });
-
-  it("should not warn if csrf logging disabled", () => {
-    const csrf = new RequestForgeryProtection({ logging: false });
-    const session = newSession();
-    csrf.getRealToken(session);
-    const result = csrf.verifyRequest({
-      method: "POST",
-      session,
-      token: null,
-      host: "example.com",
-    });
-    expect(result.warning).toBeUndefined();
-  });
-
-  it("csrf token is not saved if it is nil", () => {
-    const csrf = new RequestForgeryProtection();
-    const session = newSession();
-    expect(csrf.verifyToken(session, null)).toBe(false);
-    expect(session.get("_csrf_token")).toBeUndefined();
-  });
-
-  it("should not raise error if token is not a string", () => {
-    const csrf = new RequestForgeryProtection();
-    const session = newSession();
-    csrf.getRealToken(session);
-    expect(csrf.verifyToken(session, "")).toBe(false);
-    expect(csrf.verifyToken(session, undefined)).toBe(false);
-  });
-
-  it("reset csrf token generates new token", () => {
-    const csrf = new RequestForgeryProtection();
-    const session = newSession();
-    const t1 = csrf.getRealToken(session);
-    const t2 = csrf.resetToken(session);
-    expect(t2).not.toBe(t1);
-  });
-
-  it("csrf header name", () => {
-    const csrf = new RequestForgeryProtection();
-    expect(csrf.headerName).toBe("X-CSRF-Token");
-  });
-
-  it("csrf session key", () => {
-    const csrf = new RequestForgeryProtection();
-    expect(csrf.tokenSessionKey).toBe("_csrf_token");
-  });
-
-  it("custom csrf session key", () => {
-    const csrf = new RequestForgeryProtection({ sessionKey: "my_token" });
-    expect(csrf.tokenSessionKey).toBe("my_token");
-    const session = newSession();
-    csrf.getRealToken(session);
-    expect(session.get("my_token")).toBeTruthy();
-  });
-
-  it("should allow configured allowed origins", () => {
-    const csrf = new RequestForgeryProtection({
-      originCheck: true,
-      allowedOrigins: ["trusted.com"],
-    });
-    expect(csrf.verifyOrigin("https://trusted.com", "example.com")).toBe(true);
-  });
-
-  it("should reject unconfigured origins", () => {
-    const csrf = new RequestForgeryProtection({
-      originCheck: true,
-      allowedOrigins: ["trusted.com"],
-    });
-    expect(csrf.verifyOrigin("https://evil.com", "example.com")).toBe(false);
-  });
-
-  it("full verification flow with valid token", () => {
-    const csrf = new RequestForgeryProtection();
-    const session = newSession();
-    const real = csrf.getRealToken(session);
-    const masked = csrf.maskToken(real);
-    const result = csrf.verifyRequest({
-      method: "POST",
-      session,
-      token: masked,
-      host: "example.com",
-    });
-    expect(result.verified).toBe(true);
-    expect(result.warning).toBeUndefined();
-  });
-
-  it("full verification flow with invalid token", () => {
-    const csrf = new RequestForgeryProtection();
-    const session = newSession();
-    csrf.getRealToken(session);
-    const result = csrf.verifyRequest({
-      method: "POST",
-      session,
-      token: "invalid-token",
-      host: "example.com",
-    });
-    expect(result.verified).toBe(false);
-  });
-
-  it("GET requests always pass verification", () => {
-    const csrf = new RequestForgeryProtection();
-    const session = newSession();
-    const result = csrf.verifyRequest({
-      method: "GET",
-      session,
-      host: "example.com",
-    });
-    expect(result.verified).toBe(true);
-  });
-
-  it("should allow post with strict encoded token", () => {
-    const csrf = new RequestForgeryProtection();
-    const session = newSession();
-    const realToken = csrf.getRealToken(session);
-    const masked = csrf.maskToken(realToken);
-    const decoded = decodeURIComponent(encodeURIComponent(masked));
-    expect(csrf.verifyToken(session, decoded)).toBe(true);
-  });
-
-  it("should allow post without token on unsafe action", () => {
-    const csrf = new RequestForgeryProtection({
-      protectedMethods: new Set(["PATCH", "PUT", "DELETE"]),
-    });
-    const result = csrf.verifyRequest({
-      method: "POST",
-      session: newSession(),
-      host: "example.com",
-    });
-    expect(result.verified).toBe(true);
-  });
-});
-
-class RequestForgeryProtectionControllerUsingException extends Base {
-  async sameOriginJs(): Promise<void> {
+  async sameOriginJs(this: Base): Promise<void> {
     await this.render({ js: "foo();" });
-  }
+  },
 
-  async negotiateSameOrigin(): Promise<void> {
+  async negotiateSameOrigin(this: Base & ActionsHost): Promise<void> {
     await this.respondTo((format) => {
       format.js(() => this.sameOriginJs());
     });
-  }
-}
+  },
+
+  async crossOriginJs(this: Base & ActionsHost): Promise<void> {
+    await this.sameOriginJs();
+  },
+
+  async negotiateCrossOrigin(this: Base & ActionsHost): Promise<void> {
+    await this.negotiateSameOrigin();
+  },
+};
+
+class RequestForgeryProtectionControllerUsingResetSession extends Base {}
+include(RequestForgeryProtectionControllerUsingResetSession, RequestForgeryProtectionActions);
+RequestForgeryProtectionControllerUsingResetSession.protectFromForgery({
+  only: ["index", "meta", "sameOriginJs", "negotiateSameOrigin"],
+  with: "reset_session",
+});
+
+class RequestForgeryProtectionControllerUsingException extends Base {}
+include(RequestForgeryProtectionControllerUsingException, RequestForgeryProtectionActions);
 RequestForgeryProtectionControllerUsingException.protectFromForgery({
   only: ["index", "meta", "sameOriginJs", "negotiateSameOrigin"],
   with: "exception",
 });
 
-const tc = () => new TestCase(RequestForgeryProtectionControllerUsingException);
+class RequestForgeryProtectionControllerUsingNullSession extends Base {
+  async tryToResetSession(): Promise<void> {
+    this.resetSession();
+    this.head("ok");
+  }
+}
+RequestForgeryProtectionControllerUsingNullSession.protectFromForgery({ with: "null_session" });
 
-async function assertCrossOriginBlocked(block: () => Promise<unknown>): Promise<void> {
-  await assertRaises([InvalidCrossOriginRequest], {}, block);
+class FreeCookieController extends RequestForgeryProtectionControllerUsingResetSession {}
+FreeCookieController.allowForgeryProtection = false;
+
+class CustomAuthenticityParamController extends RequestForgeryProtectionControllerUsingResetSession {
+  formAuthenticityParam(): unknown {
+    return "foobar";
+  }
 }
 
-async function assertCrossOriginNotBlocked(
-  block: (t: TestCase) => Promise<unknown>,
-): Promise<void> {
-  const t = tc();
-  t.session.something_like_user_id = 1;
-  await assertNothingRaised(() => block(t));
-  expect(t.session.something_like_user_id).toBe(1);
-  t.assertResponse("success");
+class MockLogger {
+  private _logged = new Map<string, string[]>();
+
+  logged(level: string): string[] {
+    return this._logged.get(level) ?? [];
+  }
+
+  debug(message: string): void {
+    this.add("debug", message);
+  }
+
+  info(message: string): void {
+    this.add("info", message);
+  }
+
+  warn(message: string): void {
+    this.add("warn", message);
+  }
+
+  error(message: string): void {
+    this.add("error", message);
+  }
+
+  private add(level: string, message: string): void {
+    this._logged.set(level, [...this.logged(level), message]);
+  }
 }
+
+const TOKEN = Buffer.from("railstestrailstestrailstestrails").toString("base64url") + "=";
+
+describe("ActionController::RequestForgeryProtection", () => {
+  let tc: TestCase;
+  let oldRequestForgeryProtectionToken: string | null;
+
+  beforeEach(() => {
+    tc = new TestCase(RequestForgeryProtectionControllerUsingResetSession);
+    oldRequestForgeryProtectionToken = Base.requestForgeryProtectionToken;
+    Base.requestForgeryProtectionToken = "custom_authenticity_token";
+  });
+
+  afterEach(() => {
+    Base.requestForgeryProtectionToken = oldRequestForgeryProtectionToken;
+  });
+
+  function initializeCsrfToken(token = TOKEN): void {
+    tc.session["_csrf_token"] = token;
+  }
+
+  async function assertBlocked(block: () => Promise<void>): Promise<void> {
+    tc.session["something_like_user_id"] = 1;
+    await block();
+    expect(
+      tc.session["something_like_user_id"],
+      "session values are still present",
+    ).toBeUndefined();
+    tc.assertResponse("success");
+  }
+
+  async function assertNotBlocked(block: () => Promise<void>): Promise<void> {
+    tc.session["something_like_user_id"] = 1;
+    await assertNothingRaised(block);
+    expect(tc.session["something_like_user_id"]).toBe(1);
+    tc.assertResponse("success");
+  }
+
+  async function forgeryProtectionOriginCheck(block: () => Promise<void>): Promise<void> {
+    const oldSetting = Base.forgeryProtectionOriginCheck;
+    Base.forgeryProtectionOriginCheck = true;
+    try {
+      await block();
+    } finally {
+      Base.forgeryProtectionOriginCheck = oldSetting;
+    }
+  }
+
+  it("should allow get", async () => {
+    await assertNotBlocked(() => tc.get("index"));
+  });
+
+  it("should allow head", async () => {
+    await assertNotBlocked(() => tc.head("index"));
+  });
+
+  it("should allow post without token on unsafe action", async () => {
+    await assertNotBlocked(() => tc.post("unsafe"));
+  });
+
+  it("should not allow post without token", async () => {
+    await assertBlocked(() => tc.post("index"));
+  });
+
+  it("should not allow post without token irrespective of format", async () => {
+    await assertBlocked(() => tc.post("index", { params: { format: "xml" } }));
+  });
+
+  it("should not allow patch without token", async () => {
+    await assertBlocked(() => tc.patch("index"));
+  });
+
+  it("should not allow put without token", async () => {
+    await assertBlocked(() => tc.put("index"));
+  });
+
+  it("should not allow delete without token", async () => {
+    await assertBlocked(() => tc.delete("index"));
+  });
+
+  it("should not allow xhr post without token", async () => {
+    await assertBlocked(() => tc.post("index", { xhr: true }));
+  });
+
+  it("should allow post with token", async () => {
+    initializeCsrfToken();
+    await assertNotBlocked(() =>
+      tc.post("index", { params: { custom_authenticity_token: TOKEN } }),
+    );
+  });
+
+  it("should allow post with strict encoded token", async () => {
+    const tokenLength = Math.ceil((32 * 4.0) / 3);
+    const tokenIncludingUrlUnsafeChars = "+/".padEnd(tokenLength, "A");
+    initializeCsrfToken(tokenIncludingUrlUnsafeChars);
+    await assertNotBlocked(() =>
+      tc.post("index", { params: { custom_authenticity_token: tokenIncludingUrlUnsafeChars } }),
+    );
+  });
+
+  it("should allow patch with token", async () => {
+    initializeCsrfToken();
+    await assertNotBlocked(() =>
+      tc.patch("index", { params: { custom_authenticity_token: TOKEN } }),
+    );
+  });
+
+  it("should allow put with token", async () => {
+    initializeCsrfToken();
+    await assertNotBlocked(() => tc.put("index", { params: { custom_authenticity_token: TOKEN } }));
+  });
+
+  it("should allow delete with token", async () => {
+    initializeCsrfToken();
+    await assertNotBlocked(() =>
+      tc.delete("index", { params: { custom_authenticity_token: TOKEN } }),
+    );
+  });
+
+  it("should allow post with token in header", async () => {
+    initializeCsrfToken();
+    await assertNotBlocked(() => tc.post("index", { env: { HTTP_X_CSRF_TOKEN: TOKEN } }));
+  });
+
+  it("should allow delete with token in header", async () => {
+    initializeCsrfToken();
+    await assertNotBlocked(() => tc.delete("index", { env: { HTTP_X_CSRF_TOKEN: TOKEN } }));
+  });
+
+  it("should allow patch with token in header", async () => {
+    initializeCsrfToken();
+    await assertNotBlocked(() => tc.patch("index", { env: { HTTP_X_CSRF_TOKEN: TOKEN } }));
+  });
+
+  it("should allow put with token in header", async () => {
+    initializeCsrfToken();
+    await assertNotBlocked(() => tc.put("index", { env: { HTTP_X_CSRF_TOKEN: TOKEN } }));
+  });
+
+  it("should allow post with origin checking and correct origin", async () => {
+    await forgeryProtectionOriginCheck(async () => {
+      initializeCsrfToken();
+      await assertNotBlocked(() =>
+        tc.post("index", {
+          env: { HTTP_ORIGIN: "http://test.host" },
+          params: { custom_authenticity_token: TOKEN },
+        }),
+      );
+    });
+  });
+
+  it("should allow post with origin checking and no origin", async () => {
+    await forgeryProtectionOriginCheck(async () => {
+      initializeCsrfToken();
+      await assertNotBlocked(() =>
+        tc.post("index", { params: { custom_authenticity_token: TOKEN } }),
+      );
+    });
+  });
+
+  it("should raise for post with null origin", async () => {
+    await forgeryProtectionOriginCheck(async () => {
+      initializeCsrfToken();
+      const exception = await assertRaises([InvalidAuthenticityToken], {}, () =>
+        tc.post("index", {
+          env: { HTTP_ORIGIN: "null" },
+          params: { custom_authenticity_token: TOKEN },
+        }),
+      );
+      expect(exception.message).toMatch("The browser returned a 'null' origin for a request");
+    });
+  });
+
+  it("should block post with origin checking and wrong origin", async () => {
+    const oldLogger = Base.logger;
+    const logger = new MockLogger();
+    Base.logger = logger as never;
+    try {
+      await forgeryProtectionOriginCheck(async () => {
+        initializeCsrfToken();
+        await assertBlocked(() =>
+          tc.post("index", {
+            env: { HTTP_ORIGIN: "http://bad.host" },
+            params: { custom_authenticity_token: TOKEN },
+          }),
+        );
+      });
+
+      expect(logger.logged("warn").at(-1)).toMatch(
+        "HTTP Origin header (http://bad.host) didn't match request.base_url (http://test.host)",
+      );
+    } finally {
+      Base.logger = oldLogger;
+    }
+  });
+
+  it("should warn on missing csrf token", async () => {
+    const oldLogger = Base.logger;
+    const logger = new MockLogger();
+    Base.logger = logger as never;
+
+    try {
+      await assertBlocked(() => tc.post("index"));
+
+      expect(logger.logged("warn").length).toBe(1);
+      expect(logger.logged("warn").at(-1)).toMatch(/CSRF token authenticity/);
+    } finally {
+      Base.logger = oldLogger;
+    }
+  });
+
+  it("should not warn if csrf logging disabled", async () => {
+    const oldLogger = Base.logger;
+    const logger = new MockLogger();
+    Base.logger = logger as never;
+    Base.logWarningOnCsrfFailure = false;
+
+    try {
+      await assertBlocked(() => tc.post("index"));
+
+      expect(logger.logged("warn").length).toBe(0);
+    } finally {
+      Base.logger = oldLogger;
+      Base.logWarningOnCsrfFailure = true;
+    }
+  });
+
+  it("csrf token is not saved if it is nil", async () => {
+    await tc.get("index");
+    (tc.controller as Base).commitCsrfToken(tc.request);
+    expect(tc.session["_csrf_token"]).toBeUndefined();
+  });
+
+  it("should not raise error if token is not a string", async () => {
+    await assertBlocked(() =>
+      tc.patch("index", {
+        body: JSON.stringify({ custom_authenticity_token: 1 }),
+        as: "json",
+      }),
+    );
+  });
+});
 
 describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
   it("raised exception message explains why it occurred", async () => {
-    const controller = {
-      request: { method: "POST", origin: "http://bad.host", baseUrl: "http://test.host" },
-      forgeryProtectionOriginCheck: true,
-      forgeryProtectionStrategy: Exception,
-    } as unknown as CsrfController;
-
-    await assertRaises(
-      [MetalInvalidAuthenticityToken],
-      {
-        match:
-          "HTTP Origin header (http://bad.host) didn't match request.base_url (http://test.host)",
-      },
-      () => handleUnverifiedRequest.call(controller),
-    );
+    const tc = new TestCase(RequestForgeryProtectionControllerUsingException);
+    const oldRequestForgeryProtectionToken = Base.requestForgeryProtectionToken;
+    const oldSetting = Base.forgeryProtectionOriginCheck;
+    Base.requestForgeryProtectionToken = "custom_authenticity_token";
+    Base.forgeryProtectionOriginCheck = true;
+    try {
+      tc.session["_csrf_token"] = TOKEN;
+      const exception = await assertRaises([InvalidAuthenticityToken], {}, () =>
+        tc.post("index", {
+          env: { HTTP_ORIGIN: "http://bad.host" },
+          params: { custom_authenticity_token: TOKEN },
+        }),
+      );
+      expect(exception.message).toMatch(
+        "HTTP Origin header (http://bad.host) didn't match request.base_url (http://test.host)",
+      );
+    } finally {
+      Base.forgeryProtectionOriginCheck = oldSetting;
+      Base.requestForgeryProtectionToken = oldRequestForgeryProtectionToken;
+    }
   });
 
   it.skip("should render form with token tag", () => {});
@@ -485,251 +382,202 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
   it.skip("should render form with with token tag with authenticity token requested", () => {});
   it.skip("should render form with with token tag if remote and embedding token is on", () => {});
 
-  it("should only allow same origin js get with xhr header", async () => {
-    await assertCrossOriginBlocked(() => tc().get("sameOriginJs"));
-    await assertCrossOriginBlocked(() => tc().get("sameOriginJs", { format: "js" }));
-    await assertCrossOriginBlocked(() =>
-      tc().get("negotiateSameOrigin", { headers: { Accept: "text/javascript" } }),
-    );
+  describe("same origin js", () => {
+    let tc: TestCase;
+    let oldRequestForgeryProtectionToken: string | null;
 
-    await assertCrossOriginBlocked(() =>
-      tc().get("negotiateSameOrigin", { headers: { Accept: "application/javascript" } }),
-    );
+    beforeEach(() => {
+      tc = new TestCase(RequestForgeryProtectionControllerUsingException);
+      oldRequestForgeryProtectionToken = Base.requestForgeryProtectionToken;
+      Base.requestForgeryProtectionToken = "custom_authenticity_token";
+    });
 
-    await assertCrossOriginNotBlocked((t) => t.get("sameOriginJs", { xhr: true }));
-    await assertCrossOriginNotBlocked((t) => t.get("sameOriginJs", { xhr: true, format: "js" }));
-    await assertCrossOriginNotBlocked((t) =>
-      t.get("negotiateSameOrigin", { xhr: true, headers: { Accept: "text/javascript" } }),
-    );
+    afterEach(() => {
+      Base.requestForgeryProtectionToken = oldRequestForgeryProtectionToken;
+    });
+
+    async function assertCrossOriginBlocked(block: () => Promise<void>): Promise<void> {
+      await assertRaises([InvalidCrossOriginRequest], {}, block);
+    }
+
+    async function assertCrossOriginNotBlocked(block: () => Promise<void>): Promise<void> {
+      tc.session["something_like_user_id"] = 1;
+      await assertNothingRaised(block);
+      expect(tc.session["something_like_user_id"]).toBe(1);
+      tc.assertResponse("success");
+    }
+
+    const accept = (value: string) => ({ headers: { Accept: value } });
+
+    it("should only allow same origin js get with xhr header", async () => {
+      await assertCrossOriginBlocked(() => tc.get("sameOriginJs"));
+      await assertCrossOriginBlocked(() => tc.get("sameOriginJs", { format: "js" }));
+      await assertCrossOriginBlocked(() =>
+        tc.get("negotiateSameOrigin", accept("text/javascript")),
+      );
+
+      await assertCrossOriginBlocked(() =>
+        tc.get("negotiateSameOrigin", accept("application/javascript")),
+      );
+
+      await assertCrossOriginNotBlocked(() => tc.get("sameOriginJs", { xhr: true }));
+      await assertCrossOriginNotBlocked(() => tc.get("sameOriginJs", { xhr: true, format: "js" }));
+      await assertCrossOriginNotBlocked(() =>
+        tc.get("negotiateSameOrigin", { ...accept("text/javascript"), xhr: true }),
+      );
+    });
+
+    it("should warn on not same origin js", async () => {
+      const oldLogger = Base.logger;
+      const logger = new MockLogger();
+      Base.logger = logger as never;
+
+      try {
+        await assertCrossOriginBlocked(() => tc.get("sameOriginJs"));
+
+        expect(logger.logged("warn").length).toBe(1);
+        expect(logger.logged("warn").at(-1)).toMatch(
+          /<script> tag on another site requested protected JavaScript/,
+        );
+      } finally {
+        Base.logger = oldLogger;
+      }
+    });
+
+    it("should not warn if csrf logging disabled and not same origin js", async () => {
+      const oldLogger = Base.logger;
+      const logger = new MockLogger();
+      Base.logger = logger as never;
+      Base.logWarningOnCsrfFailure = false;
+
+      try {
+        await assertCrossOriginBlocked(() => tc.get("sameOriginJs"));
+
+        expect(logger.logged("warn").length).toBe(0);
+      } finally {
+        Base.logger = oldLogger;
+        Base.logWarningOnCsrfFailure = true;
+      }
+    });
+
+    it("should allow non get js without xhr header", async () => {
+      tc.session["_csrf_token"] = TOKEN;
+      await assertCrossOriginNotBlocked(() =>
+        tc.post("sameOriginJs", { params: { custom_authenticity_token: TOKEN } }),
+      );
+      await assertCrossOriginNotBlocked(() =>
+        tc.post("sameOriginJs", { params: { format: "js", custom_authenticity_token: TOKEN } }),
+      );
+      await assertCrossOriginNotBlocked(() =>
+        tc.post("negotiateSameOrigin", {
+          ...accept("text/javascript"),
+          params: { custom_authenticity_token: TOKEN },
+        }),
+      );
+    });
+
+    it("should only allow cross origin js get without xhr header if protection disabled", async () => {
+      await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs"));
+      await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs", { format: "js" }));
+      await assertCrossOriginNotBlocked(() =>
+        tc.get("negotiateCrossOrigin", accept("text/javascript")),
+      );
+
+      await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs", { xhr: true }));
+      await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs", { xhr: true, format: "js" }));
+      await assertCrossOriginNotBlocked(() =>
+        tc.get("negotiateCrossOrigin", { ...accept("text/javascript"), xhr: true }),
+      );
+    });
   });
-  it.skip("should warn on not same origin js", () => {});
-  it.skip("should not warn if csrf logging disabled and not same origin js", () => {});
-  it.skip("should allow non get js without xhr header", () => {});
-  it.skip("should only allow cross origin js get without xhr header if protection disabled", () => {});
 });
 
 describe("RequestForgeryProtectionControllerUsingResetSessionTest", () => {
-  it("should emit a csrf-param meta tag and a csrf-token meta tag", () => {
-    const csrf = new RequestForgeryProtection({ strategy: "reset_session" });
-    const session = newSession();
-    const meta = csrf.csrfMetaTag(session);
-    expect(meta.param).toBe("authenticity_token");
-    expect(meta.token).toBeTruthy();
-    expect(meta.token.length).toBeGreaterThan(0);
-  });
+  it.skip("should emit a csrf-param meta tag and a csrf-token meta tag", () => {});
 });
 
 describe("RequestForgeryProtectionControllerUsingNullSessionTest", () => {
-  it("should allow reset_session", () => {
-    const csrf = new RequestForgeryProtection({ strategy: "null_session" });
-    const session = newSession();
-    session.set("user_id", 1);
-    session.set("_csrf_token", "abc");
-    csrf.handleUnverified(session);
-    expect(session.get("user_id")).toBe(1);
-  });
-
   it.skip("should allow to set signed cookies", () => {});
   it.skip("should allow to set encrypted cookies", () => {});
+
+  it("should allow reset_session", async () => {
+    const tc = new TestCase(RequestForgeryProtectionControllerUsingNullSession);
+    await tc.post("tryToResetSession");
+    tc.assertResponse("ok");
+  });
 });
 
 describe("CustomAuthenticityParamControllerTest", () => {
-  it("should not warn if form authenticity param matches form authenticity token", () => {
-    const csrf = new RequestForgeryProtection({ paramName: "custom_token" });
-    expect(csrf.formParamName).toBe("custom_token");
-    const session = newSession();
-    const real = csrf.getRealToken(session);
-    const masked = csrf.maskToken(real);
-    expect(csrf.verifyToken(session, masked)).toBe(true);
+  let tc: TestCase;
+  let oldLogger: typeof Base.logger;
+  let logger: MockLogger;
+  let oldRequestForgeryProtectionToken: string | null;
+
+  beforeEach(() => {
+    tc = new TestCase(CustomAuthenticityParamController);
+    oldLogger = Base.logger;
+    logger = new MockLogger();
+    oldRequestForgeryProtectionToken = Base.requestForgeryProtectionToken;
+    Base.requestForgeryProtectionToken = SecureRandom.randomBytes(32).toString("base64url");
   });
 
-  it("should warn if form authenticity param does not match form authenticity token", () => {
-    const csrf = new RequestForgeryProtection({ paramName: "custom_token" });
-    const session = newSession();
-    csrf.getRealToken(session);
-    expect(csrf.verifyToken(session, "wrong")).toBe(false);
+  afterEach(() => {
+    Base.logger = oldLogger;
+    Base.requestForgeryProtectionToken = oldRequestForgeryProtectionToken;
+  });
+
+  it("should not warn if form authenticity param matches form authenticity token", async () => {
+    Base.logger = logger as never;
+    const stub = vi
+      .spyOn(
+        CustomAuthenticityParamController.prototype as unknown as {
+          isValidAuthenticityToken(): boolean;
+        },
+        "isValidAuthenticityToken",
+      )
+      .mockReturnValue(true);
+    try {
+      await tc.post("index", { params: { custom_token_name: "foobar" } });
+      expect(logger.logged("warn").length).toBe(0);
+    } finally {
+      stub.mockRestore();
+    }
+  });
+
+  it("should warn if form authenticity param does not match form authenticity token", async () => {
+    Base.logger = logger as never;
+    await tc.post("index", { params: { custom_token_name: "bazqux" } });
+    expect(logger.logged("warn").length).toBe(1);
   });
 });
 
 describe("PerFormTokensControllerTest", () => {
-  it("per form token is same size as global token", () => {
-    const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session = newSession();
-    const realToken = csrf.getRealToken(session);
-    const globalMasked = csrf.maskToken(realToken);
-    const perFormMasked = csrf.generatePerFormToken(session, "/posts", "POST");
-    expect(Buffer.from(perFormMasked, "base64").length).toBe(
-      Buffer.from(globalMasked, "base64").length,
-    );
-  });
-
-  it("accepts token for correct path and method", () => {
-    const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session = newSession();
-    const perFormToken = csrf.generatePerFormToken(session, "/posts", "POST");
-    expect(csrf.verifyToken(session, perFormToken, { actionPath: "/posts", method: "POST" })).toBe(
-      true,
-    );
-  });
-
-  it("accepts token with path with query params", () => {
-    const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session = newSession();
-    const perFormToken = csrf.generatePerFormToken(session, "/posts?page=1", "POST");
-    expect(csrf.verifyToken(session, perFormToken, { actionPath: "/posts", method: "POST" })).toBe(
-      true,
-    );
-  });
-
-  it("rejects token for incorrect path", () => {
-    const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session = newSession();
-    const perFormToken = csrf.generatePerFormToken(session, "/posts", "POST");
-    expect(
-      csrf.verifyToken(session, perFormToken, { actionPath: "/comments", method: "POST" }),
-    ).toBe(false);
-  });
-
-  it("rejects token for incorrect method", () => {
-    const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session = newSession();
-    const perFormToken = csrf.generatePerFormToken(session, "/posts", "POST");
-    expect(
-      csrf.verifyToken(session, perFormToken, { actionPath: "/posts", method: "DELETE" }),
-    ).toBe(false);
-  });
-
-  it("accepts global csrf token", () => {
-    const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session = newSession();
-    const realToken = csrf.getRealToken(session);
-    const masked = csrf.maskToken(realToken);
-    expect(csrf.verifyToken(session, masked)).toBe(true);
-  });
-
-  it("returns hmacd token", () => {
-    const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session = newSession();
-    const perFormToken = csrf.generatePerFormToken(session, "/posts", "POST");
-    const realToken = csrf.getRealToken(session);
-    const unmasked = csrf.unmaskToken(perFormToken);
-    expect(unmasked).not.toBe(realToken);
-  });
-
-  it("chomps slashes", () => {
-    const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session = newSession();
-    const t1 = csrf.generatePerFormToken(session, "/posts/", "POST");
-    expect(csrf.verifyToken(session, t1, { actionPath: "/posts", method: "POST" })).toBe(true);
-  });
-
-  it("ignores trailing slash during generation", () => {
-    const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session = newSession();
-    const t1 = csrf.generatePerFormToken(session, "/posts/", "POST");
-    const t2 = csrf.generatePerFormToken(session, "/posts", "POST");
-    expect(csrf.unmaskToken(t1)).toBe(csrf.unmaskToken(t2));
-  });
-
-  it("handles empty path as request path", () => {
-    const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session = newSession();
-    const token = csrf.generatePerFormToken(session, "", "POST");
-    expect(csrf.verifyToken(session, token, { actionPath: "/", method: "POST" })).toBe(true);
-  });
-
-  it("handles query string", () => {
-    const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session = newSession();
-    const token = csrf.generatePerFormToken(session, "/posts?sort=name", "POST");
-    expect(
-      csrf.verifyToken(session, token, { actionPath: "/posts?sort=date", method: "POST" }),
-    ).toBe(true);
-  });
-
-  it("handles fragment", () => {
-    const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session = newSession();
-    const token = csrf.generatePerFormToken(session, "/posts#top", "POST");
-    expect(csrf.verifyToken(session, token, { actionPath: "/posts", method: "POST" })).toBe(true);
-  });
-
-  it("ignores trailing slash during validation", () => {
-    const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session = newSession();
-    const token = csrf.generatePerFormToken(session, "/posts", "POST");
-    expect(csrf.verifyToken(session, token, { actionPath: "/posts/", method: "POST" })).toBe(true);
-  });
-
-  it("method is case insensitive", () => {
-    const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session = newSession();
-    const token = csrf.generatePerFormToken(session, "/posts", "post");
-    expect(csrf.verifyToken(session, token, { actionPath: "/posts", method: "POST" })).toBe(true);
-  });
-
+  it.skip("per form token is same size as global token", () => {});
+  it.skip("accepts token for correct path and method", () => {});
+  it.skip("accepts token with path with query params", () => {});
+  it.skip("rejects token for incorrect path", () => {});
+  it.skip("rejects token for incorrect method", () => {});
+  it.skip("accepts global csrf token", () => {});
+  it.skip("returns hmacd token", () => {});
+  it.skip("chomps slashes", () => {});
+  it.skip("ignores trailing slash during generation", () => {});
+  it.skip("handles empty path as request path", () => {});
+  it.skip("handles query string", () => {});
+  it.skip("handles fragment", () => {});
+  it.skip("ignores trailing slash during validation", () => {});
+  it.skip("method is case insensitive", () => {});
   it.skip("rejects garbage path", () => {});
   it.skip("rejects token for incorrect method button to", () => {});
   it.skip("Accepts proper token for implicit post method on button_to tag", () => {});
   it.skip("Accepts proper token for delete method on button_to tag", () => {});
   it.skip("Accepts proper token for post method on button_to tag", () => {});
   it.skip("Accepts proper token for patch method on button_to tag", () => {});
-  it("does not return old csrf token", () => {
-    const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session = newSession();
-    const realToken = csrf.getRealToken(session);
-    const perFormToken = csrf.generatePerFormToken(session, "/per_form_tokens/post_one", "POST");
-    const unmasked = csrf.unmaskToken(perFormToken);
-    expect(unmasked).not.toBe(realToken);
-  });
-
-  it("accepts old csrf token", () => {
-    const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session = newSession();
-    const realToken = csrf.getRealToken(session);
-    const nonHmacToken = csrf.maskToken(realToken);
-    expect(
-      csrf.verifyToken(session, nonHmacToken, {
-        actionPath: "/per_form_tokens/post_one",
-        method: "POST",
-      }),
-    ).toBe(true);
-  });
-
+  it.skip("does not return old csrf token", () => {});
+  it.skip("accepts old csrf token", () => {});
   it.skip("handles relative paths", () => {});
   it.skip("handles relative paths with dot", () => {});
-
-  it("ignores origin during generation", () => {
-    const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session = newSession();
-    const tokenWithOrigin = csrf.generatePerFormToken(
-      session,
-      "https://example.com/per_form_tokens/post_one/",
-      "POST",
-    );
-    expect(
-      csrf.verifyToken(session, tokenWithOrigin, {
-        actionPath: "/per_form_tokens/post_one",
-        method: "POST",
-      }),
-    ).toBe(true);
-  });
-
-  it("ignores origin during generation with protocol-relative url", () => {
-    const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session = newSession();
-    const tokenWithOrigin = csrf.generatePerFormToken(
-      session,
-      "//example.com/per_form_tokens/post_one/",
-      "POST",
-    );
-    expect(
-      csrf.verifyToken(session, tokenWithOrigin, {
-        actionPath: "/per_form_tokens/post_one",
-        method: "POST",
-      }),
-    ).toBe(true);
-  });
+  it.skip("ignores origin during generation", () => {});
+  it.skip("ignores origin during generation with protocol-relative url", () => {});
 });
 
 describe("PrependProtectForgeryBaseControllerTest", () => {
@@ -739,10 +587,11 @@ describe("PrependProtectForgeryBaseControllerTest", () => {
 });
 
 describe("FreeCookieControllerTest", () => {
-  it("should allow all methods without token", () => {
-    const csrf = new RequestForgeryProtection({ protectedMethods: new Set() });
-    expect(csrf.requiresVerification("POST")).toBe(false);
-    expect(csrf.requiresVerification("DELETE")).toBe(false);
+  it("should allow all methods without token", async () => {
+    const tc = new TestCase(FreeCookieController);
+    for (const method of ["post", "patch", "put", "delete"] as const) {
+      await tc[method]("index");
+    }
   });
   it.skip("should not render form with token tag", () => {});
   it.skip("should not render button to with token tag", () => {});

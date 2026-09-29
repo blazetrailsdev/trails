@@ -1022,7 +1022,7 @@ function mimeHost(req: Request): MimeHost {
       fetchHeader: {
         value: <T>(k: string, fallback: (key: string) => T) => req.fetchHeader(k, fallback),
       },
-      parameters: { get: () => req.params },
+      parameters: { get: () => req.parameters },
       accept: { get: () => req.accept },
       xhr: { get: () => req.xhr },
     }) as MimeHost;

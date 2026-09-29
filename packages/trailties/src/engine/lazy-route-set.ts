@@ -2,10 +2,6 @@ import { RouteSet, type DrawCallback, type Request } from "@blazetrails/actionpa
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { TopLevel } from "@blazetrails/activesupport";
 
-function reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined {
-  return TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
-}
-
 type AnyFn = (...args: unknown[]) => unknown;
 type ProxyHelpers = Record<
   "urlFor" | "fullUrlFor" | "routeFor" | "polymorphicUrl" | "polymorphicPath",
@@ -14,7 +10,7 @@ type ProxyHelpers = Record<
 
 export class LazyRouteSet extends RouteSet {
   override draw(callback: DrawCallback): void {
-    void reloadRoutesUnlessLoaded();
+    void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
     super.draw(callback);
   }
 
@@ -22,7 +18,7 @@ export class LazyRouteSet extends RouteSet {
     options: Record<string, unknown>,
     recall: Record<string, unknown> = {},
   ): [string, string[]] {
-    void reloadRoutesUnlessLoaded();
+    void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
     return super.generateExtras(options, recall);
   }
 
@@ -30,7 +26,7 @@ export class LazyRouteSet extends RouteSet {
     path: string,
     environment: { method?: string | null; extras?: Record<string, unknown> } = {},
   ): Record<string, unknown> {
-    void reloadRoutesUnlessLoaded();
+    void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
     return super.recognizePath(path, environment);
   }
 
@@ -40,12 +36,12 @@ export class LazyRouteSet extends RouteSet {
     extras: Record<string, unknown>,
     options: { raiseOnMissing?: boolean } = {},
   ): Record<string, unknown> | undefined {
-    void reloadRoutesUnlessLoaded();
+    void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
     return super.recognizePathWithRequest(req, path, extras, options);
   }
 
   override async call(req: RackEnv): Promise<RackResponse> {
-    await reloadRoutesUnlessLoaded();
+    await TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
     return super.call(req);
   }
 
@@ -55,7 +51,7 @@ export class LazyRouteSet extends RouteSet {
     const wrap = (name: keyof ProxyHelpers): void => {
       const original = helpers[name].bind(helpers);
       helpers[name] = (...args: unknown[]): unknown => {
-        void reloadRoutesUnlessLoaded();
+        void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
         return original(...args);
       };
     };

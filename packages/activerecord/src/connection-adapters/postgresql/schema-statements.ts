@@ -601,18 +601,17 @@ export class SchemaStatements extends AbstractSchemaStatements {
     default_: unknown = null,
   ): Promise<void> {
     this.validateChangeColumnNullArgumentBang(null_);
+
     await this.clearCacheBang();
-    const quotedTable = this.quoteTableName(tableName);
-    const quotedCol = this.quoteColumnName(columnName);
-    if (!null_ && default_ != null) {
+    if (!(null_ || default_ == null)) {
       const column = await this.columnFor(tableName, columnName);
-      const expr = await this.quoteDefaultExpression(default_, column);
-      await this.execute(
-        `UPDATE ${quotedTable} SET ${quotedCol} = ${expr} WHERE ${quotedCol} IS NULL`,
-      );
+      if (column)
+        await this.execute(
+          `UPDATE ${this.quoteTableName(tableName)} SET ${this.quoteColumnName(columnName)}=${await this.quoteDefaultExpression(default_, column)} WHERE ${this.quoteColumnName(columnName)} IS NULL`,
+        );
     }
     await this.execute(
-      `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} ${null_ ? "DROP" : "SET"} NOT NULL`,
+      `ALTER TABLE ${this.quoteTableName(tableName)} ALTER COLUMN ${this.quoteColumnName(columnName)} ${null_ ? "DROP" : "SET"} NOT NULL`,
     );
   }
 

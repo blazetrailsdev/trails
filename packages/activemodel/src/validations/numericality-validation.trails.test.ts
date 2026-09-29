@@ -8,6 +8,11 @@ import { NumericalityValidator, prepareValueForValidation } from "./numericality
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
 import { include } from "@blazetrails/activesupport";
 
+class Person extends Model {
+  name: string | null = null;
+  age: number | null = null;
+}
+
 describe("NumericalityValidator (trails-only)", () => {
   it("rejects blank and whitespace-only strings", async () => {
     class User extends Model {
@@ -80,12 +85,12 @@ describe("NumericalityValidator (trails-only)", () => {
   });
 
   it("rejects plain object values via NumericalityValidator.validateEach directly", () => {
-    const v = new NumericalityValidator({ attributes: ["x"] });
-    const errs = new Errors(null);
+    const v = new NumericalityValidator({ attributes: ["age"] });
+    const errs = new Errors(new Person());
     const stubRecord = { errors: errs };
-    v.validateEach(stubRecord, "x", { not: "a number" });
-    expect(errs.messagesFor("x")).toHaveLength(1);
-    expect(errs.where("x", ":not_a_number")).toHaveLength(1);
+    v.validateEach(stubRecord, "age", { not: "a number" });
+    expect(errs.messagesFor("age")).toHaveLength(1);
+    expect(errs.where("age", ":not_a_number")).toHaveLength(1);
   });
 
   it("validates against the raw before-type-cast value (prepareValueForValidation)", () => {
