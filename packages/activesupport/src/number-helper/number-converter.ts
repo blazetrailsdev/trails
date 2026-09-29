@@ -3,6 +3,7 @@ import { I18n } from "../i18n.js";
 import { camelize } from "../inflector.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
 import { SafeBuffer } from "../core-ext/string/output-safety.js";
+import { classAttribute } from "../class-attribute.js";
 import { merge, mergeBang } from "../hash-utils.js";
 
 const RATIONAL_DEFAULT_PRECISION = 32;
@@ -73,7 +74,12 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
   protected opts: TOptions;
   protected _options: Record<string, unknown> | undefined;
 
-  static namespace: string | undefined;
+  declare static namespace: string | undefined;
+  declare static isNamespace: boolean;
+
+  static {
+    classAttribute.call(this, "namespace");
+  }
 
   static convert(number: unknown, options?: any): any {
     return new (this as any)(number, options ?? {}).execute();

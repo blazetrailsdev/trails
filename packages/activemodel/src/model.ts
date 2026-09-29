@@ -46,6 +46,7 @@ export class Model {
   declare static paramDelimiter: string;
   declare private static _modelName: ModelName | null;
   declare static _validators: Map<string | null, Array<ValidatorLike>>;
+  declare static is_validators: boolean;
 
   declare static _toPartialPath: Extended<typeof ConversionClassMethods>["_toPartialPath"];
 

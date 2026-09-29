@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { fileURLToPath } from "node:url";
+import { API } from "typescript/unstable/sync";
 import { ScaffoldGenerator } from "./scaffold-generator.js";
 import { parseTs } from "../../../template-builder/testing.js";
 
@@ -71,5 +73,48 @@ describe("ScaffoldGenerator (views)", () => {
 
 </div>
 `);
+  });
+});
+
+describe("ScaffoldGenerator (type-check)", () => {
+  const PACKAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
+  const compilerOptions = { strict: true, module: "nodenext", noEmit: true, skipLibCheck: true };
+  const APP_FILES: Record<string, string> = {
+    "package.json": `{ "type": "module" }`,
+    "tsconfig.json": JSON.stringify({ compilerOptions, include: ["app/**/*.ts"] }),
+    "app/controllers/application-controller.ts": `import { ActionController } from "@blazetrails/actionpack";\nexport class ApplicationController extends ActionController.Base {}\n`,
+    "app/models/application-record.ts": `import { Base } from "@blazetrails/activerecord";\nexport class ApplicationRecord extends Base {}\n`,
+    "config/routes.ts": "export function drawRoutes(mapper: Mapper): void {\n}\n",
+  };
+
+  it("emits a controller that type-checks against the scaffolded model", async () => {
+    const appDir = fs.mkdtempSync(path.join(PACKAGE_DIR, "tmp-scaffold-strict-"));
+    const api = new API();
+    try {
+      for (const [rel, content] of Object.entries(APP_FILES)) {
+        fs.mkdirSync(path.dirname(path.join(appDir, rel)), { recursive: true });
+        fs.writeFileSync(path.join(appDir, rel), content);
+      }
+      await new ScaffoldGenerator({
+        cwd: appDir,
+        output: () => {},
+        name: "Post",
+        attributes: ["title:string", "body:text"],
+      }).run();
+
+      const configPath = path.join(appDir, "tsconfig.json");
+      const program = api
+        .createSnapshot({ openProjects: [configPath] })
+        .getConfiguredProject(configPath)!.program;
+      const diagnostics = [
+        ...program.getSyntacticDiagnostics(),
+        ...program.getSemanticDiagnostics(),
+      ].map((d) => `${path.relative(appDir, d.fileName ?? "")}: TS${d.code}`);
+
+      expect(diagnostics).toEqual([]);
+    } finally {
+      api.close();
+      fs.rmSync(appDir, { recursive: true, force: true });
+    }
   });
 });

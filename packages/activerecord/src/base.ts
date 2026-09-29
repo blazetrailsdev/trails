@@ -554,6 +554,7 @@ export class Base extends Model {
   declare static normalizes: (...args: NormalizesArgs) => void;
   declare static normalizeValueFor: (name: string, value: unknown) => unknown;
   declare static normalizedAttributes: Set<string>;
+  declare static isNormalizedAttributes: boolean;
 
   declare static lookupAncestors: typeof Translation.lookupAncestors;
 
@@ -632,6 +633,7 @@ export class Base extends Model {
     | (() => string | null | undefined)
     | null
     | undefined;
+  declare static isSignedIdVerifierSecret: boolean;
 
   static _requireConcreteClass(): void {
     if ((this.abstractClass || this === Base) && !this._suppressAbstractCheck) {
@@ -688,8 +690,10 @@ export class Base extends Model {
   }
 
   declare static tableNamePrefix: string;
+  declare static isTableNamePrefix: boolean;
 
   declare static tableNameSuffix: string;
+  declare static isTableNameSuffix: boolean;
 
   static get tableName(): string | null {
     return ModelSchema.tableName.call(this);
@@ -981,6 +985,7 @@ export class Base extends Model {
   }
 
   declare static logger: BenchmarkLogger | null | undefined;
+  declare static isLogger: boolean;
 
   static benchmark = benchmarkable;
 
@@ -1069,6 +1074,7 @@ export class Base extends Model {
   declare static defaultScopeOverride: boolean | null;
   declare static _reflections: Record<string, _Reflection.AssociationReflection>;
   declare static aggregateReflections: Record<string, _Reflection.AggregateReflection>;
+  declare static isAggregateReflections: boolean;
   declare static _reflectOnAssociation: typeof _Reflection.ClassMethods._reflectOnAssociation;
   declare static reflections: typeof _Reflection.ClassMethods.reflections;
   declare static normalizedReflections: typeof _Reflection.ClassMethods.normalizedReflections;
@@ -2050,6 +2056,7 @@ export class Base extends Model {
   declare static defaultConnectionHandler: ConnectionHandler;
   declare static isDefaultConnectionHandler: () => boolean;
   declare static defaultRole: string;
+  declare static isDefaultRole: boolean;
   declare static defaultShard: string;
   declare static isDefaultShard: () => boolean;
 
@@ -2066,6 +2073,7 @@ export class Base extends Model {
   declare static destroyAssociationAsyncBatchSize: number | null;
 
   declare static primaryKeyPrefixType: string | null | undefined;
+  declare static isPrimaryKeyPrefixType: boolean;
 
   static getPrimaryKey = _getPrimaryKey;
 
@@ -2073,13 +2081,16 @@ export class Base extends Model {
 
   static quotedPrimaryKey = _quotedPrimaryKey;
 
-  static implicitOrderColumn: string | null = null;
+  declare static implicitOrderColumn: string | null | undefined;
+  declare static isImplicitOrderColumn: boolean;
 
   declare static pluralizeTableNames: boolean;
 
-  static schemaMigrationsTableName = "schema_migrations";
+  declare static schemaMigrationsTableName: string;
+  declare static isSchemaMigrationsTableName: boolean;
 
-  static internalMetadataTableName = "ar_internal_metadata";
+  declare static internalMetadataTableName: string;
+  declare static isInternalMetadataTableName: boolean;
 
   static immutableStringsByDefault = false;
 

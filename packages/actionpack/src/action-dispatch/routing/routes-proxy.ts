@@ -18,6 +18,7 @@ import {
   type UrlForRoutes,
 } from "./url-for.js";
 import type { PolymorphicHost } from "./polymorphic-routes.js";
+import { classAttribute } from "@blazetrails/activesupport";
 import { Routing } from "../../namespaces.js";
 
 export type RoutesProxyHelpers = Record<string, unknown>;
@@ -31,7 +32,15 @@ export type RoutesProxyInstance = RoutesProxy & {
 export class RoutesProxy implements UrlForHost {
   scope: UrlForHost;
   routes: UrlForRoutes;
-  defaultUrlOptions: Record<string, unknown> = {};
+  declare static defaultUrlOptions: Record<string, unknown>;
+  declare static isDefaultUrlOptions: boolean;
+  declare defaultUrlOptions: Record<string, unknown>;
+  declare isDefaultUrlOptions: boolean;
+
+  static {
+    classAttribute.call(this, "defaultUrlOptions");
+    this.defaultUrlOptions = {};
+  }
   /** @internal */
   private _helpers: RoutesProxyHelpers;
   /** @internal */

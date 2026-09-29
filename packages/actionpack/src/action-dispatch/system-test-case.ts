@@ -1,3 +1,4 @@
+import { classAttribute } from "@blazetrails/activesupport";
 import { Driver, type BrowserName, type DriverOptions } from "./system-testing/driver.js";
 import { Server, type ServerApp } from "./system-testing/server.js";
 
@@ -15,7 +16,13 @@ export interface ServedByOptions {
 }
 
 export class SystemTestCase {
-  static driver: Driver | undefined;
+  declare static driver: Driver | undefined;
+  declare static isDriver: boolean;
+
+  static {
+    classAttribute.call(this, "driver", { instanceAccessor: false });
+  }
+
   private static _server: Server | undefined;
   private static _serverHost: string | undefined;
   private static _serverPort: number | undefined;

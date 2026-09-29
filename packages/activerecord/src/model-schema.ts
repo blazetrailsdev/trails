@@ -783,7 +783,16 @@ export const ModelSchema = {
     classAttribute.call(base, "primaryKeyPrefixType", { instanceWriter: false });
     classAttribute.call(base, "tableNamePrefix", { instanceWriter: false, default: "" });
     classAttribute.call(base, "tableNameSuffix", { instanceWriter: false, default: "" });
+    classAttribute.call(base, "schemaMigrationsTableName", {
+      instanceAccessor: false,
+      default: "schema_migrations",
+    });
+    classAttribute.call(base, "internalMetadataTableName", {
+      instanceAccessor: false,
+      default: "ar_internal_metadata",
+    });
     classAttribute.call(base, "pluralizeTableNames", { instanceWriter: false, default: true });
+    classAttribute.call(base, "implicitOrderColumn", { instanceAccessor: false });
   },
 };
 

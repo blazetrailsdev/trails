@@ -1,5 +1,6 @@
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { defineCallbacks, runCallbacks, setCallback } from "./callbacks.js";
+import { classAttribute } from "./class-attribute.js";
 import { CodeGenerator } from "./code-generator.js";
 import { objectWith } from "./core-ext/object/with.js";
 import { include, Module } from "@blazetrails/ruby-compat/include";
@@ -31,9 +32,11 @@ const INVALID_ATTRIBUTE_NAMES = [
 const NOT_SET: unknown = Object.freeze({});
 
 export abstract class CurrentAttributes {
-  public static defaults: Record<string, AttributeValue> = {};
+  declare static defaults: Record<string, AttributeValue>;
+  declare static isDefaults: boolean;
 
   static {
+    classAttribute.call(this, "defaults", { instanceWriter: false, default: Object.freeze({}) });
     defineCallbacks(CurrentAttributes.prototype, "reset");
   }
 

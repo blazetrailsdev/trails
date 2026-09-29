@@ -1,4 +1,4 @@
-import { chomp } from "@blazetrails/activesupport";
+import { chomp, classAttribute } from "@blazetrails/activesupport";
 import { rbEqual } from "@blazetrails/ruby-compat";
 import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
 import { ActionView } from "../../namespaces.js";
@@ -27,7 +27,12 @@ export type TseImplementation = (source: string, options?: EmitJsOptions) => Emi
 export class Tse implements TemplateHandler {
   static trimMode: string = "-";
 
-  static escapeIgnoreList: string[] = ["text/plain"];
+  declare static escapeIgnoreList: string[];
+  declare static isEscapeIgnoreList: boolean;
+
+  static {
+    classAttribute.call(this, "escapeIgnoreList", { default: ["text/plain"] });
+  }
 
   static stripTrailingNewlines: boolean = false;
 

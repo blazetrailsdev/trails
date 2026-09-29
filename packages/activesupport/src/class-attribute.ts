@@ -102,11 +102,11 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
     if (instancePredicate) {
       const predicateName = `is${name.charAt(0).toUpperCase()}${name.slice(1)}`;
       ClassAttribute.redefineMethod(this, predicateName, false, function (this: any) {
-        return !!this[name];
+        return this[name] != null && this[name] !== false;
       });
       if (instanceReader) {
         ClassAttribute.redefineMethod(this.prototype, predicateName, false, function (this: any) {
-          return !!this[name];
+          return this[name] != null && this[name] !== false;
         });
       }
     }

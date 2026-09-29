@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { assertMatch, assertNoMatch } from "@blazetrails/activesupport";
+import { Base } from "@blazetrails/activerecord";
 import { MigrationGenerator } from "./migration-generator.js";
 import * as Assertions from "./testing/assertions.js";
 import { migrationFileName as _migrationFileName } from "./testing/behavior.js";
@@ -341,11 +342,45 @@ describe("MigrationGeneratorTest", () => {
 
   it.skip("properly identifies usage file", () => {});
 
-  it.skip("migration with singular table name", () => {});
+  it("migration with singular table name", async () => {
+    await withSingularTableName(async () => {
+      const migration = "add_title_body_to_post";
+      await makeGen().run(migration, ["title:string"]);
+      await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+        assertMethod("change", content, (change) => {
+          assertMatch(/addColumn\("post", "title", "string"/, change);
+        }),
+      );
+    });
+  });
 
-  it.skip("create join table migration with singular table name", () => {});
+  it("create join table migration with singular table name", async () => {
+    await withSingularTableName(async () => {
+      const migration = "add_media_join_table";
+      await makeGen().run(migration, ["artist_id", "music:uniq"]);
 
-  it.skip("create table migration with singular table name", () => {});
+      await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+        assertMethod("change", content, (change) => {
+          assertMatch(/createJoinTable\("artist", "music"/, change);
+          assertMatch(/\/\/ t\.index\(\["artist_id", "music_id"\]\)/, change);
+          assertMatch(/ {2}t\.index\(\["music_id", "artist_id"\], \{ unique: true \}\)/, change);
+        }),
+      );
+    });
+  });
+
+  it("create table migration with singular table name", async () => {
+    await withSingularTableName(async () => {
+      await makeGen().run("create_book", ["title:string", "content:text"]);
+      await assertMigration("db/migrate/create_book.ts", (content) =>
+        assertMethod("change", content, (change) => {
+          assertMatch(/createTable\("book"/, change);
+          assertMatch(/ {2}t\.string\("title"\)/, change);
+          assertMatch(/ {2}t\.text\("content"\)/, change);
+        }),
+      );
+    });
+  });
 
   it("create table migration with token option", async () => {
     const gen = makeGen();
@@ -487,3 +522,13 @@ describe("MigrationGeneratorTest (JavaScript project)", () => {
     expect(content).toContain('t.text("body")');
   });
 });
+
+async function withSingularTableName(block: () => Promise<void>): Promise<void> {
+  const oldState = Base.pluralizeTableNames;
+  try {
+    Base.pluralizeTableNames = false;
+    await block();
+  } finally {
+    Base.pluralizeTableNames = oldState;
+  }
+}
