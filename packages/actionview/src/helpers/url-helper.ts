@@ -48,7 +48,7 @@ interface UrlHelperRequest {
   readonly fullpath: string;
   readonly path: string;
   readonly protocol: string;
-  readonly hostWithPort: string;
+  hostWithPort(): string;
 }
 
 type HtmlOptions = Record<string, unknown>;
@@ -304,7 +304,7 @@ export function isCurrentPage(
   requestUri = RFC2396_PARSER.unescape(requestUri);
 
   if (/^\w+:\/\//.test(urlString)) {
-    requestUri = `${request.protocol}${request.hostWithPort}${requestUri}`;
+    requestUri = `${request.protocol}${request.hostWithPort()}${requestUri}`;
   }
 
   urlString = removeTrailingSlashBang(urlString);

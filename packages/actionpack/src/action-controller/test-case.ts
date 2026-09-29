@@ -33,6 +33,7 @@ import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import type { RouteSet } from "../action-dispatch/routing/route-set.js";
 import * as routingAssertions from "../action-dispatch/testing/assertions/routing.js";
 import type { Metal } from "./metal.js";
+import { _computeRedirectToLocation } from "./metal/redirecting.js";
 
 type ControllerClass = new () => Metal;
 
@@ -258,7 +259,9 @@ export class TestCase {
       throw new Assertion("Expected a redirect but no Location header was set");
     }
     if (typeof expected === "string") {
-      if (location !== expected) {
+      const redirectIs = _computeRedirectToLocation(this.request, location);
+      const redirectExpected = _computeRedirectToLocation(this.request, expected);
+      if (redirectIs !== redirectExpected) {
         throw new Assertion(`Expected redirect to "${expected}", got "${location}"`);
       }
     } else {
@@ -334,6 +337,7 @@ export class TestCase {
 
     this.request = new Request(env);
     this.response = this.buildResponse();
+    this.response.request = this.request;
 
     if (params) (this.request as any).parameters = { ...params };
 

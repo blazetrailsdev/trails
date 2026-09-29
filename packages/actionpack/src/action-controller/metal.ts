@@ -338,9 +338,9 @@ export class Metal extends AbstractController {
     if (this.response) this.response.body = str;
   }
 
-  override get responseBody(): string {
+  override get responseBody(): string | null {
     const body = this._responseBody;
-    return typeof body === "string" ? body : (body?.toString() ?? "");
+    return typeof body === "string" ? body : (body?.toString() ?? null);
   }
 
   override get performed(): boolean {

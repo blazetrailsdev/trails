@@ -3,6 +3,8 @@ import {
   getCrypto,
   chomp,
   OpenSSL,
+  rbObjRespondTo,
+  rtest,
   SecureRandom,
   URI,
   type Bytes,
@@ -89,14 +91,7 @@ export class ResetSession implements ProtectionMethods {
     this._controller = controller;
   }
   handleUnverifiedRequest(): void {
-    const session = this._controller.session;
-    if (session && typeof session === "object") {
-      for (const key of Object.keys(session as Record<string, unknown>)) {
-        delete (session as Record<string, unknown>)[key];
-      }
-    } else {
-      this._controller.session = {};
-    }
+    (this._controller as { resetSession(): void }).resetSession();
   }
 }
 
@@ -108,20 +103,17 @@ export class Exception implements ProtectionMethods {
   }
 }
 
-const CSRF_TOKEN_SESSION_KEY = "_csrf_token";
-
 export class SessionStore {
   fetch(request: CsrfRequest): string | null {
-    const token = request.session?.[CSRF_TOKEN_SESSION_KEY];
-    return typeof token === "string" ? token : null;
+    return (request.session!.get("_csrf_token") as string | undefined) ?? null;
   }
 
   store(request: CsrfRequest, csrfToken: string): void {
-    (request.session ??= {})[CSRF_TOKEN_SESSION_KEY] = csrfToken;
+    request.session!.set("_csrf_token", csrfToken);
   }
 
   reset(request: CsrfRequest): void {
-    delete request.session?.[CSRF_TOKEN_SESSION_KEY];
+    request.session!.delete("_csrf_token");
   }
 }
 
@@ -200,7 +192,10 @@ export interface CsrfRequest {
   xhr?: boolean;
   xCsrfToken?: string | null;
   env?: Record<string, unknown>;
-  session?: Record<string, unknown> & {
+  session?: {
+    get(key: string): unknown;
+    set(key: string, value: unknown): void;
+    delete(key: string): unknown;
     id?(): { publicId?: string } | null | undefined;
     idWas?(): { publicId?: string } | null | undefined;
   };
@@ -217,8 +212,8 @@ export interface CsrfTokenStorage {
 /** @internal */
 export interface CsrfController {
   request: CsrfRequest;
-  session?: { enabled?: () => boolean } | Record<string, unknown> | null;
-  params?: Record<string, unknown>;
+  session?: { isEnabled?: () => boolean } | Record<string, unknown> | null;
+  params?: { get(key: string): unknown };
   allowForgeryProtection?: boolean;
   forgeryProtectionOriginCheck?: boolean;
   perFormCsrfTokens?: boolean;
@@ -226,6 +221,7 @@ export interface CsrfController {
   csrfTokenStorageStrategy?: CsrfTokenStorage;
   cookies?: Record<string, string>;
   _markedForSameOriginVerification?: boolean;
+  mediaType?: string | null;
   logger?: { warn(msg: string): void } | null;
   logWarningOnCsrfFailure?: boolean;
   forgeryProtectionStrategy?: new (controller: CsrfController) => ProtectionMethods;
@@ -254,12 +250,11 @@ function isGetOrHead(method: string): boolean {
 
 /** @internal */
 export function isProtectAgainstForgery(this: CsrfController): boolean {
-  if (this.allowForgeryProtection === false) return false;
-  const session = this.session;
-  if (session && typeof (session as { enabled?: unknown }).enabled === "function") {
-    return (session as { enabled: () => boolean }).enabled();
-  }
-  return true;
+  return (
+    rtest(this.allowForgeryProtection) &&
+    (!rbObjRespondTo(this.session, "isEnabled") ||
+      (this.session as { isEnabled(): boolean }).isEnabled())
+  );
 }
 
 /** @internal */
@@ -284,8 +279,7 @@ export function isMarkedForSameOriginVerification(this: CsrfController): boolean
 
 /** @internal */
 export function isNonXhrJavascriptResponse(this: CsrfController): boolean {
-  const mediaType = this.request.mediaType ?? "";
-  return /^(?:text|application)\/javascript/.test(mediaType) && !this.request.xhr;
+  return /^(?:text|application)\/javascript/.test(this.mediaType ?? "") && !this.request.xhr;
 }
 
 /** @internal */
@@ -295,6 +289,19 @@ export function verifySameOriginRequest(this: CsrfController): void {
       this.logger.warn(CROSS_ORIGIN_JAVASCRIPT_WARNING);
     }
     throw new InvalidCrossOriginRequest(CROSS_ORIGIN_JAVASCRIPT_WARNING);
+  }
+}
+
+/** @internal */
+export function verifyAuthenticityToken(this: CsrfController): void {
+  markForSameOriginVerificationBang.call(this);
+
+  if (!isVerifiedRequest.call(this)) {
+    if (this.logger && this.logWarningOnCsrfFailure) {
+      this.logger.warn(unverifiedRequestWarningMessage.call(this));
+    }
+
+    handleUnverifiedRequest.call(this);
   }
 }
 
@@ -407,6 +414,14 @@ export function unmaskToken(maskedToken: Bytes): Bytes {
 }
 
 /** @internal */
+export function formAuthenticityToken(
+  this: CsrfController,
+  { formOptions = {} }: { formOptions?: { action?: string; method?: string } } = {},
+): string {
+  return maskedAuthenticityToken.call(this, formOptions);
+}
+
+/** @internal */
 export function maskedAuthenticityToken(
   this: CsrfController,
   formOptions: { action?: string; method?: string } = {},
@@ -424,7 +439,7 @@ export function maskedAuthenticityToken(
 
 /** @internal */
 export function formAuthenticityParam(this: CsrfController): unknown {
-  return this.params?.[this.requestForgeryProtectionToken ?? "authenticity_token"];
+  return this.params?.get(this.requestForgeryProtectionToken ?? "authenticity_token");
 }
 
 /** @internal */

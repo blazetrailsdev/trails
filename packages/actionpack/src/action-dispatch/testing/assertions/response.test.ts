@@ -8,6 +8,7 @@ function host(status: number, headers: Record<string, string> = {}): AssertionRe
       body: "",
       getHeader: (k) => headers[k.toLowerCase()],
     },
+    request: { protocol: "http://", hostWithPort: () => "www.example.com" },
   };
 }
 
@@ -28,7 +29,7 @@ describe("assertRedirectedTo", () => {
 
   it("fails when location does not match string", () => {
     expect(() => assertRedirectedTo.call(host(302, { location: "/bar" }), "/foo")).toThrow(
-      /redirect to <\/foo>/,
+      /redirect to <http:\/\/www\.example\.com\/foo>/,
     );
   });
 

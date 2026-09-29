@@ -122,16 +122,16 @@ export class AuthenticationGenerator extends GeneratorBase {
 
   private async runPendingGenerators(): Promise<void> {
     for (const { what, args } of this.pendingGenerators.splice(0)) {
-      const words = [...what.split(/\s+/), ...args].filter(Boolean);
-      if (words.shift() !== "migration") continue;
-      const generator = new MigrationGenerator({
-        cwd: this.cwd,
-        output: this.output,
-        behavior: this.behavior,
-        pretend: this.options.pretend,
-        force: this.options.force || words.includes("--force"),
-      });
-      this.createdFiles.push(...(await generator.run(words[0], words.slice(1))));
+      const [namespace, ...words] = [...what.split(/\s+/), ...args].filter(Boolean);
+      if (namespace !== "migration") continue;
+      this.createdFiles.push(
+        ...(await MigrationGenerator.start(words, {
+          cwd: this.cwd,
+          output: this.output,
+          behavior: this.behavior,
+          pretend: this.options.pretend,
+        })),
+      );
     }
   }
 }

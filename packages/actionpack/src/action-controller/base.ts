@@ -3,18 +3,31 @@ import {
   Notifications,
   SafeBuffer,
   classAttribute,
+  mattrAccessor,
   extend,
   include,
   runLoadHooks,
 } from "@blazetrails/activesupport";
-import { File, getCrypto } from "@blazetrails/ruby-compat";
+import { File, getCrypto, rtest } from "@blazetrails/ruby-compat";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Metal } from "./metal.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
-import { RequestForgeryProtection } from "../action-dispatch/request-forgery-protection.js";
 import { respondTo } from "./metal/mime-responds.js";
 import { DefaultHeaders } from "./metal/default-headers.js";
 import { actionMethods, addFlashTypes, Flash } from "./metal/flash.js";
+import { _computeRedirectToLocation, redirectBack, redirectBackOrTo } from "./metal/redirecting.js";
+import {
+  commitCsrfToken,
+  type CsrfTokenStorage,
+  formAuthenticityToken,
+  isProtectAgainstForgery,
+  protectionMethodClass,
+  resetCsrfToken,
+  SessionStore,
+  storageStrategy,
+  verifyAuthenticityToken,
+  verifySameOriginRequest,
+} from "./metal/request-forgery-protection.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
 import { MissingFile } from "./metal/exceptions.js";
 import { defaultRender } from "./metal/implicit-render.js";
@@ -110,7 +123,6 @@ import {
   type SendDataOptions,
   type SendFileOptions,
 } from "./metal/data-streaming.js";
-import { statusCode } from "@blazetrails/rack";
 import {
   Options as ParamsWrapperOptions,
   _defaultWrapModel,
@@ -142,6 +154,7 @@ import {
   cleanupViewRuntime,
   haltedCallbackHook,
   processAction as _instrumentProcessAction,
+  redirectTo as _instrumentRedirectTo,
 } from "./metal/instrumentation.js";
 import {
   Parameters as StrongParameters,
@@ -240,6 +253,9 @@ export const PROTECTED_IVARS: readonly string[] = [
   "_renderedFormat",
 ];
 
+type ProtectionMethod = Parameters<typeof protectionMethodClass>[0];
+type CsrfStorage = Parameters<typeof storageStrategy>[0];
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base {
   get params(): StrongParameters;
@@ -249,6 +265,17 @@ export interface Base {
   routeFor(name: string, ...args: unknown[]): string;
   polymorphicUrl(recordOrHashOrArray: PolymorphicArg, options?: PolymorphicOptions): string;
   polymorphicPath(recordOrHashOrArray: PolymorphicArg, options?: PolymorphicOptions): string;
+  redirectTo(options?: unknown, responseOptionsAndFlash?: Record<string, unknown>): unknown;
+  redirectBack: typeof redirectBack;
+  redirectBackOrTo: typeof redirectBackOrTo;
+  _computeRedirectToLocation: typeof _computeRedirectToLocation;
+  allowForgeryProtection: boolean;
+  isProtectAgainstForgery(): boolean;
+  verifyAuthenticityToken(): void;
+  formAuthenticityToken(options?: { formOptions?: { action?: string; method?: string } }): string;
+  resetCsrfToken(request: Request): void;
+  commitCsrfToken(request: Request): void;
+  verifySameOriginRequest(): void;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -285,7 +312,7 @@ export class Base extends Metal {
   declare static _helperMethods?: string[];
   static helperMethod = helperMethod;
 
-  static includeAllHelpers = true;
+  declare static includeAllHelpers: boolean;
 
   constructor(...args: unknown[]) {
     super(...(args as []));
@@ -424,91 +451,38 @@ export class Base extends Metal {
     return this._renderedFormat;
   }
 
-  redirectTo(
-    options: string,
-    responseOptions: {
-      status?: number | string;
-      allow_other_host?: boolean;
-      flash?: Record<string, unknown>;
-      [flashType: string]: unknown;
-    } = {},
-  ): void {
-    for (const flashType of (this.constructor as typeof Base)._flashTypes) {
-      const type = responseOptions[flashType];
-      delete responseOptions[flashType];
-      if (type != null && type !== false) this.flash.set(flashType, type);
-    }
-
-    const otherFlashes = responseOptions.flash;
-    delete responseOptions.flash;
-    if (otherFlashes != null && (otherFlashes as unknown) !== false) {
-      this.flash.update(otherFlashes);
-    }
-
-    if (this.performed) {
-      throw new DoubleRenderError(
-        "Render and/or redirect were called multiple times in this action.",
-      );
-    }
-
-    const proposedStatus = responseOptions.status ? statusCode(responseOptions.status) : 302;
-    this.headers.set("location", options);
-    this.responseBody = "";
-    this.status = proposedStatus;
-    this.markPerformed();
-  }
-
-  redirectBack(options: {
-    fallbackLocation: string;
-    status?: number | string;
-    allow_other_host?: boolean;
-  }): void {
-    const referer = this.request?.getHeader("referer");
-    const url = referer ?? options.fallbackLocation;
-    this.redirectTo(url, { status: options.status });
-  }
-
   respondTo = respondTo;
 
   declare readonly notice: unknown;
   declare readonly alert: unknown;
 
-  private static _csrfProtection: RequestForgeryProtection | null = null;
+  declare static requestForgeryProtectionToken: string | null;
+  declare static allowForgeryProtection: boolean;
+  declare static logWarningOnCsrfFailure: boolean;
+  declare static forgeryProtectionOriginCheck: boolean;
+  declare static perFormCsrfTokens: boolean;
+  declare static forgeryProtectionStrategy: ReturnType<typeof protectionMethodClass> | null;
+  declare static csrfTokenStorageStrategy: CsrfTokenStorage;
 
   static protectFromForgery(
-    options: { with?: "exception" | "reset_session" | "null_session" } = {},
+    options: {
+      with?: ProtectionMethod | false | null;
+      store?: CsrfStorage | false | null;
+    } & CallbackOptions = {},
   ): void {
-    this._csrfProtection = new RequestForgeryProtection({
-      strategy: options.with ?? "exception",
-    });
-  }
+    options = { prepend: false, ...options };
 
-  verifyAuthenticityToken(): void {
-    const csrf = (this.constructor as typeof Base)._csrfProtection;
-    if (!csrf) return;
+    this.forgeryProtectionStrategy = protectionMethodClass(
+      rtest(options.with) ? (options.with as ProtectionMethod) : "null_session",
+    );
+    this.requestForgeryProtectionToken ??= "authenticity_token";
 
-    const token =
-      (this.params.get("authenticity_token") as string) ??
-      this.request?.getHeader("x-csrf-token") ??
-      null;
+    this.csrfTokenStorageStrategy = storageStrategy(
+      rtest(options.store) ? (options.store as CsrfStorage) : new SessionStore(),
+    );
 
-    const result = csrf.verifyRequest({
-      method: this.request?.method ?? "GET",
-      session: this.session,
-      token,
-      host: this.request?.host ?? "localhost",
-    });
-
-    if (!result.verified) {
-      csrf.handleUnverified(this.session);
-    }
-  }
-
-  formAuthenticityToken(): string {
-    const csrf = (this.constructor as typeof Base)._csrfProtection;
-    if (!csrf) return "";
-    const realToken = csrf.getRealToken(this.session);
-    return csrf.maskToken(realToken);
+    this.beforeAction("verifyAuthenticityToken", options);
+    this.appendAfterAction("verifySameOriginRequest");
   }
 
   static allowBrowser(options: {
@@ -900,7 +874,17 @@ export class Base extends Metal {
 
 include(Base, ConfigMethods);
 include(Base, Cookies);
+Base.prototype.redirectBack = redirectBack;
+Base.prototype.redirectBackOrTo = redirectBackOrTo;
+Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
+Base.prototype.resetCsrfToken = resetCsrfToken as never;
+Base.prototype.commitCsrfToken = commitCsrfToken as never;
+Base.prototype.verifyAuthenticityToken = verifyAuthenticityToken;
+Base.prototype.verifySameOriginRequest = verifySameOriginRequest;
+Base.prototype.formAuthenticityToken = formAuthenticityToken;
+Base.prototype.isProtectAgainstForgery = isProtectAgainstForgery;
 include(Base, Flash);
+Base.prototype.redirectTo = _instrumentRedirectTo;
 include(Base, StrongParametersModule);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
 Base.prototype._processOptions = _processOptions;
@@ -958,6 +942,27 @@ _Configurable.defaultStaticExtension ??= ".html";
 
 _Configurable.configAccessor("performCaching");
 if (_Configurable.performCaching == null) _Configurable.performCaching = true;
+
+mattrAccessor.call(Base, "raiseOnOpenRedirects", { default: false });
+
+classAttribute.call(Base, "includeAllHelpers", { default: true });
+
+_Configurable.configAccessor("requestForgeryProtectionToken");
+Base.requestForgeryProtectionToken ??= "authenticity_token";
+_Configurable.configAccessor("forgeryProtectionStrategy");
+Base.forgeryProtectionStrategy = null;
+_Configurable.configAccessor("allowForgeryProtection");
+Base.allowForgeryProtection ??= true;
+_Configurable.configAccessor("logWarningOnCsrfFailure");
+Base.logWarningOnCsrfFailure = true;
+_Configurable.configAccessor("forgeryProtectionOriginCheck");
+Base.forgeryProtectionOriginCheck = false;
+_Configurable.configAccessor("perFormCsrfTokens");
+Base.perFormCsrfTokens = false;
+_Configurable.configAccessor("csrfTokenStorageStrategy");
+Base.csrfTokenStorageStrategy = new SessionStore();
+Base.helperMethod("formAuthenticityToken");
+Base.helperMethod("isProtectAgainstForgery");
 
 _Configurable.configAccessor("enableFragmentCacheLogging");
 _Configurable.enableFragmentCacheLogging = false;

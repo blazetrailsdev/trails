@@ -26,7 +26,7 @@ describe("RedirectTest", () => {
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
     expect(c.status).toBe(302);
-    expect(c.headers.get("location")).toBe("/posts");
+    expect(c.headers.get("location")).toBe("http://localhost/posts");
   });
 
   it("redirect_to with full URL", async () => {
@@ -87,7 +87,7 @@ describe("RedirectTest", () => {
       HTTP_REFERER: "/previous-page",
     });
     await c.dispatch("index", req, makeResponse());
-    expect(c.headers.get("location")).toBe("/previous-page");
+    expect(c.headers.get("location")).toBe("http://localhost/previous-page");
   });
 
   it("redirect_back uses fallback when no referer", async () => {
@@ -98,7 +98,7 @@ describe("RedirectTest", () => {
     }
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.headers.get("location")).toBe("/home");
+    expect(c.headers.get("location")).toBe("http://localhost/home");
   });
 
   it("redirect_back with custom status", async () => {
@@ -139,7 +139,7 @@ describe("RedirectTest", () => {
 
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.headers.get("location")).toBe("/login");
+    expect(c.headers.get("location")).toBe("http://localhost/login");
     expect(log).toEqual([]);
   });
 

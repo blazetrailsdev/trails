@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AbstractController, ActionNotFound } from "./base.js";
 import {
   ActionFilter,
@@ -306,6 +306,10 @@ describe("TestCallbacksWithArgs", () => {
 });
 
 describe("TestCallbacksWithMissingConditions", () => {
+  afterEach(() => {
+    AbstractController.raiseOnMissingCallbackActions = false;
+  });
+
   function makeController(
     register: (k: typeof AbstractController) => void,
   ): typeof AbstractController {

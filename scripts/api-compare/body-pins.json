@@ -772,13 +772,6 @@
   {
     "package": "actioncontroller",
     "rubyFile": "base.rb",
-    "rubyName": "form_authenticity_token",
-    "digest": "5904776d51c54c78",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
     "rubyName": "fresh_when",
     "digest": "06fa043b7492c5cf",
     "ref": "v8.0.2"
@@ -856,20 +849,6 @@
   {
     "package": "actioncontroller",
     "rubyFile": "base.rb",
-    "rubyName": "redirect_back",
-    "digest": "e8d792c718df8775",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
-    "rubyName": "redirect_to",
-    "digest": "98623d493b254a34",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
     "rubyName": "render",
     "digest": "115cc5659b81e077",
     "ref": "v8.0.2"
@@ -935,13 +914,6 @@
     "rubyFile": "base.rb",
     "rubyName": "stale?",
     "digest": "587420e9408226ca",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
-    "rubyName": "verify_authenticity_token",
-    "digest": "26b9e8dc24a8791e",
     "ref": "v8.0.2"
   },
   {

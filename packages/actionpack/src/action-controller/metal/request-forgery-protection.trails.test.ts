@@ -9,10 +9,14 @@ import {
   CookieStore,
   type CsrfRequest,
   NullCookieJar,
+  Exception,
   NullSession,
   NullSessionHash,
+  SessionStore,
   type NullSessionRequest,
 } from "./request-forgery-protection.js";
+import { Base } from "../base.js";
+import { TestCase } from "../test-case.js";
 
 function buildRequest(): NullSessionRequest {
   const env: Record<string, unknown> = {
@@ -143,5 +147,73 @@ describe("NullSession", () => {
     expect(jar.encrypted.get("csrf_token")).toBe(
       '{"token":"the-token","session_id":{"public_id":"sid-1"}}',
     );
+  });
+});
+
+describe("ActionController::Base#verify_authenticity_token", () => {
+  const token = Buffer.from("railstestrailstestrailstestrails").toString("base64url");
+
+  class PostsController extends Base {
+    create(): void {
+      this.head("created");
+    }
+  }
+  PostsController.protectFromForgery({ with: "exception" });
+
+  it("accepts a valid X-CSRF-Token even when the form token is wrong", async () => {
+    const tc = new TestCase(PostsController);
+    await tc.post("create", {
+      session: { _csrf_token: token },
+      params: { authenticity_token: "bogus" },
+      headers: { "X-CSRF-Token": token },
+    });
+    tc.assertResponse("created");
+  });
+
+  it("rejects a mismatched Origin when forgeryProtectionOriginCheck is on", async () => {
+    PostsController.forgeryProtectionOriginCheck = true;
+    try {
+      const tc = new TestCase(PostsController);
+      await expect(
+        tc.post("create", {
+          session: { _csrf_token: token },
+          params: { authenticity_token: token },
+          headers: { Origin: "http://bad.host" },
+        }),
+      ).rejects.toThrow(
+        "HTTP Origin header (http://bad.host) didn't match request.base_url (http://test.host)",
+      );
+    } finally {
+      PostsController.forgeryProtectionOriginCheck = false;
+    }
+  });
+
+  it("protect_from_forgery configures only the receiving class", () => {
+    class A extends Base {}
+    class B extends Base {}
+    A.protectFromForgery({ with: "exception", store: "cookie" });
+    expect(A.forgeryProtectionStrategy).toBe(Exception);
+    expect(B.forgeryProtectionStrategy).toBeNull();
+    expect(B.csrfTokenStorageStrategy).toBe(Base.csrfTokenStorageStrategy);
+  });
+
+  it("falls back to null_session and SessionStore for false options", () => {
+    class C extends Base {}
+    C.protectFromForgery({ with: false, store: false });
+    expect(C.forgeryProtectionStrategy).toBe(NullSession);
+    expect(C.csrfTokenStorageStrategy).toBeInstanceOf(SessionStore);
+  });
+
+  it("reset_session delegates to the controller and drops the CSRF token", async () => {
+    class ResetController extends Base {
+      create(): void {
+        this.head("created");
+      }
+    }
+    ResetController.protectFromForgery({ with: "reset_session" });
+    const tc = new TestCase(ResetController);
+    await tc.post("create", { session: { _csrf_token: token, user_id: 1 } });
+    expect(tc.session.user_id).toBeUndefined();
+    expect(tc.session._csrf_token).toBeUndefined();
   });
 });

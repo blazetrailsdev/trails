@@ -155,3 +155,44 @@ describe("ActionController::Instrumentation#process_action", () => {
     expect(logProcessAction({})).toEqual([]);
   });
 });
+
+describe("ActionController::Instrumentation#redirect_to", () => {
+  const teardown: Array<() => void> = [];
+  afterEach(() => {
+    while (teardown.length > 0) teardown.pop()!();
+  });
+
+  it("publishes redirect_to with the request, status and filtered location", async () => {
+    const events: Record<string, unknown>[] = [];
+    teardown.push(subscribeOnce("redirect_to.action_controller", events));
+    class RedirectorController extends Base {
+      filterableRedirector(): void {
+        this.redirectTo("http://secret.foo.bar/", { status: 301 });
+      }
+    }
+    const request = newRequest();
+    request.env["action_dispatch.redirect_filter"] = ["secret"];
+    const controller = new RedirectorController();
+    await controller.dispatch(
+      "filterableRedirector",
+      request,
+      RedirectorController.makeResponseBang(request),
+    );
+
+    expect(events).toHaveLength(1);
+    expect(events[0].request).toBe(controller.request);
+    expect(events[0].status).toBe(301);
+    expect(events[0].location).toBe("[FILTERED]");
+  });
+
+  it("returns the status redirect_to assigns", async () => {
+    let result: unknown;
+    class RedirectorController extends Base {
+      redirector(): void {
+        result = this.redirectTo("http://foo.bar/");
+      }
+    }
+    await new RedirectorController().dispatch("redirector", newRequest(), new Response());
+    expect(result).toBe(302);
+  });
+});
