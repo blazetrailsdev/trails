@@ -84,9 +84,9 @@ describe("belongs_to inverse seeding with a composite-PK target", () => {
     const parent = new CompositePkParent({ id: [7, 42] });
 
     const holder = child.association("compositePkParent") as unknown as {
-      associationPrimaryKeys(klass: unknown): string[];
+      primaryKey(klass: unknown): string | string[];
     };
-    expect(holder.associationPrimaryKeys(parent.constructor)).toEqual(["id"]);
+    expect(holder.primaryKey(parent.constructor)).toBe("id");
   });
 });
 

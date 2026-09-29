@@ -1,8 +1,8 @@
+import { rbEqual } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { underscore } from "@blazetrails/activesupport";
 import { belongsToCounterCacheColumn } from "../reflection.js";
-import { hasQueryConstraints, queryConstraintsList } from "../persistence.js";
 import { SingularAssociation } from "./singular-association.js";
 import { Rollback } from "../errors.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
@@ -240,52 +240,40 @@ export class BelongsToAssociation extends SingularAssociation {
     return Array.isArray(fk) ? fk : [fk];
   }
 
-  protected associationPrimaryKeys(klass: typeof Base | null): string[] {
-    const configured = this.reflection.options.primaryKey;
-    if (configured) {
-      return Array.isArray(configured) ? configured : [configured];
-    }
-    const targetCtor = (klass ?? this.klass) as never;
-    if (
-      targetCtor &&
-      (hasQueryConstraints.call(targetCtor) || this.reflection.options.queryConstraints)
-    ) {
-      const qc = queryConstraintsList.call(targetCtor);
-      if (qc) return qc;
-    }
-    return inferCompositePrimaryKey(this.primaryKey(klass ?? this.klass));
-  }
-
   /** @internal */
   protected primaryKey(klass: typeof Base): string | string[] {
     return this.reflection.associationPrimaryKey(klass);
   }
 
   protected replaceKeys(record: Base | null, { force = false }: { force?: boolean } = {}): void {
-    const fks = this.foreignKeyNames();
-    const pks = this.associationPrimaryKeys((record?.constructor as typeof Base) ?? null);
+    const reflectionFk = this.reflection.foreignKey();
+    if (Array.isArray(reflectionFk)) {
+      let targetKeyValues: unknown[] = [];
+      if (record) {
+        const primaryKey = this.primaryKey(record.constructor as typeof Base);
+        targetKeyValues = (Array.isArray(primaryKey) ? primaryKey : [primaryKey]).map((key) =>
+          record._readAttribute(key),
+        );
+      }
 
-    const targetKeyValues = fks.map((_fk, i) => {
-      const pkCol = pks[i] ?? pks[0];
-      return record
-        ? typeof (record as any)._readAttribute === "function"
-          ? (record as any)._readAttribute(pkCol)
-          : (record as any)[pkCol]
+      if (
+        force ||
+        !rbEqual(
+          reflectionFk.map((fk) => this.owner._readAttribute(fk)),
+          targetKeyValues,
+        )
+      ) {
+        reflectionFk.forEach((key, index) => {
+          this.owner.set(key, targetKeyValues[index] ?? null);
+        });
+      }
+    } else {
+      const targetKeyValue = record
+        ? record._readAttribute(this.primaryKey(record.constructor as typeof Base) as string)
         : null;
-    });
 
-    const readOwner = (fk: string): unknown =>
-      typeof (this.owner as any)._readAttribute === "function"
-        ? (this.owner as any)._readAttribute(fk)
-        : (this.owner as any)[fk];
-    if (!force && fks.every((fk, i) => readOwner(fk) === targetKeyValues[i])) return;
-
-    for (let i = 0; i < fks.length; i++) {
-      const value = targetKeyValues[i];
-      if (typeof (this.owner as any)._writeAttribute === "function") {
-        (this.owner as any)._writeAttribute(fks[i], value);
-      } else {
-        (this.owner as any)[fks[i]] = value;
+      if (force || !rbEqual(this.owner._readAttribute(reflectionFk), targetKeyValue)) {
+        this.owner.set(reflectionFk, targetKeyValue);
       }
     }
   }
@@ -319,15 +307,6 @@ export class BelongsToAssociation extends SingularAssociation {
       }
     }
   }
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder-2
- */
-export function inferCompositePrimaryKey(pk: string | string[]): string[] {
-  if (Array.isArray(pk)) return pk.includes("id") ? ["id"] : pk;
-  return [pk];
 }
 
 Associations.BelongsToAssociation = BelongsToAssociation;

@@ -3,7 +3,7 @@ import type { Base } from "../base.js";
 import { modelRegistry } from "../associations.js";
 import { demodulize } from "@blazetrails/activesupport";
 import { baseClass } from "../inheritance.js";
-import { BelongsToAssociation, inferCompositePrimaryKey } from "./belongs-to-association.js";
+import { BelongsToAssociation } from "./belongs-to-association.js";
 
 export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
   override get klass(): typeof Base {
@@ -59,20 +59,6 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
       }
     }
     super.replaceKeys(record, { force });
-  }
-
-  protected override associationPrimaryKeys(klass: typeof Base | null): string[] {
-    const configured = this.reflection.options.primaryKey;
-    if (configured) return Array.isArray(configured) ? configured : [configured];
-    if (klass) {
-      const recordPk = (klass as any).primaryKey;
-      if (recordPk) return inferCompositePrimaryKey(recordPk);
-    }
-    const pk = (this.klass as any)?.primaryKey;
-    if (pk) return inferCompositePrimaryKey(pk);
-    const targetPk = (this.target as any)?.constructor?.primaryKey;
-    if (targetPk) return inferCompositePrimaryKey(targetPk);
-    return ["id"];
   }
 
   /** @missingRailsName class — PERMANENT */
