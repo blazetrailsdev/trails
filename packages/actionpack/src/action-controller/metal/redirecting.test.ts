@@ -11,13 +11,13 @@ import {
 
 const host = (overrides: Record<string, unknown> = {}) =>
   ({
-    request: { host: "example.com", protocol: "http://", hostWithPort: "example.com" },
+    request: { host: "example.com", protocol: "http://", hostWithPort: () => "example.com" },
     redirectTo: () => {},
     ...overrides,
   }) as never;
 
 describe("_computeRedirectToLocation", () => {
-  const req = { protocol: "http://", hostWithPort: "example.com" };
+  const req = { protocol: "http://", hostWithPort: () => "example.com" };
 
   it("passes scheme-qualified strings through", () => {
     expect(_computeRedirectToLocation.call(undefined, req, "https://foo.test/x")).toBe(

@@ -8,7 +8,7 @@ function host(status: number, headers: Record<string, string> = {}): AssertionRe
       body: "",
       getHeader: (k) => headers[k.toLowerCase()],
     },
-    request: { protocol: "http://", hostWithPort: "www.example.com" },
+    request: { protocol: "http://", hostWithPort: () => "www.example.com" },
   };
 }
 

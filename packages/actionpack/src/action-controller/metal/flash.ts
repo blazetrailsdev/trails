@@ -23,7 +23,7 @@ export class Flash {
     this: { constructor: unknown; flash: FlashHash },
     options: unknown = {},
     responseOptionsAndFlash: Record<string, unknown> = {},
-  ): void {
+  ): number {
     for (const flashType of (this.constructor as FlashClassHost)._flashTypes) {
       const type = responseOptionsAndFlash[flashType];
       delete responseOptionsAndFlash[flashType];
@@ -38,7 +38,7 @@ export class Flash {
       this.flash.update(otherFlashes as Record<string, unknown>);
     }
 
-    redirectingRedirectTo.call(this as never, options, responseOptionsAndFlash);
+    return redirectingRedirectTo.call(this as never, options, responseOptionsAndFlash);
   }
 }
 

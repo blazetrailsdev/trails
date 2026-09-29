@@ -29,7 +29,7 @@ describe("ActionController rendering", () => {
       }
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
-      expect(JSON.parse(c.responseBody)).toEqual({ a: 1 });
+      expect(JSON.parse(c.responseBody!)).toEqual({ a: 1 });
       expect(c.contentType).toBe("application/json; charset=utf-8");
     });
 
@@ -41,7 +41,7 @@ describe("ActionController rendering", () => {
       }
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
-      expect(JSON.parse(c.responseBody)).toEqual([1, 2, 3]);
+      expect(JSON.parse(c.responseBody!)).toEqual([1, 2, 3]);
     });
 
     it("renders JSON string directly", async () => {
@@ -357,7 +357,7 @@ describe("ActionController rendering", () => {
       }
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
-      expect(JSON.parse(c.responseBody)).toEqual({ api: true });
+      expect(JSON.parse(c.responseBody!)).toEqual({ api: true });
     });
 
     it("renders plain text", async () => {
@@ -521,7 +521,7 @@ describe("ActionController render edge cases", () => {
     }
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(JSON.parse(c.responseBody)).toEqual([1, 2, 3]);
+    expect(JSON.parse(c.responseBody!)).toEqual([1, 2, 3]);
   });
 
   it("render json string is used as-is", async () => {

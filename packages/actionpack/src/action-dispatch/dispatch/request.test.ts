@@ -168,7 +168,7 @@ describe("RequestHost", () => {
       HTTP_HOST: "example.com:80",
       "rack.url_scheme": "http",
     });
-    expect(req.hostWithPort).toBe("example.com");
+    expect(req.hostWithPort()).toBe("example.com");
   });
 
   it("host with port if https standard port is specified", () => {
@@ -176,7 +176,7 @@ describe("RequestHost", () => {
       HTTP_HOST: "example.com:443",
       "rack.url_scheme": "https",
     });
-    expect(req.hostWithPort).toBe("example.com");
+    expect(req.hostWithPort()).toBe("example.com");
   });
 
   it("host if ipv6 reference", () => {

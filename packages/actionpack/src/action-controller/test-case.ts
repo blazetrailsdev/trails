@@ -337,6 +337,7 @@ export class TestCase {
 
     this.request = new Request(env);
     this.response = this.buildResponse();
+    this.response.request = this.request;
 
     if (params) (this.request as any).parameters = { ...params };
 

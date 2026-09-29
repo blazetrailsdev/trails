@@ -38,7 +38,7 @@ describe("RenderJsonTest", () => {
     }
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(JSON.parse(c.responseBody)).toEqual({ hello: "world" });
+    expect(JSON.parse(c.responseBody!)).toEqual({ hello: "world" });
     expect(c.contentType).toContain("application/json");
   });
 
@@ -51,7 +51,7 @@ describe("RenderJsonTest", () => {
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
     expect(c.status).toBe(404);
-    expect(JSON.parse(c.responseBody)).toEqual({ error: "not found" });
+    expect(JSON.parse(c.responseBody!)).toEqual({ error: "not found" });
   });
 
   it("render json with callback", async () => {
@@ -143,7 +143,7 @@ describe("RenderJsonTest", () => {
     }
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(JSON.parse(c.responseBody)).toEqual([1, 2, 3]);
+    expect(JSON.parse(c.responseBody!)).toEqual([1, 2, 3]);
     expect(c.contentType).toContain("application/json");
   });
 });

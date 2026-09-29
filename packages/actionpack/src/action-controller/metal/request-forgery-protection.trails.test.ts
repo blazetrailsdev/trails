@@ -13,6 +13,8 @@ import {
   NullSessionHash,
   type NullSessionRequest,
 } from "./request-forgery-protection.js";
+import { Base } from "../base.js";
+import { TestCase } from "../test-case.js";
 
 function buildRequest(): NullSessionRequest {
   const env: Record<string, unknown> = {
@@ -143,5 +145,44 @@ describe("NullSession", () => {
     expect(jar.encrypted.get("csrf_token")).toBe(
       '{"token":"the-token","session_id":{"public_id":"sid-1"}}',
     );
+  });
+});
+
+describe("ActionController::Base#verify_authenticity_token", () => {
+  const token = Buffer.from("railstestrailstestrailstestrails").toString("base64url");
+
+  class PostsController extends Base {
+    create(): void {
+      this.head("created");
+    }
+  }
+  PostsController.protectFromForgery({ with: "exception" });
+
+  it("accepts a valid X-CSRF-Token even when the form token is wrong", async () => {
+    const tc = new TestCase(PostsController);
+    await tc.post("create", {
+      session: { _csrf_token: token },
+      params: { authenticity_token: "bogus" },
+      headers: { "X-CSRF-Token": token },
+    });
+    tc.assertResponse("created");
+  });
+
+  it("rejects a mismatched Origin when forgeryProtectionOriginCheck is on", async () => {
+    PostsController.forgeryProtectionOriginCheck = true;
+    try {
+      const tc = new TestCase(PostsController);
+      await expect(
+        tc.post("create", {
+          session: { _csrf_token: token },
+          params: { authenticity_token: token },
+          headers: { Origin: "http://bad.host" },
+        }),
+      ).rejects.toThrow(
+        "HTTP Origin header (http://bad.host) didn't match request.base_url (http://test.host)",
+      );
+    } finally {
+      PostsController.forgeryProtectionOriginCheck = false;
+    }
   });
 });

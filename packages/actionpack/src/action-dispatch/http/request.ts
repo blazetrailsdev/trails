@@ -301,7 +301,7 @@ export class Request {
     return this.isStandardPort ? "" : `:${this.port}`;
   }
 
-  get hostWithPort(): string {
+  hostWithPort(): string {
     return `${this.host}${this.portString}`;
   }
 
@@ -319,11 +319,11 @@ export class Request {
   }
 
   get originalUrl(): string {
-    return `${this.scheme}://${this.hostWithPort}${this.originalFullpath}`;
+    return `${this.scheme}://${this.hostWithPort()}${this.originalFullpath}`;
   }
 
   get url(): string {
-    return `${this.scheme}://${this.hostWithPort}${this.fullpath}`;
+    return `${this.scheme}://${this.hostWithPort()}${this.fullpath}`;
   }
 
   domain(tldLength: number = HttpURL.tldLength): string | null {
@@ -946,7 +946,6 @@ export interface Request extends Omit<
   | "requestMethod"
   | "host"
   | "port"
-  | "hostWithPort"
   | "serverPort"
   | "url"
   | "fullpath"

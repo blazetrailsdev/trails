@@ -5,6 +5,7 @@ import {
 } from "../../action-dispatch/middleware/exception-wrapper.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 import type { Response } from "../../action-dispatch/http/response.js";
+import { Flash } from "./flash.js";
 
 interface InstrumentationHost {
   actionName?: string;
@@ -48,6 +49,22 @@ export async function processAction(
       } finally {
         this.appendInfoToPayload(payload as Record<string, unknown>);
       }
+    },
+  );
+}
+
+export function redirectTo(this: InstrumentationHost, ...args: unknown[]): unknown {
+  return Notifications.instrument(
+    "redirect_to.action_controller",
+    { request: this.request },
+    (payload) => {
+      const result = Flash.prototype.redirectTo.call(
+        this as never,
+        ...(args as Parameters<Flash["redirectTo"]>),
+      );
+      payload.status = this.response.status;
+      payload.location = this.response.filteredLocation();
+      return result;
     },
   );
 }

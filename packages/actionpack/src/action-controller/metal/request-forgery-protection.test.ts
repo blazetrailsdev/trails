@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Parameters } from "./strong-parameters.js";
 import { CookieJar } from "../../action-dispatch/middleware/cookies.js";
 import {
   Exception,
@@ -321,9 +322,12 @@ describe("P20b/P20c smoke", () => {
   it("isAnyAuthenticityTokenValid: masked global via param + X-CSRF; rejects empty", () => {
     const c = tokenC();
     const masked = maskToken(globalCsrfToken.call(c));
-    expect(isAnyAuthenticityTokenValid.call({ ...c, params: { authenticity_token: masked } })).toBe(
-      true,
-    );
+    expect(
+      isAnyAuthenticityTokenValid.call({
+        ...c,
+        params: new Parameters({ authenticity_token: masked }),
+      }),
+    ).toBe(true);
     expect(
       isAnyAuthenticityTokenValid.call({ ...c, request: { ...c.request, xCsrfToken: masked } }),
     ).toBe(true);
@@ -352,7 +356,7 @@ describe("P20b/P20c smoke", () => {
 
   it("requestAuthenticityTokens + formAuthenticityParam honor custom token name", () => {
     const c = tokenC({
-      params: { my: "p" },
+      params: new Parameters({ my: "p" }),
       requestForgeryProtectionToken: "my",
       request: { ...tokenC().request, xCsrfToken: "x" },
     });

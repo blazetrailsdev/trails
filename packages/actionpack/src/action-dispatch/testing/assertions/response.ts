@@ -13,7 +13,7 @@ import { _computeRedirectToLocation } from "../../../action-controller/metal/red
 
 export interface AssertionResponseHost {
   response: AssertionResponseLike;
-  request?: { env?: Record<string, unknown>; protocol?: string; hostWithPort?: string };
+  request?: { env?: Record<string, unknown>; protocol?: string; hostWithPort?(): string };
   controller?: unknown;
 }
 

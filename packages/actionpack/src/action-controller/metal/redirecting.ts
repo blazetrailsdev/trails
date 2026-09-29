@@ -14,8 +14,8 @@ const ILLEGAL_HEADER_VALUE_REGEX = /[\x00-\x08\x0A-\x1F]/;
 const SCHEME_OR_PROTOCOL_RELATIVE_RE = /^([a-z][a-z\d\-+.]*:|\/\/).*/i;
 
 export interface RedirectingHost {
-  request: { referer?: string | null; host?: string; protocol?: string; hostWithPort?: string };
-  redirectTo(options: string, responseOptions?: Record<string, unknown>): void;
+  request: { referer?: string | null; host?: string; protocol?: string; hostWithPort?(): string };
+  redirectTo(options: string, responseOptions?: Record<string, unknown>): unknown;
   urlFor?(options: unknown): string;
 }
 
@@ -24,23 +24,21 @@ interface PrivateHost extends RedirectingHost {
 }
 
 interface RedirectToHost extends PrivateHost {
-  request: RedirectingHost["request"] & { protocol?: string; hostWithPort?: string };
-  readonly performed: boolean;
+  request: RedirectingHost["request"] & { protocol?: string; hostWithPort?(): string };
   location: string;
   responseBody: unknown;
   status: number | string;
 }
 
-/** @missingRailsCall response_body — CONVERGEABLE double-render-check-reads-performed-not-response-body */
 export function redirectTo(
   this: RedirectToHost,
   options: unknown = {},
   responseOptions: Record<string, unknown> = {},
-): void {
+): number {
   if (options == null || options === false) {
     throw new ActionControllerError("Cannot redirect to nil!");
   }
-  if (this.performed) throw new DoubleRenderError();
+  if (this.responseBody != null) throw new DoubleRenderError();
 
   const allowOtherHost = Object.hasOwn(responseOptions, "allowOtherHost")
     ? (responseOptions.allowOtherHost as boolean)
@@ -56,7 +54,7 @@ export function redirectTo(
     allowOtherHost,
   });
   this.responseBody = "";
-  this.status = proposedStatus;
+  return (this.status = proposedStatus);
 }
 
 export function redirectBack(
@@ -66,22 +64,22 @@ export function redirectBack(
     allowOtherHost = _allowOtherHost.call(this as PrivateHost),
     ...args
   }: { fallbackLocation: string; allowOtherHost?: boolean } & Record<string, unknown>,
-): void {
-  redirectBackOrTo.call(this, fallbackLocation, { allowOtherHost, ...args });
+): unknown {
+  return redirectBackOrTo.call(this, fallbackLocation, { allowOtherHost, ...args });
 }
 
 export function redirectBackOrTo(
   this: RedirectingHost,
   fallbackLocation: string,
   options: { allowOtherHost?: boolean } & Record<string, unknown> = {},
-): void {
+): unknown {
   const { allowOtherHost: explicitAllow, ...redirectOptions } = options;
   const allowOtherHost = explicitAllow ?? _allowOtherHost.call(this as PrivateHost);
   const referer = this.request.referer;
   if (referer && (allowOtherHost || _urlHostAllowed.call(this, referer))) {
-    this.redirectTo(referer, { allowOtherHost, ...redirectOptions });
+    return this.redirectTo(referer, { allowOtherHost, ...redirectOptions });
   } else {
-    this.redirectTo(fallbackLocation, redirectOptions);
+    return this.redirectTo(fallbackLocation, redirectOptions);
   }
 }
 
@@ -93,7 +91,7 @@ export function urlFrom(this: RedirectingHost, location: string | null | undefin
 /** @internal */
 export function _computeRedirectToLocation(
   this: RedirectingHost | void,
-  request: { protocol?: string; hostWithPort?: string },
+  request: { protocol?: string; hostWithPort?(): string },
   options: unknown,
 ): string {
   let result: string;
@@ -101,7 +99,7 @@ export function _computeRedirectToLocation(
     if (SCHEME_OR_PROTOCOL_RELATIVE_RE.test(options)) {
       result = options;
     } else {
-      result = `${request.protocol ?? ""}${request.hostWithPort ?? ""}${options}`;
+      result = `${request.protocol ?? ""}${request.hostWithPort?.() ?? ""}${options}`;
     }
   } else if (typeof options === "function") {
     const self = this as RedirectingHost | undefined;
