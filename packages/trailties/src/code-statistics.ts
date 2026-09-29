@@ -1,3 +1,4 @@
+import { classAttribute } from "@blazetrails/activesupport";
 import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { CodeStatisticsCalculator } from "./code-statistics-calculator.js";
 
@@ -50,8 +51,15 @@ const HEADERS = [
 const FILE_PATTERN = /^(?!\.).*?\.(rb|js|ts|tsx|css|scss|coffee|rake|tse)$/;
 
 export class CodeStatistics {
-  static directories: DirectoryPair[] = [...DEFAULT_DIRECTORIES];
-  static testTypes: string[] = [...DEFAULT_TEST_TYPES];
+  declare static directories: DirectoryPair[];
+  declare static isDirectories: boolean;
+  declare static testTypes: string[];
+  declare static isTestTypes: boolean;
+
+  static {
+    classAttribute.call(this, "directories", { default: DEFAULT_DIRECTORIES });
+    classAttribute.call(this, "testTypes", { default: DEFAULT_TEST_TYPES });
+  }
 
   static registerDirectory(
     label: string,

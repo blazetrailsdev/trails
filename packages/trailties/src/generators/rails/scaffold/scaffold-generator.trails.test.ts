@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { fileURLToPath } from "node:url";
+import { run } from "@blazetrails/activerecord-cli";
 import { ScaffoldGenerator } from "./scaffold-generator.js";
+import { AppGenerator } from "../../app-generator.js";
 import { parseTs } from "../../../template-builder/testing.js";
 
 let tmpDir: string;
@@ -66,5 +69,55 @@ describe("ScaffoldGenerator (views)", () => {
 
 </div>
 `);
+  });
+});
+
+describe("ScaffoldGenerator (type-check)", () => {
+  const PACKAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
+
+  it("emits a controller that trails-tsc builds against the scaffolded model", async () => {
+    const tmpApps = fs.mkdtempSync(path.join(PACKAGE_DIR, "tmp-scaffold-build-"));
+    try {
+      await new AppGenerator({
+        cwd: tmpApps,
+        output: () => {},
+        appPath: "blog",
+        database: "sqlite",
+      }).run();
+      const appDir = path.join(tmpApps, "blog");
+      const scope = path.join(appDir, "node_modules", "@blazetrails");
+      fs.mkdirSync(scope, { recursive: true });
+      const packagesDir = path.dirname(PACKAGE_DIR);
+      for (const pkg of fs.readdirSync(packagesDir)) {
+        if (fs.existsSync(path.join(packagesDir, pkg, "package.json")))
+          fs.symlinkSync(path.join(packagesDir, pkg), path.join(scope, pkg));
+      }
+      fs.mkdirSync(path.join(appDir, "node_modules", "@types"));
+      fs.symlinkSync(
+        path.join(packagesDir, "activerecord-cli", "node_modules", "@types", "node"),
+        path.join(appDir, "node_modules", "@types", "node"),
+      );
+      await new ScaffoldGenerator({
+        cwd: appDir,
+        output: () => {},
+        name: "Post",
+        attributes: ["title:string", "body:text"],
+      }).run();
+
+      const code = await run(
+        [
+          "typecheck",
+          "-p",
+          path.join(appDir, "tsconfig.json"),
+          "--noEmit",
+          "--schema",
+          path.join(appDir, "db/schema.ts"),
+        ],
+        appDir,
+      );
+      expect(code).toBe(0);
+    } finally {
+      fs.rmSync(tmpApps, { recursive: true, force: true });
+    }
   });
 });

@@ -783,7 +783,17 @@ export const ModelSchema = {
     classAttribute.call(base, "primaryKeyPrefixType", { instanceWriter: false });
     classAttribute.call(base, "tableNamePrefix", { instanceWriter: false, default: "" });
     classAttribute.call(base, "tableNameSuffix", { instanceWriter: false, default: "" });
+    classAttribute.call(base, "schemaMigrationsTableName", {
+      instanceAccessor: false,
+      default: "schema_migrations",
+    });
+    classAttribute.call(base, "internalMetadataTableName", {
+      instanceAccessor: false,
+      default: "ar_internal_metadata",
+    });
     classAttribute.call(base, "pluralizeTableNames", { instanceWriter: false, default: true });
+    classAttribute.call(base, "implicitOrderColumn", { instanceAccessor: false });
+    classAttribute.call(base, "immutableStringsByDefault", { instanceAccessor: false });
   },
 };
 
@@ -840,7 +850,12 @@ export function isSchemaLoaded(this: SchemaHost): boolean {
 export function typeForColumn(this: SchemaHost, connection: any, column: any): any {
   let type = connection.lookupCastTypeFromColumn(column);
 
-  if ((this as any).immutableStringsByDefault && rbObjRespondTo(type, "toImmutableString")) {
+  const immutableStringsByDefault = (this as unknown as typeof Base).immutableStringsByDefault;
+  if (
+    immutableStringsByDefault != null &&
+    immutableStringsByDefault !== false &&
+    rbObjRespondTo(type, "toImmutableString")
+  ) {
     type = type.toImmutableString();
   }
 

@@ -1,5 +1,5 @@
-import { it, expect } from "vitest";
-import { getZlib } from "@blazetrails/ruby-compat";
+import { it, expect, vi } from "vitest";
+import { GzipWriter, getZlib } from "@blazetrails/ruby-compat";
 import { Deflater, GzipStream } from "./deflater.js";
 
 const app = async () => [200, {}, ["hi"]] as [number, Record<string, any>, any];
@@ -62,5 +62,60 @@ it("flushes each yielded part before pulling the next under sync", async () => {
   await new GzipStream(body(), null, true).each((data) => written.push(data));
 
   expect(pulledAfter[0]).toBeGreaterThan(0);
+  expect(getZlib().gunzip(Buffer.concat(written)).toString()).toBe("onetwo");
+});
+
+it("pulls a generic body's next part only after the previous part's sync flush", async () => {
+  const log: string[] = [];
+  const body = {
+    async each(cb: (part: string) => Promise<void>) {
+      for (const part of ["one", "two"]) {
+        log.push(`yield ${part}`);
+        await cb(part);
+      }
+    },
+  };
+  const written: Uint8Array[] = [];
+  await new GzipStream(body, null, true).each((data) => {
+    log.push("write");
+    written.push(data);
+  });
+
+  expect(log.indexOf("write")).toBeLessThan(log.indexOf("yield two"));
+  expect(getZlib().gunzip(Buffer.concat(written)).toString()).toBe("onetwo");
+});
+
+it("finishes a synchronous generic body only after its sync flushes", async () => {
+  const log: string[] = [];
+  const flush = GzipWriter.prototype.flush;
+  const finish = GzipWriter.prototype.finish;
+  const flushSpy = vi.spyOn(GzipWriter.prototype, "flush").mockImplementation(async function (
+    this: GzipWriter,
+  ) {
+    await flush.call(this);
+    log.push("flushed");
+  });
+  const finishSpy = vi.spyOn(GzipWriter.prototype, "finish").mockImplementation(function (
+    this: GzipWriter,
+  ) {
+    log.push("finish");
+    return finish.call(this);
+  });
+  const body = {
+    each(cb: (part: string) => void) {
+      cb("one");
+      cb("");
+      cb("two");
+    },
+  };
+  const written: Uint8Array[] = [];
+  try {
+    await new GzipStream(body, null, true).each((data) => written.push(data));
+  } finally {
+    flushSpy.mockRestore();
+    finishSpy.mockRestore();
+  }
+
+  expect(log).toEqual(["flushed", "flushed", "finish"]);
   expect(getZlib().gunzip(Buffer.concat(written)).toString()).toBe("onetwo");
 });

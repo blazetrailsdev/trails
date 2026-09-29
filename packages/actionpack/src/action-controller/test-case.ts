@@ -2,6 +2,7 @@ import {
   ActiveSupportJSON,
   Assertion,
   camelize,
+  classAttribute,
   include,
   isBlank,
   isPlainObject,
@@ -86,7 +87,12 @@ include(Encoder, RackTestUtils);
 
 export class TestCase {
   /** @internal */
-  private static _controllerClass: ControllerClass | null = null;
+  declare static _controllerClass: ControllerClass | null | undefined;
+  declare static is_controllerClass: boolean;
+
+  static {
+    classAttribute.call(this, "_controllerClass");
+  }
 
   static executorAroundEachRequest = false;
 
@@ -107,12 +113,12 @@ export class TestCase {
   }
 
   static get controllerClass(): ControllerClass | null {
-    if (Object.hasOwn(this, "_controllerClass") && this._controllerClass) {
-      return this._controllerClass;
+    const currentControllerClass = this._controllerClass;
+    if (currentControllerClass) {
+      return currentControllerClass;
+    } else {
+      return (this.controllerClass = this.determineDefaultControllerClass(this.name));
     }
-    const inferred = this.determineDefaultControllerClass(this.name);
-    if (inferred) this._controllerClass = inferred;
-    return Object.hasOwn(this, "_controllerClass") ? this._controllerClass : null;
   }
   static set controllerClass(v: ControllerClass | null) {
     this._controllerClass = v;

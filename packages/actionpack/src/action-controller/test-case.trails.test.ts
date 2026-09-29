@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { b, StringIO } from "@blazetrails/ruby-compat";
 import { UploadedFile } from "@blazetrails/rack-test";
-import { TestRequest, TestSession } from "./test-case.js";
+import { TestCase, TestRequest, TestSession } from "./test-case.js";
+import { Base } from "./base.js";
 import type { UploadedFile as HttpUploadedFile } from "../action-dispatch/http/upload.js";
 
 describe("TestRequest#assignParameters Content-Type case", () => {
@@ -60,5 +61,16 @@ describe("TestSession#inspect", () => {
     expect(session.inspect()).toMatch(
       /^#<ActionController::TestSession:0x[0-9a-f]+ not yet loaded>$/,
     );
+  });
+});
+
+describe("TestCase._controllerClass", () => {
+  it("is a class_attribute, so a subclass inherits the parent's controller class", () => {
+    class PostsController extends Base {}
+    class Base1 extends TestCase {}
+    class Sub1 extends Base1 {}
+    Base1.tests(PostsController);
+    expect(Sub1.controllerClass).toBe(PostsController);
+    expect(Sub1.is_controllerClass).toBe(true);
   });
 });

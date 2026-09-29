@@ -307,12 +307,14 @@ export class Base extends Metal {
 
   static _routes: ViewContextRoutes | null = null;
 
-  static helpersPath: string[] = [];
+  declare static helpersPath: string[];
+  declare static isHelpersPath: boolean;
+  declare static includeAllHelpers: boolean;
+  declare static isIncludeAllHelpers: boolean;
+
   declare static _helpers?: HelperMethodsModule;
   declare static _helperMethods?: string[];
   static helperMethod = helperMethod;
-
-  declare static includeAllHelpers: boolean;
 
   constructor(...args: unknown[]) {
     super(...(args as []));
@@ -568,10 +570,14 @@ export class Base extends Metal {
     return instrumentName.call(this);
   }
 
-  static _wrapperOptions: ParamsWrapperOptions = ParamsWrapperOptions.fromHash({ format: [] });
+  declare static _wrapperOptions: ParamsWrapperOptions;
+  declare static is_wrapperOptions: boolean;
+  declare _wrapperOptions: ParamsWrapperOptions;
 
-  get _wrapperOptions(): ParamsWrapperOptions {
-    return (this.constructor as typeof Base)._wrapperOptions;
+  static {
+    classAttribute.call(this, "_wrapperOptions", {
+      default: ParamsWrapperOptions.fromHash({ format: [] }),
+    });
   }
 
   static wrapParameters(
@@ -945,6 +951,7 @@ if (_Configurable.performCaching == null) _Configurable.performCaching = true;
 
 mattrAccessor.call(Base, "raiseOnOpenRedirects", { default: false });
 
+classAttribute.call(Base, "helpersPath", { default: [] });
 classAttribute.call(Base, "includeAllHelpers", { default: true });
 
 _Configurable.configAccessor("requestForgeryProtectionToken");

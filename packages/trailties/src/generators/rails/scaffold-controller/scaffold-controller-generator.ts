@@ -151,15 +151,17 @@ function mk(name: string, body: string, ts: boolean): Method {
 }
 
 function paramsMethod(singular: string, attrs: string[], ts: boolean): Method {
+  const returnType = "Record<string, unknown>";
+  const cast = ts ? ` as ${returnType}` : "";
   const list =
     attrs.length === 0
-      ? `return this.params.fetch("${singular}", {});`
-      : `return this.params.expect({ ${singular}: [${attrs.map((a) => `"${a}"`).join(", ")}] });`;
+      ? `return this.params.fetch("${singular}", {})${cast};`
+      : `return this.params.expect({ ${singular}: [${attrs.map((a) => `"${a}"`).join(", ")}] })${cast};`;
   return tsMethod({
     name: `${camelize(singular, false)}Params`,
     visibility: "private",
     params: [],
-    returnType: ts ? "unknown" : undefined,
+    returnType: ts ? returnType : undefined,
     body: tsBody`${list}`,
   });
 }

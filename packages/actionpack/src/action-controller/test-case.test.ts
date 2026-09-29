@@ -76,14 +76,6 @@ describe("TestCase class helpers", () => {
     );
   });
 
-  it("controllerClass is per-class — subclasses don't inherit the base's setting", () => {
-    class Base1 extends TestCase {}
-    class Sub1 extends Base1 {}
-    Base1.tests(PostsController);
-    expect(Base1.controllerClass).toBe(PostsController);
-    expect(Sub1.controllerClass).toBeNull();
-  });
-
   it("controllerClassName returns the configured class name", () => {
     class Sub extends TestCase {}
     Sub.tests(PostsController);

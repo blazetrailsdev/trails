@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { CodeStatistics, DEFAULT_DIRECTORIES, DEFAULT_TEST_TYPES } from "./code-statistics.js";
+import { CodeStatistics } from "./code-statistics.js";
 import { CodeStatisticsCalculator } from "./code-statistics-calculator.js";
 
 describe("CodeStatisticsCalculatorTest", () => {
@@ -191,21 +191,31 @@ describe("CodeStatisticsTest", () => {
   });
   afterEach(() => {
     fs.rmSync(tmpPath, { recursive: true, force: true });
-    CodeStatistics.directories = [...DEFAULT_DIRECTORIES];
-    CodeStatistics.testTypes = [...DEFAULT_TEST_TYPES];
   });
 
   it("register directories", () => {
-    CodeStatistics.registerDirectory("My Directory", "path/to/dir");
-    expect(
-      CodeStatistics.directories.some(([l, p]) => l === "My Directory" && p === "path/to/dir"),
-    ).toBe(true);
-    expect(CodeStatistics.testTypes.includes("My Directory")).toBe(false);
+    try {
+      CodeStatistics.registerDirectory("My Directory", "path/to/dir");
+      expect(
+        CodeStatistics.directories.some(([l, p]) => l === "My Directory" && p === "path/to/dir"),
+      ).toBe(true);
+      expect(CodeStatistics.testTypes.includes("My Directory")).toBe(false);
+    } finally {
+      const index = CodeStatistics.directories.findIndex(
+        ([l, p]) => l === "My Directory" && p === "path/to/dir",
+      );
+      if (index !== -1) CodeStatistics.directories.splice(index, 1);
+    }
   });
 
   it("register test directories", () => {
-    CodeStatistics.registerDirectory("Model specs", "spec/models", { testDirectory: true });
-    expect(CodeStatistics.testTypes.includes("Model specs")).toBe(true);
+    try {
+      CodeStatistics.registerDirectory("Model specs", "spec/models", { testDirectory: true });
+      expect(CodeStatistics.testTypes.includes("Model specs")).toBe(true);
+    } finally {
+      const index = CodeStatistics.testTypes.indexOf("Model specs");
+      if (index !== -1) CodeStatistics.testTypes.splice(index, 1);
+    }
   });
 
   it("ignores directories that happen to have source files extensions", async () => {

@@ -1,11 +1,17 @@
 import { Table as ArelTable, Nodes } from "@blazetrails/arel";
 import { TableMetadata } from "../table-metadata.js";
 import type { Base } from "../base.js";
-import type { AssociationReflection, AbstractReflection } from "../reflection.js";
+import type {
+  AssociationReflection,
+  AbstractReflection,
+  PolymorphicReflection,
+  ThroughReflection,
+} from "../reflection.js";
 import { RuntimeReflection } from "../reflection.js";
-import { AliasTracker, aliasedArelTableForReflection } from "./alias-tracker.js";
+import { AliasTracker } from "./alias-tracker.js";
 import { WhereClause } from "../relation/where-clause.js";
 import { constructJoinDependency } from "../relation/query-methods.js";
+import { kernelArray } from "@blazetrails/activesupport";
 import { drop } from "@blazetrails/ruby-compat";
 import { methodMissingProxy } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
@@ -18,16 +24,14 @@ export interface AssociationScopeable {
   readonly klass: typeof Base;
 }
 
-type AliasedScope = { where(predicate: unknown): AliasedScope };
-
-type ScopeBuilder = {
-  buildScope(table?: unknown, predicateBuilder?: unknown, klass?: typeof Base): AliasedScope;
-};
+type ChainReflection =
+  | RuntimeReflection
+  | (ReflectionProxy & (AssociationReflection | ThroughReflection | PolymorphicReflection));
 
 export class ReflectionProxy {
-  readonly aliasedTable: unknown;
+  readonly aliasedTable: ArelTable | Nodes.TableAlias;
 
-  constructor(reflection: AbstractReflection, aliasedTable: unknown) {
+  constructor(reflection: AbstractReflection, aliasedTable: ArelTable | Nodes.TableAlias) {
     this.aliasedTable = aliasedTable;
     return methodMissingProxy(this, { delegate: () => reflection });
   }
@@ -112,7 +116,7 @@ export class AssociationScope {
 
   private applyScope(
     scope: unknown,
-    table: ArelTable | Nodes.TableAlias | null,
+    table: ArelTable | Nodes.TableAlias,
     key: string,
     value: unknown,
   ): unknown {
@@ -120,7 +124,7 @@ export class AssociationScope {
       where: (c: Record<string, unknown> | unknown) => unknown;
       table?: ArelTable;
     };
-    if (table && w.table && !arelTableEql(w.table, table)) {
+    if (w.table && !arelTableEql(w.table, table)) {
       const meta = new TableMetadata(null, table as unknown as ArelTable);
       const nodes = meta.predicateBuilder.buildFromHash({ [key]: value });
       let result: unknown = scope;
@@ -132,152 +136,73 @@ export class AssociationScope {
     return w.where({ [key]: value });
   }
 
-  private lastChainScope(scope: unknown, reflection: AbstractReflection, owner: Base): unknown {
-    const r = reflection as unknown as {
-      joinPrimaryKey(klass?: typeof Base): string | string[];
-      joinForeignKey: string | string[];
-      type?: string | null;
-    };
-    const aliased = (reflection as Partial<ReflectionProxy>).aliasedTable as
-      | string
-      | { name?: string }
-      | null
-      | undefined;
-    let tableName: string | null;
-    if (typeof aliased === "string") {
-      tableName = aliased;
-    } else if (aliased && typeof aliased === "object" && typeof aliased.name === "string") {
-      tableName = aliased.name;
-    } else {
-      try {
-        tableName = (reflection as { klass?: { tableName?: string } }).klass?.tableName ?? null;
-      } catch {
-        tableName = null;
-      }
+  private lastChainScope(scope: unknown, reflection: ChainReflection, owner: Base): unknown {
+    const primaryKey = kernelArray(reflection.joinPrimaryKey());
+    const foreignKey = kernelArray(reflection.joinForeignKey);
+
+    const table = reflection.aliasedTable;
+    const primaryKeyForeignKeyPairs = primaryKey.map((key, i) => [key, foreignKey[i]] as const);
+    for (const [joinKey, foreignKey] of primaryKeyForeignKeyPairs) {
+      const value = this.transformValue(owner._readAttribute(foreignKey));
+      scope = this.applyScope(scope, table, joinKey, value);
     }
-    const joinPk = r.joinPrimaryKey();
-    const joinPks = Array.isArray(joinPk) ? joinPk : [joinPk];
-    const joinFks = Array.isArray(r.joinForeignKey) ? r.joinForeignKey : [r.joinForeignKey];
-    const table = tableName ? this._arelTableFor(reflection, tableName) : null;
-    for (let i = 0; i < joinPks.length; i++) {
-      const value = this.transformValue(owner._readAttribute(joinFks[i]));
-      scope = this.applyScope(scope, table, joinPks[i], value);
-    }
-    if (r.type) {
+
+    if (reflection.type) {
       const polymorphicType = this.transformValue(
         (owner.constructor as typeof Base).polymorphicName(),
       );
-      scope = this.applyScope(scope, table, r.type, polymorphicType);
+      scope = this.applyScope(scope, table, reflection.type, polymorphicType);
     }
+
     return scope;
   }
 
   protected getChain(
     reflection: AssociationReflection,
     association: AssociationScopeable,
-    tracker?: AliasTracker,
-  ): Array<AbstractReflection> {
-    const chain: Array<AbstractReflection> = [new RuntimeReflection(reflection, association)];
-    const tail = drop(reflection.chain, 1);
+    tracker: AliasTracker,
+  ): Array<ChainReflection> {
     const name = reflection.name;
-    for (const refl of tail) {
-      const klass = (refl as unknown as { klass?: typeof Base }).klass;
-      let aliasedTable: unknown;
-      if (tracker && klass) {
-        aliasedTable = tracker.aliasedTableFor(klass.arelTable, null, () => {
-          const fn = (refl as unknown as { aliasCandidate?: (n: string) => string }).aliasCandidate;
-          return typeof fn === "function" ? fn.call(refl, name) : klass.tableName!;
-        });
-      } else {
-        aliasedTable = klass?.tableName ?? "";
-      }
-      chain.push(new ReflectionProxy(refl, aliasedTable) as ReflectionProxy & typeof refl);
+    const chain: Array<ChainReflection> = [new RuntimeReflection(reflection, association)];
+    for (const refl of drop(reflection.chain, 1)) {
+      const aliasedTable = tracker.aliasedTableFor(refl.klass.arelTable, null, () =>
+        refl.aliasCandidate(name),
+      );
+      chain.push(new ReflectionProxy(refl, aliasedTable) as ChainReflection);
     }
     return chain;
   }
 
   private nextChainScope(
     scope: unknown,
-    reflection: AbstractReflection,
-    nextReflection: AbstractReflection,
+    reflection: ChainReflection,
+    nextReflection: ChainReflection,
   ): unknown {
-    const r = reflection as unknown as {
-      joinPrimaryKey(klass?: typeof Base): string | string[];
-      joinForeignKey: string | string[];
-      klass?: { tableName?: string };
-      type?: string | null;
-    };
-    const nr = nextReflection as unknown as {
-      joinPrimaryKey(klass?: typeof Base): string | string[];
-      joinForeignKey: string | string[];
-      klass?: { tableName?: string };
-      aliasedTable?: string | { name?: string };
-    };
-    const rJoinPk = r.joinPrimaryKey();
-    const joinPks = Array.isArray(rJoinPk) ? rJoinPk : [rJoinPk];
-    const joinFks = Array.isArray(r.joinForeignKey) ? r.joinForeignKey : [r.joinForeignKey];
-    const rAliased = (reflection as Partial<ReflectionProxy>).aliasedTable as
-      | string
-      | { name?: string }
-      | null
-      | undefined;
-    let tableName: string;
-    if (typeof rAliased === "string") {
-      tableName = rAliased;
-    } else if (rAliased && typeof rAliased === "object" && typeof rAliased.name === "string") {
-      tableName = rAliased.name;
-    } else {
-      try {
-        tableName = r.klass?.tableName ?? "";
-      } catch {
-        tableName = "";
-      }
+    const primaryKey = kernelArray(reflection.joinPrimaryKey());
+    const foreignKey = kernelArray(reflection.joinForeignKey);
+
+    const table = reflection.aliasedTable;
+    const foreignTable = nextReflection.aliasedTable;
+
+    const primaryKeyForeignKeyPairs = primaryKey.map((key, i) => [key, foreignKey[i]] as const);
+    const constraints = primaryKeyForeignKeyPairs
+      .map(([joinPrimaryKey, foreignKey]) =>
+        table.get(joinPrimaryKey).eq(foreignTable.get(foreignKey)),
+      )
+      .reduce<Nodes.Node | null>((memo, node) => (memo === null ? node : memo.and(node)), null);
+
+    if (reflection.type) {
+      const value = this.transformValue(nextReflection.klass.polymorphicName());
+      scope = this.applyScope(scope, table, reflection.type, value);
     }
-    const aliased = nr.aliasedTable;
-    const foreignTableName =
-      typeof aliased === "string"
-        ? aliased
-        : aliased && typeof aliased === "object" && typeof aliased.name === "string"
-          ? aliased.name
-          : (nr.klass?.tableName ?? "");
-    const table = this._arelTableFor(reflection, tableName);
-    const foreignTable = this._arelTableFor(nextReflection, foreignTableName);
-    let constraints: Nodes.Node = table.get(joinPks[0]).eq(foreignTable.get(joinFks[0]));
-    for (let i = 1; i < joinPks.length; i++) {
-      constraints = constraints.and(table.get(joinPks[i]).eq(foreignTable.get(joinFks[i])));
-    }
-    if (r.type) {
-      const nextKlass = (nextReflection as { klass?: typeof Base }).klass;
-      const value = this.transformValue(nextKlass ? nextKlass.polymorphicName() : "");
-      scope = this.applyScope(scope, table, r.type, value);
-    }
-    return (scope as { joins: (node: Nodes.Join) => unknown }).joins(
+
+    return (scope as { joinsBang: (node: Nodes.Join) => unknown }).joinsBang(
       this.join(foreignTable, constraints) as Nodes.Join,
     );
   }
 
-  /** @internal */
-  private _arelTableFor(
-    reflection: AbstractReflection,
-    name: string,
-  ): ArelTable | Nodes.TableAlias {
-    const aliased = (reflection as Partial<ReflectionProxy>).aliasedTable;
-    if (aliased instanceof ArelTable || aliased instanceof Nodes.TableAlias) return aliased;
-    if (typeof aliased === "string" && aliased) {
-      return aliasedArelTableForReflection(reflection, name, aliased);
-    }
-    if (
-      aliased &&
-      typeof aliased === "object" &&
-      typeof (aliased as { name?: unknown }).name === "string"
-    ) {
-      return aliasedArelTableForReflection(reflection, name, (aliased as { name: string }).name);
-    }
-    return aliasedArelTableForReflection(reflection, name);
-  }
-
   /** @missingRailsCall empty? — PERMANENT */
-  private addConstraints(scope: unknown, owner: Base, chain: Array<AbstractReflection>): unknown {
+  private addConstraints(scope: unknown, owner: Base, chain: Array<ChainReflection>): unknown {
     const last = chain[chain.length - 1];
     scope = this.lastChainScope(scope, last, owner);
     for (let i = 0; i < chain.length - 1; i++) {
@@ -376,9 +301,7 @@ export class AssociationScope {
     scope: (...args: unknown[]) => unknown,
     owner: Base,
   ): unknown {
-    const relation = (reflection as unknown as ScopeBuilder).buildScope(
-      (reflection as Partial<ReflectionProxy>).aliasedTable,
-    );
+    const relation = reflection.buildScope((reflection as ChainReflection).aliasedTable);
     return scope.call(relation, owner) || relation;
   }
 

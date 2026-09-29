@@ -1,4 +1,5 @@
 import { KeyError, fetch } from "@blazetrails/ruby-compat";
+import { classAttribute } from "./class-attribute.js";
 
 export class NonActionable extends Error {
   constructor(message: string) {
@@ -8,7 +9,12 @@ export class NonActionable extends Error {
 }
 
 export class ActionableError extends Error {
-  static _actions: Record<string, () => void> = {};
+  declare static _actions: Record<string, () => void>;
+  declare static is_actions: boolean;
+
+  static {
+    classAttribute.call(this, "_actions", { default: {} });
+  }
 
   static _registry: Map<string, typeof ActionableError> = new Map();
 
