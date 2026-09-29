@@ -1,4 +1,5 @@
 import { any } from "@blazetrails/activesupport";
+import { Enumerable, include } from "@blazetrails/ruby-compat";
 import * as Visitors from "../visitors.js";
 
 export type NodeType = "LITERAL" | "SLASH" | "DOT" | "SYMBOL" | "GROUP" | "STAR" | "CAT" | "OR";
@@ -46,6 +47,8 @@ export abstract class Node {
     return this.name;
   }
 
+  declare findAll: (block: (node: Node) => unknown) => Node[];
+
   each(block: (node: Node) => void): void {
     Visitors.Each.INSTANCE.accept(this, block);
   }
@@ -77,6 +80,8 @@ export abstract class Node {
     return false;
   }
 }
+
+include(Node as unknown as new (...args: never[]) => unknown, Enumerable);
 
 export abstract class Terminal extends Node {
   get symbol(): Node | string {

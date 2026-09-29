@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "fs/promises";
 import { dirname, join } from "path";
-import { AR_SCRIPTS, init } from "./init.js";
+import { AR_DEV_DEPS, AR_SCRIPTS, init } from "./init.js";
 
 export type Driver = "better-sqlite3" | "node-sqlite" | "pg" | "mysql2";
 
@@ -72,10 +72,7 @@ function packageJson(appName: string, driver: Driver): string {
           "@blazetrails/activerecord-cli": "*",
           ...DRIVER_VERSIONS[driver],
         },
-        devDependencies: {
-          "@blazetrails/trails-tsc": "*",
-          tsx: "^4.20.0",
-        },
+        devDependencies: { ...AR_DEV_DEPS },
       },
       null,
       2,

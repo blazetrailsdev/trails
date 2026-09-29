@@ -134,7 +134,7 @@ describe("ArGenerateManifestTest", () => {
 
   it("handles an empty models dir without dangling re-exports", async () => {
     const manifest = await buildManifest(dir);
-    expect(manifest).toContain(`export const models = [] as const;`);
+    expect(manifest).toContain(`export const models: ReadonlyArray<typeof Base> = [];`);
     expect(manifest).not.toContain("export {");
   });
 

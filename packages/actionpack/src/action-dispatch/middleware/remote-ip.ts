@@ -1,4 +1,7 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import { rbInspect } from "@blazetrails/ruby-compat";
+import { ActionDispatch } from "../../namespaces.js";
+import type { Request } from "../http/request.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse> | RackResponse;
 
@@ -94,13 +97,13 @@ function proxyMatches(proxy: Proxy, ipStr: string): boolean {
 }
 
 export class GetIp {
-  private readonly env: RackEnv;
+  private readonly req: Request;
   private readonly checkIp: boolean;
   private readonly proxies: readonly Proxy[];
   private memoized: string | null | undefined;
 
-  constructor(env: RackEnv, checkIp: boolean, proxies: readonly Proxy[]) {
-    this.env = env;
+  constructor(req: Request, checkIp: boolean, proxies: readonly Proxy[]) {
+    this.req = req;
     this.checkIp = checkIp;
     this.proxies = proxies;
   }
@@ -116,20 +119,18 @@ export class GetIp {
   }
 
   private calculateIp(): string | null {
-    const remoteAddrs = this.ipsFrom(this.env["REMOTE_ADDR"] as string | undefined);
+    const remoteAddrs = this.ipsFrom(this.req.remoteAddr);
     const remoteAddr = remoteAddrs[remoteAddrs.length - 1];
-    const clientIps = this.ipsFrom(this.env["HTTP_CLIENT_IP"] as string | undefined).reverse();
-    const forwardedIps = this.ipsFrom(
-      this.env["HTTP_X_FORWARDED_FOR"] as string | undefined,
-    ).reverse();
+    const clientIps = this.ipsFrom(this.req.clientIp).reverse();
+    const forwardedIps = this.ipsFrom(this.req.xForwardedFor).reverse();
 
     const clientLast = clientIps[clientIps.length - 1];
     const forwardedLast = forwardedIps[forwardedIps.length - 1];
     if (this.checkIp && clientLast && forwardedLast && !forwardedIps.includes(clientLast)) {
       throw new IpSpoofAttackError(
         `IP spoofing attack?! ` +
-          `HTTP_CLIENT_IP=${JSON.stringify(this.env["HTTP_CLIENT_IP"] ?? null)} ` +
-          `HTTP_X_FORWARDED_FOR=${JSON.stringify(this.env["HTTP_X_FORWARDED_FOR"] ?? null)}`,
+          `HTTP_CLIENT_IP=${rbInspect(this.req.clientIp)} ` +
+          `HTTP_X_FORWARDED_FOR=${rbInspect(this.req.xForwardedFor)}`,
       );
     }
 
@@ -183,7 +184,8 @@ export class RemoteIp {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    env["action_dispatch.remote_ip"] = new GetIp(env, this.checkIp, this.proxies);
-    return await this.app(env);
+    const req = new ActionDispatch.Request(env);
+    req.remoteIp = new GetIp(req, this.checkIp, this.proxies);
+    return await this.app(req.env);
   }
 }

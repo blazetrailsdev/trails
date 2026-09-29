@@ -165,9 +165,14 @@ const product = await Product.createBang({ name: "Widget" });
     for (const pkg of ["activerecord", "activerecord-cli", "trails-tsc"]) {
       await symlink(join(packagesDir, pkg), join(appDir, "node_modules", "@blazetrails", pkg));
     }
+    await mkdir(join(appDir, "node_modules", "@types"), { recursive: true });
+    await symlink(
+      join(packagesDir, "activerecord-cli", "node_modules", "@types", "node"),
+      join(appDir, "node_modules", "@types", "node"),
+    );
 
     const typecheckCode = await run(["typecheck", "-p", join(appDir, "tsconfig.json")], appDir);
-    expect(typecheckCode).toBe(1);
+    expect(typecheckCode, exitReason("ar typecheck should exit 0", errors)).toBe(0);
     await expect(access(join(appDir, "dist", "db.js"))).resolves.toBeUndefined();
   });
 });

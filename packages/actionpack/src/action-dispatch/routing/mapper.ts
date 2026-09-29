@@ -22,8 +22,10 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import {
+  Enumerable,
   getFs,
   getPath,
+  include,
   RFC2396_PARSER,
   rbInspect,
   rbFSend,
@@ -813,6 +815,8 @@ export class Scope {
     return this.hash;
   }
 
+  declare findAll: (block: (node: Scope) => unknown) => Scope[];
+
   each(block: (node: Scope) => void): void {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     let node: Scope = this;
@@ -822,15 +826,10 @@ export class Scope {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  [Symbol.iterator](): Iterator<Scope> {
-    const nodes: Scope[] = [];
-    this.each((node) => nodes.push(node));
-    return nodes[Symbol.iterator]();
-  }
-
   static readonly ROOT: Scope = new Scope({}, null);
 }
+
+include(Scope, Enumerable);
 
 export class Mapper {
   static readonly URL_OPTIONS: readonly string[] = [
@@ -1986,8 +1985,8 @@ export class Mapper {
 
   /** @internal */
   shallowNestingDepth(): number {
-    return [...this._scope]
-      .filter((node) => node.frame.scopeLevelResource)
+    return this._scope
+      .findAll((node) => node.frame.scopeLevelResource)
       .filter((node) => (node.frame.scopeLevelResource as ResourceLike).shallow()).length;
   }
 

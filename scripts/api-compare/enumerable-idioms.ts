@@ -59,6 +59,7 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
   ["key?", ["has"]],
   ["has_key?", ["has"]],
   ["select", ["filter"]],
+  ["find_all", ["filter"]],
   ["reject", ["filter"]],
   ["detect", ["find"]],
   ["collect", ["map"]],

@@ -94,6 +94,7 @@ import {
   type ParametersHost,
 } from "./parameters.js";
 import { Headers as HttpHeaders } from "./headers.js";
+import type { GetIp } from "../middleware/remote-ip.js";
 import { ActionDispatch } from "../../namespaces.js";
 
 const ACTION_DISPATCH_REQUEST_ID = "action_dispatch.request_id";
@@ -428,7 +429,7 @@ export class Request {
     return (this.getHeader("REMOTE_ADDR") as string) || "127.0.0.1";
   }
 
-  set remoteIp(value: string | null) {
+  set remoteIp(value: string | GetIp | null) {
     this.setHeader("action_dispatch.remote_ip", value);
   }
 

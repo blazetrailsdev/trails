@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Request } from "../http/request.js";
-import { RemoteIp, IpSpoofAttackError, TRUSTED_PROXIES, type Proxy } from "./remote-ip.js";
+import { GetIp, RemoteIp, IpSpoofAttackError, TRUSTED_PROXIES, type Proxy } from "./remote-ip.js";
 
 async function callMw(
   env: Record<string, unknown>,
@@ -38,6 +38,9 @@ describe("RemoteIp middleware (smoke)", () => {
   it("raises IpSpoofAttackError when Client-Ip and X-Forwarded-For disagree", async () => {
     const req = await callMw({ HTTP_X_FORWARDED_FOR: "1.1.1.1", HTTP_CLIENT_IP: "2.2.2.2" });
     expect(() => req.remoteIp).toThrow(IpSpoofAttackError);
+    expect(() => req.remoteIp).toThrow(
+      'IP spoofing attack?! HTTP_CLIENT_IP="2.2.2.2" HTTP_X_FORWARDED_FOR="1.1.1.1"',
+    );
   });
 
   it("respects ip_spoofing_check = false", async () => {
@@ -56,6 +59,19 @@ describe("RemoteIp middleware (smoke)", () => {
       [...TRUSTED_PROXIES, /^67\.205\.106\.73$/i],
     );
     expect(req.remoteIp).toBe("3.4.5.6");
+  });
+
+  it("sets a GetIp on the request and hands the app req.env", async () => {
+    async function* emptyBody(): AsyncGenerator<string> {}
+    let received: Record<string, unknown> | undefined;
+    const env: Record<string, unknown> = { REMOTE_ADDR: "1.2.3.4" };
+    const mw = new RemoteIp(async (e) => {
+      received = e;
+      return [200, {}, emptyBody()];
+    });
+    await mw.call(env);
+    expect(received).toBe(env);
+    expect(env["action_dispatch.remote_ip"]).toBeInstanceOf(GetIp);
   });
 
   it("allows the setter to override", async () => {

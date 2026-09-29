@@ -271,8 +271,8 @@ describe("Mapper::Scope", () => {
     const nodes: Scope[] = [];
     c.each((node) => nodes.push(node));
     expect(nodes).toEqual([c, b, a]);
-    expect([...c]).toEqual([c, b, a]);
-    expect([...Scope.ROOT]).toEqual([]);
+    expect(c.findAll((node) => node.frame.controller)).toEqual([c]);
+    expect(Scope.ROOT.findAll(() => true)).toEqual([]);
   });
 });
 

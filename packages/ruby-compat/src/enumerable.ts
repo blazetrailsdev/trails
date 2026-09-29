@@ -25,6 +25,20 @@ function rbBlockCall<T>(obj: Each<T>, block: (i: T) => void): void {
 }
 
 /**
+ * Mirrors: Ruby's Enumerable#find_all — `vendor/ruby/v3.3.11/enum.c:509` `enum_find_all`,
+ * pushing each element whose block result `RTEST`s (`find_all_i`, `:456`).
+ * @noRailsEquivalent PERMANENT
+ */
+function findAll<T>(this: Each<T>, block: (i: T) => unknown): T[] {
+  const ary: T[] = [];
+  rbBlockCall(this, (i) => {
+    const result = block(i);
+    if (result != null && result !== false) ary.push(i);
+  });
+  return ary;
+}
+
+/**
  * Mirrors: Ruby's Enumerable#map — `vendor/ruby/v3.3.11/enum.c:638` `enum_collect`.
  * @noRailsEquivalent PERMANENT
  */
@@ -80,4 +94,4 @@ function isAny<T>(this: Each<T>, block?: (i: T) => unknown): boolean {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export const Enumerable = { map, first, isAny };
+export const Enumerable = { findAll, map, first, isAny };

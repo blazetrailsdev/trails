@@ -79,8 +79,9 @@ const AR_DEPS = {
   "@blazetrails/activerecord-cli": "*",
 };
 
-const AR_DEV_DEPS = {
+export const AR_DEV_DEPS = {
   "@blazetrails/trails-tsc": "*",
+  "@types/node": "^25.3.5",
   tsx: "^4.20.0",
 };
 
