@@ -197,35 +197,46 @@ export async function performQuery(
         : value;
     });
   }
-  let stmt: SqliteStatement | null = null;
   let result: Result;
-  let affectedRows: number;
-  let insertRowid: number | bigint;
-  try {
-    stmt = batch
-      ? null
-      : prepare
-        ? await this._cachedStatement(rawConnection, sql)
-        : await this._freshStatement(rawConnection, sql);
-    if (stmt === null) {
-      await rawConnection.exec(sql);
+  if (batch) {
+    await rawConnection.exec(sql);
+    result = Result.empty();
+  } else if (prepare) {
+    const stmt = await this._cachedStatement(rawConnection, sql);
+    stmt.bindParams(typeCastedBinds);
+
+    if (!stmt.reader) {
+      await stmt.step();
       result = Result.empty();
-    } else if (stmt.reader) {
-      stmt.bindParams(typeCastedBinds);
-      const columns = stmt.columns().map((c) => c.name);
-      result = new Result(columns, await stmt.toA());
-      this._narrowSpilledBigInts(stmt, result.rows);
     } else {
-      await stmt.run(typeCastedBinds);
-      result = Result.empty();
+      result = new Result(
+        stmt.columns().map((c) => c.name),
+        await stmt.toA(),
+      );
+      this._narrowSpilledBigInts(stmt, result.rows);
     }
-    affectedRows = await rawConnection.changes();
-    insertRowid = await rawConnection.lastInsertRowId();
-  } finally {
-    if (!prepare && stmt !== null) await stmt.close();
+  } else {
+    const stmt = await this._freshStatement(rawConnection, sql);
+    try {
+      if (!(binds == null || binds.length === 0)) {
+        stmt.bindParams(typeCastedBinds);
+      }
+      if (!stmt.reader) {
+        await stmt.step();
+        result = Result.empty();
+      } else {
+        result = new Result(
+          stmt.columns().map((c) => c.name),
+          await stmt.toA(),
+        );
+        this._narrowSpilledBigInts(stmt, result.rows);
+      }
+    } finally {
+      await stmt.close();
+    }
   }
-  this._lastAffectedRows = affectedRows;
-  this._lastInsertRowid = insertRowid;
+  this._lastAffectedRows = await rawConnection.changes();
+  this._lastInsertRowid = await rawConnection.lastInsertRowId();
   this.verifiedBang();
   if (notificationPayload) notificationPayload.row_count = result.length;
   return result;

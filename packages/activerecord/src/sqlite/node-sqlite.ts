@@ -75,6 +75,11 @@ class NodeSqliteStatement implements SqliteStatement, SyncSqliteStatement {
     this.boundParams = binds;
   }
 
+  step(): null {
+    this.run(this.boundParams);
+    return null;
+  }
+
   toA(): unknown[][] {
     this.stmt.setReturnArrays(true);
     try {

@@ -54,6 +54,13 @@ describe("SqliteDriver — libsql round-trip", () => {
     ).toBe(true);
   });
 
+  it("step() runs a non-reader statement over its bound params", async () => {
+    const update = await driver.prepare("UPDATE widgets SET qty = ? WHERE name = ?");
+    update.bindParams([7, "gear"]);
+    expect(await update.step()).toBeNull();
+    expect(await driver.changes()).toBe(1);
+  });
+
   it("toA() returns positional rows for the bound params, duplicate column names included", async () => {
     const select = await driver.prepare("SELECT name, qty AS name FROM widgets WHERE name = ?");
     select.bindParams(["sprocket"]);
