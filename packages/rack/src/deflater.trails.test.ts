@@ -64,3 +64,37 @@ it("flushes each yielded part before pulling the next under sync", async () => {
   expect(pulledAfter[0]).toBeGreaterThan(0);
   expect(getZlib().gunzip(Buffer.concat(written)).toString()).toBe("onetwo");
 });
+
+it("pulls a generic body's next part only after the previous part's sync flush", async () => {
+  const log: string[] = [];
+  const body = {
+    async each(cb: (part: string) => Promise<void>) {
+      for (const part of ["one", "two"]) {
+        log.push(`yield ${part}`);
+        await cb(part);
+      }
+    },
+  };
+  const written: Uint8Array[] = [];
+  await new GzipStream(body, null, true).each((data) => {
+    log.push("write");
+    written.push(data);
+  });
+
+  expect(log.indexOf("write")).toBeLessThan(log.indexOf("yield two"));
+  expect(getZlib().gunzip(Buffer.concat(written)).toString()).toBe("onetwo");
+});
+
+it("finishes a synchronous generic body only after its sync flushes", async () => {
+  const body = {
+    each(cb: (part: string) => void) {
+      cb("one");
+      cb("");
+      cb("two");
+    },
+  };
+  const written: Uint8Array[] = [];
+  await new GzipStream(body, null, true).each((data) => written.push(data));
+
+  expect(getZlib().gunzip(Buffer.concat(written)).toString()).toBe("onetwo");
+});

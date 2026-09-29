@@ -43,6 +43,7 @@
     "vite": "^7.0.0"
   },
   "devDependencies": {
+    "@blazetrails/activerecord-cli": "workspace:*",
     "typescript": "7.1.0-dev.20260920.1"
   },
   "peerDependencies": {

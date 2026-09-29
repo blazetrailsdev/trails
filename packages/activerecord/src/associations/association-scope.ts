@@ -141,23 +141,22 @@ export class AssociationScope {
     return w.where({ [key]: value });
   }
 
-  private lastChainScope(scope: unknown, reflection: AbstractReflection, owner: Base): unknown {
-    const r = reflection as unknown as ChainReflection;
-    const primaryKey = kernelArray(r.joinPrimaryKey());
-    const foreignKey = kernelArray(r.joinForeignKey);
+  private lastChainScope(scope: unknown, reflection: ChainReflection, owner: Base): unknown {
+    const primaryKey = kernelArray(reflection.joinPrimaryKey());
+    const foreignKey = kernelArray(reflection.joinForeignKey);
 
-    const table = r.aliasedTable;
+    const table = reflection.aliasedTable;
     const primaryKeyForeignKeyPairs = primaryKey.map((key, i) => [key, foreignKey[i]] as const);
     for (const [joinKey, foreignKey] of primaryKeyForeignKeyPairs) {
       const value = this.transformValue(owner._readAttribute(foreignKey));
       scope = this.applyScope(scope, table, joinKey, value);
     }
 
-    if (r.type) {
+    if (reflection.type) {
       const polymorphicType = this.transformValue(
         (owner.constructor as typeof Base).polymorphicName(),
       );
-      scope = this.applyScope(scope, table, r.type, polymorphicType);
+      scope = this.applyScope(scope, table, reflection.type, polymorphicType);
     }
 
     return scope;
@@ -168,10 +167,9 @@ export class AssociationScope {
     association: AssociationScopeable,
     tracker: AliasTracker,
   ): Array<AbstractReflection> {
-    const chain: Array<AbstractReflection> = [new RuntimeReflection(reflection, association)];
-    const tail = drop(reflection.chain, 1);
     const name = reflection.name;
-    for (const refl of tail) {
+    const chain: Array<AbstractReflection> = [new RuntimeReflection(reflection, association)];
+    for (const refl of drop(reflection.chain, 1)) {
       const aliasedTable = tracker.aliasedTableFor(
         (refl as unknown as ChainReflection).klass.arelTable,
         null,
@@ -184,28 +182,25 @@ export class AssociationScope {
 
   private nextChainScope(
     scope: unknown,
-    reflection: AbstractReflection,
-    nextReflection: AbstractReflection,
+    reflection: ChainReflection,
+    nextReflection: ChainReflection,
   ): unknown {
-    const r = reflection as unknown as ChainReflection;
-    const nr = nextReflection as unknown as ChainReflection;
-    const primaryKey = kernelArray(r.joinPrimaryKey());
-    const foreignKey = kernelArray(r.joinForeignKey);
+    const primaryKey = kernelArray(reflection.joinPrimaryKey());
+    const foreignKey = kernelArray(reflection.joinForeignKey);
 
-    const table = r.aliasedTable;
-    const foreignTable = nr.aliasedTable;
+    const table = reflection.aliasedTable;
+    const foreignTable = nextReflection.aliasedTable;
 
     const primaryKeyForeignKeyPairs = primaryKey.map((key, i) => [key, foreignKey[i]] as const);
     const constraints = primaryKeyForeignKeyPairs
-      .map(
-        ([joinPrimaryKey, foreignKey]): Nodes.Node =>
-          table.get(joinPrimaryKey).eq(foreignTable.get(foreignKey)),
+      .map(([joinPrimaryKey, foreignKey]) =>
+        table.get(joinPrimaryKey).eq(foreignTable.get(foreignKey)),
       )
-      .reduce((memo, node) => memo.and(node));
+      .reduce<Nodes.Node | null>((memo, node) => (memo === null ? node : memo.and(node)), null);
 
-    if (r.type) {
-      const value = this.transformValue(nr.klass.polymorphicName());
-      scope = this.applyScope(scope, table, r.type, value);
+    if (reflection.type) {
+      const value = this.transformValue(nextReflection.klass.polymorphicName());
+      scope = this.applyScope(scope, table, reflection.type, value);
     }
 
     return (scope as { joinsBang: (node: Nodes.Join) => unknown }).joinsBang(
@@ -216,9 +211,13 @@ export class AssociationScope {
   /** @missingRailsCall empty? — PERMANENT */
   private addConstraints(scope: unknown, owner: Base, chain: Array<AbstractReflection>): unknown {
     const last = chain[chain.length - 1];
-    scope = this.lastChainScope(scope, last, owner);
+    scope = this.lastChainScope(scope, last as unknown as ChainReflection, owner);
     for (let i = 0; i < chain.length - 1; i++) {
-      scope = this.nextChainScope(scope, chain[i], chain[i + 1]);
+      scope = this.nextChainScope(
+        scope,
+        chain[i] as unknown as ChainReflection,
+        chain[i + 1] as unknown as ChainReflection,
+      );
     }
 
     const chainHead = chain[0];

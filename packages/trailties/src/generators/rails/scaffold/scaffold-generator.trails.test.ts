@@ -3,8 +3,9 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { fileURLToPath } from "node:url";
-import { API } from "typescript/unstable/sync";
+import { run } from "@blazetrails/activerecord-cli";
 import { ScaffoldGenerator } from "./scaffold-generator.js";
+import { AppGenerator } from "../../app-generator.js";
 import { parseTs } from "../../../template-builder/testing.js";
 
 let tmpDir: string;
@@ -78,23 +79,29 @@ describe("ScaffoldGenerator (views)", () => {
 
 describe("ScaffoldGenerator (type-check)", () => {
   const PACKAGE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
-  const compilerOptions = { strict: true, module: "nodenext", noEmit: true, skipLibCheck: true };
-  const APP_FILES: Record<string, string> = {
-    "package.json": `{ "type": "module" }`,
-    "tsconfig.json": JSON.stringify({ compilerOptions, include: ["app/**/*.ts"] }),
-    "app/controllers/application-controller.ts": `import { ActionController } from "@blazetrails/actionpack";\nexport class ApplicationController extends ActionController.Base {}\n`,
-    "app/models/application-record.ts": `import { Base } from "@blazetrails/activerecord";\nexport class ApplicationRecord extends Base {}\n`,
-    "config/routes.ts": "export function drawRoutes(mapper: Mapper): void {\n}\n",
-  };
 
-  it("emits a controller that type-checks against the scaffolded model", async () => {
-    const appDir = fs.mkdtempSync(path.join(PACKAGE_DIR, "tmp-scaffold-strict-"));
-    const api = new API();
+  it("emits a controller that trails-tsc builds against the scaffolded model", async () => {
+    const tmpApps = fs.mkdtempSync(path.join(PACKAGE_DIR, "tmp-scaffold-build-"));
     try {
-      for (const [rel, content] of Object.entries(APP_FILES)) {
-        fs.mkdirSync(path.dirname(path.join(appDir, rel)), { recursive: true });
-        fs.writeFileSync(path.join(appDir, rel), content);
+      await new AppGenerator({
+        cwd: tmpApps,
+        output: () => {},
+        appPath: "blog",
+        database: "sqlite",
+      }).run();
+      const appDir = path.join(tmpApps, "blog");
+      const scope = path.join(appDir, "node_modules", "@blazetrails");
+      fs.mkdirSync(scope, { recursive: true });
+      const packagesDir = path.dirname(PACKAGE_DIR);
+      for (const pkg of fs.readdirSync(packagesDir)) {
+        if (fs.existsSync(path.join(packagesDir, pkg, "package.json")))
+          fs.symlinkSync(path.join(packagesDir, pkg), path.join(scope, pkg));
       }
+      fs.mkdirSync(path.join(appDir, "node_modules", "@types"));
+      fs.symlinkSync(
+        path.join(packagesDir, "activerecord-cli", "node_modules", "@types", "node"),
+        path.join(appDir, "node_modules", "@types", "node"),
+      );
       await new ScaffoldGenerator({
         cwd: appDir,
         output: () => {},
@@ -102,19 +109,20 @@ describe("ScaffoldGenerator (type-check)", () => {
         attributes: ["title:string", "body:text"],
       }).run();
 
-      const configPath = path.join(appDir, "tsconfig.json");
-      const program = api
-        .createSnapshot({ openProjects: [configPath] })
-        .getConfiguredProject(configPath)!.program;
-      const diagnostics = [
-        ...program.getSyntacticDiagnostics(),
-        ...program.getSemanticDiagnostics(),
-      ].map((d) => `${path.relative(appDir, d.fileName ?? "")}: TS${d.code}`);
-
-      expect(diagnostics).toEqual([]);
+      const code = await run(
+        [
+          "typecheck",
+          "-p",
+          path.join(appDir, "tsconfig.json"),
+          "--noEmit",
+          "--schema",
+          path.join(appDir, "db/schema.ts"),
+        ],
+        appDir,
+      );
+      expect(code).toBe(0);
     } finally {
-      api.close();
-      fs.rmSync(appDir, { recursive: true, force: true });
+      fs.rmSync(tmpApps, { recursive: true, force: true });
     }
   });
 });

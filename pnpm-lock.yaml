@@ -458,6 +458,9 @@ importers:
         specifier: ^7.0.0
         version: 7.3.1(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
     devDependencies:
+      '@blazetrails/activerecord-cli':
+        specifier: workspace:*
+        version: link:../activerecord-cli
       typescript:
         specifier: 7.1.0-dev.20260920.1
         version: 7.1.0-dev.20260920.1

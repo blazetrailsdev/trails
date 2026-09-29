@@ -4,16 +4,21 @@ import { classAttribute } from "./class-attribute.js";
 
 describe("classAttribute", () => {
   it("answers the predicate with Ruby's !!, so only nil and false are falsy", () => {
-    class Model {}
+    class Model {
+      declare static isPrefix: boolean;
+      declare static isCount: boolean;
+      declare static isFlag: boolean;
+      declare static isMissing: boolean;
+    }
     classAttribute.call(Model, "prefix", { default: "" });
     classAttribute.call(Model, "count", { default: 0 });
     classAttribute.call(Model, "flag", { default: false });
     classAttribute.call(Model, "missing");
 
-    expect((Model as any).isPrefix).toBe(true);
-    expect((Model as any).isCount).toBe(true);
-    expect((Model as any).isFlag).toBe(false);
-    expect((Model as any).isMissing).toBe(false);
+    expect(Model.isPrefix).toBe(true);
+    expect(Model.isCount).toBe(true);
+    expect(Model.isFlag).toBe(false);
+    expect(Model.isMissing).toBe(false);
   });
 
   it("defines a class-level attribute with default", () => {

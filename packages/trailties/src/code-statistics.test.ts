@@ -213,7 +213,8 @@ describe("CodeStatisticsTest", () => {
       CodeStatistics.registerDirectory("Model specs", "spec/models", { testDirectory: true });
       expect(CodeStatistics.testTypes.includes("Model specs")).toBe(true);
     } finally {
-      CodeStatistics.testTypes.splice(CodeStatistics.testTypes.indexOf("Model specs"), 1);
+      const index = CodeStatistics.testTypes.indexOf("Model specs");
+      if (index !== -1) CodeStatistics.testTypes.splice(index, 1);
     }
   });
 
