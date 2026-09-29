@@ -8,7 +8,16 @@ import {
   ParamsTooDeepError,
   Params,
 } from "./query-parser.js";
-import { ArgumentError, Process, RFC2396_PARSER, URI, rbInspect } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Process,
+  RFC2396_PARSER,
+  URI,
+  isSymbol,
+  rbInspect,
+  stringToSym,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 
 export { ArgumentError };
 
@@ -444,18 +453,16 @@ export function secureCompare(a: string, b: string): boolean {
   return result === 0;
 }
 
-export function statusCode(status: number | string | symbol): number {
-  if (
-    typeof status === "symbol" ||
-    (typeof status === "string" && Number.isNaN(parseInt(status, 10)))
-  ) {
-    const name = String(status);
+export function statusCode(status: number | string): number {
+  if (typeof status === "string" && (isSymbol(status) || Number.isNaN(parseInt(status, 10)))) {
+    const symbol = stringToSym(status);
+    const name = symbolToS(symbol);
     if (Object.hasOwn(SYMBOL_TO_STATUS_CODE, name)) return SYMBOL_TO_STATUS_CODE[name];
     if (!Object.hasOwn(OBSOLETE_SYMBOLS_TO_STATUS_CODES, name)) {
-      throw new ArgumentError(`Unrecognized status code ${rbInspect(`:${name}`)}`);
+      throw new ArgumentError(`Unrecognized status code ${rbInspect(symbol)}`);
     }
     const fallbackCode = OBSOLETE_SYMBOLS_TO_STATUS_CODES[name];
-    const message = `Status code ${rbInspect(`:${name}`)} is deprecated and will be removed in a future version of Rack.`;
+    const message = `Status code ${rbInspect(symbol)} is deprecated and will be removed in a future version of Rack.`;
     const canonicalSymbol = OBSOLETE_SYMBOL_MAPPINGS[name];
     if (canonicalSymbol === undefined) console.warn(message);
     return fallbackCode;
