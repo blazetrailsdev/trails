@@ -10,7 +10,7 @@ import {
   setTrailsRoot,
   underscore,
 } from "@blazetrails/activesupport";
-import { getFs, getPath, RuntimeError, symbolToS } from "@blazetrails/ruby-compat";
+import { getFs, getPath, rbConstGet, RuntimeError, symbolToS } from "@blazetrails/ruby-compat";
 import { Executor, Reloader } from "@blazetrails/activesupport";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
@@ -235,9 +235,10 @@ export class Application extends Engine {
     return (this._appEnvConfig ??= {
       ...super.envConfig(),
       "action_dispatch.log_rescued_responses": this.config.actionDispatch.logRescuedResponses,
-      "action_dispatch.debug_exception_log_level": (Logger as unknown as Record<string, number>)[
-        symbolToS(this.config.actionDispatch.debugExceptionLogLevel).toUpperCase()
-      ],
+      "action_dispatch.debug_exception_log_level": rbConstGet(
+        Logger,
+        symbolToS(this.config.actionDispatch.debugExceptionLogLevel).toUpperCase(),
+      ),
       "action_dispatch.logger": Trails.logger,
     });
   }

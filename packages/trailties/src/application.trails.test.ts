@@ -3,6 +3,7 @@ import { useInMemoryDatabaseUrl } from "./support/in-memory-database-url.js";
 import { Trailtie as BaseTrailtie } from "./trailtie.js";
 import { Trailtie as ActiveRecordTrailtie } from "./trailties/active-record.js";
 import { Logger } from "@blazetrails/activesupport";
+import { NameError } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 
 describe("Application framework railtie initializers", () => {
@@ -90,5 +91,16 @@ describe("Application#env_config", () => {
     app.config.actionDispatch.debugExceptionLogLevel = ":error";
 
     expect(app.envConfig()["action_dispatch.debug_exception_log_level"]).toBe(Logger.ERROR);
+  });
+
+  it("raises NameError for a level Logger has no constant for, as const_get does", () => {
+    class BadLogLevelApp extends Application {}
+    const app = new BadLogLevelApp();
+    (app.config.actionDispatch as { debugExceptionLogLevel: string }).debugExceptionLogLevel =
+      ":loud";
+
+    expect(() => app.envConfig()).toThrow(
+      new NameError("uninitialized constant Logger::LOUD", "LOUD"),
+    );
   });
 });
