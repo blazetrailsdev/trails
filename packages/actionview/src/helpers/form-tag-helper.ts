@@ -58,6 +58,7 @@ export function fieldId(
     .join("_");
 }
 
+/** @missingRailsArgs join — PERMANENT */
 export function fieldName(
   this: FormTagHelperHost,
   objectName: unknown,
