@@ -108,19 +108,17 @@ export class Exception implements ProtectionMethods {
   }
 }
 
-const CSRF_TOKEN_SESSION_KEY = "_csrf_token";
-
 export class SessionStore {
   fetch(request: CsrfRequest): string | null {
-    return (request.session!.get(CSRF_TOKEN_SESSION_KEY) as string | undefined) ?? null;
+    return (request.session!.get("_csrfToken") as string | undefined) ?? null;
   }
 
   store(request: CsrfRequest, csrfToken: string): void {
-    request.session!.set(CSRF_TOKEN_SESSION_KEY, csrfToken);
+    request.session!.set("_csrfToken", csrfToken);
   }
 
   reset(request: CsrfRequest): void {
-    request.session!.delete(CSRF_TOKEN_SESSION_KEY);
+    request.session!.delete("_csrfToken");
   }
 }
 

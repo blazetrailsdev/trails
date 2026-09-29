@@ -161,7 +161,7 @@ describe("ActionController::Base#verify_authenticity_token", () => {
   it("accepts a valid X-CSRF-Token even when the form token is wrong", async () => {
     const tc = new TestCase(PostsController);
     await tc.post("create", {
-      session: { _csrf_token: token },
+      session: { _csrfToken: token },
       params: { authenticity_token: "bogus" },
       headers: { "X-CSRF-Token": token },
     });
@@ -174,7 +174,7 @@ describe("ActionController::Base#verify_authenticity_token", () => {
       const tc = new TestCase(PostsController);
       await expect(
         tc.post("create", {
-          session: { _csrf_token: token },
+          session: { _csrfToken: token },
           params: { authenticity_token: token },
           headers: { Origin: "http://bad.host" },
         }),
