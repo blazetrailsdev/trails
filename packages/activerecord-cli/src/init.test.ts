@@ -96,6 +96,7 @@ describe("ArInitTest", () => {
       },
       devDependencies: {
         "@blazetrails/trails-tsc": "*",
+        "@types/node": "^25.3.5",
         tsx: "^4.20.0",
       },
     };

@@ -24,6 +24,7 @@ export const FRESH_TSCONFIG =
         strict: true,
         esModuleInterop: true,
         skipLibCheck: true,
+        types: ["node"],
         outDir: "dist",
         rootDir: ".",
         plugins: [{ name: TRAILS_TSC_PLUGIN }],

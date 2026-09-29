@@ -283,6 +283,10 @@ importers:
       typescript:
         specifier: 7.1.0-dev.20260920.1
         version: 7.1.0-dev.20260920.1
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.5
+        version: 25.3.5
 
   packages/activesupport:
     dependencies:
