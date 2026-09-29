@@ -8,7 +8,16 @@ import { env, includedModules, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Trails } from "./rails.js";
 
-class BootAppIntegrationTest extends ActionController.IntegrationTest {}
+class BootAppIntegrationTest extends ActionController.IntegrationTest {
+  declare "@post": { title: string };
+
+  static {
+    this.setup(async function (this: BootAppIntegrationTest) {
+      const self = this as BootAppIntegrationTest & { fixture(...names: string[]): unknown };
+      this["@post"] = (await self.fixture("posts", "welcome")) as { title: string };
+    });
+  }
+}
 registerConstant("BootAppIntegrationTest", BootAppIntegrationTest);
 
 type FixtureHost = { fixturePaths: string[]; fileFixturePath?: string; fixtures?: unknown };
@@ -68,6 +77,12 @@ describe("test_help wires a booted app into the test case classes", () => {
       };
       controllerTest.beforeSetup();
       expect(controllerTest.routes).toBe(Trails.application!.routes());
+    });
+
+    it("runs the test class's setup against its fixtures and url helpers", async ({ testCase }) => {
+      const session = testCase as BootAppIntegrationTest & { postsUrl(): string };
+      expect(session["@post"].title).toBe("Welcome to Trails");
+      expect(session.postsUrl()).toBe("http://www.example.com/posts");
     });
 
     it("routes an integration request through the app's config/routes.ts", async ({ testCase }) => {

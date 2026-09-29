@@ -87,6 +87,10 @@ export class NamedBase extends GeneratorBase {
     );
   }
 
+  redirectResourceName(this: NamedBase & { controllerClassPath(): string[] }): string {
+    return this.modelResourceName(undefined, { prefix: "this." });
+  }
+
   modelResourceName(
     this: NamedBase & { controllerClassPath(): string[] },
     baseName: string = this.singularTableName(),

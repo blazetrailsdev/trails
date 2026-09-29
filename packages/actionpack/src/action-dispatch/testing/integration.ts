@@ -86,14 +86,15 @@ export class IntegrationTest extends TestCase {
     super(name!);
     this.resetBang();
     const app = this.app as { routes?: unknown } | null;
-    if (rbObjRespondTo(app, "routes") && app!.routes instanceof RouteSet) {
+    const routes = typeof app?.routes === "function" ? app.routes() : app?.routes;
+    if (rbObjRespondTo(app, "routes") && routes instanceof RouteSet) {
       const session = this.constructor as typeof IntegrationTest;
       let klass = APP_SESSIONS.get(app);
       if (klass === undefined || Object.getPrototypeOf(klass) !== session) {
         klass = class extends session {};
         klass.prototype.constructor = session;
-        include(klass, app!.routes.urlHelpers());
-        include(klass, app!.routes.mountedHelpers());
+        include(klass, routes.urlHelpers());
+        include(klass, routes.mountedHelpers());
         APP_SESSIONS.set(app, klass);
       }
       Object.setPrototypeOf(this, klass.prototype);
@@ -485,7 +486,7 @@ export class IntegrationTest extends TestCase {
   async beforeSetup(): Promise<void> {
     this._app = undefined;
     await super.beforeSetup?.();
-    SetupAndTeardown.beforeSetup.call(this);
+    await SetupAndTeardown.beforeSetup.call(this);
   }
 
   /** @internal */

@@ -39,6 +39,7 @@ describe("NamedBase", () => {
       "post",
     ]);
     const g2 = generator("User");
+    expect(g2.redirectResourceName()).toBe("this.user");
     expect(g2.modelResourceName()).toBe("user");
     expect(g2.singularRouteName()).toBe("user");
     expect(g2.pluralRouteName()).toBe("users");
@@ -60,6 +61,7 @@ describe("NamedBase", () => {
     const g = generator("Admin::Foo", { modelName: "User" });
     expect(g.singularRouteName()).toBe("admin_user");
     expect(g.pluralRouteName()).toBe("admin_users");
+    expect(g.redirectResourceName()).toBe('["admin", this.user]');
     expect(g.modelResourceName()).toBe('["admin", user]');
     expect(g.indexHelper()).toBe("adminUsers");
   });

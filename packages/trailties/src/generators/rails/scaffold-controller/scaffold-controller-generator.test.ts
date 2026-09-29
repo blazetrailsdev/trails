@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { assertMatch, registerConstant, unregisterConstant } from "@blazetrails/activesupport";
+import {
+  assertMatch,
+  assertNoMatch,
+  registerConstant,
+  unregisterConstant,
+} from "@blazetrails/activesupport";
 import * as Assertions from "../../testing/assertions.js";
 import { ActiveModel } from "../../active-model.js";
 import { ScaffoldControllerGenerator } from "./scaffold-controller-generator.js";
@@ -59,19 +64,19 @@ describe("ScaffoldControllerGeneratorTest", () => {
         await assertInstanceMethod("create", content, (m) => {
           assertMatch(/this\.user = User\.new\(this\.userParams\(\)\)/, m);
           assertMatch(/this\.user\.save\(\)/, m);
-          assertMatch(/this\.redirectTo\(`\/users\/\$\{this\.user\.id\}`/, m);
+          assertMatch(/this\.redirectTo\(this\.user/, m);
         });
 
         await assertInstanceMethod("update", content, (m) => {
           assertMatch(/this\.user\.update\(this\.userParams\(\)\)/, m);
-          assertMatch(/this\.redirectTo\(`\/users\/\$\{this\.user\.id\}`/, m);
+          assertMatch(/this\.redirectTo\(this\.user/, m);
           assertMatch(/status: "see_other"/, m);
         });
 
         await assertInstanceMethod("destroy", content, (m) => {
           assertMatch(/this\.user\.destroy/, m);
           assertMatch(/User was successfully destroyed/, m);
-          assertMatch(/this\.redirectTo\("\/users"/, m);
+          assertMatch(/this\.redirectTo\(this\.usersPath\(\)/, m);
           assertMatch(/status: "see_other"/, m);
         });
 
@@ -127,6 +132,106 @@ describe("ScaffoldControllerGeneratorTest", () => {
     await runGenerator("User", [], { test: false });
     expect(fs.existsSync(path.join(tmpDir, "test/controllers/users-controller.test.ts"))).toBe(
       false,
+    );
+  });
+
+  it("functional tests", async () => {
+    await makeGen("User", [
+      "name:string",
+      "age:integer",
+      "organization:references{polymorphic}",
+    ]).run();
+
+    await Assertions.assertFile.call(
+      { destinationRoot: tmpDir },
+      "test/controllers/users-controller.test.ts",
+      (content) => {
+        assertMatch(/class UsersControllerTest extends IntegrationTest/, content);
+        assertMatch(/it\("should get index"/, content);
+        assertMatch(
+          /t\.post\(t\.usersUrl\(\), \{ params: \{ user: \{ age: t\["@user"\]\.age, name: t\["@user"\]\.name, organization_id: t\["@user"\]\.organization_id, organization_type: t\["@user"\]\.organization_type \} \} \}\)/,
+          content,
+        );
+        assertMatch(
+          /t\.patch\(t\.userUrl\(t\["@user"\]\), \{ params: \{ user: \{ age: t\["@user"\]\.age, name: t\["@user"\]\.name, organization_id: t\["@user"\]\.organization_id, organization_type: t\["@user"\]\.organization_type \} \} \}\)/,
+          content,
+        );
+      },
+    );
+  });
+
+  it("functional tests without attributes", async () => {
+    await makeGen("User").run();
+
+    await Assertions.assertFile.call(
+      { destinationRoot: tmpDir },
+      "test/controllers/users-controller.test.ts",
+      (content) => {
+        assertMatch(/class UsersControllerTest extends IntegrationTest/, content);
+        assertMatch(/it\("should get index"/, content);
+        assertMatch(/t\.post\(t\.usersUrl\(\), \{ params: \{ user: \{\} \} \}\)/, content);
+        assertMatch(
+          /t\.patch\(t\.userUrl\(t\["@user"\]\), \{ params: \{ user: \{\} \} \}\)/,
+          content,
+        );
+      },
+    );
+  });
+
+  it("model name option", async () => {
+    await makeGen("Admin::User", [], { modelName: "User" }).run();
+    await Assertions.assertFile.call(
+      { destinationRoot: tmpDir },
+      "app/controllers/admin/users-controller.ts",
+      async (content) => {
+        await assertInstanceMethod("index", content, (m) => {
+          assertMatch("this.users = await User.all()", m);
+        });
+
+        await assertInstanceMethod("create", content, (m) => {
+          assertMatch('this.redirectTo(["admin", this.user]', m);
+        });
+
+        await assertInstanceMethod("update", content, (m) => {
+          assertMatch('this.redirectTo(["admin", this.user]', m);
+        });
+      },
+    );
+
+    await Assertions.assertFile.call(
+      { destinationRoot: tmpDir },
+      "test/controllers/admin/users-controller.test.ts",
+      (content) => {
+        assertMatch("(t.adminUsersUrl()", content);
+        assertMatch("(t.newAdminUserUrl()", content);
+        assertMatch('(t.editAdminUserUrl(t["@user"])', content);
+        assertMatch('(t.adminUserUrl(t["@user"])', content);
+        assertNoMatch(/\bt\.(new|edit)?[uU]sers?(Path|Url)/, content);
+      },
+    );
+  });
+
+  it("api controller tests", async () => {
+    await makeGen("User", ["name:string", "age:integer", "organization:references{polymorphic}"], {
+      api: true,
+    }).run();
+
+    await Assertions.assertFile.call(
+      { destinationRoot: tmpDir },
+      "test/controllers/users-controller.test.ts",
+      (content) => {
+        assertMatch(/class UsersControllerTest extends IntegrationTest/, content);
+        assertMatch(/it\("should get index"/, content);
+        assertMatch(
+          /t\.post\(t\.usersUrl\(\), \{ params: \{ user: \{ age: t\["@user"\]\.age, name: t\["@user"\]\.name, organization_id: t\["@user"\]\.organization_id, organization_type: t\["@user"\]\.organization_type \} \}, as: "json" \}\)/,
+          content,
+        );
+        assertMatch(
+          /t\.patch\(t\.userUrl\(t\["@user"\]\), \{ params: \{ user: \{ age: t\["@user"\]\.age, name: t\["@user"\]\.name, organization_id: t\["@user"\]\.organization_id, organization_type: t\["@user"\]\.organization_type \} \}, as: "json" \}\)/,
+          content,
+        );
+        assertNoMatch(/assertRedirectedTo/, content);
+      },
     );
   });
 
@@ -199,7 +304,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
   it("api controller", async () => {
     await runGenerator("User", ["name:string"], { api: true });
     const c = read("app/controllers/users-controller.ts");
-    expect(c).toContain("this.render({ json: users })");
+    expect(c).toContain("this.render({ json: this.users })");
     expect(c).not.toContain("async new()");
     expect(c).not.toContain("async edit()");
     expect(c).toContain('this.params.expect({ user: ["name"] })');

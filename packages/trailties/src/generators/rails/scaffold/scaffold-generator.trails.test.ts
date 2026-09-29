@@ -32,8 +32,8 @@ describe("ScaffoldGenerator (namespaced)", () => {
     expect(controller).toContain('import { AdminAccount } from "../../models/admin/account.js";');
     for (const source of [model, controller, read("app/models/admin.ts")])
       expect(parseTs(source).diagnostics).toEqual([]);
-    expect(controller).toContain('this.redirectTo("/admin/accounts"');
-    expect(controller).toContain("this.redirectTo(`/admin/accounts/${this.admin_account.id}`");
+    expect(controller).toContain("this.redirectTo(this.adminAccountsPath(),");
+    expect(controller).toContain("this.redirectTo(this.admin_account,");
     expect(read("app/views/admin/accounts/index.html.tse")).toContain(
       'linkTo("New account", newAdminAccountPath())',
     );
