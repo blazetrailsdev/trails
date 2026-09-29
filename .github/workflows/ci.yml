@@ -85,6 +85,9 @@ jobs:
       # changed file feeds a rule's inputs rather than being linted itself —
       # see LINT_ALL_RE below.
       lint_files: ${{ steps.filter.outputs.lint_files }}
+      sqlite_runs_on: ${{ steps.self_hosted.outputs.sqlite_runs_on }}
+      sqlite_shards: ${{ steps.self_hosted.outputs.sqlite_shards }}
+      unit_runs_on: ${{ steps.self_hosted.outputs.unit_runs_on }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -333,6 +336,35 @@ jobs:
               echo "parity_mysql=false"    >> "$GITHUB_OUTPUT"
               ;;
           esac
+      - id: self_hosted
+        env:
+          GH_TOKEN: ${{ secrets.RUNNER_STATUS_TOKEN }}
+          SAME_REPO: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+          AR_AFFECTED: ${{ steps.filter.outputs.activerecord_affected }}
+        run: |
+          hosted='"ubuntu-latest"'
+          self_hosted='["self-hosted","debian","ARM64"]'
+          sqlite_runs_on=$hosted
+          sqlite_shards='[1, 2]'
+          unit_runs_on=$hosted
+          if [ "$SAME_REPO" = true ] && [ -n "$GH_TOKEN" ]; then
+            idle=$(gh api "repos/$GITHUB_REPOSITORY/actions/runners" \
+              --jq '[.runners[] | select(.status == "online" and (.busy | not) and ([.labels[].name] as $l | all("self-hosted", "debian", "ARM64"; IN($l[]))))] | length' \
+              2>/dev/null) || idle=0
+            if [[ "$idle" =~ ^[0-9]+$ ]] && [ "$idle" -gt 0 ]; then
+              if [ "$AR_AFFECTED" = true ]; then
+                sqlite_runs_on=$self_hosted
+                sqlite_shards='[1]'
+              else
+                unit_runs_on=$self_hosted
+              fi
+            fi
+          fi
+          {
+            echo "sqlite_runs_on=$sqlite_runs_on"
+            echo "sqlite_shards=$sqlite_shards"
+            echo "unit_runs_on=$unit_runs_on"
+          } >> "$GITHUB_OUTPUT"
 
   # `vars.RUNNER` is a single runner label (e.g. `self-hosted` or
   # `ubuntu-latest`). GitHub treats `runs-on:` as one literal label when given
@@ -750,7 +782,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.unit_tests_affected == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.changes.outputs.unit_runs_on) }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -967,9 +999,9 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.changes.outputs.sqlite_runs_on) }}
     timeout-minutes: 20
-    # 2-way file-level shard (RFC 0028 shard-ar-adapter-suites) — see the
+    # 2-way file-level shard on hosted (RFC 0028 shard-ar-adapter-suites) — see the
     # postgres-tests job below for the rationale. That story left this lane
     # unsharded as "not on the critical path"; sharding the other two made it
     # the critical path, so the exemption no longer holds. No service
@@ -978,7 +1010,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: ${{ fromJSON(needs.changes.outputs.sqlite_shards) }}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
@@ -1009,7 +1041,7 @@ jobs:
       # double-run across the two legs.
       - if: ${{ matrix.shard == 1 }}
         run: pnpm vitest run scripts/test-deps scripts/parity/pipeline/query/node scripts/mixin-declaration-drift.test.ts
-      - run: pnpm vitest run packages/activerecord/ --shard=${{ matrix.shard }}/2
+      - run: pnpm vitest run packages/activerecord/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
       # CLI E2E is not sharded — run it once, on shard 1 only.
       - if: ${{ matrix.shard == 1 }}
         run: pnpm vitest run packages/activerecord-cli
