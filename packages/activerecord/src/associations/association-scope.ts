@@ -1,7 +1,12 @@
 import { Table as ArelTable, Nodes } from "@blazetrails/arel";
 import { TableMetadata } from "../table-metadata.js";
 import type { Base } from "../base.js";
-import type { AssociationReflection, AbstractReflection } from "../reflection.js";
+import type {
+  AssociationReflection,
+  AbstractReflection,
+  PolymorphicReflection,
+  ThroughReflection,
+} from "../reflection.js";
 import { RuntimeReflection } from "../reflection.js";
 import { AliasTracker } from "./alias-tracker.js";
 import { WhereClause } from "../relation/where-clause.js";
@@ -19,19 +24,9 @@ export interface AssociationScopeable {
   readonly klass: typeof Base;
 }
 
-type ChainReflection = {
-  joinPrimaryKey(): string | string[];
-  joinForeignKey: string | string[];
-  aliasedTable: ArelTable | Nodes.TableAlias;
-  klass: typeof Base;
-  type?: string | null;
-};
-
-type AliasedScope = { where(predicate: unknown): AliasedScope };
-
-type ScopeBuilder = {
-  buildScope(table?: unknown, predicateBuilder?: unknown, klass?: typeof Base): AliasedScope;
-};
+type ChainReflection =
+  | RuntimeReflection
+  | (ReflectionProxy & (AssociationReflection | ThroughReflection | PolymorphicReflection));
 
 export class ReflectionProxy {
   readonly aliasedTable: ArelTable | Nodes.TableAlias;
@@ -121,7 +116,7 @@ export class AssociationScope {
 
   private applyScope(
     scope: unknown,
-    table: ArelTable | Nodes.TableAlias | null,
+    table: ArelTable | Nodes.TableAlias,
     key: string,
     value: unknown,
   ): unknown {
@@ -129,7 +124,7 @@ export class AssociationScope {
       where: (c: Record<string, unknown> | unknown) => unknown;
       table?: ArelTable;
     };
-    if (table && w.table && !arelTableEql(w.table, table)) {
+    if (w.table && !arelTableEql(w.table, table)) {
       const meta = new TableMetadata(null, table as unknown as ArelTable);
       const nodes = meta.predicateBuilder.buildFromHash({ [key]: value });
       let result: unknown = scope;
@@ -170,10 +165,8 @@ export class AssociationScope {
     const name = reflection.name;
     const chain: Array<AbstractReflection> = [new RuntimeReflection(reflection, association)];
     for (const refl of drop(reflection.chain, 1)) {
-      const aliasedTable = tracker.aliasedTableFor(
-        (refl as unknown as ChainReflection).klass.arelTable,
-        null,
-        () => (refl as unknown as { aliasCandidate(name: string): string }).aliasCandidate(name),
+      const aliasedTable = tracker.aliasedTableFor(refl.klass.arelTable, null, () =>
+        refl.aliasCandidate(name),
       );
       chain.push(new ReflectionProxy(refl, aliasedTable) as ReflectionProxy & typeof refl);
     }
@@ -312,9 +305,7 @@ export class AssociationScope {
     scope: (...args: unknown[]) => unknown,
     owner: Base,
   ): unknown {
-    const relation = (reflection as unknown as ScopeBuilder).buildScope(
-      (reflection as Partial<ReflectionProxy>).aliasedTable,
-    );
+    const relation = reflection.buildScope((reflection as ChainReflection).aliasedTable);
     return scope.call(relation, owner) || relation;
   }
 

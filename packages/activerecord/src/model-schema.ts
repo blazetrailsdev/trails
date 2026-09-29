@@ -850,7 +850,12 @@ export function isSchemaLoaded(this: SchemaHost): boolean {
 export function typeForColumn(this: SchemaHost, connection: any, column: any): any {
   let type = connection.lookupCastTypeFromColumn(column);
 
-  if ((this as any).immutableStringsByDefault && rbObjRespondTo(type, "toImmutableString")) {
+  const immutableStringsByDefault = (this as unknown as typeof Base).immutableStringsByDefault;
+  if (
+    immutableStringsByDefault != null &&
+    immutableStringsByDefault !== false &&
+    rbObjRespondTo(type, "toImmutableString")
+  ) {
     type = type.toImmutableString();
   }
 

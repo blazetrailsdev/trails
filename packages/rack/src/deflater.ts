@@ -140,16 +140,18 @@ export class GzipStream {
           if (this.sync) await gzip.flush();
         }
       } else {
-        const visit = async (part: string) => {
+        let flushed: Promise<void> | undefined;
+        const block = (part: string): Promise<void> | undefined => {
           if (part.length === 0) return;
           gzip.write(Buffer.from(String(part), "binary"));
-          if (this.sync) await gzip.flush();
+          if (this.sync) return (flushed = gzip.flush());
         };
         if (Symbol.asyncIterator in this.body || Symbol.iterator in this.body) {
-          for await (const part of this.body) await visit(part);
+          for await (const part of this.body) await block(part);
         } else {
-          await this.body.each(visit);
+          await this.body.each(block);
         }
+        await flushed;
       }
     } finally {
       await gzip.finish();

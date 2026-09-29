@@ -309,6 +309,8 @@ export class Base extends Metal {
 
   declare static helpersPath: string[];
   declare static isHelpersPath: boolean;
+  declare static includeAllHelpers: boolean;
+  declare static isIncludeAllHelpers: boolean;
 
   static {
     classAttribute.call(this, "helpersPath", { default: [] });
@@ -317,8 +319,6 @@ export class Base extends Metal {
   declare static _helpers?: HelperMethodsModule;
   declare static _helperMethods?: string[];
   static helperMethod = helperMethod;
-
-  declare static includeAllHelpers: boolean;
 
   constructor(...args: unknown[]) {
     super(...(args as []));
