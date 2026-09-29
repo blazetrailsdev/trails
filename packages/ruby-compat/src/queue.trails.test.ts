@@ -64,6 +64,16 @@ describe("Thread::SizedQueue", () => {
     expect(await q.pop()).toBe(3);
   });
 
+  it("pop(true) finds the object of a pusher it woke", () => {
+    const q = new SizedQueue<number>(1);
+    void q.push(1);
+    void q.push(2);
+    expect(q.length).toBe(1);
+    expect(q.pop(true)).toBe(1);
+    expect(q.pop(true)).toBe(2);
+    expect(() => q.pop(true)).toThrow(ThreadError);
+  });
+
   it("a push arriving after sleeping pushers are woken does not overtake them", async () => {
     const q = new SizedQueue<number>(1);
     void q.push(1);

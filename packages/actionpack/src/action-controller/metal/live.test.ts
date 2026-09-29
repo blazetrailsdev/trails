@@ -142,7 +142,7 @@ describe("ActionController::Live::Buffer", () => {
     expect(await read).toEqual(["one", "two"]);
   });
 
-  it("buildQueue honours queueSize: a full queue holds later writes until a chunk is read", async () => {
+  it("buildQueue honours queueSize: a full queue holds later writes until a chunk is read", () => {
     class SmallBuffer extends Buffer {
       static override queueSize: number | null = 1;
     }
@@ -152,9 +152,9 @@ describe("ActionController::Live::Buffer", () => {
     expect(queue.max).toBe(1);
     buf.write("one");
     buf.write("two");
+    expect(queue.length).toBe(1);
     expect(queue.pop(true)).toBe("one");
-    expect(() => queue.pop(true)).toThrow(ThreadError);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(queue.length).toBe(1);
     expect(queue.pop(true)).toBe("two");
   });
 
@@ -170,8 +170,20 @@ describe("ActionController::Live::Buffer", () => {
     const reader = buf[Symbol.asyncIterator]();
     expect((await reader.next()).value).toBe("one");
     await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(queue.length).toBe(1);
     expect(queue.pop(true)).toBe("two");
-    expect(() => queue.pop(true)).toThrow(ThreadError);
+  });
+
+  it("a sync read of a closed live buffer reads every chunk, including writes held by a full queue", () => {
+    class SmallBuffer extends Buffer {
+      static override queueSize: number | null = 2;
+    }
+    const buf = new SmallBuffer(makeResponse());
+    buf.write("one");
+    buf.write("two");
+    buf.write("three");
+    buf.close();
+    expect([...buf.each()]).toEqual(["one", "two", "three"]);
   });
 
   it("a sync read of a live buffer raises rather than blocking before close", () => {

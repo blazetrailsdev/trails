@@ -6,7 +6,6 @@ interface QueueData<T> {
   waitq: Array<() => void>;
   max: number;
   pushq: Array<() => void>;
-  numWaitingPush: number;
 }
 
 const QUEUE_DATA = new WeakMap<object, QueueData<unknown>>();
@@ -52,7 +51,7 @@ function queueDoPop<T>(q: QueueData<T>, shouldBlock: boolean): T | Promise<T> {
  * blocked in `pop` sleeps until a `push` wakes it; here `pop` is a promise that
  * the waking `push` resolves. Only the members trails calls are ported
  * (`packages/ruby-compat/README.md` rule 1): there is no `close`, `closed?`,
- * `empty?`, `length`, `num_waiting` or `SizedQueue#max=`, so no queue is ever
+ * `empty?`, `num_waiting` or `SizedQueue#max=`, so no queue is ever
  * closed and `push` never raises `ClosedQueueError`.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Thread::Queue`
@@ -60,7 +59,7 @@ function queueDoPop<T>(q: QueueData<T>, shouldBlock: boolean): T | Promise<T> {
  */
 export class Queue<T = unknown> {
   constructor() {
-    QUEUE_DATA.set(this, { que: [], waitq: [], max: Infinity, pushq: [], numWaitingPush: 0 });
+    QUEUE_DATA.set(this, { que: [], waitq: [], max: Infinity, pushq: [] });
   }
 
   /**
@@ -88,6 +87,17 @@ export class Queue<T = unknown> {
   pop(nonBlock: boolean = false): T | Promise<T> {
     const retval = queueDoPop(queuePtr<T>(this), !nonBlock);
     return nonBlock ? retval : Promise.resolve(retval);
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/thread_sync.c:1205` `rb_queue_length`, also `SizedQueue#length`
+   * (`:1428`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread::Queue#length`
+   * (`vendor/ruby/v3.3.11/thread_sync.c:1205`).
+   */
+  get length(): number {
+    return queuePtr<T>(this).que.length;
   }
 
   /**
@@ -138,33 +148,31 @@ export class SizedQueue<T = unknown> extends Queue<T> {
   /**
    * `vendor/ruby/v3.3.11/thread_sync.c:1338` `rb_szqueue_push`: while the queue
    * holds `max` objects the pusher sleeps on the push queue until a `pop` wakes
-   * it. A Ruby pusher blocks its own thread, so its next push cannot overtake
-   * it; a JS caller may leave the promise pending and push again, so a push
-   * also waits while `num_waiting_push` is nonzero, and a pusher that leaves
-   * room wakes the next, keeping arrival order.
+   * it, and the woken pusher then enqueues its object. A Ruby pusher runs as
+   * soon as it is woken and blocks its own thread, so its next push cannot
+   * overtake it. A JS caller may leave the promise pending and push again, and
+   * a woken promise resumes only on a later microtask, so here the object waits
+   * on the push queue with its pusher and the wakeup enqueues it; a push also
+   * waits while any pusher is asleep (`num_waiting_push`), keeping arrival
+   * order.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Thread::SizedQueue#push`
    * (`vendor/ruby/v3.3.11/thread_sync.c:1338`).
    */
-  override async push(object: T): Promise<this> {
+  override push(object: T): Promise<this> {
     const sq = queuePtr<T>(this);
 
-    if (sq.que.length >= sq.max || sq.numWaitingPush > 0) {
-      sq.numWaitingPush++;
-      try {
-        do {
-          await queueSleep(sq.pushq);
-        } while (sq.que.length >= sq.max);
-      } finally {
-        sq.numWaitingPush--;
-      }
+    if (sq.que.length >= sq.max || sq.pushq.length > 0) {
+      return new Promise<this>((resolve) => {
+        sq.pushq.push(() => {
+          queueDoPush(this, sq, object);
+          resolve(this);
+        });
+      });
     }
 
     queueDoPush(this, sq, object);
-    if (sq.que.length < sq.max) {
-      wakeupOne(sq.pushq);
-    }
-    return this;
+    return Promise.resolve(this);
   }
 
   /**
@@ -181,7 +189,8 @@ export class SizedQueue<T = unknown> extends Queue<T> {
 
   /**
    * `vendor/ruby/v3.3.11/thread_sync.c:1409` `rb_szqueue_clear`, which wakes every
-   * sleeping pusher.
+   * sleeping pusher; each woken pusher whose object no longer fits sleeps again,
+   * so only as many as fit are woken here.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Thread::SizedQueue#clear`
    * (`vendor/ruby/v3.3.11/thread_sync.c:1409`).
@@ -189,7 +198,9 @@ export class SizedQueue<T = unknown> extends Queue<T> {
   override clear(): this {
     const sq = queuePtr<T>(this);
     sq.que.length = 0;
-    while (sq.pushq.length > 0) wakeupOne(sq.pushq);
+    while (sq.pushq.length > 0 && sq.que.length < sq.max) {
+      wakeupOne(sq.pushq);
+    }
     return this;
   }
 }
