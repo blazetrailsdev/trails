@@ -57,7 +57,7 @@ describe("ActionController::Railtie action_controller.request_forgery_protection
     resetLoadHooks();
   });
 
-  function postWithoutToken(controller: ActionController.Base): Promise<void> {
+  function postWithoutToken(controller: ActionController.Base): Promise<unknown> {
     const request = new Request({
       REQUEST_METHOD: "POST",
       PATH_INFO: "/posts",
