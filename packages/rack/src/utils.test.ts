@@ -365,8 +365,28 @@ it("return status code for symbol", () => {
 });
 
 it("return status code and give deprecation warning for obsolete symbols", () => {
-  expect(Utils.statusCode("payload_too_large" as any)).toBe(413);
-  expect(Utils.statusCode("unprocessable_entity" as any)).toBe(422);
+  const replacedStatuses = {
+    payload_too_large: { statusCode: 413, standardSymbol: "content_too_large" },
+    unprocessable_entity: { statusCode: 422, standardSymbol: "unprocessable_content" },
+  };
+  const droppedStatuses = { bandwidth_limit_exceeded: 509, not_extended: 510 };
+
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    for (const [symbol, valueHash] of Object.entries(replacedStatuses)) {
+      expect(Utils.statusCode(symbol)).toBe(valueHash.statusCode);
+      expect(warn).not.toHaveBeenCalled();
+    }
+
+    for (const [symbol, code] of Object.entries(droppedStatuses)) {
+      expect(Utils.statusCode(symbol)).toBe(code);
+      expect(warn).toHaveBeenLastCalledWith(
+        `Status code :${symbol} is deprecated and will be removed in a future version of Rack.`,
+      );
+    }
+  } finally {
+    warn.mockRestore();
+  }
 });
 
 it("raise an error for an invalid symbol", () => {

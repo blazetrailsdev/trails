@@ -449,19 +449,15 @@ export function statusCode(status: number | string | symbol): number {
   const s = String(status);
   const num = parseInt(s, 10);
   if (!isNaN(num) && String(num) === s) return num;
-  const code = Object.hasOwn(SYMBOL_TO_STATUS_CODE, s) ? SYMBOL_TO_STATUS_CODE[s] : undefined;
-  if (code !== undefined) return code;
-  const obsolete = Object.hasOwn(OBSOLETE_SYMBOLS_TO_STATUS_CODES, s)
-    ? OBSOLETE_SYMBOLS_TO_STATUS_CODES[s]
-    : undefined;
-  if (obsolete !== undefined) {
-    let msg = `Status code ${JSON.stringify(s)} is deprecated and will be removed in a future version of Rack.`;
-    const mapping = OBSOLETE_SYMBOL_MAPPINGS[s];
-    if (mapping) msg += ` Please use ${JSON.stringify(mapping)} instead.`;
-    console.warn(msg);
-    return obsolete;
+  if (Object.hasOwn(SYMBOL_TO_STATUS_CODE, s)) return SYMBOL_TO_STATUS_CODE[s];
+  if (!Object.hasOwn(OBSOLETE_SYMBOLS_TO_STATUS_CODES, s)) {
+    throw new ArgumentError(`Unrecognized status code ${rbInspect(`:${s}`)}`);
   }
-  throw new ArgumentError(`Unrecognized status code :${s}`);
+  const fallbackCode = OBSOLETE_SYMBOLS_TO_STATUS_CODES[s];
+  const message = `Status code ${rbInspect(`:${s}`)} is deprecated and will be removed in a future version of Rack.`;
+  const canonicalSymbol = OBSOLETE_SYMBOL_MAPPINGS[s];
+  if (canonicalSymbol === undefined) console.warn(message);
+  return fallbackCode;
 }
 
 export const HTTP_STATUS_CODES: Record<number, string> = {
