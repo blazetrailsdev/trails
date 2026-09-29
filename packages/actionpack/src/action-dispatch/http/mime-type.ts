@@ -1,5 +1,5 @@
 import { registerDefaultMimeTypes } from "./mime-types.js";
-import { aryDelete, isSymbol, KeyError, symbolToS } from "@blazetrails/ruby-compat";
+import { aryDelete, isSymbol, KeyError, stringToSym, symbolToS } from "@blazetrails/ruby-compat";
 
 export class Mimes {
   /** @internal */
@@ -189,9 +189,20 @@ export class MimeType {
     return this.symbol === ":html" || this.string.includes("html");
   }
 
-  equals(other: MimeType | string): boolean {
-    if (other instanceof MimeType) return this.string === other.string;
-    return this.string === other || this.symbol === other;
+  equals(mimeType: MimeType | string | null | undefined): boolean {
+    if (mimeType == null) return false;
+    const mimeTypeToS =
+      mimeType instanceof MimeType
+        ? mimeType.toString()
+        : isSymbol(mimeType)
+          ? symbolToS(mimeType)
+          : mimeType;
+    const mimeTypeToSym = mimeType instanceof MimeType ? mimeType.toSym() : stringToSym(mimeType);
+    return [...this.synonyms, this].some((synonym) =>
+      synonym instanceof MimeType
+        ? synonym.toString() === mimeTypeToS || synonym.toSym() === mimeTypeToSym
+        : synonym === mimeTypeToS || stringToSym(synonym) === mimeTypeToSym,
+    );
   }
 
   static register(

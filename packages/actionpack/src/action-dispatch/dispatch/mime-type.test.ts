@@ -149,16 +149,15 @@ describe("MimeTypeTest", () => {
   it("register alias", () => {
     try {
       MimeType.registerAlias("application/xhtml+xml", ":foobar");
-      expect(EXTENSION_LOOKUP.get("foobar")?.toString()).toBe(Mime.get(":html")!.synonyms[0]);
+      expect(Mime.get(":html")!.equals(EXTENSION_LOOKUP.get("foobar"))).toBe(true);
     } finally {
       MimeType.unregister(":foobar");
     }
   });
 
   it("type should be equal to symbol", () => {
-    const html = Mime.get(":html");
-    expect(html).toBeDefined();
-    expect(html?.equals(":html")).toBe(true);
+    expect(Mime.get(":html")!.equals("application/xhtml+xml")).toBe(true);
+    expect(Mime.get(":html")!.equals(":html")).toBe(true);
   });
 
   it("type convenience methods", () => {
