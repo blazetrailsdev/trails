@@ -23,12 +23,10 @@ describe("Template::Handlers.extended", () => {
   });
 
   it("renders a .html template through the Html handler", () => {
-    expect(buildView().render({ template: "test/greeting" }).toString()).toBe("<p>Hello</p>");
+    expect(String(buildView().render({ template: "test/greeting" }))).toBe("<p>Hello</p>");
   });
 
   it("renders a .ruby template's source verbatim as code", () => {
-    expect(buildView().render({ template: "ruby_template" }).toString()).toBe(
-      "Hello from Ruby code",
-    );
+    expect(String(buildView().render({ template: "ruby_template" }))).toBe("Hello from Ruby code");
   });
 });

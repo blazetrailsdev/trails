@@ -3,7 +3,6 @@ import {
   h,
   htmlEscape,
   htmlEscapeOnce,
-  htmlSafe,
   InheritableOptions,
   initializeIncludedModules,
   jsonEscape,
@@ -295,20 +294,18 @@ export class Base {
     options: RenderOptions | string | object = {},
     locals: Record<string, unknown> = {},
     block?: () => unknown,
-  ): SafeBuffer | Promise<SafeBuffer> {
+  ): string | SafeBuffer | null | Promise<string | SafeBuffer | null> {
     if ((options as object | null)?.constructor === Object) {
       const hash = options as RenderOptions;
       return this.inRenderingContext(hash, () => {
         if (block) {
-          return renderedBody(
-            this.viewRenderer.renderPartial(
-              this,
-              { ...hash, partial: hash.layout as RenderOptions["partial"] },
-              block,
-            ),
+          return this.viewRenderer.renderPartial(
+            this,
+            { ...hash, partial: hash.layout as RenderOptions["partial"] },
+            block,
           );
         } else {
-          return renderedBody(this.viewRenderer.render(this, hash));
+          return this.viewRenderer.render(this, hash);
         }
       });
     } else {
@@ -318,12 +315,10 @@ export class Base {
           block,
         );
       } else {
-        return renderedBody(
-          this.viewRenderer.renderPartial(
-            this,
-            { partial: options as RenderOptions["partial"], locals },
-            block,
-          ),
+        return this.viewRenderer.renderPartial(
+          this,
+          { partial: options as RenderOptions["partial"], locals },
+          block,
         );
       }
     }
@@ -357,16 +352,6 @@ export class Base {
     restore();
     return result;
   }
-}
-
-/** @noRailsEquivalent CONVERGEABLE template-render-returns-output-buffer-to-s */
-function renderedBody(
-  body: string | SafeBuffer | null | Promise<string | SafeBuffer | null>,
-): SafeBuffer | Promise<SafeBuffer> {
-  if (typeof (body as Promise<string | SafeBuffer | null> | null)?.then === "function") {
-    return (body as Promise<string | SafeBuffer | null>).then((b) => htmlSafe(String(b ?? "")));
-  }
-  return htmlSafe(String(body ?? ""));
 }
 
 const TseUtil = { h, htmlEscape, htmlEscapeOnce, jsonEscape, xmlNameEscape };

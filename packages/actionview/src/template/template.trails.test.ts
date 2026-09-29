@@ -45,7 +45,7 @@ describe("Template#encode!", () => {
     });
 
   const render = (template: Template): string =>
-    template.render(new (Base.withEmptyTemplateCache())(null, {}, null), {}, null, {});
+    String(template.render(new (Base.withEmptyTemplateCache())(null, {}, null), {}, null, {}));
 
   it("passes a String source to the handler untouched", () => {
     expect(render(newTemplate("hello \u{fc}mlat"))).toBe("hello \u{fc}mlat");

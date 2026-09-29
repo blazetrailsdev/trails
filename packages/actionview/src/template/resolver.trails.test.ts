@@ -54,9 +54,11 @@ describe("FileSystemResolver", () => {
     const ctx = new LookupContext(null, {}, []);
     ctx.appendViewPaths([new FileSystemResolver(dir)]);
     const render = (name: string) =>
-      (ctx.findTemplate(name, ["posts"]) as Template).render(
-        new (Base.withEmptyTemplateCache())(null, {}, null),
-        {},
+      String(
+        (ctx.findTemplate(name, ["posts"]) as Template).render(
+          new (Base.withEmptyTemplateCache())(null, {}, null),
+          {},
+        ),
       );
 
     expect(render("utf8")).toBe("hello \u{fc}mlat");

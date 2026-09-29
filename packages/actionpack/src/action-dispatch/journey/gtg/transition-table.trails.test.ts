@@ -99,7 +99,9 @@ describe("ActionDispatch::Journey::GTG::TransitionTable — toJSON structure", (
 
 describe("ActionDispatch::Journey::GTG::TransitionTable — visualizer", () => {
   it("renders index.html.tse with the fsm.css and fsm.js shipped beside it", () => {
-    const html = tt(["/articles(.:format)"]).visualizer(asts(["/articles(.:format)"]), "FSM");
+    const html = String(
+      tt(["/articles(.:format)"]).visualizer(asts(["/articles(.:format)"]), "FSM"),
+    );
     expect(html.startsWith("<!DOCTYPE html>")).toBe(true);
     expect(html).toContain("<title>FSM</title>");
     expect(html).toContain('font-family: "Helvetica Neue"');

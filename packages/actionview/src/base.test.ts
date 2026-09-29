@@ -9,7 +9,9 @@ import { Template } from "./template.js";
 import { FixtureResolver } from "./testing/resolvers.js";
 
 const renderTse = (source: string, locals: Record<string, unknown>, view: Base): string =>
-  new Template(source, "t", new Tse(), { locals: [], format: ":html" }).render(view, locals);
+  String(
+    new Template(source, "t", new Tse(), { locals: [], format: ":html" }).render(view, locals),
+  );
 
 describe("ActionView::Base", () => {
   it("prepares the context with an output buffer, a view flow and no virtual path", () => {
@@ -339,35 +341,35 @@ describe("ActionView::Base#render", () => {
   };
 
   it("renders a template through the template: option", () => {
-    expect(buildView().render({ template: "test/hello_world" }).toString()).toBe("Hello world!");
+    expect(String(buildView().render({ template: "test/hello_world" }))).toBe("Hello world!");
   });
 
   it("renders a partial through the partial: option", () => {
-    expect(buildView().render({ partial: "test/partial_only" }).toString()).toBe("only partial");
+    expect(String(buildView().render({ partial: "test/partial_only" }))).toBe("only partial");
   });
 
   it("treats a non-Hash options as a partial name", () => {
-    expect(buildView().render("test/partial_only").toString()).toBe("only partial");
+    expect(String(buildView().render("test/partial_only"))).toBe("only partial");
   });
 
   it("renders the layout: option around the block's content", () => {
     const view = buildView();
-    expect(view.render({ layout: "test/layout" }, {}, () => "inside").toString()).toBe(
+    expect(String(view.render({ layout: "test/layout" }, {}, () => "inside"))).toBe(
       "<div>inside</div>",
     );
   });
 
   it("renders the plain:, html:, body: and renderable: options", () => {
     const view = buildView();
-    expect(view.render({ body: "b" }).toString()).toBe("b");
-    expect(view.render({ plain: "p" }).toString()).toBe("p");
-    expect(view.render({ html: "<p>hello world</p>" }).toString()).toBe(
+    expect(String(view.render({ body: "b" }))).toBe("b");
+    expect(String(view.render({ plain: "p" }))).toBe("p");
+    expect(String(view.render({ html: "<p>hello world</p>" }))).toBe(
       "&lt;p&gt;hello world&lt;/p&gt;",
     );
-    expect(view.render({ html: htmlSafe("<p>hello world</p>") }).toString()).toBe(
+    expect(String(view.render({ html: htmlSafe("<p>hello world</p>") }))).toBe(
       "<p>hello world</p>",
     );
-    expect(view.render({ renderable: { renderIn: () => "r" } }).toString()).toBe("r");
+    expect(String(view.render({ renderable: { renderIn: () => "r" } }))).toBe("r");
   });
 
   it("raises when given none of the render options", () => {
@@ -378,22 +380,18 @@ describe("ActionView::Base#render", () => {
   });
 
   it("renders through the formats-prepended lookup context in_rendering_context built", () => {
-    expect(
-      buildView()
-        .render({ template: "test/hello_world", formats: [":json"] })
-        .toString(),
-    ).toBe('{"hello":"world"}');
+    expect(String(buildView().render({ template: "test/hello_world", formats: [":json"] }))).toBe(
+      '{"hello":"world"}',
+    );
   });
 
   it("render inline", () => {
-    expect(buildView().render({ inline: "Hello, World!" }).toString()).toBe("Hello, World!");
+    expect(String(buildView().render({ inline: "Hello, World!" }))).toBe("Hello, World!");
   });
 
   it("render inline with locals", () => {
     expect(
-      buildView()
-        .render({ inline: "Hello, <%= name %>!", locals: { name: "Josh" } })
-        .toString(),
+      String(buildView().render({ inline: "Hello, <%= name %>!", locals: { name: "Josh" } })),
     ).toBe("Hello, Josh!");
   });
 
