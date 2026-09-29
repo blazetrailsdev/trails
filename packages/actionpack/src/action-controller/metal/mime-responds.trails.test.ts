@@ -174,7 +174,7 @@ describe("Collector#response", () => {
 
   it("calls the variant block for the inline variant syntax", () => {
     const rendered: string[] = [];
-    controller("phone").respondTo((format) => {
+    controller(":phone").respondTo((format) => {
       (format.html() as Variants).none(() => rendered.push("none"));
       (format.html() as Variants).phone(() => rendered.push("phone"));
     });
@@ -194,9 +194,9 @@ describe("Collector#response", () => {
 
   it("yields a variant collector to a format block that takes one", () => {
     const rendered: string[] = [];
-    controller("tablet").respondTo((format) => {
+    controller(":tablet").respondTo((format) => {
       format.html((variant: VariantCollector) => {
-        variant.any("tablet", "phablet", () => rendered.push("any"));
+        variant.any(":tablet", ":phablet", () => rendered.push("any"));
         (variant as Variants).phone(() => rendered.push("phone"));
       });
     });
@@ -206,7 +206,7 @@ describe("Collector#response", () => {
 
   it("falls back to the any variant for an unmatched variant", () => {
     const rendered: string[] = [];
-    controller("yolo").respondTo((format) => {
+    controller(":yolo").respondTo((format) => {
       format.html((variant: VariantCollector) => {
         variant.any(() => rendered.push("any"));
         (variant as Variants).phone(() => rendered.push("phone"));
@@ -218,7 +218,7 @@ describe("Collector#response", () => {
 
   it("reuses the catch-all variant collector across blockless any calls", () => {
     const rendered: string[] = [];
-    controller("phone").respondTo((format) => {
+    controller(":phone").respondTo((format) => {
       (format.any() as Variants).phone(() => rendered.push("phone"));
       (format.any() as Variants).tablet(() => rendered.push("tablet"));
     });
