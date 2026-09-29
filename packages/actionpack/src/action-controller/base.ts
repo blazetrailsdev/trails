@@ -312,10 +312,6 @@ export class Base extends Metal {
   declare static includeAllHelpers: boolean;
   declare static isIncludeAllHelpers: boolean;
 
-  static {
-    classAttribute.call(this, "helpersPath", { default: [] });
-  }
-
   declare static _helpers?: HelperMethodsModule;
   declare static _helperMethods?: string[];
   static helperMethod = helperMethod;
@@ -955,6 +951,7 @@ if (_Configurable.performCaching == null) _Configurable.performCaching = true;
 
 mattrAccessor.call(Base, "raiseOnOpenRedirects", { default: false });
 
+classAttribute.call(Base, "helpersPath", { default: [] });
 classAttribute.call(Base, "includeAllHelpers", { default: true });
 
 _Configurable.configAccessor("requestForgeryProtectionToken");
