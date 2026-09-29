@@ -2159,7 +2159,6 @@ export class Base extends Model {
   }
 
   declare equals: (other: unknown) => boolean;
-  declare initWith: (coder: Record<string, unknown>) => void;
   declare encodeWith: (coder: Record<string, unknown>) => void;
 
   declare eql: (other: unknown) => boolean;

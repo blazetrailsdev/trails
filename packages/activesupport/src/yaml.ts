@@ -168,9 +168,8 @@ class ToRuby {
   }
 
   private visitMapping(o: import("yaml").YAMLMap): unknown {
-    const tag = o.tag;
-    if (tag?.startsWith("!ruby/object:")) {
-      const klass = this.resolveClass(tag.slice("!ruby/object:".length));
+    if (o.tag?.startsWith("!ruby/object:")) {
+      const klass = this.resolveClass(o.tag.slice("!ruby/object:".length));
       return this.revive(klass, o);
     }
     return this.reviveHash(this.register(o, {}) as Record<string, unknown>, o);

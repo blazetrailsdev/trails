@@ -523,7 +523,7 @@ function categorize(relPath: string, describeName: string, testName: string): An
     if (p === "binary.test.ts") {
       return {
         blocked: "serialization — Ruby encoding / YAML round-trip, no Node.js equivalent",
-        rootCause: "Node.js has no Encoding::ASCII_8BIT",
+        rootCause: "Node.js has no Encoding::ASCII_8BIT or Ruby Marshal/YAML object round-trip",
         scope: "~0 LOC fix; permanent skip-list.ts candidate",
       };
     }
