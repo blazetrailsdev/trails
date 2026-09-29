@@ -18,11 +18,7 @@ import {
 } from "./errors.js";
 import { CollectionAssociation, isThenable } from "./collection-association.js";
 import type { Association } from "./association.js";
-import {
-  ForeignAssociation,
-  foreignKeyPresent,
-  ownerForeignKeyColumns,
-} from "./foreign-association.js";
+import { ForeignAssociation, foreignKeyPresent } from "./foreign-association.js";
 import { compositeQueryConstraintsList, queryConstraintsList } from "../persistence.js";
 import { eachSlice, min, selectBang, underscore } from "@blazetrails/activesupport";
 
@@ -391,12 +387,10 @@ export function scope(
 
   const targetModel = record.association(assocName).klass;
 
-  const foreignKeyColumns = ownerForeignKeyColumns(ctor, assocName, options);
-  const foreignKey: string | string[] =
-    foreignKeyColumns.length === 1 ? foreignKeyColumns[0] : foreignKeyColumns;
-
   const reflection = ctor._reflectOnAssociation?.(assocName);
   if (options.through && !reflection) return null;
+
+  const foreignKey: string | string[] = reflection!.foreignKey();
 
   const reflForOwnerFk = _ownerChainReflection(reflection);
   const fkCheckPks = reflForOwnerFk

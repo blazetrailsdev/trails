@@ -5,7 +5,6 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { Association } from "./association.js";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { Associations } from "../namespaces.js";
-import { ownerForeignKeyColumns } from "./foreign-association.js";
 import { NotImplementedError, RecordNotFound, RecordNotSaved, Rollback } from "../errors.js";
 import { CollectionIdsAssignmentError, CollectionPersistedAssignmentError } from "./errors.js";
 
@@ -601,11 +600,8 @@ export abstract class CollectionAssociation extends Association {
   }
 
   private foreignKeyColumns(): string[] {
-    return ownerForeignKeyColumns(
-      this.owner.constructor as typeof Base,
-      this.reflection.name,
-      this.reflection.options as Parameters<typeof ownerForeignKeyColumns>[2],
-    );
+    const foreignKey = this.reflection.foreignKey();
+    return Array.isArray(foreignKey) ? foreignKey : [foreignKey];
   }
 
   private foreignKeyColumn(): string {
