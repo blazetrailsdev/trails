@@ -16,13 +16,6 @@ import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
-/** @noRailsEquivalent PERMANENT */
-export interface Logger {
-  error(message: string): void;
-  warn?(message: string): void;
-  info?(message: string): void;
-}
-
 export interface DebugExceptionsOptions {
   showDetailedExceptions?: boolean;
   showExceptions?: boolean;
@@ -158,7 +151,7 @@ export class DebugExceptions {
   }
 
   /** @internal */
-  stderrLogger(): ActiveSupportLogger | null {
+  stderrLogger(): ActiveSupportLogger {
     return (this._stderrLogger ??= new ActiveSupportLogger(stderr));
   }
 

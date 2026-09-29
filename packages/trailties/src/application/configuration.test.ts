@@ -204,4 +204,17 @@ describe("ConfigurationTest", () => {
 
     expect(Resolver.isCaching()).toBe(true);
   });
+
+  it("action_dispatch.log_rescued_responses is true by default", async () => {
+    const application = await app("development");
+
+    expect(application.envConfig()["action_dispatch.log_rescued_responses"]).toBe(true);
+  });
+
+  it("action_dispatch.log_rescued_responses can be configured", async () => {
+    const application = await app("development");
+    application.config.actionDispatch.logRescuedResponses = false;
+
+    expect(application.envConfig()["action_dispatch.log_rescued_responses"]).toBe(false);
+  });
 });

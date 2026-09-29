@@ -26,16 +26,18 @@ export class Mimes {
   }
 
   deleteIf(block: (type: MimeType) => boolean): void {
-    const kept = this._mimes.filter((x) => {
+    let i = 0;
+    while (i < this._mimes.length) {
+      const x = this._mimes[i];
       if (block(x)) {
         const symType = x.toSym()!;
         aryDelete(this._symbols, symType);
         this._symbolsSet.delete(symType);
-        return false;
+        this._mimes.splice(i, 1);
+      } else {
+        i++;
       }
-      return true;
-    });
-    this._mimes.splice(0, this._mimes.length, ...kept);
+    }
   }
 
   /** @internal */

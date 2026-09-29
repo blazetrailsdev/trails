@@ -1,9 +1,9 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
-import { isBlank } from "@blazetrails/activesupport";
+import { isBlank, type Logger } from "@blazetrails/activesupport";
+import { Base } from "@blazetrails/actionview";
 import { Request } from "../http/request.js";
 import { IPAddr, regexpEscape } from "@blazetrails/ruby-compat";
-import type { Logger } from "./debug-exceptions.js";
 
 /** @internal */
 export const PORT_REGEX = "(?::\\d+)";
@@ -202,11 +202,7 @@ export class DefaultResponseApp {
 
   /** @internal */
   private availableLogger(request: Request): Logger | null {
-    const explicit = request.logger as Logger | undefined;
-    if (explicit && typeof explicit.error === "function") return explicit;
-    const rack = request.env["rack.logger"] as Logger | undefined;
-    if (rack && typeof rack.error === "function") return rack;
-    return null;
+    return (request.logger as Logger | null | undefined) ?? (Base.logger as Logger | null);
   }
 }
 

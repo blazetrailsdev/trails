@@ -209,21 +209,22 @@ describe("URLForIntegrationTest", () => {
   });
 
   for (const [i, [url, params]] of TABLE.entries()) {
-    const dispatched = async () => {
-      const [hash, pathParams, route] = params;
-      hash.onlyPath = true;
+    if (params.length <= 1) continue;
+    const [hash, pathParams, route] = params;
+    hash.onlyPath = true;
 
+    it(`${url.replaceAll(/\W/g, "_").replaceAll("_", " ")} ${i}`, async () => {
       await tc.get(URI.parse("http://test.host" + String(route)));
       expect(tc.controller!.request.pathParameters).toEqual(pathParams);
       expect(tc.controller!.urlFor(hash), rbInspect(params)).toBe(url);
-    };
-    const generated = () => {
-      expect(tc.urlFor(tc.routes, params[0]), rbInspect(params)).toBe(url);
-    };
+    });
+  }
 
-    it(
-      `${url.replaceAll(/\W/g, "_").replaceAll("_", " ")} ${i}`,
-      params.length > 1 ? dispatched : generated,
-    );
+  for (const [i, [url, params]] of TABLE.entries()) {
+    if (params.length > 1) continue;
+
+    it(`${url.replaceAll(/\W/g, "_").replaceAll("_", " ")} ${i}`, () => {
+      expect(tc.urlFor(tc.routes, params[0]), rbInspect(params)).toBe(url);
+    });
   }
 });
