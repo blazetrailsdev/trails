@@ -293,7 +293,9 @@ export function strictLoadingBang<T extends StrictLoadingFields>(
 type YamlHost = { yamlEncoder(): YAMLEncoder };
 
 export function initWith(
-  this: CoreRecord & { initWithAttributes: typeof initWithAttributes },
+  this: CoreRecord & {
+    initWithAttributes(attributes: unknown, newRecord: boolean, block?: unknown): unknown;
+  },
   coder: Record<string, unknown>,
   block?: (record: CoreRecord) => void,
 ): void {
@@ -302,16 +304,22 @@ export function initWith(
   this.initWithAttributes(attributes, coder["new_record"] as boolean, block);
 }
 
-/** @missingRailsCall init_internals — CONVERGEABLE init-with-attributes-runs-init-internals */
-export function initWithAttributes(
-  this: CoreRecord & { _attributes: any; _newRecord: boolean },
+export function initWithAttributes<T extends CoreRecord>(
+  this: T & { _attributes: any; _newRecord: boolean; initInternals(): void },
   attributes: any,
   newRecord = false,
-  block?: (record: CoreRecord) => void,
-): void {
+  block?: (record: T) => void,
+): T {
+  this.initInternals();
   this._newRecord = newRecord;
   this._attributes = attributes;
+
   block?.(this);
+
+  void runCallbacks(this, "find", undefined, { strict: "sync" });
+  void runCallbacks(this, "initialize", undefined, { strict: "sync" });
+
+  return this;
 }
 
 export function initAttributes(

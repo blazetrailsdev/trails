@@ -1705,24 +1705,14 @@ export class Base extends Model {
 
     (ModelSchema.loadSchema as any).call(this);
 
+    const attributes = (this as any).attributesBuilder().buildFromDatabase(row, columnTypes ?? {});
     const record = this.allocate();
-    (record as any).initWithAttributes(
-      (this as any).attributesBuilder().buildFromDatabase(row, columnTypes ?? {}),
-    );
-    for (const name of (record as any)._attributes.keys() as Iterable<string>) {
+    for (const name of attributes.keys() as Iterable<string>) {
       if (!basicObjRespondTo(record, name, false)) {
         (rbObjSingletonClass(record) as unknown as typeof Base).defineAttributeMethod(name);
       }
     }
-    record._newRecord = false;
-    record.changesApplied();
-    if (this._strictLoadingByDefault) {
-      record._strictLoading = true;
-    }
-    block?.(record);
-    void runCallbacks(record, "find", undefined, { strict: "sync" });
-    void runCallbacks(record, "initialize", undefined, { strict: "sync" });
-    return record;
+    return (record as any).initWithAttributes(attributes, false, block);
   }
 
   _newRecord = true;

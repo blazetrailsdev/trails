@@ -1,4 +1,3 @@
-import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { describe, it, expect, afterAll, afterEach, vi } from "vitest";
 import { Base, NotImplementedError, ReadonlyAttributeError, Relation } from "./index.js";
 import {
@@ -57,7 +56,7 @@ import { Bird } from "./test-helpers/models/bird.js";
 import { LoosePerson, LooseDescendant } from "./test-helpers/models/person.js";
 import "./support/canonical-model-index.js";
 import { MultiparameterAssignmentErrors, type AttributeAssignmentError } from "./errors.js";
-import { Range as ArRange, RuntimeError, sort } from "@blazetrails/ruby-compat";
+import { Hash, Range as ArRange, RuntimeError, sort } from "@blazetrails/ruby-compat";
 import { raiseOnAssignToAttrReadonly, setRaiseOnAssignToAttrReadonly } from "./active-record.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -275,7 +274,7 @@ describe("BasicsTest", async () => {
   it("previously changed", async () => {
     const topic = (await Topic.first()) as any;
     topic.title = "<3<3<3";
-    expect(topic.previousChanges).toEqual(new HashWithIndifferentAccess());
+    expect(topic.previousChanges).toEqual(new Hash());
 
     await topic.saveBang();
     const expected = ["The First Topic", "<3<3<3"];

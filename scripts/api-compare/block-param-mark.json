@@ -50,13 +50,12 @@
     }
   },
   "activerecord": {
-    "total": 10,
+    "total": 9,
     "byFile": {
       "associations/has_one_through_association.rb": 1,
       "base.rb": 2,
       "connection_adapters/abstract/database_statements.rb": 1,
       "connection_adapters/postgresql_adapter.rb": 1,
-      "core.rb": 1,
       "log_subscriber.rb": 1,
       "relation/batches.rb": 2,
       "schema.rb": 1
