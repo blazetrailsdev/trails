@@ -1,11 +1,24 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ActionController } from "@blazetrails/actionpack";
+import { registerConstant } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TestDatabases } from "@blazetrails/activerecord/test-databases";
 import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
 import { env, includedModules, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Trails } from "./rails.js";
+
+class BootAppIntegrationTest extends ActionController.IntegrationTest {
+  declare "@post": { title: string };
+
+  static {
+    this.setup(async function (this: BootAppIntegrationTest) {
+      const self = this as BootAppIntegrationTest & { fixture(...names: string[]): unknown };
+      this["@post"] = (await self.fixture("posts", "welcome")) as { title: string };
+    });
+  }
+}
+registerConstant("BootAppIntegrationTest", BootAppIntegrationTest);
 
 type FixtureHost = { fixturePaths: string[]; fileFixturePath?: string; fixtures?: unknown };
 
@@ -46,17 +59,37 @@ describe("test_help wires a booted app into the test case classes", () => {
     expect(integrationTest.fixturePaths).toContain(`${root}/test/fixtures/`);
   });
 
-  it("points IntegrationTest and ActionController::TestCase at the application's routes", () => {
-    const session = new ActionController.IntegrationTest();
-    session.beforeSetup();
-    expect(session.routes).toBe(Trails.application!.routes());
+  it("makes IntegrationTest an ActiveSupport::TestCase (integration.rb:651)", () => {
+    expect(ActionController.IntegrationTest.prototype instanceof TestCase).toBe(true);
+  });
 
-    const controllerTest = new ActionController.TestCase(ActionController.Base) as unknown as {
-      routes?: unknown;
-      beforeSetup(): void;
-    };
-    controllerTest.beforeSetup();
-    expect(controllerTest.routes).toBe(Trails.application!.routes());
+  describe("BootAppIntegrationTest", () => {
+    it("points IntegrationTest and ActionController::TestCase at the application's routes", async ({
+      testCase,
+    }) => {
+      const session = testCase as BootAppIntegrationTest;
+      expect(session.routes).toBe(Trails.application!.routes());
+
+      const controllerTest = new ActionController.TestCase(ActionController.Base) as unknown as {
+        routes?: unknown;
+        beforeSetup(): void;
+      };
+      controllerTest.beforeSetup();
+      expect(controllerTest.routes).toBe(Trails.application!.routes());
+    });
+
+    it("runs the test class's setup against its fixtures and url helpers", async ({ testCase }) => {
+      const session = testCase as BootAppIntegrationTest & { postsUrl(): string };
+      expect(session["@post"].title).toBe("Welcome to Trails");
+      expect(session.postsUrl()).toBe("http://www.example.com/posts");
+    });
+
+    it("routes an integration request through the app's config/routes.ts", async ({ testCase }) => {
+      const session = testCase as BootAppIntegrationTest;
+      await session.get("/posts/show");
+      expect(session.response.status).toBe(200);
+      expect(session.response.body).toContain("<p>Hello from TSE</p>");
+    });
   });
 
   it("renders a view through ActionController::TestCase", async () => {
@@ -81,13 +114,5 @@ describe("test_help wires a booted app into the test case classes", () => {
       "A second post",
       "Welcome to Trails",
     ]);
-  });
-
-  it("routes an integration request through the app's config/routes.ts", async () => {
-    const session = new ActionController.IntegrationTest();
-    session.beforeSetup();
-    await session.get("/posts/show");
-    expect(session.response.status).toBe(200);
-    expect(session.response.body).toContain("<p>Hello from TSE</p>");
   });
 });

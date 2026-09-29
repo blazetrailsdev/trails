@@ -1,5 +1,6 @@
 import { include, onLoad } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
+import "@blazetrails/activesupport/testing/autorun";
 import { TestDatabases } from "@blazetrails/activerecord/test-databases";
 import { TestFixtures } from "@blazetrails/activerecord/test-fixtures";
 import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
@@ -33,10 +34,7 @@ onLoad("active_support_test_case", function (this: typeof TestCase & FixtureHost
 });
 
 onLoad("action_dispatch_integration_test", function (this: FixtureHost) {
-  this.fixturePaths = [
-    ...(this.fixturePaths ?? []),
-    ...(TestCase as unknown as FixtureHost).fixturePaths,
-  ];
+  this.fixturePaths = [...this.fixturePaths, ...(TestCase as unknown as FixtureHost).fixturePaths];
 });
 
 onLoad("action_controller_test_case", function (this: RoutesHost) {

@@ -40,6 +40,7 @@ import { ActionDispatch } from "../../namespaces.js";
 import { Session as RackTestSession, type CookieJar } from "@blazetrails/rack-test";
 import { DEFAULT_PORTS, type RackApp, type RackMiddleware } from "@blazetrails/rack";
 import type { UploadedFile } from "@blazetrails/rack-test";
+import { TestCase } from "@blazetrails/activesupport/test-case";
 
 export interface IntegrationRequestOptions {
   params?: Record<string, unknown>;
@@ -59,7 +60,7 @@ const DEFAULT_ACCEPT =
   "text/html;q=0.9,text/plain;q=0.8,image/png," +
   "*/*;q=0.5";
 
-export class IntegrationTest {
+export class IntegrationTest extends TestCase {
   routes: RouteSet = new RouteSet();
 
   session: Record<string, unknown> = {};
@@ -81,17 +82,19 @@ export class IntegrationTest {
   /** @internal */
   _defaultUrlOptions: Record<string, unknown> = {};
 
-  constructor() {
+  constructor(name?: string) {
+    super(name!);
     this.resetBang();
     const app = this.app as { routes?: unknown } | null;
-    if (rbObjRespondTo(app, "routes") && app!.routes instanceof RouteSet) {
+    const routes = typeof app?.routes === "function" ? app.routes() : app?.routes;
+    if (rbObjRespondTo(app, "routes") && routes instanceof RouteSet) {
       const session = this.constructor as typeof IntegrationTest;
       let klass = APP_SESSIONS.get(app);
       if (klass === undefined || Object.getPrototypeOf(klass) !== session) {
         klass = class extends session {};
         klass.prototype.constructor = session;
-        include(klass, app!.routes.urlHelpers());
-        include(klass, app!.routes.mountedHelpers());
+        include(klass, routes.urlHelpers());
+        include(klass, routes.mountedHelpers());
         APP_SESSIONS.set(app, klass);
       }
       Object.setPrototypeOf(this, klass.prototype);
@@ -480,22 +483,26 @@ export class IntegrationTest {
   copySessionVariablesBang(): void {}
 
   /** @internal */
-  beforeSetup(): void {
+  beforeSetup(): unknown {
     this._app = undefined;
-    SetupAndTeardown.beforeSetup.call(this);
+    const result = super.beforeSetup?.();
+    return result instanceof Promise
+      ? result.then(() => SetupAndTeardown.beforeSetup.call(this))
+      : SetupAndTeardown.beforeSetup.call(this);
   }
 
   /** @internal */
-  afterTeardown(test: Parameters<typeof SetupAndTeardown.afterTeardown>[0]): void {
+  afterTeardown(test: Parameters<typeof SetupAndTeardown.afterTeardown>[0]): unknown {
     SetupAndTeardown.afterTeardown.call(this, test);
+    return super.afterTeardown?.(test as never);
   }
 
-  static setup(this: { prototype: object }, ...args: FilterListEntry<object>[]): void {
-    SetupAndTeardown.setup.call(this.prototype, ...args);
+  static override setup(this: object, ...args: FilterListEntry<object>[]): void {
+    SetupAndTeardown.setup.call((this as { prototype: object }).prototype, ...args);
   }
 
-  static teardown(this: { prototype: object }, ...args: FilterListEntry<object>[]): void {
-    SetupAndTeardown.teardown.call(this.prototype, ...args);
+  static override teardown(this: object, ...args: FilterListEntry<object>[]): void {
+    SetupAndTeardown.teardown.call((this as { prototype: object }).prototype, ...args);
   }
 
   static withRouting = routingAssertions.WithIntegrationRouting.ClassMethods.withRouting;

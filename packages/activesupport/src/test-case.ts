@@ -1,6 +1,3 @@
-import { afterEach, beforeEach, expect } from "vitest";
-import type { TestContext } from "vitest";
-import { Time } from "@blazetrails/date";
 import { runLoadHooks } from "./lazy-load-hooks.js";
 import {
   testOrder as activeSupportTestOrder,
@@ -22,7 +19,7 @@ import {
   afterTeardown as testsWithoutAssertionsAfterTeardown,
   type RunningTest,
 } from "./testing/tests-without-assertions.js";
-import { UnexpectedError, _takeAssertions } from "./testing/assertions.js";
+import { UnexpectedError } from "./testing/assertions.js";
 import {
   assertNot,
   assertNotIncludes,
@@ -52,8 +49,8 @@ import {
 
 export class TestCase {
   name: string;
-  declare beforeSetup?: () => unknown;
-  declare afterTeardown?: () => unknown;
+  beforeSetup?(): unknown;
+  afterTeardown?(test: RunningTest): unknown;
 
   constructor(name: string) {
     this.name = name;
@@ -119,49 +116,3 @@ export class TestCase {
 setupAndTeardownPrepended(TestCase);
 
 runLoadHooks("active_support_test_case", TestCase);
-
-const runningTestCases = new WeakMap<object, TestCase>();
-
-beforeEach(async (context: TestContext) => {
-  _takeAssertions();
-  const testCase = new TestCase(context.task.name);
-  runningTestCases.set(context.task, testCase);
-  await testCase.beforeSetup?.();
-  TestCase.beforeSetup();
-});
-
-afterEach(async (context: TestContext) => {
-  const testCase = runningTestCases.get(context.task);
-  runningTestCases.delete(context.task);
-  try {
-    TestCase.afterTeardown(_runningTest(context));
-  } finally {
-    await testCase?.afterTeardown?.();
-  }
-});
-
-/** @noRailsEquivalent PERMANENT */
-function _runningTest(context: TestContext): RunningTest {
-  const task = context.task as {
-    name: string;
-    mode?: string;
-    location?: { line?: number };
-    file?: { filepath?: string };
-    result?: { state?: string; errors?: unknown[] };
-  };
-  return {
-    assertions: (expect.getState().assertionCalls ?? 0) + _takeAssertions(),
-    skipped: task.mode === "skip" || task.mode === "todo",
-    error: task.result?.state === "fail" || (task.result?.errors?.length ?? 0) > 0,
-    name: task.name,
-    sourceLocation: [task.file?.filepath ?? "", task.location?.line ?? 0],
-    failures: [],
-  };
-}
-
-expect.addEqualityTesters([
-  function timeEquals(a: unknown, b: unknown): boolean | undefined {
-    if (!(a instanceof Time) || !(b instanceof Time)) return undefined;
-    return a.toR().cmp(b.toR()) === 0;
-  },
-]);

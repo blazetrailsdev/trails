@@ -119,6 +119,39 @@ describe("Time", () => {
     expect(time.toZonedDateTime().epochNanoseconds).toBe(BigInt(time.toI()) * 1000000000n);
   });
 
+  it("toTime reports the exact sub-minute offset, as MRI's utc_offset does", () => {
+    const zoned = Time.new("2013-09-04 03:00:00 -00:44:30").toZonedDateTime();
+    expect(zoned.offsetNanoseconds).toBe(-2670_000_000_000);
+    expect(zoned.offset).toBe("-00:44:30");
+    expect(new Time(2008, 3, 1, 6, 0, 0, 32430.5).toZonedDateTime().offset).toBe("+09:00:30.5");
+    const negative = new Time(2008, 3, 1, 6, 0, 0, -2670.5).toZonedDateTime();
+    expect(negative.offset).toBe("-00:44:30.5");
+    expect(negative.offsetNanoseconds).toBe(-2670_500_000_000);
+    expect(negative.toPlainDateTime().toString()).toBe("2008-03-01T06:00:00");
+  });
+
+  it("toTime derives with/withPlainTime/round/startOfDay from the reported wall clock", () => {
+    const zoned = Time.new("2013-09-04 03:00:00 -00:44:30").toZonedDateTime();
+
+    expect(zoned.with({ hour: 5 }).epochNanoseconds).toBe(1378273470000000000n);
+    expect(zoned.with({ hour: 5 }).offset).toBe("-00:44:30");
+    expect(zoned.add({ seconds: 1 }).toPlainDateTime().toString()).toBe("2013-09-04T03:00:01");
+    expect(zoned.subtract({ days: 1 }).offset).toBe("-00:44:30");
+    expect(zoned.withPlainTime({ hour: 12, minute: 34, second: 56 }).epochNanoseconds).toBe(
+      1378300766000000000n,
+    );
+
+    const rounded = zoned
+      .withPlainTime({ hour: 3, minute: 0, second: 40 })
+      .round({ smallestUnit: "minute" });
+    expect(rounded.toPlainDateTime().toString()).toBe("2013-09-04T03:01:00");
+    expect(rounded.epochNanoseconds).toBe(1378266330000000000n);
+
+    const midnight = zoned.startOfDay();
+    expect(midnight.toPlainDateTime().toString()).toBe("2013-09-04T00:00:00");
+    expect(midnight.epochNanoseconds).toBe(1378255470000000000n);
+  });
+
   it("toTime moves a sub-minute-offset receiver to another zone by its exact instant", () => {
     const time = Time.new("2013-09-04 03:00:00 -00:44:30");
     expect(time.toZonedDateTime().withTimeZone("UTC").toPlainDateTime().toString()).toBe(

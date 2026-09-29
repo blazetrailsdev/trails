@@ -16,8 +16,8 @@ export function teardown(this: object, ...args: FilterListEntry<object>[]): void
   setCallback(this, "teardown", "after", ...args);
 }
 
-export function beforeSetup(this: object): void {
-  runCallbacks(this, "setup");
+export function beforeSetup(this: object): unknown {
+  return runCallbacks(this, "setup");
 }
 
 export function afterTeardown(this: object, test: Pick<RunningTest, "failures">): void {

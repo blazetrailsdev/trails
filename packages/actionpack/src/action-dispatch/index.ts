@@ -147,6 +147,7 @@ export {
   type Proxy,
   type CustomProxies,
 } from "./middleware/remote-ip.js";
+export { IntegrationTest } from "./testing/integration.js";
 export {
   SystemTestCase,
   DEFAULT_HOST,

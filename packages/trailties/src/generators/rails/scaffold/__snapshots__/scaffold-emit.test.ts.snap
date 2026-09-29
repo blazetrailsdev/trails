@@ -29,7 +29,7 @@ export class PostsController extends ApplicationController {
     this.post = Post.new(this.postParams());
 
     if (await this.post.save()) {
-      this.redirectTo(\`/posts/\${this.post.id}\`, { notice: "Post was successfully created." });
+      this.redirectTo(this.post, { notice: "Post was successfully created." });
     } else {
       await this.render({ action: "new", status: "unprocessable_entity" });
     }
@@ -37,7 +37,7 @@ export class PostsController extends ApplicationController {
 
   async update(): Promise<void> {
     if (await this.post.update(this.postParams())) {
-      this.redirectTo(\`/posts/\${this.post.id}\`, { notice: "Post was successfully updated.", status: "see_other" });
+      this.redirectTo(this.post, { notice: "Post was successfully updated.", status: "see_other" });
     } else {
       await this.render({ action: "edit", status: "unprocessable_entity" });
     }
@@ -45,7 +45,7 @@ export class PostsController extends ApplicationController {
 
   async destroy(): Promise<void> {
     await this.post.destroyBang();
-    this.redirectTo("/posts", { notice: "Post was successfully destroyed.", status: "see_other" });
+    this.redirectTo(this.postsPath(), { notice: "Post was successfully destroyed.", status: "see_other" });
   }
 
   private async setPost(): Promise<void> {

@@ -184,6 +184,10 @@ const alias = {
     __dirname,
     "packages/activesupport/src/test-case.ts",
   ),
+  "@blazetrails/activesupport/testing/autorun": path.resolve(
+    __dirname,
+    "packages/activesupport/src/testing/autorun.ts",
+  ),
   "@blazetrails/activesupport/gzip": path.resolve(__dirname, "packages/activesupport/src/gzip.ts"),
   "@blazetrails/activesupport/encrypted-file": path.resolve(
     __dirname,
@@ -457,7 +461,7 @@ export default defineConfig({
             "./packages/activerecord/src/test-setup-worker-db.ts",
             // `ActiveSupport::TestCase`'s include list (test_case.rb:144-153),
             // which helper.rb picks up by requiring active_support/test_case.
-            "./packages/activesupport/src/test-case.ts",
+            "./packages/activesupport/src/testing/autorun.ts",
             "./packages/activerecord/src/cases/helper.ts",
             ...(process.env.ARCONN === "mysql2"
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
@@ -525,7 +529,7 @@ export default defineConfig({
           // Arel's suite needs `Arel::Table.engine` set, exactly as Rails' does
           // (it runs under activerecord, where the engine is ActiveRecord::Base).
           setupFiles: [
-            "./packages/activesupport/src/test-case.ts",
+            "./packages/activesupport/src/testing/autorun.ts",
             "./packages/activesupport/src/test-setup-abstract-unit.ts",
             "./packages/arel/src/test-setup-engine.ts",
           ],
