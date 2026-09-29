@@ -47,15 +47,10 @@ import {
   unfreezeTime,
 } from "./testing/time-helpers.js";
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the optional before_setup / after_teardown an included module (TestFixtures) supplies.
-export interface TestCase {
-  beforeSetup?(): unknown;
-  afterTeardown?(test: RunningTest): unknown;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TestCase {
   name: string;
+  beforeSetup?(): unknown;
+  afterTeardown?(test: RunningTest): unknown;
 
   constructor(name: string) {
     this.name = name;

@@ -184,6 +184,13 @@ describe("ScaffoldControllerGeneratorTest", () => {
         });
       },
     );
+
+    const content = read("test/controllers/admin/users-controller.test.ts");
+    assertMatch("(t.adminUsersUrl()", content);
+    assertMatch("(t.newAdminUserUrl()", content);
+    assertMatch('(t.editAdminUserUrl(t["@user"])', content);
+    assertMatch('(t.adminUserUrl(t["@user"])', content);
+    assertNoMatch(/\bt\.(new|edit)?[uU]sers?(Path|Url)/, content);
   });
 
   it("api controller tests", async () => {
