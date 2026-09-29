@@ -209,10 +209,8 @@ export async function performQuery(
       await stmt.step();
       result = Result.empty();
     } else {
-      result = new Result(
-        stmt.columns().map((c) => c.name),
-        await stmt.toA(),
-      );
+      const columns = stmt.columns().map((c) => c.name);
+      result = new Result(columns, await stmt.toA());
       this._narrowSpilledBigInts(stmt, result.rows);
     }
   } else {
@@ -225,10 +223,8 @@ export async function performQuery(
         await stmt.step();
         result = Result.empty();
       } else {
-        result = new Result(
-          stmt.columns().map((c) => c.name),
-          await stmt.toA(),
-        );
+        const columns = stmt.columns().map((c) => c.name);
+        result = new Result(columns, await stmt.toA());
         this._narrowSpilledBigInts(stmt, result.rows);
       }
     } finally {
