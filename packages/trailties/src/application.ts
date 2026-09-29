@@ -74,7 +74,7 @@ export class Application extends Engine {
     return this.instance().config;
   }
 
-  static async findRoot(from: string): Promise<string> {
+  static override findRoot(from: string | undefined): string {
     const fs = getFs();
     return this.findRootWithFlag("config.ts", from, fs.cwd());
   }
@@ -82,7 +82,8 @@ export class Application extends Engine {
   override get config(): Configuration {
     const cfg = this._config;
     if (cfg instanceof Configuration) return cfg;
-    const newCfg = new Configuration(null);
+    const klass = this.constructor as typeof Application;
+    const newCfg = new Configuration(klass.findRoot(klass.calledFrom()));
     this._config = newCfg;
     return newCfg;
   }
@@ -152,7 +153,6 @@ export class Application extends Engine {
 
   async initialize(group: InitializerGroup = "default"): Promise<this> {
     if (this._initialized) throw new Error("Application has been already initialized.");
-    await this.root();
     setTrailsRoot(() => this.config.root);
     await this.runInitializers(group, this);
     this._initialized = true;
@@ -191,7 +191,7 @@ export class Application extends Engine {
   /** @internal */
   async ensureGeneratorTemplatesAdded(): Promise<void> {
     const configuredPaths = this.config.generators().templates;
-    const libTemplates = (await this.paths()).get("lib/templates");
+    const libTemplates = this.paths().get("lib/templates");
     const existent = libTemplates ? await libTemplates.existent() : [];
     configuredPaths.unshift(...existent.filter((p) => !configuredPaths.includes(p)));
   }
@@ -252,7 +252,6 @@ export class Application extends Engine {
   async credentials(): Promise<EncryptedConfiguration> {
     if (this._credentials) return this._credentials;
     const c = this.config.credentials;
-    await this.root();
     const def = await this.config.credentialsDefaults();
     const credentials = await this.encrypted(c.contentPath ?? def.contentPath, {
       keyPath: c.keyPath ?? def.keyPath,
@@ -266,7 +265,7 @@ export class Application extends Engine {
     opts: { keyPath?: string; envKey?: string } = {},
   ): Promise<EncryptedConfiguration> {
     const p = getPath();
-    const root = await this.root();
+    const root = this.root()!;
     return new EncryptedConfiguration({
       configPath: p.resolve(root, path),
       keyPath: p.resolve(root, opts.keyPath ?? "config/master.key"),
@@ -279,7 +278,7 @@ export class Application extends Engine {
     name: string,
     { env = Trails.env.toString() }: { env?: string } = {},
   ): Promise<unknown> {
-    const configDir = ((await (await this.paths()).get("config")?.existent()) ?? [])[0];
+    const configDir = ((await this.paths().get("config")?.existent()) ?? [])[0];
     const yaml = `${configDir}/${name}`;
     let ext: string | undefined;
     for (const e of [".ts", ".js"]) ext ??= (await getFs().exists(`${yaml}${e}`)) ? e : undefined;

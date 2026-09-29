@@ -120,7 +120,6 @@ describe("BacktraceCleanerTest", () => {
     class RootApp extends Application {}
     Application.register(RootApp);
     try {
-      expect(cleaner.clean(["/my/app/app/models/user.rb:10"])).toEqual([]);
       Trails.application!.config.setRoot("/my/app");
       const result = cleaner.clean(["/my/app/app/models/user.rb:10"]);
       expect(result[0]).toBe("app/models/user.rb:10");

@@ -41,7 +41,7 @@ export const TopLevel: {
     } | null;
     Application: abstract new (...args: never[]) => unknown;
     Engine: abstract new (...args: never[]) => unknown;
-    root(): Promise<string | undefined>;
+    root(): string | null | undefined;
   };
   ActionDispatch?: {
     Request: new (env: Record<string, unknown>) => unknown;

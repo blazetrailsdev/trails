@@ -75,7 +75,7 @@ class TestApp extends Finisher {
   routesReloader(): FinisherRoutesReloader {
     return this._routesReloader;
   }
-  async paths(): Promise<Root> {
+  paths(): Root {
     return new Root(null);
   }
 
