@@ -15,7 +15,7 @@ describe("EngineTest", () => {
     engine.config.setRoot(new URL("../__fixtures__/boot-app", import.meta.url).pathname);
     const root = vi
       .spyOn(Trails, "root")
-      .mockResolvedValue(new URL("../__fixtures__", import.meta.url).pathname);
+      .mockReturnValue(new URL("../__fixtures__", import.meta.url).pathname);
 
     await engine.initializers.find((i) => i.name === "add_fixture_paths")!.run();
 

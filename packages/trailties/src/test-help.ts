@@ -21,7 +21,7 @@ if (Trails.env["production?"]()) {
 
 await import("./testing/maintain-test-schema.js");
 
-const root = await Trails.root();
+const root = Trails.root();
 
 onLoad("active_support_test_case", function (this: typeof TestCase & FixtureHost) {
   include(this, TestDatabases);

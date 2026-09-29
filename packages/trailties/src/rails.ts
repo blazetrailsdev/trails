@@ -90,10 +90,9 @@ export class Trails {
     return (_backtraceCleaner ??= new BacktraceCleaner());
   }
 
-  static async root(): Promise<string | undefined> {
+  static root(): string | null | undefined {
     const app = Trails.application;
-    if (!app) return undefined;
-    return app.config.root ?? undefined;
+    return app?.config.root;
   }
 
   static async publicPath(): Promise<string | null> {

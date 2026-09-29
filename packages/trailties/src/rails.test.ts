@@ -137,25 +137,25 @@ describe("Trails", () => {
     }
   });
 
-  it("Trails.root resolves to undefined when no app is registered", async () => {
-    expect(await Trails.root()).toBeUndefined();
+  it("Trails.root resolves to undefined when no app is registered", () => {
+    expect(Trails.root()).toBeUndefined();
   });
 
-  it("Trails.root reflects a config.setRoot override, not the discovered source root", async () => {
+  it("Trails.root reflects a config.setRoot override, not the discovered source root", () => {
     class RootApp extends Application {}
     Application.register(RootApp);
     RootApp.findRoot = () => "/discovered/source";
     const app = RootApp.instance();
     app.config.setRoot("/srv/override");
-    expect(await Trails.root()).toBe("/srv/override");
+    expect(Trails.root()).toBe("/srv/override");
   });
 
-  it("Trails.root falls back to the discovered root when config.root is unset", async () => {
+  it("Trails.root falls back to the discovered root when config.root is unset", () => {
     class DiscoveredApp extends Application {}
     Application.register(DiscoveredApp);
     DiscoveredApp.findRoot = () => "/discovered/source";
     const app = DiscoveredApp.instance();
-    expect(await Trails.root()).toBe("/discovered/source");
+    expect(Trails.root()).toBe("/discovered/source");
   });
 
   it("Trails.root agrees with the trailsRoot seam", async () => {
@@ -165,7 +165,7 @@ describe("Trails", () => {
     const app = SeamApp.instance();
     await Trails.initialize();
     app.config.setRoot("/srv/override");
-    expect(await Trails.root()).toBe(trailsRoot());
+    expect(Trails.root()).toBe(trailsRoot());
     expect(trailsRoot()).toBe("/srv/override");
   });
 
@@ -173,7 +173,7 @@ describe("Trails", () => {
     class NoRootApp extends Application {}
     Application.register(NoRootApp);
     const fs = getFs();
-    expect(await Trails.root()).toBe(await fs.realpath!(fs.cwd()));
+    expect(Trails.root()).toBe(await fs.realpath!(fs.cwd()));
   });
 
   it("Trails.publicPath honors a config.setRoot override when discovery is unresolved", async () => {

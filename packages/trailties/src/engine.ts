@@ -244,7 +244,7 @@ export class Engine extends Trailtie {
    * @missingRailsArgs join — CONVERGEABLE converge-engine-configuration-root-pathname-new
    */
   async fixturesInRootAndNotInVendorOrDotDir(fixtures: string): Promise<boolean> {
-    const root = (await TopLevel.Trails!.root())!;
+    const root = TopLevel.Trails!.root()!;
     return (
       (await getFs().exists(fixtures)) &&
       fixtures.startsWith(root) &&
