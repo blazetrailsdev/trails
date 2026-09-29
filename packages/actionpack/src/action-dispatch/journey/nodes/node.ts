@@ -1,8 +1,10 @@
 import { any } from "@blazetrails/activesupport";
+import { Enumerable, include } from "@blazetrails/ruby-compat";
 import * as Visitors from "../visitors.js";
 
 export type NodeType = "LITERAL" | "SLASH" | "DOT" | "SYMBOL" | "GROUP" | "STAR" | "CAT" | "OR";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Enumerable` (journey/nodes/node.rb:70); the class/interface merge is how `include()` surfaces on the type side.
 export abstract class Node {
   left: Node | string;
   memo: unknown = null;
@@ -77,6 +79,13 @@ export abstract class Node {
     return false;
   }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Enumerable` (journey/nodes/node.rb:70); the class/interface merge is how `include()` surfaces on the type side.
+export interface Node {
+  findAll(block: (node: Node) => unknown): Node[];
+}
+
+include(Node as unknown as new (...args: never[]) => unknown, Enumerable);
 
 export abstract class Terminal extends Node {
   get symbol(): Node | string {

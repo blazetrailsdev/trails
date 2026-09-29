@@ -1,4 +1,4 @@
-import { hasKey, regexpEscape, transformValues } from "@blazetrails/ruby-compat";
+import { hasKey, regexpEscape, transformValues, uniq } from "@blazetrails/ruby-compat";
 import { Ast } from "../ast.js";
 import { Cat, Group } from "../nodes/node.js";
 import type { Dot, Literal, Node, Or, Slash, Star } from "../nodes/node.js";
@@ -225,20 +225,14 @@ export class Pattern {
     return this._requiredNames;
   }
 
+  /** @missingRailsArgs uniq — PERMANENT */
   get optionalNames(): readonly string[] {
-    if (this._optionalNames) return this._optionalNames;
-    const groups: Group[] = [];
-    for (const n of this.spec) if (n.isGroup()) groups.push(n as Group);
-    const names: string[] = [];
-    for (const g of groups) {
-      for (const child of g.left as Node) {
-        if (child.isSymbol() && !names.includes(child.name)) {
-          names.push(child.name);
-        }
-      }
-    }
-    this._optionalNames = names;
-    return names;
+    return (this._optionalNames ??= uniq(
+      this.spec
+        .findAll((node) => node.isGroup())
+        .flatMap((group) => group.findAll((node) => node.isSymbol()))
+        .map((node) => node.name),
+    ));
   }
 
   match(other: string): MatchData | undefined {
