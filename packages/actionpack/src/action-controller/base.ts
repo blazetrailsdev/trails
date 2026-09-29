@@ -76,7 +76,7 @@ import {
   currentContentSecurityPolicy,
   isContentSecurityPolicy,
 } from "./metal/content-security-policy.js";
-import { helperMethod, type HelpersClassMethods } from "../abstract-controller/helpers.js";
+import { helperMethod, type HelperMethodsModule } from "../abstract-controller/helpers.js";
 import { defaultFormBuilder } from "./form-builder.js";
 import { instrumentPayload, instrumentName } from "./caching.js";
 import {
@@ -281,6 +281,10 @@ export class Base extends Metal {
   static _routes: ViewContextRoutes | null = null;
 
   static helpersPath: string[] = [];
+  declare static _helpers?: HelperMethodsModule;
+  declare static _helperMethods?: string[];
+  static helperMethod = helperMethod;
+
   static includeAllHelpers = true;
 
   constructor(...args: unknown[]) {
@@ -940,7 +944,7 @@ Base.prototype.expireFragment = expireFragment;
 ).viewCacheDependency = viewCacheDependency;
 
 classAttribute.call(Base, "fragmentCacheKeys", { default: [] });
-helperMethod(Base as unknown as HelpersClassMethods, "combinedFragmentCacheKey");
+Base.helperMethod("combinedFragmentCacheKey");
 
 extend(Base, ConfigMethods);
 extend(Base, DefaultHeaders.ClassMethods);
@@ -959,7 +963,7 @@ _Configurable.configAccessor("enableFragmentCacheLogging");
 _Configurable.enableFragmentCacheLogging = false;
 
 classAttribute.call(Base, "_viewCacheDependencies", { default: [] });
-helperMethod(Base as unknown as HelpersClassMethods, "viewCacheDependencies");
+Base.helperMethod("viewCacheDependencies");
 
 runLoadHooks("action_controller_base", Base);
 runLoadHooks("action_controller", Base);
@@ -973,10 +977,6 @@ Base.prototype.appendInfoToPayload = appendInfoToPayload;
 Base.prototype.cleanupViewRuntime = cleanupViewRuntime;
 Base.prototype.haltedCallbackHook = haltedCallbackHook;
 
-helperMethod(
-  Base as unknown as HelpersClassMethods,
-  "isContentSecurityPolicy",
-  "contentSecurityPolicyNonce",
-);
+Base.helperMethod("isContentSecurityPolicy", "contentSecurityPolicyNonce");
 
 export { DoubleRenderError };

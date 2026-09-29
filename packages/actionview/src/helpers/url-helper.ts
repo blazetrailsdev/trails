@@ -26,7 +26,7 @@ import {
 import { RoutingUrlFor } from "../routing-url-for.js";
 import { capture, type CaptureHelperHost } from "./capture-helper.js";
 import { preventContentExfiltration } from "./content-exfiltration-prevention-helper.js";
-import { contentTag, tag } from "./tag-helper.js";
+import { contentTag, tag, type TagHelperHost } from "./tag-helper.js";
 
 export interface UrlHelperHost {
   controller: unknown;
@@ -145,7 +145,7 @@ export function buttonTo(
   const methodOption = presence(hashDelete(htmlOptions, "method"));
   const method = rbObjAsString(rtest(methodOption) ? methodOption : methodForOptions(options));
   const methodTagValue = BUTTON_TAG_METHOD_VERBS.includes(method)
-    ? methodTag(method)
+    ? methodTag.call(this, method)
     : htmlSafe("");
 
   const formMethod = method === "get" ? "get" : "post";
@@ -178,14 +178,19 @@ export function buttonTo(
     button = this.contentTag("button", rtest(name) ? name : url, htmlOptions);
   } else {
     htmlOptions["value"] = rtest(name) ? name : url;
-    button = tag("input", htmlOptions) as SafeBuffer;
+    button = tag.call(this, "input", htmlOptions) as SafeBuffer;
   }
 
   const innerTags = methodTagValue.safeConcat(button).safeConcat(requestTokenTag);
   if (rtest(params)) {
     for (const param of toFormParams(params)) {
       innerTags.safeConcat(
-        tag("input", { type: "hidden", name: param.name, value: param.value, autocomplete: "off" }),
+        tag.call(this, "input", {
+          type: "hidden",
+          name: param.name,
+          value: param.value,
+          autocomplete: "off",
+        }),
       );
     }
   }
@@ -432,7 +437,7 @@ export function isMethodNotGetMethod(method: unknown): boolean {
 
 /** @internal */
 export function tokenTag(
-  this: UrlHelperHost,
+  this: UrlHelperHost & TagHelperHost,
   token: unknown = null,
   { formOptions = {} }: { formOptions?: Record<string, unknown> } = {},
 ): SafeBuffer | string {
@@ -445,7 +450,7 @@ export function tokenTag(
       token === true || token == null
         ? this.formAuthenticityToken!({ formOptions: { ...formOptions, authenticityToken: token } })
         : token;
-    return tag("input", {
+    return tag.call(this, "input", {
       type: "hidden",
       name: String(this.requestForgeryProtectionToken),
       value: token,
@@ -457,8 +462,8 @@ export function tokenTag(
 }
 
 /** @internal */
-export function methodTag(method: unknown): SafeBuffer {
-  return tag("input", {
+export function methodTag(this: TagHelperHost, method: unknown): SafeBuffer {
+  return tag.call(this, "input", {
     type: "hidden",
     name: "_method",
     value: String(method),

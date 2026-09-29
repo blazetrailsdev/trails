@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { BacktraceCleaner } from "@blazetrails/activesupport";
 import {
   Base,
   MissingTemplate,
@@ -83,5 +84,35 @@ describe("ExceptionWrapper tables keyed on qualified class names", () => {
     error.stack = "RoutingError\n    at x (/app/node_modules/pkg/index.js:1:1)";
     const wrapper = new ExceptionWrapper(null, error);
     expect(wrapper.exceptionTrace()).toEqual([]);
+  });
+});
+
+describe("ExceptionWrapper#backtrace", () => {
+  it("is built once, at construction, from the exception's backtrace locations", () => {
+    const error = new Error("boom");
+    error.stack =
+      "Error: boom\n    at index (/app/lib/file.js:42:7)\n    at x (/app/node_modules/rack.js:43:1)";
+    const wrapper = new ExceptionWrapper(null, error);
+    expect(wrapper.backtrace).toBe(wrapper.backtrace);
+    expect(wrapper.backtrace.map((loc) => [loc.path, loc.lineno])).toEqual([
+      ["/app/lib/file.js", 42],
+      ["/app/node_modules/rack.js", 43],
+    ]);
+    expect(wrapper.applicationTrace[0]).toBe(wrapper.fullTrace[0]);
+    expect(wrapper.traces["Application Trace"].map((t) => t.id)).toEqual([0]);
+    expect(wrapper.sourceExtracts.map((e) => [e.file, e.line])).toEqual([
+      ["/app/lib/file.js", 42],
+      ["/app/node_modules/rack.js", 43],
+    ]);
+  });
+});
+
+describe("ExceptionWrapper#clean_backtrace", () => {
+  it("hands the memoized locations to the backtrace cleaner", () => {
+    const error = new Error("boom");
+    error.stack = "Error: boom\n    at index (/app/lib/file.js:42:7)";
+    const wrapper = new ExceptionWrapper(new BacktraceCleaner().removeFilters(), error);
+    expect(wrapper.fullTrace[0]).toBe(wrapper.backtrace[0]);
+    expect(wrapper.traces["Full Trace"][0].trace).toBe("at index (/app/lib/file.js:42:7)");
   });
 });

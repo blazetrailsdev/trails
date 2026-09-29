@@ -615,9 +615,9 @@ const PictureLinkToTag: [() => unknown, string][] = [
   [
     () =>
       pic({ class: "my-class" }, () =>
-        (tag("source", { srcset: imagePath.call(host, "picture.webp") }) as SafeBuffer).plus(
-          img("picture.png", { alt: "Image" }),
-        ),
+        (
+          tag.call(host, "source", { srcset: imagePath.call(host, "picture.webp") }) as SafeBuffer
+        ).plus(img("picture.png", { alt: "Image" })),
       ),
     `<picture class="my-class"><source srcset="/images/picture.webp" /><img alt="Image" src="/images/picture.png" /></picture>`,
   ],
@@ -625,12 +625,12 @@ const PictureLinkToTag: [() => unknown, string][] = [
     () =>
       pic(() =>
         (
-          tag("source", {
+          tag.call(host, "source", {
             srcset: imagePath.call(host, "picture-small.webp"),
             media: "(min-width: 600px)",
           }) as SafeBuffer
         )
-          .plus(tag("source", { srcset: imagePath.call(host, "picture-big.webp") }))
+          .plus(tag.call(host, "source", { srcset: imagePath.call(host, "picture-big.webp") }))
           .plus(img("picture.png", { alt: "Image" })),
       ),
     `<picture><source srcset="/images/picture-small.webp" media="(min-width: 600px)" /><source srcset="/images/picture-big.webp" /><img alt="Image" src="/images/picture.png" /></picture>`,

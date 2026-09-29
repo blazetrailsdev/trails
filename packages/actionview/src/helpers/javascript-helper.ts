@@ -1,7 +1,7 @@
 import { SafeBuffer, htmlSafe } from "@blazetrails/activesupport";
 
-import { capture, type CaptureHelperHost } from "./capture-helper.js";
-import { cdataSection, contentTag } from "./tag-helper.js";
+import { capture } from "./capture-helper.js";
+import { cdataSection, contentTag, type TagHelperHost } from "./tag-helper.js";
 
 export const JS_ESCAPE_MAP: Record<string, string> = {
   "\\": "\\\\",
@@ -35,7 +35,7 @@ export function javascriptCdataSection(content: unknown): SafeBuffer {
 }
 
 export function javascriptTag(
-  this: CaptureHelperHost | void,
+  this: TagHelperHost,
   contentOrOptionsWithBlock?: unknown,
   htmlOptions?: Record<string, unknown> | (() => unknown),
   block?: () => unknown,
@@ -60,11 +60,11 @@ export function javascriptTag(
       : typeof htmlOptions === "object" && htmlOptions !== null
         ? { ...htmlOptions }
         : {};
-    content = capture.call(this as CaptureHelperHost, resolvedBlock);
+    content = capture.call(this, resolvedBlock);
   } else {
     content = contentOrOptionsWithBlock;
     opts = typeof htmlOptions === "object" && htmlOptions !== null ? { ...htmlOptions } : {};
   }
 
-  return contentTag("script", javascriptCdataSection(content), opts);
+  return contentTag.call(this, "script", javascriptCdataSection(content), opts);
 }

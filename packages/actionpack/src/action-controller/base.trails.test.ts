@@ -9,7 +9,11 @@ import {
 import { Model } from "@blazetrails/activemodel";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
+import { include } from "@blazetrails/activesupport";
+
 import { Base } from "./base.js";
+import { Metal } from "./metal.js";
+import { Cookies } from "./metal/cookies.js";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 
@@ -89,6 +93,14 @@ describe("ActionController::Cookies#cookies", () => {
     expect((CookiesController as unknown as { _helperMethods: string[] })._helperMethods).toContain(
       "cookies",
     );
+  });
+
+  it("skips helper_method on a controller without AbstractController::Helpers", () => {
+    class CookiesMetal extends Metal {}
+    expect(rbObjRespondTo(CookiesMetal, "helperMethod", true)).toBe(false);
+    include(CookiesMetal, Cookies);
+    expect(Object.hasOwn(CookiesMetal, "_helperMethods")).toBe(false);
+    expect(rbObjRespondTo(Base, "helperMethod", true)).toBe(true);
   });
 });
 

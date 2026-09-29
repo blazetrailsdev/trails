@@ -2,10 +2,10 @@ import { SafeBuffer, htmlSafe, isBlank, stringifyKeys } from "@blazetrails/activ
 import { hashDelete } from "@blazetrails/ruby-compat";
 
 import { preventContentExfiltration } from "./content-exfiltration-prevention-helper.js";
-import { tag } from "./tag-helper.js";
+import { tag, type TagHelperHost } from "./tag-helper.js";
 import { methodTag, tokenTag, type UrlHelperHost } from "./url-helper.js";
 
-export interface FormTagHelperHost extends UrlHelperHost {
+export interface FormTagHelperHost extends UrlHelperHost, TagHelperHost {
   urlFor(options: unknown): string;
 }
 
@@ -80,7 +80,7 @@ export function extraTagsForForm(
       break;
     default:
       htmlOptions["method"] = "post";
-      methodTagValue = methodTag(method).plus(
+      methodTagValue = methodTag.call(this, method).plus(
         tokenTag.call(this, authenticityToken, {
           formOptions: { action: htmlOptions["action"], method: method },
         }),
@@ -101,7 +101,7 @@ export function formTagHtml(
   htmlOptions: Record<string, unknown>,
 ): SafeBuffer {
   const extraTags = extraTagsForForm.call(this, htmlOptions);
-  const html = (tag("form", htmlOptions, true) as SafeBuffer).plus(extraTags);
+  const html = (tag.call(this, "form", htmlOptions, true) as SafeBuffer).plus(extraTags);
   return preventContentExfiltration(html);
 }
 

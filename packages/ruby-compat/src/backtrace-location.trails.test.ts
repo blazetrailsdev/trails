@@ -9,7 +9,8 @@ describe("Thread::Backtrace::Location", () => {
     expect(loc.label).toBe("_app_views_posts_show");
     expect(loc.lineno).toBe(3);
     expect(loc.column).toBe(11);
-    expect(loc.toS()).toBe(
+    expect(loc.path).toBeNull();
+    expect(loc.toString()).toBe(
       "at Base._app_views_posts_show (eval at compile (x.js:1:2), <anonymous>:3:11)",
     );
   });
@@ -18,6 +19,20 @@ describe("Thread::Backtrace::Location", () => {
     const loc = new Location("    at <anonymous>");
     expect(loc.label).toBeNull();
     expect(loc.lineno).toBe(0);
+  });
+
+  it("reads the path of a named and an anonymous V8 frame", () => {
+    expect(new Location("    at foo (/app/a.js:1:2)").path).toBe("/app/a.js");
+    expect(new Location("    at async /app/b.js:3:4").path).toBe("/app/b.js");
+    expect(new Location("    at file:///app/c.mjs:5:6").path).toBe("file:///app/c.mjs");
+    expect(new Location("    at page (webpack-internal:///(app-pages)/x.js:7:8)").path).toBe(
+      "webpack-internal:///(app-pages)/x.js",
+    );
+    expect(new Location("    at new Foo (/app/d.js:9:1)").path).toBe("/app/d.js");
+    expect(
+      new Location("    at eval (eval at compile (x.js:1:2), <anonymous>:3:11)").path,
+    ).toBeNull();
+    expect(new Location("    at <anonymous>").path).toBeNull();
   });
 });
 

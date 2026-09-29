@@ -1,4 +1,4 @@
-import { Gem, RbConfig, regexpEscape } from "@blazetrails/ruby-compat";
+import { Gem, RbConfig, rbObjAsString, regexpEscape } from "@blazetrails/ruby-compat";
 
 type LineFilter = (line: string) => string;
 type LineSilencer = (line: string) => boolean;
@@ -36,7 +36,7 @@ export class BacktraceCleaner {
     return this;
   }
 
-  clean(backtrace: string[], kind: CleanKind = "silent"): string[] {
+  clean<T>(backtrace: T[], kind: CleanKind = "silent"): Array<T | string> {
     const filtered = this.filterBacktrace(backtrace);
 
     switch (kind) {
@@ -49,7 +49,7 @@ export class BacktraceCleaner {
     }
   }
 
-  filter(backtrace: string[], kind: CleanKind = "silent"): string[] {
+  filter<T>(backtrace: T[], kind: CleanKind = "silent"): Array<T | string> {
     return this.clean(backtrace, kind);
   }
 
@@ -103,19 +103,21 @@ export class BacktraceCleaner {
     this.addSilencer((line) => line.startsWith(RbConfig.CONFIG["rubylibdir"]));
   }
 
-  protected filterBacktrace(backtrace: string[]): string[] {
-    for (const f of this._filters) backtrace = backtrace.map((line) => f(line));
+  protected filterBacktrace<T>(backtrace: Array<T | string>): Array<T | string> {
+    for (const f of this._filters) backtrace = backtrace.map((line) => f(rbObjAsString(line)));
 
     return backtrace;
   }
 
-  protected silence(backtrace: string[]): string[] {
-    for (const s of this._silencers) backtrace = backtrace.filter((line) => !s(line));
+  protected silence<T>(backtrace: Array<T | string>): Array<T | string> {
+    for (const s of this._silencers) {
+      backtrace = backtrace.filter((line) => !s(rbObjAsString(line)));
+    }
 
     return backtrace;
   }
 
-  protected noise(backtrace: string[]): string[] {
-    return backtrace.filter((line) => this._silencers.some((s) => s(line)));
+  protected noise<T>(backtrace: Array<T | string>): Array<T | string> {
+    return backtrace.filter((line) => this._silencers.some((s) => s(rbObjAsString(line))));
   }
 }

@@ -58,13 +58,13 @@ export function defineHelpersModule(
   return mod;
 }
 
-export function helperMethod(cls: HelpersClassMethods, ...names: HelperMethodNameList[]): void {
+export function helperMethod(this: HelpersClassMethods, ...names: HelperMethodNameList[]): void {
   const flat = (names as readonly unknown[]).flat(Infinity) as string[];
   if (flat.length === 0) return;
-  cls._helperMethods = [...(cls._helperMethods ?? []), ...flat];
-  const mod = _helpersForModification(cls);
+  this._helperMethods = [...(this._helperMethods ?? []), ...flat];
+  const mod = _helpersForModification(this);
   for (const name of flat) {
-    let proto = (cls as { prototype?: object }).prototype ?? null;
+    let proto = (this as { prototype?: object }).prototype ?? null;
     let descriptor: PropertyDescriptor | undefined;
     while (proto && !(descriptor = Object.getOwnPropertyDescriptor(proto, name))) {
       proto = Object.getPrototypeOf(proto) as object | null;
@@ -157,7 +157,7 @@ export function clearHelpers(cls: HelpersClassMethods): void {
   const inherited = [...(cls._helperMethods ?? [])];
   cls._helpers = Object.create(null) as HelperMethodsModule;
   cls._helperMethods = [];
-  helperMethod(cls, ...inherited);
+  helperMethod.call(cls, ...inherited);
 }
 
 export function _helpersForModification(cls: HelpersClassMethods): HelperMethodsModule {

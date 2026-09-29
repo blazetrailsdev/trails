@@ -1,13 +1,13 @@
 import { SafeBuffer, htmlEscape } from "@blazetrails/activesupport";
 import { stringify } from "@blazetrails/activesupport/yaml";
-import { contentTag } from "./tag-helper.js";
+import { contentTag, type TagHelperHost } from "./tag-helper.js";
 
-export function debug(object: unknown): SafeBuffer {
+export function debug(this: TagHelperHost, object: unknown): SafeBuffer {
   try {
     const yaml = stringify(object);
-    return contentTag("pre", htmlEscape(yaml), { class: "debug_dump" });
+    return contentTag.call(this, "pre", htmlEscape(yaml), { class: "debug_dump" });
   } catch {
-    return contentTag("code", inspect(object), { class: "debug_dump" });
+    return contentTag.call(this, "code", inspect(object), { class: "debug_dump" });
   }
 }
 

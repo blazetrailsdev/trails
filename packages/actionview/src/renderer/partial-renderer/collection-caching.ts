@@ -49,45 +49,47 @@ export function isWillCache(
 }
 
 /** @internal */
-export async function cacheCollectionRender(
+export function cacheCollectionRender(
   this: CollectionCachingHost,
   instrumentationPayload: Record<string, unknown>,
   view: CollectionCachingView,
   template: RenderableTemplate,
   collection: SameCollectionIterator,
-  block: (collection: SameCollectionIterator) => Promise<RenderedTemplate[]>,
-): Promise<RenderedTemplate[]> {
+  block: (collection: SameCollectionIterator) => RenderedTemplate[] | Promise<RenderedTemplate[]>,
+): RenderedTemplate[] | Promise<RenderedTemplate[]> {
   if (!isWillCache.call(this, this.options, view)) return block(collection);
 
-  const collectionIterator = collection;
+  return (async () => {
+    const collectionIterator = collection;
 
-  const [keyedCollection, orderedKeys] = await collectionByCacheKeys.call(
-    this,
-    view,
-    template,
-    collection,
-  );
+    const [keyedCollection, orderedKeys] = await collectionByCacheKeys.call(
+      this,
+      view,
+      template,
+      collection,
+    );
 
-  const cachedPartials = collectionCache().readMulti(...keyedCollection.keys());
-  instrumentationPayload["cache_hits"] = cachedPartials.size;
+    const cachedPartials = collectionCache().readMulti(...keyedCollection.keys());
+    instrumentationPayload["cache_hits"] = cachedPartials.size;
 
-  const filtered = [...keyedCollection]
-    .filter(([key]) => !cachedPartials.has(key))
-    .map(([, item]) => item);
+    const filtered = [...keyedCollection]
+      .filter(([key]) => !cachedPartials.has(key))
+      .map(([, item]) => item);
 
-  const renderedPartials =
-    filtered.length === 0 ? [] : await block(collectionIterator.fromCollection(filtered));
+    const renderedPartials =
+      filtered.length === 0 ? [] : await block(collectionIterator.fromCollection(filtered));
 
-  let index = 0;
-  const keyedPartials = fetchOrCachePartial.call(
-    this,
-    cachedPartials,
-    template,
-    { orderBy: [...keyedCollection.keys()] },
-    () => renderedPartials[index++],
-  );
+    let index = 0;
+    const keyedPartials = fetchOrCachePartial.call(
+      this,
+      cachedPartials,
+      template,
+      { orderBy: [...keyedCollection.keys()] },
+      () => renderedPartials[index++],
+    );
 
-  return orderedKeys.map((key) => keyedPartials.get(key) as RenderedTemplate);
+    return orderedKeys.map((key) => keyedPartials.get(key) as RenderedTemplate);
+  })();
 }
 
 /** @internal */

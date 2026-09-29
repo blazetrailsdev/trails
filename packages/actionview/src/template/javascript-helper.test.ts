@@ -60,7 +60,7 @@ describe("JavaScriptHelperTest", () => {
   });
 
   it("javascript tag with options", () => {
-    const result = javascriptTag.call(undefined, "alert('hello')", { id: "the_js_tag" }).toString();
+    const result = javascriptTag.call(host(), "alert('hello')", { id: "the_js_tag" }).toString();
     expect(result).toBe(
       "<script id=\"the_js_tag\">\n//<![CDATA[\nalert('hello')\n//]]>\n</script>",
     );

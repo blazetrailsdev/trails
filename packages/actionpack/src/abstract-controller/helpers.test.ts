@@ -21,7 +21,7 @@ function makeBase(): HelpersClassMethods & { name: string } {
 describe("helperMethod", () => {
   it("registers a proxy that forwards to controller[name]", () => {
     const cls = makeBase();
-    helperMethod(cls, "currentUser", "loggedIn");
+    helperMethod.call(cls, "currentUser", "loggedIn");
     expect(cls._helperMethods).toEqual(["currentUser", "loggedIn"]);
 
     const controller = {
@@ -35,14 +35,14 @@ describe("helperMethod", () => {
 
   it("flattens nested name arrays (Rails `methods.flatten!`)", () => {
     const cls = makeBase();
-    helperMethod(cls, "a", ["b", "c"]);
+    helperMethod.call(cls, "a", ["b", "c"]);
     expect(cls._helperMethods).toEqual(["a", "b", "c"]);
     expect(Object.keys(cls._helpers!).sort()).toEqual(["a", "b", "c"]);
   });
 
   it("throws when controller does not respond to the named method", () => {
     const cls = makeBase();
-    helperMethod(cls, "missing");
+    helperMethod.call(cls, "missing");
     expect(() => cls._helpers!.missing.call({ controller: {} })).toThrow(
       /does not respond to 'missing'/,
     );
@@ -50,10 +50,10 @@ describe("helperMethod", () => {
 
   it("copy-on-write: subclass writes don't pollute the parent", () => {
     const parent = makeBase();
-    helperMethod(parent, "fromParent");
+    helperMethod.call(parent, "fromParent");
 
     const child: HelpersClassMethods = Object.create(parent) as HelpersClassMethods;
-    helperMethod(child, "fromChild");
+    helperMethod.call(child, "fromChild");
 
     expect(Object.keys(child._helpers!)).toEqual(["fromChild"]);
     expect(typeof child._helpers!.fromParent).toBe("function");
@@ -64,11 +64,11 @@ describe("helperMethod", () => {
 
   it("parent additions made after subclass mutation remain visible (ancestor link)", () => {
     const parent = makeBase();
-    helperMethod(parent, "early");
+    helperMethod.call(parent, "early");
 
     const child: HelpersClassMethods = Object.create(parent) as HelpersClassMethods;
-    helperMethod(child, "childOnly");
-    helperMethod(parent, "late");
+    helperMethod.call(child, "childOnly");
+    helperMethod.call(parent, "late");
 
     expect(typeof child._helpers!.late).toBe("function");
     expect(typeof child._helpers!.early).toBe("function");
@@ -128,7 +128,7 @@ describe("helper", () => {
 
   it("direct-method precedence: helperMethod beats a later helper(Mod) with the same name", () => {
     const cls = makeBase();
-    helperMethod(cls, "x");
+    helperMethod.call(cls, "x");
     const Override: HelperMethodsModule = { x: () => "from-module" };
     helper(cls, Override);
     expect(typeof cls._helpers!.x).toBe("function");
@@ -170,7 +170,7 @@ describe("helper", () => {
     const cls = makeBase();
     helper(cls, { fromA: () => "A" } as HelperMethodsModule);
     helper(cls, { fromB: () => "B" } as HelperMethodsModule);
-    helperMethod(cls, "currentUser");
+    helperMethod.call(cls, "currentUser");
 
     class ViewContext {}
     include(ViewContext, cls._helpers!);
@@ -212,7 +212,7 @@ describe("clearHelpers", () => {
   it("wipes _helpers + _helperMethods, then re-adds the previous helper_method proxies", () => {
     const cls = makeBase();
     const ExtraHelper: HelperMethodsModule = { extra: () => "EXTRA" };
-    helperMethod(cls, "keep");
+    helperMethod.call(cls, "keep");
     helper(cls, ExtraHelper);
     expect(typeof cls._helpers!.keep).toBe("function");
     expect(typeof cls._helpers!.extra).toBe("function");
@@ -229,7 +229,7 @@ describe("clearHelpers", () => {
 describe("_helpersInstance", () => {
   it("returns this.class._helpers", () => {
     const cls = makeBase();
-    helperMethod(cls, "x");
+    helperMethod.call(cls, "x");
     const host = { constructor: cls } as unknown as HelpersHost;
     expect(_helpersInstance.call(host)).toBe(cls._helpers);
   });
@@ -244,7 +244,7 @@ describe("_helpersInstance", () => {
 describe("_helpersForModification", () => {
   it("returns the own module when present, else links the inherited one as an ancestor", () => {
     const parent = makeBase();
-    helperMethod(parent, "fromParent");
+    helperMethod.call(parent, "fromParent");
     const child: HelpersClassMethods = Object.create(parent) as HelpersClassMethods;
 
     const mod = _helpersForModification(child);
@@ -259,7 +259,7 @@ describe("_helpersForModification", () => {
 
   it("also flattens deeply nested array inputs", () => {
     const cls = makeBase();
-    helperMethod(cls, ["a", ["b", ["c"]]]);
+    helperMethod.call(cls, ["a", ["b", ["c"]]]);
     expect(cls._helperMethods).toEqual(["a", "b", "c"]);
   });
 });
@@ -267,7 +267,7 @@ describe("_helpersForModification", () => {
 describe("_helpers (class-level reader/writer)", () => {
   it("reads from the class, falling through to the parent via prototype", () => {
     const parent = makeBase();
-    helperMethod(parent, "fromParent");
+    helperMethod.call(parent, "fromParent");
     const child: HelpersClassMethods = Object.create(parent) as HelpersClassMethods;
 
     expect(_helpers(child)).toBe(parent._helpers);
@@ -283,7 +283,7 @@ describe("_helpers (class-level reader/writer)", () => {
 
   it("writer with null deletes the own slot to restore parent fallback", () => {
     const parent = makeBase();
-    helperMethod(parent, "fromParent");
+    helperMethod.call(parent, "fromParent");
     const child: HelpersClassMethods = Object.create(parent) as HelpersClassMethods;
     const ownMod = {} as HelperMethodsModule;
     _helpers(child, ownMod);
@@ -296,7 +296,7 @@ describe("_helpers (class-level reader/writer)", () => {
 
   it("instance form delegates to _helpersInstance (class._helpers)", () => {
     const cls = makeBase();
-    helperMethod(cls, "shown");
+    helperMethod.call(cls, "shown");
     const host = { constructor: cls } as HelpersHost;
     const instanceReader = _helpers as (this: HelpersHost) => HelperMethodsModule;
     expect(instanceReader.call(host)).toBe(cls._helpers);
@@ -319,11 +319,11 @@ describe("defineHelpersModule", () => {
 
   it("splices the parent helpers module into the prototype chain", () => {
     const parent = makeBase();
-    helperMethod(parent, "fromParent");
+    helperMethod.call(parent, "fromParent");
     const child = makeBase();
     const mod = defineHelpersModule(child, parent._helpers);
     expect(Object.getPrototypeOf(mod)).toBe(parent._helpers);
-    helperMethod(parent, "addedLater");
+    helperMethod.call(parent, "addedLater");
     expect(typeof mod.addedLater).toBe("function");
   });
 });

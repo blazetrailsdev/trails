@@ -1,10 +1,12 @@
 import { classAttribute, included } from "@blazetrails/activesupport";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { AbstractController } from "../../abstract-controller/base.js";
-import { helperMethod, type HelpersClassMethods } from "../../abstract-controller/helpers.js";
+import type { helperMethod, HelpersClassMethods } from "../../abstract-controller/helpers.js";
 import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
 
 /** @internal */
 export interface FlashClassHost extends HelpersClassMethods {
+  helperMethod?: typeof helperMethod;
   prototype: object;
   _flashTypes: string[];
   methodAdded(name: string): void;
@@ -28,7 +30,7 @@ export function addFlashTypes(this: FlashClassHost, ...types: string[]): void {
       configurable: true,
     });
     this.methodAdded(type);
-    helperMethod(this, type);
+    if (rbObjRespondTo(this, "helperMethod")) this.helperMethod!(type);
 
     this._flashTypes = [...this._flashTypes, type];
   }

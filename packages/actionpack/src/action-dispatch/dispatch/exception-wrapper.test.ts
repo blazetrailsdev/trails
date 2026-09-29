@@ -55,7 +55,7 @@ describe("ExceptionWrapperTest", () => {
 
   it("#application_trace returns traces only from the application", () => {
     const wrapper = new ExceptionWrapper(new Error("test"));
-    for (const line of wrapper.applicationTrace) {
+    for (const line of wrapper.applicationTrace.map(String)) {
       expect(line).not.toContain("node_modules");
     }
   });
@@ -85,7 +85,7 @@ describe("ExceptionWrapperTest", () => {
 
   it("#framework_trace returns traces outside the application", () => {
     const wrapper = new ExceptionWrapper(new Error("test"));
-    for (const line of wrapper.frameworkTrace) {
+    for (const line of wrapper.frameworkTrace.map(String)) {
       expect(line).toContain("node_modules");
     }
   });
@@ -123,12 +123,12 @@ describe("ExceptionWrapperTest", () => {
     expect(traces["Full Trace"].map((frame) => frame.id)).toEqual(
       wrapper.fullTrace.map((_trace, idx) => idx),
     );
-    expect(traces["Full Trace"].map((frame) => frame.trace)).toEqual(wrapper.fullTrace);
+    expect(traces["Full Trace"].map((frame) => frame.trace)).toEqual(wrapper.fullTrace.map(String));
     for (const frame of traces["Full Trace"]) {
       expect(frame.exceptionObjectId).toBe(wrapper.exceptionId());
     }
     for (const frame of traces["Application Trace"]) {
-      expect(wrapper.applicationTrace).toContain(frame.trace);
+      expect(wrapper.applicationTrace.map(String)).toContain(frame.trace);
     }
   });
 

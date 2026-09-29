@@ -10,12 +10,16 @@ import {
   highlight,
   pluralize,
   resetCycle,
-  simpleFormat,
+  simpleFormat as _simpleFormat,
   truncate,
   wordWrap,
   type TextHelperHost,
 } from "../helpers/text-helper.js";
 import { raw } from "../helpers/output-safety-helper.js";
+import { Base } from "../base.js";
+
+const view = new (Base.withEmptyTemplateCache())(null, {}, null);
+const simpleFormat = _simpleFormat.bind(view);
 
 function newHost(initial = ""): TextHelperHost {
   return { outputBuffer: new OutputBuffer(initial) };

@@ -21,13 +21,17 @@ import type { CollectionCachingView } from "./partial-renderer/collection-cachin
 /** @internal */
 export type IterationVariables = readonly string[];
 
-type Collection = readonly unknown[] | PromiseLike<readonly unknown[]>;
+type Collection = readonly unknown[];
 
 type Relation = PromiseLike<readonly unknown[]> & {
   readonly isLoaded: boolean;
   skipPreloadingBang(): unknown;
   preloadAssociations(records: Collection): Promise<void>;
 };
+
+function isThenable<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
+  return typeof (value as PromiseLike<T> | null)?.then === "function";
+}
 
 export class PartialIteration {
   readonly size: number;
@@ -61,20 +65,19 @@ export class CollectionIterator {
     this.collection = collection;
   }
 
-  async each(blk: (object: unknown) => void): Promise<void> {
-    (await this.collection).forEach((object) => blk(object));
+  each(blk: (object: unknown) => void): void {
+    this.collection.forEach((object) => blk(object));
   }
 
-  async size(): Promise<number> {
-    return (await this.collection).length;
+  size(): number {
+    return this.collection.length;
   }
 
-  async length(): Promise<number> {
-    const collection = await this.collection;
-    return rbObjRespondTo(collection, "length") ? collection.length : this.size();
+  length(): number {
+    return rbObjRespondTo(this.collection, "length") ? this.collection.length : this.size();
   }
 
-  async preloadBang(): Promise<void> {}
+  preloadBang(): void | Promise<void> {}
 }
 
 /** @internal */
@@ -97,9 +100,11 @@ export class SameCollectionIterator extends CollectionIterator {
     ) => SameCollectionIterator)(collection, this.path, this.variables);
   }
 
-  async eachWithInfo(blk: (object: unknown, variables: IterationVariables) => void): Promise<void> {
+  eachWithInfo(
+    blk: (object: unknown, variables: IterationVariables) => void,
+  ): void | Promise<void> {
     const variables = [this.path, ...this.variables];
-    (await this.collection).forEach((o) => blk(o, variables));
+    this.collection.forEach((o) => blk(o, variables));
   }
 }
 
@@ -126,7 +131,7 @@ export class PreloadCollectionIterator extends SameCollectionIterator {
     blk: (object: unknown, variables: IterationVariables) => void,
   ): Promise<void> {
     await this.preloadBang();
-    await super.eachWithInfo(blk);
+    super.eachWithInfo(blk);
   }
 
   override async preloadBang(): Promise<void> {
@@ -143,8 +148,8 @@ export class MixedCollectionIterator extends CollectionIterator {
     this.paths = paths;
   }
 
-  async eachWithInfo(blk: (object: unknown, variables: IterationVariables) => void): Promise<void> {
-    (await this.collection).forEach((o, i) => blk(o, this.paths[i]));
+  eachWithInfo(blk: (object: unknown, variables: IterationVariables) => void): void {
+    this.collection.forEach((o, i) => blk(o, this.paths[i]));
   }
 }
 
@@ -163,22 +168,22 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
     this.contextPrefix = lookupContext.prefixes[0] ?? "";
   }
 
-  async renderCollectionWithPartial(
-    collection: Collection,
+  renderCollectionWithPartial(
+    collection: Collection | Relation,
     partial: string,
     context: ViewContext,
     block: unknown,
-  ): Promise<RenderedCollection | EmptyCollection> {
+  ): RenderedCollection | EmptyCollection | Promise<RenderedCollection | EmptyCollection> {
     const iterVars = this.retrieveVariable(partial);
 
     const collectionIterator = rbObjRespondTo(collection, "preloadAssociations")
       ? new PreloadCollectionIterator(
-          collection,
+          collection as unknown as Collection,
           partial,
           iterVars,
-          collection as unknown as Relation,
+          collection as Relation,
         )
-      : new SameCollectionIterator(collection, partial, iterVars);
+      : new SameCollectionIterator(collection as Collection, partial, iterVars);
 
     const template = this.findTemplate(partial, [...Object.keys(this.locals), ...iterVars]);
 
@@ -188,14 +193,26 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
       layout = this.findTemplate(String(optionsLayout), [...Object.keys(this.locals), ...iterVars]);
     }
 
+    if (isThenable(collection)) {
+      return Promise.resolve(collection).then((records) =>
+        this.renderCollection(
+          collectionIterator.fromCollection(records),
+          context,
+          partial,
+          template,
+          layout,
+          block,
+        ),
+      );
+    }
     return this.renderCollection(collectionIterator, context, partial, template, layout, block);
   }
 
-  async renderCollectionDerivePartial(
+  renderCollectionDerivePartial(
     collection: readonly unknown[],
     context: ViewContext,
     block: unknown,
-  ): Promise<RenderedCollection | EmptyCollection> {
+  ): RenderedCollection | EmptyCollection | Promise<RenderedCollection | EmptyCollection> {
     const paths = collection.map((o) => this.partialPath(o, context));
 
     if (paths.filter((path, i) => paths.indexOf(path) === i).length === 1) {
@@ -221,24 +238,26 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
   }
 
   /** @internal */
-  protected async renderCollection(
+  protected renderCollection(
     collection: SameCollectionIterator | MixedCollectionIterator,
     view: ViewContext,
     path: string | null,
     template: RenderableTemplate | null,
     layout: RenderableTemplate | null,
     block: unknown,
-  ): Promise<RenderedCollection | EmptyCollection> {
+  ): RenderedCollection | EmptyCollection | Promise<RenderedCollection | EmptyCollection> {
     void block;
     const identifier = (template && template.identifier) || path;
-    return Notifications.instrument<Promise<RenderedCollection | EmptyCollection>>(
+    return Notifications.instrument<
+      RenderedCollection | EmptyCollection | Promise<RenderedCollection | EmptyCollection>
+    >(
       "render_collection.action_view",
       {
         identifier,
         layout: layout && layout.virtualPath,
-        count: await collection.length(),
+        count: collection.length(),
       },
-      async (payload) => {
+      (payload) => {
         let spacer: RenderedTemplate;
         if (hasKey(this.options, "spacerTemplate")) {
           const spacerTemplate = this.findTemplate(
@@ -246,7 +265,7 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
             Object.keys(this.locals),
           );
           spacer = this.buildRenderedTemplate(
-            await spacerTemplate.render(view, this.locals),
+            spacerTemplate.render(view, this.locals) as string,
             spacerTemplate,
           );
         } else {
@@ -254,7 +273,7 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
         }
 
         const collectionBody = template
-          ? await this.cacheCollectionRender(
+          ? this.cacheCollectionRender(
               payload,
               view as unknown as CollectionCachingView,
               template,
@@ -262,34 +281,36 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
               (filteredCollection) =>
                 this.collectionWithTemplate(view, template, layout, filteredCollection),
             )
-          : await this.collectionWithTemplate(view, null, layout, collection);
+          : this.collectionWithTemplate(view, null, layout, collection);
 
-        if (collectionBody.length === 0) {
-          return RenderedCollection.empty(this.lookupContext.formats[0] as string);
-        }
+        const build = (body: RenderedTemplate[]): RenderedCollection | EmptyCollection => {
+          if (body.length === 0) {
+            return RenderedCollection.empty(this.lookupContext.formats[0] as string);
+          }
 
-        return this.buildRenderedCollection(collectionBody, spacer);
+          return this.buildRenderedCollection(body, spacer);
+        };
+        return collectionBody instanceof Promise
+          ? collectionBody.then(build)
+          : build(collectionBody);
       },
     );
   }
 
   /** @internal */
-  protected async collectionWithTemplate(
+  protected collectionWithTemplate(
     view: ViewContext,
     template: RenderableTemplate | null,
     layout: RenderableTemplate | null,
     collection: SameCollectionIterator | MixedCollectionIterator,
-  ): Promise<RenderedTemplate[]> {
+  ): RenderedTemplate[] | Promise<RenderedTemplate[]> {
     const locals = this.locals;
     const cache: Record<string, RenderableTemplate> = {};
 
-    const partialIteration = new PartialIteration(await collection.size());
-
-    const pairs: [unknown, IterationVariables][] = [];
-    await collection.eachWithInfo((object, variables) => pairs.push([object, variables]));
+    const partialIteration = new PartialIteration(collection.size());
 
     const rendered: RenderedTemplate[] = [];
-    for (const [object, [path, as, counter, iteration]] of pairs) {
+    const each = collection.eachWithInfo((object, [path, as, counter, iteration]) => {
       const index = partialIteration.index;
 
       locals[as] = object;
@@ -299,13 +320,13 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
       const _template = (cache[path] ??=
         template ?? this.findTemplate(path, [...Object.keys(this.locals), as, counter, iteration]));
 
-      let content = await _template.render(view, locals, null, {
+      let content = _template.render(view, locals, null, {
         implicitLocals: [counter, iteration],
-      });
-      if (layout) content = await layout.render(view, locals, null, {}, () => content);
+      }) as string;
+      if (layout) content = layout.render(view, locals, null, {}, () => content) as string;
       partialIteration.iterateBang();
       rendered.push(this.buildRenderedTemplate(content, _template));
-    }
-    return rendered;
+    });
+    return each instanceof Promise ? each.then(() => rendered) : rendered;
   }
 }
