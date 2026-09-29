@@ -462,6 +462,18 @@ describe("body call capture", () => {
     expect(m.calls).toContain("constructor");
   });
 
+  it("credits `new` off any receiver, as the Ruby extractor records `x.new`", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        build() {
+          return { new: () => 1 }.new();
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((x) => x.name === "build")!;
+    expect(m.calls).toContain("constructor");
+  });
+
   it("does not give a respond_to?-guard read the guarded call's position (logger.rb:23-24)", () => {
     const cls = extractFromSource(
       `class Foo {

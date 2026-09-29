@@ -33,6 +33,7 @@ afterEach(async (context: TestContext) => {
   } finally {
     await context.testCase?.afterTeardown?.(test);
   }
+  if (test.failures.length > 0) throw test.failures[0];
 });
 
 /** @noRailsEquivalent PERMANENT */

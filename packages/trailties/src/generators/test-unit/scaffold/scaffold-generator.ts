@@ -38,6 +38,7 @@ export class ScaffoldGenerator extends NamedBase {
     );
   }
 
+  /** @missingRailsCall mountable_engine? — CONVERGEABLE scaffold-controller-hooks-test-framework-and-engine-arms */
   fixtureName(): string {
     return (this._fixtureName ??= this.tableName());
   }
