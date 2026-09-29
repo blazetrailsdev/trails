@@ -85,7 +85,7 @@ export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<
       yield this._strBody;
     } else {
       const chunks: unknown[] = [];
-      this.eachChunk((chunk) => chunks.push(chunk));
+      this.eachChunk((chunk) => void chunks.push(chunk));
       yield* chunks;
     }
   }
@@ -94,25 +94,30 @@ export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<
     if (this._strBody !== null) {
       yield this._strBody;
     } else {
-      const chunks: unknown[] = [];
+      const yielded: Array<{ chunk: unknown; resume: () => void }> = [];
       let wake: (() => void) | null = null;
       let done = false;
       const eachChunk = Promise.resolve(
-        this.eachChunk((chunk) => {
-          chunks.push(chunk);
-          wake?.();
-        }),
+        this.eachChunk(
+          (chunk) =>
+            new Promise<void>((resume) => {
+              yielded.push({ chunk, resume });
+              wake?.();
+            }),
+        ),
       ).finally(() => {
         done = true;
         wake?.();
       });
       eachChunk.catch(() => {});
-      while (chunks.length > 0 || !done) {
-        if (chunks.length === 0) {
+      while (yielded.length > 0 || !done) {
+        const next = yielded.shift();
+        if (next) {
+          yield next.chunk;
+          next.resume();
+        } else {
           await new Promise<void>((resolve) => (wake = resolve));
           wake = null;
-        } else {
-          yield chunks.shift();
         }
       }
       await eachChunk;
@@ -131,7 +136,7 @@ export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<
   }
 
   /** @internal */
-  protected eachChunk(block: (chunk: unknown) => void): void | Promise<void> {
+  protected eachChunk(block: (chunk: unknown) => void | Promise<void>): void | Promise<void> {
     (this._buf as unknown as Array<unknown>).forEach(block);
   }
 }

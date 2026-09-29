@@ -67,6 +67,19 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
     return !this._aborted;
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  override *each(): IterableIterator<unknown> {
+    if (this._strBody !== null) {
+      yield this._strBody;
+    } else {
+      while (true) {
+        const str = this._buf.pop(true);
+        if (str === null) break;
+        yield str;
+      }
+    }
+  }
+
   onError(block: ErrorCallback): void {
     this._errorCallback = block;
   }
@@ -76,11 +89,13 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
   }
 
   /** @internal */
-  protected override async eachChunk(block: (chunk: unknown) => void): Promise<void> {
+  protected override async eachChunk(
+    block: (chunk: unknown) => void | Promise<void>,
+  ): Promise<void> {
     while (true) {
       const str = await this._buf.pop();
       if (str === null) break;
-      block(str);
+      await block(str);
     }
   }
 

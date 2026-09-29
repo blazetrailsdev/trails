@@ -1,4 +1,5 @@
 import { ArgumentError } from "./argument-error.js";
+import { ThreadError } from "./thread-error.js";
 
 interface QueueData<T> {
   que: T[];
@@ -28,9 +29,19 @@ function queueDoPush<T>(self: Queue<T>, q: QueueData<T>, obj: T): Queue<T> {
   return self;
 }
 
-async function queueDoPop<T>(q: QueueData<T>): Promise<T> {
-  while (q.que.length === 0) {
-    await queueSleep(q.waitq);
+function queueDoPop<T>(q: QueueData<T>, shouldBlock: boolean): T | Promise<T> {
+  if (q.que.length === 0) {
+    if (!shouldBlock) {
+      throw new ThreadError("queue empty");
+    }
+
+    return (async () => {
+      while (q.que.length === 0) {
+        await queueSleep(q.waitq);
+      }
+
+      return q.que.shift()!;
+    })();
   }
 
   return q.que.shift()!;
@@ -39,7 +50,10 @@ async function queueDoPop<T>(q: QueueData<T>): Promise<T> {
 /**
  * `vendor/ruby/v3.3.11/thread_sync.c:1677` `rb_cQueue`, `Thread::Queue`. A thread
  * blocked in `pop` sleeps until a `push` wakes it; here `pop` is a promise that
- * the waking `push` resolves.
+ * the waking `push` resolves. Only the members trails calls are ported
+ * (`packages/ruby-compat/README.md` rule 1): there is no `close`, `closed?`,
+ * `empty?`, `length`, `num_waiting` or `SizedQueue#max=`, so no queue is ever
+ * closed and `push` never raises `ClosedQueueError`.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Thread::Queue`
  * (`vendor/ruby/v3.3.11/thread_sync.c:1677`).
@@ -61,14 +75,19 @@ export class Queue<T = unknown> {
   }
 
   /**
-   * `vendor/ruby/v3.3.11/thread_sync.c:1162` `rb_queue_pop`, awaiting the next object
-   * where Ruby's blocking form sleeps.
+   * `vendor/ruby/v3.3.11/thread_sync.c:1162` `rb_queue_pop`
+   * (`vendor/ruby/v3.3.11/thread_sync.rb:14`). The blocking form answers a promise of
+   * the next object where Ruby's sleeps; `nonBlock` answers it at once or
+   * raises `ThreadError` "queue empty".
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Thread::Queue#pop`
    * (`vendor/ruby/v3.3.11/thread_sync.c:1162`).
    */
-  pop(): Promise<T> {
-    return queueDoPop(queuePtr<T>(this));
+  pop(nonBlock?: false): Promise<T>;
+  pop(nonBlock: true): T;
+  pop(nonBlock: boolean = false): T | Promise<T> {
+    const retval = queueDoPop(queuePtr<T>(this), !nonBlock);
+    return nonBlock ? retval : Promise.resolve(retval);
   }
 
   /**
@@ -149,20 +168,15 @@ export class SizedQueue<T = unknown> extends Queue<T> {
   }
 
   /**
-   * `vendor/ruby/v3.3.11/thread_sync.c:1385` `szqueue_do_pop`.
+   * `vendor/ruby/v3.3.11/thread_sync.c:1397` `rb_szqueue_pop`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Thread::SizedQueue#pop`
    * (`vendor/ruby/v3.3.11/thread_sync.c:1397`).
    */
-  override async pop(): Promise<T> {
-    const sq = queuePtr<T>(this);
-    const retval = await queueDoPop(sq);
-
-    if (sq.que.length < sq.max) {
-      wakeupOne(sq.pushq);
-    }
-
-    return retval;
+  override pop(nonBlock?: false): Promise<T>;
+  override pop(nonBlock: true): T;
+  override pop(nonBlock: boolean = false): T | Promise<T> {
+    return nonBlock ? szqueueDoPop(this, false) : Promise.resolve(szqueueDoPop(this, true));
   }
 
   /**
@@ -178,4 +192,17 @@ export class SizedQueue<T = unknown> extends Queue<T> {
     while (sq.pushq.length > 0) wakeupOne(sq.pushq);
     return this;
   }
+}
+
+function szqueueDoPop<T>(self: SizedQueue<T>, shouldBlock: boolean): T | Promise<T> {
+  const sq = queuePtr<T>(self);
+  const wakeup = (retval: T): T => {
+    if (sq.que.length < sq.max) {
+      wakeupOne(sq.pushq);
+    }
+
+    return retval;
+  };
+  const retval = queueDoPop(sq, shouldBlock);
+  return retval instanceof Promise ? retval.then(wakeup) : wakeup(retval);
 }

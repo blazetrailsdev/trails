@@ -16,7 +16,7 @@ import {
   sendStream,
   responseBody,
 } from "./live.js";
-import { IOError, RuntimeError } from "@blazetrails/ruby-compat";
+import { IOError, RuntimeError, SizedQueue, ThreadError } from "@blazetrails/ruby-compat";
 import { Request } from "../../action-dispatch/http/request.js";
 
 function makeResponse() {
@@ -147,15 +147,37 @@ describe("ActionController::Live::Buffer", () => {
       static override queueSize: number | null = 1;
     }
     const buf = new SmallBuffer(makeResponse());
+    const queue = (buf as unknown as { _buf: SizedQueue<string | null> })._buf;
+    expect(queue).toBeInstanceOf(SizedQueue);
+    expect(queue.max).toBe(1);
     buf.write("one");
     buf.write("two");
-    buf.close();
-    expect(await drain(buf)).toEqual(["one", "two"]);
+    expect(queue.pop(true)).toBe("one");
+    expect(() => queue.pop(true)).toThrow(ThreadError);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(queue.pop(true)).toBe("two");
   });
 
-  it("does not answer to_ary (live.rb undef_method :to_ary)", () => {
-    const buf = new Buffer(makeResponse()) as unknown as Record<string, unknown>;
-    expect(buf.toAry).toBeUndefined();
+  it("an async reader takes one chunk at a time, leaving the queue bound in force", async () => {
+    class SmallBuffer extends Buffer {
+      static override queueSize: number | null = 1;
+    }
+    const buf = new SmallBuffer(makeResponse());
+    const queue = (buf as unknown as { _buf: SizedQueue<string | null> })._buf;
+    buf.write("one");
+    buf.write("two");
+    buf.write("three");
+    const reader = buf[Symbol.asyncIterator]();
+    expect((await reader.next()).value).toBe("one");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(queue.pop(true)).toBe("two");
+    expect(() => queue.pop(true)).toThrow(ThreadError);
+  });
+
+  it("a sync read of a live buffer raises rather than blocking before close", () => {
+    const buf = new Buffer(makeResponse());
+    buf.write("one");
+    expect(() => [...buf.each()]).toThrow(ThreadError);
   });
 });
 
@@ -240,14 +262,14 @@ describe("ActionController::Live::Response", () => {
     expect(await drain(res.stream)).toEqual(["a", "b"]);
   });
 
-  it("inherits DispatchResponse.create factory shape (status/headers/body args)", async () => {
+  it("inherits DispatchResponse.create factory shape (status/headers/body args)", () => {
     const res = new Response(201, { "x-test": "1" }, []);
     res.request = makeResponse().request;
     res.stream.write("seed");
     res.stream.close();
     expect(res.status).toBe(201);
     expect(res.headers.get("x-test")).toBe("1");
-    expect(await drain(res)).toEqual(["seed"]);
+    expect(res.body).toBe("seed");
     expect(res.stream).toBeInstanceOf(Buffer);
   });
 
@@ -300,10 +322,10 @@ describe("ActionController::Live#process", () => {
 });
 
 describe("ActionController::Live#response_body=", () => {
-  it("assigns the body and closes the response", async () => {
+  it("assigns the body and closes the response", () => {
     const host = makeHost();
     responseBody.call(host, "payload");
-    expect(await drain(host.response)).toEqual(["payload"]);
+    expect(host.response.body).toBe("payload");
     expect(host.response.committed).toBe(true);
   });
 });

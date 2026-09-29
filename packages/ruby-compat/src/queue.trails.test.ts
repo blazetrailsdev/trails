@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ArgumentError } from "./argument-error.js";
 import { Queue, SizedQueue } from "./queue.js";
+import { ThreadError } from "./thread-error.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -23,6 +24,14 @@ describe("Thread::Queue", () => {
     void q.push("x");
     await pending;
     expect(popped).toBe("x");
+  });
+
+  it("pop(true) answers at once, or raises ThreadError when empty", () => {
+    const q = new Queue<number>();
+    void q.push(1);
+    expect(q.pop(true)).toBe(1);
+    expect(() => q.pop(true)).toThrow(ThreadError);
+    expect(() => q.pop(true)).toThrow("queue empty");
   });
 
   it("clear removes all objects", async () => {
