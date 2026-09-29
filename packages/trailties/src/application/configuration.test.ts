@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { assertRaises, OrderedOptions, runLoadHooks } from "@blazetrails/activesupport";
 import { Base, Resolver } from "@blazetrails/actionview";
 import { Trailtie as ActionViewTrailtie } from "../trailties/action-view.js";
-import { env, RuntimeError, setEnv } from "@blazetrails/ruby-compat";
+import { env, getFs, RuntimeError, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { Trails, _resetTrailsEnv } from "../rails.js";
 
@@ -214,7 +214,7 @@ describe("ConfigurationTest", () => {
     application.config.secretKeyBase = null;
 
     expect(application.secretKeyBase()).not.toBeNull();
-    await access(join(appPath, "tmp/local_secret.txt"));
+    expect(await getFs().exists(join(appPath, "tmp/local_secret.txt"))).toBeTruthy();
   });
 
   it("application will generate secret_key_base in tmp file if blank in test", async () => {
@@ -222,7 +222,7 @@ describe("ConfigurationTest", () => {
     application.config.secretKeyBase = null;
 
     expect(application.secretKeyBase()).not.toBeNull();
-    await access(join(appPath, "tmp/local_secret.txt"));
+    expect(await getFs().exists(join(appPath, "tmp/local_secret.txt"))).toBeTruthy();
   });
 
   it("application will use ENV['SECRET_KEY_BASE'] if present in local env", async () => {
