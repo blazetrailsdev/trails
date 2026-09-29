@@ -1,4 +1,6 @@
 import { statusCode } from "@blazetrails/rack";
+import { DoubleRenderError } from "../../abstract-controller/rendering.js";
+import { ActionControllerError } from "./exceptions.js";
 
 export class UnsafeRedirectError extends Error {
   constructor(message?: string) {
@@ -19,6 +21,52 @@ export interface RedirectingHost {
 
 interface PrivateHost extends RedirectingHost {
   raiseOnOpenRedirects?: boolean;
+}
+
+interface RedirectToHost extends PrivateHost {
+  request: RedirectingHost["request"] & { protocol?: string; hostWithPort?: string };
+  readonly performed: boolean;
+  location: string;
+  responseBody: unknown;
+  status: number | string;
+}
+
+export function redirectTo(
+  this: RedirectToHost,
+  options: unknown = {},
+  responseOptions: Record<string, unknown> = {},
+): void {
+  if (options == null || options === false) {
+    throw new ActionControllerError("Cannot redirect to nil!");
+  }
+  if (this.performed) throw new DoubleRenderError();
+
+  const allowOtherHost = Object.hasOwn(responseOptions, "allowOtherHost")
+    ? (responseOptions.allowOtherHost as boolean)
+    : _allowOtherHost.call(this);
+  delete responseOptions.allowOtherHost;
+
+  const proposedStatus = _extractRedirectToStatus.call(this, options, responseOptions);
+
+  const redirectToLocation = _computeRedirectToLocation.call(this, this.request, options);
+  _ensureUrlIsHttpHeaderSafe.call(this, redirectToLocation);
+
+  this.location = _enforceOpenRedirectProtection.call(this, redirectToLocation, {
+    allowOtherHost,
+  });
+  this.responseBody = "";
+  this.status = proposedStatus;
+}
+
+export function redirectBack(
+  this: RedirectingHost,
+  {
+    fallbackLocation,
+    allowOtherHost = _allowOtherHost.call(this as PrivateHost),
+    ...args
+  }: { fallbackLocation: string; allowOtherHost?: boolean } & Record<string, unknown>,
+): void {
+  redirectBackOrTo.call(this, fallbackLocation, { allowOtherHost, ...args });
 }
 
 export function redirectBackOrTo(

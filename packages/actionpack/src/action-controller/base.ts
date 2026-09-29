@@ -15,6 +15,7 @@ import { RequestForgeryProtection } from "../action-dispatch/request-forgery-pro
 import { respondTo } from "./metal/mime-responds.js";
 import { DefaultHeaders } from "./metal/default-headers.js";
 import { actionMethods, addFlashTypes, Flash } from "./metal/flash.js";
+import { _computeRedirectToLocation, redirectBack, redirectBackOrTo } from "./metal/redirecting.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
 import { MissingFile } from "./metal/exceptions.js";
 import { defaultRender } from "./metal/implicit-render.js";
@@ -110,7 +111,6 @@ import {
   type SendDataOptions,
   type SendFileOptions,
 } from "./metal/data-streaming.js";
-import { statusCode } from "@blazetrails/rack";
 import {
   Options as ParamsWrapperOptions,
   _defaultWrapModel,
@@ -249,6 +249,10 @@ export interface Base {
   routeFor(name: string, ...args: unknown[]): string;
   polymorphicUrl(recordOrHashOrArray: PolymorphicArg, options?: PolymorphicOptions): string;
   polymorphicPath(recordOrHashOrArray: PolymorphicArg, options?: PolymorphicOptions): string;
+  redirectTo(options?: unknown, responseOptionsAndFlash?: Record<string, unknown>): void;
+  redirectBack: typeof redirectBack;
+  redirectBackOrTo: typeof redirectBackOrTo;
+  _computeRedirectToLocation: typeof _computeRedirectToLocation;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -422,50 +426,6 @@ export class Base extends Metal {
 
   renderedFormat(): unknown {
     return this._renderedFormat;
-  }
-
-  redirectTo(
-    options: string,
-    responseOptions: {
-      status?: number | string;
-      allow_other_host?: boolean;
-      flash?: Record<string, unknown>;
-      [flashType: string]: unknown;
-    } = {},
-  ): void {
-    for (const flashType of (this.constructor as typeof Base)._flashTypes) {
-      const type = responseOptions[flashType];
-      delete responseOptions[flashType];
-      if (type != null && type !== false) this.flash.set(flashType, type);
-    }
-
-    const otherFlashes = responseOptions.flash;
-    delete responseOptions.flash;
-    if (otherFlashes != null && (otherFlashes as unknown) !== false) {
-      this.flash.update(otherFlashes);
-    }
-
-    if (this.performed) {
-      throw new DoubleRenderError(
-        "Render and/or redirect were called multiple times in this action.",
-      );
-    }
-
-    const proposedStatus = responseOptions.status ? statusCode(responseOptions.status) : 302;
-    this.headers.set("location", options);
-    this.responseBody = "";
-    this.status = proposedStatus;
-    this.markPerformed();
-  }
-
-  redirectBack(options: {
-    fallbackLocation: string;
-    status?: number | string;
-    allow_other_host?: boolean;
-  }): void {
-    const referer = this.request?.getHeader("referer");
-    const url = referer ?? options.fallbackLocation;
-    this.redirectTo(url, { status: options.status });
   }
 
   respondTo = respondTo;
@@ -900,6 +860,9 @@ export class Base extends Metal {
 
 include(Base, ConfigMethods);
 include(Base, Cookies);
+Base.prototype.redirectBack = redirectBack;
+Base.prototype.redirectBackOrTo = redirectBackOrTo;
+Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
 include(Base, Flash);
 include(Base, StrongParametersModule);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;

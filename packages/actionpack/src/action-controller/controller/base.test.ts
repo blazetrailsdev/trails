@@ -179,7 +179,7 @@ describe("ActionController::Base redirecting", () => {
     const c = new RedirectController();
     await c.dispatch("index", makeRequest(), makeResponse());
     expect(c.status).toBe(302);
-    expect(c.headers.get("location")).toBe("/other");
+    expect(c.headers.get("location")).toBe("http://localhost/other");
     expect(c.performed).toBe(true);
   });
 
@@ -227,7 +227,7 @@ describe("ActionController::Base redirecting", () => {
     const c = new RedirectBackController();
     const req = makeRequest({ HTTP_REFERER: "/previous" });
     await c.dispatch("index", req, makeResponse());
-    expect(c.headers.get("location")).toBe("/previous");
+    expect(c.headers.get("location")).toBe("http://localhost/previous");
   });
 
   it("redirectBack uses fallback when no referer", async () => {
@@ -238,7 +238,7 @@ describe("ActionController::Base redirecting", () => {
     }
     const c = new RedirectBackFallController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.headers.get("location")).toBe("/fallback");
+    expect(c.headers.get("location")).toBe("http://localhost/fallback");
   });
 });
 

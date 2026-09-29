@@ -9,10 +9,11 @@
  */
 
 import { AssertionResponse } from "../assertion-response.js";
+import { _computeRedirectToLocation } from "../../../action-controller/metal/redirecting.js";
 
 export interface AssertionResponseHost {
   response: AssertionResponseLike;
-  request?: { env?: Record<string, unknown> };
+  request?: { env?: Record<string, unknown>; protocol?: string; hostWithPort?: string };
   controller?: unknown;
 }
 
@@ -108,7 +109,7 @@ export function normalizeArgumentToRedirection(
   if (handle?._computeRedirectToLocation) {
     return handle._computeRedirectToLocation(this.request, fragment);
   }
-  return fragment;
+  return _computeRedirectToLocation(this.request!, fragment);
 }
 
 /** @internal */

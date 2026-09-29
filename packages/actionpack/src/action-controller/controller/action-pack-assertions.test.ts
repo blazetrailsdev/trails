@@ -259,7 +259,7 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("redirect invalid external route", async () => {
     await tc.get("redirectInvalidExternalRoute");
-    expect(tc.response.redirectUrl).toBe("ht_tp://www.rubyonrails.org");
+    expect(tc.response.redirectUrl).toBe("http://test.hostht_tp://www.rubyonrails.org");
   });
 
   it("redirected to url full url", async () => {

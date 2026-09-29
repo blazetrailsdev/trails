@@ -3,6 +3,7 @@ import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { AbstractController } from "../../abstract-controller/base.js";
 import type { helperMethod, HelpersClassMethods } from "../../abstract-controller/helpers.js";
 import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
+import { redirectTo as redirectingRedirectTo } from "./redirecting.js";
 
 /** @internal */
 export interface FlashClassHost extends HelpersClassMethods {
@@ -16,6 +17,28 @@ export class Flash {
   static [included](base: FlashClassHost & { addFlashTypes(...types: string[]): void }): void {
     classAttribute.call(base, "_flashTypes", { instanceAccessor: false, default: [] });
     base.addFlashTypes("alert", "notice");
+  }
+
+  redirectTo(
+    this: { constructor: unknown; flash: FlashHash },
+    options: unknown = {},
+    responseOptionsAndFlash: Record<string, unknown> = {},
+  ): void {
+    for (const flashType of (this.constructor as FlashClassHost)._flashTypes) {
+      const type = responseOptionsAndFlash[flashType];
+      delete responseOptionsAndFlash[flashType];
+      if (type != null && type !== false) {
+        this.flash.set(flashType, type);
+      }
+    }
+
+    const otherFlashes = responseOptionsAndFlash.flash;
+    delete responseOptionsAndFlash.flash;
+    if (otherFlashes != null && otherFlashes !== false) {
+      this.flash.update(otherFlashes as Record<string, unknown>);
+    }
+
+    redirectingRedirectTo.call(this as never, options, responseOptionsAndFlash);
   }
 }
 
