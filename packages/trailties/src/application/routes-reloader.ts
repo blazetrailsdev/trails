@@ -28,7 +28,7 @@ export class RoutesReloader {
     return this.updater().isUpdated();
   }
 
-  async reload(
+  async reloadBang(
     loader: (this: RoutesReloader, path: string) => void | Promise<void> = loadRoutesFile,
   ): Promise<void> {
     try {
@@ -65,7 +65,7 @@ export class RoutesReloader {
         return hash;
       }, {});
 
-      return new FileUpdateChecker(this.paths, dirs, () => this.reload());
+      return new FileUpdateChecker(this.paths, dirs, () => this.reloadBang());
     })());
   }
 }

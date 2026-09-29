@@ -207,7 +207,7 @@ export class Application extends Engine {
   }
 
   async reloadRoutesBang(): Promise<void> {
-    await this.routesReloader().reload();
+    await this.routesReloader().reloadBang();
   }
 
   async reloadRoutesUnlessLoaded(): Promise<boolean> {

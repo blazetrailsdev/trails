@@ -28,11 +28,6 @@ export interface FinisherReloader {
   prepareBang(): void;
 }
 
-export interface FinisherFileWatcher {
-  isUpdated(): boolean;
-  execute(): Promise<void>;
-}
-
 export interface FinisherConfig {
   toPrepareBlocks: ConfigurationBlock[];
   eagerLoad: boolean | null;
@@ -171,7 +166,9 @@ Finisher.initializer(
     if (this.config.isReloadingEnabled()) {
       if (this.config.reloadClassesOnlyOnChange) {
         this.reloader.check = () => {
-          return this.reloaders.map((r) => (r as FinisherFileWatcher).isUpdated()).some((u) => u);
+          return this.reloaders
+            .map((r) => (r as { isUpdated(): boolean }).isUpdated())
+            .some((u) => u);
         };
       } else {
         this.reloader.check = () => true;
@@ -186,7 +183,7 @@ Finisher.initializer(
           files: string[],
           dirs: Record<string, string[]>,
           block: () => void,
-        ) => FinisherFileWatcher;
+        ) => { execute(): Promise<void> };
         const reloader = new FileWatcher(...this.watchableArgs(), callback);
         this.reloaders.push(reloader);
 

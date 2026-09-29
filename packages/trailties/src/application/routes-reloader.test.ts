@@ -30,7 +30,7 @@ describe("RoutesReloader", () => {
     const loaded: string[] = [];
     const after = vi.fn();
     r.runAfterLoadPaths = after;
-    await r.reload((p) => void loaded.push(p));
+    await r.reloadBang((p) => void loaded.push(p));
     expect(loaded).toEqual(["/routes-a", "/routes-b"]);
     expect(after).toHaveBeenCalledOnce();
     expect(a.calls).toEqual(["clear", "finalize", "eagerLoad"]);
@@ -45,7 +45,7 @@ describe("RoutesReloader", () => {
     const boom = (): never => {
       throw new Error("load failed");
     };
-    await expect(r.reload(boom)).rejects.toThrow(/load failed/);
+    await expect(r.reloadBang(boom)).rejects.toThrow(/load failed/);
     expect(a.disableClearAndFinalize).toBe(false);
   });
 
