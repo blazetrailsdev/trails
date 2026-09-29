@@ -145,7 +145,7 @@ describe("SchemaCacheDeepDeduplicateTest", () => {
         "      name: id",
         "      default: null",
         "      sql_type_metadata: !ruby/object:ActiveRecord::ConnectionAdapters::SqlTypeMetadata",
-        "        sqlType: integer",
+        "        sql_type: integer",
         "        type: integer",
         "      null: true",
         "primary_keys: {}",
@@ -157,6 +157,7 @@ describe("SchemaCacheDeepDeduplicateTest", () => {
         "      name: index_people_on_id",
         "      unique: true",
         "      columns: [id]",
+        "      nulls_not_distinct: true",
         "version: null",
       ].join("\n"),
     );
@@ -172,6 +173,7 @@ describe("SchemaCacheDeepDeduplicateTest", () => {
     )!;
     expect(index).toBeInstanceOf(IndexDefinition);
     expect(index.name).toBe("index_people_on_id");
+    expect(index.nullsNotDistinct).toBe(true);
   });
 
   it("deduplication leaves indexes as IndexDefinition instances", () => {

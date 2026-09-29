@@ -4,11 +4,16 @@ import {
   NotImplementedError,
   fetch,
   hashDelete,
+  include,
+  initializeIncludedModules,
   rbFPublicSend,
   rbInspect,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 
+import { isBlank, isPresent } from "@blazetrails/activesupport";
+
+import { ActiveModelInstanceTag } from "../active-model-helper.js";
 import type { FormTagHelperHost } from "../form-tag-helper.js";
 
 export class Base {
@@ -22,6 +27,10 @@ export class Base {
   protected _generateIndexedNames: boolean;
   protected _autoIndex: unknown;
   private _sanitizedMethodName?: string;
+  declare contentTag: ActiveModelInstanceTag["contentTag"];
+  declare tag: ActiveModelInstanceTag["tag"];
+  declare errorWrapping: ActiveModelInstanceTag["errorWrapping"];
+  declare errorMessage: ActiveModelInstanceTag["errorMessage"];
 
   constructor(
     objectName: unknown,
@@ -52,6 +61,8 @@ export class Base {
       this._generateIndexedNames = false;
       this._autoIndex = null;
     }
+
+    initializeIncludedModules(this);
   }
 
   render(): unknown {
@@ -119,6 +130,19 @@ export class Base {
     }
   }
 
+  protected addDefaultNameAndIdForValue(tagValue: unknown, options: Record<string, unknown>): void {
+    if (tagValue == null) {
+      this.addDefaultNameAndId(options);
+    } else {
+      const specifiedId = options["id"];
+      this.addDefaultNameAndId(options);
+
+      if (isBlank(specifiedId) && isPresent(options["id"])) {
+        options["id"] += `_${this.sanitizedValue(tagValue)}`;
+      }
+    }
+  }
+
   protected addDefaultNameAndId(options: Record<string, unknown>): void {
     const index = this.nameAndIdIndex(options);
     options["name"] = fetch(
@@ -163,6 +187,13 @@ export class Base {
       : this._methodName);
   }
 
+  protected sanitizedValue(value: unknown): string {
+    return String(value ?? "")
+      .replace(/[\s.]/g, "_")
+      .replace(/[^-\p{L}\p{M}\p{Nd}\p{Pc}]/gu, "")
+      .toLowerCase();
+  }
+
   protected nameAndIdIndex(options: Record<string, unknown>): unknown {
     if (Object.hasOwn(options, "index")) {
       const index = hashDelete(options, "index");
@@ -177,3 +208,5 @@ export class Base {
     return !(this._skipDefaultIds != null && this._skipDefaultIds !== false);
   }
 }
+
+include(Base, ActiveModelInstanceTag);

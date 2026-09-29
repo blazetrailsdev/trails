@@ -1,5 +1,5 @@
 import { File, FileUtils, Zlib, sort } from "@blazetrails/ruby-compat";
-import { atomicWrite } from "@blazetrails/activesupport";
+import { atomicWrite, camelize, underscore } from "@blazetrails/activesupport";
 import { parse as yamlParse, stringify as yamlStringify } from "@blazetrails/activesupport/yaml";
 import type { CollectionTag, YAMLMap } from "@blazetrails/activesupport/yaml";
 import { Column, NullColumn } from "./column.js";
@@ -45,7 +45,7 @@ const RUBY_OBJECT_TAGS: CollectionTag[] = Object.entries(RUBY_OBJECT_CLASSES).ma
       createNode: (schema, value, ctx) => {
         const coder: ColumnCoder = {};
         if (value instanceof Column) value.encodeWith(coder);
-        else Object.assign(coder, value);
+        else for (const [ivar, v] of Object.entries(value as object)) coder[underscore(ivar)] = v;
         return schema.tags.find((t) => t.tag === "tag:yaml.org,2002:map")!.createNode!(
           schema,
           coder,
@@ -59,7 +59,9 @@ const RUBY_OBJECT_TAGS: CollectionTag[] = Object.entries(RUBY_OBJECT_CLASSES).ma
             ctx?.onCreate?.(object);
             const coder = super.toJSON(arg, ctx) as ColumnCoder;
             if (object instanceof Column) object.initWith(coder);
-            else Object.assign(object, coder);
+            else
+              for (const [ivar, v] of Object.entries(coder))
+                Object.assign(object, { [camelize(ivar, false)]: v });
             return object;
           }
         });

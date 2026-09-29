@@ -1,11 +1,11 @@
 import { stringifyKeys } from "@blazetrails/activesupport";
-import { block, fetch } from "@blazetrails/ruby-compat";
+import { block, fetch, include } from "@blazetrails/ruby-compat";
 
-import { tag, type TagHelperHost } from "../tag-helper.js";
 import { Base } from "./base.js";
+import { Placeholderable } from "./placeholderable.js";
 
 export class TextField extends Base {
-  declare private static _fieldType?: string;
+  declare protected static _fieldType?: string;
 
   override render(): unknown {
     const options = stringifyKeys(this._options);
@@ -19,7 +19,7 @@ export class TextField extends Base {
       );
     }
     this.addDefaultNameAndId(options);
-    return tag.call(this as unknown as TagHelperHost, "input", options);
+    return this.tag("input", options);
   }
 
   static fieldType(): string {
@@ -33,3 +33,5 @@ export class TextField extends Base {
     return (this.constructor as typeof TextField).fieldType();
   }
 }
+
+include(TextField, Placeholderable);
