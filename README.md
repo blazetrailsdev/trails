@@ -275,6 +275,7 @@ Beyond the step 5 and step 6 stories, each of these is a story in RFC
 Fixed on `main` since this README was first drafted at `b4f622ae87`, each
 re-run for this quickstart:
 
+- the generated `db.ts` `connect()` resolving `default_env` without `TRAILS_ENV` (#8236)
 - polymorphic routes calling `persisted()` and dispatching snake_case helpers, and `formWith`'s `builder is not a constructor` (#8230)
 - the console prompting before models loaded (#8232)
 - `Rack::MethodOverride`, `Flash` and the rest of the Rack layer missing from the default middleware stack (#8234)

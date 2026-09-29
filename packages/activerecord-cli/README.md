@@ -82,10 +82,8 @@ pnpm runner try-runner.ts
 ```
 
 For code that runs outside `ar` (a server, a worker), the generated `db.ts`
-exports `connect()`, described under [Bootstrap](#bootstrap). One known gap:
-it needs `TRAILS_ENV` set. With it unset, `connect()` resolves `default_env`
-instead of `development`, because unlike the `ar` commands it does not default
-`TRAILS_ENV` (story `generated-db-ts-connect-resolves-default-env`).
+exports `connect()`, described under [Bootstrap](#bootstrap). It connects to
+`development` when `TRAILS_ENV` and `NODE_ENV` are unset, as the `ar` commands do.
 
 `ar typecheck` runs `trails-tsc`, but a fresh project fails it: the project
 has no `@types/node`, so `import.meta.dirname` in `db.ts` does not type-check
