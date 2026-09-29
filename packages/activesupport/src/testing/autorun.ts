@@ -12,38 +12,28 @@ declare module "vitest" {
   }
 }
 
-const runningTestCases = new WeakMap<object, TestCase>();
-
 beforeEach(async (context: TestContext) => {
   _takeAssertions();
-  const testCase = new (_testCaseClass(context.task))(context.task.name);
-  runningTestCases.set(context.task, testCase);
-  context.testCase = testCase;
+  let klass = TestCase;
+  for (let suite = context.task.suite; suite != null && klass === TestCase; suite = suite.suite) {
+    const constant = safeConstantize(suite.name);
+    if (typeof constant === "function" && constant.prototype instanceof TestCase) {
+      klass = constant as typeof TestCase;
+    }
+  }
+  const testCase = (context.testCase = new klass(context.task.name));
   await testCase.beforeSetup?.();
   TestCase.beforeSetup();
 });
 
 afterEach(async (context: TestContext) => {
-  const testCase = runningTestCases.get(context.task);
-  runningTestCases.delete(context.task);
   const test = _runningTest(context);
   try {
     TestCase.afterTeardown(test);
   } finally {
-    await testCase?.afterTeardown?.(test);
+    await context.testCase?.afterTeardown?.(test);
   }
 });
-
-/** @noRailsEquivalent PERMANENT */
-function _testCaseClass(task: TestContext["task"]): typeof TestCase {
-  for (let suite = task.suite; suite != null; suite = suite.suite) {
-    const klass = safeConstantize(suite.name);
-    if (typeof klass === "function" && klass.prototype instanceof TestCase) {
-      return klass as typeof TestCase;
-    }
-  }
-  return TestCase;
-}
 
 /** @noRailsEquivalent PERMANENT */
 function _runningTest(context: TestContext): RunningTest {
