@@ -42,6 +42,7 @@ export {
   rbFPublicSend,
   rbFSend,
   rbModPrivate,
+  rbModPublicMethodDefined,
   rbModProtected,
   rtest,
 } from "./object.js";
@@ -233,6 +234,7 @@ export { succ } from "./string/succ.js";
 export { isSymbol, rbMethodName, stringToSym, symbolToS } from "./symbol.js";
 export { Monitor, isMonOwned, synchronize } from "./monitor.js";
 export { Mutex } from "./mutex.js";
+export { Queue, SizedQueue } from "./queue.js";
 export { Fiber } from "./fiber.js";
 export { FiberError } from "./fiber-error.js";
 export { Thread } from "./thread.js";

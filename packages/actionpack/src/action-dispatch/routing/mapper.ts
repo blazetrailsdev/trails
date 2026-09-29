@@ -26,6 +26,8 @@ import {
   getPath,
   RFC2396_PARSER,
   rbInspect,
+  rbFSend,
+  rbModPublicMethodDefined,
   rbObjRespondTo,
   stringSplit,
 } from "@blazetrails/ruby-compat";
@@ -453,7 +455,7 @@ export class Mapping {
   ): Record<string, unknown> {
     const conditions = dup(currentConditions);
 
-    return keepIf(conditions, (k) => k in requestClass.prototype);
+    return keepIf(conditions, (k) => rbModPublicMethodDefined(requestClass, k));
   }
 
   /** @internal */
@@ -926,7 +928,11 @@ export class Mapper {
 
     const shallow = this._scope.get("shallow") === true;
     const path = String((options as { path?: string }).path ?? name);
-    const controller = name;
+    const controller = String(
+      options.controller != null && (options.controller as unknown) !== false
+        ? options.controller
+        : name,
+    );
     const prefix = (this._scope.get("path") as string | undefined) ?? "";
     const basePath = `${prefix}/${path}`;
     const singular = singularize(name);
@@ -1057,7 +1063,11 @@ export class Mapper {
     if (this.applyCommonBehaviorFor("resource", [name], options, cb)) return;
     options = this.applyActionOptions("resource", options);
 
-    const controller = pluralize(name);
+    const controller = String(
+      options.controller != null && (options.controller as unknown) !== false
+        ? options.controller
+        : pluralize(name),
+    );
     const prefix = (this._scope.get("path") as string | undefined) ?? "";
     const basePath = `${prefix}/${name}`;
     const namePrefix = this._scope.get("as") as string | undefined;
@@ -1658,17 +1668,31 @@ export class Mapper {
         anchor,
         optionsConstraints,
       );
-    const on = options.on;
-    if (on) {
-      delete options.on;
-      const dispatch = (this as unknown as Record<string, unknown>)[on];
-      if (typeof dispatch === "function")
-        (dispatch as (cb: MapperCallback) => void).call(this, recurse);
-      return;
+    const on = hashDelete(options as Record<string, unknown>, "on") as string | null;
+    if (on != null && (on as unknown) !== false) {
+      rbFSend(this, on, recurse);
+    } else {
+      switch (this._scope.scopeLevel) {
+        case "resources":
+          this.nested(recurse);
+          break;
+        case "resource":
+          this.member(recurse);
+          break;
+        default:
+          this.addRoute(
+            path,
+            controller,
+            options,
+            _path,
+            to,
+            via,
+            formatted,
+            anchor,
+            optionsConstraints,
+          );
+      }
     }
-    if (this._scope.scopeLevel === "resources") return this.nested(recurse);
-    if (this._scope.scopeLevel === "resource") return this.member(recurse);
-    this.addRoute(path, controller, options, _path, to, via, formatted, anchor, optionsConstraints);
   }
 
   /** @internal */

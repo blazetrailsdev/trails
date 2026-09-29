@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { RouteSet, type NamedRouteHelper } from "../routing/route-set.js";
+import type { RouteOptions } from "../routing/mapper.js";
 import { bodyFromString, bodyToString, MockRequest } from "@blazetrails/rack";
 import { Response } from "../http/response.js";
 import { controllerConstants, type Request } from "../http/request.js";
@@ -53,6 +54,7 @@ beforeEach(() => {
     "images",
     "infos",
     "internal",
+    "invoices",
     "involvements",
     "journey",
     "local",
@@ -70,11 +72,13 @@ beforeEach(() => {
     "posts",
     "products",
     "profiles",
+    "project",
     "projects",
     "purchases",
     "replies",
     "rooms",
     "search",
+    "sections",
     "sessions",
     "sheep",
     "songs",
@@ -1539,7 +1543,17 @@ describe("TestRoutingMapper", () => {
 
   it.skip("projects", () => {});
 
-  it.skip("projects with post action and new path on collection", () => {});
+  it("projects with post action and new path on collection", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.resources("projects", { controller: "project" }, (r) => {
+        r.post("new", { action: "new", on: "collection", as: "new" });
+      });
+    });
+    const params = routes.recognizePath("/projects/new", { method: "post" });
+    expect(`${params.controller}#${params.action}`).toBe("project#new");
+    expect(routes.pathFor({}, "new_projects")).toBe("/projects/new");
+  });
 
   it.skip("projects involvements", () => {});
 
@@ -1831,7 +1845,38 @@ describe("TestRoutingMapper", () => {
   it.skip("except scope should override parent only scope", () => {});
   it.skip("only scope should override parent except scope", () => {});
   it.skip("resource constraints are pushed to scope", () => {});
-  it.skip("custom resource actions defined using string", () => {});
+  it("custom resource actions defined using string", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.resources("customers", (r) => {
+        r.resources("invoices", (r) => {
+          r.get("aged/:months", { on: "collection", action: "aged", as: "aged" });
+        });
+
+        r.get("inactive", { on: "collection" });
+        r.post("deactivate", { on: "member" });
+        r.get("old", { on: "collection", as: "stale" });
+      });
+    });
+
+    let params = routes.recognizePath("/customers/inactive");
+    expect(`${params.controller}#${params.action}`).toBe("customers#inactive");
+    expect(routes.pathFor({}, "inactive_customers")).toBe("/customers/inactive");
+
+    params = routes.recognizePath("/customers/1/deactivate", { method: "post" });
+    expect(`${params.controller}#${params.action}`).toBe("customers#deactivate");
+    expect(routes.pathFor({ id: "1" }, "deactivate_customer")).toBe("/customers/1/deactivate");
+
+    params = routes.recognizePath("/customers/old");
+    expect(`${params.controller}#${params.action}`).toBe("customers#old");
+    expect(routes.pathFor({}, "stale_customers")).toBe("/customers/old");
+
+    params = routes.recognizePath("/customers/1/invoices/aged/3");
+    expect(`${params.controller}#${params.action}`).toBe("invoices#aged");
+    expect(routes.pathFor({ customer_id: "1", months: "3" }, "aged_customer_invoices")).toBe(
+      "/customers/1/invoices/aged/3",
+    );
+  });
   it.skip("named route check", () => {});
   it.skip("explicitly avoiding the named route", () => {});
   it.skip("nested route in nested resource", () => {});
@@ -1848,7 +1893,22 @@ describe("TestRoutingMapper", () => {
   it.skip("redirect https", () => {});
   it.skip("redirect argument error", () => {});
 
-  it.skip("greedy resource id regexp doesnt match edit and custom action", () => {});
+  it("greedy resource id regexp doesnt match edit and custom action", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.resources("sections", { id: /.+/ } as RouteOptions, (r) => {
+        r.get("preview", { on: "member" });
+      });
+    });
+
+    let params = routes.recognizePath("/sections/1/edit");
+    expect(`${params.controller}#${params.action}`).toBe("sections#edit");
+    expect(routes.pathFor({ id: "1" }, "edit_section")).toBe("/sections/1/edit");
+
+    params = routes.recognizePath("/sections/1/preview");
+    expect(`${params.controller}#${params.action}`).toBe("sections#preview");
+    expect(routes.pathFor({ id: "1" }, "preview_section")).toBe("/sections/1/preview");
+  });
   it.skip("path parameters is not stale", () => {});
   it.skip("action from path is frozen", () => {});
   it.skip("absolute controller namespace", () => {});

@@ -16,13 +16,19 @@ import {
   sendStream,
   responseBody,
 } from "./live.js";
-import { IOError, RuntimeError } from "@blazetrails/ruby-compat";
+import { IOError, RuntimeError, SizedQueue, ThreadError } from "@blazetrails/ruby-compat";
 import { Request } from "../../action-dispatch/http/request.js";
 
 function makeResponse() {
   const response = new Response();
   response.request = new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "localhost" });
   return response;
+}
+
+async function drain(stream: AsyncIterable<unknown>): Promise<unknown[]> {
+  const chunks: unknown[] = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  return chunks;
 }
 
 describe("ActionController::Live::Buffer", () => {
@@ -47,19 +53,20 @@ describe("ActionController::Live::Buffer", () => {
     expect(res.headers.get("cache-control")).toBeUndefined();
   });
 
-  it("writeln appends a newline only when missing", () => {
+  it("writeln appends a newline only when missing", async () => {
     const buf = new Buffer(makeResponse());
     buf.writeln("a");
     buf.writeln("b\n");
-    expect([...buf.each()]).toEqual(["a\n", "b\n"]);
+    buf.close();
+    expect(await drain(buf)).toEqual(["a\n", "b\n"]);
   });
 
-  it("close pushes a null sentinel; eachChunk stops there", () => {
+  it("close pushes a null sentinel; eachChunk stops there", async () => {
     const buf = new Buffer(makeResponse());
     buf.write("one");
     buf.write("two");
     buf.close();
-    expect([...buf.each()]).toEqual(["one", "two"]);
+    expect(await drain(buf)).toEqual(["one", "two"]);
     expect(buf.isClosed).toBe(true);
   });
 
@@ -76,12 +83,13 @@ describe("ActionController::Live::Buffer", () => {
     expect(res.committed).toBe(true);
   });
 
-  it("abort clears the queue, isConnected flips to false", () => {
+  it("abort clears the queue, isConnected flips to false", async () => {
     const buf = new Buffer(makeResponse());
     buf.write("a");
     buf.abort();
     expect(buf.isConnected).toBe(false);
-    expect([...buf.each()]).toEqual([]);
+    buf.close();
+    expect(await drain(buf)).toEqual([]);
   });
 
   it("ClientDisconnected is a RuntimeError, not an IOError", () => {
@@ -121,6 +129,67 @@ describe("ActionController::Live::Buffer", () => {
   it("default error callback is a no-op", () => {
     const buf = new Buffer(makeResponse());
     expect(() => buf.callOnError()).not.toThrow();
+  });
+
+  it("eachChunk awaits chunks written after the reader starts, until close", async () => {
+    const buf = new Buffer(makeResponse());
+    const read = drain(buf);
+    buf.write("one");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    buf.write("two");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    buf.close();
+    expect(await read).toEqual(["one", "two"]);
+  });
+
+  it("buildQueue honours queueSize: a full queue holds later writes until a chunk is read", () => {
+    class SmallBuffer extends Buffer {
+      static override queueSize: number | null = 1;
+    }
+    const buf = new SmallBuffer(makeResponse());
+    const queue = (buf as unknown as { _buf: SizedQueue<string | null> })._buf;
+    expect(queue).toBeInstanceOf(SizedQueue);
+    expect(queue.max).toBe(1);
+    buf.write("one");
+    buf.write("two");
+    expect(queue.length).toBe(1);
+    expect(queue.pop(true)).toBe("one");
+    expect(queue.length).toBe(1);
+    expect(queue.pop(true)).toBe("two");
+  });
+
+  it("an async reader takes one chunk at a time, leaving the queue bound in force", async () => {
+    class SmallBuffer extends Buffer {
+      static override queueSize: number | null = 1;
+    }
+    const buf = new SmallBuffer(makeResponse());
+    const queue = (buf as unknown as { _buf: SizedQueue<string | null> })._buf;
+    buf.write("one");
+    buf.write("two");
+    buf.write("three");
+    const reader = buf[Symbol.asyncIterator]();
+    expect((await reader.next()).value).toBe("one");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(queue.length).toBe(1);
+    expect(queue.pop(true)).toBe("two");
+  });
+
+  it("a sync read of a closed live buffer reads every chunk, including writes held by a full queue", () => {
+    class SmallBuffer extends Buffer {
+      static override queueSize: number | null = 2;
+    }
+    const buf = new SmallBuffer(makeResponse());
+    buf.write("one");
+    buf.write("two");
+    buf.write("three");
+    buf.close();
+    expect([...buf.each()]).toEqual(["one", "two", "three"]);
+  });
+
+  it("a sync read of a live buffer raises rather than blocking before close", () => {
+    const buf = new Buffer(makeResponse());
+    buf.write("one");
+    expect(() => [...buf.each()]).toThrow(ThreadError);
   });
 });
 
@@ -197,18 +266,19 @@ describe("ActionController::Live::Response", () => {
     expect(res.stream).toBeInstanceOf(Buffer);
   });
 
-  it("stream writes flow through the live Buffer", () => {
+  it("stream writes flow through the live Buffer", async () => {
     const res = makeResponse();
     res.stream.write("a");
     res.stream.write("b");
     res.stream.close();
-    expect([...res.stream.each()]).toEqual(["a", "b"]);
+    expect(await drain(res.stream)).toEqual(["a", "b"]);
   });
 
   it("inherits DispatchResponse.create factory shape (status/headers/body args)", () => {
     const res = new Response(201, { "x-test": "1" }, []);
     res.request = makeResponse().request;
     res.stream.write("seed");
+    res.stream.close();
     expect(res.status).toBe(201);
     expect(res.headers.get("x-test")).toBe("1");
     expect(res.body).toBe("seed");
