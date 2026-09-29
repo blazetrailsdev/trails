@@ -25,8 +25,8 @@ works today and lists what does not.
 
 ## Quickstart
 
-Every command and every output block in this section was run on 2026-09-28
-against `main` at `45a00eb2aa`, on Linux with Node 24.16.0 and SQLite, with
+Every command and every output block in this section was run on 2026-09-29
+against `main` at `41b8c7edb7`, on Linux with Node 24.16.0 and SQLite, with
 `TRAILS_ENV` and `NODE_ENV` unset. Where a step does not work yet, the failure
 and its stories are linked. See [what is not wired up
 yet](#what-is-not-wired-up-yet) below.
@@ -93,8 +93,10 @@ bin/trails generate scaffold Post title:string body:text
 ```text
       create  app/models/post.ts
       create  test/models/post.test.ts
-      create  db/migrate/20260928234634_create_posts.ts
+      create  db/migrate/20260929232138_create_posts.ts
+      invoke  resource_route
        route  mapper.resources("posts");
+      invoke  scaffold_controller
       create  app/controllers/posts-controller.ts
       create  app/views/posts
       create  app/views/posts/index.html.tse
@@ -105,6 +107,7 @@ bin/trails generate scaffold Post title:string body:text
       create  app/views/posts/_post.html.tse
       create  test/controllers/posts-controller.test.ts
       create  app/helpers/posts-helper.ts
+      invoke  resource_route
 ```
 
 ```sh
@@ -112,10 +115,10 @@ pnpm db:migrate
 ```
 
 ```text
-== 20260928234634 CreatePosts: migrating ======================================
+== 20260929232138 CreatePosts: migrating ======================================
 -- createTable("posts")
-   -> 0.0060s
-== 20260928234634 CreatePosts: migrated (0.0070s) =============================
+   -> 0.0080s
+== 20260929232138 CreatePosts: migrated (0.0080s) =============================
 
 All migrations are up to date.
 ```
@@ -124,7 +127,7 @@ The migration is an ordinary `Migration` subclass, and the migrate writes
 `db/schema.ts` from the live database, as Rails writes `schema.rb`:
 
 ```ts
-// db/migrate/20260928234634_create_posts.ts
+// db/migrate/20260929232138_create_posts.ts
 import { Migration } from "@blazetrails/activerecord";
 
 export class CreatePosts extends Migration {
@@ -222,25 +225,24 @@ bin/trails server -p 3927   # the default port is 3000; this run used 3927
 => Ctrl+C to stop
 ```
 
-`GET /up` answers `200 OK`. **The scaffold does not fully work yet.**
+`GET /up` answers `200 OK`, and edits to a view are picked up without a
+restart. **The scaffold does not fully work yet.** Everything below waits on
+one story more than any other: the flash's and the session's signed cookie jar
+has no key generator (story `port-application-env-config-for-action-dispatch-keys`,
+RFC 0141).
 
-- `/posts` and `/posts/1` answer 500, because `<%= notice %>` reads the flash,
-  and the flash's signed cookie jar has no key generator (story
-  `port-application-env-config-for-action-dispatch-keys`, RFC 0141). With the
-  two `notice` lines removed from `index.html.tse` and `show.html.tse`, both
-  pages render the scaffold's views inside the application layout.
-- `/posts/new` and `/posts/1/edit` answer 500, because `form.label`,
-  `form.textField` / `textarea` and `form.submit` are not ported (stories
-  `port-form-helper-label`, `port-form-helper-tags-text-field-family`,
+- `/posts` answers 500, because `<%= notice %>` reads the flash. With the
+  `notice` line removed from `index.html.tse`, the page renders the scaffold's
+  index inside the application layout.
+- `/posts/1` answers 500 even without its `notice` line, because the
+  `buttonTo("Destroy this post", ...)` form embeds an authenticity token, and
+  that reads the session.
+- `/posts/new` and `/posts/1/edit` answer 500, because `form.label` and
+  `form.submit` are not ported (stories `port-form-helper-label` and
   `port-form-builder-submit-and-submit-tag`, RFC 0140).
-- Create, update (including a `POST` with `_method=patch`) and destroy write to
-  the database, then answer 500 when their `notice:` redirect sets the flash
-  (the key-generator story above).
-- A token-less `POST /posts` is accepted: `load_defaults` turns on
-  `default_protect_from_forgery`, but nothing installs `protect_from_forgery`
-  (story `port-action-controller-request-forgery-protection-initializer`).
-- Edits to a view are not picked up until the server restarts (story
-  `port-finisher-set-clear-dependencies-hook-reloader-check`).
+- A `POST`, `PATCH` or `DELETE` without an authenticity token answers
+  `422 ActionController::InvalidAuthenticityToken`, as in Rails. A browser
+  cannot get a token until the key-generator story lands.
 
 ### 6. Type-check with `trails-tsc`
 
@@ -258,13 +260,11 @@ fails the build with:
 app/models/check.ts(4,7): error TS2322: Type 'string | null' is not assignable to type 'number'.
 ```
 
-The build passes on a new app, but after `generate scaffold` it also fails on
-the generated controller, whose `postParams()` returns `unknown`
-(story `scaffold-controller-fails-trails-tsc-on-a-fresh-app`).
+The build also passes after `generate scaffold`.
 
 ### What is not wired up yet
 
-Beyond the step 5 and step 6 stories, each of these is a story in RFC
+Beyond the step 5 stories, each of these is a story in RFC
 `0142-trailties-surfaced-deviations`, hit while writing this README:
 
 | Symptom                                                                                                  | Story                                                              |
@@ -275,6 +275,11 @@ Beyond the step 5 and step 6 stories, each of these is a story in RFC
 Fixed on `main` since this README was first drafted at `b4f622ae87`, each
 re-run for this quickstart:
 
+- the default CSRF protection, `InvalidAuthenticityToken` on a token-less `POST` (#8244, #8248)
+- dev-mode view reloading (#8246)
+- `form.textField` / `textarea` (#8249)
+- the scaffold's controller failing the app's `trails-tsc` build (#8250)
+- `ar typecheck` failing on a new `ar new` project (#8241)
 - the generated `db.ts` `connect()` resolving `default_env` without `TRAILS_ENV` (#8236)
 - polymorphic routes calling `persisted()` and dispatching snake_case helpers, and `formWith`'s `builder is not a constructor` (#8230)
 - the console prompting before models loaded (#8232)
@@ -539,7 +544,7 @@ The parity figures are in the [next section](#status-and-parity-snapshot).
 ## Status and parity snapshot
 
 **As of 2026-09-27, `main` at `91245b796a`.** These numbers predate the
-quickstart run above (`45a00eb2aa`) and were not regenerated for it. To
+quickstart run above (`41b8c7edb7`) and were not regenerated for it. To
 regenerate from a checkout:
 
 ```sh

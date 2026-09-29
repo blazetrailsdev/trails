@@ -27,7 +27,7 @@ pnpm add <driver>                           # one of: better-sqlite3 | pg | mysq
 
 ## Quickstart
 
-Verified on 2026-09-28 (`main` at `45a00eb2aa`, Node 24.16.0, SQLite), with
+Verified on 2026-09-29 (`main` at `41b8c7edb7`, Node 24.16.0, SQLite), with
 the packages linked from a checkout, and with no `TRAILS_ENV` or `NODE_ENV`
 set:
 
@@ -46,15 +46,15 @@ npx ar db:schema:dump
 ```text
 Created database '.../shop/db/development.sqlite3'
   create  .../shop/app/models/product.ts
-  create  .../shop/db/migrate/20260928195115_create_products.ts
-== 20260928195115 CreateProducts: migrating ===================================
+  create  .../shop/db/migrate/20260929192331_create_products.ts
+== 20260929192331 CreateProducts: migrating ===================================
 -- createTable("products")
-   -> 0.0100s
-== 20260928195115 CreateProducts: migrated (0.0110s) ==========================
+   -> 0.0090s
+== 20260929192331 CreateProducts: migrated (0.0090s) ==========================
 database: .../shop/db/development.sqlite3
  Status   Migration ID    Migration Name
 --------------------------------------------------
-   up     20260928195115  Create products
+   up     20260929192331  Create products
   write   .../shop/app/models/index.ts
 Dumped schema to .../shop/db/schema.ts
 ```
@@ -85,9 +85,7 @@ For code that runs outside `ar` (a server, a worker), the generated `db.ts`
 exports `connect()`, described under [Bootstrap](#bootstrap). It connects to
 `development` when `TRAILS_ENV` and `NODE_ENV` are unset, as the `ar` commands do.
 
-`ar typecheck` runs `trails-tsc`, but a fresh project fails it: the project
-has no `@types/node`, so `import.meta.dirname` in `db.ts` does not type-check
-(story `ar-new-project-fails-its-own-typecheck`).
+`ar typecheck` runs `trails-tsc`, and passes on a fresh project.
 
 ## Project layout
 
