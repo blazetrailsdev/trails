@@ -30,7 +30,8 @@ on:
     #   release             — implies `website` (release PRs need the site
     #                         built); reserve other release-only suites here
     #   self-hosted-experiment — run the jobs that read the `changes` job's
-    #                         `runner` output on the self-hosted arm64 runner.
+    #                         `runner` / `runner_hosted` outputs on the
+    #                         self-hosted arm64 runner.
     #                         Ignored for fork PRs. Those jobs stay in the `ci`
     #                         aggregator's `needs:`, so it still gates the merge.
     # `ready_for_review` is what starts the draft-deferred PG/MariaDB suites;
@@ -68,6 +69,12 @@ jobs:
         contains(github.event.pull_request.labels.*.name, 'self-hosted-experiment'))
         && '["self-hosted","debian","ARM64"]'
         || toJSON(vars.RUNNER || 'ubuntu-latest') }}
+      runner_hosted: >-
+        ${{ (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        contains(github.event.pull_request.labels.*.name, 'self-hosted-experiment'))
+        && '["self-hosted","debian","ARM64"]'
+        || '"ubuntu-latest"' }}
       docs_only: ${{ steps.filter.outputs.docs_only }}
       activerecord_affected: ${{ steps.filter.outputs.activerecord_affected }}
       db_adapter_affected: ${{ steps.filter.outputs.db_adapter_affected }}
@@ -746,7 +753,7 @@ jobs:
       (needs.changes.outputs.activerecord_affected == 'true' ||
       needs.changes.outputs.trails_tsc_affected == 'true' ||
       needs.changes.outputs.trailties_affected == 'true')
-    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner_hosted) }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -760,7 +767,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.unit_tests_affected == 'true'
-    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner_hosted) }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -977,7 +984,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true'
-    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner_hosted) }}
     timeout-minutes: 20
     # 2-way file-level shard (RFC 0028 shard-ar-adapter-suites) — see the
     # postgres-tests job below for the rationale. That story left this lane
@@ -1039,7 +1046,7 @@ jobs:
       needs.changes.outputs.activerecord_affected == 'true' &&
       (github.event_name != 'pull_request' ||
       contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem'))
-    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner_hosted) }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -1167,7 +1174,7 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       (needs.changes.outputs.trails_tsc_affected == 'true' ||
       needs.changes.outputs.tse_compiler_affected == 'true')
-    runs-on: ${{ fromJSON(needs.changes.outputs.runner) }}
+    runs-on: ${{ fromJSON(needs.changes.outputs.runner_hosted) }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
