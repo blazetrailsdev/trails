@@ -85,6 +85,8 @@ jobs:
       # changed file feeds a rule's inputs rather than being linted itself —
       # see LINT_ALL_RE below.
       lint_files: ${{ steps.filter.outputs.lint_files }}
+      sqlite_runs_on: ${{ steps.sqlite_runner.outputs.runs_on }}
+      sqlite_shards: ${{ steps.sqlite_runner.outputs.shards }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -333,6 +335,24 @@ jobs:
               echo "parity_mysql=false"    >> "$GITHUB_OUTPUT"
               ;;
           esac
+      - id: sqlite_runner
+        env:
+          GH_TOKEN: ${{ secrets.RUNNER_STATUS_TOKEN }}
+          SAME_REPO: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          runs_on='"ubuntu-latest"'
+          shards='[1, 2]'
+          if [ "$SAME_REPO" = true ] && [ -n "$GH_TOKEN" ]; then
+            idle=$(gh api "repos/$GITHUB_REPOSITORY/actions/runners" \
+              --jq '[.runners[] | select(.status == "online" and (.busy | not) and ([.labels[].name] | index("ARM64")))] | length' \
+              2>/dev/null) || idle=0
+            if [[ "$idle" =~ ^[0-9]+$ ]] && [ "$idle" -gt 0 ]; then
+              runs_on='["self-hosted","debian","ARM64"]'
+              shards='[1]'
+            fi
+          fi
+          echo "runs_on=$runs_on" >> "$GITHUB_OUTPUT"
+          echo "shards=$shards" >> "$GITHUB_OUTPUT"
 
   # `vars.RUNNER` is a single runner label (e.g. `self-hosted` or
   # `ubuntu-latest`). GitHub treats `runs-on:` as one literal label when given
@@ -967,7 +987,7 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.activerecord_affected == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(needs.changes.outputs.sqlite_runs_on) }}
     timeout-minutes: 20
     # 2-way file-level shard (RFC 0028 shard-ar-adapter-suites) — see the
     # postgres-tests job below for the rationale. That story left this lane
@@ -978,7 +998,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: ${{ fromJSON(needs.changes.outputs.sqlite_shards) }}
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
@@ -1009,7 +1029,7 @@ jobs:
       # double-run across the two legs.
       - if: ${{ matrix.shard == 1 }}
         run: pnpm vitest run scripts/test-deps scripts/parity/pipeline/query/node scripts/mixin-declaration-drift.test.ts
-      - run: pnpm vitest run packages/activerecord/ --shard=${{ matrix.shard }}/2
+      - run: pnpm vitest run packages/activerecord/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
       # CLI E2E is not sharded — run it once, on shard 1 only.
       - if: ${{ matrix.shard == 1 }}
         run: pnpm vitest run packages/activerecord-cli
