@@ -16,7 +16,7 @@ import { isBlank, isPresent } from "@blazetrails/activesupport";
 import { ActiveModelInstanceTag } from "../active-model-helper.js";
 import type { FormTagHelperHost } from "../form-tag-helper.js";
 
-export class Base {
+export class Base extends (Object as unknown as new () => ActiveModelInstanceTag) {
   object: unknown;
   protected _objectName: string;
   protected _methodName: string;
@@ -27,10 +27,6 @@ export class Base {
   protected _generateIndexedNames: boolean;
   protected _autoIndex: unknown;
   private _sanitizedMethodName?: string;
-  declare contentTag: ActiveModelInstanceTag["contentTag"];
-  declare tag: ActiveModelInstanceTag["tag"];
-  declare errorWrapping: ActiveModelInstanceTag["errorWrapping"];
-  declare errorMessage: ActiveModelInstanceTag["errorMessage"];
 
   constructor(
     objectName: unknown,
@@ -38,6 +34,7 @@ export class Base {
     templateObject: unknown,
     options: Record<string, unknown> = {},
   ) {
+    super();
     this._objectName = objectName == null ? "" : String(objectName);
     this._methodName = String(methodName);
     this._templateObject = templateObject as FormTagHelperHost;

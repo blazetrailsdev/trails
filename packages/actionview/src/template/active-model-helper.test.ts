@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { Errors } from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/date";
 
@@ -81,13 +81,9 @@ describe("ActiveModelHelperTest", () => {
     );
   });
 
-  describe("with a custom field_error_proc", () => {
+  it("field error proc", () => {
     const oldProc = Base.fieldErrorProc;
-    afterEach(() => {
-      Base.fieldErrorProc = oldProc;
-    });
-
-    it("field error proc", () => {
+    try {
       Base.fieldErrorProc = function (htmlTag, instance) {
         return raw(
           `<div class="field_with_errors">${htmlTag} <span class="error">${[(instance as { errorMessage(): unknown }).errorMessage()].flat(Infinity).join(", ")}</span></div>`,
@@ -98,6 +94,8 @@ describe("ActiveModelHelperTest", () => {
         '<div class="field_with_errors"><input id="post_author_name" name="post[author_name]" type="text" value="" /> <span class="error">can\'t be empty</span></div>',
         view.textField("post", "author_name"),
       );
-    });
+    } finally {
+      Base.fieldErrorProc = oldProc;
+    }
   });
 });

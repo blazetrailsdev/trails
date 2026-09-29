@@ -9,11 +9,15 @@ export class ActiveModelInstanceTag {
   declare protected _methodName: string;
   declare protected _templateObject: unknown;
 
-  contentTag(type: string, options: unknown, ...args: unknown[]): unknown {
+  contentTag(
+    type: string,
+    options: unknown,
+    ...args: [options?: Record<string, unknown> | null, escape?: boolean, block?: () => unknown]
+  ): unknown {
     return this.isSelectMarkupHelper(type)
-      ? contentTag.call(this as unknown as TagHelperHost, type, options, ...(args as []))
+      ? contentTag.call(this as unknown as TagHelperHost, type, options, ...args)
       : this.errorWrapping(
-          contentTag.call(this as unknown as TagHelperHost, type, options, ...(args as [])),
+          contentTag.call(this as unknown as TagHelperHost, type, options, ...args),
         );
   }
 
