@@ -81,6 +81,12 @@ describe("AuthenticationGenerator pending generators", () => {
       const migrations = fs.readdirSync(path.join(appDir, "db/migrate"));
       expect(migrations.filter((f) => f.endsWith("_create_users.ts"))).toHaveLength(1);
       expect(migrations.filter((f) => f.endsWith("_create_sessions.ts"))).toHaveLength(1);
+      const createUsers = fs.readFileSync(
+        path.join(appDir, "db/migrate", migrations.find((f) => f.endsWith("_create_users.ts"))!),
+        "utf-8",
+      );
+      expect(createUsers).toContain('t.string("email_address", { null: false });');
+      expect(createUsers).toContain('this.addIndex("users", "email_address", { unique: true });');
     } finally {
       fs.rmSync(appDir, { recursive: true, force: true });
     }
