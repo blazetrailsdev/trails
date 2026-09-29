@@ -9,7 +9,7 @@ const yaml = await import("yaml").catch(() => {
   return { parse: missing, stringify: missing } as unknown as typeof import("yaml");
 });
 
-type Node = import("yaml").Node;
+import type { Document, Node, Scalar, YAMLMap, YAMLSeq } from "yaml";
 
 export const parse: typeof import("yaml").parse = yaml.parse;
 export const stringify: typeof import("yaml").stringify = yaml.stringify;
@@ -21,12 +21,14 @@ export class DisallowedClass extends globalThis.Error {
   }
 }
 
+const coderTag: unique symbol = Symbol("tag");
+
 export class Coder {
-  declare tag: string | null;
+  declare [coderTag]: string | null;
   [key: string]: unknown;
 
   constructor(tag: string | null) {
-    Object.defineProperty(this, "tag", { value: tag, writable: true });
+    Object.defineProperty(this, coderTag, { value: tag });
   }
 }
 
@@ -68,7 +70,8 @@ class YAMLTree {
   private visitObject(o: object): Node {
     const klass = o.constructor === Object ? undefined : className(o.constructor);
     const tag = ["!ruby/object", klass].filter((part) => part !== undefined).join(":");
-    const map = this.startMapping(tag);
+    const map = new yaml.YAMLMap();
+    map.tag = tag;
     this.register(o, map);
     this.dumpIvars(o, map);
     return map;
@@ -84,7 +87,7 @@ class YAMLTree {
   }
 
   private visitHash(o: Map<unknown, unknown>): Node {
-    const map = this.startMapping(null);
+    const map = new yaml.YAMLMap();
     this.register(o, map);
     for (const [k, v] of o) map.add(new yaml.Pair(this.accept(k), this.accept(v)));
     return map;
@@ -111,25 +114,19 @@ class YAMLTree {
   }
 
   private emitCoder(c: Coder, o: object): Node {
-    const map = this.startMapping(c.tag);
+    const map = new yaml.YAMLMap();
+    if (c[coderTag] !== null) map.tag = c[coderTag];
     this.register(o, map);
     for (const [k, v] of Object.entries(c)) map.add(new yaml.Pair(this.accept(k), this.accept(v)));
     return map;
   }
 
-  private dumpIvars(target: object, map: import("yaml").YAMLMap): void {
-    for (const [iv, value] of Object.entries(target)) {
+  private dumpIvars(target: object, map: YAMLMap): void {
+    for (const [iv, value] of Object.entries(target))
       map.add(new yaml.Pair(this.doc.createNode(iv), this.accept(value)));
-    }
   }
 
-  private startMapping(tag: string | null): import("yaml").YAMLMap {
-    const map = new yaml.YAMLMap();
-    if (tag !== null) map.tag = tag;
-    return map;
-  }
-
-  get tree(): import("yaml").Document {
+  get tree(): Document {
     return this.doc;
   }
 
@@ -141,9 +138,7 @@ class YAMLTree {
 type RubyClass = { prototype: object; allocate?: () => object };
 
 function allocate(klass: RubyClass): object {
-  return typeof klass.allocate === "function"
-    ? klass.allocate()
-    : (Object.create(klass.prototype) as object);
+  return klass.allocate?.() ?? (Object.create(klass.prototype) as object);
 }
 
 class ToRuby {
@@ -157,22 +152,19 @@ class ToRuby {
     return this.register(o, this.deserialize(o));
   }
 
-  private deserialize(o: import("yaml").Scalar): unknown {
-    switch (o.tag) {
-      case "!ruby/class":
-      case "!ruby/module":
-        return this.resolveClass(String(o.value));
-      default:
-        return o.value;
+  private deserialize(o: Scalar): unknown {
+    if (o.tag === "!ruby/class" || o.tag === "!ruby/module") {
+      return this.resolveClass(String(o.value));
     }
+    return o.value;
   }
 
-  private visitMapping(o: import("yaml").YAMLMap): unknown {
+  private visitMapping(o: YAMLMap): unknown {
     if (o.tag?.startsWith("!ruby/object:")) {
       const klass = this.resolveClass(o.tag.slice("!ruby/object:".length));
       return this.revive(klass, o);
     }
-    return this.reviveHash(this.register(o, {}) as Record<string, unknown>, o);
+    return this.reviveHash(this.register(o, Object.create(null) as Record<string, unknown>), o);
   }
 
   private register<T>(node: Node, object: T): T {
@@ -180,16 +172,13 @@ class ToRuby {
     return object;
   }
 
-  private registerEmpty(o: import("yaml").YAMLSeq): unknown[] {
+  private registerEmpty(o: YAMLSeq): unknown[] {
     const list = this.register(o, [] as unknown[]);
     for (const c of o.items) list.push(this.accept(c as Node));
     return list;
   }
 
-  private reviveHash(
-    hash: Record<string, unknown>,
-    o: import("yaml").YAMLMap,
-  ): Record<string, unknown> {
+  private reviveHash(hash: Record<string, unknown>, o: YAMLMap): Record<string, unknown> {
     for (const { key: k, value: v } of o.items as { key: Node; value: Node }[]) {
       const key = String(this.accept(k));
       const val = this.accept(v);
@@ -202,19 +191,22 @@ class ToRuby {
     return hash;
   }
 
-  private revive(klass: RubyClass, node: import("yaml").YAMLMap): object {
+  private revive(klass: RubyClass, node: YAMLMap): object {
     const s = this.register(node, allocate(klass));
-    return this.initWith(s, this.reviveHash({}, node), node);
+    return this.initWith(
+      s,
+      this.reviveHash(Object.create(null) as Record<string, never>, node),
+      node,
+    );
   }
 
   private initWith(o: object, h: Record<string, unknown>, node: Node): object {
-    const c = Object.assign(new Coder(node.tag ?? null), h);
-    const target = o as { initWith?: (coder: Coder) => void } & Record<string, unknown>;
-    if (rbObjRespondTo(target, "initWith")) {
-      target.initWith!(c);
-    } else {
-      for (const [k, v] of Object.entries(h)) target[k] = v;
-    }
+    const c = Object.defineProperties(
+      new Coder(node.tag ?? null),
+      Object.getOwnPropertyDescriptors(h),
+    );
+    if (rbObjRespondTo(o, "initWith")) (o as { initWith(coder: Coder): void }).initWith(c);
+    else Object.defineProperties(o, Object.getOwnPropertyDescriptors(h));
     return o;
   }
 

@@ -290,15 +290,15 @@ export function strictLoadingBang<T extends StrictLoadingFields>(
   return value;
 }
 
+type YamlHost = { yamlEncoder(): YAMLEncoder };
+
 export function initWith(
   this: CoreRecord & { initWithAttributes: typeof initWithAttributes },
   coder: Record<string, unknown>,
   block?: (record: CoreRecord) => void,
 ): void {
   coder = LegacyYamlAdapter.convert(coder);
-  const attributes = (this.constructor as unknown as { yamlEncoder(): YAMLEncoder })
-    .yamlEncoder()
-    .decode(coder);
+  const attributes = (this.constructor as unknown as YamlHost).yamlEncoder().decode(coder);
   this.initWithAttributes(attributes, coder["new_record"] as boolean, block);
 }
 
@@ -335,9 +335,7 @@ export function encodeWith(
   this: CoreRecord & { _attributes: AttributeSet; isNewRecord(): boolean },
   coder: Record<string, unknown>,
 ): void {
-  (this.constructor as unknown as { yamlEncoder(): YAMLEncoder })
-    .yamlEncoder()
-    .encode(this._attributes, coder);
+  (this.constructor as unknown as YamlHost).yamlEncoder().encode(this._attributes, coder);
   coder["new_record"] = this.isNewRecord();
   coder["active_record_yaml_version"] = 2;
 }

@@ -7,6 +7,8 @@ import { withTimezoneConfig } from "./test-helper.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Author } from "./test-helpers/models/author.js";
 
+const TEST_ROOT = new URL("./test-helpers/", import.meta.url);
+
 describe("YamlSerializationTest", () => {
   fixtures(["topics", "authors", "posts"]);
 
@@ -15,13 +17,8 @@ describe("YamlSerializationTest", () => {
   }
 
   async function yamlFixture(fileName: string): Promise<string> {
-    return readFile(
-      new URL(
-        `./test-helpers/support/yaml_compatibility_fixtures/${fileName}.yml`,
-        import.meta.url,
-      ),
-      "utf8",
-    );
+    const path = `support/yaml_compatibility_fixtures/${fileName}.yml`;
+    return readFile(new URL(path, TEST_ROOT), "utf8");
   }
 
   it("to yaml with time with zone should not raise exception", async () => {
@@ -131,8 +128,14 @@ describe("YamlSerializationTest", () => {
     expect(topic.content).toBe("Have a nice day");
   });
 
-  it.skip("deserializing rails v1 mysql yaml", () => {
+  it.skip("deserializing rails v1 mysql yaml", async () => {
     // BLOCKED: psych-dump-type-constants
+    const topic = yamlLoad(await yamlFixture("rails_v1_mysql"));
+
+    expect(topic.isNewRecord()).toBe(false);
+    expect(topic.id).toBe(1);
+    expect(topic.title).toBe("The First Topic");
+    expect(topic.content).toBe("Have a nice day");
   });
 
   it("deserializing rails 41 yaml", async () => {
@@ -142,8 +145,12 @@ describe("YamlSerializationTest", () => {
     );
   });
 
-  it.skip("deserializing rails 4 2 0 yaml", () => {
+  it.skip("deserializing rails 4 2 0 yaml", async () => {
     // BLOCKED: psych-dump-type-constants
+    const payload = await yamlFixture("rails_4_2_0");
+    expect(() => yamlLoad(payload)).toThrow(
+      "Active Record doesn't know how to load YAML with this format.",
+    );
   });
 
   it.skip("yaml encoding keeps mutations", async () => {

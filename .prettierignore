@@ -15,8 +15,7 @@ vendor/*/*/
 # deliberately malformed YAML that prettier cannot parse, and reformatting the
 # rest would drift the fixtures away from the gem's.
 packages/i18n/src/test-data/locales/
-
-# Byte-for-byte copies of vendor/rails/v8.0.2/activerecord/test/support/yaml_compatibility_fixtures.
+# Byte-for-byte copies of files in vendor/rails/v8.0.2/activerecord/test/support/yaml_compatibility_fixtures.
 packages/activerecord/src/test-helpers/support/yaml_compatibility_fixtures/
 
 # Generated parity baselines with their own canonical serializer
