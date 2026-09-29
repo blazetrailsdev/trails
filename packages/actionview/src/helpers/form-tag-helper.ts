@@ -55,6 +55,7 @@ export function fieldId(
     ...suffixes,
   ]
     .filter((part) => part != null)
+    .flat(Infinity)
     .join("_");
 }
 
@@ -67,14 +68,13 @@ export function fieldName(
 ): string {
   const { multiple = false, index = null } = extractOptionsBang(methodNames);
   const names = methodNames.map((name) => `[${name}]`).join("");
-  const brackets = multiple != null && multiple !== false ? "[]" : "";
 
   if (isBlank(objectName)) {
-    return `${methodName}${names}${brackets}`;
+    return `${methodName}${names}${multiple != null && multiple !== false ? "[]" : ""}`;
   } else if (index != null && index !== false) {
-    return `${objectName}[${index}][${methodName}]${names}${brackets}`;
+    return `${objectName}[${index}][${methodName}]${names}${multiple != null && multiple !== false ? "[]" : ""}`;
   } else {
-    return `${objectName}[${methodName}]${names}${brackets}`;
+    return `${objectName}[${methodName}]${names}${multiple != null && multiple !== false ? "[]" : ""}`;
   }
 }
 

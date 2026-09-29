@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { I18n } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/date";
+import { Date as RubyDate, DateTime } from "@blazetrails/date";
 import { Range } from "@blazetrails/ruby-compat";
 
 import { Base } from "../base.js";
@@ -62,7 +62,7 @@ describe("FormHelperTest", () => {
     post.author_name = "";
     post.body = "Back to the hill and over it again!";
     post.secret = 1;
-    post.written_on = Temporal.PlainDate.from({ year: 2004, month: 6, day: 15 });
+    post.written_on = RubyDate.civil(2004, 6, 15);
     view.post = post;
     view.car = new Car("#000FFF");
   });
@@ -292,16 +292,79 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, view.dateField("post", "written_on"));
   });
 
+  it("date field with datetime value", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="date" value="2004-06-15" />';
+    post.written_on = DateTime.civil(2004, 6, 15, 1, 2, 3);
+    assertDomEqual(expected, view.dateField("post", "written_on"));
+  });
+
+  it("date field with extra attrs", () => {
+    const expected =
+      '<input id="post_written_on" step="2" max="2010-08-15" min="2000-06-15" name="post[written_on]" type="date" value="2004-06-15" />';
+    post.written_on = DateTime.civil(2004, 6, 15);
+    const minValue = DateTime.civil(2000, 6, 15);
+    const maxValue = DateTime.civil(2010, 8, 15);
+    const step = 2;
+    assertDomEqual(
+      expected,
+      view.dateField("post", "written_on", { min: minValue, max: maxValue, step: step }),
+    );
+  });
+
+  it("date field with value attr", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="date" value="2013-06-29" />';
+    const value = RubyDate.civil(2013, 6, 29);
+    assertDomEqual(expected, view.dateField("post", "written_on", { value: value }));
+  });
+
   it("date field with nil value", () => {
     const expected = '<input id="post_written_on" name="post[written_on]" type="date" />';
     post.written_on = null;
     assertDomEqual(expected, view.dateField("post", "written_on"));
   });
 
+  it("date field with string values for min and max", () => {
+    const expected =
+      '<input id="post_written_on" max="2010-08-15" min="2000-06-15" name="post[written_on]" type="date" value="2004-06-15" />';
+    post.written_on = DateTime.civil(2004, 6, 15);
+    const minValue = "2000-06-15";
+    const maxValue = "2010-08-15";
+    assertDomEqual(
+      expected,
+      view.dateField("post", "written_on", { min: minValue, max: maxValue }),
+    );
+  });
+
+  it("date field with invalid string values for min and max", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="date" value="2004-06-15" />';
+    post.written_on = DateTime.civil(2004, 6, 15, 1, 2, 3);
+    const minValue = "foo";
+    const maxValue = "bar";
+    assertDomEqual(
+      expected,
+      view.dateField("post", "written_on", { min: minValue, max: maxValue }),
+    );
+  });
+
   it("time field", () => {
     const expected =
       '<input id="post_written_on" name="post[written_on]" type="time" value="00:00:00.000" />';
     assertDomEqual(expected, view.timeField("post", "written_on"));
+  });
+
+  it("time field without seconds", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="time" value="01:02" max="10:25" min="20:45" />';
+    post.written_on = DateTime.civil(2004, 6, 15, 1, 2, 3);
+    const minValue = DateTime.civil(2000, 6, 15, 20, 45, 30);
+    const maxValue = DateTime.civil(2010, 8, 15, 10, 25, 0);
+    assertDomEqual(
+      expected,
+      view.timeField("post", "written_on", { includeSeconds: false, min: minValue, max: maxValue }),
+    );
   });
 
   it("datetime field", () => {
@@ -325,9 +388,21 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, view.monthField("post", "written_on"));
   });
 
+  it("month field with nil value", () => {
+    const expected = '<input id="post_written_on" name="post[written_on]" type="month" />';
+    post.written_on = null;
+    assertDomEqual(expected, view.monthField("post", "written_on"));
+  });
+
   it("week field", () => {
     const expected =
       '<input id="post_written_on" name="post[written_on]" type="week" value="2004-W25" />';
+    assertDomEqual(expected, view.weekField("post", "written_on"));
+  });
+
+  it("week field with nil value", () => {
+    const expected = '<input id="post_written_on" name="post[written_on]" type="week" />';
+    post.written_on = null;
     assertDomEqual(expected, view.weekField("post", "written_on"));
   });
 

@@ -1,7 +1,6 @@
-import { strftime, type Temporal } from "@blazetrails/date";
-import { hashDelete, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { hashDelete } from "@blazetrails/ruby-compat";
 
-import { DatetimeField } from "./datetime-field.js";
+import { DatetimeField, strftime } from "./datetime-field.js";
 
 export class DatetimeLocalField extends DatetimeField {
   private _includeSeconds: unknown;
@@ -23,13 +22,10 @@ export class DatetimeLocalField extends DatetimeField {
   }
 
   protected override formatDatetime(value: unknown): string | null {
-    const format =
-      this._includeSeconds != null && this._includeSeconds !== false
-        ? "%Y-%m-%dT%T"
-        : "%Y-%m-%dT%H:%M";
-    if (value == null) return null;
-    return rbObjRespondTo(value, "strftime")
-      ? (value as { strftime(format: string): string }).strftime(format)
-      : strftime(value as Temporal.PlainDateTime, format);
+    if (this._includeSeconds != null && this._includeSeconds !== false) {
+      return value == null ? null : strftime(value, "%Y-%m-%dT%T");
+    } else {
+      return value == null ? null : strftime(value, "%Y-%m-%dT%H:%M");
+    }
   }
 }

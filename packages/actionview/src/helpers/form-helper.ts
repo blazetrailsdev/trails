@@ -482,8 +482,16 @@ export class FormBuilder {
 
   fieldId(method: unknown, ...suffixes: unknown[]): string {
     const kwargs = extractOptionsBang(suffixes);
-    const namespace = fetch(kwargs, "namespace", this.options["namespace"]);
-    const index = fetch(kwargs, "index", this.options["index"]);
+    const namespace = fetch(
+      kwargs,
+      "namespace",
+      block(() => this.options["namespace"]),
+    );
+    const index = fetch(
+      kwargs,
+      "index",
+      block(() => this.options["index"]),
+    );
     return this._template.fieldId(this.objectName, method, ...suffixes, {
       namespace: namespace,
       index: index,
@@ -493,7 +501,11 @@ export class FormBuilder {
   fieldName(method: unknown, ...methods: unknown[]): string {
     const kwargs = extractOptionsBang(methods);
     const multiple = fetch(kwargs, "multiple", false);
-    const index = fetch(kwargs, "index", this.options["index"]);
+    const index = fetch(
+      kwargs,
+      "index",
+      block(() => this.options["index"]),
+    );
     const objectName = fetch(
       this.options,
       "as",

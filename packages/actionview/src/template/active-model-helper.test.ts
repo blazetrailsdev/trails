@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { Errors } from "@blazetrails/activemodel";
-import { Temporal } from "@blazetrails/date";
+import { Date as RubyDate } from "@blazetrails/date";
 
 import { Base } from "../base.js";
 import { raw } from "../helpers/output-safety-helper.js";
@@ -56,7 +56,7 @@ describe("ActiveModelHelperTest", () => {
     post.body = "Back to the hill and over it again!";
     post.category = "rails";
     post.published = false;
-    post.updated_at = Temporal.PlainDate.from({ year: 2004, month: 6, day: 15 });
+    post.updated_at = RubyDate.civil(2004, 6, 15);
     view.post = post;
   });
 

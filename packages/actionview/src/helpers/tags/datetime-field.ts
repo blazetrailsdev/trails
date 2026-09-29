@@ -1,6 +1,6 @@
 import { stringifyKeys } from "@blazetrails/activesupport";
-import { DateTime } from "@blazetrails/date";
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { DateTime, strftime as dateStrftime, type Temporal } from "@blazetrails/date";
+import { NotImplementedError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { TextField } from "./text-field.js";
 
@@ -40,4 +40,11 @@ export class DatetimeField extends TextField {
       return value;
     }
   }
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function strftime(value: unknown, format: string): string {
+  return rbObjRespondTo(value, "strftime")
+    ? (value as { strftime(format: string): string }).strftime(format)
+    : dateStrftime(value as Temporal.PlainDateTime, format);
 }

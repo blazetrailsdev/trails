@@ -117,7 +117,9 @@ export class Base extends (Object as unknown as new () => ActiveModelInstanceTag
     const object =
       this.object != null && this.object !== false
         ? this.object
-        : (this._templateObject as unknown as Record<string, unknown>)[preMatch];
+        : Object.hasOwn(this._templateObject, preMatch)
+          ? (this._templateObject as unknown as Record<string, unknown>)[preMatch]
+          : null;
     if (object != null && object !== false && rbObjRespondTo(object, "toParam")) {
       return (object as { toParam(): unknown }).toParam();
     } else {
