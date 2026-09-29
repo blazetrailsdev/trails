@@ -712,7 +712,6 @@ export type ScopeLevel =
 
 export type ScopeFrameHash = Record<string, unknown>;
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Enumerable` (mapper.rb:2365); the class/interface merge is how `include()` surfaces on the type side.
 export class Scope {
   static readonly OPTIONS: readonly string[] = [
     "path",
@@ -816,6 +815,8 @@ export class Scope {
     return this.hash;
   }
 
+  declare findAll: (block: (node: Scope) => unknown) => Scope[];
+
   each(block: (node: Scope) => void): void {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     let node: Scope = this;
@@ -826,11 +827,6 @@ export class Scope {
   }
 
   static readonly ROOT: Scope = new Scope({}, null);
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Enumerable` (mapper.rb:2365); the class/interface merge is how `include()` surfaces on the type side.
-export interface Scope {
-  findAll(block: (node: Scope) => unknown): Scope[];
 }
 
 include(Scope, Enumerable);
