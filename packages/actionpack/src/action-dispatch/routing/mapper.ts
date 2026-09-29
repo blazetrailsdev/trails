@@ -928,7 +928,11 @@ export class Mapper {
 
     const shallow = this._scope.get("shallow") === true;
     const path = String((options as { path?: string }).path ?? name);
-    const controller = String(options.controller != null ? options.controller : name);
+    const controller = String(
+      options.controller != null && (options.controller as unknown) !== false
+        ? options.controller
+        : name,
+    );
     const prefix = (this._scope.get("path") as string | undefined) ?? "";
     const basePath = `${prefix}/${path}`;
     const singular = singularize(name);
@@ -1059,7 +1063,11 @@ export class Mapper {
     if (this.applyCommonBehaviorFor("resource", [name], options, cb)) return;
     options = this.applyActionOptions("resource", options);
 
-    const controller = String(options.controller != null ? options.controller : pluralize(name));
+    const controller = String(
+      options.controller != null && (options.controller as unknown) !== false
+        ? options.controller
+        : pluralize(name),
+    );
     const prefix = (this._scope.get("path") as string | undefined) ?? "";
     const basePath = `${prefix}/${name}`;
     const namePrefix = this._scope.get("as") as string | undefined;
@@ -1661,7 +1669,7 @@ export class Mapper {
         optionsConstraints,
       );
     const on = hashDelete(options as Record<string, unknown>, "on") as string | null;
-    if (on != null) {
+    if (on != null && (on as unknown) !== false) {
       rbFSend(this, on, recurse);
     } else {
       switch (this._scope.scopeLevel) {
