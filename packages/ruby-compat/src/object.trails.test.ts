@@ -64,6 +64,22 @@ describe("Object#respond_to?", () => {
     expect(rbObjRespondTo({ id: 1 }, "id")).toBe(true);
   });
 
+  it("answers a writer name= for an accessor's setter, not for a getter alone", () => {
+    class Klass {
+      static get reader(): number {
+        return 1;
+      }
+      static get option(): number {
+        return 1;
+      }
+      static set option(_value: number) {}
+    }
+    expect(basicObjRespondTo(Klass, "option=")).toBe(true);
+    expect(basicObjRespondTo(class extends Klass {}, "option=")).toBe(true);
+    expect(basicObjRespondTo(Klass, "reader=")).toBe(false);
+    expect(basicObjRespondTo(Klass, "missing=")).toBe(false);
+  });
+
   it("answers to_str for a String, which String.prototype does not define", () => {
     // vendor/ruby/v3.3.11/string.c:12177 rb_define_method(rb_cString, "to_str", rb_str_to_s, 0).
     expect(basicObjRespondTo("foo bar", "toStr")).toBe(true);

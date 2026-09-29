@@ -128,6 +128,9 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
  * short of `Function.prototype`, whose `call` / `apply` / `bind` no Ruby
  * `Module` defines.
  *
+ * A writer `name=` is answered by a JS accessor's setter, the entry
+ * {@link rbFSend} dispatches it to.
+ *
  * A PRIVATE entry, and under `BOUND_RESPONDS` a PROTECTED one, answers `0`
  * when `pub` is set (`method_boundp`, `vm_method.c:1788-1818`), so the name
  * falls through to `respond_to_missing?`. JS carries no visibility of its own;
@@ -151,6 +154,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   const klass =
     typeof obj === "function" &&
     Object.getOwnPropertyDescriptor(obj, "prototype")?.writable === false;
+  const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   for (
     let o: object | null = Object(obj);
     o && !(klass && o === Function.prototype);
@@ -166,6 +170,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
       if (!("value" in entry)) return true;
       return klass ? typeof entry.value === "function" : entry.value !== undefined;
     }
+    if (attr !== undefined && Object.getOwnPropertyDescriptor(o, attr)?.set) return true;
   }
   let cme: PropertyDescriptor | undefined;
   for (

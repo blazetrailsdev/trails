@@ -8,7 +8,15 @@ import {
   type Deprecators,
 } from "@blazetrails/activesupport";
 import { ActionController, AbstractController } from "@blazetrails/actionpack";
-import { Dir, File, getPath, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  except,
+  File,
+  getPath,
+  rbFSend,
+  rbObjRespondTo,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 export interface ActionControllerConfig {
@@ -63,19 +71,22 @@ export class Trailtie extends BaseTrailtie {
           (base as unknown as typeof ActionController.Base).wrapParameters({ format: ["json"] });
         }
 
-        (base as ActionController.HelpersPathControllerClass).includeAllHelpers =
-          options.includeAllHelpers;
+        const filteredOptions = except(
+          options as unknown as Record<string, unknown>,
+          "defaultProtectFromForgery",
+          "logQueryTagsAroundActions",
+          "permitAllParameters",
+          "actionOnUnpermittedParameters",
+          "alwaysPermittedParameters",
+          "wrapParametersByDefault",
+        );
 
-        const {
-          defaultProtectFromForgery: _defaultProtectFromForgery,
-          logQueryTagsAroundActions: _logQueryTagsAroundActions,
-          wrapParametersByDefault: _wrapParametersByDefault,
-          ...filteredOptions
-        } = options;
-
-        for (const [k, v] of Object.entries(filteredOptions)) {
+        for (const [key, v] of Object.entries(filteredOptions)) {
+          const k = `${key}=`;
           if (rbObjRespondTo(base, k)) {
-            (base as unknown as Record<string, unknown>)[k] = v;
+            rbFSend(base, k, v);
+          } else if (!rbObjRespondTo(ActionController.Base, k)) {
+            throw new RuntimeError(`Invalid option key: ${k}`);
           }
         }
       });

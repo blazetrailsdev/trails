@@ -3,6 +3,7 @@ import {
   Notifications,
   SafeBuffer,
   classAttribute,
+  mattrAccessor,
   extend,
   include,
   runLoadHooks,
@@ -16,7 +17,13 @@ import { respondTo } from "./metal/mime-responds.js";
 import { DefaultHeaders } from "./metal/default-headers.js";
 import { actionMethods, addFlashTypes, Flash } from "./metal/flash.js";
 import { _computeRedirectToLocation, redirectBack, redirectBackOrTo } from "./metal/redirecting.js";
-import { isProtectAgainstForgery } from "./metal/request-forgery-protection.js";
+import {
+  isMarkedForSameOriginVerification,
+  isNonXhrJavascriptResponse,
+  isProtectAgainstForgery,
+  markForSameOriginVerificationBang,
+  verifySameOriginRequest,
+} from "./metal/request-forgery-protection.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
 import { MissingFile } from "./metal/exceptions.js";
 import { defaultRender } from "./metal/implicit-render.js";
@@ -256,6 +263,10 @@ export interface Base {
   _computeRedirectToLocation: typeof _computeRedirectToLocation;
   allowForgeryProtection: boolean;
   isProtectAgainstForgery(): boolean;
+  verifySameOriginRequest(): void;
+  markForSameOriginVerificationBang(): boolean;
+  isMarkedForSameOriginVerification(): boolean;
+  isNonXhrJavascriptResponse(): boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -292,7 +303,7 @@ export class Base extends Metal {
   declare static _helperMethods?: string[];
   static helperMethod = helperMethod;
 
-  static includeAllHelpers = true;
+  declare static includeAllHelpers: boolean;
 
   constructor(...args: unknown[]) {
     super(...(args as []));
@@ -448,9 +459,12 @@ export class Base extends Metal {
     });
 
     this.beforeAction("verifyAuthenticityToken", options);
+    this.appendAfterAction("verifySameOriginRequest");
   }
 
   verifyAuthenticityToken(): void {
+    this.markForSameOriginVerificationBang();
+
     const csrf = (this.constructor as typeof Base)._csrfProtection;
     if (!csrf) return;
     if (!this.isProtectAgainstForgery()) return;
@@ -871,6 +885,10 @@ include(Base, Cookies);
 Base.prototype.redirectBack = redirectBack;
 Base.prototype.redirectBackOrTo = redirectBackOrTo;
 Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
+Base.prototype.verifySameOriginRequest = verifySameOriginRequest;
+Base.prototype.markForSameOriginVerificationBang = markForSameOriginVerificationBang;
+Base.prototype.isMarkedForSameOriginVerification = isMarkedForSameOriginVerification;
+Base.prototype.isNonXhrJavascriptResponse = isNonXhrJavascriptResponse;
 Base.prototype.isProtectAgainstForgery = isProtectAgainstForgery;
 include(Base, Flash);
 include(Base, StrongParametersModule);
@@ -923,7 +941,11 @@ extend(Base, DefaultHeaders.ClassMethods);
 
 const _Configurable = Base as unknown as {
   configAccessor(...names: string[]): void;
-} & CachingClassMethods & { allowForgeryProtection?: boolean };
+} & CachingClassMethods & {
+    allowForgeryProtection?: boolean;
+    forgeryProtectionOriginCheck?: boolean;
+    perFormCsrfTokens?: boolean;
+  };
 
 _Configurable.configAccessor("defaultStaticExtension");
 _Configurable.defaultStaticExtension ??= ".html";
@@ -931,8 +953,16 @@ _Configurable.defaultStaticExtension ??= ".html";
 _Configurable.configAccessor("performCaching");
 if (_Configurable.performCaching == null) _Configurable.performCaching = true;
 
+mattrAccessor.call(Base, "raiseOnOpenRedirects", { default: false });
+
+classAttribute.call(Base, "includeAllHelpers", { default: true });
+
 _Configurable.configAccessor("allowForgeryProtection");
 _Configurable.allowForgeryProtection ??= true;
+_Configurable.configAccessor("forgeryProtectionOriginCheck");
+_Configurable.forgeryProtectionOriginCheck = false;
+_Configurable.configAccessor("perFormCsrfTokens");
+_Configurable.perFormCsrfTokens = false;
 Base.helperMethod("formAuthenticityToken");
 Base.helperMethod("isProtectAgainstForgery");
 

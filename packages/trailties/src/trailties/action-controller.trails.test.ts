@@ -31,6 +31,15 @@ describe("ActionController::Railtie action_controller.set_configs", () => {
     expect(WrappedController._wrapperOptions.format).toEqual(["json"]);
   });
 
+  it("set_configs raises on an option key ActionController::Base does not answer", async () => {
+    (Trailtie.config.get("actionController") as Record<string, unknown>).notAnOption = true;
+    class InvalidOptionController extends ActionController.Base {}
+    await runTrailtieInitializers(Trailtie, app);
+    expect(() => runLoadHooks("action_controller", InvalidOptionController)).toThrow(
+      "Invalid option key: notAnOption=",
+    );
+  });
+
   it("set_configs leaves parameter wrapping off when wrapParametersByDefault is off", async () => {
     class UnwrappedController extends ActionController.Base {}
     await runTrailtieInitializers(Trailtie, app);

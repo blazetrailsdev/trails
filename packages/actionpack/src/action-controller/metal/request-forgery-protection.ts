@@ -226,6 +226,7 @@ export interface CsrfController {
   csrfTokenStorageStrategy?: CsrfTokenStorage;
   cookies?: Record<string, string>;
   _markedForSameOriginVerification?: boolean;
+  mediaType?: string | null;
   logger?: { warn(msg: string): void } | null;
   logWarningOnCsrfFailure?: boolean;
   forgeryProtectionStrategy?: new (controller: CsrfController) => ProtectionMethods;
@@ -284,8 +285,7 @@ export function isMarkedForSameOriginVerification(this: CsrfController): boolean
 
 /** @internal */
 export function isNonXhrJavascriptResponse(this: CsrfController): boolean {
-  const mediaType = this.request.mediaType ?? "";
-  return /^(?:text|application)\/javascript/.test(mediaType) && !this.request.xhr;
+  return /^(?:text|application)\/javascript/.test(this.mediaType ?? "") && !this.request.xhr;
 }
 
 /** @internal */

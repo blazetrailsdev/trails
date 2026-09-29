@@ -1,4 +1,4 @@
-import { Configurable, include, underscore } from "@blazetrails/activesupport";
+import { Configurable, include, mattrAccessor, underscore } from "@blazetrails/activesupport";
 import { SpellChecker } from "@blazetrails/did-you-mean";
 
 function ownPublicMethodNames(proto: object | null | undefined): string[] {
@@ -86,7 +86,7 @@ export class AbstractController {
     this._actionName = value;
   }
 
-  static raiseOnMissingCallbackActions: boolean = false;
+  declare static raiseOnMissingCallbackActions: boolean;
 
   protected _responseBody: string | Buffer | null = null;
 
@@ -331,5 +331,6 @@ export class AbstractController {
 }
 
 include(AbstractController, Configurable);
+mattrAccessor.call(AbstractController, "raiseOnMissingCallbackActions", { default: false });
 
 _defineActionCallbacks(AbstractController.prototype);

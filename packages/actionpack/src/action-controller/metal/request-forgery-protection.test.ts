@@ -141,7 +141,8 @@ describe("isNonXhrJavascriptResponse", () => {
       expect(
         isNonXhrJavascriptResponse.call(
           controller({
-            request: { method: "GET", baseUrl: "https://example.com", cookieJar, mediaType },
+            mediaType,
+            request: { method: "GET", baseUrl: "https://example.com", cookieJar },
           }),
         ),
       ).toBe(true);
@@ -151,11 +152,11 @@ describe("isNonXhrJavascriptResponse", () => {
     expect(
       isNonXhrJavascriptResponse.call(
         controller({
+          mediaType: "text/javascript",
           request: {
             method: "GET",
             baseUrl: "https://example.com",
             cookieJar,
-            mediaType: "text/javascript",
             xhr: true,
           },
         }),
@@ -164,11 +165,11 @@ describe("isNonXhrJavascriptResponse", () => {
     expect(
       isNonXhrJavascriptResponse.call(
         controller({
+          mediaType: "text/html",
           request: {
             method: "GET",
             baseUrl: "https://example.com",
             cookieJar,
-            mediaType: "text/html",
           },
         }),
       ),
@@ -180,11 +181,11 @@ describe("verifySameOriginRequest", () => {
   it("raises when marked + non-xhr js response", () => {
     const c = controller({
       _markedForSameOriginVerification: true,
+      mediaType: "text/javascript",
       request: {
         method: "GET",
         baseUrl: "https://example.com",
         cookieJar,
-        mediaType: "text/javascript",
       },
     });
     expect(() => verifySameOriginRequest.call(c)).toThrow(InvalidCrossOriginRequest);
@@ -193,11 +194,11 @@ describe("verifySameOriginRequest", () => {
     expect(() =>
       verifySameOriginRequest.call(
         controller({
+          mediaType: "text/javascript",
           request: {
             method: "GET",
             baseUrl: "https://example.com",
             cookieJar,
-            mediaType: "text/javascript",
           },
         }),
       ),
@@ -208,11 +209,11 @@ describe("verifySameOriginRequest", () => {
     const calls: string[] = [];
     const c = controller({
       _markedForSameOriginVerification: true,
+      mediaType: "text/javascript",
       request: {
         method: "GET",
         baseUrl: "https://example.com",
         cookieJar,
-        mediaType: "text/javascript",
       },
       logger: { warn: (m) => calls.push(m) },
     });
@@ -225,11 +226,11 @@ describe("verifySameOriginRequest", () => {
     const calls: string[] = [];
     const c = controller({
       _markedForSameOriginVerification: true,
+      mediaType: "text/javascript",
       request: {
         method: "GET",
         baseUrl: "https://example.com",
         cookieJar,
-        mediaType: "text/javascript",
       },
       logger: { warn: (m) => calls.push(m) },
       logWarningOnCsrfFailure: false,

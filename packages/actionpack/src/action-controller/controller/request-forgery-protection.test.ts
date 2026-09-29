@@ -1,12 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { RequestForgeryProtection } from "../../action-dispatch/request-forgery-protection.js";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import { Base } from "../base.js";
+import { TestCase } from "../test-case.js";
 import { Session } from "../../action-dispatch/request/session.js";
 
 import {
   Exception,
   handleUnverifiedRequest,
   InvalidAuthenticityToken as MetalInvalidAuthenticityToken,
+  InvalidCrossOriginRequest,
   type CsrfController,
 } from "../metal/request-forgery-protection.js";
 
@@ -416,6 +419,38 @@ describe("ActionController::RequestForgeryProtection", () => {
   });
 });
 
+class RequestForgeryProtectionControllerUsingException extends Base {
+  async sameOriginJs(): Promise<void> {
+    await this.render({ js: "foo();" });
+  }
+
+  async negotiateSameOrigin(): Promise<void> {
+    await this.respondTo((format) => {
+      format.js(() => this.sameOriginJs());
+    });
+  }
+}
+RequestForgeryProtectionControllerUsingException.protectFromForgery({
+  only: ["index", "meta", "sameOriginJs", "negotiateSameOrigin"],
+  with: "exception",
+});
+
+const tc = () => new TestCase(RequestForgeryProtectionControllerUsingException);
+
+async function assertCrossOriginBlocked(block: () => Promise<unknown>): Promise<void> {
+  await assertRaises([InvalidCrossOriginRequest], {}, block);
+}
+
+async function assertCrossOriginNotBlocked(
+  block: (t: TestCase) => Promise<unknown>,
+): Promise<void> {
+  const t = tc();
+  t.session.something_like_user_id = 1;
+  await assertNothingRaised(() => block(t));
+  expect(t.session.something_like_user_id).toBe(1);
+  t.assertResponse("success");
+}
+
 describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
   it("raised exception message explains why it occurred", async () => {
     const controller = {
@@ -450,7 +485,23 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
   it.skip("should render form with with token tag with authenticity token requested", () => {});
   it.skip("should render form with with token tag if remote and embedding token is on", () => {});
 
-  it.skip("should only allow same origin js get with xhr header", () => {});
+  it("should only allow same origin js get with xhr header", async () => {
+    await assertCrossOriginBlocked(() => tc().get("sameOriginJs"));
+    await assertCrossOriginBlocked(() => tc().get("sameOriginJs", { format: "js" }));
+    await assertCrossOriginBlocked(() =>
+      tc().get("negotiateSameOrigin", { headers: { Accept: "text/javascript" } }),
+    );
+
+    await assertCrossOriginBlocked(() =>
+      tc().get("negotiateSameOrigin", { headers: { Accept: "application/javascript" } }),
+    );
+
+    await assertCrossOriginNotBlocked((t) => t.get("sameOriginJs", { xhr: true }));
+    await assertCrossOriginNotBlocked((t) => t.get("sameOriginJs", { xhr: true, format: "js" }));
+    await assertCrossOriginNotBlocked((t) =>
+      t.get("negotiateSameOrigin", { xhr: true, headers: { Accept: "text/javascript" } }),
+    );
+  });
   it.skip("should warn on not same origin js", () => {});
   it.skip("should not warn if csrf logging disabled and not same origin js", () => {});
   it.skip("should allow non get js without xhr header", () => {});
