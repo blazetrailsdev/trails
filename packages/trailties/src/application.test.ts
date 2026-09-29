@@ -246,8 +246,7 @@ describe("Application", () => {
       installFs(new Set(["/", "/app", "/app/src"]), new Set(["/app/config.ts"]), "/cwd");
       setTrailsRoot(null);
       class RootPubApp extends Application {}
-      RootPubApp.calledFrom("/app/src");
-      Application.register(RootPubApp);
+      Application.register(RootPubApp, "/app/src");
       try {
         await RootPubApp.instance().initialize();
         expect(trailsRoot()).toBe("/app");
@@ -264,8 +263,7 @@ describe("Application", () => {
       );
       setTrailsRoot(null);
       class RootOverrideApp extends Application {}
-      RootOverrideApp.calledFrom("/app/src");
-      Application.register(RootOverrideApp);
+      Application.register(RootOverrideApp, "/app/src");
       const app = RootOverrideApp.instance();
       app.config.setRoot("/override");
       try {
@@ -280,8 +278,7 @@ describe("Application", () => {
       installFs(new Set(["/", "/cwd", "/cwd/rel", "/app", "/app/src"]), new Set([]), "/cwd");
       setTrailsRoot(null);
       class RelRootApp extends Application {}
-      RelRootApp.calledFrom("/app/src");
-      Application.register(RelRootApp);
+      Application.register(RelRootApp, "/app/src");
       const app = RelRootApp.instance();
       app.config.setRoot("rel");
       try {
@@ -296,8 +293,7 @@ describe("Application", () => {
       installFs(new Set(["/", "/app", "/app/src", "/later"]), new Set(["/app/config.ts"]), "/cwd");
       setTrailsRoot(null);
       class LiveRootApp extends Application {}
-      LiveRootApp.calledFrom("/app/src");
-      Application.register(LiveRootApp);
+      Application.register(LiveRootApp, "/app/src");
       const app = LiveRootApp.instance();
       try {
         await app.initialize();
@@ -860,8 +856,7 @@ describe("Application key/message/credentials wiring", () => {
       new Set(["/app/config.ts", `${b}/development.yml.enc`, `${b}/development.key`]),
     );
     class A extends Application {}
-    A.calledFrom("/app");
-    Application.register(A);
+    Application.register(A, "/app");
     let f = await A.instance().credentials();
     expect([f.contentPath, f.keyPath]).toEqual([
       `${b}/development.yml.enc`,
@@ -869,8 +864,7 @@ describe("Application key/message/credentials wiring", () => {
     ]);
     installFs(new Set(["/", "/o", "/o/config"]), new Set(["/o/config.ts"]));
     class B extends Application {}
-    B.calledFrom("/o");
-    Application.register(B);
+    Application.register(B, "/o");
     f = await B.instance().credentials();
     expect([f.contentPath, f.keyPath, f.envKey]).toEqual([
       "/o/config/credentials.yml.enc",
@@ -891,8 +885,7 @@ describe("Application key/message/credentials wiring", () => {
       new Set(["/app/config.ts", `${b}/staging.yml.enc`]),
     );
     class A extends Application {}
-    A.calledFrom("/app");
-    Application.register(A);
+    Application.register(A, "/app");
     const f = await A.instance().credentials();
     expect([f.contentPath, f.keyPath]).toEqual([`${b}/staging.yml.enc`, "/app/config/master.key"]);
     expect(() => A.instance().keyGenerator(null)).toThrow(

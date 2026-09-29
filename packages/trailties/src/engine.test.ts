@@ -13,7 +13,6 @@ import { Engine } from "./engine.js";
 import { loaded } from "./__fixtures__/loaded.js";
 import { EngineConfiguration } from "./engine/configuration.js";
 import { MiddlewareStackProxy } from "./configuration.js";
-import { Trailtie } from "./trailtie.js";
 import { Trailties } from "./engine/trailties.js";
 
 const posixPath: PathAdapter = {
@@ -63,6 +62,8 @@ function installFs(dirs: Set<string>, files: Set<string>): void {
   fsAdapterConfig.adapter = "engine-test";
 }
 
+const fixtureRoot = new URL("./__fixtures__/initializer-engine", import.meta.url).pathname;
+
 const PREV = fsAdapterConfig.adapter;
 afterEach(() => {
   fsAdapterConfig.adapter = PREV;
@@ -77,16 +78,14 @@ describe("Engine", () => {
 
   it("engine_name aliases railtie_name", () => {
     class BlogEngine extends Engine {}
-    Trailtie.register(BlogEngine);
-    BlogEngine.calledFrom("/");
+    Engine.register(BlogEngine, "/");
     expect(BlogEngine.engineName()).toBe("blog_engine");
     expect(BlogEngine.engineName()).toBe(BlogEngine.railtieName());
   });
 
   it("isolated? defaults to false", () => {
     class PlainEngine extends Engine {}
-    Trailtie.register(PlainEngine);
-    PlainEngine.calledFrom("/");
+    Engine.register(PlainEngine, "/");
     expect(PlainEngine.isolated()).toBe(false);
     expect(PlainEngine.instance().isolated()).toBe(false);
   });
@@ -97,34 +96,31 @@ describe("Engine", () => {
     );
 
     it("walks parents until the flag is found", async () => {
-      expect(await Engine.findRootWithFlag("lib", "/app/sub/deep")).toBe("/app");
+      expect(Engine.findRootWithFlag("lib", "/app/sub/deep")).toBe("/app");
     });
     it("returns the fallback when nothing matches", async () => {
-      expect(await Engine.findRootWithFlag("missing", "/app/sub", "/fallback")).toBe("/fallback");
+      expect(Engine.findRootWithFlag("missing", "/app/sub", "/fallback")).toBe("/fallback");
     });
-    it("throws when no flag and no fallback", async () => {
-      await expect(Engine.findRootWithFlag("missing", "/app/sub")).rejects.toThrow(
-        /Could not find root/,
-      );
+    it("throws when no flag and no fallback", () => {
+      expect(() => Engine.findRootWithFlag("missing", "/app/sub")).toThrow(/Could not find root/);
     });
     it("find_root uses 'lib' as the flag", async () => {
-      expect(await Engine.findRoot("/app")).toBe("/app");
+      expect(Engine.findRoot("/app")).toBe("/app");
     });
   });
 
   it("paths declares the Rails default layout (root memoized once resolved)", async () => {
     installFs(new Set(["/", "/blog", "/blog/sub"]), new Set(["/blog/lib"]));
     class PathsEngine extends Engine {}
-    Trailtie.register(PathsEngine);
-    PathsEngine.calledFrom("/blog/sub");
+    Engine.register(PathsEngine, "/blog/sub");
     const inst = PathsEngine.instance();
-    const paths = await inst.paths();
+    const paths = inst.paths();
     for (const k of ["app", "app/models", "lib", "config/routes.ts", "db/migrate", "vendor"]) {
       expect(paths.get(k), k).toBeDefined();
     }
     expect(paths.get("lib")!.isLoadPath()).toBe(true);
     expect(paths.get("vendor")!.isLoadPath()).toBe(true);
-    expect(await inst.paths()).toBe(paths);
+    expect(inst.paths()).toBe(paths);
   });
 
   it("find() locates the engine whose root matches", async () => {
@@ -133,9 +129,8 @@ describe("Engine", () => {
       new Set(["/lib", "/found/lib", "/blog/sub/lib"]),
     );
     class FoundEngine extends Engine {}
-    Trailtie.register(FoundEngine);
-    FoundEngine.calledFrom("/found/sub");
-    expect(await FoundEngine.instance().root()).toBe("/found");
+    Engine.register(FoundEngine, "/found/sub");
+    expect(FoundEngine.instance().root()).toBe("/found");
     expect(await Engine.find("/found")).toBe(FoundEngine.instance());
     expect(await Engine.find("/elsewhere")).toBeUndefined();
   });
@@ -143,8 +138,7 @@ describe("Engine", () => {
   it("helpersPaths returns only existing app/helpers directories", async () => {
     installFs(new Set(["/", "/blog", "/blog/app", "/blog/app/helpers"]), new Set(["/blog/lib"]));
     class HelpersEngine extends Engine {}
-    Trailtie.register(HelpersEngine);
-    HelpersEngine.calledFrom("/blog");
+    Engine.register(HelpersEngine, "/blog");
     expect(await HelpersEngine.instance().helpersPaths()).toEqual(["/blog/app/helpers"]);
   });
 
@@ -208,14 +202,14 @@ describe("Engine", () => {
   describe("endpoint", () => {
     it("it provides routes as default endpoint", () => {
       class DefaultEndpointEngine extends Engine {}
-      Trailtie.register(DefaultEndpointEngine);
+      Engine.register(DefaultEndpointEngine, fixtureRoot);
       const engine = DefaultEndpointEngine.instance();
       expect(engine.endpoint()).toBe(engine.routes());
     });
 
     it("returns the registered endpoint", () => {
       class MountedEngine extends Engine {}
-      Trailtie.register(MountedEngine);
+      Engine.register(MountedEngine, fixtureRoot);
       const rack = async () => [200, {}, ["OK"]] as const;
       MountedEngine.endpoint(rack as never);
       expect(MountedEngine.instance().endpoint()).toBe(rack);
@@ -232,7 +226,7 @@ describe("Engine", () => {
       }
 
       class StackEngine extends Engine {}
-      Trailtie.register(StackEngine);
+      Engine.register(StackEngine, fixtureRoot);
       StackEngine.endpoint((async () => [200, {}, ["Hello World"]]) as never);
       (StackEngine.config.middleware as MiddlewareStackProxy).use(Upcaser as never);
 
@@ -244,7 +238,7 @@ describe("Engine", () => {
   describe("load_server", () => {
     it("invokes the registered server blocks and returns self", () => {
       class ServerEngine extends Engine {}
-      Trailtie.register(ServerEngine);
+      Engine.register(ServerEngine, fixtureRoot);
       const seen: unknown[] = [];
       ServerEngine.server((app: unknown) => {
         seen.push(app);
@@ -256,7 +250,7 @@ describe("Engine", () => {
 
     it("passes the given app to the server blocks", () => {
       class ServerAppEngine extends Engine {}
-      Trailtie.register(ServerAppEngine);
+      Engine.register(ServerAppEngine, fixtureRoot);
       const seen: unknown[] = [];
       ServerAppEngine.server((app: unknown) => {
         seen.push(app);
@@ -270,20 +264,20 @@ describe("Engine", () => {
   describe("tableNamePrefix", () => {
     it("defaults to null when not isolated and unset", () => {
       class PlainNamespacedEngine extends Engine {}
-      Trailtie.register(PlainNamespacedEngine);
+      Engine.register(PlainNamespacedEngine, fixtureRoot);
       expect(PlainNamespacedEngine.instance().tableNamePrefix()).toBeNull();
     });
 
     it("returns the explicit option when set", () => {
       class ShopEngine extends Engine {}
-      Trailtie.register(ShopEngine);
+      Engine.register(ShopEngine, fixtureRoot);
       ShopEngine.instance().config.tableNamePrefix = "shop_";
       expect(ShopEngine.instance().tableNamePrefix()).toBe("shop_");
     });
 
     it("falls back to `${engine_name}_` when isolated and unset", () => {
       class IsoEngine extends Engine {}
-      Trailtie.register(IsoEngine);
+      Engine.register(IsoEngine, fixtureRoot);
       IsoEngine.isolated(true);
       expect(IsoEngine.instance().tableNamePrefix()).toBe("iso_engine_");
     });
@@ -292,8 +286,8 @@ describe("Engine", () => {
   it("config.eager_load_namespaces accumulates across engines", () => {
     class A extends Engine {}
     class B extends Engine {}
-    Trailtie.register(A);
-    Trailtie.register(B);
+    Engine.register(A, fixtureRoot);
+    Engine.register(B, fixtureRoot);
     const before = A.instance().config.eagerLoadNamespaces.length;
     A.instance().config.eagerLoadNamespaces.push("ANs");
     B.instance().config.eagerLoadNamespaces.push("BNs");
@@ -303,7 +297,7 @@ describe("Engine", () => {
 
   it("routes lazily instantiates routeSetClass, append-buffers blocks, and hasRoutes flips", () => {
     class MountedEngine extends Engine {}
-    Trailtie.register(MountedEngine);
+    Engine.register(MountedEngine, fixtureRoot);
     expect(MountedEngine.instance().hasRoutes()).toBe(false);
     const r1 = MountedEngine.instance().routes((mapper) => {
       mapper.get("/mounted", { to: "mounted#index" });
@@ -324,7 +318,7 @@ describe("Engine", () => {
 
   it("railties returns a Trailties collection over registered subclasses", () => {
     class RailtiesEngine extends Engine {}
-    Trailtie.register(RailtiesEngine);
+    Engine.register(RailtiesEngine, fixtureRoot);
     const inst = RailtiesEngine.instance();
     const collection = inst.railties();
     expect(collection).toBeInstanceOf(Trailties);
@@ -334,7 +328,7 @@ describe("Engine", () => {
 
   it("add_routing_paths registers the routes file and route set on the reloader", async () => {
     class RoutingEngine extends Engine {}
-    Trailtie.register(RoutingEngine);
+    Engine.register(RoutingEngine, fixtureRoot);
     const engine = RoutingEngine.instance();
     engine.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
     const reloader = { paths: [] as string[], routeSets: [] as unknown[], externalRoutes: [] };
@@ -354,7 +348,7 @@ describe("Engine", () => {
   it("add_view_paths prepends app/views onto the action_controller load hook", async () => {
     resetLoadHooks();
     class ViewEngine extends Engine {}
-    Trailtie.register(ViewEngine);
+    Engine.register(ViewEngine, fixtureRoot);
     const engine = ViewEngine.instance();
     engine.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
 
@@ -375,7 +369,7 @@ describe("Engine", () => {
     ActionView.TemplateHandlers.registerTemplateHandler("raw", new ActionView.RawHandler());
 
     class RenderEngine extends Engine {}
-    Trailtie.register(RenderEngine);
+    Engine.register(RenderEngine, fixtureRoot);
     const engine = RenderEngine.instance();
     engine.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
     await engine.initializers.find((i) => i.name === "add_view_paths")!.run();
@@ -392,7 +386,6 @@ describe("Engine", () => {
   });
 
   describe("remaining Engine initializers", () => {
-    const fixtureRoot = new URL("./__fixtures__/initializer-engine", import.meta.url).pathname;
     let previousEnv: string | undefined;
 
     beforeEach(() => {
@@ -406,9 +399,8 @@ describe("Engine", () => {
 
     it("initializers", async () => {
       class InitializersEngine extends Engine {}
-      Trailtie.register(InitializersEngine);
+      Engine.register(InitializersEngine, fixtureRoot);
       const engine = InitializersEngine.instance();
-      engine.config.setRoot(fixtureRoot);
 
       await engine.initializers.find((i) => i.name === "load_config_initializers")!.run();
 
@@ -417,7 +409,7 @@ describe("Engine", () => {
 
     it("initializers are executed after application configuration initializers", () => {
       class OrderingEngine extends Engine {}
-      Trailtie.register(OrderingEngine);
+      Engine.register(OrderingEngine, fixtureRoot);
       OrderingEngine.initializer("dummy_initializer", () => {});
       const names = OrderingEngine.instance()
         .initializers.tsort()
@@ -430,9 +422,8 @@ describe("Engine", () => {
 
     it("load_environment_config requires config/environments/$env", async () => {
       class EnvironmentEngine extends Engine {}
-      Trailtie.register(EnvironmentEngine);
+      Engine.register(EnvironmentEngine, fixtureRoot);
       const engine = EnvironmentEngine.instance();
-      engine.config.setRoot(fixtureRoot);
 
       await engine.initializers.find((i) => i.name === "load_environment_config")!.run();
 
@@ -441,9 +432,8 @@ describe("Engine", () => {
 
     it("prepend_helpers_path unshifts app/helpers onto the application config", async () => {
       class HelpersEngine extends Engine {}
-      Trailtie.register(HelpersEngine);
+      Engine.register(HelpersEngine, fixtureRoot);
       const engine = HelpersEngine.instance();
-      engine.config.setRoot(fixtureRoot);
       const app = { config: { helpersPaths: ["existing"] } };
 
       await engine.initializers.find((i) => i.name === "prepend_helpers_path")!.run(app);
@@ -455,10 +445,9 @@ describe("Engine", () => {
 
     it("prepend_helpers_path skips an isolated engine that is not the application", async () => {
       class IsolatedEngine extends Engine {}
-      Trailtie.register(IsolatedEngine);
+      Engine.register(IsolatedEngine, fixtureRoot);
       IsolatedEngine.isolated(true);
       const engine = IsolatedEngine.instance();
-      engine.config.setRoot(fixtureRoot);
       const app = { config: { helpersPaths: [] as string[] } };
 
       await engine.initializers.find((i) => i.name === "prepend_helpers_path")!.run(app);
@@ -468,9 +457,8 @@ describe("Engine", () => {
 
     it("loading seed data", async () => {
       class SeedEngine extends Engine {}
-      Trailtie.register(SeedEngine);
+      Engine.register(SeedEngine, fixtureRoot);
       const engine = SeedEngine.instance();
-      engine.config.setRoot(fixtureRoot);
 
       await engine.loadSeed();
 
@@ -479,7 +467,7 @@ describe("Engine", () => {
 
     it("skips nonexistent seed data", async () => {
       class NoSeedEngine extends Engine {}
-      Trailtie.register(NoSeedEngine);
+      Engine.register(NoSeedEngine, fixtureRoot);
       const engine = NoSeedEngine.instance();
       engine.config.setRoot("/nonexistent-engine-root");
 
@@ -489,9 +477,11 @@ describe("Engine", () => {
 
     it("loading seed data is wrapped by the executor", async () => {
       class WrappedSeedEngine extends Engine {}
-      Trailtie.register(WrappedSeedEngine);
+      Engine.register(
+        WrappedSeedEngine,
+        new URL("./__fixtures__/seed-engine", import.meta.url).pathname,
+      );
       const engine = WrappedSeedEngine.instance();
-      engine.config.setRoot(new URL("./__fixtures__/seed-engine", import.meta.url).pathname);
       const wrapped: string[] = [];
       const app = {
         reloader: {

@@ -144,7 +144,7 @@ describe("Trails", () => {
   it("Trails.root reflects a config.setRoot override, not the discovered source root", async () => {
     class RootApp extends Application {}
     Application.register(RootApp);
-    RootApp.findRoot = async () => "/discovered/source";
+    RootApp.findRoot = () => "/discovered/source";
     const app = RootApp.instance();
     app.config.setRoot("/srv/override");
     expect(await Trails.root()).toBe("/srv/override");
@@ -153,7 +153,7 @@ describe("Trails", () => {
   it("Trails.root falls back to the discovered root when config.root is unset", async () => {
     class DiscoveredApp extends Application {}
     Application.register(DiscoveredApp);
-    DiscoveredApp.findRoot = async () => "/discovered/source";
+    DiscoveredApp.findRoot = () => "/discovered/source";
     const app = DiscoveredApp.instance();
     expect(await Trails.root()).toBe("/discovered/source");
   });
@@ -161,7 +161,7 @@ describe("Trails", () => {
   it("Trails.root agrees with the trailsRoot seam", async () => {
     class SeamApp extends Application {}
     Application.register(SeamApp);
-    SeamApp.findRoot = async () => "/discovered/source";
+    SeamApp.findRoot = () => "/discovered/source";
     const app = SeamApp.instance();
     await Trails.initialize();
     app.config.setRoot("/srv/override");
@@ -209,9 +209,9 @@ describe("Trails", () => {
     Application.register(PubApp);
     const app = PubApp.instance();
     const stubPath = { expanded: async () => ["/srv/app/public", "/srv/app/public-alt"] };
-    app.paths = async () =>
-      ({ get: (k: string) => (k === "public" ? stubPath : undefined) }) as unknown as Awaited<
-        ReturnType<typeof app.paths>
+    app.paths = () =>
+      ({ get: (k: string) => (k === "public" ? stubPath : undefined) }) as unknown as ReturnType<
+        typeof app.paths
       >;
     expect(await Trails.publicPath()).toBe("/srv/app/public");
   });

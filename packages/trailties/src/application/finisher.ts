@@ -55,7 +55,7 @@ export interface FinisherHost {
   readonly reloaders: unknown[];
   routesReloader(): FinisherRoutesReloader;
   watchableArgs(): [string[], Record<string, string[]>];
-  paths(): Promise<Root>;
+  paths(): Root;
   ensureGeneratorTemplatesAdded(): Promise<void>;
   buildMiddlewareStack(): void;
 }
@@ -67,10 +67,10 @@ Finisher.initializer("add_generator_templates", async function (this: FinisherHo
 });
 
 Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost) {
-  for (const [name, klass] of await loadControllers(await this.paths())) {
+  for (const [name, klass] of await loadControllers(this.paths())) {
     controllerConstants.set(name, klass);
   }
-  registerModel(await loadModels(await this.paths()));
+  registerModel(await loadModels(this.paths()));
 });
 
 Finisher.initializer(

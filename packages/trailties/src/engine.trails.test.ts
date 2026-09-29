@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import { MockRequest } from "@blazetrails/rack";
 import { Engine } from "./engine.js";
 import { Application } from "./application.js";
-import { Trailtie } from "./trailtie.js";
 
 describe("Engine#buildRequest", () => {
   it("merges env_config and sets routes and engine_script_name on the request", () => {
     class RequestEngine extends Engine {}
-    Trailtie.register(RequestEngine);
+    Engine.register(
+      RequestEngine,
+      new URL("./__fixtures__/initializer-engine", import.meta.url).pathname,
+    );
     const engine = RequestEngine.instance();
     engine.envConfig()["engine.flag"] = "on";
     const env = MockRequest.envFor("/bukkits/posts", { SCRIPT_NAME: "/bukkits" });
@@ -40,7 +42,10 @@ describe("Railtie class-level method_missing", () => {
         return "Blog::Engine";
       }
     }
-    Trailtie.register(BlogEngine);
+    Engine.register(
+      BlogEngine,
+      new URL("./__fixtures__/initializer-engine", import.meta.url).pathname,
+    );
     const blog = BlogEngine as unknown as typeof BlogEngine & Pick<Engine, "routes">;
     expect(blog.routes()).toBe(BlogEngine.instance().routes());
     blog.routes().draw((r) => {

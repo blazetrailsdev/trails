@@ -39,8 +39,7 @@ async function app(railsEnv: string): Promise<Application> {
   setEnv("TRAILS_ENV", railsEnv);
   _resetTrailsEnv();
   class A extends Application {}
-  A.calledFrom(appPath);
-  Application.register(A);
+  Application.register(A, appPath);
   return A.instance();
 }
 

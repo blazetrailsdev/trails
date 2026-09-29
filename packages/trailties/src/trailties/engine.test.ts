@@ -2,13 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { Engine } from "../engine.js";
 import { Trails } from "../rails.js";
-import { Trailtie } from "../trailtie.js";
 
 describe("EngineTest", () => {
   it("adds its fixtures path to fixture_paths", async () => {
     resetLoadHooks();
     class Bukkits extends Engine {}
-    Trailtie.register(Bukkits);
+    Engine.register(
+      Bukkits,
+      new URL("../__fixtures__/initializer-engine", import.meta.url).pathname,
+    );
     const engine = Bukkits.instance();
     engine.config.setRoot(new URL("../__fixtures__/boot-app", import.meta.url).pathname);
     const root = vi
@@ -20,7 +22,7 @@ describe("EngineTest", () => {
     const testClass = { fixturePaths: [] as string[] };
     runLoadHooks("active_record_fixtures", testClass);
 
-    expect(testClass.fixturePaths).toEqual([`${await engine.root()}/test/fixtures/`]);
+    expect(testClass.fixturePaths).toEqual([`${engine.root()}/test/fixtures/`]);
     root.mockRestore();
     resetLoadHooks();
   });

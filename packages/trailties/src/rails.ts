@@ -93,13 +93,13 @@ export class Trails {
   static async root(): Promise<string | undefined> {
     const app = Trails.application;
     if (!app) return undefined;
-    return app.config.root ?? (await app.root());
+    return app.config.root ?? undefined;
   }
 
   static async publicPath(): Promise<string | null> {
     const app = Trails.application;
     if (!app) return null;
-    const paths = await app.paths();
+    const paths = app.paths();
     const expanded = await paths.get("public")?.expanded();
     return expanded?.[0] ?? null;
   }
