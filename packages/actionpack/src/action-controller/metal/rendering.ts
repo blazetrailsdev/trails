@@ -55,7 +55,7 @@ export interface RenderingHost {
   contentType: string | null;
   status: number;
   headers: { set(name: string, value: string): unknown };
-  urlFor(loc: string): string;
+  urlFor(options: unknown): string;
 }
 
 /** @internal */
@@ -105,7 +105,7 @@ export function _processOptions(
     this.contentType = String(options.contentType);
   }
   if (options.location != null && options.location !== false) {
-    this.headers.set("Location", this.urlFor(String(options.location)));
+    this.headers.set("Location", this.urlFor(options.location));
   }
 }
 
