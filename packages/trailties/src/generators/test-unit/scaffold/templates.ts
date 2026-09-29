@@ -2,10 +2,12 @@ import type { ScaffoldGenerator } from "./scaffold-generator.js";
 
 type Template = (this: ScaffoldGenerator) => string;
 
-function header(this: ScaffoldGenerator, testClassName: string, modelClassName: string): string {
-  const root = "../".repeat(this.controllerClassPath().length + 1);
+function header(this: ScaffoldGenerator) {
+  const testClassName = `${this.controllerClassName().split("::").join("")}ControllerTest`;
+  const modelClassName = this.className().split("::").join("");
   const singular = this.singularTableName();
-  return `import { describe, it } from "vitest";
+  const root = "../".repeat(this.controllerClassPath().length + 1);
+  const preamble = `import { describe, it } from "vitest";
 import { IntegrationTest } from "@blazetrails/actionpack";
 import { assertDifference, registerConstant } from "@blazetrails/activesupport";
 import { ${modelClassName} } from "../${root}app/models/${this.filePath()}.js";
@@ -22,14 +24,12 @@ class ${testClassName} extends IntegrationTest {
   }
 }
 `;
+  return { testClassName, modelClassName, singular, record: `t["@${singular}"]`, preamble };
 }
 
 const functionalTest: Template = function () {
-  const testClassName = `${this.controllerClassName().split("::").join("")}ControllerTest`;
-  const modelClassName = this.className().split("::").join("");
-  const singular = this.singularTableName();
-  const record = `t["@${singular}"]`;
-  return `${header.call(this, testClassName, modelClassName)}
+  const { testClassName, modelClassName, singular, record, preamble } = header.call(this);
+  return `${preamble}
 describe("${testClassName}", () => {
   it("should get index", async ({ testCase: t }) => {
     await t.get(t.${this.indexHelper({ type: "url" })}());
@@ -76,11 +76,8 @@ describe("${testClassName}", () => {
 };
 
 const apiFunctionalTest: Template = function () {
-  const testClassName = `${this.controllerClassName().split("::").join("")}ControllerTest`;
-  const modelClassName = this.className().split("::").join("");
-  const singular = this.singularTableName();
-  const record = `t["@${singular}"]`;
-  return `${header.call(this, testClassName, modelClassName)}
+  const { testClassName, modelClassName, singular, record, preamble } = header.call(this);
+  return `${preamble}
 describe("${testClassName}", () => {
   it("should get index", async ({ testCase: t }) => {
     await t.get(t.${this.indexHelper()}Url(), { as: "json" });

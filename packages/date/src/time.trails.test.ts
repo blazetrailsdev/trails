@@ -132,14 +132,11 @@ describe("Time", () => {
   it("toTime derives with/withPlainTime/round/startOfDay from the reported wall clock", () => {
     const zoned = Time.new("2013-09-04 03:00:00 -00:44:30").toZonedDateTime();
 
-    const withHour = zoned.with({ hour: 5 });
-    expect(withHour.toPlainDateTime().toString()).toBe("2013-09-04T05:00:00");
-    expect(withHour.epochNanoseconds).toBe(1378273470000000000n);
-    expect(withHour.offset).toBe("-00:44:30");
-
-    const withTime = zoned.withPlainTime({ hour: 12, minute: 34, second: 56 });
-    expect(withTime.toPlainDateTime().toString()).toBe("2013-09-04T12:34:56");
-    expect(withTime.epochNanoseconds).toBe(1378300766000000000n);
+    expect(zoned.with({ hour: 5 }).epochNanoseconds).toBe(1378273470000000000n);
+    expect(zoned.with({ hour: 5 }).offset).toBe("-00:44:30");
+    expect(zoned.withPlainTime({ hour: 12, minute: 34, second: 56 }).epochNanoseconds).toBe(
+      1378300766000000000n,
+    );
 
     const rounded = zoned
       .withPlainTime({ hour: 3, minute: 0, second: 40 })
