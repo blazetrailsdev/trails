@@ -95,21 +95,21 @@ describe("Engine", () => {
       installFs(new Set(["/", "/app", "/app/sub", "/app/sub/deep"]), new Set(["/app/lib"])),
     );
 
-    it("walks parents until the flag is found", async () => {
+    it("walks parents until the flag is found", () => {
       expect(Engine.findRootWithFlag("lib", "/app/sub/deep")).toBe("/app");
     });
-    it("returns the fallback when nothing matches", async () => {
+    it("returns the fallback when nothing matches", () => {
       expect(Engine.findRootWithFlag("missing", "/app/sub", "/fallback")).toBe("/fallback");
     });
     it("throws when no flag and no fallback", () => {
       expect(() => Engine.findRootWithFlag("missing", "/app/sub")).toThrow(/Could not find root/);
     });
-    it("find_root uses 'lib' as the flag", async () => {
+    it("find_root uses 'lib' as the flag", () => {
       expect(Engine.findRoot("/app")).toBe("/app");
     });
   });
 
-  it("paths declares the Rails default layout (root memoized once resolved)", async () => {
+  it("paths declares the Rails default layout (root memoized once resolved)", () => {
     installFs(new Set(["/", "/blog", "/blog/sub"]), new Set(["/blog/lib"]));
     class PathsEngine extends Engine {}
     Engine.register(PathsEngine, "/blog/sub");

@@ -165,18 +165,18 @@ describe("Application", () => {
   });
 
   describe("find_root", () => {
-    it("walks parents looking for config.ts (trails' config.ru analog)", async () => {
+    it("walks parents looking for config.ts (trails' config.ru analog)", () => {
       installFs(new Set(["/", "/app", "/app/src", "/app/src/inner"]), new Set(["/app/config.ts"]));
       class RootApp extends Application {}
       Application.register(RootApp);
-      expect(await RootApp.findRoot("/app/src/inner")).toBe("/app");
+      expect(RootApp.findRoot("/app/src/inner")).toBe("/app");
     });
 
-    it("falls back to fs.cwd() when no flag is found", async () => {
+    it("falls back to fs.cwd() when no flag is found", () => {
       installFs(new Set(["/", "/cwd", "/elsewhere"]), new Set(["/cwd/config.ts"]), "/cwd");
       class CwdApp extends Application {}
       Application.register(CwdApp);
-      expect(await CwdApp.findRoot("/elsewhere")).toBe("/cwd");
+      expect(CwdApp.findRoot("/elsewhere")).toBe("/cwd");
     });
   });
 
