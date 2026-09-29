@@ -10,6 +10,7 @@
     { "path": "../ruby-compat" },
     { "path": "../activesupport" },
     { "path": "../activerecord" },
+    { "path": "../activerecord-cli" },
     { "path": "../rack" },
     { "path": "../actionpack" },
     { "path": "../actionview" },
