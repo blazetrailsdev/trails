@@ -152,7 +152,11 @@ describe("SchemaCacheDeepDeduplicateTest", () => {
         "data_sources: {}",
         "indexes:",
         "  people:",
-        "    - { table: people, name: index_people_on_id, unique: true, columns: [id] }",
+        "    - !ruby/object:ActiveRecord::ConnectionAdapters::IndexDefinition",
+        "      table: people",
+        "      name: index_people_on_id",
+        "      unique: true",
+        "      columns: [id]",
         "version: null",
       ].join("\n"),
     );

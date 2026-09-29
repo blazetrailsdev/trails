@@ -31,6 +31,7 @@ const RUBY_OBJECT_CLASSES: Record<string, { prototype: object }> = {
   "ActiveRecord::ConnectionAdapters::SqlTypeMetadata": SqlTypeMetadata,
   "ActiveRecord::ConnectionAdapters::MySQL::TypeMetadata": MysqlTypeMetadata,
   "ActiveRecord::ConnectionAdapters::PostgreSQL::TypeMetadata": PostgresqlTypeMetadata,
+  "ActiveRecord::ConnectionAdapters::IndexDefinition": IndexDefinition,
 };
 
 const RUBY_OBJECT_TAGS: CollectionTag[] = Object.entries(RUBY_OBJECT_CLASSES).map(
@@ -68,44 +69,6 @@ const RUBY_OBJECT_TAGS: CollectionTag[] = Object.entries(RUBY_OBJECT_CLASSES).ma
   },
 );
 
-function expandIndexOption<T>(
-  columns: string | string[],
-  value: unknown,
-): Record<string, T> | T | undefined {
-  if (value === null || value === undefined) return undefined;
-  if (typeof value === "object") return value as Record<string, T>;
-  if (!Array.isArray(columns)) return value as T;
-  return Object.fromEntries(columns.map((c) => [c, value as T]));
-}
-
-function rehydrateIndex(data: unknown): IndexDefinition {
-  const row = data as Record<string, unknown>;
-  const columns = (row["columns"] ?? []) as string | string[];
-  return new IndexDefinition(
-    row["table"] as string,
-    row["name"] as string,
-    (row["unique"] ?? false) as boolean,
-    columns,
-    {
-      where: row["where"] as string | undefined,
-      orders: expandIndexOption<string>(columns, row["orders"]),
-      lengths:
-        typeof row["lengths"] === "number"
-          ? row["lengths"]
-          : expandIndexOption<number>(columns, row["lengths"]),
-      opclasses: expandIndexOption<string>(columns, row["opclasses"]),
-      type: row["type"] as string | undefined,
-      using: row["using"] as string | undefined,
-      include: row["include"] as string[] | undefined,
-      nullsNotDistinct: row["nullsNotDistinct"] as boolean | undefined,
-      comment: row["comment"] as string | undefined,
-      valid: row["valid"] as boolean | undefined,
-      algorithm: row["algorithm"] as string | undefined,
-      ifNotExists: row["ifNotExists"] as boolean | undefined,
-    },
-  );
-}
-
 export class SchemaCache {
   private _columns = new Map<string, Column[]>();
   private _columnsHash = new Map<string, Record<string, Column>>();
@@ -129,12 +92,7 @@ export class SchemaCache {
         columns: new Map(Object.entries(parsed["columns"] ?? {}) as [string, Column[]][]),
         primary_keys: new Map(Object.entries(parsed["primary_keys"] ?? {})),
         data_sources: new Map(Object.entries(parsed["data_sources"] ?? {})),
-        indexes: new Map(
-          Object.entries(parsed["indexes"] ?? {}).map(([table, idx]) => [
-            table,
-            idx.map((i) => rehydrateIndex(i)),
-          ]),
-        ),
+        indexes: new Map(Object.entries(parsed["indexes"] ?? {}) as [string, IndexDefinition[]][]),
       });
       return cache;
     } catch {
