@@ -3,6 +3,8 @@ import {
   getCrypto,
   chomp,
   OpenSSL,
+  rbObjRespondTo,
+  rtest,
   SecureRandom,
   URI,
   type Bytes,
@@ -89,14 +91,7 @@ export class ResetSession implements ProtectionMethods {
     this._controller = controller;
   }
   handleUnverifiedRequest(): void {
-    const session = this._controller.session;
-    if (session && typeof session === "object") {
-      for (const key of Object.keys(session as Record<string, unknown>)) {
-        delete (session as Record<string, unknown>)[key];
-      }
-    } else {
-      this._controller.session = {};
-    }
+    (this._controller as { resetSession(): void }).resetSession();
   }
 }
 
@@ -110,15 +105,15 @@ export class Exception implements ProtectionMethods {
 
 export class SessionStore {
   fetch(request: CsrfRequest): string | null {
-    return (request.session!.get("_csrfToken") as string | undefined) ?? null;
+    return (request.session!.get("_csrf_token") as string | undefined) ?? null;
   }
 
   store(request: CsrfRequest, csrfToken: string): void {
-    request.session!.set("_csrfToken", csrfToken);
+    request.session!.set("_csrf_token", csrfToken);
   }
 
   reset(request: CsrfRequest): void {
-    request.session!.delete("_csrfToken");
+    request.session!.delete("_csrf_token");
   }
 }
 
@@ -217,7 +212,7 @@ export interface CsrfTokenStorage {
 /** @internal */
 export interface CsrfController {
   request: CsrfRequest;
-  session?: { enabled?: () => boolean } | Record<string, unknown> | null;
+  session?: { isEnabled?: () => boolean } | Record<string, unknown> | null;
   params?: { get(key: string): unknown };
   allowForgeryProtection?: boolean;
   forgeryProtectionOriginCheck?: boolean;
@@ -255,12 +250,11 @@ function isGetOrHead(method: string): boolean {
 
 /** @internal */
 export function isProtectAgainstForgery(this: CsrfController): boolean {
-  if (this.allowForgeryProtection === false) return false;
-  const session = this.session;
-  if (session && typeof (session as { enabled?: unknown }).enabled === "function") {
-    return (session as { enabled: () => boolean }).enabled();
-  }
-  return true;
+  return (
+    rtest(this.allowForgeryProtection) &&
+    (!rbObjRespondTo(this.session, "isEnabled") ||
+      (this.session as { isEnabled(): boolean }).isEnabled())
+  );
 }
 
 /** @internal */

@@ -74,7 +74,9 @@ export function redirectBackOrTo(
   options: { allowOtherHost?: boolean } & Record<string, unknown> = {},
 ): unknown {
   const { allowOtherHost: explicitAllow, ...redirectOptions } = options;
-  const allowOtherHost = explicitAllow ?? _allowOtherHost.call(this as PrivateHost);
+  const allowOtherHost = Object.hasOwn(options, "allowOtherHost")
+    ? explicitAllow
+    : _allowOtherHost.call(this as PrivateHost);
   const referer = this.request.referer;
   if (referer && (allowOtherHost || _urlHostAllowed.call(this, referer))) {
     return this.redirectTo(referer, { allowOtherHost, ...redirectOptions });

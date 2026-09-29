@@ -51,6 +51,7 @@ const cookieJar = () => {
 
 function controller(overrides: Partial<CsrfController> = {}): CsrfController {
   return {
+    allowForgeryProtection: true,
     request: {
       method: "POST",
       origin: "https://example.com",
@@ -69,10 +70,10 @@ describe("isProtectAgainstForgery", () => {
     expect(isProtectAgainstForgery.call(controller({ allowForgeryProtection: false }))).toBe(false);
   });
   it("delegates to session.enabled()", () => {
-    expect(isProtectAgainstForgery.call(controller({ session: { enabled: () => false } }))).toBe(
+    expect(isProtectAgainstForgery.call(controller({ session: { isEnabled: () => false } }))).toBe(
       false,
     );
-    expect(isProtectAgainstForgery.call(controller({ session: { enabled: () => true } }))).toBe(
+    expect(isProtectAgainstForgery.call(controller({ session: { isEnabled: () => true } }))).toBe(
       true,
     );
   });
@@ -293,6 +294,7 @@ describe("isVerifiedRequest", () => {
 describe("P20b/P20c smoke", () => {
   function tokenC(overrides: Partial<CsrfController> = {}): CsrfController {
     return {
+      allowForgeryProtection: true,
       request: {
         method: "POST",
         baseUrl: "https://example.com",

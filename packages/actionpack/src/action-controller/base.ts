@@ -8,7 +8,7 @@ import {
   include,
   runLoadHooks,
 } from "@blazetrails/activesupport";
-import { File, getCrypto } from "@blazetrails/ruby-compat";
+import { File, getCrypto, rtest } from "@blazetrails/ruby-compat";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Metal } from "./metal.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
@@ -22,6 +22,7 @@ import {
   formAuthenticityToken,
   isProtectAgainstForgery,
   protectionMethodClass,
+  resetCsrfToken,
   SessionStore,
   storageStrategy,
   verifyAuthenticityToken,
@@ -252,6 +253,9 @@ export const PROTECTED_IVARS: readonly string[] = [
   "_renderedFormat",
 ];
 
+type ProtectionMethod = Parameters<typeof protectionMethodClass>[0];
+type CsrfStorage = Parameters<typeof storageStrategy>[0];
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base {
   get params(): StrongParameters;
@@ -269,6 +273,7 @@ export interface Base {
   isProtectAgainstForgery(): boolean;
   verifyAuthenticityToken(): void;
   formAuthenticityToken(options?: { formOptions?: { action?: string; method?: string } }): string;
+  resetCsrfToken(request: Request): void;
   commitCsrfToken(request: Request): void;
   verifySameOriginRequest(): void;
 }
@@ -461,16 +466,20 @@ export class Base extends Metal {
 
   static protectFromForgery(
     options: {
-      with?: Parameters<typeof protectionMethodClass>[0];
-      store?: Parameters<typeof storageStrategy>[0];
+      with?: ProtectionMethod | false | null;
+      store?: CsrfStorage | false | null;
     } & CallbackOptions = {},
   ): void {
     options = { prepend: false, ...options };
 
-    this.forgeryProtectionStrategy = protectionMethodClass(options.with ?? "null_session");
+    this.forgeryProtectionStrategy = protectionMethodClass(
+      rtest(options.with) ? (options.with as ProtectionMethod) : "null_session",
+    );
     this.requestForgeryProtectionToken ??= "authenticity_token";
 
-    this.csrfTokenStorageStrategy = storageStrategy(options.store ?? new SessionStore());
+    this.csrfTokenStorageStrategy = storageStrategy(
+      rtest(options.store) ? (options.store as CsrfStorage) : new SessionStore(),
+    );
 
     this.beforeAction("verifyAuthenticityToken", options);
     this.appendAfterAction("verifySameOriginRequest");
@@ -868,6 +877,7 @@ include(Base, Cookies);
 Base.prototype.redirectBack = redirectBack;
 Base.prototype.redirectBackOrTo = redirectBackOrTo;
 Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
+Base.prototype.resetCsrfToken = resetCsrfToken as never;
 Base.prototype.commitCsrfToken = commitCsrfToken as never;
 Base.prototype.verifyAuthenticityToken = verifyAuthenticityToken;
 Base.prototype.verifySameOriginRequest = verifySameOriginRequest;

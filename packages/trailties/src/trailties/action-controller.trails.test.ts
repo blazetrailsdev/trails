@@ -62,6 +62,7 @@ describe("ActionController::Railtie action_controller.request_forgery_protection
       REQUEST_METHOD: "POST",
       PATH_INFO: "/posts",
       HTTP_HOST: "localhost",
+      "rack.session": new ActionController.TestSession(),
     });
     await controller.dispatch("create", request, new Response());
     return controller;
