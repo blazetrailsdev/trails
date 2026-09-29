@@ -257,6 +257,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     }
   }
 
+  /** @noRailsEquivalent PERMANENT */
   static removeClassOption(...names: string[]): void {
     for (const name of names) delete this.classOptions()[name];
   }
