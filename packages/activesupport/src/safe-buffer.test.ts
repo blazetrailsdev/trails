@@ -10,6 +10,7 @@ import {
   assertPredicate,
   assertRaise,
   assertNotNil,
+  assertNil,
 } from "./testing/assertions.js";
 
 describe("SafeBufferTest", () => {
@@ -231,7 +232,7 @@ describe("SafeBufferTest", () => {
 
   it("Should not affect frozen objects when accessing characters", () => {
     const x = htmlSafe("Hello");
-    expect(x.get(/a/, 1)).toBeNull();
+    assertNil(x.get(/a/, 1));
   });
 
   it.skip("Should set back references");

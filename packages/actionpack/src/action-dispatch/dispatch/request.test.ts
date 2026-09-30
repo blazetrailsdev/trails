@@ -6,6 +6,7 @@ import { Mime, MimeType } from "../http/mime-type.js";
 import { X_CASCADE } from "../constants.js";
 import { UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
+import { assertNil } from "@blazetrails/activesupport";
 
 describe("RequestUrlFor", () => {
   it("url_for class method", () => {
@@ -74,7 +75,7 @@ describe("RequestPort", () => {
 
   it("optional port", () => {
     const req = new Request({ HTTP_HOST: "www.example.org:80" });
-    expect(req.optionalPort).toBeNull();
+    assertNil(req.optionalPort);
     const req2 = new Request({ HTTP_HOST: "www.example.org:8080" });
     expect(req2.optionalPort).toBe(8080);
   });
@@ -275,9 +276,9 @@ describe("RequestMimeType", () => {
 
   it("no content type", () => {
     const req = new Request({});
-    expect(req.contentMimeType).toBeNull();
+    assertNil(req.contentMimeType);
     expect(req.mediaType).toBeUndefined();
-    expect(req.contentType).toBeNull();
+    assertNil(req.contentType);
   });
 
   it("content type is XML", () => {
@@ -310,7 +311,7 @@ describe("RequestMimeType", () => {
     });
     const xml = Mime.get(":xml")!;
     const json = Mime.get(":json")!;
-    expect(req.negotiateMime([xml, json])).toBeNull();
+    assertNil(req.negotiateMime([xml, json]));
     expect(req.negotiateMime([xml, MimeType.HTML])).toBe(MimeType.HTML);
     const all = MimeType.parse("*/*")[0];
     expect(req.negotiateMime([xml, all])?.symbol).toBe(":html");
@@ -401,7 +402,7 @@ describe("RequestFormat", () => {
 
   it("format is not nil with unknown format", () => {
     const req = new Request({ QUERY_STRING: "format=hello" });
-    expect(req.format.symbol).toBeNull();
+    assertNil(req.format);
   });
 
   it("can override format with parameter positive", () => {

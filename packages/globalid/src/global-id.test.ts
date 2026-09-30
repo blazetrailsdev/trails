@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { setApp, _resetApp } from "./config.js";
-import { registerConstant, _resetConstants } from "@blazetrails/activesupport";
+import { registerConstant, _resetConstants, assertNil } from "@blazetrails/activesupport";
 import { GlobalID } from "./global-id.js";
 import { GID } from "./uri/gid.js";
 import { type LocatorModel } from "./locator.js";
@@ -171,11 +171,11 @@ describe("GlobalIDCreationTest", () => {
   });
 
   it("find with class no match", async () => {
-    expect(await personGid.find({ only: Map as unknown as LocatorModel })).toBeNull();
-    expect(await personUuidGid.find({ only: Array as unknown as LocatorModel })).toBeNull();
-    expect(await personNamespacedGid.find({ only: String as unknown as LocatorModel })).toBeNull();
-    expect(await personModelGid.find({ only: Number as unknown as LocatorModel })).toBeNull();
-    expect(await cpkModelGid.find({ only: Map as unknown as LocatorModel })).toBeNull();
+    assertNil(await personGid.find({ only: Map as unknown as LocatorModel }));
+    assertNil(await personUuidGid.find({ only: Array as unknown as LocatorModel }));
+    assertNil(await personNamespacedGid.find({ only: String as unknown as LocatorModel }));
+    assertNil(await personModelGid.find({ only: Number as unknown as LocatorModel }));
+    assertNil(await cpkModelGid.find({ only: Map as unknown as LocatorModel }));
   });
 
   it("find with subclass", async () => {
@@ -185,7 +185,7 @@ describe("GlobalIDCreationTest", () => {
   });
 
   it("find with subclass no match", async () => {
-    expect(await personNamespacedGid.find({ only: String as unknown as LocatorModel })).toBeNull();
+    assertNil(await personNamespacedGid.find({ only: String as unknown as LocatorModel }));
   });
 
   it("find with multiple class", async () => {
@@ -212,26 +212,26 @@ describe("GlobalIDCreationTest", () => {
   });
 
   it("find with multiple class no match", async () => {
-    expect(
+    assertNil(
       await personGid.find({
         only: [Number as unknown as LocatorModel, Number as unknown as LocatorModel],
       }),
-    ).toBeNull();
-    expect(
+    );
+    assertNil(
       await personUuidGid.find({
         only: [Number as unknown as LocatorModel, String as unknown as LocatorModel],
       }),
-    ).toBeNull();
-    expect(
+    );
+    assertNil(
       await personModelGid.find({
         only: [Array as unknown as LocatorModel, Map as unknown as LocatorModel],
       }),
-    ).toBeNull();
-    expect(
+    );
+    assertNil(
       await personNamespacedGid.find({
         only: [String as unknown as LocatorModel, Set as unknown as LocatorModel],
       }),
-    ).toBeNull();
+    );
   });
 
   it("as string", () => {

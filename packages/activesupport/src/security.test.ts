@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { MessageEncryptor, InvalidMessage } from "./message-encryptor.js";
 import { MessageVerifier, InvalidSignature } from "./message-verifier.js";
+import { assertNil } from "./testing/assertions.js";
 
 describe("MessageEncryptorTest", () => {
   const secret = "a".repeat(32);
@@ -79,8 +80,8 @@ describe("MessageVerifierTest", () => {
   it("round-tripping nil", () => {
     const v = new MessageVerifier("Hey, I'm a secret!");
     const message = v.generate(null);
-    expect(v.verify(message)).toBeNull();
-    expect(v.verified(message)).toBeNull();
+    assertNil(v.verify(message));
+    assertNil(v.verified(message));
   });
 
   it("valid_message returns false on invalid", () => {

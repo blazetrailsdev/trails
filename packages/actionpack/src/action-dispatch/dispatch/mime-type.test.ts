@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { EXTENSION_LOOKUP, Mime, MimeType } from "../http/mime-type.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 describe("MimeTypeTest", () => {
   it("parse single", () => {
@@ -170,7 +171,7 @@ describe("MimeTypeTest", () => {
   it("references gives preference to symbols before strings", () => {
     expect(Mime.get(":html")!.ref()).toBe(":html");
     const another = MimeType.lookup("foo/bar");
-    expect(another.toSym()).toBeNull();
+    assertNil(another.toSym());
     expect(another.ref()).toBe("foo/bar");
   });
 

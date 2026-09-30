@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Base } from "../base.js";
 import { FormBuilder } from "../helpers/form-helper.js";
 import { LookupContext } from "../lookup-context.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 describe("ControllerHelperTest", () => {
   class SpecializedFormBuilder extends FormBuilder {}
@@ -20,6 +21,6 @@ describe("ControllerHelperTest", () => {
     const controller = {};
     view.assignController(controller);
 
-    expect(view.defaultFormBuilder).toBeNull();
+    assertNil(view.defaultFormBuilder);
   });
 });

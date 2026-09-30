@@ -9,6 +9,7 @@ import type { RouteSet } from "../routing/route-set.js";
 import { controllerConstants } from "../http/request.js";
 import { Cookies } from "../middleware/cookies.js";
 import { CookieStore } from "../middleware/session/cookie-store.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 function buildApp(routes: RouteSet): RackApp {
   const store = new CookieStore((e: RackEnv) => routes.call(e), { key: "_session" });
@@ -545,7 +546,7 @@ describe("ContentSecurityPolicyIntegrationTest", () => {
 
   it("generates no content security policy", async () => {
     await app.get("/no-policy", { env: cspEnv(GLOBAL_CSP_POLICY) });
-    expect(resolvedCspHeader(app)).toBeNull();
+    assertNil(resolvedCspHeader(app));
   });
 
   it("generates api security policy", async () => {
@@ -556,7 +557,7 @@ describe("ContentSecurityPolicyIntegrationTest", () => {
   it("generates no content security policy for not modified", async () => {
     await app.get("/not-modified", { env: cspEnv(GLOBAL_CSP_POLICY) });
     expect(app.response.status).toBe(304);
-    expect(resolvedCspHeader(app)).toBeNull();
+    assertNil(resolvedCspHeader(app));
   });
 });
 
@@ -571,7 +572,7 @@ describe("DisabledContentSecurityPolicyIntegrationTest", () => {
 
   it("generates no content security policy by default", async () => {
     await app.get("/", { env: cspEnv(null) });
-    expect(resolvedCspHeader(app)).toBeNull();
+    assertNil(resolvedCspHeader(app));
   });
 
   it("generates content security policy header when globally disabled", async () => {

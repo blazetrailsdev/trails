@@ -13,6 +13,7 @@ import {
 } from "../helpers/capture-helper.js";
 import { contentTag } from "../helpers/tag-helper.js";
 import { raw } from "../helpers/output-safety-helper.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 interface Host extends CaptureHelperHost {
   capture: typeof capture;
@@ -57,7 +58,7 @@ describe("CaptureHelperTest", () => {
   });
 
   it("capture returns nil if the returned value is not a string", () => {
-    expect(av.capture(() => 1)).toBeNull();
+    assertNil(av.capture(() => 1));
   });
 
   it("capture escapes html", () => {
@@ -154,38 +155,38 @@ describe("CaptureHelperTest", () => {
 
   it("content for returns nil when writing", () => {
     expect(av.isContentFor("title")).toBe(false);
-    expect(av.contentFor("title", "foo")).toBeNull();
-    expect(
+    assertNil(av.contentFor("title", "foo"));
+    assertNil(
       av.contentFor("title", undefined, undefined, () => {
         av.outputBuffer!.concat("bar");
         return null;
       }),
-    ).toBeNull();
-    expect(
+    );
+    assertNil(
       av.contentFor("title", undefined, undefined, () => {
         av.outputBuffer!.concat("  \n  ");
         return null;
       }),
-    ).toBeNull();
+    );
     expect(av.contentFor("title")?.toString()).toBe("foobar");
-    expect(av.contentFor("title", "foo", { flush: true })).toBeNull();
-    expect(
+    assertNil(av.contentFor("title", "foo", { flush: true }));
+    assertNil(
       av.contentFor("title", undefined, { flush: true }, () => {
         av.outputBuffer!.concat("bar");
         return null;
       }),
-    ).toBeNull();
-    expect(
+    );
+    assertNil(
       av.contentFor("title", undefined, { flush: true }, () => {
         av.outputBuffer!.concat("  \n  ");
         return null;
       }),
-    ).toBeNull();
+    );
     expect(av.contentFor("title")?.toString()).toBe("bar");
   });
 
   it("content for returns nil when content missing", () => {
-    expect(av.contentFor("some_missing_key")).toBeNull();
+    assertNil(av.contentFor("some_missing_key"));
   });
 
   it("content for question mark", () => {

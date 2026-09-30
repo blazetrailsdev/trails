@@ -5,6 +5,7 @@ import { LookupContext } from "../lookup-context.js";
 import { TemplateHandlers } from "./handlers.js";
 import { Tse } from "./handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 class Customer {
   constructor(readonly name: string) {}
@@ -72,12 +73,12 @@ describe("CachedViewRenderTest", () => {
   });
 
   it("render partial with empty collection should return nil", () => {
-    expect(view.viewRenderer.render(view, { partial: "test/customer", collection: [] })).toBeNull();
+    assertNil(view.viewRenderer.render(view, { partial: "test/customer", collection: [] }));
   });
 
   it("render partial with nil collection should return nil", () => {
-    expect(
+    assertNil(
       view.viewRenderer.render(view, { partial: "test/customer", collection: null as never }),
-    ).toBeNull();
+    );
   });
 });

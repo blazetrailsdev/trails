@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FlashHash } from "../../action-dispatch/flash.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 describe("FlashHashTest", () => {
   it("set get", () => {
@@ -45,10 +46,10 @@ describe("FlashHashTest", () => {
     expect(flash.toSessionValue()).toEqual({ flashes: { foo: "bar" }, discard: [] });
 
     flash.discard("foo");
-    expect(flash.toSessionValue()).toBeNull();
+    assertNil(flash.toSessionValue());
 
     flash.sweep();
-    expect(flash.toSessionValue()).toBeNull();
+    assertNil(flash.toSessionValue());
   });
 
   it("from session value", () => {

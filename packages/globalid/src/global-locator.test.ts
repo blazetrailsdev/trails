@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { setApp, _resetApp } from "./config.js";
-import { assertDeprecated, registerConstant, _resetConstants } from "@blazetrails/activesupport";
+import {
+  assertDeprecated,
+  registerConstant,
+  _resetConstants,
+  assertNil,
+} from "@blazetrails/activesupport";
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
 import { Locator, BlockLocator, _resetLocators, type LocatorModel } from "./locator.js";
@@ -132,7 +137,7 @@ describe("GlobalLocatorTest", () => {
     const found = await Locator.locate(personGid, {
       only: CompositePrimaryKeyModel as unknown as LocatorModel,
     });
-    expect(found).toBeNull();
+    assertNil(found);
   });
 
   it("by GID with only: restriction by multiple types", async () => {
@@ -241,7 +246,7 @@ describe("GlobalLocatorTest", () => {
       verifier,
       only: CompositePrimaryKeyModel as unknown as LocatorModel,
     });
-    expect(found).toBeNull();
+    assertNil(found);
   });
 
   it("by SGID with only: restriction by multiple types", async () => {
@@ -347,29 +352,29 @@ describe("GlobalLocatorTest", () => {
   });
 
   it("by non-GID returns nil", async () => {
-    expect(await Locator.locate("This is not a GID")).toBeNull();
+    assertNil(await Locator.locate("This is not a GID"));
   });
 
   it("by non-SGID returns nil", async () => {
-    expect(await Locator.locateSigned("This is not a SGID", { verifier })).toBeNull();
+    assertNil(await Locator.locateSigned("This is not a SGID", { verifier }));
   });
 
   it("by invalid GID URI returns nil", async () => {
-    expect(await Locator.locate("http://app/Person/1")).toBeNull();
-    expect(await Locator.locate("gid://Person/1")).toBeNull();
-    expect(await Locator.locate("gid://app/Person")).toBeNull();
-    expect(await Locator.locate("gid://app/Person/1/2")).toBeNull();
+    assertNil(await Locator.locate("http://app/Person/1"));
+    assertNil(await Locator.locate("gid://Person/1"));
+    assertNil(await Locator.locate("gid://app/Person"));
+    assertNil(await Locator.locate("gid://app/Person/1/2"));
   });
 
   it("locating by a GID URI with a mismatching model_id returns nil", async () => {
-    expect(await Locator.locate("gid://app/Person/1/2")).toBeNull();
-    expect(
+    assertNil(await Locator.locate("gid://app/Person/1/2"));
+    assertNil(
       await Locator.locate(
         "gid://app/CompositePrimaryKeyModel/tenant-key-value/id-value/something_else",
       ),
-    ).toBeNull();
-    expect(await Locator.locate("gid://app/CompositePrimaryKeyModel/tenant-key-value/")).toBeNull();
-    expect(await Locator.locate("gid://app/CompositePrimaryKeyModel/tenant-key-value")).toBeNull();
+    );
+    assertNil(await Locator.locate("gid://app/CompositePrimaryKeyModel/tenant-key-value/"));
+    assertNil(await Locator.locate("gid://app/CompositePrimaryKeyModel/tenant-key-value"));
   });
 
   it("use locator with block", async () => {
@@ -438,14 +443,12 @@ describe("GlobalLocatorTest", () => {
 
   it("by invalid purpose returns nil", async () => {
     const loginSgid = SignedGlobalID.create(new Person("login-1"), { verifier, for: "login" });
-    expect(
-      await Locator.locateSigned(loginSgid.toString(), { verifier, for: "like_button" }),
-    ).toBeNull();
+    assertNil(await Locator.locateSigned(loginSgid.toString(), { verifier, for: "like_button" }));
   });
 
   it("by invalid purpose with SGID returns nil", async () => {
     const loginSgid = SignedGlobalID.create(new Person("login-1"), { verifier, for: "login" });
-    expect(await Locator.locateSigned(loginSgid, { verifier, for: "like_button" })).toBeNull();
+    assertNil(await Locator.locateSigned(loginSgid, { verifier, for: "like_button" }));
   });
 
   it("by many with one record missing leading to a raise", async () => {

@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertRaises, OrderedOptions, runLoadHooks } from "@blazetrails/activesupport";
+import {
+  assertRaises,
+  OrderedOptions,
+  runLoadHooks,
+  assertNil,
+  assertNotNil,
+} from "@blazetrails/activesupport";
 import { Base, Resolver } from "@blazetrails/actionview";
 import { Trailtie as ActionViewTrailtie } from "../trailties/action-view.js";
 import { env, getFs, RuntimeError, setEnv } from "@blazetrails/ruby-compat";
@@ -116,7 +122,7 @@ describe("ConfigurationTest", () => {
 
   it("config_for without the environment configured returns nil", async () => {
     await setCustomConfig(`export default { test: { key: "custom key" } };`);
-    expect(await (await app("development")).configFor("custom")).toBeNull();
+    assertNil(await (await app("development")).configFor("custom"));
   });
 
   it("config_for shared config is overridden", async () => {
@@ -145,7 +151,7 @@ describe("ConfigurationTest", () => {
 
   it("config_for with empty file returns nil", async () => {
     await setCustomConfig("");
-    expect(await (await app("development")).configFor("custom")).toBeNull();
+    assertNil(await (await app("development")).configFor("custom"));
   });
 
   it("config_for allows overriding the environment", async () => {
@@ -213,7 +219,7 @@ describe("ConfigurationTest", () => {
     const application = await app("development");
     application.config.secretKeyBase = null;
 
-    expect(application.secretKeyBase()).not.toBeNull();
+    assertNotNil(application.secretKeyBase());
     expect(await getFs().exists(join(appPath, "tmp/local_secret.txt"))).toBeTruthy();
   });
 
@@ -221,7 +227,7 @@ describe("ConfigurationTest", () => {
     const application = await app("test");
     application.config.secretKeyBase = null;
 
-    expect(application.secretKeyBase()).not.toBeNull();
+    assertNotNil(application.secretKeyBase());
     expect(await getFs().exists(join(appPath, "tmp/local_secret.txt"))).toBeTruthy();
   });
 

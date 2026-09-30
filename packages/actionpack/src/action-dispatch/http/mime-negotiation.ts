@@ -18,11 +18,16 @@ export class NullType {
   static readonly instance = new NullType();
   readonly symbol: string | null = null;
   readonly string = "";
-  ref(): string | null {
-    return null;
+  isNil(): boolean {
+    return true;
   }
+
   toString(): string {
     return "";
+  }
+
+  ref(): string | null {
+    return null;
   }
 }
 

@@ -3,6 +3,7 @@ import { Table, sql, TreeManager, Nodes, EmptyJoinError } from "./index.js";
 
 import { mustBeLike } from "./test-helpers/must-be-like.js";
 import { uniq } from "./test-helpers/uniq.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 describe("TableTest", () => {
   const users = new Table("users");
@@ -102,7 +103,7 @@ describe("TableTest", () => {
 
     it("ignores as if it equals name", () => {
       const rel = new Table("users", { as: "users" });
-      expect(rel.tableAlias).toBeNull();
+      assertNil(rel.tableAlias);
     });
 
     it("should accept literal SQL", () => {

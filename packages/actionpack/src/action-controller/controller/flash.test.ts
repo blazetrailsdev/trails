@@ -12,6 +12,7 @@ import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
 import "../../test-helpers/abstract-unit.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 class TestController extends Base {
   async redirectWithAlert(): Promise<void> {
@@ -77,7 +78,7 @@ describe("FlashTest", () => {
 
   it("does not set the session if the flash is empty", () => {
     const flash = new FlashHash();
-    expect(flash.toSessionValue()).toBeNull();
+    assertNil(flash.toSessionValue());
   });
 
   it("keep and discard return values", () => {

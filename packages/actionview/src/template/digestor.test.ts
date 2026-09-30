@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { Logger, StringIO } from "@blazetrails/activesupport";
+import { Logger, StringIO, assertNotNil } from "@blazetrails/activesupport";
 
 import { Base } from "../base.js";
 import { Digestor, type Node } from "../digestor.js";
@@ -353,7 +353,7 @@ describe("TemplateDigestorTest", () => {
 
   it("recursion in renders", () => {
     expect(digest("level/recursion")).toBeTruthy();
-    expect(digest("level/recursion")).not.toBeNull();
+    assertNotNil(digest("level/recursion"));
   });
 
   it("chaining the top template on recursion", () => {
@@ -363,7 +363,7 @@ describe("TemplateDigestorTest", () => {
       changeTemplate("level/recursion");
     });
 
-    expect(digest("level/recursion")).not.toBeNull();
+    assertNotNil(digest("level/recursion"));
   });
 
   it("chaining the partial template on recursion", () => {
@@ -373,7 +373,7 @@ describe("TemplateDigestorTest", () => {
       changeTemplate("level/_recursion");
     });
 
-    expect(digest("level/recursion")).not.toBeNull();
+    assertNotNil(digest("level/recursion"));
   });
 
   it("dont generate a digest for missing templates", () => {

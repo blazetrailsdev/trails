@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { travelBack, travelTo } from "@blazetrails/activesupport";
+import { travelBack, travelTo, assertNil, assertNotNil } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
@@ -115,8 +115,8 @@ describe("SignedGlobalIDPurposeTest", () => {
   it("parse returns nil when purpose mismatch", () => {
     const verifier = makeVerifier();
     const loginSgid = SignedGlobalID.create(person(5), { verifier, for: "login" });
-    expect(SignedGlobalID.parse(loginSgid.toString(), { verifier })).toBeNull();
-    expect(SignedGlobalID.parse(loginSgid.toString(), { verifier, for: "like_button" })).toBeNull();
+    assertNil(SignedGlobalID.parse(loginSgid.toString(), { verifier }));
+    assertNil(SignedGlobalID.parse(loginSgid.toString(), { verifier, for: "like_button" }));
   });
 
   it("equal only with same purpose", () => {
@@ -141,9 +141,9 @@ describe("SignedGlobalIDExpirationTest", () => {
       const verifier = makeVerifier();
       const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: 1 });
       travelTo("2024-01-01T00:00:00.500Z", { withUsec: true });
-      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+      assertNotNil(SignedGlobalID.parse(sgid.toString(), { verifier }));
       travelTo("2024-01-01T00:00:02.000Z", { withUsec: true });
-      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
+      assertNil(SignedGlobalID.parse(sgid.toString(), { verifier }));
     } finally {
       travelBack();
     }
@@ -157,10 +157,10 @@ describe("SignedGlobalIDExpirationTest", () => {
       const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: null });
 
       travelTo("2024-01-01T01:00:00.000Z", { withUsec: true });
-      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+      assertNotNil(SignedGlobalID.parse(sgid.toString(), { verifier }));
 
       travelTo("2024-01-01T02:00:00.000Z", { withUsec: true });
-      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+      assertNotNil(SignedGlobalID.parse(sgid.toString(), { verifier }));
     } finally {
       travelBack();
       _resetSignedGlobalIDClassConfig();
@@ -176,7 +176,7 @@ describe("SignedGlobalIDExpirationTest", () => {
       expect(sgid.expiresAt!.epochMilliseconds).toBe(date.epochMilliseconds);
 
       travelTo("2024-01-02T00:00:00.000Z", { withUsec: true });
-      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
+      assertNil(SignedGlobalID.parse(sgid.toString(), { verifier }));
     } finally {
       travelBack();
     }
@@ -190,7 +190,7 @@ describe("SignedGlobalIDExpirationTest", () => {
       const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: null });
 
       travelTo("2024-01-01T04:00:00.000Z", { withUsec: true });
-      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+      assertNotNil(SignedGlobalID.parse(sgid.toString(), { verifier }));
     } finally {
       travelBack();
       _resetSignedGlobalIDClassConfig();
@@ -208,7 +208,7 @@ describe("SignedGlobalIDExpirationTest", () => {
       });
 
       travelTo("2024-01-01T01:00:00.000Z", { withUsec: true });
-      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+      assertNotNil(SignedGlobalID.parse(sgid.toString(), { verifier }));
     } finally {
       travelBack();
     }
@@ -255,9 +255,9 @@ describe("SignedGlobalIDExpirationTest", () => {
       SignedGlobalID.expiresIn = 3600;
       const sgid = SignedGlobalID.create(person(5), { verifier });
       travelTo("2024-01-01T00:59:00.000Z", { withUsec: true });
-      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+      assertNotNil(SignedGlobalID.parse(sgid.toString(), { verifier }));
       travelTo("2024-01-01T01:01:00.000Z", { withUsec: true });
-      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
+      assertNil(SignedGlobalID.parse(sgid.toString(), { verifier }));
     } finally {
       travelBack();
       _resetSignedGlobalIDClassConfig();
@@ -271,9 +271,9 @@ describe("SignedGlobalIDExpirationTest", () => {
       SignedGlobalID.expiresIn = 3600;
       const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: 7200 });
       travelTo("2024-01-01T01:00:00.000Z", { withUsec: true });
-      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+      assertNotNil(SignedGlobalID.parse(sgid.toString(), { verifier }));
       travelTo("2024-01-01T02:00:03.000Z", { withUsec: true });
-      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
+      assertNil(SignedGlobalID.parse(sgid.toString(), { verifier }));
     } finally {
       travelBack();
       _resetSignedGlobalIDClassConfig();
@@ -290,7 +290,7 @@ describe("SignedGlobalIDExpirationTest", () => {
       expect(sgid.expiresAt!.epochMilliseconds).toBe(date.epochMilliseconds);
 
       travelTo("2024-01-01T02:00:00.000Z", { withUsec: true });
-      expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
+      assertNotNil(SignedGlobalID.parse(sgid.toString(), { verifier }));
     } finally {
       travelBack();
       _resetSignedGlobalIDClassConfig();

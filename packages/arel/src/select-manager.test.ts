@@ -12,6 +12,7 @@ import {
 } from "./index.js";
 import { fakeRecordConnection } from "./test-helpers/connection.js";
 import { mustBeLike } from "./test-helpers/must-be-like.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 describe("SelectManagerTest", () => {
   const users = new Table("users");
@@ -959,7 +960,7 @@ describe("SelectManagerTest", () => {
       );
 
       mgr.distinct(false);
-      expect(mgr.ast.cores[mgr.ast.cores.length - 1].setQuantifier).toBeNull();
+      assertNil(mgr.ast.cores[mgr.ast.cores.length - 1].setQuantifier);
     });
 
     it("chains", () => {
@@ -980,7 +981,7 @@ describe("SelectManagerTest", () => {
       );
 
       mgr.distinctOn(false);
-      expect(mgr.ast.cores[mgr.ast.cores.length - 1].setQuantifier).toBeNull();
+      assertNil(mgr.ast.cores[mgr.ast.cores.length - 1].setQuantifier);
     });
 
     it("chains", () => {
@@ -1153,7 +1154,7 @@ describe("SelectManagerTest", () => {
 
     it("returns nil when there are no wheres", () => {
       const mgr = new SelectManager(users).project(star());
-      expect(mgr.whereSql()).toBeNull();
+      assertNil(mgr.whereSql());
     });
   });
 

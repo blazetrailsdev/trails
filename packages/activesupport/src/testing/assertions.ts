@@ -714,12 +714,12 @@ export function assertNotEqual(
 /** @noRailsEquivalent PERMANENT */
 export function assertNil(obj: unknown, msg: string | (() => string) | null = null): true {
   msg = message(msg, null, () => `Expected ${inspect(obj)} to be nil`);
-  return assert(obj == null, msg);
+  return assert(obj == null || (obj as { isNil?: () => boolean }).isNil?.(), msg);
 }
 
 function refuteNil(obj: unknown, msg: string | (() => string) | null = null): true {
   msg = message(msg, null, () => `Expected ${inspect(obj)} to not be nil`);
-  return refute(obj == null, msg);
+  return refute(obj == null || (obj as { isNil?: () => boolean }).isNil?.(), msg);
 }
 
 export function assertNotNil(obj: unknown, msg: string | (() => string) | null = null): true {

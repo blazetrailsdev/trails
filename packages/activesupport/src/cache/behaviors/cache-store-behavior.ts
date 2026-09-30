@@ -7,6 +7,7 @@ import {
   assertNot,
   assertRaises,
   assertSame,
+  assertNil,
 } from "../../testing/assertions.js";
 
 /** @internal */
@@ -77,7 +78,7 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     cache.write(key, null);
     const write = vi.spyOn(cache, "write");
     try {
-      expect(cache.fetch(key, () => "baz")).toBeNull();
+      assertNil(cache.fetch(key, () => "baz"));
       expect(write).not.toHaveBeenCalled();
     } finally {
       write.mockRestore();
@@ -88,7 +89,7 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     const key = crypto.randomUUID();
     const write = vi.spyOn(cache, "write");
     try {
-      expect(cache.fetch(key, { skipNil: true }, () => null)).toBeNull();
+      assertNil(cache.fetch(key, { skipNil: true }, () => null));
       expect(cache.exist("foo")).toBe(false);
       expect(write).not.toHaveBeenCalled();
     } finally {
@@ -124,7 +125,7 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
   it("should read and write nil", () => {
     const key = crypto.randomUUID();
     expect(cache.write(key, null)).toBe(true);
-    expect(cache.read(key)).toBeNull();
+    assertNil(cache.read(key));
   });
 
   it("should read and write false", () => {
@@ -251,7 +252,7 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
         cache.write(key, "bar", { expiresIn: -60 });
       });
       assertSame("Cache expiration time is invalid, cannot be negative: -60", error.message);
-      expect(cache.read(key)).toBeNull();
+      assertNil(cache.read(key));
     });
   });
 
