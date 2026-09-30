@@ -258,6 +258,22 @@ describe("Kernel#instance_variable_get / instance_variable_set", () => {
     expect(rbObjInstanceVariables(o)).toContain("@_cache_key");
   });
 
+  it("reports each field under a name that reads the same field back", () => {
+    const o = Object.assign(new Holder(), { a_1: 5, HTTP: 6, fooBAR: 7 });
+    expect(rbObjInstanceVariables(o)).toEqual([
+      "@foo_bar",
+      "@items",
+      "@a_1",
+      "@HTTP",
+      "@foo_b_a_r",
+    ]);
+    expect([
+      rbObjIvarGet(o, "@a_1"),
+      rbObjIvarGet(o, "@HTTP"),
+      rbObjIvarGet(o, "@foo_b_a_r"),
+    ]).toEqual([5, 6, 7]);
+  });
+
   it("raises FrozenError on a frozen receiver", () => {
     expect(() => rbObjIvarSet(Object.freeze(new Holder()), "@items", [])).toThrow(FrozenError);
   });

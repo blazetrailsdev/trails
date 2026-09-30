@@ -678,14 +678,15 @@ function ivarField(obj: object, id: string): string {
     const field = ivarFields.get(o)?.get(id);
     if (field !== undefined) return field;
   }
-  return id.slice(1).replace(/(?<=[A-Za-z\d])_([a-z\d])/g, (_, c: string) => c.toUpperCase());
+  return id.slice(1).replace(/(?<=[A-Za-z\d])_([a-z])/g, (_, c: string) => c.toUpperCase());
 }
 
 function fieldIvar(obj: object, field: string): string {
   for (let o: object | null = obj; o; o = Object.getPrototypeOf(o) as object | null) {
     for (const [iv, f] of ivarFields.get(o) ?? []) if (f === field) return iv;
   }
-  return `@${field.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)}`;
+  const iv = `@${field.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)}`;
+  return ivarField(obj, iv) === field ? iv : `@${field}`;
 }
 
 function idForVar(obj: object, iv: string): string {

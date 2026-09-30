@@ -1,4 +1,5 @@
 import { wrap } from "@blazetrails/activesupport";
+import { rbEqual } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
 
@@ -318,19 +319,12 @@ export class LoaderQuery {
   }
 
   eql(other: LoaderQuery): boolean {
-    const keysMatch =
-      this.associationKeyName === other.associationKeyName ||
-      (Array.isArray(this.associationKeyName) &&
-        Array.isArray(other.associationKeyName) &&
-        this.associationKeyName.length === other.associationKeyName.length &&
-        this.associationKeyName.every((k, i) => k === (other.associationKeyName as string[])[i]));
     return (
-      keysMatch &&
+      rbEqual(this.associationKeyName, other.associationKeyName) &&
       this.scope.tableName === other.scope.tableName &&
       this.scope.model.connectionSpecificationName ===
         other.scope.model.connectionSpecificationName &&
-      JSON.stringify(this.scope.valuesForQueries(), bigintNumber) ===
-        JSON.stringify(other.scope.valuesForQueries(), bigintNumber)
+      rbEqual(this.scope.valuesForQueries(), other.scope.valuesForQueries())
     );
   }
 

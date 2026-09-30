@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { registerModel } from "../../index.js";
+import { fixtures } from "../../test-fixtures.js";
+import { Preloader } from "../preloader.js";
+import { Author } from "../../test-helpers/models/author.js";
 import { LoaderQuery } from "./association.js";
+
+registerModel(Author);
 
 const scopeWith = (where: unknown[]) => ({
   tableName: "posts",
@@ -16,11 +22,29 @@ describe("Preloader::Association::LoaderQuery", () => {
     expect(big.hash()).toBe(same.hash());
     expect(big.eql(str)).toBe(false);
     expect(big.hash()).not.toBe(str.hash());
-    expect(big.hash()).not.toBe(
-      new LoaderQuery(scopeWith([Number(9223372036854775808n)]), "author_id").hash(),
-    );
+    const float = new LoaderQuery(scopeWith([Number(9223372036854775808n)]), "author_id");
+    expect(big.eql(float)).toBe(true);
+    expect(big.hash()).not.toBe(float.hash());
     expect(new LoaderQuery(scopeWith([1n]), "author_id").hash()).toBe(
       new LoaderQuery(scopeWith([1]), "author_id").hash(),
     );
+  });
+
+  describe("with a real scope", () => {
+    const { authors } = fixtures(["authors", "posts"]);
+
+    it("compares two separately built equal scopes as equal", async () => {
+      const loaderFor = async () =>
+        (
+          await new Preloader({
+            records: [authors("david")],
+            associations: ["posts"],
+            associateByDefault: false,
+          }).loaders()
+        )[0];
+      const [a, b] = [await loaderFor(), await loaderFor()];
+      expect(a.loaderQuery().eql(b.loaderQuery())).toBe(true);
+      expect(a.loaderQuery().hash()).toBe(b.loaderQuery().hash());
+    });
   });
 });
