@@ -18,7 +18,9 @@ export const Open3 = {
    * (`open3.rb:508-525`) with stdin closed and stdout and stderr on one pipe,
    * and answers the combined output with the child's `Process::Status`. A
    * program that cannot be spawned raises from `popen_run`'s `spawn`
-   * (`open3.rb:534`), `Errno::ENOENT` for a missing one. A host adapter without
+   * (`open3.rb:534`) as `rb_syserr_fail_str`'s `Errno::` class for the errno,
+   * `Errno::ENOENT` for a missing program and `Errno::EACCES` for one it may
+   * not execute. A host adapter without
    * `capture2e` raises `rb_notimplement`'s `NotImplementedError`
    * (`vendor/ruby/v3.3.11/error.c:3498-3502`), naming `spawn`, the C function it
    * reaches.
@@ -43,7 +45,10 @@ export const Open3 = {
       env: execarg.env,
     });
     if (result.error !== undefined) {
-      if (result.error.code === "ENOENT") throw new Errno.ENOENT(execarg.commandName);
+      const errno = Errno[result.error.code as keyof typeof Errno] as
+        | (new (mesg?: string) => Error)
+        | undefined;
+      if (errno !== undefined) throw new errno(execarg.commandName);
       throw result.error;
     }
     return [result.output, new Process.Status(result.status)];

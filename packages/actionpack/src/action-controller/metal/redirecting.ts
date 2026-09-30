@@ -31,7 +31,7 @@ export interface RedirectToResponseOptions {
 
 export interface RedirectingHost {
   request: { referer?: string | null; host?: string; protocol?: string; hostWithPort?(): string };
-  redirectTo(options: string, responseOptions?: Record<string, unknown>): unknown;
+  redirectTo(options: RedirectToOptions, responseOptions?: RedirectToResponseOptions): unknown;
   urlFor?(options: unknown): string;
 }
 

@@ -2,6 +2,7 @@ import { ArgumentError } from "./argument-error.js";
 import { getChildProcessAsync } from "./child-process-adapter.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { env as processEnv } from "./process-adapter.js";
+import { stringValueCStr } from "./string/support.js";
 
 const POSIX_SH_CMDS = [
   "!",
@@ -51,7 +52,8 @@ export interface ExecArg {
  * `rb_execarg_new` (`vendor/ruby/v3.3.11/process.c:2767`) for the
  * `([env,] command_line)` form `Kernel#system` and `Open3.capture2e` take. A
  * leading Hash is the env (`rb_exec_getargs`, `process.c:2511`), checked by
- * `rb_check_exec_env` (`process.c:2429-2466`) and applied over `ENV` the way
+ * `rb_check_exec_env` / `check_exec_env_i` (`process.c:2429-2466`), which
+ * `StringValueCStr`s each name and non-`nil` value, and applied over `ENV` the way
  * `rb_execarg_parent_start1` builds the child's `envp` (`process.c:2893-2916`):
  * a `nil` value unsets the name.
  *
@@ -62,11 +64,12 @@ export function rbExecargNew(...cmd: [Record<string, string | null>, string] | [
   const env: Record<string, string | undefined> = { ...processEnv };
   if (envModification !== null) {
     for (const [key, val] of Object.entries(envModification)) {
-      if (key.includes("=")) {
+      const k = stringValueCStr(key);
+      if (k.includes("=")) {
         throw new ArgumentError(`environment name contains a equal : ${key}`);
       }
-      if (val == null) delete env[key];
-      else env[key] = val;
+      if (val == null) delete env[k];
+      else env[k] = stringValueCStr(val);
     }
   }
   return rbExecFillarg(prog, env);

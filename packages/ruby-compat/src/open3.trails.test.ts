@@ -53,6 +53,14 @@ describe("Open3.capture2e", () => {
     );
   });
 
+  it("raises Errno::ENOENT for an empty command line", async () => {
+    await expect(Open3.capture2e("")).rejects.toThrow(new Errno.ENOENT(""));
+  });
+
+  it("raises Errno::EACCES for a program it may not execute", async () => {
+    await expect(Open3.capture2e("/dev/null")).rejects.toThrow(new Errno.EACCES("/dev/null"));
+  });
+
   it("raises NotImplementedError on an adapter without capture2e", async () => {
     registerChildProcessAdapter("spawn-sync-only", { spawnSync: getChildProcess().spawnSync });
     childProcessAdapterConfig.adapter = "spawn-sync-only";

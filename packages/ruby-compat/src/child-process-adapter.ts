@@ -111,6 +111,13 @@ function spawnAsync(
 ): Promise<Capture2eResult> {
   return new Promise((resolvePromise) => {
     const chunks: string[] = [];
+    const spawnFailed = (error: Error & { code?: string }): void => {
+      resolvePromise({ pid: null, status: null, signal: null, error, output: "" });
+    };
+    if (cmd === "") {
+      spawnFailed(Object.assign(new Error(`spawn ${cmd} ENOENT`), { code: "ENOENT" }));
+      return;
+    }
     let child: NodeSpawned;
     try {
       child = cp.spawn(cmd, args, {
@@ -118,7 +125,7 @@ function spawnAsync(
         stdio: capture ? ["pipe", "pipe", "pipe"] : "inherit",
       });
     } catch (error) {
-      resolvePromise({ pid: null, status: null, signal: null, error: error as Error, output: "" });
+      spawnFailed(error as Error);
       return;
     }
     for (const stream of [child.stdout, child.stderr]) {
@@ -127,7 +134,7 @@ function spawnAsync(
     }
     child.stdin?.end();
     child.once("error", (error) => {
-      resolvePromise({ pid: null, status: null, signal: null, error, output: chunks.join("") });
+      if (child.pid === undefined) spawnFailed(error);
     });
     child.once("close", (code, signal) => {
       resolvePromise({

@@ -58,10 +58,29 @@ class ENOENT extends SystemCallError {
 }
 
 /**
+ * `Errno::EACCES`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`)
+ * as `Errno::ENOTTY` is above, and raised by `Open3.capture2e` when its `spawn`
+ * finds a program it may not execute.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::EACCES`, which Rails
+ * rescues without defining.
+ */
+class EACCES extends SystemCallError {
+  static readonly Errno = 13;
+  readonly code = "EACCES";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Permission denied" : `Permission denied - ${mesg}`);
+    this.name = "Errno::EACCES";
+    this.errno = EACCES.Errno;
+  }
+}
+
+/**
  * Ruby's core `Errno` module (`vendor/ruby/v3.3.11/error.c:2666-2694`), holding the
  * `SystemCallError` subclass for each errno a raise site in ruby-compat names.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Errno`, which Rails rescues
  * without defining.
  */
-export const Errno = { ENOENT, ENOTTY };
+export const Errno = { EACCES, ENOENT, ENOTTY };

@@ -28,6 +28,10 @@ describe("Kernel#system", () => {
     expect(await rbKernelSystem("")).toBeNull();
   });
 
+  it("answers nil for a program it may not execute", async () => {
+    expect(await rbKernelSystem("/dev/null")).toBeNull();
+  });
+
   it("runs a line with shell meta characters through /bin/sh -c", async () => {
     expect(await rbKernelSystem("true && test 1 = 1")).toBe(true);
     expect(await rbKernelSystem("true || exit 1; exit 2")).toBe(false);
@@ -41,6 +45,18 @@ describe("Kernel#system", () => {
   it("raises ArgumentError for an env name containing =", async () => {
     await expect(rbKernelSystem({ "a=b": "c" }, "true")).rejects.toThrow(
       new ArgumentError("environment name contains a equal : a=b"),
+    );
+  });
+
+  it("raises TypeError for a non-String env value and ArgumentError for a NUL byte", async () => {
+    await expect(rbKernelSystem({ a: 1 } as never, "true")).rejects.toThrow(
+      "no implicit conversion of Integer into String",
+    );
+    await expect(rbKernelSystem({ "a\0": "c" }, "true")).rejects.toThrow(
+      new ArgumentError("string contains null byte"),
+    );
+    await expect(rbKernelSystem({ a: "c\0" }, "true")).rejects.toThrow(
+      new ArgumentError("string contains null byte"),
     );
   });
 

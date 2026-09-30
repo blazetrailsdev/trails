@@ -30,14 +30,14 @@ export class Flash {
     base.addFlashTypes("alert", "notice");
   }
 
-  redirectTo(
+  redirectTo<FlashType extends string = never>(
     this: { constructor: unknown; flash: FlashHash },
     options: RedirectToOptions = {},
-    responseOptionsAndFlash: RedirectToResponseOptionsAndFlash<string> = {},
+    responseOptionsAndFlash: RedirectToResponseOptionsAndFlash<FlashType> = {},
   ): number {
     for (const flashType of (this.constructor as FlashClassHost)._flashTypes) {
-      const type = responseOptionsAndFlash[flashType];
-      delete responseOptionsAndFlash[flashType];
+      const type = (responseOptionsAndFlash as Record<string, unknown>)[flashType];
+      delete (responseOptionsAndFlash as Record<string, unknown>)[flashType];
       if (type != null && type !== false) {
         this.flash.set(flashType, type);
       }
