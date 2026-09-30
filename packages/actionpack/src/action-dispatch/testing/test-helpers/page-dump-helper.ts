@@ -45,6 +45,7 @@ export async function saveAndOpenPage(
   return sPath;
 }
 
+// BLOCKED: ruby-compat-pathname-for-file-fixture-and-save-page
 /** @internal */
 export async function savePage(
   this: PageDumpHelperHost,

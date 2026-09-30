@@ -11,6 +11,7 @@ export const FileFixtures = {
     classAttribute.call(base, "fileFixturePath", { instanceWriter: false });
   },
 
+  // BLOCKED: ruby-compat-pathname-for-file-fixture-and-save-page
   fileFixture(this: FileFixturesHost, fixtureName: string): string {
     const path = File.join(this.fileFixturePath!, fixtureName);
 
