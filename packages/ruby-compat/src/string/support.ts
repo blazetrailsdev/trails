@@ -86,7 +86,8 @@ export function rbCheckStringType(val: unknown): string | null {
 /**
  * `NUM2LONG` (`vendor/ruby/v3.3.11/numeric.c:3135` `rb_num2long`): a Float
  * outside `long` raises `RangeError` with `out_of_range_float`'s `%-.10g`
- * (`numeric.c:3109-3124`), and anything else goes through `rb_to_int`.
+ * (`numeric.c:3109-3124`), a `bigint` (Ruby's Bignum) outside it raises
+ * `rb_big2long`'s, and anything else goes through `rb_to_int`.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -104,12 +105,16 @@ export function num2long(val: unknown): number {
             : "-Inf";
       throw new RangeError(`float ${g} out of range of integer`);
     }
+    if (typeof val === "bigint") {
+      if (val < 2n ** 63n && -(2n ** 63n) <= val) return Number(val);
+      throw new RangeError("bignum too big to convert into `long'");
+    }
     const toInt = (val as { toInt?: unknown }).toInt;
     if (typeof toInt !== "function") {
       throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(val)} into Integer`);
     }
     const v = (toInt as () => unknown).call(val);
-    if (typeof v !== "number" || !Number.isInteger(v)) {
+    if (typeof v !== "bigint" && (typeof v !== "number" || !Number.isInteger(v))) {
       const klass = rbBuiltinClassName(val);
       throw new TypeError(
         `can't convert ${klass} to Integer (${klass}#to_int gives ${rbBuiltinClassName(v)})`,

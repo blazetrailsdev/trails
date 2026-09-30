@@ -299,6 +299,10 @@ describe("processAdapter", () => {
       );
       await expect(stdin.gets(1.9)).resolves.toBe("a");
       await expect(stdin.gets({ toInt: () => 2 } as never)).resolves.toBe("bc");
+      await expect(stdin.gets((2n ** 64n) as never)).rejects.toThrow(
+        new RangeError("bignum too big to convert into `long'"),
+      );
+      await expect(stdin.gets(1n as never)).resolves.toBe("\n");
     });
 
     it("read answers what gets buffered past a line first", async () => {
