@@ -18,7 +18,7 @@ describe("tokenize", () => {
   it("honors <%- and -%> trim modes and <%% / %%> literals", () => {
     const left = tokenize("a\n   <%- x %>b");
     expect(left[0].value).toBe("a\n   ");
-    expect(left[1].trimLeft).toBe(true);
+    expect(left[1].kind).toBe("code");
     const right = tokenize("<% x -%>   \nb");
     expect(right[1].value).toBe("b");
     expect(tokenize("<%% %%>")[0].value).toBe("<% %>");
@@ -36,6 +36,7 @@ describe("tokenize", () => {
     expect(render("<%= y -%>\nz")).toBe("{y}z");
     expect(render("<%= y %>\nz")).toBe("{y}\nz");
     expect(render("  <% x %>\nq", false)).toBe("  \nq");
+    expect(tokenize("<%-= x %>")[0]).toMatchObject({ kind: "code", value: "= x " });
   });
 
   it("throws on unterminated tags", () => {
