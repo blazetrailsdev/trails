@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import { Attribute } from "./attribute.js";
 import { AttributeSet } from "./attribute-set.js";
 import { typeRegistry } from "./type/registry.js";
-import { Builder } from "./attribute-set/builder.js";
+import { Builder, LazyAttributeHash } from "./attribute-set/builder.js";
 import { IntegerType } from "./type/integer.js";
 import { StringType } from "./type/string.js";
-import { FrozenError } from "@blazetrails/ruby-compat";
+import { FrozenError, KeyError, NoMethodError } from "@blazetrails/ruby-compat";
 
 describe("AttributeSetTest", () => {
   it("freeze freezes the attributes hash", () => {
@@ -148,5 +148,39 @@ describe("AttributeSetTest", () => {
     expect(set.getAttribute("__proto__")).toBe(attr);
     expect(set.deepDup().isKey("__proto__")).toBe(true);
     expect(Object.hasOwn(set.except("foo"), "__proto__")).toBe(true);
+  });
+});
+
+describe("AttributeSet over a LazyAttributeHash store", () => {
+  const types = { name: new StringType() };
+
+  it("keeps a LazyAttributeHash passed to the constructor", () => {
+    const set = new AttributeSet(new LazyAttributeHash(types, { name: "Bob" }));
+    expect(set.fetchValue("name")).toBe("Bob");
+    expect(set.keys()).toEqual(["name"]);
+  });
+
+  it("fetch sends fetch to the LazyAttributeHash", () => {
+    const set = new AttributeSet(new LazyAttributeHash(types, {}));
+    const fallback = Attribute.null("wibble");
+    expect(set.fetch("wibble", () => fallback)).toBe(fallback);
+    expect(set.fetch("wibble", fallback)).toBe(fallback);
+    expect(() => set.fetch("wibble")).toThrow(KeyError);
+    expect(set.fetch("name").isInitialized()).toBe(false);
+  });
+
+  it("reverseMergeBang raises NoMethodError when either store is a LazyAttributeHash", () => {
+    const set = new AttributeSet(new LazyAttributeHash(types, {}));
+    expect(() => set.reverseMergeBang(new AttributeSet({}))).toThrow(NoMethodError);
+    expect(() => new AttributeSet({}).reverseMergeBang(set)).toThrow(NoMethodError);
+  });
+
+  it("initializeClone keeps a frozen store frozen", () => {
+    const set = new AttributeSet({
+      foo: Attribute.fromDatabase("foo", 1, typeRegistry.lookup("integer")),
+    }).freeze();
+    const clone = Object.assign(Object.create(AttributeSet.prototype) as AttributeSet, set);
+    clone.initializeClone(set);
+    expect(() => clone.writeFromDatabase("foo", 2)).toThrow(FrozenError);
   });
 });

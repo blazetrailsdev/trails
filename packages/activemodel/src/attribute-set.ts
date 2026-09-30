@@ -4,12 +4,15 @@ import type { LazyAttributeHash } from "./attribute-set/builder.js";
 import {
   FrozenError,
   KeyError,
+  block,
   dup,
   eachKey as hashEachKey,
   eachValue,
   except,
   hasKey,
+  rbFPublicSend,
   rbInspect,
+  rbObjClone,
   transformValues as hashTransformValues,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
@@ -78,7 +81,13 @@ export class AttributeSet {
 
   fetch<T = Attribute>(name: string, defaultOrBlock?: T | ((name: string) => T)): Attribute | T {
     const attributes = this.attributes();
-    if (isKey(attributes, name)) return aref(attributes, name)!;
+    if (!isHash(attributes)) {
+      if (defaultOrBlock === undefined) return attributes.fetch(name);
+      return typeof defaultOrBlock === "function"
+        ? attributes.fetch(name, block(defaultOrBlock as (name: string) => Attribute))
+        : attributes.fetch(name, defaultOrBlock as Attribute);
+    }
+    if (hasKey(attributes, name)) return attributes[name];
     if (typeof defaultOrBlock === "function") return (defaultOrBlock as (name: string) => T)(name);
     if (defaultOrBlock !== undefined) return defaultOrBlock;
     throw new KeyError(`key not found: ${rbInspect(name)}`, { receiver: attributes, key: name });
@@ -89,10 +98,12 @@ export class AttributeSet {
     return isHash(attributes) ? except(attributes, ...names) : attributes.except(...names);
   }
 
-  constructor(attributes: Record<string, Attribute> = {}) {
-    this._attributes = frozenErrorRaisingStore(
-      Object.setPrototypeOf(attributes, null) as Record<string, Attribute>,
-    );
+  constructor(attributes: Attributes = {}) {
+    this._attributes = isHash(attributes)
+      ? frozenErrorRaisingStore(
+          Object.setPrototypeOf(attributes, null) as Record<string, Attribute>,
+        )
+      : attributes;
   }
 
   getAttribute(name: string): Attribute {
@@ -179,10 +190,17 @@ export class AttributeSet {
   }
 
   reverseMergeBang(targetAttributes: AttributeSet): this {
-    const target = targetAttributes.attributes();
-    eachKey(target, (name) => {
-      if (!isKey(this._attributes, name)) aset(this._attributes, name, aref(target, name)!);
-    });
+    const attributes = this.attributes();
+    const other = targetAttributes.attributes();
+    if (!isHash(attributes)) {
+      rbFPublicSend(attributes, "reverseMergeBang", other);
+    } else if (!isHash(other)) {
+      rbFPublicSend(other, "merge", attributes);
+    } else {
+      for (const [name, attr] of Object.entries(other)) {
+        if (!hasKey(attributes, name)) attributes[name] = attr;
+      }
+    }
     return this;
   }
 
@@ -230,8 +248,8 @@ export class AttributeSet {
   initializeClone(_: AttributeSet): void {
     const attributes = this._attributes;
     this._attributes = isHash(attributes)
-      ? frozenErrorRaisingStore(dup(attributes))
-      : attributes.dup();
+      ? frozenErrorRaisingStore(rbObjClone(attributes))
+      : rbObjClone(attributes);
   }
 
   /** @noRailsEquivalent PERMANENT */
