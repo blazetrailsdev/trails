@@ -1,4 +1,4 @@
-import { type Hash } from "@blazetrails/ruby-compat";
+import { type Hash, isEmpty } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import "./i18n.js";
 import type { Identification } from "@blazetrails/globalid";
@@ -112,7 +112,6 @@ import {
 import {
   Access,
   sanitizeForMassAssignment,
-  isMassAssignmentEmpty,
   assertAssignedSynchronously,
   type DirtyOptions,
   dirtyInitAttributes,
@@ -1722,7 +1721,7 @@ export class Base extends Model {
   constructor(attrs: Record<string, unknown> = {}, initBlock?: (record: Base) => void) {
     (new.target as typeof Base | undefined)?._requireConcreteClass();
     attrs ??= {};
-    if (!isMassAssignmentEmpty(attrs)) {
+    if (!isEmpty(attrs)) {
       attrs = sanitizeForMassAssignment(attrs);
     }
     if (

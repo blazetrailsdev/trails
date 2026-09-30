@@ -32,7 +32,7 @@ describe("MassAssignmentEmptyParametersTest", () => {
   });
 
   it("non-empty Parameters proceeds past the empty-bag guard at construction", () => {
-    expect(new Parameters({ name: "Bob" }).empty).toBe(false);
+    expect(new Parameters({ name: "Bob" }).isEmpty()).toBe(false);
     expect(
       () => new Account(new Parameters({ name: "Bob" }) as unknown as Record<string, unknown>),
     ).toThrow(ForbiddenAttributesError);

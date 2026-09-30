@@ -14,7 +14,8 @@
  * Receiver dispatch follows `core_ext/object/blank.rb`'s own arms — Ruby's
  * `Array`/`Hash` `blank?` IS `empty?` (blank.rb:96, 111) — so `Set`/`Map` (the
  * ports' Hash-like receivers) answer on `size`, and a plain object on its own
- * keys.
+ * keys. Any other receiver that defines `isEmpty` — the TS spelling of its
+ * own `empty?` — answers through it, as Ruby sends `empty?` to the receiver.
  *
  * @internal
  * @noRailsEquivalent PERMANENT `empty?` is Ruby core, not Rails
@@ -25,5 +26,7 @@
 export function isEmpty(value: readonly unknown[] | string | object): boolean {
   if (typeof value === "string" || Array.isArray(value)) return value.length === 0;
   if (value instanceof Set || value instanceof Map) return value.size === 0;
+  const own = (value as { isEmpty?: unknown }).isEmpty;
+  if (typeof own === "function") return (own as () => boolean).call(value);
   return Object.keys(value).length === 0;
 }

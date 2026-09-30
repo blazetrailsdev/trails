@@ -25,7 +25,6 @@ export {
   assignAttributes,
   assertAssignedSynchronously,
   attributeWriterMissing,
-  isMassAssignmentEmpty,
   ArgumentError,
   NoMethodError,
   RuntimeError,

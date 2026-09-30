@@ -114,6 +114,11 @@ export abstract class Attribute {
     return this._value;
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  valueWithBlock(_block?: (name: string) => unknown): unknown {
+    return this.value;
+  }
+
   get originalValue(): unknown {
     if (this.isAssigned()) {
       return this.originalAttribute!.originalValue;
@@ -364,7 +369,15 @@ export class Uninitialized extends Attribute {
   }
 
   get value(): unknown {
-    return undefined;
+    return null;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  override valueWithBlock(block?: (name: string) => unknown): unknown {
+    if (block !== undefined) {
+      return block(this.name!);
+    }
+    return null;
   }
 
   override get originalValue(): unknown {
