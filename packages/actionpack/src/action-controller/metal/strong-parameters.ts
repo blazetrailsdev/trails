@@ -153,10 +153,10 @@ export class Parameters {
     return this._permitted;
   }
 
-  /** @missingRailsArgs permit_filters — CONVERGEABLE permit-value-is-missing-the-explicit-arrays-arm */
   permit(...filters: (string | Record<string, unknown>)[]): Parameters {
     return this.permitFilters(filters, {
       onUnpermitted: Parameters.actionOnUnpermittedParameters,
+      explicitArrays: false,
     });
   }
 
@@ -194,6 +194,7 @@ export class Parameters {
 
   expect<K extends string>(filter: Record<K, ExpectedHashFilter>): ExpectedHash<K>;
   expect(key: string): unknown;
+  expect(...keys: [string, string, ...string[]]): unknown[];
   expect(...filters: (string | Record<string, unknown>)[]): unknown;
   expect(...filters: (string | Record<string, unknown>)[]): unknown {
     const flatFilters = filters.flat();
@@ -205,6 +206,7 @@ export class Parameters {
 
   expectBang<K extends string>(filter: Record<K, ExpectedHashFilter>): ExpectedHash<K>;
   expectBang(key: string): unknown;
+  expectBang(...keys: [string, string, ...string[]]): unknown[];
   expectBang(...filters: (string | Record<string, unknown>)[]): unknown;
   expectBang(...filters: (string | Record<string, unknown>)[]): unknown {
     try {
@@ -673,12 +675,13 @@ export class Parameters {
     filter: Record<string, unknown>,
     {
       onUnpermitted = Parameters.actionOnUnpermittedParameters,
-    }: { onUnpermitted?: OnUnpermitted } = {},
+      explicitArrays = false,
+    }: { onUnpermitted?: OnUnpermitted; explicitArrays?: boolean } = {},
   ): void {
     this.slice(...Object.keys(filter)).each((key, value) => {
       if (value == null || value === false) return;
       if (!this.hasKey(key)) return;
-      const result = this.permitValue(value, filter[key], { onUnpermitted });
+      const result = this.permitValue(value, filter[key], { onUnpermitted, explicitArrays });
       if (result != null) params.set(key, result);
     });
   }
@@ -762,7 +765,10 @@ export class Parameters {
   /** @internal */
   permitFilters(
     filters: (string | Record<string, unknown>)[],
-    { onUnpermitted = null }: { onUnpermitted?: OnUnpermitted } = {},
+    {
+      onUnpermitted = null,
+      explicitArrays = true,
+    }: { onUnpermitted?: OnUnpermitted; explicitArrays?: boolean } = {},
   ): Parameters {
     const params = new Parameters();
 
@@ -770,7 +776,7 @@ export class Parameters {
       if (typeof filter === "string") {
         this._permittedScalarFilter(params, filter);
       } else if (typeof filter === "object" && filter !== null) {
-        this._hashFilter(params, filter, { onUnpermitted });
+        this._hashFilter(params, filter, { onUnpermitted, explicitArrays });
       }
     }
 
@@ -912,16 +918,17 @@ export class Parameters {
     filter: Record<string, unknown>,
     {
       onUnpermitted = Parameters.actionOnUnpermittedParameters,
-    }: { onUnpermitted?: OnUnpermitted } = {},
+      explicitArrays = false,
+    }: { onUnpermitted?: OnUnpermitted; explicitArrays?: boolean } = {},
   ): void {
-    this._hashFilter(params, filter, { onUnpermitted });
+    this._hashFilter(params, filter, { onUnpermitted, explicitArrays });
   }
 
   /** @internal */
   permitValue(
     value: unknown,
     filter: unknown,
-    { onUnpermitted }: { onUnpermitted: OnUnpermitted },
+    { onUnpermitted, explicitArrays }: { onUnpermitted: OnUnpermitted; explicitArrays: boolean },
   ): unknown {
     if (Array.isArray(filter) && filter.length === 0) {
       return this.permitArrayOfScalars(value);
@@ -932,13 +939,22 @@ export class Parameters {
       !Array.isArray(filter) &&
       Object.keys(filter as Record<string, unknown>).length === 0
     ) {
-      return this.permitHash(value, filter as Record<string, unknown>, { onUnpermitted });
+      return this.permitHash(value, filter as Record<string, unknown>, {
+        onUnpermitted,
+        explicitArrays,
+      });
     }
     if (this.isArrayFilter(filter)) {
-      return this.permitArrayOfHashes(value, (filter as unknown[])[0], { onUnpermitted });
+      return this.permitArrayOfHashes(value, (filter as unknown[])[0], {
+        onUnpermitted,
+        explicitArrays,
+      });
+    }
+    if (explicitArrays) {
+      return this.permitHash(value, filter, { onUnpermitted, explicitArrays });
     }
     if (this.isNonScalar(value)) {
-      return this.permitHashOrArray(value, filter, { onUnpermitted });
+      return this.permitHashOrArray(value, filter, { onUnpermitted, explicitArrays });
     }
     return undefined;
   }
@@ -953,12 +969,12 @@ export class Parameters {
   permitArrayOfHashes(
     value: unknown,
     filter: unknown,
-    { onUnpermitted }: { onUnpermitted: OnUnpermitted },
+    { onUnpermitted, explicitArrays }: { onUnpermitted: OnUnpermitted; explicitArrays: boolean },
   ): unknown {
     return this.eachArrayElement(value, filter, (el) =>
       el.permitFilters(
         (Array.isArray(filter) ? filter : [filter]) as (string | Record<string, unknown>)[],
-        { onUnpermitted },
+        { onUnpermitted, explicitArrays },
       ),
     );
   }
@@ -967,7 +983,7 @@ export class Parameters {
   permitHash(
     value: unknown,
     filter: Record<string, unknown> | unknown,
-    { onUnpermitted }: { onUnpermitted: OnUnpermitted },
+    { onUnpermitted, explicitArrays }: { onUnpermitted: OnUnpermitted; explicitArrays: boolean },
   ): unknown {
     if (!(value instanceof Parameters)) return undefined;
     if (
@@ -980,7 +996,7 @@ export class Parameters {
     }
     return value.permitFilters(
       (Array.isArray(filter) ? filter : [filter]) as (string | Record<string, unknown>)[],
-      { onUnpermitted },
+      { onUnpermitted, explicitArrays },
     );
   }
 
@@ -988,11 +1004,11 @@ export class Parameters {
   permitHashOrArray(
     value: unknown,
     filter: unknown,
-    { onUnpermitted }: { onUnpermitted: OnUnpermitted },
+    { onUnpermitted, explicitArrays }: { onUnpermitted: OnUnpermitted; explicitArrays: boolean },
   ): unknown {
-    const arr = this.permitArrayOfHashes(value, filter, { onUnpermitted });
+    const arr = this.permitArrayOfHashes(value, filter, { onUnpermitted, explicitArrays });
     if (arr != null) return arr;
-    return this.permitHash(value, filter, { onUnpermitted });
+    return this.permitHash(value, filter, { onUnpermitted, explicitArrays });
   }
 
   /** @internal */

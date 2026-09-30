@@ -33,6 +33,24 @@ describe("Parameters#expect types", () => {
     expect(values).toHaveLength(2);
   });
 
+  it("several scalar keys return one value per key", () => {
+    const values = params.expect("id", "id");
+    expectTypeOf(values).toEqualTypeOf<unknown[]>();
+    expect(values).toEqual(["1", "1"]);
+  });
+
+  it("array and array-of-hashes filters fall through to the untyped overload", () => {
+    const withTags = new Parameters({
+      post: { title: "Hi" },
+      tags: ["a"],
+      comments: [{ text: "ok" }],
+    });
+    expectTypeOf(withTags.expect({ tags: [] })).toBeUnknown();
+    expectTypeOf(withTags.expect({ comments: [["text"]] })).toBeUnknown();
+    expectTypeOf(withTags.expect({ post: ["title"], tags: [] })).toBeUnknown();
+    expect(withTags.expect({ tags: [] })).toEqual(["a"]);
+  });
+
   it("a scalar key returns the scalar", () => {
     const id = params.expect("id");
     expectTypeOf(id).toBeUnknown();

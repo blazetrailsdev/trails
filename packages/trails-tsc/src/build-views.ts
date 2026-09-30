@@ -245,6 +245,7 @@ function bindCheckedTypes(
   const renders = new Map<ViewShim, { calls: number; keys: Map<string, number> }>();
   const unresolved = new Set<ViewShim>();
   let unknownTarget = false;
+  let unknownTemplate = false;
   for (const view of views) {
     view.view = [...view.base.view];
     view.locals = new Map([...view.base.locals].map(([k, v]) => [k, new Set(v)]));
@@ -268,14 +269,26 @@ function bindCheckedTypes(
     }
     return [nonNull];
   };
-  for (const view of views) {
-    const sf = program.getSourceFile(view.outBase + ".ts");
+  const sources = [
+    ...views.map((v) => ({
+      file: v.outBase + ".ts",
+      prefix: path.posix.dirname(v.rel),
+      inController: false,
+    })),
+    ...controllers.map((c) => ({ file: c.file, prefix: c.path, inController: true })),
+  ];
+  for (const { file, prefix, inController } of sources) {
+    const sf = program.getSourceFile(file);
     if (sf === undefined) continue;
-    const prefix = path.posix.dirname(view.rel);
     const visit = (node: ts.Node): void => {
-      const site = ts.isCallExpression(node) ? renderedPartial(node) : undefined;
+      const site = ts.isCallExpression(node) ? renderSite(node, inController) : undefined;
       if (site === "unknown") unknownTarget = true;
-      else if (site !== undefined && "object" in site) {
+      else if (site !== undefined && "template" in site) {
+        const key = site.template?.includes("/") ? site.template : `${prefix}/${site.template}`;
+        if (site.template === undefined) unknownTemplate = true;
+        for (const view of views)
+          if (view.rel.replace(/\.[^/]*$/u, "") === key) unresolved.add(view);
+      } else if (site !== undefined && "object" in site) {
         for (const type of objectTypes(checker.getTypeAtLocation(site.object))) {
           const reached = modelPartial(type);
           if (reached === undefined) unknownTarget = true;
@@ -339,8 +352,9 @@ function bindCheckedTypes(
   for (const [target, { calls, keys }] of renders) {
     for (const [name, count] of keys) if (count < calls) target.locals.get(name)!.add("undefined");
   }
-  for (const partial of partials.values()) {
-    if (unknownTarget || unresolved.has(partial)) partial.resolved = false;
+  for (const view of views) {
+    const partial = partialRegistryKey(view.rel) !== null;
+    if (unresolved.has(view) || (partial ? unknownTarget : unknownTemplate)) view.resolved = false;
   }
   return views.some((view, i) => scopeSignature(view) !== before[i]);
 }
@@ -456,41 +470,70 @@ function sourceDeclaration(
   return declaration && !declaration.getSourceFile().isDeclarationFile ? declaration : undefined;
 }
 
-function renderedPartial(
+function renderSite(
   call: ts.CallExpression,
+  inController: boolean,
 ):
   | { name: string; locals?: ts.Expression; implicitLocals: boolean }
   | { object: ts.Expression; locals?: ts.Expression }
+  | { template: string | undefined }
   | "unknown"
   | undefined {
-  if (!ts.isIdentifier(call.expression) || call.expression.text !== "render") return undefined;
+  const callee = call.expression;
+  const isRender = ts.isIdentifier(callee)
+    ? callee.text === "render"
+    : ts.isPropertyAccessExpression(callee) &&
+      callee.expression.kind === ts.SyntaxKind.ThisKeyword &&
+      callee.name.text === "render";
+  if (!isRender) return undefined;
   const [first, second] = call.arguments;
   if (!first) return undefined;
-  if (ts.isStringLiteral(first)) return { name: first.text, locals: second, implicitLocals: false };
+  if (ts.isStringLiteral(first)) {
+    if (!inController) return { name: first.text, locals: second, implicitLocals: false };
+    return second === undefined || !passesLocals(second) ? undefined : { template: first.text };
+  }
   if (!ts.isObjectLiteralExpression(first)) return { object: first, locals: second };
-  const name = (p: ts.ObjectLiteralElementLike): string | undefined =>
-    (ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p)) &&
-    (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name))
-      ? p.name.text
-      : undefined;
-  const keys = first.properties.map(name);
+  const keys = first.properties.map(propertyName);
   if (keys.includes(undefined)) return "unknown";
-  const partialKey = second === undefined ? "partial" : "layout";
-  if (!keys.includes(partialKey)) return undefined;
-  const option = (key: string): ts.Expression | undefined => {
-    const property = first.properties.find((p) => name(p) === key);
-    return property && ts.isPropertyAssignment(property)
-      ? property.initializer
-      : property && ts.isShorthandPropertyAssignment(property)
-        ? property.name
-        : undefined;
-  };
-  const partial = option(partialKey);
+  const block = !inController && second !== undefined && isFunction(second);
+  const partialKey = block ? "layout" : "partial";
+  if (!keys.includes(partialKey)) {
+    if (!keys.includes("locals")) return undefined;
+    const named = option(first, "template") ?? option(first, "action");
+    return { template: named && ts.isStringLiteral(named) ? named.text : undefined };
+  }
+  const partial = option(first, partialKey);
   if (partial && ts.isStringLiteral(partial)) {
     const implicitLocals = keys.some((k) => k === "collection" || k === "object" || k === "as");
-    return { name: partial.text, locals: option("locals"), implicitLocals };
+    return { name: partial.text, locals: option(first, "locals"), implicitLocals };
   }
   return "unknown";
+}
+
+function propertyName(p: ts.ObjectLiteralElementLike): string | undefined {
+  return (ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p)) &&
+    (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name))
+    ? p.name.text
+    : undefined;
+}
+
+function option(hash: ts.ObjectLiteralExpression, key: string): ts.Expression | undefined {
+  const property = hash.properties.find((p) => propertyName(p) === key);
+  return property && ts.isPropertyAssignment(property)
+    ? property.initializer
+    : property && ts.isShorthandPropertyAssignment(property)
+      ? property.name
+      : undefined;
+}
+
+function passesLocals(options: ts.Expression): boolean {
+  if (!ts.isObjectLiteralExpression(options)) return true;
+  const keys = options.properties.map(propertyName);
+  return keys.includes(undefined) || keys.includes("locals");
+}
+
+function isFunction(node: ts.Expression): boolean {
+  return ts.isArrowFunction(node) || ts.isFunctionExpression(node);
 }
 
 function templateScope(

@@ -330,6 +330,49 @@ describe("buildViews", () => {
       expect(shim(partial)).toContain("      : any;");
     expect(shim("show")).toContain("      : never;");
   }, 30_000);
+
+  it("reads a hash render's second argument as a block only when it is a function", () => {
+    const cwd = mkScratch();
+    write(cwd, "app/views/posts/_row.html.tse", "<%= psot %>");
+    write(cwd, "app/views/posts/_boxed.html.tse", "<%= psot %>");
+    write(
+      cwd,
+      "app/views/posts/show.html.tse",
+      '<%= render({ partial: "row" }, { post: 1 }) %><%= render({ layout: "boxed", locals: { post: 1 } }, () => "") %>',
+    );
+    buildViews({ cwd });
+    const shim = (rel: string): string =>
+      fs.readFileSync(path.join(cwd, ".trails/views/posts", `${rel}.html.tse.ts`), "utf8");
+    expect(shim("_row")).toContain("type ObjectLocals = {};");
+    expect(shim("_row")).toContain("      : never;");
+    expect(shim("_boxed")).toContain("type ObjectLocals = { post: number };");
+  }, 30_000);
+
+  it("keeps the any fallback for a template a controller render passes locals to", () => {
+    const cwd = mkScratch();
+    write(
+      cwd,
+      "app/controllers/posts-controller.ts",
+      [
+        "export class PostsController {",
+        "  render(..._args: unknown[]): void {}",
+        '  show(): void { this.render("show", { locals: { foo: 1 } }); }',
+        '  edit(): void { this.render("edit", { status: "unprocessable_entity" }); }',
+        '  rows(): void { this.render({ partial: "row", collection: [1] }); }',
+        "}",
+      ].join("\n"),
+    );
+    for (const rel of ["show", "edit", "_row", "_form"]) {
+      write(cwd, `app/views/posts/${rel}.html.tse`, "<%= foo %>");
+    }
+    buildViews({ cwd });
+    const shim = (rel: string): string =>
+      fs.readFileSync(path.join(cwd, ".trails/views/posts", `${rel}.html.tse.ts`), "utf8");
+    expect(shim("show")).toContain("      : any;");
+    expect(shim("edit")).toContain("      : never;");
+    expect(shim("_row")).toContain("      : any;");
+    expect(shim("_form")).toContain("      : never;");
+  }, 30_000);
 });
 
 describe("runCli", () => {

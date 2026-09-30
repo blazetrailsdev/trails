@@ -1486,7 +1486,7 @@ export class Base extends Model {
     const scope = this.currentScope();
     if (scope) {
       const scopeAttrs = scope.scopeForCreate?.() ?? {};
-      return { ...scopeAttrs, ...attrs };
+      return { ...scopeAttrs, ...(isEmpty(attrs) ? {} : sanitizeForMassAssignment(attrs)) };
     }
     return attrs;
   }
