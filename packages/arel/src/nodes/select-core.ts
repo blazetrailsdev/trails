@@ -77,7 +77,7 @@ export class SelectCore extends Node {
   }
 
   initializeCopy(_other: SelectCore): void {
-    if (this.source) this.source = rbObjClone(this.source);
+    if (this.source != null) this.source = rbObjClone(this.source);
     this.projections = rbObjClone(this.projections);
     this.wheres = rbObjClone(this.wheres);
     this.groups = rbObjClone(this.groups);

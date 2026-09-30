@@ -37,8 +37,8 @@ export class InsertStatement extends Node {
 
   initializeCopy(_other: InsertStatement): void {
     this.columns = rbObjClone(this.columns);
-    if (this.values) this.values = rbObjClone(this.values);
-    if (this.select) this.select = rbObjClone(this.select);
+    if (this.values != null) this.values = rbObjClone(this.values);
+    if (this.select != null) this.select = rbObjClone(this.select);
   }
 }
 

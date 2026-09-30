@@ -54,8 +54,8 @@ export class DeleteStatement extends Node {
   }
 
   initializeCopy(_other: DeleteStatement): void {
-    if (this.relation) this.relation = rbObjClone(this.relation);
-    if (this.wheres) this.wheres = rbObjClone(this.wheres);
+    if (this.relation != null) this.relation = rbObjClone(this.relation);
+    if (this.wheres != null) this.wheres = rbObjClone(this.wheres);
   }
 }
 

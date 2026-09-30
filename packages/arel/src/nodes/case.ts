@@ -60,9 +60,9 @@ export class Case extends NodeExpression {
   }
 
   initializeCopy(_other: Case): void {
-    if (this.case) this.case = rbObjClone(this.case);
+    if (this.case != null) this.case = rbObjClone(this.case);
     this.conditions = this.conditions.map((x) => rbObjClone(x));
-    if (this.default) this.default = rbObjClone(this.default);
+    if (this.default != null) this.default = rbObjClone(this.default);
   }
 }
 
