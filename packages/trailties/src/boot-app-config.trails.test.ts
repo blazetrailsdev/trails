@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActionController } from "@blazetrails/actionpack";
 import { env, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
+import "./all.js";
 import { Trails } from "./rails.js";
 
 describe("a generated app's config files configure the application", () => {
@@ -40,4 +41,18 @@ describe("a generated app's config files configure the application", () => {
     expect(Trails.logger).not.toBeNull();
     expect(ActionController.Base.logger).toBe(Trails.logger);
   }, 15_000);
+
+  it("runs action_controller.set_configs after load_environment_config and bootstrap_hook", () => {
+    class OrderApp extends Application {}
+    Application.register(OrderApp);
+    const names = OrderApp.instance()
+      .initializers.tsort()
+      .map((initializer) => initializer.name);
+    const setConfigs = names.indexOf("action_controller.set_configs");
+    expect(names.indexOf("action_controller.deprecator")).toBeLessThan(
+      names.indexOf("load_environment_config"),
+    );
+    expect(setConfigs).toBeGreaterThan(names.indexOf("load_environment_config"));
+    expect(setConfigs).toBeGreaterThan(names.indexOf("bootstrap_hook"));
+  });
 });
