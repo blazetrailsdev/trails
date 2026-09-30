@@ -625,7 +625,6 @@ export class Relation<T extends Base> {
   }
 
   async load(block?: (record: T) => void): Promise<LoadedRelation<this>> {
-    if (this.isNullRelation()) return stripThenable(this);
     if (!this.isLoaded || this.isScheduled) {
       const token = this._loadToken;
       const records = await this.withConnection(() => this.execQueries(block));
