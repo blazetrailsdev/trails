@@ -309,4 +309,50 @@ describe("virtualizeTse", () => {
       expect(diags.join("\n")).toMatch(/not callable|is of type 'unknown'/i);
     });
   });
+
+  describe("view scope", () => {
+    const scope = {
+      view: "{ readingTime(this: { x: 1 }, words: number): string; posts: string[] }",
+      locals: "{ post: { title: string | null } }",
+    };
+
+    it("declares each name the body references, not property names or bindings", () => {
+      const out = virtualizeTse(
+        "<% const n = 1 %><%= readingTime(n) %><%= f({ model: post }, (form) => form.x) %>",
+        scope,
+      );
+      expect(out).toContain("  this: View,");
+      expect(out).toContain('  let readingTime!: Scope<"readingTime">;');
+      expect(out).toContain('  let post!: Scope<"post">;');
+      expect(out).not.toContain('Scope<"n">');
+      expect(out).not.toContain('Scope<"model">');
+      expect(out).not.toContain('Scope<"x">');
+    });
+
+    it("types a helper call through the view, so its parameter types reach the checker", () => {
+      const out = virtualizeTse("<p><%= readingTime(post.title) %></p>", scope);
+      expect(diagnose(out).join("\n")).toMatch(
+        /'string \| null' is not assignable to parameter of type 'number'/,
+      );
+      expect(diagnose(virtualizeTse("<%= readingTime(this.posts.length) %>", scope))).toEqual([]);
+    });
+
+    it("leaves an unknown name `any` without strict locals and `never` with them", () => {
+      expect(diagnose(virtualizeTse("<%= mystery.anything() %>", scope))).toEqual([]);
+      const strict = virtualizeTse("<%# locals: () %><%= mystery.anything() %>", scope);
+      expect(diagnose(strict).join("\n")).toMatch(/does not exist on type 'never'/);
+    });
+
+    it("maps each body line to the .tse line its node starts on", () => {
+      const src = '<div id="<%= a %>">\n  <p>\n    <%= b %>\n  </p>\n<% if (c) {\n  d(); } %>';
+      const { ts, mappings } = virtualizeTseWithDeltas(src, scope);
+      const lines = ts.split("\n");
+      const srcLineOf = (needle: string): number | undefined =>
+        mappings.find((m) => lines[m.genLine].includes(needle))?.srcLine;
+      expect(srcLineOf("_ob.append(a)")).toBe(0);
+      expect(srcLineOf("_ob.append(b)")).toBe(2);
+      expect(srcLineOf("if (c)")).toBe(4);
+      expect(srcLineOf("d();")).toBe(5);
+    });
+  });
 });

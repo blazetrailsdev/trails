@@ -16,10 +16,13 @@ import {
   createArSolutionBuilder,
   getPreEmitDiagnostics,
   remapDiagnostics,
+  type ArTrailsProgram,
   sortAndDeduplicateDiagnostics,
 } from "./ar-program.js";
 import type { SchemaColumnValue } from "@blazetrails/activerecord/type-virtualization/synthesize.js";
 import { parseSchemaTs } from "./schema-ts-parser.js";
+import { decodeLineMappings } from "@blazetrails/trails-tsc";
+import type { TseSourceMap } from "./ar-program.js";
 
 type RichColumnValue = Extract<SchemaColumnValue, object>;
 
@@ -299,7 +302,36 @@ function handleBuildMode(args: string[]): void {
   process.exit(status);
 }
 
-export function main(): void {
+async function loadTseSourceMaps(
+  program: ArTrailsProgram["program"],
+): Promise<Map<string, TseSourceMap>> {
+  const maps = new Map<string, TseSourceMap>();
+  const shims = program.getSourceFileNames().filter((f) => f.endsWith(".tse.ts"));
+  await Promise.all(
+    shims.map(async (fileName) => {
+      const text = program.getSourceFile(fileName)?.text ?? "";
+      const url = /\/\/# sourceMappingURL=(\S+)\s*$/u.exec(text)?.[1];
+      if (url === undefined) return;
+      const mapPath = path.resolve(path.dirname(fileName), url);
+      let raw: { sources: string[]; sourcesContent: (string | null)[]; mappings: string };
+      try {
+        raw = JSON.parse(await fs.promises.readFile(mapPath, "utf8"));
+      } catch {
+        return;
+      }
+      const sourceContent = raw.sourcesContent[0];
+      if (sourceContent == null) return;
+      maps.set(fileName, {
+        source: path.resolve(path.dirname(mapPath), raw.sources[0]),
+        sourceContent,
+        lines: new Map(decodeLineMappings(raw.mappings).map((m) => [m.genLine, m.srcLine])),
+      });
+    }),
+  );
+  return maps;
+}
+
+export async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
   handleHelp(args);
@@ -346,7 +378,11 @@ export function main(): void {
     diagnostics.push(...emitResult.diagnostics);
   }
 
-  const remapped = remapDiagnostics(diagnostics, host);
+  const tseSourceMaps = await loadTseSourceMaps(program);
+  const remapped = remapDiagnostics(diagnostics, {
+    ...host,
+    getTseSourceMap: (fileName) => tseSourceMaps.get(fileName),
+  });
   const sorted = sortAndDeduplicateDiagnostics(remapped);
 
   if (sorted.length > 0) {

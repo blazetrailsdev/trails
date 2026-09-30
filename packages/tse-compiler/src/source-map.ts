@@ -54,3 +54,37 @@ export function generateSourceMap(
     mappings: segs.join(";"),
   };
 }
+
+function decodeVlqSegment(segment: string): number[] {
+  const fields: number[] = [];
+  let value = 0;
+  let shift = 0;
+  for (const ch of segment) {
+    const digit = VLQ.indexOf(ch);
+    value += (digit & 0x1f) << shift;
+    if (digit & 0x20) {
+      shift += 5;
+      continue;
+    }
+    fields.push(value & 1 ? -(value >>> 1) : value >>> 1);
+    value = 0;
+    shift = 0;
+  }
+  return fields;
+}
+
+export function decodeLineMappings(mappings: string): LineMapping[] {
+  const out: LineMapping[] = [];
+  let srcLine = 0;
+  mappings.split(";").forEach((line, genLine) => {
+    let first = true;
+    for (const segment of line.split(",")) {
+      const fields = decodeVlqSegment(segment);
+      if (fields.length < 3) continue;
+      srcLine += fields[2];
+      if (first) out.push({ genLine, srcLine });
+      first = false;
+    }
+  });
+  return out;
+}

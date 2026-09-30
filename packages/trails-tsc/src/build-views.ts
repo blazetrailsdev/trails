@@ -2,8 +2,12 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import ts from "typescript-5";
 import { parse, generateSourceMap } from "@blazetrails/tse-compiler";
-import { virtualizeTseWithDeltas, parseLocalsSignature, localsParamType } from "./plugins/tse.js";
-import { remapLine } from "./remap.js";
+import {
+  virtualizeTseWithDeltas,
+  parseLocalsSignature,
+  localsParamType,
+  type TseScope,
+} from "./plugins/tse.js";
 
 export interface BuildViewsOptions {
   cwd?: string;
@@ -41,23 +45,19 @@ export function buildViews(opts: BuildViewsOptions = {}): BuildViewsResult {
   fs.mkdirSync(outViews, { recursive: true });
   const registryMap = new Map<string, string[]>();
   const shimPaths: string[] = [];
+  const appDir = path.dirname(viewsDir);
+  const helpers = allHelpersFromPath(path.join(appDir, "helpers"));
   for (const rel of files) {
     const src = fs.readFileSync(path.join(viewsDir, rel), "utf8");
-    const { ts: shim, deltas } = virtualizeTseWithDeltas(src);
     const srcAbsPath = path.join(viewsDir, rel);
     const mapAbsDir = path.dirname(path.join(outViews, rel));
+    const scope = templateScope(appDir, rel, mapAbsDir, helpers);
+    const { ts: shim, mappings } = virtualizeTseWithDeltas(src, scope);
     const sourceFileName = path.relative(mapAbsDir, srcAbsPath).split(path.sep).join("/");
     const outBase = path.join(outViews, rel);
     fs.mkdirSync(path.dirname(outBase), { recursive: true });
-    const shimWithUrl = shim + `//# sourceMappingURL=${path.basename(rel)}.ts.map\n`;
-    fs.writeFileSync(outBase + ".ts", shimWithUrl);
-    const shimMap = deltasToSourceMap(
-      path.basename(rel) + ".ts",
-      sourceFileName,
-      src,
-      shim,
-      deltas,
-    );
+    fs.writeFileSync(outBase + ".ts", shim + `//# sourceMappingURL=${path.basename(rel)}.ts.map\n`);
+    const shimMap = generateSourceMap(path.basename(rel) + ".ts", sourceFileName, src, mappings);
     fs.writeFileSync(outBase + ".ts.map", JSON.stringify(shimMap));
     shimPaths.push(outBase + ".ts");
     const ast = parse(src);
@@ -107,6 +107,66 @@ function walkTse(dir: string): string[] {
   return out.sort();
 }
 
+function allHelpersFromPath(helpersDir: string): string[] {
+  if (!fs.existsSync(helpersDir)) return [];
+  const names = fs
+    .readdirSync(helpersDir, { recursive: true, encoding: "utf8" })
+    .map((file) => file.split(path.sep).join("/"))
+    .filter((file) => /[-_]helper\.ts$/u.test(file) && !file.endsWith(".d.ts"));
+  return names.sort();
+}
+
+function camelize(name: string): string {
+  return name.replace(/(?:^|[-_])([a-z\d])/gu, (_, c: string) => c.toUpperCase());
+}
+
+function importPath(fromDir: string, file: string): string {
+  const rel = path.relative(fromDir, file).split(path.sep).join("/").replace(/\.ts$/u, ".js");
+  return JSON.stringify(rel.startsWith(".") ? rel : `./${rel}`);
+}
+
+function templateScope(
+  appDir: string,
+  rel: string,
+  shimDir: string,
+  helpers: readonly string[],
+): TseScope {
+  const view = ['import("@blazetrails/actionview").Base'];
+  for (const file of helpers) {
+    const name = camelize(path.posix.basename(file, ".ts").replace(/[-_]helper$/u, ""));
+    view.push(
+      `(typeof import(${importPath(shimDir, path.join(appDir, "helpers", file))}))["${name}Helper"]`,
+    );
+  }
+  view.push(
+    "{ [name: `${string}Path`]: (...args: unknown[]) => string; [name: `${string}Url`]: (...args: unknown[]) => string }",
+    'Record<"alert" | "notice", unknown>',
+  );
+  const prefix = path.posix.dirname(rel);
+  const controller = path.join(appDir, "controllers", `${prefix}-controller.ts`);
+  if (prefix !== "." && fs.existsSync(controller)) {
+    const klass = `import(${importPath(shimDir, controller)}).${camelize(path.posix.basename(prefix))}Controller`;
+    view.push(
+      `{ [K in keyof ${klass} as K extends keyof import("@blazetrails/actionpack").ActionController.Base ? never : ${klass}[K] extends (...args: never) => unknown ? never : K]: ${klass}[K] }`,
+    );
+  }
+  const scope: TseScope = { view: view.join(" & ") };
+  const partial = /^_([a-z_]\w*)/u.exec(path.posix.basename(rel));
+  if (partial !== null && prefix !== ".") {
+    const element = partial[1];
+    const model = path.join(
+      appDir,
+      "models",
+      ...prefix.split("/").slice(0, -1),
+      `${element.replace(/_/gu, "-")}.ts`,
+    );
+    if (fs.existsSync(model)) {
+      scope.locals = `{ ${element}: import(${importPath(shimDir, model)}).${camelize(element)} }`;
+    }
+  }
+  return scope;
+}
+
 function partialRegistryKey(rel: string): string | null {
   const parts = rel.replace(/\.tse$/u, "").split("/");
   const filename = parts[parts.length - 1];
@@ -130,22 +190,6 @@ function emitRegistryAugmentation(entries: Array<{ key: string; localsType: stri
   }
   lines.push("  }", "}", "");
   return lines.join("\n");
-}
-
-function deltasToSourceMap(
-  file: string,
-  sourceFile: string,
-  sourceContent: string,
-  shimText: string,
-  deltas: readonly import("./plugin.js").LineDelta[],
-): import("@blazetrails/tse-compiler").RawSourceMap {
-  const totalLines = shimText.split("\n").length;
-  const mappings: import("@blazetrails/tse-compiler").LineMapping[] = [];
-  for (let v = 0; v < totalLines; v++) {
-    const s = remapLine(v, deltas);
-    if (s !== null) mappings.push({ genLine: v, srcLine: s });
-  }
-  return generateSourceMap(file, sourceFile, sourceContent, mappings);
 }
 
 function emitDeclarations(shimPaths: readonly string[]): void {

@@ -157,6 +157,40 @@ describe("trails-tsc diagnostic remap — Phase 1b.2", () => {
   });
 });
 
+describe("trails-tsc .tse diagnostic remap", () => {
+  it("moves a compiled view's diagnostic to the .tse line and the span's column", () => {
+    const shimLine = "  _ob.append(readingTime(post.title));";
+    const character = shimLine.indexOf("post.title");
+    const diagnostic = {
+      fileName: "/app/.trails/views/posts/_post.html.tse.ts",
+      pos: 900,
+      end: 900 + "post.title".length,
+      code: 2345,
+      category: 1,
+      text: "Argument of type 'string | null' is not assignable to parameter of type 'number'.",
+      startPosition: { line: 40, character },
+      endPosition: { line: 40, character: character + "post.title".length },
+      sourceLines: [{ line: 40, text: shimLine }],
+    } as unknown as Diagnostic;
+    const sourceContent = "<div>\n  <p><%= readingTime(post.title) %></p>\n</div>\n";
+    const [remapped] = remapDiagnostics([diagnostic], {
+      getDeltasForFile: () => undefined,
+      getOriginalText: () => undefined,
+      getTseSourceMap: () => ({
+        source: "/app/app/views/posts/_post.html.tse",
+        sourceContent,
+        lines: new Map([[40, 1]]),
+      }),
+    });
+    expect(remapped.fileName).toBe("/app/app/views/posts/_post.html.tse");
+    expect(remapped.startPosition).toEqual({ line: 1, character: 21 });
+    expect(sourceContent.slice(remapped.pos, remapped.end)).toBe("post.title");
+    expect(remapped.sourceLines).toEqual([
+      { line: 1, text: "  <p><%= readingTime(post.title) %></p>\n" },
+    ]);
+  });
+});
+
 describe("trails-tsc transitive extends — Phase 1b.3", () => {
   const TRANSITIVE_DIR = path.resolve(FIXTURES_DIR, "transitive");
 

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { decodeLineMappings } from "@blazetrails/tse-compiler";
 import { buildViews } from "./build-views.js";
 import { runCli } from "./cli.js";
 import { diagnose } from "./plugins/tse-diagnose.js";
@@ -268,5 +269,46 @@ describe("runCli", () => {
     expect(rc).toBe(0);
     expect(fs.existsSync(path.join(cwd, ".trails/views/home.html.tse.ts"))).toBe(true);
     process.emit("SIGINT");
+  });
+
+  it("scopes a view to app/helpers, the controller's declared ivars and the partial's model", () => {
+    const cwd = mkScratch();
+    write(cwd, "app/helpers/posts-helper.ts", "export const PostsHelper = {};");
+    write(cwd, "app/helpers/admin/users_helper.ts", "export const UsersHelper = {};");
+    write(cwd, "app/controllers/posts-controller.ts", "export class PostsController {}");
+    write(cwd, "app/models/post.ts", "export class Post {}");
+    write(cwd, "app/views/posts/_post.html.tse", "<%= post %>");
+    write(cwd, "app/views/layouts/application.html.tse", "<%= yield %>");
+    buildViews({ cwd });
+    const shim = fs.readFileSync(path.join(cwd, ".trails/views/posts/_post.html.tse.ts"), "utf8");
+    expect(shim).toContain(
+      '(typeof import("../../../app/helpers/posts-helper.js"))["PostsHelper"]',
+    );
+    expect(shim).toContain(
+      '(typeof import("../../../app/helpers/admin/users_helper.js"))["UsersHelper"]',
+    );
+    expect(shim).toContain(
+      'import("../../../app/controllers/posts-controller.js").PostsController',
+    );
+    expect(shim).toContain(
+      'type ObjectLocals = { post: import("../../../app/models/post.js").Post };',
+    );
+    const layout = fs.readFileSync(
+      path.join(cwd, ".trails/views/layouts/application.html.tse.ts"),
+      "utf8",
+    );
+    expect(layout).not.toContain("Controller");
+    expect(layout).toContain("type ObjectLocals = {};");
+  });
+
+  it("writes a source map pointing each shim line at its .tse line", () => {
+    const cwd = mkScratch();
+    write(cwd, "app/views/posts/show.html.tse", "<div>\n  <p>\n    <%= readingTime(1) %>\n</div>");
+    buildViews({ cwd });
+    const base = path.join(cwd, ".trails/views/posts/show.html.tse.ts");
+    const lines = fs.readFileSync(base, "utf8").split("\n");
+    const map = JSON.parse(fs.readFileSync(base + ".map", "utf8"));
+    const genLine = lines.findIndex((l) => l.includes("readingTime(1)"));
+    expect(decodeLineMappings(map.mappings)).toContainEqual({ genLine, srcLine: 2 });
   });
 });

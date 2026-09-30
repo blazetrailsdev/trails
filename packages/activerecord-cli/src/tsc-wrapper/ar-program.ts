@@ -18,6 +18,13 @@ export interface CreateArTrailsProgramOptions {
 export interface ArRemapHost {
   getDeltasForFile(fileName: string): readonly LineDelta[] | undefined;
   getOriginalText(fileName: string): string | undefined;
+  getTseSourceMap?(fileName: string): TseSourceMap | undefined;
+}
+
+export interface TseSourceMap {
+  source: string;
+  sourceContent: string;
+  lines: ReadonlyMap<number, number>;
 }
 
 export interface ArTrailsProgram {
@@ -135,6 +142,9 @@ function remapOneDiagnostic(
   const unmoved = relatedInformation ? { ...d, relatedInformation } : d;
   if (!d.fileName || !d.startPosition) return unmoved;
 
+  const tse = host.getTseSourceMap?.(d.fileName);
+  if (tse) return remapTseDiagnostic(d, unmoved, tse);
+
   const deltas = host.getDeltasForFile(d.fileName);
   if (!deltas || deltas.length === 0) return unmoved;
 
@@ -166,6 +176,29 @@ function remapOneDiagnostic(
       if (line === null) return [];
       return [{ line, text: originalText.slice(lineStarts[line], lineStarts[line + 1]) }];
     }),
+  };
+}
+
+function remapTseDiagnostic(d: Diagnostic, unmoved: Diagnostic, tse: TseSourceMap): Diagnostic {
+  const line = tse.lines.get(d.startPosition!.line);
+  if (line === undefined) return unmoved;
+  const lineStarts = computeLineStarts(tse.sourceContent);
+  const text = tse.sourceContent.slice(lineStarts[line], lineStarts[line + 1]);
+  const virtualText = d.sourceLines?.find((l) => l.line === d.startPosition!.line)?.text ?? "";
+  const span = virtualText.slice(
+    d.startPosition!.character,
+    d.startPosition!.character + d.end - d.pos,
+  );
+  const character = span === "" ? 0 : Math.max(0, text.indexOf(span));
+  const pos = lineStarts[line] + character;
+  return {
+    ...unmoved,
+    fileName: tse.source,
+    pos,
+    end: pos + (d.end - d.pos),
+    startPosition: { line, character },
+    endPosition: { line, character: character + (d.end - d.pos) },
+    sourceLines: [{ line, text }],
   };
 }
 

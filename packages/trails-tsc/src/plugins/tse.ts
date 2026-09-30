@@ -1,3 +1,4 @@
+import ts from "typescript-5";
 import {
   parse,
   parseLocalsSignature,
@@ -5,6 +6,7 @@ import {
   YIELD_EXPR_RE,
   type TseAst,
   type LocalEntry,
+  type LineMapping,
 } from "@blazetrails/tse-compiler";
 import type { LineDelta, TscPlugin, VirtualizeOutput } from "../plugin.js";
 
@@ -39,25 +41,28 @@ function netBraceDepth(code: string): number {
   return depth;
 }
 
-function emitNodes(nodes: TseAst["nodes"]): string[] {
-  const lines: string[] = [];
+type EmittedLine = [code: string, srcLine: number];
+
+function emitNodes(nodes: TseAst["nodes"]): EmittedLine[] {
+  const lines: EmittedLine[] = [];
   const innerDepths: number[] = [];
   for (const node of nodes) {
+    const srcLine = node.srcLine + leadingNewlines(node);
     if (node.kind === "blockExpr") {
       innerDepths.push(0);
-      lines.push(`  _ob.append(${node.value.trim()}`);
+      lines.push([`  _ob.append(${node.value.trim()}`, srcLine]);
     } else if (node.kind === "code" && innerDepths.length > 0) {
       const innerDepth = innerDepths[innerDepths.length - 1];
       if (BLOCK_CLOSE_RE.test(node.value) && innerDepth === 0) {
         innerDepths.pop();
         const t = node.value.trim();
-        lines.push(`  ${t.endsWith(";") ? t.slice(0, -1) : t});`);
+        lines.push([`  ${t.endsWith(";") ? t.slice(0, -1) : t});`, srcLine]);
       } else {
         innerDepths[innerDepths.length - 1] += netBraceDepth(node.value);
-        lines.push(emitNode(node));
+        lines.push([emitNode(node), srcLine]);
       }
     } else {
-      lines.push(emitNode(node));
+      lines.push([emitNode(node), srcLine]);
     }
   }
   if (innerDepths.length > 0) {
@@ -66,6 +71,11 @@ function emitNodes(nodes: TseAst["nodes"]): string[] {
     );
   }
   return lines;
+}
+
+function leadingNewlines(node: TseAst["nodes"][number]): number {
+  if (node.kind === "text") return 0;
+  return (/^\s*/.exec(node.value)?.[0].match(/\n/g) ?? []).length;
 }
 
 function contextYield(value: string): string {
@@ -132,30 +142,44 @@ function buildPreamble(needsNoExtraKeys: boolean): string {
 export interface VirtualizeTseResult {
   ts: string;
   deltas: readonly LineDelta[];
+  mappings: readonly LineMapping[];
 }
 
-export function virtualizeTse(source: string): string {
-  return virtualizeTseWithDeltas(source).ts;
+export interface TseScope {
+  view: string;
+  locals?: string;
 }
 
-export function virtualizeTseWithDeltas(source: string): VirtualizeTseResult {
+export function virtualizeTse(source: string, scope?: TseScope): string {
+  return virtualizeTseWithDeltas(source, scope).ts;
+}
+
+export function virtualizeTseWithDeltas(source: string, scope?: TseScope): VirtualizeTseResult {
   const ast = parse(source);
   const locals = ast.localsSignature === null ? [] : parseLocalsSignature(ast.localsSignature);
   const localsType = localsParamType(ast, locals);
   const needsNoExtraKeys = localsType.includes("NoExtraKeys");
+  const emitted = emitNodes(ast.nodes);
+  const body = emitted.map(([code]) => code);
 
-  const header: string[] = [
-    buildPreamble(needsNoExtraKeys),
+  const header: string[] = [buildPreamble(needsNoExtraKeys)];
+  if (scope !== undefined) header.push(...scopeTypes(scope, ast.localsSignature !== null));
+  header.push(
     "export default function render(",
+    ...(scope === undefined ? [] : ["  this: View,"]),
     "  context: RenderContext,",
     `  locals: ${localsType},`,
     "): SafeString {",
     "  void context; void locals;",
     "  const _ob = context.outputBuffer;",
-  ];
+  );
   for (const line of destructureLines(locals)) header.push(line);
-  const body: string[] = [];
-  for (const line of emitNodes(ast.nodes)) body.push(line);
+  if (scope !== undefined) {
+    const declared = new Set(locals.map((l) => l.name));
+    for (const name of freeIdentifiers(body)) {
+      if (!declared.has(name)) header.push(`  let ${name}!: Scope<${JSON.stringify(name)}>;`);
+    }
+  }
   const footer = ["  return _ob;", "}", ""];
 
   const ts = [...header, ...body, ...footer].join("\n");
@@ -166,7 +190,82 @@ export function virtualizeTseWithDeltas(source: string): VirtualizeTseResult {
     { insertedAtLine: -1, lineCount: headerLineCount },
     { insertedAtLine: headerLineCount + bodyLineCount - 1, lineCount: footerLineCount },
   ];
-  return { ts, deltas };
+  const mappings: LineMapping[] = [];
+  let genLine = headerLineCount;
+  for (const [code, srcLine] of emitted) {
+    const count = code.split("\n").length;
+    for (let i = 0; i < count; i++) mappings.push({ genLine: genLine + i, srcLine: srcLine + i });
+    genLine += count;
+  }
+  return { ts, deltas, mappings };
+}
+
+function scopeTypes(scope: TseScope, strictLocals: boolean): string[] {
+  return [
+    `type View = ${scope.view};`,
+    `type ObjectLocals = ${scope.locals ?? "{}"};`,
+    "type Scope<K extends string> = K extends keyof ObjectLocals",
+    "  ? ObjectLocals[K]",
+    "  : K extends keyof View",
+    "    ? OmitThisParameter<View[K]>",
+    "    : K extends keyof typeof globalThis",
+    "      ? (typeof globalThis)[K]",
+    `      : ${strictLocals ? "never" : "any"};`,
+  ];
+}
+
+const UNDECLARABLE = new Set([
+  "undefined",
+  "NaN",
+  "Infinity",
+  "globalThis",
+  "arguments",
+  "eval",
+  "context",
+  "locals",
+  "_ob",
+]);
+
+function freeIdentifiers(body: readonly string[]): string[] {
+  const sf = ts.createSourceFile(
+    "body.ts",
+    `function __tse() {\n${body.join("\n")}\n}`,
+    ts.ScriptTarget.ESNext,
+    true,
+  );
+  const fn = sf.statements[0] as ts.FunctionDeclaration;
+  const names = new Set<string>();
+  const visit = (node: ts.Node): void => {
+    if (ts.isTypeNode(node)) return;
+    if (ts.isIdentifier(node) && isReference(node) && !UNDECLARABLE.has(node.text)) {
+      names.add(node.text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(fn.body!, visit);
+  for (const stmt of fn.body!.statements) {
+    if (ts.isVariableStatement(stmt)) {
+      for (const decl of stmt.declarationList.declarations) deleteBound(decl.name, names);
+    } else if ((ts.isFunctionDeclaration(stmt) || ts.isClassDeclaration(stmt)) && stmt.name) {
+      names.delete(stmt.name.text);
+    }
+  }
+  return [...names].sort();
+}
+
+function deleteBound(name: ts.BindingName, names: Set<string>): void {
+  if (ts.isIdentifier(name)) names.delete(name.text);
+  else for (const el of name.elements) if (!ts.isOmittedExpression(el)) deleteBound(el.name, names);
+}
+
+function isReference(node: ts.Identifier): boolean {
+  const parent = node.parent as ts.Node & {
+    name?: ts.Node;
+    propertyName?: ts.Node;
+    label?: ts.Node;
+  };
+  if (ts.isShorthandPropertyAssignment(parent)) return true;
+  return parent.name !== node && parent.propertyName !== node && parent.label !== node;
 }
 
 function errorShim(filePath: string, msg: string): string {

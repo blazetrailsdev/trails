@@ -3,4 +3,9 @@ export { parse, type TseAst, type TseNode } from "./parser.js";
 export { compileJs, YIELD_EXPR_RE, type EmitJsOptions, type EmitResult } from "./emit-js.js";
 export { parseFilename, type ParsedFilename } from "./parse-filename.js";
 export { parseLocalsSignature, LocalsSignatureError, type LocalEntry } from "./parse-locals.js";
-export { generateSourceMap, type RawSourceMap, type LineMapping } from "./source-map.js";
+export {
+  generateSourceMap,
+  decodeLineMappings,
+  type RawSourceMap,
+  type LineMapping,
+} from "./source-map.js";

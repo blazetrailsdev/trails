@@ -18,6 +18,7 @@ export {
 } from "./build.js";
 export { remapDiagnostics, remapLine } from "./remap.js";
 export { createTsePlugin, virtualizeTse } from "./plugins/tse.js";
+export { decodeLineMappings } from "@blazetrails/tse-compiler";
 export { buildViews, type BuildViewsOptions, type BuildViewsResult } from "./build-views.js";
 export { watchViews, type WatchHandle, type WatchViewsOptions } from "./watch-views.js";
 export { init as lspPluginInit } from "./lsp-plugin.js";
