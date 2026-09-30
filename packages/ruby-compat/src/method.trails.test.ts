@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Method, rbObjMethod } from "./method.js";
+import { ArgumentError } from "./argument-error.js";
+import { Method, rbCheckArity, rbIseqMinMaxArity, rbObjMethod } from "./method.js";
 import { NameError } from "./name-error.js";
 
 describe("rbObjMethod", () => {
@@ -63,5 +64,46 @@ describe("Method#arity", () => {
       methodMissing: (...args: unknown[]) => args,
     };
     expect(rbObjMethod(target, "anything").arity()).toBe(-1);
+  });
+});
+
+describe("rbCheckArity", () => {
+  it("raises MRI's wrong number of arguments for a fixed, optional or rest list", () => {
+    expect(() => rbCheckArity(function (_a: unknown) {}, 0)).toThrow(ArgumentError);
+    expect(() => rbCheckArity(function (_a: unknown) {}, 0)).toThrow(
+      "wrong number of arguments (given 0, expected 1)",
+    );
+    expect(() => rbCheckArity(function (_a: unknown, _b = {}) {}, 3)).toThrow(
+      "wrong number of arguments (given 3, expected 1..2)",
+    );
+    expect(() => rbCheckArity((_a: unknown, ..._b: unknown[]) => 1, 0)).toThrow(
+      "wrong number of arguments (given 0, expected 1+)",
+    );
+    expect(() => rbCheckArity(() => 1, 1)).toThrow(
+      "wrong number of arguments (given 1, expected 0)",
+    );
+  });
+
+  it("counts a destructured parameter with defaults inside its pattern as required", () => {
+    const min = rbIseqMinMaxArity;
+    expect(min(({ a = 1 }: { a?: number }) => a)).toEqual([1, 1]);
+    expect(min(([x = 1]: number[]) => x)).toEqual([1, 1]);
+    expect(min(({ a = 1 }: { a?: number } = {}) => a)).toEqual([0, 1]);
+    expect(min(async (a: unknown) => a)).toEqual([1, 1]);
+    expect(min(new Function("return async x => x")())).toEqual([1, 1]);
+    expect(
+      min(function (a = "x, y = z", b = ")") {
+        return [a, b];
+      }),
+    ).toEqual([0, 2]);
+    expect(() => rbCheckArity(({ a = 1 }: { a?: number }) => a, 0)).toThrow(
+      "wrong number of arguments (given 0, expected 1)",
+    );
+  });
+
+  it("answers nothing when argc is in range", () => {
+    expect(() => rbCheckArity(function (_a: unknown, _b = {}) {}, 1)).not.toThrow();
+    expect(() => rbCheckArity(function (_a: unknown, _b = {}) {}, 2)).not.toThrow();
+    expect(() => rbCheckArity((..._a: unknown[]) => 1, 7)).not.toThrow();
   });
 });

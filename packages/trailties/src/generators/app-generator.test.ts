@@ -109,6 +109,7 @@ describe("AppGenerator", () => {
     expect(exists("db/schema.ts")).toBe(false);
 
     expect(exists("test/test-helper.ts")).toBe(true);
+    expect(exists("test/global-setup.ts")).toBe(true);
     expect(exists("test/models/.gitkeep")).toBe(true);
     expect(exists("test/controllers/.gitkeep")).toBe(true);
     expect(exists("test/helpers/.gitkeep")).toBe(true);
@@ -516,6 +517,7 @@ describe("AppGenerator", () => {
     expect(read("config/environments/test.ts")).toMatchSnapshot("environments/test.ts");
     expect(read("config/environments/production.ts")).toMatchSnapshot("environments/production.ts");
     expect(read("test/test-helper.ts")).toMatchSnapshot("test-helper.ts");
+    expect(read("test/global-setup.ts")).toMatchSnapshot("global-setup.ts");
     expect(read("config.ts")).toMatchSnapshot("config.ts");
     expect(read("vite.config.ts")).toMatchSnapshot("vite.config.ts");
   });

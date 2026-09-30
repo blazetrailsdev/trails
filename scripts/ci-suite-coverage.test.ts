@@ -433,6 +433,31 @@ function gateRegex(yml: string, name: string): RegExp {
  *  each carved subtree still flips its own consuming job's gate
  *  via that gate's regex.
  *
+ *  thor_only (scripts/ci/thor-only.sh)
+ *  True only on a pull_request whose EVERY changed path is in the thor-only
+ *  set: packages/trailties/src/thor/, vendor/thor/, and thor's parity-register
+ *  rows (scripts/parity/unported-files/thor.ts and the thor/ shards of
+ *  scripts/api-compare/call-mismatches-{exclude,unreviewed}/). Any other path
+ *  — INFRA_RE included — leaves it false, and the push/schedule/
+ *  workflow_dispatch arm never runs the script, so the flag is unset there.
+ *  Thor imports nothing outside src/thor/, but trailties imports Thor
+ *  (generators/base.ts includes Thor::Actions), so the flag narrows rather
+ *  than skips:
+ *  - trailties-tests runs `vitest related` over the thor sources, through
+ *    vitest.trailties.config.ts (the root `other` project narrowed to
+ *    packages/trailties; related mode cannot crawl eslint/*.test.mjs).
+ *  - virtualized-dx-type-tests and leaf-tests' DX type step skip: thor has
+ *    no DX-type surface. The ci aggregate accepts those skips only when
+ *    thor_only is true.
+ *  - unit-tests runs only the guards a thor file can move:
+ *    stale-story-references and closing-story-references scan packages/ for
+ *    story citations; the three scripts/parity/unported-* guards read
+ *    UNPORTED_FILES (thor.ts included) and unported-live-test walks the
+ *    package test trees; lint-call-mismatches and baseline-json read the
+ *    committed call-mismatch shards. mixin-declaration-drift and
+ *    non-transactional-row-writes are not kept: they read only
+ *    packages/activerecord/. rails-comparison is not narrowed.
+ *
  *  case "${{ github.event_name }}" in
  *  Website label opt-in. The Website job otherwise gates only on
  *  packages/website/ paths, so PRs that need a site preview (or
@@ -457,6 +482,9 @@ function gateRegex(yml: string, name: string): RegExp {
  */
 type GateOpts = { cwd?: string; base?: string; head?: string };
 
+/** The filter step's last gate line; ci.yml names the script repo-relative. */
+const THOR_ONLY_CALL = "bash scripts/ci/thor-only.sh";
+
 async function gateRunner(
   yml: string,
 ): Promise<(file: string, opts?: GateOpts) => Promise<Record<string, string>>> {
@@ -469,14 +497,15 @@ async function gateRunner(
   const fnStart = lines.findIndex((l) => l.startsWith("is_additive_registration()"));
   const fnEnd = lines.indexOf("}", fnStart);
   if (fnStart === -1 || fnEnd === -1) throw new Error("no is_additive_registration in ci.yml");
-  const end = lines.findIndex((l) => l.startsWith("set_gate comparison_affected"));
+  const end = lines.findIndex((l) => l.startsWith(THOR_ONLY_CALL));
   if (start === -1 || end === -1) throw new Error("no gate block in ci.yml");
   const script = [
     "set -euo pipefail",
     ...defs,
     'GITHUB_OUTPUT=$(mktemp)\nfiles="$1"\nbase="${2:-}"\nhead="${3:-}"',
     ...lines.slice(fnStart, fnEnd + 1),
-    ...lines.slice(start, end + 1),
+    ...lines.slice(start, end),
+    lines[end].replace(THOR_ONLY_CALL, `bash ${path.join(REPO_ROOT, "scripts/ci/thor-only.sh")}`),
     'cat "$GITHUB_OUTPUT"; rm -f "$GITHUB_OUTPUT"',
   ].join("\n");
 
@@ -511,13 +540,13 @@ function filterCoversDir(filter: string, dir: string): boolean {
 /**
  * Gate names an `if:` expression reads out of the `changes` job, as one OR
  * group. A non-string `if:` names none — a bare `false` is handled by
- * `isDeadIf` instead, which drops the job outright. `docs_only` is dropped: it
- * is a negative condition, and a package's own test file is never docs-only.
+ * `isDeadIf` instead, which drops the job outright. A `!=` comparison
+ * (`docs_only`, `thor_only`) is dropped: it is a negative condition, and a
+ * package's own test file is neither docs-only nor thor-only.
  */
 function gateNames(ifText: unknown): string[] {
   if (typeof ifText !== "string") return [];
-  const names = [...ifText.matchAll(/needs\.changes\.outputs\.(\w+)/g)].map((m) => m[1]);
-  return names.filter((n) => n !== "docs_only");
+  return [...ifText.matchAll(/needs\.changes\.outputs\.(\w+)\s*==/g)].map((m) => m[1]);
 }
 
 /**
@@ -1227,6 +1256,73 @@ describe("CI runs every tooling test suite", () => {
     expect(discriminator.test("HTTP 401: Bad credentials")).toBe(false);
     expect(discriminator.test("HTTP 503: no server is currently available")).toBe(false);
     expect(discriminator.test("HTTP 404: Not Found")).toBe(false);
+  });
+
+  it("sets thor_only only when every changed path is in the thor-only set", async () => {
+    const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
+
+    const thorOnly = await runGate(
+      [
+        "packages/trailties/src/thor/actions.ts",
+        "packages/trailties/src/thor/actions.test.ts",
+        "scripts/parity/unported-files/thor.ts",
+        "scripts/api-compare/call-mismatches-exclude/thor/actions.json",
+        "scripts/api-compare/call-mismatches-unreviewed/thor/actions.json",
+      ].join("\n"),
+    );
+    expect(thorOnly.thor_only).toBe("true");
+    expect(thorOnly.trailties_affected).toBe("true");
+    expect(thorOnly.unit_tests_affected).toBe("true");
+    expect(thorOnly.activerecord_affected).toBe("false");
+
+    const withTrailties = await runGate(
+      "packages/trailties/src/thor/actions.ts\npackages/trailties/src/generators/base.ts",
+    );
+    expect(withTrailties.thor_only).toBe("false");
+    expect(withTrailties.trailties_affected).toBe("true");
+
+    const withLockfile = await runGate(
+      "packages/trailties/src/thor/actions.ts\npnpm-lock.yaml",
+      await diffRepo({ "pnpm-lock.yaml": "packages: {}\n" }),
+    );
+    expect(withLockfile.thor_only).toBe("false");
+    expect(withLockfile.activerecord_affected).toBe("true");
+    expect(withLockfile.actionpack_affected).toBe("true");
+
+    expect((await runGate("packages/trailties/src/thorough.ts")).thor_only).toBe("false");
+  });
+
+  it("never sets thor_only outside the pull_request gate arm", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+    expect(yml.split(THOR_ONLY_CALL).length - 1).toBe(1);
+
+    const lines = yml.split("\n").map((l) => l.trim());
+    const forced = lines.indexOf("push|schedule|workflow_dispatch)");
+    const forcedEnd = lines.indexOf(";;", forced);
+    const call = lines.findIndex((l) => l.startsWith(THOR_ONLY_CALL));
+    expect(forced).toBeGreaterThan(-1);
+    expect(lines.slice(forced, forcedEnd).some((l) => l.includes("thor-only"))).toBe(false);
+    expect(call).toBeGreaterThan(forcedEnd);
+  });
+
+  it("keeps the thor_only skips and the ci aggregate in agreement", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8"));
+    const flat = (x: string): string => x.replace(/\\\n/g, " ").replace(/\s+/g, " ");
+    const aggregate = flat(wf.jobs.ci.steps[0].run);
+
+    expect(flat(wf.jobs["virtualized-dx-type-tests"].if)).toContain(
+      "(needs.changes.outputs.trailties_affected == 'true' && needs.changes.outputs.thor_only != 'true')",
+    );
+    expect(flat(wf.jobs["leaf-tests"].if)).toContain(
+      "(needs.changes.outputs.trailties_affected == 'true' && needs.changes.outputs.thor_only != 'true')",
+    );
+    expect(wf.jobs.ci.steps[0].env.THOR_ONLY).toBe("${{ needs.changes.outputs.thor_only }}");
+    expect(aggregate).toContain(
+      '[ "$TRAILS_TSC_AFFECTED" = "false" ] && { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; }',
+    );
+    expect(aggregate).toContain(
+      '[ "$AR_AFFECTED" = "false" ] && { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; }',
+    );
   });
 
   it("keeps comparison_affected off for website-only changes", async () => {

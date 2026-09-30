@@ -71,6 +71,7 @@ jobs:
       guides_affected: ${{ steps.filter.outputs.guides_affected }}
       website_affected: ${{ steps.filter.outputs.website_affected }}
       comparison_affected: ${{ steps.filter.outputs.comparison_affected }}
+      thor_only: ${{ steps.filter.outputs.thor_only }}
       website_label: ${{ steps.filter.outputs.website_label }}
       parity_sqlite: ${{ steps.filter.outputs.parity_sqlite }}
       parity_postgres: ${{ steps.filter.outputs.parity_postgres }}
@@ -298,6 +299,7 @@ jobs:
                   set_gate guides_affected       "$GUIDES_PKGS_RE" "$GUIDES_EXCL_RE"
                   set_gate website_affected      "$WEBSITE_PKGS_RE"
                   set_gate comparison_affected   "$COMPARISON_RE" '^packages/website/'
+                  bash scripts/ci/thor-only.sh "$files" >> "$GITHUB_OUTPUT"
                 fi
                 ;;
             esac
@@ -767,7 +769,8 @@ jobs:
       needs.changes.outputs.docs_only != 'true' &&
       (needs.changes.outputs.activerecord_affected == 'true' ||
       needs.changes.outputs.trails_tsc_affected == 'true' ||
-      needs.changes.outputs.trailties_affected == 'true')
+      (needs.changes.outputs.trailties_affected == 'true' &&
+      needs.changes.outputs.thor_only != 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -800,7 +803,8 @@ jobs:
       # scripts/parity/pipeline/query/node spawns the dump runners as real subprocesses;
       # they resolve @blazetrails/* through package `main` entries, so the
       # dist/ trees have to exist before vitest starts.
-      - run: pnpm build
+      - if: needs.changes.outputs.thor_only != 'true'
+        run: pnpm build
       # The scripts/* suites added here are the compare tooling's own unit
       # tests; none needs Ruby or the `pnpm build` above (that step exists for
       # parity/query/node, which #5264 already wired in — the whole
@@ -808,7 +812,8 @@ jobs:
       # scripts/schema-compare is the one suite that belongs elsewhere: it
       # parses the REAL vendored test/schema/schema.rb, so it runs as a step of
       # rails-comparison, the job that fetches vendor/.
-      - run: >
+      - if: needs.changes.outputs.thor_only != 'true'
+        run: >
           pnpm vitest run
           packages/arel
           packages/activemodel
@@ -850,6 +855,16 @@ jobs:
           scripts/vendor-recite.test.ts
           vendor/sources.test.ts
           vendor/fetch.test.ts
+      - if: needs.changes.outputs.thor_only == 'true'
+        run: >
+          pnpm vitest run
+          scripts/stale-story-references.test.ts
+          scripts/closing-story-references.test.ts
+          scripts/parity/unported-files.test.ts
+          scripts/parity/unported-live-test.test.ts
+          scripts/parity/unported-overmatch.test.ts
+          scripts/api-compare/lint-call-mismatches.test.ts
+          scripts/api-compare/baseline-json.test.ts
 
   # Consolidated leaf-test job. The cheapest sub-minute leaf suites — rack
   # (~27 s), actionview (~26 s), tse-compiler (~22 s), and the DX type tests
@@ -870,7 +885,8 @@ jobs:
       needs.changes.outputs.actionview_affected == 'true' ||
       needs.changes.outputs.tse_compiler_affected == 'true' ||
       needs.changes.outputs.activerecord_affected == 'true' ||
-      needs.changes.outputs.trailties_affected == 'true')
+      (needs.changes.outputs.trailties_affected == 'true' &&
+      needs.changes.outputs.thor_only != 'true'))
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -899,7 +915,8 @@ jobs:
         if: >-
           ${{ !cancelled() && steps.install.outcome == 'success' &&
           (needs.changes.outputs.activerecord_affected == 'true' ||
-          needs.changes.outputs.trailties_affected == 'true') }}
+          (needs.changes.outputs.trailties_affected == 'true' &&
+          needs.changes.outputs.thor_only != 'true')) }}
         run: pnpm test:types
 
   actionpack-tests:
@@ -929,7 +946,12 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm build
-      - run: pnpm vitest run packages/trailties
+      - if: needs.changes.outputs.thor_only != 'true'
+        run: pnpm vitest run packages/trailties
+      - if: needs.changes.outputs.thor_only == 'true'
+        run: >
+          pnpm vitest related --run --config vitest.trailties.config.ts
+          packages/trailties/src/thor/*.ts
 
   # Reporting-only code coverage. Runs the light (non-AR) packages together
   # with v8 coverage and `--coverage.all` so untested files count toward the
@@ -2217,6 +2239,7 @@ jobs:
           GUIDES_AFFECTED: ${{ needs.changes.outputs.guides_affected }}
           WEBSITE_AFFECTED: ${{ needs.changes.outputs.website_affected }}
           COMPARISON_AFFECTED: ${{ needs.changes.outputs.comparison_affected }}
+          THOR_ONLY: ${{ needs.changes.outputs.thor_only }}
           WEBSITE_LABEL: ${{ needs.changes.outputs.website_label }}
           PARITY_SQLITE: ${{ needs.changes.outputs.parity_sqlite }}
           PARITY_POSTGRES: ${{ needs.changes.outputs.parity_postgres }}
@@ -2311,7 +2334,7 @@ jobs:
                      [ "$AV_AFFECTED" = "false" ] && \
                      [ "$TSE_COMPILER_AFFECTED" = "false" ] && \
                      [ "$AR_AFFECTED" = "false" ] && \
-                     [ "$TRAILTIES_AFFECTED" = "false" ]; then
+                     { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; }; then
                     continue
                   fi
                   ;;
@@ -2351,8 +2374,8 @@ jobs:
                   fi
                   ;;
                 virtualized-dx-type-tests)
-                  # Legitimate skip when neither activerecord nor trails-tsc paths changed.
-                  if [ "$AR_AFFECTED" = "false" ] && [ "$TRAILS_TSC_AFFECTED" = "false" ]; then
+                  if [ "$AR_AFFECTED" = "false" ] && [ "$TRAILS_TSC_AFFECTED" = "false" ] && \
+                     { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; }; then
                     continue
                   fi
                   ;;
