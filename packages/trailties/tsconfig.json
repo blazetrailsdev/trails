@@ -16,6 +16,8 @@
     { "path": "../actionview" },
     { "path": "../activemodel" },
     { "path": "../globalid" },
-    { "path": "../tse-compiler" }
+    { "path": "../tse-compiler" },
+    { "path": "../html-sanitizer" },
+    { "path": "../nokogiri" }
   ]
 }

@@ -9,10 +9,19 @@ import {
   assertNil,
   assertNotNil,
 } from "@blazetrails/activesupport";
-import { Base, Resolver } from "@blazetrails/actionview";
+import {
+  Base,
+  getSanitizerVendor,
+  Resolver,
+  SanitizeHelper,
+  setSanitizerVendor,
+} from "@blazetrails/actionview";
+import { HTML, HTML4 } from "@blazetrails/html-sanitizer";
+import * as Nokogiri from "@blazetrails/nokogiri";
 import { Trailtie as ActionViewTrailtie } from "../trailties/action-view.js";
 import { env, getFs, RuntimeError, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
+import { LOAD_DEFAULTS_VERSION } from "./configuration.js";
 import { Trails, _resetTrailsEnv } from "../rails.js";
 
 function switchEnv(key: string, value: string | undefined, block: () => void): void {
@@ -56,6 +65,7 @@ async function app(railsEnv: string): Promise<Application> {
 
 describe("ConfigurationTest", () => {
   const trailsEnv = env.TRAILS_ENV;
+  const sanitizerVendor = getSanitizerVendor();
 
   beforeEach(async () => {
     appPath = await mkdtemp(join(tmpdir(), "trails-config-for-"));
@@ -65,6 +75,7 @@ describe("ConfigurationTest", () => {
 
   afterEach(async () => {
     Resolver.caching = true;
+    setSanitizerVendor(sanitizerVendor);
     Application.appClass = null;
     delete ActionViewTrailtie.config.actionView.cacheTemplateLoading;
     setEnv("TRAILS_ENV", trailsEnv);
@@ -258,6 +269,51 @@ describe("ConfigurationTest", () => {
       setEnv("SECRET_KEY_BASE_DUMMY", undefined);
       setEnv("SECRET_KEY_BASE", undefined);
     }
+  });
+
+  it("sanitizer_vendor is set to best supported vendor in new apps", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    await application.initialize();
+
+    expect(SanitizeHelper.sanitizerVendor).toBe(HTML.Sanitizer.bestSupportedVendor());
+  });
+
+  it("sanitizer_vendor is set to HTML4 in upgraded apps", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("7.0");
+    await application.initialize();
+
+    expect(SanitizeHelper.sanitizerVendor).toBe(HTML4.Sanitizer);
+  });
+
+  it("sanitizer_vendor is set to a specific vendor", async () => {
+    const MySanitizerVendor = {
+      fullSanitizer: HTML4.FullSanitizer,
+      linkSanitizer: HTML4.LinkSanitizer,
+      safeListSanitizer: HTML4.SafeListSanitizer,
+    };
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    application.config.actionView.sanitizerVendor = MySanitizerVendor;
+    await application.initialize();
+
+    expect(SanitizeHelper.sanitizerVendor).toBe(MySanitizerVendor);
+  });
+
+  it("dom testing uses the HTML5 parser in new apps if it is supported", async () => {
+    const application = await app("development");
+    application.config.loadDefaults(LOAD_DEFAULTS_VERSION);
+    const expected = "HTML5" in Nokogiri ? ":html5" : ":html4";
+
+    expect(application.config.domTestingDefaultHtmlVersion).toBe(expected);
+  });
+
+  it("dom testing uses the HTML4 parser in upgraded apps", async () => {
+    const application = await app("development");
+    application.config.loadDefaults("7.0");
+
+    expect(application.config.domTestingDefaultHtmlVersion).toBe(":html4");
   });
 
   it("action_dispatch.log_rescued_responses is true by default", async () => {

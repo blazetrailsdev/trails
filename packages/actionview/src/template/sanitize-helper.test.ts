@@ -124,11 +124,11 @@ describe("SanitizeHelperTest", () => {
   });
 
   it("sanitize calls sanitize on the safe_list_sanitizer", () => {
-    expect(sanitize("asdf").toString()).toBe("safe_list_sanitizer#sanitize / asdf / {}");
-    expect(sanitize("asdf", { tags: ["a", "b"] }).toString()).toBe(
+    expect(sanitize("asdf")!.toString()).toBe("safe_list_sanitizer#sanitize / asdf / {}");
+    expect(sanitize("asdf", { tags: ["a", "b"] })!.toString()).toBe(
       'safe_list_sanitizer#sanitize / asdf / {"tags":["a","b"]}',
     );
-    expect(sanitize("asdf").htmlSafe).toBe(true);
+    expect(sanitize("asdf")!.htmlSafe).toBe(true);
   });
 
   it("sanitize_css calls sanitize_css on the safe_list_sanitizer", () => {
@@ -136,8 +136,8 @@ describe("SanitizeHelperTest", () => {
   });
 
   it("strip_tags calls sanitize on the full_sanitizer", () => {
-    expect(stripTags("asdf").toString()).toBe("full_sanitizer#sanitize / asdf / {}");
-    expect(stripTags("asdf").htmlSafe).toBe(true);
+    expect(stripTags("asdf")!.toString()).toBe("full_sanitizer#sanitize / asdf / {}");
+    expect(stripTags("asdf")!.htmlSafe).toBe(true);
   });
 
   it("strip_links calls sanitize on the link_sanitizer", () => {

@@ -327,6 +327,7 @@ const alias = {
   "@blazetrails/did-you-mean": path.resolve(__dirname, "packages/did-you-mean/src/index.ts"),
   "@blazetrails/i18n": path.resolve(__dirname, "packages/i18n/src/index.ts"),
   "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/src/index.ts"),
+  "@blazetrails/html-sanitizer": path.resolve(__dirname, "packages/html-sanitizer/src/index.ts"),
 };
 
 // Reporting-only code-coverage config (v8 provider — no instrumentation step,

@@ -32,6 +32,7 @@
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/date": "workspace:*",
     "@blazetrails/did-you-mean": "workspace:*",
+    "@blazetrails/html-sanitizer": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*"
   }
 }

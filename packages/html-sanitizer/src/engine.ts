@@ -38,6 +38,7 @@ export function safeListSanitize(html: string, options: SafeListEngineOptions): 
     allowedTags: [...options.allowedTags],
     allowedAttributes: { "*": allowedAttrs },
     disallowedTagsMode: options.prune ? "completelyDiscard" : "discard",
+    nonTextTags: options.prune ? undefined : [],
   });
 }
 

@@ -11,6 +11,8 @@ import {
   OrderedOptions,
   setUtcToLocalReturnsUtcOffsetTimes,
 } from "@blazetrails/activesupport";
+import { HTML } from "@blazetrails/html-sanitizer";
+import * as Nokogiri from "@blazetrails/nokogiri";
 import {
   ArgumentError,
   File,
@@ -319,7 +321,7 @@ export class Configuration extends EngineConfiguration {
 
         this.addAutoloadPathsToLoadPath = false;
         this.precompileFilterParameters = true;
-        this.domTestingDefaultHtmlVersion = ":html4";
+        this.domTestingDefaultHtmlVersion = "HTML5" in Nokogiri ? ":html5" : ":html4";
 
         if (Trails.env["local?"]()) {
           this.logFileSize = 100 * 1024 * 1024;
@@ -364,11 +366,13 @@ export class Configuration extends EngineConfiguration {
         }
 
         if (this.isRespondTo("actionView")) {
-          /** @empty */
+          const actionView = this.get("actionView") as Record<string, unknown>;
+          actionView.sanitizerVendor = HTML.Sanitizer.bestSupportedVendor();
         }
 
         if (this.isRespondTo("actionText")) {
-          /** @empty */
+          const actionText = this.get("actionText") as Record<string, unknown>;
+          actionText.sanitizerVendor = HTML.Sanitizer.bestSupportedVendor();
         }
         break;
       }

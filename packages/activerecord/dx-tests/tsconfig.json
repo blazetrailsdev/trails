@@ -47,6 +47,8 @@
       "@blazetrails/ruby-compat/name-error": ["../../ruby-compat/src/name-error.ts"],
       "@blazetrails/ruby-compat/range": ["../../ruby-compat/src/range.ts"],
       "@blazetrails/ruby-compat": ["../../ruby-compat/src/index.ts"],
+      "@blazetrails/html-sanitizer": ["../../html-sanitizer/src/index.ts"],
+      "@blazetrails/nokogiri": ["../../nokogiri/src/index.ts"],
       "@blazetrails/date": ["../../date/src/index.ts"],
       "@blazetrails/did-you-mean": ["../../did-you-mean/src/index.ts"],
       "@blazetrails/globalid": ["../../globalid/src/index.ts"],

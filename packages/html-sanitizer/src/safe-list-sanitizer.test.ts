@@ -24,7 +24,7 @@ describe("SafeListSanitizer", () => {
   test("sanitize_script", () => {
     assertSanitized(
       'a b c<script language="Javascript">blah blah blah</script>d e f',
-      "a b cd e f",
+      "a b cblah blah blahd e f",
     );
   });
 
@@ -47,7 +47,7 @@ describe("SafeListSanitizer", () => {
 
   test("should_allow_anchors", () => {
     expect(sanitize(`<a href="foo" onclick="bar"><script>baz</script></a>`)).toBe(
-      `<a href="foo"></a>`,
+      `<a href="foo">baz</a>`,
     );
   });
 
