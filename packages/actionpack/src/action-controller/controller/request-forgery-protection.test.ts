@@ -117,23 +117,23 @@ describe("ActionController::RequestForgeryProtection", () => {
   });
 
   function initializeCsrfToken(token = TOKEN): void {
-    tc.session["_csrf_token"] = token;
+    tc.session.set("_csrf_token", token);
   }
 
   async function assertBlocked(block: () => Promise<void>): Promise<void> {
-    tc.session["something_like_user_id"] = 1;
+    tc.session.set("something_like_user_id", 1);
     await block();
     expect(
-      tc.session["something_like_user_id"],
+      tc.session.get("something_like_user_id"),
       "session values are still present",
     ).toBeUndefined();
     tc.assertResponse("success");
   }
 
   async function assertNotBlocked(block: () => Promise<void>): Promise<void> {
-    tc.session["something_like_user_id"] = 1;
+    tc.session.set("something_like_user_id", 1);
     await assertNothingRaised(block);
-    expect(tc.session["something_like_user_id"]).toBe(1);
+    expect(tc.session.get("something_like_user_id")).toBe(1);
     tc.assertResponse("success");
   }
 
@@ -329,7 +329,7 @@ describe("ActionController::RequestForgeryProtection", () => {
   it("csrf token is not saved if it is nil", async () => {
     await tc.get("index");
     (tc.controller as Base).commitCsrfToken(tc.request);
-    expect(tc.session["_csrf_token"]).toBeUndefined();
+    expect(tc.session.get("_csrf_token")).toBeUndefined();
   });
 
   it("should not raise error if token is not a string", async () => {
@@ -350,7 +350,7 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
     Base.requestForgeryProtectionToken = "custom_authenticity_token";
     Base.forgeryProtectionOriginCheck = true;
     try {
-      tc.session["_csrf_token"] = TOKEN;
+      tc.session.set("_csrf_token", TOKEN);
       const exception = await assertRaises([InvalidAuthenticityToken], {}, () =>
         tc.post("index", {
           env: { HTTP_ORIGIN: "http://bad.host" },
@@ -401,9 +401,9 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
     }
 
     async function assertCrossOriginNotBlocked(block: () => Promise<void>): Promise<void> {
-      tc.session["something_like_user_id"] = 1;
+      tc.session.set("something_like_user_id", 1);
       await assertNothingRaised(block);
-      expect(tc.session["something_like_user_id"]).toBe(1);
+      expect(tc.session.get("something_like_user_id")).toBe(1);
       tc.assertResponse("success");
     }
 
@@ -461,7 +461,7 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
     });
 
     it("should allow non get js without xhr header", async () => {
-      tc.session["_csrf_token"] = TOKEN;
+      tc.session.set("_csrf_token", TOKEN);
       await assertCrossOriginNotBlocked(() =>
         tc.post("sameOriginJs", { params: { custom_authenticity_token: TOKEN } }),
       );

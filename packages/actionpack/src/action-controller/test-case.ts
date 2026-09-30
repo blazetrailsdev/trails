@@ -31,6 +31,7 @@ import { Response } from "../action-dispatch/http/response.js";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
+import type { CookieResponse } from "../action-dispatch/middleware/cookies.js";
 import type { RouteSet } from "../action-dispatch/routing/route-set.js";
 import * as routingAssertions from "../action-dispatch/testing/assertions/routing.js";
 import type { Metal } from "./metal.js";
@@ -187,7 +188,9 @@ export class TestCase {
 
   response!: Response;
 
-  session: Record<string, unknown> = {};
+  get session(): TestSession {
+    return this.request.session as unknown as TestSession;
+  }
 
   get flash(): FlashHash {
     return (this.controller as any).flash ?? new FlashHash();
@@ -211,9 +214,25 @@ export class TestCase {
   }
 
   setupControllerRequestAndResponse(): void {
-    this.request = TestRequest.create(this._controllerClass);
+    const klass = this._controllerClass;
+    if (klass) {
+      if (!this.controller) {
+        try {
+          this.controller = new klass();
+        } catch {
+          this.controller = undefined!;
+        }
+      }
+    }
+
+    this.request = TestRequest.create(this.controller?.constructor ?? klass);
     this.response = this.buildResponse();
     this.response.request = this.request;
+
+    if (this.controller) {
+      this.controller.request = this.request;
+      this.controller.params = {};
+    }
   }
 
   async get(action: string, options: RequestOptions = {}): Promise<void> {
@@ -293,7 +312,6 @@ export class TestCase {
   }
 
   reset(): void {
-    this.session = {};
     this.controller = undefined!;
     this.setupControllerRequestAndResponse();
   }
@@ -318,7 +336,7 @@ export class TestCase {
 
     this.request = new TestRequest(
       this.scrubEnvBang(this.request.env),
-      new TestSession({ ...this.session }),
+      this.request.session as unknown as TestSession,
       this._controllerClass,
     );
     this.response = this.buildResponse();
@@ -411,7 +429,11 @@ export class TestCase {
     }
 
     this.request.fetchHeader("SCRIPT_NAME", (k) => {
-      this.request.setHeader(k, (this.controller as any).config.relativeUrlRoot);
+      this.request.setHeader(
+        k,
+        (this.controller as unknown as { config(): { relativeUrlRoot?: string } }).config()
+          .relativeUrlRoot,
+      );
     });
   }
 
@@ -424,6 +446,12 @@ export class TestCase {
     } finally {
       this.request = this.controller.request as TestRequest;
       this.response = this.controller.response;
+
+      if (this.request.isHaveCookieJar()) {
+        if (!this.request.cookieJar().isCommitted()) {
+          this.request.cookieJar().write(this.response as unknown as CookieResponse);
+        }
+      }
 
       const flashValue = this.request.flash!.toSessionValue();
       if (flashValue) {
@@ -439,9 +467,6 @@ export class TestCase {
       this.request.queryString = "";
 
       this.response.sentBang();
-
-      for (const key of Object.keys(this.session)) delete this.session[key];
-      Object.assign(this.session, (this.request.session as unknown as TestSession).toHash());
     }
   }
 

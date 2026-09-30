@@ -324,7 +324,7 @@ describe("TestCaseTest", () => {
 
     it("session set by controller is available", async () => {
       await tc.post("create", { params: { title: "My Post" } });
-      expect(tc.session["lastCreated"]).toBe("My Post");
+      expect(tc.session.get("lastCreated")).toBe("My Post");
     });
 
     it("reset clears session", async () => {
@@ -338,9 +338,9 @@ describe("TestCaseTest", () => {
   describe("reset", () => {
     it("clears controller, request, response", async () => {
       await tc.get("index");
-      const { request, response } = tc;
+      const { controller, request, response } = tc;
       tc.reset();
-      expect(tc.controller).toBeUndefined();
+      expect(tc.controller).not.toBe(controller);
       expect(tc.request).not.toBe(request);
       expect(tc.response).not.toBe(response);
     });
@@ -408,24 +408,24 @@ describe("TestCaseTest", () => {
     it("process with session kwarg", async () => {
       const stc = new TestCase(SessionController);
       await stc.process("noOp", { method: "GET", session: { string: "value1", symbol: "value2" } });
-      expect(stc.session["string"]).toBe("value1");
-      expect(stc.session["symbol"]).toBe("value2");
+      expect(stc.session.get("string")).toBe("value1");
+      expect(stc.session.get("symbol")).toBe("value2");
     });
 
     it("process merges session arg", async () => {
       const stc = new TestCase(SessionController);
-      stc.session["foo"] = "bar";
+      stc.session.set("foo", "bar");
       await stc.get("noOp", { session: { bar: "baz" } });
-      expect(stc.session["foo"]).toBe("bar");
-      expect(stc.session["bar"]).toBe("baz");
+      expect(stc.session.get("foo")).toBe("bar");
+      expect(stc.session.get("bar")).toBe("baz");
     });
 
     it("merged session arg is retained across requests", async () => {
       const stc = new TestCase(SessionController);
       await stc.get("noOp", { session: { foo: "bar" } });
-      expect(stc.session["foo"]).toBe("bar");
+      expect(stc.session.get("foo")).toBe("bar");
       await stc.get("noOp");
-      expect(stc.session["foo"]).toBe("bar");
+      expect(stc.session.get("foo")).toBe("bar");
     });
 
     it("process with symbol method", async () => {
@@ -587,14 +587,14 @@ describe("TestCaseTest", () => {
 
   it("process with session", async () => {
     await tc.process("setSession");
-    expect(tc.session["string"]).toBe("A wonder");
-    expect(tc.session["symbol"]).toBe("it works");
+    expect(tc.session.get("string")).toBe("A wonder");
+    expect(tc.session.get("symbol")).toBe("it works");
   });
 
   it("process overwrites existing session arg", async () => {
-    tc.session["foo"] = "bar";
+    tc.session.set("foo", "bar");
     await tc.get("noOp", { session: { foo: "baz" } });
-    expect(tc.session["foo"]).toBe("baz");
+    expect(tc.session.get("foo")).toBe("baz");
   });
 
   it("fixture file upload should be able access to tempfile", () => {
@@ -645,8 +645,8 @@ describe("TestCaseTest", () => {
 
   it("xhr with session", async () => {
     await tc.get("setSession", { xhr: true });
-    expect(tc.session["string"]).toBe("A wonder");
-    expect(tc.session["symbol"]).toBe("it works");
+    expect(tc.session.get("string")).toBe("A wonder");
+    expect(tc.session.get("symbol")).toBe("it works");
   });
 
   it("params reset between post requests", async () => {
