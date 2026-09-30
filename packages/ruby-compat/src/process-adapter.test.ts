@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Errno, SystemCallError } from "./errno.js";
+import { RangeError } from "./range-error.js";
 import { TypeError } from "./type-error.js";
 import { RUBY_PLATFORM } from "./ruby-platform.js";
 import {
@@ -293,7 +294,11 @@ describe("processAdapter", () => {
       await expect(stdin.gets(1 as never, 2)).rejects.toThrow(
         new TypeError("no implicit conversion of Integer into String"),
       );
+      await expect(stdin.gets(1e100)).rejects.toThrow(
+        new RangeError("float 1e+100 out of range of integer"),
+      );
       await expect(stdin.gets(1.9)).resolves.toBe("a");
+      await expect(stdin.gets({ toInt: () => 2 } as never)).resolves.toBe("bc");
     });
 
     it("read answers what gets buffered past a line first", async () => {

@@ -186,7 +186,7 @@ export const stdin: ReadStream & {
   async gets(...args: unknown[]) {
     let chomp = false;
     const opts = args[args.length - 1];
-    if (opts != null && typeof opts === "object") {
+    if (opts != null && typeof opts === "object" && !("toInt" in opts)) {
       args = args.slice(0, -1);
       const c = (opts as GetlineOpts).chomp;
       chomp = c != null && c !== false;

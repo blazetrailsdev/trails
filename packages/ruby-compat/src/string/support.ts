@@ -2,6 +2,7 @@ import { ArgumentError } from "../argument-error.js";
 import { IndexError } from "../index-error.js";
 import { rbBuiltinClassName } from "../object.js";
 import { Range } from "../range.js";
+import { RangeError } from "../range-error.js";
 import { TypeError } from "../type-error.js";
 
 /**
@@ -83,21 +84,39 @@ export function rbCheckStringType(val: unknown): string | null {
 }
 
 /**
- * `NUM2LONG` (`vendor/ruby/v3.3.11/numeric.c:3135` `rb_num2long`).
+ * `NUM2LONG` (`vendor/ruby/v3.3.11/numeric.c:3135` `rb_num2long`): a Float
+ * outside `long` raises `RangeError` with `out_of_range_float`'s `%-.10g`
+ * (`numeric.c:3109-3124`), and anything else goes through `rb_to_int`.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function num2long(val: unknown): number {
-  if (typeof val === "number") {
-    if (!Number.isFinite(val)) {
-      throw new RangeError(
-        `float ${Number.isNaN(val) ? "NaN" : val > 0 ? "Inf" : "-Inf"} out of range of integer`,
+  for (;;) {
+    if (val == null) throw new TypeError("no implicit conversion from nil to integer");
+    if (typeof val === "number") {
+      if (val < 2 ** 63 && -(2 ** 63) <= val) return Math.trunc(val);
+      const g = Number.isNaN(val)
+        ? "NaN"
+        : Number.isFinite(val)
+          ? val.toPrecision(10).replace(/\.?0*e/, "e")
+          : val > 0
+            ? "Inf"
+            : "-Inf";
+      throw new RangeError(`float ${g} out of range of integer`);
+    }
+    const toInt = (val as { toInt?: unknown }).toInt;
+    if (typeof toInt !== "function") {
+      throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(val)} into Integer`);
+    }
+    const v = (toInt as () => unknown).call(val);
+    if (typeof v !== "number" || !Number.isInteger(v)) {
+      const klass = rbBuiltinClassName(val);
+      throw new TypeError(
+        `can't convert ${klass} to Integer (${klass}#to_int gives ${rbBuiltinClassName(v)})`,
       );
     }
-    return Math.trunc(val);
+    val = v;
   }
-  if (val == null) throw new TypeError("no implicit conversion from nil to integer");
-  throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(val)} into Integer`);
 }
 
 /**
