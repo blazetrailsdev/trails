@@ -583,7 +583,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
       givenOpts ?? null,
       givenConfig ?? null,
     );
-    const files = await GeneratorBase.dispatch.call(
+    return GeneratorBase.dispatch.call(
       klass as unknown as GeneratorConstructor,
       command,
       parsedArgs,
@@ -593,8 +593,6 @@ export abstract class GeneratorBase implements GeneratorActionsState {
         instance.parentOptions = this.options as unknown as Record<string, unknown>;
       },
     );
-    this.createdFiles.push(...files);
-    return files;
   }
 
   /**

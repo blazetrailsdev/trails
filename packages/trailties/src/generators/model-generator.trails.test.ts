@@ -36,10 +36,18 @@ afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
+function listFiles(root: string): string[] {
+  return (fs.readdirSync(root, { recursive: true }) as string[]).filter((f) =>
+    fs.statSync(path.join(root, f)).isFile(),
+  );
+}
+
 function makeGen() {
   return {
-    run: (name: string, args: string[]) =>
-      ModelGenerator.start([name, ...args], { cwd: tmpDir, output: () => {} }),
+    run: async (name: string, args: string[]) => {
+      await ModelGenerator.start([name, ...args], { cwd: tmpDir, output: () => {} });
+      return listFiles(tmpDir);
+    },
   };
 }
 

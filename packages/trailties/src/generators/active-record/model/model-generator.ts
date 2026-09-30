@@ -119,27 +119,22 @@ export class ${className} extends ${parentClass} {${staticBlock}}
     }
   }
 
-  /** @internal */
   private isSkipMigrationCreation(): boolean {
     return this.isCustomParent() || !this.migration();
   }
 
-  /** @internal */
   private parentClassName(): string {
     return this.parent();
   }
 
-  /** @internal */
   private parent(): string {
     return this.options.parent!;
   }
 
-  /** @internal */
   private isCustomParent(): boolean {
     return this.parent() !== ModelGenerator.classOptions()["parent"].default;
   }
 
-  /** @internal */
   private migration(): boolean | undefined {
     return this.options.migration;
   }

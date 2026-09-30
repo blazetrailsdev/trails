@@ -47,12 +47,19 @@ afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function runGenerator(name: string, attributes: string[] = [], config: object = {}) {
-  return ScaffoldGenerator.start([name, ...attributes], {
+function listFiles(root: string): string[] {
+  return (fs.readdirSync(root, { recursive: true }) as string[]).filter((f) =>
+    fs.statSync(path.join(root, f)).isFile(),
+  );
+}
+
+async function runGenerator(name: string, attributes: string[] = [], config: object = {}) {
+  await ScaffoldGenerator.start([name, ...attributes], {
     cwd: tmpDir,
     output: (m) => lines.push(m),
     ...config,
   });
+  return listFiles(tmpDir);
 }
 
 function readFile(relativePath: string): string {
@@ -268,10 +275,11 @@ describe("ScaffoldGeneratorTest (JavaScript project)", () => {
   });
 
   it("generates .js controller and model files", async () => {
-    const files = await ScaffoldGenerator.start(["Post", "title:string"], {
+    await ScaffoldGenerator.start(["Post", "title:string"], {
       cwd: jsTmpDir,
       output: (m) => jsLines.push(m),
     });
+    const files = listFiles(jsTmpDir);
     expect(fs.existsSync(path.join(jsTmpDir, "app/controllers/posts-controller.js"))).toBe(true);
     expect(files).toContain("app/models/post.js");
     const migFile = files.find((f) => f.startsWith("db/migrate/"));
