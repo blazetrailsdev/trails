@@ -1329,7 +1329,7 @@ export class Mapper {
 
     const routePath = `${path}/${name}.ts`;
     const mod = (await import(p.pathToFileURL!(routePath).href)) as {
-      drawRoutes?: (this: Mapper) => void;
+      drawRoutes?: DrawCallback;
     };
     mod.drawRoutes?.call(this);
   }
