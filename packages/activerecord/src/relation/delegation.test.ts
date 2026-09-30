@@ -299,6 +299,16 @@ describe("DelegationTest", () => {
   });
 
   describe("DelegationRelationTest", () => {
+    for (const method of ARRAY_DELEGATES) {
+      if (method === "to_yaml") {
+        it.skip(`delegates ${method.replaceAll("_", " ")} to Array`, () => {});
+        continue;
+      }
+      it(`delegates ${method.replaceAll("_", " ")} to Array`, () => {
+        assertRespondTo(Comment.all(), tsName(method));
+      });
+    }
+
     it("delegates sort to Array loading records on call", async () => {
       const target = Comment.all();
       const sorted = await (target as any).sort((a: any, b: any) =>
