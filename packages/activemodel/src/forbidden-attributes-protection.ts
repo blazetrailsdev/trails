@@ -5,23 +5,23 @@ export class ForbiddenAttributesError extends globalThis.Error {
   }
 }
 
-interface PermittedAttributes {
-  permitted?: boolean | (() => boolean);
-  toH?(): Record<string, unknown>;
+export interface PermittedAttributes {
+  permitted: boolean | (() => boolean);
+  toH(): Record<string, unknown>;
 }
 
 /** @internal */
 export function sanitizeForMassAssignment(
-  attributes: Record<string, unknown>,
+  attributes: Record<string, unknown> | PermittedAttributes,
 ): Record<string, unknown> {
-  const attrs = attributes as Record<string, unknown> & PermittedAttributes;
+  const attrs = attributes as Record<string, unknown> & Partial<PermittedAttributes>;
   if (respondToPermitted(attrs)) {
     if (!readPermitted(attrs)) {
       throw new ForbiddenAttributesError();
     }
     return attrs.toH!();
   }
-  return attributes;
+  return attrs;
 }
 
 /** @internal */
@@ -32,7 +32,7 @@ export const ForbiddenAttributesProtection = {
   sanitizeForbiddenAttributes,
 };
 
-function readPermitted(attrs: PermittedAttributes): boolean {
+function readPermitted(attrs: Partial<PermittedAttributes>): boolean {
   const permitted = attrs.permitted;
   return typeof permitted === "function" ? permitted.call(attrs) : Boolean(permitted);
 }

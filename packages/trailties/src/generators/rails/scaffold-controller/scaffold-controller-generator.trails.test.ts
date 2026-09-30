@@ -148,4 +148,15 @@ describe("ScaffoldControllerGenerator (route helper declarations)", () => {
 
     expect(controller()).not.toContain("postsPath");
   });
+
+  it("returns params.expect's permitted Parameters with no cast", async () => {
+    await ScaffoldControllerGenerator.start(["Post", "title:string"], {
+      cwd: tmpDir,
+      output: () => {},
+    });
+
+    const content = controller();
+    expect(content).toContain('return this.params.expect({ post: ["title"] });');
+    expect(content).not.toContain(" as Record<string, unknown>");
+  });
 });

@@ -343,6 +343,15 @@ describe("virtualizeTse", () => {
       expect(diagnose(strict).join("\n")).toMatch(/does not exist on type 'never'/);
     });
 
+    it("makes an unknown name `never` once every render site is resolved", () => {
+      const resolved = virtualizeTse("<%= psot.title %>", { ...scope, resolved: true });
+      expect(resolved).toContain("      : never;");
+      expect(diagnose(resolved).join("\n")).toMatch(/'title' does not exist on type 'never'/);
+      expect(diagnose(virtualizeTse("<%= post.title %>", { ...scope, resolved: true }))).toEqual(
+        [],
+      );
+    });
+
     it("maps each body line to the .tse line its node starts on", () => {
       const src = '<div id="<%= a %>">\n  <p>\n    <%= b %>\n  </p>\n<% if (c) {\n  d(); } %>';
       const { ts, mappings } = virtualizeTseWithDeltas(src, scope);

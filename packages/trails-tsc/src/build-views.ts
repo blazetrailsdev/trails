@@ -58,6 +58,7 @@ export function buildViews(opts: BuildViewsOptions = {}): BuildViewsResult {
       src,
       outBase,
       strictLocals: ast.localsSignature !== null,
+      resolved: false,
       ...templateScope(appDir, rel, path.dirname(outBase), helpers, controllers),
     });
     fs.mkdirSync(path.dirname(outBase), { recursive: true });
@@ -168,6 +169,8 @@ interface ViewShim {
   src: string;
   outBase: string;
   strictLocals: boolean;
+  resolved: boolean;
+  model?: { file: string; klass: string };
   view: string[];
   locals: Map<string, Set<string>>;
   base: { view: string[]; locals: Map<string, Set<string>> };
@@ -181,6 +184,7 @@ function writeShim(shim: ViewShim, viewsDir: string): void {
   const scope: TseScope = {
     view: relocateImports(shim.view.join(" & "), shimDir),
     locals: relocateImports(locals.length === 0 ? "{}" : `{ ${locals.join("; ")} }`, shimDir),
+    resolved: shim.resolved,
   };
   const { ts: code, mappings } = virtualizeTseWithDeltas(shim.src, scope);
   const base = path.basename(shim.rel);
@@ -239,25 +243,55 @@ function bindCheckedTypes(
   const before = views.map(scopeSignature);
   const partials = new Map<string, ViewShim>();
   const renders = new Map<ViewShim, { calls: number; keys: Map<string, number> }>();
+  const unresolved = new Set<ViewShim>();
+  let unknownTarget = false;
   for (const view of views) {
     view.view = [...view.base.view];
     view.locals = new Map([...view.base.locals].map(([k, v]) => [k, new Set(v)]));
+    view.resolved = true;
     const key = partialRegistryKey(view.rel);
     if (key !== null && !view.strictLocals) partials.set(key, view);
   }
+  const modelPartial = (type: ts.Type): ViewShim | undefined => {
+    const symbol = type.getSymbol();
+    const file = symbol?.declarations?.[0]?.getSourceFile().fileName;
+    if (symbol === undefined || file === undefined) return undefined;
+    return [...partials.values()].find(
+      (p) => p.model?.klass === symbol.name && path.resolve(p.model.file) === path.resolve(file),
+    );
+  };
+  const objectTypes = (type: ts.Type): ts.Type[] => {
+    const nonNull = checker.getNonNullableType(type);
+    if (nonNull.isUnion()) return nonNull.types.flatMap(objectTypes);
+    if (checker.isArrayType(nonNull)) {
+      return checker.getTypeArguments(nonNull as ts.TypeReference).flatMap(objectTypes);
+    }
+    return [nonNull];
+  };
   for (const view of views) {
     const sf = program.getSourceFile(view.outBase + ".ts");
     if (sf === undefined) continue;
     const prefix = path.posix.dirname(view.rel);
     const visit = (node: ts.Node): void => {
-      const passed = ts.isCallExpression(node) ? renderedPartial(node) : undefined;
+      const site = ts.isCallExpression(node) ? renderedPartial(node) : undefined;
+      if (site === "unknown") unknownTarget = true;
+      else if (site !== undefined && "object" in site) {
+        for (const type of objectTypes(checker.getTypeAtLocation(site.object))) {
+          const reached = modelPartial(type);
+          if (reached === undefined) unknownTarget = true;
+          else if (site.locals !== undefined) unresolved.add(reached);
+        }
+      }
+      const passed = site !== undefined && site !== "unknown" && "name" in site ? site : undefined;
       const target =
         passed &&
         partials.get(passed.name.includes("/") ? passed.name : `${prefix}/${passed.name}`);
       if (passed && target) {
+        if (passed.implicitLocals) unresolved.add(target);
         const seen = renders.get(target) ?? { calls: 0, keys: new Map<string, number>() };
         renders.set(target, seen);
         const hash = passed.locals && checker.getTypeAtLocation(passed.locals);
+        if (hash && hash.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) unresolved.add(target);
         for (const each of hash === undefined
           ? [undefined]
           : hash.isUnion()
@@ -305,11 +339,14 @@ function bindCheckedTypes(
   for (const [target, { calls, keys }] of renders) {
     for (const [name, count] of keys) if (count < calls) target.locals.get(name)!.add("undefined");
   }
+  for (const partial of partials.values()) {
+    if (unknownTarget || unresolved.has(partial)) partial.resolved = false;
+  }
   return views.some((view, i) => scopeSignature(view) !== before[i]);
 }
 
 function scopeSignature(view: ViewShim): string {
-  return JSON.stringify([view.view, [...view.locals].map(([k, v]) => [k, [...v]])]);
+  return JSON.stringify([view.view, [...view.locals].map(([k, v]) => [k, [...v]]), view.resolved]);
 }
 
 function controllerClass(
@@ -421,20 +458,39 @@ function sourceDeclaration(
 
 function renderedPartial(
   call: ts.CallExpression,
-): { name: string; locals?: ts.Expression } | undefined {
+):
+  | { name: string; locals?: ts.Expression; implicitLocals: boolean }
+  | { object: ts.Expression; locals?: ts.Expression }
+  | "unknown"
+  | undefined {
   if (!ts.isIdentifier(call.expression) || call.expression.text !== "render") return undefined;
   const [first, second] = call.arguments;
-  if (first && ts.isStringLiteral(first)) return { name: first.text, locals: second };
-  if (!first || !ts.isObjectLiteralExpression(first)) return undefined;
-  const option = (key: string): ts.Expression | undefined =>
-    first.properties.find(
-      (p): p is ts.PropertyAssignment =>
-        ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === key,
-    )?.initializer;
-  const partial = option("partial");
-  if (partial && ts.isStringLiteral(partial))
-    return { name: partial.text, locals: option("locals") };
-  return undefined;
+  if (!first) return undefined;
+  if (ts.isStringLiteral(first)) return { name: first.text, locals: second, implicitLocals: false };
+  if (!ts.isObjectLiteralExpression(first)) return { object: first, locals: second };
+  const name = (p: ts.ObjectLiteralElementLike): string | undefined =>
+    (ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p)) &&
+    (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name))
+      ? p.name.text
+      : undefined;
+  const keys = first.properties.map(name);
+  if (keys.includes(undefined)) return "unknown";
+  const partialKey = second === undefined ? "partial" : "layout";
+  if (!keys.includes(partialKey)) return undefined;
+  const option = (key: string): ts.Expression | undefined => {
+    const property = first.properties.find((p) => name(p) === key);
+    return property && ts.isPropertyAssignment(property)
+      ? property.initializer
+      : property && ts.isShorthandPropertyAssignment(property)
+        ? property.name
+        : undefined;
+  };
+  const partial = option(partialKey);
+  if (partial && ts.isStringLiteral(partial)) {
+    const implicitLocals = keys.some((k) => k === "collection" || k === "object" || k === "as");
+    return { name: partial.text, locals: option("locals"), implicitLocals };
+  }
+  return "unknown";
 }
 
 function templateScope(
@@ -443,7 +499,7 @@ function templateScope(
   shimDir: string,
   helpers: readonly string[],
   controllers: readonly Controller[],
-): Pick<ViewShim, "view" | "locals" | "base" | "controller" | "layout"> {
+): Pick<ViewShim, "view" | "locals" | "model" | "base" | "controller" | "layout"> {
   const view = ['import("@blazetrails/actionview").Base'];
   for (const file of helpers) {
     const name = constantName(file.replace(/[-_]helper\.ts$/u, ""));
@@ -459,6 +515,7 @@ function templateScope(
   const layout = /^layouts\/((?:[^/]+\/)*[^_/][^/.]*)\./u.exec(rel)?.[1];
   const controller = layout === undefined ? controllers.find((c) => c.path === prefix) : undefined;
   const locals = new Map<string, Set<string>>();
+  let modelClass: ViewShim["model"];
   const partial = /^_([a-z_]\w*)/u.exec(path.posix.basename(rel));
   const element = partial?.[1];
   if (element !== undefined && path.posix.basename(prefix) === pluralize(element)) {
@@ -472,11 +529,13 @@ function templateScope(
     if (fs.existsSync(model)) {
       const klass = constantName([...namespace, element].join("/"));
       locals.set(element, new Set([`import(${JSON.stringify(model)}).${klass}`]));
+      modelClass = { file: model, klass };
     }
   }
   return {
     view,
     locals,
+    model: modelClass,
     base: { view: [...view], locals: new Map(locals) },
     controller,
     layout,

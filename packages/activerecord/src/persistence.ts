@@ -3,7 +3,11 @@ import { type TouchArgs, type TouchOptions } from "./timestamp.js";
 import { Rational, basicObjRespondTo, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
-import { ArgumentError, AttributeMethods } from "@blazetrails/activemodel";
+import {
+  ArgumentError,
+  AttributeMethods,
+  type PermittedAttributes,
+} from "@blazetrails/activemodel";
 import { extractOptionsBang, runCallbacks, transformKeys } from "@blazetrails/activesupport";
 import {
   InsertManager,
@@ -379,7 +383,7 @@ interface UpdateRecord extends AttributeIO {
 /** @missingRailsCall assign_attributes — CONVERGEABLE update-must-call-assign-attributes-carried-from-0087 */
 export async function update<T extends UpdateRecord>(
   this: T,
-  attributes: Record<string, unknown>,
+  attributes: Record<string, unknown> | PermittedAttributes,
 ): Promise<boolean | undefined> {
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
@@ -391,7 +395,7 @@ export async function update<T extends UpdateRecord>(
 /** @missingRailsCall assign_attributes — CONVERGEABLE update-must-call-assign-attributes-carried-from-0087 */
 export async function updateBang<T extends UpdateRecord>(
   this: T,
-  attributes: Record<string, unknown>,
+  attributes: Record<string, unknown> | PermittedAttributes,
 ): Promise<true | undefined> {
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {

@@ -44,7 +44,7 @@ import {
   presence,
   assertValidKeys,
   any,
-  truncateBytes,
+  mbChars,
   wrap,
 } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
@@ -1390,18 +1390,18 @@ export class SchemaStatements {
   /**
    * @internal
    * @missingRailsCall first — PERMANENT
-   * @missingRailsCall limit — CONVERGEABLE port-multibyte-chars-and-string-mb-chars
    */
   generateIndexName(tableName: string, column: string | string[]): string {
-    const cols = wrap(column);
-    const name = `index_${tableName}_on_${cols.join("_and_")}`;
+    let name = `index_${tableName}_on_${wrap(column).join("_and_")}`;
     if (new TextEncoder().encode(name).length <= this.maxIndexNameSize()) return name;
 
     const hashedIdentifier = "_" + OpenSSL.Digest.SHA256.hexdigest(name).slice(0, 10);
-    const shortName = `idx_on_${cols.join("_")}`;
+    name = `idx_on_${wrap(column).join("_")}`;
 
     const shortLimit = this.maxIndexNameSize() - new TextEncoder().encode(hashedIdentifier).length;
-    return `${truncateBytes(shortName, shortLimit, { omission: null })}${hashedIdentifier}`;
+    const shortName = mbChars(name).limit(shortLimit).toS();
+
+    return `${shortName}${hashedIdentifier}`;
   }
 
   /** @internal */

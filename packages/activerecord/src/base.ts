@@ -112,6 +112,7 @@ import {
 import {
   Access,
   sanitizeForMassAssignment,
+  type PermittedAttributes,
   assertAssignedSynchronously,
   type DirtyOptions,
   dirtyInitAttributes,
@@ -1445,12 +1446,12 @@ export class Base extends Model {
   ): InstanceType<T>[];
   static new<T extends typeof Base>(
     this: T,
-    attrs?: Record<string, unknown>,
+    attrs?: Record<string, unknown> | PermittedAttributes,
     block?: (record: InstanceType<T>) => void,
   ): InstanceType<T>;
   static new<T extends typeof Base>(
     this: T,
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    attrs: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (record: InstanceType<T>) => void,
   ): InstanceType<T> | InstanceType<T>[] {
     if (Array.isArray(attrs)) {
@@ -1468,18 +1469,20 @@ export class Base extends Model {
   ): InstanceType<T>[];
   static build<T extends typeof Base>(
     this: T,
-    attrs?: Record<string, unknown>,
+    attrs?: Record<string, unknown> | PermittedAttributes,
     block?: (record: InstanceType<T>) => void,
   ): InstanceType<T>;
   static build<T extends typeof Base>(
     this: T,
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    attrs: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (record: InstanceType<T>) => void,
   ): InstanceType<T> | InstanceType<T>[] {
     return Array.isArray(attrs) ? this.new(attrs, block) : this.new(attrs, block);
   }
 
-  private static _mergeCurrentScopeAttrs(attrs: Record<string, unknown>): Record<string, unknown> {
+  private static _mergeCurrentScopeAttrs(
+    attrs: Record<string, unknown> | PermittedAttributes,
+  ): Record<string, unknown> | PermittedAttributes {
     const scope = this.currentScope();
     if (scope) {
       const scopeAttrs = scope.scopeForCreate?.() ?? {};
@@ -1718,9 +1721,12 @@ export class Base extends Model {
   _transactionAction: "create" | "update" | "destroy" | undefined = undefined;
 
   /** @missingRailsCall init_internals — CONVERGEABLE base-constructor-calls-init-internals-not-activemodel */
-  constructor(attrs: Record<string, unknown> = {}, initBlock?: (record: Base) => void) {
+  constructor(
+    attributes: Record<string, unknown> | PermittedAttributes = {},
+    initBlock?: (record: Base) => void,
+  ) {
     (new.target as typeof Base | undefined)?._requireConcreteClass();
-    attrs ??= {};
+    let attrs: Record<string, unknown> = (attributes ?? {}) as Record<string, unknown>;
     if (!isEmpty(attrs)) {
       attrs = sanitizeForMassAssignment(attrs);
     }
@@ -2407,8 +2413,8 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   ): Promise<true | undefined>;
   destroy(): Promise<this | false>;
   destroyBang(): Promise<this>;
-  update(attrs: Record<string, unknown>): Promise<boolean | undefined>;
-  updateBang(attrs: Record<string, unknown>): Promise<true | undefined>;
+  update(attrs: Record<string, unknown> | PermittedAttributes): Promise<boolean | undefined>;
+  updateBang(attrs: Record<string, unknown> | PermittedAttributes): Promise<true | undefined>;
   delete(): Promise<this>;
   reload(options?: { lock?: boolean | string; unscoped?: boolean }): Promise<this>;
   initializeDup(other: unknown): void;

@@ -107,6 +107,14 @@ const PERMITTED_SCALAR_TYPES: ((value: unknown) => boolean)[] = [
   (value) => value instanceof RackTestUploadedFile,
 ];
 
+type IsUnion<T, U = T> = T extends unknown ? ([U] extends [T] ? false : true) : never;
+
+type ExpectedHashFilter = readonly [
+  string | Record<string, unknown>,
+  ...(string | Record<string, unknown>)[],
+];
+type ExpectedHash<K extends string> = true extends IsUnion<K> ? Parameters[] : Parameters;
+
 /** @internal */
 function isPermittedScalar(value: unknown): boolean {
   return PERMITTED_SCALAR_TYPES.some((type) => type(value));
@@ -182,6 +190,9 @@ export class Parameters {
     throw new ParameterMissing(key, Object.keys(this._data));
   }
 
+  expect<K extends string>(filter: Record<K, ExpectedHashFilter>): ExpectedHash<K>;
+  expect(key: string): unknown;
+  expect(...filters: (string | Record<string, unknown>)[]): unknown;
   expect(...filters: (string | Record<string, unknown>)[]): unknown {
     const flatFilters = filters.flat();
     const params = this.permitFilters(filters);
@@ -190,6 +201,9 @@ export class Parameters {
     return values.length === 1 ? values[0] : values;
   }
 
+  expectBang<K extends string>(filter: Record<K, ExpectedHashFilter>): ExpectedHash<K>;
+  expectBang(key: string): unknown;
+  expectBang(...filters: (string | Record<string, unknown>)[]): unknown;
   expectBang(...filters: (string | Record<string, unknown>)[]): unknown {
     try {
       return this.expect(...filters);

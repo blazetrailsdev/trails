@@ -21,6 +21,7 @@ export {
   ForbiddenAttributesError,
   sanitizeForMassAssignment,
 } from "./forbidden-attributes-protection.js";
+export type { PermittedAttributes } from "./forbidden-attributes-protection.js";
 export {
   assignAttributes,
   assertAssignedSynchronously,

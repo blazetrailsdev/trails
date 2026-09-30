@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import ts from "typescript-5";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -9,6 +10,29 @@ import { diagnose } from "./plugins/tse-diagnose.js";
 
 function mkScratch(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-build-"));
+}
+
+function viewDiagnostics(cwd: string): string[] {
+  const dir = path.join(cwd, ".trails/views");
+  const roots = fs
+    .readdirSync(dir, { recursive: true, encoding: "utf8" })
+    .filter((f) => f.endsWith(".tse.ts"))
+    .map((f) => path.join(dir, f));
+  const program = ts.createProgram(roots, {
+    strict: true,
+    noEmit: true,
+    skipLibCheck: true,
+    moduleResolution: ts.ModuleResolutionKind.Bundler,
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ESNext,
+  });
+  return ts
+    .getPreEmitDiagnostics(program)
+    .filter((d) => d.file?.fileName.startsWith(dir))
+    .map((d) => {
+      const rel = path.relative(dir, d.file!.fileName);
+      return `${rel}: ${ts.flattenDiagnosticMessageText(d.messageText, "\n")}`;
+    });
 }
 
 function write(root: string, rel: string, body: string): void {
@@ -231,6 +255,81 @@ describe("buildViews", () => {
     expect(shim).toContain("{} extends TemplateLocals<TemplateRegistry[P]>");
     expect(shim).toContain("{ locals: TemplateLocals<TemplateRegistry[P]> }");
   });
+
+  it("makes an unresolved name an error once every render site of the template is resolved", () => {
+    const cwd = mkScratch();
+    write(
+      cwd,
+      "node_modules/@blazetrails/actionview/package.json",
+      '{ "name": "@blazetrails/actionview", "types": "index.d.ts" }',
+    );
+    write(
+      cwd,
+      "node_modules/@blazetrails/actionview/index.d.ts",
+      [
+        "export interface TemplateRegistry {}",
+        "export type TemplateLocals<T> = T;",
+        "export declare class Base { render(...args: unknown[]): string; }",
+      ].join("\n"),
+    );
+    write(cwd, "app/models/post.ts", 'export class Post { title = ""; }');
+    write(
+      cwd,
+      "app/controllers/posts-controller.ts",
+      [
+        'import type { Post } from "../models/post.js";',
+        "export class PostsController { declare posts: Post[]; declare post: Post; }",
+      ].join("\n"),
+    );
+    write(
+      cwd,
+      "app/views/posts/index.html.tse",
+      "<% for (const post of this.posts) { %><%= render(post) %><% } %><%= psot.title %>",
+    );
+    write(cwd, "app/views/posts/show.html.tse", "<%= render(this.post) %>");
+    write(cwd, "app/views/posts/new.html.tse", '<%= render("form", { post: this.post }) %>');
+    write(cwd, "app/views/posts/_post.html.tse", "<%= post.title %><%= psot.title %>");
+    write(cwd, "app/views/posts/_form.html.tse", "<%= post.title %><%= psot.title %>");
+    buildViews({ cwd });
+    const diagnostics = viewDiagnostics(cwd);
+    expect(diagnostics).toEqual(
+      ["posts/_form", "posts/_post", "posts/index"].map(
+        (rel) => `${rel}.html.tse.ts: Property 'title' does not exist on type 'never'.`,
+      ),
+    );
+  }, 30_000);
+
+  it("keeps the any fallback for a partial some unresolved render site may reach", () => {
+    const cwd = mkScratch();
+    write(cwd, "app/models/post.ts", "export class Post {}");
+    write(cwd, "app/views/posts/_post.html.tse", "<%= psot %>");
+    write(cwd, "app/views/posts/_form.html.tse", "<%= psot %>");
+    write(cwd, "app/views/posts/_row.html.tse", "<%= psot %>");
+    write(cwd, "app/views/posts/new.html.tse", '<%= render("form") %><%= render("row") %>');
+    const shim = (rel: string): string =>
+      fs.readFileSync(path.join(cwd, ".trails/views/posts", `${rel}.html.tse.ts`), "utf8");
+    buildViews({ cwd });
+    expect(shim("_form")).toContain("      : never;");
+    expect(shim("_row")).toContain("      : never;");
+    expect(shim("new")).toContain("      : never;");
+    write(
+      cwd,
+      "app/views/posts/edit.html.tse",
+      '<%= render({ partial: "row", collection: [1] }) %>',
+    );
+    buildViews({ cwd });
+    expect(shim("_form")).toContain("      : never;");
+    expect(shim("_row")).toContain("      : any;");
+    write(
+      cwd,
+      "app/views/posts/show.html.tse",
+      '<% const someVariable: string = "form"; %><%= render(someVariable) %>',
+    );
+    buildViews({ cwd });
+    for (const partial of ["_post", "_form", "_row"])
+      expect(shim(partial)).toContain("      : any;");
+    expect(shim("show")).toContain("      : never;");
+  }, 30_000);
 });
 
 describe("runCli", () => {
