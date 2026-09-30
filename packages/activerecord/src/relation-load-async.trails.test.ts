@@ -203,6 +203,26 @@ describe("Relation#load_async", () => {
     expect(spy).toHaveBeenCalledTimes(2);
   });
 
+  it("drains the pending query from the delegated record readers and inspect", async () => {
+    await Topic.create({ title: "delegated async topic", author_name: "David" });
+
+    const connection = (await Base.leaseConnection()) as unknown as {
+      selectAll: (...args: unknown[]) => unknown;
+    };
+    const spy = vi.spyOn(connection, "selectAll");
+
+    const relation = Topic.where({ title: "delegated async topic" }).loadAsync() as unknown as {
+      length(): number | Promise<number>;
+      map(fn: (topic: { title: string }) => string): string[] | Promise<string[]>;
+      inspect(): string | Promise<string>;
+    };
+
+    expect(await relation.length()).toBe(1);
+    expect(await relation.map((topic) => topic.title)).toEqual(["delegated async topic"]);
+    expect(await relation.inspect()).toContain("delegated async topic");
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
   it("batches a scheduled relation in memory instead of re-querying", async () => {
     await Topic.create({ title: "batched async topic", author_name: "David" });
     await Topic.create({ title: "other batched async topic", author_name: "David" });

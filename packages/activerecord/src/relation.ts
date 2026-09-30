@@ -374,7 +374,7 @@ export class Relation<T extends Base> {
           const enumerable = ENUMERABLE_METHODS[prop];
           if (enumerable) {
             return (...args: any[]) =>
-              target.isLoaded
+              target.isLoaded && !target.isScheduled && !target._loadResult
                 ? enumerable([...(target.target ?? target._records)], args)
                 : target.records().then((records: T[]) => enumerable([...records], args));
           }
@@ -399,8 +399,12 @@ export class Relation<T extends Base> {
       if (entries.length === 11) entries[10] = "...";
       return `#<${(this.constructor as typeof Relation)._railsClassName} [${entries.join(", ")}]>`;
     };
-    if (this.isLoaded && !this.isScheduled && !this._loadResult) {
-      return inspectEntries(this._records.slice(0, min(compact([this.limitValue, 11])) as number));
+    if (this.isLoaded) {
+      const entries = (records: T[]): string =>
+        inspectEntries(records.slice(0, min(compact([this.limitValue, 11])) as number));
+      return this.isScheduled || this._loadResult
+        ? this.records().then(entries)
+        : entries(this._records);
     }
     return this.annotate("loading for inspect")
       .take(min(compact([this.limitValue, 11])) as number)
