@@ -46,14 +46,25 @@ import {
   freezeTime,
   unfreezeTime,
 } from "./testing/time-helpers.js";
+import { FileFixtures } from "./testing/file-fixtures.js";
+import { include } from "@blazetrails/ruby-compat/include";
 
 export class TestCase {
   name: string;
   beforeSetup?(): unknown;
+  declare static fileFixturePath: string | null;
+  declare readonly fileFixturePath: string | null;
+  declare static isFileFixturePath: () => boolean;
+  declare isFileFixturePath: () => boolean;
+  declare fileFixture: typeof FileFixtures.fileFixture;
   afterTeardown?(test: RunningTest): unknown;
 
   constructor(name: string) {
     this.name = name;
+  }
+
+  get methodName(): string {
+    return this.name;
   }
 
   static setTestOrder(newOrder: string | null): void {
@@ -113,6 +124,7 @@ export class TestCase {
   static unfreezeTime = unfreezeTime;
 }
 
+include(TestCase, FileFixtures);
 setupAndTeardownPrepended(TestCase);
 
 runLoadHooks("active_support_test_case", TestCase);

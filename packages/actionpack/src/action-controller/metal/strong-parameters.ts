@@ -16,7 +16,16 @@ import {
   merge,
   mergeBang,
 } from "@blazetrails/ruby-compat";
-import { BigDecimal, Notifications, isBlank, toQuery } from "@blazetrails/activesupport";
+import {
+  BigDecimal,
+  Notifications,
+  ToJsonWithActiveSupportEncoder,
+  asJson,
+  include,
+  isBlank,
+  toQuery,
+  type Included,
+} from "@blazetrails/activesupport";
 
 import { UploadedFile } from "../../action-dispatch/http/upload.js";
 import { ActionController } from "../../namespaces.js";
@@ -103,6 +112,12 @@ function isPermittedScalar(value: unknown): boolean {
   return PERMITTED_SCALAR_TYPES.some((type) => type(value));
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
+export interface Parameters {
+  toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Parameters {
   private _data: Record<string, unknown>;
   private _permitted: boolean;
@@ -559,8 +574,8 @@ export class Parameters {
     return { ...this._data };
   }
 
-  toJSON(): Record<string, unknown> {
-    return this.toUnsafeHash();
+  asJson(options: Record<string, unknown> | null = null): Record<string, unknown> {
+    return asJson(this._data, options) as Record<string, unknown>;
   }
 
   toUnsafeHash(): Record<string, unknown> {
@@ -1012,6 +1027,8 @@ export class Parameters {
     return object;
   }
 }
+
+include(Parameters, ToJsonWithActiveSupportEncoder);
 
 interface StrongParametersHost {
   _params: Parameters | Record<string, unknown> | null;

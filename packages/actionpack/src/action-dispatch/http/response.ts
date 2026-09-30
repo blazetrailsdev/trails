@@ -245,7 +245,7 @@ export class Response {
   get successful(): boolean {
     return this._status >= 200 && this._status < 300;
   }
-  get redirection(): boolean {
+  get isRedirection(): boolean {
     return this._status >= 300 && this._status < 400;
   }
   get clientError(): boolean {

@@ -4,10 +4,22 @@ import {
   assertIncludes,
   assertNotIncludes,
   include,
+  sole,
+  TopLevel,
   underscore,
   type Included,
 } from "@blazetrails/activesupport";
-import { Module, NoMethodError, rbFSend, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Dir,
+  File,
+  LoadError,
+  Module,
+  NoMethodError,
+  rbFSend,
+  rbObjSingletonClass,
+  stderr,
+} from "@blazetrails/ruby-compat";
 import { XML } from "@blazetrails/nokogiri";
 import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
 import { Base } from "../base.js";
@@ -18,6 +30,11 @@ import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { controllerConstants } from "../../action-dispatch/http/request.js";
 import { X_CASCADE } from "../../action-dispatch/constants.js";
 import { Metal } from "../metal.js";
+import { MimeType } from "../../action-dispatch/http/mime-type.js";
+import {
+  InvalidResponse,
+  Launchy,
+} from "../../action-dispatch/testing/test-helpers/page-dump-helper.js";
 import type { MountableApp, RouteOptions } from "../../action-dispatch/routing/mapper.js";
 import { CookieAssertions, SharedTestRoutes } from "../../test-helpers/abstract-unit.js";
 
@@ -1291,5 +1308,349 @@ describe("IntegrationRequestsWithSessionSetup", () => {
     t.setup();
     await t.get("/foo");
     expect(t.cookies.toHash()).toEqual({ user_name: "david" });
+  });
+});
+
+describe("IntegrationRequestEncodersTest", () => {
+  class FooController extends Base {
+    async foos(): Promise<void> {
+      await this.render({ plain: "ok" });
+    }
+
+    async foos_json(): Promise<void> {
+      await this.render({ json: this.params.permit("foo") });
+    }
+
+    async foos_wibble(): Promise<void> {
+      await this.render({ plain: "ok" });
+    }
+
+    async foos_json_api(): Promise<void> {
+      await this.render({ plain: "ok" });
+    }
+  }
+
+  let t: IntegrationTest;
+  const assertResponse = (type: number | string): void => t.assertResponse(type);
+
+  beforeEach(() => {
+    t = new IntegrationTest();
+  });
+
+  const postToFoos = async (as: string, block: () => void): Promise<void> => {
+    await t.withRouting(async (routes: RouteSet) => {
+      routes.draw((r) => {
+        deprecator().silence(() => {
+          r.post(":action", { to: FooController as unknown as MountableApp });
+        });
+      });
+
+      await t.post(`/foos_${as}`, { params: { foo: "fighters" }, as });
+
+      block();
+    });
+  };
+
+  it("standard json encoding works", async () => {
+    await t.withRouting(async (routes: RouteSet) => {
+      routes.draw((r) => {
+        deprecator().silence(() => {
+          r.post(":action", { to: FooController as unknown as MountableApp });
+        });
+      });
+
+      await t.post("/foos_json.json", {
+        params: JSON.stringify({ foo: "fighters" }),
+        headers: { "Content-Type": "application/json" },
+      });
+
+      assertResponse("success");
+      expect(t.response.parsedBody).toEqual({ foo: "fighters" });
+    });
+  });
+
+  it("encoding as json", async () => {
+    await postToFoos("json", () => {
+      assertResponse("success");
+      expect(t.request.mediaType).toBe("application/json");
+      expect(t.request.accepts[0].toString()).toBe("application/json");
+      expect(t.request.format.ref()).toBe(":json");
+      expect(t.request.requestParameters).toEqual({ foo: "fighters" });
+      expect(t.response.parsedBody).toEqual({ foo: "fighters" });
+    });
+  });
+
+  it("doesnt mangle request path", async () => {
+    await t.withRouting(async (routes: RouteSet) => {
+      routes.draw((r) => {
+        deprecator().silence(() => {
+          r.post(":action", { to: FooController as unknown as MountableApp });
+        });
+      });
+
+      await t.post("/foos");
+      expect(t.request.path).toBe("/foos");
+
+      await t.post("/foos_json", { as: "json" });
+      expect(t.request.path).toBe("/foos_json");
+    });
+  });
+
+  it("encoding as without mime registration", () => {
+    expect(() => IntegrationTest.registerEncoder("wibble")).toThrow(ArgumentError);
+  });
+
+  it("registering custom encoder", async () => {
+    MimeType.register("text/wibble", ":wibble");
+    try {
+      IntegrationTest.registerEncoder("wibble", { paramEncoder: (params) => params });
+
+      await postToFoos("wibble", () => {
+        assertResponse("success");
+        expect(t.request.path).toBe("/foos_wibble");
+        expect(t.request.mediaType).toBe("text/wibble");
+        expect(t.request.accepts[0].toString()).toBe("text/wibble");
+        expect(t.request.format.ref()).toBe(":wibble");
+        expect(t.request.requestParameters).toEqual({});
+        expect(t.response.parsedBody).toBe("ok");
+      });
+    } finally {
+      MimeType.unregister(":wibble");
+    }
+  });
+
+  it("registering custom encoder including parameters", async () => {
+    const acceptHeader =
+      'application/vnd.api+json; profile="https://jsonapi.org/profiles/ethanresnick/cursor-pagination/"; ext="https://jsonapi.org/ext/atomic"';
+    MimeType.register(acceptHeader, ":json_api");
+    try {
+      IntegrationTest.registerEncoder("json_api", { paramEncoder: (params) => params });
+
+      await postToFoos("json_api", () => {
+        assertResponse("success");
+        expect(t.request.path).toBe("/foos_json_api");
+        expect(t.request.mediaType).toBe("application/vnd.api+json");
+        expect(t.request.accepts[0].toString()).toBe(acceptHeader);
+        expect(t.request.format.ref()).toBe(":json_api");
+        expect(t.request.requestParameters).toEqual({});
+        expect(t.response.parsedBody).toBe("ok");
+      });
+    } finally {
+      MimeType.unregister(":json_api");
+    }
+  });
+
+  it("parsed body without as option", async () => {
+    await t.withRouting(async (routes: RouteSet) => {
+      routes.draw((r) => {
+        deprecator().silence(() => {
+          r.get(":action", { to: FooController as unknown as MountableApp });
+        });
+      });
+
+      await t.get("/foos_json.json", { params: { foo: "heyo" } });
+
+      expect(t.response.parsedBody).toEqual({ foo: "heyo" });
+    });
+  });
+
+  it("get parameters with as option", async () => {
+    await t.withRouting(async (routes: RouteSet) => {
+      routes.draw((r) => {
+        deprecator().silence(() => {
+          r.get(":action", { to: FooController as unknown as MountableApp });
+        });
+      });
+
+      await t.get("/foos_json?foo=heyo", { as: "json" });
+
+      expect(t.response.parsedBody).toEqual({ foo: "heyo" });
+    });
+  });
+
+  it("get request with json uses method override and sends a post request", async () => {
+    await t.withRouting(async (routes: RouteSet) => {
+      routes.draw((r) => {
+        deprecator().silence(() => {
+          r.get(":action", { to: FooController as unknown as MountableApp });
+        });
+      });
+
+      await t.get("/foos_json", { params: { foo: "heyo" }, as: "json" });
+
+      expect(t.request.method).toBe("POST");
+      expect(t.request.headers.get("X-Http-Method-Override")).toBe("GET");
+      expect(t.response.parsedBody).toEqual({ foo: "heyo" });
+    });
+  });
+
+  it("get request with json excludes null query string", async () => {
+    await t.withRouting(async (routes: RouteSet) => {
+      routes.draw((r) => {
+        deprecator().silence(() => {
+          r.get(":action", { to: FooController as unknown as MountableApp });
+        });
+      });
+
+      await t.get("/foos_json", { as: "json" });
+
+      expect(t.request.url).toBe("http://www.example.com/foos_json");
+    });
+  });
+});
+
+describe("IntegrationFileUploadTest", () => {
+  class IntegrationController extends Base {
+    async test_file_upload(): Promise<void> {
+      await this.render({ plain: (this.params.get("file") as { size(): number }).size() });
+    }
+  }
+
+  class IntegrationFileUploadTest extends IntegrationTest {
+    static _routes?: RouteSet;
+
+    static get routes(): RouteSet {
+      return (this._routes ??= new RouteSet());
+    }
+
+    static call(env: RackEnv): Promise<RackResponse> {
+      return this.routes.call(env);
+    }
+
+    override get app(): unknown {
+      return this.constructor;
+    }
+
+    static override get fileFixturePath(): string {
+      return File.expandPath("../../test-helpers/fixtures/multipart", import.meta.dirname);
+    }
+
+    static {
+      controllerConstants.set("integration_file_upload_test/integration", IntegrationController);
+      this.routes.draw((r) => {
+        r.post("test_file_upload", {
+          to: "integration_file_upload_test/integration#test_file_upload",
+        });
+      });
+    }
+  }
+
+  it("fixture file upload", async () => {
+    const t = new IntegrationFileUploadTest();
+    await t.post("/test_file_upload", {
+      params: {
+        file: t.fixtureFileUpload("/ruby_on_rails.jpg", "image/jpeg"),
+      },
+    });
+    expect(t.response.body).toBe("45142");
+  });
+});
+
+describe("PageDumpIntegrationTest", () => {
+  class FooController extends Base {
+    async index(): Promise<void> {
+      await this.render({ plain: "Hello world" });
+    }
+
+    async redirect(): Promise<void> {
+      await this.redirectTo({ action: "index" });
+    }
+  }
+  include(FooController, SharedTestRoutes.urlHelpers());
+
+  class PageDumpIntegrationTest extends IntegrationTest {
+    static _routes?: RouteSet;
+
+    static get routes(): RouteSet {
+      return (this._routes ??= new RouteSet());
+    }
+
+    static call(env: RackEnv): Promise<RackResponse> {
+      return this.routes.call(env);
+    }
+
+    override get app(): unknown {
+      return this.constructor;
+    }
+
+    async withRoot<T>(block: () => T | Promise<T>): Promise<T> {
+      const spy = vi.spyOn(TopLevel.Trails!, "root").mockReturnValue(File.join(Dir.pwd(), "test"));
+      try {
+        return await block();
+      } finally {
+        spy.mockRestore();
+      }
+    }
+
+    dumpPath(): string {
+      return sole(Dir.glob(`${TopLevel.Trails!.root()}/tmp/html_dump/${this.methodName}*`));
+    }
+
+    removeDumps(): void {
+      Dir.glob(`${TopLevel.Trails!.root()}/tmp/html_dump/${this.methodName}*`).forEach((f) =>
+        File.delete(f),
+      );
+    }
+
+    static {
+      controllerConstants.set("page_dump_integration_test/foo", FooController);
+      this.routes.draw((r) => {
+        r.get("/", { to: "page_dump_integration_test/foo#index" });
+        r.get("/redirect", { to: "page_dump_integration_test/foo#redirect" });
+      });
+    }
+  }
+
+  let t: PageDumpIntegrationTest;
+  let previousTrails: typeof TopLevel.Trails;
+
+  beforeEach(async (context) => {
+    previousTrails = TopLevel.Trails;
+    TopLevel.Trails = { root: () => null } as never;
+    t = new PageDumpIntegrationTest(context.task.name);
+    await t.withRoot(() => {
+      t.removeDumps();
+    });
+  });
+
+  afterEach(async () => {
+    await t.withRoot(() => {
+      t.removeDumps();
+    });
+    TopLevel.Trails = previousTrails;
+  });
+
+  it("save_and_open_page saves a copy of the page and call to Launchy", async () => {
+    let launchyCalled = false;
+    await t.get("/");
+    await t.withRoot(async () => {
+      vi.spyOn(Launchy, "open").mockImplementation(async (path) => {
+        launchyCalled = path === t.dumpPath();
+      });
+      await t.saveAndOpenPage();
+      expect(launchyCalled).toBeTruthy();
+      expect(File.read(t.dumpPath())).toBe(t.response.body);
+    });
+  });
+
+  it("prints a warning to install launchy if it can't be loaded", async () => {
+    await t.get("/");
+    await t.withRoot(async () => {
+      vi.spyOn(Launchy, "open").mockImplementation(async () => {
+        throw new LoadError();
+      });
+      vi.spyOn(stderr, "write").mockImplementation((warning: string) =>
+        warning.includes("Please install the launchy gem to open the file automatically."),
+      );
+      await t.saveAndOpenPage();
+      expect(File.read(t.dumpPath())).toBe(t.response.body);
+    });
+  });
+
+  it("raises when called after a redirect", async () => {
+    await t.withRoot(async () => {
+      await t.get("/redirect");
+      await expect(t.saveAndOpenPage()).rejects.toThrow(InvalidResponse);
+    });
   });
 });

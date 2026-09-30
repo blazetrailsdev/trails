@@ -422,7 +422,10 @@ export class ExceptionWrapper {
     return out;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall open — CONVERGEABLE source-fragment-resolves-against-cwd-not-rails-root
+   */
   sourceFragment(
     path: string,
     line: number,

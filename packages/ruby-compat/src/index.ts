@@ -160,6 +160,7 @@ export { JSON } from "./json.js";
 export { kernelCatch, kernelThrow, UncaughtThrowError } from "./kernel-catch.js";
 export { kernelFloat } from "./kernel-float.js";
 export { format, sprintf } from "./kernel-format.js";
+export { warn } from "./kernel-warn.js";
 export { kernelInteger } from "./kernel-integer.js";
 export { kernelRand } from "./kernel-rand.js";
 export { IndexError } from "./index-error.js";

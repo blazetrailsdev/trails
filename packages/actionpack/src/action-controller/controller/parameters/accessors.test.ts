@@ -34,7 +34,7 @@ describe("ParametersAccessorsTest", () => {
 
   it("as_json returns the JSON representation of the parameters hash", () => {
     const params = new Parameters({ a: "1", b: "2" });
-    expect(params.toJSON()).toEqual({ a: "1", b: "2" });
+    expect(params.asJson()).toEqual({ a: "1", b: "2" });
   });
 
   it("to_s returns the string representation of the parameters hash", () => {
