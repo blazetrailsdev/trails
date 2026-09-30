@@ -2,17 +2,12 @@ import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { registerConstant, unregisterConstant } from "@blazetrails/activesupport";
+import { include, registerConstant, unregisterConstant } from "@blazetrails/activesupport";
 import {
   ScaffoldControllerGenerator,
   type ScaffoldControllerGeneratorOptions,
 } from "./scaffold-controller-generator.js";
-import {
-  AbstractController,
-  ActionController,
-  RouteSet,
-  controllerConstants,
-} from "@blazetrails/actionpack";
+import { ActionController, RouteSet, controllerConstants } from "@blazetrails/actionpack";
 import { bodyToString } from "@blazetrails/rack";
 
 afterEach(() => {
@@ -55,7 +50,7 @@ describe("ScaffoldControllerGenerator (dispatch)", () => {
     routes.draw((r) => {
       r.resources("posts");
     });
-    AbstractController.withRoutesHelpers(routes)(PostsController);
+    include(PostsController, routes.urlHelpers());
     controllerConstants.set("posts", PostsController as never);
 
     const [status, headers] = await routes.call({
