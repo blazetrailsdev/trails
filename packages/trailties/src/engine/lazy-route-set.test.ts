@@ -3,6 +3,7 @@ import type { Mapper } from "@blazetrails/actionpack";
 import { MockRequest } from "@blazetrails/rack";
 import { RouteSet, controllerConstants } from "@blazetrails/actionpack";
 import { LazyRouteSet } from "./lazy-route-set.js";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Trails } from "../rails.js";
 
 class StubController {}
@@ -76,6 +77,45 @@ describe("LazyRouteSet", () => {
   it("tolerates a missing application", () => {
     Trails.application = null;
     expect(() => routes.draw(() => {})).not.toThrow();
+  });
+
+  describe("when the application's routes are not loaded yet", () => {
+    let loading: Promise<boolean | null> | undefined;
+
+    beforeEach(() => {
+      loading = undefined;
+      let loaded = false;
+      reload.mockImplementation(() => {
+        if (loaded) return (loading ??= Promise.resolve(null));
+        loaded = true;
+        return (loading = Promise.resolve().then(() => {
+          routes.draw((m: Mapper) => {
+            m.root({ to: "posts#index" });
+          });
+          return true;
+        }));
+      });
+    });
+
+    it("app lazily loads routes when invoking url helpers", async () => {
+      const appUrlHelpers = routes.urlHelpers() as unknown as { rootPath(): string };
+
+      expect("rootPath" in appUrlHelpers).toBe(false);
+      expect(appUrlHelpers.rootPath).toBeUndefined();
+      expect(reload).toHaveBeenCalled();
+      await loading;
+      expect(appUrlHelpers.rootPath()).toBe("/");
+    });
+
+    it("app lazily loads routes when checking respond_to?", async () => {
+      const appUrlHelpers = routes.urlHelpers();
+
+      expect("rootPath" in appUrlHelpers).toBe(false);
+      expect(rbObjRespondTo(appUrlHelpers, "rootPath")).toBe(false);
+      expect(reload).toHaveBeenCalled();
+      await loading;
+      expect(rbObjRespondTo(appUrlHelpers, "rootPath")).toBe(true);
+    });
   });
 
   it("new_with_config builds an instance of the receiving subclass", () => {

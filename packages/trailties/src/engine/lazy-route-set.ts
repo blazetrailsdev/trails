@@ -7,6 +7,9 @@ type ProxyHelpers = Record<
   "urlFor" | "fullUrlFor" | "routeFor" | "polymorphicUrl" | "polymorphicPath",
   AnyFn
 >;
+type MethodMissingModule = {
+  respondToMissing(this: object, name: string, includeAll?: boolean): boolean;
+};
 
 export class LazyRouteSet extends RouteSet {
   override draw(callback: DrawCallback): void {
@@ -60,6 +63,37 @@ export class LazyRouteSet extends RouteSet {
     wrap("routeFor");
     wrap("polymorphicUrl");
     wrap("polymorphicPath");
+    Object.setPrototypeOf(
+      mod,
+      new Proxy(
+        Object.create(
+          Object.getPrototypeOf(mod) as object,
+          Object.getOwnPropertyDescriptors(this.methodMissingModule()),
+        ) as object,
+        {
+          get(target, name, receiver: MethodMissingModule) {
+            if (typeof name === "symbol" || Reflect.has(target, name)) {
+              return Reflect.get(target, name, receiver);
+            }
+            receiver.respondToMissing(name);
+            return undefined;
+          },
+        },
+      ),
+    );
     return mod;
+  }
+
+  /** @internal */
+  private _methodMissingModule?: MethodMissingModule;
+
+  /** @internal */
+  private methodMissingModule(): MethodMissingModule {
+    return (this._methodMissingModule ??= {
+      respondToMissing(this: object, _name: string, _includeAll: boolean = false): boolean {
+        void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+        return false;
+      },
+    });
   }
 }

@@ -47,8 +47,9 @@ onLoad("action_controller_test_case", function (this: RoutesHost) {
 
 onLoad("action_dispatch_integration_test", function (this: RoutesHost) {
   const superBeforeSetup = this.prototype.beforeSetup;
-  this.prototype.beforeSetup = function (this: { routes?: unknown }) {
+  this.prototype.beforeSetup = async function (this: { routes?: unknown }) {
     this.routes = Trails.application!.routes();
+    await Trails.application!.reloadRoutesUnlessLoaded();
     return superBeforeSetup?.call(this);
   };
 });
