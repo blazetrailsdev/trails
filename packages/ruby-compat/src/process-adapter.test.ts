@@ -192,7 +192,7 @@ describe("processAdapter", () => {
   });
 
   describe("stdin.gets / stdin.noecho", () => {
-    function registerFakeStdin(chunks: (string | null)[], isTTY = false) {
+    function registerFakeStdin(chunks: (string | null)[], isTTY = false, restores = true) {
       const modes: string[] = [];
       let mode = "echo";
       const adapter = makeFakeAdapter();
@@ -203,7 +203,7 @@ describe("processAdapter", () => {
           setattr: (t: string) => {
             mode = t;
             modes.push(t);
-            return true;
+            return restores;
           },
           setNoecho: () => {
             mode = "-echo";
@@ -237,6 +237,36 @@ describe("processAdapter", () => {
       await expect(stdin.gets()).resolves.toBeNull();
     });
 
+    it("gets with chomp drops the separator and a CR before a newline", async () => {
+      registerFakeStdin(["a\r\nb\n"]);
+      await expect(stdin.gets({ chomp: true })).resolves.toBe("a");
+      await expect(stdin.gets({ chomp: true })).resolves.toBe("b");
+    });
+
+    it("gets in paragraph mode swallows the newlines around each paragraph", async () => {
+      registerFakeStdin(["\n\npara1\nx\n", "\n\npara2\n"]);
+      await expect(stdin.gets("")).resolves.toBe("para1\nx\n\n");
+      await expect(stdin.gets("")).resolves.toBe("para2\n");
+      await expect(stdin.gets("")).resolves.toBeNull();
+    });
+
+    it("gets takes a lone Integer as a byte limit that never splits a character", async () => {
+      registerFakeStdin(["abcdef\n"]);
+      await expect(stdin.gets(3)).resolves.toBe("abc");
+      await expect(stdin.gets(0)).resolves.toBe("");
+      await expect(stdin.gets("e", 10)).resolves.toBe("de");
+      await expect(stdin.gets(null)).resolves.toBe("f\n");
+      registerFakeStdin(["héllo\n"]);
+      await expect(stdin.gets(2)).resolves.toBe("hé");
+    });
+
+    it("gets with a custom separator and with nil", async () => {
+      registerFakeStdin(["abXY", "cd"]);
+      await expect(stdin.gets("XY", { chomp: true })).resolves.toBe("ab");
+      await expect(stdin.gets(null, { chomp: true })).resolves.toBe("cd");
+      await expect(stdin.gets(null)).resolves.toBeNull();
+    });
+
     it("read answers what gets buffered past a line first", async () => {
       registerFakeStdin(["a\nb"]);
       await stdin.gets();
@@ -260,6 +290,11 @@ describe("processAdapter", () => {
         }),
       ).rejects.toThrow("boom");
       expect(modes).toEqual(["-echo", "echo"]);
+    });
+
+    it("noecho raises when the saved mode cannot be restored, after the block completes", async () => {
+      registerFakeStdin(["x\n"], true, false);
+      await expect(stdin.noecho((io) => io.gets())).rejects.toBeInstanceOf(Errno.ENOTTY);
     });
 
     it("noecho raises ENOTTY off a terminal", () => {

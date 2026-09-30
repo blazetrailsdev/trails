@@ -91,9 +91,63 @@ export const stderr: WriteStream = {
 
 let stdinBuffer = "";
 
+type GetlineOpts = { chomp?: boolean | null };
+
+/** `extract_getline_args` (`vendor/ruby/v3.3.11/io.c:4065-4086`), whose `$/` is `"\n"`. */
+function extractGetlineArgs(args: unknown[]): { rs: string | null; limit: number } {
+  let rs: string | null = "\n";
+  let lim: number | null = null;
+  if (args.length === 1) {
+    if (args[0] == null || typeof args[0] === "string") {
+      rs = args[0] ?? null;
+    } else {
+      lim = args[0] as number;
+    }
+  } else if (2 <= args.length) {
+    rs = args[0] as string | null;
+    lim = args[1] as number | null;
+  }
+  return { rs, limit: lim == null ? -1 : lim };
+}
+
+/**
+ * `appendline`'s limit (`vendor/ruby/v3.3.11/io.c:4210-4225`): the index just past
+ * the character that brings the UTF-8 byte count to `limit`, so a character
+ * is never split, or `-1` while the buffer holds fewer bytes.
+ */
+function limitEnd(limit: number): number {
+  let bytes = 0;
+  let i = 0;
+  for (const ch of stdinBuffer) {
+    const c = ch.codePointAt(0)!;
+    bytes += c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : 4;
+    i += ch.length;
+    if (bytes >= limit) return i;
+  }
+  return -1;
+}
+
+/** `swallow` (`vendor/ruby/v3.3.11/io.c:3937`): drops every leading `term`. */
+async function swallow(term: string): Promise<void> {
+  for (;;) {
+    let i = 0;
+    while (i < stdinBuffer.length && stdinBuffer[i] === term) i++;
+    stdinBuffer = stdinBuffer.slice(i);
+    if (stdinBuffer !== "") return;
+    const chunk = await requireAdapter().stdin.read();
+    if (chunk == null) return;
+    stdinBuffer += chunk;
+  }
+}
+
 /** @noRailsEquivalent PERMANENT */
 export const stdin: ReadStream & {
-  gets(): Promise<string | null>;
+  gets(
+    ...args:
+      | [opts?: GetlineOpts]
+      | [sepOrLimit: string | number | null, opts?: GetlineOpts]
+      | [sep: string | null, limit: number | null, opts?: GetlineOpts]
+  ): Promise<string | null>;
   noecho<T>(block: (io: typeof stdin) => T): T;
 } = {
   /** @noRailsEquivalent PERMANENT */
@@ -110,31 +164,64 @@ export const stdin: ReadStream & {
     return requireAdapter().stdin.read();
   },
   /**
-   * `IO#gets` (`vendor/ruby/v3.3.11/io.c:4363` `rb_io_gets_m`) with the default
-   * `$/`: the next line with its `"\n"`, the unterminated rest at end of
-   * file, then `nil`. Asynchronous, because a stdin read is. What the adapter
-   * delivered past the line is kept for the next read. `rb_io_getline`'s
-   * separator, limit and `chomp:` forms are not ported: Thor's bare `gets`
-   * is the only call site (ruby-compat's rule 1, "only what trails actually
-   * calls").
+   * `IO#gets` (`vendor/ruby/v3.3.11/io.c:4363` `rb_io_gets_m`) through
+   * `prepare_getline_args` (`io.c:4118-4125`) and `rb_io_getline_0`
+   * (`io.c:4128-4239`): `gets(sep = $/, limit = nil, chomp: false)`, where a
+   * lone Integer is the limit, a `nil` separator reads to end of file, `""`
+   * is paragraph mode, and `limit` counts bytes. Answers `nil` at end of file.
+   * Asynchronous, because a stdin read is; what the adapter delivered past
+   * the line is kept for the next read. `$_` and `lineno` are not kept.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#gets`, which Thor calls on
    * `$stdin` (`vendor/thor/v1.3.2/lib/thor/line_editor/basic.rb:25`).
    */
-  async gets() {
+  async gets(...args: unknown[]) {
+    let chomp = false;
+    const opts = args[args.length - 1];
+    if (opts != null && typeof opts === "object") {
+      args = args.slice(0, -1);
+      const c = (opts as GetlineOpts).chomp;
+      chomp = c != null && c !== false;
+    }
+    const { rs, limit } = extractGetlineArgs(args);
+
+    if (rs == null && limit < 0) {
+      let str = stdinBuffer;
+      stdinBuffer = "";
+      for (let chunk; (chunk = await requireAdapter().stdin.read()) != null; ) str += chunk;
+      return str === "" ? null : str;
+    } else if (limit === 0) {
+      return "";
+    }
+
+    let rsptr = rs;
+    const rspara = rs === "";
+    if (rspara) {
+      rsptr = "\n\n";
+      await swallow("\n");
+    }
     for (;;) {
-      const newline = stdinBuffer.indexOf("\n");
-      if (newline !== -1) {
-        const line = stdinBuffer.slice(0, newline + 1);
-        stdinBuffer = stdinBuffer.slice(newline + 1);
-        return line;
+      const p = rsptr == null ? -1 : stdinBuffer.indexOf(rsptr);
+      const e = p === -1 ? -1 : p + rsptr!.length;
+      const l = limit < 0 ? -1 : limitEnd(limit);
+      if (e !== -1 && (l === -1 || e <= l)) {
+        let str = stdinBuffer.slice(0, e);
+        stdinBuffer = stdinBuffer.slice(e);
+        if (chomp) str = str.slice(0, rs === "\n" && str[p - 1] === "\r" ? p - 1 : p);
+        if (rspara) await swallow("\n");
+        return str;
+      }
+      if (l !== -1) {
+        const str = stdinBuffer.slice(0, l);
+        stdinBuffer = stdinBuffer.slice(l);
+        return str;
       }
       const chunk = await requireAdapter().stdin.read();
       if (chunk == null) {
         if (stdinBuffer === "") return null;
-        const line = stdinBuffer;
+        const str = stdinBuffer;
         stdinBuffer = "";
-        return line;
+        return str;
       }
       stdinBuffer += chunk;
     }
@@ -145,9 +232,10 @@ export const stdin: ReadStream & {
    * mode with `getattr`, clears only the echo flags with `set_noecho`
    * (`console.c:283-291`), yields the IO, and `setattr`s the saved mode
    * back — after a returned promise settles, since a block that awaits a
-   * read has not finished when it returns. A stream whose mode cannot be read
-   * or set raises `Errno::ENOTTY`, as `ttymode`'s `rb_syserr_fail`
-   * (`console.c:378`) does.
+   * read has not finished when it returns. A mode that cannot be read, set
+   * or restored raises `Errno::ENOTTY`, as `ttymode`'s `rb_syserr_fail`
+   * (`console.c:365-379`) does, a failed restore even after the block
+   * completed.
    *
    * @noRailsEquivalent PERMANENT — `io/console`'s `IO#noecho`, which Thor
    * calls on `$stdin` (`vendor/thor/v1.3.2/lib/thor/line_editor/basic.rb:29`).
@@ -155,9 +243,9 @@ export const stdin: ReadStream & {
   noecho<T>(block: (io: typeof stdin) => T): T {
     const io = requireAdapter().stdin;
     const t = io.getattr?.() ?? null;
-    if (t == null || io.setNoecho?.() !== true) throw new Errno.ENOTTY();
+    if (t == null || io.setattr == null || io.setNoecho?.() !== true) throw new Errno.ENOTTY();
     const setattr = (): void => {
-      io.setattr!(t);
+      if (!io.setattr!(t)) throw new Errno.ENOTTY();
     };
     let result: T;
     try {
@@ -305,7 +393,9 @@ function tryAutoRegisterNode(): boolean {
  * `setRawMode`, which also clears `ICANON`, `ISIG` and `ICRNL` where
  * `set_noecho` clears echo alone, so the flags go through `stty(1)`, whose
  * `-g` form is the saved `conmode`. Answers `null` when stdin is not a
- * terminal or `stty` fails.
+ * terminal or `stty` fails. Node exposes no `SetConsoleMode`, so the Windows
+ * arm (`console.c:289`, clearing `ENABLE_ECHO_INPUT`) is not reachable and a
+ * Windows console answers `null`, which `noecho` raises as `Errno::ENOTTY`.
  */
 function stty(proc: NodeProcessLike, args: string[]): string | null {
   if (!proc.stdin.isTTY) return null;
