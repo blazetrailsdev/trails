@@ -14,6 +14,7 @@ import {
   NoMethodError,
   rbObjRespondTo,
   FileUtils,
+  getFs,
   hasKey,
   hashDelete,
   rbInspect,
@@ -25,6 +26,7 @@ import { GeneratorError } from "./generated-attribute.js";
 import * as Actions from "./actions.js";
 import type { GeneratorActionsState } from "./actions.js";
 import * as TrailsActions from "./trails-actions.js";
+import * as ThorActions from "../thor/actions.js";
 
 export interface GeneratorOptions {
   cwd: string;
@@ -73,6 +75,8 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   declare private static _invocations: Record<string, boolean>;
   declare private static _invocationBlocks: Record<string, HookBlock>;
   declare private static _commands: string[];
+  declare static _sourcePaths?: string[];
+  declare private static _sourceRoot?: string | null;
 
   static {
     this.classOption("skipNamespace", {
@@ -112,6 +116,28 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     });
   }
 
+  static sourcePaths = ThorActions.ClassMethods.sourcePaths;
+  static sourcePathsForSearch = ThorActions.ClassMethods.sourcePathsForSearch;
+
+  static async sourceRoot(path: string | null = null): Promise<string | null | undefined> {
+    if (path) this._sourceRoot = path;
+    if (!Object.prototype.hasOwnProperty.call(this, "_sourceRoot") || this._sourceRoot == null) {
+      this._sourceRoot = await this.defaultSourceRoot();
+    }
+    return this._sourceRoot;
+  }
+
+  static async defaultSourceRoot(): Promise<string | undefined> {
+    if (!(this.baseName() && this.generatorName())) return;
+    if (!(await this.defaultGeneratorRoot())) return;
+    const path = File.join((await this.defaultGeneratorRoot())!, "templates");
+    if (await getFs().exists(path)) return path;
+  }
+
+  static baseRoot(): string {
+    return decodeURIComponent(new URL(".", import.meta.url).pathname);
+  }
+
   cwd: string;
   destinationRoot: string;
   output: (msg: string) => void;
@@ -128,6 +154,12 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   private _invocations?: Invocations;
   /** @noRailsEquivalent PERMANENT */
   parentOptions?: Record<string, unknown>;
+
+  _sourcePaths?: string[];
+
+  relativeToOriginalDestinationRoot = ThorActions.relativeToOriginalDestinationRoot;
+  sourcePaths = ThorActions.sourcePaths;
+  findInSourcePaths = ThorActions.findInSourcePaths;
 
   log = Actions.log;
   generate = Actions.generate;
@@ -737,6 +769,15 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   }
 
   /** @internal */
+  protected static async defaultGeneratorRoot(): Promise<string | undefined> {
+    const path = File.expandPath(
+      File.join(dasherize(this.baseName()!), dasherize(this.generatorName()!)),
+      this.baseRoot(),
+    );
+    if (await getFs().exists(path)) return path;
+  }
+
+  /** @internal */
   static hooks(): Record<string, [string | undefined, string | undefined]> {
     if (!Object.prototype.hasOwnProperty.call(this, "_hooks")) {
       const superclass = Object.getPrototypeOf(this) as typeof GeneratorBase;
@@ -849,16 +890,6 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     const existing = File.read(fullPath);
     const updated = existing.replace(new RegExp(pattern, "g"), content);
     if (!this.options.pretend) File.write(fullPath, updated);
-  }
-
-  relativeToOriginalDestinationRoot(path: string, removeDot: boolean = true): string {
-    const root = this.cwd;
-    if (path.startsWith(root) && ["/", ""].includes(path.slice(root.length, root.length + 1))) {
-      path = "." + path.slice(root.length);
-      return removeDot ? path.slice(2) : path;
-    } else {
-      return path;
-    }
   }
 
   protected readFile(relativePath: string): string {

@@ -43,6 +43,10 @@
     "sqlite3": {
       "ref": "v2.6.0",
       "sha": "2724f7bd84db6b4f403b15e8a49cba39fa99b59a"
+    },
+    "thor": {
+      "ref": "v1.3.2",
+      "sha": "33b9682da680cda9404f9961a62ec208832cbff3"
     }
   }
 }

@@ -44,6 +44,7 @@ export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   actionpackversion: "actionpack",
   "activerecord-test-support": "activerecord",
   sqlite3: "activerecord",
+  thor: "trailties",
 };
 
 /**
@@ -107,6 +108,7 @@ export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
   actionpackversion: "action-pack",
   "activerecord-test-support": "support",
   sqlite3: "sqlite",
+  thor: "thor",
 };
 
 /**
@@ -195,6 +197,7 @@ export const MANIFEST_PACKAGES = [
   "i18n",
   "did-you-mean",
   "sqlite3",
+  "thor",
 ] as const;
 
 /**

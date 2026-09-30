@@ -15,6 +15,7 @@
     { "path": "../actionpack" },
     { "path": "../actionview" },
     { "path": "../activemodel" },
-    { "path": "../globalid" }
+    { "path": "../globalid" },
+    { "path": "../tse-compiler" }
   ]
 }

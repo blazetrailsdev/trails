@@ -499,6 +499,7 @@ export const PROTOCOL_DEFINITION_ENROLLED_PACKAGES: ReadonlySet<string> = new Se
   "rack-test",
   "ruby-compat",
   "sqlite3",
+  "thor",
   "trailties",
 ]);
 
@@ -524,6 +525,7 @@ export const PROTOCOL_CALL_ENROLLED_PACKAGES: ReadonlySet<string> = new Set<stri
   "rack-test",
   "ruby-compat",
   "sqlite3",
+  "thor",
   "trailties",
 ]);
 

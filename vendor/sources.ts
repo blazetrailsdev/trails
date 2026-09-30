@@ -267,6 +267,25 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "thor",
+    origin: {
+      type: "git",
+      url: "https://github.com/rails/thor.git",
+      // vendor/rails/Gemfile.lock:630 resolves thor (1.3.2), inside railties'
+      // `~> 1.0, >= 1.2.2` (vendor/rails/railties/railties.gemspec:45).
+      ref: "v1.3.2",
+    },
+    packages: [
+      {
+        // `Rails::Generators::Base < Thor::Group` and `include Thor::Actions`
+        // (railties/lib/rails/generators/base.rb:19-22); the gem's ports live in
+        // `packages/trailties/src/thor/`.
+        name: "thor",
+        libPath: "lib/thor",
+      },
+    ],
+  },
+  {
     name: "date",
     origin: {
       type: "git",

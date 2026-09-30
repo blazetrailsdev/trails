@@ -50,6 +50,7 @@ export function setMigrationAssigns(this: MigrationTemplateHost, destination: st
   this.migrationClassName = camelize(this.migrationFileName);
 }
 
+/** @missingRailsCall find_in_source_paths — CONVERGEABLE migration-template-expands-the-source-template-path */
 export async function migrationTemplate(
   host: MigrationTemplateHost,
   source: () => string | Promise<string>,

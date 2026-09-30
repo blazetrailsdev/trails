@@ -236,10 +236,10 @@ export function createTrailsCLI(deps: TrailsCliDeps) {
 
         if (type === "model") {
           const gen = new VfsModelGenerator({ vfs, output: log });
-          gen.run(name, columnArgs);
+          await gen.run(name, columnArgs);
         } else if (type === "migration") {
           const gen = new VfsMigrationGenerator({ vfs, output: log });
-          gen.run(name, columnArgs);
+          await gen.run(name, columnArgs);
         } else {
           throw new Error(`Unknown generator: ${type}. Available: model, migration`);
         }

@@ -350,7 +350,7 @@ describe("exported fixtures", () => {
 
     const allFixtures = [...fixtures.docs, ...fixtures.music, ...fixtures.finances];
     for (const fixture of allFixtures) {
-      runFixtureCommand(fixtureDir, fixture.command);
+      await runFixtureCommand(fixtureDir, fixture.command);
     }
   });
 

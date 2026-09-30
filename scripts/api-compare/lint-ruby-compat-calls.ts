@@ -94,6 +94,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "rack-session",
   "rack-test",
   "sqlite3",
+  "thor",
   "trailties",
 ];
 

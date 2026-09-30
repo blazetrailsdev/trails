@@ -1,0 +1,7 @@
+import { Migration } from "@blazetrails/activerecord";
+
+export class <%= this.migrationClassName %> extends Migration {
+  async change()<%= this.isTypeScript() ? ": Promise<void>" : "" %> {
+<%= this.createTableMigration() %>
+  }
+}
