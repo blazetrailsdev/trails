@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Errno, SystemCallError } from "./errno.js";
+import { TypeError } from "./type-error.js";
 import { RUBY_PLATFORM } from "./ruby-platform.js";
 import {
   __INTERNAL_resetProcessAdapter_TEST_ONLY,
@@ -196,19 +197,25 @@ describe("processAdapter", () => {
       const modes: string[] = [];
       let mode = "echo";
       const adapter = makeFakeAdapter();
+      const tty = (): void => {
+        if (!isTTY) throw new Errno.ENOTTY();
+      };
       Object.defineProperty(adapter, "stdin", {
         value: {
           isTTY,
-          getattr: () => (isTTY ? mode : null),
+          getattr: () => {
+            tty();
+            return mode;
+          },
           setattr: (t: string) => {
+            if (!restores) throw new SystemCallError("Input/output error");
             mode = t;
             modes.push(t);
-            return restores;
           },
           setNoecho: () => {
+            tty();
             mode = "-echo";
             modes.push(mode);
-            return true;
           },
           read: () => Promise.resolve(chunks.length > 0 ? chunks.shift()! : null),
         },
@@ -267,6 +274,28 @@ describe("processAdapter", () => {
       await expect(stdin.gets(null)).resolves.toBeNull();
     });
 
+    it("gets advances lineno for each line not cut by the limit", async () => {
+      registerFakeStdin(["ab\ncd\n"]);
+      const start = stdin.lineno;
+      await stdin.gets(1);
+      await stdin.gets();
+      await stdin.gets();
+      await stdin.gets();
+      expect(stdin.lineno - start).toBe(2);
+    });
+
+    it("gets converts its limit and separator as Ruby does", async () => {
+      registerFakeStdin(["abc\n"]);
+      await expect(stdin.gets(true as never)).rejects.toThrow(
+        new TypeError("no implicit conversion of true into Integer"),
+      );
+      await expect(stdin.gets(NaN)).rejects.toThrow("float NaN out of range of integer");
+      await expect(stdin.gets(1 as never, 2)).rejects.toThrow(
+        new TypeError("no implicit conversion of Integer into String"),
+      );
+      await expect(stdin.gets(1.9)).resolves.toBe("a");
+    });
+
     it("read answers what gets buffered past a line first", async () => {
       registerFakeStdin(["a\nb"]);
       await stdin.gets();
@@ -294,7 +323,9 @@ describe("processAdapter", () => {
 
     it("noecho raises when the saved mode cannot be restored, after the block completes", async () => {
       registerFakeStdin(["x\n"], true, false);
-      await expect(stdin.noecho((io) => io.gets())).rejects.toBeInstanceOf(Errno.ENOTTY);
+      await expect(stdin.noecho((io) => io.gets())).rejects.toThrow(
+        new SystemCallError("Input/output error"),
+      );
     });
 
     it("noecho raises ENOTTY off a terminal", () => {

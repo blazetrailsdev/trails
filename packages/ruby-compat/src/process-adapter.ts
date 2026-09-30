@@ -1,4 +1,5 @@
-import { Errno } from "./errno.js";
+import { Errno, SystemCallError } from "./errno.js";
+import { num2long, rbCheckStringType, stringValue } from "./string/support.js";
 
 export interface WriteStream {
   write(chunk: string): boolean;
@@ -10,9 +11,9 @@ export interface WriteStream {
 export interface ReadStream {
   readonly isTTY: boolean;
   read(): Promise<string | null>;
-  getattr?(): string | null;
-  setattr?(t: string): boolean;
-  setNoecho?(): boolean;
+  getattr?(): string;
+  setattr?(t: string): void;
+  setNoecho?(): void;
 }
 
 export type SignalName = "SIGINT" | "SIGTERM";
@@ -90,24 +91,26 @@ export const stderr: WriteStream = {
 };
 
 let stdinBuffer = "";
+let stdinLineno = 0;
 
 type GetlineOpts = { chomp?: boolean | null };
 
 /** `extract_getline_args` (`vendor/ruby/v3.3.11/io.c:4065-4086`), whose `$/` is `"\n"`. */
 function extractGetlineArgs(args: unknown[]): { rs: string | null; limit: number } {
   let rs: string | null = "\n";
-  let lim: number | null = null;
+  let lim: unknown = null;
   if (args.length === 1) {
-    if (args[0] == null || typeof args[0] === "string") {
-      rs = args[0] ?? null;
+    let tmp: string | null = null;
+    if (args[0] == null || (tmp = rbCheckStringType(args[0])) != null) {
+      rs = tmp;
     } else {
-      lim = args[0] as number;
+      lim = args[0];
     }
   } else if (2 <= args.length) {
-    rs = args[0] as string | null;
-    lim = args[1] as number | null;
+    rs = args[0] == null ? null : stringValue(args[0]);
+    lim = args[1];
   }
-  return { rs, limit: lim == null ? -1 : lim };
+  return { rs, limit: lim == null ? -1 : num2long(lim) };
 }
 
 /**
@@ -149,6 +152,7 @@ export const stdin: ReadStream & {
       | [sep: string | null, limit: number | null, opts?: GetlineOpts]
   ): Promise<string | null>;
   noecho<T>(block: (io: typeof stdin) => T): T;
+  readonly lineno: number;
 } = {
   /** @noRailsEquivalent PERMANENT */
   get isTTY() {
@@ -170,7 +174,11 @@ export const stdin: ReadStream & {
    * lone Integer is the limit, a `nil` separator reads to end of file, `""`
    * is paragraph mode, and `limit` counts bytes. Answers `nil` at end of file.
    * Asynchronous, because a stdin read is; what the adapter delivered past
-   * the line is kept for the next read. `$_` and `lineno` are not kept.
+   * the line is kept for the next read. `lineno` counts each line not cut by
+   * the limit (`io.c:4232-4234`). `rb_io_gets_m`'s `rb_lastline_set`
+   * (`io.c:4368`) is not ported: `$_` is a variable of the CALLER's frame,
+   * and JS has no way to write one; ARGF, whose `last_lineno` is `$.`
+   * (`io.c:4250-4258`), is not ported either.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#gets`, which Thor calls on
    * `$stdin` (`vendor/thor/v1.3.2/lib/thor/line_editor/basic.rb:25`).
@@ -189,7 +197,9 @@ export const stdin: ReadStream & {
       let str = stdinBuffer;
       stdinBuffer = "";
       for (let chunk; (chunk = await requireAdapter().stdin.read()) != null; ) str += chunk;
-      return str === "" ? null : str;
+      if (str === "") return null;
+      stdinLineno++;
+      return str;
     } else if (limit === 0) {
       return "";
     }
@@ -209,6 +219,7 @@ export const stdin: ReadStream & {
         stdinBuffer = stdinBuffer.slice(e);
         if (chomp) str = str.slice(0, rs === "\n" && str[p - 1] === "\r" ? p - 1 : p);
         if (rspara) await swallow("\n");
+        stdinLineno++;
         return str;
       }
       if (l !== -1) {
@@ -221,10 +232,20 @@ export const stdin: ReadStream & {
         if (stdinBuffer === "") return null;
         const str = stdinBuffer;
         stdinBuffer = "";
+        stdinLineno++;
         return str;
       }
       stdinBuffer += chunk;
     }
+  },
+  /**
+   * `IO#lineno` (`vendor/ruby/v3.3.11/io.c:4390` `rb_io_lineno`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#lineno`, the counter `gets`
+   * advances.
+   */
+  get lineno() {
+    return stdinLineno;
   },
   /**
    * `IO#noecho` (`vendor/ruby/v3.3.11/ext/io/console/console.c:633`
@@ -232,20 +253,24 @@ export const stdin: ReadStream & {
    * mode with `getattr`, clears only the echo flags with `set_noecho`
    * (`console.c:283-291`), yields the IO, and `setattr`s the saved mode
    * back — after a returned promise settles, since a block that awaits a
-   * read has not finished when it returns. A mode that cannot be read, set
-   * or restored raises `Errno::ENOTTY`, as `ttymode`'s `rb_syserr_fail`
-   * (`console.c:365-379`) does, a failed restore even after the block
-   * completed.
+   * read has not finished when it returns. The adapter raises the
+   * `SystemCallError` for a mode that cannot be read, set or restored, as
+   * `ttymode`'s `rb_syserr_fail` (`console.c:365-379`) does, a failed restore
+   * even after the block completed; an adapter with no terminal control is
+   * `Errno::ENOTTY`.
    *
    * @noRailsEquivalent PERMANENT — `io/console`'s `IO#noecho`, which Thor
    * calls on `$stdin` (`vendor/thor/v1.3.2/lib/thor/line_editor/basic.rb:29`).
    */
   noecho<T>(block: (io: typeof stdin) => T): T {
     const io = requireAdapter().stdin;
-    const t = io.getattr?.() ?? null;
-    if (t == null || io.setattr == null || io.setNoecho?.() !== true) throw new Errno.ENOTTY();
+    if (io.getattr == null || io.setattr == null || io.setNoecho == null) {
+      throw new Errno.ENOTTY();
+    }
+    const t = io.getattr();
+    io.setNoecho();
     const setattr = (): void => {
-      if (!io.setattr!(t)) throw new Errno.ENOTTY();
+      io.setattr!(t);
     };
     let result: T;
     try {
@@ -392,28 +417,36 @@ function tryAutoRegisterNode(): boolean {
  * on the terminal behind fd 0. Node exposes termios only through
  * `setRawMode`, which also clears `ICANON`, `ISIG` and `ICRNL` where
  * `set_noecho` clears echo alone, so the flags go through `stty(1)`, whose
- * `-g` form is the saved `conmode`. Answers `null` when stdin is not a
- * terminal or `stty` fails. Node exposes no `SetConsoleMode`, so the Windows
- * arm (`console.c:289`, clearing `ENABLE_ECHO_INPUT`) is not reachable and a
- * Windows console answers `null`, which `noecho` raises as `Errno::ENOTTY`.
+ * `-g` form is the saved `conmode`. A failure raises the `SystemCallError`
+ * whose `strerror` text `stty` reported, as `rb_syserr_fail` does with the
+ * failing call's errno. Node exposes no `SetConsoleMode`, so the Windows arm
+ * (`console.c:289`, clearing `ENABLE_ECHO_INPUT`) is not reachable and a
+ * Windows console raises `Errno::ENOTTY`; its convergence is
+ * `ruby-compat-noecho-windows-console-echo-input`.
  */
-function stty(proc: NodeProcessLike, args: string[]): string | null {
-  if (!proc.stdin.isTTY) return null;
+function stty(proc: NodeProcessLike, args: string[]): string {
   const childProcess = proc.getBuiltinModule?.("node:child_process") as
     | {
         spawnSync(
           cmd: string,
           args: string[],
           opts: unknown,
-        ): { status: number | null; stdout: unknown };
+        ): { status: number | null; stdout: unknown; stderr: unknown };
       }
     | undefined;
-  if (childProcess == null) return null;
+  if (!proc.stdin.isTTY || childProcess == null) throw new Errno.ENOTTY();
   const result = childProcess.spawnSync("stty", args, {
-    stdio: [0, "pipe", "ignore"],
+    stdio: [0, "pipe", "pipe"],
     encoding: "utf8",
   });
-  return result.status === 0 ? String(result.stdout).trim() : null;
+  if (result.status === 0) return String(result.stdout).trim();
+  const err =
+    String(result.stderr ?? "")
+      .trim()
+      .split(": ")
+      .pop() ?? "";
+  if (err === "" || err === "Inappropriate ioctl for device") throw new Errno.ENOTTY();
+  throw new SystemCallError(err);
 }
 
 function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
@@ -467,8 +500,12 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
         return Boolean(proc.stdin.isTTY);
       },
       getattr: () => stty(proc, ["-g"]),
-      setattr: (t) => stty(proc, [t]) !== null,
-      setNoecho: () => stty(proc, ["-echo", "-echoe", "-echok", "-echonl"]) !== null,
+      setattr: (t) => {
+        stty(proc, [t]);
+      },
+      setNoecho: () => {
+        stty(proc, ["-echo", "-echoe", "-echok", "-echonl"]);
+      },
       read: () =>
         new Promise<string | null>((resolve, reject) => {
           if (proc.stdin.readableEnded || proc.stdin.destroyed) {

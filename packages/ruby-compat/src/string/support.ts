@@ -88,7 +88,14 @@ export function rbCheckStringType(val: unknown): string | null {
  * @noRailsEquivalent PERMANENT
  */
 export function num2long(val: unknown): number {
-  if (typeof val === "number") return Math.trunc(val);
+  if (typeof val === "number") {
+    if (!Number.isFinite(val)) {
+      throw new RangeError(
+        `float ${Number.isNaN(val) ? "NaN" : val > 0 ? "Inf" : "-Inf"} out of range of integer`,
+      );
+    }
+    return Math.trunc(val);
+  }
   if (val == null) throw new TypeError("no implicit conversion from nil to integer");
   throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(val)} into Integer`);
 }
