@@ -1,10 +1,11 @@
-import { File, getFs, rbInspect } from "@blazetrails/ruby-compat";
+import { extend, File, getFs, included, rbInspect } from "@blazetrails/ruby-compat";
 import { TEMPLATE_EXTNAME, fromSuperclass } from "./base.js";
 import { Error } from "./error.js";
 
 export interface ActionsClassHost {
   name: string;
   _sourcePaths?: string[];
+  _sourceRoot?: string | null;
   sourcePaths(): string[];
   sourceRoot(path?: string): Promise<string | null | undefined>;
 }
@@ -25,11 +26,16 @@ export const ClassMethods = {
     return this._sourcePaths!;
   },
 
+  async sourceRoot(this: ActionsClassHost, path: string | null = null): Promise<string | null> {
+    if (path != null) this._sourceRoot = path;
+    return (this._sourceRoot ??= null);
+  },
+
   async sourcePathsForSearch(this: ActionsClassHost): Promise<string[]> {
     let paths: string[] = [];
     paths = paths.concat(this.sourcePaths());
     const sourceRoot = await this.sourceRoot();
-    if (sourceRoot) paths.push(sourceRoot);
+    if (sourceRoot != null) paths.push(sourceRoot);
     paths = paths.concat(fromSuperclass.call(this, "sourcePaths", []) as string[]);
     return paths;
   },
@@ -74,7 +80,7 @@ export async function findInSourcePaths(this: ActionsHost, file: string): Promis
   let message = `Could not find ${rbInspect(file)} in any of your source paths. `;
 
   const klass = this.constructor as unknown as ActionsClass;
-  if (!(await klass.sourceRoot())) {
+  if ((await klass.sourceRoot()) == null) {
     message += `Please invoke ${klass.name}.source_root(PATH) with the PATH containing your templates. `;
   }
 
@@ -85,3 +91,13 @@ export async function findInSourcePaths(this: ActionsHost, file: string): Promis
 
   throw new Error(message);
 }
+
+export const Actions = {
+  [included](base: object): void {
+    extend(base, ClassMethods);
+  },
+
+  relativeToOriginalDestinationRoot,
+  sourcePaths,
+  findInSourcePaths,
+};

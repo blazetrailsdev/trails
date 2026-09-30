@@ -15,9 +15,6 @@ import type { VirtualFS } from "./virtual-fs.js";
 import migrationTemplate from "../../../../trailties/src/generators/active-record/migration/templates/migration.ts.tt?raw";
 import createTableMigrationTemplate from "../../../../trailties/src/generators/active-record/migration/templates/create_table_migration.ts.tt?raw";
 
-// The migration generator's source root, served from the bundle rather than
-// written into the user's VFS: `find_in_source_paths` (thor/actions.rb:133-157)
-// only needs `exists` / `readFile` to answer for these paths.
 const MIGRATION_SOURCE_ROOT = "/.trails/templates/active-record/migration";
 const TEMPLATES: Record<string, string> = {
   [`${MIGRATION_SOURCE_ROOT}/migration.ts.tt`]: migrationTemplate,

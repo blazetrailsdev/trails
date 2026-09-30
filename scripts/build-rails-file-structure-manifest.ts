@@ -170,11 +170,7 @@ interface Bucket {
 
 // Reviewed `<pkg>/<file>::<Segment>` rows for collisions resolveLastSegmentCollision
 // cannot decide; without a row such a collision fails the build below.
-const EXPECTED_UNRESOLVED_COLLISIONS: string[] = [
-  // thor/error.rb:25,66 nests a `SpellChecker` in both
-  // `UndefinedCommandError` and `UnknownArgumentError`; neither is ported.
-  "thor/error.rb::SpellChecker",
-];
+const EXPECTED_UNRESOLVED_COLLISIONS: string[] = ["thor/error.rb::SpellChecker"];
 
 const unresolvedCollisions: string[] = [];
 const usedExpectedCollisions = new Set<string>();

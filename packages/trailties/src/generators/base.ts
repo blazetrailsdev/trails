@@ -15,6 +15,7 @@ import {
   rbObjRespondTo,
   FileUtils,
   getFs,
+  include,
   hasKey,
   hashDelete,
   rbInspect,
@@ -76,9 +77,14 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   declare private static _invocationBlocks: Record<string, HookBlock>;
   declare private static _commands: string[];
   declare static _sourcePaths?: string[];
-  declare private static _sourceRoot?: string | null;
+  declare static _sourceRoot?: string | null;
+
+  declare static sourcePaths: typeof ThorActions.ClassMethods.sourcePaths;
+  declare static sourcePathsForSearch: typeof ThorActions.ClassMethods.sourcePathsForSearch;
 
   static {
+    include(this as unknown as new (...args: unknown[]) => unknown, ThorActions.Actions);
+
     this.classOption("skipNamespace", {
       type: "boolean",
       default: false,
@@ -116,11 +122,8 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     });
   }
 
-  static sourcePaths = ThorActions.ClassMethods.sourcePaths;
-  static sourcePathsForSearch = ThorActions.ClassMethods.sourcePathsForSearch;
-
   static async sourceRoot(path: string | null = null): Promise<string | null | undefined> {
-    if (path) this._sourceRoot = path;
+    if (path != null) this._sourceRoot = path;
     if (!Object.prototype.hasOwnProperty.call(this, "_sourceRoot") || this._sourceRoot == null) {
       this._sourceRoot = await this.defaultSourceRoot();
     }
@@ -128,14 +131,14 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   }
 
   static async defaultSourceRoot(): Promise<string | undefined> {
-    if (!(this.baseName() && this.generatorName())) return;
-    if (!(await this.defaultGeneratorRoot())) return;
+    if (!(this.baseName() != null && this.generatorName() != null)) return;
+    if ((await this.defaultGeneratorRoot()) == null) return;
     const path = File.join((await this.defaultGeneratorRoot())!, "templates");
     if (await getFs().exists(path)) return path;
   }
 
   static baseRoot(): string {
-    return decodeURIComponent(new URL(".", import.meta.url).pathname);
+    return File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
   }
 
   cwd: string;
@@ -157,9 +160,9 @@ export abstract class GeneratorBase implements GeneratorActionsState {
 
   _sourcePaths?: string[];
 
-  relativeToOriginalDestinationRoot = ThorActions.relativeToOriginalDestinationRoot;
-  sourcePaths = ThorActions.sourcePaths;
-  findInSourcePaths = ThorActions.findInSourcePaths;
+  declare relativeToOriginalDestinationRoot: typeof ThorActions.relativeToOriginalDestinationRoot;
+  declare sourcePaths: typeof ThorActions.sourcePaths;
+  declare findInSourcePaths: typeof ThorActions.findInSourcePaths;
 
   log = Actions.log;
   generate = Actions.generate;
