@@ -29,6 +29,7 @@ import {
   type RackResponse,
 } from "@blazetrails/rack";
 import { withRoutesHelpers } from "../abstract-controller/trailties/routes-helpers.js";
+import { ActionDispatch } from "../namespaces.js";
 import { API } from "../action-controller/api.js";
 import { Base } from "../action-controller/base.js";
 import { Metal } from "../action-controller/metal.js";
@@ -97,8 +98,10 @@ SharedRoutes.defineMethod("beforeSetup", function (this: { routes?: RouteSet }):
       r.get(":controller(/:action)");
     });
   });
-  return SharedRoutes.superMethod(this, "beforeSetup")!();
+  return SharedRoutes.superMethod(this, "beforeSetup")?.();
 });
+
+Object.assign(ActionDispatch, { SharedRoutes });
 
 class Config {
   middleware: MiddlewareStack;

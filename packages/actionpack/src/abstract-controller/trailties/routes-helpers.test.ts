@@ -170,4 +170,21 @@ describe("withRoutesHelpers", () => {
 
     expect((new cls() as unknown as { helper(): string }).helper()).toBe("lower");
   });
+
+  it("crosses a named route drawn after the first helper read", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("posts", { to: "posts#index", as: "posts" });
+    });
+    const cls = class {};
+    withRoutesHelpers(routes)(cls as unknown as RoutesHelpersControllerClass);
+    const instance = new cls() as unknown as { postsPath?: unknown; commentsPath?: unknown };
+    expect(typeof instance.postsPath).toBe("function");
+
+    routes.draw((r) => {
+      r.get("comments", { to: "comments#index", as: "comments" });
+    });
+
+    expect(typeof instance.commentsPath).toBe("function");
+  });
 });
