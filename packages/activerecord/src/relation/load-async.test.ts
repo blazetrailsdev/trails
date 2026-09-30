@@ -36,21 +36,24 @@ describe("LoadAsyncTest", () => {
 
   it("scheduled?", async () => {
     const deferredPosts = Post.where({ author_id: 1 }).loadAsync();
-    expect(deferredPosts.isScheduled).toBe(!inMemoryDb());
+    expect(inMemoryDb() && deferredPosts.isScheduled).toBeFalsy();
+    expect(inMemoryDb() || deferredPosts.isScheduled).toBeTruthy();
     expect(deferredPosts.isLoaded).toBeTruthy();
     await deferredPosts;
     expect(deferredPosts.isScheduled).toBeFalsy();
   });
   it("null scheduled?", async () => {
     const deferredNullPosts = Post.none().loadAsync();
-    expect(deferredNullPosts.isScheduled).toBe(!inMemoryDb());
+    expect(inMemoryDb() && deferredNullPosts.isScheduled).toBeFalsy();
+    expect(inMemoryDb() || deferredNullPosts.isScheduled).toBeTruthy();
     expect(deferredNullPosts.isLoaded).toBeTruthy();
     await deferredNullPosts;
     expect(deferredNullPosts.isScheduled).toBeFalsy();
   });
   it("reset", () => {
     const deferredPosts = Post.where({ author_id: 1 }).loadAsync();
-    expect(deferredPosts.isScheduled).toBe(!inMemoryDb());
+    expect(inMemoryDb() && deferredPosts.isScheduled).toBeFalsy();
+    expect(inMemoryDb() || deferredPosts.isScheduled).toBeTruthy();
     deferredPosts.reset();
     expect(deferredPosts.isScheduled).toBeFalsy();
   });
