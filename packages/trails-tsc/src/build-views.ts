@@ -371,41 +371,87 @@ function layoutOf(
 function exposedHelperMethods(checker: ts.TypeChecker, klass: ts.ClassDeclaration): string[] {
   const names: string[] = [];
   const scanned = new Set<ts.Node>();
-  const scan = (declaration: ts.Node): void => {
-    if (scanned.has(declaration)) return;
-    scanned.add(declaration);
-    const visit = (node: ts.Node): void => {
-      if (ts.isCallExpression(node)) {
-        const callee = node.expression;
-        const name = ts.isPropertyAccessExpression(callee)
-          ? callee.name.text
-          : ts.isIdentifier(callee)
-            ? callee.text
-            : "";
-        if (name === "helperMethod") {
-          const flatten = (arg: ts.Expression): void => {
-            if (ts.isStringLiteral(arg)) names.push(arg.text);
-            else if (ts.isArrayLiteralExpression(arg)) arg.elements.forEach(flatten);
-          };
-          node.arguments.forEach(flatten);
-        } else if (name === "include") {
-          for (const arg of node.arguments.slice(1)) {
-            const included = sourceDeclaration(checker, arg);
-            if (included) scan(included);
-          }
+  const macro = (node: ts.Node, isSelf: (receiver?: ts.Expression) => boolean): void => {
+    if (ts.isFunctionLike(node)) return;
+    if (ts.isCallExpression(node)) {
+      const callee = node.expression;
+      const [receiver, name] = ts.isPropertyAccessExpression(callee)
+        ? [callee.expression, callee.name.text]
+        : [undefined, ts.isIdentifier(callee) ? callee.text : ""];
+      if (name === "helperMethod" && isSelf(receiver)) {
+        const flatten = (arg: ts.Expression): void => {
+          if (ts.isStringLiteral(arg)) names.push(arg.text);
+          else if (ts.isArrayLiteralExpression(arg)) arg.elements.forEach(flatten);
+        };
+        node.arguments.forEach(flatten);
+      } else if (name === "include" && isSelf(node.arguments[0])) {
+        for (const arg of node.arguments.slice(1)) {
+          const included = sourceDeclaration(checker, arg);
+          if (included) scanModule(included);
         }
       }
-      ts.forEachChild(node, visit);
+    }
+    ts.forEachChild(node, (child) => macro(child, isSelf));
+  };
+  const resolvesTo =
+    (declaration: ts.Node, thisIsSelf: boolean) =>
+    (receiver?: ts.Expression): boolean =>
+      receiver !== undefined &&
+      ((thisIsSelf && receiver.kind === ts.SyntaxKind.ThisKeyword) ||
+        sourceDeclaration(checker, receiver) === declaration);
+  const isIncludedHook = (name: ts.PropertyName): boolean =>
+    (ts.isIdentifier(name) && name.text === "included") ||
+    (ts.isComputedPropertyName(name) &&
+      ts.isIdentifier(name.expression) &&
+      name.expression.text === "included");
+  const scanModule = (declaration: ts.Node): void => {
+    if (scanned.has(declaration)) return;
+    scanned.add(declaration);
+    const findHook = (node: ts.Node): void => {
+      if (
+        (ts.isMethodDeclaration(node) || ts.isPropertyAssignment(node)) &&
+        isIncludedHook(node.name)
+      ) {
+        const hook = ts.isPropertyAssignment(node) ? node.initializer : node;
+        const base =
+          (ts.isMethodDeclaration(hook) ||
+            ts.isArrowFunction(hook) ||
+            ts.isFunctionExpression(hook)) &&
+          hook.parameters[0];
+        if (base && hook.body) macro(hook.body, resolvesTo(base, false));
+        return;
+      }
+      if (ts.isFunctionLike(node)) return;
+      ts.forEachChild(node, findHook);
     };
-    visit(declaration);
-    if (!ts.isClassDeclaration(declaration)) return;
+    findHook(declaration);
+  };
+  const scanClass = (declaration: ts.ClassDeclaration): void => {
+    if (scanned.has(declaration)) return;
+    scanned.add(declaration);
+    const inClass = resolvesTo(declaration, true);
+    for (const member of declaration.members) {
+      if (ts.isClassStaticBlockDeclaration(member)) {
+        macro(member.body, inClass);
+      } else if (
+        ts.isPropertyDeclaration(member) &&
+        member.initializer &&
+        ts.getCombinedModifierFlags(member) & ts.ModifierFlags.Static
+      ) {
+        macro(member.initializer, inClass);
+      }
+    }
+    const atTopLevel = resolvesTo(declaration, false);
+    for (const statement of declaration.getSourceFile().statements) {
+      if (ts.isExpressionStatement(statement)) macro(statement, atTopLevel);
+    }
     const superclass = declaration.heritageClauses?.find(
       (h) => h.token === ts.SyntaxKind.ExtendsKeyword,
     )?.types[0];
     const parent = superclass && sourceDeclaration(checker, superclass.expression);
-    if (parent && ts.isClassDeclaration(parent)) scan(parent);
+    if (parent && ts.isClassDeclaration(parent)) scanClass(parent);
   };
-  scan(klass);
+  scanClass(klass);
   return names;
 }
 

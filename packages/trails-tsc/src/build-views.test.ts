@@ -356,6 +356,80 @@ describe("runCli", () => {
     expect(notCollection).toContain("type ObjectLocals = {};");
   }, 30_000);
 
+  it("exposes helperMethod names only from class-level macro positions", () => {
+    const cwd = mkScratch();
+    write(
+      cwd,
+      "app/controllers/posts-controller.ts",
+      [
+        'import { Tracking } from "./concerns/tracking.js";',
+        "function include(..._modules: unknown[]): void {}",
+        'import { ApplicationController } from "./application-controller.js";',
+        "const other = { helperMethod(..._names: string[]): void {} };",
+        "export class PostsController extends ApplicationController {",
+        '  static exposed = PostsController.helperMethod("field");',
+        '  static { this.helperMethod("own"); include(this, Tracking); other.helperMethod("foreign"); }',
+        '  run(): void { PostsController.helperMethod("hidden"); }',
+        '  private hidden(): string { return ""; }',
+        '  private foreign(): string { return ""; }',
+        "  private late(): number { return 1; }",
+        "  private field(): boolean { return true; }",
+        "  private tracked(): symbol { return Symbol(); }",
+        "  private own(): bigint { return 1n; }",
+        "  private nested(): null { return null; }",
+        "  private inherited(): undefined { return undefined; }",
+        "  static helperMethod(..._names: string[]): void {}",
+        "}",
+        'PostsController.helperMethod("late");',
+      ].join("\n"),
+    );
+    write(
+      cwd,
+      "app/controllers/concerns/tracking.ts",
+      [
+        'import { Nested } from "./nested.js";',
+        "function include(..._modules: unknown[]): void {}",
+        "export const Tracking = {",
+        "  included(base: { helperMethod(n: string): void }) {",
+        '    base.helperMethod("tracked");',
+        "    include(base, Nested);",
+        "  },",
+        "};",
+      ].join("\n"),
+    );
+    write(
+      cwd,
+      "app/controllers/concerns/nested.ts",
+      [
+        "const included = Symbol();",
+        "export const Nested = {",
+        '  [included]: (base: { helperMethod(n: string): void }) => base.helperMethod("nested"),',
+        "};",
+      ].join("\n"),
+    );
+    write(
+      cwd,
+      "app/controllers/application-controller.ts",
+      [
+        "export class ApplicationController {",
+        "  static helperMethod(..._names: string[]): void {}",
+        "}",
+        'ApplicationController.helperMethod("inherited");',
+      ].join("\n"),
+    );
+    write(cwd, "app/views/posts/index.html.tse", "hi");
+    buildViews({ cwd });
+    const shim = fs.readFileSync(path.join(cwd, ".trails/views/posts/index.html.tse.ts"), "utf8");
+    expect(shim).toContain('"late": () => number');
+    expect(shim).toContain('"field": () => boolean');
+    expect(shim).toContain('"tracked": () => symbol');
+    expect(shim).toContain('"own": () => bigint');
+    expect(shim).toContain('"nested": () => null');
+    expect(shim).toContain('"inherited": () => undefined');
+    expect(shim).not.toContain('"hidden"');
+    expect(shim).not.toContain('"foreign"');
+  }, 30_000);
+
   it("writes a source map pointing each shim line at its .tse line", () => {
     const cwd = mkScratch();
     write(cwd, "app/views/posts/show.html.tse", "<div>\n  <p>\n    <%= readingTime(1) %>\n</div>");
