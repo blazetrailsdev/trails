@@ -18,11 +18,6 @@ export interface TableKlass {
   typeCaster?(): unknown;
 }
 
-interface TypeCaster {
-  typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown;
-  typeForAttribute(name: string | Node | null): unknown;
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Table {
   static get engine(): ArelEngine | null {
@@ -45,7 +40,9 @@ export class Table {
     const as = options?.as ?? null;
     this.tableAlias = as === name ? null : as;
     this.klass = options?.klass;
-    this.typeCaster = options?.typeCaster ?? options?.klass?.typeCaster?.() ?? null;
+    this.typeCaster = (options?.typeCaster ??
+      options?.klass?.typeCaster?.() ??
+      null) as Table["typeCaster"];
   }
 
   alias(name?: string): TableAlias {
@@ -123,13 +120,16 @@ export class Table {
   }
 
   typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown {
-    return (this.typeCaster as TypeCaster).typeCastForDatabase(attrName, value);
+    return this.typeCaster!.typeCastForDatabase(attrName, value);
   }
 
-  private readonly typeCaster: unknown;
+  private readonly typeCaster: {
+    typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown;
+    typeForAttribute(name: string | Node | null): unknown;
+  } | null;
 
   typeForAttribute(name: string | Node | null): unknown {
-    return (this.typeCaster as TypeCaster).typeForAttribute(name);
+    return this.typeCaster!.typeForAttribute(name);
   }
 
   isAbleToTypeCast(): boolean {
