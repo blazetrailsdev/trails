@@ -269,6 +269,7 @@ export class MimeType {
     return EXTENSION_LOOKUP.get(ext);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE delete-invented-mime-type-all */
   static all(): MimeType[] {
     return MimeType.SET.select(() => true);
   }
