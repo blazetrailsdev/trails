@@ -1,6 +1,7 @@
 import { ArgumentError } from "./argument-error.js";
 import { rbObjAsString } from "./object.js";
 import { RuntimeError } from "./runtime-error.js";
+import { TypeError } from "./type-error.js";
 import { getCrypto } from "./crypto-adapter.js";
 import { File } from "./file.js";
 import { getFs } from "./fs-adapter.js";
@@ -157,7 +158,7 @@ export class Dir {
 
   /**
    * `vendor/ruby/v3.3.11/dir.c:1172` `dir_s_chdir` — `HOME`, then `LOGDIR`,
-   * when no path is given — and `chdir_path` (`dir.c:1080-1107`): given a
+   * when no path is given, and `rb_get_path`'s `TypeError` for a given `nil` — and `chdir_path` (`dir.c:1080-1107`): given a
    * block, changes into `path`, yields it, and restores the previous directory
    * in `rb_ensure`'s `chdir_restore` (`dir.c:1066-1076`), answering the
    * block's value; without one, changes directory and answers `0`.
@@ -170,10 +171,12 @@ export class Dir {
    * @noRailsEquivalent PERMANENT — Ruby core `Dir.chdir`
    * (`vendor/ruby/v3.3.11/dir.c:1172`).
    */
-  static chdir(path?: string | null): number;
-  static chdir<T>(path: string | null | undefined, block: (path: string) => T): T;
+  static chdir(path?: string): number;
+  static chdir<T>(path: string | undefined, block: (path: string) => T): T;
   static chdir<T>(path?: string | null, block?: (path: string) => T): number | T {
-    if (path == null) {
+    if (path !== undefined) {
+      if (path === null) throw new TypeError("no implicit conversion of nil into String");
+    } else {
       const dist = env["HOME"] ?? env["LOGDIR"];
       if (dist == null) throw new ArgumentError("HOME/LOGDIR not set");
       path = dist;

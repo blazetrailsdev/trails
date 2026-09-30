@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { Errno, SystemCallError } from "./errno.js";
 import { RUBY_PLATFORM } from "./ruby-platform.js";
 import {
   __INTERNAL_resetProcessAdapter_TEST_ONLY,
@@ -192,18 +193,22 @@ describe("processAdapter", () => {
 
   describe("stdin.gets / stdin.noecho", () => {
     function registerFakeStdin(chunks: (string | null)[], isTTY = false) {
-      const modes: boolean[] = [];
-      let isRaw = false;
+      const modes: string[] = [];
+      let mode = "echo";
       const adapter = makeFakeAdapter();
       Object.defineProperty(adapter, "stdin", {
         value: {
           isTTY,
-          get isRaw() {
-            return isRaw;
+          getattr: () => (isTTY ? mode : null),
+          setattr: (t: string) => {
+            mode = t;
+            modes.push(t);
+            return true;
           },
-          setRawMode: (mode: boolean) => {
-            isRaw = mode;
+          setNoecho: () => {
+            mode = "-echo";
             modes.push(mode);
+            return true;
           },
           read: () => Promise.resolve(chunks.length > 0 ? chunks.shift()! : null),
         },
@@ -238,12 +243,12 @@ describe("processAdapter", () => {
       await expect(stdin.read()).resolves.toBe("b");
     });
 
-    it("noecho turns echo off for an async block and restores it after it settles", async () => {
+    it("noecho turns only echo off for an async block and restores it after it settles", async () => {
       const modes = registerFakeStdin(["secret\n"], true);
       const answer = stdin.noecho((io) => io.gets());
-      expect(modes).toEqual([true]);
+      expect(modes).toEqual(["-echo"]);
       await expect(answer).resolves.toBe("secret\n");
-      expect(modes).toEqual([true, false]);
+      expect(modes).toEqual(["-echo", "echo"]);
     });
 
     it("noecho restores the saved mode when the block rejects", async () => {
@@ -254,14 +259,20 @@ describe("processAdapter", () => {
           throw new Error("boom");
         }),
       ).rejects.toThrow("boom");
-      expect(modes).toEqual([true, false]);
+      expect(modes).toEqual(["-echo", "echo"]);
     });
 
     it("noecho raises ENOTTY off a terminal", () => {
       registerFakeStdin([], false);
-      expect(() => stdin.noecho(() => null)).toThrow(
-        expect.objectContaining({ code: "ENOTTY", message: "Inappropriate ioctl for device" }),
-      );
+      let error: unknown;
+      try {
+        stdin.noecho(() => null);
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(Errno.ENOTTY);
+      expect(error).toBeInstanceOf(SystemCallError);
+      expect(error).toMatchObject({ message: "Inappropriate ioctl for device", errno: 25 });
     });
   });
 

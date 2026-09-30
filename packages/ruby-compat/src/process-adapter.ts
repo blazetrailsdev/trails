@@ -1,3 +1,5 @@
+import { Errno } from "./errno.js";
+
 export interface WriteStream {
   write(chunk: string): boolean;
   readonly isTTY: boolean;
@@ -8,8 +10,9 @@ export interface WriteStream {
 export interface ReadStream {
   readonly isTTY: boolean;
   read(): Promise<string | null>;
-  readonly isRaw?: boolean;
-  setRawMode?(mode: boolean): void;
+  getattr?(): string | null;
+  setattr?(t: string): boolean;
+  setNoecho?(): boolean;
 }
 
 export type SignalName = "SIGINT" | "SIGTERM";
@@ -88,17 +91,6 @@ export const stderr: WriteStream = {
 
 let stdinBuffer = "";
 
-/**
- * `Errno::ENOTTY` (`vendor/ruby/v3.3.11/ext/io/console/console.c:378`
- * `rb_syserr_fail`), which `ttymode` raises when no descriptor of the IO is a
- * terminal.
- */
-function errnoEnotty(): Error & { code?: string } {
-  const error: Error & { code?: string } = new Error("Inappropriate ioctl for device");
-  error.code = "ENOTTY";
-  return error;
-}
-
 /** @noRailsEquivalent PERMANENT */
 export const stdin: ReadStream & {
   gets(): Promise<string | null>;
@@ -121,7 +113,10 @@ export const stdin: ReadStream & {
    * `IO#gets` (`vendor/ruby/v3.3.11/io.c:4363` `rb_io_gets_m`) with the default
    * `$/`: the next line with its `"\n"`, the unterminated rest at end of
    * file, then `nil`. Asynchronous, because a stdin read is. What the adapter
-   * delivered past the line is kept for the next read.
+   * delivered past the line is kept for the next read. `rb_io_getline`'s
+   * separator, limit and `chomp:` forms are not ported: Thor's bare `gets`
+   * is the only call site (ruby-compat's rule 1, "only what trails actually
+   * calls").
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#gets`, which Thor calls on
    * `$stdin` (`vendor/thor/v1.3.2/lib/thor/line_editor/basic.rb:25`).
@@ -147,22 +142,23 @@ export const stdin: ReadStream & {
   /**
    * `IO#noecho` (`vendor/ruby/v3.3.11/ext/io/console/console.c:633`
    * `console_noecho`): `ttymode` (`console.c:334-383`) saves the terminal
-   * mode, turns echo off, yields the IO, and sets the saved mode back —
-   * after a returned promise settles, since a block that awaits a read has
-   * not finished when it returns. A JS host turns echo off only with raw
-   * mode, so that is the switch (and raw mode also drops the terminal's
-   * `ICRNL`, which the Node adapter puts back by reading `"\r"` as `"\n"`); a stream that is not a terminal raises
-   * `Errno::ENOTTY`, as `ttymode` does.
+   * mode with `getattr`, clears only the echo flags with `set_noecho`
+   * (`console.c:283-291`), yields the IO, and `setattr`s the saved mode
+   * back — after a returned promise settles, since a block that awaits a
+   * read has not finished when it returns. A stream whose mode cannot be read
+   * or set raises `Errno::ENOTTY`, as `ttymode`'s `rb_syserr_fail`
+   * (`console.c:378`) does.
    *
    * @noRailsEquivalent PERMANENT — `io/console`'s `IO#noecho`, which Thor
    * calls on `$stdin` (`vendor/thor/v1.3.2/lib/thor/line_editor/basic.rb:29`).
    */
   noecho<T>(block: (io: typeof stdin) => T): T {
     const io = requireAdapter().stdin;
-    if (!io.isTTY || io.setRawMode == null) throw errnoEnotty();
-    const t = io.isRaw ?? false;
-    io.setRawMode(true);
-    const setattr = (): void => io.setRawMode!(t);
+    const t = io.getattr?.() ?? null;
+    if (t == null || io.setNoecho?.() !== true) throw new Errno.ENOTTY();
+    const setattr = (): void => {
+      io.setattr!(t);
+    };
     let result: T;
     try {
       result = block(stdin);
@@ -266,8 +262,6 @@ interface NodeStream {
   rows?: number;
   readableEnded?: boolean;
   destroyed?: boolean;
-  isRaw?: boolean;
-  setRawMode?(mode: boolean): void;
   pause?(): void;
   once(event: string, handler: (...args: unknown[]) => void): void;
   off(event: string, handler: (...args: unknown[]) => void): void;
@@ -288,6 +282,7 @@ interface NodeProcessLike {
   stdout: NodeStream;
   stderr: NodeStream;
   stdin: NodeStream;
+  getBuiltinModule?(id: string): unknown;
 }
 
 let nodeAttempted = false;
@@ -302,6 +297,33 @@ function tryAutoRegisterNode(): boolean {
   nodeAutoRegistered = adapter;
   registerProcessAdapter(adapter);
   return true;
+}
+
+/**
+ * `getattr` / `setattr` / `set_noecho` (`vendor/ruby/v3.3.11/ext/io/console/console.c:252-291`)
+ * on the terminal behind fd 0. Node exposes termios only through
+ * `setRawMode`, which also clears `ICANON`, `ISIG` and `ICRNL` where
+ * `set_noecho` clears echo alone, so the flags go through `stty(1)`, whose
+ * `-g` form is the saved `conmode`. Answers `null` when stdin is not a
+ * terminal or `stty` fails.
+ */
+function stty(proc: NodeProcessLike, args: string[]): string | null {
+  if (!proc.stdin.isTTY) return null;
+  const childProcess = proc.getBuiltinModule?.("node:child_process") as
+    | {
+        spawnSync(
+          cmd: string,
+          args: string[],
+          opts: unknown,
+        ): { status: number | null; stdout: unknown };
+      }
+    | undefined;
+  if (childProcess == null) return null;
+  const result = childProcess.spawnSync("stty", args, {
+    stdio: [0, "pipe", "ignore"],
+    encoding: "utf8",
+  });
+  return result.status === 0 ? String(result.stdout).trim() : null;
 }
 
 function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
@@ -354,12 +376,9 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
       get isTTY() {
         return Boolean(proc.stdin.isTTY);
       },
-      get isRaw() {
-        return Boolean(proc.stdin.isRaw);
-      },
-      setRawMode: (mode) => {
-        proc.stdin.setRawMode?.(mode);
-      },
+      getattr: () => stty(proc, ["-g"]),
+      setattr: (t) => stty(proc, [t]) !== null,
+      setNoecho: () => stty(proc, ["-echo", "-echoe", "-echok", "-echonl"]) !== null,
       read: () =>
         new Promise<string | null>((resolve, reject) => {
           if (proc.stdin.readableEnded || proc.stdin.destroyed) {
@@ -369,13 +388,13 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
           const onData = (...args: unknown[]) => {
             cleanup();
             const data = args[0];
-            const text =
+            resolve(
               typeof data === "string"
                 ? data
                 : data && typeof (data as { toString(): string }).toString === "function"
                   ? (data as { toString(): string }).toString()
-                  : null;
-            resolve(text != null && proc.stdin.isRaw ? text.replace(/\r\n?/g, "\n") : text);
+                  : null,
+            );
           };
           const onTerminal = () => {
             cleanup();

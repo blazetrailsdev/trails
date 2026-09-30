@@ -4,6 +4,7 @@ import * as nodeOs from "node:os";
 import * as nodePath from "node:path";
 import { ArgumentError } from "./argument-error.js";
 import { Dir } from "./dir.js";
+import { TypeError } from "./type-error.js";
 import { FileUtils } from "./file-utils.js";
 import { fsAdapterConfig, getFs, getPath, registerFsAdapter } from "./fs-adapter.js";
 
@@ -506,6 +507,20 @@ describe("FileUtils", () => {
     await result;
 
     expect(lines).toEqual([`cd ${root}`, "block", "cd -"]);
+  });
+
+  it("cd takes a block with no options", () => {
+    const start = Dir.pwd();
+    const dir = nodeFs.realpathSync(root);
+
+    expect(FileUtils.cd(dir, () => Dir.pwd())).toBe(dir);
+    expect(Dir.pwd()).toBe(start);
+  });
+
+  it("Dir.chdir raises TypeError for a given nil", () => {
+    expect(() => Dir.chdir(null as unknown as string)).toThrow(
+      new TypeError("no implicit conversion of nil into String"),
+    );
   });
 
   it("chdir is an alias for cd", () => {

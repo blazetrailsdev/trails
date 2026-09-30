@@ -547,16 +547,19 @@ export class FileUtils {
    * settles; `cd -` is printed at that point too.
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
-  static cd(dir: string, options?: { verbose?: boolean }): number;
-  static cd<T>(dir: string, options: { verbose?: boolean }, block: (dir: string) => T): T;
+  static cd(dir: string, options?: { verbose?: boolean | null }): number;
+  static cd<T>(dir: string, block: (dir: string) => T): T;
+  static cd<T>(dir: string, options: { verbose?: boolean | null }, block: (dir: string) => T): T;
   static cd<T>(
     dir: string,
-    { verbose }: { verbose?: boolean } = {},
+    options: { verbose?: boolean | null } | ((dir: string) => T) = {},
     block?: (dir: string) => T,
   ): number | T {
-    if (verbose === true) fuOutputMessage(`cd ${dir}`);
+    if (typeof options === "function") [options, block] = [{}, options];
+    const { verbose } = options;
+    if (verbose != null && verbose !== false) fuOutputMessage(`cd ${dir}`);
     const result = block != null ? Dir.chdir(dir, block) : Dir.chdir(dir);
-    if (verbose === true && block != null) {
+    if (verbose != null && verbose !== false && block != null) {
       if (result != null && typeof (result as { then?: unknown }).then === "function") {
         return Promise.resolve(result).then((value) => {
           fuOutputMessage("cd -");
