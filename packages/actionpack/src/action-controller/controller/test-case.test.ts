@@ -74,6 +74,10 @@ class PostsController extends Base {
     await this.render({ plain: "ok" });
   }
 
+  async xhrFlag() {
+    await this.render({ json: { xhr: this.request.isXmlHttpRequest } });
+  }
+
   async flashAlert() {
     this.flash.set("alert", "Danger!");
     await this.render({ plain: "ok" });
@@ -133,8 +137,8 @@ describe("TestCaseTest", () => {
     });
 
     it("sets XHR flag", async () => {
-      await tc.get("index", { xhr: true });
-      expect(tc.request.isXmlHttpRequest).toBe(true);
+      await tc.get("xhrFlag", { xhr: true });
+      expect(JSON.parse(tc.responseBody).xhr).toBe(true);
     });
 
     it("passes session data", async () => {
@@ -334,10 +338,11 @@ describe("TestCaseTest", () => {
   describe("reset", () => {
     it("clears controller, request, response", async () => {
       await tc.get("index");
+      const { request, response } = tc;
       tc.reset();
       expect(tc.controller).toBeUndefined();
-      expect(tc.request).toBeUndefined();
-      expect(tc.response).toBeUndefined();
+      expect(tc.request).not.toBe(request);
+      expect(tc.response).not.toBe(response);
     });
   });
 
@@ -627,11 +632,16 @@ describe("TestCaseTest", () => {
     await tc.get("testRemoteAddr");
     expect(tc.responseBody).toBe("0.0.0.0");
 
-    await tc.get("testRemoteAddr", { env: { REMOTE_ADDR: "192.0.0.1" } });
+    tc.request.remoteAddr = "192.0.0.1";
+    await tc.get("testRemoteAddr");
     expect(tc.responseBody).toBe("192.0.0.1");
   });
 
-  it.skip("header properly reset after remote http request", async () => {});
+  it("header properly reset after remote http request", async () => {
+    await tc.get("testParams", { xhr: true });
+    expect(tc.request.env["HTTP_X_REQUESTED_WITH"]).toBeUndefined();
+    expect(tc.request.env["HTTP_ACCEPT"]).toBeUndefined();
+  });
 
   it("xhr with session", async () => {
     await tc.get("setSession", { xhr: true });

@@ -27,7 +27,6 @@ import {
   Utils as RackTestUtils,
 } from "@blazetrails/rack-test";
 import { Mime } from "../action-dispatch/http/mime-type.js";
-import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
@@ -184,7 +183,7 @@ export class TestCase {
 
   controller!: Metal;
 
-  request!: Request;
+  request!: TestRequest;
 
   response!: Response;
 
@@ -208,6 +207,13 @@ export class TestCase {
 
   constructor(controllerClass: ControllerClass) {
     this._controllerClass = controllerClass;
+    this.setupControllerRequestAndResponse();
+  }
+
+  setupControllerRequestAndResponse(): void {
+    this.request = TestRequest.create(this._controllerClass);
+    this.response = this.buildResponse();
+    this.response.request = this.request;
   }
 
   async get(action: string, options: RequestOptions = {}): Promise<void> {
@@ -289,8 +295,7 @@ export class TestCase {
   reset(): void {
     this.session = {};
     this.controller = undefined!;
-    this.request = undefined!;
-    this.response = undefined!;
+    this.setupControllerRequestAndResponse();
   }
 
   async process(action: string, options: RequestOptions = {}): Promise<void> {
@@ -300,73 +305,60 @@ export class TestCase {
       session,
       body,
       flash,
-      format,
       xhr = false,
       as,
       env: extraEnv = {},
       headers,
     } = options;
+    let { format } = options;
 
     const httpMethod = String(method).toUpperCase();
 
-    const env: Record<string, unknown> = {
-      ...TestRequest.defaultEnv(),
-      REQUEST_METHOD: httpMethod,
-      PATH_INFO: (params as Record<string, unknown>)?.["path"] ?? `/${action}`,
-      HTTP_HOST: "test.host",
-      SERVER_NAME: "test.host",
-      SERVER_PORT: "80",
-      "rack.session": new TestSession({ ...this.session, ...(session ?? {}) }),
-      ...extraEnv,
-    };
+    this.controller = new this._controllerClass();
 
-    if (as) env["CONTENT_TYPE"] = formatToMime(as);
+    this.request = new TestRequest(
+      this.scrubEnvBang(this.request.env),
+      new TestSession({ ...this.session }),
+      this._controllerClass,
+    );
+    this.response = this.buildResponse();
+    this.response.request = this.request;
 
+    if (body) {
+      this.request.setHeader("RAW_POST_DATA", body);
+    }
+
+    this.request.setHeader("REQUEST_METHOD", httpMethod);
+
+    if (as) {
+      this.request.contentType = formatToMime(as);
+      format ??= as;
+    }
+
+    const parameters: Record<string, unknown> = { ...(params ?? {}) };
+
+    if (format) {
+      parameters["format"] = format;
+    }
+
+    for (const [key, value] of Object.entries(extraEnv)) this.request.setHeader(key, value);
     if (headers) {
       for (const [name, value] of Object.entries(headers)) {
         const envKey = name.startsWith("HTTP_")
           ? name
           : "HTTP_" + name.toUpperCase().replace(/-/g, "_");
-        env[envKey] = value;
+        this.request.setHeader(envKey, value);
       }
     }
 
-    if (body) {
-      env["RAW_POST_DATA"] = body;
-      env["rack.input"] = new StringIO(body);
-    }
-
-    if (xhr) {
-      env["HTTP_X_REQUESTED_WITH"] = "XMLHttpRequest";
-      env["HTTP_ACCEPT"] ??= [
-        Mime.get("js"),
-        Mime.get("html"),
-        Mime.get("xml"),
-        "text/xml",
-        "*/*",
-      ].join(", ");
-    }
-
-    this.request = new Request(env);
-    this.response = this.buildResponse();
-    this.response.request = this.request;
-
-    const parameters: Record<string, unknown> = { ...(params ?? {}) };
-    const resolvedFormat = format ?? as;
-    if (resolvedFormat) parameters["format"] = resolvedFormat;
-    if (params || resolvedFormat) (this.request as any).parameters = parameters;
-
-    this.controller = new this._controllerClass();
-
-    (this.request as any).env["action_dispatch.request.path_parameters"] = {
-      controller: (
-        this._controllerClass as unknown as typeof import("./metal.js").Metal
-      ).controllerPath(),
+    this.setupRequest(
+      (this._controllerClass as unknown as typeof import("./metal.js").Metal).controllerPath(),
       action,
-    };
-
-    this.request.flash!.update(flash ?? {});
-
+      parameters,
+      session,
+      flash,
+      xhr,
+    );
     await this.processControllerResponse(action, xhr);
   }
 
@@ -390,12 +382,48 @@ export class TestCase {
     return fn();
   }
   /** @internal */
-  private async processControllerResponse(action: string, _xhr: boolean): Promise<void> {
+  private setupRequest(
+    controllerClassName: string,
+    action: string,
+    parameters: Record<string, unknown>,
+    session: Record<string, unknown> | undefined,
+    flash: Record<string, string> | undefined,
+    xhr: boolean,
+  ): void {
+    this.request.setHeader("PATH_INFO", parameters["path"] ?? `/${action}`);
+    if (Object.keys(parameters).length > 0) (this.request as any).parameters = parameters;
+    this.request.setHeader("action_dispatch.request.path_parameters", {
+      controller: controllerClassName,
+      action,
+    });
+
+    if (session) this.request.session.update(session);
+    this.request.flash!.update(flash ?? {});
+
+    if (xhr) {
+      this.request.setHeader("HTTP_X_REQUESTED_WITH", "XMLHttpRequest");
+      this.request.fetchHeader("HTTP_ACCEPT", (k) => {
+        this.request.setHeader(
+          k,
+          [Mime.get("js"), Mime.get("html"), Mime.get("xml"), "text/xml", "*/*"].join(", "),
+        );
+      });
+    }
+  }
+
+  /** @internal */
+  private async processControllerResponse(action: string, xhr: boolean): Promise<void> {
     try {
       await this.wrapExecution(() =>
         this.controller.dispatch(action, this.request, this.response).then(() => {}),
       );
     } finally {
+      if (xhr) {
+        this.request.deleteHeader("HTTP_X_REQUESTED_WITH");
+        this.request.deleteHeader("HTTP_ACCEPT");
+      }
+      this.request.queryString = "";
+
       for (const key of Object.keys(this.session)) delete this.session[key];
       Object.assign(this.session, (this.request.session as unknown as TestSession).toHash());
     }
