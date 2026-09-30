@@ -7,6 +7,7 @@ import {
   included,
   extended,
   rbObjClone,
+  rbObjDup,
   Module,
   initialize,
   initializeIncludedModules,
@@ -1074,6 +1075,50 @@ describe("rbObjClone", () => {
     expect(Object.getPrototypeOf(clone)).toBe(Object.getPrototypeOf(obj));
     expect(clone).toMatchObject({ ivar: 1, a });
     expect(Object.isFrozen(clone)).toBe(true);
+  });
+
+  it("dispatches initializeClone on the copy before freezing it", () => {
+    class Host {
+      inner = [1];
+      initializeClone(_orig: Host): void {
+        this.inner = [...this.inner];
+      }
+    }
+    const obj = Object.freeze(new Host());
+    const clone = rbObjClone(obj);
+    expect(clone.inner).not.toBe(obj.inner);
+    expect(Object.isFrozen(clone)).toBe(true);
+  });
+});
+
+describe("rbObjDup", () => {
+  it("copies ivars, drops singleton methods and frozen state, dispatches initializeDup", () => {
+    class Host {
+      ivar = 1;
+      origin: Host | null = null;
+      initializeDup(orig: Host): void {
+        this.origin = orig;
+      }
+    }
+    const obj = new Host();
+    extend(obj, { a: () => "a" });
+    const dup = rbObjDup(Object.freeze(obj));
+
+    expect(Object.getPrototypeOf(dup)).toBe(Host.prototype);
+    expect(dup.ivar).toBe(1);
+    expect(dup.origin).toBe(obj);
+    expect("a" in dup).toBe(false);
+    expect(Object.isFrozen(dup)).toBe(false);
+  });
+
+  it("falls back to initializeCopy", () => {
+    class Host {
+      copied = false;
+      initializeCopy(_orig: Host): void {
+        this.copied = true;
+      }
+    }
+    expect(rbObjDup(new Host()).copied).toBe(true);
   });
 });
 

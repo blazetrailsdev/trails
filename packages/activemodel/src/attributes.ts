@@ -7,6 +7,7 @@ import {
   included,
   prepend,
 } from "@blazetrails/activesupport";
+import { rbObjClone } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
@@ -115,11 +116,7 @@ export function setDefineMethodAttribute(
 
 export function freeze<T>(this: AttributeInstanceHost, super_: () => T): T {
   if (!Object.isFrozen(this)) {
-    const attributes = this._attributes;
-    const cloned = Object.create(Object.getPrototypeOf(attributes) as object) as AttributeSet;
-    Object.assign(cloned, attributes);
-    cloned.initializeClone(attributes);
-    this._attributes = cloned.freeze();
+    this._attributes = rbObjClone(this._attributes).freeze();
   }
   return super_();
 }

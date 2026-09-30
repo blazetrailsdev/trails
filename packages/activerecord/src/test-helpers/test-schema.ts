@@ -1062,10 +1062,10 @@ export const TEST_SCHEMA: Schema = {
     parrot_sti_class: "string",
     killer_id: "integer",
     updated_count: { type: "integer", default: 0 },
-    created_at: "datetime",
-    created_on: "datetime",
-    updated_at: "datetime",
-    updated_on: "datetime",
+    created_at: { type: "datetime", precision: 0 },
+    created_on: { type: "datetime", precision: 0 },
+    updated_at: { type: "datetime", precision: 0 },
+    updated_on: { type: "datetime", precision: 0 },
   },
 
   pirates: {

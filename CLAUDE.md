@@ -53,6 +53,11 @@ Rails name. There is almost always a way around:
   `@blazetrails/activesupport`, or `this`-typed functions assigned to the class
   (see "Module mixins" below), so the code still lives in the Rails file at the
   Rails name.
+- Ruby `obj.clone` / `obj.dup` → `rbObjClone(obj)` / `rbObjDup(obj)` from
+  `@blazetrails/ruby-compat` (MRI `rb_obj_clone` / `rb_obj_dup`): they copy
+  the ivars and dispatch the class's `initializeClone` / `initializeDup` (else
+  `initializeCopy`), ported at their Rails names. Never open-code the
+  `Object.create` + copy at a call site.
 - Ruby kwargs, blocks, and `method_missing` each have a settled trails idiom.
   Find it and use it; don't invent a new shape.
 

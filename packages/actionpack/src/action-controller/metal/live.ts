@@ -190,7 +190,7 @@ export async function process(
 ): Promise<void> {
   let error: unknown = undefined;
   let errorSet = false;
-  await newControllerThread.call(this, async () => {
+  await Live.newControllerThread.call(this, async () => {
     try {
       await runAction(name);
     } catch (e) {
@@ -199,9 +199,9 @@ export async function process(
         try {
           resp.stream.callOnError();
         } catch (inner) {
-          logError.call(this, inner);
+          Live.logError.call(this, inner);
         } finally {
-          logError.call(this, e);
+          Live.logError.call(this, e);
           try {
             resp.stream.close();
           } catch {
@@ -213,7 +213,7 @@ export async function process(
         errorSet = true;
       }
     } finally {
-      cleanUpThreadLocals.call(this, [], null);
+      Live.cleanUpThreadLocals.call(this, [], null);
       if (!this.response.committed) this.response.close();
     }
   });
@@ -280,9 +280,6 @@ export function cleanUpThreadLocals(
   _thread: unknown,
 ): void {}
 
-export const originalNewControllerThread = newControllerThread;
-export const originalCleanUpThreadLocals = cleanUpThreadLocals;
-
 interface LiveExecutor {
   post(fn: () => void | Promise<void>): Promise<void>;
 }
@@ -319,3 +316,12 @@ export function logError(this: { logger?: LoggerLike }, exception: unknown): voi
   const stack = err?.stack ?? "";
   logger.fatal(() => `\n${name} (${message}):\n  ${stack}\n\n`);
 }
+
+export const Live = {
+  process,
+  responseBody,
+  sendStream,
+  newControllerThread,
+  cleanUpThreadLocals,
+  logError,
+};

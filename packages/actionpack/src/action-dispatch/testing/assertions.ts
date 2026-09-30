@@ -1,15 +1,19 @@
-import { XML } from "@blazetrails/nokogiri";
+import { XML, type XmlDocument } from "@blazetrails/nokogiri";
 import * as response from "./assertions/response.js";
 import * as routing from "./assertions/routing.js";
 
-/** @internal */
-export function htmlDocument(body: string, mimeType?: string) {
-  const mediaType = mimeType?.split(";")[0].trim();
-  if (mediaType === undefined || mediaType.endsWith("xml")) {
-    return XML.Document.parse(body);
+export interface HtmlDocumentHost {
+  _htmlDocument?: XmlDocument;
+  response: { mediaType: string | undefined; body: string };
+}
+
+export function htmlDocument(this: HtmlDocumentHost): XmlDocument {
+  if (this._htmlDocument) return this._htmlDocument;
+  if (this.response.mediaType?.endsWith("xml")) {
+    return (this._htmlDocument = XML.Document.parse(this.response.body));
   }
   throw new Error(
-    `htmlDocument: HTML parsing (rails-dom-testing) is not yet implemented; got mime type "${mediaType}"`,
+    `htmlDocument: HTML parsing (rails-dom-testing) is not yet implemented; got mime type "${this.response.mediaType}"`,
   );
 }
 

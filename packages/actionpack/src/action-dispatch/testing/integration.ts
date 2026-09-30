@@ -30,7 +30,7 @@ import {
 } from "./test-process.js";
 import * as routingAssertions from "./assertions/routing.js";
 import * as responseAssertions from "./assertions/response.js";
-import { htmlDocument as parseHtmlDocument } from "./assertions.js";
+import { htmlDocument, type HtmlDocumentHost } from "./assertions.js";
 import type { XmlDocument } from "@blazetrails/nokogiri";
 import * as urlForMod from "../routing/url-for.js";
 import * as polymorphicRoutes from "../routing/polymorphic-routes.js";
@@ -377,11 +377,7 @@ export class IntegrationTest extends TestCase {
   }
 
   get htmlDocument(): XmlDocument {
-    if (!this._htmlDocument) {
-      const mimeType = this.response?.getHeader("content-type") ?? undefined;
-      this._htmlDocument = parseHtmlDocument(this.responseBody, mimeType);
-    }
-    return this._htmlDocument;
+    return htmlDocument.call(this as unknown as HtmlDocumentHost);
   }
 
   get documentRootElement() {

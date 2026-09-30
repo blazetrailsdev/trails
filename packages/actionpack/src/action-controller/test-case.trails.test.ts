@@ -2,7 +2,20 @@ import { describe, it, expect } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { b, StringIO } from "@blazetrails/ruby-compat";
 import { UploadedFile } from "@blazetrails/rack-test";
-import { TestCase, TestRequest, TestSession } from "./test-case.js";
+import {
+  TestCase,
+  TestRequest,
+  TestSession,
+  newControllerThread,
+  originalCleanUpThreadLocals,
+  originalNewControllerThread,
+} from "./test-case.js";
+import {
+  Buffer as LiveBuffer,
+  Live,
+  cleanUpThreadLocals as liveCleanUpThreadLocals,
+  newControllerThread as liveNewControllerThread,
+} from "./metal/live.js";
 import { Base } from "./base.js";
 import type { UploadedFile as HttpUploadedFile } from "../action-dispatch/http/upload.js";
 
@@ -72,5 +85,39 @@ describe("TestCase._controllerClass", () => {
     Base1.tests(PostsController);
     expect(Sub1.controllerClass).toBe(PostsController);
     expect(Sub1.is_controllerClass).toBe(true);
+  });
+});
+
+describe("ActionController::Live under test_case.rb", () => {
+  it("keeps the originals and runs the controller thread block inline", async () => {
+    expect(originalNewControllerThread).toBe(liveNewControllerThread);
+    expect(originalCleanUpThreadLocals).toBe(liveCleanUpThreadLocals);
+    expect(Live.newControllerThread).toBe(newControllerThread);
+    expect(LiveBuffer.queueSize).toBeNull();
+
+    const order: string[] = [];
+    const p = Live.newControllerThread.call({} as never, () => {
+      order.push("inside");
+    });
+    order.push("after-call");
+    await p;
+    expect(order).toEqual(["inside", "after-call"]);
+  });
+});
+
+describe("TestCase#document_root_element", () => {
+  class XmlController extends Base {
+    async index() {
+      await this.render({ xml: "<root><child/></root>" });
+    }
+  }
+
+  it("parses the response as XML and resets it on the next request", async () => {
+    const tc = new TestCase(XmlController);
+    await tc.get("index");
+    const first = tc.htmlDocument;
+    expect(tc["documentRootElement"].name).toBe("root");
+    await tc.get("index");
+    expect(tc.htmlDocument).not.toBe(first);
   });
 });
