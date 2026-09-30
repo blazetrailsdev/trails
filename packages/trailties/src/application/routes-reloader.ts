@@ -1,14 +1,14 @@
 import { FileUpdateChecker, runLoadHooks, TopLevel } from "@blazetrails/activesupport";
 import { getPath } from "@blazetrails/ruby-compat";
-import type { DrawCallback, Mapper } from "@blazetrails/actionpack";
 
 export interface RouteSetLike {
   disableClearAndFinalize?: boolean;
   clearBang(): void;
   finalizeBang(): void;
   eagerLoadBang(): void;
-  draw?(block: DrawCallback): void;
 }
+
+let loads = 0;
 
 export class RoutesReloader {
   paths: string[] = [];
@@ -73,9 +73,17 @@ export class RoutesReloader {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall call — PERMANENT
+   */
   private async loadPaths(): Promise<void> {
-    for (const path of this.paths) await loadRoutesFile.call(this, path);
+    const p = getPath();
+    for (const path of this.paths) {
+      const url = p.pathToFileURL!(path);
+      url.searchParams.set("load", String(++loads));
+      await import(url.href);
+    }
     await this.runAfterLoadPaths();
   }
 
@@ -90,21 +98,4 @@ export class RoutesReloader {
       routes.disableClearAndFinalize = false;
     }
   }
-}
-
-let loads = 0;
-
-async function loadRoutesFile(this: RoutesReloader, path: string): Promise<void> {
-  const p = getPath();
-  if (!p.pathToFileURL) {
-    throw new Error("PathAdapter.pathToFileURL() is required to load a routes file.");
-  }
-  const url = p.pathToFileURL(path);
-  url.searchParams.set("load", String(++loads));
-  const mod = (await import(url.href)) as {
-    drawRoutes?: (mapper: Mapper) => void;
-  };
-  const drawRoutes = mod.drawRoutes;
-  if (typeof drawRoutes !== "function") return;
-  for (const set of this.routeSets) set.draw?.((mapper) => drawRoutes(mapper));
 }

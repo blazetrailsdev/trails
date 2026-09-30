@@ -117,21 +117,21 @@ describe("TrailsActions", () => {
   });
 
   describe("route", () => {
-    const draw = `import type { Mapper } from "@blazetrails/actionpack";\n\nexport function drawRoutes(mapper: Mapper): void {\n`;
+    const draw = `import { Trails } from "@blazetrails/trailties";\n\nTrails.application!.routes().draw((mapper) => {\n`;
 
     it("injects code after the drawRoutes sentinel", async () => {
-      files.set("/app/config/routes.ts", `${draw}  mapper.get("up");\n}\n`);
+      files.set("/app/config/routes.ts", `${draw}  mapper.get("up");\n});\n`);
       await makeGen().route(`mapper.resources("posts");`);
       expect(files.get("/app/config/routes.ts")).toBe(
-        `${draw}  mapper.resources("posts");\n  mapper.get("up");\n}\n`,
+        `${draw}  mapper.resources("posts");\n  mapper.get("up");\n});\n`,
       );
     });
 
     it("does not inject code that is already present", async () => {
-      files.set("/app/config/routes.ts", `${draw}}\n`);
+      files.set("/app/config/routes.ts", `${draw}});\n`);
       await makeGen().route(`mapper.resources("posts");`);
       await makeGen().route(`mapper.resources("posts");`);
-      expect(files.get("/app/config/routes.ts")).toBe(`${draw}  mapper.resources("posts");\n}\n`);
+      expect(files.get("/app/config/routes.ts")).toBe(`${draw}  mapper.resources("posts");\n});\n`);
     });
 
     it("raises Thor's missing-file error unless pretending", async () => {
@@ -144,27 +144,27 @@ describe("TrailsActions", () => {
     });
 
     it("wraps code in the given namespaces", async () => {
-      files.set("/app/config/routes.ts", `${draw}}\n`);
+      files.set("/app/config/routes.ts", `${draw}});\n`);
       await makeGen().route(`mapper.resources("posts");`, { namespace: ["admin", "blog"] });
       expect(files.get("/app/config/routes.ts")).toBe(
-        `${draw}  mapper.namespace("admin", () => {\n    mapper.namespace("blog", () => {\n      mapper.resources("posts");\n    });\n  });\n}\n`,
+        `${draw}  mapper.namespace("admin", () => {\n    mapper.namespace("blog", () => {\n      mapper.resources("posts");\n    });\n  });\n});\n`,
       );
     });
 
     it("injects into an existing namespace block", async () => {
       files.set(
         "/app/config/routes.ts",
-        `${draw}  mapper.namespace("admin", () => {\n    mapper.resources("users");\n  });\n}\n`,
+        `${draw}  mapper.namespace("admin", () => {\n    mapper.resources("users");\n  });\n});\n`,
       );
       await makeGen().route(`mapper.resources("posts");`, { namespace: "admin" });
       expect(files.get("/app/config/routes.ts")).toBe(
-        `${draw}  mapper.namespace("admin", () => {\n    mapper.resources("posts");\n    mapper.resources("users");\n  });\n}\n`,
+        `${draw}  mapper.namespace("admin", () => {\n    mapper.resources("posts");\n    mapper.resources("users");\n  });\n});\n`,
       );
     });
 
     it("route with namespace option revokes route without breaking existing namespace blocks", async () => {
       const revoke = new TestGenerator({ cwd: "/app", output: () => {}, behavior: "revoke" });
-      files.set("/app/config/routes.ts", `${draw}}\n`);
+      files.set("/app/config/routes.ts", `${draw}});\n`);
       await makeGen().route(
         optimizeIndentation(
           `mapper.namespace("baz", () => {
@@ -192,7 +192,7 @@ describe("TrailsActions", () => {
     });
     mapper.get("bar1");
   });
-}\n`,
+});\n`,
       );
 
       await revoke.route(`mapper.get("foo3");`, { namespace: ["baz", "qux", "hoge"] });
@@ -201,7 +201,7 @@ describe("TrailsActions", () => {
     mapper.get("foo1");
     mapper.get("bar1");
   });
-}\n`,
+});\n`,
       );
     });
   });

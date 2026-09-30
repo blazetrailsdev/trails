@@ -1,6 +1,6 @@
-import type { Mapper } from "@blazetrails/actionpack";
+import { Trails } from "../../../rails.js";
 
-export function drawRoutes(mapper: Mapper): void {
+Trails.application!.routes().draw((mapper) => {
   mapper.get("/posts", { to: "posts#index", as: "posts" });
   mapper.post("/posts", { to: "posts#create" });
   mapper.get("/admin/sessions", { to: "admin/sessions#index" });
@@ -10,4 +10,4 @@ export function drawRoutes(mapper: Mapper): void {
   mapper.get("/posts/canonical", { to: "posts#canonical" });
   mapper.get("/boom", { to: "posts#boom" });
   mapper.get("up", { to: "rails/health#show", as: "rails_health_check" });
-}
+});
