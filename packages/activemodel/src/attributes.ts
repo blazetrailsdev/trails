@@ -34,14 +34,19 @@ export function constructor(
   super_();
 }
 
-export function attributes(attrs: AttributeSet): Record<string, unknown> {
-  return attrs.toHash();
+export function initializeDup(
+  this: AttributeInstanceHost,
+  super_: (other: unknown) => void,
+  other: unknown,
+): void {
+  this._attributes = this._attributes.deepDup();
+  super_(other);
 }
 
 export type AttributeInstanceHost = { _attributes: AttributeSet };
 
-export function attributeNames(this: { attributeTypes(): Record<string, ValueType> }): string[] {
-  return Object.keys(this.attributeTypes());
+export function attributes(attrs: AttributeSet): Record<string, unknown> {
+  return attrs.toHash();
 }
 
 /** @internal */
@@ -52,6 +57,10 @@ export interface AttributeOptions {
   scale?: number | null;
   array?: boolean;
   range?: boolean;
+}
+
+export function attributeNames(this: { attributeTypes(): Record<string, ValueType> }): string[] {
+  return Object.keys(this.attributeTypes());
 }
 
 /** @internal */
@@ -102,15 +111,6 @@ export function setDefineMethodAttribute(
       });
     });
   });
-}
-
-export function initializeDup(
-  this: AttributeInstanceHost,
-  super_: (other: unknown) => void,
-  other: unknown,
-): void {
-  this._attributes = this._attributes.deepDup();
-  super_(other);
 }
 
 export function freeze<T>(this: AttributeInstanceHost, super_: () => T): T {

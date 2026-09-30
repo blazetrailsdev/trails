@@ -31,6 +31,10 @@ export interface PgSchemaCreationHost extends SchemaCreationConn {
 export class SchemaCreation extends AbstractSchemaCreation {
   declare protected conn: PgSchemaCreationHost;
 
+  protected async quotedIncludeColumnsForIndex(o: string | string[]): Promise<string> {
+    return this.conn.quotedIncludeColumnsForIndex(o);
+  }
+
   /** @internal */
   protected override async visitAlterTable(o: any): Promise<string> {
     let sql = await super.visitAlterTable(o);
@@ -62,6 +66,12 @@ export class SchemaCreation extends AbstractSchemaCreation {
     let sql = super.visitForeignKeyDefinition(o);
     if (o.deferrable) sql += ` DEFERRABLE INITIALLY ${o.deferrable.toUpperCase()}`;
     return sql;
+  }
+
+  /** @internal */
+  protected override visitCheckConstraintDefinition(o: CheckConstraintDefinition): string {
+    const sql = super.visitCheckConstraintDefinition(o);
+    return o.validate ? sql : `${sql} NOT VALID`;
   }
 
   /** @internal */
@@ -190,9 +200,15 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected override visitCheckConstraintDefinition(o: CheckConstraintDefinition): string {
-    const sql = super.visitCheckConstraintDefinition(o);
-    return o.validate ? sql : `${sql} NOT VALID`;
+  protected async quotedIncludeColumns(o: string | string[]): Promise<string> {
+    return typeof o === "string" && !isSymbol(o) ? o : this.quotedIncludeColumnsForIndex(o);
+  }
+
+  /** @internal */
+  protected override tableModifierInCreate(o: any): string {
+    if (o.temporary) return " TEMPORARY";
+    if (o.unlogged) return " UNLOGGED";
+    return "";
   }
 
   /** @internal */
@@ -209,21 +225,5 @@ export class SchemaCreation extends AbstractSchemaCreation {
       result.push(await this.visitUniqueConstraintDefinition(uc));
     }
     return result;
-  }
-
-  protected async quotedIncludeColumnsForIndex(o: string | string[]): Promise<string> {
-    return this.conn.quotedIncludeColumnsForIndex(o);
-  }
-
-  /** @internal */
-  protected async quotedIncludeColumns(o: string | string[]): Promise<string> {
-    return typeof o === "string" && !isSymbol(o) ? o : this.quotedIncludeColumnsForIndex(o);
-  }
-
-  /** @internal */
-  protected override tableModifierInCreate(o: any): string {
-    if (o.temporary) return " TEMPORARY";
-    if (o.unlogged) return " UNLOGGED";
-    return "";
   }
 }

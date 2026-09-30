@@ -1,6 +1,30 @@
 import { registerConstant } from "@blazetrails/activesupport";
 import { ValueType } from "@blazetrails/activemodel";
 
+export class Bit extends ValueType<string> {
+  override type(): string {
+    return "bit";
+  }
+
+  castValue(value: unknown): string | null {
+    if (value == null) return null;
+    if (typeof value === "string") {
+      if (/^0x/i.test(value)) {
+        const leadingHex = value.slice(2).match(/^[0-9a-f]+/i)?.[0] ?? "0";
+        return BigInt(`0x${leadingHex}`).toString(2);
+      }
+      return value;
+    }
+    return String(value);
+  }
+
+  override serialize(value: unknown): Data | null {
+    if (value == null) return null;
+    if (value instanceof Data) return value;
+    return new Data(typeof value === "string" ? value : String(value));
+  }
+}
+
 export class Data {
   /** @internal */
   readonly value: string;
@@ -19,30 +43,6 @@ export class Data {
 
   isHex(): boolean {
     return /^[0-9A-F]*$/i.test(this.value);
-  }
-}
-
-export class Bit extends ValueType<string> {
-  override type(): string {
-    return "bit";
-  }
-
-  override serialize(value: unknown): Data | null {
-    if (value == null) return null;
-    if (value instanceof Data) return value;
-    return new Data(typeof value === "string" ? value : String(value));
-  }
-
-  castValue(value: unknown): string | null {
-    if (value == null) return null;
-    if (typeof value === "string") {
-      if (/^0x/i.test(value)) {
-        const leadingHex = value.slice(2).match(/^[0-9a-f]+/i)?.[0] ?? "0";
-        return BigInt(`0x${leadingHex}`).toString(2);
-      }
-      return value;
-    }
-    return String(value);
   }
 }
 

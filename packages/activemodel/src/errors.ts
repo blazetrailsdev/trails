@@ -70,6 +70,10 @@ export class Errors<TBase extends object = object> {
     this._base = base;
   }
 
+  initializeDup(other: Errors<TBase>): void {
+    this._errors = deepDup(other.errors);
+  }
+
   copyBang<U extends object>(other: Errors<U>): void {
     this._errors = deepDup(other._errors);
     this._errors.forEach((error) => {
@@ -287,10 +291,6 @@ export class Errors<TBase extends object = object> {
     const opts = { ...(options ?? {}) };
     const resolvedType = typeof type === "function" ? type(this._base, opts) : type;
     return [attribute, resolvedType, opts];
-  }
-
-  initializeDup(other: Errors<TBase>): void {
-    this._errors = deepDup(other.errors);
   }
 
   dup(): this {

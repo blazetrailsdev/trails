@@ -52,13 +52,15 @@ export async function explain(
   return new ExplainPrettyPrinter().pp(result);
 }
 
-export function isWriteQuery(sql: string | null): boolean {
-  try {
-    return !READ_QUERY.test(sql as string);
-  } catch (error) {
-    if (!(error instanceof ArgumentError)) throw error;
-    return !READ_QUERY.test(b(sql as string));
-  }
+function query(
+  rawConnection: pg.Client,
+  config: string | Record<string, unknown> | null,
+): Promise<pg.QueryResult | pg.QueryResult[]> {
+  return (
+    rawConnection.query as unknown as (
+      c: string | Record<string, unknown> | null,
+    ) => Promise<pg.QueryResult | pg.QueryResult[]>
+  )(config);
 }
 
 /** @internal */
@@ -82,6 +84,25 @@ interface ExecuteHost extends PerformQueryHost {
   translateExceptionClass(nativeError: unknown, sql: unknown, binds: unknown): unknown;
 }
 
+export function isWriteQuery(sql: string | null): boolean {
+  try {
+    return !READ_QUERY.test(sql as string);
+  } catch (error) {
+    if (!(error instanceof ArgumentError)) throw error;
+    return !READ_QUERY.test(b(sql as string));
+  }
+}
+
+/** @internal */
+interface ExecInsertHost extends LastInsertIdResultHost {
+  isUseInsertReturning(): boolean;
+  lock: { synchronize<T>(block: () => Promise<T>): Promise<T> };
+  primaryKey(tableName: string): unknown;
+  defaultSequenceName(tableRef: string, pk: string): Promise<string | null> | string | null;
+  /** @internal */
+  lastInsertIdResult(sequenceName: string): Promise<Result>;
+}
+
 export async function execute(
   this: ExecuteHost,
   sql: string | null,
@@ -98,13 +119,22 @@ export async function execute(
 }
 
 /** @internal */
-interface ExecInsertHost extends LastInsertIdResultHost {
-  isUseInsertReturning(): boolean;
-  lock: { synchronize<T>(block: () => Promise<T>): Promise<T> };
-  primaryKey(tableName: string): unknown;
-  defaultSequenceName(tableRef: string, pk: string): Promise<string | null> | string | null;
+interface TransactionHost {
+  internalExecute(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    options?: { allowRetry?: boolean; materializeTransactions?: boolean },
+  ): Promise<unknown>;
   /** @internal */
-  lastInsertIdResult(sequenceName: string): Promise<Result>;
+  _client: pg.Client | null;
+  /** @internal */
+  _acquireFreshClient(): Promise<pg.Client>;
+  /** @internal */
+  _discardRawConnection(): void;
+  /** @internal */
+  _cancelAnyRunningQuery(): Promise<void>;
+  constructor: { _isConnectionError(err: unknown): boolean };
 }
 
 export async function execInsert(
@@ -140,25 +170,6 @@ export async function execInsert(
     }
     return this.lastInsertIdResult(sequenceName);
   });
-}
-
-/** @internal */
-interface TransactionHost {
-  internalExecute(
-    sql: string,
-    name?: string | null,
-    binds?: unknown[],
-    options?: { allowRetry?: boolean; materializeTransactions?: boolean },
-  ): Promise<unknown>;
-  /** @internal */
-  _client: pg.Client | null;
-  /** @internal */
-  _acquireFreshClient(): Promise<pg.Client>;
-  /** @internal */
-  _discardRawConnection(): void;
-  /** @internal */
-  _cancelAnyRunningQuery(): Promise<void>;
-  constructor: { _isConnectionError(err: unknown): boolean };
 }
 
 export async function beginDbTransaction(this: TransactionHost): Promise<void> {
@@ -231,6 +242,12 @@ export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
   return arelSql("CURRENT_TIMESTAMP");
 }
 
+/** @internal */
+interface SetConstraintsHost {
+  quoteTableName(name: unknown): string;
+  execute(sql: string, name?: string | null): Promise<unknown>;
+}
+
 export async function buildExplainClause(options: ExplainOption[] = []): Promise<string> {
   if (options.length === 0) return "EXPLAIN";
   return `EXPLAIN (${options
@@ -240,9 +257,9 @@ export async function buildExplainClause(options: ExplainOption[] = []): Promise
 }
 
 /** @internal */
-interface SetConstraintsHost {
-  quoteTableName(name: unknown): string;
-  execute(sql: string, name?: string | null): Promise<unknown>;
+interface CancelAnyRunningQueryHost {
+  /** @internal */
+  _cancelAnyRunningQuery(): void;
 }
 
 export async function setConstraints(
@@ -259,25 +276,8 @@ export async function setConstraints(
 }
 
 /** @internal */
-interface CancelAnyRunningQueryHost {
-  /** @internal */
-  _cancelAnyRunningQuery(): void;
-}
-
-/** @internal */
 export function cancelAnyRunningQuery(this: CancelAnyRunningQueryHost): void {
   this._cancelAnyRunningQuery();
-}
-
-function query(
-  rawConnection: pg.Client,
-  config: string | Record<string, unknown> | null,
-): Promise<pg.QueryResult | pg.QueryResult[]> {
-  return (
-    rawConnection.query as unknown as (
-      c: string | Record<string, unknown> | null,
-    ) => Promise<pg.QueryResult | pg.QueryResult[]>
-  )(config);
 }
 
 /** @internal */

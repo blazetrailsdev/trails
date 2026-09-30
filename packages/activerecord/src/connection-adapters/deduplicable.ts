@@ -15,15 +15,6 @@ const _finalizer =
       })
     : null;
 
-export function registry(this: object): Map<number, WeakRef<object>[]> {
-  let own = registries.get(this);
-  if (!own) {
-    own = new Map<number, WeakRef<object>[]>();
-    registries.set(this, own);
-  }
-  return own;
-}
-
 export function deduplicate<T extends Deduplicable & { hash(): number }>(obj: T): T {
   const own = registry.call(obj.constructor);
   const hash = obj.hash();
@@ -40,4 +31,13 @@ export function deduplicate<T extends Deduplicable & { hash(): number }>(obj: T)
   bucket.push(new WeakRef(deduped));
   _finalizer?.register(deduped, { bucket });
   return deduped;
+}
+
+export function registry(this: object): Map<number, WeakRef<object>[]> {
+  let own = registries.get(this);
+  if (!own) {
+    own = new Map<number, WeakRef<object>[]>();
+    registries.set(this, own);
+  }
+  return own;
 }

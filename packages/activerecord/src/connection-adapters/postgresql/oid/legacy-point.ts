@@ -7,14 +7,6 @@ export class LegacyPoint extends ValueType {
     return "point";
   }
 
-  override isMutable(): boolean {
-    return true;
-  }
-
-  override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
-    return !rbEqual(rawOldValue, this.serialize(newValue));
-  }
-
   cast(value: unknown): unknown {
     if (typeof value === "string") {
       if (value.startsWith("(") && value.endsWith(")")) {
@@ -38,6 +30,14 @@ export class LegacyPoint extends ValueType {
   private numberForPoint(number: unknown): string {
     const s = String(number);
     return s.endsWith(".0") ? s.slice(0, -2) : s;
+  }
+
+  override isMutable(): boolean {
+    return true;
+  }
+
+  override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
+    return !rbEqual(rawOldValue, this.serialize(newValue));
   }
 }
 

@@ -9,6 +9,14 @@ export class Column extends BaseColumn {
   private _identity: string | null;
   private _generated: string | null;
 
+  get oid(): number | null {
+    return (this.sqlTypeMetadata as TypeMetadata | null)?.oid ?? null;
+  }
+
+  get fmod(): number | null {
+    return (this.sqlTypeMetadata as TypeMetadata | null)?.fmod ?? null;
+  }
+
   constructor(
     name: string,
     defaultValue: unknown,
@@ -33,25 +41,12 @@ export class Column extends BaseColumn {
     this._generated = options.generated ?? null;
   }
 
-  get oid(): number | null {
-    return (this.sqlTypeMetadata as TypeMetadata | null)?.oid ?? null;
-  }
-
-  get fmod(): number | null {
-    return (this.sqlTypeMetadata as TypeMetadata | null)?.fmod ?? null;
-  }
-
-  override get sqlType(): string | null {
-    const raw = super.sqlType;
-    return raw?.endsWith("[]") ? raw.slice(0, -2) : (raw ?? null);
+  isIdentity(): boolean {
+    return this._identity != null;
   }
 
   isSerial(): boolean {
     return this._serial;
-  }
-
-  isIdentity(): boolean {
-    return this._identity != null;
   }
 
   override isAutoIncrementedByDb(): boolean {
@@ -76,6 +71,11 @@ export class Column extends BaseColumn {
 
   isEnum(): boolean {
     return this.sqlTypeMetadata?.type === "enum";
+  }
+
+  override get sqlType(): string | null {
+    const raw = super.sqlType;
+    return raw?.endsWith("[]") ? raw.slice(0, -2) : (raw ?? null);
   }
 
   override equals(other: unknown): boolean {

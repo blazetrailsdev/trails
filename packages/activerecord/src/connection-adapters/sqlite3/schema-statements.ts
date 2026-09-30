@@ -56,6 +56,53 @@ interface SQLite3SchemaAdapter extends DatabaseAdapter {
   ): Promise<void>;
 }
 
+export async function indexes(
+  adapter: DatabaseAdapter,
+  tableName: string,
+): Promise<IndexDefinition[]> {
+  const rows = (
+    await adapter.internalExecQuery(`PRAGMA index_list(${quoteTableName(tableName)})`, "SCHEMA")
+  ).toArray() as Array<{ name: string; unique: number; origin: string }>;
+  const result: IndexDefinition[] = [];
+  for (const idx of rows) {
+    if (idx.name.startsWith("sqlite_")) continue;
+
+    const indexSql = (await adapter.queryValue(
+      `SELECT sql FROM sqlite_master WHERE name = ${adapter.quote(idx.name)} AND type = 'index' ` +
+        `UNION ALL ` +
+        `SELECT sql FROM sqlite_temp_master WHERE name = ${adapter.quote(idx.name)} AND type = 'index'`,
+      "SCHEMA",
+    )) as string | null | undefined;
+    const match = indexSql ? INDEX_ON_REGEX.exec(indexSql) : null;
+    const expressions = match?.groups?.expressions;
+    let where = match?.groups?.where;
+    if (where != null) where = where.replace(/\s*\/\*.*\*\/$/, "");
+
+    const cols = (
+      await adapter.internalExecQuery(`PRAGMA index_info(${adapter.quote(idx.name)})`, "SCHEMA")
+    ).toArray() as Array<{ name: string | null }>;
+    const columnNames = cols.map((c) => c.name);
+
+    const orders: Record<string, string> = {};
+    let columns: string[] | string;
+    if (columnNames.some((name) => name == null)) {
+      columns = expressions ?? "";
+    } else {
+      columns = columnNames as string[];
+      if (indexSql) {
+        for (const m of indexSql.matchAll(/"(\w+)" DESC/g)) {
+          orders[m[1]] = "desc";
+        }
+      }
+    }
+
+    result.push(
+      new IndexDefinition(tableName, idx.name, idx.unique !== 0, columns, { orders, where }),
+    );
+  }
+  return result;
+}
+
 export async function addForeignKey(
   this: SQLite3SchemaAdapter,
   fromTable: string,
@@ -123,6 +170,17 @@ export async function removeForeignKey(
   await this.alterTable(fromTable, foreignKeys);
 }
 
+/** @missingRailsCall any? — PERMANENT */
+export async function virtualTableExists(
+  this: SQLite3SchemaAdapter,
+  tableName: string,
+): Promise<boolean> {
+  return (
+    (await this.queryValues(this.dataSourceSql(tableName, { type: "VIRTUAL TABLE" }), "SCHEMA"))
+      .length > 0
+  );
+}
+
 export async function checkConstraints(
   this: SQLite3SchemaAdapter,
   tableName: string,
@@ -152,6 +210,9 @@ export async function checkConstraints(
     ([name, expression]) => new CheckConstraintDefinition(tableName, expression, { name }),
   );
 }
+
+const INDEX_ON_REGEX =
+  /\bON\b\s*"?(\w+?)"?\s*\((?<expressions>.+?)\)(?:\s*WHERE\b\s*(?<where>.+))?(?:\s*\/\*.*\*\/)?$/i;
 
 export async function addCheckConstraint(
   this: SQLite3SchemaAdapter,
@@ -191,67 +252,6 @@ export async function removeCheckConstraint(
   ).name;
   checkConstraints = checkConstraints.filter((chk) => chk.name !== chkNameToDelete);
   await this.alterTable(tableName, await this.foreignKeys(tableName), checkConstraints);
-}
-
-const INDEX_ON_REGEX =
-  /\bON\b\s*"?(\w+?)"?\s*\((?<expressions>.+?)\)(?:\s*WHERE\b\s*(?<where>.+))?(?:\s*\/\*.*\*\/)?$/i;
-
-export async function indexes(
-  adapter: DatabaseAdapter,
-  tableName: string,
-): Promise<IndexDefinition[]> {
-  const rows = (
-    await adapter.internalExecQuery(`PRAGMA index_list(${quoteTableName(tableName)})`, "SCHEMA")
-  ).toArray() as Array<{ name: string; unique: number; origin: string }>;
-  const result: IndexDefinition[] = [];
-  for (const idx of rows) {
-    if (idx.name.startsWith("sqlite_")) continue;
-
-    const indexSql = (await adapter.queryValue(
-      `SELECT sql FROM sqlite_master WHERE name = ${adapter.quote(idx.name)} AND type = 'index' ` +
-        `UNION ALL ` +
-        `SELECT sql FROM sqlite_temp_master WHERE name = ${adapter.quote(idx.name)} AND type = 'index'`,
-      "SCHEMA",
-    )) as string | null | undefined;
-    const match = indexSql ? INDEX_ON_REGEX.exec(indexSql) : null;
-    const expressions = match?.groups?.expressions;
-    let where = match?.groups?.where;
-    if (where != null) where = where.replace(/\s*\/\*.*\*\/$/, "");
-
-    const cols = (
-      await adapter.internalExecQuery(`PRAGMA index_info(${adapter.quote(idx.name)})`, "SCHEMA")
-    ).toArray() as Array<{ name: string | null }>;
-    const columnNames = cols.map((c) => c.name);
-
-    const orders: Record<string, string> = {};
-    let columns: string[] | string;
-    if (columnNames.some((name) => name == null)) {
-      columns = expressions ?? "";
-    } else {
-      columns = columnNames as string[];
-      if (indexSql) {
-        for (const m of indexSql.matchAll(/"(\w+)" DESC/g)) {
-          orders[m[1]] = "desc";
-        }
-      }
-    }
-
-    result.push(
-      new IndexDefinition(tableName, idx.name, idx.unique !== 0, columns, { orders, where }),
-    );
-  }
-  return result;
-}
-
-/** @missingRailsCall any? — PERMANENT */
-export async function virtualTableExists(
-  this: SQLite3SchemaAdapter,
-  tableName: string,
-): Promise<boolean> {
-  return (
-    (await this.queryValues(this.dataSourceSql(tableName, { type: "VIRTUAL TABLE" }), "SCHEMA"))
-      .length > 0
-  );
 }
 
 export function createSchemaDumper(

@@ -330,13 +330,13 @@ const _predicatesForValidationContexts = new Map<
   (model: ValidationsContextHost) => boolean
 >();
 
-/** @internal */
-export function initInternals<TBase extends object>(
+export function initializeDup<TBase extends object>(
   this: ValidationsInternalsHost<TBase>,
-  super_: () => void,
+  super_: (other: unknown) => void,
+  other: unknown,
 ): void {
-  super_();
-  this._contextForValidation = undefined;
+  this._errors = undefined;
+  super_(other);
 }
 
 interface ValidationsFreezeHost {
@@ -401,13 +401,13 @@ export interface ReadAttributeForValidationHost {
   [key: string]: unknown;
 }
 
-export function initializeDup<TBase extends object>(
+/** @internal */
+export function initInternals<TBase extends object>(
   this: ValidationsInternalsHost<TBase>,
-  super_: (other: unknown) => void,
-  other: unknown,
+  super_: () => void,
 ): void {
-  this._errors = undefined;
-  super_(other);
+  super_();
+  this._contextForValidation = undefined;
 }
 
 export function raiseOnMissingTranslations(value?: boolean): boolean {

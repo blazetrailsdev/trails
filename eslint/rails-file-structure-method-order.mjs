@@ -797,10 +797,19 @@ const rule = {
           },
           fix(fixer) {
             // Sort fixes by range start; ESLint requires non-overlapping
-            // ranges. Slots are derived from distinct AST nodes so they
-            // do not overlap by construction.
-            fixes.sort((a, b) => a.range[0] - b.range[0]);
-            return fixes.map((f) => fixer.replaceTextRange(f.range, f.text));
+            // ranges. Slots within one container are distinct AST nodes, but
+            // a class-member slot nests inside its class's top-level
+            // declaration slot when both containers reorder. Keep the outer
+            // fix and drop the nested ones: `eslint --fix` re-lints the
+            // output, and the next pass reorders the members in place.
+            fixes.sort((a, b) => a.range[0] - b.range[0] || b.range[1] - a.range[1]);
+            const kept = [];
+            for (const f of fixes) {
+              const outer = kept[kept.length - 1];
+              if (outer && f.range[0] < outer.range[1]) continue;
+              kept.push(f);
+            }
+            return kept.map((f) => fixer.replaceTextRange(f.range, f.text));
           },
         });
       },

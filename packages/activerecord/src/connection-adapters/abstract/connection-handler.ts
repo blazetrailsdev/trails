@@ -70,20 +70,6 @@ export class ConnectionHandler {
     this._preventWrites = value;
   }
 
-  /** @internal */
-  determineOwnerName(
-    ownerName: string | ConnectionOwner | undefined,
-    config?: DatabaseConfig | string | Record<string, unknown>,
-  ): ConnectionDescriptor | ConnectionOwner | undefined {
-    if (typeof ownerName === "string") {
-      return new ConnectionDescriptor(isSymbol(ownerName) ? symbolToS(ownerName) : ownerName);
-    } else if (isSymbol(config)) {
-      return new ConnectionDescriptor(symbolToS(config));
-    } else {
-      return ownerName;
-    }
-  }
-
   connectionPoolNames(): string[] {
     return [...this._connectionNameToPoolManager.keys()];
   }
@@ -336,5 +322,19 @@ export class ConnectionHandler {
       throw new AdapterNotSpecified("database configuration does not specify adapter");
     }
     return new PoolConfig(connectionName, dbConfig, role, shard);
+  }
+
+  /** @internal */
+  determineOwnerName(
+    ownerName: string | ConnectionOwner | undefined,
+    config?: DatabaseConfig | string | Record<string, unknown>,
+  ): ConnectionDescriptor | ConnectionOwner | undefined {
+    if (typeof ownerName === "string") {
+      return new ConnectionDescriptor(isSymbol(ownerName) ? symbolToS(ownerName) : ownerName);
+    } else if (isSymbol(config)) {
+      return new ConnectionDescriptor(symbolToS(config));
+    } else {
+      return ownerName;
+    }
   }
 }

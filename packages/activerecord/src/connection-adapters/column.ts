@@ -13,6 +13,26 @@ export class Column implements Deduplicable {
   collation: string | null;
   comment: string | null;
 
+  get precision(): number | null {
+    return this.sqlTypeMetadata?.precision ?? null;
+  }
+
+  get scale(): number | null {
+    return this.sqlTypeMetadata?.scale ?? null;
+  }
+
+  get limit(): number | null {
+    return this.sqlTypeMetadata?.limit ?? null;
+  }
+
+  get type(): string | null {
+    return this.sqlTypeMetadata?.type ?? null;
+  }
+
+  get sqlType(): string | null {
+    return this.sqlTypeMetadata?.sqlType ?? null;
+  }
+
   constructor(
     name: string,
     defaultValue: unknown,
@@ -31,26 +51,6 @@ export class Column implements Deduplicable {
     this.defaultFunction = options.defaultFunction ?? null;
     this.collation = options.collation ?? null;
     this.comment = options.comment ?? null;
-  }
-
-  get sqlType(): string | null {
-    return this.sqlTypeMetadata?.sqlType ?? null;
-  }
-
-  get type(): string | null {
-    return this.sqlTypeMetadata?.type ?? null;
-  }
-
-  get limit(): number | null {
-    return this.sqlTypeMetadata?.limit ?? null;
-  }
-
-  get precision(): number | null {
-    return this.sqlTypeMetadata?.precision ?? null;
-  }
-
-  get scale(): number | null {
-    return this.sqlTypeMetadata?.scale ?? null;
   }
 
   get hasDefault(): boolean {
@@ -104,6 +104,14 @@ export class Column implements Deduplicable {
     return false;
   }
 
+  /** @internal */
+  deduplicated(): this {
+    if (this.sqlTypeMetadata) {
+      this.sqlTypeMetadata = this.sqlTypeMetadata.deduplicate();
+    }
+    return Object.freeze(this);
+  }
+
   initWith(coder: ColumnCoder): void {
     this.name = coder["name"] as string;
     this.sqlTypeMetadata = (coder["sql_type_metadata"] as SqlTypeMetadata | null) ?? null;
@@ -126,14 +134,6 @@ export class Column implements Deduplicable {
 
   deduplicate(): this {
     return deduplicate(this);
-  }
-
-  /** @internal */
-  deduplicated(): this {
-    if (this.sqlTypeMetadata) {
-      this.sqlTypeMetadata = this.sqlTypeMetadata.deduplicate();
-    }
-    return Object.freeze(this);
   }
 }
 

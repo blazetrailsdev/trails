@@ -236,12 +236,12 @@ export class CheckConstraintDefinition {
     return this.options.name;
   }
 
-  get validate(): boolean | null {
-    return "validate" in this.options ? (this.options.validate as boolean | null) : true;
-  }
-
   get isValidate(): boolean | null {
     return this.validate;
+  }
+
+  get validate(): boolean | null {
+    return "validate" in this.options ? (this.options.validate as boolean | null) : true;
   }
 
   get isExportNameOnSchemaDump(): boolean {
@@ -660,6 +660,17 @@ export class ReferenceDefinition {
   }
 
   /** @internal */
+  private columns(): [string, ColumnType, ColumnOptions][] {
+    const result: [string, ColumnType, ColumnOptions][] = [
+      [this.columnName(), this.type, this.options],
+    ];
+    if (this.polymorphic) {
+      result.unshift([`${this.name}_type`, "string", this.polymorphicOptions()]);
+    }
+    return result;
+  }
+
+  /** @internal */
   private columnName(): string {
     return `${this.name}_id`;
   }
@@ -681,17 +692,6 @@ export class ReferenceDefinition {
       block(() => (ActiveRecord.Base.pluralizeTableNames ? pluralize(this.name) : this.name)),
     );
   }
-
-  /** @internal */
-  private columns(): [string, ColumnType, ColumnOptions][] {
-    const result: [string, ColumnType, ColumnOptions][] = [
-      [this.columnName(), this.type, this.options],
-    ];
-    if (this.polymorphic) {
-      result.unshift([`${this.name}_type`, "string", this.polymorphicOptions()]);
-    }
-    return result;
-  }
 }
 
 export class AlterTable {
@@ -709,10 +709,6 @@ export class AlterTable {
 
   get name(): string {
     return this._td.name;
-  }
-
-  addColumn(name: string, type: ColumnType, options: ColumnOptions = {}): void {
-    this.adds.push(new AddColumnDefinition(this._td.newColumnDefinition(name, type, options)));
   }
 
   addForeignKey(toTable: string, options: Partial<AddForeignKeyOptions> = {}): void {
@@ -736,6 +732,10 @@ export class AlterTable {
 
   dropConstraint(constraintName: string | undefined): void {
     this.constraintDrops.push(constraintName);
+  }
+
+  addColumn(name: string, type: ColumnType, options: ColumnOptions = {}): void {
+    this.adds.push(new AddColumnDefinition(this._td.newColumnDefinition(name, type, options)));
   }
 }
 
@@ -819,32 +819,12 @@ export class TableDefinition {
     return this._primaryKeys;
   }
 
-  newColumnDefinition(
-    name: string,
-    type: ColumnType,
-    options: ColumnOptions = {},
-  ): ColumnDefinition {
-    if (this.isIntegerLikePrimaryKey(type, options)) {
-      type = this.integerLikePrimaryKeyType(type, options);
-    }
-    type = this.aliasedTypes(type, type) as ColumnType;
-    if (this.conn.supportsDatetimeWithPrecision()) {
-      if (type === "datetime" && !("precision" in options)) {
-        options = { ...options, precision: 6 };
-      }
-    }
-    options.primaryKey ||= type === "primary_key";
-    if (options.primaryKey) options.null = false;
-    return this.createColumnDefinition(name, type, options);
+  get columns(): ColumnDefinition[] {
+    return Array.from(this.columnsHash.values()) as ColumnDefinition[];
   }
 
-  /** @internal */
-  aliasedTypes(name: string, fallback: string): string {
-    return name === "timestamp" ? "datetime" : fallback;
-  }
-
-  primaryKey(name: string, type: ColumnType = "primary_key", options: ColumnOptions = {}): this {
-    return this.column(name, type, { ...options, primaryKey: true });
+  get(name: string): ColumnDefinition | undefined {
+    return this.columnsHash.get(String(name)) ?? undefined;
   }
 
   column(
@@ -862,69 +842,12 @@ export class TableDefinition {
     return this;
   }
 
-  get columns(): ColumnDefinition[] {
-    return Array.from(this.columnsHash.values()) as ColumnDefinition[];
-  }
-
-  get(name: string): ColumnDefinition | undefined {
-    return this.columnsHash.get(String(name)) ?? undefined;
-  }
-
   removeColumn(name: string): void {
     this.columnsHash.delete(String(name));
   }
 
-  /** @internal */
-  protected validColumnDefinitionOptions(): string[] {
-    return this.conn.validColumnDefinitionOptions();
-  }
-
-  /** @internal */
-  protected createColumnDefinition(
-    name: string,
-    type: ColumnType,
-    options: ColumnOptions,
-  ): ColumnDefinition {
-    if (!options._skipValidateOptions) {
-      const { _usesLegacyReferenceIndexName: _u, _skipValidateOptions: _s, ...rest } = options;
-      assertValidKeys(rest, this.validColumnDefinitionOptions());
-    }
-
-    return new ColumnDefinition(name, type, options);
-  }
-
-  /** @internal */
-  protected isIntegerLikePrimaryKey(type: ColumnType, options: ColumnOptions): boolean {
-    return (
-      !!options.primaryKey &&
-      (type === "integer" || type === "bigint") &&
-      options.default === undefined
-    );
-  }
-
-  /** @internal */
-  protected integerLikePrimaryKeyType(type: ColumnType, _options: ColumnOptions): ColumnType {
-    return type;
-  }
-
-  /** @internal */
-  protected raiseOnDuplicateColumn(name: string): void {
-    const existing = this.columnsHash.get(name);
-    if (existing) {
-      if (existing.options.primaryKey) {
-        throw new ArgumentError(
-          `you can't redefine the primary key column '${name}' on '${this.name}'. To define a custom primary key, pass { id: false } to create_table.`,
-        );
-      } else {
-        throw new ArgumentError(
-          `you can't define an already defined column '${name}' on '${this.name}'.`,
-        );
-      }
-    }
-  }
-
-  checkConstraint(expression: string, options: { name?: string; validate?: boolean } = {}): this {
-    this.checkConstraints.push(this.newCheckConstraintDefinition(expression, options));
+  index(columnName: string | string[], options: AddIndexOptions = {}): this {
+    this.indexes.push([columnName, options]);
     return this;
   }
 
@@ -933,46 +856,9 @@ export class TableDefinition {
     return this;
   }
 
-  newForeignKeyDefinition(
-    toTable: string,
-    options: Partial<AddForeignKeyOptions> = {},
-  ): ForeignKeyDefinition {
-    const prefix = this.conn.tableNamePrefix ?? ActiveRecord.Base.tableNamePrefix;
-    const suffix = this.conn.tableNameSuffix ?? ActiveRecord.Base.tableNameSuffix;
-    toTable = `${prefix}${toTable}${suffix}`;
-    options = this.conn.foreignKeyOptions(this.name, toTable, {
-      ...options,
-    }) as Partial<AddForeignKeyOptions>;
-    return new ForeignKeyDefinition(this.name, toTable, options);
-  }
-
-  newCheckConstraintDefinition(
-    expression: string,
-    options: { name?: string; validate?: boolean } = {},
-  ): CheckConstraintDefinition {
-    options = this.conn.checkConstraintOptions(this.name, expression, options) as {
-      name?: string;
-      validate?: boolean;
-    };
-    return new CheckConstraintDefinition(this.name, expression, options);
-  }
-
-  /** @internal */
-  static defineColumnMethods(...columnTypes: string[]): void {
-    for (const columnType of columnTypes) {
-      (this.prototype as unknown as Record<string, unknown>)[camelize(columnType, false)] =
-        function (this: TableDefinition, ...names: unknown[]): unknown[] {
-          const last = names[names.length - 1];
-          const options = (
-            typeof last === "object" && last !== null ? names.pop() : {}
-          ) as ColumnOptions;
-          if (names.length === 0) {
-            throw new ArgumentError(`Missing column name(s) for ${columnType}`);
-          }
-          names.forEach((name) => this.column(name as string, columnType as ColumnType, options));
-          return names;
-        };
-    }
+  checkConstraint(expression: string, options: { name?: string; validate?: boolean } = {}): this {
+    this.checkConstraints.push(this.newCheckConstraintDefinition(expression, options));
+    return this;
   }
 
   timestamps(
@@ -1009,9 +895,123 @@ export class TableDefinition {
     return (this.references as (...a: unknown[]) => this)(...args);
   }
 
-  index(columnName: string | string[], options: AddIndexOptions = {}): this {
-    this.indexes.push([columnName, options]);
-    return this;
+  newColumnDefinition(
+    name: string,
+    type: ColumnType,
+    options: ColumnOptions = {},
+  ): ColumnDefinition {
+    if (this.isIntegerLikePrimaryKey(type, options)) {
+      type = this.integerLikePrimaryKeyType(type, options);
+    }
+    type = this.aliasedTypes(type, type) as ColumnType;
+    if (this.conn.supportsDatetimeWithPrecision()) {
+      if (type === "datetime" && !("precision" in options)) {
+        options = { ...options, precision: 6 };
+      }
+    }
+    options.primaryKey ||= type === "primary_key";
+    if (options.primaryKey) options.null = false;
+    return this.createColumnDefinition(name, type, options);
+  }
+
+  newForeignKeyDefinition(
+    toTable: string,
+    options: Partial<AddForeignKeyOptions> = {},
+  ): ForeignKeyDefinition {
+    const prefix = this.conn.tableNamePrefix ?? ActiveRecord.Base.tableNamePrefix;
+    const suffix = this.conn.tableNameSuffix ?? ActiveRecord.Base.tableNameSuffix;
+    toTable = `${prefix}${toTable}${suffix}`;
+    options = this.conn.foreignKeyOptions(this.name, toTable, {
+      ...options,
+    }) as Partial<AddForeignKeyOptions>;
+    return new ForeignKeyDefinition(this.name, toTable, options);
+  }
+
+  newCheckConstraintDefinition(
+    expression: string,
+    options: { name?: string; validate?: boolean } = {},
+  ): CheckConstraintDefinition {
+    options = this.conn.checkConstraintOptions(this.name, expression, options) as {
+      name?: string;
+      validate?: boolean;
+    };
+    return new CheckConstraintDefinition(this.name, expression, options);
+  }
+
+  /** @internal */
+  protected validColumnDefinitionOptions(): string[] {
+    return this.conn.validColumnDefinitionOptions();
+  }
+
+  /** @internal */
+  protected createColumnDefinition(
+    name: string,
+    type: ColumnType,
+    options: ColumnOptions,
+  ): ColumnDefinition {
+    if (!options._skipValidateOptions) {
+      const { _usesLegacyReferenceIndexName: _u, _skipValidateOptions: _s, ...rest } = options;
+      assertValidKeys(rest, this.validColumnDefinitionOptions());
+    }
+
+    return new ColumnDefinition(name, type, options);
+  }
+
+  /** @internal */
+  aliasedTypes(name: string, fallback: string): string {
+    return name === "timestamp" ? "datetime" : fallback;
+  }
+
+  /** @internal */
+  protected isIntegerLikePrimaryKey(type: ColumnType, options: ColumnOptions): boolean {
+    return (
+      !!options.primaryKey &&
+      (type === "integer" || type === "bigint") &&
+      options.default === undefined
+    );
+  }
+
+  /** @internal */
+  protected integerLikePrimaryKeyType(type: ColumnType, _options: ColumnOptions): ColumnType {
+    return type;
+  }
+
+  /** @internal */
+  protected raiseOnDuplicateColumn(name: string): void {
+    const existing = this.columnsHash.get(name);
+    if (existing) {
+      if (existing.options.primaryKey) {
+        throw new ArgumentError(
+          `you can't redefine the primary key column '${name}' on '${this.name}'. To define a custom primary key, pass { id: false } to create_table.`,
+        );
+      } else {
+        throw new ArgumentError(
+          `you can't define an already defined column '${name}' on '${this.name}'.`,
+        );
+      }
+    }
+  }
+
+  primaryKey(name: string, type: ColumnType = "primary_key", options: ColumnOptions = {}): this {
+    return this.column(name, type, { ...options, primaryKey: true });
+  }
+
+  /** @internal */
+  static defineColumnMethods(...columnTypes: string[]): void {
+    for (const columnType of columnTypes) {
+      (this.prototype as unknown as Record<string, unknown>)[camelize(columnType, false)] =
+        function (this: TableDefinition, ...names: unknown[]): unknown[] {
+          const last = names[names.length - 1];
+          const options = (
+            typeof last === "object" && last !== null ? names.pop() : {}
+          ) as ColumnOptions;
+          if (names.length === 0) {
+            throw new ArgumentError(`Missing column name(s) for ${columnType}`);
+          }
+          names.forEach((name) => this.column(name as string, columnType as ColumnType, options));
+          return names;
+        };
+    }
   }
 }
 
@@ -1039,102 +1039,14 @@ TableDefinition.prototype.numeric = TableDefinition.prototype.decimal;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class Table {
+  get name(): string {
+    return this._tableName;
+  }
+
   constructor(
     private _tableName: string,
     private _schema: SchemaStatementsLike,
   ) {}
-
-  aliasedTypes(name: string, fallback: string): string {
-    return name === "timestamp" ? "datetime" : fallback;
-  }
-
-  /** @internal */
-  static defineColumnMethods(...columnTypes: string[]): void {
-    for (const columnType of columnTypes) {
-      (this.prototype as unknown as Record<string, unknown>)[camelize(columnType, false)] =
-        async function (this: Table, ...names: unknown[]): Promise<unknown[]> {
-          const last = names[names.length - 1];
-          const options = (
-            typeof last === "object" && last !== null ? names.pop() : {}
-          ) as ColumnOptions;
-          if (names.length === 0) {
-            throw new ArgumentError(`Missing column name(s) for ${columnType}`);
-          }
-          for (const name of names)
-            await this.column(name as string, columnType as ColumnType, options);
-          return names;
-        };
-    }
-  }
-
-  async remove(...columnNames: string[]): Promise<void>;
-  async remove(...args: [...columnNames: string[], options: ColumnOptions]): Promise<void>;
-  async remove(...args: unknown[]): Promise<void> {
-    const rest = [...args];
-    const last = rest[rest.length - 1];
-    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as ColumnOptions;
-    this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    await this._schema.removeColumns(
-      this.name,
-      ...(rest as string[]),
-      ...(Object.keys(options).length > 0 ? [options] : []),
-    );
-  }
-  async rename(columnName: string, newColumnName: string): Promise<void> {
-    await this._schema.renameColumn(this.name, columnName, newColumnName);
-  }
-  async index(columns: string | string[], options: AddIndexOptions = {}): Promise<void> {
-    this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    if (Object.keys(options).length === 0) {
-      await this._schema.addIndex(this.name, columns);
-    } else {
-      await this._schema.addIndex(this.name, columns, options);
-    }
-  }
-  async removeIndex(
-    columnName: string | string[] | { column?: string | string[]; name?: string } = {},
-    options: { column?: string | string[]; name?: string } = {},
-  ): Promise<void> {
-    const isColumn = typeof columnName === "string" || Array.isArray(columnName);
-    const column = isColumn ? columnName : undefined;
-    options = isColumn ? options : { ...columnName, ...options };
-    this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    if (Object.keys(options).length === 0) {
-      await this._schema.removeIndex(this.name, column);
-    } else {
-      await this._schema.removeIndex(this.name, column, options);
-    }
-  }
-  async references(...refNames: string[]): Promise<void>;
-  async references(...args: [...refNames: string[], options: AddReferenceOptions]): Promise<void>;
-  async references(...args: unknown[]): Promise<void> {
-    const { names, options } = this._splitRefNames(args);
-    this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    for (const refName of names) {
-      if (Object.keys(options).length === 0) {
-        await this._schema.addReference(this.name, refName);
-      } else {
-        await this._schema.addReference(this.name, refName, options);
-      }
-    }
-  }
-  async belongsTo(...refNames: string[]): Promise<void>;
-  async belongsTo(...args: [...refNames: string[], options: AddReferenceOptions]): Promise<void>;
-  async belongsTo(...args: unknown[]): Promise<void> {
-    return (this.references as (...a: unknown[]) => Promise<void>)(...args);
-  }
-  async timestamps(options: ColumnOptions = {}): Promise<void> {
-    this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    if (Object.keys(options).length === 0) {
-      await this._schema.addTimestamps(this.name);
-    } else {
-      await this._schema.addTimestamps(this.name, options);
-    }
-  }
-
-  get name(): string {
-    return this._tableName;
-  }
 
   async column(
     columnName: string,
@@ -1164,7 +1076,14 @@ export class Table {
     }
     return this._schema.columnExists(this.name, columnName, type, options);
   }
-
+  async index(columns: string | string[], options: AddIndexOptions = {}): Promise<void> {
+    this.raiseOnIfExistOptions(options as Record<string, unknown>);
+    if (Object.keys(options).length === 0) {
+      await this._schema.addIndex(this.name, columns);
+    } else {
+      await this._schema.addIndex(this.name, columns, options);
+    }
+  }
   async indexExists(
     columnName: string | string[],
     options: Record<string, unknown> = {},
@@ -1174,16 +1093,21 @@ export class Table {
     }
     return this._schema.indexExists(this.name, columnName, options);
   }
-
   async renameIndex(indexName: string, newIndexName: string): Promise<void> {
     return this._schema.renameIndex(this.name, indexName, newIndexName);
   }
-
+  async timestamps(options: ColumnOptions = {}): Promise<void> {
+    this.raiseOnIfExistOptions(options as Record<string, unknown>);
+    if (Object.keys(options).length === 0) {
+      await this._schema.addTimestamps(this.name);
+    } else {
+      await this._schema.addTimestamps(this.name, options);
+    }
+  }
   async change(columnName: string, type: ColumnType, options: ColumnOptions = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     return this._schema.changeColumn(this.name, columnName, type, options);
   }
-
   async changeDefault(columnName: string, defaultOrChanges: unknown): Promise<void> {
     return this._schema.changeColumnDefault(this.name, columnName, defaultOrChanges);
   }
@@ -1196,11 +1120,64 @@ export class Table {
     return this._schema.changeColumnNull(this.name, columnName, isNull, defaultValue);
   }
 
+  async remove(...columnNames: string[]): Promise<void>;
+  async remove(...args: [...columnNames: string[], options: ColumnOptions]): Promise<void>;
+  async remove(...args: unknown[]): Promise<void> {
+    const rest = [...args];
+    const last = rest[rest.length - 1];
+    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as ColumnOptions;
+    this.raiseOnIfExistOptions(options as Record<string, unknown>);
+    await this._schema.removeColumns(
+      this.name,
+      ...(rest as string[]),
+      ...(Object.keys(options).length > 0 ? [options] : []),
+    );
+  }
+
+  async removeIndex(
+    columnName: string | string[] | { column?: string | string[]; name?: string } = {},
+    options: { column?: string | string[]; name?: string } = {},
+  ): Promise<void> {
+    const isColumn = typeof columnName === "string" || Array.isArray(columnName);
+    const column = isColumn ? columnName : undefined;
+    options = isColumn ? options : { ...columnName, ...options };
+    this.raiseOnIfExistOptions(options as Record<string, unknown>);
+    if (Object.keys(options).length === 0) {
+      await this._schema.removeIndex(this.name, column);
+    } else {
+      await this._schema.removeIndex(this.name, column, options);
+    }
+  }
+
   async removeTimestamps(options: ColumnOptions = {}): Promise<void> {
     if (Object.keys(options).length === 0) {
       return this._schema.removeTimestamps(this.name);
     }
     return this._schema.removeTimestamps(this.name, options);
+  }
+
+  async rename(columnName: string, newColumnName: string): Promise<void> {
+    await this._schema.renameColumn(this.name, columnName, newColumnName);
+  }
+
+  async references(...refNames: string[]): Promise<void>;
+  async references(...args: [...refNames: string[], options: AddReferenceOptions]): Promise<void>;
+  async references(...args: unknown[]): Promise<void> {
+    const { names, options } = this._splitRefNames(args);
+    this.raiseOnIfExistOptions(options as Record<string, unknown>);
+    for (const refName of names) {
+      if (Object.keys(options).length === 0) {
+        await this._schema.addReference(this.name, refName);
+      } else {
+        await this._schema.addReference(this.name, refName, options);
+      }
+    }
+  }
+
+  async belongsTo(...refNames: string[]): Promise<void>;
+  async belongsTo(...args: [...refNames: string[], options: AddReferenceOptions]): Promise<void>;
+  async belongsTo(...args: unknown[]): Promise<void> {
+    return (this.references as (...a: unknown[]) => Promise<void>)(...args);
   }
 
   async removeReferences(...refNames: string[]): Promise<void>;
@@ -1218,21 +1195,13 @@ export class Table {
       }
     }
   }
+
   async removeBelongsTo(...refNames: string[]): Promise<void>;
   async removeBelongsTo(
     ...args: [...refNames: string[], options: AddReferenceOptions]
   ): Promise<void>;
   async removeBelongsTo(...args: unknown[]): Promise<void> {
     return (this.removeReferences as (...a: unknown[]) => Promise<void>)(...args);
-  }
-
-  private _splitRefNames(args: unknown[]): { names: string[]; options: AddReferenceOptions } {
-    const rest = [...args];
-    const last = rest[rest.length - 1];
-    const options = (
-      typeof last === "object" && last !== null ? rest.pop() : {}
-    ) as AddReferenceOptions;
-    return { names: rest as string[], options };
   }
 
   async foreignKey(toTable: string, options: Partial<AddForeignKeyOptions> = {}): Promise<void> {
@@ -1242,7 +1211,6 @@ export class Table {
     }
     return this._schema.addForeignKey(this.name, toTable, options);
   }
-
   async removeForeignKey(
     toTableOrOptions: string | { column?: string; name?: string } = {},
   ): Promise<void> {
@@ -1308,18 +1276,6 @@ export class Table {
     return this._schema.checkConstraintExists(this.name, ...(rest as []), options);
   }
 
-  async primaryKey(
-    name: string,
-    type: ColumnType = "primary_key",
-    options: ColumnOptions = {},
-  ): Promise<void> {
-    await this.column(name, type, { ...options, primaryKey: true });
-  }
-
-  async add(columnName: string, type: ColumnType, options?: ColumnOptions): Promise<void> {
-    return this._schema.addColumn(this.name, columnName, type, options);
-  }
-
   /** @internal */
   protected raiseOnIfExistOptions(options: Record<string, unknown>): void {
     const unrecognizedOption = Object.keys(options).find(
@@ -1334,6 +1290,50 @@ export class Table {
           `conditional clause instead, as in \`t.column(..) ${conditional} t.column_exists?(..)\``,
       );
     }
+  }
+
+  aliasedTypes(name: string, fallback: string): string {
+    return name === "timestamp" ? "datetime" : fallback;
+  }
+
+  /** @internal */
+  static defineColumnMethods(...columnTypes: string[]): void {
+    for (const columnType of columnTypes) {
+      (this.prototype as unknown as Record<string, unknown>)[camelize(columnType, false)] =
+        async function (this: Table, ...names: unknown[]): Promise<unknown[]> {
+          const last = names[names.length - 1];
+          const options = (
+            typeof last === "object" && last !== null ? names.pop() : {}
+          ) as ColumnOptions;
+          if (names.length === 0) {
+            throw new ArgumentError(`Missing column name(s) for ${columnType}`);
+          }
+          for (const name of names)
+            await this.column(name as string, columnType as ColumnType, options);
+          return names;
+        };
+    }
+  }
+
+  private _splitRefNames(args: unknown[]): { names: string[]; options: AddReferenceOptions } {
+    const rest = [...args];
+    const last = rest[rest.length - 1];
+    const options = (
+      typeof last === "object" && last !== null ? rest.pop() : {}
+    ) as AddReferenceOptions;
+    return { names: rest as string[], options };
+  }
+
+  async primaryKey(
+    name: string,
+    type: ColumnType = "primary_key",
+    options: ColumnOptions = {},
+  ): Promise<void> {
+    await this.column(name, type, { ...options, primaryKey: true });
+  }
+
+  async add(columnName: string, type: ColumnType, options?: ColumnOptions): Promise<void> {
+    return this._schema.addColumn(this.name, columnName, type, options);
   }
 }
 

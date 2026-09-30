@@ -175,41 +175,50 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
 
   protected abstract getFullVersion(): Promise<string | null>;
 
-  override async removeForeignKey(
-    fromTable: string,
-    toTable?: string | RemoveForeignKeyOptions,
-    options: RemoveForeignKeyOptions = {},
-  ): Promise<void> {
-    const optionsForm = typeof toTable === "object" && toTable !== null;
-    const opts: RemoveForeignKeyOptions = { ...(optionsForm ? toTable : options) };
-    if (opts.onUpdate === "restrict") delete opts.onUpdate;
-    if (opts.onDelete === "restrict") delete opts.onDelete;
-    return optionsForm
-      ? super.removeForeignKey(fromTable, opts)
-      : super.removeForeignKey(fromTable, toTable, opts);
+  get emulateBooleans(): boolean {
+    return this._emulateBooleans;
   }
 
-  /** @internal */
-
-  tableAliasLength(): number {
-    return mysqlTableAliasLength();
+  set emulateBooleans(value: boolean) {
+    this._emulateBooleans = value;
   }
 
-  override typeCast(value: unknown): unknown {
-    return mysqlTypeCast.call(this, value);
+  /** @missingRailsCall empty? — PERMANENT */
+  static dbconsole(config: DatabaseConfig, options: Record<string, unknown> = {}): string[] {
+    const mysqlConfig = (config as unknown as { configurationHash: DatabaseConfigOptions })
+      .configurationHash;
+
+    const args = Object.entries({
+      host: "--host",
+      port: "--port",
+      socket: "--socket",
+      username: "--user",
+      encoding: "--default-character-set",
+      sslca: "--ssl-ca",
+      sslcert: "--ssl-cert",
+      sslcapath: "--ssl-capath",
+      sslcipher: "--ssl-cipher",
+      sslkey: "--ssl-key",
+      ssl_mode: "--ssl-mode",
+    }).flatMap(([opt, arg]) =>
+      rtest(mysqlConfig[opt]) ? [`${arg}=${String(mysqlConfig[opt])}`] : [],
+    );
+
+    if (rtest(mysqlConfig.password) && options.includePassword) {
+      args.push(`--password=${String(mysqlConfig.password)}`);
+    } else if (rtest(mysqlConfig.password) && String(mysqlConfig.password) !== "") {
+      args.push("-p");
+    }
+
+    args.push(config.database as string);
+
+    return this.findCmdAndExec(databaseCli()["mysql"], ...args);
   }
 
-  override unquotedTrue(): number {
-    return mysqlUnquotedTrue();
-  }
-
-  override unquotedFalse(): number {
-    return mysqlUnquotedFalse();
-  }
-
-  /** @internal */
-  override arelVisitor(): Visitors.ToSql {
-    return new Visitors.MySQL(this);
+  override async getDatabaseVersion(): Promise<Version> {
+    const fullVersionString = await this.getFullVersion();
+    const versionString = this.versionString(fullVersionString);
+    return new Version(versionString, fullVersionString);
   }
 
   async isMariadb(): Promise<boolean> {
@@ -219,10 +228,6 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
 
   supportsBulkAlter(): boolean {
     return true;
-  }
-
-  override defaultIndexType(index: IndexDefinition): boolean {
-    return index.using === "btree" || super.defaultIndexType(index);
   }
 
   async supportsIndexSortOrder(): Promise<boolean> {
@@ -292,19 +297,6 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     return true;
   }
 
-  override async getAdvisoryLock(
-    lockName: number | bigint | string,
-    timeout = 0,
-  ): Promise<boolean> {
-    return (
-      (await this.queryValue(`SELECT GET_LOCK(${this.quote(String(lockName))}, ${timeout})`)) === 1
-    );
-  }
-
-  override async releaseAdvisoryLock(lockName: number | bigint | string): Promise<boolean> {
-    return (await this.queryValue(`SELECT RELEASE_LOCK(${this.quote(String(lockName))})`)) === 1;
-  }
-
   async supportsInsertOnDuplicateSkip(): Promise<boolean> {
     return true;
   }
@@ -324,48 +316,21 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
       : column.isAutoIncrementedByDb();
   }
 
-  /** @internal */
-  override returningColumnValues(result: Result): Promise<unknown[] | undefined> {
-    return mysqlReturningColumnValues.call(this, result);
+  override async getAdvisoryLock(
+    lockName: number | bigint | string,
+    timeout = 0,
+  ): Promise<boolean> {
+    return (
+      (await this.queryValue(`SELECT GET_LOCK(${this.quote(String(lockName))}, ${timeout})`)) === 1
+    );
   }
 
-  static readonly NATIVE_DATABASE_TYPES: NativeDatabaseTypes = {
-    primary_key: "bigint auto_increment PRIMARY KEY",
-    string: { name: "varchar", limit: 255 },
-    text: { name: "text" },
-    integer: { name: "int", limit: 4 },
-    bigint: { name: "bigint" },
-    float: { name: "float", limit: 24 },
-    decimal: { name: "decimal" },
-    datetime: { name: "datetime" },
-    timestamp: { name: "timestamp" },
-    time: { name: "time" },
-    date: { name: "date" },
-    binary: { name: "blob" },
-    blob: { name: "blob" },
-    boolean: { name: "tinyint", limit: 1 },
-    json: { name: "json" },
-  };
+  override async releaseAdvisoryLock(lockName: number | bigint | string): Promise<boolean> {
+    return (await this.queryValue(`SELECT RELEASE_LOCK(${this.quote(String(lockName))})`)) === 1;
+  }
 
   nativeDatabaseTypes(): NativeDatabaseTypes {
     return AbstractMysqlAdapter.NATIVE_DATABASE_TYPES;
-  }
-
-  /** @internal */
-  override _columnMethodNames(): string[] {
-    return [
-      ...super._columnMethodNames(),
-      "tinyblob",
-      "mediumblob",
-      "longblob",
-      "tinytext",
-      "mediumtext",
-      "longtext",
-      "unsignedInteger",
-      "unsignedBigint",
-      "unsignedFloat",
-      "unsignedDecimal",
-    ];
   }
 
   indexAlgorithms(): Record<string, string> {
@@ -398,6 +363,24 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
       materializeTransactions: false,
     });
   }
+
+  static readonly NATIVE_DATABASE_TYPES: NativeDatabaseTypes = {
+    primary_key: "bigint auto_increment PRIMARY KEY",
+    string: { name: "varchar", limit: 255 },
+    text: { name: "text" },
+    integer: { name: "int", limit: 4 },
+    bigint: { name: "bigint" },
+    float: { name: "float", limit: 24 },
+    decimal: { name: "decimal" },
+    datetime: { name: "datetime" },
+    timestamp: { name: "timestamp" },
+    time: { name: "time" },
+    date: { name: "date" },
+    binary: { name: "blob" },
+    blob: { name: "blob" },
+    boolean: { name: "tinyint", limit: 1 },
+    json: { name: "json" },
+  };
 
   async beginIsolatedDbTransaction(isolation: string): Promise<unknown> {
     const level = fetch<string>(transactionIsolationLevels(), isolation);
@@ -475,21 +458,6 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     return (await this.showVariable("collation_database")) as string | null;
   }
 
-  /** @internal */
-  dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(options: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(
-    nameOrOptions?: string | null | { type?: string },
-    options: { type?: string } = {},
-  ): string {
-    const kwargsOnly = nameOrOptions != null && typeof nameOrOptions === "object";
-    const name = kwargsOnly ? null : nameOrOptions;
-    const opts = kwargsOnly ? nameOrOptions : options;
-    return mysqlDataSourceSql.call(this, name, opts);
-  }
-
   async tableComment(tableName: string): Promise<string | null> {
     const scope = quotedScope.call(this, tableName);
 
@@ -525,6 +493,46 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
       `RENAME TABLE ${this.quoteTableName(tableName)} TO ${this.quoteTableName(newName)}`,
     );
     await this.renameTableIndexes(tableName, newName, options);
+  }
+
+  override async dropTable(
+    ...args:
+      | string[]
+      | [
+          ...string[],
+          { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean } | undefined,
+        ]
+      | [...string[], ((t: MysqlTableDefinition) => void) | undefined]
+      | [
+          ...string[],
+          { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean } | undefined,
+          ((t: MysqlTableDefinition) => void) | undefined,
+        ]
+  ): Promise<void> {
+    const rest = [...args] as unknown[];
+    while (
+      rest.length > 0 &&
+      (rest[rest.length - 1] === undefined || typeof rest[rest.length - 1] === "function")
+    ) {
+      rest.pop();
+    }
+    args = rest as typeof args;
+    const last = args[args.length - 1];
+    const hasOptions = last !== null && last !== undefined && typeof last === "object";
+    const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];
+    const options = (hasOptions ? last : {}) as {
+      ifExists?: boolean;
+      force?: boolean | "cascade";
+      temporary?: boolean;
+    };
+    for (const tableName of tableNames) {
+      await this.schemaCache.clearDataSourceCacheBang(tableName);
+    }
+    const temporary = options.temporary ? " TEMPORARY" : "";
+    const ifExists = options.ifExists ? " IF EXISTS" : "";
+    const cascade = options.force === "cascade" ? " CASCADE" : "";
+    const names = tableNames.map((tableName) => this.quoteTableName(tableName)).join(", ");
+    await this.execute(`DROP${temporary} TABLE${ifExists} ${names}${cascade}`);
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
@@ -672,50 +680,6 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     return sql;
   }
 
-  highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
-    return arelSql("CURRENT_TIMESTAMP(6)");
-  }
-
-  override isWriteQuery(sql: string | null): boolean {
-    return mysqlIsWriteQuery(sql);
-  }
-
-  castBoundValue(value: unknown): unknown {
-    return mysqlCastBoundValue(value);
-  }
-
-  quotedBinary(value: BinaryData): string {
-    return mysqlQuotedBinary(value);
-  }
-
-  unquoteIdentifier(identifier: string | null | undefined): string | null {
-    return mysqlUnquoteIdentifier(identifier);
-  }
-
-  static columnNameMatcher(): RegExp {
-    return mysqlColumnNameMatcher();
-  }
-
-  static columnNameWithOrderMatcher(): RegExp {
-    return mysqlColumnNameWithOrderMatcher();
-  }
-
-  static quoteColumnName(name: unknown): string {
-    return mysqlQuoteColumnName(name);
-  }
-
-  static quoteTableName(name: unknown): string {
-    return mysqlQuoteTableName(name);
-  }
-
-  /** @internal */
-  declare newColumnFromField: typeof newColumnFromField;
-
-  declare explain: typeof mysqlExplain;
-
-  /** @internal */
-  declare extractForeignKeyAction: typeof mysqlExtractForeignKeyAction;
-
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     if (!isPresent(tableName)) throw new ArgumentError("ArgumentError");
 
@@ -826,14 +790,6 @@ WHERE fk.referenced_column_name IS NOT NULL
     }
   }
 
-  /** @internal */
-  declare _maxAllowedPacket?: number | null;
-
-  /** @internal */
-  async maxAllowedPacket(): Promise<number | null> {
-    return mysqlMaxAllowedPacket.call(this);
-  }
-
   async primaryKeys(tableName: string): Promise<string[]> {
     if (!isPresent(tableName)) throw new ArgumentError("ArgumentError");
 
@@ -886,6 +842,10 @@ WHERE fk.referenced_column_name IS NOT NULL
 
   isDefaultIndexType(index: { using?: string | null }): boolean {
     return index.using == null || index.using.toUpperCase() === "BTREE";
+  }
+
+  override defaultIndexType(index: IndexDefinition): boolean {
+    return index.using === "btree" || super.defaultIndexType(index);
   }
 
   /** @missingRailsCall first — PERMANENT */
@@ -962,60 +922,6 @@ WHERE fk.referenced_column_name IS NOT NULL
     return string.replace(MYSQL_ESCAPE_RE, (ch) => MYSQL_ESCAPE_MAP[ch] ?? ch);
   }
 
-  protected _escapeState: EscapeState = { noBackslashEscapes: false };
-
-  protected async loadEscapeState(): Promise<void> {
-    const sqlMode = await this.selectValue("SELECT @@SESSION.sql_mode", "SCHEMA");
-    this._escapeState = {
-      noBackslashEscapes:
-        typeof sqlMode === "string" && sqlMode.split(",").includes("NO_BACKSLASH_ESCAPES"),
-    };
-  }
-
-  /** @missingRailsCall empty? — PERMANENT */
-  static dbconsole(config: DatabaseConfig, options: Record<string, unknown> = {}): string[] {
-    const mysqlConfig = (config as unknown as { configurationHash: DatabaseConfigOptions })
-      .configurationHash;
-
-    const args = Object.entries({
-      host: "--host",
-      port: "--port",
-      socket: "--socket",
-      username: "--user",
-      encoding: "--default-character-set",
-      sslca: "--ssl-ca",
-      sslcert: "--ssl-cert",
-      sslcapath: "--ssl-capath",
-      sslcipher: "--ssl-cipher",
-      sslkey: "--ssl-key",
-      ssl_mode: "--ssl-mode",
-    }).flatMap(([opt, arg]) =>
-      rtest(mysqlConfig[opt]) ? [`${arg}=${String(mysqlConfig[opt])}`] : [],
-    );
-
-    if (rtest(mysqlConfig.password) && options.includePassword) {
-      args.push(`--password=${String(mysqlConfig.password)}`);
-    } else if (rtest(mysqlConfig.password) && String(mysqlConfig.password) !== "") {
-      args.push("-p");
-    }
-
-    args.push(config.database as string);
-
-    return this.findCmdAndExec(databaseCli()["mysql"], ...args);
-  }
-
-  private _emulateBooleans = true;
-
-  get emulateBooleans(): boolean {
-    return this._emulateBooleans;
-  }
-
-  set emulateBooleans(value: boolean) {
-    this._emulateBooleans = value;
-  }
-
-  static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
-
   static override extendedTypeMap(options: {
     defaultTimezone?: string;
     emulateBooleans: boolean;
@@ -1027,81 +933,112 @@ WHERE fk.referenced_column_name IS NOT NULL
     return m;
   }
 
-  static readonly ER_DUP_ENTRY = ER_DUP_ENTRY;
-  static readonly ER_NOT_NULL_VIOLATION = ER_NOT_NULL_VIOLATION;
-  static readonly ER_DO_NOT_HAVE_DEFAULT = ER_DO_NOT_HAVE_DEFAULT;
-  static readonly ER_NO_REFERENCED_ROW_2 = ER_NO_REFERENCED_ROW_2;
-  static readonly ER_DATA_TOO_LONG = ER_DATA_TOO_LONG;
-  static readonly ER_OUT_OF_RANGE = ER_OUT_OF_RANGE;
-  static readonly ER_LOCK_DEADLOCK = ER_LOCK_DEADLOCK;
-  static readonly ER_LOCK_WAIT_TIMEOUT = ER_LOCK_WAIT_TIMEOUT;
-  static readonly ER_QUERY_INTERRUPTED = ER_QUERY_INTERRUPTED;
-  static readonly ER_QUERY_TIMEOUT = ER_QUERY_TIMEOUT;
-  static readonly ER_FILSORT_ABORT = ER_FILSORT_ABORT;
-  static readonly ER_DB_CREATE_EXISTS = ER_DB_CREATE_EXISTS;
-  static readonly ER_SERVER_SHUTDOWN = ER_SERVER_SHUTDOWN;
-  static readonly ER_CONNECTION_KILLED = ER_CONNECTION_KILLED;
-  static readonly CR_SERVER_GONE_ERROR = CR_SERVER_GONE_ERROR;
-  static readonly CR_SERVER_LOST = CR_SERVER_LOST;
-  static readonly ER_CLIENT_INTERACTION_TIMEOUT = ER_CLIENT_INTERACTION_TIMEOUT;
+  /** @internal */
+  declare newColumnFromField: typeof newColumnFromField;
 
-  buildExplainClause(options: ExplainOption[] = []): Promise<string> {
-    return mysqlBuildExplainClause.call(this, options);
+  declare explain: typeof mysqlExplain;
+
+  /** @internal */
+  declare extractForeignKeyAction: typeof mysqlExtractForeignKeyAction;
+
+  /** @internal */
+  static override initializeTypeMap(m: TypeMap): void {
+    super.initializeTypeMap(m);
+
+    m.registerType(/tinytext/i, undefined, () => new TextType({ limit: 2 ** 8 - 1 }));
+    m.registerType(/tinyblob/i, undefined, () => new BinaryType({ limit: 2 ** 8 - 1 }));
+    m.registerType(/text/i, undefined, () => new TextType({ limit: 2 ** 16 - 1 }));
+    m.registerType(/blob/i, undefined, () => new BinaryType({ limit: 2 ** 16 - 1 }));
+    m.registerType(/mediumtext/i, undefined, () => new TextType({ limit: 2 ** 24 - 1 }));
+    m.registerType(/mediumblob/i, undefined, () => new BinaryType({ limit: 2 ** 24 - 1 }));
+    m.registerType(/longtext/i, undefined, () => new TextType({ limit: 2 ** 32 - 1 }));
+    m.registerType(/longblob/i, undefined, () => new BinaryType({ limit: 2 ** 32 - 1 }));
+    m.registerType(/^float/i, undefined, () => new FloatType({ limit: 24 }));
+    m.registerType(/^double/i, undefined, () => new FloatType({ limit: 53 }));
+    this.registerIntegerType(m, /^bigint/i, { limit: 8 });
+    this.registerIntegerType(m, /^int/i, { limit: 4 });
+    this.registerIntegerType(m, /^mediumint/i, { limit: 3 });
+    this.registerIntegerType(m, /^smallint/i, { limit: 2 });
+    this.registerIntegerType(m, /^tinyint/i, { limit: 1 });
+    m.aliasType(/year/i, "integer");
+    m.aliasType(/bit/i, "binary");
   }
 
   /** @internal */
-  protected mismatchedForeignKey(
-    message: string,
-    {
-      sql,
-      binds,
-      connectionPool,
-    }: { sql: string | null; binds: unknown[]; connectionPool: AbstractAdapter["pool"] },
-  ): MismatchedForeignKey | Promise<MismatchedForeignKey> {
-    if (sql) {
-      return this.mismatchedForeignKeyDetails({ message, sql }).then(
-        (details) => new MismatchedForeignKey({ message, sql, binds, connectionPool, ...details }),
-      );
-    }
-    return new MismatchedForeignKey({
-      message,
-      binds,
-      connectionPool,
-      queryParser: (sql) => this.mismatchedForeignKeyDetails({ message, sql }),
+  protected static registerIntegerType(
+    mapping: TypeMap,
+    key: RegExp | string,
+    options: { limit: number },
+  ): void {
+    mapping.registerType(key, undefined, (sqlType: string) => {
+      if (/\bunsigned\b/i.test(sqlType)) return new UnsignedInteger(options);
+      if (options.limit === 8) return new MysqlBigInteger(options);
+      return new IntegerType(options);
     });
   }
 
   /** @internal */
-  protected async mismatchedForeignKeyDetails({
-    message,
-    sql,
-  }: {
-    message: string;
-    sql: string;
-  }): Promise<Partial<MismatchedForeignKeyOptions>> {
-    const foreignKeyPat = /Referencing column '(\w+)' and referenced/i.exec(message)?.[1] ?? "\\w+";
+  static override extractPrecision(sqlType: string): number | undefined {
+    const precision = super.extractPrecision(sqlType);
+    if (/^(?:date)?time(?:stamp)?\b/i.test(sqlType)) return precision ?? 0;
+    return precision;
+  }
 
-    const match = new RegExp(
-      String.raw`(?:CREATE|ALTER)\s+TABLE\s*(?:\`?\w+\`?\.)?\`?(?<table>\w+)\`?.+?` +
-        String.raw`FOREIGN\s+KEY\s*\(\`?(?<foreign_key>${foreignKeyPat})\`?\)\s*` +
-        String.raw`REFERENCES\s*(\`?(?<target_table>\w+)\`?)\s*\(\`?(?<primary_key>\w+)\`?\)`,
-      "ims",
-    ).exec(sql);
+  /** @internal */
+  protected stripWhitespaceCharacters(expression: string): string {
+    return expression.replace(/\\\\n/g, "").replace(/x0A/g, "").replace(/\s+/g, " ").trim();
+  }
 
-    const options: Partial<MismatchedForeignKeyOptions> = {};
+  /** @internal */
+  declare _maxAllowedPacket?: number | null;
 
-    if (match) {
-      options.table = match.groups!.table;
-      options.foreignKey = match.groups!.foreign_key;
-      options.targetTable = match.groups!.target_table;
-      options.primaryKey = match.groups!.primary_key;
-      options.primaryKeyColumn = await this.columnFor(
-        match.groups!.target_table,
-        match.groups!.primary_key,
-      );
+  /** @internal */
+  override extendedTypeMapKey(): { defaultTimezone?: string; emulateBooleans: boolean } | null {
+    if (this._defaultTimezone != null) {
+      return { defaultTimezone: this._defaultTimezone, emulateBooleans: this._emulateBooleans };
     }
+    if (this._emulateBooleans) return { emulateBooleans: true };
+    return null;
+  }
 
-    return options;
+  /** @internal */
+  async handleWarnings(sql: string): Promise<void> {
+    const rawConnection = this._connection as {
+      warningCount?: unknown;
+      query(sql: string): Promise<[unknown, unknown]>;
+    } | null;
+    const action = dbWarningsAction();
+    if (action == null || rawConnection == null) return;
+    const warningCount = await this.warningCount(rawConnection);
+    if (warningCount === 0) return;
+
+    const [rawRows] = await rawConnection.query("SHOW WARNINGS");
+    let result = rawRows as Array<{ Level?: string; Code?: number | string; Message?: string }>;
+    if (result.length === 0) {
+      result = [
+        {
+          Level: "Warning",
+          Code: undefined,
+          Message: `Query had warning_count=${warningCount} but ‘SHOW WARNINGS’ did not return the warnings. Check MySQL logs or database configuration.`,
+        },
+      ];
+    }
+    for (const row of result) {
+      const level = row.Level ?? null;
+      const code = row.Code == null ? null : String(row.Code);
+      const message = row.Message ?? "";
+      const warning = new SQLWarning(message, code, level, sql, this.pool);
+      if (this.isWarningIgnored(warning as unknown as { level?: string; message?: string }))
+        continue;
+
+      action.call(this, warning);
+    }
+  }
+
+  /** @internal */
+  override isWarningIgnored(warning: { level?: string; [k: string]: unknown }): boolean {
+    if (warning.level === "Note") return true;
+    return super.isWarningIgnored(warning);
   }
 
   /** @internal */
@@ -1160,248 +1097,6 @@ WHERE fk.referenced_column_name IS NOT NULL
       default:
         return super.translateException(exception, { message, sql, binds });
     }
-  }
-
-  /** @internal */
-  protected stripWhitespaceCharacters(expression: string): string {
-    return expression.replace(/\\\\n/g, "").replace(/x0A/g, "").replace(/\s+/g, " ").trim();
-  }
-
-  /** @internal */
-  override extendedTypeMapKey(): { defaultTimezone?: string; emulateBooleans: boolean } | null {
-    if (this._defaultTimezone != null) {
-      return { defaultTimezone: this._defaultTimezone, emulateBooleans: this._emulateBooleans };
-    }
-    if (this._emulateBooleans) return { emulateBooleans: true };
-    return null;
-  }
-
-  override async dropTable(
-    ...args:
-      | string[]
-      | [
-          ...string[],
-          { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean } | undefined,
-        ]
-      | [...string[], ((t: MysqlTableDefinition) => void) | undefined]
-      | [
-          ...string[],
-          { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean } | undefined,
-          ((t: MysqlTableDefinition) => void) | undefined,
-        ]
-  ): Promise<void> {
-    const rest = [...args] as unknown[];
-    while (
-      rest.length > 0 &&
-      (rest[rest.length - 1] === undefined || typeof rest[rest.length - 1] === "function")
-    ) {
-      rest.pop();
-    }
-    args = rest as typeof args;
-    const last = args[args.length - 1];
-    const hasOptions = last !== null && last !== undefined && typeof last === "object";
-    const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];
-    const options = (hasOptions ? last : {}) as {
-      ifExists?: boolean;
-      force?: boolean | "cascade";
-      temporary?: boolean;
-    };
-    for (const tableName of tableNames) {
-      await this.schemaCache.clearDataSourceCacheBang(tableName);
-    }
-    const temporary = options.temporary ? " TEMPORARY" : "";
-    const ifExists = options.ifExists ? " IF EXISTS" : "";
-    const cascade = options.force === "cascade" ? " CASCADE" : "";
-    const names = tableNames.map((tableName) => this.quoteTableName(tableName)).join(", ");
-    await this.execute(`DROP${temporary} TABLE${ifExists} ${names}${cascade}`);
-  }
-
-  /** @internal */
-  async handleWarnings(sql: string): Promise<void> {
-    const rawConnection = this._connection as {
-      warningCount?: unknown;
-      query(sql: string): Promise<[unknown, unknown]>;
-    } | null;
-    const action = dbWarningsAction();
-    if (action == null || rawConnection == null) return;
-    const warningCount = await this.warningCount(rawConnection);
-    if (warningCount === 0) return;
-
-    const [rawRows] = await rawConnection.query("SHOW WARNINGS");
-    let result = rawRows as Array<{ Level?: string; Code?: number | string; Message?: string }>;
-    if (result.length === 0) {
-      result = [
-        {
-          Level: "Warning",
-          Code: undefined,
-          Message: `Query had warning_count=${warningCount} but ‘SHOW WARNINGS’ did not return the warnings. Check MySQL logs or database configuration.`,
-        },
-      ];
-    }
-    for (const row of result) {
-      const level = row.Level ?? null;
-      const code = row.Code == null ? null : String(row.Code);
-      const message = row.Message ?? "";
-      const warning = new SQLWarning(message, code, level, sql, this.pool);
-      if (this.isWarningIgnored(warning as unknown as { level?: string; message?: string }))
-        continue;
-
-      action.call(this, warning);
-    }
-  }
-
-  /** @internal */
-  protected async warningCount(rawConnection: {
-    warningCount?: unknown;
-    query(sql: string): Promise<[unknown, unknown]>;
-  }): Promise<number> {
-    if (typeof rawConnection.warningCount === "number") return rawConnection.warningCount;
-    const [rows] = await rawConnection.query("SHOW COUNT(*) WARNINGS");
-    const row = (rows as Record<string, unknown>[])[0];
-    if (!row) return 0;
-    const value = Object.values(row)[0];
-    return typeof value === "number" ? value : Number(value) || 0;
-  }
-
-  /** @internal */
-  override isWarningIgnored(warning: { level?: string; [k: string]: unknown }): boolean {
-    if (warning.level === "Note") return true;
-    return super.isWarningIgnored(warning);
-  }
-
-  /** @internal */
-  async supportsInsertRawAliasSyntax(): Promise<boolean> {
-    if (await this.isMariadb()) return false;
-    return (await this.databaseVersion).compare("8.0.19") >= 0;
-  }
-
-  /** @internal */
-  async supportsRenameIndex(): Promise<boolean> {
-    if (await this.isMariadb()) return (await this.databaseVersion).compare("10.5.2") >= 0;
-    return (await this.databaseVersion).compare("5.7.6") >= 0;
-  }
-
-  /** @internal */
-  async supportsRenameColumn(): Promise<boolean> {
-    if (await this.isMariadb()) return (await this.databaseVersion).compare("10.5.2") >= 0;
-    return (await this.databaseVersion).compare("8.0.3") >= 0;
-  }
-
-  /** @internal */
-  override async configureConnection(): Promise<void> {
-    await super.configureConnection();
-    const variables: Record<string, unknown> = {
-      ...(fetch(this._config, "variables", {}) as Record<string, unknown>),
-    };
-
-    let waitTimeout = (this.constructor as typeof AbstractMysqlAdapter).typeCastConfigToInteger(
-      this._config.waitTimeout,
-    );
-    if (!Number.isInteger(waitTimeout)) waitTimeout = 2147483;
-    variables["wait_timeout"] = waitTimeout;
-
-    const defaults = new Set<unknown>([":default"]);
-
-    let sqlMode: unknown = variables["sql_mode"];
-    delete variables["sql_mode"];
-    if (sqlMode != null && sqlMode !== false) {
-      sqlMode = this.quote(sqlMode);
-    } else if (!defaults.has(this.isStrictMode())) {
-      if (rtest(this.isStrictMode())) {
-        sqlMode = "CONCAT(@@sql_mode, ',STRICT_ALL_TABLES')";
-      } else {
-        sqlMode = "REPLACE(@@sql_mode, 'STRICT_TRANS_TABLES', '')";
-        sqlMode = `REPLACE(${sqlMode}, 'STRICT_ALL_TABLES', '')`;
-        sqlMode = `REPLACE(${sqlMode}, 'TRADITIONAL', '')`;
-      }
-      sqlMode = `CONCAT(${sqlMode}, ',NO_AUTO_VALUE_ON_ZERO')`;
-    }
-    const sqlModeAssignment =
-      sqlMode != null && sqlMode !== false ? `@@SESSION.sql_mode = ${sqlMode}, ` : "";
-
-    let encoding = "";
-    if (rtest(this._config.encoding)) {
-      encoding = `NAMES ${this._config.encoding}`;
-      if (rtest(this._config.collation)) encoding += ` COLLATE ${this._config.collation}`;
-      encoding += ", ";
-    }
-
-    const variableAssignments = Object.entries(variables)
-      .flatMap(([k, v]) => {
-        if (defaults.has(v)) {
-          return [`@@SESSION.${k} = DEFAULT`];
-        } else if (v != null) {
-          return [`@@SESSION.${k} = ${this.quote(v)}`];
-        }
-        return [];
-      })
-      .join(", ");
-
-    await this.rawExecute(`SET ${encoding} ${sqlModeAssignment} ${variableAssignments}`, "SCHEMA");
-  }
-
-  override async getDatabaseVersion(): Promise<Version> {
-    const fullVersionString = await this.getFullVersion();
-    const versionString = this.versionString(fullVersionString);
-    return new Version(versionString, fullVersionString);
-  }
-
-  /** @internal */
-  protected versionString(fullVersionString: string | null | undefined): string {
-    let matches: RegExpMatchArray | null;
-    if (
-      fullVersionString != null &&
-      (matches = fullVersionString.match(/^(?:5\.5\.5-)?(\d+\.\d+\.\d+)/))
-    ) {
-      return matches[1];
-    } else {
-      throw new DatabaseVersionError(
-        `Unable to parse MySQL version from ${rbInspect(fullVersionString)}`,
-      );
-    }
-  }
-
-  /** @internal */
-  static override initializeTypeMap(m: TypeMap): void {
-    super.initializeTypeMap(m);
-
-    m.registerType(/tinytext/i, undefined, () => new TextType({ limit: 2 ** 8 - 1 }));
-    m.registerType(/tinyblob/i, undefined, () => new BinaryType({ limit: 2 ** 8 - 1 }));
-    m.registerType(/text/i, undefined, () => new TextType({ limit: 2 ** 16 - 1 }));
-    m.registerType(/blob/i, undefined, () => new BinaryType({ limit: 2 ** 16 - 1 }));
-    m.registerType(/mediumtext/i, undefined, () => new TextType({ limit: 2 ** 24 - 1 }));
-    m.registerType(/mediumblob/i, undefined, () => new BinaryType({ limit: 2 ** 24 - 1 }));
-    m.registerType(/longtext/i, undefined, () => new TextType({ limit: 2 ** 32 - 1 }));
-    m.registerType(/longblob/i, undefined, () => new BinaryType({ limit: 2 ** 32 - 1 }));
-    m.registerType(/^float/i, undefined, () => new FloatType({ limit: 24 }));
-    m.registerType(/^double/i, undefined, () => new FloatType({ limit: 53 }));
-    this.registerIntegerType(m, /^bigint/i, { limit: 8 });
-    this.registerIntegerType(m, /^int/i, { limit: 4 });
-    this.registerIntegerType(m, /^mediumint/i, { limit: 3 });
-    this.registerIntegerType(m, /^smallint/i, { limit: 2 });
-    this.registerIntegerType(m, /^tinyint/i, { limit: 1 });
-    m.aliasType(/year/i, "integer");
-    m.aliasType(/bit/i, "binary");
-  }
-
-  /** @internal */
-  protected static registerIntegerType(
-    mapping: TypeMap,
-    key: RegExp | string,
-    options: { limit: number },
-  ): void {
-    mapping.registerType(key, undefined, (sqlType: string) => {
-      if (/\bunsigned\b/i.test(sqlType)) return new UnsignedInteger(options);
-      if (options.limit === 8) return new MysqlBigInteger(options);
-      return new IntegerType(options);
-    });
-  }
-
-  /** @internal */
-  static override extractPrecision(sqlType: string): number | undefined {
-    const precision = super.extractPrecision(sqlType);
-    if (/^(?:date)?time(?:stamp)?\b/i.test(sqlType)) return precision ?? 0;
-    return precision;
   }
 
   /** @internal */
@@ -1465,6 +1160,81 @@ WHERE fk.referenced_column_name IS NOT NULL
   }
 
   /** @internal */
+  async supportsInsertRawAliasSyntax(): Promise<boolean> {
+    if (await this.isMariadb()) return false;
+    return (await this.databaseVersion).compare("8.0.19") >= 0;
+  }
+
+  /** @internal */
+  async supportsRenameIndex(): Promise<boolean> {
+    if (await this.isMariadb()) return (await this.databaseVersion).compare("10.5.2") >= 0;
+    return (await this.databaseVersion).compare("5.7.6") >= 0;
+  }
+
+  protected _escapeState: EscapeState = { noBackslashEscapes: false };
+
+  /** @internal */
+  async supportsRenameColumn(): Promise<boolean> {
+    if (await this.isMariadb()) return (await this.databaseVersion).compare("10.5.2") >= 0;
+    return (await this.databaseVersion).compare("8.0.3") >= 0;
+  }
+
+  /** @internal */
+  override async configureConnection(): Promise<void> {
+    await super.configureConnection();
+    const variables: Record<string, unknown> = {
+      ...(fetch(this._config, "variables", {}) as Record<string, unknown>),
+    };
+
+    let waitTimeout = (this.constructor as typeof AbstractMysqlAdapter).typeCastConfigToInteger(
+      this._config.waitTimeout,
+    );
+    if (!Number.isInteger(waitTimeout)) waitTimeout = 2147483;
+    variables["wait_timeout"] = waitTimeout;
+
+    const defaults = new Set<unknown>([":default"]);
+
+    let sqlMode: unknown = variables["sql_mode"];
+    delete variables["sql_mode"];
+    if (sqlMode != null && sqlMode !== false) {
+      sqlMode = this.quote(sqlMode);
+    } else if (!defaults.has(this.isStrictMode())) {
+      if (rtest(this.isStrictMode())) {
+        sqlMode = "CONCAT(@@sql_mode, ',STRICT_ALL_TABLES')";
+      } else {
+        sqlMode = "REPLACE(@@sql_mode, 'STRICT_TRANS_TABLES', '')";
+        sqlMode = `REPLACE(${sqlMode}, 'STRICT_ALL_TABLES', '')`;
+        sqlMode = `REPLACE(${sqlMode}, 'TRADITIONAL', '')`;
+      }
+      sqlMode = `CONCAT(${sqlMode}, ',NO_AUTO_VALUE_ON_ZERO')`;
+    }
+    const sqlModeAssignment =
+      sqlMode != null && sqlMode !== false ? `@@SESSION.sql_mode = ${sqlMode}, ` : "";
+
+    let encoding = "";
+    if (rtest(this._config.encoding)) {
+      encoding = `NAMES ${this._config.encoding}`;
+      if (rtest(this._config.collation)) encoding += ` COLLATE ${this._config.collation}`;
+      encoding += ", ";
+    }
+
+    const variableAssignments = Object.entries(variables)
+      .flatMap(([k, v]) => {
+        if (defaults.has(v)) {
+          return [`@@SESSION.${k} = DEFAULT`];
+        } else if (v != null) {
+          return [`@@SESSION.${k} = ${this.quote(v)}`];
+        }
+        return [];
+      })
+      .join(", ");
+
+    await this.rawExecute(`SET ${encoding} ${sqlModeAssignment} ${variableAssignments}`, "SCHEMA");
+  }
+
+  private _emulateBooleans = true;
+
+  /** @internal */
   async columnDefinitions(tableName: string): Promise<Record<string, unknown>[]> {
     const result = await this.internalExecQuery(
       `SHOW FULL FIELDS FROM ${this.quoteTableName(tableName)}`,
@@ -1472,6 +1242,8 @@ WHERE fk.referenced_column_name IS NOT NULL
     );
     return result.toArray();
   }
+
+  static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
 
   /** @internal */
   async createTableInfo(tableName: string): Promise<string | null> {
@@ -1482,11 +1254,239 @@ WHERE fk.referenced_column_name IS NOT NULL
     return (result.first()?.["Create Table"] as string | null | undefined) ?? null;
   }
 
+  static readonly ER_DUP_ENTRY = ER_DUP_ENTRY;
+  static readonly ER_NOT_NULL_VIOLATION = ER_NOT_NULL_VIOLATION;
+  static readonly ER_DO_NOT_HAVE_DEFAULT = ER_DO_NOT_HAVE_DEFAULT;
+  static readonly ER_NO_REFERENCED_ROW_2 = ER_NO_REFERENCED_ROW_2;
+  static readonly ER_DATA_TOO_LONG = ER_DATA_TOO_LONG;
+  static readonly ER_OUT_OF_RANGE = ER_OUT_OF_RANGE;
+  static readonly ER_LOCK_DEADLOCK = ER_LOCK_DEADLOCK;
+  static readonly ER_LOCK_WAIT_TIMEOUT = ER_LOCK_WAIT_TIMEOUT;
+  static readonly ER_QUERY_INTERRUPTED = ER_QUERY_INTERRUPTED;
+  static readonly ER_QUERY_TIMEOUT = ER_QUERY_TIMEOUT;
+  static readonly ER_FILSORT_ABORT = ER_FILSORT_ABORT;
+  static readonly ER_DB_CREATE_EXISTS = ER_DB_CREATE_EXISTS;
+  static readonly ER_SERVER_SHUTDOWN = ER_SERVER_SHUTDOWN;
+  static readonly ER_CONNECTION_KILLED = ER_CONNECTION_KILLED;
+  static readonly CR_SERVER_GONE_ERROR = CR_SERVER_GONE_ERROR;
+  static readonly CR_SERVER_LOST = CR_SERVER_LOST;
+  static readonly ER_CLIENT_INTERACTION_TIMEOUT = ER_CLIENT_INTERACTION_TIMEOUT;
+
+  /** @internal */
+  override arelVisitor(): Visitors.ToSql {
+    return new Visitors.MySQL(this);
+  }
+
   /** @internal */
   buildStatementPool(): StatementPool {
     return new StatementPool(
       AbstractMysqlAdapter.typeCastConfigToInteger(this._config.statementLimit) as number,
     );
+  }
+
+  /** @internal */
+  protected async mismatchedForeignKeyDetails({
+    message,
+    sql,
+  }: {
+    message: string;
+    sql: string;
+  }): Promise<Partial<MismatchedForeignKeyOptions>> {
+    const foreignKeyPat = /Referencing column '(\w+)' and referenced/i.exec(message)?.[1] ?? "\\w+";
+
+    const match = new RegExp(
+      String.raw`(?:CREATE|ALTER)\s+TABLE\s*(?:\`?\w+\`?\.)?\`?(?<table>\w+)\`?.+?` +
+        String.raw`FOREIGN\s+KEY\s*\(\`?(?<foreign_key>${foreignKeyPat})\`?\)\s*` +
+        String.raw`REFERENCES\s*(\`?(?<target_table>\w+)\`?)\s*\(\`?(?<primary_key>\w+)\`?\)`,
+      "ims",
+    ).exec(sql);
+
+    const options: Partial<MismatchedForeignKeyOptions> = {};
+
+    if (match) {
+      options.table = match.groups!.table;
+      options.foreignKey = match.groups!.foreign_key;
+      options.targetTable = match.groups!.target_table;
+      options.primaryKey = match.groups!.primary_key;
+      options.primaryKeyColumn = await this.columnFor(
+        match.groups!.target_table,
+        match.groups!.primary_key,
+      );
+    }
+
+    return options;
+  }
+
+  /** @internal */
+  protected mismatchedForeignKey(
+    message: string,
+    {
+      sql,
+      binds,
+      connectionPool,
+    }: { sql: string | null; binds: unknown[]; connectionPool: AbstractAdapter["pool"] },
+  ): MismatchedForeignKey | Promise<MismatchedForeignKey> {
+    if (sql) {
+      return this.mismatchedForeignKeyDetails({ message, sql }).then(
+        (details) => new MismatchedForeignKey({ message, sql, binds, connectionPool, ...details }),
+      );
+    }
+    return new MismatchedForeignKey({
+      message,
+      binds,
+      connectionPool,
+      queryParser: (sql) => this.mismatchedForeignKeyDetails({ message, sql }),
+    });
+  }
+
+  /** @internal */
+  protected versionString(fullVersionString: string | null | undefined): string {
+    let matches: RegExpMatchArray | null;
+    if (
+      fullVersionString != null &&
+      (matches = fullVersionString.match(/^(?:5\.5\.5-)?(\d+\.\d+\.\d+)/))
+    ) {
+      return matches[1];
+    } else {
+      throw new DatabaseVersionError(
+        `Unable to parse MySQL version from ${rbInspect(fullVersionString)}`,
+      );
+    }
+  }
+
+  override async removeForeignKey(
+    fromTable: string,
+    toTable?: string | RemoveForeignKeyOptions,
+    options: RemoveForeignKeyOptions = {},
+  ): Promise<void> {
+    const optionsForm = typeof toTable === "object" && toTable !== null;
+    const opts: RemoveForeignKeyOptions = { ...(optionsForm ? toTable : options) };
+    if (opts.onUpdate === "restrict") delete opts.onUpdate;
+    if (opts.onDelete === "restrict") delete opts.onDelete;
+    return optionsForm
+      ? super.removeForeignKey(fromTable, opts)
+      : super.removeForeignKey(fromTable, toTable, opts);
+  }
+
+  /** @internal */
+
+  tableAliasLength(): number {
+    return mysqlTableAliasLength();
+  }
+
+  override typeCast(value: unknown): unknown {
+    return mysqlTypeCast.call(this, value);
+  }
+
+  override unquotedTrue(): number {
+    return mysqlUnquotedTrue();
+  }
+
+  override unquotedFalse(): number {
+    return mysqlUnquotedFalse();
+  }
+
+  /** @internal */
+  override returningColumnValues(result: Result): Promise<unknown[] | undefined> {
+    return mysqlReturningColumnValues.call(this, result);
+  }
+
+  /** @internal */
+  override _columnMethodNames(): string[] {
+    return [
+      ...super._columnMethodNames(),
+      "tinyblob",
+      "mediumblob",
+      "longblob",
+      "tinytext",
+      "mediumtext",
+      "longtext",
+      "unsignedInteger",
+      "unsignedBigint",
+      "unsignedFloat",
+      "unsignedDecimal",
+    ];
+  }
+
+  /** @internal */
+  dataSourceSql(name?: string | null, options?: { type?: string }): string;
+  /** @internal */
+  dataSourceSql(options: { type?: string }): string;
+  /** @internal */
+  dataSourceSql(
+    nameOrOptions?: string | null | { type?: string },
+    options: { type?: string } = {},
+  ): string {
+    const kwargsOnly = nameOrOptions != null && typeof nameOrOptions === "object";
+    const name = kwargsOnly ? null : nameOrOptions;
+    const opts = kwargsOnly ? nameOrOptions : options;
+    return mysqlDataSourceSql.call(this, name, opts);
+  }
+
+  highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
+    return arelSql("CURRENT_TIMESTAMP(6)");
+  }
+
+  override isWriteQuery(sql: string | null): boolean {
+    return mysqlIsWriteQuery(sql);
+  }
+
+  castBoundValue(value: unknown): unknown {
+    return mysqlCastBoundValue(value);
+  }
+
+  quotedBinary(value: BinaryData): string {
+    return mysqlQuotedBinary(value);
+  }
+
+  unquoteIdentifier(identifier: string | null | undefined): string | null {
+    return mysqlUnquoteIdentifier(identifier);
+  }
+
+  static columnNameMatcher(): RegExp {
+    return mysqlColumnNameMatcher();
+  }
+
+  static columnNameWithOrderMatcher(): RegExp {
+    return mysqlColumnNameWithOrderMatcher();
+  }
+
+  static quoteColumnName(name: unknown): string {
+    return mysqlQuoteColumnName(name);
+  }
+
+  static quoteTableName(name: unknown): string {
+    return mysqlQuoteTableName(name);
+  }
+
+  /** @internal */
+  async maxAllowedPacket(): Promise<number | null> {
+    return mysqlMaxAllowedPacket.call(this);
+  }
+
+  protected async loadEscapeState(): Promise<void> {
+    const sqlMode = await this.selectValue("SELECT @@SESSION.sql_mode", "SCHEMA");
+    this._escapeState = {
+      noBackslashEscapes:
+        typeof sqlMode === "string" && sqlMode.split(",").includes("NO_BACKSLASH_ESCAPES"),
+    };
+  }
+
+  buildExplainClause(options: ExplainOption[] = []): Promise<string> {
+    return mysqlBuildExplainClause.call(this, options);
+  }
+
+  /** @internal */
+  protected async warningCount(rawConnection: {
+    warningCount?: unknown;
+    query(sql: string): Promise<[unknown, unknown]>;
+  }): Promise<number> {
+    if (typeof rawConnection.warningCount === "number") return rawConnection.warningCount;
+    const [rows] = await rawConnection.query("SHOW COUNT(*) WARNINGS");
+    const row = (rows as Record<string, unknown>[])[0];
+    if (!row) return 0;
+    const value = Object.values(row)[0];
+    return typeof value === "number" ? value : Number(value) || 0;
   }
 }
 

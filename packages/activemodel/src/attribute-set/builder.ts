@@ -2,11 +2,13 @@ import { registerConstant } from "@blazetrails/activesupport";
 import { Attribute, Uninitialized } from "../attribute.js";
 import type { Block } from "@blazetrails/ruby-compat";
 import {
+  dup,
   eachKey,
   eachValue,
   except,
   fetch,
   hasKey,
+  rbEqual,
   transformValues,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "../type/value.js";
@@ -30,6 +32,7 @@ export class Builder {
 }
 
 export class LazyAttributeSet extends AttributeSet {
+  declare protected _attributes: Record<string, Attribute>;
   private values: Record<string, unknown>;
   private types: Record<string, ValueType>;
   private additionalTypes: Record<string, ValueType>;
@@ -192,15 +195,13 @@ export class LazyAttributeHash {
   }
 
   deepDup(): LazyAttributeHash {
-    const copy = new LazyAttributeHash(
-      this.types,
-      this.values,
-      this.additionalTypes,
-      this.defaultAttributes,
-      transformValues(this._delegateHash, (attr) => attr.dup()),
-    );
-    copy.materialized = this.materialized;
+    const copy = this.dup();
+    copy._delegateHash = transformValues(this.delegateHash(), (attr) => attr.dup());
     return copy;
+  }
+
+  private initializeDup(_: LazyAttributeHash): void {
+    this._delegateHash = dup(this._delegateHash);
   }
 
   eachKey(fn: (key: string) => void): void {
@@ -210,6 +211,14 @@ export class LazyAttributeHash {
       ...Object.keys(this.delegateHash()),
     ]);
     for (const key of keys) fn(key);
+  }
+
+  equals(other: unknown): boolean {
+    if (other instanceof LazyAttributeHash) {
+      return rbEqual(this.materialize(), other.materialize());
+    } else {
+      return rbEqual(this.materialize(), other);
+    }
   }
 
   marshalDump(): [
@@ -279,6 +288,12 @@ export class LazyAttributeHash {
       return built;
     }
     return Attribute.null(name);
+  }
+
+  dup(): LazyAttributeHash {
+    const dup = Object.assign(Object.create(Object.getPrototypeOf(this) as object), this) as this;
+    dup.initializeDup(this);
+    return dup;
   }
 }
 

@@ -25,20 +25,16 @@ export class PoolConfig {
   private _serverVersionInFlight: { connection: DatabaseAdapter; fetch: Promise<unknown> } | null =
     null;
 
-  constructor(
-    connectionClass: ConnectionDescriptor | ConnectionOwner,
-    dbConfig: HashConfig,
-    role: string = "writing",
-    shard: string = "default",
-  ) {
-    this.connectionDescriptor = connectionClass;
-    this.dbConfig = dbConfig;
-    this.role = role;
-    this.shard = shard;
+  get connectionDescriptor(): ConnectionDescriptor {
+    return this._connectionDescriptor;
+  }
 
-    const ref = new WeakRef(this);
-    INSTANCES.add(ref);
-    registry?.register(this, ref);
+  set connectionDescriptor(value: ConnectionDescriptor | ConnectionOwner) {
+    if (value instanceof ConnectionDescriptor) {
+      this._connectionDescriptor = value;
+    } else {
+      this._connectionDescriptor = new ConnectionDescriptor(value.name, value.isPrimaryClass());
+    }
   }
 
   get schemaReflection(): SchemaReflection {
@@ -47,30 +43,6 @@ export class PoolConfig {
       this._schemaReflection = new SchemaReflection(lazySchemaCachePath);
     }
     return this._schemaReflection;
-  }
-
-  private _lazySchemaCachePath(): string | null {
-    const cfg = this.dbConfig as unknown as {
-      defaultSchemaCachePath?: (dbDir?: string) => string | null | undefined;
-      schemaCachePath?: string | null;
-    };
-    const dbDir = this._resolveDbDir();
-    let raw: string | null | undefined;
-    if (cfg && "schemaCachePath" in cfg && cfg.schemaCachePath != null) {
-      raw = cfg.schemaCachePath;
-    } else if (typeof cfg?.defaultSchemaCachePath === "function") {
-      raw = cfg.defaultSchemaCachePath(dbDir);
-    }
-    const trimmed = typeof raw === "string" ? raw.trim() : "";
-    return trimmed.length > 0 ? trimmed : null;
-  }
-
-  private _resolveDbDir(): string {
-    try {
-      return DatabaseTasks.dbDir ?? "db";
-    } catch {
-      return "db";
-    }
   }
 
   set schemaReflection(value: SchemaReflection) {
@@ -102,37 +74,6 @@ export class PoolConfig {
     this._serverVersion = value;
   }
 
-  get pool(): ConnectionPool {
-    if (!this._pool) {
-      this._pool = new ConnectionPool(this);
-    }
-    return this._pool;
-  }
-
-  async disconnectBang({
-    automaticReconnect = false,
-  }: { automaticReconnect?: boolean } = {}): Promise<void> {
-    if (!this._pool) return;
-
-    await synchronize.call(this, async () => {
-      if (!this._pool) return;
-
-      this._pool.automaticReconnect = automaticReconnect;
-      await this._pool.disconnectBang();
-    });
-  }
-
-  async discardPoolBang(): Promise<void> {
-    if (!this._pool) return;
-
-    await synchronize.call(this, async () => {
-      if (!this._pool) return;
-
-      await this._pool.discardBang();
-      this._pool = null;
-    });
-  }
-
   /** @missingRailsCall each_key — PERMANENT */
   static async discardPoolsBang(): Promise<void> {
     for (const ref of INSTANCES) {
@@ -159,15 +100,74 @@ export class PoolConfig {
     await Promise.all(drains);
   }
 
-  get connectionDescriptor(): ConnectionDescriptor {
-    return this._connectionDescriptor;
+  constructor(
+    connectionClass: ConnectionDescriptor | ConnectionOwner,
+    dbConfig: HashConfig,
+    role: string = "writing",
+    shard: string = "default",
+  ) {
+    this.connectionDescriptor = connectionClass;
+    this.dbConfig = dbConfig;
+    this.role = role;
+    this.shard = shard;
+
+    const ref = new WeakRef(this);
+    INSTANCES.add(ref);
+    registry?.register(this, ref);
   }
 
-  set connectionDescriptor(value: ConnectionDescriptor | ConnectionOwner) {
-    if (value instanceof ConnectionDescriptor) {
-      this._connectionDescriptor = value;
-    } else {
-      this._connectionDescriptor = new ConnectionDescriptor(value.name, value.isPrimaryClass());
+  async disconnectBang({
+    automaticReconnect = false,
+  }: { automaticReconnect?: boolean } = {}): Promise<void> {
+    if (!this._pool) return;
+
+    await synchronize.call(this, async () => {
+      if (!this._pool) return;
+
+      this._pool.automaticReconnect = automaticReconnect;
+      await this._pool.disconnectBang();
+    });
+  }
+
+  get pool(): ConnectionPool {
+    if (!this._pool) {
+      this._pool = new ConnectionPool(this);
+    }
+    return this._pool;
+  }
+
+  async discardPoolBang(): Promise<void> {
+    if (!this._pool) return;
+
+    await synchronize.call(this, async () => {
+      if (!this._pool) return;
+
+      await this._pool.discardBang();
+      this._pool = null;
+    });
+  }
+
+  private _lazySchemaCachePath(): string | null {
+    const cfg = this.dbConfig as unknown as {
+      defaultSchemaCachePath?: (dbDir?: string) => string | null | undefined;
+      schemaCachePath?: string | null;
+    };
+    const dbDir = this._resolveDbDir();
+    let raw: string | null | undefined;
+    if (cfg && "schemaCachePath" in cfg && cfg.schemaCachePath != null) {
+      raw = cfg.schemaCachePath;
+    } else if (typeof cfg?.defaultSchemaCachePath === "function") {
+      raw = cfg.defaultSchemaCachePath(dbDir);
+    }
+    const trimmed = typeof raw === "string" ? raw.trim() : "";
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private _resolveDbDir(): string {
+    try {
+      return DatabaseTasks.dbDir ?? "db";
+    } catch {
+      return "db";
     }
   }
 }

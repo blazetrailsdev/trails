@@ -22,12 +22,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
   protected _tableCollationCache?: Record<string, string | undefined>;
 
   /** @internal */
-  protected override async tableOptions(tableName: string): Promise<Record<string, unknown>> {
-    if (!this.connection) return {};
-    return this.connection.tableOptions(tableName);
-  }
-
-  /** @internal */
   protected override async prepareColumnOptions(
     column: MysqlColumn,
   ): Promise<Record<string, unknown>> {
@@ -111,12 +105,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected override schemaScale(column: MysqlColumn): string | undefined {
-    if (column.type !== "decimal") return undefined;
-    return super.schemaScale(column);
-  }
-
-  /** @internal */
   protected override async schemaCollation(column: MysqlColumn): Promise<string | undefined> {
     if (column.collation != null) {
       this._tableCollationCache ??= {};
@@ -159,5 +147,17 @@ export class SchemaDumper extends AbstractSchemaDumper {
         ((await this.connection!.queryValue(sql, "SCHEMA")) as string).replace(/\\'/g, "'"),
       );
     }
+  }
+
+  /** @internal */
+  protected override async tableOptions(tableName: string): Promise<Record<string, unknown>> {
+    if (!this.connection) return {};
+    return this.connection.tableOptions(tableName);
+  }
+
+  /** @internal */
+  protected override schemaScale(column: MysqlColumn): string | undefined {
+    if (column.type !== "decimal") return undefined;
+    return super.schemaScale(column);
   }
 }

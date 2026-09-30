@@ -204,6 +204,10 @@ export class Error {
     this.options = options;
   }
 
+  initializeDup(_other: Error): void {
+    this.options = deepDup(this.options);
+  }
+
   get message(): string | null {
     if (this.rawType != null && this.rawType.startsWith(":")) {
       return Error.generateMessage(
@@ -261,10 +265,6 @@ export class Error {
   /** @internal */
   protected attributesForHash(): [ModelBase, string, string | null, Record<string, unknown>] {
     return [this.base, this.attribute, this.rawType, except(this.options, ...CALLBACKS_OPTIONS)];
-  }
-
-  initializeDup(_other: Error): void {
-    this.options = deepDup(this.options);
   }
 
   deepDup(): this {

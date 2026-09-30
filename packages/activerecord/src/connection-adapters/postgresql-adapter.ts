@@ -231,20 +231,27 @@ export class PostgreSQLAdapter
 {
   static override readonly ADAPTER_NAME = "PostgreSQL";
 
-  static columnNameMatcher(): RegExp {
-    return pgColumnNameMatcher();
-  }
-
-  static columnNameWithOrderMatcher(): RegExp {
-    return pgColumnNameWithOrderMatcher();
-  }
-
-  static override quoteColumnName(name: unknown): string {
-    return pgQuoteColumnName(name);
-  }
-
-  static override quoteTableName(name: unknown): string {
-    return pgQuoteTableName(name);
+  static async newClient(connParams: pg.ClientConfig): Promise<pg.Client> {
+    const client = new pg.Client(connParams);
+    const { database, user, host } = client;
+    try {
+      await client.connect();
+      return client;
+    } catch (error) {
+      await client.end().catch(() => {});
+      const message = error instanceof Error ? error.message : String(error);
+      if (database === "postgres") {
+        throw new ConnectionNotEstablished(message);
+      } else if (database && message.includes(database)) {
+        throw NoDatabaseError.dbError(database);
+      } else if (user && message.includes(user)) {
+        throw DatabaseConnectionError.usernameError(user);
+      } else if (host && message.includes(host)) {
+        throw DatabaseConnectionError.hostnameError(host);
+      } else {
+        throw new ConnectionNotEstablished(message);
+      }
+    }
   }
 
   static override dbconsole(
@@ -276,27 +283,31 @@ export class PostgreSQLAdapter
     return this.findCmdAndExec(databaseCli()["postgresql"], config.database!);
   }
 
-  override async active(): Promise<boolean> {
-    const rawConnection = this._rawConnection;
-    if (rawConnection === null || this._closed || this._pgClientOptions == null) return false;
-    try {
-      await rawConnection.query(";");
-      this.verifiedBang();
-      return true;
-    } catch {
-      return false;
-    }
+  static get datetimeType(): string {
+    return pgDatetimeConfig.datetimeType;
+  }
+  static set datetimeType(v: string) {
+    pgDatetimeConfig.datetimeType = v;
   }
 
-  override isConnected(): boolean {
-    return this._connection !== null && !this._rawConnectionFinished();
+  supportsBulkAlter(): boolean {
+    return true;
   }
 
-  /** @internal */
-  private _rawConnectionFinished(): boolean {
-    const client = this._rawConnection as PgClientLiveness | null;
-    if (client === null) return false;
-    return client._ending === true || client._ended === true;
+  async supportsIndexSortOrder(): Promise<boolean> {
+    return true;
+  }
+
+  async supportsPartitionedIndexes(): Promise<boolean> {
+    return (await this.databaseVersion) >= 110000;
+  }
+
+  supportsPartialIndex(): boolean {
+    return true;
+  }
+
+  async supportsIndexInclude(): Promise<boolean> {
+    return (await this.databaseVersion) >= 110000;
   }
 
   static readonly NATIVE_DATABASE_TYPES: NativeDatabaseTypes = {
@@ -348,11 +359,8 @@ export class PostgreSQLAdapter
 
   private static _nativeDatabaseTypes?: NativeDatabaseTypes;
 
-  static get datetimeType(): string {
-    return pgDatetimeConfig.datetimeType;
-  }
-  static set datetimeType(v: string) {
-    pgDatetimeConfig.datetimeType = v;
+  async supportsExpressionIndex(): Promise<boolean> {
+    return true;
   }
 
   declare static createUnloggedTables: boolean;
@@ -364,13 +372,8 @@ export class PostgreSQLAdapter
 
   static decodeDates = true;
 
-  /** @internal */
-  get _rawConnection(): RawConnection | null {
-    return this._connection as RawConnection | null;
-  }
-  /** @internal */
-  set _rawConnection(value: RawConnection | null) {
-    this._connection = value;
+  supportsTransactionIsolation(): boolean {
+    return true;
   }
   /** @internal */
   private static readonly VALID_CONN_PARAM_KEYS: ReadonlySet<string> = new Set([
@@ -401,15 +404,8 @@ export class PostgreSQLAdapter
     "Promise",
   ]);
 
-  /** @internal */
-  private static _sliceValidConnParams(config: Record<string, unknown>): pg.ClientConfig {
-    const sliced: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(config)) {
-      if (value === undefined || value === null) continue;
-      if (!PostgreSQLAdapter.VALID_CONN_PARAM_KEYS.has(key)) continue;
-      sliced[key] = value;
-    }
-    return sliced as pg.ClientConfig;
+  supportsForeignKeys(): boolean {
+    return true;
   }
 
   private _pgClientOptions: pg.ClientConfig | null = null;
@@ -433,6 +429,99 @@ export class PostgreSQLAdapter
   private _discardedAcquireGenerations = new Set<number>();
   private _acquiring: Promise<pg.Client> | null = null;
   _noticeReceiverSqlWarnings: SQLWarning[] = [];
+
+  async supportsCheckConstraints(): Promise<boolean> {
+    return true;
+  }
+
+  supportsExclusionConstraints(): boolean {
+    return true;
+  }
+
+  supportsUniqueConstraints(): boolean {
+    return true;
+  }
+
+  supportsValidateConstraints(): boolean {
+    return true;
+  }
+
+  supportsDeferrableConstraints(): boolean {
+    return true;
+  }
+
+  supportsViews(): boolean {
+    return true;
+  }
+
+  supportsDatetimeWithPrecision(): boolean {
+    return true;
+  }
+
+  async supportsJson(): Promise<boolean> {
+    return true;
+  }
+
+  supportsComments(): boolean {
+    return true;
+  }
+
+  supportsSavepoints(): boolean {
+    return true;
+  }
+
+  async supportsRestartDbTransaction(): Promise<boolean> {
+    return (await this.databaseVersion) >= 120000;
+  }
+
+  async supportsInsertReturning(): Promise<boolean> {
+    return true;
+  }
+
+  async supportsInsertOnConflict(): Promise<boolean> {
+    return (await this.databaseVersion) >= 90500;
+  }
+
+  async supportsInsertOnDuplicateSkip(): Promise<boolean> {
+    return await this.supportsInsertOnConflict();
+  }
+
+  async supportsInsertOnDuplicateUpdate(): Promise<boolean> {
+    return await this.supportsInsertOnConflict();
+  }
+
+  /** @internal */
+  performQuery = pgPerformQuery;
+
+  /** @internal */
+  declare handleWarnings: (sql: unknown) => void;
+
+  async supportsInsertConflictTarget(): Promise<boolean> {
+    return await this.supportsInsertOnConflict();
+  }
+
+  async supportsVirtualColumns(): Promise<boolean> {
+    return (await this.databaseVersion) >= 120000;
+  }
+
+  async supportsIdentityColumns(): Promise<boolean> {
+    return (await this.databaseVersion) >= 100000;
+  }
+
+  async supportsNullsNotDistinct(): Promise<boolean> {
+    return (await this.databaseVersion) >= 150000;
+  }
+
+  async supportsNativePartitioning(): Promise<boolean> {
+    return (await this.databaseVersion) >= 100000;
+  }
+
+  indexAlgorithms(): Record<string, string> {
+    return { concurrently: "CONCURRENTLY" };
+  }
+
+  /** @internal */
+  executeBatch = pgExecuteBatch;
 
   constructor(config: string | (pg.PoolConfig & PostgreSQLAdapterOptions));
   /** @deprecated */
@@ -549,15 +638,385 @@ export class PostgreSQLAdapter
     };
   }
 
-  private _captureRegtypeOids(records: PgTypeRow[]): void {
-    for (const row of records) {
-      const oid = Number(row.oid);
-      for (const name of [row.typname, row.formatType, row.aliasName]) {
-        if (name != null) this._regtypeOids.set(name, oid);
-      }
+  override isConnected(): boolean {
+    return this._connection !== null && !this._rawConnectionFinished();
+  }
+
+  override async active(): Promise<boolean> {
+    const rawConnection = this._rawConnection;
+    if (rawConnection === null || this._closed || this._pgClientOptions == null) return false;
+    try {
+      await rawConnection.query(";");
+      this.verifiedBang();
+      return true;
+    } catch {
+      return false;
     }
   }
 
+  async reloadTypeMap(): Promise<void> {
+    return this.lock.synchronize(async () => {
+      this._regtypeOids.clear();
+      if (this._typeMap) {
+        this.typeMap.clear();
+      } else {
+        this._typeMap = new HashLookupTypeMap();
+      }
+
+      await this.initializeTypeMap();
+      void this._statements.reset();
+    });
+  }
+
+  override async resetBang(): Promise<void> {
+    await this.lock.synchronize(async () => {
+      const live = this._rawConnection;
+      if (!live) {
+        await this.connectBang();
+        return;
+      }
+
+      if (live.transactionStatus() !== PQTRANS_IDLE) {
+        await live.query("ROLLBACK");
+      }
+      await live.query("DISCARD ALL");
+
+      this._client = null;
+
+      await super.resetBang();
+    });
+  }
+
+  override async disconnectBang(): Promise<void> {
+    await this.lock.synchronize(async () => {
+      await super.disconnectBang();
+      const conn = this._rawConnection;
+      this._client = null;
+      if (this._acquiring) this._acquireGeneration++;
+      this._closingDriver = conn?.end().catch(() => {}) ?? null;
+      await this._closingDriver;
+      this._rawConnection = null;
+    });
+  }
+
+  override discardBang(): void {
+    const conn = this._rawConnection;
+    this._rawConnection = null;
+    this._client = null;
+    void this._statements.reset();
+    this._closed = true;
+    if (this._acquiring) this._discardedAcquireGenerations.add(this._acquireGeneration);
+    this._acquireGeneration++;
+    abandonRawSocket(conn);
+    super.discardBang();
+  }
+
+  nativeDatabaseTypes(): NativeDatabaseTypes {
+    return (this.constructor as typeof PostgreSQLAdapter).nativeDatabaseTypes();
+  }
+
+  private lastInsertIdResult = pgLastInsertIdResult;
+
+  static nativeDatabaseTypes(this: typeof PostgreSQLAdapter): NativeDatabaseTypes {
+    if (this._nativeDatabaseTypes == null) {
+      const types: NativeDatabaseTypes = { ...this.NATIVE_DATABASE_TYPES };
+      types["datetime"] = types[this.datetimeType];
+      this._nativeDatabaseTypes = types;
+    }
+    return this._nativeDatabaseTypes;
+  }
+
+  async setStandardConformingStrings(): Promise<void> {
+    await this.internalExecute("SET standard_conforming_strings = on", "SCHEMA");
+  }
+
+  supportsDdlTransactions(): boolean {
+    return true;
+  }
+
+  supportsAdvisoryLocks(): boolean {
+    return true;
+  }
+
+  supportsExplain(): boolean {
+    return true;
+  }
+
+  supportsExtensions(): boolean {
+    return true;
+  }
+
+  supportsMaterializedViews(): boolean {
+    return true;
+  }
+
+  supportsForeignTables(): boolean {
+    return true;
+  }
+
+  async supportsPgcryptoUuid(): Promise<boolean> {
+    return (await this.databaseVersion) >= 90400;
+  }
+
+  async supportsOptimizerHints(): Promise<boolean> {
+    if (this._hasPgHintPlan === undefined) {
+      this._hasPgHintPlan = await this.extensionAvailable("pg_hint_plan");
+    }
+    return this._hasPgHintPlan;
+  }
+
+  async supportsCommonTableExpressions(): Promise<boolean> {
+    return true;
+  }
+
+  supportsLazyTransactions(): boolean {
+    return true;
+  }
+
+  async getAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
+    _assertPgAdvisoryLockId(lockId);
+    return (await this.queryValue(`SELECT pg_try_advisory_lock(${lockId})`)) === true;
+  }
+
+  async releaseAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
+    _assertPgAdvisoryLockId(lockId);
+    return (await this.queryValue(`SELECT pg_advisory_unlock(${lockId})`)) === true;
+  }
+
+  /** @missingRailsCall values_at — PERMANENT */
+  async enableExtension(name: string, _options?: Record<string, unknown>): Promise<void> {
+    const parts = String(name).split(".");
+    const [schema, extName] = [parts.at(-2) ?? null, parts.at(-1)!];
+    let sql = `CREATE EXTENSION IF NOT EXISTS "${extName}"`;
+    if (schema) sql += ` SCHEMA ${schema}`;
+    await this.internalExecQuery(sql);
+    await this.reloadTypeMap();
+  }
+
+  /** @missingRailsCall values_at — PERMANENT */
+  async disableExtension(name: string, options: { force?: "cascade" } = {}): Promise<void> {
+    const parts = String(name).split(".");
+    const extName = parts.at(-1)!;
+    const cascade = options.force === "cascade" ? " CASCADE" : "";
+    await this.internalExecQuery(`DROP EXTENSION IF EXISTS "${extName}"${cascade}`);
+    await this.reloadTypeMap();
+  }
+
+  async extensionAvailable(name: string): Promise<boolean> {
+    return (
+      (await this.queryValue(
+        `SELECT true FROM pg_available_extensions WHERE name = ${this.quote(name)}`,
+        "SCHEMA",
+      )) === true
+    );
+  }
+  async extensionEnabled(name: string): Promise<boolean> {
+    return (
+      (await this.queryValue(
+        `SELECT installed_version IS NOT NULL FROM pg_available_extensions WHERE name = ${this.quote(name)}`,
+        "SCHEMA",
+      )) === true
+    );
+  }
+  async extensions(): Promise<string[]> {
+    const query = `
+      SELECT
+        pg_extension.extname,
+        n.nspname AS schema
+      FROM pg_extension
+      JOIN pg_namespace n ON pg_extension.extnamespace = n.oid
+    `;
+    const currentSchema = await this.currentSchema();
+    const result = await this.internalExecQuery(query, "SCHEMA", [], {
+      allowRetry: true,
+      materializeTransactions: false,
+    });
+    return (result.castValues() as unknown[][]).map((row) => {
+      const name = row[0] as string;
+      const schema = row[1] === currentSchema ? null : (row[1] as string);
+      return [schema, name].filter((part) => part != null).join(".");
+    });
+  }
+  async enumTypes(): Promise<[string, string[]][]> {
+    const query = `
+      SELECT
+        type.typname AS name,
+        type.OID AS oid,
+        n.nspname AS schema,
+        array_agg(enum.enumlabel ORDER BY enum.enumsortorder) AS value
+      FROM pg_enum AS enum
+      JOIN pg_type AS type ON (type.oid = enum.enumtypid)
+      JOIN pg_namespace n ON type.typnamespace = n.oid
+      WHERE n.nspname = ANY (current_schemas(false))
+      GROUP BY type.OID, n.nspname, type.typname;
+    `;
+    const currentSchema = await this.currentSchema();
+    const result = await this.internalExecQuery(query, "SCHEMA", [], {
+      allowRetry: true,
+      materializeTransactions: false,
+    });
+    const memo = new Map<string, string[]>();
+    for (const row of result.castValues() as unknown[][]) {
+      const name = row[0] as string;
+      const schema = row[2] === currentSchema ? null : (row[2] as string);
+      const fullName = [schema, name].filter((part) => part != null).join(".");
+      memo.set(fullName, row.at(-1) as string[]);
+    }
+    return Array.from(memo);
+  }
+  async createEnum(
+    name: string,
+    values: string[],
+    _options?: Record<string, unknown>,
+  ): Promise<void> {
+    const sqlValues = values.map((s) => this.quote(s)).join(", ");
+    const scope = this.quotedScope(name);
+    const query = `
+      DO $$
+      BEGIN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_type t
+            JOIN pg_namespace n ON t.typnamespace = n.oid
+            WHERE t.typname = ${scope.name}
+              AND n.nspname = ${scope.schema}
+          ) THEN
+              CREATE TYPE ${this.quoteTableName(name)} AS ENUM (${sqlValues});
+          END IF;
+      END
+      $$;
+    `;
+    await this.internalExecQuery(query);
+    await this.reloadTypeMap();
+  }
+  async dropEnum(
+    name: string,
+    values?: string[] | { ifExists?: boolean },
+    options: { ifExists?: boolean } = {},
+  ): Promise<void> {
+    if (values !== null && values !== undefined && !Array.isArray(values)) {
+      options = values;
+    }
+    const query = `
+      DROP TYPE${options.ifExists ? " IF EXISTS" : ""} ${this.quoteTableName(name)};
+    `;
+    await this.internalExecQuery(query);
+    await this.reloadTypeMap();
+  }
+  async renameEnum(name: string, newName?: string | { to: string }): Promise<void> {
+    const options: { to?: string } = typeof newName === "object" && newName !== null ? newName : {};
+    if (typeof newName !== "string") {
+      if (options.to == null) {
+        throw new ArgumentError("rename_enum requires two from/to name positional arguments.");
+      }
+      newName = options.to;
+    }
+    await this.execQuery(
+      `ALTER TYPE ${this.quoteTableName(name)} RENAME TO ${this.quoteTableName(newName)}`,
+    );
+    await this.reloadTypeMap();
+  }
+  async addEnumValue(
+    typeName: string,
+    value: string,
+    options: { before?: string; after?: string; ifNotExists?: boolean } = {},
+  ): Promise<void> {
+    const { before, after } = options;
+    let sql = `ALTER TYPE ${this.quoteTableName(typeName)} ADD VALUE`;
+    if (options.ifNotExists) sql += " IF NOT EXISTS";
+    sql += ` ${this.quote(value)}`;
+
+    if (before != null && after != null) {
+      throw new ArgumentError("Cannot have both :before and :after at the same time");
+    } else if (before != null) {
+      sql += ` BEFORE ${this.quote(before)}`;
+    } else if (after != null) {
+      sql += ` AFTER ${this.quote(after)}`;
+    }
+
+    await this.execute(sql);
+    await this.reloadTypeMap();
+  }
+  async renameEnumValue(
+    typeName: string,
+    options: { from?: string; to?: string } = {},
+  ): Promise<void> {
+    if (!((await this.databaseVersion) >= 10_00_00)) {
+      throw new ArgumentError("Renaming enum values is only supported in PostgreSQL 10 or later");
+    }
+
+    const from = options.from;
+    if (from == null) throw new ArgumentError(":from is required");
+    const to = options.to;
+    if (to == null) throw new ArgumentError(":to is required");
+
+    await this.execute(
+      `ALTER TYPE ${this.quoteTableName(typeName)} RENAME VALUE ${this.quote(from)} TO ${this.quote(to)}`,
+    );
+    await this.reloadTypeMap();
+  }
+  /** @missingRailsCall query_value — CONVERGEABLE pg-max-identifier-length-sync-async-split */
+  maxIdentifierLength(): number {
+    return this._maxIdentifierLength ?? 63;
+  }
+  async sessionAuth(user: string): Promise<void> {
+    await this.clearCacheBang();
+    const quoted = user.toUpperCase() === "DEFAULT" ? "DEFAULT" : pgQuoteColumnName(user);
+    await this.internalExecute(`SET SESSION AUTHORIZATION ${quoted}`, undefined, [], {
+      materializeTransactions: true,
+    });
+  }
+  isUseInsertReturning(): boolean {
+    return this._useInsertReturning != null && this._useInsertReturning !== false;
+  }
+  async getDatabaseVersion(): Promise<number> {
+    return await this.withRawConnection({}, async (conn) => {
+      const version = await this._serverVersion(conn as pg.Client);
+      if (version === 0) {
+        throw new ConnectionFailed("Could not determine PostgreSQL version");
+      }
+      return version;
+    });
+  }
+  async postgresqlVersion(): Promise<number> {
+    return await this.databaseVersion;
+  }
+  override defaultIndexType(index: IndexDefinition): boolean {
+    return index.using === "btree" || super.defaultIndexType(index);
+  }
+  override async buildInsertSql(insert: InsertBuilder): Promise<string> {
+    let sql = `INSERT ${insert.into()} ${await insert.valuesList()}`;
+
+    if (insert.skipDuplicates()) {
+      sql += ` ON CONFLICT ${insert.conflictTarget()} DO NOTHING`;
+    } else if (insert.updateDuplicates()) {
+      sql += ` ON CONFLICT ${insert.conflictTarget()} DO UPDATE SET `;
+      const raw = insert.rawUpdateSql();
+      if (raw) {
+        sql += raw.value;
+      } else {
+        sql += insert.touchModelTimestampsUnless(
+          (column) =>
+            `${insert.model.quotedTableName()}.${column} IS NOT DISTINCT FROM excluded.${column}`,
+        );
+        sql += insert
+          .updatableColumns()
+          .map((column) => `${column}=excluded.${column}`)
+          .join(",");
+      }
+    }
+
+    const ret = insert.returning();
+    if (ret) sql += ` RETURNING ${ret}`;
+    return sql;
+  }
+  override async checkVersion(): Promise<void> {
+    if ((await this.databaseVersion) < 9_03_00) {
+      throw new Error(
+        `Your version of PostgreSQL (${await this.databaseVersion}) is too old. Active Record supports PostgreSQL >= 9.3.`,
+      );
+    }
+  }
   static override initializeTypeMap(m: TypeMap | HashLookupTypeMap): void {
     m.registerType("int2", new IntegerType({ limit: 2 }));
     m.registerType("int4", new IntegerType({ limit: 4 }));
@@ -611,12 +1070,10 @@ export class PostgreSQLAdapter
       return new Interval({ precision });
     });
   }
-
   /** @internal */
   get typeMap(): HashLookupTypeMap {
     return this._typeMap!;
   }
-
   private async initializeTypeMap(m: HashLookupTypeMap = this.typeMap): Promise<void> {
     (this.constructor as typeof PostgreSQLAdapter).initializeTypeMap(m);
 
@@ -637,7 +1094,99 @@ export class PostgreSQLAdapter
 
     await this.loadAdditionalTypes();
   }
+  /** @internal */
+  extractValueFromDefault(defaultExpr: string | null): unknown {
+    if (defaultExpr == null) return null;
+    const quoted = /^[(B]?'([\s\S]*)'.*::"?([\w. ]+)"?(?:\[\])?$/.exec(defaultExpr);
+    if (quoted) {
+      if (quoted[1] === "now" && quoted[2] === "date") return null;
+      return quoted[1].replace(/''/g, "'");
+    }
+    if (defaultExpr === "true" || defaultExpr === "false") return defaultExpr;
+    const num = /^\(?(-?\d+(?:\.\d*)?)\)?(?:::bigint)?$/.exec(defaultExpr);
+    if (num) return num[1];
+    if (/^-?\d+$/.test(defaultExpr)) return defaultExpr;
+    return null;
+  }
+  /**
+   * @internal
+   * @missingRailsArgs has_default_function? — PERMANENT
+   */
+  extractDefaultFunction(defaultValue: unknown, defaultExpr: string | null): string | null {
+    if (defaultExpr != null && this.hasDefaultFunction(defaultValue, defaultExpr)) {
+      return defaultExpr;
+    }
+    return null;
+  }
+  /** @internal */
+  hasDefaultFunction(defaultValue: unknown, defaultExpr: string): boolean {
+    return defaultValue == null && DEFAULT_FUNCTION_RE.test(defaultExpr);
+  }
+  /** @internal */
+  translateException(
+    exception: unknown,
+    { message, sql, binds }: { message: string; sql: string; binds: unknown[] },
+  ): unknown {
+    if (!(exception instanceof Error)) return exception;
+    const noConnection =
+      /connection is closed/i.test(exception.message) ||
+      /no connection to the server/i.test(exception.message);
+    if (
+      !(exception instanceof pg.DatabaseError) &&
+      !PostgreSQLAdapter._isConnectionError(exception) &&
+      !PostgreSQLAdapter._isConnectionClosedBeforeSend(exception) &&
+      !noConnection
+    ) {
+      return exception;
+    }
 
+    switch (exception instanceof pg.DatabaseError ? exception.code : undefined) {
+      case undefined:
+        if (noConnection) {
+          return new ConnectionNotEstablished(exception, { connectionPool: this.pool });
+        } else if (
+          PostgreSQLAdapter._isConnectionError(exception) ||
+          PostgreSQLAdapter._isConnectionClosedBeforeSend(exception)
+        ) {
+          if (!PostgreSQLAdapter._isConnectionClosedBeforeSend(exception)) {
+            return new ConnectionFailed(exception, { connectionPool: this.pool });
+          } else {
+            return new ConnectionNotEstablished(exception, { connectionPool: this.pool });
+          }
+        } else {
+          return super.translateException(exception, { message, sql, binds });
+        }
+      case UNIQUE_VIOLATION:
+        return new RecordNotUnique(message, { sql, binds, connectionPool: this.pool });
+      case FOREIGN_KEY_VIOLATION:
+        return new InvalidForeignKey(message, { sql, binds, connectionPool: this.pool });
+      case VALUE_LIMIT_VIOLATION:
+        return new ValueTooLong(message, { sql, binds, connectionPool: this.pool });
+      case NUMERIC_VALUE_OUT_OF_RANGE:
+        return new ActiveRecordRangeError(message, { sql, binds, connectionPool: this.pool });
+      case NOT_NULL_VIOLATION:
+        return new NotNullViolation(message, { sql, binds, connectionPool: this.pool });
+      case SERIALIZATION_FAILURE:
+        return new SerializationFailure(message, { sql, binds, connectionPool: this.pool });
+      case DEADLOCK_DETECTED:
+        return new Deadlocked(message, { sql, binds, connectionPool: this.pool });
+      case DUPLICATE_DATABASE:
+        return new DatabaseAlreadyExists(message, { sql, binds, connectionPool: this.pool });
+      case LOCK_NOT_AVAILABLE:
+        return new LockWaitTimeout(message, { sql, binds, connectionPool: this.pool });
+      case QUERY_CANCELED:
+        return new QueryCanceled(message, { sql, binds, connectionPool: this.pool });
+      default:
+        return super.translateException(exception, { message, sql, binds });
+    }
+  }
+  /** @internal */
+  isRetryableQueryError(exception: unknown): boolean {
+    return (
+      this._rawConnection?.transactionStatus() !== PQTRANS_INERROR &&
+      super.isRetryableQueryError(exception)
+    );
+  }
   /** @internal */
   async getOidType(
     oid: number,
@@ -658,11 +1207,188 @@ export class PostgreSQLAdapter
       return castType;
     });
   }
+  /** @internal */
+  async loadAdditionalTypes(oids?: number[]): Promise<void> {
+    const initializer = new TypeMapInitializer(this.typeMap);
+    for await (const query of this.loadTypesQueries(initializer, oids)) {
+      const records = (await this.internalExecute(query, "SCHEMA", [], {
+        allowRetry: true,
+        materializeTransactions: false,
+      })) as PgTypeRow[];
+      this._captureRegtypeOids(records);
+      initializer.run(records);
+    }
+  }
+  private async *loadTypesQueries(
+    initializer: TypeMapInitializer,
+    oids?: number[],
+  ): AsyncGenerator<string, void, void> {
+    const baseQuery = [
+      "SELECT t.oid, t.typname, t.typelem, t.typdelim, t.typinput,",
+      '       format_type(t.oid, NULL) AS "formatType",',
+      "       r.rngsubtype, t.typtype, t.typbasetype",
+      "FROM pg_type as t",
+      "LEFT JOIN pg_range as r ON t.oid = r.rngtypid",
+    ].join("\n");
 
-  override lookupCastTypeFromColumn(column: CastableColumn): ValueType {
-    return pgLookupCastTypeFromColumn.call(this, column);
+    if (oids && oids.length > 0) {
+      const safe = oids.map((oid) => {
+        const n = Number(oid);
+        if (!Number.isInteger(n) || n < 0) {
+          throw new Error(`loadAdditionalTypes: invalid OID ${String(oid)}`);
+        }
+        return n;
+      });
+      yield `${baseQuery}\nWHERE t.oid IN (${safe.join(", ")})`;
+      return;
+    }
+    yield `${baseQuery}\n${initializer.queryConditionsForKnownTypeNames()}`;
+    yield `${baseQuery}\n${initializer.queryConditionsForKnownTypeTypes()}`;
+    yield `${baseQuery}\n${initializer.queryConditionsForArrayTypes()}`;
+    yield this.nativeTypeNamesQuery();
+  }
+  /** @internal */
+  isCachedPlanFailure(pgerror: unknown): boolean {
+    if (!(pgerror instanceof Error)) return false;
+    const err = pgerror as { code?: string; message?: string };
+    if (err.code !== FEATURE_NOT_SUPPORTED) return false;
+    return typeof err.message === "string" && err.message.includes("cached plan");
   }
 
+  /** @internal */
+  isInTransaction(): boolean {
+    return this.openTransactions() > 0;
+  }
+
+  /** @internal */
+  sqlKey(sql: string | null): string {
+    return `${this._schemaSearchPathMemo ?? ""}-${sql}`;
+  }
+
+  /** @internal */
+  async prepareStatement(sql: string | null, binds: unknown[], conn: pg.Client): Promise<string> {
+    const sqlKey = this.sqlKey(sql);
+    if (!this._statements.isKey(sqlKey)) {
+      const nextkey = this._statements.nextKey();
+      try {
+        await prepare(conn, nextkey, sql as string);
+      } catch (e) {
+        throw this.translateExceptionClass(e, sql, binds);
+      }
+      await this._statements.set(sqlKey, { name: nextkey });
+    }
+    return this._statements.get(sqlKey)!.name;
+  }
+  /** @internal */
+  async connect(): Promise<void> {
+    try {
+      await this._acquireFreshClient();
+    } catch (ex) {
+      if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
+      throw ex;
+    }
+  }
+
+  /** @internal */
+  async reconnect(): Promise<void> {
+    this._discardRawConnection();
+    await this.connect();
+  }
+
+  /** @internal */
+  async configureConnection(): Promise<void> {
+    await super.configureConnection();
+    this._mappedDefaultTimezone = null;
+
+    if (rtest(this._config.encoding)) {
+      await this._rawConnection!.query(
+        `SET client_encoding TO ${this._rawConnection!.escapeLiteral(String(this._config.encoding))}`,
+      );
+    }
+
+    await this.setClientMinMessages(this._minMessages);
+    await this.setSchemaSearchPath(
+      (this._config.schemaSearchPath ?? this._config.schemaOrder ?? null) as string | null,
+    );
+
+    if (dbWarningsAction() != null) {
+      this._rawConnection!.removeAllListeners("notice");
+      this._rawConnection!.on(
+        "notice",
+        (result: { severity?: string; message?: string; code?: string }) => {
+          const message = result.message;
+          const code = result.code ?? null;
+          const level = result.severity ?? null;
+          this._noticeReceiverSqlWarnings.push(
+            new SQLWarning(message, code, level, undefined, this.pool),
+          );
+        },
+      );
+    }
+
+    await this.setStandardConformingStrings();
+
+    const variables = fetch<SessionVariables>(this._config, "variables", {});
+
+    await this.internalExecute("SET intervalstyle = iso_8601", "SCHEMA");
+
+    for (const [k, v] of Object.entries(variables)) {
+      if (v === ":default") {
+        await this.internalExecute(`SET SESSION ${k} TO DEFAULT`, "SCHEMA");
+      } else if (v != null) {
+        await this.internalExecute(`SET SESSION ${k} TO ${this.quote(v)}`, "SCHEMA");
+      }
+    }
+
+    this.addPgEncoders();
+    this.addPgDecoders();
+
+    await this.reloadTypeMap();
+  }
+
+  /** @internal */
+  async reconfigureConnectionTimezone(): Promise<void> {
+    const variables = fetch<SessionVariables>(this._config, "variables", {});
+
+    if (rtest(variables["timezone"])) return;
+
+    if (this.defaultTimezone === "utc") {
+      await this.rawExecute("SET SESSION timezone TO 'UTC'", "SCHEMA");
+    } else {
+      await this.rawExecute("SET SESSION timezone TO DEFAULT", "SCHEMA");
+    }
+  }
+  /** @internal */
+  async columnDefinitions(tableName: string): Promise<unknown[][]> {
+    const identity = (await this.supportsIdentityColumns()) ? "attidentity" : this.quote("");
+    const attgenerated = (await this.supportsVirtualColumns()) ? "attgenerated" : this.quote("");
+    return this.query(
+      `  SELECT a.attname, format_type(a.atttypid, a.atttypmod),
+             pg_get_expr(d.adbin, d.adrelid), a.attnotnull, a.atttypid, a.atttypmod,
+             c.collname, col_description(a.attrelid, a.attnum) AS comment,
+             ${identity} AS identity,
+             ${attgenerated} as attgenerated
+        FROM pg_attribute a
+        LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+        LEFT JOIN pg_type t ON a.atttypid = t.oid
+        LEFT JOIN pg_collation c ON a.attcollation = c.oid AND a.attcollation <> t.typcollation
+       WHERE a.attrelid = ${this.quote(this.quoteTableName(tableName))}::regclass
+         AND a.attnum > 0 AND NOT a.attisdropped
+       ORDER BY a.attnum`,
+      "SCHEMA",
+    );
+  }
+  /** @internal */
+  override arelVisitor(): Visitors.ToSql {
+    return new Visitors.PostgreSQL(this);
+  }
+  /** @internal */
+  buildStatementPool(): StatementPool {
+    return new StatementPool(
+      this,
+      PostgreSQLAdapter.typeCastConfigToInteger(this._config.statementLimit) as number,
+    );
+  }
   /** @internal */
   override async canPerformCaseInsensitiveComparisonFor(column: {
     sqlType?: string | null;
@@ -694,46 +1420,85 @@ export class PostgreSQLAdapter
     );
   }
 
+  private _hasPgHintPlan?: boolean;
+
   /** @internal */
-  async loadAdditionalTypes(oids?: number[]): Promise<void> {
-    const initializer = new TypeMapInitializer(this.typeMap);
-    for await (const query of this.loadTypesQueries(initializer, oids)) {
-      const records = (await this.internalExecute(query, "SCHEMA", [], {
-        allowRetry: true,
-        materializeTransactions: false,
-      })) as PgTypeRow[];
-      this._captureRegtypeOids(records);
-      initializer.run(records);
+  addPgEncoders(): void {}
+
+  /** @internal */
+  async updateTypemapForDefaultTimezone(): Promise<void> {
+    const tz = defaultTimezone();
+    if (this._mappedDefaultTimezone === tz) return;
+    this._mappedDefaultTimezone = tz;
+    await this.reconfigureConnectionTimezone();
+  }
+
+  /** @internal */
+  addPgDecoders(): void {}
+
+  /** @internal */
+  constructCoder(
+    row: { oid: string | number; typname: string },
+    coderClass: string | null,
+  ): { oid: number; name: string; coderClass: string } | null {
+    if (!coderClass) return null;
+    return { oid: Number(row.oid), name: row.typname, coderClass };
+  }
+
+  static columnNameMatcher(): RegExp {
+    return pgColumnNameMatcher();
+  }
+
+  static columnNameWithOrderMatcher(): RegExp {
+    return pgColumnNameWithOrderMatcher();
+  }
+
+  static override quoteColumnName(name: unknown): string {
+    return pgQuoteColumnName(name);
+  }
+
+  static override quoteTableName(name: unknown): string {
+    return pgQuoteTableName(name);
+  }
+
+  /** @internal */
+  private _rawConnectionFinished(): boolean {
+    const client = this._rawConnection as PgClientLiveness | null;
+    if (client === null) return false;
+    return client._ending === true || client._ended === true;
+  }
+
+  /** @internal */
+  get _rawConnection(): RawConnection | null {
+    return this._connection as RawConnection | null;
+  }
+  /** @internal */
+  set _rawConnection(value: RawConnection | null) {
+    this._connection = value;
+  }
+
+  /** @internal */
+  private static _sliceValidConnParams(config: Record<string, unknown>): pg.ClientConfig {
+    const sliced: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(config)) {
+      if (value === undefined || value === null) continue;
+      if (!PostgreSQLAdapter.VALID_CONN_PARAM_KEYS.has(key)) continue;
+      sliced[key] = value;
+    }
+    return sliced as pg.ClientConfig;
+  }
+
+  private _captureRegtypeOids(records: PgTypeRow[]): void {
+    for (const row of records) {
+      const oid = Number(row.oid);
+      for (const name of [row.typname, row.formatType, row.aliasName]) {
+        if (name != null) this._regtypeOids.set(name, oid);
+      }
     }
   }
 
-  private async *loadTypesQueries(
-    initializer: TypeMapInitializer,
-    oids?: number[],
-  ): AsyncGenerator<string, void, void> {
-    const baseQuery = [
-      "SELECT t.oid, t.typname, t.typelem, t.typdelim, t.typinput,",
-      '       format_type(t.oid, NULL) AS "formatType",',
-      "       r.rngsubtype, t.typtype, t.typbasetype",
-      "FROM pg_type as t",
-      "LEFT JOIN pg_range as r ON t.oid = r.rngtypid",
-    ].join("\n");
-
-    if (oids && oids.length > 0) {
-      const safe = oids.map((oid) => {
-        const n = Number(oid);
-        if (!Number.isInteger(n) || n < 0) {
-          throw new Error(`loadAdditionalTypes: invalid OID ${String(oid)}`);
-        }
-        return n;
-      });
-      yield `${baseQuery}\nWHERE t.oid IN (${safe.join(", ")})`;
-      return;
-    }
-    yield `${baseQuery}\n${initializer.queryConditionsForKnownTypeNames()}`;
-    yield `${baseQuery}\n${initializer.queryConditionsForKnownTypeTypes()}`;
-    yield `${baseQuery}\n${initializer.queryConditionsForArrayTypes()}`;
-    yield this.nativeTypeNamesQuery();
+  override lookupCastTypeFromColumn(column: CastableColumn): ValueType {
+    return pgLookupCastTypeFromColumn.call(this, column);
   }
 
   private nativeTypeNamesQuery(): string {
@@ -752,20 +1517,6 @@ export class PostgreSQLAdapter
       "JOIN pg_type as t ON t.oid = to_regtype(a.name)",
       "LEFT JOIN pg_range as r ON t.oid = r.rngtypid",
     ].join("\n");
-  }
-
-  async reloadTypeMap(): Promise<void> {
-    return this.lock.synchronize(async () => {
-      this._regtypeOids.clear();
-      if (this._typeMap) {
-        this.typeMap.clear();
-      } else {
-        this._typeMap = new HashLookupTypeMap();
-      }
-
-      await this.initializeTypeMap();
-      void this._statements.reset();
-    });
   }
 
   private async _acquireFreshClient(): Promise<pg.Client> {
@@ -830,12 +1581,6 @@ export class PostgreSQLAdapter
       client.end().catch(() => {});
     }
   }
-
-  /** @internal */
-  performQuery = pgPerformQuery;
-
-  /** @internal */
-  declare handleWarnings: (sql: unknown) => void;
 
   /** @internal */
   affectedRows(result: PGResult): number {
@@ -950,22 +1695,6 @@ export class PostgreSQLAdapter
   }
 
   /** @internal */
-  executeBatch = pgExecuteBatch;
-
-  static nativeDatabaseTypes(this: typeof PostgreSQLAdapter): NativeDatabaseTypes {
-    if (this._nativeDatabaseTypes == null) {
-      const types: NativeDatabaseTypes = { ...this.NATIVE_DATABASE_TYPES };
-      types["datetime"] = types[this.datetimeType];
-      this._nativeDatabaseTypes = types;
-    }
-    return this._nativeDatabaseTypes;
-  }
-
-  nativeDatabaseTypes(): NativeDatabaseTypes {
-    return (this.constructor as typeof PostgreSQLAdapter).nativeDatabaseTypes();
-  }
-
-  /** @internal */
   override _columnMethodNames(): string[] {
     return [
       ...super._columnMethodNames(),
@@ -1004,15 +1733,6 @@ export class PostgreSQLAdapter
     ];
   }
 
-  async setStandardConformingStrings(): Promise<void> {
-    await this.internalExecute("SET standard_conforming_strings = on", "SCHEMA");
-  }
-
-  /** @missingRailsCall query_value — CONVERGEABLE pg-max-identifier-length-sync-async-split */
-  maxIdentifierLength(): number {
-    return this._maxIdentifierLength ?? 63;
-  }
-
   /** @noRailsEquivalent CONVERGEABLE pg-max-identifier-length-sync-async-split */
   async warmMaxIdentifierLength(): Promise<number> {
     if (this._maxIdentifierLength == null) {
@@ -1022,56 +1742,9 @@ export class PostgreSQLAdapter
     return this._maxIdentifierLength;
   }
 
-  async sessionAuth(user: string): Promise<void> {
-    await this.clearCacheBang();
-    const quoted = user.toUpperCase() === "DEFAULT" ? "DEFAULT" : pgQuoteColumnName(user);
-    await this.internalExecute(`SET SESSION AUTHORIZATION ${quoted}`, undefined, [], {
-      materializeTransactions: true,
-    });
-  }
-
-  isUseInsertReturning(): boolean {
-    return this._useInsertReturning != null && this._useInsertReturning !== false;
-  }
-
-  private lastInsertIdResult = pgLastInsertIdResult;
-
   /** @internal */
   override returningColumnValues(result: Result): unknown[] | undefined {
     return pgReturningColumnValues(result);
-  }
-
-  static async newClient(connParams: pg.ClientConfig): Promise<pg.Client> {
-    const client = new pg.Client(connParams);
-    const { database, user, host } = client;
-    try {
-      await client.connect();
-      return client;
-    } catch (error) {
-      await client.end().catch(() => {});
-      const message = error instanceof Error ? error.message : String(error);
-      if (database === "postgres") {
-        throw new ConnectionNotEstablished(message);
-      } else if (database && message.includes(database)) {
-        throw NoDatabaseError.dbError(database);
-      } else if (user && message.includes(user)) {
-        throw DatabaseConnectionError.usernameError(user);
-      } else if (host && message.includes(host)) {
-        throw DatabaseConnectionError.hostnameError(host);
-      } else {
-        throw new ConnectionNotEstablished(message);
-      }
-    }
-  }
-
-  /** @internal */
-  async connect(): Promise<void> {
-    try {
-      await this._acquireFreshClient();
-    } catch (ex) {
-      if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
-      throw ex;
-    }
   }
 
   /** @internal */
@@ -1085,148 +1758,8 @@ export class PostgreSQLAdapter
   }
 
   /** @internal */
-  async reconnect(): Promise<void> {
-    this._discardRawConnection();
-    await this.connect();
-  }
-
-  override async resetBang(): Promise<void> {
-    await this.lock.synchronize(async () => {
-      const live = this._rawConnection;
-      if (!live) {
-        await this.connectBang();
-        return;
-      }
-
-      if (live.transactionStatus() !== PQTRANS_IDLE) {
-        await live.query("ROLLBACK");
-      }
-      await live.query("DISCARD ALL");
-
-      this._client = null;
-
-      await super.resetBang();
-    });
-  }
-
-  /** @internal */
-  async configureConnection(): Promise<void> {
-    await super.configureConnection();
-    this._mappedDefaultTimezone = null;
-
-    if (rtest(this._config.encoding)) {
-      await this._rawConnection!.query(
-        `SET client_encoding TO ${this._rawConnection!.escapeLiteral(String(this._config.encoding))}`,
-      );
-    }
-
-    await this.setClientMinMessages(this._minMessages);
-    await this.setSchemaSearchPath(
-      (this._config.schemaSearchPath ?? this._config.schemaOrder ?? null) as string | null,
-    );
-
-    if (dbWarningsAction() != null) {
-      this._rawConnection!.removeAllListeners("notice");
-      this._rawConnection!.on(
-        "notice",
-        (result: { severity?: string; message?: string; code?: string }) => {
-          const message = result.message;
-          const code = result.code ?? null;
-          const level = result.severity ?? null;
-          this._noticeReceiverSqlWarnings.push(
-            new SQLWarning(message, code, level, undefined, this.pool),
-          );
-        },
-      );
-    }
-
-    await this.setStandardConformingStrings();
-
-    const variables = fetch<SessionVariables>(this._config, "variables", {});
-
-    await this.internalExecute("SET intervalstyle = iso_8601", "SCHEMA");
-
-    for (const [k, v] of Object.entries(variables)) {
-      if (v === ":default") {
-        await this.internalExecute(`SET SESSION ${k} TO DEFAULT`, "SCHEMA");
-      } else if (v != null) {
-        await this.internalExecute(`SET SESSION ${k} TO ${this.quote(v)}`, "SCHEMA");
-      }
-    }
-
-    this.addPgEncoders();
-    this.addPgDecoders();
-
-    await this.reloadTypeMap();
-  }
-
-  override async disconnectBang(): Promise<void> {
-    await this.lock.synchronize(async () => {
-      await super.disconnectBang();
-      const conn = this._rawConnection;
-      this._client = null;
-      if (this._acquiring) this._acquireGeneration++;
-      this._closingDriver = conn?.end().catch(() => {}) ?? null;
-      await this._closingDriver;
-      this._rawConnection = null;
-    });
-  }
-
-  override discardBang(): void {
-    const conn = this._rawConnection;
-    this._rawConnection = null;
-    this._client = null;
-    void this._statements.reset();
-    this._closed = true;
-    if (this._acquiring) this._discardedAcquireGenerations.add(this._acquireGeneration);
-    this._acquireGeneration++;
-    abandonRawSocket(conn);
-    super.discardBang();
-  }
-
-  /** @internal */
   _currentClientForTest(): pg.Client | null {
     return this._client;
-  }
-
-  /** @internal */
-  isInTransaction(): boolean {
-    return this.openTransactions() > 0;
-  }
-
-  override async buildInsertSql(insert: InsertBuilder): Promise<string> {
-    let sql = `INSERT ${insert.into()} ${await insert.valuesList()}`;
-
-    if (insert.skipDuplicates()) {
-      sql += ` ON CONFLICT ${insert.conflictTarget()} DO NOTHING`;
-    } else if (insert.updateDuplicates()) {
-      sql += ` ON CONFLICT ${insert.conflictTarget()} DO UPDATE SET `;
-      const raw = insert.rawUpdateSql();
-      if (raw) {
-        sql += raw.value;
-      } else {
-        sql += insert.touchModelTimestampsUnless(
-          (column) =>
-            `${insert.model.quotedTableName()}.${column} IS NOT DISTINCT FROM excluded.${column}`,
-        );
-        sql += insert
-          .updatableColumns()
-          .map((column) => `${column}=excluded.${column}`)
-          .join(",");
-      }
-    }
-
-    const ret = insert.returning();
-    if (ret) sql += ` RETURNING ${ret}`;
-    return sql;
-  }
-
-  override async checkVersion(): Promise<void> {
-    if ((await this.databaseVersion) < 9_03_00) {
-      throw new Error(
-        `Your version of PostgreSQL (${await this.databaseVersion}) is too old. Active Record supports PostgreSQL >= 9.3.`,
-      );
-    }
   }
 
   /** @internal */
@@ -1235,166 +1768,7 @@ export class PostgreSQLAdapter
     return parseInt(String(result.rows[0]?.server_version_num ?? "0"), 10);
   }
 
-  async getDatabaseVersion(): Promise<number> {
-    return await this.withRawConnection({}, async (conn) => {
-      const version = await this._serverVersion(conn as pg.Client);
-      if (version === 0) {
-        throw new ConnectionFailed("Could not determine PostgreSQL version");
-      }
-      return version;
-    });
-  }
-
-  async postgresqlVersion(): Promise<number> {
-    return await this.databaseVersion;
-  }
-
-  supportsBulkAlter(): boolean {
-    return true;
-  }
-  async supportsIndexSortOrder(): Promise<boolean> {
-    return true;
-  }
-  override defaultIndexType(index: IndexDefinition): boolean {
-    return index.using === "btree" || super.defaultIndexType(index);
-  }
-  async supportsPartitionedIndexes(): Promise<boolean> {
-    return (await this.databaseVersion) >= 110000;
-  }
-  supportsPartialIndex(): boolean {
-    return true;
-  }
-  async supportsIndexInclude(): Promise<boolean> {
-    return (await this.databaseVersion) >= 110000;
-  }
-  async supportsExpressionIndex(): Promise<boolean> {
-    return true;
-  }
-  supportsTransactionIsolation(): boolean {
-    return true;
-  }
-  supportsForeignKeys(): boolean {
-    return true;
-  }
-  async supportsCheckConstraints(): Promise<boolean> {
-    return true;
-  }
-  supportsExclusionConstraints(): boolean {
-    return true;
-  }
-  supportsUniqueConstraints(): boolean {
-    return true;
-  }
-  supportsValidateConstraints(): boolean {
-    return true;
-  }
-  supportsDeferrableConstraints(): boolean {
-    return true;
-  }
-  supportsViews(): boolean {
-    return true;
-  }
-  supportsDatetimeWithPrecision(): boolean {
-    return true;
-  }
-  async supportsJson(): Promise<boolean> {
-    return true;
-  }
-  supportsComments(): boolean {
-    return true;
-  }
-  supportsSavepoints(): boolean {
-    return true;
-  }
-  async supportsRestartDbTransaction(): Promise<boolean> {
-    return (await this.databaseVersion) >= 120000;
-  }
-  async supportsInsertReturning(): Promise<boolean> {
-    return true;
-  }
-  async supportsInsertOnConflict(): Promise<boolean> {
-    return (await this.databaseVersion) >= 90500;
-  }
-  async supportsInsertOnDuplicateSkip(): Promise<boolean> {
-    return await this.supportsInsertOnConflict();
-  }
-  async supportsInsertOnDuplicateUpdate(): Promise<boolean> {
-    return await this.supportsInsertOnConflict();
-  }
-  async supportsInsertConflictTarget(): Promise<boolean> {
-    return await this.supportsInsertOnConflict();
-  }
-  async supportsVirtualColumns(): Promise<boolean> {
-    return (await this.databaseVersion) >= 120000;
-  }
-  async supportsIdentityColumns(): Promise<boolean> {
-    return (await this.databaseVersion) >= 100000;
-  }
-  async supportsNullsNotDistinct(): Promise<boolean> {
-    return (await this.databaseVersion) >= 150000;
-  }
-  async supportsNativePartitioning(): Promise<boolean> {
-    return (await this.databaseVersion) >= 100000;
-  }
-
-  indexAlgorithms(): Record<string, string> {
-    return { concurrently: "CONCURRENTLY" };
-  }
-
-  /** @internal */
-  override arelVisitor(): Visitors.ToSql {
-    return new Visitors.PostgreSQL(this);
-  }
-
-  supportsDdlTransactions(): boolean {
-    return true;
-  }
-  supportsAdvisoryLocks(): boolean {
-    return true;
-  }
-
-  async getAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
-    _assertPgAdvisoryLockId(lockId);
-    return (await this.queryValue(`SELECT pg_try_advisory_lock(${lockId})`)) === true;
-  }
-
-  async releaseAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
-    _assertPgAdvisoryLockId(lockId);
-    return (await this.queryValue(`SELECT pg_advisory_unlock(${lockId})`)) === true;
-  }
-
-  supportsExplain(): boolean {
-    return true;
-  }
-  supportsExtensions(): boolean {
-    return true;
-  }
-  supportsMaterializedViews(): boolean {
-    return true;
-  }
-  supportsForeignTables(): boolean {
-    return true;
-  }
-  async supportsPgcryptoUuid(): Promise<boolean> {
-    return (await this.databaseVersion) >= 90400;
-  }
-
-  private _hasPgHintPlan?: boolean;
-
-  async supportsOptimizerHints(): Promise<boolean> {
-    if (this._hasPgHintPlan === undefined) {
-      this._hasPgHintPlan = await this.extensionAvailable("pg_hint_plan");
-    }
-    return this._hasPgHintPlan;
-  }
-
-  async supportsCommonTableExpressions(): Promise<boolean> {
-    return true;
-  }
-
-  supportsLazyTransactions(): boolean {
-    return true;
-  }
+  checkAllForeignKeysValidBang = checkAllForeignKeysValidBang;
 
   override quote(value: unknown): string {
     return pgQuote.call(this, value) as string;
@@ -1419,187 +1793,6 @@ export class PostgreSQLAdapter
 
   override quoteDefaultExpression(value: unknown, column: unknown): string {
     return pgQuoteDefaultExpression.call(this, value, column as DefaultExpressionColumn) as string;
-  }
-
-  async extensions(): Promise<string[]> {
-    const query = `
-      SELECT
-        pg_extension.extname,
-        n.nspname AS schema
-      FROM pg_extension
-      JOIN pg_namespace n ON pg_extension.extnamespace = n.oid
-    `;
-    const currentSchema = await this.currentSchema();
-    const result = await this.internalExecQuery(query, "SCHEMA", [], {
-      allowRetry: true,
-      materializeTransactions: false,
-    });
-    return (result.castValues() as unknown[][]).map((row) => {
-      const name = row[0] as string;
-      const schema = row[1] === currentSchema ? null : (row[1] as string);
-      return [schema, name].filter((part) => part != null).join(".");
-    });
-  }
-
-  async extensionEnabled(name: string): Promise<boolean> {
-    return (
-      (await this.queryValue(
-        `SELECT installed_version IS NOT NULL FROM pg_available_extensions WHERE name = ${this.quote(name)}`,
-        "SCHEMA",
-      )) === true
-    );
-  }
-
-  async extensionAvailable(name: string): Promise<boolean> {
-    return (
-      (await this.queryValue(
-        `SELECT true FROM pg_available_extensions WHERE name = ${this.quote(name)}`,
-        "SCHEMA",
-      )) === true
-    );
-  }
-
-  /** @missingRailsCall values_at — PERMANENT */
-  async enableExtension(name: string, _options?: Record<string, unknown>): Promise<void> {
-    const parts = String(name).split(".");
-    const [schema, extName] = [parts.at(-2) ?? null, parts.at(-1)!];
-    let sql = `CREATE EXTENSION IF NOT EXISTS "${extName}"`;
-    if (schema) sql += ` SCHEMA ${schema}`;
-    await this.internalExecQuery(sql);
-    await this.reloadTypeMap();
-  }
-
-  /** @missingRailsCall values_at — PERMANENT */
-  async disableExtension(name: string, options: { force?: "cascade" } = {}): Promise<void> {
-    const parts = String(name).split(".");
-    const extName = parts.at(-1)!;
-    const cascade = options.force === "cascade" ? " CASCADE" : "";
-    await this.internalExecQuery(`DROP EXTENSION IF EXISTS "${extName}"${cascade}`);
-    await this.reloadTypeMap();
-  }
-
-  async enumTypes(): Promise<[string, string[]][]> {
-    const query = `
-      SELECT
-        type.typname AS name,
-        type.OID AS oid,
-        n.nspname AS schema,
-        array_agg(enum.enumlabel ORDER BY enum.enumsortorder) AS value
-      FROM pg_enum AS enum
-      JOIN pg_type AS type ON (type.oid = enum.enumtypid)
-      JOIN pg_namespace n ON type.typnamespace = n.oid
-      WHERE n.nspname = ANY (current_schemas(false))
-      GROUP BY type.OID, n.nspname, type.typname;
-    `;
-    const currentSchema = await this.currentSchema();
-    const result = await this.internalExecQuery(query, "SCHEMA", [], {
-      allowRetry: true,
-      materializeTransactions: false,
-    });
-    const memo = new Map<string, string[]>();
-    for (const row of result.castValues() as unknown[][]) {
-      const name = row[0] as string;
-      const schema = row[2] === currentSchema ? null : (row[2] as string);
-      const fullName = [schema, name].filter((part) => part != null).join(".");
-      memo.set(fullName, row.at(-1) as string[]);
-    }
-    return Array.from(memo);
-  }
-
-  async createEnum(
-    name: string,
-    values: string[],
-    _options?: Record<string, unknown>,
-  ): Promise<void> {
-    const sqlValues = values.map((s) => this.quote(s)).join(", ");
-    const scope = this.quotedScope(name);
-    const query = `
-      DO $$
-      BEGIN
-          IF NOT EXISTS (
-            SELECT 1
-            FROM pg_type t
-            JOIN pg_namespace n ON t.typnamespace = n.oid
-            WHERE t.typname = ${scope.name}
-              AND n.nspname = ${scope.schema}
-          ) THEN
-              CREATE TYPE ${this.quoteTableName(name)} AS ENUM (${sqlValues});
-          END IF;
-      END
-      $$;
-    `;
-    await this.internalExecQuery(query);
-    await this.reloadTypeMap();
-  }
-
-  async dropEnum(
-    name: string,
-    values?: string[] | { ifExists?: boolean },
-    options: { ifExists?: boolean } = {},
-  ): Promise<void> {
-    if (values !== null && values !== undefined && !Array.isArray(values)) {
-      options = values;
-    }
-    const query = `
-      DROP TYPE${options.ifExists ? " IF EXISTS" : ""} ${this.quoteTableName(name)};
-    `;
-    await this.internalExecQuery(query);
-    await this.reloadTypeMap();
-  }
-
-  async renameEnum(name: string, newName?: string | { to: string }): Promise<void> {
-    const options: { to?: string } = typeof newName === "object" && newName !== null ? newName : {};
-    if (typeof newName !== "string") {
-      if (options.to == null) {
-        throw new ArgumentError("rename_enum requires two from/to name positional arguments.");
-      }
-      newName = options.to;
-    }
-    await this.execQuery(
-      `ALTER TYPE ${this.quoteTableName(name)} RENAME TO ${this.quoteTableName(newName)}`,
-    );
-    await this.reloadTypeMap();
-  }
-
-  async addEnumValue(
-    typeName: string,
-    value: string,
-    options: { before?: string; after?: string; ifNotExists?: boolean } = {},
-  ): Promise<void> {
-    const { before, after } = options;
-    let sql = `ALTER TYPE ${this.quoteTableName(typeName)} ADD VALUE`;
-    if (options.ifNotExists) sql += " IF NOT EXISTS";
-    sql += ` ${this.quote(value)}`;
-
-    if (before != null && after != null) {
-      throw new ArgumentError("Cannot have both :before and :after at the same time");
-    } else if (before != null) {
-      sql += ` BEFORE ${this.quote(before)}`;
-    } else if (after != null) {
-      sql += ` AFTER ${this.quote(after)}`;
-    }
-
-    await this.execute(sql);
-    await this.reloadTypeMap();
-  }
-
-  async renameEnumValue(
-    typeName: string,
-    options: { from?: string; to?: string } = {},
-  ): Promise<void> {
-    if (!((await this.databaseVersion) >= 10_00_00)) {
-      throw new ArgumentError("Renaming enum values is only supported in PostgreSQL 10 or later");
-    }
-
-    const from = options.from;
-    if (from == null) throw new ArgumentError(":from is required");
-    const to = options.to;
-    if (to == null) throw new ArgumentError(":to is required");
-
-    await this.execute(
-      `ALTER TYPE ${this.quoteTableName(typeName)} RENAME VALUE ${this.quote(from)} TO ${this.quote(to)}`,
-    );
-    await this.reloadTypeMap();
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
@@ -1752,8 +1945,6 @@ export class PostgreSQLAdapter
     return disableReferentialIntegrity.call(this, fn);
   }
 
-  checkAllForeignKeysValidBang = checkAllForeignKeysValidBang;
-
   override quoteTableNameForAssignment(_table: string, attr: string): string {
     return pgQuoteTableNameForAssignment(_table, attr);
   }
@@ -1792,65 +1983,6 @@ export class PostgreSQLAdapter
     if (typeof value === "number") return String(value);
     if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
     return `'${pgQuoteString(String(value))}'`;
-  }
-
-  /** @internal */
-  translateException(
-    exception: unknown,
-    { message, sql, binds }: { message: string; sql: string; binds: unknown[] },
-  ): unknown {
-    if (!(exception instanceof Error)) return exception;
-    const noConnection =
-      /connection is closed/i.test(exception.message) ||
-      /no connection to the server/i.test(exception.message);
-    if (
-      !(exception instanceof pg.DatabaseError) &&
-      !PostgreSQLAdapter._isConnectionError(exception) &&
-      !PostgreSQLAdapter._isConnectionClosedBeforeSend(exception) &&
-      !noConnection
-    ) {
-      return exception;
-    }
-
-    switch (exception instanceof pg.DatabaseError ? exception.code : undefined) {
-      case undefined:
-        if (noConnection) {
-          return new ConnectionNotEstablished(exception, { connectionPool: this.pool });
-        } else if (
-          PostgreSQLAdapter._isConnectionError(exception) ||
-          PostgreSQLAdapter._isConnectionClosedBeforeSend(exception)
-        ) {
-          if (!PostgreSQLAdapter._isConnectionClosedBeforeSend(exception)) {
-            return new ConnectionFailed(exception, { connectionPool: this.pool });
-          } else {
-            return new ConnectionNotEstablished(exception, { connectionPool: this.pool });
-          }
-        } else {
-          return super.translateException(exception, { message, sql, binds });
-        }
-      case UNIQUE_VIOLATION:
-        return new RecordNotUnique(message, { sql, binds, connectionPool: this.pool });
-      case FOREIGN_KEY_VIOLATION:
-        return new InvalidForeignKey(message, { sql, binds, connectionPool: this.pool });
-      case VALUE_LIMIT_VIOLATION:
-        return new ValueTooLong(message, { sql, binds, connectionPool: this.pool });
-      case NUMERIC_VALUE_OUT_OF_RANGE:
-        return new ActiveRecordRangeError(message, { sql, binds, connectionPool: this.pool });
-      case NOT_NULL_VIOLATION:
-        return new NotNullViolation(message, { sql, binds, connectionPool: this.pool });
-      case SERIALIZATION_FAILURE:
-        return new SerializationFailure(message, { sql, binds, connectionPool: this.pool });
-      case DEADLOCK_DETECTED:
-        return new Deadlocked(message, { sql, binds, connectionPool: this.pool });
-      case DUPLICATE_DATABASE:
-        return new DatabaseAlreadyExists(message, { sql, binds, connectionPool: this.pool });
-      case LOCK_NOT_AVAILABLE:
-        return new LockWaitTimeout(message, { sql, binds, connectionPool: this.pool });
-      case QUERY_CANCELED:
-        return new QueryCanceled(message, { sql, binds, connectionPool: this.pool });
-      default:
-        return super.translateException(exception, { message, sql, binds });
-    }
   }
 
   indexName(
@@ -1953,138 +2085,6 @@ export class PostgreSQLAdapter
   private deferrable(deferrable: "immediate" | "deferred" | undefined): string {
     if (!deferrable) return "";
     return ` DEFERRABLE INITIALLY ${deferrable.toUpperCase()}`;
-  }
-
-  /** @internal */
-  extractValueFromDefault(defaultExpr: string | null): unknown {
-    if (defaultExpr == null) return null;
-    const quoted = /^[(B]?'([\s\S]*)'.*::"?([\w. ]+)"?(?:\[\])?$/.exec(defaultExpr);
-    if (quoted) {
-      if (quoted[1] === "now" && quoted[2] === "date") return null;
-      return quoted[1].replace(/''/g, "'");
-    }
-    if (defaultExpr === "true" || defaultExpr === "false") return defaultExpr;
-    const num = /^\(?(-?\d+(?:\.\d*)?)\)?(?:::bigint)?$/.exec(defaultExpr);
-    if (num) return num[1];
-    if (/^-?\d+$/.test(defaultExpr)) return defaultExpr;
-    return null;
-  }
-
-  /**
-   * @internal
-   * @missingRailsArgs has_default_function? — PERMANENT
-   */
-  extractDefaultFunction(defaultValue: unknown, defaultExpr: string | null): string | null {
-    if (defaultExpr != null && this.hasDefaultFunction(defaultValue, defaultExpr)) {
-      return defaultExpr;
-    }
-    return null;
-  }
-
-  /** @internal */
-  hasDefaultFunction(defaultValue: unknown, defaultExpr: string): boolean {
-    return defaultValue == null && DEFAULT_FUNCTION_RE.test(defaultExpr);
-  }
-
-  /** @internal */
-  isRetryableQueryError(exception: unknown): boolean {
-    return (
-      this._rawConnection?.transactionStatus() !== PQTRANS_INERROR &&
-      super.isRetryableQueryError(exception)
-    );
-  }
-
-  /** @internal */
-  isCachedPlanFailure(pgerror: unknown): boolean {
-    if (!(pgerror instanceof Error)) return false;
-    const err = pgerror as { code?: string; message?: string };
-    if (err.code !== FEATURE_NOT_SUPPORTED) return false;
-    return typeof err.message === "string" && err.message.includes("cached plan");
-  }
-
-  /** @internal */
-  sqlKey(sql: string | null): string {
-    return `${this._schemaSearchPathMemo ?? ""}-${sql}`;
-  }
-
-  /** @internal */
-  async prepareStatement(sql: string | null, binds: unknown[], conn: pg.Client): Promise<string> {
-    const sqlKey = this.sqlKey(sql);
-    if (!this._statements.isKey(sqlKey)) {
-      const nextkey = this._statements.nextKey();
-      try {
-        await prepare(conn, nextkey, sql as string);
-      } catch (e) {
-        throw this.translateExceptionClass(e, sql, binds);
-      }
-      await this._statements.set(sqlKey, { name: nextkey });
-    }
-    return this._statements.get(sqlKey)!.name;
-  }
-
-  /** @internal */
-  async reconfigureConnectionTimezone(): Promise<void> {
-    const variables = fetch<SessionVariables>(this._config, "variables", {});
-
-    if (rtest(variables["timezone"])) return;
-
-    if (this.defaultTimezone === "utc") {
-      await this.rawExecute("SET SESSION timezone TO 'UTC'", "SCHEMA");
-    } else {
-      await this.rawExecute("SET SESSION timezone TO DEFAULT", "SCHEMA");
-    }
-  }
-
-  /** @internal */
-  async columnDefinitions(tableName: string): Promise<unknown[][]> {
-    const identity = (await this.supportsIdentityColumns()) ? "attidentity" : this.quote("");
-    const attgenerated = (await this.supportsVirtualColumns()) ? "attgenerated" : this.quote("");
-    return this.query(
-      `  SELECT a.attname, format_type(a.atttypid, a.atttypmod),
-             pg_get_expr(d.adbin, d.adrelid), a.attnotnull, a.atttypid, a.atttypmod,
-             c.collname, col_description(a.attrelid, a.attnum) AS comment,
-             ${identity} AS identity,
-             ${attgenerated} as attgenerated
-        FROM pg_attribute a
-        LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum
-        LEFT JOIN pg_type t ON a.atttypid = t.oid
-        LEFT JOIN pg_collation c ON a.attcollation = c.oid AND a.attcollation <> t.typcollation
-       WHERE a.attrelid = ${this.quote(this.quoteTableName(tableName))}::regclass
-         AND a.attnum > 0 AND NOT a.attisdropped
-       ORDER BY a.attnum`,
-      "SCHEMA",
-    );
-  }
-
-  /** @internal */
-  buildStatementPool(): StatementPool {
-    return new StatementPool(
-      this,
-      PostgreSQLAdapter.typeCastConfigToInteger(this._config.statementLimit) as number,
-    );
-  }
-
-  /** @internal */
-  addPgEncoders(): void {}
-
-  /** @internal */
-  async updateTypemapForDefaultTimezone(): Promise<void> {
-    const tz = defaultTimezone();
-    if (this._mappedDefaultTimezone === tz) return;
-    this._mappedDefaultTimezone = tz;
-    await this.reconfigureConnectionTimezone();
-  }
-
-  /** @internal */
-  addPgDecoders(): void {}
-
-  /** @internal */
-  constructCoder(
-    row: { oid: string | number; typname: string },
-    coderClass: string | null,
-  ): { oid: number; name: string; coderClass: string } | null {
-    if (!coderClass) return null;
-    return { oid: Number(row.oid), name: row.typname, coderClass };
   }
 
   /** @internal */

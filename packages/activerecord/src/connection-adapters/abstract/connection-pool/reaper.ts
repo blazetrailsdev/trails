@@ -10,11 +10,6 @@ export class Reaper {
   private _pool: ReapablePool;
   private _frequency: number;
 
-  constructor(pool: ReapablePool, frequency: number) {
-    this._pool = pool;
-    this._frequency = frequency;
-  }
-
   get pool(): ReapablePool {
     return this._pool;
   }
@@ -23,13 +18,10 @@ export class Reaper {
     return this._frequency;
   }
 
-  run(): void {
-    if (!this.frequency || this.frequency <= 0) return;
-    Reaper.registerPool(this.pool, this.frequency);
+  constructor(pool: ReapablePool, frequency: number) {
+    this._pool = pool;
+    this._frequency = frequency;
   }
-
-  private static _pools = new Map<number, WeakRef<ReapablePool>[]>();
-  private static _timers = new Map<number, ReturnType<typeof setTimeout>>();
 
   /** @missingRailsCall spawn_thread — PERMANENT */
   static registerPool(pool: ReapablePool, frequency: number): void {
@@ -53,6 +45,14 @@ export class Reaper {
 
     alive.push(new WeakRef(pool));
     Reaper._pools.set(frequency, alive);
+  }
+
+  private static _pools = new Map<number, WeakRef<ReapablePool>[]>();
+  private static _timers = new Map<number, ReturnType<typeof setTimeout>>();
+
+  run(): void {
+    if (!this.frequency || this.frequency <= 0) return;
+    Reaper.registerPool(this.pool, this.frequency);
   }
 
   private static _spawnTimer(frequency: number): ReturnType<typeof setTimeout> {

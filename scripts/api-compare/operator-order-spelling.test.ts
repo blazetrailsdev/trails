@@ -22,6 +22,8 @@ describe("operatorSpelling", () => {
 
   it("resolves `==` to each class's equality port", () => {
     expect(operatorSpelling("ActiveModel::Attribute", "==")).toEqual(["equals"]);
+    expect(operatorSpelling("ActiveModel::AttributeSet", "==")).toEqual(["equals"]);
+    expect(operatorSpelling("ActiveModel::LazyAttributeHash", "==")).toEqual(["equals"]);
     expect(operatorSpelling("ActiveModel::Type::Value", "==")).toEqual(["equals"]);
     expect(operatorSpelling("ActiveRecord::Result::IndexedRow", "==")).toEqual(["equals"]);
     expect(operatorSpelling("ActiveRecord::Reflection::MacroReflection", "==")).toEqual(["equals"]);

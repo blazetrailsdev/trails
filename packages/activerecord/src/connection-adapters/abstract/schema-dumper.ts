@@ -80,11 +80,6 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 
   /** @internal */
-  protected isBigint(column: Column): boolean {
-    return column.type === "bigint" || column.isBigint();
-  }
-
-  /** @internal */
   protected schemaLimit(column: Column): string | undefined {
     if (this.isBigint(column)) return undefined;
     const limit = column.limit;
@@ -137,6 +132,11 @@ export class SchemaDumper extends BaseSchemaDumper {
   protected async schemaCollation(column: Column): Promise<string | undefined> {
     if (column.collation) return JSON.stringify(column.collation);
     return undefined;
+  }
+
+  /** @internal */
+  protected isBigint(column: Column): boolean {
+    return column.type === "bigint" || column.isBigint();
   }
 
   /** @internal */

@@ -256,11 +256,21 @@ export interface RowFormatHost {
   _defaultRowFormat?: string | null;
 }
 
+export function tableAliasLength(): number {
+  return 256;
+}
+
 /** @internal */
 export async function isRowFormatDynamicByDefault(this: RowFormatHost): Promise<boolean> {
   return (await this.isMariadb())
     ? ((await this.databaseVersion) as Version).compare("10.2.2") >= 0
     : ((await this.databaseVersion) as Version).compare("5.7.9") >= 0;
+}
+
+/** @internal */
+export interface MysqlColumnReflectionHost {
+  createTableInfo(tableName: string): Promise<string | null>;
+  lookupCastType(sqlType: string | null): ValueType;
 }
 
 /** @internal */
@@ -275,12 +285,6 @@ export async function defaultRowFormat(this: RowFormatHost): Promise<string | nu
   }
 
   return this._defaultRowFormat ?? null;
-}
-
-/** @internal */
-export interface MysqlColumnReflectionHost {
-  createTableInfo(tableName: string): Promise<string | null>;
-  lookupCastType(sqlType: string | null): ValueType;
 }
 
 /** @internal */
@@ -354,10 +358,6 @@ export function extractForeignKeyAction(
 ): "cascade" | "nullify" | "restrict" | undefined {
   if (specifier === "RESTRICT") return undefined;
   return BaseSchemaStatements.prototype.extractForeignKeyAction.call(this, specifier);
-}
-
-export function tableAliasLength(): number {
-  return 256;
 }
 
 /** @internal */

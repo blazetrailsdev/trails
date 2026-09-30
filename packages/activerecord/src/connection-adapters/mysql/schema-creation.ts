@@ -49,6 +49,12 @@ export class SchemaCreation extends AbstractSchemaCreation {
   declare protected conn: VisitorHostAdapter;
 
   /** @internal */
+  protected addSqlCommentBang(sql: string, comment: string | null | undefined): string {
+    if (!comment?.trim()) return sql;
+    return `${sql} COMMENT ${this.conn.quote(comment)}`;
+  }
+
+  /** @internal */
   protected async isMariadb(): Promise<boolean> {
     return this.conn.isMariadb();
   }
@@ -69,16 +75,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
       await super.visitAddColumnDefinition(o),
       this.columnOptions(o.column) as MysqlColumnOptions,
     );
-  }
-
-  /** @internal */
-  protected supportsIndexesInCreate(): boolean {
-    return this.conn.supportsIndexesInCreate();
-  }
-
-  /** @internal */
-  protected async supportsCheckConstraints(): Promise<boolean> {
-    return this.conn.supportsCheckConstraints();
   }
 
   /** @internal */
@@ -178,8 +174,12 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected addSqlCommentBang(sql: string, comment: string | null | undefined): string {
-    if (!comment?.trim()) return sql;
-    return `${sql} COMMENT ${this.conn.quote(comment)}`;
+  protected supportsIndexesInCreate(): boolean {
+    return this.conn.supportsIndexesInCreate();
+  }
+
+  /** @internal */
+  protected async supportsCheckConstraints(): Promise<boolean> {
+    return this.conn.supportsCheckConstraints();
   }
 }

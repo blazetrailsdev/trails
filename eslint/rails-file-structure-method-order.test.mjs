@@ -110,7 +110,7 @@ const fixture = {
     // Rows/Range/CurrentRow/Preceding/Following where window.ts had
     // Preceding/Following/CurrentRow/Rows/Range).
     "packages/arel/src/fixture-decls.ts": {
-      classes: {},
+      classes: { Gamma: sharedClassOrder },
       functions: [],
       declarations: ["Alpha", "Beta", "Gamma"],
     },
@@ -641,6 +641,15 @@ try {
         code: `export class Gamma {}\nexport class Beta {}\nexport class Alpha {}\n`,
         errors: [{ messageId: "outOfOrder" }],
         output: `export class Alpha {}\nexport class Beta {}\nexport class Gamma {}\n`,
+      },
+      // Both the declarations and a class's members are out of order: the
+      // member slots nest inside the declaration slots, so one pass moves
+      // the declarations and the next reorders the members.
+      {
+        filename: declsFile,
+        code: `export class Gamma {\n  second() {}\n  first() {}\n}\nexport class Alpha {}\n`,
+        errors: [{ messageId: "outOfOrder" }],
+        output: `export class Alpha {}\nexport class Gamma {\n  second() {}\n  first() {}\n}\n`,
       },
       // A same-named GLOBAL in the heritage clause is not a sibling reference
       // (`class RangeError extends globalThis.RangeError`, errors.ts:288), so
