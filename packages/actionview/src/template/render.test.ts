@@ -73,12 +73,10 @@ describe("CachedViewRenderTest", () => {
   });
 
   it("render partial with empty collection should return nil", () => {
-    assertNil(view.viewRenderer.render(view, { partial: "test/customer", collection: [] }));
+    assertNil(view.render({ partial: "test/customer", collection: [] }));
   });
 
   it("render partial with nil collection should return nil", () => {
-    assertNil(
-      view.viewRenderer.render(view, { partial: "test/customer", collection: null as never }),
-    );
+    assertNil(view.render({ partial: "test/customer", collection: null as never }));
   });
 });

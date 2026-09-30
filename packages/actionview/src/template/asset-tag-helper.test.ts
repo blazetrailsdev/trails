@@ -61,6 +61,7 @@ import {
 } from "../helpers/asset-tag-helper.js";
 import type { CaptureHelperHost } from "../helpers/capture-helper.js";
 import { tag } from "../helpers/tag-helper.js";
+import { assertDomEqual } from "../testing/dom-assertions.js";
 
 Template.mimeTypesImplementation = Mime;
 
@@ -88,16 +89,6 @@ const host = {
   response,
   contentSecurityPolicyNonce: () => "iyhD0Yc0W+c=",
 } as unknown as AssetTagHelperHost & CaptureHelperHost;
-
-const normalizeDom = (html: unknown): string =>
-  String(html).replace(/<(\w+)((?:\s+[\w-]+="[^"]*")*)\s*(\/?)>/g, (_m, name, attrs, close) => {
-    const sorted = (attrs.match(/[\w-]+="[^"]*"/g) ?? []).sort().join(" ");
-    return `<${name}${sorted ? " " + sorted : ""}${close}>`;
-  });
-
-const assertDomEqual = (expected: string, actual: unknown): void => {
-  expect(normalizeDom(actual)).toEqual(normalizeDom(expected));
-};
 
 type PathHelper = (this: AssetUrlHelperHost, source: string, options?: AssetPathOptions) => string;
 const table = (helper: PathHelper, rows: [string, string, AssetPathOptions?][]) =>
@@ -201,39 +192,58 @@ const PathToStyleToTag: [() => string, string][] = [
 
 const autoDiscovery = (...args: unknown[]): unknown =>
   (autoDiscoveryLinkTag as (...a: unknown[]) => unknown).call(host, ...args);
-const adLink = (href: string, title: string, type: string, rel = "alternate") =>
-  `<link rel="${rel}" type="${type}" title="${title}" href="${href}" />`;
-const rssType = "application/rss+xml";
-const atomType = "application/atom+xml";
-
 const AutoDiscoveryToTag: [() => unknown, string][] = [
-  [() => autoDiscovery(), adLink(ex, "RSS", rssType)],
-  [() => autoDiscovery(":rss"), adLink(ex, "RSS", rssType)],
-  [() => autoDiscovery(":atom"), adLink(ex, "ATOM", atomType)],
-  [() => autoDiscovery(":json"), adLink(ex, "JSON", "application/json")],
-  [() => autoDiscovery(":rss", { action: "feed" }), adLink(ex, "RSS", rssType)],
+  [
+    () => autoDiscovery(),
+    '<link href="http://www.example.com" rel="alternate" title="RSS" type="application/rss+xml" />',
+  ],
+  [
+    () => autoDiscovery(":rss"),
+    '<link href="http://www.example.com" rel="alternate" title="RSS" type="application/rss+xml" />',
+  ],
+  [
+    () => autoDiscovery(":atom"),
+    '<link href="http://www.example.com" rel="alternate" title="ATOM" type="application/atom+xml" />',
+  ],
+  [
+    () => autoDiscovery(":json"),
+    '<link href="http://www.example.com" rel="alternate" title="JSON" type="application/json" />',
+  ],
+  [
+    () => autoDiscovery(":rss", { action: "feed" }),
+    '<link href="http://www.example.com" rel="alternate" title="RSS" type="application/rss+xml" />',
+  ],
   [
     () => autoDiscovery(":rss", "http://localhost/feed"),
-    adLink("http://localhost/feed", "RSS", rssType),
+    '<link href="http://localhost/feed" rel="alternate" title="RSS" type="application/rss+xml" />',
   ],
-  [() => autoDiscovery(":rss", "//localhost/feed"), adLink("//localhost/feed", "RSS", rssType)],
+  [
+    () => autoDiscovery(":rss", "//localhost/feed"),
+    '<link href="//localhost/feed" rel="alternate" title="RSS" type="application/rss+xml" />',
+  ],
   [
     () => autoDiscovery(":rss", { action: "feed" }, { title: "My RSS" }),
-    adLink(ex, "My RSS", rssType),
+    '<link href="http://www.example.com" rel="alternate" title="My RSS" type="application/rss+xml" />',
   ],
-  [() => autoDiscovery(":rss", {}, { title: "My RSS" }), adLink(ex, "My RSS", rssType)],
-  [() => autoDiscovery(null, {}, { type: "text/html" }), adLink(ex, "", "text/html")],
+  [
+    () => autoDiscovery(":rss", {}, { title: "My RSS" }),
+    '<link href="http://www.example.com" rel="alternate" title="My RSS" type="application/rss+xml" />',
+  ],
+  [
+    () => autoDiscovery(null, {}, { type: "text/html" }),
+    '<link href="http://www.example.com" rel="alternate" title="" type="text/html" />',
+  ],
   [
     () => autoDiscovery(null, {}, { title: "No stream.. really", type: "text/html" }),
-    adLink(ex, "No stream.. really", "text/html"),
+    '<link href="http://www.example.com" rel="alternate" title="No stream.. really" type="text/html" />',
   ],
   [
     () => autoDiscovery(":rss", {}, { title: "My RSS", type: "text/html" }),
-    adLink(ex, "My RSS", "text/html"),
+    '<link href="http://www.example.com" rel="alternate" title="My RSS" type="text/html" />',
   ],
   [
     () => autoDiscovery(":atom", {}, { rel: "Not so alternate" }),
-    adLink(ex, "ATOM", atomType, "Not so alternate"),
+    '<link href="http://www.example.com" rel="Not so alternate" title="ATOM" type="application/atom+xml" />',
   ],
 ];
 
@@ -241,51 +251,51 @@ const favicon = (...args: unknown[]): unknown =>
   (faviconLinkTag as (...a: unknown[]) => unknown).call(host, ...args);
 
 const FaviconLinkToTag: [() => unknown, string][] = [
-  [() => favicon(), '<link rel="icon" type="image/x-icon" href="/images/favicon.ico" />'],
+  [() => favicon(), '<link href="/images/favicon.ico" rel="icon" type="image/x-icon" />'],
   [
     () => favicon("favicon.ico"),
-    '<link rel="icon" type="image/x-icon" href="/images/favicon.ico" />',
+    '<link href="/images/favicon.ico" rel="icon" type="image/x-icon" />',
   ],
   [
     () => favicon("favicon.ico", { rel: "foo" }),
-    '<link rel="foo" type="image/x-icon" href="/images/favicon.ico" />',
+    '<link href="/images/favicon.ico" rel="foo" type="image/x-icon" />',
   ],
   [
     () => favicon("favicon.ico", { rel: "foo", type: "bar" }),
-    '<link rel="foo" type="bar" href="/images/favicon.ico" />',
+    '<link href="/images/favicon.ico" rel="foo" type="bar" />',
   ],
   [
     () => favicon("mb-icon.png", { rel: "apple-touch-icon", type: "image/png" }),
-    '<link rel="apple-touch-icon" type="image/png" href="/images/mb-icon.png" />',
+    '<link href="/images/mb-icon.png" rel="apple-touch-icon" type="image/png" />',
   ],
 ];
 
 const link = (...args: unknown[]): unknown => stylesheetLinkTag.call(host, ...args);
 
 const StyleLinkToTag: [() => unknown, string][] = [
-  [() => link("bank"), '<link rel="stylesheet" href="/stylesheets/bank.css" />'],
-  [() => link("bank.css"), '<link rel="stylesheet" href="/stylesheets/bank.css" />'],
-  [() => link("/elsewhere/file"), '<link rel="stylesheet" href="/elsewhere/file.css" />'],
-  [() => link("subdir/subdir"), '<link rel="stylesheet" href="/stylesheets/subdir/subdir.css" />'],
+  [() => link("bank"), '<link href="/stylesheets/bank.css" rel="stylesheet" />'],
+  [() => link("bank.css"), '<link href="/stylesheets/bank.css" rel="stylesheet" />'],
+  [() => link("/elsewhere/file"), '<link href="/elsewhere/file.css" rel="stylesheet" />'],
+  [() => link("subdir/subdir"), '<link href="/stylesheets/subdir/subdir.css" rel="stylesheet" />'],
   [
     () => link("bank", { media: "all" }),
-    '<link rel="stylesheet" href="/stylesheets/bank.css" media="all" />',
+    '<link href="/stylesheets/bank.css" media="all" rel="stylesheet" />',
   ],
   [
     () => link("bank", { host: "assets.example.com" }),
-    '<link rel="stylesheet" href="http://assets.example.com/stylesheets/bank.css" />',
+    '<link href="http://assets.example.com/stylesheets/bank.css" rel="stylesheet" />',
   ],
   [
     () => link("http://www.example.com/styles/style"),
-    '<link rel="stylesheet" href="http://www.example.com/styles/style" />',
+    '<link href="http://www.example.com/styles/style" rel="stylesheet" />',
   ],
   [
     () => link("http://www.example.com/styles/style.css"),
-    '<link rel="stylesheet" href="http://www.example.com/styles/style.css" />',
+    '<link href="http://www.example.com/styles/style.css" rel="stylesheet" />',
   ],
   [
     () => link("//www.example.com/styles/style.css"),
-    '<link rel="stylesheet" href="//www.example.com/styles/style.css" />',
+    '<link href="//www.example.com/styles/style.css" rel="stylesheet" />',
   ],
 ];
 
@@ -640,11 +650,11 @@ const PictureLinkToTag: [() => unknown, string][] = [
 const script = (...args: unknown[]): unknown => javascriptIncludeTag.call(host, ...args);
 
 const JavascriptIncludeToTag: [() => unknown, string][] = [
-  [() => script("bank"), '<script src="/javascripts/bank.js"></script>'],
-  [() => script("bank.js"), '<script src="/javascripts/bank.js"></script>'],
+  [() => script("bank"), '<script src="/javascripts/bank.js" ></script>'],
+  [() => script("bank.js"), '<script src="/javascripts/bank.js" ></script>'],
   [
     () => script("bank", { lang: "vbscript" }),
-    '<script src="/javascripts/bank.js" lang="vbscript"></script>',
+    '<script lang="vbscript" src="/javascripts/bank.js" ></script>',
   ],
   [
     () => script("bank", { host: "assets.example.com" }),
@@ -661,23 +671,23 @@ const preload = (source: string, options?: Record<string, unknown>): unknown =>
 const PreloadLinkToTag: [() => unknown, string][] = [
   [
     () => preload("/application.js", { type: "module" }),
-    '<link rel="modulepreload" href="/application.js" as="script" type="module">',
+    '<link rel="modulepreload" href="/application.js" as="script" type="module" >',
   ],
   [
     () => preload("/styles/custom_theme.css"),
-    '<link rel="preload" href="/styles/custom_theme.css" as="style" type="text/css">',
+    '<link rel="preload" href="/styles/custom_theme.css" as="style" type="text/css" />',
   ],
   [
     () => preload("/videos/video.webm"),
-    '<link rel="preload" href="/videos/video.webm" as="video" type="video/webm">',
+    '<link rel="preload" href="/videos/video.webm" as="video" type="video/webm" />',
   ],
   [
     () => preload("/posts.json", { as: "fetch" }),
-    '<link rel="preload" href="/posts.json" as="fetch" type="application/json">',
+    '<link rel="preload" href="/posts.json" as="fetch" type="application/json" />',
   ],
   [
     () => preload("/users", { as: "fetch", type: "application/json" }),
-    '<link rel="preload" href="/users" as="fetch" type="application/json">',
+    '<link rel="preload" href="/users" as="fetch" type="application/json" />',
   ],
   [
     () =>
@@ -685,19 +695,19 @@ const PreloadLinkToTag: [() => unknown, string][] = [
         as: "fetch",
         type: "application/javascript",
       }),
-    '<link rel="preload" href="//example.com/map?callback=initMap" as="fetch" type="application/javascript">',
+    '<link rel="preload" href="//example.com/map?callback=initMap" as="fetch" type="application/javascript" />',
   ],
   [
     () => preload("//example.com/font.woff2"),
-    '<link rel="preload" href="//example.com/font.woff2" as="font" type="font/woff2" crossorigin="anonymous">',
+    '<link rel="preload" href="//example.com/font.woff2" as="font" type="font/woff2" crossorigin="anonymous"/>',
   ],
   [
     () => preload("//example.com/font.woff2", { crossorigin: "use-credentials" }),
-    '<link rel="preload" href="//example.com/font.woff2" as="font" type="font/woff2" crossorigin="use-credentials">',
+    '<link rel="preload" href="//example.com/font.woff2" as="font" type="font/woff2" crossorigin="use-credentials" />',
   ],
   [
     () => preload("/media/audio.ogg", { nopush: true }),
-    '<link rel="preload" href="/media/audio.ogg" as="audio" type="audio/ogg">',
+    '<link rel="preload" href="/media/audio.ogg" as="audio" type="audio/ogg" />',
   ],
   [
     () =>
@@ -727,7 +737,7 @@ describe("AssetTagHelperTest", () => {
     const result = autoDiscoveryLinkTag.call(host, ":xml", "/feed.xml", {
       type: "application/xml",
     });
-    const expected = `<link rel="alternate" type="application/xml" title="XML" href="/feed.xml" />`;
+    const expected = `<link href="/feed.xml" rel="alternate" title="XML" type="application/xml" />`;
     assertDomEqual(expected, result);
   });
 
@@ -1143,8 +1153,16 @@ describe("AssetTagHelperTest", () => {
 });
 
 describe("AssetTagHelperWithoutRequestTest", () => {
+  const withoutRequest = { computeAssetPath, publicComputeAssetPath } as AssetTagHelperHost;
+
+  it("stylesheet link tag without request", () => {
+    assertDomEqual(
+      '<link rel="stylesheet" href="/stylesheets/foo.css" />',
+      stylesheetLinkTag.call(withoutRequest, "foo.css"),
+    );
+  });
+
   it("javascript include tag without request", () => {
-    const withoutRequest = { computeAssetPath, publicComputeAssetPath } as AssetTagHelperHost;
     assertDomEqual(
       '<script src="/javascripts/foo.js"></script>',
       javascriptIncludeTag.call(withoutRequest, "foo.js"),
@@ -1153,8 +1171,18 @@ describe("AssetTagHelperWithoutRequestTest", () => {
 });
 
 describe("AssetTagHelperWithStreamingRequest", () => {
+  const streaming = { ...host, response: { ...response, isSending: true } };
+
+  it("stylesheet link tag with streaming", () => {
+    withPreloadLinksHeader(() => {
+      assertDomEqual(
+        '<link rel="stylesheet" href="/stylesheets/foo.css" />',
+        stylesheetLinkTag.call(streaming, "foo.css"),
+      );
+    });
+  });
+
   it("javascript include tag with streaming", () => {
-    const streaming = { ...host, response: { ...response, isSending: true } };
     withPreloadLinksHeader(() => {
       assertDomEqual(
         '<script src="/javascripts/foo.js"></script>',

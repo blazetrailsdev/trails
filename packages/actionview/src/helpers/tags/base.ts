@@ -5,6 +5,7 @@ import {
   fetch,
   hashDelete,
   include,
+  type Included,
   initializeIncludedModules,
   rbFPublicSend,
   rbInspect,
@@ -14,9 +15,11 @@ import {
 import { isBlank, isPresent } from "@blazetrails/activesupport";
 
 import { ActiveModelInstanceTag } from "../active-model-helper.js";
-import type { FormTagHelperHost } from "../form-tag-helper.js";
+import { FormTagHelper, type FormTagHelperHost } from "../form-tag-helper.js";
+import { TagHelper } from "../tag-helper.js";
 
-export class Base extends (Object as unknown as new () => ActiveModelInstanceTag) {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActiveModelInstanceTag, TagHelper, FormTagHelper` (tags/base.rb:7); the class/interface merge is how the mixins surface on the type side.
+export class Base {
   object: unknown;
   protected _objectName: string;
   protected _methodName: string;
@@ -34,7 +37,6 @@ export class Base extends (Object as unknown as new () => ActiveModelInstanceTag
     templateObject: unknown,
     options: Record<string, unknown> = {},
   ) {
-    super();
     this._objectName = objectName == null ? "" : String(objectName);
     this._methodName = String(methodName);
     this._templateObject = templateObject as FormTagHelperHost;
@@ -208,4 +210,13 @@ export class Base extends (Object as unknown as new () => ActiveModelInstanceTag
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class above.
+export interface Base
+  extends
+    ActiveModelInstanceTag,
+    Omit<Included<typeof import("../tag-helper.js")>, "contentTag" | "tag">,
+    Omit<Included<typeof import("../form-tag-helper.js")>, "contentTag" | "tag"> {}
+
+include(Base, FormTagHelper);
+include(Base, TagHelper);
 include(Base, ActiveModelInstanceTag);

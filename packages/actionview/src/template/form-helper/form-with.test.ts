@@ -11,21 +11,7 @@ import { defaultEnforceUtf8, setDefaultEnforceUtf8 } from "../../helpers/form-ta
 import { urlFor } from "../../helpers/url-helper.js";
 import { RoutingUrlFor } from "../../routing-url-for.js";
 import type { FormBuilder } from "../../helpers/form-helper.js";
-
-function normalizeDom(html: string): string {
-  return html
-    .replace(/<\/form>$/, "")
-    .replace(/<([a-z]+)((?:\s+[^\s=>/]+(?:=(?:"[^"]*"|'[^']*'))?)*)\s*\/?>/g, (_m, name, attrs) => {
-      const list = (attrs.match(/[^\s=]+(?:=(?:"[^"]*"|'[^']*'))?/g) ?? []).map((a: string) =>
-        a.replace(/='([^']*)'$/, '="$1"'),
-      );
-      return `<${name} ${list.sort().join(" ")}>`;
-    });
-}
-
-function assertDomEqual(expected: string, actual: unknown): void {
-  expect(normalizeDom(String(actual))).toBe(normalizeDom(expected));
-}
+import { assertDomEqual } from "../../testing/dom-assertions.js";
 
 function withDefaultEnforceUtf8(value: boolean, block: () => void): void {
   const oldValue = defaultEnforceUtf8;

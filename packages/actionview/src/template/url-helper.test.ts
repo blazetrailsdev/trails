@@ -12,6 +12,7 @@ import * as UrlHelper from "../helpers/url-helper.js";
 import { raw } from "../helpers/output-safety-helper.js";
 import { Template } from "../template.js";
 import { TemplateHandlers } from "./handlers.js";
+import { assertDomEqual } from "../testing/dom-assertions.js";
 
 class Workshop {
   static {
@@ -59,19 +60,6 @@ class Session {
 function viewWith(controller: unknown): Base {
   return Base.withViewPaths([], {}, controller);
 }
-
-const normalizeDom = (html: unknown): string =>
-  String(html)
-    .replaceAll("&amp;", "&")
-    .replaceAll("&#39;", "'")
-    .replace(/<(\w+)((?:\s+[\w-]+="[^"]*")*)\s*(\/?)>/g, (_m, name, attrs, close) => {
-      const sorted = (attrs.match(/[\w-]+="[^"]*"/g) ?? []).sort().join(" ");
-      return `<${name}${sorted ? " " + sorted : ""}${close}>`;
-    });
-
-const assertDomEqual = (expected: string, actual: unknown): void => {
-  expect(normalizeDom(actual)).toEqual(normalizeDom(expected));
-};
 
 include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
 

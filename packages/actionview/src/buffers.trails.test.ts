@@ -141,6 +141,14 @@ describe("OutputBuffer", () => {
     expect(buf.toStr()).toBe("kept");
   });
 
+  it("raises instead of stringifying a thenable on append and safeExprAppend", () => {
+    const buf = new OutputBuffer("kept");
+    const pending = Promise.resolve("late");
+    expect(() => buf.append(pending)).toThrow(TypeError);
+    expect(() => buf.safeExprAppend(pending)).toThrow(TypeError);
+    expect(buf.toStr()).toBe("kept");
+  });
+
   it("equals compares raw contents and type", () => {
     expect(new OutputBuffer("a").equals(new OutputBuffer("a"))).toBe(true);
     expect(new OutputBuffer("a").equals(new OutputBuffer("b"))).toBe(false);
