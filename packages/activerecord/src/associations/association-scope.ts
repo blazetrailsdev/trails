@@ -209,7 +209,7 @@ export class AssociationScope {
         } else if (item.referencesValues.length > 0) {
           scope.mergeBang(item.only("joins", "leftOuterJoins"));
 
-          const associations = [...new Set([...item.eagerLoadValues, ...item.includesValues])];
+          const associations = union(item.eagerLoadValues, item.includesValues);
 
           if (associations.length > 0) {
             scope.joinsBang(item.constructJoinDependency(associations, Nodes.OuterJoin));
@@ -217,7 +217,7 @@ export class AssociationScope {
         }
 
         reflection.allIncludes(() => {
-          scope.includesValues = [...new Set([...scope.includesValues, ...item.includesValues])];
+          scope.includesValues = union(scope.includesValues, item.includesValues);
         });
 
         scope.unscopeBang(...item.unscopeValues);

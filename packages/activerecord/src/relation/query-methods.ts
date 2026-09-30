@@ -10,6 +10,7 @@ import {
   toI,
   transformValues,
   union,
+  uniq,
 } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
 import { Nodes, Predications, SelectManager, Table as ArelTable } from "@blazetrails/arel";
@@ -435,10 +436,7 @@ function order(this: QueryMethodsHost, ...args: OrderArg[]): any {
 
 function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
   if (args.length > 0) preprocessOrderArgs.call(this, args as unknown[]);
-  this.orderValues = dedupeOrderClauses([
-    ...this.orderValues,
-    ...(args as unknown[]),
-  ]) as typeof this.orderValues;
+  this.orderValues = union(this.orderValues, args as unknown[]) as typeof this.orderValues;
   return this;
 }
 
@@ -492,43 +490,11 @@ function reorder(this: QueryMethodsHost, ...args: OrderArg[]): any {
 
 function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
   preprocessOrderArgs.call(this, args as unknown[]);
+  args = uniq(args);
   this.reorderingValue = true;
-  this.orderValues = dedupeOrderClauses(args as unknown[]) as typeof this.orderValues;
+  this.orderValues = args as typeof this.orderValues;
   return this;
 }
-let orderClauseIdentity = 0;
-const orderClauseIdentities = new WeakMap<object, number>();
-
-function orderClauseKey(clause: unknown): string {
-  if (typeof clause === "string") return `s:${clause}`;
-  if (clause instanceof Nodes.SqlLiteral) return `s:${String((clause as any).value ?? "")}`;
-  if (clause instanceof Arel.Attribute) {
-    return `a:${String((clause as any).relation?.name)}.${(clause as any).name}`;
-  }
-  if (clause instanceof Nodes.Node && "expr" in (clause as any)) {
-    return `${clause.constructor.name}(${orderClauseKey((clause as any).expr)})`;
-  }
-  if (clause !== null && typeof clause === "object") {
-    let id = orderClauseIdentities.get(clause);
-    if (id === undefined) {
-      id = ++orderClauseIdentity;
-      orderClauseIdentities.set(clause, id);
-    }
-    return `o:${id}`;
-  }
-  return `v:${String(clause)}`;
-}
-
-function dedupeOrderClauses<T>(clauses: T[]): T[] {
-  const seen = new Set<string>();
-  return clauses.filter((c) => {
-    const key = orderClauseKey(c);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
 export type UnscopeType =
   | "where"
   | "select"
@@ -780,14 +746,6 @@ function invertWhereBang(this: QueryMethodsHost): any {
   return this;
 }
 
-function uniqArray(arr: unknown[]): unknown[] {
-  const out: unknown[] = [];
-  for (const el of arr) {
-    if (!out.some((seen) => deepEqual(seen, el))) out.push(el);
-  }
-  return out;
-}
-
 function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
@@ -873,8 +831,8 @@ export function structurallyIncompatibleValuesFor(
     let v2 = values[method];
     if (Array.isArray(v1)) {
       if (!Array.isArray(v2)) return false;
-      v1 = uniqArray(v1);
-      v2 = uniqArray(v2);
+      v1 = uniq(v1);
+      v2 = uniq(v2);
     }
     return !deepEqual(v1, v2);
   });
@@ -1097,7 +1055,7 @@ function optimizerHints(this: QueryMethodsHost, ...args: string[]): any {
 }
 
 function optimizerHintsBang(this: QueryMethodsHost, ...args: string[]): any {
-  this.optimizerHintsValues = [...new Set([...this.optimizerHintsValues, ...args])];
+  this.optimizerHintsValues = union(this.optimizerHintsValues, args);
   return this;
 }
 
@@ -1135,7 +1093,7 @@ function uniqBang(this: QueryMethodsHost, name?: string): any {
   if (name === undefined) return this;
   const values = this._values[name];
   if (Array.isArray(values) && values.length > 0) {
-    this._values[name] = [...new Set(values)];
+    this._values[name] = uniq(values);
   }
   return this;
 }
@@ -2111,20 +2069,19 @@ export function eachJoinDependencies(
  * @missingRailsCall empty? — PERMANENT
  */
 export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] {
-  const joinNames: AssociationSpec[] = [];
-  const addNames = (specs: ReadonlyArray<AssociationSpec>) => {
-    for (const a of specs) if (!joinNames.includes(a)) joinNames.push(a);
-  };
-  addNames(this.joinsValues as AssociationSpec[]);
-  addNames(this.leftOuterJoinsValues);
-  addNames(this.eagerLoadValues);
-  addNames(this.includesValues);
+  let joins = union(this.joinsValues as AssociationSpec[], this.leftOuterJoinsValues);
+  if (this.eagerLoadValues.length !== 0) joins = union(joins, this.eagerLoadValues);
+  if (this.includesValues.length !== 0) joins = union(joins, this.includesValues);
 
-  const stashedJoins: JoinDependency[] = [];
-  const named = selectNamedJoins.call(this, joinNames, stashedJoins);
-  const jd = constructJoinDependency.call(this, named as AssociationSpec[], null);
-  stashedJoins.unshift(jd);
-  return stashedJoins;
+  const joinDependencies: JoinDependency[] = [];
+  joinDependencies.unshift(
+    constructJoinDependency.call(
+      this,
+      selectNamedJoins.call(this, joins, joinDependencies) as AssociationSpec[],
+      null,
+    ),
+  );
+  return joinDependencies;
 }
 
 /** @internal */
@@ -2146,9 +2103,7 @@ export function buildArel(
   if (this.offsetValue !== null) arel.skip(buildCastValue("OFFSET", toI(this.offsetValue)));
 
   if (this.groupValues.length > 0)
-    arel.group(
-      ...(arelColumns.call(this, [...new Set(this.groupValues)]) as (Nodes.Node | string)[]),
-    );
+    arel.group(...(arelColumns.call(this, uniq(this.groupValues)) as (Nodes.Node | string)[]));
 
   buildOrder.call(this, arel);
   buildWith.call(this, arel);
@@ -2163,7 +2118,7 @@ export function buildArel(
 
   if (this.annotateValues.length > 0) {
     const annotates =
-      this.annotateValues.length > 1 ? [...new Set(this.annotateValues)] : this.annotateValues;
+      this.annotateValues.length > 1 ? uniq(this.annotateValues) : this.annotateValues;
     arel.comment?.(...annotates);
   }
 
