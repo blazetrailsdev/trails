@@ -159,6 +159,15 @@ export class Dirty {
   }
 }
 
+export function initializeDup(
+  this: DirtyDupHost,
+  super_: (other: unknown) => void,
+  other: unknown,
+): void {
+  super_(other);
+  this._mutationsFromDatabase = null;
+}
+
 export function initAttributes(
   this: { constructor: { _defaultAttributes?: () => AttributeSet } },
   super_: (other: unknown) => AttributeSet,
@@ -172,6 +181,15 @@ export function initAttributes(
       .map((attr) => attr.withValueFromUser(attrs.fetchValue(attr.name!)));
   }
   return attrs;
+}
+
+export interface DirtyInternalsHost {
+  _mutationsBeforeLastSave: AttributeMutationTracker | NullMutationTracker | null;
+  _mutationsFromDatabase: AttributeMutationTracker | null;
+}
+
+export interface DirtyDupHost extends DirtyInternalsHost {
+  _attributes: AttributeSet;
 }
 
 export function asJson(
@@ -188,27 +206,9 @@ export function asJson(
   return super_(options);
 }
 
-export interface DirtyInternalsHost {
-  _mutationsBeforeLastSave: AttributeMutationTracker | NullMutationTracker | null;
-  _mutationsFromDatabase: AttributeMutationTracker | null;
-}
-
-export interface DirtyDupHost extends DirtyInternalsHost {
-  _attributes: AttributeSet;
-}
-
 /** @internal */
 export function initInternals(this: DirtyInternalsHost, super_: () => void): void {
   super_();
   this._mutationsBeforeLastSave = null;
-  this._mutationsFromDatabase = null;
-}
-
-export function initializeDup(
-  this: DirtyDupHost,
-  super_: (other: unknown) => void,
-  other: unknown,
-): void {
-  super_(other);
   this._mutationsFromDatabase = null;
 }

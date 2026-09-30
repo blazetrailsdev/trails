@@ -221,6 +221,13 @@ export abstract class Attribute {
     return this.originalAttribute !== null;
   }
 
+  /** @missingRailsName value — PERMANENT */
+  private initializeDup(_other: Attribute): void {
+    if (isDuplicable(this._value)) {
+      this._value = dupValue(this._value);
+    }
+  }
+
   private changedFromAssignment(): boolean {
     if (!this.isAssigned()) return false;
     return this.type!.isChanged(this.originalValue, this.value, this.valueBeforeTypeCast);
@@ -249,13 +256,6 @@ export abstract class Attribute {
 
   deepDup(): Attribute {
     return this.dup();
-  }
-
-  /** @missingRailsName value — PERMANENT */
-  private initializeDup(_other: Attribute): void {
-    if (isDuplicable(this._value)) {
-      this._value = dupValue(this._value);
-    }
   }
 
   withUserDefault(value: unknown): Attribute {

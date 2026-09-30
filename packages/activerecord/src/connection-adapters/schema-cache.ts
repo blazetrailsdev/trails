@@ -388,6 +388,17 @@ export class SchemaCache {
     return callback(File.read(filename));
   }
 
+  initializeDup(): SchemaCache {
+    const dup = new SchemaCache();
+    dup._columns = new Map(this._columns);
+    dup._columnsHash = new Map(this._columnsHash);
+    dup._primaryKeys = new Map(this._primaryKeys);
+    dup._dataSources = new Map(this._dataSources);
+    dup._indexes = new Map(this._indexes);
+    dup._version = this._version;
+    return dup;
+  }
+
   isCached(tableName: string): boolean {
     return this._columns.has(tableName);
   }
@@ -615,17 +626,6 @@ export class SchemaCache {
         block(file);
       }
     });
-  }
-
-  initializeDup(): SchemaCache {
-    const dup = new SchemaCache();
-    dup._columns = new Map(this._columns);
-    dup._columnsHash = new Map(this._columnsHash);
-    dup._primaryKeys = new Map(this._primaryKeys);
-    dup._dataSources = new Map(this._dataSources);
-    dup._indexes = new Map(this._indexes);
-    dup._version = this._version;
-    return dup;
   }
 
   encodeWith(coder: Record<string, unknown>): void {
