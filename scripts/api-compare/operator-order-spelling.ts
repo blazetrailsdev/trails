@@ -76,12 +76,17 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // the same spellings AttributeSet uses below (RFC 0115 retired the Map-facade
   // `get`/`has` pair this class used to carry). The class is declared at
   // builder.rb:94 directly under `module ActiveModel`, so its fqn is NOT nested
-  // under `AttributeSet`.
-  "ActiveModel::LazyAttributeHash": { "[]": ["getAttribute"], "[]=": ["set"] },
+  // under `AttributeSet`. :134 `def ==(other)` → `equals`.
+  "ActiveModel::LazyAttributeHash": {
+    "[]": ["getAttribute"],
+    "[]=": ["set"],
+    "==": ["equals"],
+  },
   // attribute_set.rb:16 `def [](name)` → attribute-set.ts `getAttribute`, and
   // :20 `def []=(name, value)` → `set`, which takes the `Attribute` Rails
   // stores (RFC 0115 retired the bare-value Map-compat sibling it used to be).
-  "ActiveModel::AttributeSet": { "[]": ["getAttribute"], "[]=": ["set"] },
+  // :106 `def ==(other)` → `equals`.
+  "ActiveModel::AttributeSet": { "[]": ["getAttribute"], "[]=": ["set"], "==": ["equals"] },
   // attribute.rb:115 `def ==(other)` → attribute.ts `equals`.
   // actionpack/lib/action_dispatch/middleware/stack.rb:25-32 — the stack entry's
   // `==`, ported as `equals` in action-dispatch/middleware/stack.ts.

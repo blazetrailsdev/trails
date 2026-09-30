@@ -1,14 +1,19 @@
-import { isPlainObject, registerConstant } from "@blazetrails/activesupport";
+import {
+  isPlainObject,
+  registerConstant,
+  reverseMergeBang as hashReverseMergeBang,
+} from "@blazetrails/activesupport";
 import { Attribute, Uninitialized } from "./attribute.js";
 import type { LazyAttributeHash } from "./attribute-set/builder.js";
+import type { Block } from "@blazetrails/ruby-compat";
 import {
   FrozenError,
-  KeyError,
   block,
   dup,
   eachKey as hashEachKey,
   eachValue,
   except,
+  fetch as hashFetch,
   hasKey,
   rbFPublicSend,
   rbInspect,
@@ -62,6 +67,23 @@ function eachKey(attributes: Attributes, block: (name: string) => void): void {
   else attributes.eachKey(block);
 }
 
+function fetch(
+  attributes: Attributes,
+  name: string,
+  ...rest: [] | [Attribute] | [Block<Attribute>]
+): Attribute {
+  if (!isHash(attributes)) return attributes.fetch(name, ...rest);
+  return rest.length === 0
+    ? hashFetch<Attribute>(attributes, name)
+    : hashFetch<Attribute>(attributes, name, rest[0] as Attribute);
+}
+
+function reverseMergeBang(attributes: Attributes, otherHash: Attributes): unknown {
+  if (!isHash(attributes)) return rbFPublicSend(attributes, "reverseMergeBang", otherHash);
+  if (!isHash(otherHash)) return rbFPublicSend(otherHash, "merge", attributes);
+  return hashReverseMergeBang(attributes, otherHash);
+}
+
 function transformValues<T>(
   attributes: Attributes,
   block: (attr: Attribute) => T,
@@ -82,16 +104,10 @@ export class AttributeSet {
 
   fetch<T = Attribute>(name: string, defaultOrBlock?: T | ((name: string) => T)): Attribute | T {
     const attributes = this.attributes();
-    if (!isHash(attributes)) {
-      if (defaultOrBlock === undefined) return attributes.fetch(name);
-      return typeof defaultOrBlock === "function"
-        ? attributes.fetch(name, block(defaultOrBlock as (name: string) => Attribute))
-        : attributes.fetch(name, defaultOrBlock as Attribute);
-    }
-    if (hasKey(attributes, name)) return attributes[name];
-    if (typeof defaultOrBlock === "function") return (defaultOrBlock as (name: string) => T)(name);
-    if (defaultOrBlock !== undefined) return defaultOrBlock;
-    throw new KeyError(`key not found: ${rbInspect(name)}`, { receiver: attributes, key: name });
+    if (defaultOrBlock === undefined) return fetch(attributes, name);
+    return typeof defaultOrBlock === "function"
+      ? fetch(attributes, name, block(defaultOrBlock as (name: string) => Attribute))
+      : fetch(attributes, name, defaultOrBlock as Attribute);
   }
 
   except(...names: string[]): Record<string, Attribute> {
@@ -171,6 +187,13 @@ export class AttributeSet {
     return new AttributeSet(transformValues(this.attributes(), (attr) => attr.deepDup()));
   }
 
+  initializeDup(_: AttributeSet): void {
+    const attributes = this._attributes;
+    this._attributes = isHash(attributes)
+      ? frozenErrorRaisingStore(dup(attributes))
+      : attributes.dup();
+  }
+
   reset(key: string): void {
     if (this.isKey(key)) {
       this.writeFromDatabase(key, null);
@@ -191,18 +214,11 @@ export class AttributeSet {
   }
 
   reverseMergeBang(targetAttributes: AttributeSet): this {
-    const attributes = this.attributes();
-    const other = targetAttributes.attributes();
-    if (!isHash(attributes)) {
-      rbFPublicSend(attributes, "reverseMergeBang", other);
-    } else if (!isHash(other)) {
-      rbFPublicSend(other, "merge", attributes);
-    } else {
-      for (const [name, attr] of Object.entries(other)) {
-        if (!hasKey(attributes, name)) attributes[name] = attr;
-      }
-    }
-    return this;
+    return (reverseMergeBang(this.attributes(), targetAttributes.attributes()) as object) && this;
+  }
+
+  equals(other: unknown): boolean {
+    return other instanceof AttributeSet && rbEqual(this.attributes(), other.attributes());
   }
 
   protected attributes(): Attributes {
@@ -212,10 +228,6 @@ export class AttributeSet {
   /** @internal */
   protected defaultAttribute(name: string): Attribute {
     return Attribute.null(name);
-  }
-
-  equals(other: unknown): boolean {
-    return other instanceof AttributeSet && rbEqual(this.attributes(), other.attributes());
   }
 
   toHash(): Record<string, unknown> {
@@ -230,13 +242,6 @@ export class AttributeSet {
     Object.freeze(this.attributes());
     Object.freeze(this);
     return this;
-  }
-
-  initializeDup(_: AttributeSet): void {
-    const attributes = this._attributes;
-    this._attributes = isHash(attributes)
-      ? frozenErrorRaisingStore(dup(attributes))
-      : attributes.dup();
   }
 
   initializeClone(_: AttributeSet): void {

@@ -195,15 +195,13 @@ export class LazyAttributeHash {
   }
 
   deepDup(): LazyAttributeHash {
-    const copy = new LazyAttributeHash(
-      this.types,
-      this.values,
-      this.additionalTypes,
-      this.defaultAttributes,
-      transformValues(this._delegateHash, (attr) => attr.dup()),
-    );
-    copy.materialized = this.materialized;
+    const copy = this.dup();
+    copy._delegateHash = transformValues(this.delegateHash(), (attr) => attr.dup());
     return copy;
+  }
+
+  private initializeDup(_: LazyAttributeHash): void {
+    this._delegateHash = dup(this._delegateHash);
   }
 
   eachKey(fn: (key: string) => void): void {
@@ -213,6 +211,14 @@ export class LazyAttributeHash {
       ...Object.keys(this.delegateHash()),
     ]);
     for (const key of keys) fn(key);
+  }
+
+  equals(other: unknown): boolean {
+    if (other instanceof LazyAttributeHash) {
+      return rbEqual(this.materialize(), other.materialize());
+    } else {
+      return rbEqual(this.materialize(), other);
+    }
   }
 
   marshalDump(): [
@@ -282,18 +288,6 @@ export class LazyAttributeHash {
       return built;
     }
     return Attribute.null(name);
-  }
-
-  equals(other: unknown): boolean {
-    if (other instanceof LazyAttributeHash) {
-      return rbEqual(this.materialize(), other.materialize());
-    } else {
-      return rbEqual(this.materialize(), other);
-    }
-  }
-
-  private initializeDup(_: LazyAttributeHash): void {
-    this._delegateHash = dup(this._delegateHash);
   }
 
   dup(): LazyAttributeHash {

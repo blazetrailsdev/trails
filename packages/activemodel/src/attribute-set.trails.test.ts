@@ -151,6 +151,27 @@ describe("AttributeSetTest", () => {
   });
 });
 
+describe("AttributeSet#reverseMergeBang", () => {
+  const integer = typeRegistry.lookup("integer");
+
+  it("puts the target's new keys first, as Hash#reverse_merge! does", () => {
+    const set = new AttributeSet({ foo: Attribute.fromDatabase("foo", 1, integer) });
+    set.reverseMergeBang(
+      new AttributeSet({
+        bar: Attribute.fromDatabase("bar", 2, integer),
+        foo: Attribute.fromDatabase("foo", 3, integer),
+      }),
+    );
+    expect(set.keys()).toEqual(["bar", "foo"]);
+    expect(set.fetchValue("foo")).toBe(1);
+  });
+
+  it("raises FrozenError on a frozen store", () => {
+    const set = new AttributeSet({ foo: Attribute.fromDatabase("foo", 1, integer) }).freeze();
+    expect(() => set.reverseMergeBang(new AttributeSet({}))).toThrow(FrozenError);
+  });
+});
+
 describe("AttributeSet over a LazyAttributeHash store", () => {
   const types = { name: new StringType() };
 
