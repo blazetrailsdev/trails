@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { ActionController } from "@blazetrails/actionpack";
 import { registerConstant } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
@@ -90,6 +90,20 @@ describe("test_help wires a booted app into the test case classes", () => {
       expect(session.response.status).toBe(200);
       expect(session.response.body).toContain("<p>Hello from TSE</p>");
     });
+  });
+
+  it("loads the application's routes in IntegrationTest's before_setup", async () => {
+    const reload = vi.spyOn(Trails.application!, "reloadRoutesUnlessLoaded");
+    try {
+      const session = new ActionController.IntegrationTest("test") as unknown as {
+        beforeSetup(): unknown;
+      };
+      const setup = session.beforeSetup();
+      expect(reload).toHaveBeenCalledTimes(1);
+      await setup;
+    } finally {
+      reload.mockRestore();
+    }
   });
 
   it("renders a view through ActionController::TestCase", async () => {
