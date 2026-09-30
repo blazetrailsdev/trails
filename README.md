@@ -33,9 +33,9 @@ checkout of this repository.
 
 Every command and every output block in this section was run on 2026-09-30
 against `main` at `98d96082e4`, on Linux with Node 24.16.0 and SQLite, with
-`TRAILS_ENV` and `NODE_ENV` unset. No step needs a workaround. Two
-[known gaps](#known-gaps) remain: `bin/trails routes` (step 4) and the first
-`pnpm test` in a new app.
+`TRAILS_ENV` and `NODE_ENV` unset. No step needs a workaround. One
+[known gap](#known-gaps) remains, in the first `pnpm test` in a new app.
+`bin/trails routes` was re-checked on `bff66f3b83`, after #8283.
 
 ### 1. Build the framework from a checkout
 
@@ -190,11 +190,6 @@ SELECT "posts".* FROM "posts" WHERE "posts"."title" = 'Hello' ORDER BY created_a
 bin/trails routes
 ```
 
-On this commit `bin/trails routes` prints `You don't have any routes defined!`,
-because the command reads the route table before the lazily loaded routes file
-is drawn (story `trails-routes-command-shows-no-routes-under-lazy-route-set`).
-The server is not affected. On `247e8da8bf` it printed:
-
 ```text
             Prefix Verb   URI Pattern               Controller#Action
              posts GET    /posts(.:format)          posts#index
@@ -314,11 +309,10 @@ The build also passes after `generate scaffold`.
 
 ### Known gaps
 
-Both are in RFC `0142-trailties-surfaced-deviations`:
+In RFC `0142-trailties-surfaced-deviations`:
 
 | Symptom                                                                                                                                                                                                                 | Story                                                                    |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `bin/trails routes` prints `You don't have any routes defined!`: the command reads the route table before the lazily loaded routes file is drawn                                                                        | `trails-routes-command-shows-no-routes-under-lazy-route-set`             |
 | The first `pnpm test` in a new app fails with `attempt to write a readonly database`: both test files' workers create and load `storage/test.sqlite3` at once. Every later run passes all seven ported controller tests | `generated-app-first-test-run-races-maintain-test-schema-across-workers` |
 
 ## Models: the ActiveRecord surface
