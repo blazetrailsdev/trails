@@ -36,6 +36,7 @@ import * as urlForMod from "../routing/url-for.js";
 import * as polymorphicRoutes from "../routing/polymorphic-routes.js";
 import type { UrlForRoutes } from "../routing/url-for.js";
 import { RequestEncoder } from "./request-encoder.js";
+import * as pageDumpHelper from "./test-helpers/page-dump-helper.js";
 import { ActionDispatch } from "../../namespaces.js";
 import { Session as RackTestSession, type CookieJar } from "@blazetrails/rack-test";
 import { DEFAULT_PORTS, type RackApp, type RackMiddleware } from "@blazetrails/rack";
@@ -43,7 +44,7 @@ import type { UploadedFile } from "@blazetrails/rack-test";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 
 export interface IntegrationRequestOptions {
-  params?: Record<string, unknown>;
+  params?: Record<string, unknown> | string;
   headers?: Record<string, string>;
   xhr?: boolean;
   env?: Record<string, unknown>;
@@ -596,6 +597,13 @@ export class IntegrationTest extends TestCase {
   declare normalizeArgumentToRedirection: typeof responseAssertions.normalizeArgumentToRedirection;
   declare assertResponse: typeof responseAssertions.assertResponse;
   declare assertRedirectedTo: typeof responseAssertions.assertRedirectedTo;
+  declare saveAndOpenPage: typeof pageDumpHelper.saveAndOpenPage;
+  /** @internal */
+  declare savePage: typeof pageDumpHelper.savePage;
+  /** @internal */
+  declare openFile: typeof pageDumpHelper.openFile;
+  /** @internal */
+  declare htmlDumpDefaultPath: typeof pageDumpHelper.htmlDumpDefaultPath;
   /** @internal */
   generateResponseMessage(expected: number | string, actual: number): string {
     return responseAssertions.generateResponseMessage(this, expected, actual);
@@ -646,6 +654,10 @@ proto.parameterize = responseAssertions.parameterize;
 proto.normalizeArgumentToRedirection = responseAssertions.normalizeArgumentToRedirection;
 proto.assertResponse = responseAssertions.assertResponse;
 proto.assertRedirectedTo = responseAssertions.assertRedirectedTo;
+proto.saveAndOpenPage = pageDumpHelper.saveAndOpenPage;
+proto.savePage = pageDumpHelper.savePage;
+proto.openFile = pageDumpHelper.openFile;
+proto.htmlDumpDefaultPath = pageDumpHelper.htmlDumpDefaultPath;
 include(IntegrationTest, urlForMod.UrlFor);
 
 SetupAndTeardown.prepended(IntegrationTest.prototype);

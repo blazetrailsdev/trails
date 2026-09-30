@@ -4,7 +4,7 @@ import { Parameters } from "../../metal/strong-parameters.js";
 describe("ParametersSerializationTest", () => {
   it("YAML serialization", () => {
     const params = new Parameters({ name: "John", age: 22 });
-    const json = JSON.stringify(params.toJSON());
+    const json = JSON.stringify(params.asJson());
     const parsed = JSON.parse(json);
     expect(parsed.name).toBe("John");
     expect(parsed.age).toBe(22);
@@ -20,14 +20,14 @@ describe("ParametersSerializationTest", () => {
 
   it("YAML backwardscompatible with psych 2.0.8 format", () => {
     const params = new Parameters({ key: "value" });
-    const data = params.toJSON();
+    const data = params.asJson();
     const restored = new Parameters(data);
     expect(restored.get("key")).toBe("value");
   });
 
   it("YAML backwardscompatible with psych 2.0.9+ format", () => {
     const params = new Parameters({ key: "value" }).permitAll();
-    const data = params.toJSON();
+    const data = params.asJson();
     const restored = new Parameters(data);
     expect(restored.get("key")).toBe("value");
   });

@@ -5,5 +5,12 @@
     "rubyName": "source_fragment",
     "call": "root",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "middleware/exception-wrapper.ts",
+    "rubyName": "source_fragment",
+    "call": "open",
+    "reason": "File.open block read is File.read; surfaced when Launchy.open joined the population, converged by source-fragment-resolves-against-cwd-not-rails-root."
   }
 ]
