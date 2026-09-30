@@ -100,6 +100,7 @@ interface IncludedMethodTable {
 
 const includedMethodTables = new WeakMap<object, WeakMap<Module, IncludedMethodTable>>();
 
+/** @noRailsEquivalent PERMANENT */
 function moduleInstanceMethod(
   cls: RoutesHelpersControllerClass,
   mod: Module,
