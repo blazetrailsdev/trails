@@ -17,8 +17,8 @@ export const HTML4 = {} as {
 };
 
 export const HTML5 = {} as {
-  Sanitizer?: VendorMethods;
-  FullSanitizer?: typeof FullSanitizer;
-  LinkSanitizer?: typeof LinkSanitizer;
-  SafeListSanitizer?: typeof SafeListSanitizer;
+  Sanitizer: VendorMethods;
+  FullSanitizer: typeof FullSanitizer;
+  LinkSanitizer: typeof LinkSanitizer;
+  SafeListSanitizer: typeof SafeListSanitizer;
 };

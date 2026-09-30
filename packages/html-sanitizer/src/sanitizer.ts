@@ -2,7 +2,7 @@ import * as Nokogiri from "@blazetrails/nokogiri";
 import { HTML4, HTML5, type VendorMethods } from "./namespaces.js";
 
 export abstract class Sanitizer {
-  private static _html5Support?: boolean;
+  declare private static _html5Support: boolean | undefined;
 
   static isHtml5Support(): boolean {
     if (Object.prototype.hasOwnProperty.call(this, "_html5Support")) return this._html5Support!;
@@ -11,7 +11,7 @@ export abstract class Sanitizer {
   }
 
   static bestSupportedVendor(): VendorMethods {
-    return this.isHtml5Support() ? HTML5.Sanitizer! : HTML4.Sanitizer;
+    return this.isHtml5Support() ? HTML5.Sanitizer : HTML4.Sanitizer;
   }
 
   abstract sanitize(

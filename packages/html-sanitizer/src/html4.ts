@@ -1,10 +1,11 @@
+import { extend } from "@blazetrails/ruby-compat";
 import { FullSanitizer } from "./full-sanitizer.js";
 import { LinkSanitizer } from "./link-sanitizer.js";
 import { SafeListSanitizer } from "./safe-list-sanitizer.js";
 import { Sanitizer } from "./sanitizer.js";
 import { HTML4, type VendorMethods } from "./namespaces.js";
 
-const vendorMethods: VendorMethods = {
+const VendorMethods: VendorMethods = {
   get fullSanitizer() {
     return HTML4.FullSanitizer;
   },
@@ -22,14 +23,13 @@ const vendorMethods: VendorMethods = {
   },
 };
 
-HTML4.Sanitizer = Object.assign(Object.create(vendorMethods) as VendorMethods, {
-  VendorMethods: vendorMethods,
-});
+HTML4.Sanitizer = { VendorMethods } as typeof HTML4.Sanitizer;
+extend(HTML4.Sanitizer, VendorMethods);
 HTML4.FullSanitizer = FullSanitizer;
 HTML4.LinkSanitizer = LinkSanitizer;
 HTML4.SafeListSanitizer = SafeListSanitizer;
 
-Object.defineProperties(Sanitizer, Object.getOwnPropertyDescriptors(vendorMethods));
+extend(Sanitizer, VendorMethods);
 
 export const HTML = {
   Sanitizer: Sanitizer as typeof Sanitizer & VendorMethods,
