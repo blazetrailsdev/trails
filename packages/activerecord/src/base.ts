@@ -283,6 +283,7 @@ import "./associations/has-many-association.js";
 import "./associations/has-many-through-association.js";
 import "./associations/has-one-association.js";
 import "./associations/has-one-through-association.js";
+import "./associations/join-dependency.js";
 import type { WhereChain } from "./relation/query-methods.js";
 import {
   ScopeRegistry,

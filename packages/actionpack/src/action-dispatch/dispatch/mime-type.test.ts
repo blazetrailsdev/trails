@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { EXTENSION_LOOKUP, Mime, MimeType } from "../http/mime-type.js";
-import { assertNil } from "@blazetrails/activesupport";
+import {
+  assertEqual,
+  assertNil,
+  assertNotEqual,
+  assertRespondTo,
+  camelize,
+} from "@blazetrails/activesupport";
+import { rbInspect, symbolToS } from "@blazetrails/ruby-compat";
 
 describe("MimeTypeTest", () => {
   it("parse single", () => {
@@ -162,10 +169,17 @@ describe("MimeTypeTest", () => {
   });
 
   it("type convenience methods", () => {
-    expect(MimeType.HTML.string).toBe("text/html");
-    expect(MimeType.JSON.string).toBe("application/json");
-    expect(MimeType.XML.string).toBe("application/xml");
-    expect(MimeType.TEXT.string).toBe("text/plain");
+    const types = [...new Set(Mime.symbols())].filter((type) => type !== ":iphone");
+
+    for (const type of types) {
+      const mime = Mime.get(type)!;
+      assertRespondTo(mime, `is${camelize(symbolToS(type))}`);
+      assertEqual(type, mime.symbol, `${rbInspect(mime)} is not ${type}?`);
+      const invalidTypes = types.filter((t) => t !== type && t !== ":html");
+      for (const otherType of invalidTypes) {
+        assertNotEqual(mime.symbol, otherType, `${rbInspect(mime)} is ${otherType}?`);
+      }
+    }
   });
 
   it("references gives preference to symbols before strings", () => {

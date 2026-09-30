@@ -21,7 +21,6 @@ import { PredicateBuilder } from "./predicate-builder.js";
 import { DeferredIdsNotIn } from "./predicate-builder/deferred-distinct-pk-in.js";
 import { ActiveRecord } from "../namespaces.js";
 import { defaultValue } from "../type.js";
-import { Relation } from "../relation.js";
 import {
   ActiveRecordError,
   IrreversibleOrderError,
@@ -33,7 +32,7 @@ import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js
 import { FromClause } from "./from-clause.js";
 import { Map as TypeCasterMap } from "../type-caster/map.js";
 import { WhereClause } from "./where-clause.js";
-import { JoinDependency } from "../associations/join-dependency.js";
+import type { JoinDependency } from "../associations/join-dependency.js";
 import type { AliasCounts, AliasTracker } from "../associations/alias-tracker.js";
 import {
   any,
@@ -807,7 +806,11 @@ function uniqArray(arr: unknown[]): unknown[] {
  * @noRailsEquivalent CONVERGEABLE union-order-clauses-is-a-second-spelling-of-ruby-array-union
  */
 export function structuralUnionEq(a: unknown, b: unknown): boolean {
-  if (a instanceof JoinDependency || b instanceof JoinDependency) return a === b;
+  if (
+    a instanceof ActiveRecord.Associations.JoinDependency ||
+    b instanceof ActiveRecord.Associations.JoinDependency
+  )
+    return a === b;
   return deepEqual(a, b);
 }
 
@@ -924,7 +927,7 @@ function rubyClassNameOf(value: unknown): string {
 }
 
 function assertRelationForCombining(other: unknown, methodName: string): void {
-  if (!(other instanceof Relation)) {
+  if (!(other instanceof ActiveRecord.Relation)) {
     throw new ArgumentError(
       `You have passed ${rubyClassNameOf(other)} object to #${methodName}. Pass an ActiveRecord::Relation object instead.`,
     );
@@ -1165,9 +1168,9 @@ function uniqBang(this: QueryMethodsHost, name?: string): any {
 
 function excludingWithCallee(callee: "excluding" | "without") {
   return function (this: QueryMethodsHost, ...records: unknown[]): any {
-    const relations = records.filter((r) => r instanceof Relation) as any[];
+    const relations = records.filter((r) => r instanceof ActiveRecord.Relation) as any[];
     records = records
-      .filter((r) => !(r instanceof Relation))
+      .filter((r) => !(r instanceof ActiveRecord.Relation))
       .flat(1)
       .filter((r) => r != null);
 
@@ -1245,7 +1248,7 @@ export function constructJoinDependency(
   associations: string | AssociationSpec[],
   joinType?: unknown,
 ): JoinDependency {
-  return new JoinDependency(
+  return new ActiveRecord.Associations.JoinDependency(
     this.model,
     this.table,
     associations,
@@ -1370,7 +1373,7 @@ export function buildNamedBoundSqlLiteral(
   values: Record<string, unknown>,
 ): Nodes.BoundSqlLiteral {
   const boundValues = transformValues(values, (value) => {
-    if (value instanceof Relation) {
+    if (value instanceof ActiveRecord.Relation) {
       return Arel.sql(value.toSql());
     } else if (rbObjRespondTo(value, "map") && !actsLike.call(value, "string")) {
       const values = (value as { map<R>(b: (v: unknown) => R): R[] }).map((v) =>
@@ -1399,7 +1402,7 @@ export function buildBoundSqlLiteral(
   values: unknown[],
 ): Nodes.BoundSqlLiteral {
   const boundValues = values.map((value) => {
-    if (value instanceof Relation) {
+    if (value instanceof ActiveRecord.Relation) {
       return Arel.sql(value.toSql());
     } else if (rbObjRespondTo(value, "map") && !actsLike.call(value, "string")) {
       const values = (value as { map<R>(b: (v: unknown) => R): R[] }).map((v) =>
@@ -1808,13 +1811,13 @@ export const QueryMethods = defineModule(
 
 Object.defineProperty(QueryMethods, included, {
   value(): void {
-    for (const name of Relation.VALUE_METHODS) {
+    for (const name of ActiveRecord.Relation.VALUE_METHODS) {
       let methodName: string;
       let defaultValue: () => unknown;
-      if ((Relation.MULTI_VALUE_METHODS as readonly string[]).includes(name)) {
+      if ((ActiveRecord.Relation.MULTI_VALUE_METHODS as readonly string[]).includes(name)) {
         methodName = `${name}Values`;
         defaultValue = () => FROZEN_EMPTY_ARRAY;
-      } else if ((Relation.SINGLE_VALUE_METHODS as readonly string[]).includes(name)) {
+      } else if ((ActiveRecord.Relation.SINGLE_VALUE_METHODS as readonly string[]).includes(name)) {
         methodName = `${name}Value`;
         defaultValue = name === "createWith" ? () => FROZEN_EMPTY_HASH : () => null;
       } else {
@@ -1822,7 +1825,7 @@ Object.defineProperty(QueryMethods, included, {
         defaultValue = name === "from" ? () => FromClause.empty() : () => WhereClause.empty();
       }
 
-      Object.defineProperty(Relation.prototype, methodName, {
+      Object.defineProperty(ActiveRecord.Relation.prototype, methodName, {
         configurable: true,
         get(this: QueryMethodsHost): unknown {
           return fetch(this._values, name, defaultValue());
@@ -1834,7 +1837,7 @@ Object.defineProperty(QueryMethods, included, {
       });
     }
 
-    Object.defineProperty(Relation.prototype, "extensions", {
+    Object.defineProperty(ActiveRecord.Relation.prototype, "extensions", {
       configurable: true,
       get(this: QueryMethodsHost) {
         return this.extendingValues;
@@ -2232,7 +2235,7 @@ export function selectAssociationList(
   for (const association of associations) {
     if (Array.isArray(association) || isPlainObject(association) || isRubySymbol(association)) {
       result.push(association);
-    } else if (association instanceof JoinDependency) {
+    } else if (association instanceof ActiveRecord.Associations.JoinDependency) {
       stashedJoins?.push(association);
     } else {
       block?.(association);
@@ -2286,7 +2289,7 @@ export function buildJoinBuckets(
   const joins = [...joinsValues];
   const lastJoinValue = joins[joins.length - 1];
   let stashedEagerLoad: JoinDependency | undefined;
-  if (lastJoinValue instanceof JoinDependency) {
+  if (lastJoinValue instanceof ActiveRecord.Associations.JoinDependency) {
     if (lastJoinValue.baseKlass === this.model) {
       joins.pop();
       stashedEagerLoad = lastJoinValue;

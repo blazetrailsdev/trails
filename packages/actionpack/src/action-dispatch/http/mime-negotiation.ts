@@ -1,6 +1,6 @@
 import { ArrayInquirer } from "@blazetrails/activesupport";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
-import { MimeType } from "./mime-type.js";
+import { MimeType, NullType } from "./mime-type.js";
 import { ParseError } from "./parameters.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 
@@ -11,23 +11,6 @@ export class InvalidType extends Error {
   constructor(message?: string) {
     super(message);
     this.name = "ActionDispatch::Http::MimeNegotiation::InvalidType";
-  }
-}
-
-export class NullType {
-  static readonly instance = new NullType();
-  readonly symbol: string | null = null;
-  readonly string = "";
-  isNil(): boolean {
-    return true;
-  }
-
-  toString(): string {
-    return "";
-  }
-
-  ref(): string | null {
-    return null;
   }
 }
 

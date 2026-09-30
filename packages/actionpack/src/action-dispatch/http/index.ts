@@ -1,6 +1,6 @@
 export { Request } from "./request.js";
 export { Response, type CookieOptions } from "./response.js";
-export { MimeType } from "./mime-type.js";
+export { MimeType, NullType } from "./mime-type.js";
 export { UploadedFile, type UploadedFileOptions } from "./upload.js";
 export {
   ContentSecurityPolicy,
@@ -45,7 +45,6 @@ export {
 export {
   InvalidType,
   MimeNegotiation,
-  NullType,
   contentMimeType,
   hasContentType,
   accepts,

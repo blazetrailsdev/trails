@@ -15,7 +15,7 @@ import {
   isDangerousClassMethod,
   isMethodDefinedWithin,
 } from "./attribute-methods.js";
-import { Relation } from "./relation.js";
+import { ActiveRecord } from "./namespaces.js";
 import { loadSchema as reflectSchemaSync } from "./model-schema.js";
 import { isReplayingOverColdSchema } from "./attributes.js";
 
@@ -415,7 +415,7 @@ export function detectEnumConflictBang(
     if (isDangerousClassMethod.call(this, methodName)) {
       raiseConflictError.call(this, enumName, methodName, { type: "class" });
     }
-    if (isMethodDefinedWithin.call(this, methodName, Relation)) {
+    if (isMethodDefinedWithin.call(this, methodName, ActiveRecord.Relation)) {
       raiseConflictError.call(this, enumName, methodName, {
         type: "class",
         source: "ActiveRecord::Relation",

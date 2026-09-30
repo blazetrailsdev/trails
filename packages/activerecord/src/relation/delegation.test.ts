@@ -275,7 +275,10 @@ describe("DelegationTest", () => {
   describe("DelegationAssociationTest", () => {
     for (const method of ARRAY_DELEGATES) {
       if (method === "to_yaml") {
-        it.skip(`delegates ${method.replaceAll("_", " ")} to Array`, () => {});
+        it.skip(`delegates ${method.replaceAll("_", " ")} to Array`, () => {
+          // BLOCKED: missing surface — to_yaml is Psych's Object#to_yaml (psych-object-to-yaml), and respond_to? does not answer it (respond-to-answers-object-to-yaml)
+          assertRespondTo(new Post().comments, tsName(method));
+        });
         continue;
       }
       it(`delegates ${method.replaceAll("_", " ")} to Array`, () => {
@@ -299,6 +302,19 @@ describe("DelegationTest", () => {
   });
 
   describe("DelegationRelationTest", () => {
+    for (const method of ARRAY_DELEGATES) {
+      if (method === "to_yaml") {
+        it.skip(`delegates ${method.replaceAll("_", " ")} to Array`, () => {
+          // BLOCKED: missing surface — to_yaml is Psych's Object#to_yaml (psych-object-to-yaml), and respond_to? does not answer it (respond-to-answers-object-to-yaml)
+          assertRespondTo(Comment.all(), tsName(method));
+        });
+        continue;
+      }
+      it(`delegates ${method.replaceAll("_", " ")} to Array`, () => {
+        assertRespondTo(Comment.all(), tsName(method));
+      });
+    }
+
     it("delegates sort to Array loading records on call", async () => {
       const target = Comment.all();
       const sorted = await (target as any).sort((a: any, b: any) =>

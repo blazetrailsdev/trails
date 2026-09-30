@@ -2043,16 +2043,18 @@ function resolvePrototypeHosts(
   if (!ts.isPropertyAccessExpression(e)) return [];
   if (!ts.isIdentifier(e.name) || e.name.text !== "prototype") return [];
   const base = unwrapTsExpression(e.expression);
-  if (!ts.isIdentifier(base)) return [];
 
-  const decl = resolvedDeclaration(base, checker);
-  if (!decl) return [];
-  if (ts.isClassDeclaration(decl)) {
-    const host = hostForClassDeclaration(decl, info, srcDir);
-    return host ? [host] : [];
+  const decl = ts.isIdentifier(base) ? resolvedDeclaration(base, checker) : null;
+  if (decl && ts.isParameter(decl)) {
+    return hostsPassedToParameter(decl, info, checker, srcDir, program);
   }
-  if (ts.isParameter(decl)) return hostsPassedToParameter(decl, info, checker, srcDir, program);
-  return [];
+  const classDecl =
+    decl && ts.isClassDeclaration(decl)
+      ? decl
+      : checker.getTypeAtLocation(base).getSymbol()?.valueDeclaration;
+  if (!classDecl || !ts.isClassDeclaration(classDecl)) return [];
+  const host = hostForClassDeclaration(classDecl, info, srcDir);
+  return host ? [host] : [];
 }
 
 /** The declaration an identifier resolves to, through import aliases. */
