@@ -194,6 +194,13 @@ export class AttributeSet {
       : attributes.dup();
   }
 
+  initializeClone(_: AttributeSet): void {
+    const attributes = this._attributes;
+    this._attributes = isHash(attributes)
+      ? frozenErrorRaisingStore(rbObjClone(attributes))
+      : rbObjClone(attributes);
+  }
+
   reset(key: string): void {
     if (this.isKey(key)) {
       this.writeFromDatabase(key, null);
@@ -242,13 +249,6 @@ export class AttributeSet {
     Object.freeze(this.attributes());
     Object.freeze(this);
     return this;
-  }
-
-  initializeClone(_: AttributeSet): void {
-    const attributes = this._attributes;
-    this._attributes = isHash(attributes)
-      ? frozenErrorRaisingStore(rbObjClone(attributes))
-      : rbObjClone(attributes);
   }
 
   /** @noRailsEquivalent PERMANENT */
