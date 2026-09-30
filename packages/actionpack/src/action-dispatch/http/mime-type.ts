@@ -2,11 +2,15 @@ import { registerDefaultMimeTypes } from "./mime-types.js";
 import {
   aryDelete,
   isSymbol,
+  KERNEL_METHODS,
   KeyError,
+  NoMethodError,
+  PROTOCOL_PROBES,
   rbEqual,
   stringToSym,
   symbolToS,
 } from "@blazetrails/ruby-compat";
+import { underscore } from "@blazetrails/activesupport";
 
 export class Mimes {
   /** @internal */
@@ -149,7 +153,29 @@ const TRAILING_STAR_REGEXP = /^(text|application)\/\*/;
 const PARAMETER_SEPARATOR_REGEXP = /;\s*q="?/;
 const ACCEPT_HEADER_REGEXP = /[^,\s"](?:[^,"]|"[^"]*")*/g;
 
+function rubyPredicateName(prop: string | symbol): string | null {
+  if (typeof prop === "symbol" || KERNEL_METHODS.has(prop) || PROTOCOL_PROBES.has(prop)) {
+    return null;
+  }
+  return /^is[A-Z]/.test(prop) ? `${underscore(prop.slice(2))}?` : null;
+}
+
+const METHOD_MISSING_HANDLER: ProxyHandler<MimeType> = {
+  get(target, prop, receiver) {
+    if (Reflect.has(target, prop)) return Reflect.get(target, prop, receiver);
+    const method = rubyPredicateName(prop);
+    if (method === null || !target.respondToMissing(method, false)) return undefined;
+    return (...args: unknown[]) => target.methodMissing(method, ...args);
+  },
+  has(target, prop) {
+    if (Reflect.has(target, prop)) return true;
+    const method = rubyPredicateName(prop);
+    return method !== null && target.respondToMissing(method, false);
+  },
+};
+
 export class MimeType {
+  [predicate: `is${string}`]: () => boolean;
   /** @internal */
   readonly string: string;
   readonly symbol: string | null;
@@ -164,6 +190,7 @@ export class MimeType {
     this.string = string;
     this.symbol = symbol;
     this.synonyms = synonyms;
+    return new Proxy(this, METHOD_MISSING_HANDLER);
   }
 
   toString(): string {
@@ -196,6 +223,10 @@ export class MimeType {
     return this.symbol === ":html" || this.string.includes("html");
   }
 
+  isAll(): boolean {
+    return false;
+  }
+
   equals(mimeType: MimeType | string | null | undefined): boolean {
     if (mimeType == null) return false;
     const mimeTypeToS =
@@ -221,6 +252,20 @@ export class MimeType {
         rbEqual(this.synonyms, other.synonyms) &&
         this.symbol === other.symbol)
     );
+  }
+
+  /** @internal */
+  methodMissing(method: string, ..._args: unknown[]): unknown {
+    if (method.endsWith("?")) {
+      return stringToSym(method.slice(0, -1).toLowerCase()) === this.toSym();
+    } else {
+      throw new NoMethodError(`undefined method '${method}' for an instance of Mime::Type`);
+    }
+  }
+
+  /** @internal */
+  respondToMissing(method: string, _includePrivate = false): boolean {
+    return method.endsWith("?");
   }
 
   static register(
@@ -409,6 +454,54 @@ export class MimeType {
   }
 
   static readonly ALL = new MimeType("*/*", null);
+}
+
+const NULL_TYPE_METHOD_MISSING_HANDLER: ProxyHandler<NullType> = {
+  get(target, prop, receiver) {
+    if (Reflect.has(target, prop)) return Reflect.get(target, prop, receiver);
+    const method = rubyPredicateName(prop);
+    if (method === null || !target.respondToMissing(method, false)) return undefined;
+    return (...args: unknown[]) => target.methodMissing(method, ...args);
+  },
+  has(target, prop) {
+    if (Reflect.has(target, prop)) return true;
+    const method = rubyPredicateName(prop);
+    return method !== null && target.respondToMissing(method, false);
+  },
+};
+
+export class NullType {
+  [predicate: `is${string}`]: () => boolean;
+  static readonly instance = new NullType();
+  readonly symbol: string | null = null;
+  readonly string = "";
+
+  constructor() {
+    return new Proxy(this, NULL_TYPE_METHOD_MISSING_HANDLER);
+  }
+
+  isNil(): boolean {
+    return true;
+  }
+
+  toString(): string {
+    return "";
+  }
+
+  ref(): string | null {
+    return null;
+  }
+
+  /** @internal */
+  respondToMissing(method: string, _includePrivate?: boolean): boolean {
+    return method.endsWith("?");
+  }
+
+  /** @internal */
+  methodMissing(method: string, ..._args: unknown[]): unknown {
+    if (method.endsWith("?")) return false;
+    return null;
+  }
 }
 
 registerDefaultMimeTypes(MimeType);

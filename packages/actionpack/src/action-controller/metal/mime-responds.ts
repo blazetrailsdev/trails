@@ -1,6 +1,6 @@
 import { Collector as AbstractCollector } from "../../abstract-controller/collector.js";
 import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
-import type { NullType } from "../../action-dispatch/http/mime-negotiation.js";
+import type { NullType } from "../../action-dispatch/http/mime-type.js";
 import { RespondToMismatchError, UnknownFormat } from "./exceptions.js";
 import { _setRenderedContentType } from "./rendering.js";
 import { ArgumentError, fetch, rbEqual } from "@blazetrails/ruby-compat";

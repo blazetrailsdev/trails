@@ -44,10 +44,9 @@ import {
   validAcceptHeader as _validAcceptHeader,
   variant as _variant,
   type MimeNegotiationHost,
-  type NullType,
 } from "./mime-negotiation.js";
 import { include, type ArrayInquirer } from "@blazetrails/activesupport";
-import type { MimeType } from "./mime-type.js";
+import type { MimeType, NullType } from "./mime-type.js";
 import { URL as HttpURL } from "./url.js";
 import {
   envFilter as _envFilter,

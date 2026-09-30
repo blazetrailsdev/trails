@@ -1358,6 +1358,7 @@ the capability, in a different place. Each is decided here, and each but
 | `rails/railtie.rb`                                    | Proxy (class chain)   |
 | `rails/railtie/configuration.rb`                      | Proxy                 |
 | `action_controller/metal/mime_responds.rb`            | Proxy                 |
+| `action_dispatch/http/mime_type.rb`                   | Proxy (`is…` names)   |
 
 A Proxy row whose Ruby class also defines `respond_to_missing?` forwards a
 name only when that predicate answers it (`broadcast_logger.rb:235-251`): a
@@ -1367,6 +1368,14 @@ handing every name a raising function would turn Ruby's skipped arm into a
 raise. The `method_missing` `super` arm stays in the port; an unanswered name
 reads `undefined`, and calling it is a `TypeError` where Ruby raises
 `NoMethodError`.
+
+`action_dispatch/http/mime_type.rb`'s `Mime::Type` and `Mime::NullType` answer
+every `…?` name from `method_missing` (`mime_type.rb:336-346,379-385`). trails
+spells a Ruby predicate `foo?` as `isFoo`, so their trap reads an `is…` name that
+missed the class as the Ruby name `foo?` (`isUrlEncodedForm` is
+`url_encoded_form?`), skipping `KERNEL_METHODS` / `PROTOCOL_PROBES`, which Ruby
+finds on the receiver first. A defined predicate (`isHtml`, `isAll`, `isNil`) is
+found before the trap, as Ruby finds `html?` before `method_missing`.
 
 A "named method, no trap" row answers only an explicit `methodMissing` call.
 These rows are decided per class, not ratified: a "nothing" row with a

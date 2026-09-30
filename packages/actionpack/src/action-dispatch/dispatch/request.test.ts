@@ -6,7 +6,7 @@ import { Mime, MimeType } from "../http/mime-type.js";
 import { X_CASCADE } from "../constants.js";
 import { UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { assertNil } from "@blazetrails/activesupport";
+import { assertNil, assertNotPredicate } from "@blazetrails/activesupport";
 
 describe("RequestUrlFor", () => {
   it("url_for class method", () => {
@@ -403,6 +403,9 @@ describe("RequestFormat", () => {
   it("format is not nil with unknown format", () => {
     const req = new Request({ QUERY_STRING: "format=hello" });
     assertNil(req.format);
+    assertNotPredicate(req.format, (f) => f.isHtml());
+    assertNotPredicate(req.format, (f) => f.isXml());
+    assertNotPredicate(req.format, (f) => f.isJson());
   });
 
   it("can override format with parameter positive", () => {
