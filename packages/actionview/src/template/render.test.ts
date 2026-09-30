@@ -53,6 +53,18 @@ describe("CachedViewRenderTest", () => {
     ).toBe("david david davidmary mary mary");
   });
 
+  it("render partial collection as by symbol", () => {
+    expect(
+      String(
+        view.render({
+          partial: "test/customer_with_var",
+          collection: [new Customer("david"), new Customer("mary")],
+          as: ":customer",
+        }),
+      ),
+    ).toBe("david david davidmary mary mary");
+  });
+
   it("render partial collection without as", () => {
     expect(
       String(view.render({ partial: "test/local_inspector", collection: [new Customer("mary")] })),

@@ -1,4 +1,11 @@
-import { ArgumentError, File, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  File,
+  isSymbol,
+  rbInspect,
+  rbObjRespondTo,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 import { htmlSafe, kernelArray, type SafeBuffer } from "@blazetrails/activesupport";
 import type { LookupContext } from "../lookup-context.js";
 import type { Template } from "../template.js";
@@ -142,8 +149,8 @@ const OPTION_AS_ERROR_MESSAGE =
 export function localVariable(this: ObjectRenderingHost, path: string): string {
   const as = this.options["as"];
   if (as !== undefined) {
-    if (!/^[a-z_]\w*$/.test(String(as))) raiseInvalidOptionAs(as);
-    return String(as);
+    if (!/^[a-z_]\w*$/.test(isSymbol(as) ? symbolToS(as) : String(as))) raiseInvalidOptionAs(as);
+    return isSymbol(as) ? symbolToS(as) : String(as);
   }
   const base = path.endsWith("/") ? "" : File.basename(path);
   const match = /^_?(.*?)(?:\.\w+)*$/.exec(base);
@@ -158,7 +165,9 @@ export function raiseInvalidIdentifier(path: string): never {
 
 /** @internal */
 export function raiseInvalidOptionAs(as: unknown): never {
-  throw new ArgumentError(OPTION_AS_ERROR_MESSAGE.replace("%s", String(as)));
+  throw new ArgumentError(
+    OPTION_AS_ERROR_MESSAGE.replace("%s", isSymbol(as) ? symbolToS(as) : String(as)),
+  );
 }
 
 /** @internal */
