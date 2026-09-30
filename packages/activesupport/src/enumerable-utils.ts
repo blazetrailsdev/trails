@@ -122,8 +122,8 @@ function intRangeSum(beg: number | bigint, end: number | bigint, excl: boolean, 
 /** Ruby core `Enumerable#sum` (`vendor/ruby/v3.3.11/enum.c:4760` `enum_sum`). */
 export function sum(collection: Iterable<number>): number;
 export function sum<T>(collection: Iterable<T>, block: (element: T) => number): number;
-export function sum<T>(collection: Iterable<T>, ...args: unknown[]): unknown;
-export function sum<T>(collection: Iterable<T>, ...args: unknown[]): unknown {
+export function sum<T>(collection: Iterable<T> | Range<T>, ...args: unknown[]): unknown;
+export function sum<T>(collection: Iterable<T> | Range<T>, ...args: unknown[]): unknown {
   const block =
     typeof args[args.length - 1] === "function"
       ? (args.pop() as (element: T) => unknown)
@@ -150,7 +150,8 @@ export function sum<T>(collection: Iterable<T>, ...args: unknown[]): unknown {
     }
   }
 
-  for (const element of collection) sumIter(element, memo, block);
+  const each = collection instanceof Range ? collection.each() : collection;
+  for (const element of each) sumIter(element, memo, block);
 
   if (memo.floatValue) {
     return rbDbl2num(memo.f + memo.c);
