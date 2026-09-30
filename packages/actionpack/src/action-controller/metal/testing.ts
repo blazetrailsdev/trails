@@ -1,11 +1,11 @@
 export function clearInstanceVariablesBetweenRequests(this: Record<string, unknown>): void {
   if (Object.hasOwn(this, "_ivars")) {
     const ivars = this._ivars as string[];
-    const newIvars = Object.keys(this).filter((ivar) => !ivars.includes(ivar));
+    const newIvars = Object.getOwnPropertyNames(this).filter((ivar) => !ivars.includes(ivar));
     for (const ivar of newIvars) delete this[ivar];
   }
 
-  this._ivars = Object.keys(this);
+  this._ivars = Object.getOwnPropertyNames(this);
 }
 
 export function recycleBang(this: Record<string, unknown>): void {
