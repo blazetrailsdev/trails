@@ -252,10 +252,35 @@ export function reject<T>(hash: Record<string, T>, block: PairBlock<T>): Record<
 /**
  * Ruby `Hash#each_pair` (`vendor/ruby/v3.3.11/hash.c:3149` `rb_hash_each_pair`), which
  * `Hash#each` is also defined onto (`hash.c:7219`): yields each key and value
- * and returns the receiver.
+ * and returns the receiver. A `Hash` (a `Map`) is walked as readily as a plain object.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_pair` (`vendor/ruby/v3.3.11/hash.c:3149`).
  */
-export function eachPair<T>(hash: Record<string, T>, block: PairBlock<T>): Record<string, T> {
+export function eachPair<T>(hash: Record<string, T>, block: PairBlock<T>): Record<string, T>;
+/**
+ * The Map arm: `rb_hash_foreach` walks whichever hash it is given.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_pair` (`vendor/ruby/v3.3.11/hash.c:3149`).
+ */
+export function eachPair<T>(hash: Map<string, T>, block: PairBlock<T>): Map<string, T>;
+/**
+ * Either arm, for a receiver typed as either.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_pair` (`vendor/ruby/v3.3.11/hash.c:3149`).
+ */
+export function eachPair<T>(
+  hash: Record<string, T> | Map<string, T>,
+  block: PairBlock<T>,
+): Record<string, T> | Map<string, T>;
+/**
+ * The arms share one body.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_pair` (`vendor/ruby/v3.3.11/hash.c:3149`).
+ */
+export function eachPair<T>(
+  hash: Record<string, T> | Map<string, T>,
+  block: PairBlock<T>,
+): Record<string, T> | Map<string, T> {
+  if (hash instanceof Map) {
+    for (const [key, value] of hash) block(key, value);
+    return hash;
+  }
   for (const key of Object.keys(hash)) {
     block(key, hash[key]);
   }

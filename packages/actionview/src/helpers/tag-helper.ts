@@ -6,6 +6,10 @@ import {
   xmlNameEscape,
   extractOptionsBang,
   CodeGenerator,
+  isBlank,
+  isPlainObject,
+  isPresent,
+  unwrappedHtmlEscape,
 } from "@blazetrails/activesupport";
 import {
   raw as _raw,
@@ -13,7 +17,7 @@ import {
   toSentence as _toSentence,
   type ToSentenceOptions,
 } from "./output-safety-helper.js";
-import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, eachPair, Hash, rbInspect } from "@blazetrails/ruby-compat";
 import { capture, type CaptureHelperHost } from "./capture-helper.js";
 
 export interface TagHelperHost extends CaptureHelperHost {
@@ -99,16 +103,12 @@ export function buildTagValues(...args: unknown[]): string[] {
       continue;
     }
 
-    if (
-      typeof tagValue === "object" &&
-      !Array.isArray(tagValue) &&
-      !(tagValue instanceof SafeBuffer)
-    ) {
-      for (const [key, val] of Object.entries(tagValue as Record<string, unknown>)) {
+    if (isPlainObject(tagValue) || tagValue instanceof Hash) {
+      eachPair(tagValue, (key: string, val: unknown) => {
         if (key !== "" && val !== false && val !== null && val !== undefined) {
           tagValues.push(String(key));
         }
-      }
+      });
     } else if (Array.isArray(tagValue)) {
       tagValues.push(...buildTagValues(...tagValue));
     } else {
@@ -135,11 +135,11 @@ function buildTagValuesPreservingSafety(value: unknown): Array<string | SafeBuff
       !(val instanceof SafeBuffer) &&
       !(val instanceof RegExp)
     ) {
-      for (const [k, v] of Object.entries(val as Record<string, unknown>)) {
+      eachPair(val instanceof Hash ? val : (val as Record<string, unknown>), (k, v) => {
         if (k !== "" && v !== false && v !== null && v !== undefined) {
           result.push(String(k));
         }
-      }
+      });
     } else if (val instanceof SafeBuffer) {
       const str = val.toString();
       if (str !== "") {
@@ -155,122 +155,6 @@ function buildTagValuesPreservingSafety(value: unknown): Array<string | SafeBuff
   return result;
 }
 
-function booleanTagOption(key: string): string {
-  return `${key}="${key}"`;
-}
-
-function tagOption(key: string, value: unknown, escape: boolean): string {
-  if (escape) {
-    key = xmlNameEscape(key);
-  }
-
-  let strValue: string;
-
-  if (
-    Array.isArray(value) ||
-    (typeof value === "object" &&
-      value !== null &&
-      !(value instanceof SafeBuffer) &&
-      !(value instanceof RegExp))
-  ) {
-    if (key === "class") {
-      const built = buildTagValuesPreservingSafety(value);
-      strValue = escape ? safeJoin(built, " ").toString() : built.map((v) => String(v)).join(" ");
-    } else {
-      const arr = Array.isArray(value) ? value : Object.values(value as Record<string, unknown>);
-      strValue = escape ? safeJoin(arr.map(String), " ").toString() : arr.map(String).join(" ");
-    }
-  } else if (value instanceof RegExp) {
-    strValue = escape ? htmlEscape(value.source).toString() : value.source;
-  } else if (value instanceof SafeBuffer) {
-    if (value.htmlSafe) {
-      strValue = value.toString();
-    } else {
-      strValue = escape ? htmlEscape(value.toString()).toString() : value.toString();
-    }
-  } else {
-    strValue = escape ? htmlEscape(value).toString() : String(value);
-  }
-
-  if (strValue.includes('"')) {
-    strValue = strValue.replace(/"/g, "&quot;");
-  }
-
-  return `${key}="${strValue}"`;
-}
-
-/** @internal */
-function prefixTagOption(prefix: string, key: string, value: unknown, escape: boolean): string {
-  const dasherizedKey = `${prefix}-${dasherize(String(key))}`;
-  if (typeof value === "string" || value instanceof SafeBuffer || typeof value === "symbol") {
-    /** @empty */
-  } else if (
-    Array.isArray(value) ||
-    (typeof value === "object" && value !== null && !(value instanceof RegExp))
-  ) {
-    try {
-      value = JSON.stringify(value);
-    } catch {
-      value = String(value);
-    }
-  } else {
-    value = String(value);
-  }
-  return tagOption(dasherizedKey, value, escape);
-}
-
-function tagOptions(options: Record<string, unknown> | undefined, escape: boolean = true): string {
-  if (!options || Object.keys(options).length === 0) return "";
-
-  let output = "";
-  const sep = " ";
-
-  for (const [key, value] of Object.entries(options)) {
-    const isPlainObject =
-      typeof value === "object" &&
-      value !== null &&
-      !Array.isArray(value) &&
-      !(value instanceof SafeBuffer) &&
-      !(value instanceof RegExp);
-    if (DATA_PREFIXES.has(key) && isPlainObject) {
-      for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-        if (v === null || v === undefined) continue;
-        output += sep;
-        output += prefixTagOption(key, k, v, escape);
-      }
-    } else if (ARIA_PREFIXES.has(key) && isPlainObject) {
-      for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-        if (v === null || v === undefined) continue;
-
-        let processedValue: unknown;
-        if (Array.isArray(v) || (typeof v === "object" && v !== null)) {
-          const tokens = buildTagValues(v);
-          if (tokens.length === 0) continue;
-          processedValue = safeJoin(tokens, " ");
-        } else {
-          processedValue = String(v);
-        }
-
-        output += sep;
-        output += prefixTagOption(key, k, processedValue, escape);
-      }
-    } else if (BOOLEAN_ATTRIBUTES.has(key)) {
-      if (value === true) {
-        output += sep;
-        output += booleanTagOption(key);
-      } else if (value !== null && value !== undefined && value !== false) {
-        output += sep;
-        output += tagOption(key, value, escape);
-      }
-    } else if (value !== null && value !== undefined) {
-      output += sep;
-      output += tagOption(key, value, escape);
-    }
-  }
-
-  return output;
-}
-
 export function tag(
   this: TagHelperHost,
   name?: string,
@@ -283,7 +167,7 @@ export function tag(
   }
   ensureValidHtml5TagName(name);
   const esc = escape !== undefined ? escape : true;
-  const opts = options ? tagOptions(options, esc) : "";
+  const opts = options ? (tagBuilder.call(this).tagOptions(options, esc) ?? "") : "";
   const suffix = open ? ">" : " />";
   return htmlSafe(`<${name}${opts}${suffix}`);
 }
@@ -306,33 +190,10 @@ export function contentTag(
       !(contentOrOptionsWithBlock instanceof SafeBuffer) &&
       !Array.isArray(contentOrOptionsWithBlock);
     const opts = isPlainOpts ? (contentOrOptionsWithBlock as Record<string, unknown>) : options;
-    return contentTagString(name, capture.call(this, block), opts ?? undefined, esc);
+    return tagBuilder.call(this).contentTagString(name, capture.call(this, block), opts, esc);
   }
 
-  return contentTagString(name, contentOrOptionsWithBlock, options ?? undefined, esc);
-}
-
-function contentTagString(
-  name: string,
-  content: unknown,
-  options?: Record<string, unknown>,
-  escape: boolean = true,
-): SafeBuffer {
-  const opts = options ? tagOptions(options, escape) : "";
-  let contentStr: string;
-
-  if (escape && content !== null && content !== undefined && String(content) !== "") {
-    if (content instanceof SafeBuffer && content.htmlSafe) {
-      contentStr = content.toString();
-    } else {
-      contentStr = htmlEscape(content).toString();
-    }
-  } else {
-    contentStr = content !== null && content !== undefined ? String(content) : "";
-  }
-
-  const pre = PRE_CONTENT_STRINGS[name] || "";
-  return htmlSafe(`<${name}${opts}>${pre}${contentStr}</${name}>`);
+  return tagBuilder.call(this).contentTagString(name, contentOrOptionsWithBlock, options, esc);
 }
 
 export function tokenList(...args: unknown[]): SafeBuffer {
@@ -595,7 +456,7 @@ export class TagBuilder {
 
   attributes(attributes: Record<string, unknown> | null | undefined): SafeBuffer {
     if (!attributes) return htmlSafe("");
-    const result = tagOptions(attributes).trim();
+    const result = (this.tagOptions(attributes) ?? "").trim();
     return htmlSafe(result);
   }
 
@@ -613,7 +474,7 @@ export class TagBuilder {
         opts.block as (...args: unknown[]) => unknown,
         this,
       );
-    return contentTagString(name, actualContent, options ?? undefined, escape);
+    return this.contentTagString(name, actualContent, options, escape);
   }
 
   selfClosingTagString(
@@ -622,7 +483,136 @@ export class TagBuilder {
     escape: boolean = true,
     tagSuffix: string = " />",
   ): SafeBuffer {
-    return htmlSafe(`<${name}${tagOptions(options, escape)}${tagSuffix}`);
+    return htmlSafe(`<${name}${this.tagOptions(options, escape) ?? ""}${tagSuffix}`);
+  }
+
+  contentTagString(
+    name: string,
+    content: unknown,
+    options: Record<string, unknown> | Hash<string, unknown> | null | undefined,
+    escape: boolean = true,
+  ): SafeBuffer {
+    let tagOptions: string | null | undefined;
+    if (options != null) tagOptions = this.tagOptions(options, escape);
+
+    if (escape && isPresent(content)) {
+      content = unwrappedHtmlEscape(content);
+    }
+    return htmlSafe(
+      `<${name}${tagOptions ?? ""}>${PRE_CONTENT_STRINGS[name] ?? ""}${content ?? ""}</${name}>`,
+    );
+  }
+
+  tagOptions(
+    options: Record<string, unknown> | Hash<string, unknown> | null | undefined,
+    escape: boolean = true,
+  ): string | null {
+    if (isBlank(options)) return null;
+    let output = "";
+    const sep = " ";
+    eachPair(options!, (key: string, value: unknown) => {
+      if (DATA_PREFIXES.has(key) && (isPlainObject(value) || value instanceof Hash)) {
+        eachPair(value, (k: string, v: unknown) => {
+          if (v == null) return;
+          output += sep;
+          output += this.prefixTagOption(key, k, v, escape);
+        });
+      } else if (ARIA_PREFIXES.has(key) && (isPlainObject(value) || value instanceof Hash)) {
+        eachPair(value, (k: string, v: unknown) => {
+          if (v == null) return;
+
+          if (Array.isArray(v) || isPlainObject(v) || v instanceof Hash) {
+            const tokens = buildTagValues(v);
+            if (tokens.length === 0) return;
+
+            v = safeJoin(tokens, " ");
+          } else {
+            v = String(v);
+          }
+
+          output += sep;
+          output += this.prefixTagOption(key, k, v, escape);
+        });
+      } else if (BOOLEAN_ATTRIBUTES.has(key)) {
+        if (value != null && value !== false) {
+          output += sep;
+          output += this.booleanTagOption(key);
+        }
+      } else if (value != null) {
+        output += sep;
+        output += this.tagOption(key, value, escape);
+      }
+    });
+    return output === "" ? null : output;
+  }
+
+  booleanTagOption(key: string): string {
+    return `${key}="${key}"`;
+  }
+
+  tagOption(key: string, value: unknown, escape: boolean): string {
+    if (escape) {
+      key = xmlNameEscape(key);
+    }
+
+    let strValue: string;
+
+    if (
+      Array.isArray(value) ||
+      value instanceof Hash ||
+      (typeof value === "object" &&
+        value !== null &&
+        !(value instanceof SafeBuffer) &&
+        !(value instanceof RegExp))
+    ) {
+      if (key === "class") {
+        const built = buildTagValuesPreservingSafety(value);
+        strValue = escape ? safeJoin(built, " ").toString() : built.map((v) => String(v)).join(" ");
+      } else {
+        const arr = Array.isArray(value)
+          ? value
+          : value instanceof Hash
+            ? [...value.values()]
+            : Object.values(value as Record<string, unknown>);
+        strValue = escape ? safeJoin(arr.map(String), " ").toString() : arr.map(String).join(" ");
+      }
+    } else if (value instanceof RegExp) {
+      strValue = escape ? htmlEscape(value.source).toString() : value.source;
+    } else if (value instanceof SafeBuffer) {
+      if (value.htmlSafe) {
+        strValue = value.toString();
+      } else {
+        strValue = escape ? htmlEscape(value.toString()).toString() : value.toString();
+      }
+    } else {
+      strValue = escape ? htmlEscape(value).toString() : String(value);
+    }
+
+    if (strValue.includes('"')) {
+      strValue = strValue.replace(/"/g, "&quot;");
+    }
+
+    return `${key}="${strValue}"`;
+  }
+
+  /** @internal */
+  private prefixTagOption(prefix: string, key: string, value: unknown, escape: boolean): string {
+    key = `${prefix}-${dasherize(String(key))}`;
+    if (typeof value === "string" || value instanceof SafeBuffer) {
+      /** @empty */
+    } else if (
+      Array.isArray(value) ||
+      (typeof value === "object" && value !== null && !(value instanceof RegExp))
+    ) {
+      try {
+        value = JSON.stringify(value instanceof Hash ? Object.fromEntries(value) : value);
+      } catch {
+        value = String(value);
+      }
+    } else {
+      value = String(value);
+    }
+    return this.tagOption(key, value, escape);
   }
 
   private methodMissing(called: string, ...args: unknown[]): SafeBuffer {
