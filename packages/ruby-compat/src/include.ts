@@ -110,6 +110,12 @@ export class Module {
     if (block !== undefined) block(this);
   }
 
+  /**
+   * The module's method table (`RCLASS_M_TBL`,
+   * vendor/ruby/v3.3.11/class.c:1145), which `rbModPrivate` records on.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   get [M_TBL](): object {
     return carrierOf(this);
   }
