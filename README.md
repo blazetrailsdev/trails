@@ -26,7 +26,7 @@ works today and lists what does not.
 ## Quickstart
 
 Every command and every output block in this section was run on 2026-09-30
-against `main` at `247e8da8bf`, on Linux with Node 24.16.0 and SQLite, with
+against `main` at `98d96082e4`, on Linux with Node 24.16.0 and SQLite, with
 `TRAILS_ENV` and `NODE_ENV` unset. Where a step does not work yet, the failure
 and its stories are linked. See [what is not wired up
 yet](#what-is-not-wired-up-yet) below.
@@ -92,7 +92,7 @@ bin/trails generate scaffold Post title:string body:text
 
 ```text
       invoke  active_record
-      create  db/migrate/20260930141124_create_posts.ts
+      create  db/migrate/20260930164919_create_posts.ts
       create  app/models/post.ts
       invoke  test_unit
       create  test/models/post.test.ts
@@ -118,10 +118,10 @@ pnpm db:migrate
 ```
 
 ```text
-== 20260930141124 CreatePosts: migrating ======================================
+== 20260930164919 CreatePosts: migrating ======================================
 -- createTable("posts")
-   -> 0.0060s
-== 20260930141124 CreatePosts: migrated (0.0070s) =============================
+   -> 0.0070s
+== 20260930164919 CreatePosts: migrated (0.0080s) =============================
 
 All migrations are up to date.
 ```
@@ -130,7 +130,7 @@ The migration is an ordinary `Migration` subclass, and the migrate writes
 `db/schema.ts` from the live database, as Rails writes `schema.rb`:
 
 ```ts
-// db/migrate/20260930141124_create_posts.ts
+// db/migrate/20260930164919_create_posts.ts
 import { Migration } from "@blazetrails/activerecord";
 
 export class CreatePosts extends Migration {
@@ -183,6 +183,11 @@ SELECT "posts".* FROM "posts" WHERE "posts"."title" = 'Hello' ORDER BY created_a
 ```sh
 bin/trails routes
 ```
+
+On this commit `bin/trails routes` prints `You don't have any routes defined!`,
+because the command reads the route table before the lazily loaded routes file
+is drawn (story `trails-routes-command-shows-no-routes-under-lazy-route-set`).
+The server is not affected. On `247e8da8bf` it printed:
 
 ```text
             Prefix Verb   URI Pattern               Controller#Action
@@ -304,15 +309,18 @@ The build also passes after `generate scaffold`.
 
 ### What is not wired up yet
 
-One gap is left in the steps above, in RFC `0142-trailties-surfaced-deviations`:
+Two gaps are left in the steps above, both in RFC `0142-trailties-surfaced-deviations`:
 
-| Symptom                                                                                                                                                                                                                                                           | Story                                              |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `pnpm test` runs the scaffold's model test and seven controller tests (ported from Rails' `functional_test.rb.tt`); the three non-GET ones fail with `InvalidAuthenticityToken`, because `config.action_controller` settings never reach `ActionController::Base` | `action-controller-set-configs-never-reaches-base` |
+| Symptom                                                                                                                                                                                                                 | Story                                                                    |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `bin/trails routes` prints `You don't have any routes defined!`: the command reads the route table before the lazily loaded routes file is drawn                                                                        | `trails-routes-command-shows-no-routes-under-lazy-route-set`             |
+| The first `pnpm test` in a new app fails with `attempt to write a readonly database`: both test files' workers create and load `storage/test.sqlite3` at once. Every later run passes all seven ported controller tests | `generated-app-first-test-run-races-maintain-test-schema-across-workers` |
 
 Fixed on `main` since this README was first drafted at `b4f622ae87`, each
 re-run for this quickstart:
 
+- `config.action_controller` settings, such as the test env's `allowForgeryProtection = false`, not reaching `ActionController::Base` (#8281)
+- `generate scaffold` going through the ORM hook, in Rails' order: `invoke active_record` first, then the migration before the model (#8270)
 - `trails server` serving the middleware stack instead of the application, so no request saw `env_config` (#8261)
 - Rack rejecting the `:lax` Symbol for `same_site` (#8259)
 - a cold `Post.new(attrs)` raising `UnknownAttributeError` on a first-request form POST: the schema is now warmed at boot (#8258)
@@ -591,7 +599,7 @@ The parity figures are in the [next section](#status-and-parity-snapshot).
 ## Status and parity snapshot
 
 **As of 2026-09-27, `main` at `91245b796a`.** These numbers predate the
-quickstart run above (`247e8da8bf`) and were not regenerated for it. To
+quickstart run above (`98d96082e4`) and were not regenerated for it. To
 regenerate from a checkout:
 
 ```sh
