@@ -33,11 +33,14 @@ const posixPath: PathAdapter = {
     return p.split("/").pop() ?? p;
   },
   resolve(...parts: string[]): string {
-    return parts
-      .filter(Boolean)
-      .join("/")
-      .replace(/\/+/g, "/")
-      .replace(/\/\.(?=\/|$)/g, "");
+    const joined = parts.filter(Boolean).join("/");
+    const segments: string[] = [];
+    for (const segment of joined.split("/")) {
+      if (segment === "" || segment === ".") continue;
+      if (segment === "..") segments.pop();
+      else segments.push(segment);
+    }
+    return (joined.startsWith("/") ? "/" : "") + segments.join("/");
   },
   extname(p: string): string {
     const base = p.split("/").pop() ?? "";

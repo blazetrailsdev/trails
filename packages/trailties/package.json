@@ -28,7 +28,7 @@
   },
   "scripts": {
     "build": "tsc && pnpm build:templates",
-    "build:templates": "mkdir -p dist/generators/active-record/migration && cp -R src/generators/active-record/migration/templates dist/generators/active-record/migration/"
+    "build:templates": "node -e \"require('fs').cpSync('src/generators/active-record/migration/templates', 'dist/generators/active-record/migration/templates', { recursive: true })\""
   },
   "files": [
     "dist",

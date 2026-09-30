@@ -1,5 +1,6 @@
 import { File, getFs } from "@blazetrails/ruby-compat";
-import { parse as tseParse } from "@blazetrails/tse-compiler";
+import { compileJs } from "@blazetrails/tse-compiler";
+import { OutputBuffer } from "@blazetrails/actionview";
 import { GeneratorBase, GeneratorOptions } from "./base.js";
 import { migrationTemplate } from "./migration.js";
 import { nextMigrationNumber } from "./active-record/migration.js";
@@ -68,25 +69,10 @@ export class MigrationGenerator extends GeneratorBase {
     const file = await migrationTemplate(
       this,
       async () => {
-        const { nodes } = tseParse(await getFs().readFile(source, "utf8"));
-        let body = 'let __out = "";\n';
-        for (const node of nodes) {
-          switch (node.kind) {
-            case "text":
-              body += `__out += ${JSON.stringify(node.value)};\n`;
-              break;
-            case "expr":
-            case "rawExpr":
-              body += `__out += String(${node.value});\n`;
-              break;
-            case "code":
-            case "blockExpr":
-              body += `${node.value}\n`;
-              break;
-          }
-        }
-        body += `return __out;\n//# sourceURL=${source}\n`;
-        return (new Function(body) as () => string).call(this);
+        const render = new Function(
+          `return ${compileJs(await getFs().readFile(source, "utf8"), { escapeIgnore: true }).code.replace(/^export default /u, "")}`,
+        )() as (context: { outputBuffer: OutputBuffer }, locals: object) => OutputBuffer;
+        return render.call(this, { outputBuffer: new OutputBuffer() }, {}).toStr();
       },
       File.join("db/migrate", `${underscore(name)}${this.ext()}`),
     );

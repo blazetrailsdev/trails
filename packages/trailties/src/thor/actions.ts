@@ -4,6 +4,7 @@ import { Error } from "./error.js";
 
 export interface ActionsClassHost {
   name: string;
+  baseclass(): unknown;
   _sourcePaths?: string[];
   _sourceRoot?: string | null;
   sourcePaths(): string[];
@@ -28,7 +29,8 @@ export const ClassMethods = {
 
   async sourceRoot(this: ActionsClassHost, path: string | null = null): Promise<string | null> {
     if (path != null) this._sourceRoot = path;
-    return (this._sourceRoot ??= null);
+    if (!Object.prototype.hasOwnProperty.call(this, "_sourceRoot")) this._sourceRoot = null;
+    return this._sourceRoot ?? null;
   },
 
   async sourcePathsForSearch(this: ActionsClassHost): Promise<string[]> {

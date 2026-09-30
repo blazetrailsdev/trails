@@ -138,7 +138,8 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   }
 
   static baseRoot(): string {
-    return File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
+    const path = decodeURIComponent(new URL(import.meta.url).pathname);
+    return File.dirname(/^\/[A-Za-z]:/.test(path) ? path.slice(1) : path);
   }
 
   cwd: string;
@@ -769,6 +770,10 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     } else {
       return defaultValue;
     }
+  }
+
+  static baseclass(): typeof GeneratorBase {
+    return GeneratorBase;
   }
 
   /** @internal */
