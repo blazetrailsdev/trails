@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -99,35 +99,46 @@ describe("trails server environment (trails)", () => {
   });
 
   describe("serves the application, not its middleware stack", () => {
-    class ServedApp extends Application {}
-    let app: ServedApp;
+    let app: Application;
+
+    beforeAll(async () => {
+      await import("../__fixtures__/boot-app/config/application.js");
+      Trails.application!.config.setRoot(
+        new URL("../__fixtures__/boot-app", import.meta.url).pathname,
+      );
+      app = await Trails.initialize();
+    }, 15_000);
 
     beforeEach(() => {
-      app = new ServedApp();
-      app.config.secretKeyBase = "b3c631c314c0bbca50c1b2843150fe33";
       vi.spyOn(Trails, "initialize").mockResolvedValue(app);
     });
 
+    afterAll(() => {
+      Trails.application = null;
+      Application.appClass = null;
+    });
+
     async function served(railsApp: RackApp): Promise<RackEnv> {
-      const env = MockRequest.envFor("/posts");
-      await railsApp(env).catch(() => {});
-      return env;
+      const rackEnv = MockRequest.envFor("/up", { HTTP_ACCEPT: "*/*" });
+      const [status] = await railsApp(rackEnv);
+      expect(status).toBe(200);
+      return rackEnv;
     }
 
     it("hands the Node handler Engine#call, which seeds the request env with env_config", async () => {
-      await serverCommand().parseAsync(["-e", "production"], { from: "user" });
+      await serverCommand().parseAsync(["-e", "test"], { from: "user" });
 
       expect(runApps).toHaveLength(1);
-      const env = await served(runApps[0]);
-      expect(env["action_dispatch.key_generator"]).toBe(app.keyGenerator());
+      const rackEnv = await served(runApps[0]);
+      expect(rackEnv["action_dispatch.key_generator"]).toBe(app.keyGenerator());
     });
 
     it("hands the dev server Engine#call, which seeds the request env with env_config", async () => {
       await serverCommand().parseAsync([], { from: "user" });
 
       expect(devServerStarts).toHaveLength(1);
-      const env = await served((devServerStarts[0] as { app: RackApp }).app);
-      expect(env["action_dispatch.key_generator"]).toBe(app.keyGenerator());
+      const rackEnv = await served((devServerStarts[0] as { app: RackApp }).app);
+      expect(rackEnv["action_dispatch.key_generator"]).toBe(app.keyGenerator());
     });
   });
 });
