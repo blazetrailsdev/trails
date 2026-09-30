@@ -1,4 +1,11 @@
-import { ArgumentError, File, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  File,
+  isSymbol,
+  rbInspect,
+  rbObjRespondTo,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 import { htmlSafe, kernelArray, type SafeBuffer } from "@blazetrails/activesupport";
 import type { LookupContext } from "../lookup-context.js";
 import type { Template } from "../template.js";
@@ -56,7 +63,7 @@ export interface RenderOptions {
       ) => RenderOptions["layout"]);
   locals?: Record<string, unknown>;
   collection?: readonly unknown[];
-  as?: string;
+  as?: string | false | null;
   spacerTemplate?: string;
   object?: unknown;
   prefixes?: string[];
@@ -141,9 +148,10 @@ const OPTION_AS_ERROR_MESSAGE =
 /** @internal */
 export function localVariable(this: ObjectRenderingHost, path: string): string {
   const as = this.options["as"];
-  if (as !== undefined) {
-    if (!/^[a-z_]\w*$/.test(String(as))) raiseInvalidOptionAs(as);
-    return String(as);
+  if (as != null && as !== false) {
+    const asS = isSymbol(as) ? symbolToS(as) : as;
+    if (!/^[a-z_]\w*$/.test(asS)) raiseInvalidOptionAs(as);
+    return asS;
   }
   const base = path.endsWith("/") ? "" : File.basename(path);
   const match = /^_?(.*?)(?:\.\w+)*$/.exec(base);
@@ -158,7 +166,9 @@ export function raiseInvalidIdentifier(path: string): never {
 
 /** @internal */
 export function raiseInvalidOptionAs(as: unknown): never {
-  throw new ArgumentError(OPTION_AS_ERROR_MESSAGE.replace("%s", String(as)));
+  throw new ArgumentError(
+    OPTION_AS_ERROR_MESSAGE.replace("%s", isSymbol(as) ? symbolToS(as) : String(as)),
+  );
 }
 
 /** @internal */
