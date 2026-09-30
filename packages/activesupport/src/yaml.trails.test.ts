@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Range } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, Temporal, Time } from "@blazetrails/date";
-import { Coder, dump, loadTags, toYaml, unsafeLoad } from "./yaml.js";
+import { Coder, dump, loadTags, unsafeLoad } from "./yaml.js";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 import { registerConstant, unregisterConstant } from "./inflector.js";
 
@@ -138,7 +138,7 @@ describe("Psych object protocol", () => {
       foo = "bar";
     })();
     h.set("x", 42);
-    expect(toYaml(h)).toBe(
+    expect(dump(h)).toBe(
       "---\n!ruby/hash-with-ivars:Carrier\nivars:\n  :@foo: bar\nelements:\n  x: 42\n",
     );
   });
@@ -146,6 +146,6 @@ describe("Psych object protocol", () => {
   it("tags a Hash subclass without ivars as !ruby/hash", () => {
     const h = new (class Plain extends HashWithIndifferentAccess {})();
     h.set("x", 42);
-    expect(toYaml(h)).toBe("---\n!ruby/hash:Plain\nx: 42\n");
+    expect(dump(h)).toBe("---\n!ruby/hash:Plain\nx: 42\n");
   });
 });

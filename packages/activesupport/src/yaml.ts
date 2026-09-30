@@ -417,24 +417,10 @@ class ToRuby {
   }
 }
 
-export function dump(o: unknown, options: { lineWidth?: number } = {}): string {
+export function dump(o: unknown): string {
   const visitor = new YAMLTree();
   visitor.push(o);
-  return visitor.tree.toString({
-    directives: true,
-    ...(options.lineWidth !== undefined && {
-      lineWidth: options.lineWidth === -1 ? 0 : options.lineWidth,
-    }),
-  });
-}
-
-/**
- * `Object#to_yaml` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/core_ext.rb:13-15`).
- *
- * @noRailsEquivalent PERMANENT
- */
-export function toYaml(self: unknown, options: { lineWidth?: number } = {}): string {
-  return dump(self, options);
+  return visitor.tree.toString({ directives: true });
 }
 
 export function unsafeLoad(yamlString: string): unknown {
