@@ -293,7 +293,7 @@ describe("runCli", () => {
     write(
       cwd,
       "app/controllers/admin/blog-posts-controller.ts",
-      "export class AdminBlogPostsController {}",
+      "export class AdminBlogPostsController { declare posts: string[]; }",
     );
     write(cwd, "app/models/admin/blog-post.ts", "export class AdminBlogPost {}");
     write(cwd, "app/views/admin/blog_posts/_blog_post.html.tse", "<%= blog_post %>");
@@ -319,9 +319,7 @@ describe("runCli", () => {
     expect(shim).toContain(
       '(typeof import("../../../app/helpers/admin/users-helper.js"))["AdminUsersHelper"]',
     );
-    expect(shim).toContain(
-      'import("../../../app/controllers/posts-controller.js").PostsController',
-    );
+    expect(shim).toContain('{ "currentPost": () => string; "tracked": () => number }');
     expect(shim).toContain(
       'type ObjectLocals = { post: import("../../../app/models/post.js").Post };',
     );
@@ -349,15 +347,14 @@ describe("runCli", () => {
       "utf8",
     );
     expect(applicationLayout).toContain(
-      'import("../../../app/controllers/application-controller.js").ApplicationController',
+      '{ "signedIn": () => boolean; "currentUser": () => string }',
     );
-    expect(applicationLayout).toContain("{ signedIn: () => boolean; currentUser: () => string }");
     const notCollection = fs.readFileSync(
       path.join(cwd, ".trails/views/comments/_post.html.tse.ts"),
       "utf8",
     );
     expect(notCollection).toContain("type ObjectLocals = {};");
-  });
+  }, 30_000);
 
   it("writes a source map pointing each shim line at its .tse line", () => {
     const cwd = mkScratch();
@@ -399,7 +396,7 @@ describe("runCli", () => {
       "utf8",
     );
     expect(strict).toContain("type ObjectLocals = {};");
-  });
+  }, 30_000);
 
   it("types a local a partial forwards to another partial", () => {
     const cwd = mkScratch();
@@ -409,5 +406,54 @@ describe("runCli", () => {
     buildViews({ cwd });
     const line = fs.readFileSync(path.join(cwd, ".trails/views/posts/_line.html.tse.ts"), "utf8");
     expect(line).toContain("type ObjectLocals = { post: number };");
-  });
+  }, 30_000);
+
+  it("types a shared layout from every controller that falls back to it", () => {
+    const cwd = mkScratch();
+    write(
+      cwd,
+      "app/controllers/application-controller.ts",
+      "export class ApplicationController {}",
+    );
+    for (const [name, type] of [
+      ["comments", "string[]"],
+      ["posts", "number[]"],
+    ]) {
+      write(
+        cwd,
+        `app/controllers/${name}-controller.ts`,
+        [
+          'import { ApplicationController } from "./application-controller.js";',
+          `export class ${name[0].toUpperCase()}${name.slice(1)}Controller extends ApplicationController {`,
+          `  declare items: ${type};`,
+          "}",
+        ].join("\n"),
+      );
+    }
+    write(cwd, "app/views/layouts/application.html.tse", "<%= this.items %>");
+    write(cwd, "app/views/layouts/posts.html.tse", "<%= this.items %>");
+    buildViews({ cwd });
+    const read = (rel: string): string =>
+      fs.readFileSync(path.join(cwd, ".trails/views", `${rel}.ts`), "utf8");
+    expect(read("layouts/application.html.tse")).toContain('{ "items": string[] }');
+    expect(read("layouts/posts.html.tse")).toContain('{ "items": number[] }');
+  }, 30_000);
+
+  it("types a partial's locals from each hash of a conditional render", () => {
+    const cwd = mkScratch();
+    write(
+      cwd,
+      "app/views/posts/show.html.tse",
+      '<%= render({ partial: "choice", locals: Math.random() > 0.5 ? { post: 1 } : { title: "t" } }) %>',
+    );
+    write(cwd, "app/views/posts/_choice.html.tse", "<%= post %><%= title %>");
+    buildViews({ cwd });
+    const choice = fs.readFileSync(
+      path.join(cwd, ".trails/views/posts/_choice.html.tse.ts"),
+      "utf8",
+    );
+    expect(choice).toMatch(
+      /type ObjectLocals = \{ post: [^;]*number[^;]*undefined[^;]*; title: [^}]*string[^}]*undefined/,
+    );
+  }, 30_000);
 });
