@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFile } from "fs/promises";
-import { include } from "@blazetrails/ruby-compat";
+import { include, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { FixtureSet, FixtureError } from "./fixtures.js";
 import { File as FixtureFile } from "./fixture-set/file.js";
 import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "./test-helpers/fixtures-registry.js";
@@ -585,6 +585,11 @@ describe("FixturesWithoutInstantiationTest", () => {
 
   it("fixtures from root yml without instantiation", () => {
     expect("@unknown" in self(), "@unknown is not defined").toBe(false);
+  });
+
+  it("visibility of accessor method", () => {
+    expect(rbObjRespondTo(self(), "topics", false), "should be private method").toBe(false);
+    expect(rbObjRespondTo(self(), "topics", true), "confirm to respond surely").toBe(true);
   });
 
   it("accessor methods", () => {

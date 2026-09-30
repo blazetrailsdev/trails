@@ -84,3 +84,37 @@ describe("TestFixtures::ClassMethods", () => {
     expect(klass.isUsesTransaction("test_c")).toBe(false);
   });
 });
+
+describe("TestFixtures#method_missing", () => {
+  type Instance = {
+    _loadedFixtures: Record<string, { fixtures: Record<string, unknown> }>;
+    _fixtureCache: Record<string, Record<string, unknown>>;
+    topics(...names: unknown[]): unknown;
+    developers?: unknown;
+  };
+  let instance: Instance;
+
+  beforeEach(() => {
+    const k = class {};
+    include(k, TestFixtures);
+    (k as unknown as Host).fixtures("topics");
+    instance = new k() as unknown as Instance;
+    instance._loadedFixtures = { topics: { fixtures: { first: { find: async () => "first" } } } };
+    instance._fixtureCache = {};
+  });
+
+  it("dispatches a fixture set name to active_record_fixture", async () => {
+    await expect(instance.topics("first")).resolves.toBe("first");
+    expect((instance as unknown as Record<string, unknown>).topics).toBeTypeOf("function");
+  });
+
+  it("raises for a fixture the set does not have", () => {
+    expect(() => instance.topics("missing")).toThrow(
+      "No fixture named 'missing' found for fixture set 'topics'",
+    );
+  });
+
+  it("leaves a name that is not a fixture set unanswered", () => {
+    expect(instance.developers).toBeUndefined();
+  });
+});
