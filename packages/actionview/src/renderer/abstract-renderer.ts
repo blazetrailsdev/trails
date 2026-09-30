@@ -148,7 +148,7 @@ const OPTION_AS_ERROR_MESSAGE =
 /** @internal */
 export function localVariable(this: ObjectRenderingHost, path: string): string {
   const as = this.options["as"];
-  if (as !== undefined) {
+  if (as != null) {
     if (!/^[a-z_]\w*$/.test(isSymbol(as) ? symbolToS(as) : String(as))) raiseInvalidOptionAs(as);
     return isSymbol(as) ? symbolToS(as) : String(as);
   }
