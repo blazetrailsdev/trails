@@ -95,64 +95,24 @@ function dasherize(str: string): string {
 }
 
 /** @internal */
-export function buildTagValues(...args: unknown[]): string[] {
-  const tagValues: string[] = [];
+export function buildTagValues(...args: unknown[]): Array<string | SafeBuffer> {
+  const tagValues: Array<string | SafeBuffer> = [];
 
   for (const tagValue of args) {
-    if (tagValue === null || tagValue === undefined || tagValue === false) {
-      continue;
-    }
-
     if (isPlainObject(tagValue) || tagValue instanceof Hash) {
       eachPair(tagValue, (key: string, val: unknown) => {
-        if (key !== "" && val !== false && val !== null && val !== undefined) {
-          tagValues.push(String(key));
-        }
+        if (val != null && val !== false && isPresent(key)) tagValues.push(String(key));
       });
     } else if (Array.isArray(tagValue)) {
       tagValues.push(...buildTagValues(...tagValue));
     } else {
-      const str = String(tagValue);
-      if (str !== "") {
-        tagValues.push(str);
+      if (isPresent(tagValue)) {
+        tagValues.push(tagValue instanceof SafeBuffer ? tagValue : String(tagValue));
       }
     }
   }
 
   return tagValues;
-}
-
-function buildTagValuesPreservingSafety(value: unknown): Array<string | SafeBuffer> {
-  const result: Array<string | SafeBuffer> = [];
-
-  function walk(val: unknown): void {
-    if (val === null || val === undefined || val === false) return;
-
-    if (Array.isArray(val)) {
-      for (const item of val) walk(item);
-    } else if (
-      typeof val === "object" &&
-      !(val instanceof SafeBuffer) &&
-      !(val instanceof RegExp)
-    ) {
-      eachPair(val instanceof Hash ? val : (val as Record<string, unknown>), (k, v) => {
-        if (k !== "" && v !== false && v !== null && v !== undefined) {
-          result.push(String(k));
-        }
-      });
-    } else if (val instanceof SafeBuffer) {
-      const str = val.toString();
-      if (str !== "") {
-        result.push(val.htmlSafe ? val : str);
-      }
-    } else {
-      const str = String(val);
-      if (str !== "") result.push(str);
-    }
-  }
-
-  walk(value);
-  return result;
 }
 
 export function tag(
@@ -199,7 +159,7 @@ export function contentTag(
 export function tokenList(...args: unknown[]): SafeBuffer {
   const tokens = buildTagValues(...args)
     .flatMap((value) => {
-      const unescaped = value
+      const unescaped = String(value)
         .replace(/&amp;/g, "&")
         .replace(/&lt;/g, "<")
         .replace(/&gt;/g, ">")
@@ -566,7 +526,7 @@ export class TagBuilder {
         !(value instanceof RegExp))
     ) {
       if (key === "class") {
-        const built = buildTagValuesPreservingSafety(value);
+        const built = buildTagValues(value);
         strValue = escape ? safeJoin(built, " ").toString() : built.map((v) => String(v)).join(" ");
       } else {
         const arr = Array.isArray(value)
