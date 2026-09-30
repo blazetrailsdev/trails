@@ -189,6 +189,9 @@ importers:
       '@blazetrails/did-you-mean':
         specifier: workspace:*
         version: link:../did-you-mean
+      '@blazetrails/html-sanitizer':
+        specifier: workspace:*
+        version: link:../html-sanitizer
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
@@ -354,6 +357,9 @@ importers:
 
   packages/html-sanitizer:
     dependencies:
+      '@blazetrails/nokogiri':
+        specifier: workspace:*
+        version: link:../nokogiri
       sanitize-html:
         specifier: ^2.13.0
         version: 2.17.4
@@ -448,6 +454,12 @@ importers:
       '@blazetrails/globalid':
         specifier: workspace:*
         version: link:../globalid
+      '@blazetrails/html-sanitizer':
+        specifier: workspace:*
+        version: link:../html-sanitizer
+      '@blazetrails/nokogiri':
+        specifier: workspace:*
+        version: link:../nokogiri
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../rack

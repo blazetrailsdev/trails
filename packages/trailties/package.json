@@ -41,6 +41,8 @@
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
+    "@blazetrails/html-sanitizer": "workspace:*",
+    "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*",

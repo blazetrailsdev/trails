@@ -12,6 +12,7 @@
     { "path": "../activesupport" },
     { "path": "../date" },
     { "path": "../did-you-mean" },
-    { "path": "../tse-compiler" }
+    { "path": "../tse-compiler" },
+    { "path": "../html-sanitizer" }
   ]
 }
