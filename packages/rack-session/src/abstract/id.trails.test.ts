@@ -56,9 +56,9 @@ describe("Rack::Session::SessionId", () => {
 
 describe("Rack::Session::Abstract::Persisted", () => {
   it("deletes key, cookie_only and same_site out of the default options", () => {
-    const store = new Persisted(undefined, { key: "_sid", sameSite: "lax" });
+    const store = new Persisted(undefined, { key: "_sid", sameSite: ":lax" });
     expect(store.key).toBe("_sid");
-    expect(store.sameSite).toBe("lax");
+    expect(store.sameSite).toBe(":lax");
     expect(store.defaultOptions).not.toHaveProperty("key");
     expect(store.defaultOptions).not.toHaveProperty("cookieOnly");
     expect(store.defaultOptions).not.toHaveProperty("sameSite");

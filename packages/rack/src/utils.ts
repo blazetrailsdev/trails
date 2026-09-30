@@ -310,9 +310,10 @@ export function setCookieHeader(
     if ("httponly" in opts ? opts.httponly : opts.httpOnly) httponly = "; httponly";
     if (opts.sameSite !== undefined && opts.sameSite !== false && opts.sameSite !== null) {
       const ss = opts.sameSite;
-      if (ss === "none" || ss === "None") sameSite = "; samesite=none";
-      else if (ss === "lax" || ss === "Lax") sameSite = "; samesite=lax";
-      else if (ss === true || ss === "strict" || ss === "Strict") sameSite = "; samesite=strict";
+      if (ss === ":none" || ss === "None" || ss === ":None") sameSite = "; samesite=none";
+      else if (ss === ":lax" || ss === "Lax" || ss === ":Lax") sameSite = "; samesite=lax";
+      else if (ss === true || ss === ":strict" || ss === "Strict" || ss === ":Strict")
+        sameSite = "; samesite=strict";
       else throw new ArgumentError(`Invalid :same_site value: ${rbInspect(ss)}`);
     }
     if (opts.partitioned) partitioned = "; partitioned";

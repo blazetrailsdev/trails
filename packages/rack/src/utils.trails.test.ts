@@ -23,3 +23,16 @@ describe("Utils.statusCode", () => {
     expect(Utils.statusCode("  ")).toBe(0);
   });
 });
+
+describe("Utils.setCookieHeader", () => {
+  it("rejects a lowercase String same_site, which only the Symbol spelling matches", () => {
+    for (const val of ["none", "lax", "strict"]) {
+      expect(() => Utils.setCookieHeader("foo", { value: "bar", sameSite: val })).toThrow(
+        `Invalid :same_site value: "${val}"`,
+      );
+    }
+    expect(Utils.setCookieHeader("foo", { value: "bar", sameSite: ":Lax" })).toBe(
+      "foo=bar; samesite=lax",
+    );
+  });
+});

@@ -722,7 +722,17 @@ export interface CookieOptions {
   expires?: CookieExpires;
   secure?: boolean;
   httpOnly?: boolean;
-  sameSite?: "strict" | "lax" | "none";
+  sameSite?:
+    | true
+    | ":none"
+    | "None"
+    | ":None"
+    | ":lax"
+    | "Lax"
+    | ":Lax"
+    | ":strict"
+    | "Strict"
+    | ":Strict";
 }
 
 function rackCookieValue(value: string | Partial<CookieOptions>): Record<string, unknown> {

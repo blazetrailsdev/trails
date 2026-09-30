@@ -65,7 +65,19 @@ export interface SetCookieOptions {
   maxAge?: number;
   secure?: boolean;
   httpOnly?: boolean;
-  sameSite?: "strict" | "lax" | "none" | null;
+  sameSite?:
+    | true
+    | ":none"
+    | "None"
+    | ":None"
+    | ":lax"
+    | "Lax"
+    | ":Lax"
+    | ":strict"
+    | "Strict"
+    | ":Strict"
+    | false
+    | null;
 }
 
 /** @noRailsEquivalent PERMANENT */

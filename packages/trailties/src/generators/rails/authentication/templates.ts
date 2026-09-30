@@ -127,7 +127,7 @@ export const Authentication = defineModule(
       this.cookies().signed.permanent.set("session_id", {
         value: session.id,
         httpOnly: true,
-        sameSite: "lax",
+        sameSite: ":lax",
       });
       return session;
     },
