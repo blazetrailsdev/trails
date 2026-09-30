@@ -238,14 +238,17 @@ export function sanitizeToId(name: unknown): string {
 /** @internal */
 export function setDefaultDisableWith(value: unknown, tagOptions: Record<string, unknown>): void {
   const data = fetch<Record<string, unknown> | Hash<string, unknown>>(tagOptions, "data", {});
-  const dataDisableWith = data instanceof Hash ? data.get("disable_with") : data["disable_with"];
 
-  if (tagOptions["data-disable-with"] === false || dataDisableWith === false) {
+  if (
+    tagOptions["data-disable-with"] === false ||
+    (data instanceof Hash ? data.get("disable_with") : data["disable_with"]) === false
+  ) {
     if (data instanceof Hash) data.delete("disable_with");
     else hashDelete(data, "disable_with");
   } else if (ActionView.Base.automaticallyDisableSubmitTag) {
     let disableWithText = tagOptions["data-disable-with"];
-    if (disableWithText == null || disableWithText === false) disableWithText = dataDisableWith;
+    if (disableWithText == null || disableWithText === false)
+      disableWithText = data instanceof Hash ? data.get("disable_with") : data["disable_with"];
     if (disableWithText == null || disableWithText === false) {
       disableWithText = value == null ? "" : String(value);
     }

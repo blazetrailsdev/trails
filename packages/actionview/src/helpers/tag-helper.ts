@@ -1,11 +1,11 @@
 import {
   SafeBuffer,
-  htmlEscape,
   htmlSafe,
   htmlEscapeOnce,
   xmlNameEscape,
   extractOptionsBang,
   CodeGenerator,
+  ActiveSupportJSON,
   isBlank,
   isPlainObject,
   isPresent,
@@ -17,7 +17,7 @@ import {
   toSentence as _toSentence,
   type ToSentenceOptions,
 } from "./output-safety-helper.js";
-import { ArgumentError, eachPair, Hash, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, BigDecimal, eachPair, Hash, rbInspect } from "@blazetrails/ruby-compat";
 import { capture, type CaptureHelperHost } from "./capture-helper.js";
 
 export interface TagHelperHost extends CaptureHelperHost {
@@ -136,7 +136,7 @@ export function contentTag(
   this: TagHelperHost,
   name: string,
   contentOrOptionsWithBlock?: unknown,
-  options?: Record<string, unknown> | null,
+  options?: Record<string, unknown> | Hash<string, unknown> | null,
   escape?: boolean,
   block?: () => unknown,
 ): SafeBuffer {
@@ -144,13 +144,10 @@ export function contentTag(
   const esc = escape !== undefined ? escape : true;
 
   if (block) {
-    const isPlainOpts =
-      typeof contentOrOptionsWithBlock === "object" &&
-      contentOrOptionsWithBlock !== null &&
-      !(contentOrOptionsWithBlock instanceof SafeBuffer) &&
-      !Array.isArray(contentOrOptionsWithBlock);
-    const opts = isPlainOpts ? (contentOrOptionsWithBlock as Record<string, unknown>) : options;
-    return tagBuilder.call(this).contentTagString(name, capture.call(this, block), opts, esc);
+    if (isPlainObject(contentOrOptionsWithBlock) || contentOrOptionsWithBlock instanceof Hash) {
+      options = contentOrOptionsWithBlock as Record<string, unknown> | Hash<string, unknown>;
+    }
+    return tagBuilder.call(this).contentTagString(name, capture.call(this, block), options, esc);
   }
 
   return tagBuilder.call(this).contentTagString(name, contentOrOptionsWithBlock, options, esc);
@@ -511,66 +508,33 @@ export class TagBuilder {
   }
 
   tagOption(key: string, value: unknown, escape: boolean): string {
-    if (escape) {
-      key = xmlNameEscape(key);
-    }
+    if (escape) key = xmlNameEscape(key);
 
-    let strValue: string;
-
-    if (
-      Array.isArray(value) ||
-      value instanceof Hash ||
-      (typeof value === "object" &&
-        value !== null &&
-        !(value instanceof SafeBuffer) &&
-        !(value instanceof RegExp))
-    ) {
-      if (key === "class") {
-        const built = buildTagValues(value);
-        strValue = escape ? safeJoin(built, " ").toString() : built.map((v) => String(v)).join(" ");
-      } else {
-        const arr = Array.isArray(value)
-          ? value
-          : value instanceof Hash
-            ? [...value.values()]
-            : Object.values(value as Record<string, unknown>);
-        strValue = escape ? safeJoin(arr.map(String), " ").toString() : arr.map(String).join(" ");
-      }
+    if (Array.isArray(value) || isPlainObject(value) || value instanceof Hash) {
+      if (key === "class") value = buildTagValues(value);
+      const flattened = Array.isArray(value)
+        ? value
+        : [
+            ...(value instanceof Hash ? value : Object.entries(value as Record<string, unknown>)),
+          ].flat();
+      value = escape ? safeJoin(flattened, " ") : flattened.join(" ");
     } else if (value instanceof RegExp) {
-      strValue = escape ? htmlEscape(value.source).toString() : value.source;
-    } else if (value instanceof SafeBuffer) {
-      if (value.htmlSafe) {
-        strValue = value.toString();
-      } else {
-        strValue = escape ? htmlEscape(value.toString()).toString() : value.toString();
-      }
+      value = escape ? unwrappedHtmlEscape(value.source) : value.source;
     } else {
-      strValue = escape ? htmlEscape(value).toString() : String(value);
+      value = escape ? unwrappedHtmlEscape(value) : String(value);
     }
+    if (String(value).includes('"')) value = String(value).replaceAll('"', "&quot;");
 
-    if (strValue.includes('"')) {
-      strValue = strValue.replace(/"/g, "&quot;");
-    }
-
-    return `${key}="${strValue}"`;
+    return `${key}="${String(value)}"`;
   }
 
   /** @internal */
   private prefixTagOption(prefix: string, key: string, value: unknown, escape: boolean): string {
     key = `${prefix}-${dasherize(String(key))}`;
-    if (typeof value === "string" || value instanceof SafeBuffer) {
-      /** @empty */
-    } else if (
-      Array.isArray(value) ||
-      (typeof value === "object" && value !== null && !(value instanceof RegExp))
+    if (
+      !(typeof value === "string" || value instanceof SafeBuffer || value instanceof BigDecimal)
     ) {
-      try {
-        value = JSON.stringify(value instanceof Hash ? Object.fromEntries(value) : value);
-      } catch {
-        value = String(value);
-      }
-    } else {
-      value = String(value);
+      value = ActiveSupportJSON.encode(value);
     }
     return this.tagOption(key, value, escape);
   }
