@@ -30,6 +30,36 @@ function structValues(s: StructInstance): unknown[] {
   return s.members().map((member) => (s as unknown as Record<string, unknown>)[member]);
 }
 
+const pairedRecursion: [object, object][] = [];
+
+function rbExecRecursivePaired(
+  func: (s: StructInstance, s2: StructInstance, recur: boolean) => boolean,
+  s: StructInstance,
+  s2: StructInstance,
+): boolean {
+  if (pairedRecursion.some(([obj, paired]) => obj === s && paired === s2)) {
+    return func(s, s2, true);
+  }
+  pairedRecursion.push([s, s2]);
+  try {
+    return func(s, s2, false);
+  } finally {
+    pairedRecursion.pop();
+  }
+}
+
+function recursiveEqual(s: StructInstance, s2: StructInstance, recur: boolean): boolean {
+  if (recur) return true;
+  const values = structValues(s2);
+  return structValues(s).every((value, i) => rbEqual(value, values[i]));
+}
+
+function recursiveEql(s: StructInstance, s2: StructInstance, recur: boolean): boolean {
+  if (recur) return true;
+  const values = structValues(s2);
+  return structValues(s).every((value, i) => rbEql(value, values[i]));
+}
+
 /**
  * Ruby's `Struct` (`vendor/ruby/v3.3.11/struct.c:2166` `rb_cStruct`). `Struct.new`
  * returns the members' anonymous class as a module: a class that JS already
@@ -64,8 +94,7 @@ export const Struct = {
         if (this === other) return true;
         if (!isStruct(other)) return false;
         if (this.constructor !== other.constructor) return false;
-        const values = structValues(other);
-        return structValues(this).every((value, i) => rbEqual(value, values[i]));
+        return rbExecRecursivePaired(recursiveEqual, this, other);
       },
 
       /**
@@ -77,8 +106,7 @@ export const Struct = {
         if (this === other) return true;
         if (!isStruct(other)) return false;
         if (this.constructor !== other.constructor) return false;
-        const values = structValues(other);
-        return structValues(this).every((value, i) => rbEql(value, values[i]));
+        return rbExecRecursivePaired(recursiveEql, this, other);
       },
 
       /**

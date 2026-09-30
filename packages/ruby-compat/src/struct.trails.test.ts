@@ -51,6 +51,15 @@ describe("Struct", () => {
     expect(rbEql(new Customer("Joe", zip(1)), new Customer("Joe", zip(1)))).toBe(false);
   });
 
+  it("answers true for a pair already being compared", () => {
+    const joe = new Customer("Joe", null);
+    const joe2 = new Customer("Joe", null);
+    joe.zip = joe;
+    joe2.zip = joe2;
+    expect(rbEqual(joe, joe2)).toBe(true);
+    expect(rbEql(joe, joe2)).toBe(true);
+  });
+
   it("hashes by class and members", () => {
     expect(rbHash(new Customer("Joe", 1))).toBe(rbHash(new Customer("Joe", 1)));
     expect(rbHash(new Customer("Joe", 1))).not.toBe(rbHash(new Customer("Joe", 2)));

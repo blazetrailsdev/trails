@@ -216,7 +216,6 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
 
 const stringClasses = new WeakSet<object>();
 
-/** `RB_TYPE_P(value, T_STRING)` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:375`). */
 function isTString(value: unknown): boolean {
   if (typeof value === "string") return true;
   if (typeof value !== "object" || value === null) return false;
@@ -226,7 +225,6 @@ function isTString(value: unknown): boolean {
   return false;
 }
 
-/** `rb_str_eql` (`vendor/ruby/v3.3.11/string.c:3773`). */
 function rbStrEql(str1: string, str2: unknown): boolean {
   if (!isTString(str2)) return false;
   return str1 === String(str2);
