@@ -171,8 +171,10 @@ export function relationClassFor(this: FamilyCtor, model: typeof Base): FamilyCt
 export interface DelegationHost {
   readonly model: typeof Base;
   readonly isLoaded: boolean;
+  readonly isScheduled?: boolean;
   readonly target?: Base[];
   _records?: Base[];
+  readonly _loadResult?: Promise<unknown>;
   records(): Promise<Base[]>;
 }
 
@@ -456,7 +458,8 @@ Object.defineProperty(Delegation.prototype.length, Symbol.toPrimitive, {
 });
 
 function withRecords<R>(host: DelegationHost, fn: (records: Base[]) => R): R | Promise<R> {
-  if (host.isLoaded) return fn([...(host.target ?? host._records ?? [])]);
+  if (host.isLoaded && !host.isScheduled && !host._loadResult)
+    return fn([...(host.target ?? host._records ?? [])]);
   return host.records().then((records) => fn([...records]));
 }
 

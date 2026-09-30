@@ -129,6 +129,8 @@ interface CalculationRelation {
   loaded: boolean;
   /** @internal */
   readonly isScheduled: boolean;
+  /** @internal */
+  readonly _loadResult?: Promise<unknown>;
   records(): Promise<
     Array<{ _readAttribute(name: string): unknown; get(attrName: string): unknown }>
   >;
@@ -485,7 +487,7 @@ export function ids(this: CalculationRelation): Promise<unknown[]> | unknown[] {
       }
       return primaryKeyArray.map((column) => record._readAttribute(column));
     };
-    return this.isScheduled
+    return this.isScheduled || this._loadResult
       ? this.records().then((records) => records.map(toId))
       : this._records.map(toId);
   }
