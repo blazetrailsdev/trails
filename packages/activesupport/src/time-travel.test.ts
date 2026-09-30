@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 
 import {
   DateTime,
@@ -57,23 +57,11 @@ describe("TimeTravelTest", () => {
   });
 
   it("time helper travel", () => {
-    const expectedTime = Time.now().plus(86400);
-    travel(Duration.days(1));
+    const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+    try {
+      const expectedTime = Time.now().plus(86400);
+      travel(Duration.days(1));
 
-    expect(toFs(Time.now(), "db")).toEqual(toFs(expectedTime, "db"));
-    expect(RubyDate.today().toString()).toEqual(expectedTime.toDate().toString());
-    expect(dateTimeToFs(DateTime.now(), "db")).toEqual(
-      dateTimeToFs(expectedTime.toDatetime(), "db"),
-    );
-
-    expect(toFs(Time.new(), "db")).toEqual(toFs(expectedTime, "db"));
-    expect(toFs(Time.new({ precision: 3 }), "db")).not.toEqual(toFs(expectedTime, "db"));
-  });
-
-  it("time helper travel with block", () => {
-    const expectedTime = Time.now().plus(86400);
-
-    travel(Duration.days(1), {}, () => {
       expect(toFs(Time.now(), "db")).toEqual(toFs(expectedTime, "db"));
       expect(RubyDate.today().toString()).toEqual(expectedTime.toDate().toString());
       expect(dateTimeToFs(DateTime.now(), "db")).toEqual(
@@ -82,19 +70,42 @@ describe("TimeTravelTest", () => {
 
       expect(toFs(Time.new(), "db")).toEqual(toFs(expectedTime, "db"));
       expect(toFs(Time.new({ precision: 3 }), "db")).not.toEqual(toFs(expectedTime, "db"));
+    } finally {
+      travelBack();
+      now.mockRestore();
+    }
+  });
+
+  it("time helper travel with block", () => {
+    const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+    try {
+      const expectedTime = Time.now().plus(86400);
+
+      travel(Duration.days(1), {}, () => {
+        expect(toFs(Time.now(), "db")).toEqual(toFs(expectedTime, "db"));
+        expect(RubyDate.today().toString()).toEqual(expectedTime.toDate().toString());
+        expect(dateTimeToFs(DateTime.now(), "db")).toEqual(
+          dateTimeToFs(expectedTime.toDatetime(), "db"),
+        );
+
+        expect(toFs(Time.new(), "db")).toEqual(toFs(expectedTime, "db"));
+        expect(toFs(Time.new({ precision: 3 }), "db")).not.toEqual(toFs(expectedTime, "db"));
+        expect(instantOf(Time.new("2000-12-31 23:59:59.56789", { precision: 3 }))).toEqual(
+          instantOf(Time.new("2000-12-31 23:59:59.567")),
+        );
+      });
+
+      expect(toFs(Time.now(), "db")).not.toEqual(toFs(expectedTime, "db"));
+      expect(RubyDate.today().toString()).not.toEqual(expectedTime.toDate().toString());
+      expect(dateTimeToFs(DateTime.now(), "db")).not.toEqual(
+        dateTimeToFs(expectedTime.toDatetime(), "db"),
+      );
       expect(instantOf(Time.new("2000-12-31 23:59:59.56789", { precision: 3 }))).toEqual(
         instantOf(Time.new("2000-12-31 23:59:59.567")),
       );
-    });
-
-    expect(toFs(Time.now(), "db")).not.toEqual(toFs(expectedTime, "db"));
-    expect(RubyDate.today().toString()).not.toEqual(expectedTime.toDate().toString());
-    expect(dateTimeToFs(DateTime.now(), "db")).not.toEqual(
-      dateTimeToFs(expectedTime.toDatetime(), "db"),
-    );
-    expect(instantOf(Time.new("2000-12-31 23:59:59.56789", { precision: 3 }))).toEqual(
-      instantOf(Time.new("2000-12-31 23:59:59.567")),
-    );
+    } finally {
+      now.mockRestore();
+    }
   });
 
   it("time helper travel to", () => {
