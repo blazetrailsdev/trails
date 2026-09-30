@@ -87,7 +87,10 @@ export function rbCheckStringType(val: unknown): string | null {
  * `NUM2LONG` (`vendor/ruby/v3.3.11/numeric.c:3135` `rb_num2long`): a Float
  * outside `long` raises `RangeError` with `out_of_range_float`'s `%-.10g`
  * (`numeric.c:3109-3124`), a `bigint` (Ruby's Bignum) outside it raises
- * `rb_big2long`'s, and anything else goes through `rb_to_int`.
+ * `rb_big2long`'s, and anything else goes through `rb_to_int`. The result
+ * is a JS `number`, the one integer type an index or length takes, so an
+ * in-range `bigint` past `Number.MAX_SAFE_INTEGER` arrives rounded to the
+ * nearest double.
  *
  * @noRailsEquivalent PERMANENT
  */
