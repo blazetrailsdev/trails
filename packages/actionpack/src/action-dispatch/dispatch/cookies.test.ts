@@ -137,7 +137,7 @@ describe("CookiesMiddlewareTest", () => {
 describe("CookiesTest", () => {
   it("setting cookie with same site strict", () => {
     const jar = new CookieJar(cookieRequest());
-    jar.set("foo", { value: "bar", sameSite: "strict" });
+    jar.set("foo", { value: "bar", sameSite: ":strict" });
     const headers = setCookieHeaders(jar);
     expect(headers[0]).toContain("samesite=strict");
   });
@@ -150,14 +150,14 @@ describe("CookiesTest", () => {
   });
 
   it("setting cookie with specific same site strict", () => {
-    const jar = jarWithSameSiteProtection(() => "lax");
-    jar.set("foo", { value: "bar", sameSite: "strict" });
+    const jar = jarWithSameSiteProtection(() => ":lax");
+    jar.set("foo", { value: "bar", sameSite: ":strict" });
     const headers = setCookieHeaders(jar);
     expect(headers[0]).toContain("samesite=strict");
   });
 
   it("setting cookie with specific same site nil", () => {
-    const jar = jarWithSameSiteProtection(() => "lax");
+    const jar = jarWithSameSiteProtection(() => ":lax");
     jar.set("foo", { value: "bar", sameSite: null });
     const headers = setCookieHeaders(jar);
     expect(headers[0]).not.toContain("samesite");
@@ -364,7 +364,7 @@ describe("CookiesTest", () => {
 
   it("setting cookie with same site protection proc normal user agent", () => {
     const jar = jarWithSameSiteProtection((request) =>
-      request.userAgent === "spooky browser" ? undefined : "strict",
+      request.userAgent === "spooky browser" ? undefined : ":strict",
     );
     jar.set("user_name", "david");
     const headers = setCookieHeaders(jar);
@@ -584,7 +584,7 @@ describe("CookiesTest", () => {
 
   it("setting cookie with same site protection proc special user agent", () => {
     const jar = jarWithSameSiteProtection(
-      (request) => (request.userAgent === "spooky browser" ? undefined : "strict"),
+      (request) => (request.userAgent === "spooky browser" ? undefined : ":strict"),
       "spooky browser",
     );
     jar.set("user_name", "david");

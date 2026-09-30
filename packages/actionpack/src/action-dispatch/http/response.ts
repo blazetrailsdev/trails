@@ -8,7 +8,7 @@ import {
   statusCode,
   unescape,
 } from "@blazetrails/rack";
-import type { CookieExpires } from "../middleware/cookies.js";
+import type { CookieExpires, SetCookieOptions } from "../middleware/cookies.js";
 import type { Request } from "./request.js";
 import {
   type CacheControlHash,
@@ -722,7 +722,7 @@ export interface CookieOptions {
   expires?: CookieExpires;
   secure?: boolean;
   httpOnly?: boolean;
-  sameSite?: "strict" | "lax" | "none";
+  sameSite?: SetCookieOptions["sameSite"];
 }
 
 function rackCookieValue(value: string | Partial<CookieOptions>): Record<string, unknown> {

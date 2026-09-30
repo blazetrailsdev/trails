@@ -155,7 +155,7 @@ export class CookieStore {
     request.cookieJar().encrypted.permanent.set(this._cookieName, {
       value: ActiveSupportJSON.encode({ token: csrfToken, session_id: request.session!.id?.() }),
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: ":lax",
     });
   }
 

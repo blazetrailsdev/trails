@@ -203,20 +203,20 @@ describe("Rack::Session::Pool", () => {
   });
 
   it("passes through same_site option to session pool", async () => {
-    const pool = new Pool(incrementor, { sameSite: "none" });
-    expect(pool.sameSite).toBe("none");
+    const pool = new Pool(incrementor, { sameSite: ":none" });
+    expect(pool.sameSite).toBe(":none");
     const req = new MockRequest((env) => pool.call(env));
     const res = await req.get("/");
     expect(res.headers["set-cookie"]).toMatch(/SameSite=None/i);
   });
 
   it("allows using a lambda to specify same_site option, because some browsers require different settings", async () => {
-    let pool = new Pool(incrementor, { sameSite: () => "none" });
+    let pool = new Pool(incrementor, { sameSite: () => ":none" });
     let req = new MockRequest((env) => pool.call(env));
     let res = await req.get("/");
     expect(res.headers["set-cookie"]).toMatch(/SameSite=None/i);
 
-    pool = new Pool(incrementor, { sameSite: () => "lax" });
+    pool = new Pool(incrementor, { sameSite: () => ":lax" });
     req = new MockRequest((env) => pool.call(env));
     res = await req.get("/");
     expect(res.headers["set-cookie"]).toMatch(/SameSite=Lax/i);
