@@ -1726,10 +1726,8 @@ export class Base extends Model {
     initBlock?: (record: Base) => void,
   ) {
     (new.target as typeof Base | undefined)?._requireConcreteClass();
-    let attrs: Record<string, unknown> = (attributes ?? {}) as Record<string, unknown>;
-    if (!isEmpty(attrs)) {
-      attrs = sanitizeForMassAssignment(attrs);
-    }
+    attributes ??= {};
+    let attrs = isEmpty(attributes) ? {} : sanitizeForMassAssignment(attributes);
     if (
       (new.target as (typeof Base & { _suppressStiNewDispatch?: unknown }) | undefined)
         ?._suppressStiNewDispatch !== new.target

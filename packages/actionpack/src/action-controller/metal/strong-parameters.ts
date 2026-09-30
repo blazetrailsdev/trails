@@ -179,6 +179,8 @@ export class Parameters {
     return this;
   }
 
+  require(key: string[]): unknown[];
+  require(key: string): unknown;
   require(key: string | string[]): unknown {
     if (Array.isArray(key)) {
       return key.map((k) => this.require(k));
@@ -197,7 +199,7 @@ export class Parameters {
     const flatFilters = filters.flat();
     const params = this.permitFilters(filters);
     const keys = flatFilters.flatMap((f) => (typeof f === "string" ? [f] : Object.keys(f)));
-    const values = keys.map((k) => params.require(k));
+    const values = params.require(keys);
     return values.length === 1 ? values[0] : values;
   }
 
