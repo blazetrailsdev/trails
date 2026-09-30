@@ -17,13 +17,13 @@ export interface TseAst {
 const LOCALS_RE = /^\s*locals:\s*\((.*)\)\s*$/s;
 const FORMAT_RE = /^\s*format:\s*"([^"]+)"\s*$/;
 
-export function parse(source: string): TseAst {
+export function parse(source: string, trim = true): TseAst {
   const nodes: TseNode[] = [];
   let localsSignature: string | null = null;
   let typesAnnotation: string | null = null;
   let formatAnnotation: string | null = null;
 
-  for (const tok of tokenize(source)) {
+  for (const tok of tokenize(source, trim)) {
     if (tok.kind === "text") {
       if (tok.value.length > 0)
         nodes.push({ kind: "text", value: tok.value, srcLine: tok.srcLine });

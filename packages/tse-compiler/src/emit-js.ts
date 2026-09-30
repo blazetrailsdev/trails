@@ -3,6 +3,7 @@ import { generateSourceMap, type RawSourceMap, type LineMapping } from "./source
 
 export interface EmitJsOptions {
   escapeIgnore?: boolean;
+  trim?: boolean;
   preamble?: string;
   postamble?: string;
   async?: boolean;
@@ -18,7 +19,7 @@ export interface EmitResult {
 }
 
 export function compileJs(source: string, options: EmitJsOptions = {}): EmitResult {
-  const ast = parse(source);
+  const ast = parse(source, options.trim !== false);
   const { code, mappings } = emit(ast, options);
   const sourceMap =
     options.fileName && options.sourceFileName

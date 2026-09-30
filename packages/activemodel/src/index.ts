@@ -74,6 +74,7 @@ export { MutableModule } from "./type/helpers/mutable.js";
 export type { Mutable } from "./type/helpers/mutable.js";
 export { ModelName, Naming } from "./naming.js";
 export { Conversion } from "./conversion.js";
+export { Translation } from "./translation.js";
 export type { ModelLike } from "./naming.js";
 /** @noRailsEquivalent PERMANENT */
 export { Dirty, initAttributes as dirtyInitAttributes } from "./dirty.js";
