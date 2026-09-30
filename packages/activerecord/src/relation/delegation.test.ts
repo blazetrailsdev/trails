@@ -301,7 +301,10 @@ describe("DelegationTest", () => {
   describe("DelegationRelationTest", () => {
     for (const method of ARRAY_DELEGATES) {
       if (method === "to_yaml") {
-        it.skip(`delegates ${method.replaceAll("_", " ")} to Array`, () => {});
+        it.skip(`delegates ${method.replaceAll("_", " ")} to Array`, () => {
+          // BLOCKED: missing surface — to_yaml is Psych's Object#to_yaml and trails has no Psych emitter for it (activesupport-has-no-psych-emitter-for-to-yaml)
+          assertRespondTo(Comment.all(), tsName(method));
+        });
         continue;
       }
       it(`delegates ${method.replaceAll("_", " ")} to Array`, () => {

@@ -403,9 +403,9 @@ describe("RequestFormat", () => {
   it("format is not nil with unknown format", () => {
     const req = new Request({ QUERY_STRING: "format=hello" });
     assertNil(req.format);
-    assertNotPredicate(req.format, (f) => f.isHtml());
-    assertNotPredicate(req.format, (f) => f.isXml());
-    assertNotPredicate(req.format, (f) => f.isJson());
+    assertNotPredicate(req.format, (f) => f.isHtml!());
+    assertNotPredicate(req.format, (f) => f.isXml!());
+    assertNotPredicate(req.format, (f) => f.isJson!());
   });
 
   it("can override format with parameter positive", () => {

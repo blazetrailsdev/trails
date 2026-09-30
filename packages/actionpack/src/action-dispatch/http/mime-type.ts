@@ -175,7 +175,7 @@ const METHOD_MISSING_HANDLER: ProxyHandler<MimeType | NullType> = {
 };
 
 export class MimeType {
-  [predicate: `is${string}`]: () => boolean;
+  [predicate: `is${string}`]: (() => boolean) | undefined;
   /** @internal */
   readonly string: string;
   readonly symbol: string | null;
@@ -453,11 +453,29 @@ export class MimeType {
     return MimeType.lookupByExtension("gzip")!;
   }
 
-  static readonly ALL = new MimeType("*/*", null);
+  declare static readonly ALL: AllType;
 }
 
+export class AllType extends MimeType {
+  static readonly instance = new AllType();
+
+  constructor() {
+    super("*/*", null);
+  }
+
+  override isAll(): boolean {
+    return true;
+  }
+
+  override isHtml(): boolean {
+    return true;
+  }
+}
+
+Object.defineProperty(MimeType, "ALL", { value: AllType.instance });
+
 export class NullType {
-  [predicate: `is${string}`]: () => boolean;
+  [predicate: `is${string}`]: (() => boolean) | undefined;
   static readonly instance = new NullType();
   readonly symbol: string | null = null;
   /** @internal */
