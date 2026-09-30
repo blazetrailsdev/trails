@@ -1,4 +1,5 @@
-import { statusCode } from "@blazetrails/rack";
+import { statusCode, type StatusSymbol } from "@blazetrails/rack";
+import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.js";
 import { DoubleRenderError } from "../../abstract-controller/rendering.js";
 import { ActionControllerError } from "./exceptions.js";
 import { include, included } from "@blazetrails/activesupport";
@@ -21,6 +22,13 @@ export class UnsafeRedirectError extends Error {
 const ILLEGAL_HEADER_VALUE_REGEX = /[\x00-\x08\x0A-\x1F]/;
 const SCHEME_OR_PROTOCOL_RELATIVE_RE = /^([a-z][a-z\d\-+.]*:|\/\/).*/i;
 
+export type RedirectToOptions = string | ToModel | Record<string, unknown> | (() => string);
+
+export interface RedirectToResponseOptions {
+  status?: StatusSymbol | `:${StatusSymbol}` | number;
+  allowOtherHost?: boolean;
+}
+
 export interface RedirectingHost {
   request: { referer?: string | null; host?: string; protocol?: string; hostWithPort?(): string };
   redirectTo(options: string, responseOptions?: Record<string, unknown>): unknown;
@@ -40,10 +48,10 @@ interface RedirectToHost extends PrivateHost {
 
 export function redirectTo(
   this: RedirectToHost,
-  options: unknown = {},
-  responseOptions: Record<string, unknown> = {},
+  options: RedirectToOptions = {},
+  responseOptions: RedirectToResponseOptions = {},
 ): number {
-  if (options == null || options === false) {
+  if (options == null || (options as unknown) === false) {
     throw new ActionControllerError("Cannot redirect to nil!");
   }
   if (this.responseBody != null) throw new DoubleRenderError();
@@ -137,7 +145,7 @@ export function _allowOtherHost(this: PrivateHost): boolean {
 export function _extractRedirectToStatus(
   this: unknown,
   options: unknown,
-  responseOptions: Record<string, unknown>,
+  responseOptions: RedirectToResponseOptions,
 ): number {
   if (
     options !== null &&

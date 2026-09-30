@@ -3,7 +3,18 @@ import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { AbstractController } from "../../abstract-controller/base.js";
 import type { helperMethod, HelpersClassMethods } from "../../abstract-controller/helpers.js";
 import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
-import { redirectTo as redirectingRedirectTo } from "./redirecting.js";
+import {
+  redirectTo as redirectingRedirectTo,
+  type RedirectToOptions,
+  type RedirectToResponseOptions,
+} from "./redirecting.js";
+
+export type RedirectToResponseOptionsAndFlash<FlashType extends string = never> =
+  RedirectToResponseOptions & {
+    alert?: string;
+    notice?: string;
+    flash?: Record<string, unknown>;
+  } & { [K in NoInfer<FlashType>]?: unknown };
 
 /** @internal */
 export interface FlashClassHost extends HelpersClassMethods {
@@ -21,8 +32,8 @@ export class Flash {
 
   redirectTo(
     this: { constructor: unknown; flash: FlashHash },
-    options: unknown = {},
-    responseOptionsAndFlash: Record<string, unknown> = {},
+    options: RedirectToOptions = {},
+    responseOptionsAndFlash: RedirectToResponseOptionsAndFlash<string> = {},
   ): number {
     for (const flashType of (this.constructor as FlashClassHost)._flashTypes) {
       const type = responseOptionsAndFlash[flashType];
@@ -34,8 +45,8 @@ export class Flash {
 
     const otherFlashes = responseOptionsAndFlash.flash;
     delete responseOptionsAndFlash.flash;
-    if (otherFlashes != null && otherFlashes !== false) {
-      this.flash.update(otherFlashes as Record<string, unknown>);
+    if (otherFlashes != null && (otherFlashes as unknown) !== false) {
+      this.flash.update(otherFlashes);
     }
 
     return redirectingRedirectTo.call(this as never, options, responseOptionsAndFlash);

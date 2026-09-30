@@ -22,8 +22,18 @@ import {
 } from "./metal/request-forgery-protection.js";
 import { respondTo } from "./metal/mime-responds.js";
 import { DefaultHeaders } from "./metal/default-headers.js";
-import { actionMethods, addFlashTypes, Flash } from "./metal/flash.js";
-import { _computeRedirectToLocation, redirectBack, redirectBackOrTo } from "./metal/redirecting.js";
+import {
+  actionMethods,
+  addFlashTypes,
+  Flash,
+  type RedirectToResponseOptionsAndFlash,
+} from "./metal/flash.js";
+import {
+  _computeRedirectToLocation,
+  redirectBack,
+  redirectBackOrTo,
+  type RedirectToOptions,
+} from "./metal/redirecting.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
 import { MissingFile } from "./metal/exceptions.js";
 import { defaultRender } from "./metal/implicit-render.js";
@@ -263,7 +273,10 @@ export interface Base {
   routeFor(name: string, ...args: unknown[]): string;
   polymorphicUrl(recordOrHashOrArray: PolymorphicArg, options?: PolymorphicOptions): string;
   polymorphicPath(recordOrHashOrArray: PolymorphicArg, options?: PolymorphicOptions): string;
-  redirectTo(options?: unknown, responseOptionsAndFlash?: Record<string, unknown>): unknown;
+  redirectTo<FlashType extends string = never>(
+    options?: RedirectToOptions,
+    responseOptionsAndFlash?: RedirectToResponseOptionsAndFlash<FlashType>,
+  ): number;
   redirectBack: typeof redirectBack;
   redirectBackOrTo: typeof redirectBackOrTo;
   _computeRedirectToLocation: typeof _computeRedirectToLocation;

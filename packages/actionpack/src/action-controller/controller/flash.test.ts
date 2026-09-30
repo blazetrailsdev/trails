@@ -28,7 +28,7 @@ class TestController extends Base {
   }
 
   async redirectWithFooFlash(): Promise<void> {
-    this.redirectTo("/wonderland", { foo: "for great justice" });
+    this.redirectTo<"foo">("/wonderland", { foo: "for great justice" });
   }
 }
 
