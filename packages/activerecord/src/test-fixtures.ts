@@ -475,7 +475,6 @@ export class TestFixtures {
     return this.useInstantiatedFixtures !== ":no_instances";
   }
 
-  /** @internal */
   methodMissing(method: string, ...args: unknown[]): unknown {
     if (Object.prototype.hasOwnProperty.call(this.fixtureSets, method)) {
       return this.activeRecordFixture(method, ...args);
@@ -487,7 +486,6 @@ export class TestFixtures {
     }
   }
 
-  /** @internal */
   respondToMissing(method: string, includePrivate: boolean = false): boolean {
     if (includePrivate && Object.prototype.hasOwnProperty.call(this.fixtureSets, method)) {
       return true;

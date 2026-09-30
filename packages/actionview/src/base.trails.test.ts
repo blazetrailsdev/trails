@@ -65,7 +65,8 @@ describe("ActionView::Base include Helpers, Context (base.rb:158)", () => {
     const view = new (Base.withEmptyTemplateCache())(null, {}, null);
     view.viewFlow.set("layout", "body");
     expect(String(view._layoutFor())).toBe("body");
-    expect(String(view._layoutFor("x", () => "captured"))).toBe("captured");
+    const layoutFor = view._layoutFor as (...args: unknown[]) => unknown;
+    expect(String(layoutFor.call(view, "x", () => "captured"))).toBe("captured");
   });
 });
 
