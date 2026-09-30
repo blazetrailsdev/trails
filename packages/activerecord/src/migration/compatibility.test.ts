@@ -343,6 +343,48 @@ describe("Migration", () => {
       }
     });
 
+    it("add reference on 6 0", async () => {
+      const createMigration = new (class extends Migration.get(6.0) {
+        override get version(): number {
+          return 100;
+        }
+
+        override async migrate(_x: unknown): Promise<void> {
+          await this.createTable("more_testings", (t) => {
+            t.string("test");
+          });
+        }
+      })();
+
+      const migration = new (class extends Migration.get(6.0) {
+        override get version(): number {
+          return 101;
+        }
+
+        override async migrate(_x: unknown): Promise<void> {
+          await this.addReference("more_testings", "testings");
+        }
+      })();
+
+      const pool = Base.connectionPool();
+      await new Migrator(
+        "up",
+        [createMigration, migration] as unknown as MigrationProxy[],
+        pool.schemaMigration,
+        pool.internalMetadata,
+      ).migrate();
+
+      const column = (await connection.columns("more_testings")).find(
+        (el) => el.name === "testings_id",
+      );
+
+      if (currentAdapter("SQLite3Adapter")) {
+        expect(column!.sqlType).toMatch(/integer/i);
+      } else {
+        expect(column!.isBigint()).toBeTruthy();
+      }
+    });
+
     it("add index errors on too long name 7 0", async () => {
       const migration = new (class extends Migration.get(7.0) {
         override async migrate(_x: unknown): Promise<void> {

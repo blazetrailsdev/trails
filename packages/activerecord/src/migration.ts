@@ -267,7 +267,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   /** @internal */
   protected _poolOverride?: ConnectionPool;
   private _executionStrategy?: ExecutionStrategy;
-  private _name?: string;
+  private _name: string | null;
   static delegate: Migration | null = null;
   private _version?: number;
 
@@ -288,7 +288,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
   private static _disableDdlTransaction = false;
 
-  constructor(name?: string, version?: number) {
+  constructor(name: string | null = new.target.name || null, version?: number) {
     this._name = name;
     this._version = version;
   }
@@ -798,8 +798,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return (await this.methodMissing("views")) as string[];
   }
 
-  get name(): string {
-    return this._name ?? this.constructor.name;
+  get name(): string | null {
+    return this._name;
   }
 
   async revert(...migrationClasses: Array<MigrationClass | (() => Promise<void>)>): Promise<void> {
@@ -911,7 +911,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   announce(message: string): void {
-    this.write(announceMigrationText(`${this.version ?? ""} ${this.name}`, message));
+    this.write(announceMigrationText(`${this.version ?? ""} ${this.name ?? ""}`, message));
   }
 
   say(message: string, subitem = false): void {
