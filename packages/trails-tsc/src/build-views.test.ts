@@ -362,20 +362,41 @@ describe("runCli", () => {
       cwd,
       "app/controllers/posts-controller.ts",
       [
+        'import { Tracking } from "./concerns/tracking.js";',
+        "function include(..._modules: unknown[]): void {}",
+        "const other = { helperMethod(..._names: string[]): void {} };",
         "export class PostsController {",
+        '  static exposed = PostsController.helperMethod("field");',
+        '  static { include(this, Tracking); other.helperMethod("foreign"); }',
         '  run(): void { PostsController.helperMethod("hidden"); }',
         '  private hidden(): string { return ""; }',
+        '  private foreign(): string { return ""; }',
         "  private late(): number { return 1; }",
+        "  private field(): boolean { return true; }",
+        "  private tracked(): symbol { return Symbol(); }",
         "  static helperMethod(..._names: string[]): void {}",
         "}",
         'PostsController.helperMethod("late");',
       ].join("\n"),
     );
+    write(
+      cwd,
+      "app/controllers/concerns/tracking.ts",
+      [
+        "const included = Symbol();",
+        "export const Tracking = {",
+        '  [included]: (base: { helperMethod(n: string): void }) => base.helperMethod("tracked"),',
+        "};",
+      ].join("\n"),
+    );
     write(cwd, "app/views/posts/index.html.tse", "hi");
     buildViews({ cwd });
     const shim = fs.readFileSync(path.join(cwd, ".trails/views/posts/index.html.tse.ts"), "utf8");
-    expect(shim).toContain('{ "late": () => number }');
+    expect(shim).toContain('"late": () => number');
+    expect(shim).toContain('"field": () => boolean');
+    expect(shim).toContain('"tracked": () => symbol');
     expect(shim).not.toContain('"hidden"');
+    expect(shim).not.toContain('"foreign"');
   }, 30_000);
 
   it("writes a source map pointing each shim line at its .tse line", () => {

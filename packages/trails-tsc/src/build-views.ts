@@ -371,7 +371,6 @@ function layoutOf(
 function exposedHelperMethods(checker: ts.TypeChecker, klass: ts.ClassDeclaration): string[] {
   const names: string[] = [];
   const scanned = new Set<ts.Node>();
-  const classLevel = (): boolean => true;
   const macro = (node: ts.Node, isSelf: (receiver?: ts.Expression) => boolean): void => {
     if (ts.isFunctionLike(node)) return;
     if (ts.isCallExpression(node)) {
@@ -394,6 +393,12 @@ function exposedHelperMethods(checker: ts.TypeChecker, klass: ts.ClassDeclaratio
     }
     ts.forEachChild(node, (child) => macro(child, isSelf));
   };
+  const resolvesTo =
+    (declaration: ts.Node, thisIsSelf: boolean) =>
+    (receiver?: ts.Expression): boolean =>
+      receiver !== undefined &&
+      ((thisIsSelf && receiver.kind === ts.SyntaxKind.ThisKeyword) ||
+        sourceDeclaration(checker, receiver) === declaration);
   const isIncludedHook = (name: ts.PropertyName): boolean =>
     (ts.isIdentifier(name) && name.text === "included") ||
     (ts.isComputedPropertyName(name) &&
@@ -408,9 +413,12 @@ function exposedHelperMethods(checker: ts.TypeChecker, klass: ts.ClassDeclaratio
         isIncludedHook(node.name)
       ) {
         const hook = ts.isPropertyAssignment(node) ? node.initializer : node;
-        if (ts.isFunctionLike(hook) && "body" in hook && hook.body) {
-          ts.forEachChild(hook.body, (child) => macro(child, classLevel));
-        }
+        const base =
+          (ts.isMethodDeclaration(hook) ||
+            ts.isArrowFunction(hook) ||
+            ts.isFunctionExpression(hook)) &&
+          hook.parameters[0];
+        if (base && hook.body) macro(hook.body, resolvesTo(base, false));
         return;
       }
       if (ts.isFunctionLike(node)) return;
@@ -421,21 +429,21 @@ function exposedHelperMethods(checker: ts.TypeChecker, klass: ts.ClassDeclaratio
   const scanClass = (declaration: ts.ClassDeclaration): void => {
     if (scanned.has(declaration)) return;
     scanned.add(declaration);
+    const inClass = resolvesTo(declaration, true);
     for (const member of declaration.members) {
       if (ts.isClassStaticBlockDeclaration(member)) {
-        member.body.statements.forEach((s) => macro(s, classLevel));
+        macro(member.body, inClass);
       } else if (
         ts.isPropertyDeclaration(member) &&
         member.initializer &&
         ts.getCombinedModifierFlags(member) & ts.ModifierFlags.Static
       ) {
-        macro(member.initializer, classLevel);
+        macro(member.initializer, inClass);
       }
     }
-    const isClass = (receiver?: ts.Expression): boolean =>
-      receiver !== undefined && sourceDeclaration(checker, receiver) === declaration;
+    const atTopLevel = resolvesTo(declaration, false);
     for (const statement of declaration.getSourceFile().statements) {
-      if (ts.isExpressionStatement(statement)) macro(statement, isClass);
+      if (ts.isExpressionStatement(statement)) macro(statement, atTopLevel);
     }
     const superclass = declaration.heritageClauses?.find(
       (h) => h.token === ts.SyntaxKind.ExtendsKeyword,
