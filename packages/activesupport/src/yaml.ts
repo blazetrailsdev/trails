@@ -194,7 +194,7 @@ class YAMLTree {
   }
 
   private visitHashSubclass(o: Map<unknown, unknown>): Node {
-    const ivars = Object.entries(o);
+    const ivars = rbObjInstanceVariables(o);
     if (ivars.length > 0) {
       const node = new yaml.YAMLMap();
       node.tag = `!ruby/hash-with-ivars:${className(o.constructor)}`;
@@ -202,10 +202,8 @@ class YAMLTree {
 
       const ivarsKey = this.accept("ivars");
       const ivarsMap = new yaml.YAMLMap();
-      for (const [ivar, value] of Object.entries(o)) {
-        ivarsMap.add(
-          new yaml.Pair(this.accept(`:@${underscore(ivar.replace(/^_/, ""))}`), this.accept(value)),
-        );
+      for (const ivar of rbObjInstanceVariables(o)) {
+        ivarsMap.add(new yaml.Pair(this.accept(`:${ivar}`), this.accept(rbObjIvarGet(o, ivar))));
       }
       node.add(new yaml.Pair(ivarsKey, ivarsMap));
 
