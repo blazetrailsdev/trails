@@ -29,6 +29,8 @@ import {
 import { Mime } from "../action-dispatch/http/mime-type.js";
 import { Response } from "../action-dispatch/http/response.js";
 import { TestResponse } from "../action-dispatch/testing/test-response.js";
+import { htmlDocument as parseHtmlDocument } from "../action-dispatch/testing/assertions.js";
+import type { XmlDocument } from "@blazetrails/nokogiri";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
@@ -38,6 +40,7 @@ import type { RouteSet } from "../action-dispatch/routing/route-set.js";
 import * as routingAssertions from "../action-dispatch/testing/assertions/routing.js";
 import { Metal } from "./metal.js";
 import { Functional } from "./metal/testing.js";
+import { Buffer as LiveBuffer, Live, type LiveControllerHost } from "./metal/live.js";
 import { _computeRedirectToLocation } from "./metal/redirecting.js";
 
 include(Metal, Functional);
@@ -46,6 +49,24 @@ declare module "./metal.js" {
   /* eslint-disable-next-line @typescript-eslint/no-empty-object-type -- Ruby `class Metal; include Testing::Functional; end` (`actionpack/lib/action_controller/test_case.rb:16-18`). */
   interface Metal extends Included<typeof Functional> {}
 }
+
+export const originalNewControllerThread = Live.newControllerThread;
+
+export async function newControllerThread(
+  this: LiveControllerHost,
+  block: () => void | Promise<void>,
+): Promise<void> {
+  await block();
+}
+
+export const originalCleanUpThreadLocals = Live.cleanUpThreadLocals;
+
+export function cleanUpThreadLocals(this: LiveControllerHost, ..._args: unknown[]): void {}
+
+Live.newControllerThread = newControllerThread;
+Live.cleanUpThreadLocals = cleanUpThreadLocals;
+
+LiveBuffer.queueSize = null;
 
 type ControllerClass = new () => Metal;
 
@@ -349,9 +370,11 @@ export class TestCase {
     } = options;
     let { format } = options;
 
+    this.controller.clearInstanceVariablesBetweenRequests();
+
     const httpMethod = String(method).toUpperCase();
 
-    this.controller.clearInstanceVariablesBetweenRequests();
+    this._htmlDocument = undefined;
 
     this.cookies.update(this.request.cookies);
     this.cookies.updateCookiesFromJar();
@@ -502,6 +525,22 @@ export class TestCase {
 
       this.response.sentBang();
     }
+  }
+
+  /** @internal */
+  _htmlDocument?: XmlDocument;
+
+  get htmlDocument(): XmlDocument {
+    if (!this._htmlDocument) {
+      const mimeType = this.response?.getHeader("content-type") ?? undefined;
+      this._htmlDocument = parseHtmlDocument(this.response.body, mimeType);
+    }
+    return this._htmlDocument;
+  }
+
+  /** @internal */
+  get documentRootElement() {
+    return this.htmlDocument.root;
   }
 
   /** @internal */

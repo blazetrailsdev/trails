@@ -190,7 +190,7 @@ export async function process(
 ): Promise<void> {
   let error: unknown = undefined;
   let errorSet = false;
-  await newControllerThread.call(this, async () => {
+  await Live.newControllerThread.call(this, async () => {
     try {
       await runAction(name);
     } catch (e) {
@@ -213,7 +213,7 @@ export async function process(
         errorSet = true;
       }
     } finally {
-      cleanUpThreadLocals.call(this, [], null);
+      Live.cleanUpThreadLocals.call(this, [], null);
       if (!this.response.committed) this.response.close();
     }
   });
@@ -280,8 +280,7 @@ export function cleanUpThreadLocals(
   _thread: unknown,
 ): void {}
 
-export const originalNewControllerThread = newControllerThread;
-export const originalCleanUpThreadLocals = cleanUpThreadLocals;
+export const Live = { newControllerThread, cleanUpThreadLocals };
 
 interface LiveExecutor {
   post(fn: () => void | Promise<void>): Promise<void>;

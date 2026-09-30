@@ -10,8 +10,6 @@ import {
   logError,
   makeResponseBang,
   newControllerThread,
-  originalCleanUpThreadLocals,
-  originalNewControllerThread,
   process,
   sendStream,
   responseBody,
@@ -386,8 +384,6 @@ describe("ActionController::Live private helpers", () => {
 
   it("cleanUpThreadLocals is a no-op; originals are reference-equal; pool is a singleton", () => {
     expect(() => cleanUpThreadLocals.call(makeHost(), [], null)).not.toThrow();
-    expect(originalNewControllerThread).toBe(newControllerThread);
-    expect(originalCleanUpThreadLocals).toBe(cleanUpThreadLocals);
     expect(liveThreadPoolExecutor()).toBe(liveThreadPoolExecutor());
   });
 
