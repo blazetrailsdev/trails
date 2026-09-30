@@ -136,7 +136,6 @@ describe("Object#respond_to?", () => {
   });
 
   it("answers include? for the core collections and to_sym for a String, which their JS values do not define", () => {
-    // vendor/ruby/v3.3.11/string.c:12212,12215, array.c:8679, hash.c:7255, lib/set.rb:393.
     for (const obj of ["abc", [1], new Set([1]), new Map(), {}]) {
       expect(basicObjRespondTo(obj, "isInclude")).toBe(true);
     }
