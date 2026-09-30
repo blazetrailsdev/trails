@@ -26,7 +26,7 @@ export class ModelGenerator extends NamedBase {
     this.commands().push("createTestFile", "createFixtureFile");
   }
 
-  /** @missingRailsCall template — CONVERGEABLE generators-have-no-thor-source-paths-or-template-files */
+  /** @missingRailsCall template — CONVERGEABLE thor-actions-template-is-unported */
   createTestFile(): void {
     this.createFile(
       File.join(
@@ -38,7 +38,7 @@ export class ModelGenerator extends NamedBase {
     );
   }
 
-  /** @missingRailsCall template — CONVERGEABLE generators-have-no-thor-source-paths-or-template-files */
+  /** @missingRailsCall template — CONVERGEABLE thor-actions-template-is-unported */
   createFixtureFile(): void {
     if (
       (this.options as ModelGeneratorOptions).fixture &&
