@@ -8,6 +8,9 @@ import { assertMatch } from "@blazetrails/activesupport";
 import { Application } from "../application.js";
 import { Trails } from "../rails.js";
 import "../trailties/active-record.js";
+import "../test-unit/trailtie.js";
+import { parse as yamlLoad } from "@blazetrails/activesupport/yaml";
+import { Base } from "@blazetrails/activerecord";
 
 class ModelGeneratorTestApp extends Application {}
 let oldBelongsToRequiredByDefault: boolean | undefined;
@@ -21,7 +24,7 @@ const assertMigration = Assertions.assertMigration.bind(destination);
 const assertFile = Assertions.assertFile.bind(destination);
 const { assertMethod } = Assertions;
 
-beforeEach(() => {
+beforeEach(async () => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-test-"));
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
   destination.destinationRoot = tmpDir;
@@ -29,6 +32,7 @@ beforeEach(() => {
   Trails.application = ModelGeneratorTestApp.instance();
   oldBelongsToRequiredByDefault = Trails.application.config.activeRecord.belongsToRequiredByDefault;
   Trails.application.config.activeRecord.belongsToRequiredByDefault = true;
+  await Trails.application.loadGenerators();
 });
 
 afterEach(() => {
@@ -44,6 +48,10 @@ function makeGen() {
 
 function readModel(name: string): string {
   return fs.readFileSync(path.join(tmpDir, `app/models/${name}.ts`), "utf-8");
+}
+
+function assertGeneratedFixture(relative: string, parsedContents: unknown): void {
+  expect(yamlLoad(fs.readFileSync(path.join(tmpDir, relative), "utf-8"))).toEqual(parsedContents);
 }
 
 function findMigration(files: string[]): string {
@@ -286,19 +294,70 @@ describe("ModelGeneratorTest", () => {
     expect(files).toContain("test/models/account.test.ts");
     const content = fs.readFileSync(path.join(tmpDir, "test/models/account.test.ts"), "utf-8");
     expect(content).toContain('describe("Account"');
+
+    await assertFile("test/fixtures/accounts.yml", /name: MyString/, /age: 1/);
+    assertGeneratedFixture("test/fixtures/accounts.yml", {
+      one: { name: "MyString", age: 1 },
+      two: { name: "MyString", age: 1 },
+    });
   });
 
-  it.skip("fixtures use the references ids", () => {});
+  it("fixtures use the references ids", async () => {
+    await makeGen().run("LineItem", ["product:references", "cart:belongs_to"]);
 
-  it.skip("fixtures use the references ids and type", () => {});
+    await assertFile("test/fixtures/line_items.yml", /product: one\n {2}cart: one/);
+    assertGeneratedFixture("test/fixtures/line_items.yml", {
+      one: { product: "one", cart: "one" },
+      two: { product: "two", cart: "two" },
+    });
+  });
 
-  it.skip("fixtures respect reserved yml keywords", () => {});
+  it("fixtures use the references ids and type", async () => {
+    await makeGen().run("LineItem", ["product:references{polymorphic}", "cart:belongs_to"]);
 
-  it.skip("fixture is skipped", () => {});
+    await assertFile(
+      "test/fixtures/line_items.yml",
+      /product: one\n {2}product_type: Product\n {2}cart: one/,
+    );
+    assertGeneratedFixture("test/fixtures/line_items.yml", {
+      one: { product: "one", product_type: "Product", cart: "one" },
+      two: { product: "two", product_type: "Product", cart: "two" },
+    });
+  });
 
-  it.skip("fixture is skipped if fixture replacement is given", () => {});
+  it("fixtures respect reserved yml keywords", async () => {
+    await makeGen().run("LineItem", ["no:integer", "Off:boolean", "ON:boolean"]);
 
-  it.skip("fixture without pluralization", () => {});
+    assertGeneratedFixture("test/fixtures/line_items.yml", {
+      one: { no: 1, Off: false, ON: false },
+      two: { no: 1, Off: false, ON: false },
+    });
+  });
+
+  it("fixture is skipped", async () => {
+    await makeGen().run("account", ["--skip-fixture"]);
+    assertNoFile("test/fixtures/accounts.yml");
+  });
+
+  it("fixture is skipped if fixture replacement is given", async () => {
+    await makeGen().run("account", ["-r", "factory_girl"]);
+    assertMatch(/factory_girl \[not found\]/, lines.join("\n"));
+    assertNoFile("test/fixtures/accounts.yml");
+  });
+
+  it("fixture without pluralization", async () => {
+    const originalPluralizeTableName = Base.pluralizeTableNames;
+    Base.pluralizeTableNames = false;
+    try {
+      await makeGen().run("Account", ["name:string", "age:integer"]);
+      assertGeneratedFixture("test/fixtures/account.yml", {
+        one: { name: "MyString", age: 1 },
+        two: { name: "MyString", age: 1 },
+      });
+    } finally {
+      Base.pluralizeTableNames = originalPluralizeTableName;
+    }
+  });
 
   it.skip("check class collision", () => {});
 
@@ -445,7 +504,11 @@ describe("ModelGeneratorTest", () => {
     expect(content).toContain('this.hasManyAttached("photos")');
   });
 
-  it.skip("skip virtual fields in fixtures", () => {});
+  it("skip virtual fields in fixtures", async () => {
+    await makeGen().run("message", ["content:rich_text", "video:attachment", "photos:attachments"]);
+
+    assertGeneratedFixture("test/fixtures/messages.yml", { one: null, two: null });
+  });
 });
 
 describe("ModelGenerator (JavaScript project)", () => {

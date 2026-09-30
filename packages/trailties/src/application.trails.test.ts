@@ -4,7 +4,8 @@ import { Trailtie as BaseTrailtie } from "./trailtie.js";
 import { Trailtie as ActiveRecordTrailtie } from "./trailties/active-record.js";
 import { Logger } from "@blazetrails/activesupport";
 import { Dir, File, FileUtils, NameError, SecureRandom } from "@blazetrails/ruby-compat";
-import { MockRequest } from "@blazetrails/rack";
+import { MockRequest, Utils } from "@blazetrails/rack";
+import { Configuration } from "./application/configuration.js";
 import { Application } from "./application.js";
 
 describe("Application framework railtie initializers", () => {
@@ -170,5 +171,18 @@ describe("Application#requireEnvironmentBang", () => {
     } finally {
       FileUtils.rmRf(root);
     }
+  });
+});
+
+describe("Configuration#loadDefaults 6.1", () => {
+  it("seats cookiesSameSiteProtection in the spelling rack's setCookieHeader accepts", () => {
+    const c = new Configuration();
+    c.set("actionDispatch", {});
+
+    c.loadDefaults("6.1");
+
+    const sameSite = (c.get("actionDispatch") as Record<string, unknown>).cookiesSameSiteProtection;
+    expect(sameSite).toBe("lax");
+    expect(Utils.setCookieHeader("k", { value: "v", sameSite })).toBe("k=v; samesite=lax");
   });
 });

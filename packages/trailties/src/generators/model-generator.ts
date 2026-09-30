@@ -1,6 +1,7 @@
 import { GeneratorBase, GeneratorOptions, dasherize } from "./base.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
 import { MigrationGenerator } from "./migration-generator.js";
+import { Generators } from "../generators.js";
 import { camelize, classify, pluralize, singularize, underscore } from "@blazetrails/activesupport";
 
 interface ModelOptions {
@@ -102,18 +103,19 @@ export class ${className} extends ${parentClass} {${staticBlock}}
     }
 
     if (test) {
-      this.createFile(
-        `test/models/${fileName}.test${ext}`,
-        `import { describe, it, expect } from "vitest";
-import { ${className} } from "../../${relativeRoot}app/models/${fileName}.js";
-
-describe("${className}", () => {
-  it("exists", () => {
-    expect(${className}).toBeDefined();
-  });
-});
-`,
-      );
+      const klass = await Generators.findByNamespace("test_unit", "active_record", "model");
+      if (klass) {
+        this.createdFiles.push(
+          ...(await klass.start([name, ...args], {
+            cwd: this.cwd,
+            output: this.output,
+            behavior: this.behavior,
+            pretend: this.options.pretend,
+            force: this.options.force,
+            skip: this.options.skip,
+          })),
+        );
+      }
     }
 
     if (migration && !parent) {

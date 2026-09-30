@@ -220,7 +220,7 @@ export class Configuration extends EngineConfiguration {
 
         if (this.isRespondTo("actionDispatch")) {
           const actionDispatch = this.get("actionDispatch") as Record<string, unknown>;
-          actionDispatch.cookiesSameSiteProtection = ":lax";
+          actionDispatch.cookiesSameSiteProtection = "lax";
           actionDispatch.sslDefaultRedirectStatus = 308;
         }
 
