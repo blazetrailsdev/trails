@@ -31,7 +31,8 @@ import { Response } from "../action-dispatch/http/response.js";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
-import type { CookieResponse } from "../action-dispatch/middleware/cookies.js";
+import { CookieJar, type CookieResponse } from "../action-dispatch/middleware/cookies.js";
+import { cookies, type TestProcessHost } from "../action-dispatch/testing/test-process.js";
 import type { RouteSet } from "../action-dispatch/routing/route-set.js";
 import * as routingAssertions from "../action-dispatch/testing/assertions/routing.js";
 import type { Metal } from "./metal.js";
@@ -196,9 +197,12 @@ export class TestCase {
     return (this.controller as any).flash ?? new FlashHash();
   }
 
-  get cookies(): Record<string, string | undefined> {
-    return this.response?.cookies ?? {};
+  get cookies(): CookieJar {
+    return cookies.call(this as unknown as TestProcessHost);
   }
+
+  /** @internal */
+  _cookieJar?: CookieJar;
 
   get responseBody(): string {
     return this.response?.body ?? this.controller?.responseBody ?? "";
@@ -313,6 +317,7 @@ export class TestCase {
 
   reset(): void {
     this.controller = undefined!;
+    this._cookieJar = undefined;
     this.setupControllerRequestAndResponse();
   }
 
@@ -333,6 +338,11 @@ export class TestCase {
     const httpMethod = String(method).toUpperCase();
 
     this.controller = new this._controllerClass();
+
+    this.cookies.update(this.request.cookies);
+    this.cookies.updateCookiesFromJar();
+    this.request.setHeader("HTTP_COOKIE", this.cookies.toHeader());
+    this.request.deleteHeader("action_dispatch.cookies");
 
     this.request = new TestRequest(
       this.scrubEnvBang(this.request.env),
@@ -450,8 +460,11 @@ export class TestCase {
       if (this.request.isHaveCookieJar()) {
         if (!this.request.cookieJar().isCommitted()) {
           this.request.cookieJar().write(this.response as unknown as CookieResponse);
+          this.cookies.update(this.request.cookieJar().toHash());
+          this.cookies.update(this.response.cookies as Record<string, string>);
         }
       }
+      this.response.toRack();
 
       const flashValue = this.request.flash!.toSessionValue();
       if (flashValue) {
