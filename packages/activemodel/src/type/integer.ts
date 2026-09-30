@@ -54,7 +54,7 @@ export class IntegerType extends NumericValueType {
   /** @internal */
   protected castValue(value: unknown): number | bigint | null {
     try {
-      return toI(value);
+      return this.narrowBigInt(toI(value));
     } catch {
       return null;
     }
@@ -87,7 +87,8 @@ export class IntegerType extends NumericValueType {
   }
 
   /** @internal */
-  protected narrowBigInt(value: bigint): number | bigint {
+  protected narrowBigInt(value: number | bigint): number | bigint {
+    if (typeof value === "number") return value;
     const num = Number(value);
     return Number.isSafeInteger(num) ? num : value;
   }

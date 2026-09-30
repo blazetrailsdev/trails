@@ -99,6 +99,13 @@ describe("IntegerType", () => {
     );
   });
 
+  it("casts a safe bigint to a number and keeps a large one exact", () => {
+    expect(type.cast(42n)).toBe(42);
+    expect(new Types.IntegerType({ limit: 8 }).cast(9223372036854775807n)).toBe(
+      9223372036854775807n,
+    );
+  });
+
   it("holds exact 64-bit endpoints in its @range", () => {
     const bigint = new Types.IntegerType({ limit: 8 });
     expect(bigint.serialize(-9223372036854775808n)).toBe(-9223372036854775808n);

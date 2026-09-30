@@ -6,6 +6,8 @@ type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
 const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
+const bigintDigits = (_key: string, value: unknown): unknown =>
+  typeof value === "bigint" ? value.toString() : value;
 
 export class Association {
   readonly klass: typeof Base;
@@ -325,8 +327,8 @@ export class LoaderQuery {
       this.scope.tableName === other.scope.tableName &&
       this.scope.model.connectionSpecificationName ===
         other.scope.model.connectionSpecificationName &&
-      JSON.stringify(this.scope.valuesForQueries()) ===
-        JSON.stringify(other.scope.valuesForQueries())
+      JSON.stringify(this.scope.valuesForQueries(), bigintDigits) ===
+        JSON.stringify(other.scope.valuesForQueries(), bigintDigits)
     );
   }
 
@@ -334,7 +336,7 @@ export class LoaderQuery {
     const keyName = Array.isArray(this.associationKeyName)
       ? this.associationKeyName.join(",")
       : this.associationKeyName;
-    return `${keyName}::${this.scope.model.tableName}::${this.scope.model.connectionSpecificationName}::${JSON.stringify(this.scope.valuesForQueries())}`;
+    return `${keyName}::${this.scope.model.tableName}::${this.scope.model.connectionSpecificationName}::${JSON.stringify(this.scope.valuesForQueries(), bigintDigits)}`;
   }
 
   async loadRecordsForKeys(
