@@ -246,6 +246,10 @@ export class AttributeSet {
     return result;
   }
 
+  toH(): Record<string, unknown> {
+    return this.toHash();
+  }
+
   freeze(): this {
     Object.freeze(this.attributes());
     Object.freeze(this);

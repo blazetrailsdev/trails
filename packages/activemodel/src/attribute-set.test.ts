@@ -92,7 +92,7 @@ describe("AttributeSetTest", () => {
     const attributes = builder.buildFromDatabase({ foo: "1.1", bar: "2.2" });
 
     expect(attributes.toHash()).toEqual({ foo: 1, bar: 2.2 });
-    expect(attributes.toHash()).toEqual({ foo: 1, bar: 2.2 });
+    expect(attributes.toH()).toEqual({ foo: 1, bar: 2.2 });
   });
 
   it("to_hash maintains order", () => {
