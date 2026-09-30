@@ -77,8 +77,14 @@ function lineMappings(genLine: number, code: string, node: TseAst["nodes"][numbe
   const tagCol = node.kind === "text" ? 0 : (node.srcCol ?? 0);
   const lead = node.kind === "text" ? [""] : (/^\s*/.exec(node.value)?.[0] ?? "").split("\n");
   const srcLine = node.srcLine + lead.length - 1;
-  const srcCol = lead.length === 1 ? tagCol + lead[0].length : lead[lead.length - 1].length;
-  const at = node.kind === "text" ? 0 : pieces[0].indexOf(node.value.trim().split("\n")[0]);
+  const valueCol = lead.length === 1 ? tagCol + lead[0].length : lead[lead.length - 1].length;
+  const value = node.kind === "text" ? "" : node.value.trim();
+  const yielded =
+    node.kind === "expr" || node.kind === "rawExpr" ? YIELD_EXPR_RE.exec(value) : null;
+  const arg = (yielded?.[1] ?? yielded?.[2] ?? "").trim();
+  const anchor = yielded === null ? value.split("\n")[0] : arg || "context.yield";
+  const at = node.kind === "text" ? 0 : pieces[0].indexOf(anchor);
+  const srcCol = valueCol + (yielded !== null && arg !== "" ? value.indexOf(arg) : 0);
   return pieces.map((_, i) =>
     i === 0
       ? { genLine, srcLine, genCol: at === -1 ? pieces[0].length : at, srcCol }

@@ -45,23 +45,22 @@ export function buildViews(opts: BuildViewsOptions = {}): BuildViewsResult {
   fs.rmSync(path.join(outDir, "views-manifest.ts"), { force: true });
   fs.mkdirSync(outViews, { recursive: true });
   const registryMap = new Map<string, string[]>();
-  const shimPaths: string[] = [];
   const appDir = path.dirname(viewsDir);
   const helpers = allHelpersFromPath(path.join(appDir, "helpers"));
+  const views: ViewShim[] = [];
   for (const rel of files) {
     const src = fs.readFileSync(path.join(viewsDir, rel), "utf8");
-    const srcAbsPath = path.join(viewsDir, rel);
-    const mapAbsDir = path.dirname(path.join(outViews, rel));
-    const scope = templateScope(appDir, rel, mapAbsDir, helpers);
-    const { ts: shim, mappings } = virtualizeTseWithDeltas(src, scope);
-    const sourceFileName = path.relative(mapAbsDir, srcAbsPath).split(path.sep).join("/");
     const outBase = path.join(outViews, rel);
-    fs.mkdirSync(path.dirname(outBase), { recursive: true });
-    fs.writeFileSync(outBase + ".ts", shim + `//# sourceMappingURL=${path.basename(rel)}.ts.map\n`);
-    const shimMap = generateSourceMap(path.basename(rel) + ".ts", sourceFileName, src, mappings);
-    fs.writeFileSync(outBase + ".ts.map", JSON.stringify(shimMap));
-    shimPaths.push(outBase + ".ts");
     const ast = parse(src);
+    views.push({
+      rel,
+      src,
+      outBase,
+      strictLocals: ast.localsSignature !== null,
+      ...templateScope(appDir, rel, path.dirname(outBase), helpers),
+    });
+    fs.mkdirSync(path.dirname(outBase), { recursive: true });
+    writeShim(views[views.length - 1], viewsDir);
     const registryKey = partialRegistryKey(rel);
     if (registryKey !== null && ast.localsSignature !== null) {
       const locals = parseLocalsSignature(ast.localsSignature);
@@ -69,7 +68,16 @@ export function buildViews(opts: BuildViewsOptions = {}): BuildViewsResult {
       registryMap.set(registryKey, [...existing, localsParamType(ast, locals)]);
     }
   }
-  emitDeclarations(shimPaths);
+  const shimPaths = views.map((v) => v.outBase + ".ts");
+  if (shimPaths.length > 0) {
+    const host = cachingHost();
+    let program = ts.createProgram([...shimPaths], EMIT_OPTIONS, host);
+    if (bindCheckedTypes(views, program)) {
+      for (const view of views) writeShim(view, viewsDir);
+      program = ts.createProgram([...shimPaths], EMIT_OPTIONS, host, program);
+    }
+    emitDeclarations(program, host);
+  }
   const registryEntries = Array.from(registryMap, ([key, types]) => ({
     key,
     localsType: types.length === 1 ? types[0] : types.map((t) => `(${t})`).join(" & "),
@@ -146,12 +154,152 @@ function helperMethodNames(files: readonly string[]): string[] {
   return names;
 }
 
+interface ViewShim {
+  rel: string;
+  src: string;
+  outBase: string;
+  strictLocals: boolean;
+  view: string[];
+  locals: Map<string, Set<string>>;
+  controller?: { file: string; name: string; exposed: string[] };
+}
+
+function writeShim(shim: ViewShim, viewsDir: string): void {
+  const shimDir = path.dirname(shim.outBase);
+  const locals = [...shim.locals].map(([name, types]) => `${name}: ${[...types].join(" | ")}`);
+  const scope: TseScope = {
+    view: relocateImports(shim.view.join(" & "), shimDir),
+    locals: relocateImports(locals.length === 0 ? "{}" : `{ ${locals.join("; ")} }`, shimDir),
+  };
+  const { ts: code, mappings } = virtualizeTseWithDeltas(shim.src, scope);
+  const base = path.basename(shim.rel);
+  fs.writeFileSync(shim.outBase + ".ts", code + `//# sourceMappingURL=${base}.ts.map\n`);
+  const sourceFileName = path
+    .relative(shimDir, path.join(viewsDir, shim.rel))
+    .split(path.sep)
+    .join("/");
+  const map = generateSourceMap(`${base}.ts`, sourceFileName, shim.src, mappings);
+  fs.writeFileSync(shim.outBase + ".ts.map", JSON.stringify(map));
+}
+
+function relocateImports(typeText: string, shimDir: string): string {
+  return typeText.replace(/import\("([^"]+)"\)/gu, (whole, target: string) =>
+    path.isAbsolute(target)
+      ? `import(${importPath(shimDir, target.replace(/(\.ts)?$/u, ".ts"))})`
+      : whole,
+  );
+}
+
+const EMIT_OPTIONS: ts.CompilerOptions = {
+  declaration: true,
+  declarationMap: true,
+  emitDeclarationOnly: true,
+  skipLibCheck: true,
+  strict: true,
+  moduleResolution: ts.ModuleResolutionKind.Bundler,
+  module: ts.ModuleKind.ESNext,
+  target: ts.ScriptTarget.ESNext,
+};
+
+function cachingHost(): ts.CompilerHost {
+  const host = ts.createCompilerHost(EMIT_OPTIONS, true);
+  const getSourceFile = host.getSourceFile.bind(host);
+  const parsed = new Map<string, ts.SourceFile | undefined>();
+  host.getSourceFile = (fileName, ...rest) => {
+    if (fileName.endsWith(".tse.ts")) return getSourceFile(fileName, ...rest);
+    if (!parsed.has(fileName)) parsed.set(fileName, getSourceFile(fileName, ...rest));
+    return parsed.get(fileName);
+  };
+  return host;
+}
+
+function bindCheckedTypes(views: ViewShim[], program: ts.Program): boolean {
+  const checker = program.getTypeChecker();
+  const typeText = (type: ts.Type): string =>
+    checker.typeToString(
+      type,
+      undefined,
+      ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseFullyQualifiedType,
+    );
+  let changed = false;
+  const partials = new Map<string, ViewShim>();
+  for (const view of views) {
+    const key = partialRegistryKey(view.rel);
+    if (key !== null && !view.strictLocals) partials.set(key, view);
+  }
+  for (const view of views) {
+    const sf = program.getSourceFile(view.outBase + ".ts");
+    if (sf === undefined) continue;
+    const prefix = path.posix.dirname(view.rel);
+    const visit = (node: ts.Node): void => {
+      const passed = ts.isCallExpression(node) ? renderedPartial(node) : undefined;
+      const target =
+        passed &&
+        partials.get(passed.name.includes("/") ? passed.name : `${prefix}/${passed.name}`);
+      if (passed && target) {
+        for (const prop of passed.locals.properties) {
+          if (!(ts.isPropertyAssignment(prop) || ts.isShorthandPropertyAssignment(prop))) continue;
+          if (!ts.isIdentifier(prop.name)) continue;
+          const at = ts.isPropertyAssignment(prop) ? prop.initializer : prop.name;
+          const types = target.locals.get(prop.name.text) ?? new Set<string>();
+          types.add(typeText(checker.getBaseTypeOfLiteralType(checker.getTypeAtLocation(at))));
+          target.locals.set(prop.name.text, types);
+          changed = true;
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+    const controller = view.controller && program.getSourceFile(view.controller.file);
+    const klass = controller?.statements.find(
+      (s): s is ts.ClassDeclaration =>
+        ts.isClassDeclaration(s) && s.name?.text === view.controller!.name,
+    );
+    const instance =
+      klass?.name && checker.getDeclaredTypeOfSymbol(checker.getSymbolAtLocation(klass.name)!);
+    if (!instance || !klass) continue;
+    const members = view.controller!.exposed.flatMap((name) => {
+      const member = instance.getProperty(name);
+      return member
+        ? [`${name}: ${typeText(checker.getTypeOfSymbolAtLocation(member, klass))}`]
+        : [];
+    });
+    if (members.length > 0) {
+      view.view.push(`{ ${members.join("; ")} }`);
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function renderedPartial(
+  call: ts.CallExpression,
+): { name: string; locals: ts.ObjectLiteralExpression } | undefined {
+  if (!ts.isIdentifier(call.expression) || call.expression.text !== "render") return undefined;
+  const [first, second] = call.arguments;
+  if (first && ts.isStringLiteral(first) && second && ts.isObjectLiteralExpression(second)) {
+    return { name: first.text, locals: second };
+  }
+  if (!first || !ts.isObjectLiteralExpression(first)) return undefined;
+  const option = (key: string): ts.Expression | undefined =>
+    first.properties.find(
+      (p): p is ts.PropertyAssignment =>
+        ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === key,
+    )?.initializer;
+  const partial = option("partial");
+  const locals = option("locals");
+  if (partial && ts.isStringLiteral(partial) && locals && ts.isObjectLiteralExpression(locals)) {
+    return { name: partial.text, locals };
+  }
+  return undefined;
+}
+
 function templateScope(
   appDir: string,
   rel: string,
   shimDir: string,
   helpers: readonly string[],
-): TseScope {
+): Pick<ViewShim, "view" | "locals" | "controller"> {
   const view = ['import("@blazetrails/actionview").Base'];
   for (const file of helpers) {
     const name = constantName(file.replace(/[-_]helper\.ts$/u, ""));
@@ -165,32 +313,31 @@ function templateScope(
   );
   const prefix = path.posix.dirname(rel);
   const controllersDir = path.join(appDir, "controllers");
-  const controller = path.join(
+  const file = path.join(
     controllersDir,
     `${prefix.split("/").map(dasherize).join("/")}-controller.ts`,
   );
-  if (prefix !== "." && fs.existsSync(controller)) {
-    const klass = `import(${importPath(shimDir, controller)}).${constantName(prefix)}Controller`;
+  let controller: ViewShim["controller"];
+  if (prefix !== "." && fs.existsSync(file)) {
+    const name = `${constantName(prefix)}Controller`;
+    const klass = `import(${importPath(shimDir, file)}).${name}`;
     view.push(
       `{ [K in keyof ${klass} as K extends keyof import("@blazetrails/actionpack").ActionController.Base ? never : ${klass}[K] extends (...args: never) => unknown ? never : K]: ${klass}[K] }`,
     );
     const concerns = path.join(controllersDir, "concerns");
     const exposed = helperMethodNames([
       path.join(controllersDir, "application-controller.ts"),
-      controller,
+      file,
       ...(fs.existsSync(concerns)
         ? fs
             .readdirSync(concerns, { recursive: true, encoding: "utf8" })
-            .map((file) => path.join(concerns, file))
+            .filter((f) => f.endsWith(".ts"))
+            .map((f) => path.join(concerns, f))
         : []),
     ]);
-    if (exposed.length > 0) {
-      view.push(
-        `Pick<${klass}, Extract<${exposed.map((n) => JSON.stringify(n)).join(" | ")}, keyof ${klass}>>`,
-      );
-    }
+    controller = { file, name, exposed };
   }
-  const scope: TseScope = { view: view.join(" & ") };
+  const locals = new Map<string, Set<string>>();
   const partial = /^_([a-z_]\w*)/u.exec(path.posix.basename(rel));
   const element = partial?.[1];
   if (element !== undefined && path.posix.basename(prefix) === pluralize(element)) {
@@ -203,10 +350,10 @@ function templateScope(
     );
     if (fs.existsSync(model)) {
       const klass = constantName([...namespace, element].join("/"));
-      scope.locals = `{ ${element}: import(${importPath(shimDir, model)}).${klass} }`;
+      locals.set(element, new Set([`import(${JSON.stringify(model)}).${klass}`]));
     }
   }
-  return scope;
+  return { view, locals, controller };
 }
 
 function partialRegistryKey(rel: string): string | null {
@@ -234,19 +381,7 @@ function emitRegistryAugmentation(entries: Array<{ key: string; localsType: stri
   return lines.join("\n");
 }
 
-function emitDeclarations(shimPaths: readonly string[]): void {
-  if (shimPaths.length === 0) return;
-  const opts: ts.CompilerOptions = {
-    declaration: true,
-    declarationMap: true,
-    emitDeclarationOnly: true,
-    skipLibCheck: true,
-    moduleResolution: ts.ModuleResolutionKind.Bundler,
-    module: ts.ModuleKind.ESNext,
-    target: ts.ScriptTarget.ESNext,
-  };
-  const host = ts.createCompilerHost(opts, true);
-  const program = ts.createProgram([...shimPaths], opts, host);
+function emitDeclarations(program: ts.Program, host: ts.CompilerHost): void {
   const emitResult = program.emit();
   if (emitResult.emitSkipped) {
     const diagnostics = [...ts.getPreEmitDiagnostics(program), ...emitResult.diagnostics];

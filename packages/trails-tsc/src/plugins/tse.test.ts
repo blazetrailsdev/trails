@@ -354,5 +354,14 @@ describe("virtualizeTse", () => {
       expect(srcLineOf("if (c)")).toBe(4);
       expect(srcLineOf("d();")).toBe(5);
     });
+
+    it("maps a yielded section to its column inside the tag", () => {
+      const src = '<p><%= yield("sidebar") %></p>';
+      const { ts, mappings } = virtualizeTseWithDeltas(src, scope);
+      const lines = ts.split("\n");
+      const m = mappings.find((x) => lines[x.genLine].includes("context.yield"))!;
+      expect(lines[m.genLine].slice(m.genCol)).toMatch(/^"sidebar"/);
+      expect(src.slice(m.srcCol)).toMatch(/^"sidebar"/);
+    });
   });
 });

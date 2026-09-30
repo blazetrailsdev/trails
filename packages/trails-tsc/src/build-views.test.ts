@@ -278,7 +278,7 @@ describe("runCli", () => {
     write(
       cwd,
       "app/controllers/posts-controller.ts",
-      'export class PostsController { static { this.helperMethod("currentPost"); } }',
+      'export class PostsController { static { this.helperMethod("currentPost"); } private currentPost(): string { return ""; } }',
     );
     write(
       cwd,
@@ -329,5 +329,26 @@ describe("runCli", () => {
     expect(decodeLineMappings(map.mappings)).toContainEqual(
       expect.objectContaining({ genLine, srcLine: 2, srcCol: 8 }),
     );
+  });
+
+  it("types a partial's passed locals from every render call that passes them", () => {
+    const cwd = mkScratch();
+    write(cwd, "app/views/posts/new.html.tse", '<%= render("form", { post: 1, title: "x" }) %>');
+    write(
+      cwd,
+      "app/views/posts/edit.html.tse",
+      '<%= render({ partial: "posts/form", locals: { post: "y" } }) %>',
+    );
+    write(cwd, "app/views/posts/_form.html.tse", "<%= post %><%= title %>");
+    write(cwd, "app/views/posts/_strict.html.tse", "<%# locals: (post:) %><%= post %>");
+    write(cwd, "app/views/posts/show.html.tse", '<%= render("strict", { post: 1 }) %>');
+    buildViews({ cwd });
+    const form = fs.readFileSync(path.join(cwd, ".trails/views/posts/_form.html.tse.ts"), "utf8");
+    expect(form).toContain("type ObjectLocals = { post: string | number; title: string };");
+    const strict = fs.readFileSync(
+      path.join(cwd, ".trails/views/posts/_strict.html.tse.ts"),
+      "utf8",
+    );
+    expect(strict).toContain("type ObjectLocals = {};");
   });
 });
