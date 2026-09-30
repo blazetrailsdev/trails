@@ -16,6 +16,7 @@ import {
   rbObjIvarSet,
 } from "./object.js";
 import { NameError } from "./name-error.js";
+import { FrozenError } from "./frozen-error.js";
 import { NoMethodError } from "./no-method-error.js";
 
 describe("Object#inspect", () => {
@@ -249,6 +250,13 @@ describe("Kernel#instance_variable_get / instance_variable_set", () => {
     expect(rbObjIvarGet(o, "@items")).toEqual([2]);
     expect(rbObjIvarGet(o, "@foo_bar")).toBe(1);
     expect(rbObjIvarGet(o, "@missing")).toBeNull();
+    rbObjIvarSet(o, "@_cache_key", 3);
+    expect(Object.hasOwn(o, "_cacheKey")).toBe(true);
+    expect(rbObjInstanceVariables(o)).toContain("@_cache_key");
+  });
+
+  it("raises FrozenError on a frozen receiver", () => {
+    expect(() => rbObjIvarSet(Object.freeze(new Holder()), "@items", [])).toThrow(FrozenError);
   });
 
   it("raises NameError for a name that is not an ivar name", () => {

@@ -3,6 +3,7 @@ import { isSymbol } from "./symbol.js";
 import { rubyClass, type Comparable } from "./comparable.js";
 import { TypeError } from "./type-error.js";
 import { NameError } from "./name-error.js";
+import { FrozenError } from "./frozen-error.js";
 import { NoMethodError } from "./no-method-error.js";
 
 /**
@@ -677,7 +678,7 @@ function ivarField(obj: object, id: string): string {
     const field = ivarFields.get(o)?.get(id);
     if (field !== undefined) return field;
   }
-  return id.slice(1).replace(/_([a-z\d])/g, (_, c: string) => c.toUpperCase());
+  return id.slice(1).replace(/(?<=[A-Za-z\d])_([a-z\d])/g, (_, c: string) => c.toUpperCase());
 }
 
 function fieldIvar(obj: object, field: string): string {
@@ -725,13 +726,19 @@ export function rbObjIvarGet(obj: object, iv: string): unknown {
 /**
  * `Kernel#instance_variable_set` (`rb_obj_ivar_set_m`, `vendor/ruby/v3.3.11/object.c:2914`):
  * sets ivar `iv` as an own field of `obj`, never through a setter, as
- * `rb_ivar_set` writes the ivar table directly.
+ * `rb_ivar_set` (`vendor/ruby/v3.3.11/variable.c:1923`) writes the ivar table
+ * directly after `rb_check_frozen`.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#instance_variable_set`
  * (`vendor/ruby/v3.3.11/object.c:2914`).
  */
 export function rbObjIvarSet(obj: object, iv: string, val: unknown): unknown {
   const id = idForVar(obj, iv);
+  if (Object.isFrozen(obj)) {
+    throw new FrozenError(`can't modify frozen ${rbObjClass(obj)}: ${rbInspect(obj)}`, {
+      receiver: obj,
+    });
+  }
   Object.defineProperty(obj, ivarField(obj, id), {
     value: val,
     writable: true,

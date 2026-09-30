@@ -61,13 +61,6 @@ export class IntegerType extends NumericValueType {
 
   /** @internal */
   protected castValue(value: unknown): number | bigint | null {
-    if (typeof value === "number") {
-      if (!isFinite(value)) return null;
-      return Math.trunc(value);
-    }
-    if (typeof value === "bigint") {
-      return this.narrowBigInt(value);
-    }
     try {
       return toI(value);
     } catch {
