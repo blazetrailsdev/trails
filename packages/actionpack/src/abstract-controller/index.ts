@@ -16,7 +16,7 @@ export {
   type LocalizeOptions,
 } from "./translation.js";
 export { deprecator } from "./deprecator.js";
-export { ASSET_PATH_SLOTS, type AssetPathSlot, type AssetPathsHost } from "./asset-paths.js";
+export { AssetPaths, type AssetPathsHost } from "./asset-paths.js";
 export { benchmark, type LoggerHost, type LoggerLike } from "./logger.js";
 export { Collector } from "./collector.js";
 export {

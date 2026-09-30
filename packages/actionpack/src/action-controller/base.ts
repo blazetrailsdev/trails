@@ -78,6 +78,7 @@ import { permissionsPolicy } from "./metal/permissions-policy.js";
 import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
 import { logAt } from "./metal/logging.js";
 import type { LoggerHost } from "../abstract-controller/logger.js";
+import { AssetPaths } from "../abstract-controller/asset-paths.js";
 import { Instrumentation, logProcessAction } from "./metal/instrumentation.js";
 import { Redirecting } from "./metal/redirecting.js";
 import {
@@ -909,6 +910,7 @@ classAttribute.call(Base, "fragmentCacheKeys", { default: [] });
 Base.helperMethod("combinedFragmentCacheKey");
 
 extend(Base, ConfigMethods);
+include(Base, AssetPaths);
 extend(Base, DefaultHeaders.ClassMethods);
 include(Base, Redirecting);
 include(Base, Instrumentation);
