@@ -199,9 +199,9 @@ export async function process(
         try {
           resp.stream.callOnError();
         } catch (inner) {
-          logError.call(this, inner);
+          Live.logError.call(this, inner);
         } finally {
-          logError.call(this, e);
+          Live.logError.call(this, e);
           try {
             resp.stream.close();
           } catch {
@@ -280,8 +280,6 @@ export function cleanUpThreadLocals(
   _thread: unknown,
 ): void {}
 
-export const Live = { newControllerThread, cleanUpThreadLocals };
-
 interface LiveExecutor {
   post(fn: () => void | Promise<void>): Promise<void>;
 }
@@ -318,3 +316,12 @@ export function logError(this: { logger?: LoggerLike }, exception: unknown): voi
   const stack = err?.stack ?? "";
   logger.fatal(() => `\n${name} (${message}):\n  ${stack}\n\n`);
 }
+
+export const Live = {
+  process,
+  responseBody,
+  sendStream,
+  newControllerThread,
+  cleanUpThreadLocals,
+  logError,
+};

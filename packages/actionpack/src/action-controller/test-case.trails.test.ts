@@ -104,3 +104,20 @@ describe("ActionController::Live under test_case.rb", () => {
     expect(order).toEqual(["inside", "after-call"]);
   });
 });
+
+describe("TestCase#document_root_element", () => {
+  class XmlController extends Base {
+    async index() {
+      await this.render({ xml: "<root><child/></root>" });
+    }
+  }
+
+  it("parses the response as XML and resets it on the next request", async () => {
+    const tc = new TestCase(XmlController);
+    await tc.get("index");
+    const first = tc.htmlDocument;
+    expect(tc.documentRootElement.name).toBe("root");
+    await tc.get("index");
+    expect(tc.htmlDocument).not.toBe(first);
+  });
+});

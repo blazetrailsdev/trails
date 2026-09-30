@@ -29,7 +29,7 @@ import {
 import { Mime } from "../action-dispatch/http/mime-type.js";
 import { Response } from "../action-dispatch/http/response.js";
 import { TestResponse } from "../action-dispatch/testing/test-response.js";
-import { htmlDocument as parseHtmlDocument } from "../action-dispatch/testing/assertions.js";
+import { htmlDocument, type HtmlDocumentHost } from "../action-dispatch/testing/assertions.js";
 import type { XmlDocument } from "@blazetrails/nokogiri";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
@@ -531,11 +531,7 @@ export class TestCase {
   _htmlDocument?: XmlDocument;
 
   get htmlDocument(): XmlDocument {
-    if (!this._htmlDocument) {
-      const mimeType = this.response?.getHeader("content-type") ?? undefined;
-      this._htmlDocument = parseHtmlDocument(this.response.body, mimeType);
-    }
-    return this._htmlDocument;
+    return htmlDocument.call(this as unknown as HtmlDocumentHost);
   }
 
   /** @internal */
