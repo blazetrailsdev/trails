@@ -74,7 +74,7 @@ import { Explain } from "./explain.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { PrettyPrinter } from "./pretty-print.js";
-import { JoinDependency } from "./associations/join-dependency.js";
+import type { JoinDependency } from "./associations/join-dependency.js";
 import {
   DeferredIdsIn,
   DeferredIdsNotIn,

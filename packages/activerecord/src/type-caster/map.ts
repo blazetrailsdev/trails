@@ -1,6 +1,5 @@
 import { ValueType } from "@blazetrails/activemodel";
 import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
-import { enumTypeOf } from "../enum.js";
 
 export class Map {
   private _klass: any;
@@ -10,8 +9,6 @@ export class Map {
   }
 
   typeCastForDatabase(attrName: unknown, value: unknown): unknown {
-    const enumType = enumTypeOf(this._klass, toS(attrName));
-    if (enumType) return enumType.serialize(value);
     const type = this.typeForAttribute(attrName);
     return type.serialize(value);
   }

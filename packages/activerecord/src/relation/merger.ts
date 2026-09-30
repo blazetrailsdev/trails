@@ -1,7 +1,6 @@
 import { Nodes } from "@blazetrails/arel";
 import { assertValidKeys, isBlank, isPlainObject } from "@blazetrails/activesupport";
 
-import { JoinDependency } from "../associations/join-dependency.js";
 import { Relation } from "../relation.js";
 import type { ValueMethod } from "../relation.js";
 import type { AssociationSpec } from "./query-methods.js";
@@ -158,7 +157,7 @@ export class Merger {
     const associations: unknown[] = [];
     const others: unknown[] = [];
     for (const v of otherLeft) {
-      if (!(v instanceof JoinDependency)) {
+      if (isPlainObject(v) || Array.isArray(v) || (typeof v === "string" && v.startsWith(":"))) {
         associations.push(v);
       } else {
         others.push(v);
