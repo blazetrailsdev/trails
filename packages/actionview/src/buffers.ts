@@ -53,6 +53,7 @@ export class OutputBuffer {
     if (value === null || value === undefined) {
       throw new TypeError("no implicit conversion of nil into String");
     }
+    rejectThenable(value);
     this._raw += value instanceof SafeBuffer ? value.toString() : String(value);
     return this;
   }
@@ -120,6 +121,7 @@ export class RawOutputBuffer {
 
   append(value: unknown): this {
     if (value === null || value === undefined) return this;
+    rejectThenable(value);
     this.buffer.appendRaw(value instanceof SafeBuffer ? value.toString() : String(value));
     return this;
   }
@@ -211,6 +213,7 @@ export class RawStreamingBuffer {
 
 function toRawString(value: unknown): string {
   if (value == null) return "";
+  rejectThenable(value);
   if (value instanceof SafeBuffer) return value.toString();
   if (value instanceof OutputBuffer) return value.toStr();
   return String(value);
