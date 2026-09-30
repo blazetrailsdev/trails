@@ -1128,6 +1128,13 @@ shape splits it the same way:
   `withConnection` scope and then enters the single `loadSchemaBang` body.
   `SchemaReflection#loadAllBang` / `BoundSchemaReflection#loadAllBang` and
   `SchemaReflection.eagerLoadSchemaCache` warm a whole pool up front.
+- **A booted app warms before user code runs.** Rails' first-touch load
+  (`activerecord/lib/active_record/railtie.rb:162-167`) cannot happen from a
+  synchronous `new`, so trailties' `active_record.initialize_database` awaits
+  `loadAllBang` on the pool it has just established. It skips the test env,
+  where db:test:prepare may still change the schema (`railtie.rb:159-160`),
+  and a database error only warns, so the app still boots against an unhealthy
+  database (`railtie.rb:146-155,176-180`).
 - **Synchronous readers peek.** `SchemaCache#getCachedColumnsHash`,
   `#getCachedDataSourceExists`, `#getCachedPrimaryKeys`, `#setColumns` and
   `SchemaReflection#loadedCache` read or seed the memo maps and never query.
