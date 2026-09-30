@@ -100,6 +100,7 @@ export class UnusedRoutesCommand extends Base {
 
   async perform(): Promise<void> {
     await bootApplicationBang();
+    await Trails.application!.reloadRoutesUnlessLoaded();
 
     this.say((await this.inspector()).format(this.formatter(), this.routesFilter()));
 

@@ -44,6 +44,11 @@ export class LazyRouteSet extends RouteSet {
     return super.recognizePathWithRequest(req, path, extras, options);
   }
 
+  override get routes(): RouteSet["routes"] {
+    void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    return super.routes;
+  }
+
   override async call(req: RackEnv): Promise<RackResponse> {
     await TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
     return super.call(req);
