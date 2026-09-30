@@ -6,6 +6,45 @@ interface SystemCallError extends Error {
 }
 
 /**
+ * `Process::Status` (`vendor/ruby/v3.3.11/process.c:9169` `rb_cProcessStatus`), the
+ * waited-for state of a child process. trails holds the two halves of the
+ * `waitpid` status word a Node child reports: the exit code when the child
+ * exited, and nothing when a signal ended it (`WIFEXITED` false).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Process::Status`, which Rails
+ * and Thor read without defining.
+ */
+class Status {
+  readonly #exitstatus: number | null;
+
+  constructor(exitstatus: number | null) {
+    this.#exitstatus = exitstatus;
+  }
+
+  /**
+   * `Process::Status#exitstatus` (`vendor/ruby/v3.3.11/process.c:1084`
+   * `pst_wexitstatus`): the exit code, or `nil` when the child did not exit.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Process::Status#exitstatus`.
+   */
+  get exitstatus(): number | null {
+    return this.#exitstatus;
+  }
+
+  /**
+   * `Process::Status#success?` (`vendor/ruby/v3.3.11/process.c:1107`
+   * `pst_success_p`): `nil` when the child did not exit, else whether it
+   * exited with `EXIT_SUCCESS`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Process::Status#success?`.
+   */
+  isSuccess(): boolean | null {
+    if (this.#exitstatus === null) return null;
+    return this.#exitstatus === 0;
+  }
+}
+
+/**
  * `Process` (`vendor/ruby/v3.3.11/process.c:9129` `rb_mProcess`), the sliver of it
  * trails calls.
  *
@@ -23,6 +62,15 @@ interface SystemCallError extends Error {
  * Rails or gem file declares the module this file's export lives in.
  */
 export class Process {
+  /**
+   * `vendor/ruby/v3.3.11/process.c:9169` — `Process::Status`, what `Open3.capture2e`
+   * answers beside the output.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Process::Status`
+   * (`vendor/ruby/v3.3.11/process.c:9169`).
+   */
+  static readonly Status = Status;
+
   /**
    * `vendor/ruby/v3.3.11/process.c:9404` — the clock that cannot go backwards, which is
    * every Rails elapsed-time measurement's clock id.

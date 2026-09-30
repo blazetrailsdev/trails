@@ -39,10 +39,29 @@ class ENOTTY extends SystemCallError {
 }
 
 /**
+ * `Errno::ENOENT`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`)
+ * as `Errno::ENOTTY` is above, and raised by `Open3.capture2e` when its `spawn`
+ * cannot find the program.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ENOENT`, which Rails
+ * rescues without defining.
+ */
+class ENOENT extends SystemCallError {
+  static readonly Errno = 2;
+  readonly code = "ENOENT";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "No such file or directory" : `No such file or directory - ${mesg}`);
+    this.name = "Errno::ENOENT";
+    this.errno = ENOENT.Errno;
+  }
+}
+
+/**
  * Ruby's core `Errno` module (`vendor/ruby/v3.3.11/error.c:2666-2694`), holding the
  * `SystemCallError` subclass for each errno a raise site in ruby-compat names.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Errno`, which Rails rescues
  * without defining.
  */
-export const Errno = { ENOTTY };
+export const Errno = { ENOENT, ENOTTY };

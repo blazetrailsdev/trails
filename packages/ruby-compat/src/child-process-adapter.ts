@@ -18,8 +18,25 @@ export interface SpawnSyncResult {
   error?: Error;
 }
 
+export interface SpawnOptions {
+  env: Record<string, string | undefined>;
+}
+
+export interface SpawnResult {
+  pid: number | null;
+  status: number | null;
+  signal: string | null;
+  error?: Error & { code?: string };
+}
+
+export interface Capture2eResult extends SpawnResult {
+  output: string;
+}
+
 export interface ChildProcessAdapter {
   spawnSync(cmd: string, args: string[], options?: SpawnSyncOptions): SpawnSyncResult;
+  system?(cmd: string, args: string[], options: SpawnOptions): Promise<SpawnResult>;
+  capture2e?(cmd: string, args: string[], options: SpawnOptions): Promise<Capture2eResult>;
 }
 
 const registry = new Map<string, ChildProcessAdapter>();
@@ -66,9 +83,62 @@ type NodeSpawnSyncResult = {
   error?: Error;
 };
 
+type NodeReadable = {
+  setEncoding(encoding: "utf8"): void;
+  on(event: "data", listener: (chunk: string) => void): void;
+};
+
+type NodeSpawned = {
+  pid?: number;
+  stdin: { end(): void } | null;
+  stdout: NodeReadable | null;
+  stderr: NodeReadable | null;
+  once(event: "error", listener: (error: Error & { code?: string }) => void): void;
+  once(event: "close", listener: (code: number | null, signal: string | null) => void): void;
+};
+
 type NodeChildProcess = {
   spawnSync: (cmd: string, args: string[], opts?: unknown) => NodeSpawnSyncResult;
+  spawn: (cmd: string, args: string[], opts?: unknown) => NodeSpawned;
 };
+
+function spawnAsync(
+  cp: NodeChildProcess,
+  cmd: string,
+  args: string[],
+  options: SpawnOptions,
+  capture: boolean,
+): Promise<Capture2eResult> {
+  return new Promise((resolvePromise) => {
+    const chunks: string[] = [];
+    let child: NodeSpawned;
+    try {
+      child = cp.spawn(cmd, args, {
+        env: options.env,
+        stdio: capture ? ["pipe", "pipe", "pipe"] : "inherit",
+      });
+    } catch (error) {
+      resolvePromise({ pid: null, status: null, signal: null, error: error as Error, output: "" });
+      return;
+    }
+    for (const stream of [child.stdout, child.stderr]) {
+      stream?.setEncoding("utf8");
+      stream?.on("data", (chunk) => chunks.push(chunk));
+    }
+    child.stdin?.end();
+    child.once("error", (error) => {
+      resolvePromise({ pid: null, status: null, signal: null, error, output: chunks.join("") });
+    });
+    child.once("close", (code, signal) => {
+      resolvePromise({
+        pid: child.pid ?? null,
+        status: code,
+        signal,
+        output: chunks.join(""),
+      });
+    });
+  });
+}
 
 function wrap(cp: NodeChildProcess): ChildProcessAdapter {
   return {
@@ -97,6 +167,12 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
         stderr: typeof result.stderr === "string" ? result.stderr : String(result.stderr ?? ""),
         error: result.error,
       };
+    },
+    system(cmd, args, options) {
+      return spawnAsync(cp, cmd, args, options, false);
+    },
+    capture2e(cmd, args, options) {
+      return spawnAsync(cp, cmd, args, options, true);
     },
   };
 }
