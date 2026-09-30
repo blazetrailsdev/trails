@@ -72,18 +72,6 @@ export function stringValue(val: unknown): string {
 }
 
 /**
- * `StringValueCStr` (`vendor/ruby/v3.3.11/string.c:2667` `rb_string_value_cstr`): a
- * String, or its `to_str`, that holds no NUL byte.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function stringValueCStr(val: unknown): string {
-  const str = stringValue(val);
-  if (str.includes("\0")) throw new ArgumentError("string contains null byte");
-  return str;
-}
-
-/**
  * `rb_check_string_type` (`vendor/ruby/v3.3.11/string.c:2690`): a String, its `to_str`, or nil.
  *
  * @noRailsEquivalent PERMANENT

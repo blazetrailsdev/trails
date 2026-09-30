@@ -1,5 +1,6 @@
 import { statusCode, type StatusSymbol } from "@blazetrails/rack";
 import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.js";
+import type { UrlOptions } from "../../action-dispatch/http/url.js";
 import { DoubleRenderError } from "../../abstract-controller/rendering.js";
 import { ActionControllerError } from "./exceptions.js";
 import { include, included } from "@blazetrails/activesupport";
@@ -22,7 +23,11 @@ export class UnsafeRedirectError extends Error {
 const ILLEGAL_HEADER_VALUE_REGEX = /[\x00-\x08\x0A-\x1F]/;
 const SCHEME_OR_PROTOCOL_RELATIVE_RE = /^([a-z][a-z\d\-+.]*:|\/\/).*/i;
 
-export type RedirectToOptions = string | ToModel | Record<string, unknown> | (() => string);
+export type RedirectToOptions =
+  | string
+  | ToModel
+  | (UrlOptions & Record<string, unknown>)
+  | (() => string);
 
 export interface RedirectToResponseOptions {
   status?: StatusSymbol | `:${StatusSymbol}` | number;

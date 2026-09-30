@@ -27,6 +27,9 @@ describe("Redirecting#redirect_to types", () => {
         status: "see_other",
       });
       controller.redirectTo({ action: "index", status: 303 });
+      controller.redirectTo({ action: "show", id: 5, onlyPath: true, anchor: "comments" });
+      // @ts-expect-error a url_for option of the wrong type
+      controller.redirectTo({ action: "index", onlyPath: "yes" });
       controller.redirectTo(() => "/posts", { alert: "Watch it, mister!", status: ":found" });
       controller.redirectTo("/posts", { status: 301, flash: { updatedPostId: 1 } });
       controller.redirectTo("/posts", { status: "unprocessable_entity" });
