@@ -82,8 +82,7 @@ describe("RoutesReloader", () => {
       File.write(`${tmp}/app-routes.ts`, drawInto("Trails.application", "/posts"));
       File.write(
         `${tmp}/engine-routes.ts`,
-        `import { BlogEngine } from "./blog-engine.ts";\n` +
-          drawInto("BlogEngine.instance()", "/blog"),
+        `import { BlogEngine } from "./blog-engine.ts";\n` + drawInto("BlogEngine", "/blog"),
       );
       const { BlogEngine } = (await import(`${tmp}/blog-engine.ts`)) as {
         BlogEngine: { instance(): { routes(): RouteSetLike & { routes: { length: number } } } };
