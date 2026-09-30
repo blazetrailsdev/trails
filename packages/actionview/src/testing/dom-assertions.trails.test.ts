@@ -23,6 +23,7 @@ describe("DomAssertions", () => {
 
   it("ignores blank text and whitespace runs unless strict", () => {
     assertDomEqual("<div>\nfoo\n</div>", "<div>foo</div>");
+    assertDomEqual("<p>  a</p>", "<p>a</p>");
     assertDomEqual("<ul> <li>a  b</li> </ul>", "<ul><li>a b</li></ul>");
     assertDomNotEqual("<div>\nfoo\n</div>", "<div>foo</div>", null, { strict: true });
   });
