@@ -145,6 +145,7 @@ export {
   extend,
   extended,
   rbObjClone,
+  rbObjDup,
   include,
   included,
   initialize,

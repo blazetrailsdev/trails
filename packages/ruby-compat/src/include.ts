@@ -921,25 +921,85 @@ export type Extended<M extends object> = CallableMethods<M>;
 /**
  * Mirrors: Ruby's Object#clone — vendor/ruby/v3.3.11/object.c:536 `rb_obj_clone`, via
  * `rb_obj_clone_setup` (:457-527): a new object of the same class carrying a
- * copy of the receiver's singleton class and instance variables, frozen when
- * the receiver is. The singleton class is copied, not shared, so the clone's
- * `extend()` registries are its own.
+ * copy of the receiver's singleton class and instance variables (`init_copy`),
+ * then `initialize_clone(orig)` dispatched on the copy, which is frozen after
+ * that hook runs when the receiver is. The singleton class is copied, not
+ * shared, so the clone's `extend()` registries are its own.
+ *
+ * Ruby's `Object#initialize_clone` / `#initialize_dup` default to
+ * `initialize_copy` (`rb_obj_init_clone` / `rb_obj_init_dup_clone`, object.c:4382-4383), so a
+ * receiver that defines only `initializeCopy` gets it here. This and
+ * {@link rbObjDup} are the one spelling of Ruby `obj.clone` / `obj.dup`; a
+ * class ports `initialize_clone` / `initialize_dup` / `initialize_copy` at
+ * their Rails names and never open-codes the copy.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
  * uses but does not define.
  */
 export function rbObjClone<T extends object>(obj: T): T {
-  const descriptors = Object.getOwnPropertyDescriptors(obj) as Record<
-    string | symbol,
-    PropertyDescriptor
-  >;
+  const frozen = Object.isFrozen(obj);
+  const descriptors = copiedDescriptors(obj, frozen);
   for (const registry of [extendedKeys, includedModulesKey]) {
     const table = descriptors[registry];
     if (table) descriptors[registry] = { ...table, value: new Set(table.value as Set<unknown>) };
   }
   const clone = Object.create(Object.getPrototypeOf(obj) as object | null, descriptors) as T;
-  if (Object.isFrozen(obj)) Object.freeze(clone);
+  initCopyHook(clone, "initializeClone", obj);
+  if (frozen) Object.freeze(clone);
   return clone;
+}
+
+/**
+ * Mirrors: Ruby's Object#dup — vendor/ruby/v3.3.11/object.c:591 `rb_obj_dup`, via
+ * `rb_obj_dup_setup` (:543-549): a new object of `rb_obj_class(obj)` — the
+ * singleton class and the modules it was `extend`ed with are not carried —
+ * holding a copy of the instance variables, then `initialize_dup(orig)`
+ * dispatched on the copy. The frozen state is not carried either.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
+ * uses but does not define.
+ */
+export function rbObjDup<T extends object>(obj: T): T {
+  const descriptors = copiedDescriptors(obj, true);
+  const singletonKeys = Object.prototype.hasOwnProperty.call(obj, extendedKeys)
+    ? ((obj as Record<symbol, unknown>)[extendedKeys] as Set<string>)
+    : undefined;
+  for (const key of [extendedKeys, includedModulesKey, ...(singletonKeys ?? [])]) {
+    delete descriptors[key];
+  }
+  let proto = Object.getPrototypeOf(obj) as object | null;
+  if (proto !== null && Object.prototype.hasOwnProperty.call(proto, FL_SINGLETON)) {
+    proto = Object.getPrototypeOf(proto) as object | null;
+  }
+  const dup = Object.create(proto, descriptors) as T;
+  initCopyHook(dup, "initializeDup", obj);
+  return dup;
+}
+
+const FL_SINGLETON = Symbol.for("@blazetrails/ruby-compat:FL_SINGLETON");
+
+function copiedDescriptors(
+  obj: object,
+  unfreeze: boolean,
+): Record<string | symbol, PropertyDescriptor> {
+  const descriptors = Object.getOwnPropertyDescriptors(obj) as Record<
+    string | symbol,
+    PropertyDescriptor
+  >;
+  if (unfreeze) {
+    for (const key of Reflect.ownKeys(descriptors)) {
+      const descriptor = descriptors[key as string];
+      descriptor.configurable = true;
+      if (!descriptor.get && !descriptor.set) descriptor.writable = true;
+    }
+  }
+  return descriptors;
+}
+
+function initCopyHook(copy: object, hook: "initializeClone" | "initializeDup", orig: object): void {
+  const host = copy as Record<string, unknown>;
+  const fn = typeof host[hook] === "function" ? host[hook] : host.initializeCopy;
+  if (typeof fn === "function") (fn as (orig: object) => unknown).call(copy, orig);
 }
 
 /**

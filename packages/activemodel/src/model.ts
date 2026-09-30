@@ -16,6 +16,7 @@ import {
   type Included,
   type Extended,
 } from "@blazetrails/activesupport";
+import { rbObjDup } from "@blazetrails/ruby-compat";
 import { humanAttributeName as translationHumanAttributeName } from "./translation.js";
 import { ModelName } from "./naming.js";
 import { defineModelCallbacks as defineModelCallbacksImpl } from "./callbacks.js";
@@ -160,16 +161,7 @@ export class Model {
   _contextForValidation?: ValidationContext;
 
   dup(): this {
-    const duped = Object.create(Object.getPrototypeOf(this) as object) as this;
-    const descriptors = Object.getOwnPropertyDescriptors(this);
-    for (const key of Reflect.ownKeys(descriptors)) {
-      const descriptor = descriptors[key as string];
-      descriptor.configurable = true;
-      if (!descriptor.get && !descriptor.set) descriptor.writable = true;
-    }
-    Object.defineProperties(duped, descriptors);
-    duped.initializeDup(this);
-    return duped;
+    return rbObjDup(this);
   }
 
   declare runCallbacks: Included<typeof ASCallbacks.InstanceMethods>["runCallbacks"];
