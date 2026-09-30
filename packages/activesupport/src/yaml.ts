@@ -42,13 +42,8 @@ export class Coder {
   }
 }
 
-const rubyNamespace: unique symbol = Symbol.for("@blazetrails:rubyNamespace");
-
-function className(klass: { name?: string; [rubyNamespace]?: string }): string | undefined {
-  const registered = registeredConstantName(klass);
-  if (registered !== undefined) return registered;
-  const nesting = klass[rubyNamespace];
-  return typeof nesting === "string" ? `${nesting}::${klass.name}` : klass.name;
+function className(klass: { name?: string }): string | undefined {
+  return registeredConstantName(klass) ?? klass.name;
 }
 
 const TIME =

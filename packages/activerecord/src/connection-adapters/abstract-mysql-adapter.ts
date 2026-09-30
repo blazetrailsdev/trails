@@ -95,6 +95,7 @@ import {
 } from "@blazetrails/activesupport";
 import type { Column as MysqlColumn } from "./mysql/column.js";
 import { TypeMap } from "../type/type-map.js";
+import { dumpTags } from "@blazetrails/activesupport/yaml";
 import {
   IntegerType,
   BigIntegerType,
@@ -118,6 +119,8 @@ class MysqlBigInteger extends BigIntegerType {
     return this.ensureInRange(this.cast(value));
   }
 }
+
+dumpTags.set(MysqlBigInteger, "!ruby/object:ActiveModel::Type::Integer");
 import { UnsignedInteger } from "../type/unsigned-integer.js";
 import { Text as TextType } from "../type/text.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";

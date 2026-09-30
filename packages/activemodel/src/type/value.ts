@@ -3,18 +3,23 @@ import { rbInspect as inspect, rbEqual } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "../attribute-assignment.js";
 
 export interface ValueType<T = unknown> {
-  readonly precision?: number;
-  readonly scale?: number;
-  readonly limit?: number;
+  readonly precision: number | null;
+  readonly scale: number | null;
+  readonly limit: number | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ValueType<T = unknown> {
-  constructor(options?: { precision?: number; scale?: number; limit?: number }) {
-    const self = this as { -readonly [K in "precision" | "scale" | "limit"]?: number };
-    if (options?.precision !== undefined) self.precision = options.precision;
-    if (options?.scale !== undefined) self.scale = options.scale;
-    if (options?.limit !== undefined) self.limit = options.limit;
+  constructor(options?: {
+    precision?: number | null;
+    scale?: number | null;
+    limit?: number | null;
+  }) {
+    const self = this as { -readonly [K in "precision" | "scale" | "limit"]: number | null };
+    const proto = Object.getPrototypeOf(this) as object;
+    if (!("precision" in proto)) self.precision = options?.precision ?? null;
+    if (!("scale" in proto)) self.scale = options?.scale ?? null;
+    if (!("limit" in proto)) self.limit = options?.limit ?? null;
   }
 
   isSerializable(value: unknown, _block?: (castValue: unknown) => void): boolean {

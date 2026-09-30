@@ -2,9 +2,9 @@ import { BigDecimal, Duration, registerConstant } from "@blazetrails/activesuppo
 import { ValueType } from "./value.js";
 
 export interface ImmutableStringTypeOptions {
-  precision?: number;
-  scale?: number;
-  limit?: number;
+  precision?: number | null;
+  scale?: number | null;
+  limit?: number | null;
   true?: string;
   false?: string;
 }

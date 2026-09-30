@@ -61,7 +61,7 @@ export class YAMLColumn extends ColumnSerializer {
   }
 
   override initWith(coder: Record<string, unknown>): void {
-    if (!coder["coder"]) {
+    if (coder["coder"] == null || coder["coder"] === false) {
       const permittedClasses = (coder["permitted_classes"] as unknown[] | undefined) ?? [];
       const unsafeLoad = (coder["unsafe_load"] as boolean | undefined) ?? false;
       coder["coder"] = new SafeCoder(permittedClasses, unsafeLoad);

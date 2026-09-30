@@ -112,9 +112,9 @@ export class PgTextDecoderArray {
 
 export interface ArraySubtype {
   readonly type?: string | (() => string | undefined);
-  readonly limit?: number;
-  readonly precision?: number;
-  readonly scale?: number;
+  readonly limit?: number | null;
+  readonly precision?: number | null;
+  readonly scale?: number | null;
   cast(value: unknown): unknown;
   serialize(value: unknown): unknown;
   deserialize?(value: unknown): unknown;
@@ -144,16 +144,16 @@ export class Array extends ValueType<unknown> {
     });
   }
 
-  override get limit(): number | undefined {
-    return this.subtype.limit;
+  override get limit(): number | null {
+    return this.subtype.limit ?? null;
   }
 
-  override get precision(): number | undefined {
-    return this.subtype.precision;
+  override get precision(): number | null {
+    return this.subtype.precision ?? null;
   }
 
-  override get scale(): number | undefined {
-    return this.subtype.scale;
+  override get scale(): number | null {
+    return this.subtype.scale ?? null;
   }
 
   userInputInTimeZone(value: unknown): unknown {
