@@ -417,6 +417,7 @@ export default defineConfig({
     root: fileURLToPath(new URL(".", import.meta.url)),
     include: ["test/**/*.test.ts"],
     exclude: ["test/{system,dummy,fixtures}/**/*.test.ts"],
+    globalSetup: ["test/global-setup.ts"],
   },
   publicDir: false,
   build: {
@@ -1170,6 +1171,20 @@ await import("@blazetrails/trailties/test-help");
 (TestCase as typeof TestCase & { fixtures(...names: string[]): void }).fixtures(":all");
 
 // Add more helper methods to be used by all tests here...
+`,
+    );
+
+    this.createFile(
+      "test/global-setup.ts",
+      `import { env, setEnv } from "@blazetrails/ruby-compat";
+
+// Maintain the test schema once, before vitest starts its workers, as
+// \`rails test\` loads test_help before \`parallelize\` forks.
+export async function setup(): Promise<void> {
+  if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
+  await import("../config/environment.js");
+  await import("@blazetrails/trailties/testing/maintain-test-schema");
+}
 `,
     );
 

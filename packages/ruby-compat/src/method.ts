@@ -1,4 +1,5 @@
 import { NameError } from "./name-error.js";
+import { rbErrorArity } from "./string/support.js";
 import { rbObjClass } from "./object.js";
 
 /**
@@ -54,43 +55,12 @@ export class Method {
   /**
    * `Method#arity` (`vendor/ruby/v3.3.11/proc.c:2872` `method_arity`, over
    * `method_def_arity` at `:2808`): the required count when it is also the
-   * maximum, else `-min-1`. JS `Function#length` stops counting at the first
-   * default, so `(gid)` and `(gid, options = {})` both report 1; the parameter
-   * list is read from the function's source instead.
+   * maximum, else `-min-1`.
    *
    * @noRailsEquivalent PERMANENT
    */
   arity(): number {
-    const src = Function.prototype.toString.call(this.#func);
-    const open = src.indexOf("(");
-    const arrow = src.indexOf("=>");
-    if (arrow !== -1 && (open === -1 || arrow < open)) {
-      return src
-        .slice(0, arrow)
-        .replace(/^async\s+/, "")
-        .trim() === ""
-        ? 0
-        : 1;
-    }
-    let depth = 0;
-    let current = "";
-    const params: string[] = [];
-    for (let i = open + 1; i < src.length; i++) {
-      const ch = src[i];
-      if ("([{".includes(ch)) depth++;
-      else if (")]}".includes(ch)) {
-        if (depth === 0) break;
-        depth--;
-      } else if (ch === "," && depth === 0) {
-        params.push(current.trim());
-        current = "";
-        continue;
-      }
-      current += ch;
-    }
-    if (current.trim() !== "") params.push(current.trim());
-    const min = params.filter((p) => !p.startsWith("...") && !/^[^=]*[^=!<>]=[^=>]/.test(p)).length;
-    const max = params.some((p) => p.startsWith("...")) ? -1 : params.length;
+    const [min, max] = rbIseqMinMaxArity(this.#func);
     return min === max ? min : -min - 1;
   }
 }
@@ -122,4 +92,63 @@ export function rbObjMethod(obj: unknown, vid: string): Method {
   throw new NameError(`undefined method '${vid}' for an instance of ${rbObjClass(obj)}`, vid, {
     receiver: obj,
   });
+}
+
+/**
+ * `rb_iseq_min_max_arity` (`vendor/ruby/v3.3.11/proc.c:1069`): a body's
+ * `[min, max]` argument counts, `max` `Infinity` for `UNLIMITED_ARGUMENTS`
+ * once a rest parameter appears. JS `Function#length` stops counting at the
+ * first default, so `(gid)` and `(gid, options = {})` both report 1; the
+ * parameter list is read from the function's source instead.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbIseqMinMaxArity(func: (...args: never[]) => unknown): [number, number] {
+  const src = Function.prototype.toString.call(func);
+  const open = src.indexOf("(");
+  const arrow = src.indexOf("=>");
+  if (arrow !== -1 && (open === -1 || arrow < open)) {
+    const lead =
+      src
+        .slice(0, arrow)
+        .replace(/^async\s+/, "")
+        .trim() === ""
+        ? 0
+        : 1;
+    return [lead, lead];
+  }
+  let depth = 0;
+  let current = "";
+  const params: string[] = [];
+  for (let i = open + 1; i < src.length; i++) {
+    const ch = src[i];
+    if ("([{".includes(ch)) depth++;
+    else if (")]}".includes(ch)) {
+      if (depth === 0) break;
+      depth--;
+    } else if (ch === "," && depth === 0) {
+      params.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+  if (current.trim() !== "") params.push(current.trim());
+  const min = params.filter((p) => !p.startsWith("...") && !/^[^=]*[^=!<>]=[^=>]/.test(p)).length;
+  const max = params.some((p) => p.startsWith("...")) ? Infinity : params.length;
+  return [min, max];
+}
+
+/**
+ * `argument_arity_error` (`vendor/ruby/v3.3.11/vm_args.c:800`), raised where
+ * `setup_parameters_complex` finds `argc` outside the callee's range. JS never
+ * checks call arity (a missing argument is `undefined`, an extra one is
+ * dropped), so a caller whose Ruby body rescues that `ArgumentError` checks
+ * the body's parameter list before sending.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbCheckArity(method: (...args: never[]) => unknown, argc: number): void {
+  const [min, max] = rbIseqMinMaxArity(method);
+  if (argc < min || argc > max) rbErrorArity(argc, min, max);
 }

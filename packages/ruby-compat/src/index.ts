@@ -200,7 +200,7 @@ export {
 } from "./process-adapter.js";
 export type { ProcessAdapter, ReadStream, SignalName, WriteStream } from "./process-adapter.js";
 export type { PrependMethod, PrependModule } from "./prepend.js";
-export { Method, rbObjMethod } from "./method.js";
+export { Method, rbCheckArity, rbObjMethod } from "./method.js";
 export { regexpEscape } from "./regexp.js";
 export { Range } from "./range.js";
 export { Rational, ZeroDivisionError, rational } from "./rational.js";
