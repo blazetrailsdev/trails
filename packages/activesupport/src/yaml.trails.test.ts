@@ -81,6 +81,17 @@ describe("Psych object protocol", () => {
     expect((loaded as Time).toS()).toBe(time.toS());
   });
 
+  it("dumps a Temporal.Instant as a UTC Time and loads it back as UTC", () => {
+    const loaded = unsafeLoad(dump(Temporal.Instant.from("2003-07-16T14:28:11Z"))) as Time;
+    expect(loaded).toBeInstanceOf(Time);
+    expect(loaded.isUtc()).toBe(true);
+  });
+
+  it("keeps Strings that look like other scalars Strings", () => {
+    const strings = ["123", "true", "null", "1.5", "2004-04-15", ":sym", "a\nb"];
+    expect(unsafeLoad(dump(strings))).toEqual(strings);
+  });
+
   it("dumps a Temporal.ZonedDateTime with its offset", () => {
     const zoned = Temporal.ZonedDateTime.from("2003-07-16T14:28:11-07:00[America/Los_Angeles]");
     expect(dump(zoned)).toContain("2003-07-16 14:28:11.000000000 -07:00");

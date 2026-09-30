@@ -51,6 +51,21 @@ function className(klass: { name?: string; [rubyNamespace]?: string }): string |
   return typeof nesting === "string" ? `${nesting}::${klass.name}` : klass.name;
 }
 
+const TIME =
+  /^-?\d{4}-\d{1,2}-\d{1,2}(?:[Tt]|\s+)\d{1,2}:\d\d:\d\d(?:\.\d*)?(?:\s*(?:Z|[-+]\d{1,2}:?(?:\d\d)?))?$/;
+const DATE = /^\d{4}-(?:1[012]|0\d|\d)-(?:[12]\d|3[01]|0\d|\d)$/;
+
+function tokenize(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  try {
+    if (TIME.test(value)) return Time.parse(value);
+    if (DATE.test(value)) return RubyDate.strptime(value, "%F", RubyDate.GREGORIAN);
+  } catch (error) {
+    if (!(error instanceof ArgumentError)) throw error;
+  }
+  return value;
+}
+
 class YAMLTree {
   private readonly st = new Map<object, Node>();
   private readonly doc = new yaml.Document();
@@ -66,6 +81,7 @@ class YAMLTree {
     if (rbObjRespondTo(target, "encodeWith")) {
       return this.dumpCoder(target as { encodeWith(coder: Coder): void });
     }
+    if (typeof target === "string") return this.visitString(target);
     if (typeof target === "function") return this.visitClass(target);
     if (target instanceof DateTime) return this.visitDateTime(target);
     if (target instanceof RubyDate) return this.visitDate(target);
@@ -110,6 +126,12 @@ class YAMLTree {
     scalar.tag = "!ruby/class";
     scalar.type = yaml.Scalar.QUOTE_SINGLE;
     return this.register(o, scalar);
+  }
+
+  private visitString(o: string): Node {
+    const scalar = this.doc.createNode(o) as Scalar;
+    if (typeof tokenize(o) !== "string") scalar.type = yaml.Scalar.QUOTE_SINGLE;
+    return scalar;
   }
 
   private visitRegexp(o: RegExp): Node {
@@ -237,10 +259,6 @@ const CACHE: Record<string, unknown> = {
   Regexp: RegExp,
 };
 
-const TIME =
-  /^-?\d{4}-\d{1,2}-\d{1,2}(?:[Tt]|\s+)\d{1,2}:\d\d:\d\d(?:\.\d*)?(?:\s*(?:Z|[-+]\d{1,2}:?(?:\d\d)?))?$/;
-const DATE = /^\d{4}-(?:1[012]|0\d|\d)-(?:[12]\d|3[01]|0\d|\d)$/;
-
 class ToRuby {
   private readonly st = new Map<string, unknown>();
 
@@ -255,7 +273,7 @@ class ToRuby {
   private deserialize(o: Scalar): unknown {
     if (!o.tag) {
       const quoted = o.type === yaml.Scalar.QUOTE_SINGLE || o.type === yaml.Scalar.QUOTE_DOUBLE;
-      return quoted ? o.value : this.tokenize(o.value);
+      return quoted ? o.value : tokenize(o.value);
     }
 
     const value = String(o.value);
@@ -277,19 +295,8 @@ class ToRuby {
       }
       default:
         if (/^!ruby\/sym(bol)?:?(.*)?$/.test(o.tag)) return `:${value}`;
-        return this.tokenize(o.value);
+        return tokenize(o.value);
     }
-  }
-
-  private tokenize(value: unknown): unknown {
-    if (typeof value !== "string") return value;
-    try {
-      if (TIME.test(value)) return Time.parse(value);
-      if (DATE.test(value)) return RubyDate.strptime(value, "%F", RubyDate.GREGORIAN);
-    } catch (error) {
-      if (!(error instanceof ArgumentError)) throw error;
-    }
-    return value;
   }
 
   private visitMapping(o: YAMLMap): unknown {
