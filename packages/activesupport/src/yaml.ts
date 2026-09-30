@@ -1,5 +1,6 @@
 import {
   ArgumentError,
+  Hash,
   LoadError,
   Range,
   TypeError,
@@ -170,12 +171,16 @@ class YAMLTree {
   }
 
   private visitHash(o: Map<unknown, unknown> | object): Node {
-    const map = new yaml.YAMLMap();
-    this.register(o, map);
-    for (const [k, v] of o instanceof Map ? o : Object.entries(o)) {
-      map.add(new yaml.Pair(this.accept(k), this.accept(v)));
+    if (!(o instanceof Map) || o.constructor === Map || o.constructor === Hash) {
+      const map = new yaml.YAMLMap();
+      this.register(o, map);
+      for (const [k, v] of o instanceof Map ? o : Object.entries(o)) {
+        map.add(new yaml.Pair(this.accept(k), this.accept(v)));
+      }
+      return map;
+    } else {
+      return this.visitHashSubclass(o);
     }
-    return map;
   }
 
   private visitArray(o: unknown[]): Node {
@@ -183,6 +188,37 @@ class YAMLTree {
     this.register(o, seq);
     for (const thing of o) seq.items.push(this.accept(thing));
     return seq;
+  }
+
+  private visitHashSubclass(o: Map<unknown, unknown>): Node {
+    const ivars = Object.entries(o);
+    if (ivars.length > 0) {
+      const node = new yaml.YAMLMap();
+      node.tag = `!ruby/hash-with-ivars:${className(o.constructor)}`;
+      this.register(o, node);
+
+      const ivarsKey = this.accept("ivars");
+      const ivarsMap = new yaml.YAMLMap();
+      for (const [ivar, value] of Object.entries(o)) {
+        ivarsMap.add(
+          new yaml.Pair(this.accept(`:@${underscore(ivar.replace(/^_/, ""))}`), this.accept(value)),
+        );
+      }
+      node.add(new yaml.Pair(ivarsKey, ivarsMap));
+
+      const elementsKey = this.accept("elements");
+      const elements = new yaml.YAMLMap();
+      for (const [k, v] of o) elements.add(new yaml.Pair(this.accept(k), this.accept(v)));
+      node.add(new yaml.Pair(elementsKey, elements));
+
+      return node;
+    } else {
+      const node = new yaml.YAMLMap();
+      node.tag = `!ruby/hash:${className(o.constructor)}`;
+      this.register(o, node);
+      for (const [k, v] of o) node.add(new yaml.Pair(this.accept(k), this.accept(v)));
+      return node;
+    }
   }
 
   private formatTime(

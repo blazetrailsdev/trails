@@ -461,10 +461,10 @@ type MapBoundaryReturn = any;
  * @noRailsEquivalent PERMANENT — Ruby core `Hash` (`vendor/ruby/v3.3.11/hash.c:7182`).
  */
 export class Hash<K, V> extends Map<K, V> {
-  private _default?: V;
-  private _defaultProc?: DefaultProc<K, V>;
-  private _frozen = false;
-  private _eqlKeys = new Map<number, K[]>();
+  #default?: V;
+  #defaultProc?: DefaultProc<K, V>;
+  #frozen = false;
+  #eqlKeys = new Map<number, K[]>();
 
   /**
    * `Hash.new` (`vendor/ruby/v3.3.11/hash.c:1782` `rb_hash_initialize`): a block is
@@ -499,7 +499,7 @@ export class Hash<K, V> extends Map<K, V> {
    * @noRailsEquivalent PERMANENT — Ruby core `Object#freeze` (`vendor/ruby/v3.3.11/object.c:1284`).
    */
   freeze(): this {
-    this._frozen = true;
+    this.#frozen = true;
     return this;
   }
 
@@ -510,7 +510,7 @@ export class Hash<K, V> extends Map<K, V> {
    * @noRailsEquivalent PERMANENT — Ruby core `Object#frozen?` (`vendor/ruby/v3.3.11/object.c:1301`).
    */
   isFrozen(): boolean {
-    return this._frozen;
+    return this.#frozen;
   }
 
   /**
@@ -519,7 +519,7 @@ export class Hash<K, V> extends Map<K, V> {
    * class and `inspect`.
    */
   private modifyCheck(): void {
-    if (this._frozen) {
+    if (this.#frozen) {
       throw new FrozenError(`can't modify frozen ${this.constructor.name}: ${inspect(this)}`, {
         receiver: this,
       });
@@ -537,9 +537,9 @@ export class Hash<K, V> extends Map<K, V> {
     const stored = this.hashStlikeLookup(key);
     if (stored === key && isObjectKey(key) && !super.has(key)) {
       const h = rbHash(key);
-      const bucket = this._eqlKeys.get(h);
+      const bucket = this.#eqlKeys.get(h);
       if (bucket) bucket.push(key);
-      else this._eqlKeys.set(h, [key]);
+      else this.#eqlKeys.set(h, [key]);
     }
     return super.set(stored, value);
   }
@@ -563,7 +563,7 @@ export class Hash<K, V> extends Map<K, V> {
    */
   private hashStlikeLookup(key: K): K {
     if (!isObjectKey(key)) return key;
-    return this._eqlKeys.get(rbHash(key))?.find((stored) => rbEql(stored, key)) ?? key;
+    return this.#eqlKeys.get(rbHash(key))?.find((stored) => rbEql(stored, key)) ?? key;
   }
 
   /**
@@ -574,7 +574,7 @@ export class Hash<K, V> extends Map<K, V> {
    */
   override clear(): void {
     this.modifyCheck();
-    this._eqlKeys.clear();
+    this.#eqlKeys.clear();
     super.clear();
   }
 
@@ -592,11 +592,11 @@ export class Hash<K, V> extends Map<K, V> {
    * @noRailsEquivalent PERMANENT — Ruby core `Hash#default` (`vendor/ruby/v3.3.11/hash.c:2238`).
    */
   default(...key: [] | [K]): V | undefined {
-    if (this._defaultProc) {
+    if (this.#defaultProc) {
       if (key.length === 0) return undefined;
-      return this._defaultProc(this, key[0]);
+      return this.#defaultProc(this, key[0]);
     }
-    return this._default;
+    return this.#default;
   }
 
   /**
@@ -622,8 +622,8 @@ export class Hash<K, V> extends Map<K, V> {
    */
   setDefault(value: V | undefined): void {
     this.modifyCheck();
-    this._default = value;
-    this._defaultProc = undefined;
+    this.#default = value;
+    this.#defaultProc = undefined;
   }
 
   /**
@@ -633,7 +633,7 @@ export class Hash<K, V> extends Map<K, V> {
    * @noRailsEquivalent PERMANENT — Ruby core `Hash#default_proc` (`vendor/ruby/v3.3.11/hash.c:2285`).
    */
   defaultProc(): DefaultProc<K, V> | undefined {
-    return this._defaultProc;
+    return this.#defaultProc;
   }
 
   /**
@@ -654,8 +654,8 @@ export class Hash<K, V> extends Map<K, V> {
         `wrong default_proc type ${(proc as object).constructor.name} (expected Proc)`,
       );
     }
-    this._default = undefined;
-    this._defaultProc = proc;
+    this.#default = undefined;
+    this.#defaultProc = proc;
   }
 
   /**
@@ -675,9 +675,9 @@ export class Hash<K, V> extends Map<K, V> {
       super.delete(stored);
       if (isObjectKey(stored)) {
         const h = rbHash(stored);
-        const bucket = this._eqlKeys.get(h)!;
+        const bucket = this.#eqlKeys.get(h)!;
         bucket.splice(bucket.indexOf(stored), 1);
-        if (bucket.length === 0) this._eqlKeys.delete(h);
+        if (bucket.length === 0) this.#eqlKeys.delete(h);
       }
       return val;
     }
