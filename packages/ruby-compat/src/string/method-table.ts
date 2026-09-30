@@ -260,7 +260,7 @@ export function stringSuperclass<M extends keyof StringInstance>(
   };
   for (const method of methods) {
     mod[method] = function (this: object, ...args: unknown[]): unknown {
-      return (STRING_METHOD_TABLE[method] as Method)({ string: String(this) }, ...args);
+      return rbStrSend(String(this), method, ...args)[0];
     };
   }
   return mod as unknown as Pick<StringInstance, M>;
@@ -326,8 +326,10 @@ export function rbStrMatch(x: string, y: unknown): unknown {
 /**
  * `rb_define_method` (`vendor/ruby/v3.3.11/class.c:2134`) with a fixed `argc`, which MRI
  * checks.
+ *
+ * @noRailsEquivalent PERMANENT
  */
-function rbDefineMethod<A extends unknown[]>(
+export function rbDefineMethod<A extends unknown[]>(
   argc: number,
   func: (self: StringReceiver, ...args: A) => unknown,
 ): Method {

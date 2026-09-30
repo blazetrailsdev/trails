@@ -233,6 +233,7 @@ export { rbStrDump } from "./string/convert.js";
 export { stringDelete } from "./string/delete.js";
 export { sliceBang } from "./string/slice.js";
 export {
+  rbDefineMethod,
   rbStrMatch,
   rbStrRespondTo,
   rbStrSend,

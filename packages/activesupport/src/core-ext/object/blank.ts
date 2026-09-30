@@ -1,5 +1,5 @@
 import { Temporal } from "@blazetrails/date";
-import { STRING_METHOD_TABLE } from "@blazetrails/ruby-compat";
+import { STRING_METHOD_TABLE, rbDefineMethod } from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../../time-with-zone.js";
 
 const BLANK_RE = /^\s*$/;
@@ -76,7 +76,7 @@ declare module "@blazetrails/ruby-compat" {
   }
 }
 
-STRING_METHOD_TABLE.isBlank = (self) => String.isBlank(self.string);
+STRING_METHOD_TABLE.isBlank = rbDefineMethod(0, (self) => String.isBlank(self.string));
 
 export class Time {
   static isBlank(_value: TimeValue): false {

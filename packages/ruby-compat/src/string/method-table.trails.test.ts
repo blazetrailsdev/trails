@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Encoding } from "../encoding.js";
 import { MatchData } from "../match-data.js";
+import { NoMethodError } from "../no-method-error.js";
 import { Range } from "../range.js";
 import { TypeError } from "../type-error.js";
 import { bytes } from "./bytes.js";
@@ -1071,6 +1072,13 @@ describe("stringSuperclass", () => {
     expect(literal("a").eql(new Literal("b"))).toBe(false);
     expect(literal("a").eql({ toString: () => "a" })).toBe(false);
     expect(rbStrSend("a", "eql", new Literal("a"))[0]).toBe(true);
+  });
+
+  it("raises NoMethodError for a String method nothing defined", () => {
+    const mod = stringSuperclass(
+      "undefinedStringMethod" as keyof StringInstance,
+    ) as unknown as Record<string, (this: object) => unknown>;
+    expect(() => mod.undefinedStringMethod.call(literal("a"))).toThrow(NoMethodError);
   });
 
   it("hashes as its String contents", () => {

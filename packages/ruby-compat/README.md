@@ -40,6 +40,7 @@ Every export, with the call site that justifies it (rule 1).
 | `rbDeclareIvar`          | none: the ivar's JS field                        | `activemodel/src/{attribute-set,attribute-set/builder,type/integer}.ts`                                                                                                                                                                                                                    |
 | `Struct`                 | `struct.c:643` `rb_struct_s_def`                 | `arel/src/attributes/attribute.ts` (`Attribute < Struct.new :relation, :name`)                                                                                                                                                                                                             |
 | `stringSuperclass`       | `string.c:12119` `rb_cString`                    | `arel/src/nodes/sql-literal.ts` (`SqlLiteral < String`)                                                                                                                                                                                                                                    |
+| `rbDefineMethod`         | `class.c:2134` `rb_define_method`                | `activesupport/src/core-ext/object/blank.ts` (`String#blank?`, `blank.rb:153`)                                                                                                                                                                                                             |
 
 ## The contract
 
