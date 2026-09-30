@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { htmlSafe, isHtmlSafe } from "@blazetrails/activesupport";
+import { htmlSafe, isHtmlSafe, assertNil } from "@blazetrails/activesupport";
 import {
   numberToPhone,
   numberToCurrency,
@@ -16,7 +16,7 @@ const s = (v: unknown) => (v == null ? v : (v as { toString(): string }).toStrin
 
 describe("NumberHelperTest", () => {
   it("number to phone", () => {
-    expect(numberToPhone(null)).toBeNull();
+    assertNil(numberToPhone(null));
     expect(s(numberToPhone(5551234))).toBe("555-1234");
     expect(s(numberToPhone(8005551212, { areaCode: true, extension: 123 }))).toBe(
       "(800) 555-1212 x 123",
@@ -31,7 +31,7 @@ describe("NumberHelperTest", () => {
   });
 
   it("number to currency", () => {
-    expect(numberToCurrency(null)).toBeNull();
+    assertNil(numberToCurrency(null));
     expect(s(numberToCurrency(1234567890.5))).toBe("$1,234,567,890.50");
     expect(s(numberToCurrency(1234567891.5, { precision: 0 }))).toBe("$1,234,567,892");
     expect(s(numberToCurrency("1234567890.50", { unit: "&pound;" }))).toBe(
@@ -46,7 +46,7 @@ describe("NumberHelperTest", () => {
   });
 
   it("number to percentage", () => {
-    expect(numberToPercentage(null)).toBeNull();
+    assertNil(numberToPercentage(null));
     expect(s(numberToPercentage(100))).toBe("100.000%");
     expect(s(numberToPercentage(100, { format: "<b>%n</b> %" }))).toBe(
       "&lt;b&gt;100.000&lt;/b&gt; %",
@@ -60,25 +60,25 @@ describe("NumberHelperTest", () => {
   });
 
   it("number with delimiter", () => {
-    expect(numberWithDelimiter(null)).toBeNull();
+    assertNil(numberWithDelimiter(null));
     expect(s(numberWithDelimiter(12345678))).toBe("12,345,678");
     expect(s(numberWithDelimiter(0))).toBe("0");
   });
 
   it("number with precision", () => {
-    expect(numberWithPrecision(null)).toBeNull();
+    assertNil(numberWithPrecision(null));
     expect(s(numberWithPrecision(-111.2346))).toBe("-111.235");
     expect(s(numberWithPrecision(111, { precision: 2 }))).toBe("111.00");
   });
 
   it("number to human size", () => {
-    expect(numberToHumanSize(null)).toBeNull();
+    assertNil(numberToHumanSize(null));
     expect(s(numberToHumanSize(3.14159265))).toBe("3 Bytes");
     expect(s(numberToHumanSize(1234567, { precision: 2 }))).toBe("1.2 MB");
   });
 
   it("number to human", () => {
-    expect(numberToHuman(null)).toBeNull();
+    assertNil(numberToHuman(null));
     expect(s(numberToHuman(0))).toBe("0");
     expect(s(numberToHuman(1234))).toBe("1.23 Thousand");
   });

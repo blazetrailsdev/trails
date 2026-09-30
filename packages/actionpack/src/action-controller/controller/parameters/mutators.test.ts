@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Parameters, UnfilteredParameters } from "../../metal/strong-parameters.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 describe("ParametersMutatorsTest", () => {
   it("delete retains permitted status", () => {
@@ -180,7 +181,7 @@ describe("ParametersMutatorsTest", () => {
 
   it("compact! returns nil when no values are nil", () => {
     const params = new Parameters({ a: "1" });
-    expect(params.compactBang()).toBeNull();
+    assertNil(params.compactBang());
   });
 
   it("compact! retains permitted status", () => {

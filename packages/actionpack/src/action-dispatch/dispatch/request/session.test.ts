@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Options, Session, type SessionStore } from "../../request/session.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 function makeStore(opts: { exists?: boolean; data?: Record<string, unknown> } = {}): SessionStore {
   const exists = opts.exists ?? true;
@@ -53,7 +54,7 @@ describe("Request", () => {
 
     it("find", () => {
       const req = makeReq();
-      expect(Session.find(req)).toBeNull();
+      assertNil(Session.find(req));
 
       const s = Session.create(makeStore(), req, {});
       expect(Session.find(req)).toBe(s);
@@ -134,7 +135,7 @@ describe("Request", () => {
       s.set("one", "1");
       expect(s.fetch("one")).toBe("1");
       expect(s.fetch("two", "2")).toBe("2");
-      expect(s.fetch("two", null)).toBeNull();
+      assertNil(s.fetch("two", null));
       expect(s.fetch("three", undefined, (el: string) => el.toString())).toBe("three");
       expect(() => s.fetch("three")).toThrow();
     });
@@ -151,21 +152,21 @@ describe("Request", () => {
     it("id was for new session that does not exist", () => {
       const req = makeReq();
       const s = Session.create(makeStore({ exists: false }), req, {});
-      expect(s.idWas()).toBeNull();
+      assertNil(s.idWas());
     });
 
     it("id was for session that does not exist after writing", () => {
       const req = makeReq();
       const s = Session.create(makeStore({ exists: false }), req, {});
       s.set("one", "1");
-      expect(s.idWas()).toBeNull();
+      assertNil(s.idWas());
     });
 
     it("id was for session that does not exist after destroying", () => {
       const req = makeReq();
       const s = Session.create(makeStore({ exists: false }), req, {});
       s.destroy();
-      expect(s.idWas()).toBeNull();
+      assertNil(s.idWas());
     });
 
     it("id was for existing session", () => {

@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { File, Rational, StringIO, type Tempfile } from "@blazetrails/ruby-compat";
 import { Date, DateTime, Time } from "@blazetrails/date";
 import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
-import { BigDecimal } from "@blazetrails/activesupport";
+import { BigDecimal, assertNil } from "@blazetrails/activesupport";
 import { UploadedFile } from "../../../action-dispatch/http/upload.js";
 import { Parameters, UnfilteredParameters } from "../../metal/strong-parameters.js";
 
@@ -111,7 +111,7 @@ describe("ParametersPermitTest", () => {
     const params = new Parameters({ name: "John", age: null });
     const permitted = params.permit("name", "age");
     expect(permitted.get("name")).toBe("John");
-    expect(permitted.get("age")).toBeNull();
+    assertNil(permitted.get("age"));
   });
 
   it("key to empty array: arrays of permitted scalars pass", () => {
@@ -187,7 +187,7 @@ describe("ParametersPermitTest", () => {
 
   it("fetch doesn't raise ParameterMissing exception if there is a default that is nil", () => {
     const params = new Parameters({});
-    expect(params.fetch("missing", null)).toBeNull();
+    assertNil(params.fetch("missing", null));
   });
 
   it("KeyError in fetch block should not be covered up", () => {

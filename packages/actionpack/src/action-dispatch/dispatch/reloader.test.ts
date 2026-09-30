@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Reloader } from "../middleware/reloader.js";
 import type { ExecutorLike, ExecutorState } from "../middleware/executor.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 class StubReloader implements ExecutorLike {
   prepareHooks: Array<() => void> = [];
@@ -53,7 +54,7 @@ describe("ReloaderTest", () => {
       c = 3;
     });
 
-    expect(a ?? b ?? c).toBeNull();
+    assertNil(a ?? b ?? c);
 
     await callAndReturnBody(r);
 

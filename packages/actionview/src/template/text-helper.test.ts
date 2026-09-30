@@ -17,6 +17,7 @@ import {
 } from "../helpers/text-helper.js";
 import { raw } from "../helpers/output-safety-helper.js";
 import { Base } from "../base.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 const view = new (Base.withEmptyTemplateCache())(null, {}, null);
 const simpleFormat = _simpleFormat.bind(view);
@@ -407,7 +408,7 @@ describe("TextHelperTest", () => {
     expect(excerpt("This is a beautiful morning", "morning", { radius: 5 })).toBe(
       "...iful morning",
     );
-    expect(excerpt("This is a beautiful morning", "day")).toBeNull();
+    assertNil(excerpt("This is a beautiful morning", "day"));
   });
 
   it("excerpt with regex", () => {

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { assertRaises, assertRespondTo, OrderedOptions } from "@blazetrails/activesupport";
+import {
+  assertRaises,
+  assertRespondTo,
+  OrderedOptions,
+  assertNil,
+} from "@blazetrails/activesupport";
 import { ArgumentError, Method, rbObjMethod } from "@blazetrails/ruby-compat";
 import { Configuration } from "../configuration.js";
 
@@ -16,7 +21,7 @@ describe("CustomTest", () => {
     expect(x.paymentProcessing.retries).toBe(3);
     expect(x.superDebugger).toBe(true);
     expect(x.hyperDebugger).toBe(false);
-    expect(x.nilDebugger).toBeNull();
+    assertNil(x.nilDebugger);
     expect(x.iDoNotExist.zomg).toBeUndefined();
     assertRespondTo(x, "iDoNotExist");
     expect(rbObjMethod(x, "iDoNotExist")).toBeInstanceOf(Method);

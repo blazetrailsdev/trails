@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import type { Store, StoreOptions } from "../store.js";
+import { assertNil } from "../../testing/assertions.js";
 
 function uniqueKey(): string {
   return `key${Math.random()}`;
@@ -52,6 +53,6 @@ export function cacheIncrementDecrementBehavior(host: CacheIncrementDecrementBeh
 
     await new Promise((r) => setTimeout(r, 150));
 
-    expect(cache.read(key, { raw: true })).toBeNull();
+    assertNil(cache.read(key, { raw: true }));
   });
 }

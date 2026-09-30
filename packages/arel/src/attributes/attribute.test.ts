@@ -4,6 +4,7 @@ import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, star, Nodes, Visitors } from "../index.js";
 import { Attribute } from "./attribute.js";
 import { mustBeLike } from "../test-helpers/must-be-like.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 describe("AttributeTest", () => {
   const users = new Table("users");
@@ -402,7 +403,7 @@ describe("AttributeTest", () => {
       const relation = new Table("users");
       const count = relation.get("id").count(null);
       expect(count).toBeInstanceOf(Nodes.Count);
-      expect(count.distinct).toBeNull();
+      assertNil(count.distinct);
     });
   });
 

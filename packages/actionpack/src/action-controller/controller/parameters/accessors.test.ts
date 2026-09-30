@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Parameters } from "../../metal/strong-parameters.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 describe("ParametersAccessorsTest", () => {
   it("each returns self", () => {
@@ -429,6 +430,6 @@ describe("ParametersAccessorsTest", () => {
     const params = new Parameters({ id: "1_123", tags: "ruby,rails" });
     expect(params.extractValue("id")).toEqual(["1", "123"]);
     expect(params.extractValue("tags", ",")).toEqual(["ruby", "rails"]);
-    expect(params.extractValue("missing")).toBeNull();
+    assertNil(params.extractValue("missing"));
   });
 });

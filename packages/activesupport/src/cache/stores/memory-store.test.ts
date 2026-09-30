@@ -11,7 +11,7 @@ import type { StoreOptions } from "../store.js";
 import { Entry } from "../entry.js";
 import type { Event } from "../../notifications/instrumenter.js";
 import { Notifications } from "../../notifications.js";
-import { assert, assertNot, assertSame } from "../../testing/assertions.js";
+import { assert, assertNot, assertSame, assertNil } from "../../testing/assertions.js";
 
 function withInstrumentation(operation: string, block: () => void): Event[] {
   const eventName = `cache_${operation}.active_support`;
@@ -48,19 +48,19 @@ describe("MemoryStoreTest", () => {
     expect(cache.read("counter", { raw: true })).toEqual(1);
 
     await sleep(60);
-    expect(cache.read("counter", { raw: true })).toBeNull();
+    assertNil(cache.read("counter", { raw: true }));
 
     cache.write("counter", 1, { raw: true, expiresIn: 0.05 });
     cache.increment("counter");
     expect(cache.read("counter", { raw: true })).toEqual(2);
     await sleep(60);
-    expect(cache.read("counter", { raw: true })).toBeNull();
+    assertNil(cache.read("counter", { raw: true }));
 
     cache.write("counter", 1, { raw: true });
     cache.increment("counter", 1, { expiresIn: 0.05 });
     expect(cache.read("counter", { raw: true })).toEqual(2);
     await sleep(60);
-    expect(cache.read("counter2", { raw: true })).toBeNull();
+    assertNil(cache.read("counter2", { raw: true }));
   });
 
   it("cleanup instrumentation", () => {

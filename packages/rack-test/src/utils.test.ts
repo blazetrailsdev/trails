@@ -4,6 +4,7 @@ import { MockRequest, Multipart } from "@blazetrails/rack";
 import { Utils } from "./utils.js";
 import { MULTIPART_BOUNDARY } from "./test.js";
 import { UploadedFile } from "./uploaded-file.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 function multipartFile(name: string): string {
   return File.join(File.dirname(new URL(import.meta.url).pathname), "fixtures", name);
@@ -264,9 +265,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
   });
 
   it("returns nil if no UploadedFiles were used", () => {
-    expect(
-      Utils.buildMultipart({ people: [{ "submit-name": "Larry", files: "contents" }] }),
-    ).toBeNull();
+    assertNil(Utils.buildMultipart({ people: [{ "submit-name": "Larry", files: "contents" }] }));
   });
 
   it("allows for forcing multipart uploads even without a file", () => {

@@ -2,6 +2,7 @@ import { StringIO, Tempfile } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 
 import { UploadedFile } from "../http/upload.js";
+import { assertNil } from "@blazetrails/activesupport";
 
 describe("UploadedFileTest", () => {
   it("constructor with argument error", () => {
@@ -87,7 +88,7 @@ describe("UploadedFileTest", () => {
     const uf = new UploadedFile({ tempfile: tf });
     uf.close(true);
     expect(tf.isClosed()).toBe(true);
-    expect(tf.path()).toBeNull();
+    assertNil(tf.path());
   });
 
   it("delegates read to tempfile", () => {

@@ -2,10 +2,11 @@ import { describe, it, expect } from "vitest";
 import { enableWarnings, silenceWarnings } from "./kernel/reporting.js";
 import { suppress } from "../module-ext.js";
 import { ArgumentError, LoadError, verbose } from "@blazetrails/ruby-compat";
+import { assertNil } from "../testing/assertions.js";
 
 describe("KernelTest", () => {
   it("silence warnings", () => {
-    silenceWarnings(() => expect(verbose()).toBeNull());
+    silenceWarnings(() => assertNil(verbose()));
     expect(silenceWarnings(() => 1234)).toEqual(1234);
   });
 

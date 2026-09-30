@@ -6,6 +6,7 @@ import { FileStore } from "./cache/file-store.js";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { assertNil } from "./testing/assertions.js";
 
 describe("MemoryStoreTest", () => {
   let store: MemoryStore;
@@ -215,7 +216,7 @@ describe("NullStoreTest", () => {
   it("cleanup", () => {
     store.write("name", "value");
     store.cleanup();
-    expect(store.read("name")).toBeNull();
+    assertNil(store.read("name"));
   });
 
   it("write", () => {
@@ -224,7 +225,7 @@ describe("NullStoreTest", () => {
 
   it("read", () => {
     store.write("name", "value");
-    expect(store.read("name")).toBeNull();
+    assertNil(store.read("name"));
   });
 
   it("delete", () => {
@@ -234,40 +235,40 @@ describe("NullStoreTest", () => {
 
   it("increment", () => {
     store.write("name", 1);
-    expect(store.increment("name")).toBeNull();
+    assertNil(store.increment("name"));
   });
 
   it("increment with options", () => {
     expect(store.increment("name", 1, { expiresIn: 1000 })).toBeNull();
-    expect(store.read("name")).toBeNull();
+    assertNil(store.read("name"));
   });
 
   it("decrement", () => {
     store.write("name", 1);
-    expect(store.decrement("name")).toBeNull();
+    assertNil(store.decrement("name"));
   });
 
   it("decrement with options", () => {
     store.write("name", 1);
     expect(store.decrement("name", 1, { expiresIn: 1000 })).toBeNull();
-    expect(store.read("name")).toBeNull();
+    assertNil(store.read("name"));
   });
 
   it("delete matched", () => {
     store.write("name", "value");
     store.deleteMatched(/name/);
-    expect(store.read("name")).toBeNull();
+    assertNil(store.read("name"));
   });
 
   it("local store strategy", () => {
-    expect(store.read("foo")).toBeNull();
+    assertNil(store.read("foo"));
     store.write("foo", "bar");
-    expect(store.read("foo")).toBeNull();
+    assertNil(store.read("foo"));
   });
 
   it("local store repeated reads", () => {
     expect(store.read("foo")).toBeNull();
-    expect(store.read("foo")).toBeNull();
+    assertNil(store.read("foo"));
   });
 });
 
