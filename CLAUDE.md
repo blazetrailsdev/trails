@@ -1412,15 +1412,11 @@ prepended onto `named_routes.url_helpers_module` / `path_helpers_module`
 (`:52-53`). A trails `Module` copies its carrier into each includer's link, so
 a Proxy there would reach no includer. Instead, `LazyRouteSet#generateUrlHelpers`
 splices the Proxy directly beneath the generated module, the one object that
-reaches those modules through `extend`. Ruby re-sends once
-`reload_routes_unless_loaded` answers truthy. trails' reload is an awaited
-`import()`, and a pending promise is always truthy. So the async
-`methodMissing` awaits the reload and re-sends, while the synchronous
-`respondToMissing` starts the load and answers `super`. A missed read therefore
-reads `undefined` until the load settles. After that, the live `Module`
-includes answer the drawn helpers. `IntegrationTest` has no helper read to
-wait on, so test_help's `before_setup` (`test_help.rb:43-48`) awaits the
-reload before the test body runs.
+reaches those modules through `extend`. This row is not converged yet. The
+reload is async, so `respondToMissing` starts it and answers `super`,
+`method_missing`'s in-line re-send is unported, and test_help's integration
+`before_setup` awaits the reload. All three are debt tracked by
+`lazy-route-set-method-missing-resends-in-line`, not a ratified shape.
 
 ## `inherited` is deferred to own-property memo guards (`ModelSchema.inherited`)
 

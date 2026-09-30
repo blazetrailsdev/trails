@@ -1,7 +1,7 @@
 import { RouteSet, type DrawCallback, type Request } from "@blazetrails/actionpack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { TopLevel } from "@blazetrails/activesupport";
-import { NoMethodError, rbFPublicSend } from "@blazetrails/ruby-compat";
+import { KERNEL_METHODS, PROTOCOL_PROBES } from "@blazetrails/ruby-compat";
 
 type AnyFn = (...args: unknown[]) => unknown;
 type ProxyHelpers = Record<
@@ -9,7 +9,6 @@ type ProxyHelpers = Record<
   AnyFn
 >;
 type MethodMissingModule = {
-  methodMissing(this: object, name: string, ...args: unknown[]): Promise<unknown>;
   respondToMissing(this: object, name: string, includeAll?: boolean): boolean;
 };
 
@@ -74,11 +73,16 @@ export class LazyRouteSet extends RouteSet {
         ) as object,
         {
           get(target, name, receiver: MethodMissingModule) {
-            if (typeof name === "symbol" || Reflect.has(target, name)) {
+            if (
+              typeof name === "symbol" ||
+              Reflect.has(target, name) ||
+              PROTOCOL_PROBES.has(name) ||
+              KERNEL_METHODS.has(name)
+            ) {
               return Reflect.get(target, name, receiver);
             }
-            if (!receiver.respondToMissing(name)) return undefined;
-            return (...args: unknown[]) => receiver.methodMissing(name, ...args);
+            receiver.respondToMissing(name);
+            return undefined;
           },
         },
       ),
@@ -92,14 +96,6 @@ export class LazyRouteSet extends RouteSet {
   /** @internal */
   private methodMissingModule(): MethodMissingModule {
     return (this._methodMissingModule ??= {
-      async methodMissing(this: object, name: string, ...args: unknown[]): Promise<unknown> {
-        if (await TopLevel.Trails!.application?.reloadRoutesUnlessLoaded()) {
-          return rbFPublicSend(this, name, ...args);
-        } else {
-          throw new NoMethodError(`undefined method '${name}' for module '#<Module>'`, name);
-        }
-      },
-
       respondToMissing(this: object, _name: string, _includeAll: boolean = false): boolean {
         void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
         return false;
