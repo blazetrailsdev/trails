@@ -5,4 +5,4 @@ if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
 await import("../config/environment.js");
 await import("../../../test-help.js");
 
-(TestCase as typeof TestCase & { fixtures(...names: string[]): void }).fixtures(":all");
+TestCase.fixtures(":all");

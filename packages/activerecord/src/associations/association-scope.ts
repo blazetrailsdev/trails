@@ -11,7 +11,7 @@ import type {
 import { RuntimeReflection } from "../reflection.js";
 import { AliasTracker } from "./alias-tracker.js";
 import { kernelArray } from "@blazetrails/activesupport";
-import { drop } from "@blazetrails/ruby-compat";
+import { drop, union } from "@blazetrails/ruby-compat";
 import { methodMissingProxy } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 
@@ -222,7 +222,7 @@ export class AssociationScope {
 
         scope.unscopeBang(...item.unscopeValues);
         scope.whereClause = scope.whereClause.plus(item.whereClause);
-        scope.orderValues = unionOrderClauses(item.orderValues, scope.orderValues);
+        scope.orderValues = union(item.orderValues, scope.orderValues);
       }
     }
 
@@ -253,28 +253,6 @@ function arelTableEql(a: ArelTable | Nodes.TableAlias, b: ArelTable | Nodes.Tabl
     return a.name === b.name && a.tableName === b.tableName;
   }
   return false;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE union-order-clauses-is-a-second-spelling-of-ruby-array-union
- */
-export function unionOrderClauses<T>(first: T[], second: T[]): T[] {
-  const result: T[] = [];
-  const seen = new Set<string>();
-  for (const o of [...first, ...second]) {
-    const key =
-      Array.isArray(o) && o.length === 2
-        ? `T:${String(o[0])}:${String(o[1])}`
-        : typeof o === "string"
-          ? `S:${o}`
-          : `J:${JSON.stringify(o)}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(o);
-    }
-  }
-  return result;
 }
 
 Associations.AssociationScope = AssociationScope;

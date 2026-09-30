@@ -1,11 +1,22 @@
-import { include, onLoad } from "@blazetrails/activesupport";
+import { include, onLoad, type Extended } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import "@blazetrails/activesupport/testing/autorun";
 import { TestDatabases } from "@blazetrails/activerecord/test-databases";
-import { TestFixtures } from "@blazetrails/activerecord/test-fixtures";
+import { TestFixtures, type ClassMethods } from "@blazetrails/activerecord/test-fixtures";
 import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
 import { abort } from "@blazetrails/ruby-compat";
 import { Trails } from "./rails.js";
+
+declare module "@blazetrails/activesupport/test-case" {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- `include ActiveRecord::TestFixtures` in the `on_load(:active_support_test_case)` block below (`railties/lib/rails/test_help.rb:19`) extends `TestFixtures::ClassMethods` onto `ActiveSupport::TestCase`; a namespace merged onto the class is how the added statics surface on the type side.
+  namespace TestCase {
+    const setFixtureClass: Extended<typeof ClassMethods>["setFixtureClass"];
+    const fixtures: Extended<typeof ClassMethods>["fixtures"];
+    const setupFixtureAccessors: Extended<typeof ClassMethods>["setupFixtureAccessors"];
+    const usesTransaction: Extended<typeof ClassMethods>["usesTransaction"];
+    const isUsesTransaction: Extended<typeof ClassMethods>["isUsesTransaction"];
+  }
+}
 
 interface FixtureHost {
   fixturePaths: string[];

@@ -9,6 +9,7 @@ import {
   RuntimeError,
   toI,
   transformValues,
+  union,
 } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
 import { Nodes, Predications, SelectManager, Table as ArelTable } from "@blazetrails/arel";
@@ -206,21 +207,13 @@ interface QueryMethodsHost {
   predicateBuilder: import("./predicate-builder.js").PredicateBuilder;
 }
 
-function unionAppend<T>(target: readonly T[], incoming: readonly T[]): T[] {
-  const union = [...target];
-  for (const spec of incoming) {
-    if (!union.some((seen) => structuralUnionEq(seen, spec))) union.push(spec);
-  }
-  return union;
-}
-
 function includes(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
   checkIfMethodHasArgumentsBang.call(this, ":includes", args);
   return includesBang.apply(this.spawn(), args);
 }
 
 function includesBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
-  this.includesValues = unionAppend(this.includesValues, args);
+  this.includesValues = union(this.includesValues, args);
   return this;
 }
 
@@ -234,7 +227,7 @@ function eagerLoad(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
 }
 
 function eagerLoadBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
-  this.eagerLoadValues = unionAppend(this.eagerLoadValues, args);
+  this.eagerLoadValues = union(this.eagerLoadValues, args);
   return this;
 }
 
@@ -244,7 +237,7 @@ function preload(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
 }
 
 function preloadBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
-  this.preloadValues = unionAppend(this.preloadValues, args);
+  this.preloadValues = union(this.preloadValues, args);
   return this;
 }
 
@@ -299,7 +292,7 @@ function withCte(this: QueryMethodsHost, ...args: any[]): any {
 
 function withBang(this: QueryMethodsHost, ...args: unknown[]): any {
   const processed = processWithArgs.call(this, args);
-  this.withValues = unionAppend(this.withValues, processed);
+  this.withValues = union(this.withValues, processed);
   return this;
 }
 
@@ -310,7 +303,7 @@ function withRecursive(this: QueryMethodsHost, ...args: any[]): any {
 
 function withRecursiveBang(this: QueryMethodsHost, ...args: unknown[]): any {
   const processed = processWithArgs.call(this, args);
-  this.withValues = unionAppend(this.withValues, processed);
+  this.withValues = union(this.withValues, processed);
   this._withIsRecursive = true;
   return this;
 }
@@ -650,10 +643,7 @@ function joins(this: QueryMethodsHost, ...args: JoinSpec[]): any {
 }
 
 function joinsBang(this: QueryMethodsHost, ...args: (string | Nodes.Join | JoinDependency)[]): any {
-  for (const arg of args) {
-    if (!this.joinsValues.some((seen) => structuralUnionEq(seen, arg)))
-      this.joinsValues = [...this.joinsValues, arg];
-  }
+  this.joinsValues = union(this.joinsValues, args);
   return this;
 }
 
@@ -668,10 +658,7 @@ function leftJoins(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
 }
 
 function leftOuterJoinsBang(this: QueryMethodsHost, ...args: AssociationSpec[]): any {
-  for (const arg of args) {
-    if (!this.leftOuterJoinsValues.some((seen) => structuralUnionEq(seen, arg)))
-      this.leftOuterJoinsValues = [...this.leftOuterJoinsValues, arg];
-  }
+  this.leftOuterJoinsValues = union(this.leftOuterJoinsValues, args);
   return this;
 }
 
@@ -799,19 +786,6 @@ function uniqArray(arr: unknown[]): unknown[] {
     if (!out.some((seen) => deepEqual(seen, el))) out.push(el);
   }
   return out;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE union-order-clauses-is-a-second-spelling-of-ruby-array-union
- */
-export function structuralUnionEq(a: unknown, b: unknown): boolean {
-  if (
-    a instanceof ActiveRecord.Associations.JoinDependency ||
-    b instanceof ActiveRecord.Associations.JoinDependency
-  )
-    return a === b;
-  return deepEqual(a, b);
 }
 
 function deepEqual(a: unknown, b: unknown): boolean {
