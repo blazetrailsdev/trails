@@ -7,6 +7,7 @@ import { Topic } from "./test-helpers/models/topic.js";
 import { Reply } from "./test-helpers/models/reply.js";
 import { fixtures } from "./test-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
 
 fixtures({ topics: [Topic, {}] });
 
@@ -174,7 +175,7 @@ describe("Relation#load_async", () => {
 
     const relation = Topic.where({ title: "sole async topic" }).loadAsync();
     expect(relation.isLoaded).toBe(true);
-    expect(relation.isScheduled).toBe(true);
+    expect(relation.isScheduled).toBe(!inMemoryDb());
 
     expect(await relation.size()).toBe(1);
     expect(await relation.isEmpty()).toBe(false);

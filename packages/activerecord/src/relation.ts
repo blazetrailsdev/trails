@@ -336,6 +336,8 @@ export class Relation<T extends Base> {
   protected _take?: T | null;
   protected _offsets?: Map<number, T | null>;
   private _futureResult?: FutureResult | Complete | Promise<Result>;
+  /** @internal */
+  _loadResult?: Promise<Result>;
   private _loadToken = 0;
 
   private _joinDependency: JoinDependency | null = null;
@@ -397,7 +399,7 @@ export class Relation<T extends Base> {
       if (entries.length === 11) entries[10] = "...";
       return `#<${(this.constructor as typeof Relation)._railsClassName} [${entries.join(", ")}]>`;
     };
-    if (this.isLoaded && !this.isScheduled) {
+    if (this.isLoaded && !this.isScheduled && !this._loadResult) {
       return inspectEntries(this._records.slice(0, min(compact([this.limitValue, 11])) as number));
     }
     return this.annotate("loading for inspect")
@@ -445,6 +447,7 @@ export class Relation<T extends Base> {
     this._loadToken += 1;
     if (this._futureResult instanceof FutureResult) this._futureResult.cancel();
     this._futureResult = undefined;
+    this._loadResult = undefined;
     return this;
   }
 
@@ -466,14 +469,14 @@ export class Relation<T extends Base> {
   loadAsync(): Relation<T> {
     this._model.connectionPool().withConnectionSync((c: DatabaseAdapter) => {
       if (!this.isLoaded) {
-        const result = this.execMainQuery(
-          c.asyncEnabled?.() === true && !c.currentTransaction().joinable,
-        );
+        const asyncEnabled = c.asyncEnabled?.() === true;
+        const result = this.execMainQuery(asyncEnabled && !c.currentTransaction().joinable);
         if (result instanceof Result) {
           this.loadRecords(this.instantiateRecords(result));
         } else {
           if (result instanceof Promise) void result.catch(() => {});
-          this._futureResult = result;
+          if (asyncEnabled) this._futureResult = result;
+          else this._loadResult = result as Promise<Result>;
         }
         this._loaded = true;
       }
@@ -625,7 +628,7 @@ export class Relation<T extends Base> {
   }
 
   async load(block?: (record: T) => void): Promise<LoadedRelation<this>> {
-    if (!this.isLoaded || this.isScheduled) {
+    if (!this.isLoaded || this.isScheduled || this._loadResult) {
       const token = this._loadToken;
       const records = await this.withConnection(() => this.execQueries(block));
       if (token === this._loadToken) this.loadRecords(records);
@@ -652,6 +655,10 @@ export class Relation<T extends Base> {
         const future = this._futureResult!;
         this._futureResult = undefined;
         rows = await (future instanceof FutureResult ? future.result() : future);
+      } else if (this._loadResult) {
+        const loadResult = this._loadResult;
+        this._loadResult = undefined;
+        rows = await loadResult;
       } else {
         rows = await this.execMainQuery();
       }

@@ -1187,7 +1187,7 @@ function excludingWithCallee(callee: "excluding" | "without") {
     const flatMappedIds: unknown[] = [];
     const deferredRelations: any[] = [];
     for (const relation of relations) {
-      if (!relation.isLoaded || relation.isScheduled) {
+      if (!relation.isLoaded || relation.isScheduled || relation._loadResult) {
         deferredRelations.push(relation);
         continue;
       }
