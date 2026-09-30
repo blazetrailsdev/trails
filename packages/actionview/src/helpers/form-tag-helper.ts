@@ -258,19 +258,9 @@ export const FormTagHelper = new Module((mod) => {
   mod.include(TextHelper);
   mod.include(ContentExfiltrationPreventionHelper);
 
-  mod.moduleEval((m) =>
-    Object.assign(m, {
-      fieldId,
-      fieldName,
-      labelTag,
-      utf8EnforcerTag,
-      submitTag,
-      htmlOptionsForForm,
-      extraTagsForForm,
-      formTagHtml,
-      formTagWithBody,
-      sanitizeToId,
-      setDefaultDisableWith,
-    }),
-  );
+  mod.moduleEval((m) => {
+    Object.assign(m, { fieldId, fieldName, labelTag, submitTag, utf8EnforcerTag });
+    Object.assign(m, { htmlOptionsForForm, extraTagsForForm, formTagHtml, formTagWithBody });
+    Object.assign(m, { sanitizeToId, setDefaultDisableWith });
+  });
 });

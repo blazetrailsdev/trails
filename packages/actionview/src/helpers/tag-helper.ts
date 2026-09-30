@@ -616,16 +616,8 @@ export const TagHelper = new Module((mod) => {
   mod.include(CaptureHelper);
   mod.include(OutputSafetyHelper);
 
-  mod.moduleEval((m) =>
-    Object.assign(m, {
-      tag,
-      contentTag,
-      tokenList,
-      classNames,
-      cdataSection,
-      escapeOnce,
-      buildTagValues,
-      tagBuilder,
-    }),
-  );
+  mod.moduleEval((m) => {
+    Object.assign(m, { tag, contentTag, tokenList, classNames, cdataSection, escapeOnce });
+    Object.assign(m, { buildTagValues, tagBuilder });
+  });
 });

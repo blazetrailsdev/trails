@@ -7,16 +7,13 @@ type Node =
 
 type Fragment = { children: Node[] };
 
-type DomOptions = { strict?: boolean };
-
 export function assertDomEqual(
   expected: unknown,
   actual: unknown,
   message: string | null = null,
-  { strict = false }: DomOptions = {},
+  { strict = false }: { strict?: boolean } = {},
 ): void {
-  const expectedDom = fragment(expected);
-  const actualDom = fragment(actual);
+  const [expectedDom, actualDom] = [fragment(expected), fragment(actual)];
   message ??= `Expected: ${String(expected)}\nActual: ${String(actual)}`;
   assert(compareDoms(expectedDom, actualDom, strict), message);
 }
@@ -25,10 +22,9 @@ export function assertDomNotEqual(
   expected: unknown,
   actual: unknown,
   message: string | null = null,
-  { strict = false }: DomOptions = {},
+  { strict = false }: { strict?: boolean } = {},
 ): void {
-  const expectedDom = fragment(expected);
-  const actualDom = fragment(actual);
+  const [expectedDom, actualDom] = [fragment(expected), fragment(actual)];
   message ??= `Expected: ${String(expected)}\nActual: ${String(actual)}`;
   assertNot(compareDoms(expectedDom, actualDom, strict), message);
 }
@@ -94,8 +90,7 @@ function isEqualAttribute(attr: [string, string], otherAttr: [string, string]): 
 }
 
 function split(string: string): string[] {
-  const trimmed = string.trim();
-  return trimmed === "" ? [] : trimmed.split(/\s+/);
+  return string.trim() === "" ? [] : string.trim().split(/\s+/);
 }
 
 function toS(node: Node): string {

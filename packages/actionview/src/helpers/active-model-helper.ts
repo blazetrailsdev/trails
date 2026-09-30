@@ -5,11 +5,7 @@ import { ActionView } from "../namespaces.js";
 
 export interface ActiveModelInstanceTag {
   object: unknown;
-  contentTag(
-    type: string,
-    options: unknown,
-    ...args: [options?: Record<string, unknown> | null, escape?: boolean, block?: () => unknown]
-  ): unknown;
+  contentTag(type: string, options: unknown, ...args: unknown[]): unknown;
   tag(type: string, options: Record<string, unknown>, ...args: unknown[]): unknown;
   errorWrapping(htmlTag: unknown): unknown;
   errorMessage(): unknown;
@@ -89,14 +85,8 @@ function isTagGenerateErrors(this: Host, options: Record<string, unknown>): bool
   return options["type"] !== "hidden";
 }
 
-ActiveModelInstanceTag.moduleEval((m) =>
-  Object.assign(Object.defineProperty(m, "object", { get: object, configurable: true }), {
-    contentTag,
-    tag,
-    errorWrapping,
-    errorMessage,
-    isObjectHasErrors,
-    isSelectMarkupHelper,
-    isTagGenerateErrors,
-  }),
-);
+ActiveModelInstanceTag.moduleEval((m) => {
+  Object.defineProperty(m, "object", { get: object, configurable: true });
+  Object.assign(m, { contentTag, tag, errorWrapping, errorMessage });
+  Object.assign(m, { isObjectHasErrors, isSelectMarkupHelper, isTagGenerateErrors });
+});
