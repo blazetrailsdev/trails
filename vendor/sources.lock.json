@@ -36,6 +36,10 @@
       "ref": "v8.0.2",
       "sha": "3235827585d87661942c91bc81f64f56d710f0b2"
     },
+    "rails-dom-testing": {
+      "ref": "v2.2.0",
+      "sha": "a14001a41d514ece1a7c4d03a1d9bc69edf677d1"
+    },
     "ruby": {
       "ref": "v3_3_11",
       "sha": "1f2d15125a2dc701e1822ed2900eb17899500ec7"

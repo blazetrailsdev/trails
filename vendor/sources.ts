@@ -352,6 +352,25 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "rails-dom-testing",
+    origin: {
+      type: "git",
+      url: "https://github.com/rails/rails-dom-testing.git",
+      // The version vendor/rails/v8.0.2/Gemfile.lock:447 resolves; ported as
+      // packages/actionview/src/testing/dom-assertions.ts. A read-anchor only,
+      // like minitest above: there is no packages/rails-dom-testing to compare.
+      ref: "v2.2.0",
+    },
+    packages: [
+      {
+        name: "rails-dom-testing",
+        libPath: "lib/rails/dom/testing",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
     name: "ruby",
     origin: {
       type: "git",
