@@ -2518,6 +2518,40 @@ describe("extractFromProgram — defineProperty accessor generator", () => {
     expect(names).toEqual([]);
   });
 
+  it("credits a class read off a namespace seat at call time", () => {
+    const info = extractFromFiles("/p", {
+      "namespaces.ts": `
+        import type { Relation } from "./relation.js";
+        export const ActiveRecord = {} as { Relation: typeof Relation };
+      `,
+      "relation.ts": `
+        import { ActiveRecord } from "./namespaces.js";
+        export class Relation {
+          static readonly VALUE_METHODS = ["limit"] as const;
+        }
+        ActiveRecord.Relation = Relation;
+      `,
+      "query-methods.ts": `
+        import { ActiveRecord } from "./namespaces.js";
+        export function install(): void {
+          for (const name of ActiveRecord.Relation.VALUE_METHODS) {
+            let methodName: string;
+            if (ActiveRecord.Relation.VALUE_METHODS.includes(name)) {
+              methodName = \`\${name}Value\`;
+            } else {
+              methodName = \`\${name}Clause\`;
+            }
+            Object.defineProperty(ActiveRecord.Relation.prototype, methodName, {
+              get(this: any): unknown { return null; },
+            });
+          }
+        }
+      `,
+    });
+    const names = info.classes["relation.ts:Relation"].instanceMethods.map((m) => m.name);
+    expect(names).toEqual(["limitValue"]);
+  });
+
   it("credits every class the generator's call sites pass, each exactly once", () => {
     const info = extractFromFiles("/p", {
       "relation.ts": `
