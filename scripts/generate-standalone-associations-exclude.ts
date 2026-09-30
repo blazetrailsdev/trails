@@ -65,6 +65,10 @@ async function main(): Promise<void> {
     const rel = repoRel(file);
     if (!rel) continue;
     const code = fs.readFileSync(file, "utf8");
+    // macroOfCall only matches a callee on the identifier `Associations`, so a
+    // file whose text never spells it (nor could, via a `\u` escape) has no
+    // site. Parsing all ~4k files dominated this generator's runtime.
+    if (!code.includes("Associations") && !code.includes("\\u")) continue;
     let ast;
     try {
       ast = parse(code);
