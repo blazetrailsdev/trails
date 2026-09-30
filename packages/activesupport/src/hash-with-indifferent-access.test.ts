@@ -8,7 +8,8 @@ import {
   rbInspect as inspect,
   symbolToS,
 } from "@blazetrails/ruby-compat";
-import { assertRaises, assertNil } from "./testing/assertions.js";
+import { assertIncludes, assertRaises, assertNil } from "./testing/assertions.js";
+import { toYaml } from "./yaml.js";
 import { deepDup } from "./hash-utils.js";
 
 const plainly = <V>(hash: Hash<string, V>): Record<string, unknown> =>
@@ -1231,11 +1232,15 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(Object.getPrototypeOf(klass)).toEqual(HashWithIndifferentAccess);
   });
 
-  it.skip("inheriting from hash with indifferent access properly dumps ivars", () => {
-    // BLOCKED: activesupport-has-no-psych-emitter-for-to-yaml
-    class MyHWIA<V> extends HashWithIndifferentAccess<V> {}
-    const h = new MyHWIA({ x: 42 });
-    expect(Object.fromEntries(h.toHash())).toEqual({ x: 42 });
+  it("inheriting from hash with indifferent access properly dumps ivars", () => {
+    const klass = class extends HashWithIndifferentAccess {
+      foo = "bar";
+    };
+
+    const yamlOutput = toYaml(new klass());
+
+    assertIncludes(yamlOutput, "hash-with-ivars");
+    assertIncludes(yamlOutput, "@foo: bar");
   });
 
   it("should use default proc for unknown key", () => {
