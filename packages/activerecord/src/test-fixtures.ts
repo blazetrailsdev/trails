@@ -131,7 +131,7 @@ type FixtureAttrs = Record<string, unknown>;
 
 export type FixtureMap = Record<string, [BaseClass, Record<string, FixtureAttrs>]>;
 
-export type FixtureAccessor<T> = {
+export type FixtureSetAccessor<T> = {
   (fixtureName: string, forceReload?: true | ":reload"): T | Promise<T>;
   (...fixtureNames: unknown[]): Array<T | Promise<T>>;
 };

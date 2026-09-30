@@ -53,6 +53,7 @@ export {
   sanitizedAllowedTags,
   sanitizedAllowedAttributes,
   SanitizeHelper,
+  ClassMethods as SanitizeHelperClassMethods,
 } from "./sanitize-helper.js";
 export type { Sanitizer, SanitizerClass, SanitizerVendor } from "./sanitize-helper.js";
 

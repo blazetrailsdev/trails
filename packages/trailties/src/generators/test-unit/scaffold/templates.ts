@@ -10,14 +10,14 @@ function header(this: ScaffoldGenerator) {
   const root = "../".repeat(this.controllerClassPath().length + 1);
   const preamble = `import { describe, it } from "vitest";
 import { IntegrationTest } from "@blazetrails/actionpack";
-import type { FixtureAccessor } from "@blazetrails/activerecord/test-fixtures";
+import type { FixtureSetAccessor } from "@blazetrails/activerecord/test-fixtures";
 import { assertDifference, registerConstant } from "@blazetrails/activesupport";
 import { ${modelClassName} } from "../${root}app/models/${this.filePath()}.js";
 import "${root}test-helper.js";
 
 class ${testClassName} extends IntegrationTest {
   declare "@${singular}": ${modelClassName};
-  declare ${fixtureName}: FixtureAccessor<${modelClassName}>;
+  declare ${fixtureName}: FixtureSetAccessor<${modelClassName}>;
 
   static {
     registerConstant("${testClassName}", this);

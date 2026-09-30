@@ -3,7 +3,7 @@ import { ActionController } from "@blazetrails/actionpack";
 import { registerConstant } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TestDatabases } from "@blazetrails/activerecord/test-databases";
-import type { FixtureAccessor } from "@blazetrails/activerecord/test-fixtures";
+import type { FixtureSetAccessor } from "@blazetrails/activerecord/test-fixtures";
 import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
 import { env, includedModules, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
@@ -11,7 +11,7 @@ import { Trails } from "./rails.js";
 
 class BootAppIntegrationTest extends ActionController.IntegrationTest {
   declare "@post": { title: string };
-  declare posts: FixtureAccessor<{ title: string }>;
+  declare posts: FixtureSetAccessor<{ title: string }>;
 
   static {
     this.setup(async function (this: BootAppIntegrationTest) {

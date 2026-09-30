@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  SanitizeHelper,
+  ClassMethods,
   getFullSanitizer,
   getLinkSanitizer,
   getSafeListSanitizer,
@@ -32,10 +32,10 @@ describe("SanitizeHelper class accessors", () => {
   });
 
   it("readers return the memoized module-level instances", () => {
-    expect(SanitizeHelper.fullSanitizer).toBe(getFullSanitizer());
-    expect(SanitizeHelper.linkSanitizer).toBe(getLinkSanitizer());
-    expect(SanitizeHelper.safeListSanitizer).toBe(getSafeListSanitizer());
-    expect(SanitizeHelper.sanitizerVendor).toBe(getSanitizerVendor());
+    expect(ClassMethods.fullSanitizer).toBe(getFullSanitizer());
+    expect(ClassMethods.linkSanitizer).toBe(getLinkSanitizer());
+    expect(ClassMethods.safeListSanitizer).toBe(getSafeListSanitizer());
+    expect(ClassMethods.sanitizerVendor).toBe(getSanitizerVendor());
   });
 
   it("writers replace the underlying instance seen by get* functions", () => {
@@ -43,13 +43,13 @@ describe("SanitizeHelper class accessors", () => {
     const link = stub("link");
     const safe = stub("safe");
 
-    SanitizeHelper.fullSanitizer = full;
-    SanitizeHelper.linkSanitizer = link;
-    SanitizeHelper.safeListSanitizer = safe;
+    ClassMethods.fullSanitizer = full;
+    ClassMethods.linkSanitizer = link;
+    ClassMethods.safeListSanitizer = safe;
 
     expect(getFullSanitizer()).toBe(full);
     expect(getLinkSanitizer()).toBe(link);
     expect(getSafeListSanitizer()).toBe(safe);
-    expect(SanitizeHelper.fullSanitizer).toBe(full);
+    expect(ClassMethods.fullSanitizer).toBe(full);
   });
 });

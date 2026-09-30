@@ -15,7 +15,18 @@ import "./log-subscriber.js";
 import { ActionView } from "./namespaces.js";
 import { OutputBuffer } from "./buffers.js";
 import { Context } from "./context.js";
-import * as Helpers from "./helpers/index.js";
+import { Helpers } from "./helpers.js";
+import type * as HelperExports from "./helpers/index.js";
+import {
+  ClassMethods as UrlHelperClassMethods,
+  type _backUrl,
+  type _filteredReferrer,
+} from "./helpers/url-helper.js";
+import {
+  assignController,
+  installControllerDelegates,
+  installControllerInternals,
+} from "./helpers/controller-helper.js";
 import { LookupContext } from "./lookup-context.js";
 import type { Template } from "./template.js";
 import { StrictLocalsError } from "./template/error.js";
@@ -43,11 +54,11 @@ export interface CompiledMethodContainer {
 }
 
 type HelperMethods = {
-  [K in keyof typeof Helpers as (typeof Helpers)[K] extends (...args: never) => unknown
+  [K in keyof typeof HelperExports as (typeof HelperExports)[K] extends (...args: never) => unknown
     ? K extends Capitalize<string & K>
       ? never
       : K
-    : never]: (typeof Helpers)[K];
+    : never]: (typeof HelperExports)[K];
 };
 
 interface TseUtilMethods {
@@ -184,7 +195,7 @@ export class Base {
   /** @noRailsEquivalent PERMANENT */
   currentTemplate: Template | null = null;
 
-  _controller: Parameters<typeof Helpers.assignController>[0] = null;
+  _controller: Parameters<typeof assignController>[0] = null;
 
   _request: unknown = null;
 
@@ -219,7 +230,7 @@ export class Base {
     this._lookupContext = lookupContext;
     this._viewRenderer = new Renderer(this._lookupContext!);
     this.currentTemplate = null;
-    this.assignController(controller as Parameters<typeof Helpers.assignController>[0]);
+    this.assignController(controller as Parameters<typeof assignController>[0]);
     this._prepareContext();
 
     initializeIncludedModules(this);
@@ -359,15 +370,9 @@ for (const [name, value] of Object.entries(TseUtil)) {
   (Base.prototype as unknown as Record<string, unknown>)[name] = value;
 }
 
-Helpers.installControllerInternals(Base.prototype);
+installControllerInternals(Base.prototype);
 attrInternal.call(Base.prototype, "defaultFormBuilder");
-Helpers.installControllerDelegates(Base.prototype);
-
-for (const [name, value] of Object.entries(Helpers)) {
-  if (typeof value !== "function") continue;
-  if (name[0] !== name[0]?.toLowerCase()) continue;
-  (Base.prototype as unknown as Record<string, unknown>)[name] = value;
-}
+installControllerDelegates(Base.prototype);
 
 Object.defineProperty(Base.prototype, "yield", {
   get(this: Base): SafeBuffer | Promise<SafeBuffer> {
@@ -379,16 +384,17 @@ Object.defineProperty(Base.prototype, "yield", {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class above.
 export interface Base extends Context, HelperMethods, TseUtilMethods {
-  controller: Parameters<typeof Helpers.assignController>[0];
+  controller: Parameters<typeof assignController>[0];
   request: unknown;
-  _backUrl: typeof Helpers._backUrl;
-  _filteredReferrer: typeof Helpers._filteredReferrer;
+  _backUrl: typeof _backUrl;
+  _filteredReferrer: typeof _filteredReferrer;
   /** @noRailsEquivalent PERMANENT */
   readonly yield: SafeBuffer;
 }
 
 include(Base, Context);
-extend(Base, Helpers.UrlHelperClassMethods);
+include(Base, Helpers);
+extend(Base, UrlHelperClassMethods);
 
 runLoadHooks("action_view", Base);
 

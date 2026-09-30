@@ -12,7 +12,6 @@ import {
   isPresent,
   unwrappedHtmlEscape,
 } from "@blazetrails/activesupport";
-import { safeJoin } from "./output-safety-helper.js";
 import {
   ArgumentError,
   BigDecimal,
@@ -21,9 +20,8 @@ import {
   Module,
   rbInspect,
 } from "@blazetrails/ruby-compat";
-import * as CaptureHelper from "./capture-helper.js";
-import { capture, type CaptureHelperHost } from "./capture-helper.js";
-import * as OutputSafetyHelper from "./output-safety-helper.js";
+import { CaptureHelper, capture, type CaptureHelperHost } from "./capture-helper.js";
+import { OutputSafetyHelper, safeJoin } from "./output-safety-helper.js";
 
 export interface TagHelperHost extends CaptureHelperHost {
   _tagBuilder?: TagBuilder;
