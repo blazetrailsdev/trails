@@ -63,7 +63,7 @@ export interface RenderOptions {
       ) => RenderOptions["layout"]);
   locals?: Record<string, unknown>;
   collection?: readonly unknown[];
-  as?: string;
+  as?: string | false | null;
   spacerTemplate?: string;
   object?: unknown;
   prefixes?: string[];
@@ -148,9 +148,10 @@ const OPTION_AS_ERROR_MESSAGE =
 /** @internal */
 export function localVariable(this: ObjectRenderingHost, path: string): string {
   const as = this.options["as"];
-  if (as != null) {
-    if (!/^[a-z_]\w*$/.test(isSymbol(as) ? symbolToS(as) : String(as))) raiseInvalidOptionAs(as);
-    return isSymbol(as) ? symbolToS(as) : String(as);
+  if (as != null && as !== false) {
+    const asS = isSymbol(as) ? symbolToS(as) : as;
+    if (!/^[a-z_]\w*$/.test(asS)) raiseInvalidOptionAs(as);
+    return asS;
   }
   const base = path.endsWith("/") ? "" : File.basename(path);
   const match = /^_?(.*?)(?:\.\w+)*$/.exec(base);

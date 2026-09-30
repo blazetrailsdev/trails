@@ -18,6 +18,7 @@ describe("Base#render collection: inside a template", () => {
     const resolver = new FixtureResolver({
       "test/_customer.html.tse": "Hello: <%= customer.name %>",
       "test/_list.html.tse": '<%= render({ partial: "test/customer", collection: customers }) %>',
+      "test/_customer_with_var.html.tse": "<%= customer_with_var.name %>",
     });
     const lookupContext = new LookupContext(null, {}, []);
     lookupContext.appendViewPaths([resolver]);
@@ -37,5 +38,27 @@ describe("Base#render collection: inside a template", () => {
         }),
       ),
     ).toBe("Hello: davidHello: mary");
+  });
+
+  it("treats as: false like an absent as:, deriving the local from the partial name", () => {
+    expect(
+      String(
+        view.render({
+          partial: "test/customer_with_var",
+          collection: [new Customer("david"), new Customer("mary")],
+          as: false,
+        }),
+      ),
+    ).toBe("davidmary");
+  });
+
+  it("names an invalid Symbol as: without its colon", () => {
+    expect(() =>
+      view.render({
+        partial: "test/customer",
+        collection: [new Customer("david")],
+        as: ":Foo",
+      }),
+    ).toThrow("The value (Foo) of the option `as` is not a valid Ruby identifier");
   });
 });
