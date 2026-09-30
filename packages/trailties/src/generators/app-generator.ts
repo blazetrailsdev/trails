@@ -1176,12 +1176,17 @@ await import("@blazetrails/trailties/test-help");
 
     this.createFile(
       "test/global-setup.ts",
-      `import { env, setEnv } from "@blazetrails/ruby-compat";
+      `import { Base } from "@blazetrails/activerecord";
+import { env, setEnv } from "@blazetrails/ruby-compat";
 
 export async function setup(): Promise<void> {
   if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
   await import("../config/environment.js");
   await import("@blazetrails/trailties/testing/maintain-test-schema");
+}
+
+export async function teardown(): Promise<void> {
+  await Base.connectionHandler.clearAllConnectionsBang("all");
 }
 `,
     );

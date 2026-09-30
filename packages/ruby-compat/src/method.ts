@@ -119,23 +119,37 @@ export function rbIseqMinMaxArity(func: (...args: never[]) => unknown): [number,
   }
   let depth = 0;
   let current = "";
-  const params: string[] = [];
+  let optional = false;
+  const params: { text: string; optional: boolean }[] = [];
   for (let i = open + 1; i < src.length; i++) {
     const ch = src[i];
+    if (ch === '"' || ch === "'" || ch === "`") {
+      const start = i;
+      for (i++; i < src.length && src[i] !== ch; i++) if (src[i] === "\\") i++;
+      current += src.slice(start, i + 1);
+      continue;
+    }
+    if (ch === "/" && (src[i + 1] === "/" || src[i + 1] === "*")) {
+      const close = src.indexOf(src[i + 1] === "/" ? "\n" : "*/", i + 2);
+      i = close === -1 ? src.length : src[i + 1] === "/" ? close : close + 1;
+      continue;
+    }
     if ("([{".includes(ch)) depth++;
     else if (")]}".includes(ch)) {
       if (depth === 0) break;
       depth--;
-    } else if (ch === "," && depth === 0) {
-      params.push(current.trim());
+    } else if (depth === 0 && ch === ",") {
+      params.push({ text: current.trim(), optional });
       current = "";
+      optional = false;
       continue;
-    }
+    } else if (depth === 0 && ch === "=") optional = true;
     current += ch;
   }
-  if (current.trim() !== "") params.push(current.trim());
-  const min = params.filter((p) => !p.startsWith("...") && !/^[^=]*[^=!<>]=[^=>]/.test(p)).length;
-  const max = params.some((p) => p.startsWith("...")) ? Infinity : params.length;
+  if (current.trim() !== "") params.push({ text: current.trim(), optional });
+  const rest = params.some((p) => p.text.startsWith("..."));
+  const min = params.filter((p) => !p.optional && !p.text.startsWith("...")).length;
+  const max = rest ? Infinity : params.length;
   return [min, max];
 }
 

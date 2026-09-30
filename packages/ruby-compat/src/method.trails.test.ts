@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
-import { Method, rbCheckArity, rbObjMethod } from "./method.js";
+import { Method, rbCheckArity, rbIseqMinMaxArity, rbObjMethod } from "./method.js";
 import { NameError } from "./name-error.js";
 
 describe("rbObjMethod", () => {
@@ -81,6 +81,23 @@ describe("rbCheckArity", () => {
     );
     expect(() => rbCheckArity(() => 1, 1)).toThrow(
       "wrong number of arguments (given 1, expected 0)",
+    );
+  });
+
+  it("counts a destructured parameter with defaults inside its pattern as required", () => {
+    const min = rbIseqMinMaxArity;
+    expect(min(({ a = 1 }: { a?: number }) => a)).toEqual([1, 1]);
+    expect(min(([x = 1]: number[]) => x)).toEqual([1, 1]);
+    expect(min(({ a = 1 }: { a?: number } = {}) => a)).toEqual([0, 1]);
+    expect(min(async (a: unknown) => a)).toEqual([1, 1]);
+    expect(min(new Function("return async x => x")())).toEqual([1, 1]);
+    expect(
+      min(function (a = "x, y = z", b = ")") {
+        return [a, b];
+      }),
+    ).toEqual([0, 2]);
+    expect(() => rbCheckArity(({ a = 1 }: { a?: number }) => a, 0)).toThrow(
+      "wrong number of arguments (given 0, expected 1)",
     );
   });
 

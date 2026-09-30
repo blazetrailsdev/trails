@@ -372,12 +372,17 @@ Trails.application!.configure(function () {
 `;
 
 exports[`AppGenerator > snapshots emitted TypeScript sources > global-setup.ts 1`] = `
-"import { env, setEnv } from "@blazetrails/ruby-compat";
+"import { Base } from "@blazetrails/activerecord";
+import { env, setEnv } from "@blazetrails/ruby-compat";
 
 export async function setup(): Promise<void> {
   if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
   await import("../config/environment.js");
   await import("@blazetrails/trailties/testing/maintain-test-schema");
+}
+
+export async function teardown(): Promise<void> {
+  await Base.connectionHandler.clearAllConnectionsBang("all");
 }
 "
 `;
