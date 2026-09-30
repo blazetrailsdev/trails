@@ -1,5 +1,12 @@
 import { registerDefaultMimeTypes } from "./mime-types.js";
-import { aryDelete, isSymbol, KeyError, stringToSym, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  aryDelete,
+  isSymbol,
+  KeyError,
+  rbEqual,
+  stringToSym,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 
 export class Mimes {
   /** @internal */
@@ -205,6 +212,17 @@ export class MimeType {
     );
   }
 
+  eql(other: unknown): boolean {
+    return (
+      this === other ||
+      (other instanceof MimeType &&
+        this.constructor === other.constructor &&
+        this.string === other.string &&
+        rbEqual(this.synonyms, other.synonyms) &&
+        this.symbol === other.symbol)
+    );
+  }
+
   static register(
     string: string,
     symbol: string,
@@ -233,9 +251,9 @@ export class MimeType {
     symbol = symbol.toLowerCase();
     const mime = Mime.get(symbol);
     if (mime) {
-      MimeType.SET.deleteIf((v) => v === mime);
-      for (const [k, v] of LOOKUP) if (v === mime) LOOKUP.delete(k);
-      for (const [k, v] of EXTENSION_LOOKUP) if (v === mime) EXTENSION_LOOKUP.delete(k);
+      MimeType.SET.deleteIf((v) => v.eql(mime));
+      for (const [k, v] of LOOKUP) if (v.eql(mime)) LOOKUP.delete(k);
+      for (const [k, v] of EXTENSION_LOOKUP) if (v.eql(mime)) EXTENSION_LOOKUP.delete(k);
     }
   }
 
@@ -252,15 +270,7 @@ export class MimeType {
   }
 
   static all(): MimeType[] {
-    const seen = new Set<MimeType>();
-    const out: MimeType[] = [];
-    for (const type of LOOKUP.values()) {
-      if (!seen.has(type)) {
-        seen.add(type);
-        out.push(type);
-      }
-    }
-    return out;
+    return MimeType.SET.select(() => true);
   }
 
   static onRegister(callback: (type: MimeType) => void): void {

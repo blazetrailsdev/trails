@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { EnvironmentInquirer, NullLogger, trailsRoot } from "@blazetrails/activesupport";
 import { env, setEnv } from "@blazetrails/ruby-compat";
 import { getFs } from "@blazetrails/ruby-compat";
@@ -161,14 +164,10 @@ describe("Trails", () => {
   it("Trails.root agrees with the trailsRoot seam", async () => {
     class SeamApp extends Application {}
     Application.register(SeamApp);
-    SeamApp.findRoot = () => "/discovered/source";
+    const discovered = await mkdtemp(join(tmpdir(), "trails-seam-"));
+    SeamApp.findRoot = () => discovered;
     const app = SeamApp.instance();
-    setEnv("SECRET_KEY_BASE", "b3c631c314c0bbca50c1b2843150fe33");
-    try {
-      await Trails.initialize();
-    } finally {
-      setEnv("SECRET_KEY_BASE", undefined);
-    }
+    await Trails.initialize();
     app.config.setRoot("/srv/override");
     expect(Trails.root()).toBe(trailsRoot());
     expect(trailsRoot()).toBe("/srv/override");

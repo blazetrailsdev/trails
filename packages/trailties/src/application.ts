@@ -154,11 +154,8 @@ export class Application extends Engine {
   async initialize(group: InitializerGroup = "default"): Promise<this> {
     if (this._initialized) throw new Error("Application has been already initialized.");
     setTrailsRoot(() => this.config.root);
-    if (
-      getEnv("SECRET_KEY_BASE_DUMMY") != null ||
-      (getEnv("SECRET_KEY_BASE") == null && Trails.env["local?"]())
-    ) {
-      await this.config.generateLocalSecret();
+    if (getEnv("SECRET_KEY_BASE_DUMMY") != null || Trails.env["local?"]()) {
+      await this.config.loadLocalSecret();
     }
     await this.runInitializers(group, this);
     this._initialized = true;

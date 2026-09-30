@@ -43,7 +43,7 @@ async function app(railsEnv: string): Promise<Application> {
   const application = A.instance();
   await application.root();
   if (env.SECRET_KEY_BASE_DUMMY != null || Trails.env["local?"]()) {
-    await application.config.generateLocalSecret();
+    await application.config.loadLocalSecret();
   }
   return application;
 }

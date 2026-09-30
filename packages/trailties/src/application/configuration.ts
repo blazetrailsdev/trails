@@ -79,9 +79,7 @@ export class Configuration extends EngineConfiguration {
   railtiesOrder: Array<string | { instance(): unknown }> = [":all"];
   relativeUrlRoot: string | null = null;
   requireMasterKey = false;
-  /** @internal */
   private _secretKeyBase: string | null = null;
-  /** @internal */
   private _localSecret?: string;
   credentials: { contentPath: string | null; keyPath: string | null } = {
     contentPath: null,
@@ -96,12 +94,10 @@ export class Configuration extends EngineConfiguration {
   rakeEagerLoad = false;
   serverTiming = false;
   domTestingDefaultHtmlVersion = ":html4";
-  /** @internal */
   private _contentSecurityPolicy: ContentSecurityPolicy | null = null;
   contentSecurityPolicyReportOnly = false;
   contentSecurityPolicyNonceGenerator: NonceGenerator | null = null;
   contentSecurityPolicyNonceDirectives: readonly string[] | null = null;
-  /** @internal */
   private _permissionsPolicy: PermissionsPolicy | null = null;
   yjit = false;
 
@@ -436,15 +432,15 @@ export class Configuration extends EngineConfiguration {
       this._secretKeyBase ??
       ((this.secretKeyBase =
         getEnv("SECRET_KEY_BASE_DUMMY") != null
-          ? this._localSecret!
+          ? this.generateLocalSecret()
           : (getEnv("SECRET_KEY_BASE") ??
-            (Trails.env["local?"]() && this._localSecret!))) as string)
+            (Trails.env["local?"]() && this.generateLocalSecret()))) as string)
     );
   }
 
   set secretKeyBase(newSecretKeyBase: unknown) {
     if (newSecretKeyBase == null && Trails.env["local?"]()) {
-      this._secretKeyBase = this._localSecret!;
+      this._secretKeyBase = this.generateLocalSecret();
     } else if (typeof newSecretKeyBase === "string" && isPresent(newSecretKeyBase)) {
       this._secretKeyBase = newSecretKeyBase;
     } else if (newSecretKeyBase != null && newSecretKeyBase !== false) {
@@ -546,8 +542,8 @@ export class Configuration extends EngineConfiguration {
     return { contentPath: contentPath, keyPath: keyPath };
   }
 
-  /** @internal */
-  async generateLocalSecret(): Promise<string> {
+  /** @noRailsEquivalent PERMANENT */
+  async loadLocalSecret(): Promise<string> {
     const keyFile = getPath().join(this.root as string, "tmp/local_secret.txt");
 
     if (!(await getFs().exists(keyFile))) {
@@ -557,6 +553,15 @@ export class Configuration extends EngineConfiguration {
     }
 
     return (this._localSecret = await getFs().readFile(keyFile, "utf8"));
+  }
+
+  private generateLocalSecret(): string {
+    if (this._localSecret === undefined) {
+      throw new RuntimeError(
+        "tmp/local_secret.txt is not loaded; await Application#initialize first",
+      );
+    }
+    return this._localSecret;
   }
 }
 
