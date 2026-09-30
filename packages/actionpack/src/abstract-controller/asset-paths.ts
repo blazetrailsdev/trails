@@ -1,17 +1,6 @@
 /** @internal */
 
-const SLOTS = [
-  "assetHost",
-  "assetsDir",
-  "javascriptsDir",
-  "stylesheetsDir",
-  "defaultAssetHostProtocol",
-  "relativeUrlRoot",
-] as const;
-
-export type AssetPathSlot = (typeof SLOTS)[number];
-
-export const ASSET_PATH_SLOTS: readonly AssetPathSlot[] = SLOTS;
+import { included } from "@blazetrails/activesupport";
 
 export interface AssetPathsHost {
   assetHost?: string;
@@ -20,4 +9,21 @@ export interface AssetPathsHost {
   stylesheetsDir?: string;
   defaultAssetHostProtocol?: string;
   relativeUrlRoot?: string;
+}
+
+type AssetPathsIncludingClass = (new (...args: never[]) => unknown) & {
+  configAccessor(...names: string[]): void;
+};
+
+export class AssetPaths {
+  static [included](base: AssetPathsIncludingClass): void {
+    base.configAccessor(
+      "assetHost",
+      "assetsDir",
+      "javascriptsDir",
+      "stylesheetsDir",
+      "defaultAssetHostProtocol",
+      "relativeUrlRoot",
+    );
+  }
 }

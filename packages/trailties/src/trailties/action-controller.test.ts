@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { Configuration } from "../application/configuration.js";
 import { Trailtie, type ActionControllerConfig } from "./action-controller.js";
 import { Deprecators, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
@@ -13,7 +14,7 @@ let deprecators: Deprecators;
 let app: {
   deprecators: Deprecators;
   routes(): RouteSet;
-  config: { helpersPaths: string[] };
+  config: Configuration;
 };
 
 describe("ActionController::Trailtie", () => {
@@ -22,7 +23,11 @@ describe("ActionController::Trailtie", () => {
   beforeEach(() => {
     deprecators = new Deprecators();
     const routes = new RouteSet();
-    app = { deprecators, routes: () => routes, config: { helpersPaths: [] } };
+    app = {
+      deprecators,
+      routes: () => routes,
+      config: Object.assign(new Configuration("/app"), { helpersPaths: [] }),
+    };
     savedConfig = structuredClone(
       Trailtie.config.get("actionController") as ActionControllerConfig,
     );
@@ -69,7 +74,11 @@ describe("action_controller.set_helpers_path", () => {
       join(root, "fun", "pdf-helper.ts"),
       "export const PdfHelper = { foobar: () => 'baz' };",
     );
-    app = { deprecators, routes: () => routes, config: { helpersPaths: [root] } };
+    app = {
+      deprecators,
+      routes: () => routes,
+      config: Object.assign(new Configuration("/app"), { helpersPaths: [root] }),
+    };
     savedConfig = structuredClone(
       Trailtie.config.get("actionController") as ActionControllerConfig,
     );

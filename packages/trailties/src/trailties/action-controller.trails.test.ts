@@ -2,15 +2,20 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Deprecators, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { ActionController, Request, Response, RouteSet } from "@blazetrails/actionpack";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
+import { Configuration } from "../application/configuration.js";
 import { Trailtie, type ActionControllerConfig } from "./action-controller.js";
 
-let app: { deprecators: Deprecators; routes(): RouteSet; config: { helpersPaths: string[] } };
+let app: { deprecators: Deprecators; routes(): RouteSet; config: Configuration };
 let savedConfig: ActionControllerConfig;
 
 beforeEach(() => {
   resetLoadHooks();
   const routes = new RouteSet();
-  app = { deprecators: new Deprecators(), routes: () => routes, config: { helpersPaths: [] } };
+  app = {
+    deprecators: new Deprecators(),
+    routes: () => routes,
+    config: Object.assign(new Configuration("/app"), { helpersPaths: [] }),
+  };
   savedConfig = structuredClone(Trailtie.config.get("actionController") as ActionControllerConfig);
 });
 
@@ -43,6 +48,19 @@ describe("ActionController::Railtie action_controller.set_configs", () => {
     await runTrailtieInitializers(Trailtie, app);
     runLoadHooks("action_controller", UnwrappedController);
     expect(UnwrappedController._wrapperOptions.format).toEqual([]);
+  });
+
+  it("set_configs seeds the public asset dirs, asset host and relative url root from the app", async () => {
+    app.config.assetHost = "http://assets.example.com";
+    app.config.relativeUrlRoot = "/blog";
+    class AssetController extends ActionController.Base {}
+    await runTrailtieInitializers(Trailtie, app);
+    runLoadHooks("action_controller", AssetController);
+    const config = (AssetController as unknown as { config(): Record<string, unknown> }).config();
+    expect(config.javascriptsDir).toBe("/app/public/javascripts");
+    expect(config.stylesheetsDir).toBe("/app/public/stylesheets");
+    expect(config.assetHost).toBe("http://assets.example.com");
+    expect(config.relativeUrlRoot).toBe("/blog");
   });
 });
 

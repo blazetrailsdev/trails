@@ -78,6 +78,7 @@ import { permissionsPolicy } from "./metal/permissions-policy.js";
 import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
 import { logAt } from "./metal/logging.js";
 import type { LoggerHost } from "../abstract-controller/logger.js";
+import { AssetPaths } from "../abstract-controller/asset-paths.js";
 import { Instrumentation, logProcessAction } from "./metal/instrumentation.js";
 import { Redirecting } from "./metal/redirecting.js";
 import {
@@ -857,6 +858,7 @@ export class Base extends Metal {
 }
 
 include(Base, ConfigMethods);
+include(Base, AssetPaths);
 include(Base, Cookies);
 Base.prototype.redirectBack = redirectBack;
 Base.prototype.redirectBackOrTo = redirectBackOrTo;

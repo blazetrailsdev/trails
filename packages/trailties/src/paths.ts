@@ -105,6 +105,10 @@ export class Path {
       .map((k) => this._root._entries.get(k)!);
   }
 
+  async first(): Promise<string | undefined> {
+    return (await this.expanded())[0];
+  }
+
   autoloadOnceBang(): void {
     this._autoloadOnce = true;
   }

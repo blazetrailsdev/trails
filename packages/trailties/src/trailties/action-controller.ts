@@ -5,7 +5,10 @@ import {
   demodulize,
   include,
   onLoad,
+  TopLevel,
+  type CacheStore,
   type Deprecators,
+  type Logger,
 } from "@blazetrails/activesupport";
 import { ActionController, AbstractController } from "@blazetrails/actionpack";
 import {
@@ -17,6 +20,7 @@ import {
   rbObjRespondTo,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
+import type { Root } from "../paths.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 export interface ActionControllerConfig {
@@ -29,6 +33,12 @@ export interface ActionControllerConfig {
   allowForgeryProtection?: boolean;
   raiseOnMissingCallbackActions?: boolean;
   defaultProtectFromForgery?: boolean;
+  logger?: Logger | null;
+  cacheStore?: CacheStore | `:${string}` | readonly [`:${string}`, ...unknown[]] | null;
+  javascriptsDir?: string | null;
+  stylesheetsDir?: string | null;
+  assetHost?: string | null;
+  relativeUrlRoot?: string | null;
 }
 
 declare module "../trailtie/configuration.js" {
@@ -41,7 +51,12 @@ declare module "../trailtie/configuration.js" {
 interface TrailtieApp {
   deprecators: Deprecators;
   routes(): AppRoutes;
-  config: { helpersPaths: string[] };
+  config: {
+    helpersPaths: string[];
+    paths(): Root;
+    assetHost: string | null;
+    relativeUrlRoot: string | null;
+  };
 }
 
 type AppRoutes = Parameters<typeof AbstractController.withRoutesHelpers>[0] & {
@@ -59,8 +74,18 @@ export class Trailtie extends BaseTrailtie {
       includeAllHelpers: true,
     } satisfies ActionControllerConfig);
 
-    this.initializer("action_controller.set_configs", (app) => {
+    this.initializer("action_controller.set_configs", async (app) => {
+      const paths = (app as TrailtieApp).config.paths();
       const options = this.config.get("actionController") as ActionControllerConfig;
+
+      options.logger ??= TopLevel.Trails!.logger;
+      options.cacheStore ??= TopLevel.Trails!.cache;
+
+      options.javascriptsDir ??= await paths.get("public/javascripts")!.first();
+      options.stylesheetsDir ??= await paths.get("public/stylesheets")!.first();
+
+      options.assetHost ??= (app as TrailtieApp).config.assetHost;
+      options.relativeUrlRoot ??= (app as TrailtieApp).config.relativeUrlRoot;
 
       onLoad("action_controller", (base: AbstractController.RoutesHelpersControllerClass) => {
         const routes = (app as TrailtieApp).routes();
