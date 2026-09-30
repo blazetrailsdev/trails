@@ -5,7 +5,7 @@ import * as os from "node:os";
 import { ModelGenerator } from "./model-generator.js";
 import * as Assertions from "./testing/assertions.js";
 import { assertMatch, assertNoMatch } from "@blazetrails/activesupport";
-import { migrationFileName as _migrationFileName } from "./testing/behavior.js";
+import { Dir } from "@blazetrails/ruby-compat";
 import { Application } from "../application.js";
 import { Trails } from "../rails.js";
 import "../trailties/active-record.js";
@@ -23,7 +23,6 @@ const assertNoMigration = Assertions.assertNoMigration.bind(destination);
 const assertNoFile = Assertions.assertNoFile.bind(destination);
 const assertMigration = Assertions.assertMigration.bind(destination);
 const assertFile = Assertions.assertFile.bind(destination);
-const migrationFileName = _migrationFileName.bind(destination);
 const { assertMethod } = Assertions;
 
 beforeEach(async () => {
@@ -283,7 +282,9 @@ describe("ModelGeneratorTest", () => {
 
   it("existing migration is removed on force", async () => {
     await makeGen().run("Account", ["name:string", "age:integer"]);
-    const oldMigration = migrationFileName("db/migrate/create_accounts.ts")!;
+    const oldMigration = Dir.glob(
+      `${destination.destinationRoot}/db/migrate/*_create_accounts.ts`,
+    )[0];
     const gen = new ModelGenerator({ cwd: tmpDir, output: (m) => lines.push(m), force: true });
     await gen.run("Account", []);
     const error = lines.join("\n");
