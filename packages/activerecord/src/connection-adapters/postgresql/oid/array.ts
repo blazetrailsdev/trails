@@ -129,6 +129,28 @@ export class Array extends ValueType<unknown> {
   private readonly pgEncoder: PgTextEncoderArray;
   private readonly pgDecoder: PgTextDecoderArray;
 
+  override type(): string | undefined {
+    const subtypeType = this.subtype.type;
+    if (typeof subtypeType === "function") return subtypeType.call(this.subtype);
+    return subtypeType;
+  }
+
+  userInputInTimeZone(value: unknown): unknown {
+    return this.subtype.userInputInTimeZone!(value);
+  }
+
+  override get limit(): number | null {
+    return this.subtype.limit ?? null;
+  }
+
+  override get precision(): number | null {
+    return this.subtype.precision ?? null;
+  }
+
+  override get scale(): number | null {
+    return this.subtype.scale ?? null;
+  }
+
   constructor(subtype: ArraySubtype, delimiter: string = ",") {
     super();
     this.subtype = subtype;
@@ -144,30 +166,13 @@ export class Array extends ValueType<unknown> {
     });
   }
 
-  override get limit(): number | null {
-    return this.subtype.limit ?? null;
-  }
-
-  override get precision(): number | null {
-    return this.subtype.precision ?? null;
-  }
-
-  override get scale(): number | null {
-    return this.subtype.scale ?? null;
-  }
-
-  userInputInTimeZone(value: unknown): unknown {
-    return this.subtype.userInputInTimeZone!(value);
-  }
-
-  override type(): string | undefined {
-    const subtypeType = this.subtype.type;
-    if (typeof subtypeType === "function") return subtypeType.call(this.subtype);
-    return subtypeType;
-  }
-
-  override isMutable(): boolean {
-    return true;
+  override deserialize(value: unknown): unknown {
+    if (typeof value === "string") {
+      return this.typeCastArray(this.pgDecoder.decode(value), "deserialize");
+    }
+    if (value instanceof Data) return this.typeCastArray(value.values, "deserialize");
+    if (globalThis.Array.isArray(value)) return this.typeCastArray(value, "deserialize");
+    return super.deserialize(value);
   }
 
   cast(value: unknown): unknown {
@@ -188,15 +193,6 @@ export class Array extends ValueType<unknown> {
       return new Data(this.pgEncoder, castedValues);
     }
     return super.serialize(value);
-  }
-
-  override deserialize(value: unknown): unknown {
-    if (typeof value === "string") {
-      return this.typeCastArray(this.pgDecoder.decode(value), "deserialize");
-    }
-    if (value instanceof Data) return this.typeCastArray(value.values, "deserialize");
-    if (globalThis.Array.isArray(value)) return this.typeCastArray(value, "deserialize");
-    return super.deserialize(value);
   }
 
   override typeCastForSchema(value: unknown): unknown {
@@ -236,6 +232,10 @@ export class Array extends ValueType<unknown> {
       return this.subtype.deserialize?.(value) ?? this.subtype.cast(value);
     if (method === "cast") return this.subtype.cast(value);
     return this.subtype.serialize(value);
+  }
+
+  override isMutable(): boolean {
+    return true;
   }
 }
 

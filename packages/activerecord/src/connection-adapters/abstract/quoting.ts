@@ -57,15 +57,6 @@ export type TemporalDateLike =
   | Temporal.PlainDateTime
   | Temporal.PlainDate;
 
-export function quoteColumnName(_columnName: unknown): string {
-  // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/quoting.rb:61
-  throw new NotImplementedError();
-}
-
-export function quoteTableName(this: QuotingClassMethods, tableName: unknown): string {
-  return this.quoteColumnName(tableName);
-}
-
 export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "string") {
     return `'${this.quoteString(value)}'`;
@@ -138,11 +129,6 @@ export function castBoundValue(value: unknown): unknown {
   return value;
 }
 
-export interface QuotingHost {
-  /** @internal */
-  lookupCastType(sqlType: string | null): ValueType;
-}
-
 export function lookupCastTypeFromColumn(
   this: QuotingHost,
   column: { sqlType: string | null },
@@ -152,6 +138,20 @@ export function lookupCastTypeFromColumn(
 
 export function quoteString(s: string): string {
   return s.replace(/\\/g, "\\\\").replace(/'/g, "''");
+}
+
+export interface QuotingHost {
+  /** @internal */
+  lookupCastType(sqlType: string | null): ValueType;
+}
+
+export function quoteColumnName(_columnName: unknown): string {
+  // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/quoting.rb:61
+  throw new NotImplementedError();
+}
+
+export function quoteTableName(this: QuotingClassMethods, tableName: unknown): string {
+  return this.quoteColumnName(tableName);
 }
 
 export function quoteTableNameForAssignment(
@@ -190,6 +190,23 @@ export function unquotedFalse(): boolean {
   return false;
 }
 
+export function quotedDate(value: TemporalDateLike): string {
+  if (actsLikeTime(value)) {
+    if (defaultTimezone() === "utc") {
+      if (!isUtc(value)) value = getutc(value);
+    } else {
+      value = getlocal(value);
+    }
+  }
+
+  return toFsDb(value);
+}
+
+export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): string {
+  value = value.change({ year: 2000, month: 1, day: 1 });
+  return this.quotedDate(value).replace(/^\d{4}-\d{2}-\d{2} /, "");
+}
+
 export function quotedBinary(value: BinaryData): string {
   return `'${quoteString(Buffer.from(value.bytes).toString("latin1"))}'`;
 }
@@ -200,6 +217,29 @@ export function sanitizeAsSqlComment(value: unknown): string {
   comment = comment.replace(/\*\//g, "* /");
   comment = comment.replace(/\/\*/g, "/ *");
   return comment;
+}
+
+/** @internal */
+export function typeCastedBinds(
+  this: { typeCast: (v: unknown) => unknown },
+  binds: unknown[] | null | undefined,
+): unknown[] | undefined {
+  return binds?.map((value: unknown) => {
+    if (value instanceof ModelAttribute) {
+      return this.typeCast(value.valueForDatabase);
+    }
+    return this.typeCast(value);
+  });
+}
+
+type TimeLike = TimeWithZone | RubyTime | Temporal.Instant | Temporal.ZonedDateTime;
+
+/** @internal */
+export function lookupCastType(
+  this: { typeMap: TypeMap },
+  sqlType: string | number | null,
+): ValueType {
+  return this.typeMap.lookup(sqlType as string | null);
 }
 
 export function columnNameMatcher(): RegExp {
@@ -218,8 +258,6 @@ function actsLikeTime(value: unknown): value is TimeLike {
     value instanceof Temporal.ZonedDateTime
   );
 }
-
-type TimeLike = TimeWithZone | RubyTime | Temporal.Instant | Temporal.ZonedDateTime;
 
 function instantOf(value: TimeLike): Temporal.Instant {
   if (value instanceof TimeWithZone) value = value.utc();
@@ -261,44 +299,6 @@ function toFsDb(value: TemporalDateLike): string {
   throw new TypeError(
     `quotedDate: cannot format ${(value as object).constructor?.name ?? typeof value} — use a Temporal type`,
   );
-}
-
-export function quotedDate(value: TemporalDateLike): string {
-  if (actsLikeTime(value)) {
-    if (defaultTimezone() === "utc") {
-      if (!isUtc(value)) value = getutc(value);
-    } else {
-      value = getlocal(value);
-    }
-  }
-
-  return toFsDb(value);
-}
-
-export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): string {
-  value = value.change({ year: 2000, month: 1, day: 1 });
-  return this.quotedDate(value).replace(/^\d{4}-\d{2}-\d{2} /, "");
-}
-
-/** @internal */
-export function typeCastedBinds(
-  this: { typeCast: (v: unknown) => unknown },
-  binds: unknown[] | null | undefined,
-): unknown[] | undefined {
-  return binds?.map((value: unknown) => {
-    if (value instanceof ModelAttribute) {
-      return this.typeCast(value.valueForDatabase);
-    }
-    return this.typeCast(value);
-  });
-}
-
-/** @internal */
-export function lookupCastType(
-  this: { typeMap: TypeMap },
-  sqlType: string | number | null,
-): ValueType {
-  return this.typeMap.lookup(sqlType as string | null);
 }
 
 /** @internal */

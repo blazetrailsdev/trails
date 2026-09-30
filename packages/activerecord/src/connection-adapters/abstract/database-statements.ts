@@ -55,14 +55,78 @@ import { queryTransformers } from "../../active-record.js";
 /** @internal */
 let _base: typeof Base | undefined;
 
-/** @internal */
-export function _registerBase(base: typeof Base): void {
-  _base = base;
+export function toSql(
+  this: DatabaseStatementsHost | void,
+  arelOrSqlString: unknown,
+  binds: unknown[] = [],
+): string {
+  const [sql] = toSqlAndBinds.call(this, arelOrSqlString, binds);
+  return sql;
 }
 
-function baseClass(): typeof Base {
-  if (!_base) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
-  return _base;
+/** @internal */
+export function toSqlAndBinds(
+  this: DatabaseStatementsHost | void,
+  arelOrSqlString: unknown,
+  binds: unknown[] = [],
+  preparable: boolean | null = null,
+  allowRetry = false,
+): [string, unknown[], boolean | null, boolean] {
+  if (
+    arelOrSqlString &&
+    (arelOrSqlString as any).ast != null &&
+    typeof (arelOrSqlString as any).ast === "object"
+  ) {
+    arelOrSqlString = (arelOrSqlString as any).ast;
+  }
+
+  if (
+    arelNode(arelOrSqlString) &&
+    typeof arelOrSqlString !== "string" &&
+    !(arelOrSqlString instanceof Nodes.SqlLiteral)
+  ) {
+    if (binds.length > 0) {
+      throw new Error(
+        "Passing bind parameters with an arel AST is forbidden. " +
+          "The values must be stored on the AST directly",
+      );
+    }
+
+    const host = this as unknown as DatabaseStatementsHost | undefined;
+    const visitor = (host as any)?.visitor as Visitors.ToSql;
+
+    const collector = host!.collector!() as unknown as Collectors.Composite;
+    collector.retryable = true;
+
+    let sql: string;
+    if (host!.preparedStatements) {
+      collector.preparable = true;
+      [sql, binds] = visitor.compile(arelOrSqlString as Nodes.Node, collector) as unknown as [
+        string,
+        unknown[],
+      ];
+
+      if (binds.length > (host as unknown as { bindParamsLength(): number }).bindParamsLength()) {
+        return host!.unpreparedStatement!(() => toSqlAndBinds.call(host, arelOrSqlString)) as [
+          string,
+          unknown[],
+          boolean | null,
+          boolean,
+        ];
+      }
+      preparable = collector.preparable ?? null;
+    } else {
+      sql = visitor.compile(arelOrSqlString as Nodes.Node, collector) as unknown as string;
+    }
+    allowRetry = collector.retryable;
+    return [sql, binds, preparable, allowRetry];
+  }
+
+  if (arelOrSqlString instanceof Nodes.SqlLiteral) {
+    return [arelOrSqlString.value, binds, preparable, allowRetry];
+  }
+
+  return [arelOrSqlString as string, binds, preparable, allowRetry];
 }
 
 export type ExplainOption = string;
@@ -177,80 +241,6 @@ export interface DatabaseStatementsHost {
   supportsConcurrentConnections?(): boolean;
 }
 
-export function toSql(
-  this: DatabaseStatementsHost | void,
-  arelOrSqlString: unknown,
-  binds: unknown[] = [],
-): string {
-  const [sql] = toSqlAndBinds.call(this, arelOrSqlString, binds);
-  return sql;
-}
-
-/** @internal */
-export function toSqlAndBinds(
-  this: DatabaseStatementsHost | void,
-  arelOrSqlString: unknown,
-  binds: unknown[] = [],
-  preparable: boolean | null = null,
-  allowRetry = false,
-): [string, unknown[], boolean | null, boolean] {
-  if (
-    arelOrSqlString &&
-    (arelOrSqlString as any).ast != null &&
-    typeof (arelOrSqlString as any).ast === "object"
-  ) {
-    arelOrSqlString = (arelOrSqlString as any).ast;
-  }
-
-  if (
-    arelNode(arelOrSqlString) &&
-    typeof arelOrSqlString !== "string" &&
-    !(arelOrSqlString instanceof Nodes.SqlLiteral)
-  ) {
-    if (binds.length > 0) {
-      throw new Error(
-        "Passing bind parameters with an arel AST is forbidden. " +
-          "The values must be stored on the AST directly",
-      );
-    }
-
-    const host = this as unknown as DatabaseStatementsHost | undefined;
-    const visitor = (host as any)?.visitor as Visitors.ToSql;
-
-    const collector = host!.collector!() as unknown as Collectors.Composite;
-    collector.retryable = true;
-
-    let sql: string;
-    if (host!.preparedStatements) {
-      collector.preparable = true;
-      [sql, binds] = visitor.compile(arelOrSqlString as Nodes.Node, collector) as unknown as [
-        string,
-        unknown[],
-      ];
-
-      if (binds.length > (host as unknown as { bindParamsLength(): number }).bindParamsLength()) {
-        return host!.unpreparedStatement!(() => toSqlAndBinds.call(host, arelOrSqlString)) as [
-          string,
-          unknown[],
-          boolean | null,
-          boolean,
-        ];
-      }
-      preparable = collector.preparable ?? null;
-    } else {
-      sql = visitor.compile(arelOrSqlString as Nodes.Node, collector) as unknown as string;
-    }
-    allowRetry = collector.retryable;
-    return [sql, binds, preparable, allowRetry];
-  }
-
-  if (arelOrSqlString instanceof Nodes.SqlLiteral) {
-    return [arelOrSqlString.value, binds, preparable, allowRetry];
-  }
-
-  return [arelOrSqlString as string, binds, preparable, allowRetry];
-}
-
 export function cacheableQuery(
   this: DatabaseStatementsHost | void,
   klass: {
@@ -347,6 +337,26 @@ export function explain(
 ): Promise<string> {
   // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:180
   throw new NotImplementedError();
+}
+
+export async function insert(
+  this: any,
+  arel: unknown,
+  name: string | null = null,
+  pk?: string | null,
+  idValue?: unknown,
+  sequenceName?: string | null,
+  binds: unknown[] = [],
+  opts?: { returning?: string[] | null },
+): Promise<unknown> {
+  let sql: string;
+  [sql, binds] = toSqlAndBinds.call(this, arel, binds);
+  const value = await this.execInsert(sql, name, binds, pk, sequenceName, opts?.returning ?? null);
+  if (opts?.returning != null) {
+    return this.returningColumnValues(value);
+  }
+  if (idValue != null && idValue !== false) return idValue;
+  return this.lastInsertedId(value);
 }
 
 /** @missingRailsName buildTruncateStatement — PERMANENT */
@@ -485,6 +495,20 @@ export function dirtyCurrentTransaction(this: DatabaseStatementsHost): void {
   transactionManager.call(this)!.dirtyCurrentTransaction();
 }
 
+export function markTransactionWrittenIfWrite(
+  this: DatabaseStatementsHost,
+  sql: string | null,
+): void {
+  const transaction = this.currentTransaction();
+  if (transaction.open) {
+    (transaction as Transaction).written ||= this.isWriteQuery(sql);
+  }
+}
+
+export function isTransactionOpen(this: DatabaseStatementsHost): boolean {
+  return this.currentTransaction().open;
+}
+
 export function resetTransaction(this: DatabaseStatementsHost): void;
 export function resetTransaction(
   this: DatabaseStatementsHost,
@@ -524,20 +548,6 @@ export function resetTransaction(
     return Promise.resolve();
   }
   self._transactionManager = new TransactionManager(self);
-}
-
-export function markTransactionWrittenIfWrite(
-  this: DatabaseStatementsHost,
-  sql: string | null,
-): void {
-  const transaction = this.currentTransaction();
-  if (transaction.open) {
-    (transaction as Transaction).written ||= this.isWriteQuery(sql);
-  }
-}
-
-export function isTransactionOpen(this: DatabaseStatementsHost): boolean {
-  return this.currentTransaction().open;
 }
 
 /** @missingRailsName ensureFinalize — PERMANENT */
@@ -727,9 +737,47 @@ export async function internalExecQuery(
 }
 
 /** @internal */
-function singleValueFromRows(rows: unknown[][]): unknown {
-  const row = rows[0];
-  return row ? row[0] : undefined;
+/** @internal */
+export async function rawExecute(
+  this: DatabaseStatementsHost,
+  sql: string,
+  name: string | null = null,
+  binds?: unknown[],
+  prepare = false,
+  async = false,
+  allowRetry = false,
+  materializeTransactions = true,
+  batch = false,
+): Promise<unknown> {
+  const typeCastedBinds = this.typeCastedBinds(binds ?? []) ?? [];
+  return this.log!(sql, name, binds ?? [], typeCastedBinds, async, (notificationPayload) =>
+    (this as any).withRawConnection({ allowRetry, materializeTransactions }, (conn: unknown) =>
+      (this as any).performQuery(conn, sql, binds ?? [], typeCastedBinds, {
+        prepare,
+        notificationPayload,
+        batch,
+      }),
+    ),
+  );
+}
+
+/** @internal */
+export function performQuery(
+  this: DatabaseStatementsHost,
+  _rawConnection: unknown,
+  _sql: string | null,
+  _binds: unknown[],
+  _typeCastedBinds: unknown[],
+  _options: {
+    prepare: boolean;
+    notificationPayload?: unknown;
+    batch?: boolean;
+  },
+): never {
+  // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:561
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#perform_query is not implemented",
+  );
 }
 
 interface DatabaseStatementsDefaultsHost {
@@ -792,24 +840,12 @@ interface DatabaseStatementsDefaultsHost {
   ): Promise<[string, unknown[]]>;
 }
 
-export async function insert(
-  this: any,
-  arel: unknown,
-  name: string | null = null,
-  pk?: string | null,
-  idValue?: unknown,
-  sequenceName?: string | null,
-  binds: unknown[] = [],
-  opts?: { returning?: string[] | null },
-): Promise<unknown> {
-  let sql: string;
-  [sql, binds] = toSqlAndBinds.call(this, arel, binds);
-  const value = await this.execInsert(sql, name, binds, pk, sequenceName, opts?.returning ?? null);
-  if (opts?.returning != null) {
-    return this.returningColumnValues(value);
-  }
-  if (idValue != null && idValue !== false) return idValue;
-  return this.lastInsertedId(value);
+/** @internal */
+export function castResult(rawResult: any): never {
+  // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:566
+  throw new NotImplementedError(
+    "ActiveRecord::ConnectionAdapters::DatabaseStatements#cast_result is not implemented",
+  );
 }
 
 export const create = insert;
@@ -1038,58 +1074,6 @@ export const DatabaseStatements = {
 };
 
 /** @internal */
-/** @internal */
-export async function rawExecute(
-  this: DatabaseStatementsHost,
-  sql: string,
-  name: string | null = null,
-  binds?: unknown[],
-  prepare = false,
-  async = false,
-  allowRetry = false,
-  materializeTransactions = true,
-  batch = false,
-): Promise<unknown> {
-  const typeCastedBinds = this.typeCastedBinds(binds ?? []) ?? [];
-  return this.log!(sql, name, binds ?? [], typeCastedBinds, async, (notificationPayload) =>
-    (this as any).withRawConnection({ allowRetry, materializeTransactions }, (conn: unknown) =>
-      (this as any).performQuery(conn, sql, binds ?? [], typeCastedBinds, {
-        prepare,
-        notificationPayload,
-        batch,
-      }),
-    ),
-  );
-}
-
-/** @internal */
-export function performQuery(
-  this: DatabaseStatementsHost,
-  _rawConnection: unknown,
-  _sql: string | null,
-  _binds: unknown[],
-  _typeCastedBinds: unknown[],
-  _options: {
-    prepare: boolean;
-    notificationPayload?: unknown;
-    batch?: boolean;
-  },
-): never {
-  // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:561
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#perform_query is not implemented",
-  );
-}
-
-/** @internal */
-export function castResult(rawResult: any): never {
-  // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:566
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#cast_result is not implemented",
-  );
-}
-
-/** @internal */
 export function affectedRows(rawResult: any): never {
   // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:570
   throw new NotImplementedError(
@@ -1161,23 +1145,10 @@ export async function executeBatch(
   }
 }
 
-const DEFAULT_INSERT_VALUE = arelSql("DEFAULT");
-
 /** @internal */
 export function defaultInsertValue(_column: unknown): Nodes.SqlLiteral {
   return DEFAULT_INSERT_VALUE;
 }
-
-/** @internal */
-type BuildFixtureHost = DatabaseStatementsHost &
-  Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
-    schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown>> };
-    supportsVirtualColumns?(): Promise<boolean> | boolean;
-    defaultInsertValue?(column: unknown): unknown;
-    lookupCastTypeFromColumn(column: unknown): { serialize(value: unknown): unknown };
-    typeMap?: unknown;
-    verifyBang?(): Promise<void>;
-  };
 
 /** @internal */
 export async function buildFixtureSql(
@@ -1247,6 +1218,8 @@ export async function buildFixtureStatements(
   return statements;
 }
 
+const DEFAULT_INSERT_VALUE = arelSql("DEFAULT");
+
 /** @internal */
 export function buildTruncateStatement(
   this: Pick<Quoting, "quoteTableName">,
@@ -1254,6 +1227,17 @@ export function buildTruncateStatement(
 ): string {
   return `TRUNCATE TABLE ${this.quoteTableName(tableName)}`;
 }
+
+/** @internal */
+type BuildFixtureHost = DatabaseStatementsHost &
+  Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
+    schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown>> };
+    supportsVirtualColumns?(): Promise<boolean> | boolean;
+    defaultInsertValue?(column: unknown): unknown;
+    lookupCastTypeFromColumn(column: unknown): { serialize(value: unknown): unknown };
+    typeMap?: unknown;
+    verifyBang?(): Promise<void>;
+  };
 
 /** @internal */
 export function buildTruncateStatements(
@@ -1314,12 +1298,6 @@ export function select(
   }
 }
 
-type FutureResultClass = new (
-  pool: FutureResultPool,
-  args: unknown[],
-  kwargs: Record<string, unknown>,
-) => FutureResult;
-
 /** @internal */
 export async function sqlForInsert(
   this: DatabaseStatementsHost,
@@ -1355,6 +1333,18 @@ export function returningColumnValues(this: DatabaseStatementsHost, result: Resu
   return [singleValueFromRows(result.rows)];
 }
 
+type FutureResultClass = new (
+  pool: FutureResultPool,
+  args: unknown[],
+  kwargs: Record<string, unknown>,
+) => FutureResult;
+
+/** @internal */
+function singleValueFromRows(rows: unknown[][]): unknown {
+  const row = rows[0];
+  return row ? row[0] : undefined;
+}
+
 /** @internal */
 export function arelFromRelation(relation: unknown): unknown {
   if (relation != null && typeof (relation as any).arel === "function") {
@@ -1371,4 +1361,14 @@ export function extractTableRefFromInsertSql(
   const match = sql.match(/into\s("[ A-Za-z0-9_."[\]]+"|[A-Za-z0-9_.[\]"]+)\s*/im);
   if (!match) return null;
   return match[1].replace(/"/g, "").trim();
+}
+
+/** @internal */
+export function _registerBase(base: typeof Base): void {
+  _base = base;
+}
+
+function baseClass(): typeof Base {
+  if (!_base) throw new ActiveRecordError("ActiveRecord::Base has not finished loading");
+  return _base;
 }

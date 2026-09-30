@@ -92,11 +92,6 @@ export class TableDefinition extends AbstractTableDefinition {
   }
 
   /** @internal */
-  override aliasedTypes(_name: string, fallback: string): string {
-    return fallback;
-  }
-
-  /** @internal */
   protected override validColumnDefinitionOptions(): string[] {
     return super
       .validColumnDefinitionOptions()
@@ -111,6 +106,11 @@ export class TableDefinition extends AbstractTableDefinition {
         "type",
         "stored",
       ]);
+  }
+
+  /** @internal */
+  override aliasedTypes(_name: string, fallback: string): string {
+    return fallback;
   }
 
   /** @internal */

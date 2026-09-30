@@ -48,6 +48,78 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   static readonly ER_CONN_HOST_ERROR = 2003;
   static readonly ER_UNKNOWN_HOST_ERROR = 2005;
 
+  static async newClient(
+    config: mysql.PoolOptions & MysqlAdapterOptions,
+  ): Promise<mysql.Connection> {
+    const {
+      typeCast: userTypeCast,
+      adapter: _adapter,
+      strict: _strict,
+      waitTimeout: _wt,
+      variables: _vars,
+      initSql,
+      connectionLimit: _connLimit,
+      queueLimit: _queueLimit,
+      waitForConnections: _waitFor,
+      ...connOptions
+    } = config as mysql.PoolOptions &
+      MysqlAdapterOptions & {
+        adapter?: string;
+        connectionLimit?: number;
+        queueLimit?: number;
+        waitForConnections?: boolean;
+      };
+
+    const composedTypeCast =
+      typeof userTypeCast === "function"
+        ? (field: unknown, next: () => unknown) =>
+            temporalTypeCast(field as Parameters<typeof temporalTypeCast>[0], () =>
+              (userTypeCast as (f: unknown, n: () => unknown) => unknown)(field, next),
+            )
+        : TEMPORAL_POOL_OPTIONS.typeCast;
+
+    let conn: mysql.Connection;
+    try {
+      conn = await mysql.createConnection({
+        supportBigNumbers: true,
+        ...(connOptions as mysql.ConnectionOptions),
+        flags: withoutDefaultIgnoreSpace(connOptions.flags),
+        multipleStatements: true,
+        typeCast: composedTypeCast,
+      });
+    } catch (err) {
+      if (!(err instanceof Error)) throw new ConnectionNotEstablished(String(err));
+      switch ((err as { errno?: number }).errno) {
+        case Mysql2Adapter.ER_BAD_DB_ERROR:
+          throw NoDatabaseError.dbError(
+            (connOptions as { database?: string }).database ?? "unknown",
+          );
+        case Mysql2Adapter.ER_DBACCESS_DENIED_ERROR:
+        case Mysql2Adapter.ER_ACCESS_DENIED_ERROR:
+          throw DatabaseConnectionError.usernameError(
+            config.user ?? parseUriField(config, "username") ?? "unknown",
+          );
+        case Mysql2Adapter.ER_CONN_HOST_ERROR:
+        case Mysql2Adapter.ER_UNKNOWN_HOST_ERROR:
+          throw DatabaseConnectionError.hostnameError(
+            config.host ?? parseUriField(config, "hostname") ?? "unknown",
+          );
+        default:
+          throw new ConnectionNotEstablished(err.message, { cause: err });
+      }
+    }
+
+    if (initSql) {
+      try {
+        await conn.query(initSql);
+      } catch (err) {
+        conn.end().catch(() => {});
+        throw err;
+      }
+    }
+    return conn;
+  }
+
   /** @internal */
   static override initializeTypeMap(m: TypeMap): void {
     super.initializeTypeMap(m);
@@ -58,105 +130,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     m.registerType(/^enum/i, Type.lookup("string", { adapter: "mysql2" }));
     m.registerType(/^set/i, Type.lookup("string", { adapter: "mysql2" }));
   }
-
-  static override get TYPE_MAP(): TypeMap {
-    return (mysql2TypeMap ??= (() => {
-      const m = new TypeMap();
-      Mysql2Adapter.initializeTypeMap(m);
-      return m;
-    })());
-  }
-
-  override async active(): Promise<boolean> {
-    if (!this.isConnected()) return false;
-    try {
-      const conn = await this._ensureClient();
-      await conn.ping();
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  override isConnected(): boolean {
-    const conn = this._rawConnection as
-      | (mysql.Connection & {
-          connection: { _closing?: boolean; stream?: { destroyed?: boolean } };
-        })
-      | null;
-    return !(
-      conn == null ||
-      conn.connection._closing === true ||
-      conn.connection.stream?.destroyed === true
-    );
-  }
-
-  /** @internal */
-  get _rawConnection(): mysql.Connection | null {
-    return this._connection as mysql.Connection | null;
-  }
-  /** @internal */
-  set _rawConnection(value: mysql.Connection | null) {
-    this._connection = value;
-  }
-  private _connectingPromise: Promise<mysql.Connection> | null = null;
-  private _connectGeneration = 0;
-  private _connectingPromiseGen = -1;
-  private _discardedConnectGenerations = new Set<number>();
-  private _endingClient: Promise<void> | null = null;
-  private _isFakeConnection = false;
-  private _poolConfig: mysql.PoolOptions & MysqlAdapterOptions;
-  private _connectionConfigured = false;
-  declare _statements: MysqlStatementPool | null;
-
-  _databaseTimezone: "utc" | "local" = "utc";
-
-  _affectedRowsBeforeWarnings = 0;
-
-  /** @internal */
-  override translateException(
-    exception: unknown,
-    { message, sql, binds }: { message: string; sql: string; binds: unknown[] },
-  ): unknown {
-    if (isMysql2DriverTimeout(exception)) {
-      return new AdapterTimeout(message, { sql, binds, connectionPool: this.pool });
-    } else if (isMysql2ConnectionError(exception)) {
-      if (/MySQL client is not connected/i.test((exception as Error).message)) {
-        return new ConnectionNotEstablished(exception as Error, { connectionPool: this.pool });
-      } else {
-        return new ConnectionFailed(message, { sql, binds, connectionPool: this.pool });
-      }
-    } else {
-      return super.translateException(exception, { message, sql, binds });
-    }
-  }
-
-  private _getStmtPool(): MysqlStatementPool {
-    if (!this._statements) {
-      this._statements = this.buildStatementPool();
-    }
-    return this._statements;
-  }
-
-  _trackPrepared(conn: mysql.Connection, sql: string): void {
-    const pool = this._getStmtPool();
-    if (pool.get(sql)) return;
-    void pool.set(sql, {
-      sql,
-      close(): void {
-        try {
-          (conn as unknown as { unprepare: (sql: string) => void }).unprepare(sql);
-        } catch {}
-      },
-    });
-  }
-
-  /** @internal */
-  _clientForTest(): mysql.Connection | null {
-    return this._rawConnection;
-  }
-
-  private _database: string | undefined;
 
   constructor(config: string | (mysql.PoolOptions & MysqlAdapterOptions));
   /** @deprecated */
@@ -267,6 +240,19 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   supportsComments(): boolean {
     return true;
   }
+  private _connectingPromise: Promise<mysql.Connection> | null = null;
+  private _connectGeneration = 0;
+  private _connectingPromiseGen = -1;
+  private _discardedConnectGenerations = new Set<number>();
+  private _endingClient: Promise<void> | null = null;
+  private _isFakeConnection = false;
+  private _poolConfig: mysql.PoolOptions & MysqlAdapterOptions;
+  private _connectionConfigured = false;
+  declare _statements: MysqlStatementPool | null;
+
+  _databaseTimezone: "utc" | "local" = "utc";
+
+  _affectedRowsBeforeWarnings = 0;
 
   supportsCommentsInCreate(): boolean {
     return true;
@@ -276,12 +262,66 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return true;
   }
 
+  override isSavepointErrorsInvalidateTransactions(): boolean {
+    return true;
+  }
+
   supportsLazyTransactions(): boolean {
     return true;
   }
 
+  private _database: string | undefined;
+
   override errorNumber(exception: Error & { errno?: number }): number | null {
     return exception.errno ?? null;
+  }
+
+  override isConnected(): boolean {
+    const conn = this._rawConnection as
+      | (mysql.Connection & {
+          connection: { _closing?: boolean; stream?: { destroyed?: boolean } };
+        })
+      | null;
+    return !(
+      conn == null ||
+      conn.connection._closing === true ||
+      conn.connection.stream?.destroyed === true
+    );
+  }
+
+  override async active(): Promise<boolean> {
+    if (!this.isConnected()) return false;
+    try {
+      const conn = await this._ensureClient();
+      await conn.ping();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  override async disconnectBang(): Promise<void> {
+    await this.lock.synchronize(async () => {
+      await super.disconnectBang();
+      this._connectGeneration++;
+      this._connectionConfigured = false;
+      this._statements = null;
+      this._endRawConnection();
+      this._rawConnection = null;
+      await this._endingClient;
+    });
+  }
+
+  override discardBang(): void {
+    if (this._connectingPromise && this._connectingPromiseGen === this._connectGeneration) {
+      this._discardedConnectGenerations.add(this._connectGeneration);
+    }
+    this._connectGeneration++;
+    super.discardBang();
+    this._connectionConfigured = false;
+    this._statements = null;
+    abandonRawSocket(this._rawConnection);
+    this._rawConnection = null;
   }
 
   /** @internal */
@@ -290,6 +330,126 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       Mysql2Adapter.TYPE_MAP.lookup(type) instanceof StringType ||
       Mysql2Adapter.TYPE_MAP.lookup(type) instanceof TextType
     );
+  }
+
+  /** @internal */
+  async connect(): Promise<void> {
+    try {
+      await this._ensureClient();
+    } catch (ex) {
+      if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
+      throw ex;
+    }
+  }
+
+  /** @internal */
+  override async reconnect(): Promise<void> {
+    return this.lock.synchronize(async () => {
+      this._connectGeneration++;
+      this._connectionConfigured = false;
+      this._statements = null;
+      this._endRawConnection();
+      this._rawConnection = null;
+      await this._ensureClient();
+    });
+  }
+
+  /** @internal */
+  override async configureConnection(): Promise<void> {
+    this._databaseTimezone = defaultTimezone();
+    if (this._connectionConfigured || !this._rawConnection) return;
+    this._connectionConfigured = true;
+    await super.configureConnection();
+    await this.loadEscapeState();
+  }
+
+  /** @internal */
+  executeBatch = mysql2ExecuteBatch;
+
+  /** @internal */
+  override async fullVersion(): Promise<string | null> {
+    return (await this.databaseVersion).fullVersionString;
+  }
+
+  /** @internal */
+  isMultiStatementsEnabled = mysql2IsMultiStatementsEnabled;
+
+  /** @internal */
+  declare performQuery: typeof mysql2PerformQuery;
+
+  /** @internal */
+  declare castResult: typeof mysql2CastResult;
+
+  /** @internal */
+  override async getFullVersion(): Promise<string | null> {
+    type Handshake = { _handshakePacket?: { serverVersion?: string } };
+    const conn = (await this.anyRawConnection()) as (Handshake & { connection?: Handshake }) | null;
+    return (conn?.connection ?? conn)?._handshakePacket?.serverVersion ?? null;
+  }
+
+  /** @internal */
+  override translateException(
+    exception: unknown,
+    { message, sql, binds }: { message: string; sql: string; binds: unknown[] },
+  ): unknown {
+    if (isMysql2DriverTimeout(exception)) {
+      return new AdapterTimeout(message, { sql, binds, connectionPool: this.pool });
+    } else if (isMysql2ConnectionError(exception)) {
+      if (/MySQL client is not connected/i.test((exception as Error).message)) {
+        return new ConnectionNotEstablished(exception as Error, { connectionPool: this.pool });
+      } else {
+        return new ConnectionFailed(message, { sql, binds, connectionPool: this.pool });
+      }
+    } else {
+      return super.translateException(exception, { message, sql, binds });
+    }
+  }
+
+  /** @internal */
+  override defaultPreparedStatements(): boolean {
+    return false;
+  }
+
+  static override get TYPE_MAP(): TypeMap {
+    return (mysql2TypeMap ??= (() => {
+      const m = new TypeMap();
+      Mysql2Adapter.initializeTypeMap(m);
+      return m;
+    })());
+  }
+
+  /** @internal */
+  get _rawConnection(): mysql.Connection | null {
+    return this._connection as mysql.Connection | null;
+  }
+  /** @internal */
+  set _rawConnection(value: mysql.Connection | null) {
+    this._connection = value;
+  }
+
+  private _getStmtPool(): MysqlStatementPool {
+    if (!this._statements) {
+      this._statements = this.buildStatementPool();
+    }
+    return this._statements;
+  }
+
+  _trackPrepared(conn: mysql.Connection, sql: string): void {
+    const pool = this._getStmtPool();
+    if (pool.get(sql)) return;
+    void pool.set(sql, {
+      sql,
+      close(): void {
+        try {
+          (conn as unknown as { unprepare: (sql: string) => void }).unprepare(sql);
+        } catch {}
+      },
+    });
+  }
+
+  /** @internal */
+  _clientForTest(): mysql.Connection | null {
+    return this._rawConnection;
   }
 
   private async _ensureClient(): Promise<mysql.Connection> {
@@ -341,63 +501,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /** @internal */
-  executeBatch = mysql2ExecuteBatch;
-
-  /** @internal */
   lastInsertedId(result: Result): Promise<unknown> {
     return mysql2LastInsertedId.call(this as never, result);
   }
 
   /** @internal */
-  isMultiStatementsEnabled = mysql2IsMultiStatementsEnabled;
-
-  /** @internal */
-  declare performQuery: typeof mysql2PerformQuery;
-
-  /** @internal */
-  declare castResult: typeof mysql2CastResult;
-
-  /** @internal */
   affectedRows(rawResult: Mysql2RawResult): number {
     return mysql2AffectedRows.call(this as any, rawResult);
-  }
-
-  override isSavepointErrorsInvalidateTransactions(): boolean {
-    return true;
-  }
-
-  /** @internal */
-  async connect(): Promise<void> {
-    try {
-      await this._ensureClient();
-    } catch (ex) {
-      if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
-      throw ex;
-    }
-  }
-
-  /** @internal */
-  override async reconnect(): Promise<void> {
-    return this.lock.synchronize(async () => {
-      this._connectGeneration++;
-      this._connectionConfigured = false;
-      this._statements = null;
-      this._endRawConnection();
-      this._rawConnection = null;
-      await this._ensureClient();
-    });
-  }
-
-  override async disconnectBang(): Promise<void> {
-    await this.lock.synchronize(async () => {
-      await super.disconnectBang();
-      this._connectGeneration++;
-      this._connectionConfigured = false;
-      this._statements = null;
-      this._endRawConnection();
-      this._rawConnection = null;
-      await this._endingClient;
-    });
   }
 
   /** @internal */
@@ -407,119 +517,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._endingClient = this._endingClient ? this._endingClient.then(() => ending) : ending;
   }
 
-  override discardBang(): void {
-    if (this._connectingPromise && this._connectingPromiseGen === this._connectGeneration) {
-      this._discardedConnectGenerations.add(this._connectGeneration);
-    }
-    this._connectGeneration++;
-    super.discardBang();
-    this._connectionConfigured = false;
-    this._statements = null;
-    abandonRawSocket(this._rawConnection);
-    this._rawConnection = null;
-  }
-
   /** @internal */
   _testOnlyPoolFlags(): string[] | undefined {
     return this._poolConfig.flags;
-  }
-
-  /** @internal */
-  override async configureConnection(): Promise<void> {
-    this._databaseTimezone = defaultTimezone();
-    if (this._connectionConfigured || !this._rawConnection) return;
-    this._connectionConfigured = true;
-    await super.configureConnection();
-    await this.loadEscapeState();
-  }
-
-  /** @internal */
-  override async fullVersion(): Promise<string | null> {
-    return (await this.databaseVersion).fullVersionString;
-  }
-
-  /** @internal */
-  override async getFullVersion(): Promise<string | null> {
-    type Handshake = { _handshakePacket?: { serverVersion?: string } };
-    const conn = (await this.anyRawConnection()) as (Handshake & { connection?: Handshake }) | null;
-    return (conn?.connection ?? conn)?._handshakePacket?.serverVersion ?? null;
-  }
-
-  /** @internal */
-  override defaultPreparedStatements(): boolean {
-    return false;
-  }
-
-  static async newClient(
-    config: mysql.PoolOptions & MysqlAdapterOptions,
-  ): Promise<mysql.Connection> {
-    const {
-      typeCast: userTypeCast,
-      adapter: _adapter,
-      strict: _strict,
-      waitTimeout: _wt,
-      variables: _vars,
-      initSql,
-      connectionLimit: _connLimit,
-      queueLimit: _queueLimit,
-      waitForConnections: _waitFor,
-      ...connOptions
-    } = config as mysql.PoolOptions &
-      MysqlAdapterOptions & {
-        adapter?: string;
-        connectionLimit?: number;
-        queueLimit?: number;
-        waitForConnections?: boolean;
-      };
-
-    const composedTypeCast =
-      typeof userTypeCast === "function"
-        ? (field: unknown, next: () => unknown) =>
-            temporalTypeCast(field as Parameters<typeof temporalTypeCast>[0], () =>
-              (userTypeCast as (f: unknown, n: () => unknown) => unknown)(field, next),
-            )
-        : TEMPORAL_POOL_OPTIONS.typeCast;
-
-    let conn: mysql.Connection;
-    try {
-      conn = await mysql.createConnection({
-        supportBigNumbers: true,
-        ...(connOptions as mysql.ConnectionOptions),
-        flags: withoutDefaultIgnoreSpace(connOptions.flags),
-        multipleStatements: true,
-        typeCast: composedTypeCast,
-      });
-    } catch (err) {
-      if (!(err instanceof Error)) throw new ConnectionNotEstablished(String(err));
-      switch ((err as { errno?: number }).errno) {
-        case Mysql2Adapter.ER_BAD_DB_ERROR:
-          throw NoDatabaseError.dbError(
-            (connOptions as { database?: string }).database ?? "unknown",
-          );
-        case Mysql2Adapter.ER_DBACCESS_DENIED_ERROR:
-        case Mysql2Adapter.ER_ACCESS_DENIED_ERROR:
-          throw DatabaseConnectionError.usernameError(
-            config.user ?? parseUriField(config, "username") ?? "unknown",
-          );
-        case Mysql2Adapter.ER_CONN_HOST_ERROR:
-        case Mysql2Adapter.ER_UNKNOWN_HOST_ERROR:
-          throw DatabaseConnectionError.hostnameError(
-            config.host ?? parseUriField(config, "hostname") ?? "unknown",
-          );
-        default:
-          throw new ConnectionNotEstablished(err.message, { cause: err });
-      }
-    }
-
-    if (initSql) {
-      try {
-        await conn.query(initSql);
-      } catch (err) {
-        conn.end().catch(() => {});
-        throw err;
-      }
-    }
-    return conn;
   }
 }
 

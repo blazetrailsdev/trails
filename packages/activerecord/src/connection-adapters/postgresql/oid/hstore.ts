@@ -11,21 +11,6 @@ export class Hstore extends ValueType<Record<string, string | null>> {
     return "hstore";
   }
 
-  override isMutable(): boolean {
-    return true;
-  }
-
-  accessor(): typeof StringKeyedHashAccessor {
-    return StringKeyedHashAccessor;
-  }
-
-  cast(value: unknown): Record<string, string | null> | null {
-    if (value == null) return null;
-    const serialized = this.serialize(value);
-    if (typeof serialized !== "string") return null;
-    return this.deserialize(serialized);
-  }
-
   override deserialize(value: unknown): Record<string, string | null> | null {
     if (typeof value !== "string") return value as Record<string, string | null> | null;
 
@@ -99,11 +84,26 @@ export class Hstore extends ValueType<Record<string, string | null>> {
     return null;
   }
 
+  accessor(): typeof StringKeyedHashAccessor {
+    return StringKeyedHashAccessor;
+  }
+
   override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
     const oldHash = this.deserialize(rawOldValue);
     if (oldHash == null && newValue == null) return false;
     if (oldHash == null || newValue == null) return true;
     return !hashesEqual(oldHash, newValue as Record<string, unknown>);
+  }
+
+  override isMutable(): boolean {
+    return true;
+  }
+
+  cast(value: unknown): Record<string, string | null> | null {
+    if (value == null) return null;
+    const serialized = this.serialize(value);
+    if (typeof serialized !== "string") return null;
+    return this.deserialize(serialized);
   }
 }
 

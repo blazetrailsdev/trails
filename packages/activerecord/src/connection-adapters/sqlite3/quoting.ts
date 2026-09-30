@@ -21,6 +21,38 @@ import { Database } from "../../sqlite/database.js";
 import { BinaryData } from "@blazetrails/activemodel";
 import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 
+export function quote(this: QuotingDispatchHost, value: unknown): string {
+  if (typeof value === "number" || value instanceof BigDecimal) {
+    if (value instanceof BigDecimal ? value.isFinite() : Number.isFinite(value)) {
+      return abstractQuote.call(this, value);
+    } else {
+      return `'${toS(value)}'`;
+    }
+  } else {
+    return abstractQuote.call(this, value);
+  }
+}
+
+export function quoteString(s: string): string {
+  return Database.quote(s);
+}
+
+export function quoteTableNameForAssignment(_table: string, attr: string): string {
+  return quoteColumnName(attr);
+}
+
+export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): string {
+  value = value.change({ year: 2000, month: 1, day: 1 });
+  return this.quotedDate(value).replace(/^\d{4}-\d{2}-\d{2} /, "2000-01-01 ");
+}
+
+const QUOTED_COLUMN_NAMES = new Map<unknown, string>();
+const QUOTED_TABLE_NAMES = new Map<unknown, string>();
+
+export function quotedBinary(value: BinaryData): string {
+  return `x'${value.hex()}'`;
+}
+
 export function quotedTrue(): string {
   return "1";
 }
@@ -35,56 +67,6 @@ export function quotedFalse(): string {
 
 export function unquotedFalse(): number {
   return 0;
-}
-
-const QUOTED_COLUMN_NAMES = new Map<unknown, string>();
-const QUOTED_TABLE_NAMES = new Map<unknown, string>();
-
-export function quoteTableName(name: unknown): string {
-  let quoted = QUOTED_TABLE_NAMES.get(name);
-  if (quoted === undefined) {
-    quoted = `"${toS(name).replace(/"/g, '""').replace(/\./g, '"."')}"`;
-    QUOTED_TABLE_NAMES.set(name, quoted);
-  }
-  return quoted;
-}
-
-export function quoteColumnName(name: unknown): string {
-  let quoted = QUOTED_COLUMN_NAMES.get(name);
-  if (quoted === undefined) {
-    quoted = `"${toS(name).replace(/"/g, '""')}"`;
-    QUOTED_COLUMN_NAMES.set(name, quoted);
-  }
-  return quoted;
-}
-
-export function quoteString(s: string): string {
-  return Database.quote(s);
-}
-
-export function quote(this: QuotingDispatchHost, value: unknown): string {
-  if (typeof value === "number" || value instanceof BigDecimal) {
-    if (value instanceof BigDecimal ? value.isFinite() : Number.isFinite(value)) {
-      return abstractQuote.call(this, value);
-    } else {
-      return `'${toS(value)}'`;
-    }
-  } else {
-    return abstractQuote.call(this, value);
-  }
-}
-
-export function quoteTableNameForAssignment(_table: string, attr: string): string {
-  return quoteColumnName(attr);
-}
-
-export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): string {
-  value = value.change({ year: 2000, month: 1, day: 1 });
-  return this.quotedDate(value).replace(/^\d{4}-\d{2}-\d{2} /, "2000-01-01 ");
-}
-
-export function quotedBinary(value: BinaryData): string {
-  return `x'${value.hex()}'`;
 }
 
 export function quoteDefaultExpression(
@@ -107,8 +89,34 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   return abstractTypeCast.call(this, value);
 }
 
+export function columnNameMatcher(): RegExp {
+  return COLUMN_NAME_MATCHER;
+}
+
+export function columnNameWithOrderMatcher(): RegExp {
+  return COLUMN_NAME_WITH_ORDER_MATCHER;
+}
+
 const DANGEROUS_KEYWORDS =
   /\b(?:SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|INTO|FROM|WHERE|EXEC|EXECUTE)\b/i;
+
+export function quoteColumnName(name: unknown): string {
+  let quoted = QUOTED_COLUMN_NAMES.get(name);
+  if (quoted === undefined) {
+    quoted = `"${toS(name).replace(/"/g, '""')}"`;
+    QUOTED_COLUMN_NAMES.set(name, quoted);
+  }
+  return quoted;
+}
+
+export function quoteTableName(name: unknown): string {
+  let quoted = QUOTED_TABLE_NAMES.get(name);
+  if (quoted === undefined) {
+    quoted = `"${toS(name).replace(/"/g, '""').replace(/\./g, '"."')}"`;
+    QUOTED_TABLE_NAMES.set(name, quoted);
+  }
+  return quoted;
+}
 
 function skipBalancedParens(s: string, pos: number): number {
   if (s[pos] !== "(") return -1;
@@ -178,6 +186,31 @@ function matchColumnExpr(s: string, pos: number): number {
   return i;
 }
 
+class ColumnMatcher extends RegExp {
+  private readonly _allowOrder: boolean;
+
+  constructor(allowOrder: boolean) {
+    super(".*");
+    this._allowOrder = allowOrder;
+  }
+
+  override test(s: string): boolean {
+    return matchColumnList(s, this._allowOrder);
+  }
+
+  override exec(s: string): RegExpExecArray | null {
+    if (!this.test(s)) return null;
+    const match = [s] as RegExpExecArray;
+    match.index = 0;
+    match.input = s;
+    match.groups = undefined;
+    return match;
+  }
+}
+
+export const COLUMN_NAME_MATCHER: RegExp = new ColumnMatcher(false);
+export const COLUMN_NAME_WITH_ORDER_MATCHER: RegExp = new ColumnMatcher(true);
+
 function skipWhitespace(s: string, pos: number): number {
   while (pos < s.length && /\s/.test(s[pos])) pos++;
   return pos;
@@ -239,37 +272,4 @@ function matchColumnList(s: string, allowOrder: boolean): boolean {
     if (s[i] !== ",") return false;
     i = skipWhitespace(s, i + 1);
   }
-}
-
-class ColumnMatcher extends RegExp {
-  private readonly _allowOrder: boolean;
-
-  constructor(allowOrder: boolean) {
-    super(".*");
-    this._allowOrder = allowOrder;
-  }
-
-  override test(s: string): boolean {
-    return matchColumnList(s, this._allowOrder);
-  }
-
-  override exec(s: string): RegExpExecArray | null {
-    if (!this.test(s)) return null;
-    const match = [s] as RegExpExecArray;
-    match.index = 0;
-    match.input = s;
-    match.groups = undefined;
-    return match;
-  }
-}
-
-export const COLUMN_NAME_MATCHER: RegExp = new ColumnMatcher(false);
-export const COLUMN_NAME_WITH_ORDER_MATCHER: RegExp = new ColumnMatcher(true);
-
-export function columnNameMatcher(): RegExp {
-  return COLUMN_NAME_MATCHER;
-}
-
-export function columnNameWithOrderMatcher(): RegExp {
-  return COLUMN_NAME_WITH_ORDER_MATCHER;
 }

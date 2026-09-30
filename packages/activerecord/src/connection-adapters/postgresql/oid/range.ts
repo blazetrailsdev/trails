@@ -16,18 +16,18 @@ export class RangeType extends ValueType<Range<unknown>> {
   readonly subtype: RangeSubtype;
   private readonly _type: string;
 
-  constructor(subtype: RangeSubtype, type: string = "range") {
-    super();
-    this.subtype = subtype;
-    this._type = type;
-  }
-
   override type(): string {
     return this._type;
   }
 
   userInputInTimeZone(value: unknown): unknown {
     return this.subtype.userInputInTimeZone!(value);
+  }
+
+  constructor(subtype: RangeSubtype, type: string = "range") {
+    super();
+    this.subtype = subtype;
+    this._type = type;
   }
 
   override typeCastForSchema(value: unknown): string {

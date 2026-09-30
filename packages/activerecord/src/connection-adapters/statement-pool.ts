@@ -11,12 +11,22 @@ export class StatementPool<T = unknown> {
     this._statementLimit = statementLimit ?? StatementPool.DEFAULT_STATEMENT_LIMIT;
   }
 
-  get length(): number {
-    return this.cache.size;
+  each(fn: (key: string, stmt: T) => void): void {
+    for (const [key, stmt] of this.cache) {
+      fn(key, stmt);
+    }
+  }
+
+  isKey(key: string): boolean {
+    return this.cache.has(key);
   }
 
   get(key: string): T | undefined {
     return this.cache.get(key);
+  }
+
+  get length(): number {
+    return this.cache.size;
   }
 
   /**
@@ -36,18 +46,6 @@ export class StatementPool<T = unknown> {
     return deallocating;
   }
 
-  isKey(key: string): boolean {
-    return this.cache.has(key);
-  }
-
-  delete(key: string): T | undefined | Promise<T | undefined> {
-    if (!this.cache.has(key)) return undefined;
-    const stmt = this.cache.get(key) as T;
-    this.cache.delete(key);
-    const pending = this.dealloc(stmt);
-    return pending ? pending.then(() => stmt) : stmt;
-  }
-
   clear(): void | Promise<void> {
     let deallocating: Promise<void> | undefined;
     for (const stmt of this.cache.values()) {
@@ -63,10 +61,12 @@ export class StatementPool<T = unknown> {
     this.cache.clear();
   }
 
-  each(fn: (key: string, stmt: T) => void): void {
-    for (const [key, stmt] of this.cache) {
-      fn(key, stmt);
-    }
+  delete(key: string): T | undefined | Promise<T | undefined> {
+    if (!this.cache.has(key)) return undefined;
+    const stmt = this.cache.get(key) as T;
+    this.cache.delete(key);
+    const pending = this.dealloc(stmt);
+    return pending ? pending.then(() => stmt) : stmt;
   }
 
   private get cache(): Map<string, T> {

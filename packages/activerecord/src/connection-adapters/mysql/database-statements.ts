@@ -32,6 +32,36 @@ export interface BuildExplainClauseHost {
   databaseVersion?: Version | Promise<Version>;
 }
 
+export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
+  return arelSql("CURRENT_TIMESTAMP(6)");
+}
+
+interface SupportsInsertReturningHost {
+  /** @internal */
+  supportsInsertReturning?(): Promise<boolean>;
+}
+
+interface AutoIncrementColumnHost {
+  isAutoIncrement?(): boolean;
+}
+
+export async function explain(
+  this: {
+    buildExplainClause(options?: ExplainOption[]): Promise<string>;
+    toSql(arel: unknown, binds?: unknown[]): string;
+    internalExecQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+  },
+  arel: unknown,
+  binds: unknown[] = [],
+  options: ExplainOption[] = [],
+): Promise<string> {
+  const sql = (await this.buildExplainClause(options)) + " " + this.toSql(arel, binds);
+  const start = Date.now();
+  const result = await this.internalExecQuery(sql, "EXPLAIN", binds);
+  const elapsed = (Date.now() - start) / 1000;
+  return new ExplainPrettyPrinter().pp(result, elapsed);
+}
+
 export async function buildExplainClause(
   this: BuildExplainClauseHost | void,
   options: ExplainOption[] = [],
@@ -47,15 +77,6 @@ export async function buildExplainClause(
   return clause;
 }
 
-interface SupportsInsertReturningHost {
-  /** @internal */
-  supportsInsertReturning?(): Promise<boolean>;
-}
-
-interface AutoIncrementColumnHost {
-  isAutoIncrement?(): boolean;
-}
-
 /** @internal */
 export async function isAnalyzeWithoutExplain(
   this: BuildExplainClauseHost | void,
@@ -63,6 +84,13 @@ export async function isAnalyzeWithoutExplain(
   const host = this as BuildExplainClauseHost | null;
   if (!(await host?.isMariadb?.())) return false;
   return ((await host?.databaseVersion)?.compare("10.1.0") ?? -1) >= 0;
+}
+
+export interface MaxAllowedPacketHost {
+  showVariable(name: string): Promise<unknown>;
+  _maxAllowedPacket?: number | null;
+  /** @internal */
+  maxAllowedPacket(): Promise<number | null>;
 }
 
 /** @internal */
@@ -83,13 +111,6 @@ export async function returningColumnValues(
     return result.rows[0] as unknown[] | undefined;
   }
   return undefined;
-}
-
-export interface MaxAllowedPacketHost {
-  showVariable(name: string): Promise<unknown>;
-  _maxAllowedPacket?: number | null;
-  /** @internal */
-  maxAllowedPacket(): Promise<number | null>;
 }
 
 /** @internal */
@@ -132,25 +153,4 @@ export async function maxAllowedPacket(this: MaxAllowedPacketHost): Promise<numb
   return (this._maxAllowedPacket ??= (await this.showVariable("max_allowed_packet")) as
     | number
     | null);
-}
-
-export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
-  return arelSql("CURRENT_TIMESTAMP(6)");
-}
-
-export async function explain(
-  this: {
-    buildExplainClause(options?: ExplainOption[]): Promise<string>;
-    toSql(arel: unknown, binds?: unknown[]): string;
-    internalExecQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
-  },
-  arel: unknown,
-  binds: unknown[] = [],
-  options: ExplainOption[] = [],
-): Promise<string> {
-  const sql = (await this.buildExplainClause(options)) + " " + this.toSql(arel, binds);
-  const start = Date.now();
-  const result = await this.internalExecQuery(sql, "EXPLAIN", binds);
-  const elapsed = (Date.now() - start) / 1000;
-  return new ExplainPrettyPrinter().pp(result, elapsed);
 }

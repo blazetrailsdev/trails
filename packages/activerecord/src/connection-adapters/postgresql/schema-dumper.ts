@@ -8,96 +8,6 @@ import type { Column } from "./column.js";
 
 export class SchemaDumper extends AbstractSchemaDumper {
   /** @internal */
-  protected override async prepareColumnOptions(column: Column): Promise<Record<string, unknown>> {
-    const spec = await super.prepareColumnOptions(column);
-    if (column.isArray()) spec["array"] = true;
-
-    if (this.supportsVirtualColumns && column.isVirtual()) {
-      spec["as"] = this.extractExpressionForVirtualColumn(column);
-      spec["stored"] = true;
-      if (column.isEnum()) spec["enumType"] = JSON.stringify(column.sqlType);
-      return { type: JSON.stringify(this.schemaType(column).replace(/^:/, "")), ...spec };
-    }
-
-    if (column.isEnum()) spec["enumType"] = JSON.stringify(column.sqlType);
-
-    return spec;
-  }
-
-  /** @internal */
-  protected override isDefaultPrimaryKey(column: Column): boolean {
-    return this.schemaType(column) === ":bigserial";
-  }
-
-  /** @internal */
-  protected override schemaLimit(column: Column): string | undefined {
-    if (column.type === "integer" && column.limit === 4) return undefined;
-    const base = super.schemaLimit(column);
-    if (base !== undefined) return base;
-    const sqlType = (column.sqlType ?? "").toLowerCase();
-    if (/^(?:character varying|varchar|char(?:acter)?|bpchar)\b/.test(sqlType)) {
-      const m = /\((\d+)\)/.exec(sqlType);
-      return m ? m[1] : undefined;
-    }
-    if (/^(?:bit|varbit|bit varying)\b/.test(sqlType)) {
-      const m = /\((\d+)\)/.exec(sqlType);
-      return m ? m[1] : undefined;
-    }
-    return undefined;
-  }
-
-  /** @internal */
-  protected override schemaPrecision(column: Column): string | undefined {
-    const base = super.schemaPrecision(column);
-    if (base !== undefined) return base;
-    const sqlType = (column.sqlType ?? "").toLowerCase();
-    const m = /^numeric\((\d+)/.exec(sqlType);
-    return m ? m[1] : undefined;
-  }
-
-  /** @internal */
-  protected override schemaScale(column: Column): string | undefined {
-    const base = super.schemaScale(column);
-    if (base !== undefined) return base;
-    const sqlType = (column.sqlType ?? "").toLowerCase();
-    const m = /^numeric\(\d+,\s*(\d+)\)/.exec(sqlType);
-    return m ? m[1] : undefined;
-  }
-
-  /** @internal */
-  protected isExplicitPrimaryKeyDefault(column: Column): boolean {
-    return column.type === "uuid" || (column.type === "integer" && !column.isSerial());
-  }
-
-  /** @internal */
-  protected override schemaType(column: Column): string {
-    const isBigSql = /^bigint\b/i.test(column.sqlType ?? "");
-    if (column.isSerial()) return isBigSql ? ":bigserial" : ":serial";
-    if (isBigSql || column.type === "bigint") return ":bigint";
-    const semantic = column.type ?? undefined;
-    if (semantic === "big_integer") return ":bigint";
-    if (semantic === "bit_varying") return ":bitVarying";
-    return semantic != null ? `:${semantic}` : super.schemaType(column as any);
-  }
-
-  /** @internal */
-  protected override schemaTypeWithVirtual(column: Column): string {
-    if (this.supportsVirtualColumns && column.isVirtual()) return ":virtual";
-    return this.schemaType(column);
-  }
-
-  /** @internal */
-  protected override schemaExpression(column: Column): string | undefined {
-    if (column.isSerial()) return undefined;
-    return super.schemaExpression(column);
-  }
-
-  /** @internal */
-  protected extractExpressionForVirtualColumn(column: Column): string {
-    return JSON.stringify(column.defaultFunction);
-  }
-
-  /** @internal */
   protected override async extensions(stream: IO | StringIO): Promise<void> {
     const adapter = this.pgAdapter();
     if (!adapter?.extensions) return;
@@ -187,6 +97,96 @@ export class SchemaDumper extends AbstractSchemaDumper {
       return `    t.uniqueConstraint(${JSON.stringify(uc.column)}${optStr});`;
     });
     stream.puts(stmts.sort().join("\n"));
+  }
+
+  /** @internal */
+  protected override async prepareColumnOptions(column: Column): Promise<Record<string, unknown>> {
+    const spec = await super.prepareColumnOptions(column);
+    if (column.isArray()) spec["array"] = true;
+
+    if (this.supportsVirtualColumns && column.isVirtual()) {
+      spec["as"] = this.extractExpressionForVirtualColumn(column);
+      spec["stored"] = true;
+      if (column.isEnum()) spec["enumType"] = JSON.stringify(column.sqlType);
+      return { type: JSON.stringify(this.schemaType(column).replace(/^:/, "")), ...spec };
+    }
+
+    if (column.isEnum()) spec["enumType"] = JSON.stringify(column.sqlType);
+
+    return spec;
+  }
+
+  /** @internal */
+  protected override isDefaultPrimaryKey(column: Column): boolean {
+    return this.schemaType(column) === ":bigserial";
+  }
+
+  /** @internal */
+  protected isExplicitPrimaryKeyDefault(column: Column): boolean {
+    return column.type === "uuid" || (column.type === "integer" && !column.isSerial());
+  }
+
+  /** @internal */
+  protected override schemaType(column: Column): string {
+    const isBigSql = /^bigint\b/i.test(column.sqlType ?? "");
+    if (column.isSerial()) return isBigSql ? ":bigserial" : ":serial";
+    if (isBigSql || column.type === "bigint") return ":bigint";
+    const semantic = column.type ?? undefined;
+    if (semantic === "big_integer") return ":bigint";
+    if (semantic === "bit_varying") return ":bitVarying";
+    return semantic != null ? `:${semantic}` : super.schemaType(column as any);
+  }
+
+  /** @internal */
+  protected override schemaExpression(column: Column): string | undefined {
+    if (column.isSerial()) return undefined;
+    return super.schemaExpression(column);
+  }
+
+  /** @internal */
+  protected extractExpressionForVirtualColumn(column: Column): string {
+    return JSON.stringify(column.defaultFunction);
+  }
+
+  /** @internal */
+  protected override schemaLimit(column: Column): string | undefined {
+    if (column.type === "integer" && column.limit === 4) return undefined;
+    const base = super.schemaLimit(column);
+    if (base !== undefined) return base;
+    const sqlType = (column.sqlType ?? "").toLowerCase();
+    if (/^(?:character varying|varchar|char(?:acter)?|bpchar)\b/.test(sqlType)) {
+      const m = /\((\d+)\)/.exec(sqlType);
+      return m ? m[1] : undefined;
+    }
+    if (/^(?:bit|varbit|bit varying)\b/.test(sqlType)) {
+      const m = /\((\d+)\)/.exec(sqlType);
+      return m ? m[1] : undefined;
+    }
+    return undefined;
+  }
+
+  /** @internal */
+  protected override schemaPrecision(column: Column): string | undefined {
+    const base = super.schemaPrecision(column);
+    if (base !== undefined) return base;
+    const sqlType = (column.sqlType ?? "").toLowerCase();
+    const m = /^numeric\((\d+)/.exec(sqlType);
+    return m ? m[1] : undefined;
+  }
+
+  /** @internal */
+  protected override schemaScale(column: Column): string | undefined {
+    const base = super.schemaScale(column);
+    if (base !== undefined) return base;
+    const sqlType = (column.sqlType ?? "").toLowerCase();
+    const m = /^numeric\(\d+,\s*(\d+)\)/.exec(sqlType);
+    return m ? m[1] : undefined;
+  }
+
+  /** @internal */
+  protected override schemaTypeWithVirtual(column: Column): string {
+    if (this.supportsVirtualColumns && column.isVirtual()) return ":virtual";
+    return this.schemaType(column);
   }
 
   /** @internal */

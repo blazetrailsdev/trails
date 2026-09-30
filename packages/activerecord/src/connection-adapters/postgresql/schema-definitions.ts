@@ -252,6 +252,20 @@ export class TableDefinition extends AbstractTableDefinition {
   }
 
   /** @internal */
+  protected override validColumnDefinitionOptions(): string[] {
+    return [
+      ...super.validColumnDefinitionOptions(),
+      "array",
+      "using",
+      "castAs",
+      "as",
+      "type",
+      "enumType",
+      "stored",
+    ];
+  }
+
+  /** @internal */
   override aliasedTypes(_name: string, fallback: string): string {
     return fallback;
   }
@@ -266,20 +280,6 @@ export class TableDefinition extends AbstractTableDefinition {
     } else {
       return "serial";
     }
-  }
-
-  /** @internal */
-  protected override validColumnDefinitionOptions(): string[] {
-    return [
-      ...super.validColumnDefinitionOptions(),
-      "array",
-      "using",
-      "castAs",
-      "as",
-      "type",
-      "enumType",
-      "stored",
-    ];
   }
 }
 
@@ -421,16 +421,6 @@ export class AlterTable extends AbstractAlterTable {
     super(td);
   }
 
-  /** @internal */
-  protected get _pgTd(): TableDefinition {
-    if (this._td == null) {
-      throw new Error(
-        "PostgreSQL AlterTable was constructed without a TableDefinition; use adapter.createAlterTable(name) to obtain one.",
-      );
-    }
-    return this._td as TableDefinition;
-  }
-
   validateConstraint(name: string | undefined): void {
     this.constraintValidations.push(name);
   }
@@ -443,5 +433,15 @@ export class AlterTable extends AbstractAlterTable {
 
   addUniqueConstraint(columnName: string | string[], options: UniqueConstraintOptions = {}): void {
     this.uniqueConstraintAdds.push(this._pgTd.newUniqueConstraintDefinition(columnName, options));
+  }
+
+  /** @internal */
+  protected get _pgTd(): TableDefinition {
+    if (this._td == null) {
+      throw new Error(
+        "PostgreSQL AlterTable was constructed without a TableDefinition; use adapter.createAlterTable(name) to obtain one.",
+      );
+    }
+    return this._td as TableDefinition;
   }
 }

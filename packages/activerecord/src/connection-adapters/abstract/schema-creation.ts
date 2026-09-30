@@ -42,20 +42,15 @@ export class SchemaCreation {
 
   constructor(protected conn: SchemaCreationConn) {}
 
-  protected supportsPartialIndex(): boolean {
-    return this.conn.supportsPartialIndex();
-  }
-
-  protected supportsIndexUsing(): boolean {
-    return true;
-  }
-
-  protected async supportsIndexInclude(): Promise<boolean> {
-    return this.conn.supportsIndexInclude();
-  }
-
-  protected async supportsNullsNotDistinct(): Promise<boolean> {
-    return this.conn.supportsNullsNotDistinct();
+  /** @missingRailsCall split — PERMANENT */
+  async accept(o: object): Promise<string> {
+    const klass = o.constructor as abstract new (...args: never[]) => object;
+    let m = this.cache.get(klass);
+    if (m === undefined) {
+      m = `visit${klass.name}`;
+      this.cache.set(klass, m);
+    }
+    return (this as unknown as Record<string, (o: object) => Promise<string> | string>)[m](o);
   }
 
   /** @internal */
@@ -74,8 +69,54 @@ export class SchemaCreation {
   }
 
   /** @internal */
+  protected typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
+    return this.conn.typeToSql(type, options);
+  }
+
+  protected optionsIncludeDefault(options: ColumnOptions): boolean {
+    if (!("default" in options) || options.default === undefined) return false;
+    return !(options.null === false && options.default === null);
+  }
+
+  /** @internal */
   protected supportsIndexesInCreate(): boolean {
     return this.conn.supportsIndexesInCreate();
+  }
+
+  /** @internal */
+  protected useForeignKeys(): boolean {
+    return this.conn.useForeignKeys();
+  }
+
+  /** @internal */
+  protected async quotedColumnsForIndex(
+    columnNames: string[],
+    options: {
+      length?: number | Record<string, number>;
+      order?: string | Record<string, string>;
+      opclass?: string | Record<string, string>;
+    },
+  ): Promise<string> {
+    const host = this.conn as SchemaQuoter & {
+      quotedColumnsForIndex?(cols: string[], options: Record<string, unknown>): Promise<string>;
+    };
+    if (typeof host.quotedColumnsForIndex === "function") {
+      return host.quotedColumnsForIndex(columnNames, options);
+    }
+    return columnNames.map((c) => this.conn.quoteColumnName(c)).join(", ");
+  }
+
+  protected supportsPartialIndex(): boolean {
+    return this.conn.supportsPartialIndex();
+  }
+
+  /** @internal */
+  protected async supportsCheckConstraints(): Promise<boolean> {
+    return this.conn.supportsCheckConstraints();
+  }
+
+  protected async supportsIndexInclude(): Promise<boolean> {
+    return this.conn.supportsIndexInclude();
   }
 
   /** @internal */
@@ -88,15 +129,50 @@ export class SchemaCreation {
     return this.conn.supportsUniqueConstraints();
   }
 
-  /** @missingRailsCall split — PERMANENT */
-  async accept(o: object): Promise<string> {
-    const klass = o.constructor as abstract new (...args: never[]) => object;
-    let m = this.cache.get(klass);
-    if (m === undefined) {
-      m = `visit${klass.name}`;
-      this.cache.set(klass, m);
+  protected async supportsNullsNotDistinct(): Promise<boolean> {
+    return this.conn.supportsNullsNotDistinct();
+  }
+
+  /** @missingRailsCall order:accept,map — PERMANENT */
+  protected async visitAlterTable(o: AlterTable): Promise<string> {
+    let sql = `ALTER TABLE ${this.conn.quoteTableName(o.name)} `;
+
+    const adds: string[] = [];
+    for (const col of o.adds) adds.push(await this.accept(col));
+    sql += adds.join(" ");
+    const foreignKeyAdds: string[] = [];
+    for (const fk of o.foreignKeyAdds) foreignKeyAdds.push(await this.visitAddForeignKey(fk));
+    sql += foreignKeyAdds.join(" ");
+    sql += o.foreignKeyDrops.map((fk) => this.visitDropForeignKey(fk)).join(" ");
+    const checkConstraintAdds: string[] = [];
+    for (const con of o.checkConstraintAdds) {
+      checkConstraintAdds.push(await this.visitAddCheckConstraint(con));
     }
-    return (this as unknown as Record<string, (o: object) => Promise<string> | string>)[m](o);
+    sql += checkConstraintAdds.join(" ");
+    const checkConstraintDrops: string[] = [];
+    for (const con of o.checkConstraintDrops) {
+      checkConstraintDrops.push(await this.visitDropCheckConstraint(con));
+    }
+    sql += checkConstraintDrops.join(" ");
+    sql += o.constraintDrops.map((con) => this.visitDropConstraint(con)).join(" ");
+
+    return sql;
+  }
+
+  protected async visitColumnDefinition(o: ColumnDefinition): Promise<string> {
+    o.sqlType ??= this.typeToSql(o.type, o.options);
+    let columnSql = `${this.conn.quoteColumnName(o.name)} ${o.sqlType}`;
+    if (o.type !== "primary_key") {
+      columnSql = await this.addColumnOptionsBang(
+        columnSql,
+        this.columnOptions(o) as ColumnOptions,
+      );
+    }
+    return columnSql;
+  }
+
+  protected async visitAddColumnDefinition(o: AddColumnDefinition): Promise<string> {
+    return `ADD ${await this.accept(o.column)}`;
   }
 
   protected async visitTableDefinition(o: TableDefinition): Promise<string> {
@@ -142,65 +218,43 @@ export class SchemaCreation {
   }
 
   /** @internal */
-  protected useForeignKeys(): boolean {
-    return this.conn.useForeignKeys();
+  protected visitPrimaryKeyDefinition(o: PrimaryKeyDefinition): string {
+    return `PRIMARY KEY (${o.name.map((name) => this.conn.quoteColumnName(name)).join(", ")})`;
   }
 
-  /** @internal */
-  protected async supportsCheckConstraints(): Promise<boolean> {
-    return this.conn.supportsCheckConstraints();
-  }
-
-  /** @internal */
-  protected async tableConstraintStatements(_o: TableDefinition): Promise<string[]> {
-    return [];
-  }
-
-  protected async visitColumnDefinition(o: ColumnDefinition): Promise<string> {
-    o.sqlType ??= this.typeToSql(o.type, o.options);
-    let columnSql = `${this.conn.quoteColumnName(o.name)} ${o.sqlType}`;
-    if (o.type !== "primary_key") {
-      columnSql = await this.addColumnOptionsBang(
-        columnSql,
-        this.columnOptions(o) as ColumnOptions,
-      );
-    }
-    return columnSql;
-  }
-
-  protected async visitAddColumnDefinition(o: AddColumnDefinition): Promise<string> {
-    return `ADD ${await this.accept(o.column)}`;
-  }
-
-  /** @missingRailsCall order:accept,map — PERMANENT */
-  protected async visitAlterTable(o: AlterTable): Promise<string> {
-    let sql = `ALTER TABLE ${this.conn.quoteTableName(o.name)} `;
-
-    const adds: string[] = [];
-    for (const col of o.adds) adds.push(await this.accept(col));
-    sql += adds.join(" ");
-    const foreignKeyAdds: string[] = [];
-    for (const fk of o.foreignKeyAdds) foreignKeyAdds.push(await this.visitAddForeignKey(fk));
-    sql += foreignKeyAdds.join(" ");
-    sql += o.foreignKeyDrops.map((fk) => this.visitDropForeignKey(fk)).join(" ");
-    const checkConstraintAdds: string[] = [];
-    for (const con of o.checkConstraintAdds) {
-      checkConstraintAdds.push(await this.visitAddCheckConstraint(con));
-    }
-    sql += checkConstraintAdds.join(" ");
-    const checkConstraintDrops: string[] = [];
-    for (const con of o.checkConstraintDrops) {
-      checkConstraintDrops.push(await this.visitDropCheckConstraint(con));
-    }
-    sql += checkConstraintDrops.join(" ");
-    sql += o.constraintDrops.map((con) => this.visitDropConstraint(con)).join(" ");
-
+  protected visitForeignKeyDefinition(o: ForeignKeyDefinition): string {
+    const quotedColumns = wrap(o.column)
+      .map((c) => this.conn.quoteColumnName(c))
+      .join(", ");
+    const quotedPrimaryKeys = wrap(o.primaryKey)
+      .map((c) => this.conn.quoteColumnName(c))
+      .join(", ");
+    let sql = `CONSTRAINT ${this.conn.quoteColumnName(o.name)} `;
+    sql += `FOREIGN KEY (${quotedColumns}) `;
+    sql += `REFERENCES ${this.conn.quoteTableName(o.toTable)} (${quotedPrimaryKeys})`;
+    if (o.onDelete) sql += ` ${this.actionSql("DELETE", o.onDelete)}`;
+    if (o.onUpdate) sql += ` ${this.actionSql("UPDATE", o.onUpdate)}`;
     return sql;
   }
 
   /** @internal */
   protected async visitAddForeignKey(o: ForeignKeyDefinition): Promise<string> {
     return `ADD ${await this.accept(o)}`;
+  }
+
+  /** @internal */
+  protected visitDropConstraint(name: string | undefined): string {
+    return `DROP CONSTRAINT ${this.conn.quoteColumnName(name)}`;
+  }
+
+  /** @internal */
+  protected visitDropForeignKey(name: string | undefined): string {
+    return `DROP CONSTRAINT ${this.quoteColumnName(name)}`;
+  }
+
+  /** @internal */
+  protected async visitDropCheckConstraint(name: string | undefined): Promise<string> {
+    return `DROP CONSTRAINT ${this.quoteColumnName(name)}`;
   }
 
   protected async visitCreateIndexDefinition(o: CreateIndexDefinition): Promise<string> {
@@ -228,41 +282,38 @@ export class SchemaCreation {
     return parts.join(" ");
   }
 
-  /** @internal */
-  protected async quotedColumnsForIndex(
-    columnNames: string[],
-    options: {
-      length?: number | Record<string, number>;
-      order?: string | Record<string, string>;
-      opclass?: string | Record<string, string>;
-    },
-  ): Promise<string> {
-    const host = this.conn as SchemaQuoter & {
-      quotedColumnsForIndex?(cols: string[], options: Record<string, unknown>): Promise<string>;
-    };
-    if (typeof host.quotedColumnsForIndex === "function") {
-      return host.quotedColumnsForIndex(columnNames, options);
-    }
-    return columnNames.map((c) => this.conn.quoteColumnName(c)).join(", ");
-  }
-
-  protected visitForeignKeyDefinition(o: ForeignKeyDefinition): string {
-    const quotedColumns = wrap(o.column)
-      .map((c) => this.conn.quoteColumnName(c))
-      .join(", ");
-    const quotedPrimaryKeys = wrap(o.primaryKey)
-      .map((c) => this.conn.quoteColumnName(c))
-      .join(", ");
-    let sql = `CONSTRAINT ${this.conn.quoteColumnName(o.name)} `;
-    sql += `FOREIGN KEY (${quotedColumns}) `;
-    sql += `REFERENCES ${this.conn.quoteTableName(o.toTable)} (${quotedPrimaryKeys})`;
-    if (o.onDelete) sql += ` ${this.actionSql("DELETE", o.onDelete)}`;
-    if (o.onUpdate) sql += ` ${this.actionSql("UPDATE", o.onUpdate)}`;
-    return sql;
-  }
-
   protected visitCheckConstraintDefinition(o: CheckConstraintDefinition): string {
     return `CONSTRAINT ${o.name} CHECK (${o.expression})`;
+  }
+
+  /** @internal */
+  protected async visitAddCheckConstraint(o: CheckConstraintDefinition): Promise<string> {
+    return `ADD ${await this.accept(o)}`;
+  }
+
+  /** @internal */
+  protected async quotedColumns(o: IndexDefinition): Promise<string> {
+    return typeof o.columns === "string"
+      ? o.columns
+      : this.quotedColumnsForIndex(o.columns, o.columnOptions());
+  }
+
+  protected supportsIndexUsing(): boolean {
+    return true;
+  }
+
+  /** @internal */
+  protected addTableOptionsBang(createSql: string, o: TableDefinition): string {
+    if (o.options) createSql += ` ${o.options}`;
+    return createSql;
+  }
+
+  /**
+   * @internal
+   * @missingRailsCall merge — PERMANENT
+   */
+  protected columnOptions(o: ColumnDefinition): Record<string, unknown> {
+    return { ...o.options, column: o };
   }
 
   /** @internal */
@@ -283,62 +334,6 @@ export class SchemaCreation {
       sql += " PRIMARY KEY";
     }
     return sql;
-  }
-
-  protected optionsIncludeDefault(options: ColumnOptions): boolean {
-    if (!("default" in options) || options.default === undefined) return false;
-    return !(options.null === false && options.default === null);
-  }
-
-  /** @internal */
-  protected typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
-    return this.conn.typeToSql(type, options);
-  }
-
-  /** @internal */
-  protected visitPrimaryKeyDefinition(o: PrimaryKeyDefinition): string {
-    return `PRIMARY KEY (${o.name.map((name) => this.conn.quoteColumnName(name)).join(", ")})`;
-  }
-
-  /** @internal */
-  protected visitDropConstraint(name: string | undefined): string {
-    return `DROP CONSTRAINT ${this.conn.quoteColumnName(name)}`;
-  }
-
-  /** @internal */
-  protected visitDropForeignKey(name: string | undefined): string {
-    return `DROP CONSTRAINT ${this.quoteColumnName(name)}`;
-  }
-
-  /** @internal */
-  protected async visitDropCheckConstraint(name: string | undefined): Promise<string> {
-    return `DROP CONSTRAINT ${this.quoteColumnName(name)}`;
-  }
-
-  /** @internal */
-  protected async visitAddCheckConstraint(o: CheckConstraintDefinition): Promise<string> {
-    return `ADD ${await this.accept(o)}`;
-  }
-
-  /** @internal */
-  protected async quotedColumns(o: IndexDefinition): Promise<string> {
-    return typeof o.columns === "string"
-      ? o.columns
-      : this.quotedColumnsForIndex(o.columns, o.columnOptions());
-  }
-
-  /** @internal */
-  protected addTableOptionsBang(createSql: string, o: TableDefinition): string {
-    if (o.options) createSql += ` ${o.options}`;
-    return createSql;
-  }
-
-  /**
-   * @internal
-   * @missingRailsCall merge — PERMANENT
-   */
-  protected columnOptions(o: ColumnDefinition): Record<string, unknown> {
-    return { ...o.options, column: o };
   }
 
   /** @internal */
@@ -367,5 +362,10 @@ export class SchemaCreation {
             `Supported values are: :nullify, :cascade, :restrict\n`,
         );
     }
+  }
+
+  /** @internal */
+  protected async tableConstraintStatements(_o: TableDefinition): Promise<string[]> {
+    return [];
   }
 }

@@ -20,50 +20,6 @@ import { BinaryData } from "@blazetrails/activemodel";
 import { defaultTimezone } from "../../active-record.js";
 import { Value as TimeValue } from "../../type/time.js";
 
-export function unquotedTrue(): number {
-  return 1;
-}
-
-export function unquotedFalse(): number {
-  return 0;
-}
-
-const QUOTED_COLUMN_NAMES = new Map<unknown, string>();
-const QUOTED_TABLE_NAMES = new Map<unknown, string>();
-
-export function quoteTableName(name: unknown): string {
-  let quoted = QUOTED_TABLE_NAMES.get(name);
-  if (quoted === undefined) {
-    quoted = `\`${toS(name).replace(/`/g, "``").replace(/\./g, "`.`")}\``;
-    QUOTED_TABLE_NAMES.set(name, quoted);
-  }
-  return quoted;
-}
-
-export function quoteColumnName(name: unknown): string {
-  let quoted = QUOTED_COLUMN_NAMES.get(name);
-  if (quoted === undefined) {
-    quoted = `\`${toS(name).replace(/`/g, "``")}\``;
-    QUOTED_COLUMN_NAMES.set(name, quoted);
-  }
-  return quoted;
-}
-
-export interface EscapeState {
-  noBackslashEscapes: boolean;
-}
-
-export function quotedBinary(value: BinaryData): string {
-  return `x'${value.hex()}'`;
-}
-
-export function unquoteIdentifier(identifier: string | null | undefined): string | null {
-  if (identifier && identifier.startsWith("`") && identifier.endsWith("`")) {
-    return identifier.slice(1, -1).replace(/``/g, "`");
-  }
-  return identifier ?? null;
-}
-
 export function castBoundValue(value: unknown): unknown {
   if (value instanceof Rational) {
     const f = value.toF();
@@ -76,6 +32,53 @@ export function castBoundValue(value: unknown): unknown {
   if (value === true) return "1";
   if (value === false) return "0";
   return value;
+}
+
+export function unquotedTrue(): number {
+  return 1;
+}
+
+const QUOTED_COLUMN_NAMES = new Map<unknown, string>();
+const QUOTED_TABLE_NAMES = new Map<unknown, string>();
+
+export function unquotedFalse(): number {
+  return 0;
+}
+
+export function quotedBinary(value: BinaryData): string {
+  return `x'${value.hex()}'`;
+}
+
+export interface EscapeState {
+  noBackslashEscapes: boolean;
+}
+
+export function unquoteIdentifier(identifier: string | null | undefined): string | null {
+  if (identifier && identifier.startsWith("`") && identifier.endsWith("`")) {
+    return identifier.slice(1, -1).replace(/``/g, "`");
+  }
+  return identifier ?? null;
+}
+
+export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
+  if (value instanceof TimeWithZone) {
+    if (defaultTimezone() === "utc") {
+      return value.getutc();
+    } else {
+      return value.getlocal();
+    }
+  }
+  if (value instanceof RubyTime && !(value instanceof TimeValue)) {
+    if (defaultTimezone() === "utc") {
+      return value.isUtc() ? value : value.getutc();
+    } else {
+      return value.isUtc() ? value.getlocal() : value;
+    }
+  }
+  if (value instanceof Temporal.PlainDate) {
+    return value;
+  }
+  return abstractTypeCast.call(this, value);
 }
 
 export function columnNameMatcher(): RegExp {
@@ -115,23 +118,20 @@ export function columnNameWithOrderMatcher(): RegExp {
   return new RegExp(`^${ordered}(?:\\s*,\\s*${ordered})*$`, "i");
 }
 
-export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
-  if (value instanceof TimeWithZone) {
-    if (defaultTimezone() === "utc") {
-      return value.getutc();
-    } else {
-      return value.getlocal();
-    }
+export function quoteColumnName(name: unknown): string {
+  let quoted = QUOTED_COLUMN_NAMES.get(name);
+  if (quoted === undefined) {
+    quoted = `\`${toS(name).replace(/`/g, "``")}\``;
+    QUOTED_COLUMN_NAMES.set(name, quoted);
   }
-  if (value instanceof RubyTime && !(value instanceof TimeValue)) {
-    if (defaultTimezone() === "utc") {
-      return value.isUtc() ? value : value.getutc();
-    } else {
-      return value.isUtc() ? value.getlocal() : value;
-    }
+  return quoted;
+}
+
+export function quoteTableName(name: unknown): string {
+  let quoted = QUOTED_TABLE_NAMES.get(name);
+  if (quoted === undefined) {
+    quoted = `\`${toS(name).replace(/`/g, "``").replace(/\./g, "`.`")}\``;
+    QUOTED_TABLE_NAMES.set(name, quoted);
   }
-  if (value instanceof Temporal.PlainDate) {
-    return value;
-  }
-  return abstractTypeCast.call(this, value);
+  return quoted;
 }

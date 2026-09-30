@@ -22,18 +22,14 @@ export class Store {
   enabled = false;
   dirties = true;
 
+  isDirties(): boolean {
+    return this.dirties;
+  }
+
   constructor(version: { value: number } | null = null, maxSize: number | null = DEFAULT_MAX_SIZE) {
     this._maxSize = maxSize;
     this._version = version;
     this._currentVersion = version?.value ?? 0;
-  }
-
-  /** @internal */
-  private checkVersion(): void {
-    if (this._version && this._version.value !== this._currentVersion) {
-      this._map.clear();
-      this._currentVersion = this._version.value;
-    }
   }
 
   get size(): number {
@@ -44,10 +40,6 @@ export class Store {
   get empty(): boolean {
     this.checkVersion();
     return this._map.size === 0;
-  }
-
-  isDirties(): boolean {
-    return this.dirties;
   }
 
   get(key: string): Result | undefined {
@@ -88,6 +80,14 @@ export class Store {
 
   clear(): void {
     this._map.clear();
+  }
+
+  /** @internal */
+  private checkVersion(): void {
+    if (this._version && this._version.value !== this._currentVersion) {
+      this._map.clear();
+      this._currentVersion = this._version.value;
+    }
   }
 }
 
@@ -262,6 +262,21 @@ export class ConnectionPoolConfiguration {
   }
 };
 
+export function dirtiesQueryCache(base: { prototype: object }, ...methodNames: string[]): void {
+  const proto = base.prototype as Record<string, unknown>;
+  for (const methodName of methodNames) {
+    const original = proto[methodName];
+    if (typeof original !== "function") continue;
+
+    proto[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
+      if (this._queryCache?.dirties) {
+        clearCurrentThreadQueryCaches(this);
+      }
+      return (original as (...a: unknown[]) => unknown).apply(this, args);
+    };
+  }
+}
+
 export function queryCache(this: QueryCacheHost): Store | null {
   return this._queryCache;
 }
@@ -291,10 +306,6 @@ export function disableQueryCacheBang(this: QueryCacheHost): void {
   this.pool.disableQueryCacheBang();
 }
 
-export function clearQueryCache(this: QueryCacheHost): void {
-  this.pool.clearQueryCache();
-}
-
 type BaseSelectAll = (
   this: QueryCacheHost,
   arel: string | unknown,
@@ -302,6 +313,10 @@ type BaseSelectAll = (
   binds?: unknown[],
   opts?: { allowRetry?: boolean; preparable?: boolean | null; async?: boolean },
 ) => Result | Promise<Result> | FutureResult | FutureResultComplete;
+
+export function clearQueryCache(this: QueryCacheHost): void {
+  this.pool.clearQueryCache();
+}
 
 export function selectAll(
   this: QueryCacheHost,
@@ -343,82 +358,8 @@ export function selectAll(
 }
 
 /** @internal */
-function clearCurrentThreadQueryCaches(host: QueryCacheHost): void {
-  const cleared = new Set<Store>();
-  ActiveRecord.Base?.connectionHandler.eachConnectionPool((pool) => {
-    const p = pool as unknown as QueryCachePool & { queryCache?: Store };
-    p.clearQueryCache();
-    if (p.queryCache) cleared.add(p.queryCache);
-  });
-  if (host._queryCache && !cleared.has(host._queryCache)) host._queryCache.clear();
-}
-
-export function dirtiesQueryCache(base: { prototype: object }, ...methodNames: string[]): void {
-  const proto = base.prototype as Record<string, unknown>;
-  for (const methodName of methodNames) {
-    const original = proto[methodName];
-    if (typeof original !== "function") continue;
-
-    proto[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
-      if (this._queryCache?.dirties) {
-        clearCurrentThreadQueryCaches(this);
-      }
-      return (original as (...a: unknown[]) => unknown).apply(this, args);
-    };
-  }
-}
-
-/** @internal */
-export function checkVersion(this: QueryCacheHost): void {}
-
-/** @internal */
 function unsetQueryCacheBang(this: QueryCacheHost): void {
   this._queryCache = null;
-}
-
-/** @internal */
-function cacheNotificationInfo(
-  this: QueryCacheHost,
-  sql: string,
-  name: string | null | undefined,
-  binds: unknown[],
-): Record<string, unknown> {
-  const userTx = (this as any).currentTransaction?.()?.userTransaction ?? null;
-  const transaction =
-    userTx !== null && typeof userTx?.isOpen === "function" && userTx.isOpen() ? userTx : null;
-  return {
-    sql,
-    binds,
-    type_casted_binds: () => this.typeCastedBinds(binds),
-    name,
-    connection: this,
-    cached: true,
-    transaction,
-  };
-}
-
-/** @internal */
-function cacheNotificationInfoResult(
-  this: QueryCacheHost,
-  sql: string,
-  name: string | null | undefined,
-  binds: unknown[],
-  result: Result,
-): Record<string, unknown> {
-  const payload = this.cacheNotificationInfo(sql, name, binds);
-  payload["row_count"] = result.length;
-  return payload;
-}
-
-/** @internal */
-function sqlCacheKey(sql: string, binds: unknown[]): string {
-  const values =
-    binds && binds.length > 0
-      ? binds.map((b) => (b instanceof ModelAttribute ? b.valueForDatabase : b))
-      : binds;
-  return binds && binds.length > 0
-    ? JSON.stringify([sql, values], (_k, v) => (typeof v === "bigint" ? `${v}n` : v))
-    : sql;
 }
 
 /** @internal */
@@ -468,6 +409,65 @@ function cacheSql(
       }
       return result.dup();
     });
+}
+
+/** @internal */
+function cacheNotificationInfoResult(
+  this: QueryCacheHost,
+  sql: string,
+  name: string | null | undefined,
+  binds: unknown[],
+  result: Result,
+): Record<string, unknown> {
+  const payload = this.cacheNotificationInfo(sql, name, binds);
+  payload["row_count"] = result.length;
+  return payload;
+}
+
+/** @internal */
+function cacheNotificationInfo(
+  this: QueryCacheHost,
+  sql: string,
+  name: string | null | undefined,
+  binds: unknown[],
+): Record<string, unknown> {
+  const userTx = (this as any).currentTransaction?.()?.userTransaction ?? null;
+  const transaction =
+    userTx !== null && typeof userTx?.isOpen === "function" && userTx.isOpen() ? userTx : null;
+  return {
+    sql,
+    binds,
+    type_casted_binds: () => this.typeCastedBinds(binds),
+    name,
+    connection: this,
+    cached: true,
+    transaction,
+  };
+}
+
+/** @internal */
+function clearCurrentThreadQueryCaches(host: QueryCacheHost): void {
+  const cleared = new Set<Store>();
+  ActiveRecord.Base?.connectionHandler.eachConnectionPool((pool) => {
+    const p = pool as unknown as QueryCachePool & { queryCache?: Store };
+    p.clearQueryCache();
+    if (p.queryCache) cleared.add(p.queryCache);
+  });
+  if (host._queryCache && !cleared.has(host._queryCache)) host._queryCache.clear();
+}
+
+/** @internal */
+export function checkVersion(this: QueryCacheHost): void {}
+
+/** @internal */
+function sqlCacheKey(sql: string, binds: unknown[]): string {
+  const values =
+    binds && binds.length > 0
+      ? binds.map((b) => (b instanceof ModelAttribute ? b.valueForDatabase : b))
+      : binds;
+  return binds && binds.length > 0
+    ? JSON.stringify([sql, values], (_k, v) => (typeof v === "bigint" ? `${v}n` : v))
+    : sql;
 }
 
 export const QueryCache = {

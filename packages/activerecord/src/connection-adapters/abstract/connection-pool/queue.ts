@@ -153,11 +153,6 @@ export class Queue {
     });
   }
 
-  /** @internal */
-  get any(): boolean {
-    return this._queue.length > 0;
-  }
-
   add(element: DatabaseAdapter): void {
     synchronize(this, () => {
       this._queue.push(element);
@@ -178,16 +173,16 @@ export class Queue {
     });
   }
 
-  poll(): DatabaseAdapter | undefined;
-  poll(timeout: number): Promise<DatabaseAdapter> | DatabaseAdapter;
-  poll(timeout?: number): Promise<DatabaseAdapter> | DatabaseAdapter | undefined {
-    return synchronize(this, () => this.internalPoll(timeout));
-  }
-
   clear(): void {
     synchronize(this, () => {
       this._queue = [];
     });
+  }
+
+  poll(): DatabaseAdapter | undefined;
+  poll(timeout: number): Promise<DatabaseAdapter> | DatabaseAdapter;
+  poll(timeout?: number): Promise<DatabaseAdapter> | DatabaseAdapter | undefined {
+    return synchronize(this, () => this.internalPoll(timeout));
   }
 
   protected internalPoll(timeout?: number): Promise<DatabaseAdapter> | DatabaseAdapter | undefined {
@@ -195,6 +190,11 @@ export class Queue {
     if (conn) return conn;
     if (timeout != null) return this.waitPoll(timeout);
     return undefined;
+  }
+
+  /** @internal */
+  get any(): boolean {
+    return this._queue.length > 0;
   }
 
   /** @missingRailsCall size — PERMANENT */

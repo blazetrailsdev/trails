@@ -71,6 +71,285 @@ const RUBY_OBJECT_TAGS: CollectionTag[] = Object.entries(RUBY_OBJECT_CLASSES).ma
   },
 );
 
+export class SchemaReflection {
+  static useSchemaCacheDump = true;
+  static checkSchemaCacheDumpVersion = true;
+
+  /** @noRailsEquivalent PERMANENT */
+  static eagerLoadSchemaCache = false;
+
+  private _cache: SchemaCache | null;
+  private _cachePath: string | null;
+  private _cachePromise: Promise<SchemaCache> | null = null;
+
+  constructor(cachePath?: string | null, cache?: SchemaCache) {
+    this._cache = cache ?? null;
+    this._cachePath = cachePath ?? null;
+  }
+
+  clearBang(): void {
+    this._cache = this.emptyCache();
+    this._cachePromise = null;
+  }
+
+  async loadBang(pool: Pool): Promise<this> {
+    await this.cache(pool);
+    return this;
+  }
+
+  async primaryKeys(pool: Pool, tableName: string): Promise<string | string[] | null> {
+    return (await this.cache(pool)).primaryKeys(pool, tableName);
+  }
+
+  async dataSourceExists(pool: Pool, name: string): Promise<boolean | null> {
+    return (await this.cache(pool)).dataSourceExists(pool, name);
+  }
+
+  async add(pool: Pool, name: string): Promise<void> {
+    return (await this.cache(pool)).add(pool, name);
+  }
+
+  async dataSources(pool: Pool, name: string): Promise<boolean | null> {
+    return (await this.cache(pool)).dataSourceExists(pool, name);
+  }
+
+  async columns(pool: Pool, tableName: string): Promise<Column[]> {
+    return (await this.cache(pool)).columns(pool, tableName);
+  }
+
+  async columnsHash(pool: Pool, tableName: string): Promise<Record<string, Column>> {
+    return (await this.cache(pool)).columnsHash(pool, tableName);
+  }
+
+  async isColumnsHash(pool: Pool, tableName: string): Promise<boolean> {
+    return (await this.cache(pool)).isColumnsHash(pool, tableName);
+  }
+
+  async indexes(pool: Pool, tableName: string): Promise<IndexDefinition[]> {
+    return (await this.cache(pool)).indexes(pool, tableName);
+  }
+
+  async version(pool: Pool): Promise<string | number | null> {
+    return (await this.cache(pool)).version(pool);
+  }
+
+  async size(pool: Pool): Promise<number> {
+    return (await this.cache(pool)).size;
+  }
+
+  async clearDataSourceCacheBang(pool: Pool, name: string): Promise<void> {
+    if (!this._cache && !this.possibleCacheAvailable()) return;
+    (await this.cache(pool)).clearDataSourceCacheBang(pool, name);
+  }
+
+  async isCached(tableName: string): Promise<boolean | null> {
+    if (this._cache == null) {
+      if (!SchemaReflection.checkSchemaCacheDumpVersion) {
+        this._cache = await this.loadCache(null);
+      }
+    }
+
+    return this._cache?.isCached(tableName) ?? null;
+  }
+
+  async dumpTo(pool: Pool, filename: string): Promise<SchemaCache> {
+    const freshCache = this.emptyCache();
+    await freshCache.addAll(pool);
+    await freshCache.dumpTo(filename);
+    this._cachePromise = null;
+    return (this._cache = freshCache);
+  }
+
+  private emptyCache(): SchemaCache {
+    return new SchemaCache();
+  }
+
+  private async cache(pool: Pool): Promise<SchemaCache> {
+    if (this._cache) return this._cache;
+
+    if (!this._cachePromise) {
+      const promise = this.loadCache(pool).then((loaded) => {
+        if (this._cachePromise === promise) {
+          this._cache = loaded ?? this.emptyCache();
+          this._cachePromise = null;
+        }
+        return this._cache ?? this.emptyCache();
+      });
+      this._cachePromise = promise;
+    }
+    return this._cachePromise;
+  }
+
+  /** @missingRailsName cachePath — PERMANENT */
+  private possibleCacheAvailable(): boolean {
+    if (!SchemaReflection.useSchemaCacheDump) return false;
+    if (!this._cachePath) return false;
+    try {
+      return File.isFile(this._cachePath);
+    } catch {
+      return false;
+    }
+  }
+
+  private async loadCache(pool: Pool | null): Promise<SchemaCache | null> {
+    if (!this.possibleCacheAvailable()) return null;
+
+    const newCache = await SchemaCache._loadFrom(this._cachePath!);
+    if (!newCache) return null;
+
+    if (SchemaReflection.checkSchemaCacheDumpVersion) {
+      try {
+        const expired = await pool!.withConnection(async (connection) => {
+          const currentVersion = await connection.schemaVersion();
+
+          if ((await newCache.version(connection)) !== currentVersion) {
+            console.warn(
+              `Ignoring ${this._cachePath} because it has expired. The current schema version is ${currentVersion}, but the one in the schema cache file is ${newCache.schemaVersion}.`,
+            );
+            return true;
+          }
+          return false;
+        });
+        if (expired) return null;
+      } catch (error) {
+        if (!(error instanceof ActiveRecordError)) throw error;
+        console.warn(
+          `Failed to validate the schema cache because of ${error.name}: ${error.message}`,
+        );
+        return null;
+      }
+    }
+
+    return newCache;
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  async loadAllBang(pool: Pool): Promise<this> {
+    const cache = await this.cache(pool);
+    await cache.addAll(pool);
+    return this;
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  get loadedCache(): SchemaCache | null {
+    return this._cache;
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  set loadedCache(cache: SchemaCache | null) {
+    this._cache = cache;
+    this._cachePromise = null;
+  }
+}
+
+export class BoundSchemaReflection {
+  private _schemaReflection: SchemaReflection;
+  private _pool: Pool;
+
+  static forLoneConnection(
+    abstractSchemaReflection: SchemaReflection,
+    connection: unknown,
+  ): BoundSchemaReflection {
+    return new BoundSchemaReflection(abstractSchemaReflection, new FakePool(connection));
+  }
+
+  constructor(abstractSchemaReflection: SchemaReflection, pool: Pool) {
+    this._schemaReflection = abstractSchemaReflection;
+    this._pool = pool;
+  }
+
+  clearBang(): void {
+    this._schemaReflection.clearBang();
+  }
+
+  async loadBang(): Promise<this> {
+    await this._schemaReflection.loadBang(this._pool);
+    return this;
+  }
+
+  async isCached(tableName: string): Promise<boolean | null> {
+    return this._schemaReflection.isCached(tableName);
+  }
+
+  async primaryKeys(tableName: string): Promise<string | string[] | null> {
+    return this._schemaReflection.primaryKeys(this._pool, tableName);
+  }
+
+  async dataSourceExists(name: string): Promise<boolean | null> {
+    return this._schemaReflection.dataSourceExists(this._pool, name);
+  }
+
+  async add(name: string): Promise<void> {
+    return this._schemaReflection.add(this._pool, name);
+  }
+
+  async dataSources(name: string): Promise<boolean | null> {
+    return this._schemaReflection.dataSources(this._pool, name);
+  }
+
+  async columns(tableName: string): Promise<Column[]> {
+    return this._schemaReflection.columns(this._pool, tableName);
+  }
+
+  async columnsHash(tableName: string): Promise<Record<string, Column>> {
+    return this._schemaReflection.columnsHash(this._pool, tableName);
+  }
+
+  async isColumnsHash(tableName: string): Promise<boolean> {
+    return this._schemaReflection.isColumnsHash(this._pool, tableName);
+  }
+
+  async indexes(tableName: string): Promise<IndexDefinition[]> {
+    return this._schemaReflection.indexes(this._pool, tableName);
+  }
+
+  async version(): Promise<string | number | null> {
+    return this._schemaReflection.version(this._pool);
+  }
+
+  async size(): Promise<number> {
+    return this._schemaReflection.size(this._pool);
+  }
+
+  async clearDataSourceCacheBang(name: string): Promise<void> {
+    return this._schemaReflection.clearDataSourceCacheBang(this._pool, name);
+  }
+
+  async dumpTo(filename: string): Promise<SchemaCache> {
+    return this._schemaReflection.dumpTo(this._pool, filename);
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  async loadAllBang(): Promise<this> {
+    await this._schemaReflection.loadAllBang(this._pool);
+    return this;
+  }
+}
+
+export class FakePool {
+  private _connection: unknown;
+
+  constructor(connection: unknown) {
+    this._connection = connection;
+  }
+
+  withConnection<T>(callback: (conn: unknown) => T): T {
+    return callback(this._connection);
+  }
+}
+
 export class SchemaCache {
   private _columns = new Map<string, Column[]>();
   private _columnsHash = new Map<string, Record<string, Column>>();
@@ -107,38 +386,6 @@ export class SchemaCache {
       return Zlib.GzipReader.open(filename, async (gz) => callback(await gz.read()));
     }
     return callback(File.read(filename));
-  }
-
-  initializeDup(): SchemaCache {
-    const dup = new SchemaCache();
-    dup._columns = new Map(this._columns);
-    dup._columnsHash = new Map(this._columnsHash);
-    dup._primaryKeys = new Map(this._primaryKeys);
-    dup._dataSources = new Map(this._dataSources);
-    dup._indexes = new Map(this._indexes);
-    dup._version = this._version;
-    return dup;
-  }
-
-  encodeWith(coder: Record<string, unknown>): void {
-    coder["columns"] = new Map(sort([...this._columns]));
-    coder["primary_keys"] = new Map(sort([...this._primaryKeys]));
-    coder["data_sources"] = new Map(sort([...this._dataSources]));
-    coder["indexes"] = new Map(sort([...this._indexes]));
-    coder["version"] = this._version;
-  }
-
-  initWith(coder: Record<string, unknown>): void {
-    this._columns = coder["columns"] as Map<string, Column[]>;
-    this._columnsHash = coder["columns_hash"] as Map<string, Record<string, Column>>;
-    this._primaryKeys = coder["primary_keys"] as Map<string, string | string[] | null>;
-    this._dataSources = coder["data_sources"] as Map<string, boolean>;
-    this._indexes = (coder["indexes"] as Map<string, IndexDefinition[]>) ?? new Map();
-    this._version = (coder["version"] as string | number | null | undefined) ?? null;
-
-    if (coder["deduplicated"] == null || coder["deduplicated"] === false) {
-      this.deriveColumnsHashAndDeduplicateValues();
-    }
   }
 
   isCached(tableName: string): boolean {
@@ -225,30 +472,6 @@ export class SchemaCache {
     return this._columnsHash.has(tableName);
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  getCachedColumnsHash(tableName: string): Record<string, Column> | undefined {
-    return this._columnsHash.get(tableName);
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  getCachedDataSourceExists(name: string): boolean | undefined {
-    return this._dataSources.get(name);
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  getCachedPrimaryKeys(tableName: string): string | string[] | null | undefined {
-    return this._primaryKeys.get(tableName);
-  }
-
   async indexes(pool: Pool, tableName: string): Promise<IndexDefinition[]> {
     if (this._indexes.has(tableName)) {
       return this._indexes.get(tableName)!;
@@ -286,20 +509,6 @@ export class SchemaCache {
     this._primaryKeys.delete(name);
     this._dataSources.delete(name);
     this._indexes.delete(name);
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  setColumns(tableName: string, cols: Column[]): void {
-    this._columns.set(tableName, cols);
-    const hash: Record<string, Column> = {};
-    for (const col of cols) {
-      hash[col.name] = col;
-    }
-    this._columnsHash.set(tableName, hash);
-    this._dataSources.set(tableName, true);
   }
 
   async addAll(pool: Pool): Promise<void> {
@@ -355,6 +564,17 @@ export class SchemaCache {
     this.deriveColumnsHashAndDeduplicateValues();
   }
 
+  private async tablesToCache(pool: Pool): Promise<string[]> {
+    return pool.withConnection(async (connection) => {
+      const tables: string[] = await connection.dataSources();
+      return tables.filter((table) => !this.isIgnoredTable(table));
+    });
+  }
+
+  private isIgnoredTable(tableName: string): boolean {
+    return isSchemaCacheIgnoredTable(tableName);
+  }
+
   /**
    * @missingRailsName columns — PERMANENT
    * @missingRailsName primaryKeys — PERMANENT
@@ -372,17 +592,6 @@ export class SchemaCache {
     this._primaryKeys = deepDeduplicate(this._primaryKeys);
     this._dataSources = deepDeduplicate(this._dataSources);
     this._indexes = deepDeduplicate(this._indexes);
-  }
-
-  private isIgnoredTable(tableName: string): boolean {
-    return isSchemaCacheIgnoredTable(tableName);
-  }
-
-  private async tablesToCache(pool: Pool): Promise<string[]> {
-    return pool.withConnection(async (connection) => {
-      const tables: string[] = await connection.dataSources();
-      return tables.filter((table) => !this.isIgnoredTable(table));
-    });
   }
 
   /**
@@ -407,284 +616,75 @@ export class SchemaCache {
       }
     });
   }
-}
 
-export class SchemaReflection {
-  static useSchemaCacheDump = true;
-  static checkSchemaCacheDumpVersion = true;
-
-  /** @noRailsEquivalent PERMANENT */
-  static eagerLoadSchemaCache = false;
-
-  private _cache: SchemaCache | null;
-  private _cachePath: string | null;
-  private _cachePromise: Promise<SchemaCache> | null = null;
-
-  constructor(cachePath?: string | null, cache?: SchemaCache) {
-    this._cache = cache ?? null;
-    this._cachePath = cachePath ?? null;
+  initializeDup(): SchemaCache {
+    const dup = new SchemaCache();
+    dup._columns = new Map(this._columns);
+    dup._columnsHash = new Map(this._columnsHash);
+    dup._primaryKeys = new Map(this._primaryKeys);
+    dup._dataSources = new Map(this._dataSources);
+    dup._indexes = new Map(this._indexes);
+    dup._version = this._version;
+    return dup;
   }
 
-  private emptyCache(): SchemaCache {
-    return new SchemaCache();
+  encodeWith(coder: Record<string, unknown>): void {
+    coder["columns"] = new Map(sort([...this._columns]));
+    coder["primary_keys"] = new Map(sort([...this._primaryKeys]));
+    coder["data_sources"] = new Map(sort([...this._dataSources]));
+    coder["indexes"] = new Map(sort([...this._indexes]));
+    coder["version"] = this._version;
   }
 
-  clearBang(): void {
-    this._cache = this.emptyCache();
-    this._cachePromise = null;
-  }
+  initWith(coder: Record<string, unknown>): void {
+    this._columns = coder["columns"] as Map<string, Column[]>;
+    this._columnsHash = coder["columns_hash"] as Map<string, Record<string, Column>>;
+    this._primaryKeys = coder["primary_keys"] as Map<string, string | string[] | null>;
+    this._dataSources = coder["data_sources"] as Map<string, boolean>;
+    this._indexes = (coder["indexes"] as Map<string, IndexDefinition[]>) ?? new Map();
+    this._version = (coder["version"] as string | number | null | undefined) ?? null;
 
-  async loadBang(pool: Pool): Promise<this> {
-    await this.cache(pool);
-    return this;
+    if (coder["deduplicated"] == null || coder["deduplicated"] === false) {
+      this.deriveColumnsHashAndDeduplicateValues();
+    }
   }
 
   /**
    * @internal
    * @noRailsEquivalent PERMANENT
    */
-  async loadAllBang(pool: Pool): Promise<this> {
-    const cache = await this.cache(pool);
-    await cache.addAll(pool);
-    return this;
+  getCachedColumnsHash(tableName: string): Record<string, Column> | undefined {
+    return this._columnsHash.get(tableName);
   }
 
   /**
    * @internal
    * @noRailsEquivalent PERMANENT
    */
-  get loadedCache(): SchemaCache | null {
-    return this._cache;
+  getCachedDataSourceExists(name: string): boolean | undefined {
+    return this._dataSources.get(name);
   }
 
   /**
    * @internal
    * @noRailsEquivalent PERMANENT
    */
-  set loadedCache(cache: SchemaCache | null) {
-    this._cache = cache;
-    this._cachePromise = null;
-  }
-
-  async primaryKeys(pool: Pool, tableName: string): Promise<string | string[] | null> {
-    return (await this.cache(pool)).primaryKeys(pool, tableName);
-  }
-
-  async dataSourceExists(pool: Pool, name: string): Promise<boolean | null> {
-    return (await this.cache(pool)).dataSourceExists(pool, name);
-  }
-
-  async add(pool: Pool, name: string): Promise<void> {
-    return (await this.cache(pool)).add(pool, name);
-  }
-
-  async dataSources(pool: Pool, name: string): Promise<boolean | null> {
-    return (await this.cache(pool)).dataSourceExists(pool, name);
-  }
-
-  async columns(pool: Pool, tableName: string): Promise<Column[]> {
-    return (await this.cache(pool)).columns(pool, tableName);
-  }
-
-  async columnsHash(pool: Pool, tableName: string): Promise<Record<string, Column>> {
-    return (await this.cache(pool)).columnsHash(pool, tableName);
-  }
-
-  async isColumnsHash(pool: Pool, tableName: string): Promise<boolean> {
-    return (await this.cache(pool)).isColumnsHash(pool, tableName);
-  }
-
-  async indexes(pool: Pool, tableName: string): Promise<IndexDefinition[]> {
-    return (await this.cache(pool)).indexes(pool, tableName);
-  }
-
-  async version(pool: Pool): Promise<string | number | null> {
-    return (await this.cache(pool)).version(pool);
-  }
-
-  async size(pool: Pool): Promise<number> {
-    return (await this.cache(pool)).size;
-  }
-
-  async clearDataSourceCacheBang(pool: Pool, name: string): Promise<void> {
-    if (!this._cache && !this.possibleCacheAvailable()) return;
-    (await this.cache(pool)).clearDataSourceCacheBang(pool, name);
-  }
-
-  async isCached(tableName: string): Promise<boolean | null> {
-    if (this._cache == null) {
-      if (!SchemaReflection.checkSchemaCacheDumpVersion) {
-        this._cache = await this.loadCache(null);
-      }
-    }
-
-    return this._cache?.isCached(tableName) ?? null;
-  }
-
-  async dumpTo(pool: Pool, filename: string): Promise<SchemaCache> {
-    const freshCache = this.emptyCache();
-    await freshCache.addAll(pool);
-    await freshCache.dumpTo(filename);
-    this._cachePromise = null;
-    return (this._cache = freshCache);
-  }
-
-  private async cache(pool: Pool): Promise<SchemaCache> {
-    if (this._cache) return this._cache;
-
-    if (!this._cachePromise) {
-      const promise = this.loadCache(pool).then((loaded) => {
-        if (this._cachePromise === promise) {
-          this._cache = loaded ?? this.emptyCache();
-          this._cachePromise = null;
-        }
-        return this._cache ?? this.emptyCache();
-      });
-      this._cachePromise = promise;
-    }
-    return this._cachePromise;
-  }
-
-  /** @missingRailsName cachePath — PERMANENT */
-  private possibleCacheAvailable(): boolean {
-    if (!SchemaReflection.useSchemaCacheDump) return false;
-    if (!this._cachePath) return false;
-    try {
-      return File.isFile(this._cachePath);
-    } catch {
-      return false;
-    }
-  }
-
-  private async loadCache(pool: Pool | null): Promise<SchemaCache | null> {
-    if (!this.possibleCacheAvailable()) return null;
-
-    const newCache = await SchemaCache._loadFrom(this._cachePath!);
-    if (!newCache) return null;
-
-    if (SchemaReflection.checkSchemaCacheDumpVersion) {
-      try {
-        const expired = await pool!.withConnection(async (connection) => {
-          const currentVersion = await connection.schemaVersion();
-
-          if ((await newCache.version(connection)) !== currentVersion) {
-            console.warn(
-              `Ignoring ${this._cachePath} because it has expired. The current schema version is ${currentVersion}, but the one in the schema cache file is ${newCache.schemaVersion}.`,
-            );
-            return true;
-          }
-          return false;
-        });
-        if (expired) return null;
-      } catch (error) {
-        if (!(error instanceof ActiveRecordError)) throw error;
-        console.warn(
-          `Failed to validate the schema cache because of ${error.name}: ${error.message}`,
-        );
-        return null;
-      }
-    }
-
-    return newCache;
-  }
-}
-
-export class BoundSchemaReflection {
-  private _schemaReflection: SchemaReflection;
-  private _pool: Pool;
-
-  static forLoneConnection(
-    abstractSchemaReflection: SchemaReflection,
-    connection: unknown,
-  ): BoundSchemaReflection {
-    return new BoundSchemaReflection(abstractSchemaReflection, new FakePool(connection));
-  }
-
-  constructor(abstractSchemaReflection: SchemaReflection, pool: Pool) {
-    this._schemaReflection = abstractSchemaReflection;
-    this._pool = pool;
-  }
-
-  clearBang(): void {
-    this._schemaReflection.clearBang();
-  }
-
-  async loadBang(): Promise<this> {
-    await this._schemaReflection.loadBang(this._pool);
-    return this;
+  getCachedPrimaryKeys(tableName: string): string | string[] | null | undefined {
+    return this._primaryKeys.get(tableName);
   }
 
   /**
    * @internal
    * @noRailsEquivalent PERMANENT
    */
-  async loadAllBang(): Promise<this> {
-    await this._schemaReflection.loadAllBang(this._pool);
-    return this;
-  }
-
-  async isCached(tableName: string): Promise<boolean | null> {
-    return this._schemaReflection.isCached(tableName);
-  }
-
-  async primaryKeys(tableName: string): Promise<string | string[] | null> {
-    return this._schemaReflection.primaryKeys(this._pool, tableName);
-  }
-
-  async dataSourceExists(name: string): Promise<boolean | null> {
-    return this._schemaReflection.dataSourceExists(this._pool, name);
-  }
-
-  async add(name: string): Promise<void> {
-    return this._schemaReflection.add(this._pool, name);
-  }
-
-  async dataSources(name: string): Promise<boolean | null> {
-    return this._schemaReflection.dataSources(this._pool, name);
-  }
-
-  async columns(tableName: string): Promise<Column[]> {
-    return this._schemaReflection.columns(this._pool, tableName);
-  }
-
-  async columnsHash(tableName: string): Promise<Record<string, Column>> {
-    return this._schemaReflection.columnsHash(this._pool, tableName);
-  }
-
-  async isColumnsHash(tableName: string): Promise<boolean> {
-    return this._schemaReflection.isColumnsHash(this._pool, tableName);
-  }
-
-  async indexes(tableName: string): Promise<IndexDefinition[]> {
-    return this._schemaReflection.indexes(this._pool, tableName);
-  }
-
-  async version(): Promise<string | number | null> {
-    return this._schemaReflection.version(this._pool);
-  }
-
-  async size(): Promise<number> {
-    return this._schemaReflection.size(this._pool);
-  }
-
-  async clearDataSourceCacheBang(name: string): Promise<void> {
-    return this._schemaReflection.clearDataSourceCacheBang(this._pool, name);
-  }
-
-  async dumpTo(filename: string): Promise<SchemaCache> {
-    return this._schemaReflection.dumpTo(this._pool, filename);
-  }
-}
-
-export class FakePool {
-  private _connection: unknown;
-
-  constructor(connection: unknown) {
-    this._connection = connection;
-  }
-
-  withConnection<T>(callback: (conn: unknown) => T): T {
-    return callback(this._connection);
+  setColumns(tableName: string, cols: Column[]): void {
+    this._columns.set(tableName, cols);
+    const hash: Record<string, Column> = {};
+    for (const col of cols) {
+      hash[col.name] = col;
+    }
+    this._columnsHash.set(tableName, hash);
+    this._dataSources.set(tableName, true);
   }
 }
 

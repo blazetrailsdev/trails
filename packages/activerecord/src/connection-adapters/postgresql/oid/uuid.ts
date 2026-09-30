@@ -6,12 +6,12 @@ export const ACCEPTABLE_UUID = /^(?:\{([a-fA-F0-9]{4}-?){8}\}|([a-fA-F0-9]{4}-?)
 export const CANONICAL_UUID = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/;
 
 export class Uuid extends ValueType<string> {
-  override type(): string {
-    return "uuid";
-  }
-
   override serialize(value: unknown): string | null {
     return this.cast(value);
+  }
+
+  override type(): string {
+    return "uuid";
   }
 
   override isChanged(

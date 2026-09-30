@@ -61,17 +61,20 @@ export class TypeMapInitializer {
     return `WHERE\n  t.typelem IN (${knownTypeOids.join(", ")})\n`;
   }
 
-  private registerSqlTypeName(row: PgTypeRow): void {
-    const oid = toI(row.oid) as number;
-    if (!this.store.isKey(oid)) return;
-    for (const name of [row.formatType, row.aliasName]) {
-      if (name == null || this.store.isKey(name)) continue;
-      this.store.aliasType(name, oid);
-    }
-  }
-
   private registerMappedType(row: PgTypeRow): void {
     this.aliasType(row.oid, row.typname);
+  }
+
+  private registerEnumType(row: PgTypeRow): void {
+    this.register(row.oid, new Enum());
+  }
+
+  private registerArrayType(row: PgTypeRow): void {
+    this.registerWithSubtype(
+      row.oid,
+      toI(row.typelem) as number,
+      (subtype) => new OidArray(subtype, row.typdelim),
+    );
   }
 
   private registerRangeType(row: PgTypeRow): void {
@@ -80,10 +83,6 @@ export class TypeMapInitializer {
       toI(row.rngsubtype) as number,
       (subtype) => new RangeType(subtype as unknown as RangeSubtype, row.typname),
     );
-  }
-
-  private registerEnumType(row: PgTypeRow): void {
-    this.register(row.oid, new Enum());
   }
 
   private registerDomainType(row: PgTypeRow): void {
@@ -98,14 +97,6 @@ export class TypeMapInitializer {
   private registerCompositeType(row: PgTypeRow): void {
     const subtype = this.store.lookup(toI(row.typelem) as number);
     if (subtype) this.register(row.oid, new Vector(row.typdelim, subtype));
-  }
-
-  private registerArrayType(row: PgTypeRow): void {
-    this.registerWithSubtype(
-      row.oid,
-      toI(row.typelem) as number,
-      (subtype) => new OidArray(subtype, row.typdelim),
-    );
   }
 
   private register(
@@ -140,6 +131,15 @@ export class TypeMapInitializer {
   private assertValidRegistration(oid: number | string, oidType: unknown): number {
     if (oidType == null) throw new ArgumentError(`can't register nil type for OID ${oid}`);
     return toI(oid) as number;
+  }
+
+  private registerSqlTypeName(row: PgTypeRow): void {
+    const oid = toI(row.oid) as number;
+    if (!this.store.isKey(oid)) return;
+    for (const name of [row.formatType, row.aliasName]) {
+      if (name == null || this.store.isKey(name)) continue;
+      this.store.aliasType(name, oid);
+    }
   }
 }
 

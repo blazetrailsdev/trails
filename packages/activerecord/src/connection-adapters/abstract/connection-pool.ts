@@ -96,11 +96,6 @@ export class NullPool implements AbstractPool {
     });
   }
 
-  inspect(): string {
-    const v = this._serverVersion;
-    return `#<ActiveRecord::ConnectionAdapters::NullPool @server_version=${v == null ? "nil" : String(v)}>`;
-  }
-
   serverVersion(connection: DatabaseAdapter): unknown {
     if (this._serverVersion != null) return this._serverVersion;
     if (this._serverVersionFetcher !== null && isMonOwned.call(this._serverVersionFetcher.lock)) {
@@ -132,10 +127,6 @@ export class NullPool implements AbstractPool {
     return undefined;
   }
 
-  checkout(): never {
-    throw new ConnectionNotEstablished("NullPool does not support checkout");
-  }
-
   checkin(_: DatabaseAdapter): void {}
 
   remove(_: DatabaseAdapter): void {}
@@ -150,6 +141,15 @@ export class NullPool implements AbstractPool {
 
   get dirtiesQueryCache(): boolean {
     return true;
+  }
+
+  inspect(): string {
+    const v = this._serverVersion;
+    return `#<ActiveRecord::ConnectionAdapters::NullPool @server_version=${v == null ? "nil" : String(v)}>`;
+  }
+
+  checkout(): never {
+    throw new ConnectionNotEstablished("NullPool does not support checkout");
   }
 
   disconnect(): void {}
@@ -208,12 +208,12 @@ export class LeaseRegistry {
     return lease;
   }
 
-  _peek(context: object): Lease | undefined {
-    return this._map.get(context);
-  }
-
   clear(): void {
     this._map = new WeakMap();
+  }
+
+  _peek(context: object): Lease | undefined {
+    return this._map.get(context);
   }
 }
 
@@ -261,6 +261,35 @@ export class ConnectionPool implements ReapablePool {
   private _pinnedConnection: DatabaseAdapter | null = null;
   private _pinnedConnectionsDepth = 0;
 
+  static installExecutorHooks(
+    executor: { registerHook(hooks: typeof ExecutorHooks): void } = Executor,
+  ): void {
+    executor.registerHook(ExecutorHooks);
+  }
+
+  get schemaReflection(): SchemaReflection {
+    return this.poolConfig.schemaReflection;
+  }
+
+  set schemaReflection(value: SchemaReflection) {
+    this.poolConfig.schemaReflection = value;
+    this._boundSchemaCache = undefined;
+    this._lazyLoadTriggered = false;
+    this._lazyLoadPromise = null;
+    this._eagerWarmTriggered = false;
+    this._eagerWarmPromise = null;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  [Symbol.for("nodejs.util.inspect.custom")](): string {
+    return this.inspect();
+  }
+
+  serverVersion(connection: DatabaseAdapter): unknown {
+    return this.poolConfig.serverVersion(connection);
+  }
+
+  private _boundSchemaCache?: BoundSchemaReflection;
   constructor(poolConfig: PoolConfig) {
     this.poolConfig = poolConfig;
     this.dbConfig = poolConfig.dbConfig;
@@ -280,37 +309,6 @@ export class ConnectionPool implements ReapablePool {
     initializeIncludedModules(this);
   }
 
-  inspect(): string {
-    const q = (v: string) => JSON.stringify(String(v));
-    const nameField = this.dbConfig.name === "primary" ? "" : ` name=${q(this.dbConfig.name)}`;
-    const shardField = this.shard === "default" ? "" : ` shard=:${this.shard}`;
-    const className =
-      this.constructor === ConnectionPool
-        ? "ActiveRecord::ConnectionAdapters::ConnectionPool"
-        : this.constructor.name;
-
-    return `#<${className} env_name=${q(this.dbConfig.envName)}${nameField} role=:${this.role}${shardField}>`;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return this.inspect();
-  }
-
-  get schemaReflection(): SchemaReflection {
-    return this.poolConfig.schemaReflection;
-  }
-
-  set schemaReflection(value: SchemaReflection) {
-    this.poolConfig.schemaReflection = value;
-    this._boundSchemaCache = undefined;
-    this._lazyLoadTriggered = false;
-    this._lazyLoadPromise = null;
-    this._eagerWarmTriggered = false;
-    this._eagerWarmPromise = null;
-  }
-
-  private _boundSchemaCache?: BoundSchemaReflection;
   get schemaCache(): BoundSchemaReflection {
     if (!this._boundSchemaCache) {
       this._boundSchemaCache = new BoundSchemaReflection(this.schemaReflection, this);
@@ -318,12 +316,8 @@ export class ConnectionPool implements ReapablePool {
     return this._boundSchemaCache;
   }
 
-  serverVersion(connection: DatabaseAdapter): unknown {
-    return this.poolConfig.serverVersion(connection);
-  }
-
-  get connectionDescriptor(): ConnectionDescriptor {
-    return this.poolConfig.connectionDescriptor;
+  get migrationContext(): MigrationContext {
+    return new MigrationContext(this.migrationsPaths, this.schemaMigration, this.internalMetadata);
   }
 
   get migrationsPaths(): string[] {
@@ -339,36 +333,6 @@ export class ConnectionPool implements ReapablePool {
     return new InternalMetadata(this);
   }
 
-  get migrationContext(): MigrationContext {
-    return new MigrationContext(this.migrationsPaths, this.schemaMigration, this.internalMetadata);
-  }
-
-  isActiveConnection(): DatabaseAdapter | null {
-    return this.connectionLease().connection;
-  }
-
-  get activeConnection(): DatabaseAdapter | null {
-    return this.isActiveConnection();
-  }
-
-  isConnected(): boolean {
-    return this._connections != null && this._connections.some((conn) => conn.isConnected());
-  }
-
-  get connections(): DatabaseAdapter[] {
-    return this._connections ? [...this._connections] : [];
-  }
-
-  isDiscarded(): boolean {
-    return this._connections === null;
-  }
-
-  static installExecutorHooks(
-    executor: { registerHook(hooks: typeof ExecutorHooks): void } = Executor,
-  ): void {
-    executor.registerHook(ExecutorHooks);
-  }
-
   async leaseConnection(): Promise<DatabaseAdapter> {
     const lease = this.connectionLease();
     lease.sticky = true;
@@ -378,62 +342,8 @@ export class ConnectionPool implements ReapablePool {
     return lease.connection;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
-   */
-  withConnectionSync<T>(
-    fn: (conn: DatabaseAdapter) => T,
-    options: { preventPermanentCheckout?: boolean } = {},
-  ): T {
-    const preventPermanentCheckout = options.preventPermanentCheckout ?? false;
-    const lease = this.connectionLease();
-    const stickyWas = lease.sticky;
-    if (preventPermanentCheckout) lease.sticky = false;
-
-    const ensure = (release: boolean, result?: T): T => {
-      const restore = () => {
-        if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
-        if (release && !lease.sticky) this.releaseConnection(lease);
-      };
-      if (result instanceof Promise) return result.finally(restore) as T;
-      restore();
-      return result as T;
-    };
-
-    let result: T;
-    const release = !lease.connection;
-    try {
-      if (lease.connection) {
-        result = fn(lease.connection);
-      } else {
-        const pinned = this._pinnedConnection;
-        if (pinned && this._connections && !this._connections.includes(pinned)) {
-          this._connections.push(pinned);
-        }
-        result = fn(
-          (lease.connection =
-            pinned ?? this.checkoutAndVerify(this.acquireConnectionSync(this.checkoutTimeout))),
-        );
-      }
-    } catch (error) {
-      ensure(release);
-      throw error;
-    }
-    return ensure(release, result);
-  }
-
   isPermanentLease(): boolean {
     return this.connectionLease().sticky === null;
-  }
-
-  releaseConnection(_existingLease: Lease | null = null): boolean {
-    const conn = this.connectionLease().release();
-    if (conn) {
-      this.checkin(conn);
-      return true;
-    }
-    return false;
   }
 
   async pinConnectionBang(lockThread = false): Promise<void> {
@@ -495,70 +405,25 @@ export class ConnectionPool implements ReapablePool {
     return clean;
   }
 
-  async checkout(checkoutTimeout: number = this.checkoutTimeout): Promise<DatabaseAdapter> {
-    if (!this._pinnedConnection) {
-      return this.checkoutAndVerify(await this.acquireConnection(checkoutTimeout));
-    }
-
-    return this._pinnedConnection.lock.synchronize(() =>
-      (synchronize<DatabaseAdapter>).call(this, async () => {
-        if (this._pinnedConnection) {
-          await (
-            this._pinnedConnection as unknown as { verifyBang(): void | Promise<void> }
-          ).verifyBang();
-          if (this._connections && !this._connections.includes(this._pinnedConnection)) {
-            this._connections.push(this._pinnedConnection);
-          }
-          return this._pinnedConnection;
-        }
-        return this.checkoutAndVerify(await this.acquireConnection(checkoutTimeout));
-      }),
-    );
+  get connectionDescriptor(): ConnectionDescriptor {
+    return this.poolConfig.connectionDescriptor;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
-   */
-  acquireConnectionSync(checkoutTimeout: number): DatabaseAdapter {
-    const pinned = this._pinnedConnection;
-    if (pinned) return pinned;
-    if (this.isDiscarded()) {
-      throw new ConnectionNotEstablished("Connection pool has been discarded");
-    }
-    let conn = this._available?.poll() ?? this.tryToCheckoutNewConnection();
-    if (!conn) {
-      void this.reap().catch((err) => {
-        console.warn(`[trails] reap failed: ${err instanceof Error ? err.message : String(err)}`);
-      });
-      conn = this._available?.poll() ?? this.tryToCheckoutNewConnection();
-    }
-    if (!conn) {
-      throw new ConnectionTimeoutError(
-        `Could not obtain a connection from the pool within ${checkoutTimeout} seconds`,
-        { connectionPool: this },
-      );
-    }
-    this._checkedOut.add(conn);
-    return conn;
+  isActiveConnection(): DatabaseAdapter | null {
+    return this.connectionLease().connection;
   }
 
-  checkin(conn: DatabaseAdapter): void {
-    if (this._isConnectionPinned(conn)) return;
-    this.connectionLease().clear(conn);
-    if (this._checkedOut.has(conn)) {
-      this._checkedOut.delete(conn);
-      const c = conn as unknown as PoolManagedConnection & {
-        _runCheckinCallbacks?: (block: () => void) => void;
-      };
-      const expireBlock = () => c.expire?.();
-      if (typeof c._runCheckinCallbacks === "function") c._runCheckinCallbacks(expireBlock);
-      else {
-        expireBlock();
-        QueryCache.unsetQueryCacheBang.call(conn as unknown as QueryCacheHost);
-      }
-      this._available?.add(conn);
+  get activeConnection(): DatabaseAdapter | null {
+    return this.isActiveConnection();
+  }
+
+  releaseConnection(_existingLease: Lease | null = null): boolean {
+    const conn = this.connectionLease().release();
+    if (conn) {
+      this.checkin(conn);
+      return true;
     }
+    return false;
   }
 
   async withConnection<T>(
@@ -586,29 +451,12 @@ export class ConnectionPool implements ReapablePool {
     }
   }
 
-  numWaitingInQueue(): number {
-    return this._available?.numWaiting() ?? 0;
+  isConnected(): boolean {
+    return this._connections != null && this._connections.some((conn) => conn.isConnected());
   }
 
-  /** @missingRailsCall count — PERMANENT */
-  stat(): {
-    size: number;
-    connections: number;
-    busy: number;
-    dead: number;
-    idle: number;
-    waiting: number;
-    checkoutTimeout: number;
-  } {
-    return {
-      size: this.size,
-      connections: this._connections?.length ?? 0,
-      busy: this._connections?.filter((c) => c.isInUse() && c.owner!.isAlive()).length ?? 0,
-      dead: this._connections?.filter((c) => c.isInUse() && !c.owner!.isAlive()).length ?? 0,
-      idle: this._connections?.filter((c) => !c.isInUse()).length ?? 0,
-      waiting: this.numWaitingInQueue(),
-      checkoutTimeout: this.checkoutTimeout,
-    };
+  get connections(): DatabaseAdapter[] {
+    return this._connections ? [...this._connections] : [];
   }
 
   async disconnect(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
@@ -649,6 +497,10 @@ export class ConnectionPool implements ReapablePool {
     });
   }
 
+  isDiscarded(): boolean {
+    return this._connections === null;
+  }
+
   async clearReloadableConnections(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
     await this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () =>
       synchronize.call(this, async () => {
@@ -676,6 +528,68 @@ export class ConnectionPool implements ReapablePool {
 
   async clearReloadableConnectionsBang(): Promise<void> {
     await this.clearReloadableConnections(false);
+  }
+
+  async checkout(checkoutTimeout: number = this.checkoutTimeout): Promise<DatabaseAdapter> {
+    if (!this._pinnedConnection) {
+      return this.checkoutAndVerify(await this.acquireConnection(checkoutTimeout));
+    }
+
+    return this._pinnedConnection.lock.synchronize(() =>
+      (synchronize<DatabaseAdapter>).call(this, async () => {
+        if (this._pinnedConnection) {
+          await (
+            this._pinnedConnection as unknown as { verifyBang(): void | Promise<void> }
+          ).verifyBang();
+          if (this._connections && !this._connections.includes(this._pinnedConnection)) {
+            this._connections.push(this._pinnedConnection);
+          }
+          return this._pinnedConnection;
+        }
+        return this.checkoutAndVerify(await this.acquireConnection(checkoutTimeout));
+      }),
+    );
+  }
+
+  checkin(conn: DatabaseAdapter): void {
+    if (this._isConnectionPinned(conn)) return;
+    this.connectionLease().clear(conn);
+    if (this._checkedOut.has(conn)) {
+      this._checkedOut.delete(conn);
+      const c = conn as unknown as PoolManagedConnection & {
+        _runCheckinCallbacks?: (block: () => void) => void;
+      };
+      const expireBlock = () => c.expire?.();
+      if (typeof c._runCheckinCallbacks === "function") c._runCheckinCallbacks(expireBlock);
+      else {
+        expireBlock();
+        QueryCache.unsetQueryCacheBang.call(conn as unknown as QueryCacheHost);
+      }
+      this._available?.add(conn);
+    }
+  }
+
+  remove(conn: DatabaseAdapter): void {
+    this.connectionLease().clear(conn);
+    this._checkedOut.delete(conn);
+    this._available?.delete(conn);
+
+    if (this._connections) {
+      const connIdx = this._connections.indexOf(conn);
+      if (connIdx >= 0) this._connections.splice(connIdx, 1);
+    }
+
+    const needsNewConnection = this._available?.isAnyWaiting() ?? false;
+    if (
+      needsNewConnection &&
+      this.automaticReconnect &&
+      this._connections &&
+      this._connections.length < this.size
+    ) {
+      const newConn = this.newConnection();
+      this._connections.push(newConn);
+      this._available?.add(newConn);
+    }
   }
 
   async reap(): Promise<void> {
@@ -733,14 +647,33 @@ export class ConnectionPool implements ReapablePool {
     await this.flush(-1);
   }
 
-  /** @internal */
-  _trackCloseDrain(drain: Promise<void> | undefined): void {
-    if (!drain) return;
-    this._pendingCloseDrains.add(drain);
-    const forget = (): void => {
-      this._pendingCloseDrains.delete(drain);
+  numWaitingInQueue(): number {
+    return this._available?.numWaiting() ?? 0;
+  }
+
+  /** @missingRailsCall count — PERMANENT */
+  stat(): {
+    size: number;
+    connections: number;
+    busy: number;
+    dead: number;
+    idle: number;
+    waiting: number;
+    checkoutTimeout: number;
+  } {
+    return {
+      size: this.size,
+      connections: this._connections?.length ?? 0,
+      busy: this._connections?.filter((c) => c.isInUse() && c.owner!.isAlive()).length ?? 0,
+      dead: this._connections?.filter((c) => c.isInUse() && !c.owner!.isAlive()).length ?? 0,
+      idle: this._connections?.filter((c) => !c.isInUse()).length ?? 0,
+      waiting: this.numWaitingInQueue(),
+      checkoutTimeout: this.checkoutTimeout,
     };
-    drain.then(forget, forget);
+  }
+
+  scheduleQuery(futureResult: { executeOrSkip(): Promise<void> | void }): void {
+    this.asyncExecutor!.post(() => futureResult.executeOrSkip());
   }
 
   newConnection(): DatabaseAdapter {
@@ -804,41 +737,11 @@ export class ConnectionPool implements ReapablePool {
     return conn;
   }
 
-  private _lazyLoadTriggered = false;
-
-  /** @internal */
-  _lazyLoadPromise: Promise<void> | null = null;
-
-  private _eagerWarmTriggered = false;
-
-  /** @internal */
-  _eagerWarmPromise: Promise<void> | null = null;
-
-  remove(conn: DatabaseAdapter): void {
-    this.connectionLease().clear(conn);
-    this._checkedOut.delete(conn);
-    this._available?.delete(conn);
-
-    if (this._connections) {
-      const connIdx = this._connections.indexOf(conn);
-      if (connIdx >= 0) this._connections.splice(connIdx, 1);
+  private connectionLease(): Lease {
+    if (!this._leases) {
+      this._leases = new LeaseRegistry();
     }
-
-    const needsNewConnection = this._available?.isAnyWaiting() ?? false;
-    if (
-      needsNewConnection &&
-      this.automaticReconnect &&
-      this._connections &&
-      this._connections.length < this.size
-    ) {
-      const newConn = this.newConnection();
-      this._connections.push(newConn);
-      this._available?.add(newConn);
-    }
-  }
-
-  scheduleQuery(futureResult: { executeOrSkip(): Promise<void> | void }): void {
-    this.asyncExecutor!.post(() => futureResult.executeOrSkip());
+    return this._leases.get(IsolatedExecutionState.context());
   }
 
   private buildAsyncExecutor(): ThreadPoolExecutor | null {
@@ -859,25 +762,15 @@ export class ConnectionPool implements ReapablePool {
     }
   }
 
-  private _isConnectionPinned(conn: DatabaseAdapter): boolean {
-    return this._pinnedConnection === conn;
-  }
+  private _lazyLoadTriggered = false;
 
-  private connectionLease(): Lease {
-    if (!this._leases) {
-      this._leases = new LeaseRegistry();
-    }
-    return this._leases.get(IsolatedExecutionState.context());
-  }
+  /** @internal */
+  _lazyLoadPromise: Promise<void> | null = null;
 
-  private bulkMakeNewConnections = bulkMakeNewConnections;
-  private withExclusivelyAcquiredAllConnections = withExclusivelyAcquiredAllConnections;
-  private attemptToCheckoutAllExistingConnections = attemptToCheckoutAllExistingConnections;
-  private withNewConnectionsBlocked = withNewConnectionsBlocked;
-  private acquireConnection = acquireConnection;
-  private tryToCheckoutNewConnection = tryToCheckoutNewConnection;
-  private adoptConnection = adoptConnection;
-  private checkoutNewConnection = checkoutNewConnection;
+  private _eagerWarmTriggered = false;
+
+  /** @internal */
+  _eagerWarmPromise: Promise<void> | null = null;
 
   private checkoutAndVerify(c: DatabaseAdapter): DatabaseAdapter {
     try {
@@ -890,6 +783,113 @@ export class ConnectionPool implements ReapablePool {
       this._trackCloseDrain(c.disconnectBang());
       throw err;
     }
+  }
+
+  inspect(): string {
+    const q = (v: string) => JSON.stringify(String(v));
+    const nameField = this.dbConfig.name === "primary" ? "" : ` name=${q(this.dbConfig.name)}`;
+    const shardField = this.shard === "default" ? "" : ` shard=:${this.shard}`;
+    const className =
+      this.constructor === ConnectionPool
+        ? "ActiveRecord::ConnectionAdapters::ConnectionPool"
+        : this.constructor.name;
+
+    return `#<${className} env_name=${q(this.dbConfig.envName)}${nameField} role=:${this.role}${shardField}>`;
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
+   */
+  withConnectionSync<T>(
+    fn: (conn: DatabaseAdapter) => T,
+    options: { preventPermanentCheckout?: boolean } = {},
+  ): T {
+    const preventPermanentCheckout = options.preventPermanentCheckout ?? false;
+    const lease = this.connectionLease();
+    const stickyWas = lease.sticky;
+    if (preventPermanentCheckout) lease.sticky = false;
+
+    const ensure = (release: boolean, result?: T): T => {
+      const restore = () => {
+        if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
+        if (release && !lease.sticky) this.releaseConnection(lease);
+      };
+      if (result instanceof Promise) return result.finally(restore) as T;
+      restore();
+      return result as T;
+    };
+
+    let result: T;
+    const release = !lease.connection;
+    try {
+      if (lease.connection) {
+        result = fn(lease.connection);
+      } else {
+        const pinned = this._pinnedConnection;
+        if (pinned && this._connections && !this._connections.includes(pinned)) {
+          this._connections.push(pinned);
+        }
+        result = fn(
+          (lease.connection =
+            pinned ?? this.checkoutAndVerify(this.acquireConnectionSync(this.checkoutTimeout))),
+        );
+      }
+    } catch (error) {
+      ensure(release);
+      throw error;
+    }
+    return ensure(release, result);
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
+   */
+  acquireConnectionSync(checkoutTimeout: number): DatabaseAdapter {
+    const pinned = this._pinnedConnection;
+    if (pinned) return pinned;
+    if (this.isDiscarded()) {
+      throw new ConnectionNotEstablished("Connection pool has been discarded");
+    }
+    let conn = this._available?.poll() ?? this.tryToCheckoutNewConnection();
+    if (!conn) {
+      void this.reap().catch((err) => {
+        console.warn(`[trails] reap failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
+      conn = this._available?.poll() ?? this.tryToCheckoutNewConnection();
+    }
+    if (!conn) {
+      throw new ConnectionTimeoutError(
+        `Could not obtain a connection from the pool within ${checkoutTimeout} seconds`,
+        { connectionPool: this },
+      );
+    }
+    this._checkedOut.add(conn);
+    return conn;
+  }
+
+  /** @internal */
+  _trackCloseDrain(drain: Promise<void> | undefined): void {
+    if (!drain) return;
+    this._pendingCloseDrains.add(drain);
+    const forget = (): void => {
+      this._pendingCloseDrains.delete(drain);
+    };
+    drain.then(forget, forget);
+  }
+
+  private bulkMakeNewConnections = bulkMakeNewConnections;
+  private withExclusivelyAcquiredAllConnections = withExclusivelyAcquiredAllConnections;
+  private attemptToCheckoutAllExistingConnections = attemptToCheckoutAllExistingConnections;
+  private withNewConnectionsBlocked = withNewConnectionsBlocked;
+  private acquireConnection = acquireConnection;
+  private tryToCheckoutNewConnection = tryToCheckoutNewConnection;
+  private adoptConnection = adoptConnection;
+  private checkoutNewConnection = checkoutNewConnection;
+
+  private _isConnectionPinned(conn: DatabaseAdapter): boolean {
+    return this._pinnedConnection === conn;
   }
 }
 

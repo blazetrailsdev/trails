@@ -47,12 +47,12 @@ export class SqlTypeMetadata implements Deduplicable {
     );
   }
 
-  deduplicate(): this {
-    return deduplicate(this);
-  }
-
   /** @internal */
   deduplicated(): this {
     return Object.freeze(this);
+  }
+
+  deduplicate(): this {
+    return deduplicate(this);
   }
 }

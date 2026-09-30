@@ -172,10 +172,6 @@ export class Version {
     this.fullVersionString = fullVersionString;
   }
 
-  toString(): string {
-    return this._version.join(".");
-  }
-
   compare(versionString: string): number {
     const other = versionString.split(".").map((part) => parseInt(part, 10) || 0);
     for (let i = 0; i < Math.min(this._version.length, other.length); i++) {
@@ -183,6 +179,10 @@ export class Version {
       if (this._version[i] < other[i]) return -1;
     }
     return this._version.length === other.length ? 0 : this._version.length > other.length ? 1 : -1;
+  }
+
+  toString(): string {
+    return this._version.join(".");
   }
 }
 
@@ -778,6 +778,119 @@ export class AbstractAdapter implements Quoting {
 
   static readonly COMMENT_REGEX = /(?:--.*\n)|\/\*(?:[^*]|\*[^/])*\*\//;
 
+  get visitor(): Visitors.ToSql {
+    return this._visitor;
+  }
+
+  protected _visitor!: Visitors.ToSql;
+  protected _connection: unknown = null;
+  private _owner: Thread | Fiber | null = null;
+  private _preparedStatements: unknown = false;
+  private _schemaCache: BoundSchemaReflection | null = null;
+  private _idleSince = Process.clockGettime(Process.CLOCK_MONOTONIC);
+  protected _lastActivity = 0;
+  protected _verified = false;
+  protected _unconfiguredConnection: unknown = null;
+  /** @internal */
+  protected _connectionParameters: unknown = null;
+  protected _rawConnectionDirty = false;
+  protected _config: Record<string, unknown> = {};
+  protected _defaultTimezone?: string;
+  protected _advisoryLocksEnabled: unknown = true;
+  _transactionManager!: TransactionManager;
+
+  _queryCache: Store | null = null;
+
+  pool: ConnectionPool | NullPool = new NullPool();
+  logger: unknown = null;
+  lock: LoadInterlockAwareMonitor | NullLock = new LoadInterlockAwareMonitor();
+
+  get owner(): Thread | Fiber | null {
+    return this._owner;
+  }
+
+  /** @internal */
+  _statements?: StatementPool | null;
+  /** @internal */
+  private _inspectId?: number;
+  private static _inspectSeq?: number;
+
+  isInUse(): Thread | Fiber | null {
+    return this.owner;
+  }
+
+  static typeCastConfigToInteger(config: unknown): number | unknown {
+    if (typeof config === "number") return config;
+    if (typeof config === "string" && /^\d+$/.test(config)) return parseInt(config, 10);
+    return config;
+  }
+
+  static typeCastConfigToBoolean(config: unknown): boolean | unknown {
+    if (config === "false") return false;
+    return config;
+  }
+
+  static validateDefaultTimezone(config: unknown): string | undefined {
+    switch (config) {
+      case null:
+      case undefined:
+        return undefined;
+      case "utc":
+      case "local":
+        return config as string;
+      default:
+        throw new ArgumentError("default_timezone must be either 'utc' or 'local'");
+    }
+  }
+
+  /** @missingRailsCall union — PERMANENT */
+  static buildReadQueryRegexp(...parts: string[]): RegExp {
+    parts = parts.concat(AbstractAdapter.DEFAULT_READ_QUERY);
+    return new RegExp(
+      `^(?:[(\\s]|${AbstractAdapter.COMMENT_REGEX.source})*(?:${parts.join("|")})`,
+      "i",
+    );
+  }
+
+  /**
+   * @missingRailsCall exec — PERMANENT
+   * @missingRailsCall empty? — PERMANENT
+   */
+  static findCmdAndExec(commands: string | string[], ...args: string[]): string[] {
+    let cmds = Array.isArray(commands) ? commands : commands == null ? [] : [commands];
+
+    const dirsOnPath = toS(env["PATH"]).split(File.PATH_SEPARATOR);
+    const ext = RbConfig.CONFIG["EXEEXT"];
+    if (ext !== "") {
+      cmds = cmds.map((cmd) => `${cmd}${ext}`);
+    }
+
+    let fullPathCommand: string | null = null;
+    const found = cmds.find((cmd) =>
+      dirsOnPath.find((path) => {
+        fullPathCommand = File.join(path, cmd);
+        let stat;
+        try {
+          stat = File.stat(fullPathCommand);
+        } catch {
+          return false;
+        }
+        return stat.isFile() && stat.isExecutable();
+      }),
+    );
+
+    if (found != null) {
+      return [fullPathCommand!, ...args];
+    } else {
+      abort(`Couldn't find database client: ${cmds.join(", ")}. Check your $PATH and try again.`);
+    }
+  }
+
+  static dbconsole(_config?: DatabaseConfig, _options?: Record<string, unknown>): unknown {
+    // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract_adapter.rb:121
+    throw new NotImplementedError("dbconsole");
+  }
+
   /** @missingRailsCall fetch — PERMANENT */
   constructor(
     configOrDeprecatedConnection: unknown,
@@ -838,165 +951,44 @@ export class AbstractAdapter implements Quoting {
     );
   }
 
-  protected _visitor!: Visitors.ToSql;
-  protected _connection: unknown = null;
-  private _owner: Thread | Fiber | null = null;
-  private _preparedStatements: unknown = false;
-  private _schemaCache: BoundSchemaReflection | null = null;
-  private _idleSince = Process.clockGettime(Process.CLOCK_MONOTONIC);
-  protected _lastActivity = 0;
-  protected _verified = false;
-  protected _unconfiguredConnection: unknown = null;
-  /** @internal */
-  protected _connectionParameters: unknown = null;
-  protected _rawConnectionDirty = false;
-  protected _config: Record<string, unknown> = {};
-  protected _defaultTimezone?: string;
-  protected _advisoryLocksEnabled: unknown = true;
-  _transactionManager!: TransactionManager;
-
-  _queryCache: Store | null = null;
-
-  pool: ConnectionPool | NullPool = new NullPool();
-  logger: unknown = null;
-  lock: LoadInterlockAwareMonitor | NullLock = new LoadInterlockAwareMonitor();
-
   setLockThread(lockThread: unknown): void {
     this.lock = lockThread != null ? new LoadInterlockAwareMonitor() : NullLock;
   }
 
-  /** @internal */
-  _statements?: StatementPool | null;
-  /** @internal */
-  private _inspectId?: number;
-  private static _inspectSeq?: number;
-
-  quote(value: unknown): string {
-    return abstractQuote.call(this, value);
-  }
-
-  typeCast(value: unknown): unknown {
-    return abstractTypeCast.call(this, value);
-  }
-
-  /** @internal */
-  typeCastedBinds(binds: unknown[] | null | undefined): unknown[] | undefined {
-    return abstractTypeCastedBinds.call(this, binds);
-  }
-
-  quoteString(s: string): string {
-    return abstractQuoteString(s);
-  }
-
-  static quoteColumnName(columnName: unknown): string {
-    return abstractQuoteColumnName(columnName);
-  }
-
-  static quoteTableName(tableName: unknown): string {
-    return abstractQuoteTableName.call(this, tableName);
-  }
-
-  quoteTableName(tableName: unknown): string {
-    return (this.constructor as typeof AbstractAdapter).quoteTableName(tableName);
-  }
-
-  quoteColumnName(columnName: unknown): string {
-    return (this.constructor as typeof AbstractAdapter).quoteColumnName(columnName);
-  }
-
-  quoteTableNameForAssignment(table: string, attr: string): string {
-    return this.quoteTableName(`${table}.${attr}`);
-  }
-
-  quoteDefaultExpression(value: unknown, column: unknown): string {
-    return abstractQuoteDefaultExpression.call(this, value, column as { sqlType?: string | null });
-  }
-
-  quotedTrue(): string {
-    return abstractQuotedTrue();
-  }
-
-  quotedFalse(): string {
-    return abstractQuotedFalse();
-  }
-
-  unquotedTrue(): boolean | number {
-    return abstractUnquotedTrue();
-  }
-
-  unquotedFalse(): boolean | number {
-    return abstractUnquotedFalse();
-  }
-
-  quotedDate(value: Parameters<typeof abstractQuotedDate>[0]): string {
-    return abstractQuotedDate(value);
-  }
-
-  quotedTime(value: QuotedTimeValue): string {
-    return abstractQuotedTime.call(this, value);
-  }
-
-  quotedBinary(value: BinaryData): string {
-    return abstractQuotedBinary(value);
-  }
-
-  castBoundValue(value: unknown): unknown {
-    return abstractCastBoundValue(value);
-  }
-
-  sanitizeAsSqlComment(value: unknown): string {
-    return abstractSanitizeAsSqlComment(value);
-  }
-
-  private _ensureQueryCache(): Store {
-    if (!this._queryCache) {
-      this._queryCache = new Store();
+  checkIfWriteQuery(sql: string | null): void {
+    if (this.isPreventingWrites() && this.isWriteQuery(sql)) {
+      throw new ReadOnlyError("Write query attempted while in readonly mode: " + sql);
     }
-    return this._queryCache;
   }
 
-  get queryCache(): Store | null {
-    return this._queryCache;
+  isReplica(): boolean {
+    return (this._config.replica as boolean | undefined) ?? false;
   }
 
-  set queryCache(value: Store | null) {
-    this._queryCache = value;
+  get connectionRetries(): number {
+    const v = this._config.connectionRetries;
+    return typeof v === "number" ? v : 1;
   }
 
-  get queryCacheEnabled(): boolean {
-    return queryCacheEnabledGet.call(this as unknown as QueryCacheHost);
+  get verifyTimeout(): number {
+    const v = this._config.verifyTimeout;
+    return typeof v === "number" ? v : 2;
   }
 
-  cache<T>(fn: () => T | Promise<T>): T | Promise<T> {
-    this._ensureQueryCache();
-    return cacheMixin.call(this as unknown as QueryCacheHost, fn) as T | Promise<T>;
+  get retryDeadline(): number | null {
+    const v = this._config.retryDeadline;
+    return typeof v === "number" ? v : null;
   }
 
-  enableQueryCacheBang(): void {
-    this._ensureQueryCache();
-    enableQueryCacheBangMixin.call(this as unknown as QueryCacheHost);
+  get defaultTimezone(): string {
+    return this._defaultTimezone ?? defaultTimezone();
   }
 
-  async uncached<T>(fn: () => T | Promise<T>, options: { dirties?: boolean } = {}): Promise<T> {
-    this._ensureQueryCache();
-    return uncachedMixin.call(this as unknown as QueryCacheHost, fn, options) as Promise<T>;
-  }
+  isPreventingWrites(): boolean {
+    if (this.isReplica()) return true;
+    if (this.connectionDescriptor == null) return false;
 
-  disableQueryCacheBang(): void {
-    this._ensureQueryCache();
-    disableQueryCacheBangMixin.call(this as unknown as QueryCacheHost);
-  }
-
-  clearQueryCache(): void {
-    clearQueryCacheMixin.call(this as unknown as QueryCacheHost);
-  }
-
-  isInUse(): Thread | Fiber | null {
-    return this.owner;
-  }
-
-  get owner(): Thread | Fiber | null {
-    return this._owner;
+    return this.connectionDescriptor.currentPreventingWrites();
   }
 
   get preparedStatements(): boolean {
@@ -1011,8 +1003,21 @@ export class AbstractAdapter implements Quoting {
     this._preparedStatements = value;
   }
 
-  async active(): Promise<boolean> {
-    return this._connection !== null;
+  get preparedStatementsDisabledCache(): Set<unknown> {
+    return (
+      IsolatedExecutionState.get<Set<unknown>>(
+        "active_record_prepared_statements_disabled_cache",
+      ) ??
+      IsolatedExecutionState.set(
+        "active_record_prepared_statements_disabled_cache",
+        new Set<unknown>(),
+      )
+    );
+  }
+
+  isValidType(type: string | null | undefined): boolean {
+    if (type == null) return false;
+    return this.nativeDatabaseTypes()[type] != null;
   }
 
   lease(): void {
@@ -1029,6 +1034,28 @@ export class AbstractAdapter implements Quoting {
     }
 
     this._owner = IsolatedExecutionState.context();
+  }
+
+  get connectionDescriptor(): ConnectionDescriptor | undefined {
+    return this.pool.connectionDescriptor;
+  }
+
+  get role(): string {
+    return this.pool.role;
+  }
+
+  get shard(): string {
+    return this.pool.shard;
+  }
+
+  get schemaCache(): BoundSchemaReflection {
+    const schemaCache = this.pool.schemaCache;
+    if (schemaCache instanceof BoundSchemaReflection) return schemaCache;
+    this._schemaCache ??= BoundSchemaReflection.forLoneConnection(
+      this._poolSchemaReflection(),
+      this,
+    );
+    return this._schemaCache;
   }
 
   expire(): void {
@@ -1048,50 +1075,312 @@ export class AbstractAdapter implements Quoting {
     }
   }
 
-  protected static _connectionCallbacks: Record<ConnectionCallbackPhase, ConnectionCallback[]> = {
-    checkout: [],
-    checkin: [],
-  };
+  stealBang(): void {
+    if (this.isInUse()) {
+      if (this._owner !== IsolatedExecutionState.context()) {
+        removeConnectionFromThreadCache(this.pool as ConnectionPool, this, this._owner!);
 
-  static setCallback(
-    phase: ConnectionCallbackPhase,
-    kind: ConnectionCallbackKind,
-    method: (this: AbstractAdapter) => void,
-  ): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_connectionCallbacks")) {
-      const inherited = this._connectionCallbacks;
-      this._connectionCallbacks = {
-        checkout: [...inherited.checkout],
-        checkin: [...inherited.checkin],
-      };
-    }
-    this._connectionCallbacks[phase].push({ kind, method });
-  }
-
-  private _runCallbacks(phase: ConnectionCallbackPhase, block: () => void): void {
-    const callbacks = (this.constructor as typeof AbstractAdapter)._connectionCallbacks[phase];
-    for (const cb of callbacks) if (cb.kind === "before") cb.method.call(this);
-    block();
-    for (let i = callbacks.length - 1; i >= 0; i--) {
-      if (callbacks[i].kind === "after") callbacks[i].method.call(this);
+        this._owner = IsolatedExecutionState.context();
+      }
+    } else {
+      throw new ActiveRecordError("Cannot steal connection, it is not currently leased.");
     }
   }
 
-  /** @internal */
-  _runCheckoutCallbacks(block: () => void): void {
-    this._runCallbacks("checkout", block);
+  get secondsIdle(): number {
+    if (this.isInUse()) return 0;
+    return Process.clockGettime(Process.CLOCK_MONOTONIC) - this._idleSince;
   }
 
-  /** @internal */
-  _runCheckinCallbacks(block: () => void): void {
-    this._runCallbacks("checkin", block);
+  get secondsSinceLastActivity(): number | null {
+    if (!this._connection || !this._lastActivity) return null;
+    return Process.clockGettime(Process.CLOCK_MONOTONIC) - this._lastActivity;
+  }
+
+  /** @missingRailsName objectId — PERMANENT */
+  unpreparedStatement<T>(fn: () => Promise<T> | T): Promise<T> | T {
+    let cache: Set<unknown> | undefined;
+    if (
+      this._preparedStatements != null &&
+      this._preparedStatements !== false &&
+      !this.preparedStatementsDisabledCache.has(this)
+    ) {
+      cache = this.preparedStatementsDisabledCache.add(this);
+    }
+    let result: Promise<T> | T;
+    try {
+      result = fn();
+    } catch (error) {
+      cache?.delete(this);
+      throw error;
+    }
+    if (result instanceof Promise) {
+      return result.finally(() => {
+        cache?.delete(this);
+      });
+    }
+    cache?.delete(this);
+    return result;
   }
 
   get adapterName(): string {
     return (this.constructor as typeof AbstractAdapter).ADAPTER_NAME;
   }
 
+  static async databaseExists(config: unknown): Promise<boolean> {
+    const ctor = this as unknown as new (config: unknown) => AbstractAdapter;
+    return new ctor(config).databaseExists();
+  }
+
+  async databaseExists(): Promise<boolean> {
+    try {
+      await this.connectBang();
+      return true;
+    } catch (error) {
+      if (error instanceof NoDatabaseError) return false;
+      throw error;
+    }
+  }
+
+  supportsDdlTransactions(): boolean {
+    return false;
+  }
+
+  protected static _connectionCallbacks: Record<ConnectionCallbackPhase, ConnectionCallback[]> = {
+    checkout: [],
+    checkin: [],
+  };
+
+  supportsBulkAlter(): boolean {
+    return false;
+  }
+
+  supportsSavepoints(): boolean {
+    return false;
+  }
+
+  isSavepointErrorsInvalidateTransactions(): boolean {
+    return false;
+  }
+
+  async supportsRestartDbTransaction(): Promise<boolean> {
+    return false;
+  }
+
+  supportsAdvisoryLocks(): boolean {
+    return false;
+  }
+
+  isPrefetchPrimaryKey(_tableName?: string): boolean {
+    return false;
+  }
+
+  async supportsPartitionedIndexes(): Promise<boolean> {
+    return false;
+  }
+
+  async supportsIndexSortOrder(): Promise<boolean> {
+    return false;
+  }
+
+  supportsPartialIndex(): boolean {
+    return false;
+  }
+
+  async supportsIndexInclude(): Promise<boolean> {
+    return false;
+  }
+
+  async supportsExpressionIndex(): Promise<boolean> {
+    return false;
+  }
+
+  supportsExplain(): boolean {
+    return false;
+  }
+
+  supportsTransactionIsolation(): boolean {
+    return false;
+  }
+
+  supportsExtensions(): boolean {
+    return false;
+  }
+
+  supportsIndexesInCreate(): boolean {
+    return false;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  [Symbol.for("nodejs.util.inspect.custom")](): string {
+    return this.inspect();
+  }
+
+  supportsForeignKeys(): boolean {
+    return false;
+  }
+
+  supportsValidateConstraints(): boolean {
+    return false;
+  }
+
+  supportsDeferrableConstraints(): boolean {
+    return false;
+  }
+
+  async supportsCheckConstraints(): Promise<boolean> {
+    return false;
+  }
+
+  supportsExclusionConstraints(): boolean {
+    return false;
+  }
+
+  supportsUniqueConstraints(): boolean {
+    return false;
+  }
+
+  supportsViews(): boolean {
+    return false;
+  }
+
+  supportsMaterializedViews(): boolean {
+    return false;
+  }
+
+  supportsDatetimeWithPrecision(): boolean {
+    return false;
+  }
+
+  async supportsJson(): Promise<boolean> {
+    return false;
+  }
+
+  supportsComments(): boolean {
+    return false;
+  }
+
+  supportsCommentsInCreate(): boolean {
+    return false;
+  }
+
+  async supportsVirtualColumns(): Promise<boolean> {
+    return false;
+  }
+
+  supportsForeignTables(): boolean {
+    return false;
+  }
+
+  async supportsOptimizerHints(): Promise<boolean> {
+    return false;
+  }
+
+  async supportsCommonTableExpressions(): Promise<boolean> {
+    return false;
+  }
+
+  supportsLazyTransactions(): boolean {
+    return false;
+  }
+
+  async supportsInsertReturning(): Promise<boolean> {
+    return false;
+  }
+
+  async supportsInsertOnDuplicateSkip(): Promise<boolean> {
+    return false;
+  }
+
+  async supportsInsertOnDuplicateUpdate(): Promise<boolean> {
+    return false;
+  }
+
+  async supportsInsertConflictTarget(): Promise<boolean> {
+    return false;
+  }
+
+  supportsConcurrentConnections(): boolean {
+    return true;
+  }
+
+  async supportsNullsNotDistinct(): Promise<boolean> {
+    return false;
+  }
+
+  isReturnValueAfterInsert(_column?: unknown): boolean {
+    return false;
+  }
+
+  async returnValueAfterInsert(column: Column): Promise<boolean> {
+    return column.isAutoPopulated();
+  }
+
+  isAsyncEnabled(): boolean {
+    return false;
+  }
+
+  asyncEnabled(): boolean {
+    return (
+      this.supportsConcurrentConnections() &&
+      asyncQueryExecutor() != null &&
+      this.pool?.asyncExecutor != null
+    );
+  }
+
+  async disableExtension(_name: string): Promise<void> {}
+
+  async enableExtension(_name: string): Promise<void> {}
+
+  async createEnum(_name: string, _values: string[]): Promise<void> {}
+
+  async dropEnum(_name: string): Promise<void> {}
+
+  async renameEnum(_oldName: string, _newName: string): Promise<void> {}
+
+  async addEnumValue(_enumName: string, _value: string): Promise<void> {}
+
+  async renameEnumValue(..._args: unknown[]): Promise<void> {}
+
+  async createVirtualTable(..._args: unknown[]): Promise<void> {}
+
+  async dropVirtualTable(_name: string): Promise<void> {}
+
+  isAdvisoryLocksEnabled(): boolean {
+    return (
+      this.supportsAdvisoryLocks() &&
+      this._advisoryLocksEnabled != null &&
+      this._advisoryLocksEnabled !== false
+    );
+  }
+
+  async getAdvisoryLock(_lockId: number | bigint | string): Promise<boolean> {
+    return false;
+  }
+
+  async releaseAdvisoryLock(_lockId: number | bigint | string): Promise<boolean> {
+    return false;
+  }
+
+  extensions(): string[] | Promise<string[]> {
+    return [];
+  }
+
+  indexAlgorithms(): Record<string, string> {
+    return {};
+  }
+
+  async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
+    await fn();
+  }
+
+  async checkAllForeignKeysValidBang(): Promise<void> {}
+
   isConnected(): boolean {
+    return this._connection !== null;
+  }
+
+  async active(): Promise<boolean> {
     return this._connection !== null;
   }
 
@@ -1142,24 +1431,43 @@ export class AbstractAdapter implements Quoting {
     });
   }
 
-  /** @internal */
-  protected static _isDeprecatedRawConnectionArg(arg: unknown): boolean {
-    if (typeof arg !== "object" || arg === null || Array.isArray(arg)) return false;
-    const proto = Object.getPrototypeOf(arg) as object | null;
-    return proto !== Object.prototype && proto !== null;
-  }
-
-  /** @internal */
-  protected _acceptDeprecatedRawConnection(rawConnection: unknown): void {
-    this._unconfiguredConnection = rawConnection;
-  }
-
   async disconnectBang(): Promise<void> {
     await this.lock.synchronize(async () => {
       await this.clearCacheBang({ newConnection: true });
       this.resetTransaction();
       this._rawConnectionDirty = false;
     });
+  }
+
+  discardBang(): void {}
+
+  async resetBang(): Promise<void> {
+    await this.clearCacheBang({ newConnection: true });
+    this.resetTransaction();
+    await this.attemptConfigureConnection();
+  }
+
+  throwAwayBang(): void | Promise<void> {
+    this.pool.remove(this);
+    return this.disconnectBang();
+  }
+
+  clearCacheBang({
+    newConnection = false,
+  }: { newConnection?: boolean } = {}): void | Promise<void> {
+    if (this._statements) {
+      return this.lock.synchronize(() => {
+        if (newConnection) {
+          return this._statements!.reset();
+        } else {
+          return this._statements!.clear();
+        }
+      });
+    }
+  }
+
+  requiresReloading(): boolean {
+    return false;
   }
 
   async verifyBang(): Promise<void> {
@@ -1181,502 +1489,6 @@ export class AbstractAdapter implements Quoting {
     this.verifiedBang();
   }
 
-  clearCacheBang({
-    newConnection = false,
-  }: { newConnection?: boolean } = {}): void | Promise<void> {
-    if (this._statements) {
-      return this.lock.synchronize(() => {
-        if (newConnection) {
-          return this._statements!.reset();
-        } else {
-          return this._statements!.clear();
-        }
-      });
-    }
-  }
-
-  get role(): string {
-    return this.pool.role;
-  }
-
-  get shard(): string {
-    return this.pool.shard;
-  }
-
-  inspect(): string {
-    const q = (v: string): string => JSON.stringify(String(v));
-    const dbConfig = this.pool.dbConfig;
-    const envName = dbConfig.envName ?? "test";
-    const configName = dbConfig.name;
-    const nameField = configName && configName !== "primary" ? ` name=${q(configName)}` : "";
-    const shardField = this.shard !== "default" ? ` shard=:${this.shard}` : "";
-    this._inspectId ??= AbstractAdapter._inspectSeq = (AbstractAdapter._inspectSeq ?? 0) + 1;
-    const hex = `0x${this._inspectId.toString(16).padStart(12, "0")}`;
-    return `#<${this.constructor.name}:${hex} env_name=${q(envName)}${nameField} role=:${this.role}${shardField}>`;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return this.inspect();
-  }
-
-  isValidType(type: string | null | undefined): boolean {
-    if (type == null) return false;
-    return this.nativeDatabaseTypes()[type] != null;
-  }
-
-  /** @internal */
-  _columnMethodNames(): string[] {
-    return [...ABSTRACT_COLUMN_METHOD_NAMES];
-  }
-
-  isReplica(): boolean {
-    return (this._config.replica as boolean | undefined) ?? false;
-  }
-
-  isPreventingWrites(): boolean {
-    if (this.isReplica()) return true;
-    if (this.connectionDescriptor == null) return false;
-
-    return this.connectionDescriptor.currentPreventingWrites();
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
-   */
-  get internalSchemaCache(): SchemaCache {
-    const reflection = this._poolSchemaReflection();
-    if (!reflection.loadedCache) reflection.loadedCache = new SchemaCache();
-    return reflection.loadedCache;
-  }
-
-  get schemaCache(): BoundSchemaReflection {
-    const schemaCache = this.pool.schemaCache;
-    if (schemaCache instanceof BoundSchemaReflection) return schemaCache;
-    this._schemaCache ??= BoundSchemaReflection.forLoneConnection(
-      this._poolSchemaReflection(),
-      this,
-    );
-    return this._schemaCache;
-  }
-
-  /** @internal */
-  private _poolSchemaReflection(): SchemaReflection {
-    return this.pool.schemaReflection;
-  }
-
-  checkIfWriteQuery(sql: string | null): void {
-    if (this.isPreventingWrites() && this.isWriteQuery(sql)) {
-      throw new ReadOnlyError("Write query attempted while in readonly mode: " + sql);
-    }
-  }
-
-  /** @missingRailsName objectId — PERMANENT */
-  unpreparedStatement<T>(fn: () => Promise<T> | T): Promise<T> | T {
-    let cache: Set<unknown> | undefined;
-    if (
-      this._preparedStatements != null &&
-      this._preparedStatements !== false &&
-      !this.preparedStatementsDisabledCache.has(this)
-    ) {
-      cache = this.preparedStatementsDisabledCache.add(this);
-    }
-    let result: Promise<T> | T;
-    try {
-      result = fn();
-    } catch (error) {
-      cache?.delete(this);
-      throw error;
-    }
-    if (result instanceof Promise) {
-      return result.finally(() => {
-        cache?.delete(this);
-      });
-    }
-    cache?.delete(this);
-    return result;
-  }
-
-  supportsExplain(): boolean {
-    return false;
-  }
-
-  supportsExtensions(): boolean {
-    return false;
-  }
-
-  supportsIndexesInCreate(): boolean {
-    return false;
-  }
-
-  async supportsInsertReturning(): Promise<boolean> {
-    return false;
-  }
-
-  async returnValueAfterInsert(column: Column): Promise<boolean> {
-    return column.isAutoPopulated();
-  }
-
-  async supportsInsertOnDuplicateSkip(): Promise<boolean> {
-    return false;
-  }
-
-  async supportsInsertOnDuplicateUpdate(): Promise<boolean> {
-    return false;
-  }
-
-  supportsDdlTransactions(): boolean {
-    return false;
-  }
-
-  supportsBulkAlter(): boolean {
-    return false;
-  }
-
-  supportsPartialIndex(): boolean {
-    return false;
-  }
-
-  async supportsExpressionIndex(): Promise<boolean> {
-    return false;
-  }
-
-  supportsTransactionIsolation(): boolean {
-    return false;
-  }
-
-  supportsForeignKeys(): boolean {
-    return false;
-  }
-
-  async supportsCheckConstraints(): Promise<boolean> {
-    return false;
-  }
-
-  supportsViews(): boolean {
-    return false;
-  }
-
-  supportsMaterializedViews(): boolean {
-    return false;
-  }
-
-  async supportsJson(): Promise<boolean> {
-    return false;
-  }
-
-  supportsComments(): boolean {
-    return false;
-  }
-
-  supportsSavepoints(): boolean {
-    return false;
-  }
-
-  supportsLazyTransactions(): boolean {
-    return false;
-  }
-
-  /** @internal */
-  reconnect(): void | Promise<void> {}
-
-  get transactionManager(): TransactionManager {
-    return this._transactionManager;
-  }
-
-  async transaction<T>(
-    fnOrOpts?:
-      | ((tx?: unknown) => Promise<T> | T)
-      | { requiresNew?: boolean; isolation?: string; joinable?: boolean },
-    fnOrOpts2?:
-      | ((tx?: unknown) => Promise<T> | T)
-      | { requiresNew?: boolean; isolation?: string; joinable?: boolean },
-  ): Promise<T | undefined> {
-    let opts: { requiresNew?: boolean; isolation?: string; joinable?: boolean } = {};
-    let block: (tx?: unknown) => Promise<T> | T;
-    if (typeof fnOrOpts === "function") {
-      block = fnOrOpts;
-      if (fnOrOpts2 && typeof fnOrOpts2 !== "function") opts = fnOrOpts2;
-    } else {
-      opts = fnOrOpts ?? {};
-      block = fnOrOpts2 as (tx?: unknown) => Promise<T> | T;
-    }
-    if (typeof block !== "function") {
-      throw new TypeError("transaction requires a function block");
-    }
-    return dbStatementsTransaction.call(this as any, block, opts) as Promise<T | undefined>;
-  }
-
-  close(): void | Promise<void> {
-    this.pool.checkin(this);
-  }
-
-  requiresReloading(): boolean {
-    return false;
-  }
-
-  async rawConnection<Self extends AbstractAdapter>(this: Self): Promise<RawConnectionOf<Self>> {
-    return this.withRawConnection({}, async (conn) => {
-      await this.disableLazyTransactionsBang();
-      this._rawConnectionDirty = true;
-      return conn as RawConnectionOf<Self>;
-    });
-  }
-
-  get connectionRetries(): number {
-    const v = this._config.connectionRetries;
-    return typeof v === "number" ? v : 1;
-  }
-
-  get verifyTimeout(): number {
-    const v = this._config.verifyTimeout;
-    return typeof v === "number" ? v : 2;
-  }
-
-  get retryDeadline(): number | null {
-    const v = this._config.retryDeadline;
-    return typeof v === "number" ? v : null;
-  }
-
-  get defaultTimezone(): string {
-    return this._defaultTimezone ?? defaultTimezone();
-  }
-
-  get connectionDescriptor(): ConnectionDescriptor | undefined {
-    return this.pool.connectionDescriptor;
-  }
-
-  get visitor(): Visitors.ToSql {
-    return this._visitor;
-  }
-
-  /** @internal */
-  arelVisitor(): Visitors.ToSql {
-    return new Visitors.ToSql(this);
-  }
-
-  get preparedStatementsDisabledCache(): Set<unknown> {
-    return (
-      IsolatedExecutionState.get<Set<unknown>>(
-        "active_record_prepared_statements_disabled_cache",
-      ) ??
-      IsolatedExecutionState.set(
-        "active_record_prepared_statements_disabled_cache",
-        new Set<unknown>(),
-      )
-    );
-  }
-
-  stealBang(): void {
-    if (this.isInUse()) {
-      if (this._owner !== IsolatedExecutionState.context()) {
-        removeConnectionFromThreadCache(this.pool as ConnectionPool, this, this._owner!);
-
-        this._owner = IsolatedExecutionState.context();
-      }
-    } else {
-      throw new ActiveRecordError("Cannot steal connection, it is not currently leased.");
-    }
-  }
-
-  get secondsIdle(): number {
-    if (this.isInUse()) return 0;
-    return Process.clockGettime(Process.CLOCK_MONOTONIC) - this._idleSince;
-  }
-
-  get secondsSinceLastActivity(): number | null {
-    if (!this._connection || !this._lastActivity) return null;
-    return Process.clockGettime(Process.CLOCK_MONOTONIC) - this._lastActivity;
-  }
-
-  discardBang(): void {}
-
-  async resetBang(): Promise<void> {
-    await this.clearCacheBang({ newConnection: true });
-    this.resetTransaction();
-    await this.attemptConfigureConnection();
-  }
-
-  supportsAdvisoryLocks(): boolean {
-    return false;
-  }
-
-  async supportsPartitionedIndexes(): Promise<boolean> {
-    return false;
-  }
-
-  async supportsIndexSortOrder(): Promise<boolean> {
-    return false;
-  }
-
-  defaultIndexType(index: IndexDefinition): boolean {
-    return index.using == null;
-  }
-
-  supportsConcurrentConnections(): boolean {
-    return true;
-  }
-
-  asyncEnabled(): boolean {
-    return (
-      this.supportsConcurrentConnections() &&
-      asyncQueryExecutor() != null &&
-      this.pool?.asyncExecutor != null
-    );
-  }
-
-  async supportsCommonTableExpressions(): Promise<boolean> {
-    return false;
-  }
-
-  static typeCastConfigToInteger(config: unknown): number | unknown {
-    if (typeof config === "number") return config;
-    if (typeof config === "string" && /^\d+$/.test(config)) return parseInt(config, 10);
-    return config;
-  }
-
-  static typeCastConfigToBoolean(config: unknown): boolean | unknown {
-    if (config === "false") return false;
-    return config;
-  }
-
-  isAsyncEnabled(): boolean {
-    return false;
-  }
-
-  async supportsIndexInclude(): Promise<boolean> {
-    return false;
-  }
-
-  supportsValidateConstraints(): boolean {
-    return false;
-  }
-
-  supportsDeferrableConstraints(): boolean {
-    return false;
-  }
-
-  supportsExclusionConstraints(): boolean {
-    return false;
-  }
-
-  supportsUniqueConstraints(): boolean {
-    return false;
-  }
-
-  supportsDatetimeWithPrecision(): boolean {
-    return false;
-  }
-
-  supportsCommentsInCreate(): boolean {
-    return false;
-  }
-
-  async supportsVirtualColumns(): Promise<boolean> {
-    return false;
-  }
-
-  supportsForeignTables(): boolean {
-    return false;
-  }
-
-  async supportsOptimizerHints(): Promise<boolean> {
-    return false;
-  }
-
-  async supportsInsertConflictTarget(): Promise<boolean> {
-    return false;
-  }
-
-  async supportsNullsNotDistinct(): Promise<boolean> {
-    return false;
-  }
-
-  isReturnValueAfterInsert(_column?: unknown): boolean {
-    return false;
-  }
-
-  isPrefetchPrimaryKey(_tableName?: string): boolean {
-    return false;
-  }
-
-  isSavepointErrorsInvalidateTransactions(): boolean {
-    return false;
-  }
-
-  async supportsRestartDbTransaction(): Promise<boolean> {
-    return false;
-  }
-
-  static async databaseExists(config: unknown): Promise<boolean> {
-    const ctor = this as unknown as new (config: unknown) => AbstractAdapter;
-    return new ctor(config).databaseExists();
-  }
-
-  async databaseExists(): Promise<boolean> {
-    try {
-      await this.connectBang();
-      return true;
-    } catch (error) {
-      if (error instanceof NoDatabaseError) return false;
-      throw error;
-    }
-  }
-
-  async enableExtension(_name: string): Promise<void> {}
-
-  async disableExtension(_name: string): Promise<void> {}
-
-  async createEnum(_name: string, _values: string[]): Promise<void> {}
-
-  async dropEnum(_name: string): Promise<void> {}
-
-  async renameEnum(_oldName: string, _newName: string): Promise<void> {}
-
-  async addEnumValue(_enumName: string, _value: string): Promise<void> {}
-
-  async renameEnumValue(..._args: unknown[]): Promise<void> {}
-
-  async createVirtualTable(..._args: unknown[]): Promise<void> {}
-
-  async dropVirtualTable(_name: string): Promise<void> {}
-
-  isAdvisoryLocksEnabled(): boolean {
-    return (
-      this.supportsAdvisoryLocks() &&
-      this._advisoryLocksEnabled != null &&
-      this._advisoryLocksEnabled !== false
-    );
-  }
-
-  async getAdvisoryLock(_lockId: number | bigint | string): Promise<boolean> {
-    return false;
-  }
-
-  async releaseAdvisoryLock(_lockId: number | bigint | string): Promise<boolean> {
-    return false;
-  }
-
-  extensions(): string[] | Promise<string[]> {
-    return [];
-  }
-
-  indexAlgorithms(): Record<string, string> {
-    return {};
-  }
-
-  async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
-    await fn();
-  }
-
-  async checkAllForeignKeysValidBang(): Promise<void> {}
-
-  throwAwayBang(): void | Promise<void> {
-    this.pool.remove(this);
-    return this.disconnectBang();
-  }
-
   async connectBang(): Promise<this> {
     await this.verifyBang();
     return this;
@@ -1685,6 +1497,14 @@ export class AbstractAdapter implements Quoting {
   cleanBang(): void {
     this._rawConnectionDirty = false;
     this._verified = false;
+  }
+
+  async rawConnection<Self extends AbstractAdapter>(this: Self): Promise<RawConnectionOf<Self>> {
+    return this.withRawConnection({}, async (conn) => {
+      await this.disableLazyTransactionsBang();
+      this._rawConnectionDirty = true;
+      return conn as RawConnectionOf<Self>;
+    });
   }
 
   defaultUniquenessComparison(attribute: Arel.Attribute, value: unknown): Nodes.Node {
@@ -1713,8 +1533,16 @@ export class AbstractAdapter implements Quoting {
     return true;
   }
 
+  close(): void | Promise<void> {
+    this.pool.checkin(this);
+  }
+
   isDefaultIndexType(_index: unknown): boolean {
     return true;
+  }
+
+  defaultIndexType(index: IndexDefinition): boolean {
+    return index.using == null;
   }
 
   async buildInsertSql(insert: InsertBuilder): Promise<string> {
@@ -1743,87 +1571,19 @@ export class AbstractAdapter implements Quoting {
     return (this.pool as ConnectionPool).migrationContext.currentVersion();
   }
 
-  static validateDefaultTimezone(config: unknown): string | undefined {
-    switch (config) {
-      case null:
-      case undefined:
-        return undefined;
-      case "utc":
-      case "local":
-        return config as string;
-      default:
-        throw new ArgumentError("default_timezone must be either 'utc' or 'local'");
-    }
+  /** @missingRailsName last — PERMANENT */
+  static registerClassWithPrecision(
+    this: Pick<typeof AbstractAdapter, "extractPrecision">,
+    mapping: TypeMap | HashLookupTypeMap,
+    key: string | RegExp,
+    klass: new (options?: { precision?: number }) => object,
+    kwargs: Record<string, unknown> = {},
+  ): void {
+    (mapping as TypeMap).registerType(key, undefined, (...args: string[]) => {
+      const precision = this.extractPrecision(args.at(-1)!);
+      return new klass({ precision, ...kwargs }) as ReturnType<TypeMap["lookup"]>;
+    });
   }
-
-  private static readonly DEFAULT_READ_QUERY = [
-    "begin",
-    "commit",
-    "explain",
-    "release",
-    "rollback",
-    "savepoint",
-    "select",
-    "with",
-  ];
-
-  /** @missingRailsCall union — PERMANENT */
-  static buildReadQueryRegexp(...parts: string[]): RegExp {
-    parts = parts.concat(AbstractAdapter.DEFAULT_READ_QUERY);
-    return new RegExp(
-      `^(?:[(\\s]|${AbstractAdapter.COMMENT_REGEX.source})*(?:${parts.join("|")})`,
-      "i",
-    );
-  }
-
-  /**
-   * @missingRailsCall exec — PERMANENT
-   * @missingRailsCall empty? — PERMANENT
-   */
-  static findCmdAndExec(commands: string | string[], ...args: string[]): string[] {
-    let cmds = Array.isArray(commands) ? commands : commands == null ? [] : [commands];
-
-    const dirsOnPath = toS(env["PATH"]).split(File.PATH_SEPARATOR);
-    const ext = RbConfig.CONFIG["EXEEXT"];
-    if (ext !== "") {
-      cmds = cmds.map((cmd) => `${cmd}${ext}`);
-    }
-
-    let fullPathCommand: string | null = null;
-    const found = cmds.find((cmd) =>
-      dirsOnPath.find((path) => {
-        fullPathCommand = File.join(path, cmd);
-        let stat;
-        try {
-          stat = File.stat(fullPathCommand);
-        } catch {
-          return false;
-        }
-        return stat.isFile() && stat.isExecutable();
-      }),
-    );
-
-    if (found != null) {
-      return [fullPathCommand!, ...args];
-    } else {
-      abort(`Couldn't find database client: ${cmds.join(", ")}. Check your $PATH and try again.`);
-    }
-  }
-
-  static dbconsole(_config?: DatabaseConfig, _options?: Record<string, unknown>): unknown {
-    // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract_adapter.rb:121
-    throw new NotImplementedError("dbconsole");
-  }
-
-  static get TYPE_MAP(): TypeMap {
-    return (abstractTypeMap ??= (() => {
-      const m = new TypeMap();
-      AbstractAdapter.initializeTypeMap(m);
-      return m;
-    })());
-  }
-
-  static readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
 
   static extendedTypeMap(
     this: typeof AbstractAdapter,
@@ -1879,20 +1639,6 @@ export class AbstractAdapter implements Quoting {
     (mapping as TypeMap).registerType(key, undefined, (...args: string[]) => {
       const limit = this.extractLimit(args.at(-1)!);
       return new klass({ limit }) as ReturnType<TypeMap["lookup"]>;
-    });
-  }
-
-  /** @missingRailsName last — PERMANENT */
-  static registerClassWithPrecision(
-    this: Pick<typeof AbstractAdapter, "extractPrecision">,
-    mapping: TypeMap | HashLookupTypeMap,
-    key: string | RegExp,
-    klass: new (options?: { precision?: number }) => object,
-    kwargs: Record<string, unknown> = {},
-  ): void {
-    (mapping as TypeMap).registerType(key, undefined, (...args: string[]) => {
-      const precision = this.extractPrecision(args.at(-1)!);
-      return new klass({ precision, ...kwargs }) as ReturnType<TypeMap["lookup"]>;
     });
   }
 
@@ -1983,11 +1729,6 @@ export class AbstractAdapter implements Quoting {
   }
 
   /** @internal */
-  protected async rawConnectionForBlock(): Promise<unknown> {
-    return this._connection;
-  }
-
-  /** @internal */
   verifiedBang(): void {
     this._lastActivity = Process.clockGettime(Process.CLOCK_MONOTONIC);
     this._verified = true;
@@ -2028,6 +1769,9 @@ export class AbstractAdapter implements Quoting {
   }
 
   /** @internal */
+  reconnect(): void | Promise<void> {}
+
+  /** @internal */
   anyRawConnection(): unknown {
     return this._connection ?? this.validRawConnection();
   }
@@ -2061,11 +1805,6 @@ export class AbstractAdapter implements Quoting {
     let m = ctor.EXTENDED_TYPE_MAPS.get(cacheKey);
     if (!m) ctor.EXTENDED_TYPE_MAPS.set(cacheKey, (m = ctor.extendedTypeMap(key)));
     return m;
-  }
-
-  /** @internal */
-  configureConnection(..._args: unknown[]): void | Promise<void> {
-    return this.checkVersion();
   }
 
   /** @internal */
@@ -2174,6 +1913,11 @@ export class AbstractAdapter implements Quoting {
   }
 
   /** @internal */
+  arelVisitor(): Visitors.ToSql {
+    return new Visitors.ToSql(this);
+  }
+
+  /** @internal */
   buildStatementPool(..._args: unknown[]): unknown {
     return undefined;
   }
@@ -2185,6 +1929,11 @@ export class AbstractAdapter implements Quoting {
     columnTypes: ColumnTypes | null = null,
   ): Result {
     return new Result(columns, rows, columnTypes);
+  }
+
+  /** @internal */
+  configureConnection(..._args: unknown[]): void | Promise<void> {
+    return this.checkVersion();
   }
 
   /** @internal */
@@ -2213,6 +1962,257 @@ export class AbstractAdapter implements Quoting {
         typeof warningMatcher === "string" ? new RegExp(warningMatcher) : warningMatcher;
       return matcher.test(warning.message ?? "") || matcher.test(String(warning.code ?? ""));
     });
+  }
+
+  quote(value: unknown): string {
+    return abstractQuote.call(this, value);
+  }
+
+  typeCast(value: unknown): unknown {
+    return abstractTypeCast.call(this, value);
+  }
+
+  /** @internal */
+  typeCastedBinds(binds: unknown[] | null | undefined): unknown[] | undefined {
+    return abstractTypeCastedBinds.call(this, binds);
+  }
+
+  quoteString(s: string): string {
+    return abstractQuoteString(s);
+  }
+
+  static quoteColumnName(columnName: unknown): string {
+    return abstractQuoteColumnName(columnName);
+  }
+
+  private static readonly DEFAULT_READ_QUERY = [
+    "begin",
+    "commit",
+    "explain",
+    "release",
+    "rollback",
+    "savepoint",
+    "select",
+    "with",
+  ];
+
+  static quoteTableName(tableName: unknown): string {
+    return abstractQuoteTableName.call(this, tableName);
+  }
+
+  quoteTableName(tableName: unknown): string {
+    return (this.constructor as typeof AbstractAdapter).quoteTableName(tableName);
+  }
+
+  quoteColumnName(columnName: unknown): string {
+    return (this.constructor as typeof AbstractAdapter).quoteColumnName(columnName);
+  }
+
+  quoteTableNameForAssignment(table: string, attr: string): string {
+    return this.quoteTableName(`${table}.${attr}`);
+  }
+
+  static readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
+
+  quoteDefaultExpression(value: unknown, column: unknown): string {
+    return abstractQuoteDefaultExpression.call(this, value, column as { sqlType?: string | null });
+  }
+
+  quotedTrue(): string {
+    return abstractQuotedTrue();
+  }
+
+  quotedFalse(): string {
+    return abstractQuotedFalse();
+  }
+
+  unquotedTrue(): boolean | number {
+    return abstractUnquotedTrue();
+  }
+
+  unquotedFalse(): boolean | number {
+    return abstractUnquotedFalse();
+  }
+
+  quotedDate(value: Parameters<typeof abstractQuotedDate>[0]): string {
+    return abstractQuotedDate(value);
+  }
+
+  quotedTime(value: QuotedTimeValue): string {
+    return abstractQuotedTime.call(this, value);
+  }
+
+  quotedBinary(value: BinaryData): string {
+    return abstractQuotedBinary(value);
+  }
+
+  castBoundValue(value: unknown): unknown {
+    return abstractCastBoundValue(value);
+  }
+
+  sanitizeAsSqlComment(value: unknown): string {
+    return abstractSanitizeAsSqlComment(value);
+  }
+
+  private _ensureQueryCache(): Store {
+    if (!this._queryCache) {
+      this._queryCache = new Store();
+    }
+    return this._queryCache;
+  }
+
+  get queryCache(): Store | null {
+    return this._queryCache;
+  }
+
+  set queryCache(value: Store | null) {
+    this._queryCache = value;
+  }
+
+  get queryCacheEnabled(): boolean {
+    return queryCacheEnabledGet.call(this as unknown as QueryCacheHost);
+  }
+
+  cache<T>(fn: () => T | Promise<T>): T | Promise<T> {
+    this._ensureQueryCache();
+    return cacheMixin.call(this as unknown as QueryCacheHost, fn) as T | Promise<T>;
+  }
+
+  enableQueryCacheBang(): void {
+    this._ensureQueryCache();
+    enableQueryCacheBangMixin.call(this as unknown as QueryCacheHost);
+  }
+
+  async uncached<T>(fn: () => T | Promise<T>, options: { dirties?: boolean } = {}): Promise<T> {
+    this._ensureQueryCache();
+    return uncachedMixin.call(this as unknown as QueryCacheHost, fn, options) as Promise<T>;
+  }
+
+  disableQueryCacheBang(): void {
+    this._ensureQueryCache();
+    disableQueryCacheBangMixin.call(this as unknown as QueryCacheHost);
+  }
+
+  clearQueryCache(): void {
+    clearQueryCacheMixin.call(this as unknown as QueryCacheHost);
+  }
+
+  static setCallback(
+    phase: ConnectionCallbackPhase,
+    kind: ConnectionCallbackKind,
+    method: (this: AbstractAdapter) => void,
+  ): void {
+    if (!Object.prototype.hasOwnProperty.call(this, "_connectionCallbacks")) {
+      const inherited = this._connectionCallbacks;
+      this._connectionCallbacks = {
+        checkout: [...inherited.checkout],
+        checkin: [...inherited.checkin],
+      };
+    }
+    this._connectionCallbacks[phase].push({ kind, method });
+  }
+
+  private _runCallbacks(phase: ConnectionCallbackPhase, block: () => void): void {
+    const callbacks = (this.constructor as typeof AbstractAdapter)._connectionCallbacks[phase];
+    for (const cb of callbacks) if (cb.kind === "before") cb.method.call(this);
+    block();
+    for (let i = callbacks.length - 1; i >= 0; i--) {
+      if (callbacks[i].kind === "after") callbacks[i].method.call(this);
+    }
+  }
+
+  /** @internal */
+  _runCheckoutCallbacks(block: () => void): void {
+    this._runCallbacks("checkout", block);
+  }
+
+  /** @internal */
+  _runCheckinCallbacks(block: () => void): void {
+    this._runCallbacks("checkin", block);
+  }
+
+  /** @internal */
+  protected static _isDeprecatedRawConnectionArg(arg: unknown): boolean {
+    if (typeof arg !== "object" || arg === null || Array.isArray(arg)) return false;
+    const proto = Object.getPrototypeOf(arg) as object | null;
+    return proto !== Object.prototype && proto !== null;
+  }
+
+  /** @internal */
+  protected _acceptDeprecatedRawConnection(rawConnection: unknown): void {
+    this._unconfiguredConnection = rawConnection;
+  }
+
+  inspect(): string {
+    const q = (v: string): string => JSON.stringify(String(v));
+    const dbConfig = this.pool.dbConfig;
+    const envName = dbConfig.envName ?? "test";
+    const configName = dbConfig.name;
+    const nameField = configName && configName !== "primary" ? ` name=${q(configName)}` : "";
+    const shardField = this.shard !== "default" ? ` shard=:${this.shard}` : "";
+    this._inspectId ??= AbstractAdapter._inspectSeq = (AbstractAdapter._inspectSeq ?? 0) + 1;
+    const hex = `0x${this._inspectId.toString(16).padStart(12, "0")}`;
+    return `#<${this.constructor.name}:${hex} env_name=${q(envName)}${nameField} role=:${this.role}${shardField}>`;
+  }
+
+  /** @internal */
+  _columnMethodNames(): string[] {
+    return [...ABSTRACT_COLUMN_METHOD_NAMES];
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
+   */
+  get internalSchemaCache(): SchemaCache {
+    const reflection = this._poolSchemaReflection();
+    if (!reflection.loadedCache) reflection.loadedCache = new SchemaCache();
+    return reflection.loadedCache;
+  }
+
+  /** @internal */
+  private _poolSchemaReflection(): SchemaReflection {
+    return this.pool.schemaReflection;
+  }
+
+  get transactionManager(): TransactionManager {
+    return this._transactionManager;
+  }
+
+  async transaction<T>(
+    fnOrOpts?:
+      | ((tx?: unknown) => Promise<T> | T)
+      | { requiresNew?: boolean; isolation?: string; joinable?: boolean },
+    fnOrOpts2?:
+      | ((tx?: unknown) => Promise<T> | T)
+      | { requiresNew?: boolean; isolation?: string; joinable?: boolean },
+  ): Promise<T | undefined> {
+    let opts: { requiresNew?: boolean; isolation?: string; joinable?: boolean } = {};
+    let block: (tx?: unknown) => Promise<T> | T;
+    if (typeof fnOrOpts === "function") {
+      block = fnOrOpts;
+      if (fnOrOpts2 && typeof fnOrOpts2 !== "function") opts = fnOrOpts2;
+    } else {
+      opts = fnOrOpts ?? {};
+      block = fnOrOpts2 as (tx?: unknown) => Promise<T> | T;
+    }
+    if (typeof block !== "function") {
+      throw new TypeError("transaction requires a function block");
+    }
+    return dbStatementsTransaction.call(this as any, block, opts) as Promise<T | undefined>;
+  }
+
+  static get TYPE_MAP(): TypeMap {
+    return (abstractTypeMap ??= (() => {
+      const m = new TypeMap();
+      AbstractAdapter.initializeTypeMap(m);
+      return m;
+    })());
+  }
+
+  /** @internal */
+  protected async rawConnectionForBlock(): Promise<unknown> {
+    return this._connection;
   }
 
   /** @internal */

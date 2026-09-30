@@ -124,469 +124,6 @@ let sqlite3TypeMap: TypeMap | undefined;
 export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   static override readonly ADAPTER_NAME = "SQLite";
 
-  get schemaCreation(): SQLite3SchemaCreation {
-    return new SQLite3SchemaCreation(this);
-  }
-
-  /** @internal */
-  createTableDefinition(
-    name: string,
-    options: Record<string, unknown> = {},
-  ): SQLite3TableDefinition {
-    return new SQLite3TableDefinition(this, name, options);
-  }
-
-  declare static strictStringsByDefault: boolean;
-  declare static isStrictStringsByDefault: () => boolean;
-
-  static {
-    classAttribute.call(this, "strictStringsByDefault", { default: false });
-  }
-
-  static columnNameMatcher(): RegExp {
-    const id = String.raw`(?:\w+|"(?:[^"]|"")*")`;
-    const col = String.raw`(?:${id}\.)?${id}`;
-    const fn2 = String.raw`\w+\(\s*(?:\*|${col})?\s*\)`;
-    const fn1 = String.raw`\w+\(\s*(?:\*|${col}|${fn2})?\s*\)`;
-    const expr = String.raw`(?:${col}|${fn1})`;
-    const aliased = String.raw`${expr}(?:(?:\s+AS)?\s+${id})?`;
-    return new RegExp(`^${aliased}(?:\\s*,\\s*${aliased})*$`, "i");
-  }
-
-  static columnNameWithOrderMatcher(): RegExp {
-    const id = String.raw`(?:\w+|"(?:[^"]|"")*")`;
-    const col = String.raw`(?:${id}\.)?${id}`;
-    const fn2 = String.raw`\w+\(\s*(?:\*|${col})?\s*\)`;
-    const fn1 = String.raw`\w+\(\s*(?:\*|${col}|${fn2})?\s*\)`;
-    const expr = String.raw`(?:${col}|${fn1})`;
-    const ordered = String.raw`${expr}(?:\s+COLLATE\s+(?:\w+|"\w+"))?(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?`;
-    return new RegExp(`^${ordered}(?:\\s*,\\s*${ordered})*$`, "i");
-  }
-
-  static override quoteColumnName(name: unknown): string {
-    return quoteColumnName(name);
-  }
-
-  static override quoteTableName(name: unknown): string {
-    return quoteTableName(name);
-  }
-
-  /** @internal */
-  override arelVisitor(): Visitors.ToSql {
-    return new Visitors.SQLite(this);
-  }
-
-  /** @internal */
-  bindParamsLength(): number {
-    return 999;
-  }
-
-  /** @internal */
-  get _rawConnection(): SqliteConnection | null {
-    return this._connection as SqliteConnection;
-  }
-  /** @internal */
-  set _rawConnection(value: SqliteConnection | null) {
-    this._connection = value;
-  }
-  private _closingDriver: Promise<void> | null = null;
-  override async active(): Promise<boolean> {
-    await this._closingDriver;
-    return this._rawConnection?.isOpen() ?? false;
-  }
-  /** @internal */
-  _connectionParameters: SQLite3ConnectionParameters;
-  private _strict: boolean;
-  /** @internal */
-  _lastAffectedRows = 0;
-  _lastInsertRowid: number | bigint = 0;
-  private _memoryDatabase: boolean;
-  private _filename: string;
-  /** @internal */
-  declare _statements: StatementPool;
-
-  /** @internal */
-  get _strictStrings(): boolean {
-    return this._strict;
-  }
-
-  static readonly NATIVE_DATABASE_TYPES: NativeDatabaseTypes = {
-    primary_key: "integer PRIMARY KEY AUTOINCREMENT NOT NULL",
-    string: { name: "varchar" },
-    text: { name: "text" },
-    integer: { name: "integer" },
-    float: { name: "float" },
-    decimal: { name: "decimal" },
-    datetime: { name: "datetime" },
-    time: { name: "time" },
-    date: { name: "date" },
-    binary: { name: "blob" },
-    boolean: { name: "boolean" },
-    json: { name: "json" },
-  };
-
-  static readonly DEFAULT_PRAGMAS: Readonly<Record<string, string | number | boolean>> = {
-    foreign_keys: true,
-    journal_mode: ":wal",
-    synchronous: ":normal",
-    mmap_size: 134217728,
-    journal_size_limit: 67108864,
-    cache_size: 2000,
-  };
-
-  /** @missingRailsName config — PERMANENT */
-  constructor(config: SQLite3Config) {
-    const { database, ...options } = config;
-    let filename = database ?? "";
-    const strict = hasKey(options, "strict")
-      ? options.strict!
-      : SQLite3Adapter.strictStringsByDefault;
-    super({ ...options, strict });
-
-    this._memoryDatabase = false;
-    if (filename === "") {
-      throw new ArgumentError("No database file specified. Missing argument: database");
-    } else if (filename === ":memory:") {
-      this._memoryDatabase = true;
-    } else if (/^file:/.test(filename)) {
-    } else {
-      filename = File.expandPath(filename, trailsRoot() ?? undefined);
-      const dirname = File.dirname(filename);
-      if (!File.isDirectory(dirname)) {
-        try {
-          FileUtils.mkdirP(dirname);
-        } catch (error) {
-          if (typeof (error as { code?: unknown } | null | undefined)?.code !== "string")
-            throw error;
-          throw new NoDatabaseError(undefined, { connectionPool: this.pool });
-        }
-      }
-    }
-    this._filename = filename;
-    this._strict = strict;
-    this._connectionParameters = merge(this._config as SQLite3Config, {
-      database: filename,
-      resultsAsHash: true,
-      defaultTransactionMode: "immediate",
-    });
-  }
-
-  /** @internal */
-  declare performQuery: typeof sqlitePerformQuery;
-
-  declare highPrecisionCurrentTimestamp: typeof sqliteHighPrecisionCurrentTimestamp;
-
-  /** @internal */
-  affectedRows(result?: unknown): number {
-    return sqliteAffectedRows.call(this, result);
-  }
-
-  async _freshStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement> {
-    const stmt = await rawConnection.prepare(sql);
-    this._maybeEnableReadBigInts(sql, stmt);
-    return stmt;
-  }
-
-  async _cachedStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement> {
-    if (!this.preparedStatements) {
-      const stmt = await rawConnection.prepare(sql);
-      this._maybeEnableReadBigInts(sql, stmt);
-      return stmt;
-    }
-    let stmt = this._statements.get(sql);
-    if (!stmt) {
-      stmt = await rawConnection.prepare(sql);
-      this._maybeEnableReadBigInts(sql, stmt);
-      void this._statements.set(sql, stmt);
-    }
-    return stmt;
-  }
-
-  private _maybeEnableReadBigInts(sql: string, stmt: SqliteStatement): void {
-    if (this.isWriteQuery(sql) || !stmt.reader) return;
-    const cols = stmt.columns();
-    if (cols.some((c) => c.type !== null && /bigint/i.test(c.type))) {
-      stmt.setReadBigInts(true);
-    }
-  }
-
-  _narrowSpilledBigInts(stmt: SqliteStatement, rows: unknown[][]): void {
-    if (!stmt.columns().some((c) => c.type !== null && /bigint/i.test(c.type))) return;
-    for (const row of rows) {
-      for (let i = 0; i < row.length; i++) {
-        const value = row[i];
-        if (
-          typeof value === "bigint" &&
-          value >= BigInt(Number.MIN_SAFE_INTEGER) &&
-          value <= BigInt(Number.MAX_SAFE_INTEGER)
-        ) {
-          row[i] = Number(value);
-        }
-      }
-    }
-  }
-
-  /** @internal */
-  _previousReadUncommitted: unknown = null;
-
-  override quote(value: unknown): string {
-    return sqliteQuote.call(this, value);
-  }
-
-  quotedTime(value: Parameters<typeof sqliteQuotedTime>[0]): string {
-    return sqliteQuotedTime.call(this, value);
-  }
-
-  override typeCast(value: unknown): unknown {
-    return sqliteTypeCast.call(this, value);
-  }
-
-  override quoteString(s: string): string {
-    return sqliteQuoteString(s);
-  }
-
-  override quoteTableNameForAssignment(table: string, attr: string): string {
-    return sqliteQuoteTableNameForAssignment(table, attr);
-  }
-
-  override quoteDefaultExpression(value: unknown, column: unknown): string {
-    if (typeof value === "function") {
-      const result = (value as () => unknown)() as string;
-      return /^\w+\(.*\)$/.test(result) ? `(${result})` : result;
-    }
-    return super.quoteDefaultExpression(value, column);
-  }
-
-  private serializeDefaultForColumn(value: unknown, sqlType: string | null | undefined): unknown {
-    if (!sqlType || !isStructuredDefault(value)) return value;
-    const castType = this.lookupCastType(sqlType) as { serialize?(v: unknown): unknown };
-    return typeof castType.serialize === "function" ? castType.serialize(value) : value;
-  }
-
-  override quotedTrue(): string {
-    return sqliteQuotedTrue();
-  }
-
-  override quotedFalse(): string {
-    return sqliteQuotedFalse();
-  }
-
-  override unquotedTrue(): number {
-    return sqliteUnquotedTrue();
-  }
-
-  override unquotedFalse(): number {
-    return sqliteUnquotedFalse();
-  }
-
-  override quotedBinary(value: BinaryData): string {
-    return sqliteQuotedBinary(value);
-  }
-
-  override supportsDdlTransactions(): boolean {
-    return true;
-  }
-
-  override supportsSavepoints(): boolean {
-    return true;
-  }
-
-  override supportsTransactionIsolation(): boolean {
-    return true;
-  }
-
-  override supportsPartialIndex(): boolean {
-    return true;
-  }
-
-  async supportsExpressionIndex(): Promise<boolean> {
-    return (await this.databaseVersion).compare("3.9.0") >= 0;
-  }
-
-  override supportsForeignKeys(): boolean {
-    return true;
-  }
-
-  override async supportsCheckConstraints(): Promise<boolean> {
-    return true;
-  }
-
-  override supportsViews(): boolean {
-    return true;
-  }
-
-  override supportsDatetimeWithPrecision(): boolean {
-    return true;
-  }
-
-  override async supportsJson(): Promise<boolean> {
-    return true;
-  }
-
-  override async supportsCommonTableExpressions(): Promise<boolean> {
-    return (await this.databaseVersion).compare("3.8.3") >= 0;
-  }
-
-  async supportsInsertReturning(): Promise<boolean> {
-    return (await this.databaseVersion).compare("3.35.0") >= 0;
-  }
-
-  /** @internal */
-  override returningColumnValues(result: Result): unknown[] | undefined {
-    return sqliteReturningColumnValues(result);
-  }
-
-  /** @internal */
-  override async executeBatch(
-    statements: string[],
-    name?: string | null,
-    kwargs?: { allowRetry?: boolean; materializeTransactions?: boolean },
-  ): Promise<void> {
-    return sqliteExecuteBatch.call(this, statements, name, kwargs);
-  }
-
-  /** @internal */
-  override buildTruncateStatement(tableName: string): string {
-    return sqliteBuildTruncateStatement.call(this, tableName);
-  }
-
-  /** @internal */
-  castResult(result: Result): Result {
-    return sqliteCastResult(result);
-  }
-
-  async supportsInsertOnConflict(): Promise<boolean> {
-    return (await this.databaseVersion).compare("3.24.0") >= 0;
-  }
-
-  override async supportsInsertOnDuplicateSkip(): Promise<boolean> {
-    return await this.supportsInsertOnConflict();
-  }
-
-  override async supportsInsertOnDuplicateUpdate(): Promise<boolean> {
-    return await this.supportsInsertOnConflict();
-  }
-
-  override async supportsInsertConflictTarget(): Promise<boolean> {
-    return await this.supportsInsertOnConflict();
-  }
-
-  override supportsConcurrentConnections(): boolean {
-    return !this._memoryDatabase;
-  }
-
-  override async supportsVirtualColumns(): Promise<boolean> {
-    return (await this.databaseVersion).compare("3.31.0") >= 0;
-  }
-
-  override async supportsIndexSortOrder(): Promise<boolean> {
-    return true;
-  }
-
-  override supportsExplain(): boolean {
-    return true;
-  }
-
-  override supportsLazyTransactions(): boolean {
-    return true;
-  }
-
-  override supportsDeferrableConstraints(): boolean {
-    return true;
-  }
-
-  isRequiresReloading(): boolean {
-    return false;
-  }
-
-  override isConnected(): boolean {
-    return this._rawConnection?.isOpen() ?? false;
-  }
-
-  isActive(): boolean {
-    return this._rawConnection?.isOpen() ?? false;
-  }
-
-  override async disconnectBang(): Promise<void> {
-    await super.disconnectBang();
-
-    await this.lock.synchronize(() => {
-      void this._disconnect();
-    });
-    await this._closingDriver;
-  }
-
-  /** @internal */
-  private _disconnect(): Promise<void> | void {
-    const conn = this._rawConnection;
-    let closing: Promise<void> | void = undefined;
-    if (conn?.isOpen()) {
-      closing = conn.close();
-      if (closing) this._chainClose(closing);
-    }
-    this._rawConnection = null;
-    return closing;
-  }
-
-  /** @internal */
-  private _chainClose(closing: Promise<void>): void {
-    const settled = closing.catch(() => {});
-    this._closingDriver = this._closingDriver ? this._closingDriver.then(() => settled) : settled;
-  }
-
-  /** @internal */
-  override async reconnect(): Promise<void> {
-    if (await this.active()) {
-      try {
-        await this._rawConnection!.exec("ROLLBACK");
-      } catch {}
-    } else {
-      await this.connect();
-    }
-  }
-
-  nativeDatabaseTypes(): NativeDatabaseTypes {
-    return SQLite3Adapter.NATIVE_DATABASE_TYPES;
-  }
-
-  get encoding(): string | Promise<string> {
-    const read = (rawConnection: SqliteConnection): string | Promise<string> => {
-      const result = rawConnection.pragma("encoding");
-      return result instanceof Promise
-        ? result.then(SQLite3Adapter.parseEncoding)
-        : SQLite3Adapter.parseEncoding(result);
-    };
-    const rawConnection = this.anyRawConnection() as SqliteConnection | Promise<SqliteConnection>;
-    return rawConnection instanceof Promise ? rawConnection.then(read) : read(rawConnection);
-  }
-
-  /** @internal */
-  private static parseEncoding(result: unknown): string {
-    const rows = result as Array<{ encoding: string }> | undefined;
-    return rows?.[0]?.encoding ?? "UTF-8";
-  }
-
-  /** @missingRailsName config — PERMANENT */
-  isSharedCache(): boolean {
-    return anybits(fetch(this._config, "flags", 0), SQLite3Constants.Open.SHAREDCACHE);
-  }
-
-  override async getDatabaseVersion(): Promise<Version> {
-    return new Version((await this.queryValue("SELECT sqlite_version(*)", "SCHEMA")) as string);
-  }
-
-  override async checkVersion(): Promise<void> {
-    if ((await this.databaseVersion).compare("3.8.0") < 0) {
-      throw new Error(
-        `Your version of SQLite (${await this.databaseVersion}) is too old. Active Record supports SQLite >= 3.8.`,
-      );
-    }
-  }
-
-  override async databaseExists(): Promise<boolean> {
-    return this._memoryDatabase || File.isExist(this._filename);
-  }
-
   static newClient(
     this: typeof SQLite3Adapter,
     config: SQLite3ConnectionParameters,
@@ -633,6 +170,251 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this.findCmdAndExec(databaseCli()["sqlite"], ...args);
   }
 
+  declare static strictStringsByDefault: boolean;
+  declare static isStrictStringsByDefault: () => boolean;
+
+  static {
+    classAttribute.call(this, "strictStringsByDefault", { default: false });
+  }
+
+  /** @missingRailsName config — PERMANENT */
+  constructor(config: SQLite3Config) {
+    const { database, ...options } = config;
+    let filename = database ?? "";
+    const strict = hasKey(options, "strict")
+      ? options.strict!
+      : SQLite3Adapter.strictStringsByDefault;
+    super({ ...options, strict });
+
+    this._memoryDatabase = false;
+    if (filename === "") {
+      throw new ArgumentError("No database file specified. Missing argument: database");
+    } else if (filename === ":memory:") {
+      this._memoryDatabase = true;
+    } else if (/^file:/.test(filename)) {
+    } else {
+      filename = File.expandPath(filename, trailsRoot() ?? undefined);
+      const dirname = File.dirname(filename);
+      if (!File.isDirectory(dirname)) {
+        try {
+          FileUtils.mkdirP(dirname);
+        } catch (error) {
+          if (typeof (error as { code?: unknown } | null | undefined)?.code !== "string")
+            throw error;
+          throw new NoDatabaseError(undefined, { connectionPool: this.pool });
+        }
+      }
+    }
+    this._filename = filename;
+    this._strict = strict;
+    this._connectionParameters = merge(this._config as SQLite3Config, {
+      database: filename,
+      resultsAsHash: true,
+      defaultTransactionMode: "immediate",
+    });
+  }
+
+  override async databaseExists(): Promise<boolean> {
+    return this._memoryDatabase || File.isExist(this._filename);
+  }
+
+  override supportsDdlTransactions(): boolean {
+    return true;
+  }
+
+  override supportsSavepoints(): boolean {
+    return true;
+  }
+
+  override supportsTransactionIsolation(): boolean {
+    return true;
+  }
+
+  override supportsPartialIndex(): boolean {
+    return true;
+  }
+
+  async supportsExpressionIndex(): Promise<boolean> {
+    return (await this.databaseVersion).compare("3.9.0") >= 0;
+  }
+  private _closingDriver: Promise<void> | null = null;
+  isRequiresReloading(): boolean {
+    return false;
+  }
+  /** @internal */
+  _connectionParameters: SQLite3ConnectionParameters;
+  private _strict: boolean;
+  /** @internal */
+  _lastAffectedRows = 0;
+  _lastInsertRowid: number | bigint = 0;
+  private _memoryDatabase: boolean;
+  private _filename: string;
+  /** @internal */
+  declare _statements: StatementPool;
+
+  override supportsForeignKeys(): boolean {
+    return true;
+  }
+
+  static readonly NATIVE_DATABASE_TYPES: NativeDatabaseTypes = {
+    primary_key: "integer PRIMARY KEY AUTOINCREMENT NOT NULL",
+    string: { name: "varchar" },
+    text: { name: "text" },
+    integer: { name: "integer" },
+    float: { name: "float" },
+    decimal: { name: "decimal" },
+    datetime: { name: "datetime" },
+    time: { name: "time" },
+    date: { name: "date" },
+    binary: { name: "blob" },
+    boolean: { name: "boolean" },
+    json: { name: "json" },
+  };
+
+  static readonly DEFAULT_PRAGMAS: Readonly<Record<string, string | number | boolean>> = {
+    foreign_keys: true,
+    journal_mode: ":wal",
+    synchronous: ":normal",
+    mmap_size: 134217728,
+    journal_size_limit: 67108864,
+    cache_size: 2000,
+  };
+
+  override async supportsCheckConstraints(): Promise<boolean> {
+    return true;
+  }
+
+  /** @internal */
+  declare performQuery: typeof sqlitePerformQuery;
+
+  declare highPrecisionCurrentTimestamp: typeof sqliteHighPrecisionCurrentTimestamp;
+
+  override supportsViews(): boolean {
+    return true;
+  }
+
+  override supportsDatetimeWithPrecision(): boolean {
+    return true;
+  }
+
+  override async supportsJson(): Promise<boolean> {
+    return true;
+  }
+
+  override async supportsCommonTableExpressions(): Promise<boolean> {
+    return (await this.databaseVersion).compare("3.8.3") >= 0;
+  }
+
+  async supportsInsertReturning(): Promise<boolean> {
+    return (await this.databaseVersion).compare("3.35.0") >= 0;
+  }
+
+  /** @internal */
+  _previousReadUncommitted: unknown = null;
+
+  async supportsInsertOnConflict(): Promise<boolean> {
+    return (await this.databaseVersion).compare("3.24.0") >= 0;
+  }
+
+  override async supportsInsertOnDuplicateSkip(): Promise<boolean> {
+    return await this.supportsInsertOnConflict();
+  }
+
+  override async supportsInsertOnDuplicateUpdate(): Promise<boolean> {
+    return await this.supportsInsertOnConflict();
+  }
+
+  override async supportsInsertConflictTarget(): Promise<boolean> {
+    return await this.supportsInsertOnConflict();
+  }
+
+  override supportsConcurrentConnections(): boolean {
+    return !this._memoryDatabase;
+  }
+
+  override async supportsVirtualColumns(): Promise<boolean> {
+    return (await this.databaseVersion).compare("3.31.0") >= 0;
+  }
+
+  override isConnected(): boolean {
+    return this._rawConnection?.isOpen() ?? false;
+  }
+
+  isActive(): boolean {
+    return this._rawConnection?.isOpen() ?? false;
+  }
+
+  override async active(): Promise<boolean> {
+    await this._closingDriver;
+    return this._rawConnection?.isOpen() ?? false;
+  }
+
+  override async disconnectBang(): Promise<void> {
+    await super.disconnectBang();
+
+    await this.lock.synchronize(() => {
+      void this._disconnect();
+    });
+    await this._closingDriver;
+  }
+
+  override async supportsIndexSortOrder(): Promise<boolean> {
+    return true;
+  }
+
+  nativeDatabaseTypes(): NativeDatabaseTypes {
+    return SQLite3Adapter.NATIVE_DATABASE_TYPES;
+  }
+
+  get encoding(): string | Promise<string> {
+    const read = (rawConnection: SqliteConnection): string | Promise<string> => {
+      const result = rawConnection.pragma("encoding");
+      return result instanceof Promise
+        ? result.then(SQLite3Adapter.parseEncoding)
+        : SQLite3Adapter.parseEncoding(result);
+    };
+    const rawConnection = this.anyRawConnection() as SqliteConnection | Promise<SqliteConnection>;
+    return rawConnection instanceof Promise ? rawConnection.then(read) : read(rawConnection);
+  }
+
+  override supportsExplain(): boolean {
+    return true;
+  }
+
+  override supportsLazyTransactions(): boolean {
+    return true;
+  }
+
+  override supportsDeferrableConstraints(): boolean {
+    return true;
+  }
+
+  override async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
+    const oldForeignKeys = await this.queryValue("PRAGMA foreign_keys");
+    const oldDeferForeignKeys = await this.queryValue("PRAGMA defer_foreign_keys");
+    try {
+      await this.execute("PRAGMA defer_foreign_keys = ON");
+      await this.execute("PRAGMA foreign_keys = OFF");
+      await fn();
+    } finally {
+      await this.execute(`PRAGMA defer_foreign_keys = ${String(oldDeferForeignKeys)}`);
+      await this.execute(`PRAGMA foreign_keys = ${String(oldForeignKeys)}`);
+    }
+  }
+
+  override async checkAllForeignKeysValidBang(): Promise<void> {
+    const sql = "PRAGMA foreign_key_check";
+    const result = (await this.execute(sql))!;
+
+    if (!isBlank(result)) {
+      const tables = result.map((row) => row["table"]);
+      throw new StatementInvalid(`Foreign key violations found: ${tables.join(", ")}`, {
+        sql,
+        connectionPool: this.pool,
+      });
+    }
+  }
+
   async primaryKeys(tableName: string): Promise<string[]> {
     const pks = (await this.tableStructure(tableName)).filter((f) => Number(f["pk"]) > 0);
     return pks.sort((a, b) => Number(a["pk"]) - Number(b["pk"])).map((f) => String(f["name"]));
@@ -657,16 +439,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
     await this.execQuery(`DROP INDEX ${quoteColumnName(indexName)}`);
   }
-
-  createSchemaDumper(options: Record<string, unknown>): Sqlite3SchemaDumper {
-    return Sqlite3SchemaDumper.create(this, options);
-  }
-
-  async virtualTableExists(tableName: string): Promise<boolean> {
-    return sqliteVirtualTableExists.call(this, tableName);
-  }
-
-  static readonly VIRTUAL_TABLE_REGEX = /USING\s+(\w+)\s*\((.+)\)/i;
 
   async virtualTables(): Promise<Array<[string, [string, string]]>> {
     const query = "SELECT name, sql FROM sqlite_master WHERE sql LIKE 'CREATE VIRTUAL %';";
@@ -826,10 +598,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this.addReference(tableName, refName, options);
   }
 
-  private static readonly FK_REGEX =
-    /.*FOREIGN KEY\s+\("([^"]+)"\)\s+REFERENCES\s+"(\w+)"\s+\("(\w+)"\)/;
-  private static readonly DEFERRABLE_REGEX = /DEFERRABLE INITIALLY (\w+)/;
-
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     const rows = (
       await this.internalExecQuery(`PRAGMA foreign_key_list(${this.quote(tableName)})`, "SCHEMA")
@@ -913,57 +681,50 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return sql;
   }
 
-  override async disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
-    const oldForeignKeys = await this.queryValue("PRAGMA foreign_keys");
-    const oldDeferForeignKeys = await this.queryValue("PRAGMA defer_foreign_keys");
-    try {
-      await this.execute("PRAGMA defer_foreign_keys = ON");
-      await this.execute("PRAGMA foreign_keys = OFF");
-      await fn();
-    } finally {
-      await this.execute(`PRAGMA defer_foreign_keys = ${String(oldDeferForeignKeys)}`);
-      await this.execute(`PRAGMA foreign_keys = ${String(oldForeignKeys)}`);
+  /** @missingRailsName config — PERMANENT */
+  isSharedCache(): boolean {
+    return anybits(fetch(this._config, "flags", 0), SQLite3Constants.Open.SHAREDCACHE);
+  }
+
+  override async getDatabaseVersion(): Promise<Version> {
+    return new Version((await this.queryValue("SELECT sqlite_version(*)", "SCHEMA")) as string);
+  }
+
+  override async checkVersion(): Promise<void> {
+    if ((await this.databaseVersion).compare("3.8.0") < 0) {
+      throw new Error(
+        `Your version of SQLite (${await this.databaseVersion}) is too old. Active Record supports SQLite >= 3.8.`,
+      );
     }
   }
 
-  override async checkAllForeignKeysValidBang(): Promise<void> {
-    const sql = "PRAGMA foreign_key_check";
-    const result = (await this.execute(sql))!;
+  /** @internal */
+  static override initializeTypeMap(m: TypeMap): void {
+    super.initializeTypeMap(m);
+    this.registerClassWithLimit(m, /int/i, SQLite3Integer);
+    this.registerClassWithPrecision(m, /datetime/i, ARDateTimeType);
+    m.aliasType(/timestamp/i, "datetime");
+  }
 
-    if (!isBlank(result)) {
-      const tables = result.map((row) => row["table"]);
-      throw new StatementInvalid(`Foreign key violations found: ${tables.join(", ")}`, {
-        sql,
+  /** @internal */
+  bindParamsLength(): number {
+    return 999;
+  }
+
+  /** @internal */
+  private async tableStructure(tableName: string): Promise<Record<string, unknown>[]> {
+    const structure = await this.tableInfo(tableName);
+    if (!structure.length) {
+      throw new StatementInvalid(`Could not find table '${tableName}'`, {
         connectionPool: this.pool,
       });
     }
-  }
-
-  private quoteDefault(value: unknown): string {
-    if (value === null) return "NULL";
-    if (typeof value === "string") return `'${sqliteQuoteString(value)}'`;
-    if (typeof value === "number") return String(value);
-    if (typeof value === "boolean") return value ? "1" : "0";
-    if (typeof value === "function") return String(value());
-    // boundary: defensive Date branch in SQLite adapter literal quoting.
-    if (value instanceof globalThis.Date) return `'${sqliteQuoteString(value.toISOString())}'`;
-    if (typeof (value as any)?.toSql === "function") return String((value as any).toSql());
-    return `'${sqliteQuoteString(String(value))}'`;
+    return await this.tableStructureWithCollation(tableName, structure);
   }
 
   /** @internal */
-  dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(options: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(
-    nameOrOptions?: string | null | { type?: string },
-    options: { type?: string } = {},
-  ): string {
-    const kwargsOnly = nameOrOptions != null && typeof nameOrOptions === "object";
-    const name = kwargsOnly ? null : nameOrOptions;
-    const opts = kwargsOnly ? nameOrOptions : options;
-    return sqliteDataSourceSql.call(this, name ?? undefined, { type: opts.type });
+  private async columnDefinitions(tableName: string): Promise<Record<string, unknown>[]> {
+    return this.tableStructure(tableName);
   }
 
   /** @internal */
@@ -983,72 +744,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     } else {
       return null;
     }
-  }
-
-  /** @internal */
-  private newColumnFromField(
-    tableName: string,
-    field: Record<string, unknown>,
-    definitions: Record<string, unknown>[],
-  ): Column {
-    return newColumnFromField(this, tableName, field, definitions);
-  }
-
-  async indexes(tableName: string): Promise<IndexDefinition[]> {
-    return sqliteIndexes(this, tableName);
-  }
-
-  /** @internal */
-  validTableDefinitionOptions(): string[] {
-    return sqliteValidTableDefinitionOptions.call(this);
-  }
-
-  /** @internal */
-  override validateIndexLengthBang(tableName: string, newName: string, internal = false): void {
-    sqliteValidateIndexLengthBang.call(this, tableName, newName, internal);
-  }
-
-  async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
-    return sqliteCheckConstraints.call(this, tableName);
-  }
-
-  async addForeignKey(
-    fromTable: string,
-    toTable: string,
-    options: AddForeignKeyOptions = {},
-  ): Promise<void> {
-    return sqliteAddForeignKey.call(this, fromTable, toTable, options);
-  }
-
-  async removeForeignKey(
-    fromTable: string,
-    toTable?: string | RemoveForeignKeyOptions,
-    options: RemoveForeignKeyOptions = {},
-  ): Promise<void> {
-    return sqliteRemoveForeignKey.call(this, fromTable, toTable, options);
-  }
-
-  async addCheckConstraint(
-    tableName: string,
-    expression: string,
-    options: { name?: string; validate?: boolean } = {},
-  ): Promise<void> {
-    return sqliteAddCheckConstraint.call(this, tableName, expression, options);
-  }
-
-  async removeCheckConstraint(
-    tableName: string,
-    expression?:
-      | string
-      | { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
-    options: {
-      name?: string;
-      expression?: string;
-      validate?: boolean;
-      ifExists?: boolean;
-    } = {},
-  ): Promise<void> {
-    return sqliteRemoveCheckConstraint.call(this, tableName, expression, options);
   }
 
   /** @internal */
@@ -1091,98 +786,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     });
 
     this.schemaCache.clearBang();
-  }
-
-  /** @internal */
-  private async tableInfo(tableName: string): Promise<Record<string, unknown>[]> {
-    const pragma = (await this.supportsVirtualColumns()) ? "table_xinfo" : "table_info";
-    return (
-      await this.internalExecQuery(`PRAGMA ${pragma}(${quoteTableName(tableName)})`, "SCHEMA")
-    ).toArray();
-  }
-
-  private static readonly UNQUOTED_OPEN_PARENS_REGEX = /\((?![^'"]*['"][^'"]*$)/;
-  private static readonly FINAL_CLOSE_PARENS_REGEX = /\);*$/;
-
-  /**
-   * @internal
-   * @missingRailsCall last — PERMANENT
-   * @missingRailsCall union — PERMANENT
-   */
-  private async tableStructureSql(tableName: string, columnNames?: string[]): Promise<string[]> {
-    if (!columnNames) {
-      const columnInfo = await this.tableInfo(tableName);
-      columnNames = columnInfo.map((column) => String(column["name"]));
-    }
-    const sql = `SELECT sql FROM
-  (SELECT * FROM sqlite_master UNION ALL
-   SELECT * FROM sqlite_temp_master)
-WHERE type = 'table' AND name = ${this.quote(tableName)}
-`;
-    const result = (await this.queryValue(sql, "SCHEMA")) as string | null;
-
-    if (!result) return [];
-
-    const openParens = SQLite3Adapter.UNQUOTED_OPEN_PARENS_REGEX.exec(result);
-    const partitioned = openParens ? result.slice(openParens.index + openParens[0].length) : "";
-    const union =
-      columnNames.length > 0
-        ? columnNames.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")
-        : "(?!)";
-    return partitioned
-      .replace(SQLite3Adapter.FINAL_CLOSE_PARENS_REGEX, "")
-      .split(new RegExp(`,(?=\\s(?:CONSTRAINT|"(?:${union})"))`, "i"))
-      .map((columnString) => columnString.trim());
-  }
-
-  /** @internal */
-  private async tableStructureWithCollation(
-    tableName: string,
-    basicStructure: Record<string, unknown>[],
-  ): Promise<Record<string, unknown>[]> {
-    const COLLATE_REGEX = /.*"(\w+)".*collate\s+"(\w+)".*/i;
-    const AI_REGEX = /.*"(\w+)".+PRIMARY KEY AUTOINCREMENT/i;
-    const GENERATED_REGEX = /.*"(\w+)".+GENERATED ALWAYS AS \((.+)\) (?:STORED|VIRTUAL)/i;
-    const columnStrings = await this.tableStructureSql(
-      tableName,
-      basicStructure.map((column) => String(column["name"])),
-    );
-    if (!columnStrings.length) return basicStructure.map((c) => ({ ...c }));
-    const collationHash: Record<string, string> = {};
-    const autoIncrements: Record<string, boolean> = {};
-    const generatedColumns: Record<string, string> = {};
-    for (const columnString of columnStrings) {
-      const cm = COLLATE_REGEX.exec(columnString);
-      if (cm) collationHash[cm[1]] = cm[2];
-      const aim = AI_REGEX.exec(columnString);
-      if (aim) autoIncrements[aim[1]] = true;
-      const gm = GENERATED_REGEX.exec(columnString);
-      if (gm) generatedColumns[gm[1]] = gm[2];
-    }
-    return basicStructure.map((col) => {
-      const name = String(col["name"]);
-      const out: Record<string, unknown> = { ...col };
-      if (collationHash[name] !== undefined) out["collation"] = collationHash[name];
-      if (autoIncrements[name]) out["auto_increment"] = true;
-      if (generatedColumns[name] !== undefined) out["dflt_value"] = generatedColumns[name];
-      return out;
-    });
-  }
-
-  /** @internal */
-  private async tableStructure(tableName: string): Promise<Record<string, unknown>[]> {
-    const structure = await this.tableInfo(tableName);
-    if (!structure.length) {
-      throw new StatementInvalid(`Could not find table '${tableName}'`, {
-        connectionPool: this.pool,
-      });
-    }
-    return await this.tableStructureWithCollation(tableName, structure);
-  }
-
-  /** @internal */
-  private async columnDefinitions(tableName: string): Promise<Record<string, unknown>[]> {
-    return this.tableStructure(tableName);
   }
 
   /** @internal */
@@ -1340,37 +943,88 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   }
 
   /** @internal */
+  private async tableStructureWithCollation(
+    tableName: string,
+    basicStructure: Record<string, unknown>[],
+  ): Promise<Record<string, unknown>[]> {
+    const COLLATE_REGEX = /.*"(\w+)".*collate\s+"(\w+)".*/i;
+    const AI_REGEX = /.*"(\w+)".+PRIMARY KEY AUTOINCREMENT/i;
+    const GENERATED_REGEX = /.*"(\w+)".+GENERATED ALWAYS AS \((.+)\) (?:STORED|VIRTUAL)/i;
+    const columnStrings = await this.tableStructureSql(
+      tableName,
+      basicStructure.map((column) => String(column["name"])),
+    );
+    if (!columnStrings.length) return basicStructure.map((c) => ({ ...c }));
+    const collationHash: Record<string, string> = {};
+    const autoIncrements: Record<string, boolean> = {};
+    const generatedColumns: Record<string, string> = {};
+    for (const columnString of columnStrings) {
+      const cm = COLLATE_REGEX.exec(columnString);
+      if (cm) collationHash[cm[1]] = cm[2];
+      const aim = AI_REGEX.exec(columnString);
+      if (aim) autoIncrements[aim[1]] = true;
+      const gm = GENERATED_REGEX.exec(columnString);
+      if (gm) generatedColumns[gm[1]] = gm[2];
+    }
+    return basicStructure.map((col) => {
+      const name = String(col["name"]);
+      const out: Record<string, unknown> = { ...col };
+      if (collationHash[name] !== undefined) out["collation"] = collationHash[name];
+      if (autoIncrements[name]) out["auto_increment"] = true;
+      if (generatedColumns[name] !== undefined) out["dflt_value"] = generatedColumns[name];
+      return out;
+    });
+  }
+
+  /**
+   * @internal
+   * @missingRailsCall last — PERMANENT
+   * @missingRailsCall union — PERMANENT
+   */
+  private async tableStructureSql(tableName: string, columnNames?: string[]): Promise<string[]> {
+    if (!columnNames) {
+      const columnInfo = await this.tableInfo(tableName);
+      columnNames = columnInfo.map((column) => String(column["name"]));
+    }
+    const sql = `SELECT sql FROM
+  (SELECT * FROM sqlite_master UNION ALL
+   SELECT * FROM sqlite_temp_master)
+WHERE type = 'table' AND name = ${this.quote(tableName)}
+`;
+    const result = (await this.queryValue(sql, "SCHEMA")) as string | null;
+
+    if (!result) return [];
+
+    const openParens = SQLite3Adapter.UNQUOTED_OPEN_PARENS_REGEX.exec(result);
+    const partitioned = openParens ? result.slice(openParens.index + openParens[0].length) : "";
+    const union =
+      columnNames.length > 0
+        ? columnNames.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")
+        : "(?!)";
+    return partitioned
+      .replace(SQLite3Adapter.FINAL_CLOSE_PARENS_REGEX, "")
+      .split(new RegExp(`,(?=\\s(?:CONSTRAINT|"(?:${union})"))`, "i"))
+      .map((columnString) => columnString.trim());
+  }
+
+  /** @internal */
+  private async tableInfo(tableName: string): Promise<Record<string, unknown>[]> {
+    const pragma = (await this.supportsVirtualColumns()) ? "table_xinfo" : "table_info";
+    return (
+      await this.internalExecQuery(`PRAGMA ${pragma}(${quoteTableName(tableName)})`, "SCHEMA")
+    ).toArray();
+  }
+
+  /** @internal */
+  override arelVisitor(): Visitors.ToSql {
+    return new Visitors.SQLite(this);
+  }
+
+  /** @internal */
   override buildStatementPool(): StatementPool {
     return new StatementPool(
       SQLite3Adapter.typeCastConfigToInteger(this._config.statementLimit) as number,
     );
-  }
-
-  /** @internal */
-  protected static defaultSqliteDriver(): SqliteDriver | undefined {
-    return undefined;
-  }
-
-  /** @internal */
-  private static resolveDriverFactory(config: SQLite3Config): SqliteDriver {
-    const driverOpt = config.driver;
-    if (driverOpt != null) {
-      if (typeof driverOpt.name !== "string" || typeof driverOpt.open !== "function") {
-        throw new TypeError(
-          "config.driver must be a SqliteDriver " +
-            "(object with `name: string` and `open(config)` function).",
-        );
-      }
-      return driverOpt;
-    }
-    const def = this.defaultSqliteDriver();
-    if (!def) {
-      throw new Error(
-        "No SQLite driver configured. Use a concrete adapter subclass " +
-          "(e.g. BetterSQLite3Adapter) or pass a `driver` in the adapter config.",
-      );
-    }
-    return def;
   }
 
   /**
@@ -1394,6 +1048,17 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       this._rawConnection = rawConnection;
     } catch (ex) {
       rescue(ex);
+    }
+  }
+
+  /** @internal */
+  override async reconnect(): Promise<void> {
+    if (await this.active()) {
+      try {
+        await this._rawConnection!.exec("ROLLBACK");
+      } catch {}
+    } else {
+      await this.connect();
     }
   }
 
@@ -1435,12 +1100,347 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     }
   }
 
+  static readonly VIRTUAL_TABLE_REGEX = /USING\s+(\w+)\s*\((.+)\)/i;
+
+  get schemaCreation(): SQLite3SchemaCreation {
+    return new SQLite3SchemaCreation(this);
+  }
+
   /** @internal */
-  static override initializeTypeMap(m: TypeMap): void {
-    super.initializeTypeMap(m);
-    this.registerClassWithLimit(m, /int/i, SQLite3Integer);
-    this.registerClassWithPrecision(m, /datetime/i, ARDateTimeType);
-    m.aliasType(/timestamp/i, "datetime");
+  createTableDefinition(
+    name: string,
+    options: Record<string, unknown> = {},
+  ): SQLite3TableDefinition {
+    return new SQLite3TableDefinition(this, name, options);
+  }
+
+  static columnNameMatcher(): RegExp {
+    const id = String.raw`(?:\w+|"(?:[^"]|"")*")`;
+    const col = String.raw`(?:${id}\.)?${id}`;
+    const fn2 = String.raw`\w+\(\s*(?:\*|${col})?\s*\)`;
+    const fn1 = String.raw`\w+\(\s*(?:\*|${col}|${fn2})?\s*\)`;
+    const expr = String.raw`(?:${col}|${fn1})`;
+    const aliased = String.raw`${expr}(?:(?:\s+AS)?\s+${id})?`;
+    return new RegExp(`^${aliased}(?:\\s*,\\s*${aliased})*$`, "i");
+  }
+
+  static columnNameWithOrderMatcher(): RegExp {
+    const id = String.raw`(?:\w+|"(?:[^"]|"")*")`;
+    const col = String.raw`(?:${id}\.)?${id}`;
+    const fn2 = String.raw`\w+\(\s*(?:\*|${col})?\s*\)`;
+    const fn1 = String.raw`\w+\(\s*(?:\*|${col}|${fn2})?\s*\)`;
+    const expr = String.raw`(?:${col}|${fn1})`;
+    const ordered = String.raw`${expr}(?:\s+COLLATE\s+(?:\w+|"\w+"))?(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?`;
+    return new RegExp(`^${ordered}(?:\\s*,\\s*${ordered})*$`, "i");
+  }
+
+  static override quoteColumnName(name: unknown): string {
+    return quoteColumnName(name);
+  }
+
+  static override quoteTableName(name: unknown): string {
+    return quoteTableName(name);
+  }
+
+  /** @internal */
+  get _rawConnection(): SqliteConnection | null {
+    return this._connection as SqliteConnection;
+  }
+  /** @internal */
+  set _rawConnection(value: SqliteConnection | null) {
+    this._connection = value;
+  }
+
+  /** @internal */
+  get _strictStrings(): boolean {
+    return this._strict;
+  }
+
+  /** @internal */
+  affectedRows(result?: unknown): number {
+    return sqliteAffectedRows.call(this, result);
+  }
+
+  async _freshStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement> {
+    const stmt = await rawConnection.prepare(sql);
+    this._maybeEnableReadBigInts(sql, stmt);
+    return stmt;
+  }
+
+  async _cachedStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement> {
+    if (!this.preparedStatements) {
+      const stmt = await rawConnection.prepare(sql);
+      this._maybeEnableReadBigInts(sql, stmt);
+      return stmt;
+    }
+    let stmt = this._statements.get(sql);
+    if (!stmt) {
+      stmt = await rawConnection.prepare(sql);
+      this._maybeEnableReadBigInts(sql, stmt);
+      void this._statements.set(sql, stmt);
+    }
+    return stmt;
+  }
+
+  private _maybeEnableReadBigInts(sql: string, stmt: SqliteStatement): void {
+    if (this.isWriteQuery(sql) || !stmt.reader) return;
+    const cols = stmt.columns();
+    if (cols.some((c) => c.type !== null && /bigint/i.test(c.type))) {
+      stmt.setReadBigInts(true);
+    }
+  }
+
+  _narrowSpilledBigInts(stmt: SqliteStatement, rows: unknown[][]): void {
+    if (!stmt.columns().some((c) => c.type !== null && /bigint/i.test(c.type))) return;
+    for (const row of rows) {
+      for (let i = 0; i < row.length; i++) {
+        const value = row[i];
+        if (
+          typeof value === "bigint" &&
+          value >= BigInt(Number.MIN_SAFE_INTEGER) &&
+          value <= BigInt(Number.MAX_SAFE_INTEGER)
+        ) {
+          row[i] = Number(value);
+        }
+      }
+    }
+  }
+
+  override quote(value: unknown): string {
+    return sqliteQuote.call(this, value);
+  }
+
+  private static readonly FK_REGEX =
+    /.*FOREIGN KEY\s+\("([^"]+)"\)\s+REFERENCES\s+"(\w+)"\s+\("(\w+)"\)/;
+  private static readonly DEFERRABLE_REGEX = /DEFERRABLE INITIALLY (\w+)/;
+
+  quotedTime(value: Parameters<typeof sqliteQuotedTime>[0]): string {
+    return sqliteQuotedTime.call(this, value);
+  }
+
+  override typeCast(value: unknown): unknown {
+    return sqliteTypeCast.call(this, value);
+  }
+
+  override quoteString(s: string): string {
+    return sqliteQuoteString(s);
+  }
+
+  override quoteTableNameForAssignment(table: string, attr: string): string {
+    return sqliteQuoteTableNameForAssignment(table, attr);
+  }
+
+  override quoteDefaultExpression(value: unknown, column: unknown): string {
+    if (typeof value === "function") {
+      const result = (value as () => unknown)() as string;
+      return /^\w+\(.*\)$/.test(result) ? `(${result})` : result;
+    }
+    return super.quoteDefaultExpression(value, column);
+  }
+
+  private serializeDefaultForColumn(value: unknown, sqlType: string | null | undefined): unknown {
+    if (!sqlType || !isStructuredDefault(value)) return value;
+    const castType = this.lookupCastType(sqlType) as { serialize?(v: unknown): unknown };
+    return typeof castType.serialize === "function" ? castType.serialize(value) : value;
+  }
+
+  override quotedTrue(): string {
+    return sqliteQuotedTrue();
+  }
+
+  override quotedFalse(): string {
+    return sqliteQuotedFalse();
+  }
+
+  override unquotedTrue(): number {
+    return sqliteUnquotedTrue();
+  }
+
+  override unquotedFalse(): number {
+    return sqliteUnquotedFalse();
+  }
+
+  override quotedBinary(value: BinaryData): string {
+    return sqliteQuotedBinary(value);
+  }
+
+  /** @internal */
+  override returningColumnValues(result: Result): unknown[] | undefined {
+    return sqliteReturningColumnValues(result);
+  }
+
+  /** @internal */
+  override async executeBatch(
+    statements: string[],
+    name?: string | null,
+    kwargs?: { allowRetry?: boolean; materializeTransactions?: boolean },
+  ): Promise<void> {
+    return sqliteExecuteBatch.call(this, statements, name, kwargs);
+  }
+
+  /** @internal */
+  override buildTruncateStatement(tableName: string): string {
+    return sqliteBuildTruncateStatement.call(this, tableName);
+  }
+
+  /** @internal */
+  castResult(result: Result): Result {
+    return sqliteCastResult(result);
+  }
+
+  /** @internal */
+  private _disconnect(): Promise<void> | void {
+    const conn = this._rawConnection;
+    let closing: Promise<void> | void = undefined;
+    if (conn?.isOpen()) {
+      closing = conn.close();
+      if (closing) this._chainClose(closing);
+    }
+    this._rawConnection = null;
+    return closing;
+  }
+
+  /** @internal */
+  private _chainClose(closing: Promise<void>): void {
+    const settled = closing.catch(() => {});
+    this._closingDriver = this._closingDriver ? this._closingDriver.then(() => settled) : settled;
+  }
+
+  /** @internal */
+  private static parseEncoding(result: unknown): string {
+    const rows = result as Array<{ encoding: string }> | undefined;
+    return rows?.[0]?.encoding ?? "UTF-8";
+  }
+
+  private static readonly UNQUOTED_OPEN_PARENS_REGEX = /\((?![^'"]*['"][^'"]*$)/;
+  private static readonly FINAL_CLOSE_PARENS_REGEX = /\);*$/;
+
+  createSchemaDumper(options: Record<string, unknown>): Sqlite3SchemaDumper {
+    return Sqlite3SchemaDumper.create(this, options);
+  }
+
+  async virtualTableExists(tableName: string): Promise<boolean> {
+    return sqliteVirtualTableExists.call(this, tableName);
+  }
+
+  private quoteDefault(value: unknown): string {
+    if (value === null) return "NULL";
+    if (typeof value === "string") return `'${sqliteQuoteString(value)}'`;
+    if (typeof value === "number") return String(value);
+    if (typeof value === "boolean") return value ? "1" : "0";
+    if (typeof value === "function") return String(value());
+    // boundary: defensive Date branch in SQLite adapter literal quoting.
+    if (value instanceof globalThis.Date) return `'${sqliteQuoteString(value.toISOString())}'`;
+    if (typeof (value as any)?.toSql === "function") return String((value as any).toSql());
+    return `'${sqliteQuoteString(String(value))}'`;
+  }
+
+  /** @internal */
+  dataSourceSql(name?: string | null, options?: { type?: string }): string;
+  /** @internal */
+  dataSourceSql(options: { type?: string }): string;
+  /** @internal */
+  dataSourceSql(
+    nameOrOptions?: string | null | { type?: string },
+    options: { type?: string } = {},
+  ): string {
+    const kwargsOnly = nameOrOptions != null && typeof nameOrOptions === "object";
+    const name = kwargsOnly ? null : nameOrOptions;
+    const opts = kwargsOnly ? nameOrOptions : options;
+    return sqliteDataSourceSql.call(this, name ?? undefined, { type: opts.type });
+  }
+
+  /** @internal */
+  private newColumnFromField(
+    tableName: string,
+    field: Record<string, unknown>,
+    definitions: Record<string, unknown>[],
+  ): Column {
+    return newColumnFromField(this, tableName, field, definitions);
+  }
+
+  async indexes(tableName: string): Promise<IndexDefinition[]> {
+    return sqliteIndexes(this, tableName);
+  }
+
+  /** @internal */
+  validTableDefinitionOptions(): string[] {
+    return sqliteValidTableDefinitionOptions.call(this);
+  }
+
+  /** @internal */
+  override validateIndexLengthBang(tableName: string, newName: string, internal = false): void {
+    sqliteValidateIndexLengthBang.call(this, tableName, newName, internal);
+  }
+
+  async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
+    return sqliteCheckConstraints.call(this, tableName);
+  }
+
+  async addForeignKey(
+    fromTable: string,
+    toTable: string,
+    options: AddForeignKeyOptions = {},
+  ): Promise<void> {
+    return sqliteAddForeignKey.call(this, fromTable, toTable, options);
+  }
+
+  async removeForeignKey(
+    fromTable: string,
+    toTable?: string | RemoveForeignKeyOptions,
+    options: RemoveForeignKeyOptions = {},
+  ): Promise<void> {
+    return sqliteRemoveForeignKey.call(this, fromTable, toTable, options);
+  }
+
+  async addCheckConstraint(
+    tableName: string,
+    expression: string,
+    options: { name?: string; validate?: boolean } = {},
+  ): Promise<void> {
+    return sqliteAddCheckConstraint.call(this, tableName, expression, options);
+  }
+
+  async removeCheckConstraint(
+    tableName: string,
+    expression?:
+      | string
+      | { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
+    options: {
+      name?: string;
+      expression?: string;
+      validate?: boolean;
+      ifExists?: boolean;
+    } = {},
+  ): Promise<void> {
+    return sqliteRemoveCheckConstraint.call(this, tableName, expression, options);
+  }
+
+  /** @internal */
+  protected static defaultSqliteDriver(): SqliteDriver | undefined {
+    return undefined;
+  }
+
+  /** @internal */
+  private static resolveDriverFactory(config: SQLite3Config): SqliteDriver {
+    const driverOpt = config.driver;
+    if (driverOpt != null) {
+      if (typeof driverOpt.name !== "string" || typeof driverOpt.open !== "function") {
+        throw new TypeError(
+          "config.driver must be a SqliteDriver " +
+            "(object with `name: string` and `open(config)` function).",
+        );
+      }
+      return driverOpt;
+    }
+    const def = this.defaultSqliteDriver();
+    if (!def) {
+      throw new Error(
+        "No SQLite driver configured. Use a concrete adapter subclass " +
+          "(e.g. BetterSQLite3Adapter) or pass a `driver` in the adapter config.",
+      );
+    }
+    return def;
   }
 
   static override get TYPE_MAP(): TypeMap {
@@ -1454,12 +1454,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
 }
 
-export class SQLite3Integer extends IntegerType {
-  protected override _limit(): number {
-    return this.limit ?? 8;
-  }
-}
-
 export class StatementPool extends GenericStatementPool<SqliteStatement> {
   override reset(): void | Promise<void> {
     return this.clear();
@@ -1468,6 +1462,12 @@ export class StatementPool extends GenericStatementPool<SqliteStatement> {
   /** @internal */
   protected override dealloc(stmt: SqliteStatement): void | Promise<void> {
     if (!stmt.closed) return stmt.close();
+  }
+}
+
+export class SQLite3Integer extends IntegerType {
+  protected override _limit(): number {
+    return this.limit ?? 8;
   }
 }
 
