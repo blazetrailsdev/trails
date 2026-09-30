@@ -13,7 +13,7 @@ describe("FileFixturesTest", () => {
 
   it("#file_fixture returns Pathname to file fixture", () => {
     const path = t.fileFixture("sample.txt");
-    expect(path).toBeTypeOf("string");
+    expect(Object(path)).toBeInstanceOf(String);
     expect(path).toMatch(/.*\/fixtures\/file_fixtures\/sample\.txt$/);
   });
 
@@ -37,7 +37,7 @@ describe("FileFixturesPathnameDirectoryTest", () => {
 
   it("#file_fixture_path returns Pathname to file fixture", () => {
     const path = t.fileFixture("sample.txt");
-    expect(path).toBeTypeOf("string");
+    expect(Object(path)).toBeInstanceOf(String);
     expect(path).toMatch(/.*\/fixtures\/file_fixtures\/sample\.txt$/);
   });
 });

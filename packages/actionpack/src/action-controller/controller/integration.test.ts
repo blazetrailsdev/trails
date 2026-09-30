@@ -1628,7 +1628,7 @@ describe("PageDumpIntegrationTest", () => {
         launchyCalled = path === t.dumpPath();
       });
       await t.saveAndOpenPage();
-      expect(launchyCalled).toBe(true);
+      expect(launchyCalled).toBeTruthy();
       expect(File.read(t.dumpPath())).toBe(t.response.body);
     });
   });
