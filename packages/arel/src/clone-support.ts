@@ -1,4 +1,4 @@
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE arel-copy-hooks-onto-rbobjclone-initialize-copy */
 
 /** @internal */
 export function objectClone<T extends object>(self: T): T {

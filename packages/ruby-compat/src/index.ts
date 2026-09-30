@@ -259,6 +259,7 @@ export type { MonitorMixin } from "./monitor.js";
 
 export { Tempfile } from "./tempfile.js";
 export type { TempfileBasename } from "./tempfile.js";
+export { temporalTag } from "./temporal-tag.js";
 export { TypeError } from "./type-error.js";
 export { setVerbose, verbose } from "./verbose.js";
 export { Zlib } from "./zlib.js";

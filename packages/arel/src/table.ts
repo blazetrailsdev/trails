@@ -18,8 +18,7 @@ export interface TableKlass {
   typeCaster?(): unknown;
 }
 
-/** @noRailsEquivalent PERMANENT */
-export interface TypeCaster {
+interface TypeCaster {
   typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown;
   typeForAttribute(name: string | Node | null): unknown;
 }

@@ -119,7 +119,6 @@ function predicationDispatch<T extends PredicationHost>(
   return (expr) => fn.call(host, expr, ...extras);
 }
 
-/** @noRailsEquivalent PERMANENT */
 export interface PredicationsModule extends GroupingFolders {
   eq(other: unknown): Equality;
   notEq(other: unknown): NotEqual;

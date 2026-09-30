@@ -19,13 +19,13 @@ export class SqlLiteral extends Node {
     return undefined;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE arel-struct-and-string-protocol-from-ruby-compat */
   eql(other: unknown): boolean {
     if (typeof other === "string") return this.value === other;
     return other instanceof SqlLiteral && this.value === other.value;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE arel-struct-and-string-protocol-from-ruby-compat */
   hash(): number {
     return rbHash(this.value);
   }
@@ -38,7 +38,7 @@ export class SqlLiteral extends Node {
     return this.value;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE arel-struct-and-string-protocol-from-ruby-compat */
   isBlank(): boolean {
     return isBlank(this.value);
   }
