@@ -475,7 +475,7 @@ export function statusCode(status: number | string): number {
   }
 }
 
-export const HTTP_STATUS_CODES: Record<number, string> = {
+const httpStatusCodes = {
   100: "Continue",
   101: "Switching Protocols",
   102: "Processing",
@@ -536,19 +536,33 @@ export const HTTP_STATUS_CODES: Record<number, string> = {
   507: "Insufficient Storage",
   508: "Loop Detected",
   511: "Network Authentication Required",
-};
+} as const;
+
+export const HTTP_STATUS_CODES: Record<number, string> = httpStatusCodes;
 
 const SYMBOL_TO_STATUS_CODE: Record<string, number> = {};
 for (const [code, msg] of Object.entries(HTTP_STATUS_CODES)) {
   SYMBOL_TO_STATUS_CODE[msg.toLowerCase().replace(/[\s-]/g, "_")] = parseInt(code);
 }
 
-const OBSOLETE_SYMBOLS_TO_STATUS_CODES: Record<string, number> = {
+const obsoleteSymbolsToStatusCodes = {
   payload_too_large: 413,
   unprocessable_entity: 422,
   bandwidth_limit_exceeded: 509,
   not_extended: 510,
-};
+} as const;
+
+const OBSOLETE_SYMBOLS_TO_STATUS_CODES: Record<string, number> = obsoleteSymbolsToStatusCodes;
+
+type SymbolizedStatusMessage<S extends string> = S extends `${infer A} ${infer B}`
+  ? SymbolizedStatusMessage<`${A}_${B}`>
+  : S extends `${infer A}-${infer B}`
+    ? SymbolizedStatusMessage<`${A}_${B}`>
+    : S;
+
+export type StatusSymbol =
+  | SymbolizedStatusMessage<Lowercase<(typeof httpStatusCodes)[keyof typeof httpStatusCodes]>>
+  | keyof typeof obsoleteSymbolsToStatusCodes;
 
 const OBSOLETE_SYMBOL_MAPPINGS: Record<string, string> = {
   payload_too_large: "content_too_large",

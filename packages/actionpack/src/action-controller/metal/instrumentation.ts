@@ -66,15 +66,15 @@ export async function processAction(
   );
 }
 
-export function redirectTo(this: InstrumentationHost, ...args: unknown[]): unknown {
+export function redirectTo(
+  this: InstrumentationHost,
+  ...args: Parameters<Flash["redirectTo"]>
+): number {
   return Notifications.instrument(
     "redirect_to.action_controller",
     { request: this.request },
     (payload) => {
-      const result = Flash.prototype.redirectTo.call(
-        this as never,
-        ...(args as Parameters<Flash["redirectTo"]>),
-      );
+      const result = Flash.prototype.redirectTo.call(this as never, ...args);
       payload.status = this.response.status;
       payload.location = this.response.filteredLocation();
       return result;
