@@ -253,6 +253,8 @@ describe("rbModPrivate on a Module", () => {
     expect(() => rbModPrivate(Helper, "nope")).toThrow(
       "undefined method 'nope' for module '#<Module>'",
     );
+    const Named = Object.assign(new Module(), { name: "Named" });
+    expect(() => rbModPrivate(Named, "nope")).toThrow("undefined method 'nope' for module 'Named'");
   });
 });
 
