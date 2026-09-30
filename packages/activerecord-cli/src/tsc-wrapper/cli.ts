@@ -283,6 +283,10 @@ function handleBuildMode(args: string[]): void {
   const fh = formatHost();
   const pretty = parsePretty(args, {});
   const schemaColumnsByTable = loadSchemaColumns(args);
+  for (const root of rootConfigs) {
+    const isDir = fs.existsSync(root) && fs.statSync(root).isDirectory();
+    buildConfiguredViews(isDir ? path.join(root, "tsconfig.json") : root);
+  }
   const builder = createArSolutionBuilder(rootConfigs, {
     verbose,
     schemaColumnsByTable,

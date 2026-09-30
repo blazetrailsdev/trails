@@ -252,6 +252,17 @@ describe("trails-tsc .tse views", () => {
       expect(fs.existsSync(path.join(root, ".trails/views/posts/_post.html.tse.ts"))).toBe(true);
       expect(stderr).toContain("app/views/posts/_post.html.tse(2,22): error TS2345");
       expect(stderr).toContain("in <%= readingTime(post.title) %>");
+      fs.rmSync(path.join(root, ".trails"), { recursive: true, force: true });
+      try {
+        execFileSync("node", [CLI_BIN_PATH, "-b", root], {
+          encoding: "utf8",
+          stdio: ["pipe", "pipe", "pipe"],
+          cwd: root,
+        });
+      } catch {
+        void 0;
+      }
+      expect(fs.existsSync(path.join(root, ".trails/views/posts/_post.html.tse.ts"))).toBe(true);
     },
     30_000,
   );

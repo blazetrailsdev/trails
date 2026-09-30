@@ -127,7 +127,7 @@ function allHelpersFromPath(helpersDir: string): string[] {
   const names = fs
     .readdirSync(helpersDir, { recursive: true, encoding: "utf8" })
     .map((file) => file.split(path.sep).join("/"))
-    .filter((file) => /[-_]helper\.ts$/u.test(file) && !file.endsWith(".d.ts"));
+    .filter((file) => /[-_]helper\.ts$/u.test(file));
   return names.sort();
 }
 

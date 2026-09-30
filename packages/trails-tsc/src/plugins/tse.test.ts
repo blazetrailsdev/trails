@@ -355,6 +355,17 @@ describe("virtualizeTse", () => {
       expect(srcLineOf("d();")).toBe(5);
     });
 
+    it("maps a one-character expression past the emitted append prefix", () => {
+      const src = "<p><%= a %><%= b %><%= o %></p>";
+      const { ts, mappings } = virtualizeTseWithDeltas(src, scope);
+      const lines = ts.split("\n");
+      for (const name of ["a", "b", "o"]) {
+        const m = mappings.find((x) => lines[x.genLine].includes(`_ob.append(${name})`))!;
+        expect(lines[m.genLine].slice(m.genCol)).toBe(`${name});`);
+        expect(src[m.srcCol!]).toBe(name);
+      }
+    });
+
     it("maps a yielded section to its column inside the tag", () => {
       const src = '<p><%= yield("sidebar") %></p>';
       const { ts, mappings } = virtualizeTseWithDeltas(src, scope);

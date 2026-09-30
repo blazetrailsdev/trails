@@ -83,7 +83,8 @@ function lineMappings(genLine: number, code: string, node: TseAst["nodes"][numbe
     node.kind === "expr" || node.kind === "rawExpr" ? YIELD_EXPR_RE.exec(value) : null;
   const arg = (yielded?.[1] ?? yielded?.[2] ?? "").trim();
   const anchor = yielded === null ? value.split("\n")[0] : arg || "context.yield";
-  const at = node.kind === "text" ? 0 : pieces[0].indexOf(anchor);
+  const emitted = /^\s*(?:_ob\.\w+\()?/u.exec(pieces[0])?.[0].length ?? 0;
+  const at = node.kind === "text" ? 0 : pieces[0].indexOf(anchor, emitted);
   const srcCol = valueCol + (yielded !== null && arg !== "" ? value.indexOf(arg) : 0);
   return pieces.map((_, i) =>
     i === 0
