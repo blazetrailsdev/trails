@@ -278,7 +278,17 @@ describe("runCli", () => {
     write(
       cwd,
       "app/controllers/posts-controller.ts",
-      'export class PostsController { static { this.helperMethod("currentPost"); } private currentPost(): string { return ""; } }',
+      [
+        'import { Tracking } from "./concerns/tracking.js";',
+        "function include(..._modules: unknown[]): void {}",
+        "export class PostsController {",
+        '  static { this.helperMethod("currentPost"); include(this, Tracking); }',
+        '  private currentPost(): string { return ""; }',
+        "  tracked(): number { return 1; }",
+        "  other(): boolean { return true; }",
+        "  static helperMethod(..._names: string[]): void {}",
+        "}",
+      ].join("\n"),
     );
     write(
       cwd,
@@ -287,6 +297,16 @@ describe("runCli", () => {
     );
     write(cwd, "app/models/admin/blog-post.ts", "export class AdminBlogPost {}");
     write(cwd, "app/views/admin/blog_posts/_blog_post.html.tse", "<%= blog_post %>");
+    write(
+      cwd,
+      "app/controllers/concerns/tracking.ts",
+      'export const Tracking = { included(base: { helperMethod(n: string): void }) { base.helperMethod("tracked"); } };',
+    );
+    write(
+      cwd,
+      "app/controllers/concerns/unused/other.ts",
+      'export const Other = { included(base: { helperMethod(n: string): void }) { base.helperMethod("other"); } };',
+    );
     write(cwd, "app/models/post.ts", "export class Post {}");
     write(cwd, "app/views/posts/_post.html.tse", "<%= post %>");
     write(cwd, "app/views/layouts/application.html.tse", "<%= yield %>");
@@ -344,11 +364,23 @@ describe("runCli", () => {
     write(cwd, "app/views/posts/show.html.tse", '<%= render("strict", { post: 1 }) %>');
     buildViews({ cwd });
     const form = fs.readFileSync(path.join(cwd, ".trails/views/posts/_form.html.tse.ts"), "utf8");
-    expect(form).toContain("type ObjectLocals = { post: string | number; title: string };");
+    expect(form).toContain(
+      "type ObjectLocals = { post: string | number; title: string | undefined };",
+    );
     const strict = fs.readFileSync(
       path.join(cwd, ".trails/views/posts/_strict.html.tse.ts"),
       "utf8",
     );
     expect(strict).toContain("type ObjectLocals = {};");
+  });
+
+  it("types a local a partial forwards to another partial", () => {
+    const cwd = mkScratch();
+    write(cwd, "app/views/posts/show.html.tse", '<%= render("card", { post: 1 }) %>');
+    write(cwd, "app/views/posts/_card.html.tse", '<%= render("line", { post }) %>');
+    write(cwd, "app/views/posts/_line.html.tse", "<%= post %>");
+    buildViews({ cwd });
+    const line = fs.readFileSync(path.join(cwd, ".trails/views/posts/_line.html.tse.ts"), "utf8");
+    expect(line).toContain("type ObjectLocals = { post: number };");
   });
 });

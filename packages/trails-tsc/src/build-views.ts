@@ -72,7 +72,7 @@ export function buildViews(opts: BuildViewsOptions = {}): BuildViewsResult {
   if (shimPaths.length > 0) {
     const host = cachingHost();
     let program = ts.createProgram([...shimPaths], EMIT_OPTIONS, host);
-    if (bindCheckedTypes(views, program)) {
+    for (let pass = 0; pass <= views.length && bindCheckedTypes(views, program); pass++) {
       for (const view of views) writeShim(view, viewsDir);
       program = ts.createProgram([...shimPaths], EMIT_OPTIONS, host, program);
     }
@@ -134,26 +134,6 @@ function constantName(path_: string): string {
   return camelize(underscore(path_)).split("::").join("");
 }
 
-function helperMethodNames(files: readonly string[]): string[] {
-  const names: string[] = [];
-  for (const file of files) {
-    if (!fs.existsSync(file)) continue;
-    const sf = ts.createSourceFile(file, fs.readFileSync(file, "utf8"), ts.ScriptTarget.ESNext);
-    const visit = (node: ts.Node): void => {
-      if (
-        ts.isCallExpression(node) &&
-        ts.isPropertyAccessExpression(node.expression) &&
-        node.expression.name.text === "helperMethod"
-      ) {
-        for (const arg of node.arguments) if (ts.isStringLiteral(arg)) names.push(arg.text);
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(sf);
-  }
-  return names;
-}
-
 interface ViewShim {
   rel: string;
   src: string;
@@ -161,7 +141,8 @@ interface ViewShim {
   strictLocals: boolean;
   view: string[];
   locals: Map<string, Set<string>>;
-  controller?: { file: string; name: string; exposed: string[] };
+  base: { view: string[]; locals: Map<string, Set<string>> };
+  controller?: { file: string; name: string };
 }
 
 function writeShim(shim: ViewShim, viewsDir: string): void {
@@ -221,9 +202,12 @@ function bindCheckedTypes(views: ViewShim[], program: ts.Program): boolean {
       undefined,
       ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseFullyQualifiedType,
     );
-  let changed = false;
+  const before = views.map(scopeSignature);
   const partials = new Map<string, ViewShim>();
+  const renders = new Map<ViewShim, { calls: number; keys: Map<string, number> }>();
   for (const view of views) {
+    view.view = [...view.base.view];
+    view.locals = new Map([...view.base.locals].map(([k, v]) => [k, new Set(v)]));
     const key = partialRegistryKey(view.rel);
     if (key !== null && !view.strictLocals) partials.set(key, view);
   }
@@ -237,6 +221,9 @@ function bindCheckedTypes(views: ViewShim[], program: ts.Program): boolean {
         passed &&
         partials.get(passed.name.includes("/") ? passed.name : `${prefix}/${passed.name}`);
       if (passed && target) {
+        const seen = renders.get(target) ?? { calls: 0, keys: new Map<string, number>() };
+        seen.calls++;
+        renders.set(target, seen);
         for (const prop of passed.locals.properties) {
           if (!(ts.isPropertyAssignment(prop) || ts.isShorthandPropertyAssignment(prop))) continue;
           if (!ts.isIdentifier(prop.name)) continue;
@@ -244,32 +231,89 @@ function bindCheckedTypes(views: ViewShim[], program: ts.Program): boolean {
           const types = target.locals.get(prop.name.text) ?? new Set<string>();
           types.add(typeText(checker.getBaseTypeOfLiteralType(checker.getTypeAtLocation(at))));
           target.locals.set(prop.name.text, types);
-          changed = true;
+          seen.keys.set(prop.name.text, (seen.keys.get(prop.name.text) ?? 0) + 1);
         }
       }
       ts.forEachChild(node, visit);
     };
     visit(sf);
-    const controller = view.controller && program.getSourceFile(view.controller.file);
-    const klass = controller?.statements.find(
-      (s): s is ts.ClassDeclaration =>
-        ts.isClassDeclaration(s) && s.name?.text === view.controller!.name,
-    );
-    const instance =
-      klass?.name && checker.getDeclaredTypeOfSymbol(checker.getSymbolAtLocation(klass.name)!);
-    if (!instance || !klass) continue;
-    const members = view.controller!.exposed.flatMap((name) => {
+    const klass = view.controller && controllerClass(program, view.controller);
+    if (klass?.name === undefined) continue;
+    const instance = checker.getDeclaredTypeOfSymbol(checker.getSymbolAtLocation(klass.name)!);
+    const members = exposedHelperMethods(checker, klass).flatMap((name) => {
       const member = instance.getProperty(name);
       return member
         ? [`${name}: ${typeText(checker.getTypeOfSymbolAtLocation(member, klass))}`]
         : [];
     });
-    if (members.length > 0) {
-      view.view.push(`{ ${members.join("; ")} }`);
-      changed = true;
-    }
+    if (members.length > 0) view.view.push(`{ ${members.join("; ")} }`);
   }
-  return changed;
+  for (const [target, { calls, keys }] of renders) {
+    for (const [name, count] of keys) if (count < calls) target.locals.get(name)!.add("undefined");
+  }
+  return views.some((view, i) => scopeSignature(view) !== before[i]);
+}
+
+function scopeSignature(view: ViewShim): string {
+  return JSON.stringify([view.view, [...view.locals].map(([k, v]) => [k, [...v]])]);
+}
+
+function controllerClass(
+  program: ts.Program,
+  { file, name }: NonNullable<ViewShim["controller"]>,
+): ts.ClassDeclaration | undefined {
+  return program
+    .getSourceFile(file)
+    ?.statements.find(
+      (s): s is ts.ClassDeclaration => ts.isClassDeclaration(s) && s.name?.text === name,
+    );
+}
+
+function exposedHelperMethods(checker: ts.TypeChecker, klass: ts.ClassDeclaration): string[] {
+  const names: string[] = [];
+  const scanned = new Set<ts.Node>();
+  const scan = (declaration: ts.Node): void => {
+    if (scanned.has(declaration)) return;
+    scanned.add(declaration);
+    const visit = (node: ts.Node): void => {
+      if (ts.isCallExpression(node)) {
+        const callee = node.expression;
+        const name = ts.isPropertyAccessExpression(callee)
+          ? callee.name.text
+          : ts.isIdentifier(callee)
+            ? callee.text
+            : "";
+        if (name === "helperMethod") {
+          for (const arg of node.arguments) if (ts.isStringLiteral(arg)) names.push(arg.text);
+        } else if (name === "include") {
+          for (const arg of node.arguments.slice(1)) {
+            const included = sourceDeclaration(checker, arg);
+            if (included) scan(included);
+          }
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(declaration);
+    if (!ts.isClassDeclaration(declaration)) return;
+    const superclass = declaration.heritageClauses?.find(
+      (h) => h.token === ts.SyntaxKind.ExtendsKeyword,
+    )?.types[0];
+    const parent = superclass && sourceDeclaration(checker, superclass.expression);
+    if (parent && ts.isClassDeclaration(parent)) scan(parent);
+  };
+  scan(klass);
+  return names;
+}
+
+function sourceDeclaration(
+  checker: ts.TypeChecker,
+  expr: ts.Expression,
+): ts.Declaration | undefined {
+  let symbol = checker.getSymbolAtLocation(expr);
+  if (symbol && symbol.flags & ts.SymbolFlags.Alias) symbol = checker.getAliasedSymbol(symbol);
+  const declaration = symbol?.valueDeclaration ?? symbol?.declarations?.[0];
+  return declaration && !declaration.getSourceFile().isDeclarationFile ? declaration : undefined;
 }
 
 function renderedPartial(
@@ -299,7 +343,7 @@ function templateScope(
   rel: string,
   shimDir: string,
   helpers: readonly string[],
-): Pick<ViewShim, "view" | "locals" | "controller"> {
+): Pick<ViewShim, "view" | "locals" | "base" | "controller"> {
   const view = ['import("@blazetrails/actionview").Base'];
   for (const file of helpers) {
     const name = constantName(file.replace(/[-_]helper\.ts$/u, ""));
@@ -324,18 +368,7 @@ function templateScope(
     view.push(
       `{ [K in keyof ${klass} as K extends keyof import("@blazetrails/actionpack").ActionController.Base ? never : ${klass}[K] extends (...args: never) => unknown ? never : K]: ${klass}[K] }`,
     );
-    const concerns = path.join(controllersDir, "concerns");
-    const exposed = helperMethodNames([
-      path.join(controllersDir, "application-controller.ts"),
-      file,
-      ...(fs.existsSync(concerns)
-        ? fs
-            .readdirSync(concerns, { recursive: true, encoding: "utf8" })
-            .filter((f) => f.endsWith(".ts"))
-            .map((f) => path.join(concerns, f))
-        : []),
-    ]);
-    controller = { file, name, exposed };
+    controller = { file, name };
   }
   const locals = new Map<string, Set<string>>();
   const partial = /^_([a-z_]\w*)/u.exec(path.posix.basename(rel));
@@ -353,7 +386,7 @@ function templateScope(
       locals.set(element, new Set([`import(${JSON.stringify(model)}).${klass}`]));
     }
   }
-  return { view, locals, controller };
+  return { view, locals, base: { view: [...view], locals: new Map(locals) }, controller };
 }
 
 function partialRegistryKey(rel: string): string | null {
