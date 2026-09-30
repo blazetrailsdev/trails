@@ -1258,8 +1258,6 @@ describe("CI runs every tooling test suite", () => {
     expect(discriminator.test("HTTP 404: Not Found")).toBe(false);
   });
 
-  // thor_only narrows trailties-tests and unit-tests and skips the DX type
-  // lanes, so it may fire only when EVERY changed path is thor's own.
   it("sets thor_only only when every changed path is in the thor-only set", async () => {
     const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
 
@@ -1291,12 +1289,9 @@ describe("CI runs every tooling test suite", () => {
     expect(withLockfile.activerecord_affected).toBe("true");
     expect(withLockfile.actionpack_affected).toBe("true");
 
-    // A sibling of the thor tree is not thor.
     expect((await runGate("packages/trailties/src/thorough.ts")).thor_only).toBe("false");
   });
 
-  // push / schedule / workflow_dispatch force the full matrix and never run
-  // the script, so thor_only is unset there and no narrowed step can fire.
   it("never sets thor_only outside the pull_request gate arm", async () => {
     const yml = await readFile(CI_YML, "utf8");
     expect(yml.split(THOR_ONLY_CALL).length - 1).toBe(1);
@@ -1310,8 +1305,6 @@ describe("CI runs every tooling test suite", () => {
     expect(call).toBeGreaterThan(forcedEnd);
   });
 
-  // Each thor_only skip needs its arm in the ci aggregate, conditioned on the
-  // flag, or the aggregate either wedges thor PRs or passes a missing suite.
   it("keeps the thor_only skips and the ci aggregate in agreement", async () => {
     const wf = parseYaml(await readFile(CI_YML, "utf8"));
     const flat = (x: string): string => x.replace(/\\\n/g, " ").replace(/\s+/g, " ");

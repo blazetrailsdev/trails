@@ -1178,8 +1178,6 @@ await import("@blazetrails/trailties/test-help");
       "test/global-setup.ts",
       `import { env, setEnv } from "@blazetrails/ruby-compat";
 
-// Maintain the test schema once, before vitest starts its workers, as
-// \`rails test\` loads test_help before \`parallelize\` forks.
 export async function setup(): Promise<void> {
   if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
   await import("../config/environment.js");

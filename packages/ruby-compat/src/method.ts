@@ -1,5 +1,5 @@
 import { NameError } from "./name-error.js";
-import { rbErrorArity } from "./string/support.js";
+import { checkArity } from "./string/support.js";
 import { rbObjClass } from "./object.js";
 
 /**
@@ -150,5 +150,5 @@ export function rbIseqMinMaxArity(func: (...args: never[]) => unknown): [number,
  */
 export function rbCheckArity(method: (...args: never[]) => unknown, argc: number): void {
   const [min, max] = rbIseqMinMaxArity(method);
-  if (argc < min || argc > max) rbErrorArity(argc, min, max);
+  checkArity(argc, min, max);
 }
