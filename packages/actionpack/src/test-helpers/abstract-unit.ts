@@ -5,7 +5,9 @@ import {
   assertNotEqual,
   assertNotIncludes,
   include,
+  kernelArray,
   transformKeys,
+  underscore,
 } from "@blazetrails/activesupport";
 import {
   DelegateClass,
@@ -47,7 +49,10 @@ import {
   type Config as RouteSetConfig,
   type UrlHelpersModule,
 } from "../action-dispatch/routing/route-set.js";
-import { IntegrationTest } from "../action-dispatch/testing/integration.js";
+import {
+  IntegrationTest,
+  type IntegrationRequestOptions,
+} from "../action-dispatch/testing/integration.js";
 
 export const ActionPackTestSuiteUtils = {
   async requireHelpers(helpersDirs: string | string[]): Promise<void> {
@@ -185,6 +190,70 @@ declare module "../action-dispatch/testing/integration.js" {
     let stubControllers: StubControllers;
   }
 }
+
+class TestCase extends IntegrationTest {
+  /** @internal */
+  static _testing?: string;
+
+  static testing(klass: { name: string } | null = null): string | undefined {
+    if (klass) {
+      return (this._testing = `/${underscore(klass.name)}`.replace(/_controller$/, ""));
+    } else {
+      return this._testing;
+    }
+  }
+
+  override get(thing: string, options: IntegrationRequestOptions = {}): Promise<void> {
+    if (thing.startsWith(":")) {
+      return super.get(
+        `${(this.constructor as typeof TestCase).testing()}/${thing.slice(1)}`,
+        options,
+      );
+    } else {
+      return super.get(thing, options);
+    }
+  }
+
+  assertBody(body: string): void {
+    assertEqual(body, kernelArray(this.response.body).join(""));
+  }
+
+  assertStatus(code: number): void {
+    assertEqual(code, this.response.status);
+  }
+
+  declare assertResponse: ((
+    body: string,
+    status?: number,
+    headers?: Record<string, string>,
+  ) => void) &
+    IntegrationTest["assertResponse"];
+
+  assertContentType(type: string): void {
+    assertEqual(type, this.response.headers.get("Content-Type"));
+  }
+
+  assertHeader(name: string, value: string): void {
+    assertEqual(value, this.response.headers.get(name));
+  }
+}
+
+TestCase.prototype.assertResponse = function (
+  this: TestCase,
+  body: string,
+  status: number = 200,
+  headers: Record<string, string> = {},
+): void {
+  this.assertBody(body);
+  this.assertStatus(status);
+  for (const [header, value] of Object.entries(headers)) {
+    this.assertHeader(header, value);
+  }
+} as TestCase["assertResponse"];
+
+export const Rack = { TestCase };
+
+export class ApplicationController extends Base {}
 
 (DebugExceptions.prototype as unknown as { stderrLogger(): null }).stderrLogger = function () {
   return null;

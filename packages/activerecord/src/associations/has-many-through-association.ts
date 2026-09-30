@@ -3,10 +3,10 @@ import type { Base } from "../base.js";
 import type { AssociationReflection } from "../reflection.js";
 import type { AssociationDefinition } from "../associations.js";
 import { HasManyAssociation } from "./has-many-association.js";
-import { Hash, NotImplementedError, rbEqual } from "@blazetrails/ruby-compat";
+import { Hash, include, NotImplementedError, rbEqual } from "@blazetrails/ruby-compat";
 import { underscore, singularize, isBlank } from "@blazetrails/activesupport";
 import { collectionProxyFor as collectionProxyFor } from "../associations.js";
-import { ThroughAssociation, sourceReflection, throughBuildRecord } from "./through-association.js";
+import { ThroughAssociation, sourceReflection } from "./through-association.js";
 import { isThenable, type CollectionAssociation } from "./collection-association.js";
 import { runCallbacks } from "@blazetrails/activesupport";
 
@@ -133,8 +133,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     this.ensureNotNested();
     this._throughScope = this.scope();
     try {
-      throughBuildRecord(this, (attributes ??= {}));
-      const record = super.buildRecord(attributes, block)!;
+      const record = super.buildRecord((attributes ??= {}), block)!;
 
       const inverse = this.sourceReflection().isPolymorphic()
         ? this.sourceReflection().polymorphicInverseOf(record.constructor as typeof Base)
@@ -487,9 +486,9 @@ const throughAssociationMethods = {
   saveThroughRecord,
   throughRecordsFor,
   deleteThroughRecords,
-  ...ThroughAssociation,
 };
 
 Object.assign(HasManyThroughAssociation.prototype, throughAssociationMethods);
+include(HasManyThroughAssociation, ThroughAssociation);
 
 Associations.HasManyThroughAssociation = HasManyThroughAssociation;

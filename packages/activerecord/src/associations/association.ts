@@ -5,7 +5,6 @@ import { associationInstanceGet } from "../associations.js";
 import { AssociationScope, type AssociationScopeable } from "./association-scope.js";
 import { ActiveRecord, Associations } from "../namespaces.js";
 import { relationClassFor } from "../relation/delegation.js";
-import { ThroughAssociation } from "./through-association.js";
 import { camelize, kernelArray, safeConstantize, singularize } from "@blazetrails/activesupport";
 import { except, hasKey, rbEqual } from "@blazetrails/ruby-compat";
 import { AssociationTypeMismatch } from "../errors.js";
@@ -605,5 +604,3 @@ function inspectMismatchedRecord(record: unknown): string {
     return String(record);
   }
 }
-
-Object.setPrototypeOf(ThroughAssociation, Association.prototype);

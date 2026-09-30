@@ -4,7 +4,6 @@ import { MemberDetail } from "../test-helpers/models/member-detail.js";
 import { Member } from "../test-helpers/models/member.js";
 import { Organization } from "../test-helpers/models/organization.js";
 import { fixtures } from "../test-fixtures.js";
-import { throughBuildRecord } from "./through-association.js";
 
 describe("ThroughAssociation#build_record seeds the source inverse foreign key", () => {
   const { memberDetails, organizations } = fixtures(["members", "memberDetails", "organizations"]);
@@ -20,7 +19,11 @@ describe("ThroughAssociation#build_record seeds the source inverse foreign key",
     await memberDetail.organization;
 
     const attributes: Record<string, unknown> = {};
-    throughBuildRecord(memberDetail.association("organizationMemberDetails") as never, attributes);
+    (
+      memberDetail.association("organizationMemberDetails") as unknown as {
+        buildRecord(attributes: Record<string, unknown>): unknown;
+      }
+    ).buildRecord(attributes);
 
     expect(attributes).toEqual({ organization_id: organizations("nsa").id });
   });
@@ -30,7 +33,11 @@ describe("ThroughAssociation#build_record seeds the source inverse foreign key",
     memberDetail.organization = Organization.new({ name: "Discordians" });
 
     const attributes: Record<string, unknown> = {};
-    throughBuildRecord(memberDetail.association("organizationMemberDetails") as never, attributes);
+    (
+      memberDetail.association("organizationMemberDetails") as unknown as {
+        buildRecord(attributes: Record<string, unknown>): unknown;
+      }
+    ).buildRecord(attributes);
 
     expect(attributes).toEqual({});
   });

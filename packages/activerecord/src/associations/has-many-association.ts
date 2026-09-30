@@ -375,7 +375,7 @@ async function findTarget(
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder-3
+ * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder-4
  */
 export function scope(
   record: Base,

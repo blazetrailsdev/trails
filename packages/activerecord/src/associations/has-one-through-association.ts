@@ -1,3 +1,4 @@
+import { include } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { HasOneAssociation } from "./has-one-association.js";
@@ -111,7 +112,7 @@ function buildThroughProxyRecord(
 
 Object.assign(HasOneThroughAssociation.prototype, {
   createThroughRecord,
-  ...ThroughAssociation,
 });
+include(HasOneThroughAssociation, ThroughAssociation);
 
 Associations.HasOneThroughAssociation = HasOneThroughAssociation;
