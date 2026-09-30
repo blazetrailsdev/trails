@@ -109,7 +109,6 @@ export function numericPlus(x: unknown, y: unknown): unknown {
     if (rbFloatTypeP(y)) return rbDbl2num(Number(x) + y.valueOf());
     if (y instanceof Complex) return y.plus(x);
   }
-  // `do_coerce` (`vendor/ruby/v3.3.11/numeric.c:455`).
   const coerce = (y as { coerce?: unknown } | null)?.coerce;
   if (typeof coerce !== "function") {
     throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClass(x)}`);

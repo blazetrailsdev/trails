@@ -8,7 +8,6 @@ function fixnumZeroP(x: unknown): boolean {
   return x === 0 || x === 0n;
 }
 
-/** `f_add` (`vendor/ruby/v3.3.11/complex.c:71`). */
 function fAdd(x: unknown, y: unknown): unknown {
   if (rbIntegerTypeP(x)) {
     if (fixnumZeroP(x)) return y;
@@ -24,7 +23,6 @@ function fAdd(x: unknown, y: unknown): unknown {
   return (x as { plus(other: unknown): unknown }).plus(y);
 }
 
-/** `f_mul` (`vendor/ruby/v3.3.11/complex.c:123`). */
 function fMul(x: unknown, y: unknown): unknown {
   if (rbIntegerTypeP(x)) {
     if (fixnumZeroP(y)) return 0;
@@ -32,15 +30,19 @@ function fMul(x: unknown, y: unknown): unknown {
     if (x === 1) return y;
     if (y === 1) return x;
     if (rbFloatTypeP(y)) return rbDbl2num(Number(x) * y.valueOf());
+    if (y instanceof Rational) return y.mul(x);
     return typeof x === typeof y ? (x as number) * (y as number) : BigInt(x) * BigInt(y as bigint);
   } else if (rbFloatTypeP(x)) {
     if (y === 1) return x;
     return rbDbl2num(x.valueOf() * Number((y as number | bigint).valueOf()));
+  } else if (x instanceof Rational) {
+    if (y === 1) return x;
+    return x.mul(y as number | bigint);
   }
+  if (y === 1) return x;
   return (x as { multiply(other: unknown): unknown }).multiply(y);
 }
 
-/** `f_zero_p` (`vendor/ruby/v3.3.11/complex.c:321`). */
 function fZeroP(x: unknown): boolean {
   if (rbFloatTypeP(x)) return x.valueOf() === 0;
   if (rbIntegerTypeP(x)) return fixnumZeroP(x);
@@ -48,13 +50,10 @@ function fZeroP(x: unknown): boolean {
   return rbEqual(x, 0);
 }
 
-/** `k_numeric_p(x) && f_real_p(x)` (`vendor/ruby/v3.3.11/complex.c:832`). */
 function kRealP(x: unknown): boolean {
   return rbIntegerTypeP(x) || rbFloatTypeP(x) || x instanceof Rational;
 }
 
-/** `f_complex_new2` (`vendor/ruby/v3.3.11/complex.c:512`), whose
- * `nucomp_s_canonicalize_internal` (`:445`) is the identity for real parts. */
 function fComplexNew2(x: unknown, y: unknown): Complex {
   if (x instanceof Complex) {
     y = fAdd(x.imaginary, y);

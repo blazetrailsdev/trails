@@ -70,9 +70,6 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
     }
     return equalOrEql(x, y, eql);
   }
-  /* `fix_equal` / `flo_eq` hand a non-Numeric operand (Rational, Complex and
-     every user class) to `num_equal` (`vendor/ruby/v3.3.11/numeric.c:1588`), which
-     sends `other == self`. */
   if (!eql && (typeof a === "number" || typeof a === "bigint") && typeof b === "object") {
     return equalOrEql(b, a, eql);
   }

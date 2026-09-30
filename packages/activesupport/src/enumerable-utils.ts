@@ -26,7 +26,6 @@ interface EnumSumMemo {
   floatValue: boolean;
 }
 
-/** `sum_iter_normalize_memo` (`vendor/ruby/v3.3.11/enum.c:4539`). */
 function sumIterNormalizeMemo(memo: EnumSumMemo): void {
   memo.v = numericPlus(memo.n, memo.v);
   memo.n = 0;
@@ -34,7 +33,6 @@ function sumIterNormalizeMemo(memo: EnumSumMemo): void {
   memo.r = undefined;
 }
 
-/** `sum_iter_fixnum` (`vendor/ruby/v3.3.11/enum.c:4554`). */
 function sumIterFixnum(i: number, memo: EnumSumMemo): void {
   memo.n += i;
   if (!Number.isSafeInteger(memo.n)) {
@@ -43,12 +41,10 @@ function sumIterFixnum(i: number, memo: EnumSumMemo): void {
   }
 }
 
-/** `sum_iter_bignum` (`vendor/ruby/v3.3.11/enum.c:4564`). */
 function sumIterBignum(i: bigint, memo: EnumSumMemo): void {
   memo.v = numericPlus(i, memo.v);
 }
 
-/** `sum_iter_rational` (`vendor/ruby/v3.3.11/enum.c:4570`). */
 function sumIterRational(i: Rational, memo: EnumSumMemo): void {
   if (memo.r === undefined) memo.r = i;
   else memo.r = memo.r.add(i);
@@ -76,7 +72,6 @@ function sumIterSomeValue(v: unknown, i: unknown): unknown {
   );
 }
 
-/** `sum_iter_Kahan_Babuska` (`vendor/ruby/v3.3.11/enum.c:4587`). */
 function sumIterKahanBabuska(i: unknown, memo: EnumSumMemo): void {
   let x: number;
   if (rbFloatTypeP(i)) x = i.valueOf();
@@ -109,7 +104,6 @@ function sumIterKahanBabuska(i: unknown, memo: EnumSumMemo): void {
   memo.c = c;
 }
 
-/** `sum_iter` (`vendor/ruby/v3.3.11/enum.c:4641`). */
 function sumIter<T>(i: unknown, memo: EnumSumMemo, block?: (element: T) => unknown): void {
   if (memo.blockGiven) i = block!(i as T);
 
@@ -134,7 +128,6 @@ function sumIter<T>(i: unknown, memo: EnumSumMemo, block?: (element: T) => unkno
   }
 }
 
-/** `int_range_sum` (`vendor/ruby/v3.3.11/enum.c:4701`). */
 function intRangeSum(beg: number | bigint, end: number | bigint, excl: boolean, init: unknown) {
   if (excl) end = typeof end === "bigint" ? end - 1n : end - 1;
   if (BigInt(end) >= BigInt(beg)) {
