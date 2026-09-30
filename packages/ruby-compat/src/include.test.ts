@@ -2,6 +2,8 @@ import { describe, it, expect, expectTypeOf } from "vitest";
 import { NameError } from "./name-error.js";
 import {
   include,
+  rbModConstSet,
+  rbModPrivateConstant,
   prepend,
   extend,
   included,
@@ -1211,5 +1213,20 @@ describe("Module#dup", () => {
     expect(copy.label).toBe("original");
     expect(copy.instanceMethods()).toEqual(["greet", "extra"]);
     expect(mod.instanceMethods()).toEqual(["greet"]);
+  });
+});
+
+describe("Module#const_set", () => {
+  it("names an anonymous module after the constant it is bound to", () => {
+    class Topic {}
+    const mod = new Module();
+    expect(mod.name).toBeNull();
+    expect(rbModConstSet(Topic, "Generated", mod)).toBe(mod);
+    expect((Topic as unknown as { Generated: Module }).Generated).toBe(mod);
+    expect(mod.name).toBe("Topic::Generated");
+    expect(mod.inspect()).toBe("Topic::Generated");
+    rbModPrivateConstant(Topic, "Generated");
+    expect(Object.keys(Topic)).not.toContain("Generated");
+    expect(() => rbModPrivateConstant(Topic, "Missing")).toThrow(NameError);
   });
 });
