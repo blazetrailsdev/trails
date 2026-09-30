@@ -542,9 +542,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "GVL / Ruby Thread semantics — first test pins across threads; second uses FutureResult (thread-based async queries).",
   },
   // --- Permanently not-portable: GVL / Ruby Thread + fork in mixed files ---
-  // (relation/load_async_test.rb's one thread-interleaving case is excluded
-  //  above — these are the scattered thread/fork cases that live in
-  //  otherwise-portable test files.)
   {
     testFile: "query_cache_test.rb",
     tests: [
