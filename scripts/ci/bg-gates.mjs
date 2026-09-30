@@ -1,28 +1,4 @@
 #!/usr/bin/env node
-// Runs a CI job's independent gates concurrently in the background while the
-// job's foreground steps keep going, and lets a later step collect each one.
-//
-// GitHub Actions runs a job's steps strictly in order, so a job made of many
-// single-threaded gates leaves most of a 4-vCPU runner idle. More jobs would buy
-// the parallelism at the price of a whole runner (and its ~35s of checkout /
-// install / build) each, and runners are the scarce resource. This keeps one
-// runner and fills its cores instead.
-//
-//   bg-gates.mjs start   reads a task spec on stdin, launches a detached
-//                        scheduler, and returns at once
-//   bg-gates.mjs wait ID... prints each task's output once it has finished,
-//                        in order, and exits with the first failing status
-//   bg-gates.mjs summary prints every task's queued / run time
-//
-// A spec line is `ID [after DEP,DEP]: COMMAND`, blank lines and `#` comments
-// ignored. COMMAND runs under `bash -eo pipefail -c` from the start step's cwd
-// and env. A task starts once every DEP has exited 0; a failed DEP marks it
-// skipped, which `wait` reports as a failure. Ready tasks start in spec order,
-// so list the longest dependency chains first. Background processes survive
-// the start step; the runner reaps them only when the job ends.
-//
-// Concurrency is CI_BG_JOBS, else one less than the available cores, which
-// leaves a core for the foreground steps running beside the scheduler.
 import { spawn } from "node:child_process";
 import {
   closeSync,
@@ -45,6 +21,13 @@ const statusPath = (id) => path.join(DIR, `${id}.status`);
 const logPath = (id) => path.join(DIR, `${id}.log`);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Parses a `bg-gates.mjs start` spec: one `ID [after DEP,DEP]: COMMAND` per
+ * line, blank and `#` lines ignored. COMMAND runs under `bash -eo pipefail -c`
+ * once every DEP has exited 0; a failed DEP marks it skipped, and `wait` reports
+ * a skipped task as failed. Ready tasks start in spec order, at most CI_BG_JOBS
+ * (default: available cores minus one) at a time.
+ */
 export function parseSpec(text) {
   const tasks = [];
   for (const raw of text.split("\n")) {

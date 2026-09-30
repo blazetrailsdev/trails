@@ -841,6 +841,7 @@ jobs:
           scripts/rails-file-structure-collisions.test.ts
           scripts/deprecated-manifest-diff.test.ts
           scripts/ci-suite-coverage.test.ts
+          scripts/ci/bg-gates.test.mjs
           scripts/mixin-declaration-drift.test.ts
           scripts/mysql-grant-namespaces.test.ts
           scripts/stale-story-references.test.ts
@@ -1672,19 +1673,6 @@ jobs:
       - name: Fetch upstream Ruby sources
         run: pnpm vendor:fetch
       - name: Start background gates
-        # Every gate below that is not on the API-comparison chain runs in the
-        # background on the runner's spare cores (scripts/ci/bg-gates.mjs); the
-        # step bearing each gate's name waits for it and exits with its status.
-        # Ready tasks start in the order listed, so the longest chains go first.
-        # An `after` edge is a real dependency: an artifact the task reads, or a
-        # file another task writes that the task must not read mid-write. The
-        # two root-config ESLint runs (`method-order`, `test-names`) read every
-        # manifest and exclude baseline the generators write, so they follow
-        # all of them; with rails-test-names.json in place, `method-order` also
-        # applies test-name parity to arel's tests, which `test-names` enforces
-        # there anyway. `deprecated` checks the committed
-        # rails-deprecated-methods.json before `privates-manifest` regenerates
-        # it.
         run: |
           node scripts/ci/bg-gates.mjs start <<'SPEC'
           ts-api: pnpm exec tsx scripts/api-compare/extract-ts-api.ts
@@ -2025,8 +2013,6 @@ jobs:
       - name: Models comparison
         run: node scripts/ci/bg-gates.mjs wait models
       - name: Background gate timings
-        # Reporting only: when each background task started and how long it
-        # ran, to keep the ordering in the spec above honest.
         if: always()
         run: node scripts/ci/bg-gates.mjs summary
 

@@ -518,6 +518,7 @@ export default defineConfig({
             "scripts/schema-compare/*.test.ts",
             "scripts/parity/**/*.test.ts",
             "scripts/*.test.ts",
+            "scripts/ci/*.test.mjs",
             "scripts/test-deps/*.test.ts",
             "scripts/tasks/*.test.ts",
             "scripts/test-compare/*.test.ts",
