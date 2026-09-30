@@ -13,6 +13,8 @@ export class PostsController extends ApplicationController {
 
   declare post: Post;
 
+  declare postsPath: (...args: unknown[]) => string;
+
   async index(): Promise<void> {
     this.posts = await Post.all();
   }
