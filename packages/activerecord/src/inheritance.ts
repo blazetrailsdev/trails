@@ -2,7 +2,6 @@ import type { Base } from "./base.js";
 import { modelRegistry, registerModelConstant } from "./associations.js";
 import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
 import { ActiveRecord } from "./namespaces.js";
-import { IndexedRow } from "./result.js";
 import {
   camelize,
   classAttribute,
@@ -313,14 +312,17 @@ export function ensureProperType(this: Base): void {
 /** @internal */
 export function discriminateClassForRecord(
   modelClass: typeof Base,
-  record: Record<string, unknown> | IndexedRow,
+  record: Record<string, unknown>,
 ): typeof Base {
   if (modelClass.usingSingleTableInheritance(record)) {
     const inheritCol = modelClass.inheritanceColumn;
     if (inheritCol === null) return modelClass;
-    const value = record instanceof IndexedRow ? record.get(inheritCol) : record[inheritCol];
-    const castValue = castInheritanceColumnValue(baseClass.call(modelClass), inheritCol, value);
-    const typeName = (castValue as string | null) ?? String(value);
+    const castValue = castInheritanceColumnValue(
+      baseClass.call(modelClass),
+      inheritCol,
+      record[inheritCol],
+    );
+    const typeName = (castValue as string | null) ?? String(record[inheritCol]);
     return findStiClassForRow(modelClass, typeName);
   }
   return modelClass;
@@ -329,14 +331,12 @@ export function discriminateClassForRecord(
 /** @internal */
 export function usingSingleTableInheritance(
   this: typeof Base,
-  record: Record<string, unknown> | IndexedRow,
+  record: Record<string, unknown>,
 ): boolean {
   const modelClass = this;
   const inheritCol = modelClass.inheritanceColumn;
   if (inheritCol === null) return false;
-  if (!isPresent(record instanceof IndexedRow ? record.get(inheritCol) : record[inheritCol])) {
-    return false;
-  }
+  if (!isPresent(record[inheritCol])) return false;
   return stiColumnIsAttribute(modelClass, inheritCol, record);
 }
 
@@ -344,15 +344,9 @@ export function usingSingleTableInheritance(
 function stiColumnIsAttribute(
   modelClass: typeof Base,
   inheritCol: string,
-  record: Record<string, unknown> | IndexedRow,
+  record: Record<string, unknown>,
 ): boolean {
-  if (
-    record instanceof IndexedRow
-      ? record.isKey(inheritCol)
-      : Object.prototype.hasOwnProperty.call(record, inheritCol)
-  ) {
-    return true;
-  }
+  if (Object.prototype.hasOwnProperty.call(record, inheritCol)) return true;
   return modelClass._hasAttribute(inheritCol);
 }
 

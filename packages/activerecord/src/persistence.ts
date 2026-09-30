@@ -1,4 +1,3 @@
-import type { IndexedRow } from "./result.js";
 import { Time as RubyTime } from "@blazetrails/date";
 import { type TouchArgs, type TouchOptions } from "./timestamp.js";
 import { Rational, basicObjRespondTo, rbObjSingletonClass } from "@blazetrails/ruby-compat";
@@ -35,7 +34,7 @@ import {
 interface PersistenceHost {
   new (attrs?: Record<string, unknown>, block?: (record: any) => void): any;
   _instantiate(
-    row: Record<string, unknown> | IndexedRow,
+    row: Record<string, unknown>,
     block?: (record: any) => void,
     columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
   ): any;
@@ -116,7 +115,7 @@ export function build(
 
 export function instantiate(
   this: PersistenceHost,
-  attributes: Record<string, unknown> | IndexedRow,
+  attributes: Record<string, unknown>,
   columnTypes: Record<string, unknown> = {},
   block?: (record: any) => void,
 ): any {
@@ -1088,12 +1087,12 @@ export function _raiseRecordNotTouchedError(): never {
 function instantiateInstanceOf(
   klass: {
     _instantiate(
-      attrs: Record<string, unknown> | IndexedRow,
+      attrs: Record<string, unknown>,
       block?: (r: any) => void,
       columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
     ): any;
   },
-  attributes: Record<string, unknown> | IndexedRow,
+  attributes: Record<string, unknown>,
   columnTypes: Record<string, unknown> = {},
   block?: (r: any) => void,
 ): any {
@@ -1105,7 +1104,7 @@ function instantiateInstanceOf(
 }
 
 /** @internal */
-function discriminateClassForRecord<T>(klass: T, _record: Record<string, unknown> | IndexedRow): T {
+function discriminateClassForRecord<T>(klass: T, _record: Record<string, unknown>): T {
   return klass;
 }
 
