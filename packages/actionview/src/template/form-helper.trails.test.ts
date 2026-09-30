@@ -36,6 +36,27 @@ describe("FormHelper includes RecordIdentifier (form_helper.rb:120)", () => {
   });
 });
 
+describe("FormHelper includes ModelNaming (form_helper.rb:119)", () => {
+  const view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, null);
+
+  it("renders convertToModel from a template", () => {
+    const model = new Post(1);
+    const rendered = view.render({
+      inline: "<%= convertToModel(post) === model %>",
+      locals: { post: { toModel: () => model }, model },
+    });
+    expect(String(rendered)).toBe("true");
+  });
+
+  it("renders modelNameFromRecordOrClass from a template", () => {
+    const rendered = view.render({
+      inline: "<%= modelNameFromRecordOrClass(post).paramKey %>",
+      locals: { post: new Post(1) },
+    });
+    expect(String(rendered)).toBe("post");
+  });
+});
+
 describe("FormHelper attr_internal :default_form_builder (form_helper.rb:122)", () => {
   class SpecializedFormBuilder extends FormBuilder {}
 

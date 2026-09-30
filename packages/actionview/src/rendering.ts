@@ -1,7 +1,8 @@
 /** @internal */
 
-import type { SafeBuffer } from "@blazetrails/activesupport";
-import { include } from "@blazetrails/ruby-compat/include";
+import { isPlainObject, type SafeBuffer } from "@blazetrails/activesupport";
+import { Hash, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { include, Module } from "@blazetrails/ruby-compat/include";
 import { Base } from "./base.js";
 import { DetailsKey, type LookupContext } from "./lookup-context.js";
 import { Renderer } from "./renderer.js";
@@ -187,7 +188,38 @@ export function _processFormat(
   this: { lookupContext: LookupContext },
   format: { toSym?(): string | null; toString(): string },
 ): void {
+  Rendering.superMethod(this, "_processFormat")!(format);
   if (format.toSym?.() != null) this.lookupContext.formats = [format.toSym() as string];
+}
+
+/** @internal */
+export function _normalizeArgs(
+  this: object,
+  action: unknown = null,
+  options: Record<string, unknown> = {},
+): Record<string, unknown> {
+  options = Rendering.superMethod(this, "_normalizeArgs")!(action, options) as Record<
+    string,
+    unknown
+  >;
+  if (action == null) {
+    return options;
+  } else if (isPlainObject(action) || action instanceof Hash) {
+    options = action as Record<string, unknown>;
+  } else if (typeof action === "string") {
+    const key = action.includes("/") ? "template" : "action";
+    options[key] = action;
+  } else {
+    if (rbObjRespondTo(action, "permitted") && (action as { permitted: boolean }).permitted) {
+      options = action as Record<string, unknown>;
+    } else if (rbObjRespondTo(action, "renderIn")) {
+      options["renderable"] = action;
+    } else {
+      options["partial"] = action;
+    }
+  }
+
+  return options;
 }
 
 /** @internal */
@@ -205,3 +237,13 @@ export function _processRenderTemplateOptions(
 
   options["template"] ??= String(options["action"] ?? this.actionName);
 }
+
+export const Rendering = new Module((mod) => {
+  mod.defineMethod("viewContext", viewContext);
+  mod.defineMethod("viewRenderer", viewRenderer);
+  mod.defineMethod("renderToBody", renderToBody);
+  mod.defineMethod("_renderTemplate", _renderTemplate);
+  mod.defineMethod("_processFormat", _processFormat);
+  mod.defineMethod("_normalizeArgs", _normalizeArgs);
+  mod.defineMethod("_processRenderTemplateOptions", _processRenderTemplateOptions);
+});

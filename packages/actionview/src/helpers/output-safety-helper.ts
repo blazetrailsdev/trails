@@ -5,8 +5,10 @@ import {
   SafeBuffer,
   htmlEscape,
   htmlSafe,
+  isPlainObject,
   unwrappedHtmlEscape,
 } from "@blazetrails/activesupport";
+import { Hash } from "@blazetrails/ruby-compat";
 import { OutputBuffer } from "../buffers.js";
 
 export function raw(stringish: unknown): SafeBuffer {
@@ -14,10 +16,16 @@ export function raw(stringish: unknown): SafeBuffer {
   return htmlSafe(String(stringish ?? ""));
 }
 
-export function safeJoin(array: unknown[], sep?: string | SafeBuffer | null): SafeBuffer {
+export function safeJoin(
+  array: unknown[] | Hash<unknown, unknown> | Record<string, unknown>,
+  sep?: string | SafeBuffer | null,
+): SafeBuffer {
   const escapedSep = unwrappedHtmlEscape(sep ?? "");
 
-  const flattened = flatten(array);
+  const flattened =
+    array instanceof Hash || isPlainObject(array)
+      ? [...(array instanceof Hash ? array : Object.entries(array))].flat()
+      : flatten(array);
   const escaped = flattened.map((i) => unwrappedHtmlEscape(i));
   const joined = escaped.map((s) => s.toString()).join(escapedSep.toString());
   return htmlSafe(joined);

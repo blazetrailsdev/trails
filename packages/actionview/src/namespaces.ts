@@ -1,4 +1,4 @@
-import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
+import { Autoload, extend, TopLevel, type Extended } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
@@ -14,3 +14,5 @@ extend(ActionView, Autoload);
 ActionView.eagerAutoload(() => {
   ActionView.autoload("Base");
 });
+
+TopLevel.ActionView = ActionView;

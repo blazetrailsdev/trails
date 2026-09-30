@@ -36,6 +36,8 @@ export type {
 export {
   _renderTemplate,
   _processFormat,
+  _normalizeArgs,
+  Rendering,
   buildViewContextClass,
   renderToBody,
   isInheritViewContextClass,

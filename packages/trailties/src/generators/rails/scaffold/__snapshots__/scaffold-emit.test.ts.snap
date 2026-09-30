@@ -33,7 +33,7 @@ export class PostsController extends ApplicationController {
     if (await this.post.save()) {
       this.redirectTo(this.post, { notice: "Post was successfully created." });
     } else {
-      await this.render({ action: "new", status: "unprocessable_entity" });
+      await this.render("new", { status: "unprocessable_entity" });
     }
   }
 
@@ -41,7 +41,7 @@ export class PostsController extends ApplicationController {
     if (await this.post.update(this.postParams())) {
       this.redirectTo(this.post, { notice: "Post was successfully updated.", status: "see_other" });
     } else {
-      await this.render({ action: "edit", status: "unprocessable_entity" });
+      await this.render("edit", { status: "unprocessable_entity" });
     }
   }
 

@@ -163,12 +163,12 @@ function crudMethods(
     mk("edit", "", ts),
     mk(
       "create",
-      `this.${singular} = ${ormClass.build(model, params)};\n\nif (await this.${ormInstance.save()}) {\n  this.redirectTo(${this.redirectResourceName()}, { notice: "${humanName} was successfully created." });\n} else {\n  await this.render({ action: "new", status: "unprocessable_entity" });\n}`,
+      `this.${singular} = ${ormClass.build(model, params)};\n\nif (await this.${ormInstance.save()}) {\n  this.redirectTo(${this.redirectResourceName()}, { notice: "${humanName} was successfully created." });\n} else {\n  await this.render("new", { status: "unprocessable_entity" });\n}`,
       ts,
     ),
     mk(
       "update",
-      `if (await this.${ormInstance.update(params)}) {\n  this.redirectTo(${this.redirectResourceName()}, { notice: "${humanName} was successfully updated.", status: "see_other" });\n} else {\n  await this.render({ action: "edit", status: "unprocessable_entity" });\n}`,
+      `if (await this.${ormInstance.update(params)}) {\n  this.redirectTo(${this.redirectResourceName()}, { notice: "${humanName} was successfully updated.", status: "see_other" });\n} else {\n  await this.render("edit", { status: "unprocessable_entity" });\n}`,
       ts,
     ),
     mk(

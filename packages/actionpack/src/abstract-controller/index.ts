@@ -30,6 +30,7 @@ export {
   _processOptions,
   _processVariant,
   _normalizeRender,
+  Rendering,
   type RenderOptions,
   type RenderingHost,
 } from "./rendering.js";

@@ -63,10 +63,7 @@ function setupFiberedBase() {
   afterEach(() => TemplateHandlers.clear());
 
   const renderBody = (options: Record<string, unknown>) =>
-    state.view.viewRenderer.renderBody(state.view as unknown as ViewContext, {
-      locals: { I18n },
-      ...options,
-    });
+    state.view.viewRenderer.renderBody(state.view as unknown as ViewContext, options);
 
   const bufferedRender = async (options: Record<string, unknown>): Promise<string> => {
     const body = await renderBody(options);
