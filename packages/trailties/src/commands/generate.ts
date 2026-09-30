@@ -24,19 +24,21 @@ export function generateCommand(): Command {
       await gen.run(name, columns);
     });
 
+  const help = async (): Promise<void> => {
+    if (APP_PATH != null) {
+      await bootApplicationBang();
+      await loadGenerators();
+    }
+    await Generators.help("generate", console.log);
+  };
+
   cmd
     .argument("[generator]", "Generator name")
     .argument("[args...]", "Generator arguments")
     .allowUnknownOption()
     .passThroughOptions()
     .action(async (generator: string | undefined, args: string[]) => {
-      if (!generator) {
-        if (APP_PATH != null) {
-          await bootApplicationBang();
-          await loadGenerators();
-        }
-        return Generators.help("generate", console.log);
-      }
+      if (!generator) return help();
 
       if (APP_PATH != null) {
         await bootApplicationBang();
