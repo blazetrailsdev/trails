@@ -12,6 +12,7 @@ import {
 import {
   DelegateClass,
   Dir,
+  Module,
   type Generic,
   Hash,
   rbInspect,
@@ -27,9 +28,12 @@ import {
   type RackEnv,
   type RackResponse,
 } from "@blazetrails/rack";
+import { withRoutesHelpers } from "../abstract-controller/trailties/routes-helpers.js";
+import { API } from "../action-controller/api.js";
 import { Base } from "../action-controller/base.js";
 import { Metal } from "../action-controller/metal.js";
 import { RoutingError } from "../action-controller/metal/exceptions.js";
+import { TestCase as ActionControllerTestCase } from "../action-controller/test-case.js";
 import { deprecator } from "../action-dispatch/deprecator.js";
 import { controllerConstants, Request } from "../action-dispatch/http/request.js";
 import type { Response } from "../action-dispatch/http/response.js";
@@ -48,12 +52,14 @@ import {
 import {
   RouteSet,
   type Config as RouteSetConfig,
+  type DrawCallback,
   type UrlHelpersModule,
 } from "../action-dispatch/routing/route-set.js";
 import {
   IntegrationTest,
   type IntegrationRequestOptions,
 } from "../action-dispatch/testing/integration.js";
+import { TestProcess } from "../action-dispatch/testing/test-process.js";
 
 export const ActionPackTestSuiteUtils = {
   async requireHelpers(helpersDirs: string | string[]): Promise<void> {
@@ -80,6 +86,18 @@ SharedTestRoutes.draw((r) => {
   deprecator().silence(() => {
     r.get(":controller(/:action)");
   });
+});
+
+export const SharedRoutes = new Module();
+
+SharedRoutes.defineMethod("beforeSetup", function (this: { routes?: RouteSet }): unknown {
+  this.routes = new RouteSet();
+  deprecator().silence(() => {
+    this.routes!.draw((r) => {
+      r.get(":controller(/:action)");
+    });
+  });
+  return SharedRoutes.superMethod(this, "beforeSetup")!();
 });
 
 class Config {
@@ -258,7 +276,31 @@ TestCase.prototype.assertResponse = function (
 
 export const Rack = { TestCase };
 
+withRoutesHelpers(SharedTestRoutes)(API);
+
+withRoutesHelpers(SharedTestRoutes)(Base);
+include(Base, SharedTestRoutes.mountedHelpers());
+
 Base.viewPaths(FIXTURE_LOAD_PATH);
+
+Base.testRoutes = function (this: typeof Base, block: DrawCallback): RouteSet {
+  const routes = new RouteSet();
+  routes.draw(block);
+  include(this, routes.urlHelpers());
+  return routes;
+};
+
+type TestRoutes = (this: typeof Base, block: DrawCallback) => RouteSet;
+
+declare module "../action-controller/base.js" {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- Ruby reopens `class ActionController::Base` (`abstract_unit.rb:229`) to add `self.test_routes`; a namespace merged onto the class is how an added static surfaces on the type side.
+  namespace Base {
+    let testRoutes: TestRoutes;
+  }
+}
+
+include(ActionControllerTestCase, TestProcess);
+include(ActionControllerTestCase, SharedRoutes);
 
 export class ApplicationController extends Base {}
 

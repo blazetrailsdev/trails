@@ -1,4 +1,5 @@
-import { assertRespondTo } from "@blazetrails/activesupport";
+import { assert, Assertion, assertEqual, assertRespondTo } from "@blazetrails/activesupport";
+import { rbObjId } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
 import { TestCase } from "../test-case.js";
 import { Base } from "../base.js";
@@ -573,8 +574,9 @@ describe("TestCaseTest", () => {
   const FILES_DIR = `${FIXTURE_LOAD_PATH}/multipart`;
   let tc: TestCase;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tc = new TestCase(TestController);
+    await tc.beforeSetup();
   });
 
   it("head", async () => {
@@ -627,6 +629,23 @@ describe("TestCaseTest", () => {
     expect(tc.responseBody).toBe("OK");
     await tc.process("testOnlyOneParam", { method: "GET", params: { right: "true" } });
     expect(tc.responseBody).toBe("OK");
+  });
+
+  it("with routing places routes back", () => {
+    assert(tc.routes);
+    const routesId = rbObjId(tc.routes!);
+
+    try {
+      tc.withRouting(() => {
+        throw new Error("fail");
+      });
+      throw new Error("Should not be here.");
+    } catch (e) {
+      if (!(e instanceof Error) || e instanceof Assertion) throw e;
+    }
+
+    assert(tc.routes);
+    assertEqual(routesId, rbObjId(tc.routes!));
   });
 
   it("remote addr", async () => {

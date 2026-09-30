@@ -12,7 +12,7 @@ import {
   type FilterListEntry,
   type Included,
 } from "@blazetrails/activesupport";
-import { b, KeyError, merge, SecureRandom, StringIO } from "@blazetrails/ruby-compat";
+import { b, KeyError, merge, Module, SecureRandom, StringIO } from "@blazetrails/ruby-compat";
 import {
   DEFAULT_OPTIONS,
   Persisted,
@@ -179,14 +179,10 @@ export class TestCase {
   }
 
   /** @internal */
-  beforeSetup(): void {
-    SetupAndTeardown.beforeSetup.call(this);
-  }
+  declare beforeSetup: () => unknown;
 
   /** @internal */
-  afterTeardown(test: Parameters<typeof SetupAndTeardown.afterTeardown>[0]): void {
-    SetupAndTeardown.afterTeardown.call(this, test);
-  }
+  declare afterTeardown: (test: Parameters<typeof SetupAndTeardown.afterTeardown>[0]) => void;
 
   setup(): void {
     routingAssertions.setup.call(this);
@@ -568,6 +564,21 @@ proto.recognizedRequestFor = routingAssertions.recognizedRequestFor;
 proto.failOn = routingAssertions.failOn;
 
 SetupAndTeardown.prepended(TestCase.prototype);
+
+include(
+  TestCase,
+  new Module((mod) => {
+    mod.defineMethod("beforeSetup", function (this: TestCase): unknown {
+      return SetupAndTeardown.beforeSetup.call(this);
+    });
+    mod.defineMethod(
+      "afterTeardown",
+      function (this: TestCase, test: Parameters<typeof SetupAndTeardown.afterTeardown>[0]): void {
+        SetupAndTeardown.afterTeardown.call(this, test);
+      },
+    );
+  }),
+);
 
 runLoadHooks("action_controller_test_case", TestCase);
 

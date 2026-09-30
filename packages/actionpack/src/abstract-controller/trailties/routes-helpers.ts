@@ -5,7 +5,7 @@ import { Module } from "@blazetrails/ruby-compat";
 import type { HelperMethodsModule, HelpersClassMethods } from "../helpers.js";
 
 export interface UrlHelpersRouteSet {
-  urlHelpers(includePathHelpers?: boolean): HelperMethodsModule;
+  urlHelpers(includePathHelpers?: boolean): HelperMethodsModule | Module;
 }
 
 export interface RoutesHelpersClassMethods extends HelpersClassMethods {
@@ -19,7 +19,7 @@ export function withRoutesHelpers(
 ): (cls: RoutesHelpersControllerClass) => void {
   return (cls) => {
     const namespaceBuilder = findTrailtieUrlHelpers(cls);
-    const urlHelpersModule = (): HelperMethodsModule =>
+    const urlHelpersModule = (): HelperMethodsModule | Module =>
       namespaceBuilder
         ? namespaceBuilder(includePathHelpers)
         : routes.urlHelpers(includePathHelpers);
@@ -61,13 +61,16 @@ export interface RoutesHelpersControllerClass extends RoutesHelpersClassMethods 
   prototype: object;
 }
 
-function includedAccessor(mod: HelperMethodsModule, key: string): PropertyDescriptor | undefined {
+function includedAccessor(
+  mod: HelperMethodsModule | Module,
+  key: string,
+): PropertyDescriptor | undefined {
   if (!(mod instanceof Module)) return undefined;
   const descriptor = mod.instanceMethod(key);
   return descriptor?.get ? descriptor : undefined;
 }
 
-function includedMember(mod: HelperMethodsModule, key: string): unknown {
+function includedMember(mod: HelperMethodsModule | Module, key: string): unknown {
   let current: object | null = mod;
   if (mod instanceof Module) {
     current = Object.getPrototypeOf(mod) as object | null;
