@@ -2,6 +2,7 @@ import type { ModelGenerator } from "./model-generator.js";
 
 type Template = (this: ModelGenerator) => string;
 
+/** @missingRailsCall module_namespacing — CONVERGEABLE scaffold-controller-hooks-test-framework-and-engine-arms */
 const unitTest: Template = function () {
   const className = this.className().split("::").join("");
   const root = "../".repeat(this.classPathParts.length + 1);
