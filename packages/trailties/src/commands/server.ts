@@ -2,7 +2,7 @@ import { getEnv, presence } from "@blazetrails/activesupport";
 import { getFs, getPath, setEnv } from "@blazetrails/ruby-compat";
 import { Dir } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
-import { Handler } from "@blazetrails/rack";
+import { Handler, type RackEnv } from "@blazetrails/rack";
 import { requireApplicationBang } from "../command/actions.js";
 import { Trails } from "../rails.js";
 import { DevServer } from "../server/dev-server.js";
@@ -29,8 +29,9 @@ export function serverCommand(): Command {
       await requireApplicationBang();
       const app = await Trails.initialize();
       const port = parseInt(options.port, 10);
+      const railsApp = (env: RackEnv) => app.call(env);
       if (options.environment !== "development" || !(await hasViteConfig(root))) {
-        const server = await Handler.Node.run(app.app(), { Port: port, Host: host(options) });
+        const server = await Handler.Node.run(railsApp, { Port: port, Host: host(options) });
         const address = server.address();
         const boundPort = address && typeof address === "object" ? address.port : port;
         console.log(
@@ -44,7 +45,7 @@ export function serverCommand(): Command {
         port,
         host: host(options),
         cwd: root,
-        app: app.app(),
+        app: railsApp,
       });
       await server.start();
     });
