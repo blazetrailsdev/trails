@@ -14,6 +14,7 @@ import { except, prepend, Process, rbObjRespondTo } from "@blazetrails/ruby-comp
 import { Callbacks } from "@blazetrails/actionpack";
 import * as ActiveRecord from "@blazetrails/activerecord";
 import {
+  ActiveRecordError,
   AsynchronousQueriesTracker,
   AutoFilteredParameters,
   Base,
@@ -260,7 +261,18 @@ export class Trailtie extends BaseTrailtie {
             (await databaseConfiguration()) as Parameters<typeof base.configurations>[0],
           );
 
-          return base.establishConnection();
+          const pool = await base.establishConnection();
+
+          if (!Trails.env["test?"]()) {
+            try {
+              await pool.schemaReflection.loadAllBang(pool);
+            } catch (error) {
+              if (!(error instanceof ActiveRecordError)) throw error;
+              console.warn(
+                `Failed to load the schema cache because of ${error.constructor.name}: ${error.message}`,
+              );
+            }
+          }
         })();
       });
       await initializeDatabase;

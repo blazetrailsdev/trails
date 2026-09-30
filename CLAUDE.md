@@ -1128,6 +1128,22 @@ shape splits it the same way:
   `withConnection` scope and then enters the single `loadSchemaBang` body.
   `SchemaReflection#loadAllBang` / `BoundSchemaReflection#loadAllBang` and
   `SchemaReflection.eagerLoadSchemaCache` warm a whole pool up front.
+- **A booted app warms before user code runs.** Rails loads a model's schema
+  lazily, on first touch (`activerecord/lib/active_record/model_schema.rb:587-597`);
+  its `active_record.define_attribute_methods` initializer
+  (`activerecord/lib/active_record/railtie.rb:145-185`) is only an eager
+  optimisation, taken only under the guard at `:169`
+  (`!check_schema_cache_dump_version && app.config.eager_load && !Rails.env.local?`),
+  and skips development and test on purpose (`:154-168`). A synchronous trails `new` cannot make the
+  first-touch load, so trailties' `active_record.initialize_database` awaits
+  `loadAllBang` — `SchemaCache#add_all` (`schema_cache.rb:396-404`) — on the
+  pool it has just established, in every env but test. It runs in development
+  and ignores Rails' `eager_load` / `check_schema_cache_dump_version` arms,
+  because in trails first touch IS a cold `new` in every env; it skips test for
+  the reason `railtie.rb:159-160` gives, that db:test:prepare may still change
+  the schema. Like `railtie.rb:175-180`, an `ActiveRecordError` only warns, so
+  the app still boots against an unhealthy database; the adapters wrap driver
+  failures (a refused PostgreSQL connection is a `DatabaseConnectionError`).
 - **Synchronous readers peek.** `SchemaCache#getCachedColumnsHash`,
   `#getCachedDataSourceExists`, `#getCachedPrimaryKeys`, `#setColumns` and
   `SchemaReflection#loadedCache` read or seed the memo maps and never query.
