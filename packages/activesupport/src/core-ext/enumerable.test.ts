@@ -197,7 +197,7 @@ describe("EnumerableTests", () => {
   });
 
   it("range sums", async () => {
-    expect(new Range(1, 4).sum((i: number) => i * 2)).toEqual(20);
+    expect(new Range(1, 4).sum(undefined, (i: number) => i * 2)).toEqual(20);
     expect(new Range(1, 4).sum()).toEqual(10);
     expect(new Range(1, 4.5).sum()).toEqual(10);
     expect(new Range(1, 4, true).sum()).toEqual(6);

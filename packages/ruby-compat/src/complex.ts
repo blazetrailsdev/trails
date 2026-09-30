@@ -1,4 +1,11 @@
-import { numericPlus, rbDbl2num, rbFloatTypeP, rbIntegerTypeP } from "./numeric.js";
+import {
+  numericPlus,
+  rbBigNorm,
+  rbDbl2num,
+  rbFloatTypeP,
+  rbIntegerTypeP,
+  rbPlus,
+} from "./numeric.js";
 import { rbObjClass } from "./object.js";
 import { Rational } from "./rational.js";
 import { rbEqual } from "./rb-equal.js";
@@ -20,26 +27,35 @@ function fAdd(x: unknown, y: unknown): unknown {
     if (fixnumZeroP(y)) return x;
     return numericPlus(x, y);
   }
-  return (x as { plus(other: unknown): unknown }).plus(y);
+  return rbPlus(x, y);
+}
+
+function fixnumOneP(x: unknown): boolean {
+  return x === 1 || x === 1n;
 }
 
 function fMul(x: unknown, y: unknown): unknown {
   if (rbIntegerTypeP(x)) {
     if (fixnumZeroP(y)) return 0;
     if (fixnumZeroP(x) && rbIntegerTypeP(y)) return 0;
-    if (x === 1) return y;
-    if (y === 1) return x;
+    if (fixnumOneP(x)) return y;
+    if (fixnumOneP(y)) return x;
     if (rbFloatTypeP(y)) return rbDbl2num(Number(x) * y.valueOf());
     if (y instanceof Rational) return y.mul(x);
-    return typeof x === typeof y ? (x as number) * (y as number) : BigInt(x) * BigInt(y as bigint);
+    if (typeof x === "number" && typeof y === "number" && Number.isSafeInteger(x * y)) {
+      return x * y;
+    }
+    return rbBigNorm(BigInt(x) * BigInt(y as number | bigint));
   } else if (rbFloatTypeP(x)) {
-    if (y === 1) return x;
+    if (fixnumOneP(y)) return x;
+    if (y instanceof Rational) return rbDbl2num(x.valueOf() * y.toF());
     return rbDbl2num(x.valueOf() * Number((y as number | bigint).valueOf()));
   } else if (x instanceof Rational) {
-    if (y === 1) return x;
+    if (fixnumOneP(y)) return x;
+    if (rbFloatTypeP(y)) return rbDbl2num(x.toF() * y.valueOf());
     return x.mul(y as number | bigint);
   }
-  if (y === 1) return x;
+  if (fixnumOneP(y)) return x;
   return (x as { multiply(other: unknown): unknown }).multiply(y);
 }
 

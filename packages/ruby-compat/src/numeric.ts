@@ -90,6 +90,14 @@ export function rbIntegerTypeP(x: unknown): x is number | bigint {
 }
 
 /**
+ * `rb_big_norm` (`vendor/ruby/v3.3.11/bignum.c:3188`).
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbBigNorm(x: bigint): number | bigint {
+  return Number.isSafeInteger(Number(x)) ? Number(x) : x;
+}
+
+/**
  * `fix_plus` (`vendor/ruby/v3.3.11/numeric.c:3942`), `rb_float_plus` (`numeric.c:1176`),
  * `rb_rational_plus` (`vendor/ruby/v3.3.11/rational.c:724`), else `rb_num_coerce_bin`.
  * @noRailsEquivalent PERMANENT
@@ -103,8 +111,10 @@ export function numericPlus(x: unknown, y: unknown): unknown {
     if (y instanceof Rational) return x.add(y);
   } else if (rbIntegerTypeP(x)) {
     if (rbIntegerTypeP(y)) {
-      if (typeof x === typeof y) return (x as number) + (y as number);
-      return BigInt(x) + BigInt(y);
+      if (typeof x === "number" && typeof y === "number" && Number.isSafeInteger(x + y)) {
+        return x + y;
+      }
+      return rbBigNorm(BigInt(x) + BigInt(y));
     }
     if (rbFloatTypeP(y)) return rbDbl2num(Number(x) + y.valueOf());
     if (y instanceof Complex) return y.plus(x);
@@ -114,6 +124,31 @@ export function numericPlus(x: unknown, y: unknown): unknown {
     throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClass(x)}`);
   }
   const [a, b] = coerce.call(y, x) as [unknown, unknown];
-  if (rbIntegerTypeP(a) || rbFloatTypeP(a) || a instanceof Rational) return numericPlus(a, b);
-  return (a as { plus(other: unknown): unknown }).plus(b);
+  return rbPlus(a, b);
+}
+
+/**
+ * The `+` send (`rb_funcallv(v, idPLUS, 1, &i)`, `vendor/ruby/v3.3.11/enum.c:4583`),
+ * over `vm_opt_plus`'s String and Array arms (`vendor/ruby/v3.3.11/vm_insnhelper.c:6010`).
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbPlus(v: unknown, i: unknown): unknown {
+  if (rbIntegerTypeP(v) || rbFloatTypeP(v) || v instanceof Rational) return numericPlus(v, i);
+  if (typeof v === "string") {
+    if (typeof i !== "string") {
+      throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(i)} into String`);
+    }
+    return v + i;
+  }
+  if (Array.isArray(v)) {
+    if (!Array.isArray(i)) {
+      throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(i)} into Array`);
+    }
+    return [...v, ...i];
+  }
+  const plus = (v as { plus?: unknown } | null)?.plus;
+  if (typeof plus === "function") return plus.call(v, i);
+  throw new NoMethodError(
+    `undefined method '+' for ${v == null ? "nil" : `an instance of ${rbObjClass(v)}`}`,
+  );
 }

@@ -1,21 +1,26 @@
-import { StandardError, numericPlus } from "@blazetrails/ruby-compat";
+import { StandardError, rbBigNorm, rbIntegerTypeP, rbPlus } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { sum as enumerableSum } from "../enumerable-utils.js";
 
 export class SoleItemExpectedError extends StandardError {}
 
-export function sum<T>(this: Range<T>, ...args: unknown[]): unknown {
-  const blockGiven = typeof args[args.length - 1] === "function";
-  const initialValue = args.length > (blockGiven ? 1 : 0) ? args[0] : 0;
-  const first = this.first() as number;
-  const last = this.last() as number;
-  if (blockGiven || !(Number.isInteger(first) && Number.isInteger(last))) {
-    return enumerableSum(this, ...args);
+export function sum<T>(
+  this: Range<T>,
+  initialValue: unknown = 0,
+  block?: (element: T) => unknown,
+): unknown {
+  const first = this.first();
+  const last = this.last();
+  if (block !== undefined || !(rbIntegerTypeP(first) && rbIntegerTypeP(last))) {
+    return enumerableSum(this, initialValue, block);
   } else {
-    const actualLast = this.excludeEnd ? last - 1 : last;
-    if (actualLast >= first) {
+    const actualLast = this.excludeEnd ? BigInt(last) - 1n : BigInt(last);
+    if (actualLast >= BigInt(first)) {
       const sum = initialValue != null && initialValue !== false ? initialValue : 0;
-      return numericPlus(sum, ((actualLast - first + 1) * (actualLast + first)) / 2);
+      return rbPlus(
+        sum,
+        rbBigNorm(((actualLast - BigInt(first) + 1n) * (actualLast + BigInt(first))) / 2n),
+      );
     } else {
       return initialValue != null && initialValue !== false ? initialValue : 0;
     }
@@ -24,7 +29,7 @@ export function sum<T>(this: Range<T>, ...args: unknown[]): unknown {
 
 declare module "@blazetrails/ruby-compat/range" {
   interface Range<T> {
-    sum(...args: unknown[]): unknown;
+    sum(initialValue?: unknown, block?: (element: T) => unknown): unknown;
   }
 }
 

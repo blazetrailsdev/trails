@@ -22,11 +22,5 @@
     "name": "DeprecationException",
     "rubyFile": "active_support/deprecation/behaviors.rb",
     "reason": "active_support/deprecation/behaviors.rb (Deprecation#raise behavior) is unported."
-  },
-  {
-    "package": "activesupport",
-    "name": "SoleItemExpectedError",
-    "rubyFile": "active_support/core_ext/enumerable.rb",
-    "reason": "active_support/core_ext/enumerable.rb (Enumerable#sole/#pick) is unported."
   }
 ]

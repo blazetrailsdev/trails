@@ -1,15 +1,13 @@
 import {
   Hash,
-  NoMethodError,
   Rational,
-  TypeError,
   numericPlus,
-  rbBuiltinClassName,
+  rbBigNorm,
   rbDbl2num,
   rbEqual,
   rbFloatTypeP,
   rbIntegerTypeP,
-  rbObjClass,
+  rbPlus,
 } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { SoleItemExpectedError } from "./core-ext/enumerable.js";
@@ -34,9 +32,10 @@ function sumIterNormalizeMemo(memo: EnumSumMemo): void {
 }
 
 function sumIterFixnum(i: number, memo: EnumSumMemo): void {
-  memo.n += i;
-  if (!Number.isSafeInteger(memo.n)) {
-    memo.v = numericPlus(BigInt(memo.n), memo.v);
+  if (Number.isSafeInteger(memo.n + i)) {
+    memo.n += i;
+  } else {
+    memo.v = numericPlus(rbBigNorm(BigInt(memo.n) + BigInt(i)), memo.v);
     memo.n = 0;
   }
 }
@@ -51,25 +50,8 @@ function sumIterRational(i: Rational, memo: EnumSumMemo): void {
 }
 
 /** `sum_iter_some_value` (`vendor/ruby/v3.3.11/enum.c:4581`): `memo->v + i`. */
-function sumIterSomeValue(v: unknown, i: unknown): unknown {
-  if (rbIntegerTypeP(v) || rbFloatTypeP(v) || v instanceof Rational) return numericPlus(v, i);
-  if (typeof v === "string") {
-    if (typeof i !== "string") {
-      throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(i)} into String`);
-    }
-    return v + i;
-  }
-  if (Array.isArray(v)) {
-    if (!Array.isArray(i)) {
-      throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(i)} into Array`);
-    }
-    return [...v, ...i];
-  }
-  const plus = (v as { plus?: unknown } | null)?.plus;
-  if (typeof plus === "function") return plus.call(v, i);
-  throw new NoMethodError(
-    `undefined method '+' for ${v == null ? "nil" : `an instance of ${rbObjClass(v)}`}`,
-  );
+function sumIterSomeValue(i: unknown, memo: EnumSumMemo): void {
+  memo.v = rbPlus(memo.v, i);
 }
 
 function sumIterKahanBabuska(i: unknown, memo: EnumSumMemo): void {
@@ -81,7 +63,7 @@ function sumIterKahanBabuska(i: unknown, memo: EnumSumMemo): void {
   else {
     memo.v = rbDbl2num(memo.f);
     memo.floatValue = false;
-    memo.v = sumIterSomeValue(memo.v, i);
+    sumIterSomeValue(i, memo);
     return;
   }
   const f = memo.f;
@@ -121,10 +103,10 @@ function sumIter<T>(i: unknown, memo: EnumSumMemo, block?: (element: T) => unkno
       sumIterKahanBabuska(i, memo);
     } else {
       sumIterNormalizeMemo(memo);
-      memo.v = sumIterSomeValue(memo.v, i);
+      sumIterSomeValue(i, memo);
     }
   } else {
-    memo.v = sumIterSomeValue(memo.v, i);
+    sumIterSomeValue(i, memo);
   }
 }
 
@@ -132,7 +114,7 @@ function intRangeSum(beg: number | bigint, end: number | bigint, excl: boolean, 
   if (excl) end = typeof end === "bigint" ? end - 1n : end - 1;
   if (BigInt(end) >= BigInt(beg)) {
     const a = ((BigInt(end) - BigInt(beg) + 1n) * (BigInt(end) + BigInt(beg))) / 2n;
-    return numericPlus(init, Number.isSafeInteger(Number(a)) ? Number(a) : a);
+    return numericPlus(init, rbBigNorm(a));
   }
   return init;
 }
