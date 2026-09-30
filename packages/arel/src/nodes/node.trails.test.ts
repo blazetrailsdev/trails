@@ -212,6 +212,7 @@ describe("Arel::Nodes::Node#dup", () => {
     expect(dolly).toBeInstanceOf(Nodes.Extract);
     assertNotSame(extract, dolly);
     expect(dolly.expr).toBe(extract.expr);
+    expect(dolly.field).toBe(extract.field);
   });
 
   it("runs initialize_copy, copying the cores of a SelectStatement", () => {
