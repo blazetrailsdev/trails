@@ -4,7 +4,7 @@ import { RuntimeError } from "./runtime-error.js";
 import { getCrypto } from "./crypto-adapter.js";
 import { File } from "./file.js";
 import { getFs } from "./fs-adapter.js";
-import { env } from "./process-adapter.js";
+import { chdir, env } from "./process-adapter.js";
 import { Process } from "./process.js";
 import type { TempfileBasename } from "./tempfile.js";
 import { warn } from "./kernel-warn.js";
@@ -24,6 +24,9 @@ function isWritable(dir: string): boolean {
     return false;
   }
 }
+
+/** `chdir_blocking` (`vendor/ruby/v3.3.11/dir.c:1044`), the count of open `Dir.chdir` blocks. */
+let chdirBlocking = 0;
 
 /** `Dir::SYSTMPDIR` (`vendor/ruby/v3.3.11/lib/tmpdir.rb:20`). */
 const SYSTMPDIR = "/tmp";
@@ -150,6 +153,61 @@ export class Dir {
    */
   static pwd(): string {
     return getFs().cwd();
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/dir.c:1172` `dir_s_chdir` — `HOME`, then `LOGDIR`,
+   * when no path is given — and `chdir_path` (`dir.c:1080-1107`): given a
+   * block, changes into `path`, yields it, and restores the previous directory
+   * in `rb_ensure`'s `chdir_restore` (`dir.c:1066-1076`), answering the
+   * block's value; without one, changes directory and answers `0`.
+   *
+   * A block that returns a promise has not finished when it returns, so the
+   * restore waits for it to settle, resolved or rejected. `chdir_path`'s
+   * `conflicting chdir` `RuntimeError` (`dir.c:1083`) raises only from another
+   * thread than the block's; JS has the one, so only its warning arm is ported.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Dir.chdir`
+   * (`vendor/ruby/v3.3.11/dir.c:1172`).
+   */
+  static chdir(path?: string | null): number;
+  static chdir<T>(path: string | null | undefined, block: (path: string) => T): T;
+  static chdir<T>(path?: string | null, block?: (path: string) => T): number | T {
+    if (path == null) {
+      const dist = env["HOME"] ?? env["LOGDIR"];
+      if (dist == null) throw new ArgumentError("HOME/LOGDIR not set");
+      path = dist;
+    }
+
+    if (chdirBlocking > 0 && block == null) {
+      warn("warning: conflicting chdir during another chdir block");
+    }
+
+    if (block != null) {
+      const oldPath = Dir.pwd();
+      chdir(path);
+      chdirBlocking++;
+      const chdirRestore = (): void => {
+        chdirBlocking--;
+        chdir(oldPath);
+      };
+      let result: T;
+      try {
+        result = block(path);
+      } catch (error) {
+        chdirRestore();
+        throw error;
+      }
+      if (result != null && typeof (result as { then?: unknown }).then === "function") {
+        return Promise.resolve(result).finally(chdirRestore) as T;
+      }
+      chdirRestore();
+      return result;
+    } else {
+      chdir(path);
+    }
+
+    return 0;
   }
 
   /**

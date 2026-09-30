@@ -8,6 +8,8 @@ export interface WriteStream {
 export interface ReadStream {
   readonly isTTY: boolean;
   read(): Promise<string | null>;
+  readonly isRaw?: boolean;
+  setRawMode?(mode: boolean): void;
 }
 
 export type SignalName = "SIGINT" | "SIGTERM";
@@ -84,14 +86,96 @@ export const stderr: WriteStream = {
   },
 };
 
+let stdinBuffer = "";
+
+/**
+ * `Errno::ENOTTY` (`vendor/ruby/v3.3.11/ext/io/console/console.c:378`
+ * `rb_syserr_fail`), which `ttymode` raises when no descriptor of the IO is a
+ * terminal.
+ */
+function errnoEnotty(): Error & { code?: string } {
+  const error: Error & { code?: string } = new Error("Inappropriate ioctl for device");
+  error.code = "ENOTTY";
+  return error;
+}
+
 /** @noRailsEquivalent PERMANENT */
-export const stdin: ReadStream = {
+export const stdin: ReadStream & {
+  gets(): Promise<string | null>;
+  noecho<T>(block: (io: typeof stdin) => T): T;
+} = {
   /** @noRailsEquivalent PERMANENT */
   get isTTY() {
     return requireAdapter().stdin.isTTY;
   },
   /** @noRailsEquivalent PERMANENT */
-  read: () => requireAdapter().stdin.read(),
+  read: () => {
+    if (stdinBuffer !== "") {
+      const data = stdinBuffer;
+      stdinBuffer = "";
+      return Promise.resolve(data);
+    }
+    return requireAdapter().stdin.read();
+  },
+  /**
+   * `IO#gets` (`vendor/ruby/v3.3.11/io.c:4363` `rb_io_gets_m`) with the default
+   * `$/`: the next line with its `"\n"`, the unterminated rest at end of
+   * file, then `nil`. Asynchronous, because a stdin read is. What the adapter
+   * delivered past the line is kept for the next read.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#gets`, which Thor calls on
+   * `$stdin` (`vendor/thor/v1.3.2/lib/thor/line_editor/basic.rb:25`).
+   */
+  async gets() {
+    for (;;) {
+      const newline = stdinBuffer.indexOf("\n");
+      if (newline !== -1) {
+        const line = stdinBuffer.slice(0, newline + 1);
+        stdinBuffer = stdinBuffer.slice(newline + 1);
+        return line;
+      }
+      const chunk = await requireAdapter().stdin.read();
+      if (chunk == null) {
+        if (stdinBuffer === "") return null;
+        const line = stdinBuffer;
+        stdinBuffer = "";
+        return line;
+      }
+      stdinBuffer += chunk;
+    }
+  },
+  /**
+   * `IO#noecho` (`vendor/ruby/v3.3.11/ext/io/console/console.c:633`
+   * `console_noecho`): `ttymode` (`console.c:334-383`) saves the terminal
+   * mode, turns echo off, yields the IO, and sets the saved mode back —
+   * after a returned promise settles, since a block that awaits a read has
+   * not finished when it returns. A JS host turns echo off only with raw
+   * mode, so that is the switch (and raw mode also drops the terminal's
+   * `ICRNL`, which the Node adapter puts back by reading `"\r"` as `"\n"`); a stream that is not a terminal raises
+   * `Errno::ENOTTY`, as `ttymode` does.
+   *
+   * @noRailsEquivalent PERMANENT — `io/console`'s `IO#noecho`, which Thor
+   * calls on `$stdin` (`vendor/thor/v1.3.2/lib/thor/line_editor/basic.rb:29`).
+   */
+  noecho<T>(block: (io: typeof stdin) => T): T {
+    const io = requireAdapter().stdin;
+    if (!io.isTTY || io.setRawMode == null) throw errnoEnotty();
+    const t = io.isRaw ?? false;
+    io.setRawMode(true);
+    const setattr = (): void => io.setRawMode!(t);
+    let result: T;
+    try {
+      result = block(stdin);
+    } catch (error) {
+      setattr();
+      throw error;
+    }
+    if (result != null && typeof (result as { then?: unknown }).then === "function") {
+      return Promise.resolve(result).finally(setattr) as T;
+    }
+    setattr();
+    return result;
+  },
 };
 
 /** @noRailsEquivalent PERMANENT */
@@ -150,6 +234,7 @@ export function registerProcessAdapter(adapter: ProcessAdapter): void {
   const argvSnapshot = adapter.argvSnapshot();
 
   currentAdapter = adapter;
+  stdinBuffer = "";
   for (const k of Object.keys(envInternal)) delete envInternal[k];
   for (const [key, value] of Object.entries(envSnapshot)) {
     if (value !== undefined) envInternal[key] = value;
@@ -181,6 +266,9 @@ interface NodeStream {
   rows?: number;
   readableEnded?: boolean;
   destroyed?: boolean;
+  isRaw?: boolean;
+  setRawMode?(mode: boolean): void;
+  pause?(): void;
   once(event: string, handler: (...args: unknown[]) => void): void;
   off(event: string, handler: (...args: unknown[]) => void): void;
 }
@@ -266,6 +354,12 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
       get isTTY() {
         return Boolean(proc.stdin.isTTY);
       },
+      get isRaw() {
+        return Boolean(proc.stdin.isRaw);
+      },
+      setRawMode: (mode) => {
+        proc.stdin.setRawMode?.(mode);
+      },
       read: () =>
         new Promise<string | null>((resolve, reject) => {
           if (proc.stdin.readableEnded || proc.stdin.destroyed) {
@@ -275,13 +369,13 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
           const onData = (...args: unknown[]) => {
             cleanup();
             const data = args[0];
-            resolve(
+            const text =
               typeof data === "string"
                 ? data
                 : data && typeof (data as { toString(): string }).toString === "function"
                   ? (data as { toString(): string }).toString()
-                  : null,
-            );
+                  : null;
+            resolve(text != null && proc.stdin.isRaw ? text.replace(/\r\n?/g, "\n") : text);
           };
           const onTerminal = () => {
             cleanup();
@@ -293,6 +387,7 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
             reject(err instanceof Error ? err : new Error(String(err)));
           };
           const cleanup = () => {
+            proc.stdin.pause?.();
             proc.stdin.off("data", onData);
             proc.stdin.off("end", onTerminal);
             proc.stdin.off("close", onTerminal);
@@ -312,6 +407,7 @@ export function __INTERNAL_resetProcessAdapter_TEST_ONLY(): void {
   currentAdapter = null;
   nodeAutoRegistered = null;
   nodeAttempted = false;
+  stdinBuffer = "";
   for (const k of Object.keys(envInternal)) delete envInternal[k];
   argvInternal.length = 0;
 }

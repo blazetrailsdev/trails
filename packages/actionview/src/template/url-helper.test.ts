@@ -129,7 +129,7 @@ describe("UrlHelperTest", () => {
   });
 
   it("url for does not escape urls", () => {
-    expect(view.urlFor(hashFor({ a: "b", c: "d" }))).toBe("/?a=b&c=d");
+    expect(view.urlFor(hashFor({ a: ":b", c: ":d" }))).toBe("/?a=b&c=d");
   });
 
   it("url for does not include empty hashes", () => {

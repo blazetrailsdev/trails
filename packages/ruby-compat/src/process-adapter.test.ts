@@ -190,6 +190,81 @@ describe("processAdapter", () => {
     });
   });
 
+  describe("stdin.gets / stdin.noecho", () => {
+    function registerFakeStdin(chunks: (string | null)[], isTTY = false) {
+      const modes: boolean[] = [];
+      let isRaw = false;
+      const adapter = makeFakeAdapter();
+      Object.defineProperty(adapter, "stdin", {
+        value: {
+          isTTY,
+          get isRaw() {
+            return isRaw;
+          },
+          setRawMode: (mode: boolean) => {
+            isRaw = mode;
+            modes.push(mode);
+          },
+          read: () => Promise.resolve(chunks.length > 0 ? chunks.shift()! : null),
+        },
+        configurable: true,
+      });
+      registerProcessAdapter(adapter);
+      return modes;
+    }
+
+    it("gets answers each line with its newline and keeps the rest for the next call", async () => {
+      registerFakeStdin(["yes\nno", "\nmaybe\n"]);
+      await expect(stdin.gets()).resolves.toBe("yes\n");
+      await expect(stdin.gets()).resolves.toBe("no\n");
+      await expect(stdin.gets()).resolves.toBe("maybe\n");
+    });
+
+    it("gets answers an unterminated last line, then null at EOF", async () => {
+      registerFakeStdin(["last"]);
+      await expect(stdin.gets()).resolves.toBe("last");
+      await expect(stdin.gets()).resolves.toBeNull();
+    });
+
+    it("gets answers an empty line as a newline, distinct from null at EOF", async () => {
+      registerFakeStdin(["\n"]);
+      await expect(stdin.gets()).resolves.toBe("\n");
+      await expect(stdin.gets()).resolves.toBeNull();
+    });
+
+    it("read answers what gets buffered past a line first", async () => {
+      registerFakeStdin(["a\nb"]);
+      await stdin.gets();
+      await expect(stdin.read()).resolves.toBe("b");
+    });
+
+    it("noecho turns echo off for an async block and restores it after it settles", async () => {
+      const modes = registerFakeStdin(["secret\n"], true);
+      const answer = stdin.noecho((io) => io.gets());
+      expect(modes).toEqual([true]);
+      await expect(answer).resolves.toBe("secret\n");
+      expect(modes).toEqual([true, false]);
+    });
+
+    it("noecho restores the saved mode when the block rejects", async () => {
+      const modes = registerFakeStdin([], true);
+      await expect(
+        stdin.noecho(async () => {
+          await Promise.resolve();
+          throw new Error("boom");
+        }),
+      ).rejects.toThrow("boom");
+      expect(modes).toEqual([true, false]);
+    });
+
+    it("noecho raises ENOTTY off a terminal", () => {
+      registerFakeStdin([], false);
+      expect(() => stdin.noecho(() => null)).toThrow(
+        expect.objectContaining({ code: "ENOTTY", message: "Inappropriate ioctl for device" }),
+      );
+    });
+  });
+
   describe("setExitCode", () => {
     it("forwards to the adapter", () => {
       const adapter = makeFakeAdapter();

@@ -432,6 +432,7 @@ export function toParam(value: unknown): string | boolean | null {
       return toQuery(value as Record<string, unknown>);
     }
   }
+  if (isSymbol(value)) return symbolToS(value);
   return String(value);
 }
 
