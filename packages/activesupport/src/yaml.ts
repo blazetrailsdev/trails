@@ -417,10 +417,15 @@ class ToRuby {
   }
 }
 
-export function dump(o: unknown): string {
+export function dump(o: unknown, options: { lineWidth?: number } = {}): string {
   const visitor = new YAMLTree();
   visitor.push(o);
-  return visitor.tree.toString({ directives: true });
+  return visitor.tree.toString({
+    directives: true,
+    ...(options.lineWidth !== undefined && {
+      lineWidth: options.lineWidth === -1 ? 0 : options.lineWidth,
+    }),
+  });
 }
 
 /**
@@ -428,8 +433,8 @@ export function dump(o: unknown): string {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function toYaml(self: unknown): string {
-  return dump(self);
+export function toYaml(self: unknown, options: { lineWidth?: number } = {}): string {
+  return dump(self, options);
 }
 
 export function unsafeLoad(yamlString: string): unknown {
