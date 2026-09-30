@@ -299,11 +299,11 @@ describe("Engine", () => {
     class MountedEngine extends Engine {}
     Engine.register(MountedEngine, fixtureRoot);
     expect(MountedEngine.instance().hasRoutes()).toBe(false);
-    const r1 = MountedEngine.instance().routes((mapper) => {
-      mapper.get("/mounted", { to: "mounted#index" });
+    const r1 = MountedEngine.instance().routes(function () {
+      this.get("/mounted", { to: "mounted#index" });
     });
     expect(r1).toBeInstanceOf(RouteSet);
-    expect(MountedEngine.instance().routes(() => {})).toBe(r1);
+    expect(MountedEngine.instance().routes(function () {})).toBe(r1);
     expect(MountedEngine.instance().hasRoutes()).toBe(true);
   });
 

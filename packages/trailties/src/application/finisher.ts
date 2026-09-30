@@ -122,16 +122,16 @@ Finisher.initializer("finisher_hook", function (this: FinisherHost) {
 
 Finisher.initializer("add_internal_routes", function (this: FinisherHost) {
   if (!Trails.env["development?"]()) return;
-  this.routes().prepend((mapper) => {
-    mapper.get("/rails/info/properties", { to: "rails/info#properties", internal: true });
-    mapper.get("/rails/info/routes", { to: "rails/info#routes", internal: true });
-    mapper.get("/rails/info/notes", { to: "rails/info#notes", internal: true });
-    mapper.get("/rails/info", { to: "rails/info#index", internal: true });
+  this.routes().prepend(function () {
+    this.get("/rails/info/properties", { to: "rails/info#properties", internal: true });
+    this.get("/rails/info/routes", { to: "rails/info#routes", internal: true });
+    this.get("/rails/info/notes", { to: "rails/info#notes", internal: true });
+    this.get("/rails/info", { to: "rails/info#index", internal: true });
   });
 
   this.routesReloader().runAfterLoadPaths = () => {
-    this.routes().append((mapper) => {
-      mapper.get("/", { to: "rails/welcome#index", internal: true });
+    this.routes().append(function () {
+      this.get("/", { to: "rails/welcome#index", internal: true });
     });
   };
 });

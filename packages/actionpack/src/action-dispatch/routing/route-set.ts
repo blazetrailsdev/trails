@@ -235,7 +235,7 @@ export class Generator {
   }
 }
 
-export type DrawCallback = (mapper: Mapper) => void;
+export type DrawCallback = (this: Mapper) => void;
 
 export class Dispatcher extends Endpoint {
   private readonly _raiseOnNameError: boolean;
@@ -683,8 +683,8 @@ export class RouteSet {
   /** @internal */
   private _urlHelpersWithoutPaths?: UrlHelpersModule;
   defaultUrlOptions: Record<string, unknown> = {};
-  private readonly _append: Array<(mapper: Mapper) => void> = [];
-  private readonly _prepend: Array<(mapper: Mapper) => void> = [];
+  private readonly _append: DrawCallback[] = [];
+  private readonly _prepend: DrawCallback[] = [];
   private _finalized = false;
   readonly polymorphicMappings: Map<string, PolymorphicMappingEntry> = new Map();
   /** @internal */
@@ -950,7 +950,11 @@ export class RouteSet {
   /** @internal */
   evalBlock(block: DrawCallback): void {
     const mapper = new Mapper(this);
-    block(mapper);
+    if (this.defaultScope) {
+      mapper.withDefaultScope(this.defaultScope, block);
+    } else {
+      block.call(mapper);
+    }
   }
 
   append(block: DrawCallback): void {

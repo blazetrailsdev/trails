@@ -259,8 +259,8 @@ describe("ActionDispatch::Routing::UrlFor", () => {
 describe("ActionDispatch::Routing::UrlFor#route_for against a drawn RouteSet", () => {
   it("dispatches to the named route's url helper", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/users/:id", { to: "users#show", as: "user" });
+    routes.draw(function () {
+      this.get("/users/:id", { to: "users#show", as: "user" });
     });
     class Host {}
     include(Host, routes.urlHelpers());

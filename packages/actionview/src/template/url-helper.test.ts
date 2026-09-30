@@ -64,18 +64,18 @@ function viewWith(controller: unknown): Base {
 include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
 
 const routes = new RouteSet();
-routes.draw((r) => {
-  r.get("/", { to: "foo#bar" });
-  r.get("/other", { to: "foo#other" });
-  r.get("/article/:id", { to: "foo#article", as: "article" });
-  r.get("/category/:category", { to: "foo#category" });
-  r.resources("sessions");
-  r.resources("workshops", (r) => {
-    r.resources("sessions");
+routes.draw(function () {
+  this.get("/", { to: "foo#bar" });
+  this.get("/other", { to: "foo#other" });
+  this.get("/article/:id", { to: "foo#article", as: "article" });
+  this.get("/category/:category", { to: "foo#category" });
+  this.resources("sessions");
+  this.resources("workshops", () => {
+    this.resources("sessions");
   });
 
-  r.scope("engine", (r) => {
-    r.get("/", { to: "foo#bar" });
+  this.scope("engine", () => {
+    this.get("/", { to: "foo#bar" });
   });
 });
 

@@ -169,8 +169,8 @@ describe("polymorphic dispatch against a drawn RouteSet", () => {
     }
   }
   const routes = new RouteSet();
-  routes.draw((r) => {
-    r.resources("articles");
+  routes.draw(function () {
+    this.resources("articles");
   });
   class Host {}
   include(Host, routes.urlHelpers());

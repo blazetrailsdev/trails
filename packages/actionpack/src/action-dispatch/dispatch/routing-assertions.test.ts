@@ -14,7 +14,7 @@ import { controllerConstants } from "../http/request.js";
 import type { MiddlewareFactory, MiddlewareStack, RackApp } from "../middleware/stack.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import type { Request } from "../http/request.js";
-import type { Mapper, MountableApp, RouteOptions } from "../routing/mapper.js";
+import type { MountableApp, RouteOptions } from "../routing/mapper.js";
 import { RouteSet } from "../routing/route-set.js";
 import { IntegrationTest } from "../testing/integration.js";
 import "../../test-helpers/abstract-unit.js";
@@ -112,57 +112,57 @@ function RoutingAssertionsSharedTests(klass: HostClass, t: () => Host): void {
     setup(this: Host): void {
       const rootEngine = engineClass("root_engine");
 
-      rootEngine.routes().draw((r) => {
-        r.root({ to: "books#index" });
+      rootEngine.routes().draw(function () {
+        this.root({ to: "books#index" });
       });
 
       const engine = engineClass("blog_engine");
 
-      engine.routes().draw((r) => {
-        r.resources("books");
+      engine.routes().draw(function () {
+        this.resources("books");
 
-        r.scope("secure", { constraints: { protocol: "https://" } }, () => {
-          r.resources("books", { controller: "secure_books" } as RouteOptions);
+        this.scope("secure", { constraints: { protocol: "https://" } }, () => {
+          this.resources("books", { controller: "secure_books" } as RouteOptions);
         });
 
-        r.scope("block", { constraints: (req: Request) => req.ssl }, () => {
-          r.resources("books", { controller: "block_books" } as RouteOptions);
+        this.scope("block", { constraints: (req: Request) => req.ssl }, () => {
+          this.resources("books", { controller: "block_books" } as RouteOptions);
         });
 
-        r.scope(
+        this.scope(
           "query",
           { constraints: (req: Request) => req.params["use_query"] === "true" },
           () => {
-            r.resources("books", { controller: "query_books" } as RouteOptions);
+            this.resources("books", { controller: "query_books" } as RouteOptions);
           },
         );
       });
 
       this.routes = new RouteSet();
-      this.routes.draw((r) => {
-        r.resources("articles");
+      this.routes.draw(function () {
+        this.resources("articles");
 
-        r.scope("secure", { constraints: { protocol: "https://" } }, () => {
-          r.resources("articles", { controller: "secure_articles" } as RouteOptions);
+        this.scope("secure", { constraints: { protocol: "https://" } }, () => {
+          this.resources("articles", { controller: "secure_articles" } as RouteOptions);
         });
 
-        r.scope("block", { constraints: (req: Request) => req.ssl }, () => {
-          r.resources("articles", { controller: "block_articles" } as RouteOptions);
+        this.scope("block", { constraints: (req: Request) => req.ssl }, () => {
+          this.resources("articles", { controller: "block_articles" } as RouteOptions);
         });
 
-        r.scope(
+        this.scope(
           "query",
           { constraints: (req: Request) => req.params["use_query"] === "true" },
           () => {
-            r.resources("articles", { controller: "query_articles" } as RouteOptions);
+            this.resources("articles", { controller: "query_articles" } as RouteOptions);
           },
         );
 
-        r.mount(engine, { at: "/shelf" });
+        this.mount(engine, { at: "/shelf" });
 
-        r.mount(rootEngine, { at: "/" });
+        this.mount(rootEngine, { at: "/" });
 
-        r.get("/shelf/foo", { controller: "query_articles", action: "index" });
+        this.get("/shelf/foo", { controller: "query_articles", action: "index" });
       });
     },
   });
@@ -409,8 +409,8 @@ function RoutingAssertionsSharedTests(klass: HostClass, t: () => Host): void {
 
   it("with routing", async () => {
     await t().withRouting(async (routes: RouteSet) => {
-      routes.draw((r) => {
-        r.resources("articles", { path: "artikel" } as RouteOptions);
+      routes.draw(function () {
+        this.resources("articles", { path: "artikel" } as RouteOptions);
       });
 
       assertRouting("/artikel", { controller: "articles", action: "index" });
@@ -427,16 +427,16 @@ function WithRoutingSharedTests(klass: HostClass, t: () => Host): void {
   const beforeSetup = klass.prototype.beforeSetup;
   klass.prototype.beforeSetup = function (this: Host): void {
     this.routes = new RouteSet();
-    this.routes.draw((r) => {
-      r.resources("articles");
+    this.routes.draw(function () {
+      this.resources("articles");
     });
 
     beforeSetup.call(this);
   };
 
   klass.withRouting((routes: RouteSet) => {
-    routes.draw((r) => {
-      r.resources("articles", { path: "artikel" } as RouteOptions);
+    routes.draw(function () {
+      this.resources("articles", { path: "artikel" } as RouteOptions);
     });
   });
 
@@ -449,8 +449,8 @@ function WithRoutingSharedTests(klass: HostClass, t: () => Host): void {
 
   it("with routing for entire test file can be overwritten for individual test", async () => {
     await t().withRouting(async (routes: RouteSet) => {
-      routes.draw((r) => {
-        r.resources("articles", { path: "articolo" } as RouteOptions);
+      routes.draw(function () {
+        this.resources("articles", { path: "articolo" } as RouteOptions);
       });
 
       assertRouting("/articolo", { controller: "articles", action: "index" });
@@ -490,8 +490,8 @@ describe("RoutingAssertionsControllerTest", () => {
       t().controller = new SecureArticlesController();
 
       await t().withRouting(async (routes: RouteSet) => {
-        routes.draw((r) => {
-          r.get("new_route", { to: "secure_articles#index" });
+        routes.draw(function () {
+          this.get("new_route", { to: "secure_articles#index" });
         });
 
         await t().get("index");
@@ -512,7 +512,7 @@ describe("RoutingAssertionsIntegrationTest", () => {
     t().hostBang("newhost.com");
 
     t().withRouting((routes: RouteSet) => {
-      routes.draw(() => {});
+      routes.draw(function () {});
       assertPredicate(t().integrationSession, (v) => v.isHttps());
       assertEqual("newhost.com", t().integrationSession.host);
     });
@@ -525,8 +525,8 @@ describe("RoutingAssertionsIntegrationTest", () => {
 
     it("with_routing routes are reachable", async () => {
       await t().withRouting(async (routes: RouteSet) => {
-        routes.draw((r) => {
-          r.get("new_route", { to: "secure_articles#index" });
+        routes.draw(function () {
+          this.get("new_route", { to: "secure_articles#index" });
         });
 
         await t().get("/new_route");
@@ -545,7 +545,7 @@ describe("RoutingAssertionsIntegrationTest", () => {
         });
 
         this.withRouting((routes: RouteSet) => {
-          routes.draw(() => {});
+          routes.draw(function () {});
         });
       }
     }
@@ -589,8 +589,8 @@ describe("WithRoutingResetTest", () => {
         },
       );
     });
-    (t().app as { routes: RouteSet }).routes.draw((r: Mapper) => {
-      r.get("/purchase", { to: "store#purchase" });
+    (t().app as { routes: RouteSet }).routes.draw(function () {
+      this.get("/purchase", { to: "store#purchase" });
     });
 
     middlewareConfig!.foo = "bar";
@@ -600,8 +600,8 @@ describe("WithRoutingResetTest", () => {
     assertEqual("bar", t().response.body);
 
     await t().withRouting(async (routeSet: RouteSet) => {
-      routeSet.draw((r) => {
-        r.get("/purchase", { to: "store#purchase" });
+      routeSet.draw(function () {
+        this.get("/purchase", { to: "store#purchase" });
       });
 
       await t().get("/purchase");

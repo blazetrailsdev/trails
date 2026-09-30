@@ -36,9 +36,9 @@ class NoticesSession extends IntegrationTest {
 describe("add_flash_types readers", () => {
   it("reads notice on the controller and in the view after a redirect", async () => {
     const t = new NoticesSession();
-    t.routes.draw((r) => {
-      r.post("/notices", { to: "notices#create" });
-      r.get("/notices", { to: "notices#index" });
+    t.routes.draw(function () {
+      this.post("/notices", { to: "notices#create" });
+      this.get("/notices", { to: "notices#index" });
     });
     t.app = IntegrationTest.buildApp(t.routes, (middleware) => {
       middleware.use(CookieStore as MiddlewareFactory, { key: "_session" });

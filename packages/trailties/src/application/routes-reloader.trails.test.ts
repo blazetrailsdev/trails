@@ -12,8 +12,12 @@ const makeRouteSet = (): Counted => {
     clearBang: () => void r.calls.push("clear"),
     finalizeBang: () => void r.calls.push("finalize"),
     eagerLoadBang: () => void r.calls.push("eagerLoad"),
-    draw: (block: DrawCallback) =>
-      block({ get: (path: string) => void r.calls.push(`get ${path}`) } as unknown as Mapper),
+    draw: (block: DrawCallback) => {
+      const mapper = {
+        get: (path: string) => void r.calls.push(`get ${path}`),
+      } as unknown as Mapper;
+      block.call(mapper);
+    },
   };
   return r;
 };
@@ -21,7 +25,7 @@ const rails = new URL("../rails.js", import.meta.url).href;
 const engine = new URL("../engine.js", import.meta.url).href;
 const drawInto = (receiver: string, path: string): string =>
   `import { Trails } from "${rails}";\n` +
-  `${receiver}.routes().draw((mapper) => mapper.get("${path}", { to: "posts#index" }));\n`;
+  `${receiver}.routes().draw(function () { this.get("${path}", { to: "posts#index" }); });\n`;
 
 describe("RoutesReloader", () => {
   afterEach(() => {

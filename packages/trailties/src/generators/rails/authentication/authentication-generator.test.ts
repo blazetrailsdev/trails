@@ -64,7 +64,7 @@ beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-auth-"));
   write("tsconfig.json", "{}");
   write(APP_CTRL_PATH, APP_CTRL_EMPTY);
-  write("config/routes.ts", "Trails.application!.routes().draw((mapper) => {\n});\n");
+  write("config/routes.ts", "Trails.application!.routes().draw(function () {\n});\n");
 });
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
@@ -123,7 +123,7 @@ describe("AuthenticationGenerator", () => {
   it("partial pre-existing config: missing pieces filled, no duplicates", async () => {
     write(
       "config/routes.ts",
-      `Trails.application!.routes().draw((mapper) => {\n  mapper.resources("passwords", { param: "token" });\n  mapper.resource("session");\n});\n`,
+      `Trails.application!.routes().draw(function () {\n  this.resources("passwords", { param: "token" });\n  this.resource("session");\n});\n`,
     );
     writeAC(
       "\n\nexport",
@@ -131,8 +131,8 @@ describe("AuthenticationGenerator", () => {
     );
     await makeGen().run();
     const routes = read("config/routes.ts");
-    expect(routes.match(/mapper\.resources\("passwords"/g)).toHaveLength(1);
-    expect(routes.match(/mapper\.resource\("session"\)/g)).toHaveLength(1);
+    expect(routes.match(/this\.resources\("passwords"/g)).toHaveLength(1);
+    expect(routes.match(/this\.resource\("session"\)/g)).toHaveLength(1);
     const ac = read(APP_CTRL_PATH);
     expect(ac.match(/import\s+\{\s*Authentication\b/g)).toHaveLength(1);
     expect(ac).toContain("include(this, Authentication);");

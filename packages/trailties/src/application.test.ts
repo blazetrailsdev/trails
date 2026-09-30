@@ -355,8 +355,8 @@ describe("Application", () => {
       expect(middleware.middlewares.length).toBeGreaterThan(0);
       expect(middleware.middlewares.map((m) => m.klass)).toContain(RequestId);
       expect(app.routes().isEmpty()).toBe(true);
-      app.routes().draw((mapper) => {
-        mapper.get("/hello", { to: "hello#index" });
+      app.routes().draw(function () {
+        this.get("/hello", { to: "hello#index" });
       });
       expect(app.routes().isEmpty()).toBe(false);
     });

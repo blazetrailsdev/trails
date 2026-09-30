@@ -180,8 +180,8 @@ class FlashIntegrationTestSession extends IntegrationTest {
 
 async function withTestRouteSet(block: (t: IntegrationTest) => Promise<void>): Promise<void> {
   const t = new FlashIntegrationTestSession();
-  t.routes.draw((r) => {
-    r.get("/set_bar", { to: "flash_integration_test#setBar" });
+  t.routes.draw(function () {
+    this.get("/set_bar", { to: "flash_integration_test#setBar" });
   });
   t.app = IntegrationTest.buildApp(t.routes, (middleware) => {
     middleware.use(CookieStore as MiddlewareFactory, { key: SessionKey });

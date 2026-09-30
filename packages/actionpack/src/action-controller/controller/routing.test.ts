@@ -51,8 +51,8 @@ describe("UriReservedCharactersRoutingTest", () => {
 
   beforeEach(() => {
     rs = new RouteSet();
-    rs.draw((r) => {
-      r.get(":controller/:action/:variable/*additional", {});
+    rs.draw(function () {
+      this.get(":controller/:action/:variable/*additional", {});
     });
 
     const safe = [":", "@", "&", "=", "+", "$", ",", ";"];
@@ -112,8 +112,8 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it("symbols with dashes", async () => {
-    rs.draw((r) => {
-      r.get("/:artist/:song-omg", {
+    rs.draw(function () {
+      this.get("/:artist/:song-omg", {
         to: async (env: any) => {
           const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
           return [200, {}, bodyFromString(JSON.stringify(params))];
@@ -126,8 +126,8 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it("id with dash", async () => {
-    rs.draw((r) => {
-      r.get("/journey/:id", {
+    rs.draw(function () {
+      this.get("/journey/:id", {
         to: async (env: any) => {
           const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
           return [200, {}, bodyFromString(JSON.stringify(params))];
@@ -140,8 +140,8 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it("dash with custom regexp", async () => {
-    rs.draw((r) => {
-      r.get("/:artist/:song-omg", {
+    rs.draw(function () {
+      this.get("/:artist/:song-omg", {
         constraints: { song: /\d+/ },
         to: async (env: any) => {
           const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
@@ -156,8 +156,8 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it("pre dash", async () => {
-    rs.draw((r) => {
-      r.get("/:artist/omg-:song", {
+    rs.draw(function () {
+      this.get("/:artist/omg-:song", {
         to: async (env: any) => {
           const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
           return [200, {}, bodyFromString(JSON.stringify(params))];
@@ -170,8 +170,8 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it("pre dash with custom regexp", async () => {
-    rs.draw((r) => {
-      r.get("/:artist/omg-:song", {
+    rs.draw(function () {
+      this.get("/:artist/omg-:song", {
         constraints: { song: /\d+/ },
         to: async (env: any) => {
           const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
@@ -186,8 +186,8 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it("star paths are greedy", async () => {
-    rs.draw((r) => {
-      r.get("/*path", {
+    rs.draw(function () {
+      this.get("/*path", {
         format: false,
         to: async (env: any) => {
           const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
@@ -201,8 +201,8 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("star paths are greedy but not too much", async () => {
-    rs.draw((r) => {
-      r.get("/*path", {
+    rs.draw(function () {
+      this.get("/*path", {
         to: async (env: any) => {
           const params = env["action_dispatch.request.path_parameters"];
           return [200, {}, bodyFromString(JSON.stringify(params))];
@@ -216,8 +216,8 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it("optional star paths are greedy", async () => {
-    rs.draw((r) => {
-      r.get("/(*filters)", {
+    rs.draw(function () {
+      this.get("/(*filters)", {
         format: false,
         to: async (env: any) => {
           const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
@@ -231,8 +231,8 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("optional star paths are greedy but not too much", async () => {
-    rs.draw((r) => {
-      r.get("/(*filters)", {
+    rs.draw(function () {
+      this.get("/(*filters)", {
         to: async (env: any) => {
           const params = env["action_dispatch.request.path_parameters"];
           return [200, {}, bodyFromString(JSON.stringify(params))];
@@ -251,12 +251,12 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it("regexp precedence", async () => {
-    rs.draw((r) => {
-      r.get("/whois/:domain", {
+    rs.draw(function () {
+      this.get("/whois/:domain", {
         constraints: { domain: /\w+\.[\w.]+/ },
         to: async (_env: any) => [200, {}, bodyFromString("regexp")],
       });
-      r.get("/whois/:id", {
+      this.get("/whois/:id", {
         to: async (_env: any) => [200, {}, bodyFromString("id")],
       });
     });
@@ -266,12 +266,12 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("format symbol constraints", async () => {
-    rs.draw((r) => {
-      r.get("/api", {
+    rs.draw(function () {
+      this.get("/api", {
         constraints: { format: "json" },
         to: async (_env: any) => [200, {}, bodyFromString("json")],
       });
-      r.get("/api", {
+      this.get("/api", {
         constraints: { format: "xml" },
         to: async (_env: any) => [200, {}, bodyFromString("xml")],
       });
@@ -282,8 +282,8 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it("empty string match", async () => {
-    rs.draw((r) => {
-      r.get("/:username", {
+    rs.draw(function () {
+      this.get("/:username", {
         constraints: { username: /[^/]+/ },
         to: async (_env: any) => [200, {}, bodyFromString("foo")],
       });
@@ -295,8 +295,8 @@ describe("LegacyRouteSetTests", () => {
 
   it.skip("non greedy glob regexp", async () => {
     let capturedParams: Record<string, unknown> = {};
-    rs.draw((r) => {
-      r.get("/posts/:id(/*filters)", {
+    rs.draw(function () {
+      this.get("/posts/:id(/*filters)", {
         constraints: { filters: /.+?/ },
         to: async (env: any) => {
           capturedParams = env["action_dispatch.request.path_parameters"];
@@ -310,17 +310,17 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it("specific controller action failure", () => {
-    rs.draw((r) => {
-      r.mount(async (_env: any) => [200, {}, bodyFromString("")], { at: "/foo" });
+    rs.draw(function () {
+      this.mount(async (_env: any) => [200, {}, bodyFromString("")], { at: "/foo" });
     });
 
     expect(() => urlFor(rs, { controller: "omg", action: "lol" })).toThrow(UrlGenerationError);
   });
 
   it("route with colon first", () => {
-    rs.draw((r) => {
-      r.get("/:controller/:action/:id", { defaults: { action: "index" } } as any);
-      r.get(":url", { to: "content#translate" });
+    rs.draw(function () {
+      this.get("/:controller/:action/:id", { defaults: { action: "index" } } as any);
+      this.get(":url", { to: "content#translate" });
     });
 
     expect(rs.recognizePath("/example")).toMatchObject({
@@ -331,8 +331,8 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("route with regexp for action", () => {
-    rs.draw((r) => {
-      r.get("/:controller/:action", { action: /auth[-|_].+/ } as any);
+    rs.draw(function () {
+      this.get("/:controller/:action", { action: /auth[-|_].+/ } as any);
     });
 
     expect(rs.recognizePath("/content/auth_google")).toMatchObject({
@@ -353,8 +353,8 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("route with regexp and captures for controller", () => {
-    rs.draw((r) => {
-      r.get("/:controller(/:action(/:id))", { controller: /admin\/(accounts|users)/ } as any);
+    rs.draw(function () {
+      this.get("/:controller(/:action(/:id))", { controller: /admin\/(accounts|users)/ } as any);
     });
 
     expect(rs.recognizePath("/admin/accounts")).toMatchObject({
@@ -369,8 +369,8 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("route with regexp and dot", () => {
-    rs.draw((r) => {
-      r.get(":controller/:action/:file", {
+    rs.draw(function () {
+      this.get(":controller/:action/:file", {
         controller: /admin|user/,
         action: /upload|download/,
         defaults: { file: undefined },
@@ -398,9 +398,9 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it("paths escaped", () => {
-    rs.draw((r) => {
-      r.get("file/*path", { to: "content#show_file", as: "path" });
-      r.get(":controller/:action/:id", {});
+    rs.draw(function () {
+      this.get("file/*path", { to: "content#show_file", as: "path" });
+      this.get(":controller/:action/:id", {});
     });
 
     const results = rs.recognizePath("/file/hello+world/how+are+you%3F");
@@ -413,16 +413,16 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("non controllers cannot be matched", () => {
-    rs.draw((r) => {
-      r.get(":controller/:action/:id", {});
+    rs.draw(function () {
+      this.get(":controller/:action/:id", {});
     });
 
     expect(() => rs.recognizePath("/not_a/show/10")).toThrow(RoutingError);
   });
 
   it.skip("should list options diff when routing constraints dont match", () => {
-    rs.draw((r) => {
-      r.get("post/:id", { to: "post#show", constraints: { id: /\d+/ }, as: "post" });
+    rs.draw(function () {
+      this.get("post/:id", { to: "post#show", constraints: { id: /\d+/ }, as: "post" });
     });
 
     expect(() =>
@@ -431,8 +431,8 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("dynamic path allowed", () => {
-    rs.draw((r) => {
-      r.get("*path", { to: "content#show_file" });
+    rs.draw(function () {
+      this.get("*path", { to: "content#show_file" });
     });
 
     expect(urlFor(rs, { controller: "content", action: "show_file", path: ["pages", "boo"] })).toBe(
@@ -441,9 +441,9 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it("escapes newline character for dynamic path", () => {
-    rs.draw((r) => {
-      r.get("/dynamic/:dynamic_segment", { to: "subpath_books#show", as: "dynamic" });
-      r.get(":controller/:action/:id", {});
+    rs.draw(function () {
+      this.get("/dynamic/:dynamic_segment", { to: "subpath_books#show", as: "dynamic" });
+      this.get(":controller/:action/:id", {});
     });
 
     const results = rs.recognizePath("/dynamic/a%0Anewline");
@@ -452,9 +452,9 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it("escapes newline character for wildcard path", () => {
-    rs.draw((r) => {
-      r.get("/wildcard/*wildcard_segment", { to: "subpath_books#show", as: "wildcard" });
-      r.get(":controller/:action/:id", {});
+    rs.draw(function () {
+      this.get("/wildcard/*wildcard_segment", { to: "subpath_books#show", as: "wildcard" });
+      this.get(":controller/:action/:id", {});
     });
 
     const results = rs.recognizePath("/wildcard/a%0Anewline");
@@ -463,8 +463,8 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("route with integer default", () => {
-    rs.draw((r) => {
-      r.get("page(/:id)", { to: "content#show_page", id: 1 } as any);
+    rs.draw(function () {
+      this.get("page(/:id)", { to: "content#show_page", id: 1 } as any);
     });
 
     expect(urlFor(rs, { controller: "content", action: "show_page" })).toBe("/page");
@@ -490,8 +490,8 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("requirement should prevent optional id", () => {
-    rs.draw((r) => {
-      r.get("post/:id", { to: "post#show", constraints: { id: /\d+/ }, as: "post" });
+    rs.draw(function () {
+      this.get("post/:id", { to: "post#show", constraints: { id: /\d+/ }, as: "post" });
     });
 
     expect(urlFor(rs, { controller: "post", action: "show", id: 10 })).toBe("/post/10");
@@ -534,12 +534,12 @@ describe("LegacyRouteSetTests", () => {
       }
     };
 
-    rs.draw((r) => {
-      r.get("/", {
+    rs.draw(function () {
+      this.get("/", {
         constraints: new subdomain(),
         to: async () => [200, {}, bodyFromString("default")],
       });
-      r.get("/", {
+      this.get("/", {
         constraints: { subdomain: "clients" },
         to: async () => [200, {}, bodyFromString("clients")],
       });
@@ -550,13 +550,13 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it("lambda constraints", async () => {
-    rs.draw((r) => {
-      r.get("/", {
+    rs.draw(function () {
+      this.get("/", {
         constraints: (req: Request) => isPresent(req.subdomain()) && req.subdomain() !== "clients",
         to: async () => [200, {}, bodyFromString("default")],
       });
 
-      r.get("/", {
+      this.get("/", {
         constraints: (req: Request) => isPresent(req.subdomain()) && req.subdomain() === "clients",
         to: async () => [200, {}, bodyFromString("clients")],
       });
@@ -568,9 +568,9 @@ describe("LegacyRouteSetTests", () => {
 
   it("scoped lambda", async () => {
     let scopeCalled = false;
-    rs.draw((r) => {
-      r.scope("/foo", { constraints: (_req: Request) => (scopeCalled = true) }, () => {
-        r.get("/", { to: async () => [200, {}, bodyFromString("default")] });
+    rs.draw(function () {
+      this.scope("/foo", { constraints: (_req: Request) => (scopeCalled = true) }, () => {
+        this.get("/", { to: async () => [200, {}, bodyFromString("default")] });
       });
     });
 
@@ -581,8 +581,8 @@ describe("LegacyRouteSetTests", () => {
   it("scoped lambda with get lambda", async () => {
     let innerCalled = false;
 
-    rs.draw((r) => {
-      r.scope(
+    rs.draw(function () {
+      this.scope(
         "/foo",
         {
           constraints: (_req: Request) => {
@@ -590,7 +590,7 @@ describe("LegacyRouteSetTests", () => {
           },
         },
         () => {
-          r.get("/", {
+          this.get("/", {
             constraints: (_req: Request) => (innerCalled = true),
             to: async () => [200, {}, bodyFromString("default")],
           });
@@ -630,41 +630,41 @@ describe("RouteSetTest", () => {
 
   it("route constraints on request object with anchors are valid", () => {
     expect(() => {
-      set.draw((r) => {
-        r.get("page/:id", { to: "pages#show", constraints: { host: /^foo$/ } });
+      set.draw(function () {
+        this.get("page/:id", { to: "pages#show", constraints: { host: /^foo$/ } });
       });
     }).not.toThrow();
   });
 
   it("route constraints with anchor chars are invalid", () => {
     expect(() => {
-      set.draw((r) => {
-        r.get("page/:id", { to: "pages#show", id: /^\d+/ } as Parameters<typeof r.get>[1]);
+      set.draw(function () {
+        this.get("page/:id", { to: "pages#show", id: /^\d+/ } as Parameters<typeof this.get>[1]);
       });
     }).toThrow(ArgumentError);
     expect(() => {
-      set.draw((r) => {
-        r.get("page/:id", { to: "pages#show", id: new RegExp("\\A\\d+") } as Parameters<
-          typeof r.get
+      set.draw(function () {
+        this.get("page/:id", { to: "pages#show", id: new RegExp("\\A\\d+") } as Parameters<
+          typeof this.get
         >[1]);
       });
     }).toThrow(ArgumentError);
     expect(() => {
-      set.draw((r) => {
-        r.get("page/:id", { to: "pages#show", id: /\d+$/ } as Parameters<typeof r.get>[1]);
+      set.draw(function () {
+        this.get("page/:id", { to: "pages#show", id: /\d+$/ } as Parameters<typeof this.get>[1]);
       });
     }).toThrow(ArgumentError);
     expect(() => {
-      set.draw((r) => {
-        r.get("page/:id", { to: "pages#show", id: new RegExp("\\d+\\Z") } as Parameters<
-          typeof r.get
+      set.draw(function () {
+        this.get("page/:id", { to: "pages#show", id: new RegExp("\\d+\\Z") } as Parameters<
+          typeof this.get
         >[1]);
       });
     }).toThrow(ArgumentError);
     expect(() => {
-      set.draw((r) => {
-        r.get("page/:id", { to: "pages#show", id: new RegExp("\\d+\\z") } as Parameters<
-          typeof r.get
+      set.draw(function () {
+        this.get("page/:id", { to: "pages#show", id: new RegExp("\\d+\\z") } as Parameters<
+          typeof this.get
         >[1]);
       });
     }).toThrow(ArgumentError);
@@ -672,16 +672,16 @@ describe("RouteSetTest", () => {
 
   it("route constraints with unsupported regexp options must error", () => {
     expect(() => {
-      set.draw((r) => {
-        r.get("page/:name", { to: "pages#show", constraints: { name: /(david|jamis)/s } });
+      set.draw(function () {
+        this.get("page/:name", { to: "pages#show", constraints: { name: /(david|jamis)/s } });
       });
     }).toThrow(ArgumentError);
   });
 
   it("route constraints with supported options must not error", () => {
     expect(() => {
-      set.draw((r) => {
-        r.get("page/:name", { to: "pages#show", constraints: { name: /(david|jamis)/i } });
+      set.draw(function () {
+        this.get("page/:name", { to: "pages#show", constraints: { name: /(david|jamis)/i } });
       });
     }).not.toThrow();
   });

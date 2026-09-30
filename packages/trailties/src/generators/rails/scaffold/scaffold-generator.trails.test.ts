@@ -24,7 +24,7 @@ beforeEach(() => {
   fs.mkdirSync(path.join(tmpDir, "config"));
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
-    "Trails.application!.routes().draw((mapper) => {\n});\n",
+    "Trails.application!.routes().draw(function () {\n});\n",
   );
 });
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
@@ -59,6 +59,21 @@ describe("ScaffoldGenerator (namespaced)", () => {
       );
     const rerun = ScaffoldGenerator.start(["admin/account"], { ...config, force: true });
     await expect(rerun).resolves.toEqual(expect.any(Array));
+  });
+});
+
+describe("ScaffoldGenerator (routes)", () => {
+  it("logs and writes the resource route with the mapper as this", async () => {
+    fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
+    const lines: string[] = [];
+    await ScaffoldGenerator.start(["post", "title:string"], {
+      cwd: tmpDir,
+      output: (line: string) => lines.push(line),
+    });
+    expect(lines).toContain('       route  this.resources("posts");');
+    expect(read("config/routes.ts")).toBe(
+      'Trails.application!.routes().draw(function () {\n  this.resources("posts");\n});\n',
+    );
   });
 });
 

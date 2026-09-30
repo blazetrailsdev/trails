@@ -213,9 +213,9 @@ registerConstant("Blog", { name: "Blog", useRelativeModelNaming: () => true, Pos
 include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
 
 const Routes = new RouteSet();
-Routes.draw((r) => {
-  r.resources("posts", (r) => {
-    r.resources("comments");
+Routes.draw(function () {
+  this.resources("posts", () => {
+    this.resources("comments");
   });
 });
 

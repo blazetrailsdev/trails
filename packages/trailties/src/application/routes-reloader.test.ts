@@ -14,8 +14,12 @@ const makeRouteSet = (): Counted => {
     clearBang: () => void r.calls.push("clear"),
     finalizeBang: () => void r.calls.push("finalize"),
     eagerLoadBang: () => void r.calls.push("eagerLoad"),
-    draw: (block: DrawCallback) =>
-      block({ get: (path: string) => void r.calls.push(`get ${path}`) } as unknown as Mapper),
+    draw: (block: DrawCallback) => {
+      const mapper = {
+        get: (path: string) => void r.calls.push(`get ${path}`),
+      } as unknown as Mapper;
+      block.call(mapper);
+    },
   };
   return r;
 };
@@ -44,7 +48,7 @@ describe("RoutesReloader", () => {
       File.write(
         `${tmp}/routes-${name}.ts`,
         `import { Trails } from "${rails}";\n` +
-          `Trails.application.routes().draw((mapper) => mapper.get("/${name}"));\n`,
+          `Trails.application.routes().draw(function () { this.get("/${name}"); });\n`,
       );
       r.paths.push(`${tmp}/routes-${name}.ts`);
     }

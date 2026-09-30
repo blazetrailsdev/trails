@@ -27,15 +27,15 @@ describe("InfoControllerTest", () => {
     Trails.application = InfoControllerTestApp.instance();
     const routes = Trails.application.routes() as unknown as RouteSet;
     routes.clearBang();
-    routes.draw((r) => {
-      r.namespace("test", (r) => {
-        r.get("nested_route", { to: "test#show" });
+    routes.draw(function () {
+      this.namespace("test", () => {
+        this.get("nested_route", { to: "test#show" });
       });
-      r.get("/rails/info/properties", { to: "rails/info#properties" });
-      r.get("/rails/info/routes", { to: "rails/info#routes" });
-      r.get("/rails/info/notes", { to: "rails/info#notes" });
-      r.post("/rails/:test/properties", { to: "rails/info#properties" });
-      r.put("/rails/:test/named_properties", {
+      this.get("/rails/info/properties", { to: "rails/info#properties" });
+      this.get("/rails/info/routes", { to: "rails/info#routes" });
+      this.get("/rails/info/notes", { to: "rails/info#notes" });
+      this.post("/rails/:test/properties", { to: "rails/info#properties" });
+      this.put("/rails/:test/named_properties", {
         to: "rails/info#properties",
         as: "named_rails_info_properties",
       });

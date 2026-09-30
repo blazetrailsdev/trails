@@ -127,8 +127,8 @@ describe("withRoutesHelpers", () => {
 
   it("crosses a Module's own and nested instance methods, deferring modules the class already includes", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("posts", { to: "posts#index", as: "posts" });
+    routes.draw(function () {
+      this.get("posts", { to: "posts#index", as: "posts" });
     });
     const parent = class {
       urlOptions(): Record<string, unknown> {
@@ -173,16 +173,16 @@ describe("withRoutesHelpers", () => {
 
   it("crosses a named route drawn after the first helper read", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("posts", { to: "posts#index", as: "posts" });
+    routes.draw(function () {
+      this.get("posts", { to: "posts#index", as: "posts" });
     });
     const cls = class {};
     withRoutesHelpers(routes)(cls as unknown as RoutesHelpersControllerClass);
     const instance = new cls() as unknown as { postsPath?: unknown; commentsPath?: unknown };
     expect(typeof instance.postsPath).toBe("function");
 
-    routes.draw((r) => {
-      r.get("comments", { to: "comments#index", as: "comments" });
+    routes.draw(function () {
+      this.get("comments", { to: "comments#index", as: "comments" });
     });
 
     expect(typeof instance.commentsPath).toBe("function");

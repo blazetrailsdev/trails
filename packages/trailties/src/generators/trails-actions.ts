@@ -91,7 +91,7 @@ export async function route(
     .reverse()
     .reduce(
       (code, name) =>
-        `mapper.namespace(${JSON.stringify(name)}, () => {\n${rebaseIndentation(code, 2)}});`,
+        `this.namespace(${JSON.stringify(name)}, () => {\n${rebaseIndentation(code, 2)}});`,
       routingCode,
     );
 
@@ -126,8 +126,7 @@ export async function route(
       let stripped: string;
       while (
         ending !== "" &&
-        (stripped = beginning.replace(/^[ ]*mapper\.namespace\(.+ \{\n\s*(?![^])/m, "")) !==
-          beginning
+        (stripped = beginning.replace(/^[ ]*this\.namespace\(.+ \{\n\s*(?![^])/m, "")) !== beginning
       ) {
         beginning = stripped;
         ending = ending.replace(/^\s*\}\);\n/, "");
@@ -197,10 +196,10 @@ function routeNamespacePattern(namespace: string[]): RegExp {
     .reduce<string | null>((pattern, [name, i]) => {
       const cumulativeMargin = `\\${i + 1}[ ]{2}`;
       const blankOrIndentedLine = `^[ ]*\\n|^${cumulativeMargin}.*\\n`;
-      return `(?:(?:${blankOrIndentedLine})*?^(${cumulativeMargin})mapper\\.namespace\\(${regexpEscape(JSON.stringify(name))}, \\(\\) => \\{\\n${pattern ?? ""})?`;
+      return `(?:(?:${blankOrIndentedLine})*?^(${cumulativeMargin})this\\.namespace\\(${regexpEscape(JSON.stringify(name))}, \\(\\) => \\{\\n${pattern ?? ""})?`;
     }, null);
   return new RegExp(
-    `^([ ]*).+\\.routes\\(\\)\\.draw\\(\\(mapper\\) => \\{[ ]*\\n${pattern ?? ""}`,
+    `^([ ]*).+\\.routes\\(\\)\\.draw\\(function \\(\\) \\{[ ]*\\n${pattern ?? ""}`,
     "m",
   );
 }

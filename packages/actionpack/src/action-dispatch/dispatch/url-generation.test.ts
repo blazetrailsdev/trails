@@ -7,21 +7,21 @@ describe("TestUrlGeneration::WithMountPoint", () => {
 
   beforeEach(() => {
     routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/foo", { to: "my_route_generating#index", as: "foo" });
-      r.get("(/optional/:optional_id)/baz", {
+    routes.draw(function () {
+      this.get("/foo", { to: "my_route_generating#index", as: "foo" });
+      this.get("(/optional/:optional_id)/baz", {
         to: "my_route_generating#index",
         as: "baz",
       });
-      r.get("/add_trailing_slash", {
+      this.get("/add_trailing_slash", {
         to: "my_route_generating#addTrailingSlash",
         as: "add_trailing_slash",
       });
-      r.get("/trailing_slash_default", {
+      this.get("/trailing_slash_default", {
         to: "my_route_generating#trailingSlashDefault",
         as: "trailing_slash_default",
       });
-      r.resources("bars");
+      this.resources("bars");
     });
     routes.setDefaultUrlOptions({ host: "www.example.com" });
   });

@@ -42,20 +42,24 @@ class TestApp extends Finisher {
   mountedHelpers: string[] = [];
 
   private _routes: FinisherRoutes = {
-    prepend: (block) =>
-      block({
+    prepend: (block) => {
+      const mapper = {
         get: (path: string, options: { to: string; internal?: boolean }) =>
           this.internalRoutes.push(
             `get ${path} -> ${options.to}${options.internal === true ? " (internal)" : ""}`,
           ),
-      } as unknown as Mapper),
-    append: (block) =>
-      block({
+      } as unknown as Mapper;
+      block.call(mapper);
+    },
+    append: (block) => {
+      const mapper = {
         get: (path: string, options: { to: string; internal?: boolean }) =>
           this.internalRoutes.push(
             `get ${path} -> ${options.to}${options.internal === true ? " (internal)" : ""}`,
           ),
-      } as unknown as Mapper),
+      } as unknown as Mapper;
+      block.call(mapper);
+    },
     defineMountedHelper: (name) => this.mountedHelpers.push(name),
   };
 

@@ -213,7 +213,9 @@ describe("Mapper#mount dispatch", () => {
       return [200, { "content-type": "text/plain" }, bodyFromString("engine-ok")];
     };
     const routes = new RouteSet();
-    routes.draw((r) => r.mount(engine, { at: "/foo" }));
+    routes.draw(function () {
+      this.mount(engine, { at: "/foo" });
+    });
 
     const res = await routes.call({ REQUEST_METHOD: "GET", PATH_INFO: "/foo/bar" });
     expect(res[0]).toBe(200);
@@ -231,7 +233,9 @@ describe("Mapper#mount dispatch", () => {
       return [200, {}, bodyFromString("")];
     };
     const routes = new RouteSet();
-    routes.draw((r) => r.mount(engine, { at: "/:tenant" }));
+    routes.draw(function () {
+      this.mount(engine, { at: "/:tenant" });
+    });
 
     await routes.call({ REQUEST_METHOD: "GET", PATH_INFO: "/acme/widgets" });
     expect(seen).toEqual([

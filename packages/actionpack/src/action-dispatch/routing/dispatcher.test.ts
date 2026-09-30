@@ -50,7 +50,9 @@ describe("RouteDispatcher", () => {
 
   it("dispatches to a registered handler via RouteSet.serve", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => r.get("/posts/:id", { to: "posts#show" }));
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show" });
+    });
 
     const calls: Array<{ action: string; id: string }> = [];
     registerController(
@@ -69,7 +71,9 @@ describe("RouteDispatcher", () => {
 
   it("returns 404 X-Cascade when no controller handler is registered", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => r.get("/:controller/:action"));
+    routes.draw(function () {
+      this.get("/:controller/:action");
+    });
 
     const res = await routes.router.serve(makeReq("/posts/index"));
     expect(res[0]).toBe(404);
@@ -78,7 +82,9 @@ describe("RouteDispatcher", () => {
 
   it("raises ActionController::RoutingError when a pinned controller is missing", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => r.get("/posts", { to: "posts#index" }));
+    routes.draw(function () {
+      this.get("/posts", { to: "posts#index" });
+    });
 
     await expect(routes.router.serve(makeReq("/posts"))).rejects.toThrow(
       /uninitialized constant PostsController/,
@@ -87,7 +93,9 @@ describe("RouteDispatcher", () => {
 
   it("raises ActionController::RoutingError when defaults pin the controller", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => r.get("/x/:action", { controller: "posts" }));
+    routes.draw(function () {
+      this.get("/x/:action", { controller: "posts" });
+    });
 
     await expect(routes.router.serve(makeReq("/x/index"))).rejects.toThrow(
       /uninitialized constant PostsController/,
@@ -96,7 +104,9 @@ describe("RouteDispatcher", () => {
 
   it("returns 404 X-Cascade when no route matches", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => r.get("/posts", { to: "posts#index" }));
+    routes.draw(function () {
+      this.get("/posts", { to: "posts#index" });
+    });
     registerController(
       "posts",
       makeControllerClass(() => [200, {}, []]),
@@ -109,9 +119,9 @@ describe("RouteDispatcher", () => {
 
   it("X-Cascade: pass from a handler falls through to the next route", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/x", { to: "first#index" });
-      r.get("/x", { to: "second#index" });
+    routes.draw(function () {
+      this.get("/x", { to: "first#index" });
+      this.get("/x", { to: "second#index" });
     });
 
     registerController(
@@ -155,7 +165,9 @@ describe("RouteDispatcher", () => {
 
   it("unregister removes a handler so subsequent serves return 404 pass", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => r.get("/:controller/:action"));
+    routes.draw(function () {
+      this.get("/:controller/:action");
+    });
     registerController(
       "posts",
       makeControllerClass(() => [200, {}, []]),

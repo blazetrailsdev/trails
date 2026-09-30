@@ -117,48 +117,48 @@ describe("TrailsActions", () => {
   });
 
   describe("route", () => {
-    const draw = `import { Trails } from "@blazetrails/trailties";\n\nTrails.application!.routes().draw((mapper) => {\n`;
+    const draw = `import { Trails } from "@blazetrails/trailties";\n\nTrails.application!.routes().draw(function () {\n`;
 
     it("injects code after the drawRoutes sentinel", async () => {
-      files.set("/app/config/routes.ts", `${draw}  mapper.get("up");\n});\n`);
-      await makeGen().route(`mapper.resources("posts");`);
+      files.set("/app/config/routes.ts", `${draw}  this.get("up");\n});\n`);
+      await makeGen().route(`this.resources("posts");`);
       expect(files.get("/app/config/routes.ts")).toBe(
-        `${draw}  mapper.resources("posts");\n  mapper.get("up");\n});\n`,
+        `${draw}  this.resources("posts");\n  this.get("up");\n});\n`,
       );
     });
 
     it("does not inject code that is already present", async () => {
       files.set("/app/config/routes.ts", `${draw}});\n`);
-      await makeGen().route(`mapper.resources("posts");`);
-      await makeGen().route(`mapper.resources("posts");`);
-      expect(files.get("/app/config/routes.ts")).toBe(`${draw}  mapper.resources("posts");\n});\n`);
+      await makeGen().route(`this.resources("posts");`);
+      await makeGen().route(`this.resources("posts");`);
+      expect(files.get("/app/config/routes.ts")).toBe(`${draw}  this.resources("posts");\n});\n`);
     });
 
     it("raises Thor's missing-file error unless pretending", async () => {
-      await expect(makeGen().route(`mapper.resources("posts");`)).rejects.toThrow(
+      await expect(makeGen().route(`this.resources("posts");`)).rejects.toThrow(
         new GeneratorError("The file /app/config/routes.ts does not appear to exist"),
       );
       const pretend = new TestGenerator({ cwd: "/app", output: () => {}, pretend: true });
-      await expect(pretend.route(`mapper.resources("posts");`)).resolves.toBeUndefined();
+      await expect(pretend.route(`this.resources("posts");`)).resolves.toBeUndefined();
       expect(files.has("/app/config/routes.ts")).toBe(false);
     });
 
     it("wraps code in the given namespaces", async () => {
       files.set("/app/config/routes.ts", `${draw}});\n`);
-      await makeGen().route(`mapper.resources("posts");`, { namespace: ["admin", "blog"] });
+      await makeGen().route(`this.resources("posts");`, { namespace: ["admin", "blog"] });
       expect(files.get("/app/config/routes.ts")).toBe(
-        `${draw}  mapper.namespace("admin", () => {\n    mapper.namespace("blog", () => {\n      mapper.resources("posts");\n    });\n  });\n});\n`,
+        `${draw}  this.namespace("admin", () => {\n    this.namespace("blog", () => {\n      this.resources("posts");\n    });\n  });\n});\n`,
       );
     });
 
     it("injects into an existing namespace block", async () => {
       files.set(
         "/app/config/routes.ts",
-        `${draw}  mapper.namespace("admin", () => {\n    mapper.resources("users");\n  });\n});\n`,
+        `${draw}  this.namespace("admin", () => {\n    this.resources("users");\n  });\n});\n`,
       );
-      await makeGen().route(`mapper.resources("posts");`, { namespace: "admin" });
+      await makeGen().route(`this.resources("posts");`, { namespace: "admin" });
       expect(files.get("/app/config/routes.ts")).toBe(
-        `${draw}  mapper.namespace("admin", () => {\n    mapper.resources("posts");\n    mapper.resources("users");\n  });\n});\n`,
+        `${draw}  this.namespace("admin", () => {\n    this.resources("posts");\n    this.resources("users");\n  });\n});\n`,
       );
     });
 
@@ -167,39 +167,39 @@ describe("TrailsActions", () => {
       files.set("/app/config/routes.ts", `${draw}});\n`);
       await makeGen().route(
         optimizeIndentation(
-          `mapper.namespace("baz", () => {
-  mapper.get("foo1");
-  mapper.namespace("qux", () => {
-    mapper.get("foo2");
-    mapper.namespace("hoge", () => {
-      mapper.get("foo3");
+          `this.namespace("baz", () => {
+  this.get("foo1");
+  this.namespace("qux", () => {
+    this.get("foo2");
+    this.namespace("hoge", () => {
+      this.get("foo3");
     });
   });
-  mapper.get("bar1");
+  this.get("bar1");
 });`,
           0,
         ).trimEnd(),
       );
 
-      await revoke.route(`mapper.get("foo2");`, { namespace: ["baz", "qux"] });
+      await revoke.route(`this.get("foo2");`, { namespace: ["baz", "qux"] });
       expect(files.get("/app/config/routes.ts")).toBe(
-        `${draw}  mapper.namespace("baz", () => {
-    mapper.get("foo1");
-    mapper.namespace("qux", () => {
-      mapper.namespace("hoge", () => {
-        mapper.get("foo3");
+        `${draw}  this.namespace("baz", () => {
+    this.get("foo1");
+    this.namespace("qux", () => {
+      this.namespace("hoge", () => {
+        this.get("foo3");
       });
     });
-    mapper.get("bar1");
+    this.get("bar1");
   });
 });\n`,
       );
 
-      await revoke.route(`mapper.get("foo3");`, { namespace: ["baz", "qux", "hoge"] });
+      await revoke.route(`this.get("foo3");`, { namespace: ["baz", "qux", "hoge"] });
       expect(files.get("/app/config/routes.ts")).toBe(
-        `${draw}  mapper.namespace("baz", () => {
-    mapper.get("foo1");
-    mapper.get("bar1");
+        `${draw}  this.namespace("baz", () => {
+    this.get("foo1");
+    this.get("bar1");
   });
 });\n`,
       );

@@ -168,28 +168,28 @@ describe("ActionDispatch::IntegrationTest", () => {
 
   beforeEach(() => {
     app = new IntegrationTestWithSession();
-    app.routes.draw((r) => {
-      r.get("/posts/xml", { to: "posts#renderXml", as: "posts_xml" });
-      r.get("/posts/xml2", { to: "posts#renderXml2", as: "posts_xml2" });
-      r.get("/posts/html", { to: "posts#renderHtml", as: "posts_html" });
-      r.get("/posts/error", { to: "posts#serverError", as: "posts_error" });
-      r.get("/posts/redirect", { to: "posts#redirectToIndex", as: "posts_redirect" });
-      r.get("/posts/header", { to: "posts#customHeader", as: "posts_header" });
-      r.get("/posts/session", { to: "posts#readSession", as: "posts_session" });
-      r.post("/posts/create-and-redirect", {
+    app.routes.draw(function () {
+      this.get("/posts/xml", { to: "posts#renderXml", as: "posts_xml" });
+      this.get("/posts/xml2", { to: "posts#renderXml2", as: "posts_xml2" });
+      this.get("/posts/html", { to: "posts#renderHtml", as: "posts_html" });
+      this.get("/posts/error", { to: "posts#serverError", as: "posts_error" });
+      this.get("/posts/redirect", { to: "posts#redirectToIndex", as: "posts_redirect" });
+      this.get("/posts/header", { to: "posts#customHeader", as: "posts_header" });
+      this.get("/posts/session", { to: "posts#readSession", as: "posts_session" });
+      this.post("/posts/create-and-redirect", {
         to: "posts#createAndRedirect",
         as: "posts_create_and_redirect",
       });
-      r.get("/posts/flash", { to: "posts#showFlash", as: "posts_flash" });
-      r.get("/posts/set-cookie", { to: "posts#setCookie", as: "posts_set_cookie" });
-      r.get("/posts/read-cookie", { to: "posts#readCookie", as: "posts_read_cookie" });
-      r.resources("posts", {}, (posts) => {
-        posts.resources("comments");
+      this.get("/posts/flash", { to: "posts#showFlash", as: "posts_flash" });
+      this.get("/posts/set-cookie", { to: "posts#setCookie", as: "posts_set_cookie" });
+      this.get("/posts/read-cookie", { to: "posts#readCookie", as: "posts_read_cookie" });
+      this.resources("posts", {}, () => {
+        this.resources("comments");
       });
-      r.namespace("admin", (admin) => {
-        admin.resources("posts");
+      this.namespace("admin", () => {
+        this.resources("posts");
       });
-      r.resource("session");
+      this.resource("session");
     });
     app.app = IntegrationTest.buildApp(app.routes, useCookieStore);
     controllerConstants.set("posts", PostsController);
@@ -275,8 +275,8 @@ describe("ActionDispatch::IntegrationTest", () => {
     });
 
     it("unregistered controller throws", async () => {
-      app.routes.draw((r) => {
-        r.get("/unknown", { to: "unknown#index" });
+      app.routes.draw(function () {
+        this.get("/unknown", { to: "unknown#index" });
       });
       app.app = IntegrationTest.buildApp(app.routes, useCookieStore);
       await expect(app.get("/unknown")).rejects.toThrow(/uninitialized constant UnknownController/);
@@ -653,8 +653,8 @@ describe("ActionDispatch::IntegrationTest", () => {
           this.redirectTo("/this-path-does-not-exist");
         }
       }
-      redirectApp.routes.draw((r) => {
-        r.get("/redirect-to-missing", { to: "redirector#index", as: "redirector" });
+      redirectApp.routes.draw(function () {
+        this.get("/redirect-to-missing", { to: "redirector#index", as: "redirector" });
       });
       redirectApp.app = IntegrationTest.buildApp(redirectApp.routes, useCookieStore);
       controllerConstants.set("redirector", RedirectToMissingController);
@@ -675,8 +675,8 @@ describe("ActionDispatch::IntegrationTest", () => {
           this.redirectTo("/no-route-here");
         }
       }
-      redirectApp.routes.draw((r) => {
-        r.get("/redirect-to-missing2", { to: "redirector2#index", as: "redirector2" });
+      redirectApp.routes.draw(function () {
+        this.get("/redirect-to-missing2", { to: "redirector2#index", as: "redirector2" });
       });
       redirectApp.app = IntegrationTest.buildApp(redirectApp.routes, useCookieStore);
       controllerConstants.set("redirector2", RedirectToMissing2Controller);

@@ -1,6 +1,6 @@
 import { Redirect, redirect as redirectFactory } from "./redirection.js";
 import { Endpoint } from "./endpoint.js";
-import { Dispatcher, StaticDispatcher, type RouteSet } from "./route-set.js";
+import { Dispatcher, StaticDispatcher, type DrawCallback, type RouteSet } from "./route-set.js";
 import type { DispatchableControllerClass } from "./dispatcher.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
@@ -95,7 +95,8 @@ export interface RedirectOptions {
   status?: number;
 }
 
-type MapperCallback = (mapper: Mapper) => void;
+type MapperCallback = () => void;
+type ConcernBlock = (this: Mapper, options: Record<string, unknown>) => void;
 type ConcernCallback = (mapper: Mapper, options: Record<string, unknown>) => void;
 type ConcernCallable =
   | ConcernCallback
@@ -983,7 +984,7 @@ export class Mapper {
     };
     this.withScopeLevel("resources", () =>
       this.resourceScope(resource, () => {
-        if (cb) cb(this);
+        if (cb) cb();
 
         if (options.concerns) this.concerns(options.concerns);
       }),
@@ -1094,7 +1095,7 @@ export class Mapper {
     };
     this.withScopeLevel("resource", () =>
       this.resourceScope(resource, () => {
-        if (cb) cb(this);
+        if (cb) cb();
 
         if (options.concerns) this.concerns(options.concerns);
       }),
@@ -1235,7 +1236,7 @@ export class Mapper {
     const previous = this._scope;
     this._scope = this._scope.new(scope);
     try {
-      cb(this);
+      cb();
     } finally {
       this._scope = previous;
     }
@@ -1249,10 +1250,10 @@ export class Mapper {
     this.withScopeLevel("member", () => {
       if (this.isShallow()) {
         this.shallowScope(() => {
-          this.pathScope(this.parentResource()!.memberScope, () => callback(this));
+          this.pathScope(this.parentResource()!.memberScope, () => callback());
         });
       } else {
-        this.pathScope(this.parentResource()!.memberScope, () => callback(this));
+        this.pathScope(this.parentResource()!.memberScope, () => callback());
       }
     });
   }
@@ -1263,7 +1264,7 @@ export class Mapper {
     }
 
     this.withScopeLevel("collection", () => {
-      this.pathScope(this.parentResource()!.collectionScope, () => callback(this));
+      this.pathScope(this.parentResource()!.collectionScope, () => callback());
     });
   }
 
@@ -1293,7 +1294,7 @@ export class Mapper {
     }
 
     this.withScopeLevel("new", () => {
-      this.pathScope(this.parentResource()!.newScope(this.actionPath("new")), () => callback(this));
+      this.pathScope(this.parentResource()!.newScope(this.actionPath("new")), () => callback());
     });
   }
 
@@ -1301,7 +1302,7 @@ export class Mapper {
     const previous = this._scope;
     this._scope = this._scope.new({ shallow: true });
     try {
-      callback(this);
+      callback();
     } finally {
       this._scope = previous;
     }
@@ -1328,9 +1329,9 @@ export class Mapper {
 
     const routePath = `${path}/${name}.ts`;
     const mod = (await import(p.pathToFileURL!(routePath).href)) as {
-      drawRoutes?: (mapper: Mapper) => void;
+      drawRoutes?: DrawCallback;
     };
-    mod.drawRoutes?.(this);
+    mod.drawRoutes?.call(this);
   }
 
   /** @internal */
@@ -1369,8 +1370,8 @@ export class Mapper {
     this.scope({ constraints }, block);
   }
 
-  concern(name: string, callable: ConcernCallable | null = null, block?: ConcernCallback): void {
-    callable ??= (mapper, options) => block!(mapper, options);
+  concern(name: string, callable: ConcernCallable | null = null, block?: ConcernBlock): void {
+    callable ??= (mapper, options) => block!.call(mapper, options);
     this._concerns.set(name, callable);
   }
 
@@ -1466,7 +1467,7 @@ export class Mapper {
     const previous = this._scope;
     this._scope = this._scope.new({ controller });
     try {
-      callback(this);
+      callback();
     } finally {
       this._scope = previous;
     }
@@ -1480,7 +1481,7 @@ export class Mapper {
     );
     this._scope = this._scope.new({ defaults: merged });
     try {
-      callback(this);
+      callback();
     } finally {
       this._scope = previous;
     }
@@ -2093,8 +2094,10 @@ export class Mapper {
   }
 
   /** @internal */
-  withDefaultScope(scope: ScopeOptions, callback: MapperCallback): void {
-    this.scope(scope, callback);
+  withDefaultScope(scope: ScopeOptions, block: DrawCallback): void {
+    this.scope(scope, () => {
+      block.call(this);
+    });
   }
 
   /** @internal */

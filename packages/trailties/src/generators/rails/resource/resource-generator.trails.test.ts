@@ -11,7 +11,7 @@ beforeEach(() => {
   fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
-    "Trails.application!.routes().draw((mapper) => {\n});\n",
+    "Trails.application!.routes().draw(function () {\n});\n",
   );
 });
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
@@ -23,6 +23,6 @@ describe("ResourceGenerator (--actions)", () => {
       output: () => {},
     });
     const routes = fs.readFileSync(path.join(tmpDir, "config/routes.ts"), "utf-8");
-    expect(routes).toContain('mapper.resources("accounts");');
+    expect(routes).toContain('this.resources("accounts");');
   });
 });

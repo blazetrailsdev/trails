@@ -49,13 +49,13 @@ describe("Railtie class-level method_missing", () => {
     );
     const blog = BlogEngine as unknown as typeof BlogEngine & Pick<Engine, "routes">;
     expect(blog.routes()).toBe(BlogEngine.instance().routes());
-    blog.routes().draw((r) => {
-      r.get("/cart", { to: "cart#show" });
+    blog.routes().draw(function () {
+      this.get("/cart", { to: "cart#show" });
     });
 
     const set = new RouteSet();
-    set.draw((r) => {
-      r.mount(BlogEngine as never, { at: "/blog", as: "blog" });
+    set.draw(function () {
+      this.mount(BlogEngine as never, { at: "/blog", as: "blog" });
     });
     const output = new RoutesInspector(set.routes.routes).format(new ConsoleFormatter.Sheet());
 

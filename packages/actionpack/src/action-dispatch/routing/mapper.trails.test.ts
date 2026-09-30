@@ -279,8 +279,8 @@ describe("Mapper::Scope", () => {
 describe("ActionDispatch::Routing::Mapper::Resources inflection", () => {
   it("singularizes resources :people through the ActiveSupport inflector (mapper.rb:1228-1230)", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("people");
+    routes.draw(function () {
+      this.resources("people");
     });
     expect(routes.namedRoutes.isKey("person")).toBe(true);
     expect(routes.namedRoutes.isKey("people")).toBe(true);
@@ -291,8 +291,8 @@ describe("ActionDispatch::Routing::Mapper::Resources inflection", () => {
 
   it("pluralizes a singleton resource's controller through the ActiveSupport inflector (mapper.rb:1298-1300)", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resource("person");
+    routes.draw(function () {
+      this.resource("person");
     });
     expect(routes.fromRequirements({ controller: "people", action: "show" })?.name).toBe("person");
   });

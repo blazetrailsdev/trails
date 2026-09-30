@@ -68,9 +68,9 @@ describe("RoutingTestHelpers", () => {
 
   it("make_set captures the dispatched controller and verbs return the body", async () => {
     tc.routes = tc.makeSet(false);
-    tc.routes.draw((r) => {
+    tc.routes.draw(function () {
       deprecator().silence(() => {
-        r.get(":controller(/:action(/:id))");
+        this.get(":controller(/:action(/:id))");
       });
     });
 
@@ -90,8 +90,8 @@ describe("RoutingTestHelpers", () => {
 
   it("request_path_params raises RoutingError when no route matches", async () => {
     tc.routes = tc.makeSet(false);
-    tc.routes.draw((r) => {
-      r.get("/posts", { to: "posts#index" });
+    tc.routes.draw(function () {
+      this.get("/posts", { to: "posts#index" });
     });
 
     await expect(tc.requestPathParams("/nowhere")).rejects.toThrow(
@@ -101,9 +101,9 @@ describe("RoutingTestHelpers", () => {
 
   it("a strict set dispatches to the routed controller class", async () => {
     tc.routes = tc.makeSet();
-    tc.routes.draw((r) => {
-      r.resources("comments");
-      r.resources("accounts");
+    tc.routes.draw(function () {
+      this.resources("comments");
+      this.resources("accounts");
     });
 
     await tc.get(URI.parse("http://test.host/comments/1"));
@@ -115,8 +115,8 @@ describe("RoutingTestHelpers", () => {
 
   it("url_for generates an only-path url through use_route", () => {
     const set = tc.makeSet(false);
-    set.draw((r) => {
-      r.get("/admin/users", { to: "admin/users#index", as: "admin_users" });
+    set.draw(function () {
+      this.get("/admin/users", { to: "admin/users#index", as: "admin_users" });
     });
 
     expect(tc.urlFor(set, { useRoute: "admin_users" })).toBe("/admin/users");

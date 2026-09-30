@@ -38,8 +38,8 @@ describe("createAppServer", () => {
     }
 
     server.registerController("posts", PostsController);
-    server.drawRoutes((r: any) => {
-      r.resources("posts");
+    server.drawRoutes(function () {
+      this.resources("posts");
     });
 
     const [status, headers, body] = await server.call(makeEnv("GET", "/posts"));
@@ -51,8 +51,8 @@ describe("createAppServer", () => {
 
   it("returns 404 for unregistered controller", async () => {
     const server = createAppServer({ executeCode: async () => {} });
-    server.drawRoutes((r: any) => {
-      r.resources("users");
+    server.drawRoutes(function () {
+      this.resources("users");
     });
 
     const [status, headers] = await server.call(makeEnv("GET", "/users"));
@@ -70,8 +70,8 @@ describe("createAppServer", () => {
     }
 
     server.registerController("broken", BrokenController);
-    server.drawRoutes((r: any) => {
-      r.get("/broken", { to: "broken#index" });
+    server.drawRoutes(function () {
+      this.get("/broken", { to: "broken#index" });
     });
 
     const [status, _headers, body] = await server.call(makeEnv("GET", "/broken"));
