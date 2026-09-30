@@ -95,38 +95,19 @@ import {
 } from "@blazetrails/activesupport";
 import type { Column as MysqlColumn } from "./mysql/column.js";
 import { TypeMap } from "../type/type-map.js";
-import { dumpTags } from "@blazetrails/activesupport/yaml";
 import {
   IntegerType,
-  BigIntegerType,
   FloatType,
   BooleanType,
   BinaryType,
   BinaryData,
   ArgumentError,
 } from "@blazetrails/activemodel";
-
-class MysqlBigInteger extends BigIntegerType {
-  protected override maxValue(): number {
-    return 2 ** (this._limit() * 8 - 1);
-  }
-
-  override serializeCastValue(value: number | null): number | null {
-    return this.ensureInRange(value) as number | null;
-  }
-
-  override serialize(value: unknown): unknown {
-    return this.ensureInRange(this.cast(value));
-  }
-}
-
 import { UnsignedInteger } from "../type/unsigned-integer.js";
 import { Text as TextType } from "../type/text.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { databaseCli } from "../active-record.js";
 import { dbWarningsAction } from "../active-record.js";
-
-dumpTags.set(MysqlBigInteger, "!ruby/object:ActiveModel::Type::Integer");
 
 const ER_DUP_ENTRY = 1062;
 const ER_CANNOT_ADD_FOREIGN = 1215;
@@ -972,7 +953,6 @@ WHERE fk.referenced_column_name IS NOT NULL
   ): void {
     mapping.registerType(key, undefined, (sqlType: string) => {
       if (/\bunsigned\b/i.test(sqlType)) return new UnsignedInteger(options);
-      if (options.limit === 8) return new MysqlBigInteger(options);
       return new IntegerType(options);
     });
   }

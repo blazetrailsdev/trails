@@ -1,4 +1,5 @@
 import { isBlank, registerConstant } from "@blazetrails/activesupport";
+import { rbDeclareIvar, toI } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 import { RangeError } from "../errors.js";
 import { applyNumericMixin, isNonNumericString } from "./helpers/numeric.js";
@@ -67,12 +68,8 @@ export class IntegerType extends NumericValueType {
     if (typeof value === "bigint") {
       return this.narrowBigInt(value);
     }
-    if (typeof value === "string") {
-      const parsed = parseInt(value, 10);
-      return isNaN(parsed) ? 0 : parsed;
-    }
     try {
-      return (value as { toI(): number | bigint }).toI();
+      return toI(value);
     } catch {
       return null;
     }
@@ -110,5 +107,7 @@ export class IntegerType extends NumericValueType {
     return Number.isSafeInteger(num) ? num : value;
   }
 }
+
+rbDeclareIvar(IntegerType, "@range", "_range");
 
 registerConstant("ActiveModel::Type::Integer", IntegerType);

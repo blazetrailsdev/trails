@@ -88,4 +88,13 @@ describe("IntegerType", () => {
     expect(type.cast(BigDecimal.NAN)).toBeNull();
     expect(type.cast(BigDecimal.INFINITY)).toBeNull();
   });
+
+  it("casts a 64-bit string exactly, as String#to_i does", () => {
+    const bigint = new Types.IntegerType({ limit: 8 });
+    expect(bigint.cast("9223372036854775807")).toBe(9223372036854775807n);
+    expect(bigint.serialize("9223372036854775807")).toBe(9223372036854775807n);
+    expect(() => bigint.serialize("9223372036854775808")).toThrow(
+      "9223372036854775808 is out of range for IntegerType with limit 8 bytes",
+    );
+  });
 });

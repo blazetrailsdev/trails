@@ -4,10 +4,13 @@ import {
   LoadError,
   Range,
   TypeError,
+  rbObjInstanceVariables,
+  rbObjIvarGet,
+  rbObjIvarSet,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, DateTime, Temporal, Time } from "@blazetrails/date";
-import { camelize, constantize, registeredConstantName, underscore } from "./inflector.js";
+import { constantize, registeredConstantName } from "./inflector.js";
 export type { CollectionTag, YAMLMap } from "yaml";
 
 const yaml = await import("yaml").catch(() => {
@@ -262,9 +265,12 @@ class YAMLTree {
   }
 
   private dumpIvars(target: object, map: YAMLMap): void {
-    for (const [iv, value] of Object.entries(target)) {
+    for (const iv of rbObjInstanceVariables(target)) {
       map.add(
-        new yaml.Pair(this.doc.createNode(underscore(iv.replace(/^_/, ""))), this.accept(value)),
+        new yaml.Pair(
+          this.doc.createNode(iv.replace(/^@/, "")),
+          this.accept(rbObjIvarGet(target, iv)),
+        ),
       );
     }
   }
@@ -397,18 +403,7 @@ class ToRuby {
       Object.getOwnPropertyDescriptors(h),
     );
     if (rbObjRespondTo(o, "initWith")) (o as { initWith(coder: Coder): void }).initWith(c);
-    else {
-      for (const [k, v] of Object.entries(h)) {
-        const name = camelize(k, false);
-        const ivar = name in o ? `_${name}` : name;
-        Object.defineProperty(o, ivar, {
-          value: v,
-          writable: true,
-          enumerable: true,
-          configurable: true,
-        });
-      }
-    }
+    else for (const [k, v] of Object.entries(h)) rbObjIvarSet(o, `@${k}`, v);
     return o;
   }
 
