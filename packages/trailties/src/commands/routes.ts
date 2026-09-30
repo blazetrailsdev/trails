@@ -26,6 +26,7 @@ export function routesCommand(): Command {
         return;
       }
       await bootApplicationBang();
+      await Trails.application!.reloadRoutesUnlessLoaded();
       console.log(inspector().format(formatter(options), routesFilter(options)));
     });
 
