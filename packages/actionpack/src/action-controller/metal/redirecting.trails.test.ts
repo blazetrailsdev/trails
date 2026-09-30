@@ -2,7 +2,7 @@ import { describe, it, expect, expectTypeOf } from "vitest";
 import type { Base } from "../base.js";
 import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.js";
 import { Flash } from "./flash.js";
-import { redirectBackOrTo } from "./redirecting.js";
+import { redirectBackOrTo, type RedirectingHost } from "./redirecting.js";
 
 describe("Redirecting#redirect_back_or_to", () => {
   const redirects: string[] = [];
@@ -45,6 +45,8 @@ describe("Redirecting#redirect_to types", () => {
       const flash = controller as unknown as Flash & { flash: never };
       // @ts-expect-error a misspelled response option on Flash#redirect_to itself
       flash.redirectTo("/posts", { statsu: "see_other" });
+      const host = controller as unknown as RedirectingHost;
+      host.redirectTo("/posts", { notice: "Forwarded by redirect_back_or_to", status: 303 });
     };
     expect(typed).toBeTypeOf("function");
   });

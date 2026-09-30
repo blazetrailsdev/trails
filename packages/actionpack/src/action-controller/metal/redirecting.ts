@@ -3,6 +3,7 @@ import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.j
 import type { UrlOptions } from "../../action-dispatch/http/url.js";
 import { DoubleRenderError } from "../../abstract-controller/rendering.js";
 import { ActionControllerError } from "./exceptions.js";
+import type { RedirectToResponseOptionsAndFlash } from "./flash.js";
 import { include, included } from "@blazetrails/activesupport";
 import { Logger, type LoggerIncludingClass } from "../../abstract-controller/logger.js";
 
@@ -36,7 +37,10 @@ export interface RedirectToResponseOptions {
 
 export interface RedirectingHost {
   request: { referer?: string | null; host?: string; protocol?: string; hostWithPort?(): string };
-  redirectTo(options: RedirectToOptions, responseOptions?: RedirectToResponseOptions): unknown;
+  redirectTo(
+    options: RedirectToOptions,
+    responseOptionsAndFlash?: RedirectToResponseOptionsAndFlash<string>,
+  ): unknown;
   urlFor?(options: unknown): string;
 }
 
