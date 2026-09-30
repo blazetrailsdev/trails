@@ -109,33 +109,46 @@ describe("TimeTravelTest", () => {
   });
 
   it("time helper travel to", () => {
-    const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
-    travelTo(expectedTime);
+    const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+    try {
+      const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+      travelTo(expectedTime);
 
-    expect(Time.now().toS()).toEqual(expectedTime.toS());
-    expect(Time.new().toS()).toEqual(expectedTime.toS());
-    expect(Time.new(2004, 11, 25).toS()).not.toEqual(expectedTime.toS());
-    expect(instantOf(Time.new({ precision: 3 }))).not.toEqual(instantOf(expectedTime));
-    expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
-    expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
+      expect(Time.now().toS()).toEqual(expectedTime.toS());
+      expect(Time.new().toS()).toEqual(expectedTime.toS());
+      expect(Time.new(2004, 11, 25).toS()).not.toEqual(expectedTime.toS());
+      expect(instantOf(Time.new({ precision: 3 }))).not.toEqual(instantOf(expectedTime));
+      expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
+      expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
+    } finally {
+      travelBack();
+      now.mockRestore();
+    }
   });
 
   it("time helper travel to with block", () => {
-    const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+    const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+    try {
+      const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
 
-    travelTo(expectedTime, {}, () => {
-      expect(Time.now().toS()).toEqual(expectedTime.toS());
-      expect(Time.new().toS()).toEqual(expectedTime.toS());
-      expect(instantOf(Time.new({ precision: 3 }))).not.toEqual(instantOf(expectedTime));
-      expect(Time.new(2004, 11, 25).toS()).not.toEqual(expectedTime.toS());
-      expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
-      expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
-    });
+      travelTo(expectedTime, {}, () => {
+        expect(Time.now().toS()).toEqual(expectedTime.toS());
+        expect(Time.new().toS()).toEqual(expectedTime.toS());
+        expect(instantOf(Time.new({ precision: 3 }))).not.toEqual(instantOf(expectedTime));
+        expect(Time.new(2004, 11, 25).toS()).not.toEqual(expectedTime.toS());
+        expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
+        expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
+      });
 
-    expect(Time.now().toS()).not.toEqual(expectedTime.toS());
-    expect(Time.new().toS()).not.toEqual(expectedTime.toS());
-    expect(RubyDate.today().toString()).not.toEqual(new RubyDate(2004, 11, 24).toDate().toString());
-    expect(DateTime.now().toString()).not.toEqual(expectedTime.toDatetime().toString());
+      expect(Time.now().toS()).not.toEqual(expectedTime.toS());
+      expect(Time.new().toS()).not.toEqual(expectedTime.toS());
+      expect(RubyDate.today().toString()).not.toEqual(
+        new RubyDate(2004, 11, 24).toDate().toString(),
+      );
+      expect(DateTime.now().toString()).not.toEqual(expectedTime.toDatetime().toString());
+    } finally {
+      now.mockRestore();
+    }
   });
 
   it.skip("time helper travel to with time zone");
@@ -145,11 +158,16 @@ describe("TimeTravelTest", () => {
   it("time helper travel to with string and milliseconds", () => {
     withEnvTz("US/Eastern", () => {
       withTzDefault(TimeZone.find("UTC"), () => {
-        const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+        const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+        try {
+          const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
 
-        travelTo("2004-11-24T01:04:44.123-05:00", {}, () => {
-          expect(zone()!.now().toF()).toEqual(expectedTime.toF());
-        });
+          travelTo("2004-11-24T01:04:44.123-05:00", {}, () => {
+            expect(zone()!.now().toF()).toEqual(expectedTime.toF());
+          });
+        } finally {
+          now.mockRestore();
+        }
       });
     });
   });
@@ -157,134 +175,182 @@ describe("TimeTravelTest", () => {
   it.skip("time helper travel to with separate class");
 
   it("time helper travel back", () => {
-    const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+    const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+    try {
+      const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
 
-    travelTo(expectedTime);
-    expect(Time.now().toS()).toEqual(expectedTime.toS());
-    expect(Time.new().toS()).toEqual(expectedTime.toS());
-    expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
-    expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
-    travelBack();
+      travelTo(expectedTime);
+      expect(Time.now().toS()).toEqual(expectedTime.toS());
+      expect(Time.new().toS()).toEqual(expectedTime.toS());
+      expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
+      expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
+      travelBack();
 
-    expect(Time.now().toS()).not.toEqual(expectedTime.toS());
-    expect(Time.new().toS()).not.toEqual(expectedTime.toS());
-    expect(RubyDate.today().toString()).not.toEqual(new RubyDate(2004, 11, 24).toDate().toString());
-    expect(DateTime.now().toString()).not.toEqual(expectedTime.toDatetime().toString());
-  });
-
-  it("time helper travel back with block", () => {
-    const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
-
-    travelTo(expectedTime);
-    expect(Time.now().toS()).toEqual(expectedTime.toS());
-    expect(Time.new().toS()).toEqual(expectedTime.toS());
-    expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
-    expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
-
-    travelBack(() => {
       expect(Time.now().toS()).not.toEqual(expectedTime.toS());
       expect(Time.new().toS()).not.toEqual(expectedTime.toS());
       expect(RubyDate.today().toString()).not.toEqual(
         new RubyDate(2004, 11, 24).toDate().toString(),
       );
       expect(DateTime.now().toString()).not.toEqual(expectedTime.toDatetime().toString());
-    });
+    } finally {
+      travelBack();
+      now.mockRestore();
+    }
+  });
 
-    expect(Time.now().toS()).toEqual(expectedTime.toS());
-    expect(Time.new().toS()).toEqual(expectedTime.toS());
-    expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
-    expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
+  it("time helper travel back with block", () => {
+    const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+    try {
+      const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+
+      travelTo(expectedTime);
+      expect(Time.now().toS()).toEqual(expectedTime.toS());
+      expect(Time.new().toS()).toEqual(expectedTime.toS());
+      expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
+      expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
+
+      travelBack(() => {
+        expect(Time.now().toS()).not.toEqual(expectedTime.toS());
+        expect(Time.new().toS()).not.toEqual(expectedTime.toS());
+        expect(RubyDate.today().toString()).not.toEqual(
+          new RubyDate(2004, 11, 24).toDate().toString(),
+        );
+        expect(DateTime.now().toString()).not.toEqual(expectedTime.toDatetime().toString());
+      });
+
+      expect(Time.now().toS()).toEqual(expectedTime.toS());
+      expect(Time.new().toS()).toEqual(expectedTime.toS());
+      expect(RubyDate.today().toString()).toEqual(new RubyDate(2004, 11, 24).toDate().toString());
+      expect(DateTime.now().toString()).toEqual(expectedTime.toDatetime().toString());
+    } finally {
+      travelBack();
+      now.mockRestore();
+    }
   });
 
   it("time helper travel to with nested calls with blocks", () => {
-    const outerExpectedTime = Time.new(2004, 11, 24, 1, 4, 44);
-    const innerExpectedTime = Time.new(2004, 10, 24, 1, 4, 44);
-    travelTo(outerExpectedTime, {}, () => {
-      let e: unknown;
-      expect(() => {
-        try {
-          travelTo(innerExpectedTime, {}, () => {});
-        } catch (error) {
-          e = error;
-          throw error;
-        }
-      }).toThrow(RuntimeError);
-      expect((e as Error).message).toMatch(
-        /Calling `travel_to` with a block, when we have previously already made a call to `travel_to`, can lead to confusing time stubbing\./,
-      );
-    });
+    const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+    try {
+      const outerExpectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+      const innerExpectedTime = Time.new(2004, 10, 24, 1, 4, 44);
+      travelTo(outerExpectedTime, {}, () => {
+        let e: unknown;
+        expect(() => {
+          try {
+            travelTo(innerExpectedTime, {}, () => {});
+          } catch (error) {
+            e = error;
+            throw error;
+          }
+        }).toThrow(RuntimeError);
+        expect((e as Error).message).toMatch(
+          /Calling `travel_to` with a block, when we have previously already made a call to `travel_to`, can lead to confusing time stubbing\./,
+        );
+      });
+    } finally {
+      now.mockRestore();
+    }
   });
 
   it("time helper travel to with nested calls", () => {
-    const outerExpectedTime = Time.new(2004, 11, 24, 1, 4, 44);
-    const innerExpectedTime = Time.new(2004, 10, 24, 1, 4, 44);
-    travelTo(outerExpectedTime, {}, () => {
-      expect(() => {
-        travelTo(innerExpectedTime);
+    const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+    try {
+      const outerExpectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+      const innerExpectedTime = Time.new(2004, 10, 24, 1, 4, 44);
+      travelTo(outerExpectedTime, {}, () => {
+        expect(() => {
+          travelTo(innerExpectedTime);
 
-        expect(Time.now().toS()).toEqual(innerExpectedTime.toS());
-      }).not.toThrow();
-    });
+          expect(Time.now().toS()).toEqual(innerExpectedTime.toS());
+        }).not.toThrow();
+      });
+    } finally {
+      now.mockRestore();
+    }
   });
 
   it("time helper travel to with subsequent calls", () => {
-    const initialExpectedTime = Time.new(2004, 11, 24, 1, 4, 44);
-    const subsequentExpectedTime = Time.new(2004, 10, 24, 1, 4, 44);
-    expect(() => {
-      travelTo(initialExpectedTime);
-      travelTo(subsequentExpectedTime);
+    const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+    try {
+      const initialExpectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+      const subsequentExpectedTime = Time.new(2004, 10, 24, 1, 4, 44);
+      expect(() => {
+        travelTo(initialExpectedTime);
+        travelTo(subsequentExpectedTime);
 
-      expect(Time.now().toS()).toEqual(subsequentExpectedTime.toS());
+        expect(Time.now().toS()).toEqual(subsequentExpectedTime.toS());
 
+        travelBack();
+      }).not.toThrow();
+    } finally {
       travelBack();
-    }).not.toThrow();
+      now.mockRestore();
+    }
   });
 
   it("time helper travel to with usec", () => {
-    const traveledTime = Time.new(2004, 11, 24, 1, 4, 44).plus(new Rational(1, 10));
-    const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+    const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+    try {
+      const traveledTime = Time.new(2004, 11, 24, 1, 4, 44).plus(new Rational(1, 10));
+      const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
 
-    expect(() => {
-      travelTo(traveledTime);
+      expect(() => {
+        travelTo(traveledTime);
 
-      expect(instantOf(Time.now())).toEqual(instantOf(expectedTime));
+        expect(instantOf(Time.now())).toEqual(instantOf(expectedTime));
 
+        travelBack();
+      }).not.toThrow();
+    } finally {
       travelBack();
-    }).not.toThrow();
+      now.mockRestore();
+    }
   });
 
   it("time helper with usec true", () => {
-    const expectedTime = Time.new(2004, 11, 24, 1, 4, 44).plus(new Rational(1, 10));
+    const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+    try {
+      const expectedTime = Time.new(2004, 11, 24, 1, 4, 44).plus(new Rational(1, 10));
 
-    expect(() => {
-      travelTo(expectedTime, { withUsec: true });
+      expect(() => {
+        travelTo(expectedTime, { withUsec: true });
 
-      expect(Time.now().toF()).toEqual(expectedTime.toF());
+        expect(Time.now().toF()).toEqual(expectedTime.toF());
 
-      travel(0.5, { withUsec: true });
+        travel(0.5, { withUsec: true });
 
-      expect(Time.now().toF()).toEqual(expectedTime.plus(0.5).toF());
+        expect(Time.now().toF()).toEqual(expectedTime.plus(0.5).toF());
 
+        travelBack();
+      }).not.toThrow();
+    } finally {
       travelBack();
-    }).not.toThrow();
+      now.mockRestore();
+    }
   });
 
   it("time helper travel to with datetime and usec", () => {
     withEnvTz("US/Eastern", () => {
       withTzDefault(TimeZone.find("UTC"), () => {
-        const durationUsec = Duration.seconds(0.1);
-        const traveledTime = dateTimeAdvance(DateTime.iso8601("2004-11-24T01:04:44.000-05:00"), {
-          seconds: durationUsec.inSeconds(),
-        });
-        const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+        const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+        try {
+          const durationUsec = Duration.seconds(0.1);
+          const traveledTime = dateTimeAdvance(DateTime.iso8601("2004-11-24T01:04:44.000-05:00"), {
+            seconds: durationUsec.inSeconds(),
+          });
+          const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
 
-        expect(() => {
-          travelTo(traveledTime);
+          expect(() => {
+            travelTo(traveledTime);
 
-          expect(zone()!.now().toF()).toEqual(expectedTime.toF());
+            expect(zone()!.now().toF()).toEqual(expectedTime.toF());
 
+            travelBack();
+          }).not.toThrow();
+        } finally {
           travelBack();
-        }).not.toThrow();
+          now.mockRestore();
+        }
       });
     });
   });
@@ -292,49 +358,72 @@ describe("TimeTravelTest", () => {
   it("time helper travel to with datetime and usec true", () => {
     withEnvTz("US/Eastern", () => {
       withTzDefault(TimeZone.find("UTC"), () => {
-        const durationUsec = Duration.seconds(0.1);
-        const traveledTime = dateTimeAdvance(DateTime.iso8601("2004-11-24T01:04:44.000-05:00"), {
-          seconds: durationUsec.inSeconds(),
-        });
-        const expectedTime = durationUsec.since(Time.new(2004, 11, 24, 1, 4, 44));
+        const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+        try {
+          const durationUsec = Duration.seconds(0.1);
+          const traveledTime = dateTimeAdvance(DateTime.iso8601("2004-11-24T01:04:44.000-05:00"), {
+            seconds: durationUsec.inSeconds(),
+          });
+          const expectedTime = durationUsec.since(Time.new(2004, 11, 24, 1, 4, 44));
 
-        expect(() => {
-          travelTo(traveledTime, { withUsec: true });
+          expect(() => {
+            travelTo(traveledTime, { withUsec: true });
 
-          expect(instantOf(Time.now())).toEqual(instantOf(expectedTime));
+            expect(instantOf(Time.now())).toEqual(instantOf(expectedTime));
 
+            travelBack();
+          }).not.toThrow();
+        } finally {
           travelBack();
-        }).not.toThrow();
+          now.mockRestore();
+        }
       });
     });
   });
 
   it("time helper travel to with string and usec", () => {
-    const expectedTime = Time.utc(2004, 11, 24, 1, 4, 44);
+    withTzDefault(TimeZone.find("UTC"), () => {
+      const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+      try {
+        const traveledTime = Time.new(2004, 11, 24, 1, 4, 44).plus(new Rational(1, 10));
+        const expectedTime = Time.new(2004, 11, 24, 1, 4, 44);
 
-    expect(() => {
-      travelTo("2004-11-24T01:04:44.100Z");
+        expect(() => {
+          travelTo(traveledTime.iso8601(3));
 
-      expect(instantOf(Time.now())).toEqual(instantOf(expectedTime));
+          expect(instantOf(Time.now())).toEqual(instantOf(expectedTime));
 
-      travelBack();
-    }).not.toThrow();
+          travelBack();
+        }).not.toThrow();
+      } finally {
+        travelBack();
+        now.mockRestore();
+      }
+    });
   });
 
   it("time helper travel to with string and usec true", () => {
-    const expectedTime = Time.utc(2004, 11, 24, 1, 4, 44).plus(new Rational(1, 10));
+    withTzDefault(TimeZone.find("UTC"), () => {
+      const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+      try {
+        const expectedTime = Time.new(2004, 11, 24, 1, 4, 44).plus(new Rational(1, 10));
 
-    expect(() => {
-      travelTo("2004-11-24T01:04:44.100Z", { withUsec: true });
+        expect(() => {
+          travelTo(expectedTime.iso8601(3), { withUsec: true });
 
-      expect(Time.now().toF()).toEqual(expectedTime.toF());
+          expect(Time.now().toF()).toEqual(expectedTime.toF());
 
-      travel(0.5, { withUsec: true });
+          travel(0.5, { withUsec: true });
 
-      expect(Time.now().toF()).toEqual(expectedTime.plus(0.5).toF());
+          expect(Time.now().toF()).toEqual(expectedTime.plus(0.5).toF());
 
-      travelBack();
-    }).not.toThrow();
+          travelBack();
+        }).not.toThrow();
+      } finally {
+        travelBack();
+        now.mockRestore();
+      }
+    });
   });
 
   it("time helper freeze time with usec true", () => {
@@ -349,28 +438,39 @@ describe("TimeTravelTest", () => {
   });
 
   it("time helper travel with subsequent block", () => {
-    const outerExpectedTime = Time.new(2004, 11, 24, 1, 4, 44);
-    const innerExpectedTime = Time.new(2004, 10, 24, 1, 4, 44);
-    travelTo(outerExpectedTime);
+    const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+    try {
+      const outerExpectedTime = Time.new(2004, 11, 24, 1, 4, 44);
+      const innerExpectedTime = Time.new(2004, 10, 24, 1, 4, 44);
+      travelTo(outerExpectedTime);
 
-    expect(Time.now().toS()).toEqual(outerExpectedTime.toS());
+      expect(Time.now().toS()).toEqual(outerExpectedTime.toS());
 
-    expect(() => {
-      travelTo(innerExpectedTime, {}, () => {
-        expect(Time.now().toS()).toEqual(innerExpectedTime.toS());
-      });
-    }).not.toThrow();
+      expect(() => {
+        travelTo(innerExpectedTime, {}, () => {
+          expect(Time.now().toS()).toEqual(innerExpectedTime.toS());
+        });
+      }).not.toThrow();
 
-    expect(Time.now().toS()).toEqual(outerExpectedTime.toS());
+      expect(Time.now().toS()).toEqual(outerExpectedTime.toS());
+    } finally {
+      travelBack();
+      now.mockRestore();
+    }
   });
 
   it("travel to will reset the usec to avoid mysql rounding", () => {
-    travelTo(Time.utc(2014, 10, 10, 10, 10, 50, 999999), {}, () => {
-      expect(Time.now().sec).toEqual(50);
-      expect(Time.now().usec).toEqual(0);
-      expect(DateTime.now().second).toEqual(50);
-      expect(dateTimeUsec(DateTime.now())).toEqual(0);
-    });
+    const now = vi.spyOn(Time, "now").mockReturnValue(Time.now());
+    try {
+      travelTo(Time.utc(2014, 10, 10, 10, 10, 50, 999999), {}, () => {
+        expect(Time.now().sec).toEqual(50);
+        expect(Time.now().usec).toEqual(0);
+        expect(DateTime.now().second).toEqual(50);
+        expect(dateTimeUsec(DateTime.now())).toEqual(0);
+      });
+    } finally {
+      now.mockRestore();
+    }
   });
 
   it.skip("time helper travel with time subclass");
