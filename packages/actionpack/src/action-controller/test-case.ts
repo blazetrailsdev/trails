@@ -409,6 +409,10 @@ export class TestCase {
         );
       });
     }
+
+    this.request.fetchHeader("SCRIPT_NAME", (k) => {
+      this.request.setHeader(k, (this.controller as any).config.relativeUrlRoot);
+    });
   }
 
   /** @internal */
@@ -418,11 +422,23 @@ export class TestCase {
         this.controller.dispatch(action, this.request, this.response).then(() => {}),
       );
     } finally {
+      this.request = this.controller.request as TestRequest;
+      this.response = this.controller.response;
+
+      const flashValue = this.request.flash!.toSessionValue();
+      if (flashValue) {
+        this.request.session.set("flash", flashValue);
+      } else {
+        this.request.session.delete("flash");
+      }
+
       if (xhr) {
         this.request.deleteHeader("HTTP_X_REQUESTED_WITH");
         this.request.deleteHeader("HTTP_ACCEPT");
       }
       this.request.queryString = "";
+
+      this.response.sentBang();
 
       for (const key of Object.keys(this.session)) delete this.session[key];
       Object.assign(this.session, (this.request.session as unknown as TestSession).toHash());
