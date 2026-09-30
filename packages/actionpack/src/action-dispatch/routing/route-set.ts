@@ -1208,9 +1208,9 @@ export class RouteSet {
         pathParameters = req.pathParameters;
         return true;
       } else if (app.matches(req) && app.engine()) {
-        const engineParameters = (
-          app.rackApp() as { routes: RouteSet }
-        ).routes.recognizePathWithRequest(req, path, extras, { raiseOnMissing: false });
+        const engineParameters = (app.rackApp() as { routes(): RouteSet })
+          .routes()
+          .recognizePathWithRequest(req, path, extras, { raiseOnMissing: false });
         if (engineParameters) {
           pathParameters = engineParameters;
           return true;

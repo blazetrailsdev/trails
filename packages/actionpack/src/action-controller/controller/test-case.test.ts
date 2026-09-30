@@ -4,6 +4,7 @@ import { TestCase } from "../test-case.js";
 import { Base } from "../base.js";
 import { Metal } from "../metal.js";
 import { Request } from "../../action-dispatch/http/request.js";
+import { TestResponse } from "../../action-dispatch/testing/test-response.js";
 import {
   fixtureFileUpload,
   type TestProcessHost,
@@ -450,7 +451,7 @@ describe("TestCaseTest", () => {
     });
 
     it("build_response returns a new Response", () => {
-      const resp = tc.buildResponse();
+      const resp = tc.buildResponse(TestResponse);
       expect(resp).toBeDefined();
     });
 

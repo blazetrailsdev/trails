@@ -422,14 +422,6 @@ export class IntegrationTest extends TestCase {
     await this.process("OPTIONS", path, options);
   }
 
-  async followRedirect(): Promise<void> {
-    const location = this.redirectUrl;
-    if (!location) {
-      throw new Error("No redirect to follow (no Location header)");
-    }
-    await this.get(location);
-  }
-
   get integrationSession(): this {
     return this;
   }
@@ -623,44 +615,6 @@ export class IntegrationTest extends TestCase {
   /** @internal */
   codeWithName(codeOrName: number | string): string {
     return responseAssertions.codeWithName(codeOrName);
-  }
-
-  assertContentType(expected: string): void {
-    const actual = this.response?.getHeader("content-type") ?? this.controller?.contentType ?? "";
-    if (!actual.includes(expected)) {
-      throw new Error(`Expected content type to include "${expected}", got "${actual}"`);
-    }
-  }
-
-  assertHeader(name: string, expected: string | RegExp): void {
-    const actual = this.response?.getHeader(name) ?? this.controller?.headers.get(name);
-    if (actual === undefined) {
-      throw new Error(`Expected header "${name}" to be set`);
-    }
-    if (typeof expected === "string") {
-      if (actual !== expected) {
-        throw new Error(`Expected header "${name}" to be "${expected}", got "${actual}"`);
-      }
-    } else {
-      if (!expected.test(actual)) {
-        throw new Error(`Expected header "${name}" to match ${expected}, got "${actual}"`);
-      }
-    }
-  }
-
-  assertFlash(key: string, expected?: string | RegExp): void {
-    const value = this.flash.get(key);
-    if (value === undefined) {
-      throw new Error(`Expected flash[:${key}] to be set`);
-    }
-    if (expected !== undefined) {
-      if (typeof expected === "string" && value !== expected) {
-        throw new Error(`Expected flash[:${key}] to be "${expected}", got "${value}"`);
-      }
-      if (expected instanceof RegExp && !expected.test(value as string)) {
-        throw new Error(`Expected flash[:${key}] to match ${expected}, got "${value}"`);
-      }
-    }
   }
 
   reset(): void {
