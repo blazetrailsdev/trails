@@ -95,7 +95,7 @@ function includedMember(
 
 interface IncludedMethodTable {
   prototype: object;
-  skipped: Set<string>;
+  ancestry: object;
 }
 
 const includedMethodTables = new WeakMap<object, WeakMap<Module, IncludedMethodTable>>();
@@ -110,36 +110,28 @@ function moduleInstanceMethod(
   if (!tables) includedMethodTables.set(cls, (tables = new WeakMap()));
   let table = tables.get(mod);
   if (!table) {
-    const probe = class {};
-    include(probe, mod);
-    const kept = new Set<string>();
-    const skipped = new Set<string>();
-    for (const included of includedModules(probe)) {
-      const names = moduleMethodNames(included);
-      const target = isModuleIncluded(cls, included as object) ? skipped : kept;
-      for (const name of names) target.add(name);
+    const scan = class {};
+    include(scan, mod);
+    const ancestry = class {};
+    for (const included of includedModules(scan).reverse()) {
+      if (included !== mod && isModuleIncluded(cls, included as object)) {
+        include(ancestry, included as object);
+      }
     }
-    for (const name of kept) skipped.delete(name);
-    table = { prototype: probe.prototype, skipped };
+    const probe = class extends ancestry {};
+    include(probe, mod);
+    table = { prototype: probe.prototype, ancestry: ancestry.prototype };
     tables.set(mod, table);
   }
-  if (table.skipped.has(key)) return undefined;
   for (
     let current: object | null = table.prototype;
-    current && current !== Object.prototype;
+    current && current !== table.ancestry;
     current = Object.getPrototypeOf(current) as object | null
   ) {
     const descriptor = Object.getOwnPropertyDescriptor(current, key);
     if (descriptor) return descriptor;
   }
   return undefined;
-}
-
-function moduleMethodNames(mod: unknown): string[] {
-  if (mod instanceof Module) return mod.instanceMethods();
-  if (typeof mod === "function")
-    return Object.getOwnPropertyNames((mod as { prototype: object }).prototype);
-  return Object.getOwnPropertyNames(mod);
 }
 
 function findTrailtieUrlHelpers(
