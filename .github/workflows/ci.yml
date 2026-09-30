@@ -1672,12 +1672,33 @@ jobs:
           key: vendor-sources-${{ hashFiles('vendor/sources.ts', 'vendor/sources.lock.json', 'vendor/fetch.ts') }}
       - name: Fetch upstream Ruby sources
         run: pnpm vendor:fetch
+      - name: Ruby extraction inputs
+        id: ruby-extraction-key
+        run: |
+          set -euo pipefail
+          dir=$RUNNER_TEMP/ruby-extraction
+          mkdir -p "$dir"
+          pnpm --silent vendor:fetch --print-lib-paths > "$dir/lib-paths.json"
+          pnpm --silent vendor:fetch --print-lib-entry-files > "$dir/lib-entry-files.json"
+          pnpm --silent vendor:fetch --print-test-paths > "$dir/test-paths.json"
+          ruby -e 'print RUBY_DESCRIPTION' > "$dir/ruby-version.txt"
+          echo "hash=$(cat "$dir"/* | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+      - name: Restore Ruby extraction outputs
+        id: ruby-extraction
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            scripts/api-compare/output/rails-api.json
+            scripts/test-compare/output/rails-tests.json
+          key: ruby-extraction-${{ steps.ruby-extraction-key.outputs.hash }}-${{ hashFiles('vendor/sources.lock.json', 'vendor/sources.ts', 'scripts/api-compare/extract-ruby-api.rb', 'scripts/test-compare/extract-ruby-tests.rb') }}
       - name: Start background gates
+        env:
+          RUBY_EXTRACTION_HIT: ${{ steps.ruby-extraction.outputs.cache-hit }}
         run: |
           node scripts/ci/bg-gates.mjs start <<'SPEC'
           ts-api: pnpm exec tsx scripts/api-compare/extract-ts-api.ts
-          ruby-api: cd scripts/api-compare && LIB_PATHS_JSON=$(pnpm --silent -C ../.. vendor:fetch --print-lib-paths) LIB_ENTRY_FILES_JSON=$(pnpm --silent -C ../.. vendor:fetch --print-lib-entry-files) LOCKFILE_PATH=$GITHUB_WORKSPACE/vendor/sources.lock.json ruby extract-ruby-api.rb
-          ruby-tests: cd scripts/test-compare && TEST_PATHS_JSON=$(pnpm --silent -C ../.. vendor:fetch --print-test-paths) ruby extract-ruby-tests.rb
+          ruby-api: if [ "$RUBY_EXTRACTION_HIT" = true ]; then echo "rails-api.json restored from cache"; else cd scripts/api-compare && LIB_PATHS_JSON=$(cat $RUNNER_TEMP/ruby-extraction/lib-paths.json) LIB_ENTRY_FILES_JSON=$(cat $RUNNER_TEMP/ruby-extraction/lib-entry-files.json) LOCKFILE_PATH=$GITHUB_WORKSPACE/vendor/sources.lock.json ruby extract-ruby-api.rb; fi
+          ruby-tests: if [ "$RUBY_EXTRACTION_HIT" = true ]; then echo "rails-tests.json restored from cache"; else cd scripts/test-compare && TEST_PATHS_JSON=$(cat $RUNNER_TEMP/ruby-extraction/test-paths.json) ruby extract-ruby-tests.rb; fi
           deprecated: pnpm exec tsx scripts/build-rails-privates-manifest.ts --check-deprecated
           eslint-excludes: pnpm exec tsx scripts/generate-standalone-associations-exclude.ts && pnpm exec tsx scripts/test-deps/rails-test-deps.ts && pnpm exec tsx scripts/test-deps/build-fixture-baseline.ts
           privates-manifest after ruby-api,deprecated: pnpm exec tsx scripts/build-rails-privates-manifest.ts
@@ -1700,6 +1721,7 @@ jobs:
           conventions-doc: pnpm exec tsx scripts/parity/conventions-doc.ts --check
           SPEC
       - name: Extract Ruby API
+        id: extract-ruby-api
         run: node scripts/ci/bg-gates.mjs wait ruby-api
       - name: API comparison
         run: node scripts/ci/bg-gates.mjs wait ts-api && pnpm exec tsx scripts/api-compare/compare.ts
@@ -1982,7 +2004,21 @@ jobs:
         # so the silent-drop surface stays visible in the job log.
         run: node scripts/ci/bg-gates.mjs wait method-order-manifest method-order
       - name: Extract Ruby tests
+        id: extract-ruby-tests
+        if: ${{ !cancelled() }}
         run: node scripts/ci/bg-gates.mjs wait ruby-tests
+      - name: Save Ruby extraction outputs
+        if: >-
+          !cancelled() &&
+          steps.ruby-extraction.outputs.cache-hit != 'true' &&
+          steps.extract-ruby-api.outcome == 'success' &&
+          steps.extract-ruby-tests.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            scripts/api-compare/output/rails-api.json
+            scripts/test-compare/output/rails-tests.json
+          key: ${{ steps.ruby-extraction.outputs.cache-primary-key }}
       - name: Rails test-name parity ratchet
         # Only-shrink per-file gate on TS-only tests sitting in Rails-named
         # test files (RFC 0124). The manifest needs the Ruby test extraction
