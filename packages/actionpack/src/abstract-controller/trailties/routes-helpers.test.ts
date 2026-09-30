@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { include } from "@blazetrails/ruby-compat";
+
+import { RouteSet } from "../../action-dispatch/routing/route-set.js";
+import { UrlFor } from "../../action-dispatch/routing/url-for.js";
 import type { HelperMethodsModule } from "../helpers.js";
 import { withRoutesHelpers, type RoutesHelpersControllerClass } from "./routes-helpers.js";
 
@@ -119,5 +123,32 @@ describe("withRoutesHelpers", () => {
     const proto = cls.prototype as { a?: () => string; b?: () => string };
     expect(proto.a?.()).toBe("a");
     expect(proto.b?.()).toBe("b");
+  });
+
+  it("crosses a Module's own and nested instance methods, deferring modules the class already includes", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("posts", { to: "posts#index", as: "posts" });
+    });
+    const parent = class {
+      urlOptions(): Record<string, unknown> {
+        return { host: "example.com" };
+      }
+    };
+    include(parent, UrlFor);
+    const cls = class extends parent {};
+    withRoutesHelpers(routes, false)(cls as unknown as RoutesHelpersControllerClass);
+    const sub = class extends cls {};
+    const instance = new sub() as unknown as {
+      _generatePathsByDefault(): boolean;
+      postsUrl?: unknown;
+      postsPath?: unknown;
+      urlOptions(): Record<string, unknown>;
+    };
+
+    expect(instance._generatePathsByDefault()).toBe(false);
+    expect(typeof instance.postsUrl).toBe("function");
+    expect(instance.postsPath).toBeUndefined();
+    expect(instance.urlOptions()).toEqual({ host: "example.com" });
   });
 });

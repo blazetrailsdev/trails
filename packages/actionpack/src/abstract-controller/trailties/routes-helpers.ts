@@ -1,6 +1,6 @@
 /** @internal */
 
-import { Module } from "@blazetrails/ruby-compat";
+import { include, includedModules, isModuleIncluded, Module } from "@blazetrails/ruby-compat";
 
 import type { HelperMethodsModule, HelpersClassMethods } from "../helpers.js";
 
@@ -29,16 +29,16 @@ export function withRoutesHelpers(
       new Proxy(Object.getPrototypeOf(proto) as object, {
         get(target, key, receiver) {
           if (typeof key === "string") {
-            const accessor = includedAccessor(urlHelpersModule(), key);
+            const accessor = includedAccessor(cls, urlHelpersModule(), key);
             if (accessor) return accessor.get!.call(receiver);
-            const member = includedMember(urlHelpersModule(), key);
+            const member = includedMember(cls, urlHelpersModule(), key);
             if (member !== undefined) return member;
           }
           return Reflect.get(target, key, receiver);
         },
         set(target, key, value, receiver) {
           const accessor =
-            typeof key === "string" ? includedAccessor(urlHelpersModule(), key) : undefined;
+            typeof key === "string" ? includedAccessor(cls, urlHelpersModule(), key) : undefined;
           if (accessor?.set) {
             accessor.set.call(receiver, value);
             return true;
@@ -46,7 +46,11 @@ export function withRoutesHelpers(
           return Reflect.set(target, key, value, receiver);
         },
         has(target, key) {
-          if (typeof key === "string" && includedMember(urlHelpersModule(), key) !== undefined) {
+          if (
+            typeof key === "string" &&
+            (includedAccessor(cls, urlHelpersModule(), key) ||
+              includedMember(cls, urlHelpersModule(), key) !== undefined)
+          ) {
             return true;
           }
           return Reflect.has(target, key);
@@ -62,19 +66,22 @@ export interface RoutesHelpersControllerClass extends RoutesHelpersClassMethods 
 }
 
 function includedAccessor(
+  cls: RoutesHelpersControllerClass,
   mod: HelperMethodsModule | Module,
   key: string,
 ): PropertyDescriptor | undefined {
   if (!(mod instanceof Module)) return undefined;
-  const descriptor = mod.instanceMethod(key);
+  const descriptor = moduleInstanceMethod(cls, mod, key);
   return descriptor?.get ? descriptor : undefined;
 }
 
-function includedMember(mod: HelperMethodsModule | Module, key: string): unknown {
+function includedMember(
+  cls: RoutesHelpersControllerClass,
+  mod: HelperMethodsModule | Module,
+  key: string,
+): unknown {
+  if (mod instanceof Module) return moduleInstanceMethod(cls, mod, key)?.value;
   let current: object | null = mod;
-  if (mod instanceof Module) {
-    current = Object.getPrototypeOf(mod) as object | null;
-  }
   while (current && current !== Object.prototype) {
     const own = Object.getOwnPropertyDescriptor(current, key);
     if (own && (own.enumerable || !Object.prototype.hasOwnProperty.call(current, "constructor"))) {
@@ -84,6 +91,55 @@ function includedMember(mod: HelperMethodsModule | Module, key: string): unknown
     current = Object.getPrototypeOf(current) as object | null;
   }
   return undefined;
+}
+
+interface IncludedMethodTable {
+  prototype: object;
+  skipped: Set<string>;
+}
+
+const includedMethodTables = new WeakMap<object, WeakMap<Module, IncludedMethodTable>>();
+
+function moduleInstanceMethod(
+  cls: RoutesHelpersControllerClass,
+  mod: Module,
+  key: string,
+): PropertyDescriptor | undefined {
+  if (key === "constructor") return undefined;
+  let tables = includedMethodTables.get(cls);
+  if (!tables) includedMethodTables.set(cls, (tables = new WeakMap()));
+  let table = tables.get(mod);
+  if (!table) {
+    const probe = class {};
+    include(probe, mod);
+    const kept = new Set<string>();
+    const skipped = new Set<string>();
+    for (const included of includedModules(probe)) {
+      const names = moduleMethodNames(included);
+      const target = isModuleIncluded(cls, included as object) ? skipped : kept;
+      for (const name of names) target.add(name);
+    }
+    for (const name of kept) skipped.delete(name);
+    table = { prototype: probe.prototype, skipped };
+    tables.set(mod, table);
+  }
+  if (table.skipped.has(key)) return undefined;
+  for (
+    let current: object | null = table.prototype;
+    current && current !== Object.prototype;
+    current = Object.getPrototypeOf(current) as object | null
+  ) {
+    const descriptor = Object.getOwnPropertyDescriptor(current, key);
+    if (descriptor) return descriptor;
+  }
+  return undefined;
+}
+
+function moduleMethodNames(mod: unknown): string[] {
+  if (mod instanceof Module) return mod.instanceMethods();
+  if (typeof mod === "function")
+    return Object.getOwnPropertyNames((mod as { prototype: object }).prototype);
+  return Object.getOwnPropertyNames(mod);
 }
 
 function findTrailtieUrlHelpers(
