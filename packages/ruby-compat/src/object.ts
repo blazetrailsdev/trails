@@ -3,6 +3,7 @@ import { isSymbol } from "./symbol.js";
 import { rubyClass, type Comparable } from "./comparable.js";
 import { TypeError } from "./type-error.js";
 import { NameError } from "./name-error.js";
+import { FrozenError } from "./frozen-error.js";
 import { NoMethodError } from "./no-method-error.js";
 
 /**
@@ -652,4 +653,101 @@ function floToS(flo: number | { valueOf(): number }): string {
     return `${s}0.${"0".repeat(-decpt)}${buf}`;
   }
   return `${s}${buf[0]}.${digs > 1 ? buf.slice(1) : "0"}e${decpt - 1 < 0 ? "-" : "+"}${String(Math.abs(decpt - 1)).padStart(2, "0")}`;
+}
+
+const ivarFields = new WeakMap<object, Map<string, string>>();
+
+/**
+ * The ivar-table entry `rb_ivar_set` (`vendor/ruby/v3.3.11/variable.c:1923`) writes
+ * for `iv`, located on `klass`'s instances: the JS field holding it, where that
+ * is not the field-name rule's spelling. An ivar behind a same-named reader
+ * lives in the `_`-prefixed field. {@link rbObjIvarGet}, {@link rbObjIvarSet}
+ * and {@link rbObjInstanceVariables} read the declaration, which subclasses
+ * inherit.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core ivar table (`vendor/ruby/v3.3.11/variable.c:1923`).
+ */
+export function rbDeclareIvar(klass: { prototype: object }, iv: string, field: string): void {
+  let table = ivarFields.get(klass.prototype);
+  if (!table) ivarFields.set(klass.prototype, (table = new Map()));
+  table.set(iv, field);
+}
+
+function ivarField(obj: object, id: string): string {
+  for (let o: object | null = obj; o; o = Object.getPrototypeOf(o) as object | null) {
+    const field = ivarFields.get(o)?.get(id);
+    if (field !== undefined) return field;
+  }
+  return id.slice(1).replace(/(?<=[A-Za-z\d])_([a-z])/g, (_, c: string) => c.toUpperCase());
+}
+
+function fieldIvar(obj: object, field: string): string {
+  for (let o: object | null = obj; o; o = Object.getPrototypeOf(o) as object | null) {
+    for (const [iv, f] of ivarFields.get(o) ?? []) if (f === field) return iv;
+  }
+  const iv = `@${field.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)}`;
+  return ivarField(obj, iv) === field ? iv : `@${field}`;
+}
+
+function idForVar(obj: object, iv: string): string {
+  if (!/^@[A-Za-z_\u0080-\u{10FFFF}][A-Za-z0-9_\u0080-\u{10FFFF}]*$/u.test(iv)) {
+    throw new NameError(`\`${iv}' is not allowed as an instance variable name`, iv, {
+      receiver: obj,
+    });
+  }
+  return iv;
+}
+
+/**
+ * `Kernel#instance_variables` (`rb_obj_instance_variables`,
+ * `vendor/ruby/v3.3.11/variable.c:2259`): the ivar names of `obj`'s own
+ * enumerable fields, each spelled by its {@link rbDeclareIvar} declaration or
+ * the field-name rule (`fooBar` is `@foo_bar`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Kernel#instance_variables`
+ * (`vendor/ruby/v3.3.11/variable.c:2259`).
+ */
+export function rbObjInstanceVariables(obj: object): string[] {
+  return Object.keys(obj).map((field) => fieldIvar(obj, field));
+}
+
+/**
+ * `Kernel#instance_variable_get` (`rb_obj_ivar_get`, `vendor/ruby/v3.3.11/object.c:2880`):
+ * the value of ivar `iv`, or `nil` when `obj` has no own field for it
+ * (`rb_ivar_get`, `vendor/ruby/v3.3.11/variable.c:1405`), never an inherited
+ * method or accessor. A name that is not an ivar name (`rb_is_instance_name`,
+ * where a non-ASCII character is an identifier character) raises `NameError`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Kernel#instance_variable_get`
+ * (`vendor/ruby/v3.3.11/object.c:2880`).
+ */
+export function rbObjIvarGet(obj: object, iv: string): unknown {
+  const id = idForVar(obj, iv);
+  const field = ivarField(obj, id);
+  return Object.hasOwn(obj, field) ? (obj as Record<string, unknown>)[field] : null;
+}
+
+/**
+ * `Kernel#instance_variable_set` (`rb_obj_ivar_set_m`, `vendor/ruby/v3.3.11/object.c:2914`):
+ * sets ivar `iv` as an own field of `obj`, never through a setter, as
+ * `rb_ivar_set` (`vendor/ruby/v3.3.11/variable.c:1923`) writes the ivar table
+ * directly after `rb_check_frozen`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Kernel#instance_variable_set`
+ * (`vendor/ruby/v3.3.11/object.c:2914`).
+ */
+export function rbObjIvarSet(obj: object, iv: string, val: unknown): unknown {
+  const id = idForVar(obj, iv);
+  if (Object.isFrozen(obj)) {
+    throw new FrozenError(`can't modify frozen ${rbObjClass(obj)}: ${rbInspect(obj)}`, {
+      receiver: obj,
+    });
+  }
+  Object.defineProperty(obj, ivarField(obj, id), {
+    value: val,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+  return val;
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
+import { dump, unsafeLoad } from "@blazetrails/activesupport/yaml";
 import { Types } from "../index.js";
 
 const type = new Types.IntegerType();
@@ -87,5 +88,37 @@ describe("IntegerType", () => {
   it("cast rescues the FloatDomainError a non-finite decimal raises", () => {
     expect(type.cast(BigDecimal.NAN)).toBeNull();
     expect(type.cast(BigDecimal.INFINITY)).toBeNull();
+  });
+
+  it("casts a 64-bit string exactly, as String#to_i does", () => {
+    const bigint = new Types.IntegerType({ limit: 8 });
+    expect(bigint.cast("9223372036854775807")).toBe(9223372036854775807n);
+    expect(bigint.serialize("9223372036854775807")).toBe(9223372036854775807n);
+    expect(() => bigint.serialize("9223372036854775808")).toThrow(
+      "9223372036854775808 is out of range for IntegerType with limit 8 bytes",
+    );
+  });
+
+  it("casts a safe bigint to a number and keeps a large one exact", () => {
+    expect(type.cast(42n)).toBe(42);
+    expect(new Types.IntegerType({ limit: 8 }).cast(9223372036854775807n)).toBe(
+      9223372036854775807n,
+    );
+  });
+
+  it("holds exact 64-bit endpoints in its @range", () => {
+    const bigint = new Types.IntegerType({ limit: 8 });
+    expect(bigint.serialize(-9223372036854775808n)).toBe(-9223372036854775808n);
+    expect(() => bigint.serialize(-9223372036854775809n)).toThrow(
+      "-9223372036854775809 is out of range for IntegerType with limit 8 bytes",
+    );
+  });
+
+  it("dumps and loads its @range through YAML", () => {
+    const yaml = dump(new Types.IntegerType());
+    expect(yaml).toContain("range: !ruby/range");
+    const loaded = unsafeLoad(yaml) as InstanceType<typeof Types.IntegerType>;
+    expect(loaded.serialize(2147483647)).toBe(2147483647);
+    expect(() => loaded.serialize(2147483648)).toThrow("out of range");
   });
 });

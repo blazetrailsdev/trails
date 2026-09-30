@@ -10,7 +10,13 @@ import {
   rbFSend,
   rbModPrivate,
   rbModPublicMethodDefined,
+  rbDeclareIvar,
+  rbObjInstanceVariables,
+  rbObjIvarGet,
+  rbObjIvarSet,
 } from "./object.js";
+import { NameError } from "./name-error.js";
+import { FrozenError } from "./frozen-error.js";
 import { NoMethodError } from "./no-method-error.js";
 
 describe("Object#inspect", () => {
@@ -218,5 +224,65 @@ describe("rbModPublicMethodDefined", () => {
     expect(rbModPublicMethodDefined(Req, "field")).toBe(false);
     expect(rbModPublicMethodDefined(Req, "hasOwnProperty")).toBe(false);
     expect(rbModPublicMethodDefined(Req, "nope")).toBe(false);
+  });
+});
+
+describe("Kernel#instance_variable_get / instance_variable_set", () => {
+  class Holder {
+    fooBar = 1;
+    _items: number[] = [];
+    get items(): number[] {
+      return this._items;
+    }
+  }
+  rbDeclareIvar(Holder, "@items", "_items");
+  class SubHolder extends Holder {}
+
+  it("names each field by its declaration or the field-name rule", () => {
+    expect(rbObjInstanceVariables(new Holder())).toEqual(["@foo_bar", "@items"]);
+  });
+
+  it("reads and writes the declared field, never through the reader", () => {
+    const o = new SubHolder();
+    expect(rbObjIvarSet(o, "@items", [2])).toEqual([2]);
+    expect(o._items).toEqual([2]);
+    expect(Object.hasOwn(o, "items")).toBe(false);
+    expect(rbObjIvarGet(o, "@items")).toEqual([2]);
+    expect(rbObjIvarGet(o, "@foo_bar")).toBe(1);
+    expect(rbObjIvarGet(o, "@missing")).toBeNull();
+    expect(rbObjIvarGet(new SubHolder(), "@constructor")).toBeNull();
+    rbObjIvarSet(o, "@é", 4);
+    expect(rbObjIvarGet(o, "@é")).toBe(4);
+    rbObjIvarSet(o, "@_cache_key", 3);
+    expect(Object.hasOwn(o, "_cacheKey")).toBe(true);
+    expect(rbObjInstanceVariables(o)).toContain("@_cache_key");
+  });
+
+  it("reports each field under a name that reads the same field back", () => {
+    const o = Object.assign(new Holder(), { a_1: 5, HTTP: 6, fooBAR: 7 });
+    expect(rbObjInstanceVariables(o)).toEqual([
+      "@foo_bar",
+      "@items",
+      "@a_1",
+      "@HTTP",
+      "@foo_b_a_r",
+    ]);
+    expect([
+      rbObjIvarGet(o, "@a_1"),
+      rbObjIvarGet(o, "@HTTP"),
+      rbObjIvarGet(o, "@foo_b_a_r"),
+    ]).toEqual([5, 6, 7]);
+  });
+
+  it("raises FrozenError on a frozen receiver", () => {
+    expect(() => rbObjIvarSet(Object.freeze(new Holder()), "@items", [])).toThrow(FrozenError);
+  });
+
+  it("raises NameError for a name that is not an ivar name", () => {
+    expect(() => rbObjIvarGet(new Holder(), "foo")).toThrow(NameError);
+    expect(() => rbObjIvarGet(new Holder(), "@1a")).toThrow(NameError);
+    expect(() => rbObjIvarSet(new Holder(), "foo", 1)).toThrow(
+      "`foo' is not allowed as an instance variable name",
+    );
   });
 });

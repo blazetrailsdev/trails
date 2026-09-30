@@ -8,6 +8,7 @@ import {
   except,
   fetch,
   hasKey,
+  rbDeclareIvar,
   rbEqual,
   transformValues,
 } from "@blazetrails/ruby-compat";
@@ -296,6 +297,8 @@ export class LazyAttributeHash {
     return dup;
   }
 }
+
+rbDeclareIvar(LazyAttributeHash, "@delegate_hash", "_delegateHash");
 
 registerConstant("ActiveModel::AttributeSet::Builder", Builder);
 registerConstant("ActiveModel::LazyAttributeSet", LazyAttributeSet);

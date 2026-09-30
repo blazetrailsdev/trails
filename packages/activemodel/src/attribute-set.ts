@@ -15,6 +15,7 @@ import {
   except,
   fetch as hashFetch,
   hasKey,
+  rbDeclareIvar,
   rbFPublicSend,
   rbInspect,
   rbEqual,
@@ -258,5 +259,7 @@ export class AttributeSet {
     }
   }
 }
+
+rbDeclareIvar(AttributeSet, "@attributes", "_attributes");
 
 registerConstant("ActiveModel::AttributeSet", AttributeSet);

@@ -1,4 +1,5 @@
 import { wrap } from "@blazetrails/activesupport";
+import { rbEqual } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
 
@@ -6,6 +7,10 @@ type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
 const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
+const bigintNumber = (_key: string, value: unknown): unknown =>
+  typeof value === "bigint"
+    ? (JSON as JSON & { rawJSON(text: string): unknown }).rawJSON(value.toString())
+    : value;
 
 export class Association {
   readonly klass: typeof Base;
@@ -314,19 +319,12 @@ export class LoaderQuery {
   }
 
   eql(other: LoaderQuery): boolean {
-    const keysMatch =
-      this.associationKeyName === other.associationKeyName ||
-      (Array.isArray(this.associationKeyName) &&
-        Array.isArray(other.associationKeyName) &&
-        this.associationKeyName.length === other.associationKeyName.length &&
-        this.associationKeyName.every((k, i) => k === (other.associationKeyName as string[])[i]));
     return (
-      keysMatch &&
+      rbEqual(this.associationKeyName, other.associationKeyName) &&
       this.scope.tableName === other.scope.tableName &&
       this.scope.model.connectionSpecificationName ===
         other.scope.model.connectionSpecificationName &&
-      JSON.stringify(this.scope.valuesForQueries()) ===
-        JSON.stringify(other.scope.valuesForQueries())
+      rbEqual(this.scope.valuesForQueries(), other.scope.valuesForQueries())
     );
   }
 
@@ -334,7 +332,7 @@ export class LoaderQuery {
     const keyName = Array.isArray(this.associationKeyName)
       ? this.associationKeyName.join(",")
       : this.associationKeyName;
-    return `${keyName}::${this.scope.model.tableName}::${this.scope.model.connectionSpecificationName}::${JSON.stringify(this.scope.valuesForQueries())}`;
+    return `${keyName}::${this.scope.model.tableName}::${this.scope.model.connectionSpecificationName}::${JSON.stringify(this.scope.valuesForQueries(), bigintNumber)}`;
   }
 
   async loadRecordsForKeys(
