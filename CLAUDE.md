@@ -1356,6 +1356,7 @@ the capability, in a different place. Each is decided here, and each but
 | `active_support/string_inquirer.rb`                   | Proxy                 |
 | `active_support/time_with_zone.rb`                    | Proxy                 |
 | `rails/railtie.rb`                                    | Proxy (class chain)   |
+| `rails/engine/lazy_route_set.rb`                      | Proxy (module chain)  |
 | `rails/railtie/configuration.rb`                      | Proxy                 |
 | `action_controller/metal/mime_responds.rb`            | Proxy                 |
 | `action_dispatch/http/mime_type.rb`                   | Proxy (`is…` names)   |
@@ -1405,6 +1406,21 @@ every class below it forwards to `instance()` when the railtie is not abstract
 and the instance answers the name, so `Blog::Engine.routes` reaches
 `Engine#routes`. `Function.prototype.call` answers `call` before the trap can,
 so `Engine` forwards that one name with an explicit `static call`.
+
+`rails/engine/lazy_route_set.rb`'s `method_missing_module` (`:92-110`) is
+prepended onto `named_routes.url_helpers_module` / `path_helpers_module`
+(`:52-53`). A trails `Module` copies its carrier into each includer's link, so
+a Proxy there would reach no includer. Instead, `LazyRouteSet#generateUrlHelpers`
+splices the Proxy directly beneath the generated module, the one object that
+reaches those modules through `extend`. Ruby re-sends once
+`reload_routes_unless_loaded` answers truthy. trails' reload is an awaited
+`import()`, and a pending promise is always truthy. So the async
+`methodMissing` awaits the reload and re-sends, while the synchronous
+`respondToMissing` starts the load and answers `super`. A missed read therefore
+reads `undefined` until the load settles. After that, the live `Module`
+includes answer the drawn helpers. `IntegrationTest` has no helper read to
+wait on, so test_help's `before_setup` (`test_help.rb:43-48`) awaits the
+reload before the test body runs.
 
 ## `inherited` is deferred to own-property memo guards (`ModelSchema.inherited`)
 

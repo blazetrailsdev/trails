@@ -1,6 +1,7 @@
 import { RouteSet, type DrawCallback, type Request } from "@blazetrails/actionpack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { TopLevel } from "@blazetrails/activesupport";
+import { NoMethodError, rbFPublicSend } from "@blazetrails/ruby-compat";
 
 type AnyFn = (...args: unknown[]) => unknown;
 type ProxyHelpers = Record<
@@ -8,6 +9,7 @@ type ProxyHelpers = Record<
   AnyFn
 >;
 type MethodMissingModule = {
+  methodMissing(this: object, name: string, ...args: unknown[]): Promise<unknown>;
   respondToMissing(this: object, name: string, includeAll?: boolean): boolean;
 };
 
@@ -75,8 +77,8 @@ export class LazyRouteSet extends RouteSet {
             if (typeof name === "symbol" || Reflect.has(target, name)) {
               return Reflect.get(target, name, receiver);
             }
-            receiver.respondToMissing(name);
-            return undefined;
+            if (!receiver.respondToMissing(name)) return undefined;
+            return (...args: unknown[]) => receiver.methodMissing(name, ...args);
           },
         },
       ),
@@ -90,6 +92,14 @@ export class LazyRouteSet extends RouteSet {
   /** @internal */
   private methodMissingModule(): MethodMissingModule {
     return (this._methodMissingModule ??= {
+      async methodMissing(this: object, name: string, ...args: unknown[]): Promise<unknown> {
+        if (await TopLevel.Trails!.application?.reloadRoutesUnlessLoaded()) {
+          return rbFPublicSend(this, name, ...args);
+        } else {
+          throw new NoMethodError(`undefined method '${name}' for module '#<Module>'`, name);
+        }
+      },
+
       respondToMissing(this: object, _name: string, _includeAll: boolean = false): boolean {
         void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
         return false;

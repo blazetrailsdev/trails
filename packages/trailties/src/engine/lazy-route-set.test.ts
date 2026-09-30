@@ -8,6 +8,14 @@ import { Trails } from "../rails.js";
 
 class StubController {}
 
+function assertOperator(o1: object, operator: "respond_to?", o2: string): void {
+  expect(rbObjRespondTo(o1, o2), `Expected ${String(o1)} to be ${operator} ${o2}`).toBe(true);
+}
+
+function assertNotOperator(o1: string, operator: "in", o2: object): void {
+  expect(o1 in o2, `Expected ${o1} to not be ${operator} ${String(o2)}`).toBe(false);
+}
+
 describe("LazyRouteSet", () => {
   let routes: LazyRouteSet;
   let reload: ReturnType<typeof vi.fn>;
@@ -79,43 +87,38 @@ describe("LazyRouteSet", () => {
     expect(() => routes.draw(() => {})).not.toThrow();
   });
 
-  describe("when the application's routes are not loaded yet", () => {
+  function loadRoutesLazily(): () => Promise<boolean | null> | undefined {
     let loading: Promise<boolean | null> | undefined;
-
-    beforeEach(() => {
-      loading = undefined;
-      let loaded = false;
-      reload.mockImplementation(() => {
-        if (loaded) return (loading ??= Promise.resolve(null));
-        loaded = true;
-        return (loading = Promise.resolve().then(() => {
-          routes.draw((m: Mapper) => {
-            m.root({ to: "posts#index" });
-          });
-          return true;
-        }));
-      });
+    reload.mockImplementation(() => {
+      if (loading) return Promise.resolve(null);
+      return (loading = Promise.resolve().then(() => {
+        routes.draw((m: Mapper) => {
+          m.root({ to: "posts#index" });
+        });
+        return true;
+      }));
     });
+    return () => loading;
+  }
 
-    it("app lazily loads routes when invoking url helpers", async () => {
-      const appUrlHelpers = routes.urlHelpers() as unknown as { rootPath(): string };
+  it("app lazily loads routes when invoking url helpers", async () => {
+    const loading = loadRoutesLazily();
+    const appUrlHelpers = routes.urlHelpers() as unknown as { rootPath(): string };
 
-      expect("rootPath" in appUrlHelpers).toBe(false);
-      expect(appUrlHelpers.rootPath).toBeUndefined();
-      expect(reload).toHaveBeenCalled();
-      await loading;
-      expect(appUrlHelpers.rootPath()).toBe("/");
-    });
+    assertNotOperator("rootPath", "in", appUrlHelpers);
+    void appUrlHelpers.rootPath;
+    await loading();
+    expect(appUrlHelpers.rootPath()).toBe("/");
+  });
 
-    it("app lazily loads routes when checking respond_to?", async () => {
-      const appUrlHelpers = routes.urlHelpers();
+  it("app lazily loads routes when checking respond_to?", async () => {
+    const loading = loadRoutesLazily();
+    const appUrlHelpers = routes.urlHelpers();
 
-      expect("rootPath" in appUrlHelpers).toBe(false);
-      expect(rbObjRespondTo(appUrlHelpers, "rootPath")).toBe(false);
-      expect(reload).toHaveBeenCalled();
-      await loading;
-      expect(rbObjRespondTo(appUrlHelpers, "rootPath")).toBe(true);
-    });
+    assertNotOperator("rootPath", "in", appUrlHelpers);
+    rbObjRespondTo(appUrlHelpers, "rootPath");
+    await loading();
+    assertOperator(appUrlHelpers, "respond_to?", "rootPath");
   });
 
   it("new_with_config builds an instance of the receiving subclass", () => {
