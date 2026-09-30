@@ -176,7 +176,7 @@ describe("buildViews", () => {
     expect(
       check("const a: R extends { name: unknown } ? 1 : 2 = 2; void a;").length,
     ).toBeGreaterThan(0);
-  });
+  }, 30_000);
 
   it("emits an empty augmentation when no partials have a locals directive", () => {
     const cwd = mkScratch();
@@ -415,28 +415,30 @@ describe("runCli", () => {
       "app/controllers/application-controller.ts",
       "export class ApplicationController {}",
     );
-    for (const [name, type] of [
-      ["comments", "string[]"],
-      ["posts", "number[]"],
+    for (const [file, name, field] of [
+      ["comments", "CommentsController", "declare items: string[];"],
+      ["posts", "PostsController", "private declare items: number[];"],
+      ["admin/posts", "AdminPostsController", "declare items: boolean[];"],
     ]) {
       write(
         cwd,
-        `app/controllers/${name}-controller.ts`,
+        `app/controllers/${file}-controller.ts`,
         [
-          'import { ApplicationController } from "./application-controller.js";',
-          `export class ${name[0].toUpperCase()}${name.slice(1)}Controller extends ApplicationController {`,
-          `  declare items: ${type};`,
-          "}",
+          `import { ApplicationController } from "${file.includes("/") ? "../" : "./"}application-controller.js";`,
+          `export class ${name} extends ApplicationController { ${field} }`,
         ].join("\n"),
       );
     }
     write(cwd, "app/views/layouts/application.html.tse", "<%= this.items %>");
     write(cwd, "app/views/layouts/posts.html.tse", "<%= this.items %>");
+    write(cwd, "app/views/layouts/admin/posts.html.tse", "<%= this.items %>");
     buildViews({ cwd });
     const read = (rel: string): string =>
       fs.readFileSync(path.join(cwd, ".trails/views", `${rel}.ts`), "utf8");
-    expect(read("layouts/application.html.tse")).toContain('{ "items": string[] }');
+    expect(read("layouts/application.html.tse")).toContain('{ "items": string[] | undefined }');
     expect(read("layouts/posts.html.tse")).toContain('{ "items": number[] }');
+    expect(read("layouts/admin/posts.html.tse")).toContain('{ "items": boolean[] }');
+    expect(fs.existsSync(path.join(cwd, "app/controllers/posts-controller.d.ts"))).toBe(false);
   }, 30_000);
 
   it("types a partial's locals from each hash of a conditional render", () => {

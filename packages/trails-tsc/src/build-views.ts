@@ -82,7 +82,7 @@ export function buildViews(opts: BuildViewsOptions = {}): BuildViewsResult {
       for (const view of views) writeShim(view, viewsDir);
       program = ts.createProgram(roots, EMIT_OPTIONS, host, program);
     }
-    emitDeclarations(program, host);
+    emitDeclarations(program, host, outViews);
   }
   const registryEntries = Array.from(registryMap, ([key, types]) => ({
     key,
@@ -296,9 +296,10 @@ function bindCheckedTypes(
         merged.set(name, (merged.get(name) ?? new Set<string>()).add(type));
       }
     }
-    const fields = [...merged].map(
-      ([name, types]) => `${JSON.stringify(name)}: ${[...types].join(" | ")}`,
-    );
+    const fields = [...merged].map(([name, types]) => {
+      const everywhere = (rendering ?? []).every((c) => members.get(c)?.has(name));
+      return `${JSON.stringify(name)}: ${[...types, ...(everywhere ? [] : ["undefined"])].join(" | ")}`;
+    });
     if (fields.length > 0) view.view.push(`{ ${fields.join("; ")} }`);
   }
   for (const [target, { calls, keys }] of renders) {
@@ -332,8 +333,6 @@ function controllerMembers(
   for (const prop of checker.getPropertiesOfType(instance)) {
     const declarations = prop.declarations ?? [];
     if (declarations.every((d) => d.getSourceFile().isDeclarationFile)) continue;
-    const flags = ts.getCombinedModifierFlags(declarations[0]);
-    if (flags & (ts.ModifierFlags.Private | ts.ModifierFlags.Protected)) continue;
     const type = checker.getTypeOfSymbolAtLocation(prop, klass);
     if (type.getCallSignatures().length > 0) continue;
     members.set(prop.name, typeText(type));
@@ -457,7 +456,7 @@ function templateScope(
     'Record<"alert" | "notice", unknown>',
   );
   const prefix = path.posix.dirname(rel);
-  const layout = /^layouts\/([^_][^.]*)\./u.exec(rel)?.[1];
+  const layout = /^layouts\/((?:[^/]+\/)*[^_/][^/.]*)\./u.exec(rel)?.[1];
   const controller = layout === undefined ? controllers.find((c) => c.path === prefix) : undefined;
   const locals = new Map<string, Set<string>>();
   const partial = /^_([a-z_]\w*)/u.exec(path.posix.basename(rel));
@@ -509,8 +508,10 @@ function emitRegistryAugmentation(entries: Array<{ key: string; localsType: stri
   return lines.join("\n");
 }
 
-function emitDeclarations(program: ts.Program, host: ts.CompilerHost): void {
-  const emitResult = program.emit();
+function emitDeclarations(program: ts.Program, host: ts.CompilerHost, outViews: string): void {
+  const emitResult = program.emit(undefined, (fileName, ...rest) => {
+    if (path.resolve(fileName).startsWith(outViews + path.sep)) host.writeFile(fileName, ...rest);
+  });
   if (emitResult.emitSkipped) {
     const diagnostics = [...ts.getPreEmitDiagnostics(program), ...emitResult.diagnostics];
     const formatted = ts.formatDiagnostics(ts.sortAndDeduplicateDiagnostics(diagnostics), host);
