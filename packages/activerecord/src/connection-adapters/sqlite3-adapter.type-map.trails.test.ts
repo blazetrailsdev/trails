@@ -49,7 +49,7 @@ describe("SQLite3Adapter type-map limit threading", () => {
   it("defaults SQLite integers to an 8-byte limit when the sql_type carries none", () => {
     for (const sqlType of ["integer", "bigint"] as const) {
       const type = castType(sqlType);
-      expect(type.limit).toBeUndefined();
+      expect(type.limit).toBeNull();
       expect(() => type.serialize(2 ** 40)).not.toThrow();
     }
   });
