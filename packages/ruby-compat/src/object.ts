@@ -39,7 +39,13 @@ function hasEpochNanoseconds(value: unknown): value is { epochNanoseconds: bigin
   );
 }
 
-const FL_SINGLETON = Symbol.for("@blazetrails/ruby-compat:FL_SINGLETON");
+/**
+ * `FL_SINGLETON` (`vendor/ruby/v3.3.11/include/ruby/internal/fl_type.h:58`), the
+ * flag marking a class as some object's singleton class.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const FL_SINGLETON = Symbol.for("@blazetrails/ruby-compat:FL_SINGLETON");
 
 /**
  * `rb_obj_singleton_class` (`vendor/ruby/v3.3.11/object.c:288`), Ruby's

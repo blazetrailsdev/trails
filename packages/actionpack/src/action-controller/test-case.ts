@@ -374,6 +374,7 @@ export class TestCase {
 
     const httpMethod = String(method).toUpperCase();
 
+    this._htmlDocument?.dispose();
     this._htmlDocument = undefined;
 
     this.cookies.update(this.request.cookies);
@@ -528,18 +529,6 @@ export class TestCase {
   }
 
   /** @internal */
-  _htmlDocument?: XmlDocument;
-
-  get htmlDocument(): XmlDocument {
-    return htmlDocument.call(this as unknown as HtmlDocumentHost);
-  }
-
-  /** @internal */
-  get documentRootElement() {
-    return this.htmlDocument.root;
-  }
-
-  /** @internal */
   private scrubEnvBang(env: Record<string, unknown>): Record<string, unknown> {
     for (const key of Object.keys(env)) {
       if (
@@ -553,6 +542,18 @@ export class TestCase {
     delete env["RAW_POST_DATA"];
     env["rack.input"] = new StringIO();
     return env;
+  }
+
+  /** @internal */
+  _htmlDocument?: XmlDocument;
+
+  get htmlDocument(): XmlDocument {
+    return htmlDocument.call(this as unknown as HtmlDocumentHost);
+  }
+
+  /** @internal */
+  private get documentRootElement() {
+    return this.htmlDocument.root;
   }
 }
 

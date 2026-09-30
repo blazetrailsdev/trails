@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   Buffer,
   ClientDisconnected,
+  Live,
   Response,
   SSE,
   cleanUpThreadLocals,
@@ -384,6 +385,8 @@ describe("ActionController::Live private helpers", () => {
 
   it("cleanUpThreadLocals is a no-op; originals are reference-equal; pool is a singleton", () => {
     expect(() => cleanUpThreadLocals.call(makeHost(), [], null)).not.toThrow();
+    expect(Live.newControllerThread).toBe(newControllerThread);
+    expect(Live.cleanUpThreadLocals).toBe(cleanUpThreadLocals);
     expect(liveThreadPoolExecutor()).toBe(liveThreadPoolExecutor());
   });
 

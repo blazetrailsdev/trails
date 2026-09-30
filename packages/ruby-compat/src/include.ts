@@ -22,6 +22,7 @@
 
 import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
+import { FL_SINGLETON } from "./object.js";
 
 type AnyClass = new (...args: never[]) => unknown;
 type ModuleObject = object;
@@ -975,8 +976,6 @@ export function rbObjDup<T extends object>(obj: T): T {
   initCopyHook(dup, "initializeDup", obj);
   return dup;
 }
-
-const FL_SINGLETON = Symbol.for("@blazetrails/ruby-compat:FL_SINGLETON");
 
 function copiedDescriptors(
   obj: object,
