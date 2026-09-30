@@ -94,7 +94,7 @@ export function highlight(
   if (text == null) {
     working = "";
   } else {
-    working = doSanitize ? sanitize(String(text)).toString() : String(text);
+    working = doSanitize ? sanitize(String(text))!.toString() : String(text);
   }
 
   const phrasesBlank =
@@ -233,7 +233,7 @@ export function simpleFormat(
 
   let working: string;
   if (options.sanitize !== false) {
-    working = sanitize(text == null ? "" : String(text), options.sanitizeOptions ?? {}).toString();
+    working = sanitize(text == null ? "" : String(text), options.sanitizeOptions ?? {})!.toString();
   } else {
     working = text == null ? "" : String(text);
   }

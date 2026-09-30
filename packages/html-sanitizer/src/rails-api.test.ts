@@ -1,7 +1,12 @@
 import { describe, expect, test, vi } from "vitest";
-import { HTML, HTML4, HTML5 } from "./index.js";
+import { HTML, HTML4, Html } from "./index.js";
+import { HTML5 } from "./namespaces.js";
 
 describe("RailsApiTest", () => {
+  test("html_module_name_alias", () => {
+    expect(Html).toBe(HTML);
+  });
+
   test("best_supported_vendor_when_html5_is_not_supported_returns_html4", () => {
     const stub = vi.spyOn(HTML.Sanitizer, "isHtml5Support").mockReturnValue(false);
     try {

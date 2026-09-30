@@ -83,9 +83,9 @@ export function sanitizedAllowedAttributes(): Iterable<string> {
 export function sanitize(
   html: string | null | undefined,
   options: Record<string, unknown> = {},
-): SafeBuffer {
-  const result = getSafeListSanitizer().sanitize(html ?? "", options);
-  return htmlSafe(result ?? "");
+): SafeBuffer | null {
+  const result = getSafeListSanitizer().sanitize(html, options);
+  return result == null ? null : htmlSafe(result);
 }
 
 export function sanitizeCss(style: string): string {
@@ -96,13 +96,13 @@ export function sanitizeCss(style: string): string {
   return style;
 }
 
-export function stripTags(html: string | null | undefined): SafeBuffer {
-  const result = getFullSanitizer().sanitize(html ?? "");
-  return htmlSafe(result ?? "");
+export function stripTags(html: string | null | undefined): SafeBuffer | null {
+  const result = getFullSanitizer().sanitize(html);
+  return result == null ? null : htmlSafe(result);
 }
 
 export function stripLinks(html: string | null | undefined): string | null | undefined {
-  return getLinkSanitizer().sanitize(html ?? "");
+  return getLinkSanitizer().sanitize(html);
 }
 
 export class SanitizeHelper {
