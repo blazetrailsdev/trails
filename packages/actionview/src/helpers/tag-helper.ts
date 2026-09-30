@@ -6,6 +6,7 @@ import {
   extractOptionsBang,
   CodeGenerator,
   ActiveSupportJSON,
+  indexWith,
   isBlank,
   isPlainObject,
   isPresent,
@@ -76,8 +77,14 @@ const BOOLEAN_ATTRIBUTES = new Set([
   "visible",
 ]);
 
-const DATA_PREFIXES = new Set(["data"]);
 const ARIA_PREFIXES = new Set(["aria"]);
+const DATA_PREFIXES = new Set(["data"]);
+
+const TAG_TYPES = new Map<string, string>([
+  ...indexWith([...BOOLEAN_ATTRIBUTES], "boolean"),
+  ...indexWith([...DATA_PREFIXES], "data"),
+  ...indexWith([...ARIA_PREFIXES], "aria"),
+]);
 
 const PRE_CONTENT_STRINGS: Record<string, string> = {
   textarea: "\n",
@@ -468,13 +475,14 @@ export class TagBuilder {
     let output = "";
     const sep = " ";
     eachPair(options!, (key: string, value: unknown) => {
-      if (DATA_PREFIXES.has(key) && (isPlainObject(value) || value instanceof Hash)) {
+      const type = TAG_TYPES.get(key);
+      if (type === "data" && (isPlainObject(value) || value instanceof Hash)) {
         eachPair(value, (k: string, v: unknown) => {
           if (v == null) return;
           output += sep;
           output += this.prefixTagOption(key, k, v, escape);
         });
-      } else if (ARIA_PREFIXES.has(key) && (isPlainObject(value) || value instanceof Hash)) {
+      } else if (type === "aria" && (isPlainObject(value) || value instanceof Hash)) {
         eachPair(value, (k: string, v: unknown) => {
           if (v == null) return;
 
@@ -490,7 +498,7 @@ export class TagBuilder {
           output += sep;
           output += this.prefixTagOption(key, k, v, escape);
         });
-      } else if (BOOLEAN_ATTRIBUTES.has(key)) {
+      } else if (type === "boolean") {
         if (value != null && value !== false) {
           output += sep;
           output += this.booleanTagOption(key);
@@ -512,12 +520,7 @@ export class TagBuilder {
 
     if (Array.isArray(value) || isPlainObject(value) || value instanceof Hash) {
       if (key === "class") value = buildTagValues(value);
-      const flattened = Array.isArray(value)
-        ? value
-        : [
-            ...(value instanceof Hash ? value : Object.entries(value as Record<string, unknown>)),
-          ].flat();
-      value = escape ? safeJoin(flattened, " ") : flattened.join(" ");
+      value = escape ? safeJoin(value as unknown[], " ") : (value as unknown[]).join(" ");
     } else if (value instanceof RegExp) {
       value = escape ? unwrappedHtmlEscape(value.source) : value.source;
     } else {
@@ -567,7 +570,10 @@ export function raw(stringish: unknown): SafeBuffer {
   return _raw(stringish);
 }
 
-export function safeJoin(array: unknown[], sep?: string | SafeBuffer | null): SafeBuffer {
+export function safeJoin(
+  array: unknown[] | Hash<unknown, unknown> | Record<string, unknown>,
+  sep?: string | SafeBuffer | null,
+): SafeBuffer {
   return _safeJoin(array, sep);
 }
 

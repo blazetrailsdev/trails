@@ -83,3 +83,21 @@ describe("Template#compiled_source", () => {
     );
   });
 });
+
+describe("Template#compiled_source resolves top-level constants", () => {
+  const renderTse = (source: string): string =>
+    String(
+      new Template(source, "t", new Tse(), { locals: [], format: ":html" }).render(
+        new (Base.withEmptyTemplateCache())(null, {}, null),
+        {},
+      ),
+    );
+
+  it("resolves a seated TopLevel constant with no local passed", () => {
+    expect(renderTse("<%= I18n.locale() %>")).toBe("en");
+  });
+
+  it("still resolves JS globals past the TopLevel scope", () => {
+    expect(renderTse("<%= Math.max(1, 2) %> <%= JSON.stringify([1]) %>")).toBe("2 [1]");
+  });
+});
