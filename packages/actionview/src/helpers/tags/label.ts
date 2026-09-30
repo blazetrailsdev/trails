@@ -7,7 +7,6 @@ import {
 } from "@blazetrails/activesupport";
 import { dup, hashDelete, mergeBang } from "@blazetrails/ruby-compat";
 
-import { labelTag } from "../form-tag-helper.js";
 import { Base } from "./base.js";
 import { Translator } from "./translator.js";
 
@@ -111,7 +110,7 @@ export class Label extends Base {
       content = this.renderComponent(builder);
     }
 
-    return labelTag.call(this, nameAndId["id"], content, options);
+    return this.labelTag(nameAndId["id"], content, options);
   }
 
   private renderComponent(builder: LabelBuilder): unknown {

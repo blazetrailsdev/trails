@@ -352,6 +352,23 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "rails-dom-testing",
+    origin: {
+      type: "git",
+      url: "https://github.com/rails/rails-dom-testing.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:447; a read-anchor only, like minitest.
+      ref: "v2.2.0",
+    },
+    packages: [
+      {
+        name: "rails-dom-testing",
+        libPath: "lib/rails/dom/testing",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
     name: "ruby",
     origin: {
       type: "git",

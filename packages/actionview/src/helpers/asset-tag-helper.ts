@@ -134,9 +134,7 @@ export function javascriptIncludeTag(this: AssetTagHelperHost, ...sources: unkno
 }
 
 export function stylesheetLinkTag(this: AssetTagHelperHost, ...sources: unknown[]): SafeBuffer {
-  const extracted = extractOptionsBang(sources);
-  const rawSources = sources;
-  const options = stringifyKeys(extracted);
+  const options = stringifyKeys(extractOptionsBang(sources));
   const pathOptions = extractBang(options, [
     "protocol",
     "extname",
@@ -146,7 +144,7 @@ export function stylesheetLinkTag(this: AssetTagHelperHost, ...sources: unknown[
   const usePreloadLinksHeader =
     options["preloadLinksHeader"] === null || options["preloadLinksHeader"] === undefined
       ? preloadLinksHeader
-      : (deleteKey(options, "preloadLinksHeader") as boolean);
+      : deleteKey(options, "preloadLinksHeader");
   const preloadLinks: string[] = [];
   let crossorigin = deleteKey(options, "crossorigin");
   if (crossorigin === true) crossorigin = "anonymous";
@@ -157,10 +155,10 @@ export function stylesheetLinkTag(this: AssetTagHelperHost, ...sources: unknown[
   const integrity = options["integrity"];
 
   const sourcesTags = htmlSafe(
-    [...new Set(rawSources.map(String))]
+    [...new Set(sources)]
       .map((source) => {
-        const href = pathToStylesheet.call(this, source, pathOptions);
-        if (usePreloadLinksHeader === true && isPresent(href) && !href.startsWith("data:")) {
+        const href = pathToStylesheet.call(this, source as string, pathOptions);
+        if (rtest(usePreloadLinksHeader) && isPresent(href) && !href.startsWith("data:")) {
           let preloadLink = `<${href}>; rel=preload; as=style`;
           if (crossorigin !== null && crossorigin !== undefined) {
             preloadLink += `; crossorigin=${String(crossorigin)}`;
@@ -168,7 +166,7 @@ export function stylesheetLinkTag(this: AssetTagHelperHost, ...sources: unknown[
           if (integrity !== null && integrity !== undefined) {
             preloadLink += `; integrity=${String(integrity)}`;
           }
-          if (nopush === true) preloadLink += "; nopush";
+          if (rtest(nopush)) preloadLink += "; nopush";
           preloadLinks.push(preloadLink);
         }
         const tagOptions: Record<string, unknown> = {
@@ -181,7 +179,7 @@ export function stylesheetLinkTag(this: AssetTagHelperHost, ...sources: unknown[
           tagOptions["nonce"] = this.contentSecurityPolicyNonce?.() ?? null;
         }
 
-        if (applyStylesheetMediaDefault === true && isBlank(tagOptions["media"])) {
+        if (rtest(applyStylesheetMediaDefault) && isBlank(tagOptions["media"])) {
           tagOptions["media"] = "screen";
         }
 
@@ -190,7 +188,7 @@ export function stylesheetLinkTag(this: AssetTagHelperHost, ...sources: unknown[
       .join("\n"),
   );
 
-  if (usePreloadLinksHeader === true) {
+  if (rtest(usePreloadLinksHeader)) {
     sendPreloadLinksHeader.call(this, preloadLinks);
   }
 

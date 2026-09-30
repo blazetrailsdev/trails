@@ -38,6 +38,7 @@ export class OutputBuffer {
 
   append(value: unknown): this {
     if (value === null || value === undefined) return this;
+    rejectThenable(value);
     if (isHtmlSafe(value)) {
       this._raw += (value as SafeBuffer).toString();
     } else if (value instanceof OutputBuffer) {
@@ -52,6 +53,7 @@ export class OutputBuffer {
     if (value === null || value === undefined) {
       throw new TypeError("no implicit conversion of nil into String");
     }
+    rejectThenable(value);
     this._raw += value instanceof SafeBuffer ? value.toString() : String(value);
     return this;
   }
@@ -68,6 +70,7 @@ export class OutputBuffer {
 
   safeExprAppend(value: unknown): this {
     if (value === null || value === undefined) return this;
+    rejectThenable(value);
     this._raw += value instanceof SafeBuffer ? value.toString() : String(value);
     return this;
   }
@@ -118,6 +121,7 @@ export class RawOutputBuffer {
 
   append(value: unknown): this {
     if (value === null || value === undefined) return this;
+    rejectThenable(value);
     this.buffer.appendRaw(value instanceof SafeBuffer ? value.toString() : String(value));
     return this;
   }
@@ -209,7 +213,14 @@ export class RawStreamingBuffer {
 
 function toRawString(value: unknown): string {
   if (value == null) return "";
+  rejectThenable(value);
   if (value instanceof SafeBuffer) return value.toString();
   if (value instanceof OutputBuffer) return value.toStr();
   return String(value);
+}
+
+function rejectThenable(value: unknown): void {
+  if (typeof (value as PromiseLike<unknown>).then === "function") {
+    throw new TypeError("no implicit conversion of Promise into String");
+  }
 }

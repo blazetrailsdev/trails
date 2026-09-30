@@ -1,26 +1,11 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, it } from "vitest";
 import { Errors } from "@blazetrails/activemodel";
 import { Date as RubyDate } from "@blazetrails/date";
 
 import { Base } from "../base.js";
 import { raw } from "../helpers/output-safety-helper.js";
 import { LookupContext } from "../lookup-context.js";
-
-function normalizeDom(html: string): string {
-  return html.replace(
-    /<([a-z]+)((?:\s+[^\s=>/]+(?:=(?:"[^"]*"|'[^']*'))?)*)\s*\/?>/g,
-    (_m, name, attrs) => {
-      const list = (attrs.match(/[^\s=]+(?:=(?:"[^"]*"|'[^']*'))?/g) ?? []).map((a: string) =>
-        a.replace(/='([^']*)'$/, '="$1"'),
-      );
-      return `<${name} ${list.sort().join(" ")}>`;
-    },
-  );
-}
-
-function assertDomEqual(expected: string, actual: unknown): void {
-  expect(normalizeDom(String(actual))).toBe(normalizeDom(expected));
-}
+import { assertDomEqual } from "../testing/dom-assertions.js";
 
 class Post {
   static modelName = { singular: "post", paramKey: "post", i18nKey: "post" };

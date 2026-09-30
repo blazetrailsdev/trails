@@ -15,14 +15,11 @@ import { raw } from "../helpers/output-safety-helper.js";
 import { Base } from "../base.js";
 import { Template } from "../template.js";
 import { TemplateHandlers } from "./handlers.js";
+import { assertDomEqual } from "../testing/dom-assertions.js";
 
 const view = new (Base.withEmptyTemplateCache())(null, {}, null);
 const tag = _tag.bind(view);
 const contentTag = _contentTag.bind(view);
-
-const assertDomEqual = (expected: string, actual: unknown): void => {
-  expect(String(actual)).toEqual(expected);
-};
 
 const renderTse = (string: string): string => {
   const template = new Template(

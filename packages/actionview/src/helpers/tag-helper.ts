@@ -18,8 +18,17 @@ import {
   toSentence as _toSentence,
   type ToSentenceOptions,
 } from "./output-safety-helper.js";
-import { ArgumentError, BigDecimal, eachPair, Hash, rbInspect } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  BigDecimal,
+  eachPair,
+  Hash,
+  Module,
+  rbInspect,
+} from "@blazetrails/ruby-compat";
+import * as CaptureHelper from "./capture-helper.js";
 import { capture, type CaptureHelperHost } from "./capture-helper.js";
+import * as OutputSafetyHelper from "./output-safety-helper.js";
 
 export interface TagHelperHost extends CaptureHelperHost {
   _tagBuilder?: TagBuilder;
@@ -602,3 +611,13 @@ function createTagBuilderProxy(viewContext: TagHelperHost): TagBuilder {
     },
   });
 }
+
+export const TagHelper = new Module((mod) => {
+  mod.include(CaptureHelper);
+  mod.include(OutputSafetyHelper);
+
+  mod.moduleEval((m) => {
+    Object.assign(m, { tag, contentTag, tokenList, classNames, cdataSection, escapeOnce });
+    Object.assign(m, { buildTagValues, tagBuilder });
+  });
+});

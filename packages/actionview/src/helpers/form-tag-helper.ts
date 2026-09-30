@@ -10,12 +10,15 @@ import {
   presence,
   stringifyKeys,
 } from "@blazetrails/activesupport";
-import { Hash, fetch, hashDelete, rbObjRespondTo, update } from "@blazetrails/ruby-compat";
+import { Hash, Module, fetch, hashDelete, rbObjRespondTo, update } from "@blazetrails/ruby-compat";
 
 import { ActionView } from "../namespaces.js";
 import type { capture } from "./capture-helper.js";
+import * as ContentExfiltrationPreventionHelper from "./content-exfiltration-prevention-helper.js";
 import { preventContentExfiltration } from "./content-exfiltration-prevention-helper.js";
 import { contentTag, tag, type TagHelperHost } from "./tag-helper.js";
+import * as TextHelper from "./text-helper.js";
+import * as UrlHelper from "./url-helper.js";
 import { methodTag, tokenTag, type UrlHelperHost } from "./url-helper.js";
 
 export interface FormTagHelperHost extends UrlHelperHost, TagHelperHost {
@@ -88,15 +91,7 @@ export function fieldName(
 }
 
 export function labelTag(
-  this: {
-    contentTag(
-      name: string,
-      contentOrOptionsWithBlock?: unknown,
-      options?: Record<string, unknown> | null,
-      escape?: boolean,
-      block?: () => unknown,
-    ): unknown;
-  },
+  this: FormTagHelperHost,
   name: unknown = null,
   contentOrOptions: unknown = null,
   options: Record<string, unknown> | null = null,
@@ -257,3 +252,15 @@ export function setDefaultDisableWith(value: unknown, tagOptions: Record<string,
 
   hashDelete(tagOptions, "data-disable-with");
 }
+
+export const FormTagHelper = new Module((mod) => {
+  mod.include(UrlHelper);
+  mod.include(TextHelper);
+  mod.include(ContentExfiltrationPreventionHelper);
+
+  mod.moduleEval((m) => {
+    Object.assign(m, { fieldId, fieldName, labelTag, submitTag, utf8EnforcerTag });
+    Object.assign(m, { htmlOptionsForForm, extraTagsForForm, formTagHtml, formTagWithBody });
+    Object.assign(m, { sanitizeToId, setDefaultDisableWith });
+  });
+});
