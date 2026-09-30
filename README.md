@@ -13,7 +13,8 @@ tests, `db:migrate` builds the table, and `trails server` serves working CRUD
 pages: Rails' scaffold views in the generated layout, forms with CSRF
 protection, flash notices, validation errors, and view reloading in
 development. The model is typed from the schema by `trails-tsc`, and the
-scaffold's functional tests, ported from Rails' templates, pass. The
+scaffold's functional tests, ported from Rails' templates, pass once the test
+database exists (see [known gaps](#known-gaps)). The
 [quickstart](#quickstart) walks through all of it.
 
 It is pre-release. Nothing is published to npm yet, so you run it from a
@@ -32,8 +33,9 @@ checkout of this repository.
 
 Every command and every output block in this section was run on 2026-09-30
 against `main` at `98d96082e4`, on Linux with Node 24.16.0 and SQLite, with
-`TRAILS_ENV` and `NODE_ENV` unset. No step needs a workaround. The two
-[known gaps](#known-gaps) are linked where they show.
+`TRAILS_ENV` and `NODE_ENV` unset. No step needs a workaround. Two
+[known gaps](#known-gaps) remain: `bin/trails routes` (step 4) and the first
+`pnpm test` in a new app.
 
 ### 1. Build the framework from a checkout
 
