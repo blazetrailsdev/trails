@@ -7,7 +7,12 @@ import {
   ScaffoldControllerGenerator,
   type ScaffoldControllerGeneratorOptions,
 } from "./scaffold-controller-generator.js";
-import { ActionController, RouteSet, controllerConstants } from "@blazetrails/actionpack";
+import {
+  AbstractController,
+  ActionController,
+  RouteSet,
+  controllerConstants,
+} from "@blazetrails/actionpack";
 import { bodyToString } from "@blazetrails/rack";
 
 afterEach(() => {
@@ -32,6 +37,35 @@ describe("ScaffoldControllerGenerator (dispatch)", () => {
 
     expect(status).toBe(200);
     expect(await bodyToString(body)).toBe("new post");
+  });
+
+  it("redirects the emitted destroy action through the declared index path helper", async () => {
+    class PostsController extends ActionController.Base {
+      declare postsPath: (...args: unknown[]) => string;
+
+      async destroy(): Promise<void> {
+        this.redirectTo(this.postsPath(), {
+          notice: "Post was successfully destroyed.",
+          status: "see_other",
+        });
+      }
+    }
+
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.resources("posts");
+    });
+    AbstractController.withRoutesHelpers(routes)(PostsController);
+    controllerConstants.set("posts", PostsController as never);
+
+    const [status, headers] = await routes.call({
+      REQUEST_METHOD: "DELETE",
+      PATH_INFO: "/posts/1",
+      HTTP_HOST: "www.example.com",
+    });
+
+    expect(status).toBe(303);
+    expect(headers["location"]).toBe("http://www.example.com/posts");
   });
 });
 
