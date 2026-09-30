@@ -1566,8 +1566,9 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   constraints(): Array<(...args: any[]) => any> {
-    const sourceConstraints = this.sourceReflection?.constraints?.() ?? [];
-    return this.scope ? [...sourceConstraints, this.scope] : sourceConstraints;
+    const scopeChain = this.sourceReflection!.constraints();
+    if (this.scope) scopeChain.push(this.scope);
+    return scopeChain;
   }
 
   addAsSource(seed: AbstractReflection[]): AbstractReflection[] {
@@ -1677,8 +1678,7 @@ export class PolymorphicReflection extends AbstractReflection {
   }
 
   constraints(): Array<(...args: any[]) => any> {
-    const reflConstraints = (this._reflection as any).constraints?.() ?? [];
-    return [...reflConstraints, this.sourceTypeScope()];
+    return [...this._reflection.constraints(), this.sourceTypeScope()];
   }
 
   /** @internal */
@@ -1722,7 +1722,7 @@ export class RuntimeReflection extends AbstractReflection {
   }
 
   constraints(): Array<(...args: any[]) => any> {
-    return (this._reflection as any).constraints?.() ?? [];
+    return this._reflection.constraints();
   }
 
   get joinForeignKey(): string | string[] {

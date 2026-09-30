@@ -245,8 +245,8 @@ export function whilePreventingWrites<T>(this: typeof Base, fn: () => T, enabled
   ) as T;
 }
 
-export function prohibitShardSwapping<T>(fn: () => T, enabled = true): T {
-  const prevValue = IsolatedExecutionState.get<boolean>(PROHIBIT_SHARD_SWAPPING_KEY);
+export function prohibitShardSwapping<T>(fn: () => T, enabled: boolean | null = true): T {
+  const prevValue = IsolatedExecutionState.get<boolean | null>(PROHIBIT_SHARD_SWAPPING_KEY);
   IsolatedExecutionState.set(PROHIBIT_SHARD_SWAPPING_KEY, enabled);
   let result: T;
   try {
