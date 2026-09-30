@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NameError, StandardError, Thread, rbEqual, stderr } from "@blazetrails/ruby-compat";
-import { Module } from "@blazetrails/ruby-compat/include";
+import { Module, rbModConstSet } from "@blazetrails/ruby-compat/include";
 import {
   Deprecation,
   DeprecationException,
@@ -82,7 +82,10 @@ expect.addEqualityTesters([
   },
 ]);
 
-const UndeprecatedFoo = Object.assign(new Module(), { name: "Undeprecated::Foo", BAR: "foo bar" });
+const Undeprecated = { name: "Undeprecated" };
+const UndeprecatedFoo = Object.assign(rbModConstSet(Undeprecated, "Foo", new Module()), {
+  BAR: "foo bar",
+});
 registerConstant("Undeprecated::Foo", UndeprecatedFoo);
 registerConstant("Undeprecated::Foo::BAR", UndeprecatedFoo.BAR);
 class UndeprecatedError extends StandardError {}

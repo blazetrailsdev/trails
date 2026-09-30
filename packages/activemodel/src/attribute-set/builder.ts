@@ -81,9 +81,9 @@ export class LazyAttributeSet extends AttributeSet {
   /** @missingRailsName attributes — PERMANENT */
   override keys(): string[] {
     const keys = new Set([
-      ...(isPlainObject(this.values)
-        ? Object.keys(this.values)
-        : (this.values as IndexedRow).keys()),
+      ...(!isPlainObject(this.values)
+        ? (this.values as IndexedRow).keys()
+        : Object.keys(this.values)),
       ...Object.keys(this.types),
       ...Object.keys(this._attributes),
     ]);

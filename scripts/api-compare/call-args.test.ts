@@ -774,6 +774,25 @@ describe("pairCallSites", () => {
     expect(pairs.map((p) => p.ts.args)).toEqual([["id:node"], ["id:n"]]);
   });
 
+  it("breaks a tie toward the TS site reading the Ruby receiver's own ivar", () => {
+    // builder.rb:37 `values.keys | types.keys | @attributes.keys` vs builder.ts's
+    // keys(), whose values arm is a Hash / IndexedRow conditional.
+    const pairs = pairCallSites(
+      [
+        { ...site("keys", []), recv: "id:values" },
+        { ...site("keys", []), recv: "id:types" },
+        { ...site("keys", []), recv: "id:@attributes" },
+      ],
+      [
+        { ...site("keys", []), recv: "id:values" },
+        site("keys", ["id:values"]),
+        site("keys", ["id:types"]),
+        site("keys", ["id:_attributes"]),
+      ],
+    );
+    expect(pairs[2].ts.args).toEqual(["id:_attributes"]);
+  });
+
   it("does not pair a Ruby proc call against a TS Function.prototype.call mixin dispatch", () => {
     // parameters.rb:95 `strategy.call(raw_post)` vs request.ts:1008
     // `_parseFormattedParameters.call(this._paramsHost, parsers, fallback)`.

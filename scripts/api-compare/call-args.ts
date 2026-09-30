@@ -924,6 +924,19 @@ function blockAffinity(ruby: CallSite, ts: CallSite): number {
 }
 
 /**
+ * Whether the TS site reads the same object the Ruby site's receiver names —
+ * `@attributes.keys` against `Object.keys(this._attributes)` — once an ivar's
+ * `@`, the port's `_` and camelCasing are set aside: the {@link pairCallSites}
+ * tie-break for a port whose extra same-named site (a second arm of a
+ * conditional) would otherwise take the pair in source order.
+ */
+function receiverAffinity(ruby: CallSite, ts: CallSite): number {
+  const rubyRef = ruby.recv?.match(/^id:@?(\w+)$/)?.[1];
+  const tsRef = (ts.recv ?? ts.args[0])?.match(/^id:_?(\w+)$/)?.[1];
+  return rubyRef !== undefined && tsRef !== undefined && snakeToCamel(rubyRef) === tsRef ? 1 : 0;
+}
+
+/**
  * How well two same-named call sites' argument lists agree, for
  * {@link pairCallSites}. Higher is a better pairing. Ordered so that an exact
  * argument-list agreement always outranks a mere arity agreement, which in turn
@@ -1040,7 +1053,13 @@ export function pairCallSites(
   rubySites: readonly CallSite[],
   tsSites: readonly CallSite[],
 ): { ruby: CallSite; ts: CallSite }[] {
-  const candidates: { rubyIdx: number; tsIdx: number; score: number; block: number }[] = [];
+  const candidates: {
+    rubyIdx: number;
+    tsIdx: number;
+    score: number;
+    block: number;
+    receiver: number;
+  }[] = [];
   rubySites.forEach((ruby, rubyIdx) => {
     const keys = new Set(tsCallNameKeys(ruby.name));
     tsSites.forEach((ts, tsIdx) => {
@@ -1052,11 +1071,17 @@ export function pairCallSites(
         tsIdx,
         score: argSimilarity(ruby, ts),
         block: blockAffinity(ruby, ts),
+        receiver: receiverAffinity(ruby, ts),
       });
     });
   });
   candidates.sort(
-    (a, b) => b.score - a.score || b.block - a.block || a.rubyIdx - b.rubyIdx || a.tsIdx - b.tsIdx,
+    (a, b) =>
+      b.score - a.score ||
+      b.block - a.block ||
+      b.receiver - a.receiver ||
+      a.rubyIdx - b.rubyIdx ||
+      a.tsIdx - b.tsIdx,
   );
   const takenRuby = new Set<number>();
   const takenTs = new Set<number>();
