@@ -1,14 +1,16 @@
-import { registerConstant } from "@blazetrails/activesupport";
+import { isPlainObject, registerConstant } from "@blazetrails/activesupport";
 import { Attribute, Uninitialized } from "./attribute.js";
+import type { LazyAttributeHash } from "./attribute-set/builder.js";
 import {
   FrozenError,
   KeyError,
   dup,
-  eachKey,
+  eachKey as hashEachKey,
+  eachValue,
   except,
   hasKey,
   rbInspect,
-  transformValues,
+  transformValues as hashTransformValues,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
 
@@ -31,23 +33,60 @@ function frozenErrorRaisingStore(attributes: Record<string, Attribute>): Record<
   });
 }
 
+type Attributes = Record<string, Attribute> | LazyAttributeHash;
+
+function isHash(attributes: Attributes): attributes is Record<string, Attribute> {
+  return isPlainObject(attributes);
+}
+
+function aref(attributes: Attributes, name: string): Attribute | undefined {
+  return isHash(attributes) ? attributes[name] : attributes.getAttribute(name);
+}
+
+function aset(attributes: Attributes, name: string, value: Attribute): Attribute {
+  if (isHash(attributes)) attributes[name] = value;
+  else attributes.set(name, value);
+  return value;
+}
+
+function isKey(attributes: Attributes, name: string): boolean {
+  return isHash(attributes) ? hasKey(attributes, name) : attributes.isKey(name);
+}
+
+function eachKey(attributes: Attributes, block: (name: string) => void): void {
+  if (isHash(attributes)) hashEachKey(attributes, block);
+  else attributes.eachKey(block);
+}
+
+function transformValues<T>(
+  attributes: Attributes,
+  block: (attr: Attribute) => T,
+): Record<string, T> {
+  return isHash(attributes)
+    ? hashTransformValues(attributes, block)
+    : attributes.transformValues(block);
+}
+
 export class AttributeSet {
-  protected _attributes: Record<string, Attribute>;
+  protected _attributes: Attributes;
 
   eachValue(fn: (attr: Attribute) => void): void {
-    for (const attr of Object.values(this.attributes())) fn(attr);
+    const attributes = this.attributes();
+    if (isHash(attributes)) eachValue(attributes, fn);
+    else attributes.eachValue(fn);
   }
 
   fetch<T = Attribute>(name: string, defaultOrBlock?: T | ((name: string) => T)): Attribute | T {
     const attributes = this.attributes();
-    if (hasKey(attributes, name)) return attributes[name];
+    if (isKey(attributes, name)) return aref(attributes, name)!;
     if (typeof defaultOrBlock === "function") return (defaultOrBlock as (name: string) => T)(name);
     if (defaultOrBlock !== undefined) return defaultOrBlock;
     throw new KeyError(`key not found: ${rbInspect(name)}`, { receiver: attributes, key: name });
   }
 
   except(...names: string[]): Record<string, Attribute> {
-    return except(this.attributes(), ...names);
+    const attributes = this.attributes();
+    return isHash(attributes) ? except(attributes, ...names) : attributes.except(...names);
   }
 
   constructor(attributes: Record<string, Attribute> = {}) {
@@ -57,11 +96,11 @@ export class AttributeSet {
   }
 
   getAttribute(name: string): Attribute {
-    return this._attributes[name] ?? this.defaultAttribute(name);
+    return aref(this._attributes, name) ?? this.defaultAttribute(name);
   }
 
   set(name: string, value: Attribute): void {
-    this._attributes[name] = value;
+    aset(this._attributes, name, value);
   }
 
   castTypes(): Record<string, ValueType | null> {
@@ -77,7 +116,7 @@ export class AttributeSet {
   }
 
   isKey(name: string): boolean {
-    return hasKey(this.attributes(), name) && this.getAttribute(name).isInitialized();
+    return isKey(this.attributes(), name) && this.getAttribute(name).isInitialized();
   }
 
   isInclude(name: string): boolean {
@@ -101,19 +140,19 @@ export class AttributeSet {
   }
 
   writeFromDatabase(name: string, value: unknown): void {
-    this._attributes[name] = this.getAttribute(name).withValueFromDatabase(value);
+    aset(this._attributes, name, this.getAttribute(name).withValueFromDatabase(value));
   }
 
   writeFromUser(name: string, value: unknown): unknown {
     if (Object.isFrozen(this)) {
       throw new FrozenError("can't modify frozen attributes");
     }
-    this._attributes[name] = this.getAttribute(name).withValueFromUser(value);
+    aset(this._attributes, name, this.getAttribute(name).withValueFromUser(value));
     return value;
   }
 
   writeCastValue(name: string, value: unknown): Attribute {
-    return (this._attributes[name] = this.getAttribute(name).withCastValue(value));
+    return aset(this._attributes, name, this.getAttribute(name).withCastValue(value));
   }
 
   deepDup(): AttributeSet {
@@ -140,15 +179,14 @@ export class AttributeSet {
   }
 
   reverseMergeBang(targetAttributes: AttributeSet): this {
-    for (const [name, attr] of Object.entries(targetAttributes.attributes())) {
-      if (!hasKey(this._attributes, name)) {
-        this._attributes[name] = attr;
-      }
-    }
+    const target = targetAttributes.attributes();
+    eachKey(target, (name) => {
+      if (!isKey(this._attributes, name)) aset(this._attributes, name, aref(target, name)!);
+    });
     return this;
   }
 
-  protected attributes(): Record<string, Attribute> {
+  protected attributes(): Attributes {
     return this._attributes;
   }
 
@@ -159,8 +197,8 @@ export class AttributeSet {
 
   equals(other: unknown): boolean {
     if (!(other instanceof AttributeSet)) return false;
-    const attributes = this.attributes();
-    const otherAttributes = other.attributes();
+    const attributes = transformValues(this.attributes(), (attr) => attr);
+    const otherAttributes = transformValues(other.attributes(), (attr) => attr);
     const names = Object.keys(attributes);
     if (names.length !== Object.keys(otherAttributes).length) return false;
     return names.every(
@@ -182,13 +220,18 @@ export class AttributeSet {
     return this;
   }
 
-  /** @missingRailsName attributes — PERMANENT */
   initializeDup(_: AttributeSet): void {
-    this._attributes = frozenErrorRaisingStore(dup(this._attributes));
+    const attributes = this._attributes;
+    this._attributes = isHash(attributes)
+      ? frozenErrorRaisingStore(dup(attributes))
+      : attributes.dup();
   }
 
   initializeClone(_: AttributeSet): void {
-    this._attributes = frozenErrorRaisingStore(dup(this._attributes));
+    const attributes = this._attributes;
+    this._attributes = isHash(attributes)
+      ? frozenErrorRaisingStore(dup(attributes))
+      : attributes.dup();
   }
 
   /** @noRailsEquivalent PERMANENT */

@@ -124,8 +124,7 @@ describe("YamlSerializationTest", () => {
     expect(topic.content).toBe("Have a nice day");
   });
 
-  it.skip("deserializing rails v1 mysql yaml", async () => {
-    // BLOCKED: attribute-set-accepts-lazy-attribute-hash
+  it("deserializing rails v1 mysql yaml", async () => {
     const topic = yamlLoad(await yamlFixture("rails_v1_mysql"));
 
     expect(topic.isNewRecord()).toBe(false);

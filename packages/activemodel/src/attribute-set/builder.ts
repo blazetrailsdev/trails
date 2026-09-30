@@ -2,6 +2,7 @@ import { registerConstant } from "@blazetrails/activesupport";
 import { Attribute, Uninitialized } from "../attribute.js";
 import type { Block } from "@blazetrails/ruby-compat";
 import {
+  dup,
   eachKey,
   eachValue,
   except,
@@ -30,6 +31,7 @@ export class Builder {
 }
 
 export class LazyAttributeSet extends AttributeSet {
+  declare protected _attributes: Record<string, Attribute>;
   private values: Record<string, unknown>;
   private types: Record<string, ValueType>;
   private additionalTypes: Record<string, ValueType>;
@@ -279,6 +281,16 @@ export class LazyAttributeHash {
       return built;
     }
     return Attribute.null(name);
+  }
+
+  private initializeDup(_: LazyAttributeHash): void {
+    this._delegateHash = dup(this._delegateHash);
+  }
+
+  dup(): LazyAttributeHash {
+    const dup = Object.assign(Object.create(Object.getPrototypeOf(this) as object), this) as this;
+    dup.initializeDup(this);
+    return dup;
   }
 }
 
