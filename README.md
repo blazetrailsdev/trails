@@ -25,8 +25,8 @@ works today and lists what does not.
 
 ## Quickstart
 
-Every command and every output block in this section was run on 2026-09-29
-against `main` at `329f709afd`, on Linux with Node 24.16.0 and SQLite, with
+Every command and every output block in this section was run on 2026-09-30
+against `main` at `1721b9a448`, on Linux with Node 24.16.0 and SQLite, with
 `TRAILS_ENV` and `NODE_ENV` unset. Where a step does not work yet, the failure
 and its stories are linked. See [what is not wired up
 yet](#what-is-not-wired-up-yet) below.
@@ -92,8 +92,10 @@ bin/trails generate scaffold Post title:string body:text
 
 ```text
       create  app/models/post.ts
+      invoke  test_unit
       create  test/models/post.test.ts
-      create  db/migrate/20260930020505_create_posts.ts
+      create  test/fixtures/posts.yml
+      create  db/migrate/20260930131625_create_posts.ts
       invoke  resource_route
        route  mapper.resources("posts");
       invoke  scaffold_controller
@@ -115,10 +117,10 @@ pnpm db:migrate
 ```
 
 ```text
-== 20260930020505 CreatePosts: migrating ======================================
+== 20260930131625 CreatePosts: migrating ======================================
 -- createTable("posts")
    -> 0.0060s
-== 20260930020505 CreatePosts: migrated (0.0070s) =============================
+== 20260930131625 CreatePosts: migrated (0.0070s) =============================
 
 All migrations are up to date.
 ```
@@ -127,7 +129,7 @@ The migration is an ordinary `Migration` subclass, and the migrate writes
 `db/schema.ts` from the live database, as Rails writes `schema.rb`:
 
 ```ts
-// db/migrate/20260930020505_create_posts.ts
+// db/migrate/20260930131625_create_posts.ts
 import { Migration } from "@blazetrails/activerecord";
 
 export class CreatePosts extends Migration {
@@ -225,32 +227,61 @@ bin/trails server -p 3927   # the default port is 3000; this run used 3927
 => Ctrl+C to stop
 ```
 
-`GET /up` answers `200 OK`, and edits to a view are picked up without a
-restart. **Every scaffold page answers 500**, with
-`Cannot read properties of undefined (reading 'generateKey')`.
-`trails server` serves the application's middleware stack rather than the
-application, so `Engine#call` never merges `env_config` into the request, and
-the session, flash and CSRF token have no key generator (story
-`trails-server-serves-the-middleware-stack-not-the-application`). Right behind
-it, every cookie write raises `Invalid :same_site value: :lax` (story
-`rack-set-cookie-header-same-site-rejects-symbol-spelling`).
+`GET /up` answers `200 OK`. Open `http://localhost:3927/posts` and the scaffold works
+as it does in Rails:
 
-With those two patched locally, the scaffold works end to end in a browser-shaped run:
-
-- `/posts`, `/posts/1`, `/posts/new` and `/posts/1/edit` render Rails'
-  scaffold views inside the layout, titled from `contentFor("title")`.
-- The form carries an authenticity token. Create redirects `302` to the new
+- `/posts`, `/posts/:id`, `/posts/new` and `/posts/:id/edit` render Rails'
+  scaffold views inside the generated layout, titled from `contentFor("title")`.
+- The forms carry an authenticity token. Create redirects `302` to the new
   post, update and destroy redirect `303 See Other`, and each shows its
   `notice` once.
-- With `validates("title", { presence: true })`, an empty title re-renders
-  `new` with `422`, "1 error prohibited this post from being saved", and
-  `field_with_errors` around the field.
-- A request without a token answers `422 ActionController::InvalidAuthenticityToken`.
+- Add `this.validates("title", { presence: true })` to `Post`, restart the
+  server, and an empty title re-renders the form with `422`,
+  "1 error prohibited this post from being saved", and `field_with_errors`
+  around the field.
+- A non-GET request without a valid token answers
+  `422 ActionController::InvalidAuthenticityToken`.
+- Edits to a view show on the next request. Edits to a model need a restart:
+  trails has no autoloader.
 
-One more gap: on a freshly started server, a form `POST` that arrives before
-any read of `Post` raises `unknown attribute 'title' for Post`, because a cold
-`Post.new(attrs)` cannot load the schema (story
-`cold-model-new-with-attributes-raises-unknown-attribute`).
+`GET /posts`, with the development-mode `<!-- BEGIN … -->` / `<!-- END … -->`
+template comments and blank lines stripped:
+
+```text
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Posts</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="icon" href="/icon.png" type="image/png">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon.png">
+    <link rel="stylesheet" href="/assets/stylesheets/application.css" />
+  </head>
+  <body>
+    <p style="color: green"></p>
+<h1>Posts</h1>
+<div id="posts">
+    <div id="post_1">
+  <p>
+    <strong>Title:</strong>
+    Hello
+  </p>
+  <p>
+    <strong>Body:</strong>
+    First post
+  </p>
+</div>
+    <p>
+      <a href="/posts/1">Show this post</a>
+    </p>
+</div>
+<a href="/posts/new">New post</a>
+  </body>
+</html>
+```
 
 ### 6. Type-check with `trails-tsc`
 
@@ -268,22 +299,25 @@ fails the build with:
 app/models/check.ts(4,7): error TS2322: Type 'string | null' is not assignable to type 'number'.
 ```
 
-After `generate scaffold` the build fails on the controller's redirect,
-`Property 'postsPath' does not exist on type 'PostsController'` (story
-`scaffold-controller-route-helpers-fail-trails-tsc`).
+The build also passes after `generate scaffold`.
 
 ### What is not wired up yet
 
-Beyond the step 5 and step 6 stories:
+One gap is left in the steps above, in RFC `0142-trailties-surfaced-deviations`:
 
-| Symptom                                                                                                                                                                              | Story                                  |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- |
-| `pnpm test` fails the scaffold's seven controller tests (ported from Rails' `functional_test.rb.tt`) with `No fixture set named ':posts'`: no `test/fixtures/posts.yml` is generated | `scaffold-generates-no-model-fixtures` |
+| Symptom                                                                                                                                                                                                                                                           | Story                                              |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `pnpm test` runs the scaffold's model test and seven controller tests (ported from Rails' `functional_test.rb.tt`); the three non-GET ones fail with `InvalidAuthenticityToken`, because `config.action_controller` settings never reach `ActionController::Base` | `action-controller-set-configs-never-reaches-base` |
 
 Fixed on `main` since this README was first drafted at `b4f622ae87`, each
 re-run for this quickstart:
 
-- the port of `Application#env_config` (#8256); `trails server` does not reach it yet
+- `trails server` serving the middleware stack instead of the application, so no request saw `env_config` (#8261)
+- Rack rejecting the `:lax` Symbol for `same_site` (#8259)
+- a cold `Post.new(attrs)` raising `UnknownAttributeError` on a first-request form POST: the schema is now warmed at boot (#8258)
+- the scaffold writing no `test/fixtures/posts.yml` (#8262)
+- the scaffold controller's route helpers failing `trails-tsc` (#8260)
+- the port of `Application#env_config` (#8256)
 - `form.label` (#8257) and `form.submit` (#8247)
 - the generated layout, now a port of Rails' `application.html.erb` (#8255)
 - the scaffold's controller tests, now ported from Rails' `functional_test.rb.tt` (#8253)
@@ -556,7 +590,7 @@ The parity figures are in the [next section](#status-and-parity-snapshot).
 ## Status and parity snapshot
 
 **As of 2026-09-27, `main` at `91245b796a`.** These numbers predate the
-quickstart run above (`329f709afd`) and were not regenerated for it. To
+quickstart run above (`1721b9a448`) and were not regenerated for it. To
 regenerate from a checkout:
 
 ```sh
