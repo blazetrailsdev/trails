@@ -22,7 +22,7 @@
 
 import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
-import { FL_SINGLETON, rbAnyToS } from "./object.js";
+import { FL_SINGLETON, rbAnyToS, rbModToS } from "./object.js";
 
 type AnyClass = new (...args: never[]) => unknown;
 type ModuleObject = object;
@@ -38,7 +38,9 @@ const classpaths = new WeakMap<Module, { path: string; permanent: boolean }>();
 /**
  * Mirrors: Ruby's Module#const_set — vendor/ruby/v3.3.11/object.c:2545
  * `rb_mod_const_set`, which raises `NameError` for a name that is not a
- * constant name (`id_for_var`, object.c:2220-2240), then `const_set`
+ * constant name (`id_for_var`, object.c:2220-2240): an uppercase or titlecase
+ * letter (`rb_sym_constant_char_p`, vendor/ruby/v3.3.11/symbol.c:218-250), then
+ * identifier characters (`is_identchar`, symbol.c:54). It then calls `const_set`
  * (vendor/ruby/v3.3.11/variable.c:3607). Binding a module names it after the
  * owner (variable.c:3648-3668): permanently under a named owner, and under an
  * anonymous one with the owner's temporary path, until a named owner re-paths
@@ -46,8 +48,12 @@ const classpaths = new WeakMap<Module, { path: string; permanent: boolean }>();
  *
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
  */
-export function rbModConstSet<T>(mod: { name: string | null }, id: string, value: T): T {
-  if (!/^\p{Lu}[\p{L}\p{N}_]*$/u.test(id)) {
+export function rbModConstSet<T>(
+  mod: Module | (abstract new (...args: never) => unknown),
+  id: string,
+  value: T,
+): T {
+  if (!/^[\p{Lu}\p{Lt}](?:\w|\P{ASCII})*$/u.test(id)) {
     throw new NameError(`wrong constant name ${id}`, id);
   }
   Object.defineProperty(mod, id, { value, writable: true, enumerable: true, configurable: true });
@@ -59,7 +65,7 @@ export function rbModConstSet<T>(mod: { name: string | null }, id: string, value
       ? mod.name
       : mod instanceof Module
         ? mod.inspect()
-        : rbAnyToS(mod).replace(/^#<Proc:/, "#<Class:");
+        : rbModToS(mod);
     if (parentalPathPermanent && valPath?.permanent !== true) {
       classpaths.set(value, { path: `${parentalPath}::${id}`, permanent: true });
     } else if (!parentalPathPermanent && valPath === undefined) {

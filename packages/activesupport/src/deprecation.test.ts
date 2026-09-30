@@ -82,7 +82,7 @@ expect.addEqualityTesters([
   },
 ]);
 
-const Undeprecated = { name: "Undeprecated" };
+class Undeprecated {}
 const UndeprecatedFoo = Object.assign(rbModConstSet(Undeprecated, "Foo", new Module()), {
   BAR: "foo bar",
 });

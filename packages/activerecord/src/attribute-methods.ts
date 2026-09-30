@@ -226,7 +226,7 @@ export function initializeGeneratedModules(this: AttributeMethodsHost): void {
     previous.removeMethod(...previous.instanceMethods());
   }
   this._generatedAttributeMethods = rbModConstSet(
-    this,
+    this as unknown as new (...args: unknown[]) => unknown,
     "GeneratedAttributeMethods",
     new GeneratedAttributeMethods(),
   );

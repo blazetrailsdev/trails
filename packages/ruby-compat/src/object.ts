@@ -94,7 +94,10 @@ export function rbModSingletonP(klass: unknown): boolean {
  * `rb_mod_to_s` (`vendor/ruby/v3.3.11/object.c:1710-1742`), `Module#to_s` /
  * `Module#inspect`: a singleton class renders `#<Class:` plus its attached
  * object — `rb_inspect` for a class or module, `rb_any_to_s` otherwise — and
- * `>`; any other class renders its name. Ruby's refinement arm has no JS seat.
+ * `>`; any other class renders `rb_class_name`: its name, or for an anonymous
+ * class the `#<Class:0x…>` path `make_temporary_path`
+ * (`vendor/ruby/v3.3.11/variable.c:320-336`) gives it. Ruby's refinement arm
+ * has no JS seat.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -112,7 +115,7 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
 
     return s;
   }
-  return klass.name;
+  return klass.name || `#<Class:${objAddress(klass)}>`;
 }
 
 /**
@@ -459,12 +462,16 @@ export function rbObjInspect(obj: object): string {
  */
 export function rbAnyToS(obj: object): string {
   const cname = typeof obj === "function" ? "Proc" : obj.constructor.name;
+  return `#<${cname}:${objAddress(obj)}>`;
+}
+
+function objAddress(obj: object): string {
   let address = objAddresses.get(obj);
   if (address === undefined) {
     address = nextObjAddress += 8;
     objAddresses.set(obj, address);
   }
-  return `#<${cname}:0x${address.toString(16).padStart(16, "0")}>`;
+  return `0x${address.toString(16).padStart(16, "0")}`;
 }
 
 /**

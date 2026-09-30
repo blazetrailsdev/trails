@@ -307,22 +307,22 @@ describe("calculation result type follows group_values", () => {
   it("keeps a grouped relation's Map type through the chainables that follow group", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
     const grouped = Account.group("firm_id");
-    expectTypeOf(grouped.where({ firm_id: 6 }).count()).resolves.toEqualTypeOf<
-      Map<unknown, number>
-    >();
-    expectTypeOf(grouped.order("firm_id").limit(5).count()).resolves.toEqualTypeOf<
-      Map<unknown, number>
-    >();
-    expectTypeOf(grouped.having("COUNT(*) > 0").invertWhere().count()).resolves.toEqualTypeOf<
-      Map<unknown, number>
-    >();
-    expectTypeOf(Account.all().merge(grouped).count()).resolves.toEqualTypeOf<
-      Map<unknown, number>
-    >();
-    expectTypeOf(grouped.unscope(":group").count()).resolves.toEqualTypeOf<number>();
-    expectTypeOf(grouped.except("group").count()).resolves.toEqualTypeOf<number>();
-    expectTypeOf(grouped.only("where").count()).resolves.toEqualTypeOf<number>();
-    expectTypeOf(grouped.only("group").count()).resolves.toEqualTypeOf<Map<unknown, number>>();
+    type GroupedCount = Map<unknown, number>;
+    expectTypeOf(
+      grouped.where({ firm_id: 6 }).count,
+    ).returns.resolves.toEqualTypeOf<GroupedCount>();
+    expectTypeOf(
+      grouped.order("firm_id").limit(5).count,
+    ).returns.resolves.toEqualTypeOf<GroupedCount>();
+    expectTypeOf(
+      grouped.having("COUNT(*) > 0").invertWhere().count,
+    ).returns.resolves.toEqualTypeOf<GroupedCount>();
+    expectTypeOf(Account.all().merge(grouped).count).returns.resolves.toEqualTypeOf<GroupedCount>();
+    expectTypeOf(grouped.unscope(":group").count).returns.resolves.toEqualTypeOf<number>();
+    expectTypeOf(grouped.except("group").count).returns.resolves.toEqualTypeOf<number>();
+    expectTypeOf(grouped.only("where").count).returns.resolves.toEqualTypeOf<number>();
+    expectTypeOf(grouped.only("group").count).returns.resolves.toEqualTypeOf<GroupedCount>();
+    expect((await Account.all().merge(grouped).count()).get(6)).toBe(2);
     expect(await grouped.unscope(":group").count()).toBe(await Account.count());
     const counts = await grouped.where({ firm_id: 6 }).order("firm_id").limit(5).count();
     expect(counts.get(6)).toBe(2);
