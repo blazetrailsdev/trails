@@ -237,8 +237,11 @@ export {
   rbStrRespondTo,
   rbStrSend,
   STRING_METHOD_TABLE,
+  stringSuperclass,
   type StringReceiver,
+  type StringInstance,
 } from "./string/method-table.js";
+export { Struct, type StructInstance } from "./struct.js";
 export { MatchData } from "./match-data.js";
 export { StringScanner } from "./string-scanner.js";
 export { stringSplit } from "./string/split.js";

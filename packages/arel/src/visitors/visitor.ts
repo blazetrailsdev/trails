@@ -10,13 +10,7 @@ function describeClass(object: unknown): string {
 
 export type NodeCtor = abstract new (...args: never[]) => object;
 
-/**
- * @noRailsEquivalent TypeScript-only ctor type; Ruby dispatches on the class object directly.
- */
-type VisitorCtor = (abstract new (...args: never[]) => Visitor) &
-  Pick<typeof Visitor, "dispatchCache">;
-
-const PER_CLASS_CACHE = new WeakMap<VisitorCtor, Map<NodeCtor, string>>();
+const PER_CLASS_CACHE = new WeakMap<typeof Visitor, Map<NodeCtor, string>>();
 
 export abstract class Visitor {
   protected dispatch: Map<NodeCtor, string>;
@@ -32,10 +26,10 @@ export abstract class Visitor {
   }
 
   /** @internal */
-  static dispatchCache(this: VisitorCtor): Map<NodeCtor, string> {
+  static dispatchCache(this: typeof Visitor): Map<NodeCtor, string> {
     let cache = PER_CLASS_CACHE.get(this);
     if (!cache) {
-      const parent = Object.getPrototypeOf(this) as VisitorCtor | null;
+      const parent = Object.getPrototypeOf(this) as typeof Visitor | null;
       const inherited =
         parent && typeof parent.dispatchCache === "function" && parent !== this
           ? parent.dispatchCache()
@@ -47,7 +41,7 @@ export abstract class Visitor {
   }
 
   protected getDispatchCache(): Map<NodeCtor, string> {
-    return (this.constructor as VisitorCtor).dispatchCache();
+    return (this.constructor as typeof Visitor).dispatchCache();
   }
 
   protected visit<C>(object: unknown, collector: C): C;

@@ -2,6 +2,7 @@ import { Nodes } from "../namespaces.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { cloneSlot } from "../clone-support.js";
 import { setRubyNamespace } from "../visitors/ruby-class.js";
+import type { FactoryMethodsModule } from "../factory-methods.js";
 
 export interface ArelEngine {
   withConnection<T>(
@@ -64,22 +65,9 @@ export class Node {
   }
 }
 
-/**
- * Methods supplied by the FactoryMethods mixin (runtime wiring in ../index.ts).
- * The aliased import keeps this type-only — pulling factory-methods.ts into
- * the static import graph here would create a module-load cycle, since it
- * imports concrete Node subclasses. The explicit `FactoryMethodsModule`
- * interface (vs. `Included<typeof FactoryMethods>`) is required: under
- * composite/declaration emit, the cycle Node ↔ FactoryMethods would force
- * tsc to fall back to a structural shape with a string index signature.
- *
- * @noRailsEquivalent TypeScript-only mixin typing; Ruby `include` needs no type surface.
- */
-type _FactoryMethodsModule = import("../factory-methods.js").FactoryMethodsModule;
-
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
    @typescript-eslint/no-unsafe-declaration-merging */
-export interface Node extends _FactoryMethodsModule {}
+export interface Node extends FactoryMethodsModule {}
 setRubyNamespace(Node, "Arel::Nodes");
 
 Nodes.Node = Node;

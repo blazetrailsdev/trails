@@ -4,7 +4,9 @@ import { MatchData } from "../match-data.js";
 import { Range } from "../range.js";
 import { TypeError } from "../type-error.js";
 import { bytes } from "./bytes.js";
-import { rbStrSend } from "./method-table.js";
+import { include } from "../include.js";
+import { rbHash } from "../rb-hash.js";
+import { rbStrSend, stringSuperclass, type StringInstance } from "./method-table.js";
 
 type Row = [string, string, unknown[], unknown];
 
@@ -1050,5 +1052,28 @@ describe("STRING_METHOD_TABLE blocks and enumerators", () => {
   it("answers upto's enumerator before walking the range", () => {
     const [enumerator] = rbStrSend("a", "upto", "zzzzzzzzzz") as [Iterator<string>, string];
     expect([enumerator.next().value, enumerator.next().value]).toEqual(["a", "b"]);
+  });
+});
+
+describe("stringSuperclass", () => {
+  class Literal {
+    constructor(public value: string) {}
+    toString(): string {
+      return this.value;
+    }
+  }
+  include(Literal, stringSuperclass("eql", "hash"));
+  const literal = (value: string) => new Literal(value) as Literal & StringInstance;
+
+  it("is eql? to a String or String subclass instance with the same contents", () => {
+    expect(literal("a").eql("a")).toBe(true);
+    expect(literal("a").eql(new Literal("a"))).toBe(true);
+    expect(literal("a").eql(new Literal("b"))).toBe(false);
+    expect(literal("a").eql({ toString: () => "a" })).toBe(false);
+    expect(rbStrSend("a", "eql", new Literal("a"))[0]).toBe(true);
+  });
+
+  it("hashes as its String contents", () => {
+    expect(literal("a").hash()).toBe(rbHash("a"));
   });
 });
