@@ -1,76 +1,86 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { Assertion, assertEqual, assertPredicate, assertRaise } from "@blazetrails/activesupport";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  Assertion,
+  assertEqual,
+  assertMatch,
+  assertPredicate,
+  assertRaise,
+  include,
+  TopLevel,
+} from "@blazetrails/activesupport";
 import { Base } from "../../action-controller/base.js";
 import { TestCase } from "../../action-controller/test-case.js";
 import { controllerConstants } from "../http/request.js";
 import type { MiddlewareFactory, MiddlewareStack, RackApp } from "../middleware/stack.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
-import type { Mapper, RouteOptions } from "../routing/mapper.js";
+import type { Request } from "../http/request.js";
+import type { Mapper, MountableApp, RouteOptions } from "../routing/mapper.js";
 import { RouteSet } from "../routing/route-set.js";
 import { IntegrationTest } from "../testing/integration.js";
-import { assertRecognizes, assertRouting } from "../testing/assertions/routing.js";
 import "../../test-helpers/abstract-unit.js";
 
 class ArticlesController extends Base {}
+class BooksController extends Base {}
 
 class SecureArticlesController extends ArticlesController {
   async index(): Promise<void> {
     await this.render({ inline: "" });
   }
 }
+class BlockArticlesController extends ArticlesController {}
+class QueryArticlesController extends ArticlesController {}
+
+class SecureBooksController extends BooksController {}
+class BlockBooksController extends BooksController {}
+class QueryBooksController extends BooksController {}
+
 beforeAll(() => {
-  controllerConstants.set("posts", StubController as unknown as DispatchableControllerClass);
   for (const [name, klass] of Object.entries({
     articles: ArticlesController,
     secure_articles: SecureArticlesController,
+    block_articles: BlockArticlesController,
+    query_articles: QueryArticlesController,
+    books: BooksController,
+    secure_books: SecureBooksController,
+    block_books: BlockBooksController,
+    query_books: QueryBooksController,
   })) {
     controllerConstants.set(name, klass as unknown as DispatchableControllerClass);
   }
 });
 
-class StubController {}
+class Engine {}
 
-describe("ActionDispatch::Routing::Assertions", () => {
-  it("assert generates", () => {
-    const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id", { to: "posts#show", as: "post" });
-    });
-    expect(routes.pathFor({ id: 1 }, "post")).toBe("/posts/1");
-  });
-
-  it("assert recognizes", () => {
-    const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id", { to: "posts#show" });
-    });
-    assertRecognizes.call({ routes }, { controller: "posts", action: "show", id: "1" }, "/posts/1");
-  });
-
-  it("assert routing", () => {
-    const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id", { to: "posts#show", as: "post" });
-    });
-    assertRouting.call({ routes }, "/posts/1", { controller: "posts", action: "show", id: "1" });
-  });
-
-  it("with routing", () => {
-    const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/temp", { to: "temp#index", as: "temp" });
-    });
-    expect(routes.pathFor({}, "temp")).toBe("/temp");
-    routes.clearBang();
-    expect(() => routes.pathFor({}, "temp")).toThrow();
-  });
+let trails: typeof TopLevel.Trails;
+beforeAll(() => {
+  trails = TopLevel.Trails;
+  TopLevel.Trails = { Engine } as never;
 });
+afterAll(() => {
+  TopLevel.Trails = trails;
+});
+
+function engineClass(name: string): MountableApp & { routes(): RouteSet } {
+  const klass = class extends Engine {
+    static _routes = new RouteSet();
+
+    static routes(): RouteSet {
+      return this._routes;
+    }
+
+    static call(_env: Record<string, unknown>): void {}
+  };
+  Object.defineProperty(klass, "name", { value: name });
+  return klass as unknown as MountableApp & { routes(): RouteSet };
+}
 
 interface Host {
   routes?: RouteSet;
   beforeSetup(): void;
   setup(): void;
   afterTeardown(test: { failures: Error[] }): void;
+  assertGenerates: TestCase["assertGenerates"];
+  assertRecognizes: TestCase["assertRecognizes"];
   assertRouting: TestCase["assertRouting"];
   withRouting<T>(block: (routes: RouteSet) => T): T;
 }
@@ -91,22 +101,329 @@ function runTest<T extends Host>(klass: new () => T): () => T {
   return () => t;
 }
 
-function RoutingAssertionsSharedTests(t: () => Host): void {
+function RoutingAssertionsSharedTests(klass: HostClass, t: () => Host): void {
+  const assertGenerates = (...args: Parameters<Host["assertGenerates"]>) =>
+    t().assertGenerates(...args);
+  const assertRecognizes = (...args: Parameters<Host["assertRecognizes"]>) =>
+    t().assertRecognizes(...args);
+  const assertRouting = (...args: Parameters<Host["assertRouting"]>) => t().assertRouting(...args);
+
+  include(klass, {
+    setup(this: Host): void {
+      const rootEngine = engineClass("root_engine");
+
+      rootEngine.routes().draw((r) => {
+        r.root({ to: "books#index" });
+      });
+
+      const engine = engineClass("blog_engine");
+
+      engine.routes().draw((r) => {
+        r.resources("books");
+
+        r.scope("secure", { constraints: { protocol: "https://" } }, () => {
+          r.resources("books", { controller: "secure_books" } as RouteOptions);
+        });
+
+        r.scope("block", { constraints: (req: Request) => req.ssl }, () => {
+          r.resources("books", { controller: "block_books" } as RouteOptions);
+        });
+
+        r.scope(
+          "query",
+          { constraints: (req: Request) => req.params["use_query"] === "true" },
+          () => {
+            r.resources("books", { controller: "query_books" } as RouteOptions);
+          },
+        );
+      });
+
+      this.routes = new RouteSet();
+      this.routes.draw((r) => {
+        r.resources("articles");
+
+        r.scope("secure", { constraints: { protocol: "https://" } }, () => {
+          r.resources("articles", { controller: "secure_articles" } as RouteOptions);
+        });
+
+        r.scope("block", { constraints: (req: Request) => req.ssl }, () => {
+          r.resources("articles", { controller: "block_articles" } as RouteOptions);
+        });
+
+        r.scope(
+          "query",
+          { constraints: (req: Request) => req.params["use_query"] === "true" },
+          () => {
+            r.resources("articles", { controller: "query_articles" } as RouteOptions);
+          },
+        );
+
+        r.mount(engine, { at: "/shelf" });
+
+        r.mount(rootEngine, { at: "/" });
+
+        r.get("/shelf/foo", { controller: "query_articles", action: "index" });
+      });
+    },
+  });
+
+  it("assert generates", () => {
+    assertGenerates("/articles", { controller: "articles", action: "index" });
+    assertGenerates("/articles/1", { controller: "articles", action: "show", id: "1" });
+  });
+
+  it("assert generates with defaults", () => {
+    assertGenerates("/articles/1/edit", { controller: "articles", action: "edit" }, { id: "1" });
+  });
+
+  it("assert generates with extras", () => {
+    assertGenerates(
+      "/articles",
+      { controller: "articles", action: "index", page: "1" },
+      {},
+      { page: "1" },
+    );
+  });
+
+  it("assert recognizes", () => {
+    assertRecognizes({ controller: "articles", action: "index" }, "/articles");
+    assertRecognizes({ controller: "articles", action: "show", id: "1" }, "/articles/1");
+  });
+
+  it("assert recognizes with extras", () => {
+    assertRecognizes({ controller: "articles", action: "index", page: "1" }, "/articles", {
+      page: "1",
+    });
+  });
+
+  it("assert recognizes with method", () => {
+    assertRecognizes(
+      { controller: "articles", action: "create" },
+      { path: "/articles", method: "post" },
+    );
+    assertRecognizes(
+      { controller: "articles", action: "update", id: "1" },
+      { path: "/articles/1", method: "put" },
+    );
+  });
+
+  it("assert recognizes with hash constraint", async () => {
+    await assertRaise([Assertion], {}, () => {
+      assertRecognizes(
+        { controller: "secure_articles", action: "index" },
+        "http://test.host/secure/articles",
+      );
+    });
+    assertRecognizes(
+      { controller: "secure_articles", action: "index", protocol: "https://" },
+      "https://test.host/secure/articles",
+    );
+  });
+
+  it("assert recognizes with block constraint", async () => {
+    await assertRaise([Assertion], {}, () => {
+      assertRecognizes(
+        { controller: "block_articles", action: "index" },
+        "http://test.host/block/articles",
+      );
+    });
+    assertRecognizes(
+      { controller: "block_articles", action: "index" },
+      "https://test.host/block/articles",
+    );
+  });
+
+  it("assert recognizes with query constraint", async () => {
+    await assertRaise([Assertion], {}, () => {
+      assertRecognizes(
+        { controller: "query_articles", action: "index", use_query: "false" },
+        "/query/articles",
+        { use_query: "false" },
+      );
+    });
+    assertRecognizes(
+      { controller: "query_articles", action: "index", use_query: "true" },
+      "/query/articles",
+      { use_query: "true" },
+    );
+  });
+
+  it("assert recognizes raises message", async () => {
+    const err = await assertRaise([Assertion], {}, () => {
+      assertRecognizes(
+        { controller: "secure_articles", action: "index" },
+        "http://test.host/secure/articles",
+        {},
+        "This is a really bad msg",
+      );
+    });
+
+    assertMatch(err.message, "This is a really bad msg");
+  });
+
+  it("assert recognizes with engine", () => {
+    assertRecognizes({ controller: "books", action: "index" }, "/shelf/books");
+    assertRecognizes({ controller: "books", action: "show", id: "1" }, "/shelf/books/1");
+  });
+
+  it("assert recognizes with engine at root", () => {
+    assertRecognizes({ controller: "books", action: "index" }, "/");
+  });
+
+  it("assert recognizes with engine and extras", () => {
+    assertRecognizes({ controller: "books", action: "index", page: "1" }, "/shelf/books", {
+      page: "1",
+    });
+  });
+
+  it("assert recognizes with engine and method", () => {
+    assertRecognizes(
+      { controller: "books", action: "create" },
+      { path: "/shelf/books", method: "post" },
+    );
+    assertRecognizes(
+      { controller: "books", action: "update", id: "1" },
+      { path: "/shelf/books/1", method: "put" },
+    );
+  });
+
+  it("assert recognizes with engine and hash constraint", async () => {
+    await assertRaise([Assertion], {}, () => {
+      assertRecognizes(
+        { controller: "secure_books", action: "index" },
+        "http://test.host/shelf/secure/books",
+      );
+    });
+    assertRecognizes(
+      { controller: "secure_books", action: "index", protocol: "https://" },
+      "https://test.host/shelf/secure/books",
+    );
+  });
+
+  it("assert recognizes with engine and block constraint", async () => {
+    await assertRaise([Assertion], {}, () => {
+      assertRecognizes(
+        { controller: "block_books", action: "index" },
+        "http://test.host/shelf/block/books",
+      );
+    });
+    assertRecognizes(
+      { controller: "block_books", action: "index" },
+      "https://test.host/shelf/block/books",
+    );
+  });
+
+  it("assert recognizes with engine and query constraint", async () => {
+    await assertRaise([Assertion], {}, () => {
+      assertRecognizes(
+        { controller: "query_books", action: "index", use_query: "false" },
+        "/shelf/query/books",
+        { use_query: "false" },
+      );
+    });
+    assertRecognizes(
+      { controller: "query_books", action: "index", use_query: "true" },
+      "/shelf/query/books",
+      { use_query: "true" },
+    );
+  });
+
+  it("assert recognizes raises message with engine", async () => {
+    const err = await assertRaise([Assertion], {}, () => {
+      assertRecognizes(
+        { controller: "secure_books", action: "index" },
+        "http://test.host/shelf/secure/books",
+        {},
+        "This is a really bad msg",
+      );
+    });
+
+    assertMatch(err.message, "This is a really bad msg");
+  });
+
+  it("assert recognizes continue to recognize after it tried engines", () => {
+    assertRecognizes({ controller: "query_articles", action: "index" }, "/shelf/foo");
+  });
+
+  it("assert routing", () => {
+    assertRouting("/articles", { controller: "articles", action: "index" });
+  });
+
+  it("assert routing raises message", async () => {
+    const err = await assertRaise([Assertion], {}, () => {
+      assertRouting(
+        "/thisIsNotARoute",
+        { controller: "articles", action: "edit", id: "1" },
+        { id: "1" },
+        {},
+        "This is a really bad msg",
+      );
+    });
+
+    assertMatch(err.message, "This is a really bad msg");
+  });
+
+  it("assert routing with defaults", () => {
+    assertRouting(
+      "/articles/1/edit",
+      { controller: "articles", action: "edit", id: "1" },
+      { id: "1" },
+    );
+  });
+
+  it("assert routing with extras", () => {
+    assertRouting(
+      "/articles",
+      { controller: "articles", action: "index", page: "1" },
+      {},
+      { page: "1" },
+    );
+  });
+
+  it("assert routing with hash constraint", async () => {
+    await assertRaise([Assertion], {}, () => {
+      assertRouting("http://test.host/secure/articles", {
+        controller: "secure_articles",
+        action: "index",
+      });
+    });
+    assertRouting("https://test.host/secure/articles", {
+      controller: "secure_articles",
+      action: "index",
+      protocol: "https://",
+    });
+  });
+
+  it("assert routing with block constraint", async () => {
+    await assertRaise([Assertion], {}, () => {
+      assertRouting("http://test.host/block/articles", {
+        controller: "block_articles",
+        action: "index",
+      });
+    });
+    assertRouting("https://test.host/block/articles", {
+      controller: "block_articles",
+      action: "index",
+    });
+  });
+
   it("with routing", async () => {
     await t().withRouting(async (routes: RouteSet) => {
       routes.draw((r) => {
         r.resources("articles", { path: "artikel" } as RouteOptions);
       });
 
-      t().assertRouting("/artikel", { controller: "articles", action: "index" });
+      assertRouting("/artikel", { controller: "articles", action: "index" });
       await assertRaise([Assertion], {}, () => {
-        t().assertRouting("/articles", { controller: "articles", action: "index" });
+        assertRouting("/articles", { controller: "articles", action: "index" });
       });
     });
   });
 }
 
 function WithRoutingSharedTests(klass: HostClass, t: () => Host): void {
+  const assertRouting = (...args: Parameters<Host["assertRouting"]>) => t().assertRouting(...args);
+
   const beforeSetup = klass.prototype.beforeSetup;
   klass.prototype.beforeSetup = function (this: Host): void {
     this.routes = new RouteSet();
@@ -124,9 +441,9 @@ function WithRoutingSharedTests(klass: HostClass, t: () => Host): void {
   });
 
   it("with routing for the entire test file", async () => {
-    t().assertRouting("/artikel", { controller: "articles", action: "index" });
+    assertRouting("/artikel", { controller: "articles", action: "index" });
     await assertRaise([Assertion], {}, () => {
-      t().assertRouting("/articles", { controller: "articles", action: "index" });
+      assertRouting("/articles", { controller: "articles", action: "index" });
     });
   });
 
@@ -136,15 +453,15 @@ function WithRoutingSharedTests(klass: HostClass, t: () => Host): void {
         r.resources("articles", { path: "articolo" } as RouteOptions);
       });
 
-      t().assertRouting("/articolo", { controller: "articles", action: "index" });
+      assertRouting("/articolo", { controller: "articles", action: "index" });
       await assertRaise([Assertion], {}, () => {
-        t().assertRouting("/artikel", { controller: "articles", action: "index" });
+        assertRouting("/artikel", { controller: "articles", action: "index" });
       });
     });
 
-    t().assertRouting("/artikel", { controller: "articles", action: "index" });
+    assertRouting("/artikel", { controller: "articles", action: "index" });
     await assertRaise([Assertion], {}, () => {
-      t().assertRouting("/articolo", { controller: "articles", action: "index" });
+      assertRouting("/articolo", { controller: "articles", action: "index" });
     });
   });
 }
@@ -155,7 +472,10 @@ describe("RoutingAssertionsControllerTest", () => {
       super(ArticlesController);
     }
   }
-  RoutingAssertionsSharedTests(runTest(RoutingAssertionsControllerTest));
+  RoutingAssertionsSharedTests(
+    RoutingAssertionsControllerTest,
+    runTest(RoutingAssertionsControllerTest),
+  );
 
   describe("WithRoutingTest", () => {
     class WithRoutingTest extends TestCase {
@@ -185,7 +505,7 @@ describe("RoutingAssertionsControllerTest", () => {
 describe("RoutingAssertionsIntegrationTest", () => {
   class RoutingAssertionsIntegrationTest extends IntegrationTest {}
   const t = runTest(RoutingAssertionsIntegrationTest);
-  RoutingAssertionsSharedTests(t);
+  RoutingAssertionsSharedTests(RoutingAssertionsIntegrationTest, t);
 
   it("https and host settings are set on new session", () => {
     t().httpsBang();

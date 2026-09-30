@@ -1834,6 +1834,7 @@ export class Mapper {
       true,
       {},
     );
+    if (name != null && (!/^[_a-z]/i.test(name) || this.hasNamedRoute(name))) name = undefined;
     this._set.addRoute(mapping, name);
   }
 

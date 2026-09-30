@@ -207,7 +207,7 @@ describe("ActionDispatch::IntegrationTest", () => {
 
     it("GET /posts returns JSON", async () => {
       await app.get("/posts");
-      app.assertContentType("application/json");
+      expect(app.response.mediaType).toBe("application/json");
       expect(app.parsedBody).toEqual([{ id: 1 }, { id: 2 }]);
     });
 
@@ -292,14 +292,14 @@ describe("ActionDispatch::IntegrationTest", () => {
 
     it("followRedirect follows the redirect", async () => {
       await app.get("/posts/redirect");
-      await app.followRedirect();
+      await app.followRedirectBang();
       app.assertResponse("success");
       expect(app.parsedBody).toEqual([{ id: 1 }, { id: 2 }]);
     });
 
     it("followRedirect throws when no redirect", async () => {
       await app.get("/posts");
-      await expect(app.followRedirect()).rejects.toThrow(/No redirect to follow/);
+      await expect(app.followRedirectBang()).rejects.toThrow(/not a redirect!/);
     });
 
     it("assertRedirectedTo with regex", async () => {
@@ -311,24 +311,24 @@ describe("ActionDispatch::IntegrationTest", () => {
   describe("content types", () => {
     it("JSON content type", async () => {
       await app.get("/posts");
-      app.assertContentType("application/json");
+      expect(app.response.mediaType).toBe("application/json");
     });
 
     it("HTML content type", async () => {
       await app.get("/posts/html");
-      app.assertContentType("text/html");
+      expect(app.response.mediaType).toBe("text/html");
     });
   });
 
   describe("headers", () => {
     it("assertHeader checks response headers", async () => {
       await app.get("/posts/header");
-      app.assertHeader("x-custom", "integration-test");
+      expect(app.response.headers.get("x-custom")).toBe("integration-test");
     });
 
     it("assertHeader with regex", async () => {
       await app.get("/posts/header");
-      app.assertHeader("x-custom", /integration/);
+      expect(app.response.headers.get("x-custom")).toMatch(/integration/);
     });
   });
 
@@ -378,14 +378,14 @@ describe("ActionDispatch::IntegrationTest", () => {
   describe("flash", () => {
     it("flash is accessible after request", async () => {
       await app.post("/posts", { params: { title: "Flash!" } });
-      app.assertFlash("notice", "Post created!");
+      expect(app.flash.get("notice")).toBe("Post created!");
     });
 
     it("flash survives a redirect and is swept on the request after", async () => {
       await app.post("/posts/create-and-redirect");
       app.assertResponse(302);
 
-      await app.followRedirect();
+      await app.followRedirectBang();
       expect(app.responseBody).toBe("Post created!");
 
       await app.get("/posts/flash");
@@ -394,7 +394,7 @@ describe("ActionDispatch::IntegrationTest", () => {
 
     it("assertFlash throws when not set", async () => {
       await app.get("/posts");
-      expect(() => app.assertFlash("notice")).toThrow(/Expected flash/);
+      expect(app.flash.get("notice")).toBeUndefined();
     });
   });
 

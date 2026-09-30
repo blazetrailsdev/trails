@@ -28,6 +28,7 @@ import {
 } from "@blazetrails/rack-test";
 import { Mime } from "../action-dispatch/http/mime-type.js";
 import { Response } from "../action-dispatch/http/response.js";
+import { TestResponse } from "../action-dispatch/testing/test-response.js";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
@@ -212,6 +213,9 @@ export class TestCase {
   /** @internal */
   _cookieJar?: CookieJar;
 
+  /** @internal */
+  _responseKlass!: typeof Response;
+
   get responseBody(): string {
     return this.response?.body ?? this.controller?.responseBody ?? "";
   }
@@ -226,6 +230,8 @@ export class TestCase {
   }
 
   setupControllerRequestAndResponse(): void {
+    this._responseKlass = TestResponse;
+
     const klass = this._controllerClass;
     if (klass) {
       if (!this.controller) {
@@ -238,7 +244,7 @@ export class TestCase {
     }
 
     this.request = TestRequest.create(this.controller?.constructor ?? klass);
-    this.response = this.buildResponse();
+    this.response = this.buildResponse(this._responseKlass);
     this.response.request = this.request;
 
     if (this.controller) {
@@ -357,7 +363,7 @@ export class TestCase {
       this.request.session as unknown as TestSession,
       this.controller.constructor,
     );
-    this.response = this.buildResponse();
+    this.response = this.buildResponse(this._responseKlass);
     this.response.request = this.request;
     this.controller.recycleBang();
 
@@ -396,7 +402,7 @@ export class TestCase {
       flash,
       xhr,
     );
-    await this.processControllerResponse(action, xhr);
+    await this.processControllerResponse(action, this.cookies, xhr);
   }
 
   /** @internal */
@@ -410,8 +416,8 @@ export class TestCase {
   }
 
   /** @internal */
-  buildResponse(): Response {
-    return new Response();
+  buildResponse(klass: typeof Response): Response {
+    return klass.create();
   }
 
   /** @internal */
@@ -457,7 +463,11 @@ export class TestCase {
   }
 
   /** @internal */
-  private async processControllerResponse(action: string, xhr: boolean): Promise<void> {
+  private async processControllerResponse(
+    action: string,
+    cookies: CookieJar,
+    xhr: boolean,
+  ): Promise<void> {
     try {
       this.controller.recycleBang();
 
@@ -471,8 +481,8 @@ export class TestCase {
       if (this.request.isHaveCookieJar()) {
         if (!this.request.cookieJar().isCommitted()) {
           this.request.cookieJar().write(this.response as unknown as CookieResponse);
-          this.cookies.update(this.request.cookieJar().toHash());
-          this.cookies.update(this.response.cookies as Record<string, string>);
+          cookies.update(this.request.cookieJar().toHash());
+          cookies.update(this.response.cookies as Record<string, string>);
         }
       }
       this.response.toRack();
