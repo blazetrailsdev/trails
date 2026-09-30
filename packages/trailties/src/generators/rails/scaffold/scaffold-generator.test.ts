@@ -1,15 +1,21 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { assertNoMatch } from "@blazetrails/activesupport";
 import * as Assertions from "../../testing/assertions.js";
-import { ScaffoldGenerator } from "./scaffold-generator.js";
 import { Application } from "../../../application.js";
 import { Trails } from "../../../rails.js";
 import "../../../trailties/active-record.js";
+import "../../../test-unit/trailtie.js";
 
 class ScaffoldGeneratorApp extends Application {}
+let ScaffoldGenerator: typeof import("./scaffold-generator.js").ScaffoldGenerator;
+
+beforeAll(async () => {
+  await ScaffoldGeneratorApp.instance().loadGenerators();
+  ({ ScaffoldGenerator } = await import("./scaffold-generator.js"));
+});
 
 beforeEach(() => {
   Trails.application = ScaffoldGeneratorApp.instance();
@@ -41,12 +47,19 @@ afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function runGenerator(name: string, attributes: string[] = [], config: object = {}) {
-  return ScaffoldGenerator.start([name, ...attributes], {
+function listFiles(root: string): string[] {
+  return (fs.readdirSync(root, { recursive: true }) as string[]).filter((f) =>
+    fs.statSync(path.join(root, f)).isFile(),
+  );
+}
+
+async function runGenerator(name: string, attributes: string[] = [], config: object = {}) {
+  await ScaffoldGenerator.start([name, ...attributes], {
     cwd: tmpDir,
     output: (m) => lines.push(m),
     ...config,
   });
+  return listFiles(tmpDir);
 }
 
 function readFile(relativePath: string): string {
@@ -262,10 +275,11 @@ describe("ScaffoldGeneratorTest (JavaScript project)", () => {
   });
 
   it("generates .js controller and model files", async () => {
-    const files = await ScaffoldGenerator.start(["Post", "title:string"], {
+    await ScaffoldGenerator.start(["Post", "title:string"], {
       cwd: jsTmpDir,
       output: (m) => jsLines.push(m),
     });
+    const files = listFiles(jsTmpDir);
     expect(fs.existsSync(path.join(jsTmpDir, "app/controllers/posts-controller.js"))).toBe(true);
     expect(files).toContain("app/models/post.js");
     const migFile = files.find((f) => f.startsWith("db/migrate/"));

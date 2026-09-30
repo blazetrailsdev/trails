@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { ModelHelpers } from "./model-helpers.js";
 import { ResourceGenerator } from "./rails/resource/resource-generator.js";
 import type { ResourceGeneratorOptions } from "./rails/resource/resource-generator.js";
+import { ScaffoldGenerator } from "./test-unit/scaffold/scaffold-generator.js";
 
 const build = (name: string, modelName?: string, output: (m: string) => void = () => {}) =>
   new ResourceGenerator({
@@ -41,7 +42,8 @@ describe("applyResourceHelpers", () => {
   });
 
   it("ormClass raises without an :orm class option", () => {
-    expect(() => build("post").ormClass()).toThrow(
+    const i = new ScaffoldGenerator({ cwd: "/nonexistent", output: () => {}, name: "post" });
+    expect(() => i.ormClass()).toThrow(
       "You need to have :orm as class option to invoke orm_class and orm_instance",
     );
   });

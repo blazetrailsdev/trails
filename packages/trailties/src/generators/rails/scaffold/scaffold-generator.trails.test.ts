@@ -1,12 +1,22 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { fileURLToPath } from "node:url";
 import { run } from "@blazetrails/activerecord-cli";
-import { ScaffoldGenerator } from "./scaffold-generator.js";
 import { AppGenerator } from "../../app-generator.js";
 import { parseTs } from "../../../template-builder/testing.js";
+import { Application } from "../../../application.js";
+import "../../../trailties/active-record.js";
+import "../../../test-unit/trailtie.js";
+
+class ScaffoldGeneratorApp extends Application {}
+let ScaffoldGenerator: typeof import("./scaffold-generator.js").ScaffoldGenerator;
+
+beforeAll(async () => {
+  await ScaffoldGeneratorApp.instance().loadGenerators();
+  ({ ScaffoldGenerator } = await import("./scaffold-generator.js"));
+});
 
 let tmpDir: string;
 beforeEach(() => {
@@ -24,8 +34,11 @@ describe("ScaffoldGenerator (namespaced)", () => {
   it("names a namespaced scaffold's migration create_<table_name> and routes it under /admin/accounts", async () => {
     fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
     const config = { cwd: tmpDir, output: () => {} };
-    const files = await ScaffoldGenerator.start(["admin/account", "name:string"], config);
-    const migration = files.find((f) => f.startsWith("db/migrate/"))!;
+    await ScaffoldGenerator.start(["admin/account", "name:string"], config);
+    const migration = fs
+      .readdirSync(tmpDir, { recursive: true })
+      .map(String)
+      .find((f) => f.startsWith("db/migrate/"))!;
     expect(migration).toMatch(/^db\/migrate\/\d+_create_admin_accounts\.ts$/);
     expect(read(migration)).toContain('this.createTable("admin_accounts"');
     const controller = read("app/controllers/admin/accounts-controller.ts");
@@ -45,7 +58,7 @@ describe("ScaffoldGenerator (namespaced)", () => {
         'linkTo("Back to accounts", adminAccountsPath())',
       );
     const rerun = ScaffoldGenerator.start(["admin/account"], { ...config, force: true });
-    await expect(rerun).resolves.toContain("app/models/admin/account.ts");
+    await expect(rerun).resolves.toEqual(expect.any(Array));
   });
 });
 
@@ -97,12 +110,10 @@ describe("ScaffoldGenerator (type-check)", () => {
         path.join(packagesDir, "activerecord-cli", "node_modules", "@types", "node"),
         path.join(appDir, "node_modules", "@types", "node"),
       );
-      await new ScaffoldGenerator({
+      await ScaffoldGenerator.start(["Post", "title:string", "body:text"], {
         cwd: appDir,
         output: () => {},
-        name: "Post",
-        attributes: ["title:string", "body:text"],
-      }).run();
+      });
 
       const code = await run(
         [

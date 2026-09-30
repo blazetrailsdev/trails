@@ -64,7 +64,7 @@ export const ModelHelpers = {
       if (!ModelHelpers.skipWarn) {
         this.say(format(PLURAL_MODEL_NAME_WARN_MESSAGE, this.name, singular));
       }
-      this.name = singular;
+      this.name = (this.options as { name?: string }).name = singular;
       this.assignNamesBang(this.name);
     }
     if (this.isInflectionImpossible(this.name)) {

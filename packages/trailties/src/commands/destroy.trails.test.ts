@@ -1,9 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { destroyCommand } from "./destroy.js";
 import { Generators } from "../generators.js";
+import { Application } from "../application.js";
+import "../trailties/active-record.js";
+
+class DestroyCommandApp extends Application {}
+
+beforeAll(async () => {
+  await DestroyCommandApp.instance().loadGenerators();
+});
 
 let tmpDir: string;
 let originalCwd: string;

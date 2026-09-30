@@ -194,9 +194,16 @@ export class VfsModelGenerator extends ModelGenerator {
   private _vfs: VirtualFS;
   private _vfsOutput: (msg: string) => void;
 
-  constructor(options: VfsGeneratorOptions) {
+  constructor(options: VfsGeneratorOptions & { name: string; attributes: string[] }) {
     ensureVfsAdapter(options.vfs);
-    super({ cwd: "/", output: options.output });
+    super({
+      cwd: "/",
+      output: options.output,
+      name: options.name,
+      attributes: options.attributes,
+      migration: true,
+      timestamps: true,
+    });
     this._vfs = options.vfs;
     this._vfsOutput = options.output;
     applyVfsOverrides(this, options.vfs);

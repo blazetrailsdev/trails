@@ -1,39 +1,11 @@
-import { camelize, include } from "@blazetrails/activesupport";
-import { tsClass, tsField, tsImport, tsModule } from "../../../template-builder/index.js";
+import { include } from "@blazetrails/activesupport";
 import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
 import { ModelHelpers, type ModelHelpersOptions } from "../../model-helpers.js";
 
 export interface ModelGeneratorOptions extends NamedBaseOptions, ModelHelpersOptions {}
 
-// prettier-ignore
-const TS_TYPES: Record<string, string> = { integer: "number", float: "number",
-  decimal: "number", boolean: "boolean", date: "Date", datetime: "Date",
-  timestamp: "Date", time: "Date", references: "number", belongs_to: "number",
-  binary: "Uint8Array", digest: "string" };
+export class ModelGenerator extends NamedBase {}
 
-export function emitModelSource(className: string, fields: Array<[string, string]>): string {
-  const { refs } = tsImport("@blazetrails/activerecord", { Base: "named" });
-  return tsModule({
-    declarations: [
-      tsClass({
-        name: className,
-        extends: refs.Base,
-        body: fields.map(([name, type]) => tsField(name, type, { definite: true })),
-      }),
-    ],
-  });
-}
-
-export class ModelGenerator extends NamedBase {
-  async run(): Promise<string[]> {
-    const filename = `app/models/${this.filePath()}${this.ext()}`;
-    const className = [...this.classPathParts, this.fileName].map((p) => camelize(p)).join("");
-    const fields: Array<[string, string]> = this.attributes
-      .filter((a) => !a.virtual())
-      .map((a) => [a.columnName(), TS_TYPES[a.type] ?? "string"]);
-    this.createFile(filename, emitModelSource(className, fields));
-    return this.getCreatedFiles();
-  }
-}
-
+Object.defineProperty(ModelGenerator, "name", { value: "Rails::Generators::ModelGenerator" });
 include(ModelGenerator, ModelHelpers);
+ModelGenerator.hookFor("orm", { required: true, desc: "ORM to be invoked" });
