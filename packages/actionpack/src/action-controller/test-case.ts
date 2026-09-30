@@ -213,6 +213,9 @@ export class TestCase {
   /** @internal */
   _cookieJar?: CookieJar;
 
+  /** @internal */
+  _responseKlass!: typeof Response;
+
   get responseBody(): string {
     return this.response?.body ?? this.controller?.responseBody ?? "";
   }
@@ -411,9 +414,6 @@ export class TestCase {
   queryParameterNames(generatedExtras: [string, string[]]): string[] {
     return [...generatedExtras[1], "controller", "action"];
   }
-
-  /** @internal */
-  _responseKlass!: typeof Response;
 
   /** @internal */
   buildResponse(klass: typeof Response): Response {
