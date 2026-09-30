@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { rbInspect } from "@blazetrails/ruby-compat";
 
 import {
   ArgumentError,
@@ -8,7 +9,6 @@ import {
   MissingTranslation,
   MissingTranslationData,
   ReservedInterpolationKey,
-  inspect,
 } from "./exceptions.js";
 import { config, resetConfig, translate } from "./i18n.js";
 import { resetClassConfig } from "./config.js";
@@ -72,7 +72,7 @@ describe("I18nExceptionsTest", () => {
   it("InvalidPluralizationData message contains count, data and missing key", () => {
     forceInvalidPluralizationData((exception) => {
       expect(exception.message).toMatch("1");
-      expect(exception.message).toMatch(`${inspect({ other: "bar" })}`);
+      expect(exception.message).toMatch(`{:other=>"bar"}`);
       expect(exception.message).toMatch("one");
     });
   });
@@ -88,7 +88,7 @@ describe("I18nExceptionsTest", () => {
   it("MissingInterpolationArgument message contains the missing and given arguments", () => {
     forceMissingInterpolationArgument((exception) => {
       expect(exception.message).toBe(
-        `missing interpolation argument :bar in "%{bar}" (${inspect({ baz: "baz" })} given)`,
+        `missing interpolation argument :bar in "%{bar}" (${rbInspect({ ":baz": "baz" })} given)`,
       );
     });
   });

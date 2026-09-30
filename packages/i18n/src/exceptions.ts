@@ -1,4 +1,4 @@
-import { EMPTY_HASH, normalizeKeys } from "./i18n.js";
+import { EMPTY_HASH, normalizeKeys, toSym } from "./i18n.js";
 import type { Locale, TranslationKey } from "./i18n.js";
 import {
   ArgumentError as RubyArgumentError,
@@ -8,71 +8,13 @@ import {
 
 export { NoMethodError };
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function inspect(value: unknown): string {
-  if (value === null || value === undefined) return "nil";
-  if (typeof value === "string") return inspectString(value);
-  if (typeof value === "function") return "#<Proc>";
-  if (Array.isArray(value)) return `[${value.map(inspect).join(", ")}]`;
-  if (typeof value === "object") {
-    const pairs = Object.entries(value as Record<string, unknown>).map(
-      ([k, v]) => `${inspectSymbol(k)}=>${inspect(v)}`,
-    );
-    return `{${pairs.join(", ")}}`;
-  }
-  return rbInspect(value);
-}
-
-const RUBY_ESCAPES: Record<string, string> = {
-  "\n": "\\n",
-  "\r": "\\r",
-  "\t": "\\t",
-  "\f": "\\f",
-  "\v": "\\v",
-  "\b": "\\b",
-  "\x07": "\\a",
-  "\x1b": "\\e",
-};
-
-const NONPRINTABLE = /^[\p{Cc}\p{Cn}\p{Zl}\p{Zp}]$/u;
-
-function inspectString(value: string): string {
-  const chars = Array.from(value);
-  let result = '"';
-  for (let i = 0; i < chars.length; i++) {
-    const char = chars[i];
-    const code = char.codePointAt(0)!;
-    if (char === '"' || char === "\\") {
-      result += `\\${char}`;
-    } else if (char === "#" && ["{", "$", "@"].includes(chars[i + 1] ?? "")) {
-      result += "\\#";
-    } else if (char in RUBY_ESCAPES) {
-      result += RUBY_ESCAPES[char];
-    } else if (NONPRINTABLE.test(char)) {
-      result +=
-        code <= 0xffff
-          ? `\\u${code.toString(16).toUpperCase().padStart(4, "0")}`
-          : `\\u{${code.toString(16).toUpperCase()}}`;
-    } else if (code >= 0xd800 && code <= 0xdfff) {
-      for (const byte of [0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f)]) {
-        result += `\\x${byte.toString(16).toUpperCase()}`;
-      }
-    } else {
-      result += char;
-    }
-  }
-  return `${result}"`;
-}
-
-function inspectSymbol(value: unknown): string {
-  return typeof value === "string" ? `:${value}` : inspect(value);
-}
-
-function inspectSymbolOrString(value: string): string {
-  return value.startsWith(":") ? value : inspect(value);
+function deepSymbolizeKeys(object: unknown): unknown {
+  if (Array.isArray(object)) return object.map(deepSymbolizeKeys);
+  if (typeof object !== "object" || object === null) return object;
+  if (Object.getPrototypeOf(object) !== Object.prototype) return object;
+  return Object.fromEntries(
+    Object.entries(object).map(([key, value]) => [toSym(key), deepSymbolizeKeys(value)]),
+  );
 }
 
 export class ArgumentError extends RubyArgumentError {
@@ -100,7 +42,9 @@ export class InvalidLocale extends ArgumentError {
   readonly locale: unknown;
 
   constructor(locale: unknown) {
-    super(`${inspectSymbol(locale)} is not a valid locale`);
+    super(
+      `${rbInspect(typeof locale === "string" ? toSym(locale) : locale)} is not a valid locale`,
+    );
     this.name = "InvalidLocale";
     this.locale = locale;
   }
@@ -145,7 +89,7 @@ export class Base extends ArgumentError {
       if (permitted in options) slice[permitted] = options[permitted];
     }
     for (const [k, v] of Object.entries(options)) {
-      if (typeof v === "function") slice[k] = inspect(v);
+      if (typeof v === "function") slice[k] = rbInspect(v);
     }
   }
 
@@ -204,7 +148,7 @@ export class InvalidPluralizationData extends ArgumentError {
 
   constructor(entry: unknown, count: unknown, key: TranslationKey) {
     super(
-      `translation data ${inspect(entry)} can not be used with :count => ${count}. key '${key}' is missing.`,
+      `translation data ${rbInspect(deepSymbolizeKeys(entry))} can not be used with :count => ${count}. key '${key}' is missing.`,
     );
     this.name = "InvalidPluralizationData";
     this.entry = entry;
@@ -220,7 +164,7 @@ export class MissingInterpolationArgument extends ArgumentError {
 
   constructor(key: string, values: Record<string, unknown>, string: string) {
     super(
-      `missing interpolation argument ${inspectSymbolOrString(key)} in ${inspect(string)} (${inspect(values)} given)`,
+      `missing interpolation argument ${rbInspect(key)} in ${rbInspect(string)} (${rbInspect(deepSymbolizeKeys(values))} given)`,
     );
     this.name = "MissingInterpolationArgument";
     this.key = key;
@@ -234,7 +178,7 @@ export class ReservedInterpolationKey extends ArgumentError {
   readonly string: string;
 
   constructor(key: string, string: string) {
-    super(`reserved key ${inspectSymbolOrString(key)} used in ${inspect(string)}`);
+    super(`reserved key ${rbInspect(key)} used in ${rbInspect(string)}`);
     this.name = "ReservedInterpolationKey";
     this.key = key;
     this.string = string;

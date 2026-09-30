@@ -1,6 +1,6 @@
-import { kernelCatch } from "@blazetrails/ruby-compat";
+import { kernelCatch, rbInspect } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
-import { MissingInterpolationArgument, MissingTranslationData, inspect } from "../exceptions.js";
+import { MissingInterpolationArgument, MissingTranslationData } from "../exceptions.js";
 import { config, l, resetConfig, setBackend, t } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
 import { Simple } from "./simple.js";
@@ -51,7 +51,7 @@ describe("I18nBackendExceptionsTest", () => {
   it("exceptions: MissingInterpolationArgument message includes missing key, provided keys and full string", () => {
     const exception = new MissingInterpolationArgument("key", { this: "was given" }, "string");
     expect(exception.message).toBe(
-      `missing interpolation argument "key" in "string" (${inspect({ this: "was given" })} given)`,
+      `missing interpolation argument "key" in "string" (${rbInspect({ ":this": "was given" })} given)`,
     );
   });
 });

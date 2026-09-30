@@ -428,7 +428,7 @@ describe("AppGenerator", () => {
     expect(appConfig).toContain("MyApp");
 
     const layout = fs.readFileSync(appPath("app/views/layouts/application.html.tse"), "utf-8");
-    expect(layout).toContain("my-app");
+    expect(layout).toContain(`contentFor("title") ?? "My App"`);
   });
 
   it("generates an application class that subclasses Application", async () => {

@@ -86,6 +86,11 @@ class BetterSqlite3Statement implements SqliteStatement, SyncSqliteStatement {
     this.boundParams = binds;
   }
 
+  step(): null {
+    this.run(this.boundParams);
+    return null;
+  }
+
   toA(): unknown[][] {
     this.stmt.raw(true);
     try {

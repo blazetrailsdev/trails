@@ -37,6 +37,49 @@ describe("Object#inspect", () => {
     expect(inspect(/x/)).toBe("/x/");
     expect(inspect(new RegExp("a/b"))).toBe("/a\\/b/");
   });
+  it("quotes a Symbol whose name is not a symname, as sym_inspect does", () => {
+    const names = ["foo", "Foo", "foo?", "foo!", "foo=", "foo?=", "de-AT", "@a", "@@a", "$a"];
+    names.push("$1", "$~", "[]", "[]=", "<=>", "==", "=", "+@", "!", "a b", "", "1a", "é", "@1");
+    expect(names.map((name) => inspect(`:${name}`))).toEqual([
+      ":foo",
+      ":Foo",
+      ":foo?",
+      ":foo!",
+      ":foo=",
+      ':"foo?="',
+      ':"de-AT"',
+      ":@a",
+      ":@@a",
+      ":$a",
+      ":$1",
+      ":$~",
+      ":[]",
+      ":[]=",
+      ":<=>",
+      ":==",
+      ':"="',
+      ":+@",
+      ":!",
+      ':"a b"',
+      ':""',
+      ':"1a"',
+      ":é",
+      ':"@1"',
+    ]);
+  });
+
+  it("follows rb_enc_symname_type's operator and sigil arms", () => {
+    const names =
+      "! != !~ !@ ~ ~@ + +@ - -@ * ** / % & | ^ < << <= <=> > >> >= = == === =~ [] []= [ ] ` `@ !! =! a? a! a= A= A? @a? $a? @a= @@a= $a= $- $-w $-ww $12 $0 $_ $~ $_a";
+    expect(
+      names
+        .split(" ")
+        .map((name) => inspect(`:${name}`))
+        .join(" "),
+    ).toBe(
+      ':! :!= :!~ :"!@" :~ :"~@" :+ :+@ :- :-@ :* :** :/ :% :& :| :^ :< :<< :<= :<=> :> :>> :>= :"=" :== :=== :=~ :[] :[]= :"[" :"]" :` :"`@" :"!!" :"=!" :a? :a! :a= :A= :A? :"@a?" :"$a?" :"@a=" :"@@a=" :"$a=" :"$-" :$-w :"$-ww" :$12 :$0 :$_ :$~ :$_a',
+    );
+  });
 });
 
 describe("Object#to_s", () => {

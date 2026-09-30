@@ -1,17 +1,9 @@
-import { rbObjClass } from "@blazetrails/ruby-compat";
+import { rbInspect, rbObjClass } from "@blazetrails/ruby-compat";
 import { InvalidLocale, Disabled } from "../exceptions.js";
-import type { Locale } from "../i18n.js";
+import { toSym, type Locale } from "../i18n.js";
 import { tag as tagFor } from "./tag.js";
 
 export type FallbackMappings = Record<Locale, Locale | Locale[]>;
-
-function inspectSymbol(value: Locale): string {
-  return /^[a-zA-Z_][a-zA-Z0-9_]*[?!=]?$/.test(value) ? `:${value}` : `:"${value}"`;
-}
-
-function inspectLocales(locales: Locale[]): string {
-  return `[${locales.map(inspectSymbol).join(", ")}]`;
-}
 
 export class Fallbacks extends Map<Locale, Locale[]> {
   static override name = "I18n::Locale::Fallbacks";
@@ -69,10 +61,10 @@ export class Fallbacks extends Map<Locale, Locale[]> {
   }
 
   inspect(): string {
-    const map = Object.entries(this.mapStore)
-      .map(([key, value]) => `${inspectSymbol(key)}=>${inspectLocales(value)}`)
-      .join(", ");
-    return `#<${rbObjClass(this)} @map={${map}} @defaults=${inspectLocales(this.defaultsStore)}>`;
+    const map = Object.fromEntries(
+      Object.entries(this.mapStore).map(([key, value]) => [toSym(key), value.map(toSym)]),
+    );
+    return `#<${rbObjClass(this)} @map=${rbInspect(map)} @defaults=${rbInspect(this.defaultsStore.map(toSym))}>`;
   }
 
   protected compute(

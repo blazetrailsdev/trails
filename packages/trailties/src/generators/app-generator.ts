@@ -1,5 +1,5 @@
 import { File } from "@blazetrails/ruby-compat";
-import { TopLevel, camelize, parameterize, underscore } from "@blazetrails/activesupport";
+import { TopLevel, camelize, parameterize, titleize, underscore } from "@blazetrails/activesupport";
 import { ref, tsClass, tsField, tsModule, tsRaw } from "../template-builder/index.js";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
 import { Trails } from "../rails.js";
@@ -1077,15 +1077,28 @@ Trails.application!.config.filterParameters = Trails.application!.config.filterP
       "app/views/layouts/application.html.tse",
       `<!DOCTYPE html>
 <html>
-<head>
-  <title>${name}</title>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <%= stylesheetLinkTag("application") %>
-</head>
-<body>
-  <%= yield %>
-</body>
+  <head>
+    <title><%= contentFor("title") ?? "${titleize(this.appName())}" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <%= yield("head") %>
+
+    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.ts too!) %>
+    <%#= tag.link({ rel: "manifest", href: pwaManifestPath({ format: "json" }) }) %>
+
+    <link rel="icon" href="/icon.png" type="image/png">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon.png">
+
+    <%# Includes all stylesheet files in app/assets/stylesheets %>
+    <%= stylesheetLinkTag("application") %>
+  </head>
+
+  <body>
+    <%= yield %>
+  </body>
 </html>
 `,
     );

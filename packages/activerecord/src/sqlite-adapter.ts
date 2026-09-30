@@ -21,6 +21,7 @@ export interface SqliteStatement {
   all(binds?: SqliteBinds): unknown[] | Promise<unknown[]>;
   iterate(binds?: SqliteBinds): Iterable<unknown> | AsyncIterable<unknown>;
   bindParams(binds: SqliteBinds): void;
+  step(): null | Promise<null>;
   toA(): unknown[][] | Promise<unknown[][]>;
   columns(): ColumnInfo[];
   setReadBigInts(on: boolean): void;
@@ -53,6 +54,7 @@ export interface SyncSqliteStatement {
   all(binds?: SqliteBinds): unknown[];
   iterate(binds?: SqliteBinds): Iterable<unknown>;
   bindParams(binds: SqliteBinds): void;
+  step(): null;
   toA(): unknown[][];
   columns(): ColumnInfo[];
   setReadBigInts(on: boolean): void;

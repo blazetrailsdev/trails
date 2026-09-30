@@ -62,6 +62,11 @@ class SqlJsStatement implements SyncSqliteStatement {
     this.boundParams = binds;
   }
 
+  step(): null {
+    this.run(this.boundParams);
+    return null;
+  }
+
   toA(): unknown[][] {
     const rows: unknown[][] = [];
     this.stmt.bind(bindParams(this.boundParams));

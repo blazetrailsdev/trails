@@ -21,6 +21,12 @@ export function stringInspect(str: string): string {
     const char = chars[i];
     const c = char.codePointAt(0)!;
 
+    if (c >= 0xd800 && c <= 0xdfff) {
+      for (const byte of [0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f)]) {
+        result += `\\x${byte.toString(16).toUpperCase()}`;
+      }
+      continue;
+    }
     if (char === '"' || char === "\\") {
       result += "\\" + char;
       continue;
@@ -59,20 +65,16 @@ const ESCAPE_ALIASES: Record<number, string> = {
 };
 
 /**
- * `rb_enc_isprint(c, enc) && c != 0x85` (`vendor/ruby/v3.3.11/string.c:6902`) for
- * UTF-8: the C0 controls, DEL and the C1 controls are not printable, and
- * everything above them is — Onigmo answers `print` for U+200B and U+FFFD
- * alike, and `"\u200b".inspect` keeps the literal character.
- *
- * A lone surrogate is the one JS string a UTF-8 `String` cannot hold; MRI
- * reaches such bytes through `!MBCLEN_CHARFOUND_P` (`string.c:6845-6857`) and
- * escapes them, which is the arm {@link catEscapedChar} lands on here.
+ * `rb_enc_isprint(c, enc) && c != 0x85` (`vendor/ruby/v3.3.11/string.c:6866-6867`)
+ * for UTF-8: Onigmo's `print` excludes the controls, the unassigned code
+ * points and the line / paragraph separators, so `"\u0378".inspect` and
+ * `"\u2028".inspect` escape, while U+200B and U+00AD stay literal.
  */
 function isPrint(c: number): boolean {
-  if (c < 0x20 || (c >= 0x7f && c <= 0x9f)) return false;
-  if (c >= 0xd800 && c <= 0xdfff) return false;
-  return true;
+  return !NONPRINTABLE.test(String.fromCodePoint(c));
 }
+
+const NONPRINTABLE = /^[\p{Cc}\p{Cn}\p{Zl}\p{Zp}]$/u;
 
 /**
  * `rb_str_buf_cat_escaped_char` (`vendor/ruby/v3.3.11/string.c:6671`), the

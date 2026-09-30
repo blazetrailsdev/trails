@@ -492,7 +492,7 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
   if (typeof value === "boolean") return value ? "true" : "false";
   if (typeof value === "number" || value instanceof Number) return floToS(value);
   if (typeof value === "bigint") return String(value);
-  if (isSymbol(value)) return value;
+  if (isSymbol(value)) return symInspect(value);
   if (typeof value === "string") return stringInspect(value);
   if (Array.isArray(value)) return inspectAry(value, recursing);
   if (isPlainHash(value) || value instanceof Map) return inspectHash(value, recursing);
@@ -505,7 +505,29 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
   ) {
     return rbModToS(value as abstract new (...args: never) => unknown);
   }
+  if (typeof value === "function") return rbAnyToS(value);
   return String(value);
+}
+
+function symInspect(sym: string): string {
+  const name = sym.slice(1);
+  return strSymnameP(name) ? sym : `:${stringInspect(name)}`;
+}
+
+const SYM_OPERATOR = /^(?:\[\]=?|<=>|<<|<=|<|>>|>=|>|=~|===?|\*\*?|[+-]@?|[|^&/%~`]|!=|!~|!)$/;
+const SYM_SPECIAL_GLOBAL = /^\$(?:[~*$?!@/\\;,.=:<>"&`'+0]|\d+|-[\p{L}\p{N}_])$/u;
+const SYM_PREFIXED_IDENT = /^(?:@@?|\$)[\p{L}_\P{ASCII}][\p{L}\p{N}_\P{ASCII}]*$/u;
+const SYM_IDENT = /^[\p{L}_\P{ASCII}][\p{L}\p{N}_\P{ASCII}]*[?!=]?$/u;
+const SYM_UNPRINTABLE = /[\p{Cc}\p{Cn}\p{Cs}\p{Zl}\p{Zp}]/u;
+
+function strSymnameP(name: string): boolean {
+  if (SYM_UNPRINTABLE.test(name)) return false;
+  return (
+    SYM_OPERATOR.test(name) ||
+    SYM_SPECIAL_GLOBAL.test(name) ||
+    SYM_PREFIXED_IDENT.test(name) ||
+    SYM_IDENT.test(name)
+  );
 }
 
 /**

@@ -45,7 +45,7 @@ function renderLayout(root: string): string {
     locals: [],
     format: ":html",
   })
-    .render(view, {})
+    .render(view, {}, null, undefined, (...name) => view._layoutFor(...(name as [string])))
     .toString();
 }
 

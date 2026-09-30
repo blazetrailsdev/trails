@@ -106,6 +106,11 @@ class ExpoSqliteStatement implements SqliteStatement {
     this.boundParams = binds;
   }
 
+  async step(): Promise<null> {
+    await this.run(this.boundParams);
+    return null;
+  }
+
   async toA(): Promise<unknown[][]> {
     const result = await this.stmt.executeForRawResultAsync(expandBinds(this.boundParams));
     return (await result.getAllAsync()) as unknown[][];
