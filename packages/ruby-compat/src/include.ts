@@ -22,7 +22,7 @@
 
 import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
-import { FL_SINGLETON } from "./object.js";
+import { FL_SINGLETON, rbAnyToS } from "./object.js";
 
 type AnyClass = new (...args: never[]) => unknown;
 type ModuleObject = object;
@@ -32,6 +32,44 @@ type ModuleHooks = {
   [extended]?: (klass: unknown) => void;
   [initialize]?: (this: object) => void;
 };
+
+const classpaths = new WeakMap<Module, string>();
+
+/**
+ * Mirrors: Ruby's Module#const_set — vendor/ruby/v3.3.11/object.c:2545
+ * `rb_mod_const_set`, through `const_set` (vendor/ruby/v3.3.11/variable.c:3607).
+ * Binding an anonymous module names it `<mod>::<id>` (variable.c:3648-3660),
+ * which is where `Module#name` and `Module#inspect` read it from.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+ */
+export function rbModConstSet<T>(mod: { name: string }, id: string, value: T): T {
+  Object.defineProperty(mod, id, { value, writable: true, enumerable: true, configurable: true });
+  if (value instanceof Module && !classpaths.has(value)) {
+    classpaths.set(value, `${mod.name}::${id}`);
+  }
+  return value;
+}
+
+/**
+ * Mirrors: Ruby's Module#private_constant — vendor/ruby/v3.3.11/variable.c:3852
+ * `rb_mod_private_constant`. A JS property read carries no caller to raise
+ * `NameError` against, so the flag is what `Module#constants` observes: a
+ * private constant is left out of the listing (`rb_local_constants_i`,
+ * variable.c:3373-3379), as a non-enumerable property is left out of
+ * `Object.keys`. An unbound name raises as `undefined_constant` does
+ * (variable.c:3235-3239).
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+ */
+export function rbModPrivateConstant(mod: { name: string }, ...names: string[]): void {
+  for (const name of names) {
+    if (!Object.prototype.hasOwnProperty.call(mod, name)) {
+      throw new NameError(`constant ${mod.name}::${name} not defined`, name);
+    }
+    Object.defineProperty(mod, name, { enumerable: false });
+  }
+}
 
 /**
  * Ruby's `Module.new` — an anonymous module built at runtime and populated
@@ -66,6 +104,28 @@ export class Module {
    */
   constructor(block?: (mod: Module) => void) {
     if (block !== undefined) block(this);
+  }
+
+  /**
+   * Mirrors: Ruby's Module#name — vendor/ruby/v3.3.11/variable.c:122
+   * `rb_mod_name`: the classpath `const_set` gave the module, or `nil` while
+   * it is anonymous.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  get name(): string | null {
+    return classpaths.get(this) ?? null;
+  }
+
+  /**
+   * Mirrors: Ruby's Module#inspect — vendor/ruby/v3.3.11/object.c:1710
+   * `rb_mod_to_s`, which renders `rb_class_name`: the classpath, or the
+   * temporary `#<Class:0x…>` path of an anonymous module.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  inspect(): string {
+    return this.name ?? rbAnyToS(this);
   }
 
   /**
