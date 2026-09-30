@@ -13,8 +13,7 @@ tests, `db:migrate` builds the table, and `trails server` serves working CRUD
 pages: Rails' scaffold views in the generated layout, forms with CSRF
 protection, flash notices, validation errors, and view reloading in
 development. The model is typed from the schema by `trails-tsc`, and the
-scaffold's functional tests, ported from Rails' templates, pass once the test
-database exists (see [known gaps](#known-gaps)). The
+scaffold's functional tests, ported from Rails' templates, pass. The
 [quickstart](#quickstart) walks through all of it.
 
 It is pre-release. Nothing is published to npm yet, so you run it from a
@@ -32,10 +31,8 @@ checkout of this repository.
 ## Quickstart
 
 Every command and every output block in this section was run on 2026-09-30
-against `main` at `98d96082e4`, on Linux with Node 24.16.0 and SQLite, with
-`TRAILS_ENV` and `NODE_ENV` unset. No step needs a workaround. One
-[known gap](#known-gaps) remains, in the first `pnpm test` in a new app.
-`bin/trails routes` was re-checked on `bff66f3b83`, after #8283.
+against `main` at `53a6249ae6`, on Linux with Node 24.16.0 and SQLite, with
+`TRAILS_ENV` and `NODE_ENV` unset. No step needs a workaround.
 
 ### 1. Build the framework from a checkout
 
@@ -98,7 +95,7 @@ bin/trails generate scaffold Post title:string body:text
 
 ```text
       invoke  active_record
-      create  db/migrate/20260930164919_create_posts.ts
+      create  db/migrate/20260930175642_create_posts.ts
       create  app/models/post.ts
       invoke  test_unit
       create  test/models/post.test.ts
@@ -124,10 +121,10 @@ pnpm db:migrate
 ```
 
 ```text
-== 20260930164919 CreatePosts: migrating ======================================
+== 20260930175642 CreatePosts: migrating ======================================
 -- createTable("posts")
-   -> 0.0070s
-== 20260930164919 CreatePosts: migrated (0.0080s) =============================
+   -> 0.0060s
+== 20260930175642 CreatePosts: migrated (0.0070s) =============================
 
 All migrations are up to date.
 ```
@@ -136,7 +133,7 @@ The migration is an ordinary `Migration` subclass, and the migrate writes
 `db/schema.ts` from the live database, as Rails writes `schema.rb`:
 
 ```ts
-// db/migrate/20260930164919_create_posts.ts
+// db/migrate/20260930175642_create_posts.ts
 import { Migration } from "@blazetrails/activerecord";
 
 export class CreatePosts extends Migration {
@@ -307,13 +304,22 @@ app/models/check.ts(4,7): error TS2322: Type 'string | null' is not assignable t
 
 The build also passes after `generate scaffold`.
 
-### Known gaps
+### 7. Run the tests
 
-In RFC `0142-trailties-surfaced-deviations`:
+```sh
+pnpm test
+```
 
-| Symptom                                                                                                                                                                                                                 | Story                                                                    |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| The first `pnpm test` in a new app fails with `attempt to write a readonly database`: both test files' workers create and load `storage/test.sqlite3` at once. Every later run passes all seven ported controller tests | `generated-app-first-test-run-races-maintain-test-schema-across-workers` |
+The scaffold's controller test is a port of Rails' `functional_test.rb.tt`:
+it drives `index`, `new`, `create`, `show`, `edit`, `update` and `destroy`
+through `ActionDispatch::IntegrationTest` against the generated
+`test/fixtures/posts.yml`. The model test is Rails' `the truth` placeholder, a
+`todo`.
+
+```text
+ Test Files  1 passed | 1 skipped (2)
+      Tests  7 passed | 1 todo (8)
+```
 
 ## Models: the ActiveRecord surface
 
@@ -560,7 +566,7 @@ The parity figures are in the [next section](#status-and-parity-snapshot).
 ## Status and parity snapshot
 
 **As of 2026-09-27, `main` at `91245b796a`.** These numbers predate the
-quickstart run above (`98d96082e4`) and were not regenerated for it. To
+quickstart run above (`53a6249ae6`) and were not regenerated for it. To
 regenerate from a checkout:
 
 ```sh
