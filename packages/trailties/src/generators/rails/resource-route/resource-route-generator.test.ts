@@ -13,7 +13,7 @@ beforeEach(() => {
   fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
-    "export function drawRoutes(mapper: Mapper): void {\n}\n",
+    "Trails.application!.routes().draw((mapper) => {\n});\n",
   );
 });
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
@@ -27,7 +27,7 @@ describe("ResourceRouteGeneratorTest", () => {
   it("nests namespaces", async () => {
     await mk("admin/users/product").addResourceRoute();
     expect(read()).toBe(
-      'export function drawRoutes(mapper: Mapper): void {\n  mapper.namespace("admin", () => {\n    mapper.namespace("users", () => {\n      mapper.resources("products");\n    });\n  });\n}\n',
+      'Trails.application!.routes().draw((mapper) => {\n  mapper.namespace("admin", () => {\n    mapper.namespace("users", () => {\n      mapper.resources("products");\n    });\n  });\n});\n',
     );
   });
 

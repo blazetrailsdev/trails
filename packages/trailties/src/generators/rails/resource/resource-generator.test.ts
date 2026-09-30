@@ -27,7 +27,7 @@ beforeEach(() => {
   fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
-    "export function drawRoutes(mapper: Mapper): void {\n}\n",
+    "Trails.application!.routes().draw((mapper) => {\n});\n",
   );
   ModelHelpers.skipWarn = false;
 });

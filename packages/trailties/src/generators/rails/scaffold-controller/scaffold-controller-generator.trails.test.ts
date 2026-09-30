@@ -71,7 +71,7 @@ describe("ScaffoldControllerGenerator (class collisions)", () => {
     fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, "config/routes.ts"),
-      "export function drawRoutes(mapper: Mapper): void {\n}\n",
+      "Trails.application!.routes().draw((mapper) => {\n});\n",
     );
   });
   afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
@@ -119,7 +119,7 @@ describe("ScaffoldControllerGenerator (route helper declarations)", () => {
     fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, "config/routes.ts"),
-      "export function drawRoutes(mapper: Mapper): void {\n}\n",
+      "Trails.application!.routes().draw((mapper) => {\n});\n",
     );
   });
   afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));

@@ -200,7 +200,7 @@ function routeNamespacePattern(namespace: string[]): RegExp {
       return `(?:(?:${blankOrIndentedLine})*?^(${cumulativeMargin})mapper\\.namespace\\(${regexpEscape(JSON.stringify(name))}, \\(\\) => \\{\\n${pattern ?? ""})?`;
     }, null);
   return new RegExp(
-    `^([ ]*).+drawRoutes\\(mapper: Mapper\\): void \\{[ ]*\\n${pattern ?? ""}`,
+    `^([ ]*).+\\.routes\\(\\)\\.draw\\(\\(mapper\\) => \\{[ ]*\\n${pattern ?? ""}`,
     "m",
   );
 }

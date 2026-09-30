@@ -64,7 +64,7 @@ beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-auth-"));
   write("tsconfig.json", "{}");
   write(APP_CTRL_PATH, APP_CTRL_EMPTY);
-  write("config/routes.ts", "export function drawRoutes(mapper: Mapper): void {\n}\n");
+  write("config/routes.ts", "Trails.application!.routes().draw((mapper) => {\n});\n");
 });
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
@@ -123,7 +123,7 @@ describe("AuthenticationGenerator", () => {
   it("partial pre-existing config: missing pieces filled, no duplicates", async () => {
     write(
       "config/routes.ts",
-      `export function drawRoutes(mapper: Mapper): void {\n  mapper.resources("passwords", { param: "token" });\n  mapper.resource("session");\n}\n`,
+      `Trails.application!.routes().draw((mapper) => {\n  mapper.resources("passwords", { param: "token" });\n  mapper.resource("session");\n});\n`,
     );
     writeAC(
       "\n\nexport",

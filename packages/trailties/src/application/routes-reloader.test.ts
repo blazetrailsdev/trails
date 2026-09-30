@@ -5,7 +5,8 @@ import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { RoutesReloader, type RouteSetLike } from "./routes-reloader.js";
 import { Trails } from "../rails.js";
 
-type Counted = RouteSetLike & { calls: string[] };
+type Counted = RouteSetLike & { calls: string[]; draw(block: DrawCallback): void };
+const rails = new URL("../rails.js", import.meta.url).href;
 const makeRouteSet = (): Counted => {
   const r: Counted = {
     disableClearAndFinalize: false,
@@ -38,10 +39,12 @@ describe("RoutesReloader", () => {
     expect(r.loaded).toBe(false);
     const a = makeRouteSet();
     r.routeSets.push(a);
+    Trails.application = { routes: () => a } as never;
     for (const name of ["a", "b"]) {
       File.write(
         `${tmp}/routes-${name}.ts`,
-        `export function drawRoutes(mapper) { mapper.get("/${name}"); }\n`,
+        `import { Trails } from "${rails}";\n` +
+          `Trails.application.routes().draw((mapper) => mapper.get("/${name}"));\n`,
       );
       r.paths.push(`${tmp}/routes-${name}.ts`);
     }

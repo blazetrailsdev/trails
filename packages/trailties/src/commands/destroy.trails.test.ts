@@ -36,7 +36,7 @@ describe("DestroyCommand", () => {
   it("revokes everything a scaffold generate created, including views and the routes line", async () => {
     fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
     fs.mkdirSync(path.join(tmpDir, "config"));
-    const routes = "export function drawRoutes(mapper: Mapper): void {\n}\n";
+    const routes = "Trails.application!.routes().draw((mapper) => {\n});\n";
     fs.writeFileSync(path.join(tmpDir, "config", "routes.ts"), routes);
     fs.mkdirSync(path.join(tmpDir, "app", "views", "layouts"), { recursive: true });
     fs.writeFileSync(path.join(tmpDir, "app", "views", "layouts", "application.html.tse"), "");
@@ -67,7 +67,7 @@ describe("DestroyCommand", () => {
     fs.mkdirSync(path.join(tmpDir, "config"));
     fs.writeFileSync(
       path.join(tmpDir, "config", "routes.ts"),
-      "export function drawRoutes(mapper: Mapper): void {\n}\n",
+      "Trails.application!.routes().draw((mapper) => {\n});\n",
     );
     await Generators.invoke("scaffold", ["Post"], { cwd: tmpDir, output: () => {} });
     const generated = listFiles(tmpDir);

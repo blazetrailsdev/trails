@@ -572,9 +572,9 @@ export default await Trails.initialize();
 
     this.createFile(
       "config/routes.ts",
-      `import type { Mapper } from "@blazetrails/actionpack";
+      `import { Trails } from "@blazetrails/trailties";
 
-export function drawRoutes(mapper: Mapper): void {
+Trails.application!.routes().draw((mapper) => {
   // Define your application routes here.
   // Example:
   //   mapper.get("/posts", { to: "posts#index" });
@@ -585,7 +585,7 @@ export function drawRoutes(mapper: Mapper): void {
 
   // Defines the root path route ("/")
   // mapper.root("posts#index");
-}
+});
 `,
     );
 
