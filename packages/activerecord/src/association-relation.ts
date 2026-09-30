@@ -6,7 +6,7 @@ import { ActiveRecord } from "./namespaces.js";
 import { relationClassFor } from "./relation/delegation.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
-export class AssociationRelation<T extends Base> extends Relation<T> {
+export class AssociationRelation<T extends Base> extends Relation<T, boolean> {
   /** @internal */
   static override _railsClassName = "ActiveRecord::AssociationRelation";
 
@@ -29,9 +29,9 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * @internal
    * @noRailsEquivalent PERMANENT
    */
-  override clone(): Relation<T> {
+  override clone(): Relation<T, boolean> {
     const Ctor = relationClassFor.call(AssociationRelation, this.model);
-    const rel = new Ctor(this.model, this._association) as Relation<T>;
+    const rel = new Ctor(this.model, this._association) as Relation<T, boolean>;
     rel.initializeCopy(this);
     return rel;
   }

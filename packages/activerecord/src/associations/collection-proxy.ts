@@ -1,4 +1,5 @@
 import { NoMethodError, extend } from "@blazetrails/ruby-compat";
+import type { HasManyThroughAssociation } from "./has-many-through-association.js";
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
 import { QueryMethods } from "../relation/query-methods.js";
@@ -67,21 +68,8 @@ function sameRecordList(a: Base[], b: Base[]): boolean {
   return a.length === b.length && a.every((record, i) => record.equals(b[i]));
 }
 
-/** @internal */
-interface ThroughAssociationHandle {
-  _throughScope?: unknown;
-  concat(...records: Base[]): Promise<Base[] | undefined>;
-  insertRecord(
-    record: Base,
-    validate?: boolean,
-    raise?: boolean,
-    block?: (record: Base) => void,
-  ): Promise<boolean>;
-  transaction<R>(block: () => Promise<R>): Promise<R | undefined>;
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class CollectionProxy<T extends Base = Base> extends Relation<T> {
+export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean> {
   /** @internal */
   static override _railsClassName = "ActiveRecord::Associations::CollectionProxy";
 
@@ -264,7 +252,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   private async _pushThrough(records: T[], throughScope?: unknown): Promise<void> {
-    const assoc = this._association as unknown as ThroughAssociationHandle;
+    const assoc = this._association as HasManyThroughAssociation;
     const previousThroughScope = assoc._throughScope;
     if (throughScope != null) assoc._throughScope = throughScope;
     try {
@@ -436,15 +424,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return count;
   }
 
-  override async calculate(operation: "count", column?: string): Promise<number>;
+  override async calculate(
+    operation: "count",
+    column?: string,
+  ): Promise<number | Map<unknown, number>>;
   override async calculate(
     operation: "sum",
     column: string | Nodes.Node | number | null,
-  ): Promise<number | bigint>;
+  ): Promise<number | bigint | Map<unknown, number | bigint>>;
   override async calculate(
     operation: "average" | "minimum" | "maximum",
     column: string,
-  ): Promise<unknown>;
+  ): Promise<unknown | null | Map<unknown, unknown>>;
   override async calculate(
     operation: string,
     columnName?: string | Nodes.Node | number | null,

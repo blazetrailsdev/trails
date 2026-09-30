@@ -3,7 +3,6 @@ import { NameError } from "./name-error.js";
 import {
   include,
   rbModConstSet,
-  rbModPrivateConstant,
   prepend,
   extend,
   included,
@@ -1225,8 +1224,20 @@ describe("Module#const_set", () => {
     expect((Topic as unknown as { Generated: Module }).Generated).toBe(mod);
     expect(mod.name).toBe("Topic::Generated");
     expect(mod.inspect()).toBe("Topic::Generated");
-    rbModPrivateConstant(Topic, "Generated");
-    expect(Object.keys(Topic)).not.toContain("Generated");
-    expect(() => rbModPrivateConstant(Topic, "Missing")).toThrow(NameError);
+  });
+
+  it("gives a module bound under an anonymous owner a temporary path until a named owner binds it", () => {
+    const owner = new Module();
+    const mod = new Module();
+    rbModConstSet(owner, "X", mod);
+    expect(mod.name).toBe(`${owner.inspect()}::X`);
+    rbModConstSet({ name: "N" }, "Z", mod);
+    expect(mod.name).toBe("N::Z");
+  });
+
+  it("raises NameError for a name that is not a constant name", () => {
+    expect(() => rbModConstSet({ name: "N" }, "foo", 1)).toThrow(
+      new NameError("wrong constant name foo", "foo"),
+    );
   });
 });

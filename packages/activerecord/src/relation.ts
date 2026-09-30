@@ -1971,7 +1971,9 @@ export interface Relation<T extends Base, G extends boolean = false>
     key?: string | string[],
     notFoundIds?: unknown[],
   ): never;
-  unscope(...args: UnscopeArg[]): Relation<T, G>;
+  unscope<A extends UnscopeArg[]>(
+    ...args: A
+  ): Relation<T, UnscopeArg extends A[number] ? boolean : ":group" extends A[number] ? false : G>;
   lock(locks?: string | boolean | null): Relation<T, G>;
   none(): Relation<T, G>;
   readonly(value?: boolean): Relation<T, G>;
@@ -2059,11 +2061,17 @@ export interface Relation<T extends Base, G extends boolean = false>
   distinct(value?: boolean): Relation<T, G>;
   reverseOrder(): Relation<T, G>;
   spawn(): Relation<T, G>;
-  merge<U extends Base>(other: Relation<U>): Relation<T, G>;
+  merge<U extends Base, H extends boolean>(
+    other: Relation<U, H>,
+  ): Relation<T, [G] extends [true] ? true : [H] extends [true] ? true : G | H>;
   merge(other: Partial<Record<ValueMethod, unknown>>): Relation<T, G>;
   mergeBang(other: any): Relation<T, G>;
-  except(...skips: Array<ExceptSkip>): Relation<T, G>;
-  only(...onlies: Array<ExceptSkip>): Relation<T, G>;
+  except<A extends ExceptSkip[]>(
+    ...skips: A
+  ): Relation<T, string extends A[number] ? boolean : "group" extends A[number] ? false : G>;
+  only<A extends ExceptSkip[]>(
+    ...onlies: A
+  ): Relation<T, string extends A[number] ? boolean : "group" extends A[number] ? G : false>;
   /** @internal */
   relationWith(values: Record<string, unknown>): Relation<T, G>;
   /** @internal */
@@ -2091,7 +2099,7 @@ export interface Relation<T extends Base, G extends boolean = false>
   /** @internal */
   findLast(limit?: number): Promise<T | T[] | null>;
   /** @internal */
-  orderedRelation(): Relation<T>;
+  orderedRelation(): Relation<T, G>;
   /** @internal */
   _orderColumns(): string[];
   /** @internal */
@@ -2102,9 +2110,9 @@ export interface Relation<T extends Base, G extends boolean = false>
   findInBatches(opts?: FindEachOptions): AsyncGenerator<T[]> & { size(): Promise<number> };
   inBatches(
     opts: InBatchesOptions,
-    block: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
+    block: (relation: LoadedRelation<Relation<T, G>>) => void | Promise<void>,
   ): Promise<null>;
-  inBatches(opts?: InBatchesOptions): BatchEnumerator<LoadedRelation<Relation<T>>>;
+  inBatches(opts?: InBatchesOptions): BatchEnumerator<LoadedRelation<Relation<T, G>>>;
 }
 
 export interface Relation<T extends Base, G extends boolean = false> {

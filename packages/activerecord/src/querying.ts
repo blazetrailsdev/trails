@@ -6,7 +6,12 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { FutureResult, Complete } from "./future-result.js";
 import type { FindEachOptions, Relation } from "./relation.js";
 import type { Result } from "./result.js";
-import type { AssociationSpec, JoinSpec } from "./relation/query-methods.js";
+import type {
+  AssociationSpec,
+  ExceptSkip,
+  JoinSpec,
+  UnscopeArg,
+} from "./relation/query-methods.js";
 import type { SumBlock } from "./relation/calculations.js";
 
 export const QUERYING_METHODS = [
@@ -812,10 +817,10 @@ export function extending<T extends typeof Base>(
     : this.all().extending();
 }
 
-export function unscope<T extends typeof Base>(
+export function unscope<T extends typeof Base, A extends UnscopeArg[]>(
   this: T,
-  ...args: Parameters<Relation<InstanceType<T>>["unscope"]>
-): Relation<InstanceType<T>> {
+  ...args: A
+): Relation<InstanceType<T>, UnscopeArg extends A[number] ? boolean : false> {
   return this.all().unscope(...args);
 }
 
@@ -959,17 +964,17 @@ export function without<T extends typeof Base>(
   return this.all().without(...records);
 }
 
-export function only<T extends typeof Base>(
+export function only<T extends typeof Base, A extends ExceptSkip[]>(
   this: T,
-  ...types: Parameters<Relation<InstanceType<T>>["only"]>
-): Relation<InstanceType<T>> {
+  ...types: A
+): Relation<InstanceType<T>, string extends A[number] ? boolean : false> {
   return this.all().only(...types);
 }
 
-export function merge<T extends typeof Base, U extends Base>(
+export function merge<T extends typeof Base, U extends Base, H extends boolean>(
   this: T,
-  other: Relation<U>,
-): Relation<InstanceType<T>> {
+  other: Relation<U, H>,
+): Relation<InstanceType<T>, [H] extends [true] ? true : false | H> {
   return this.all().merge(other);
 }
 
@@ -981,10 +986,10 @@ export function extractAssociated<T extends typeof Base>(this: T, name: string):
   return this.all().extractAssociated(name);
 }
 
-export function except<T extends typeof Base>(
+export function except<T extends typeof Base, A extends ExceptSkip[]>(
   this: T,
-  ...skips: Array<import("./relation/query-methods.js").ExceptSkip>
-): Relation<InstanceType<T>> {
+  ...skips: A
+): Relation<InstanceType<T>, string extends A[number] ? boolean : false> {
   return this.all().except(...skips);
 }
 

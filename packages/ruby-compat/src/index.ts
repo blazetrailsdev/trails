@@ -143,7 +143,6 @@ export type { Bytes, FsAdapter, FsDirent, FsStatResult, PathAdapter } from "./fs
 export {
   Module,
   rbModConstSet,
-  rbModPrivateConstant,
   defineModule,
   extend,
   extended,

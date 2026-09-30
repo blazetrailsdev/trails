@@ -33,42 +33,40 @@ type ModuleHooks = {
   [initialize]?: (this: object) => void;
 };
 
-const classpaths = new WeakMap<Module, string>();
+const classpaths = new WeakMap<Module, { path: string; permanent: boolean }>();
 
 /**
  * Mirrors: Ruby's Module#const_set — vendor/ruby/v3.3.11/object.c:2545
- * `rb_mod_const_set`, through `const_set` (vendor/ruby/v3.3.11/variable.c:3607).
- * Binding an anonymous module names it `<mod>::<id>` (variable.c:3648-3660),
- * which is where `Module#name` and `Module#inspect` read it from.
+ * `rb_mod_const_set`, which raises `NameError` for a name that is not a
+ * constant name (`id_for_var`, object.c:2220-2240), then `const_set`
+ * (vendor/ruby/v3.3.11/variable.c:3607). Binding a module names it after the
+ * owner (variable.c:3648-3668): permanently under a named owner, and under an
+ * anonymous one with the owner's temporary path, until a named owner re-paths
+ * it. `Module#name` and `Module#inspect` read that path.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
  */
-export function rbModConstSet<T>(mod: { name: string }, id: string, value: T): T {
+export function rbModConstSet<T>(mod: { name: string | null }, id: string, value: T): T {
+  if (!/^\p{Lu}[\p{L}\p{N}_]*$/u.test(id)) {
+    throw new NameError(`wrong constant name ${id}`, id);
+  }
   Object.defineProperty(mod, id, { value, writable: true, enumerable: true, configurable: true });
-  if (value instanceof Module && !classpaths.has(value)) {
-    classpaths.set(value, `${mod.name}::${id}`);
+  if (value instanceof Module) {
+    const valPath = classpaths.get(value);
+    const parentalPathPermanent =
+      mod instanceof Module ? classpaths.get(mod)?.permanent === true : Boolean(mod.name);
+    const parentalPath = parentalPathPermanent
+      ? mod.name
+      : mod instanceof Module
+        ? mod.inspect()
+        : rbAnyToS(mod).replace(/^#<Proc:/, "#<Class:");
+    if (parentalPathPermanent && valPath?.permanent !== true) {
+      classpaths.set(value, { path: `${parentalPath}::${id}`, permanent: true });
+    } else if (!parentalPathPermanent && valPath === undefined) {
+      classpaths.set(value, { path: `${parentalPath}::${id}`, permanent: false });
+    }
   }
   return value;
-}
-
-/**
- * Mirrors: Ruby's Module#private_constant — vendor/ruby/v3.3.11/variable.c:3852
- * `rb_mod_private_constant`. A JS property read carries no caller to raise
- * `NameError` against, so the flag is what `Module#constants` observes: a
- * private constant is left out of the listing (`rb_local_constants_i`,
- * variable.c:3373-3379), as a non-enumerable property is left out of
- * `Object.keys`. An unbound name raises as `undefined_constant` does
- * (variable.c:3235-3239).
- *
- * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
- */
-export function rbModPrivateConstant(mod: { name: string }, ...names: string[]): void {
-  for (const name of names) {
-    if (!Object.prototype.hasOwnProperty.call(mod, name)) {
-      throw new NameError(`constant ${mod.name}::${name} not defined`, name);
-    }
-    Object.defineProperty(mod, name, { enumerable: false });
-  }
 }
 
 /**
@@ -114,7 +112,7 @@ export class Module {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   get name(): string | null {
-    return classpaths.get(this) ?? null;
+    return classpaths.get(this)?.path ?? null;
   }
 
   /**

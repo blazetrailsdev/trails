@@ -1,11 +1,6 @@
 import { CodeGenerator, include, Module, TimeWithZone, toFs } from "@blazetrails/activesupport";
 import { AttributeMethods as AMAttributeMethods, Model } from "@blazetrails/activemodel";
-import {
-  isEmpty,
-  rbInspect as inspect,
-  rbModConstSet,
-  rbModPrivateConstant,
-} from "@blazetrails/ruby-compat";
+import { isEmpty, rbInspect as inspect, rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
   AttributeMethods,
@@ -235,7 +230,6 @@ export function initializeGeneratedModules(this: AttributeMethodsHost): void {
     "GeneratedAttributeMethods",
     new GeneratedAttributeMethods(),
   );
-  rbModPrivateConstant(this, "GeneratedAttributeMethods");
   this._attributeMethodsGenerated = false;
   this._aliasAttributesMassGenerated = false;
   include(this as unknown as new (...args: unknown[]) => unknown, this._generatedAttributeMethods);
