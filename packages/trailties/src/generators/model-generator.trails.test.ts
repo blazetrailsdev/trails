@@ -7,11 +7,13 @@ import { ModelGenerator } from "./model-generator.js";
 import { Application } from "../application.js";
 import { Trails } from "../rails.js";
 import "../trailties/active-record.js";
+import "../test-unit/trailtie.js";
 
 class ModelGeneratorApp extends Application {}
 
-beforeEach(() => {
+beforeEach(async () => {
   Trails.application = ModelGeneratorApp.instance();
+  await Trails.application.loadGenerators();
 });
 
 afterEach(() => {
@@ -66,5 +68,16 @@ describe("ModelGeneratorTest", () => {
     await expect(makeGen().run("User", ["name:string:unknown"])).rejects.toThrow(
       new GeneratorError("Could not generate field 'name' with unknown index 'unknown'."),
     );
+  });
+
+  it("writes a namespaced model's unit test and fixture under its class path, importing test/test-helper", async () => {
+    await makeGen().run("admin/account", ["name:string"]);
+    const unitTest = fs.readFileSync(
+      path.join(tmpDir, "test/models/admin/account.test.ts"),
+      "utf-8",
+    );
+    expect(unitTest).toContain('import "../../test-helper.js";');
+    expect(unitTest).toContain('describe("AdminAccountTest"');
+    expect(fs.existsSync(path.join(tmpDir, "test/fixtures/admin/accounts.yml"))).toBe(true);
   });
 });
