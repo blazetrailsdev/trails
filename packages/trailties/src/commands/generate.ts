@@ -30,11 +30,18 @@ export function generateCommand(): Command {
     .allowUnknownOption()
     .passThroughOptions()
     .action(async (generator: string | undefined, args: string[]) => {
+      if (!generator) {
+        if (APP_PATH != null) {
+          await bootApplicationBang();
+          await loadGenerators();
+        }
+        return Generators.help("generate", console.log);
+      }
+
       if (APP_PATH != null) {
         await bootApplicationBang();
         await loadGenerators();
       }
-      if (!generator) return Generators.help("generate", console.log);
 
       await Generators.invoke(generator, args, {
         cwd: Dir.pwd(),

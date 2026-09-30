@@ -9,6 +9,7 @@ export interface ModelGeneratorOptions extends NamedBaseOptions {
   parent?: string;
   indexes?: boolean;
   primaryKeyType?: string;
+  database?: string;
 }
 
 export class ModelGenerator extends NamedBase {
@@ -120,11 +121,25 @@ export class ${className} extends ${parentClass} {${staticBlock}}
   }
 
   private isSkipMigrationCreation(): boolean {
-    return this.isCustomParent() || !this.migration();
+    return (this.isCustomParent() && !this.database()) || !this.migration();
   }
 
   private parentClassName(): string {
-    return this.parent();
+    if (this.isCustomParent()) {
+      return this.parent();
+    } else if (this.database()) {
+      return this.abstractClassName();
+    } else {
+      return this.parent();
+    }
+  }
+
+  private abstractClassName(): string {
+    return `${camelize(this.database()!)}Record`;
+  }
+
+  private database(): string | undefined {
+    return this.options.database;
   }
 
   private parent(): string {
