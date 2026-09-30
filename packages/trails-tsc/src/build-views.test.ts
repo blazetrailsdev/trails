@@ -356,6 +356,28 @@ describe("runCli", () => {
     expect(notCollection).toContain("type ObjectLocals = {};");
   }, 30_000);
 
+  it("exposes helperMethod names only from class-level macro positions", () => {
+    const cwd = mkScratch();
+    write(
+      cwd,
+      "app/controllers/posts-controller.ts",
+      [
+        "export class PostsController {",
+        '  run(): void { PostsController.helperMethod("hidden"); }',
+        '  private hidden(): string { return ""; }',
+        "  private late(): number { return 1; }",
+        "  static helperMethod(..._names: string[]): void {}",
+        "}",
+        'PostsController.helperMethod("late");',
+      ].join("\n"),
+    );
+    write(cwd, "app/views/posts/index.html.tse", "hi");
+    buildViews({ cwd });
+    const shim = fs.readFileSync(path.join(cwd, ".trails/views/posts/index.html.tse.ts"), "utf8");
+    expect(shim).toContain('{ "late": () => number }');
+    expect(shim).not.toContain('"hidden"');
+  }, 30_000);
+
   it("writes a source map pointing each shim line at its .tse line", () => {
     const cwd = mkScratch();
     write(cwd, "app/views/posts/show.html.tse", "<div>\n  <p>\n    <%= readingTime(1) %>\n</div>");
