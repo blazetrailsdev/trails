@@ -1,4 +1,5 @@
 import { any } from "@blazetrails/activesupport";
+import type { Table, Nodes } from "@blazetrails/arel";
 import type { AliasTracker } from "./alias-tracker.js";
 import {
   AssociationScope,
@@ -8,13 +9,11 @@ import {
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
 import { relationClassFor } from "../relation/delegation.js";
 import type { Relation } from "../relation.js";
-import { WhereClause } from "../relation/where-clause.js";
-import type { ExceptKey } from "../relation/query-methods.js";
 import type { Base } from "../base.js";
 import type { AbstractReflection } from "../reflection.js";
 import { Associations } from "../namespaces.js";
 
-type ChainEntry = AbstractReflection;
+type ChainEntry = AbstractReflection & { aliasedTable: Table | Nodes.TableAlias };
 
 type JoinIds = unknown[] | unknown[][];
 
@@ -114,22 +113,13 @@ export class DisableJoinsAssociationScope extends AssociationScope {
     owner: Base,
     ordered: boolean,
   ): unknown {
-    const klass = (reflection as { klass: typeof Base }).klass;
-    let scope = (
-      reflection as unknown as {
-        buildScope(table?: unknown): unknown;
-        aliasedTable?: unknown;
-      }
-    ).buildScope((reflection as { aliasedTable?: unknown }).aliasedTable) as Relation<Base>;
-    scope = (scope as { where: (c: Map<string[], JoinIds>) => unknown }).where(
-      new Map([[keyCols, joinIds]]),
-    ) as Relation<Base>;
+    const scope: Relation<Base> = reflection
+      .buildScope(reflection.aliasedTable)
+      .where(new Map([[keyCols, joinIds]]));
 
-    const sfa = (
-      klass as unknown as { scopeForAssociation?: () => unknown }
-    ).scopeForAssociation?.();
-    if (sfa) {
-      const stripped = (sfa as { except: (...keys: ExceptKey[]) => unknown }).except(
+    const relation: Relation<Base> = reflection.klass.scopeForAssociation();
+    scope.mergeBang(
+      relation.except(
         "select",
         "createWith",
         "includes",
@@ -137,34 +127,28 @@ export class DisableJoinsAssociationScope extends AssociationScope {
         "eagerLoad",
         "joins",
         "leftOuterJoins",
-      );
-      scope = (scope as { merge: (o: unknown) => unknown }).merge(stripped) as Relation<Base>;
-    }
+      ),
+    );
 
     for (const scopeChainItem of reflection.constraints()) {
-      const item = this.evalScope(reflection, scopeChainItem, owner) as Relation<Base>;
+      const item = this.evalScope(reflection, scopeChainItem, owner);
       scope.unscopeBang(...item.unscopeValues);
       scope.whereClause = scope.whereClause.plus(item.whereClause);
       scope.orderValues = unionOrderClauses(item.orderValues, scope.orderValues);
     }
 
-    const finalOrd = scope as { orderValues?: unknown[] };
-    const finalOrders = (finalOrd.orderValues?.length ?? 0) > 0 ? [1] : [];
-    if (finalOrders.length === 0 && ordered) {
-      if ((scope as unknown as { _isNone: boolean })._isNone) return scope;
-      const Ctor = relationClassFor.call(DisableJoinsAssociationRelation, klass);
-      const split =
+    if (scope.orderValues.length === 0 && ordered) {
+      if (scope.isNullRelation()) return scope;
+      const Ctor = relationClassFor.call(DisableJoinsAssociationRelation, scope.model);
+      const splitScope =
         keyCols.length === 1
-          ? new Ctor(klass, keyCols[0], joinIds as unknown[])
-          : new Ctor(klass, keyCols, joinIds as unknown[][]);
-      const sourceWhere = (scope as { whereClause?: WhereClause }).whereClause;
-      if (sourceWhere && sourceWhere.predicates.length > 0) {
-        const target = split as unknown as { whereClause: WhereClause };
-        target.whereClause = target.whereClause.plus(sourceWhere);
-      }
-      return split;
+          ? new Ctor(scope.model, keyCols[0], joinIds as unknown[])
+          : new Ctor(scope.model, keyCols, joinIds as unknown[][]);
+      splitScope.whereClause = splitScope.whereClause.plus(scope.whereClause);
+      return splitScope;
+    } else {
+      return scope;
     }
-    return scope;
   }
 }
 

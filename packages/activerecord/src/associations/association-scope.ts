@@ -83,24 +83,12 @@ export class AssociationScope {
 
   scope(association: AssociationScopeable): unknown {
     const { owner, reflection, klass } = association;
-    const scopeRelation = klass.unscoped() as {
-      aliasTracker: () => AliasTracker;
-    };
-    let scope: unknown = scopeRelation;
-    const chain = this.getChain(reflection, association, scopeRelation.aliasTracker());
-    const extensions =
-      typeof (reflection as { extensions?: () => unknown[] }).extensions === "function"
-        ? (reflection as { extensions: () => unknown[] }).extensions()
-        : [];
-    if (extensions.length > 0) {
-      scope = (scope as { extendingBang: (...m: unknown[]) => unknown }).extendingBang(
-        ...extensions,
-      );
-    }
-    scope = this.addConstraints(scope as Relation<Base>, owner, chain);
-    if (!reflection.isCollection()) {
-      scope = (scope as { limit: (n: number) => unknown }).limit(1);
-    }
+    let scope: Relation<Base> = klass.unscoped();
+    const chain = this.getChain(reflection, association, scope.aliasTracker());
+
+    scope.extendingBang(...reflection.extensions());
+    scope = this.addConstraints(scope, owner, chain);
+    if (!reflection.isCollection()) scope.limitBang(1);
     return scope;
   }
 
@@ -114,28 +102,28 @@ export class AssociationScope {
   }
 
   private applyScope(
-    scope: unknown,
+    scope: Relation<Base>,
     table: ArelTable | Nodes.TableAlias,
     key: string,
     value: unknown,
-  ): unknown {
-    const w = scope as {
-      where: (c: Record<string, unknown> | unknown) => unknown;
-      table?: ArelTable;
-    };
-    if (w.table && !arelTableEql(w.table, table)) {
+  ): Relation<Base> {
+    if (scope.table && !arelTableEql(scope.table, table)) {
       const meta = new TableMetadata(null, table as unknown as ArelTable);
       const nodes = meta.predicateBuilder.buildFromHash({ [key]: value });
-      let result: unknown = scope;
+      let result = scope;
       for (const node of nodes) {
-        result = (result as { where: (c: unknown) => unknown }).where(node);
+        result = result.where(node);
       }
       return result;
     }
-    return w.where({ [key]: value });
+    return scope.where({ [key]: value });
   }
 
-  private lastChainScope(scope: unknown, reflection: ChainReflection, owner: Base): unknown {
+  private lastChainScope(
+    scope: Relation<Base>,
+    reflection: ChainReflection,
+    owner: Base,
+  ): Relation<Base> {
     const primaryKey = kernelArray(reflection.joinPrimaryKey());
     const foreignKey = kernelArray(reflection.joinForeignKey);
 
@@ -173,10 +161,10 @@ export class AssociationScope {
   }
 
   private nextChainScope(
-    scope: unknown,
+    scope: Relation<Base>,
     reflection: ChainReflection,
     nextReflection: ChainReflection,
-  ): unknown {
+  ): Relation<Base> {
     const primaryKey = kernelArray(reflection.joinPrimaryKey());
     const foreignKey = kernelArray(reflection.joinForeignKey);
 
@@ -195,9 +183,7 @@ export class AssociationScope {
       scope = this.applyScope(scope, table, reflection.type, value);
     }
 
-    return (scope as { joinsBang: (node: Nodes.Join) => unknown }).joinsBang(
-      this.join(foreignTable, constraints) as Nodes.Join,
-    );
+    return scope.joinsBang(this.join(foreignTable, constraints));
   }
 
   /** @missingRailsCall empty? — PERMANENT */
@@ -207,16 +193,16 @@ export class AssociationScope {
     chain: Array<ChainReflection>,
   ): Relation<Base> {
     const last = chain[chain.length - 1];
-    scope = this.lastChainScope(scope, last, owner) as Relation<Base>;
+    scope = this.lastChainScope(scope, last, owner);
     for (let i = 0; i < chain.length - 1; i++) {
-      scope = this.nextChainScope(scope, chain[i], chain[i + 1]) as Relation<Base>;
+      scope = this.nextChainScope(scope, chain[i], chain[i + 1]);
     }
 
     const chainHead = chain[0];
     for (let i = chain.length - 1; i >= 0; i--) {
       const reflection = chain[i];
       for (const scopeChainItem of reflection.constraints()) {
-        const item = this.evalScope(reflection, scopeChainItem, owner) as Relation<Base>;
+        const item = this.evalScope(reflection, scopeChainItem, owner);
 
         if (scopeChainItem === chainHead.scope) {
           scope.mergeBang(item.except("where", "includes", "unscope", "order"));
@@ -248,13 +234,15 @@ export class AssociationScope {
     reflection: AbstractReflection,
     scope: (...args: unknown[]) => unknown,
     owner: Base,
-  ): unknown {
-    const relation = reflection.buildScope((reflection as ChainReflection).aliasedTable);
-    return scope.call(relation, owner) || relation;
+  ): Relation<Base> {
+    const relation: Relation<Base> = reflection.buildScope(
+      (reflection as ChainReflection).aliasedTable,
+    );
+    return (scope.call(relation, owner) as Relation<Base> | null) || relation;
   }
 
   /** @internal */
-  private join(table: unknown, constraint: unknown): unknown {
+  private join(table: unknown, constraint: unknown): Nodes.Join {
     return new Nodes.LeadingJoin(table as never, new Nodes.On(constraint as never));
   }
 }

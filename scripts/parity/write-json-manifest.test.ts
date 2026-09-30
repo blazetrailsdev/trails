@@ -186,13 +186,8 @@ describe("manifest emitters", () => {
   it("reproduces the committed expected-fixtures-exclude.json byte-identically", () => {
     const tracked = path.join(REPO_ROOT, "eslint/expected-fixtures-exclude.json");
     const committed = fs.readFileSync(tracked, "utf8");
-    const dir = fs.mkdtempSync(path.join(path.dirname(tracked), ".write-json-manifest-"));
-    try {
-      const out = path.join(dir, "manifest.json");
-      writeJsonManifest(out, JSON.parse(committed));
-      expect(fs.readFileSync(out, "utf8")).toBe(committed);
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
+    const out = tmpManifest();
+    writeJsonManifest(out, JSON.parse(committed));
+    expect(fs.readFileSync(out, "utf8")).toBe(committed);
   });
 });

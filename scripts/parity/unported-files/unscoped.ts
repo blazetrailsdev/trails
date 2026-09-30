@@ -175,16 +175,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "fixtures_test.rb",
-    className: "SameNameDifferentDatabaseFixturesTest",
-    tests: ["fixtures are properly loaded"],
-    reason:
-      'Loads dogs and other_dogs, both table "dogs", where OtherDog < ARUnit2Model lives on ' +
-      "the arunit2 database (models/other_dog.rb). trails' fixtures() loads every set through " +
-      "one connection, so the two sets land in one dogs table and useFixtures rejects the " +
-      "colliding primary keys.",
-  },
-  {
-    testFile: "fixtures_test.rb",
     className: "FixtureWithSetModelClassPrevailsOverNamingConventionTest",
     tests: ["model class in fixture file is respected"],
     reason:
