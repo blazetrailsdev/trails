@@ -795,6 +795,19 @@ describe("pairCallSites", () => {
     expect(pairs).toEqual([]);
   });
 
+  it("does not pair a receiverless Ruby self-reader against a TS send to a local", () => {
+    // crud.rb:25 `um.offset(offset)` vs crud.ts `um.offset(this.offset)`: the
+    // outer weak `um.offset` is dropped, and the inner `offset` reader has no
+    // TS site because `this.offset` is a getter.
+    const ruby = [
+      { ...site("offset", ["id:offset"], ["weak"]), recv: "id:um" },
+      site("offset", []),
+    ];
+    const ts = [{ ...site("offset", ["id:offset"]), recv: "id:um" }];
+    const comparable = comparableRubySites(ruby, ts, () => false);
+    expect(pairCallSites(comparable, ts)).toEqual([]);
+  });
+
   it("pairs same-named sites by argument agreement, not source order", () => {
     const pairs = pairCallSites(
       [site("new", ["id:table_name", "id:options"])],

@@ -35,7 +35,6 @@ export const Crud: Crud = {
     return new InsertManager();
   },
 
-  /** @missingRailsArgs offset — CONVERGEABLE call-args-gate-pairs-self-reader-against-local-send */
   compileUpdate(
     this: SelectManager,
     values: UpdateValues,
@@ -56,7 +55,6 @@ export const Crud: Crud = {
     return um;
   },
 
-  /** @missingRailsArgs offset — CONVERGEABLE call-args-gate-pairs-self-reader-against-local-send */
   compileDelete(
     this: SelectManager,
     key: Node | Node[] | null = null,
