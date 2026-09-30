@@ -117,6 +117,7 @@ const ORDER_ONLY_CANDIDATES: Record<string, string[]> = {
   hash: ["hash"],
   "eql?": ["isEql", "eql"],
   initialize_dup: ["initializeDup"],
+  initialize_clone: ["initializeClone"],
   // Ruby OPERATORS (`[]`, `==`, `<=>`, …) are NOT resolved here: their TS
   // spelling is class-specific (`[]`→`get` in `Arel::Table` but `getAttribute`
   // in `ActiveModel::AttributeSet`), so they resolve PER-CLASS via
