@@ -1,6 +1,6 @@
+import { rbObjClone } from "@blazetrails/ruby-compat";
 import { ArelEngine, Node, _engine } from "./nodes/node.js";
 import { Visitors } from "./namespaces.js";
-import { cloneSlot, objectClone } from "./clone-support.js";
 import { PlainString } from "./collectors/plain-string.js";
 import { Limit, Offset } from "./nodes/unary.js";
 import { buildQuoted } from "./nodes/casted.js";
@@ -70,10 +70,8 @@ export abstract class TreeManager {
     return this.ast.toSql(engine);
   }
 
-  clone(): this {
-    const copy = objectClone(this);
-    copy.ast = cloneSlot(this.ast);
-    return copy;
+  initializeCopy(_other: TreeManager): void {
+    this.ast = rbObjClone(this.ast);
   }
 }
 

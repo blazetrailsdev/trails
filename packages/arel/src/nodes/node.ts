@@ -1,6 +1,5 @@
 import { Nodes } from "../namespaces.js";
 import { SQLString } from "../collectors/sql-string.js";
-import { cloneSlot } from "../clone-support.js";
 import { setRubyNamespace } from "../visitors/ruby-class.js";
 
 export interface ArelEngine {
@@ -47,20 +46,6 @@ export class Node {
 
   isEquality(): boolean {
     return false;
-  }
-
-  /**
-   * Ruby's `Object#dup` (`vendor/ruby/v3.3.11/object.c:543-600`, `rb_obj_dup`):
-   * a new node of the same class carrying the receiver's instance variables,
-   * with no deep copy of its children, then `initialize_copy`, which an arel
-   * node ports as its own `clone()`. Those ports build on `objectClone`, which
-   * copies neither frozen state nor extended modules, so they are already
-   * `dup` + `initialize_copy` (`object.c:543-547`), not `Object#clone`.
-   *
-   * @noRailsEquivalent CONVERGEABLE arel-copy-hooks-onto-rbobjclone-initialize-copy
-   */
-  dup(): this {
-    return cloneSlot(this);
   }
 }
 

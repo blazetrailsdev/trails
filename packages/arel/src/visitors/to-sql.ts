@@ -1,5 +1,5 @@
 import { Attributes, Nodes, Visitors } from "../namespaces.js";
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { NotImplementedError, rbObjClone } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
@@ -1085,7 +1085,7 @@ export class ToSql extends Visitor {
 
   protected prepareUpdateStatement(o: Nodes.UpdateStatement): Nodes.UpdateStatement {
     if (o.key && (this.hasLimitOrOffsetOrOrders(o) || this.hasJoinSources(o))) {
-      const stmt = o.clone();
+      const stmt = rbObjClone(o);
       stmt.limit = null;
       stmt.offset = null;
       stmt.orders = [];
@@ -1104,7 +1104,7 @@ export class ToSql extends Visitor {
 
   protected prepareDeleteStatement(o: Nodes.DeleteStatement): Nodes.DeleteStatement {
     if (o.key && (this.hasLimitOrOffsetOrOrders(o) || this.hasJoinSources(o))) {
-      const stmt = o.clone();
+      const stmt = rbObjClone(o);
       stmt.limit = null;
       stmt.offset = null;
       stmt.orders = [];

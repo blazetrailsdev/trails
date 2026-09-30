@@ -1,6 +1,6 @@
+import { rbObjClone } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import type { Table } from "../table.js";
 import { JoinSource } from "./join-source.js";
@@ -76,15 +76,13 @@ export class SelectCore extends Node {
     );
   }
 
-  clone(): this {
-    const copy = objectClone(this);
-    if (this.source) copy.source = cloneSlot(this.source);
-    copy.projections = [...this.projections];
-    copy.wheres = [...this.wheres];
-    copy.groups = [...this.groups];
-    copy.havings = [...this.havings];
-    copy.windows = [...this.windows];
-    return copy;
+  initializeCopy(_other: SelectCore): void {
+    if (this.source) this.source = rbObjClone(this.source);
+    this.projections = rbObjClone(this.projections);
+    this.wheres = rbObjClone(this.wheres);
+    this.groups = rbObjClone(this.groups);
+    this.havings = rbObjClone(this.havings);
+    this.windows = rbObjClone(this.windows);
   }
 }
 

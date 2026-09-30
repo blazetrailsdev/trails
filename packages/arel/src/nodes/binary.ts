@@ -1,7 +1,7 @@
+import { rbObjClone } from "@blazetrails/ruby-compat";
 import type { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import type { Temporal } from "@blazetrails/date";
 import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
-import { cloneSlot, objectClone } from "../clone-support.js";
 import { Attributes, Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
@@ -62,11 +62,9 @@ export class Binary extends NodeExpression {
     );
   }
 
-  clone(): this {
-    const copy = objectClone(this);
-    if (this.left != null && this.left !== false) copy.left = cloneSlot(this.left);
-    if (this.right != null && this.right !== false) copy.right = cloneSlot(this.right);
-    return copy;
+  initializeCopy(_other: Binary): void {
+    if (this.left != null && this.left !== false) this.left = rbObjClone(this.left);
+    if (this.right != null && this.right !== false) this.right = rbObjClone(this.right);
   }
 
   and(other: Node): And {

@@ -925,7 +925,11 @@ export type Extended<M extends object> = CallableMethods<M>;
  * copy of the receiver's singleton class and instance variables (`init_copy`),
  * then `initialize_clone(orig)` dispatched on the copy, which is frozen after
  * that hook runs when the receiver is. The singleton class is copied, not
- * shared, so the clone's `extend()` registries are its own.
+ * shared, so the clone's `extend()` registries are its own. A JS primitive is
+ * MRI's `special_object_p` (:380-393) and is returned as is (:539); an array is
+ * allocated as one (`rb_obj_alloc`), so its elements, which Ruby copies in
+ * `Array#initialize_copy` (`array.c:8613`, `rb_ary_replace`), land on a real
+ * array.
  *
  * Ruby's `Object#initialize_clone` / `#initialize_dup` default to
  * `initialize_copy` (`rb_obj_init_clone` / `rb_obj_init_dup_clone`, object.c:4382-4383), so a
@@ -937,17 +941,18 @@ export type Extended<M extends object> = CallableMethods<M>;
  * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
  * uses but does not define.
  */
-export function rbObjClone<T extends object>(obj: T): T {
+export function rbObjClone<T>(obj: T): T {
+  if (obj === null || (typeof obj !== "object" && typeof obj !== "function")) return obj;
   const frozen = Object.isFrozen(obj);
   const descriptors = copiedDescriptors(obj, frozen);
   for (const registry of [extendedKeys, includedModulesKey]) {
     const table = descriptors[registry];
     if (table) descriptors[registry] = { ...table, value: new Set(table.value as Set<unknown>) };
   }
-  const clone = Object.create(Object.getPrototypeOf(obj) as object | null, descriptors) as T;
+  const clone = Object.defineProperties(rbObjAlloc(obj, Object.getPrototypeOf(obj)), descriptors);
   initCopyHook(clone, "initializeClone", obj);
   if (frozen) Object.freeze(clone);
-  return clone;
+  return clone as T;
 }
 
 /**
@@ -955,12 +960,14 @@ export function rbObjClone<T extends object>(obj: T): T {
  * `rb_obj_dup_setup` (:543-549): a new object of `rb_obj_class(obj)` — the
  * singleton class and the modules it was `extend`ed with are not carried —
  * holding a copy of the instance variables, then `initialize_dup(orig)`
- * dispatched on the copy. The frozen state is not carried either.
+ * dispatched on the copy. The frozen state is not carried either. A primitive
+ * and an array are handled as in {@link rbObjClone}.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
  * uses but does not define.
  */
-export function rbObjDup<T extends object>(obj: T): T {
+export function rbObjDup<T>(obj: T): T {
+  if (obj === null || (typeof obj !== "object" && typeof obj !== "function")) return obj;
   const descriptors = copiedDescriptors(obj, true);
   const singletonKeys = Object.prototype.hasOwnProperty.call(obj, extendedKeys)
     ? ((obj as Record<symbol, unknown>)[extendedKeys] as Set<string>)
@@ -972,9 +979,13 @@ export function rbObjDup<T extends object>(obj: T): T {
   if (proto !== null && Object.prototype.hasOwnProperty.call(proto, FL_SINGLETON)) {
     proto = Object.getPrototypeOf(proto) as object | null;
   }
-  const dup = Object.create(proto, descriptors) as T;
+  const dup = Object.defineProperties(rbObjAlloc(obj, proto), descriptors);
   initCopyHook(dup, "initializeDup", obj);
-  return dup;
+  return dup as T;
+}
+
+function rbObjAlloc(obj: object, proto: object | null): object {
+  return Array.isArray(obj) ? Object.setPrototypeOf([], proto) : Object.create(proto);
 }
 
 function copiedDescriptors(
@@ -995,10 +1006,14 @@ function copiedDescriptors(
   return descriptors;
 }
 
-function initCopyHook(copy: object, hook: "initializeClone" | "initializeDup", orig: object): void {
+function initCopyHook(
+  copy: object,
+  hook: "initializeClone" | "initializeDup",
+  orig: unknown,
+): void {
   const host = copy as Record<string, unknown>;
   const fn = typeof host[hook] === "function" ? host[hook] : host.initializeCopy;
-  if (typeof fn === "function") (fn as (orig: object) => unknown).call(copy, orig);
+  if (typeof fn === "function") (fn as (orig: unknown) => unknown).call(copy, orig);
 }
 
 /**

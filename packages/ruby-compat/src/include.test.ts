@@ -1089,6 +1089,24 @@ describe("rbObjClone", () => {
     expect(clone.inner).not.toBe(obj.inner);
     expect(Object.isFrozen(clone)).toBe(true);
   });
+
+  it("returns a special object as is", () => {
+    expect(rbObjClone(1)).toBe(1);
+    expect(rbObjClone("a")).toBe("a");
+    expect(rbObjClone(null)).toBe(null);
+  });
+
+  it("allocates an array as an array holding the same elements", () => {
+    const node = {};
+    const ary = [node, 2];
+    const clone = rbObjClone(ary);
+    expect(Array.isArray(clone)).toBe(true);
+    expect(clone).not.toBe(ary);
+    expect(clone).toEqual(ary);
+    expect(clone[0]).toBe(node);
+    clone.push(3);
+    expect(ary).toHaveLength(2);
+  });
 });
 
 describe("rbObjDup", () => {

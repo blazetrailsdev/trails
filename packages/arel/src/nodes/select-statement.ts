@@ -1,6 +1,6 @@
+import { rbObjClone } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import type { Table } from "../table.js";
 import { NodeExpression } from "./node-expression.js";
@@ -42,11 +42,9 @@ export class SelectStatement extends NodeExpression {
     );
   }
 
-  clone(): this {
-    const copy = objectClone(this);
-    copy.cores = this.cores.map((x) => x.clone());
-    copy.orders = this.orders.map((x) => cloneSlot(x));
-    return copy;
+  initializeCopy(_other: SelectStatement): void {
+    this.cores = this.cores.map((x) => rbObjClone(x));
+    this.orders = this.orders.map((x) => rbObjClone(x));
   }
 }
 
