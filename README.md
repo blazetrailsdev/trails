@@ -26,7 +26,7 @@ works today and lists what does not.
 ## Quickstart
 
 Every command and every output block in this section was run on 2026-09-30
-against `main` at `1721b9a448`, on Linux with Node 24.16.0 and SQLite, with
+against `main` at `247e8da8bf`, on Linux with Node 24.16.0 and SQLite, with
 `TRAILS_ENV` and `NODE_ENV` unset. Where a step does not work yet, the failure
 and its stories are linked. See [what is not wired up
 yet](#what-is-not-wired-up-yet) below.
@@ -91,11 +91,12 @@ bin/trails generate scaffold Post title:string body:text
 ```
 
 ```text
+      invoke  active_record
+      create  db/migrate/20260930141124_create_posts.ts
       create  app/models/post.ts
       invoke  test_unit
       create  test/models/post.test.ts
       create  test/fixtures/posts.yml
-      create  db/migrate/20260930131625_create_posts.ts
       invoke  resource_route
        route  mapper.resources("posts");
       invoke  scaffold_controller
@@ -117,10 +118,10 @@ pnpm db:migrate
 ```
 
 ```text
-== 20260930131625 CreatePosts: migrating ======================================
+== 20260930141124 CreatePosts: migrating ======================================
 -- createTable("posts")
    -> 0.0060s
-== 20260930131625 CreatePosts: migrated (0.0070s) =============================
+== 20260930141124 CreatePosts: migrated (0.0070s) =============================
 
 All migrations are up to date.
 ```
@@ -129,7 +130,7 @@ The migration is an ordinary `Migration` subclass, and the migrate writes
 `db/schema.ts` from the live database, as Rails writes `schema.rb`:
 
 ```ts
-// db/migrate/20260930131625_create_posts.ts
+// db/migrate/20260930141124_create_posts.ts
 import { Migration } from "@blazetrails/activerecord";
 
 export class CreatePosts extends Migration {
@@ -590,7 +591,7 @@ The parity figures are in the [next section](#status-and-parity-snapshot).
 ## Status and parity snapshot
 
 **As of 2026-09-27, `main` at `91245b796a`.** These numbers predate the
-quickstart run above (`1721b9a448`) and were not regenerated for it. To
+quickstart run above (`247e8da8bf`) and were not regenerated for it. To
 regenerate from a checkout:
 
 ```sh
