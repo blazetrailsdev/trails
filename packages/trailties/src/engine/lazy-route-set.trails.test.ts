@@ -30,3 +30,23 @@ describe("LazyRouteSet method_missing_module", () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("LazyRouteSet#routes", () => {
+  let reload: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    reload = vi.fn(async () => true);
+    Trails.application = { reloadRoutesUnlessLoaded: reload } as never;
+  });
+
+  afterEach(() => {
+    Trails.application = null;
+  });
+
+  it("reloads routes when routes is read", () => {
+    const routes = new LazyRouteSet();
+
+    expect(routes.routes.routes).toEqual([]);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+});

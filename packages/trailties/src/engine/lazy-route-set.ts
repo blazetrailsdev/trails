@@ -13,45 +13,12 @@ type MethodMissingModule = {
 };
 
 export class LazyRouteSet extends RouteSet {
-  override draw(callback: DrawCallback): void {
-    void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
-    super.draw(callback);
-  }
-
   override generateExtras(
     options: Record<string, unknown>,
     recall: Record<string, unknown> = {},
   ): [string, string[]] {
     void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
     return super.generateExtras(options, recall);
-  }
-
-  override recognizePath(
-    path: string,
-    environment: { method?: string | null; extras?: Record<string, unknown> } = {},
-  ): Record<string, unknown> {
-    void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
-    return super.recognizePath(path, environment);
-  }
-
-  override recognizePathWithRequest(
-    req: Request,
-    path: string,
-    extras: Record<string, unknown>,
-    options: { raiseOnMissing?: boolean } = {},
-  ): Record<string, unknown> | undefined {
-    void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
-    return super.recognizePathWithRequest(req, path, extras, options);
-  }
-
-  override get routes(): RouteSet["routes"] {
-    void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
-    return super.routes;
-  }
-
-  override async call(req: RackEnv): Promise<RackResponse> {
-    await TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
-    return super.call(req);
   }
 
   override generateUrlHelpers(supportsPath: boolean): ReturnType<RouteSet["generateUrlHelpers"]> {
@@ -93,6 +60,39 @@ export class LazyRouteSet extends RouteSet {
       ),
     );
     return mod;
+  }
+
+  override async call(req: RackEnv): Promise<RackResponse> {
+    await TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    return super.call(req);
+  }
+
+  override draw(callback: DrawCallback): void {
+    void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    super.draw(callback);
+  }
+
+  override recognizePath(
+    path: string,
+    environment: { method?: string | null; extras?: Record<string, unknown> } = {},
+  ): Record<string, unknown> {
+    void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    return super.recognizePath(path, environment);
+  }
+
+  override recognizePathWithRequest(
+    req: Request,
+    path: string,
+    extras: Record<string, unknown>,
+    options: { raiseOnMissing?: boolean } = {},
+  ): Record<string, unknown> | undefined {
+    void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    return super.recognizePathWithRequest(req, path, extras, options);
+  }
+
+  override get routes(): RouteSet["routes"] {
+    void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    return super.routes;
   }
 
   /** @internal */
