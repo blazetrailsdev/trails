@@ -4,7 +4,7 @@ import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 
 export class Comment extends Node {
-  readonly values: string[];
+  values: string[];
 
   constructor(values: string[]) {
     super();
@@ -24,7 +24,7 @@ export class Comment extends Node {
   }
 
   initializeCopy(_other: Comment): void {
-    (this as { values: string[] }).values = rbObjClone(this.values);
+    this.values = rbObjClone(this.values);
   }
 }
 

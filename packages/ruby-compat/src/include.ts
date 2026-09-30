@@ -999,7 +999,7 @@ function copiedDescriptors(
   if (unfreeze) {
     for (const key of Reflect.ownKeys(descriptors)) {
       const descriptor = descriptors[key as string];
-      descriptor.configurable = true;
+      descriptor.configurable = !(key === "length" && Array.isArray(obj));
       if (!descriptor.get && !descriptor.set) descriptor.writable = true;
     }
   }
