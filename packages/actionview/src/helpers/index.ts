@@ -91,6 +91,7 @@ export type {
 export {
   assignController,
   logger,
+  isRespondTo,
   installControllerDelegates,
   installControllerInternals,
   CONTROLLER_DELEGATES,

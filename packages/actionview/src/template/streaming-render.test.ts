@@ -22,27 +22,27 @@ const FIXTURES = {
     '<%= _layoutFor("header") -%>\n<%= yield -%>\n<%= _layoutFor("footer") -%>\n' +
     '<%= _layoutFor("unknown").toString() || "." -%>',
   "layouts/streaming_with_capture.html.tse":
-    '<%= _layoutFor("header") -%>\n<%= capture(() => { %>\n this works\n<%- }) -%>\n' +
+    '<%= _layoutFor("header") -%>\n<%= capture(() => { %>\n this works\n<% }) %>\n' +
     '<%= _layoutFor("footer") -%>\n<%= _layoutFor("unknown").toString() || "." -%>\n',
   "layouts/streaming_with_locale.html.tse": "layout.locale: <%= I18n.locale() %>\n<%= yield %>\n",
   "test/hello_world.html.tse": "Hello world!",
   "test/_partial_only.html.tse": "only partial",
   "test/_partial.html.tse": "partial html",
   "test/nested_layout.html.tse":
-    '<%- contentFor("title", "title") -%>\n' +
-    '<% contentFor("column", () => { %>column<% }) %>\n' +
-    "<%= render({ layout: 'layouts/column' }, {}, () => { %>content<% }) %>",
+    '<% contentFor("title", "title") -%>\n' +
+    '<% contentFor("column", () => { -%>column<% }) -%>\n' +
+    "<%= render({ layout: 'layouts/column' }, {}, () => { -%>content<% }) -%>",
   "test/layout_render_file.html.tse":
-    '<% contentFor("title", () => { %>title<% }) %>\n' +
+    '<% contentFor("title", () => { %>title<% }) -%>\n' +
     "<%= render({ template: 'layouts/yield' }) -%>\n",
   "test/hello.html.raw": "<p>This is grand!</p>\n",
   "test/streaming.html.tse":
-    '<% provide("header", null, () => { %>Yes, <% }) %>\nthis works\n' +
+    '<%- provide("header", null, () => { -%>Yes, <%- }) -%>\nthis works\n' +
     '<%- contentFor("footer", " like a charm") -%>\n',
   "test/streaming_buster.html.tse":
-    '<%= _layoutFor("foo") -%>\nThis won\'t look\n<%- provide("unknown", " good.") -%>\n',
+    '<%= _layoutFor("foo") -%>\nThis won\'t look\n<% provide("unknown", " good.") -%>\n',
   "test/nested_streaming.html.tse":
-    '<% contentFor("header", () => { %>?<% }) %>\n' +
+    '<%- contentFor("header", () => { -%>?<%- }) -%>\n' +
     '<%= render({ template: "test/streaming" }) %>\n?',
   "test/streaming_with_locale.html.tse": "view.locale: <%= I18n.locale() %>\n",
 };

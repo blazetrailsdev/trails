@@ -60,6 +60,7 @@ export class Tse implements TemplateHandler {
     const prepared = ctor.stripTrailingNewlines ? chomp(source) : source;
     const options: EmitJsOptions = {
       escapeIgnore: ctor.escapeIgnoreList.some((type) => rbEqual(type, template.type)),
+      trim: ctor.trimMode === "-",
       async: template._streaming === true,
     };
     if (

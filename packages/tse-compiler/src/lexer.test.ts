@@ -17,11 +17,26 @@ describe("tokenize", () => {
 
   it("honors <%- and -%> trim modes and <%% / %%> literals", () => {
     const left = tokenize("a\n   <%- x %>b");
-    expect(left[0].value).toBe("a\n");
-    expect(left[1].trimLeft).toBe(true);
+    expect(left[0].value).toBe("a\n   ");
+    expect(left[1].kind).toBe("code");
     const right = tokenize("<% x -%>   \nb");
     expect(right[1].value).toBe("b");
     expect(tokenize("<%% %%>")[0].value).toBe("<% %>");
+  });
+
+  it("trims like Erubi's trim: true", () => {
+    const render = (source: string, trim?: boolean): string =>
+      tokenize(source, trim)
+        .map((t) => (t.kind === "text" ? t.value : t.kind === "expr" ? `{${t.value.trim()}}` : ""))
+        .join("");
+    expect(render("<% if (x) { %>\n  hi\n<% } %>\n")).toBe("  hi\n");
+    expect(render("  <%# c %>\nq")).toBe("q");
+    expect(render("a <% x %>\nb")).toBe("a \nb");
+    expect(render("Yes, <%- }) -%>\n")).toBe("Yes, \n");
+    expect(render("<%= y -%>\nz")).toBe("{y}z");
+    expect(render("<%= y %>\nz")).toBe("{y}\nz");
+    expect(render("  <% x %>\nq", false)).toBe("  \nq");
+    expect(tokenize("<%-= x %>")[0]).toMatchObject({ kind: "code", value: "= x " });
   });
 
   it("throws on unterminated tags", () => {

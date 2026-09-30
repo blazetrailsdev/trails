@@ -1,14 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { I18n } from "@blazetrails/activesupport";
+import { Conversion, ModelName, Naming, Translation } from "@blazetrails/activemodel";
+import { I18n, extend } from "@blazetrails/activesupport";
 import { Date as RubyDate, DateTime } from "@blazetrails/date";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range, include } from "@blazetrails/ruby-compat";
 
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
+import { TemplateHandlers } from "./handlers.js";
+import { Tse } from "./handlers/tse.js";
+import { FixtureResolver } from "../testing/resolvers.js";
+import type { LabelBuilder } from "../helpers/tags/label.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
 
 class Post {
-  static modelName = { singular: "post", paramKey: "post", i18nKey: "post" };
+  static {
+    extend(this, Naming);
+    include(this, Conversion);
+    extend(this, Translation);
+  }
+  declare static humanAttributeName: (attribute: string) => string;
+
   title: unknown = null;
   body: unknown = null;
   secret: unknown = null;
@@ -16,9 +27,6 @@ class Post {
   written_on: unknown = null;
   cost: unknown = null;
   errors = { get: (field: string) => (field === "author_name" ? ["can't be empty"] : []) };
-  get modelName(): typeof Post.modelName {
-    return Post.modelName;
-  }
   get ["secret?"](): unknown {
     return this.secret;
   }
@@ -27,17 +35,57 @@ class Post {
   }
 }
 
+class PostDelegator extends Post {
+  toModel(): unknown {
+    return new PostDelegate();
+  }
+}
+
+class PostDelegate extends Post {
+  static override humanAttributeName(attribute: string): string {
+    return `Delegate ${super.humanAttributeName(attribute)}`;
+  }
+
+  get modelName(): ModelName {
+    return new ModelName(this.constructor as never);
+  }
+}
+
 class Car {
   constructor(public color: string) {}
 }
 
-type View = Base & Record<string, (...args: unknown[]) => unknown> & { post: Post; car: Car };
+type View = Base &
+  Record<string, (...args: unknown[]) => unknown> & {
+    post: Post;
+    car: Car;
+    post_delegator: PostDelegator;
+  };
 
 describe("FormHelperTest", () => {
   let view: View;
   let post: Post;
 
   beforeEach(() => {
+    I18n.backend().storeTranslations("label", {
+      activemodel: {
+        attributes: {
+          post: { cost: "Total cost" },
+          "post/language": { spanish: "Espanol" },
+        },
+      },
+      helpers: {
+        label: {
+          post: {
+            body: "Write entire text here",
+            color: { red: "Rojo" },
+            comments: { body: "Write body here" },
+          },
+          tag: { value: "Tag" },
+          post_delegate: { title: "Delegate model_name title" },
+        },
+      },
+    });
     I18n.backend().storeTranslations("placeholder", {
       helpers: { placeholder: { post: { title: "What is this about?" } } },
     });
@@ -50,10 +98,217 @@ describe("FormHelperTest", () => {
     post.written_on = RubyDate.civil(2004, 6, 15);
     view.post = post;
     view.car = new Car("#000FFF");
+    const postDelegator = new PostDelegator();
+    postDelegator.title = "Hello World";
+    view.post_delegator = postDelegator;
   });
 
   afterEach(() => {
     I18n.reloadBang();
+  });
+
+  it("label", () => {
+    assertDomEqual('<label for="post_title">Title</label>', view.label("post", "title"));
+    assertDomEqual(
+      '<label for="post_title">The title goes here</label>',
+      view.label("post", "title", "The title goes here"),
+    );
+    assertDomEqual(
+      '<label class="title_label" for="post_title">Title</label>',
+      view.label("post", "title", null, { class: "title_label" }),
+    );
+    assertDomEqual('<label for="post_secret">Secret?</label>', view.label("post", "secret?"));
+  });
+
+  it("label with symbols", () => {
+    assertDomEqual('<label for="post_title">Title</label>', view.label("post", "title"));
+    assertDomEqual('<label for="post_secret">Secret?</label>', view.label("post", "secret?"));
+  });
+
+  it("label with locales strings", () => {
+    I18n.withLocale("label", () => {
+      assertDomEqual(
+        '<label for="post_body">Write entire text here</label>',
+        view.label("post", "body"),
+      );
+    });
+  });
+
+  it("label with human attribute name", () => {
+    I18n.withLocale("label", () => {
+      assertDomEqual('<label for="post_cost">Total cost</label>', view.label("post", "cost"));
+    });
+  });
+
+  it("label with human attribute name and options", () => {
+    I18n.withLocale("label", () => {
+      assertDomEqual(
+        '<label for="post_language_spanish">Espanol</label>',
+        view.label("post", "language", { value: "spanish" }),
+      );
+    });
+  });
+
+  it("label with locales symbols", () => {
+    I18n.withLocale("label", () => {
+      assertDomEqual(
+        '<label for="post_body">Write entire text here</label>',
+        view.label("post", "body"),
+      );
+    });
+  });
+
+  it("label with locales and options", () => {
+    I18n.withLocale("label", () => {
+      assertDomEqual(
+        '<label for="post_body" class="post_body">Write entire text here</label>',
+        view.label("post", "body", { class: "post_body" }),
+      );
+    });
+  });
+
+  it("label with locales and value", () => {
+    I18n.withLocale("label", () => {
+      assertDomEqual(
+        '<label for="post_color_red">Rojo</label>',
+        view.label("post", "color", { value: "red" }),
+      );
+    });
+  });
+
+  it.skip("label with locales and nested attributes", () => {});
+
+  it.skip("label with locales fallback and nested attributes", () => {});
+
+  it.skip("label with non active record object", () => {});
+
+  it("label with for attribute as symbol", () => {
+    assertDomEqual(
+      '<label for="my_for">Title</label>',
+      view.label("post", "title", null, { for: "my_for" }),
+    );
+  });
+
+  it("label with for attribute as string", () => {
+    assertDomEqual(
+      '<label for="my_for">Title</label>',
+      view.label("post", "title", null, { for: "my_for" }),
+    );
+  });
+
+  it("label does not generate for attribute when given nil", () => {
+    assertDomEqual("<label>Title</label>", view.label("post", "title", { for: null }));
+  });
+
+  it("label with id attribute as symbol", () => {
+    assertDomEqual(
+      '<label for="post_title" id="my_id">Title</label>',
+      view.label("post", "title", null, { id: "my_id" }),
+    );
+  });
+
+  it("label with id attribute as string", () => {
+    assertDomEqual(
+      '<label for="post_title" id="my_id">Title</label>',
+      view.label("post", "title", null, { id: "my_id" }),
+    );
+  });
+
+  it("label with for and id attributes as symbol", () => {
+    assertDomEqual(
+      '<label for="my_for" id="my_id">Title</label>',
+      view.label("post", "title", null, { for: "my_for", id: "my_id" }),
+    );
+  });
+
+  it("label with for and id attributes as string", () => {
+    assertDomEqual(
+      '<label for="my_for" id="my_id">Title</label>',
+      view.label("post", "title", null, { for: "my_for", id: "my_id" }),
+    );
+  });
+
+  it("label for radio buttons with value", () => {
+    assertDomEqual(
+      '<label for="post_title_great_title">The title goes here</label>',
+      view.label("post", "title", "The title goes here", { value: "great_title" }),
+    );
+    assertDomEqual(
+      '<label for="post_title_great_title">The title goes here</label>',
+      view.label("post", "title", "The title goes here", { value: "great title" }),
+    );
+  });
+
+  it("label with block", () => {
+    assertDomEqual(
+      '<label for="post_title">The title, please:</label>',
+      view.label("post", "title", null, null, () => "The title, please:"),
+    );
+  });
+
+  it("label with block and html", () => {
+    assertDomEqual(
+      '<label for="post_terms">Accept <a href="/terms">Terms</a>.</label>',
+      view.label("post", "terms", null, null, () => view.raw('Accept <a href="/terms">Terms</a>.')),
+    );
+  });
+
+  it("label with block and options", () => {
+    assertDomEqual(
+      '<label for="my_for">The title, please:</label>',
+      view.label("post", "title", { for: "my_for" }, null, () => "The title, please:"),
+    );
+  });
+
+  it("label with block and builder", () => {
+    I18n.withLocale("label", () => {
+      assertDomEqual(
+        '<label for="post_body"><b>Write entire text here</b></label>',
+        view.label("post", "body", null, null, (b: LabelBuilder) =>
+          view.raw(`<b>${String(b.translation())}</b>`),
+        ),
+      );
+    });
+  });
+
+  it("label with block in erb", () => {
+    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    try {
+      const erbView = Base.withEmptyTemplateCache().withViewPaths(
+        [
+          new FixtureResolver({
+            "test/_label_with_block.html.tse":
+              "<%= label('post', 'message', null, null, () => { %>\n" +
+              "  Message\n" +
+              "  <%= textField('post', 'message') %>\n" +
+              "<% }) %>\n",
+          }),
+        ],
+        {},
+      );
+      assertDomEqual(
+        '<label for="post_message">\n  Message\n  <input id="post_message" name="post[message]" type="text" />\n</label>',
+        erbView.render("test/label_with_block"),
+      );
+    } finally {
+      TemplateHandlers.clear();
+    }
+  });
+
+  it("label with to model", () => {
+    assertDomEqual(
+      `<label for="post_delegator_title">Delegate Title</label>`,
+      view.label("post_delegator", "title"),
+    );
+  });
+
+  it("label with to model and overridden model name", () => {
+    I18n.withLocale("label", () => {
+      assertDomEqual(
+        `<label for="post_delegator_title">Delegate model_name title</label>`,
+        view.label("post_delegator", "title"),
+      );
+    });
   });
 
   it("text field placeholder without locales", () => {
