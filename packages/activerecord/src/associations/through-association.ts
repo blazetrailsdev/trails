@@ -19,7 +19,10 @@ export interface ThroughAssociationHost {
   /** @internal */
   ensureMutable(): void;
   /** @internal */
-  sourceReflection(): unknown;
+  sourceReflection(): {
+    isCollection(): boolean;
+    inverseOf(): { foreignKey(): string | string[] } | null | undefined;
+  };
 }
 
 /** @internal */
@@ -213,9 +216,9 @@ export const ThroughAssociation: Module = new Module((mod) =>
       attributes: Record<string, unknown>,
       block?: (record: Base) => void,
     ): Base | null {
-      if ((this.sourceReflection() as any).isCollection()) {
-        const inverse = (this.sourceReflection() as any).inverseOf();
-        const target = (this.throughAssociation() as any).target;
+      if (this.sourceReflection().isCollection()) {
+        const inverse = this.sourceReflection().inverseOf();
+        const target = (this.throughAssociation() as { target: Base | Base[] | null }).target;
 
         if (inverse && target && !Array.isArray(target)) {
           const foreignKeyColumns = toArray(inverse.foreignKey()) as string[];

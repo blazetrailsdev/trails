@@ -199,7 +199,7 @@ class TestCase extends IntegrationTest {
     if (klass) {
       return (this._testing = `/${underscore(klass.name)}`.replace(/_controller$/, ""));
     } else {
-      return this._testing;
+      return Object.hasOwn(this, "_testing") ? this._testing : undefined;
     }
   }
 
