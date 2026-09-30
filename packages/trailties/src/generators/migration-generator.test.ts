@@ -42,10 +42,6 @@ function makeGen() {
   return new MigrationGenerator({ cwd: tmpDir, output: (m) => lines.push(m) });
 }
 
-function readMigration(files: string[]): string {
-  return fs.readFileSync(path.join(tmpDir, files[0]), "utf-8");
-}
-
 describe("MigrationGeneratorTest", () => {
   it("migration", async () => {
     const migration = "change_title_body_from_posts";
@@ -278,44 +274,51 @@ describe("MigrationGeneratorTest", () => {
   });
 
   it("create join table migration", async () => {
-    const gen = makeGen();
-    const files = await gen.run("add_media_join_table", ["artist_id", "musics:uniq"]);
-    const content = readMigration(files);
-    expect(content).toContain('createJoinTable("artists", "musics"');
-    expect(content).toMatch(/\/\/ t\.index\(\["artist_id", "music_id"\]\)/);
-    expect(content).toMatch(/t\.index\(\["music_id", "artist_id"\], \{ unique: true \}\)/);
+    const migration = "add_media_join_table";
+    await makeGen().run(migration, ["artist_id", "musics:uniq"]);
+
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch(/createJoinTable\("artists", "musics"/, change);
+        assertMatch(/\/\/ t\.index\(\["artist_id", "music_id"\]\)/, change);
+        assertMatch(/ {2}t\.index\(\["music_id", "artist_id"\], \{ unique: true \}\)/, change);
+      }),
+    );
   });
 
   it("create table migration", async () => {
-    const gen = makeGen();
-    const files = await gen.run("create_books", ["title:string", "content:text"]);
-    const content = readMigration(files);
-    expect(content).toContain('createTable("books"');
-    expect(content).toContain('t.string("title")');
-    expect(content).toContain('t.text("content")');
+    await makeGen().run("create_books", ["title:string", "content:text"]);
+    await assertMigration("db/migrate/create_books.ts", (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch(/createTable\("books"/, change);
+        assertMatch(/ {2}t\.string\("title"\)/, change);
+        assertMatch(/ {2}t\.text\("content"\)/, change);
+      }),
+    );
   });
 
   it("create table migration with timestamps", async () => {
-    const gen = makeGen();
-    const files = await gen.run("create_books", ["title:string", "content:text"]);
-    const content = readMigration(files);
-    expect(content).toContain("t.timestamps()");
+    await makeGen().run("create_books", ["title:string", "content:text"]);
+    await assertMigration("db/migrate/create_books.ts", /t.timestamps/);
   });
 
   it("create table timestamps are skipped", async () => {
-    const gen = makeGen();
-    const files = await gen.run("create_books", ["title:string", "content:text"], {
-      timestamps: false,
-    });
-    const content = readMigration(files);
-    expect(content).not.toContain("timestamps");
+    await makeGen().run("create_books", ["title:string", "content:text"], { timestamps: false });
+
+    await assertMigration("db/migrate/create_books.ts", (m) =>
+      assertMethod("change", m, (change) => {
+        assertNoMatch(/t.timestamps/, change);
+      }),
+    );
   });
 
   it("add uuid to create table migration", async () => {
-    const gen = makeGen();
-    const files = await gen.run("create_books", [], { primaryKeyType: "uuid" });
-    const content = readMigration(files);
-    expect(content).toMatch(/createTable\("books", \{ id: "uuid" \}/);
+    await makeGen().run("create_books", [], { primaryKeyType: "uuid" });
+    await assertMigration("db/migrate/create_books.ts", (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch(/createTable\("books", \{ id: "uuid" \}/, change);
+      }),
+    );
   });
 
   it("add migration with references options when primary key uuid", async () => {
@@ -333,11 +336,14 @@ describe("MigrationGeneratorTest", () => {
   it.skip("database puts migrations in configured folder with aliases", () => {});
 
   it("should create empty migrations if name not start with add or remove or create", async () => {
-    const gen = makeGen();
-    const files = await gen.run("delete_books", ["title:string", "content:text"]);
-    const content = readMigration(files);
-    expect(content).toContain("async change()");
-    expect(content).toMatch(/change\(\).*\{[\s]*\}/s);
+    const migration = "delete_books";
+    await makeGen().run(migration, ["title:string", "content:text"]);
+
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch(/^\s*$/, change);
+      }),
+    );
   });
 
   it.skip("properly identifies usage file", () => {});
@@ -383,81 +389,94 @@ describe("MigrationGeneratorTest", () => {
   });
 
   it("create table migration with token option", async () => {
-    const gen = makeGen();
-    const files = await gen.run("create_users", ["token:token", "auth_token:token"]);
-    const content = readMigration(files);
-    expect(content).toContain('createTable("users"');
-    expect(content).toContain('t.string("token")');
-    expect(content).toContain('t.string("auth_token")');
-    expect(content).toMatch(/addIndex\("users", "token", \{ unique: true \}/);
-    expect(content).toMatch(/addIndex\("users", "auth_token", \{ unique: true \}/);
+    await makeGen().run("create_users", ["token:token", "auth_token:token"]);
+    await assertMigration("db/migrate/create_users.ts", (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch(/createTable\("users"/, change);
+        assertMatch(/ {2}t\.string\("token"\)/, change);
+        assertMatch(/ {2}t\.string\("auth_token"\)/, change);
+        assertMatch(/addIndex\("users", "token", \{ unique: true \}/, change);
+        assertMatch(/addIndex\("users", "auth_token", \{ unique: true \}/, change);
+      }),
+    );
   });
 
   it("add migration with token option", async () => {
-    const gen = makeGen();
-    const files = await gen.run("add_token_to_users", ["auth_token:token"]);
-    const content = readMigration(files);
-    expect(content).toContain('addColumn("users", "auth_token", "string")');
-    expect(content).toMatch(/addIndex\("users", "auth_token", \{ unique: true \}/);
+    const migration = "add_token_to_users";
+    await makeGen().run(migration, ["auth_token:token"]);
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch(/addColumn\("users", "auth_token", "string"/, change);
+        assertMatch(/addIndex\("users", "auth_token", \{ unique: true \}/, change);
+      }),
+    );
   });
 
   it.skip("add migration to configured path", () => {});
 
   it("add migration ignores virtual attributes", async () => {
-    const gen = makeGen();
-    const files = await gen.run("add_rich_text_content_to_messages", [
-      "content:rich_text",
-      "video:attachment",
-      "photos:attachments",
-    ]);
-    const content = readMigration(files);
-    expect(content).not.toContain('addColumn("messages", "content", "rich_text"');
-    expect(content).not.toContain('addColumn("messages", "video", "attachment"');
-    expect(content).not.toContain('addColumn("messages", "photos", "attachments"');
+    const migration = "add_rich_text_content_to_messages";
+    await makeGen().run(migration, ["content:rich_text", "video:attachment", "photos:attachments"]);
+
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertNoMatch(/addColumn\("messages", "content", "rich_text"/, change);
+        assertNoMatch(/addColumn\("messages", "video", "attachment"/, change);
+        assertNoMatch(/addColumn\("messages", "photos", "attachments"/, change);
+      }),
+    );
   });
 
   it("create table migration ignores virtual attributes", async () => {
-    const gen = makeGen();
-    const files = await gen.run("create_messages", [
+    await makeGen().run("create_messages", [
       "content:rich_text",
       "video:attachment",
       "photos:attachments",
     ]);
-    const content = readMigration(files);
-    expect(content).toContain('createTable("messages"');
-    expect(content).not.toContain('t.rich_text("content")');
-    expect(content).not.toContain('t.attachment("video")');
-    expect(content).not.toContain('t.attachments("photos")');
+    await assertMigration("db/migrate/create_messages.ts", (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch(/createTable\("messages"/, change);
+        assertNoMatch(/ {2}t\.rich_text\("content"\)/, change);
+        assertNoMatch(/ {2}t\.attachment\("video"\)/, change);
+        assertNoMatch(/ {2}t\.attachments\("photos"\)/, change);
+      }),
+    );
   });
 
   it("remove migration with virtual attributes", async () => {
-    const gen = makeGen();
-    const files = await gen.run("remove_content_from_messages", [
-      "content:rich_text",
-      "video:attachment",
-      "photos:attachments",
-    ]);
-    const content = readMigration(files);
-    expect(content).not.toContain('removeColumn("messages", "content", "rich_text"');
-    expect(content).not.toContain('removeColumn("messages", "video", "attachment"');
-    expect(content).not.toContain('removeColumn("messages", "photos", "attachments"');
+    const migration = "remove_content_from_messages";
+    await makeGen().run(migration, ["content:rich_text", "video:attachment", "photos:attachments"]);
+
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertNoMatch(/removeColumn\("messages", "content", "rich_text"/, change);
+        assertNoMatch(/removeColumn\("messages", "video", "attachment"/, change);
+        assertNoMatch(/removeColumn\("messages", "photos", "attachments"/, change);
+      }),
+    );
   });
 
   it("create table migration with required attributes", async () => {
-    const gen = makeGen();
-    const files = await gen.run("create_books", ["title:string!", "content:text!"]);
-    const content = readMigration(files);
-    expect(content).toContain('createTable("books"');
-    expect(content).toContain('t.string("title", { null: false })');
-    expect(content).toContain('t.text("content", { null: false })');
+    await makeGen().run("create_books", ["title:string!", "content:text!"]);
+    await assertMigration("db/migrate/create_books.ts", (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch(/createTable\("books"/, change);
+        assertMatch(/ {2}t\.string\("title", \{ null: false \}\)/, change);
+        assertMatch(/ {2}t\.text\("content", \{ null: false \}\)/, change);
+      }),
+    );
   });
 
   it("add migration with required attributes", async () => {
-    const gen = makeGen();
-    const files = await gen.run("add_title_body_to_posts", ["title:string!", "body:text!"]);
-    const content = readMigration(files);
-    expect(content).toContain('addColumn("posts", "title", "string", { null: false })');
-    expect(content).toContain('addColumn("posts", "body", "text", { null: false })');
+    const migration = "add_title_body_to_posts";
+    await makeGen().run(migration, ["title:string!", "body:text!"]);
+
+    await assertMigration(`db/migrate/${migration}.ts`, (content) =>
+      assertMethod("change", content, (change) => {
+        assertMatch(/addColumn\("posts", "title", "string", \{ null: false \}\)/, change);
+        assertMatch(/addColumn\("posts", "body", "text", \{ null: false \}\)/, change);
+      }),
+    );
   });
 });
 

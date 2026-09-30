@@ -6,7 +6,7 @@ import {
   assertNothingRaised,
 } from "@blazetrails/activesupport";
 import { File, rbInspect } from "@blazetrails/ruby-compat";
-import { migrationFileName, type BehaviorHost } from "./behavior.js";
+import { createGeneratedAttribute, migrationFileName, type BehaviorHost } from "./behavior.js";
 
 export type AssertionsHost = BehaviorHost;
 
@@ -60,6 +60,14 @@ export function assertNoMigration(this: AssertionsHost, relative: string): void 
   assertNil(fileName, `Expected migration ${relative} to not exist, but found ${fileName}`);
 }
 
+export async function assertClassMethod(
+  method: string,
+  content: string,
+  block?: (body: string) => unknown,
+): Promise<void> {
+  await assertInstanceMethod(`static ${method}`, content, block);
+}
+
 export async function assertInstanceMethod(
   method: string,
   content: string,
@@ -74,3 +82,23 @@ export async function assertInstanceMethod(
 }
 
 export const assertMethod = assertInstanceMethod;
+
+export function assertFieldType(attributeType: string, fieldType: string): void {
+  assertEqual(fieldType, createGeneratedAttribute(attributeType).fieldType());
+}
+
+export function assertFieldDefaultValue(attributeType: string, value: unknown): void {
+  if (value == null) {
+    assertNil(createGeneratedAttribute(attributeType).default());
+  } else {
+    assertEqual(value, createGeneratedAttribute(attributeType).default());
+  }
+}
+
+export async function assertInitializer(
+  this: AssertionsHost,
+  name: string,
+  ...contents: Contents
+): Promise<void> {
+  await assertFile.call(this, `config/initializers/${name}`, ...contents);
+}
