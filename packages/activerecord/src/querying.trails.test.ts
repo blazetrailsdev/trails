@@ -240,4 +240,14 @@ describe("_loadFromSql — STI detection (Story J gap 2)", () => {
   it("returns empty array for empty result set", () => {
     expect(_loadFromSql.call(Topic as typeof Base, resultFromRowHashes([]))).toEqual([]);
   });
+  it("instantiates both arms from indexed_rows without materializing hash rows", () => {
+    for (const rows of [[{ id: 1, type: Reply.name, title: "Rex" }], [{ id: 1, title: "Rex" }]]) {
+      const result = resultFromRowHashes(rows);
+      const toArray = vi.spyOn(result, "toArray");
+      const [record] = _loadFromSql.call(Topic as typeof Base, result);
+      expect(toArray).not.toHaveBeenCalled();
+      expect((record as Topic).title).toBe("Rex");
+      expect(record.readAttribute("id")).toBe(1);
+    }
+  });
 });

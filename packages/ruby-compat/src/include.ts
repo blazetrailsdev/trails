@@ -120,7 +120,8 @@ export class Module {
   /**
    * Mirrors: Ruby's Module#inspect — vendor/ruby/v3.3.11/object.c:1710
    * `rb_mod_to_s`, which renders `rb_class_name`: the classpath, or the
-   * temporary `#<Class:0x…>` path of an anonymous module.
+   * `#<Klass:0x…>` path `make_temporary_path` (vendor/ruby/v3.3.11/variable.c:320)
+   * gives an anonymous one.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */

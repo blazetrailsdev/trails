@@ -1,7 +1,8 @@
-import { registerConstant } from "@blazetrails/activesupport";
+import { isPlainObject, registerConstant } from "@blazetrails/activesupport";
 import { Attribute } from "../attribute.js";
 import type { Block } from "@blazetrails/ruby-compat";
 import {
+  block as rbBlock,
   dup,
   eachKey,
   eachValue,
@@ -15,6 +16,15 @@ import {
 import { ValueType } from "../type/value.js";
 import { AttributeSet } from "../attribute-set.js";
 
+type IndexedRow = {
+  isKey(name: string): boolean;
+  keys(): string[];
+  fetch(name: string, fallback: () => unknown): unknown;
+  eachKey(block: (key: string) => void): void;
+};
+
+export type DatabaseValues = Record<string, unknown> | IndexedRow;
+
 export class Builder {
   readonly types: Record<string, ValueType>;
   readonly defaultAttributes: Record<string, Attribute>;
@@ -25,7 +35,7 @@ export class Builder {
   }
 
   buildFromDatabase(
-    values: Record<string, unknown> = {},
+    values: DatabaseValues = {},
     additionalTypes: Record<string, ValueType> = {},
   ): AttributeSet {
     return new LazyAttributeSet(values, this.types, additionalTypes, this.defaultAttributes);
@@ -34,7 +44,7 @@ export class Builder {
 
 export class LazyAttributeSet extends AttributeSet {
   declare protected _attributes: Record<string, Attribute>;
-  private values: Record<string, unknown>;
+  private values: DatabaseValues;
   private types: Record<string, ValueType>;
   private additionalTypes: Record<string, ValueType>;
   private defaultAttributes: Record<string, Attribute>;
@@ -42,7 +52,7 @@ export class LazyAttributeSet extends AttributeSet {
   private materialized: boolean;
 
   constructor(
-    values: Record<string, unknown>,
+    values: DatabaseValues,
     types: Record<string, ValueType>,
     additionalTypes: Record<string, ValueType>,
     defaultAttributes: Record<string, Attribute>,
@@ -59,7 +69,9 @@ export class LazyAttributeSet extends AttributeSet {
 
   override isKey(name: string): boolean {
     return (
-      (Object.hasOwn(this.values, name) ||
+      ((isPlainObject(this.values)
+        ? Object.hasOwn(this.values, name)
+        : (this.values as IndexedRow).isKey(name)) ||
         hasKey(this.types, name) ||
         hasKey(this._attributes, name)) &&
       this.getAttribute(name).isInitialized()
@@ -69,7 +81,9 @@ export class LazyAttributeSet extends AttributeSet {
   /** @missingRailsName attributes — PERMANENT */
   override keys(): string[] {
     const keys = new Set([
-      ...Object.keys(this.values),
+      ...(isPlainObject(this.values)
+        ? Object.keys(this.values)
+        : (this.values as IndexedRow).keys()),
       ...Object.keys(this.types),
       ...Object.keys(this._attributes),
     ]);
@@ -85,12 +99,13 @@ export class LazyAttributeSet extends AttributeSet {
     if (hasKey(this.castedValues, name)) return this.castedValues[name];
 
     let valuePresent = true;
-    let value: unknown;
-    if (Object.hasOwn(this.values, name)) {
-      value = this.values[name];
-    } else {
-      valuePresent = false;
-    }
+    const value = isPlainObject(this.values)
+      ? fetch<unknown>(
+          this.values,
+          name,
+          rbBlock(() => (valuePresent = false)),
+        )
+      : (this.values as IndexedRow).fetch(name, () => (valuePresent = false));
 
     if (valuePresent) {
       const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
@@ -105,7 +120,11 @@ export class LazyAttributeSet extends AttributeSet {
 
   protected override attributes(): Record<string, Attribute> {
     if (!this.materialized) {
-      eachKey(this.values, (key) => this.getAttribute(key));
+      if (isPlainObject(this.values)) {
+        eachKey(this.values, (key) => this.getAttribute(key));
+      } else {
+        (this.values as IndexedRow).eachKey((key) => this.getAttribute(key));
+      }
       eachKey(this.types, (key) => this.getAttribute(key));
       this.materialized = true;
     }
@@ -118,8 +137,14 @@ export class LazyAttributeSet extends AttributeSet {
     value?: unknown,
   ): Attribute {
     if (valuePresent === undefined) {
-      valuePresent = Object.hasOwn(this.values, name);
-      value = valuePresent ? this.values[name] : undefined;
+      valuePresent = true;
+      value = isPlainObject(this.values)
+        ? fetch<unknown>(
+            this.values,
+            name,
+            rbBlock(() => (valuePresent = false)),
+          )
+        : (this.values as IndexedRow).fetch(name, () => (valuePresent = false));
     }
 
     const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);

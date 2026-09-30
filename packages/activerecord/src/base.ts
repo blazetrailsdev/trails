@@ -1,3 +1,4 @@
+import type { IndexedRow } from "./result.js";
 import { type Hash, isEmpty } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import "./i18n.js";
@@ -1526,7 +1527,7 @@ export class Base extends Model {
 
   static instantiate<T extends typeof Base>(
     this: T,
-    attributes: Record<string, unknown>,
+    attributes: Record<string, unknown> | IndexedRow,
     columnTypes?: Record<string, unknown>,
     block?: (record: InstanceType<T>) => void,
   ): InstanceType<T> {
@@ -1690,7 +1691,7 @@ export class Base extends Model {
 
   static _instantiate<T extends typeof Base>(
     this: T,
-    row: Record<string, unknown>,
+    row: Record<string, unknown> | IndexedRow,
     block?: (record: InstanceType<T>) => void,
     columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
   ): InstanceType<T> {

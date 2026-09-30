@@ -53,6 +53,7 @@ export {
 export { UserProvidedDefault } from "./attribute/user-provided-default.js";
 export { AttributeSet } from "./attribute-set.js";
 export { LazyAttributeSet, LazyAttributeHash } from "./attribute-set/builder.js";
+export type { DatabaseValues } from "./attribute-set/builder.js";
 export { YAMLEncoder } from "./attribute-set/yaml-encoder.js";
 export { AttributeSetCodecError } from "./attribute-set/codecs/codec.js";
 export type {
