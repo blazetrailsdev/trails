@@ -15,6 +15,7 @@ import {
   type Generic,
   Hash,
   rbInspect,
+  rbStrSend,
   stringSplit,
   URI,
 } from "@blazetrails/ruby-compat";
@@ -197,7 +198,11 @@ class TestCase extends IntegrationTest {
 
   static testing(klass: { name: string } | null = null): string | undefined {
     if (klass) {
-      return (this._testing = `/${underscore(klass.name)}`.replace(/_controller$/, ""));
+      return (this._testing = rbStrSend(
+        `/${underscore(klass.name)}`,
+        "deleteSuffix",
+        "_controller",
+      )[0] as string);
     } else {
       return Object.hasOwn(this, "_testing") ? this._testing : undefined;
     }
@@ -206,7 +211,7 @@ class TestCase extends IntegrationTest {
   override get(thing: string, options: IntegrationRequestOptions = {}): Promise<void> {
     if (thing.startsWith(":")) {
       return super.get(
-        `${(this.constructor as typeof TestCase).testing()}/${thing.slice(1)}`,
+        `${(this.constructor as typeof TestCase).testing() ?? ""}/${thing.slice(1)}`,
         options,
       );
     } else {

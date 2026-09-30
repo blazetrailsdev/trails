@@ -79,6 +79,7 @@ controllerConstants.set("render_plain/with_layout", WithLayoutController);
 class RenderPlainTest extends Rack.TestCase {}
 
 describe("RenderPlainTest", () => {
+  // BLOCKED: action-controller-rendering-is-not-an-includable-module
   it.skip("rendering text from a minimal controller", () => {});
 
   it("rendering text from an action with default options renders the text with the layout", async () => {
@@ -176,6 +177,7 @@ describe("RenderPlainTest", () => {
     t.assertStatus(200);
   });
 
+  // BLOCKED: action-controller-rendering-is-not-an-includable-module
   it.skip("rendering from minimal controller returns response with text/plain content type", () => {});
 
   it("rendering from normal controller returns response with text/plain content type", async () => {
