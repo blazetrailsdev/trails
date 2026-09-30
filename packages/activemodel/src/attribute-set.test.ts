@@ -170,7 +170,7 @@ describe("AttributeSetTest", () => {
 
   it("fetch_value returns nil for uninitialized attributes if no block is given", () => {
     const attributes = attributesWithUninitializedKey();
-    expect(attributes.fetchValue("bar")).toBeUndefined();
+    assertNil(attributes.fetchValue("bar"));
   });
 
   it("the primary_key is always initialized", () => {
@@ -201,7 +201,7 @@ describe("AttributeSetTest", () => {
     const builder = new Builder({ foo: new MyType() });
     const attributes = builder.buildFromDatabase();
 
-    expect(attributes.fetchValue("foo")).toBeUndefined();
+    assertNil(attributes.fetchValue("foo"));
 
     attributes.writeFromDatabase("foo", "value");
 
@@ -212,7 +212,7 @@ describe("AttributeSetTest", () => {
     const builder = new Builder({ foo: new MyType() });
     const attributes = builder.buildFromDatabase();
 
-    expect(attributes.fetchValue("foo")).toBeUndefined();
+    assertNil(attributes.fetchValue("foo"));
 
     attributes.writeFromUser("foo", "value");
 

@@ -16,7 +16,6 @@ import {
   AccountsController,
   CommentsController,
   CookieAssertions,
-  FIXTURE_LOAD_PATH,
   HeadersAssertions,
   ResourcesController,
   RoutingTestHelpers,
@@ -33,7 +32,6 @@ class FixtureLoadPathController extends Base {
     await this.render({ inline: "hello: <%= stratego() %>" });
   }
 }
-FixtureLoadPathController.prependViewPath(FIXTURE_LOAD_PATH);
 helper(FixtureLoadPathController as unknown as HelpersClassMethods, GamesHelper);
 
 async function dispatch(action: string): Promise<unknown> {

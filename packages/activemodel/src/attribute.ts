@@ -233,6 +233,11 @@ export abstract class Attribute {
     return this.type!.isChanged(this.originalValue, this.value, this.valueBeforeTypeCast);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE track-getter-vs-method-shape */
+  valueWithBlock(_block?: (name: string) => unknown): unknown {
+    return this.value;
+  }
+
   /** @missingRailsCall key? — PERMANENT */
   initWith(coder: Coder): void {
     const self = this as { -readonly [K in "name" | "type"]: Attribute[K] };
@@ -364,7 +369,7 @@ export class Uninitialized extends Attribute {
   }
 
   get value(): unknown {
-    return undefined;
+    return this.valueWithBlock();
   }
 
   override get originalValue(): unknown {
@@ -385,6 +390,14 @@ export class Uninitialized extends Attribute {
 
   override withType(type: ValueType | null): Attribute {
     return new Uninitialized(this.name, type);
+  }
+
+  /** @noRailsEquivalent CONVERGEABLE track-getter-vs-method-shape */
+  override valueWithBlock(block?: (name: string) => unknown): unknown {
+    if (block !== undefined) {
+      return block(this.name!);
+    }
+    return null;
   }
 
   typeCast(): unknown {

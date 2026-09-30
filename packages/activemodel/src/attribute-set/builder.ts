@@ -1,5 +1,5 @@
 import { registerConstant } from "@blazetrails/activesupport";
-import { Attribute, Uninitialized } from "../attribute.js";
+import { Attribute } from "../attribute.js";
 import type { Block } from "@blazetrails/ruby-compat";
 import {
   dup,
@@ -79,8 +79,7 @@ export class LazyAttributeSet extends AttributeSet {
   override fetchValue(name: string, block?: (name: string) => unknown): unknown {
     const attr = this._attributes[name];
     if (attr) {
-      if (block !== undefined && attr instanceof Uninitialized) return block(name);
-      return attr.value;
+      return attr.valueWithBlock(block);
     }
 
     if (hasKey(this.castedValues, name)) return this.castedValues[name];
@@ -100,8 +99,7 @@ export class LazyAttributeSet extends AttributeSet {
       return casted;
     } else {
       const attr = this.defaultAttribute(name, valuePresent, value);
-      if (block !== undefined && attr instanceof Uninitialized) return block(name);
-      return attr.value;
+      return attr.valueWithBlock(block);
     }
   }
 

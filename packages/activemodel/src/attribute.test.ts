@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Attribute } from "./attribute.js";
-import { AttributeSet } from "./attribute-set.js";
 import { ValueType } from "./type/value.js";
 import { FloatType } from "./type/float.js";
 import { IntegerType } from "./type/integer.js";
@@ -194,12 +193,12 @@ describe("AttributeTest", () => {
     const foo = Attribute.uninitialized("foo", null);
     const bar = Attribute.uninitialized("bar", null);
 
-    expect(new AttributeSet({ foo }).fetchValue("foo", block)).toEqual("foo!");
-    expect(new AttributeSet({ bar }).fetchValue("bar", block)).toEqual("bar!");
+    expect(foo.valueWithBlock(block)).toEqual("foo!");
+    expect(bar.valueWithBlock(block)).toEqual("bar!");
   });
 
   it("uninitialized attributes have no value", () => {
-    expect(Attribute.uninitialized("foo", null).value).toBeUndefined();
+    expect(Attribute.uninitialized("foo", null).value).toBeNull();
   });
 
   it("attributes equal other attributes with the same constructor arguments", () => {

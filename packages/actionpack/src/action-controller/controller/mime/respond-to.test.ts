@@ -1,5 +1,6 @@
+import "../../../test-helpers/abstract-unit.js";
 import { afterEach, beforeAll, beforeEach, describe, it, expect } from "vitest";
-import { DetailsKey, FixtureResolver } from "@blazetrails/actionview";
+import { DetailsKey } from "@blazetrails/actionview";
 import { MimeType } from "../../../action-dispatch/http/mime-type.js";
 import { Request } from "../../../action-dispatch/http/request.js";
 import { Response } from "../../../action-dispatch/http/response.js";
@@ -235,17 +236,6 @@ async function get(action: string, v: string): Promise<RespondToController> {
 }
 
 beforeAll(() => {
-  RespondToController.prependViewPath(
-    new FixtureResolver({
-      "respond_to/variantWithImplicitTemplateRendering.html+mobile.tse": "mobile",
-      "respond_to/variantPlusNoneForFormat.html.tse": "none",
-      "respond_to/customConstantHandlingWithoutBlock.mobile.tse": "Mobile",
-      "respond_to/usingDefaults.html.tse": "Hello world!",
-      "respond_to/usingDefaults.xml.tse": "<p>Hello world!</p>\n",
-      "respond_to/usingDefaultsWithTypeList.html.tse": "Hello world!",
-      "respond_to/usingDefaultsWithTypeList.xml.tse": "<p>Hello world!</p>\n",
-    }),
-  );
   RespondToController.layout(false);
 });
 

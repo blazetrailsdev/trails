@@ -5,6 +5,7 @@ import {
   NotImplementedError,
   RuntimeError,
   TypeError,
+  isEmpty,
   rbFPublicSend,
   rbObjClass,
   rbObjRespondTo,
@@ -17,7 +18,7 @@ export function assignAttributes(this: AttributeAssignment, newAttributes: unkno
       `When assigning attributes, you must pass a hash as an argument, ${rbObjClass(newAttributes)} passed.`,
     );
   }
-  if (isMassAssignmentEmpty(newAttributes)) return;
+  if (isEmpty(newAttributes)) return;
 
   assertAssignedSynchronously(
     this._assignAttributes(this.sanitizeForMassAssignment(newAttributes)),
@@ -44,7 +45,7 @@ export function setAttributes(
       `When assigning attributes, you must pass a hash as an argument, ${rbObjClass(newAttributes)} passed.`,
     );
   }
-  if (isMassAssignmentEmpty(newAttributes)) return;
+  if (isEmpty(newAttributes)) return;
 
   return this._assignAttributes(this.sanitizeForMassAssignment(newAttributes));
 }
@@ -86,18 +87,6 @@ export interface AttributeAssignment {
   /** @internal */
   _assignAttribute(k: string, v: unknown): Promise<void> | void;
   methodMissing?(method: string, ...args: unknown[]): unknown;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-is-mass-assignment-empty-into-assign-attributes
- */
-export function isMassAssignmentEmpty(attrs: object): boolean {
-  if (isParamsLikeWrapper(attrs)) {
-    const empty = (attrs as { empty?: unknown }).empty;
-    if (typeof empty === "boolean") return empty;
-  }
-  return Object.keys(attrs).length === 0;
 }
 
 function respondToEachPair(attrs: unknown): attrs is Record<string, unknown> {

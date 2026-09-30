@@ -3,7 +3,7 @@ import {
   registerConstant,
   reverseMergeBang as hashReverseMergeBang,
 } from "@blazetrails/activesupport";
-import { Attribute, Uninitialized } from "./attribute.js";
+import { Attribute } from "./attribute.js";
 import type { LazyAttributeHash } from "./attribute-set/builder.js";
 import type { Block } from "@blazetrails/ruby-compat";
 import {
@@ -161,11 +161,7 @@ export class AttributeSet {
   }
 
   fetchValue(name: string, block?: (name: string) => unknown): unknown {
-    const attr = this.getAttribute(name);
-    if (block !== undefined && attr instanceof Uninitialized) {
-      return block(name);
-    }
-    return attr.value;
+    return this.getAttribute(name).valueWithBlock(block);
   }
 
   writeFromDatabase(name: string, value: unknown): void {

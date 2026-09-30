@@ -139,11 +139,11 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("empty? returns true when params contains no key/value pairs", () => {
-    expect(new Parameters({}).empty).toBe(true);
+    expect(new Parameters({}).isEmpty()).toBe(true);
   });
 
   it("empty? returns false when any params are present", () => {
-    expect(new Parameters({ a: "1" }).empty).toBe(false);
+    expect(new Parameters({ a: "1" }).isEmpty()).toBe(false);
   });
 
   it("except retains permitted status", () => {

@@ -258,6 +258,8 @@ TestCase.prototype.assertResponse = function (
 
 export const Rack = { TestCase };
 
+Base.viewPaths(FIXTURE_LOAD_PATH);
+
 export class ApplicationController extends Base {}
 
 (DebugExceptions.prototype as unknown as { stderrLogger(): null }).stderrLogger = function () {

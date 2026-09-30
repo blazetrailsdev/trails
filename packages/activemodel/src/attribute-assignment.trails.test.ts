@@ -3,6 +3,7 @@
    test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
    how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
+import { isEmpty } from "@blazetrails/ruby-compat";
 import { Model } from "./index.js";
 import { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
@@ -25,8 +26,8 @@ class ProtectedParams {
     return this;
   }
 
-  get empty(): boolean {
-    return Object.keys(this.parameters).length === 0;
+  isEmpty(): boolean {
+    return isEmpty(this.parameters);
   }
 
   toH(): Record<string, unknown> {

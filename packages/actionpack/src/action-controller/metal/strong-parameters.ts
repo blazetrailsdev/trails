@@ -12,6 +12,7 @@ import {
   type ConflictBlock,
   eachPair,
   hasKey,
+  isEmpty,
   merge,
   mergeBang,
 } from "@blazetrails/ruby-compat";
@@ -229,8 +230,8 @@ export class Parameters {
     return Object.values(this._data);
   }
 
-  get empty(): boolean {
-    return Object.keys(this._data).length === 0;
+  isEmpty(): boolean {
+    return isEmpty(this._data);
   }
 
   get length(): number {

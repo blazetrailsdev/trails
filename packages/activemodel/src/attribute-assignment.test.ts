@@ -4,7 +4,7 @@
    merge beside it is how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
 import { include, assertRaises } from "@blazetrails/activesupport";
-import { ArgumentError, StandardError } from "@blazetrails/ruby-compat";
+import { ArgumentError, StandardError, isEmpty } from "@blazetrails/ruby-compat";
 import {
   type AttributeAssignment,
   assignAttributes,
@@ -80,8 +80,8 @@ class ProtectedParams {
     return this;
   }
 
-  get empty(): boolean {
-    return Object.keys(this.parameters).length === 0;
+  isEmpty(): boolean {
+    return isEmpty(this.parameters);
   }
 
   toH(): Record<string, unknown> {

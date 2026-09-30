@@ -16,34 +16,15 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "relation/load_async_test.rb",
-    tests: [
-      "scheduled?",
-      "null scheduled?",
-      "reset",
-      "load async has many association",
-      "load async has many through association",
-      "load async instrumentation is thread safe",
-      "simple query",
-      "load async from transaction",
-      "eager loading query",
-      "contradiction",
-      "pluck",
-      "count",
-      "size",
-      "empty?",
-      "load async pluck with query cache",
-      "load async count with query cache",
-      "async query executor and configuration",
-    ],
+    className: "LoadAsyncTest",
+    tests: ["load async instrumentation is thread safe"],
     reason:
-      "SOURCE NOW PORTED (future_result.rb — story " +
-      "call-args-ar-select-all-empty-async-row); this is a test-only entry, narrowed " +
-      "from the whole file by story enroll-load-async-notification-forwarding, which " +
-      "ported `test_notification_forwarding` now that FutureResult::EventBuffer stamps " +
-      "`payload[:lock_wait]` (future_result.rb:43). The tests still named here assert " +
-      "`scheduled?`, thread interleaving and thread-pool sizing, which have no " +
-      "observable analogue on a single-threaded event loop where " +
-      "`await relation.toArray()` is the async surface.",
+      "Parks a thread inside the connection's `log` on a Concurrent::CountDownLatch " +
+      "(load_async_test.rb:161-195) while a second thread runs `Post.count`. A JS " +
+      "event loop has no thread to block, and trails' adapter monitor serializes " +
+      "the two statements, so the interleaving the test asserts cannot occur. " +
+      "Every other case in the file asserts the Relation#load_async surface and " +
+      "is enrolled in relation/load-async.test.ts.",
   },
   {
     testFile: "asynchronous_queries_test.rb",
@@ -561,9 +542,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "GVL / Ruby Thread semantics — first test pins across threads; second uses FutureResult (thread-based async queries).",
   },
   // --- Permanently not-portable: GVL / Ruby Thread + fork in mixed files ---
-  // (load_async / FutureResult itself is already fully excluded above via the
-  //  future_result.rb / relation/load_async_test.rb entry — these are the
-  //  scattered thread/fork cases that live in otherwise-portable test files.)
   {
     testFile: "query_cache_test.rb",
     tests: [
