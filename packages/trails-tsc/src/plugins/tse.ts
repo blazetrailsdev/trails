@@ -41,28 +41,27 @@ function netBraceDepth(code: string): number {
   return depth;
 }
 
-type EmittedLine = [code: string, srcLine: number];
+type EmittedLine = [code: string, node: TseAst["nodes"][number]];
 
 function emitNodes(nodes: TseAst["nodes"]): EmittedLine[] {
   const lines: EmittedLine[] = [];
   const innerDepths: number[] = [];
   for (const node of nodes) {
-    const srcLine = node.srcLine + leadingNewlines(node);
     if (node.kind === "blockExpr") {
       innerDepths.push(0);
-      lines.push([`  _ob.append(${node.value.trim()}`, srcLine]);
+      lines.push([`  _ob.append(${node.value.trim()}`, node]);
     } else if (node.kind === "code" && innerDepths.length > 0) {
       const innerDepth = innerDepths[innerDepths.length - 1];
       if (BLOCK_CLOSE_RE.test(node.value) && innerDepth === 0) {
         innerDepths.pop();
         const t = node.value.trim();
-        lines.push([`  ${t.endsWith(";") ? t.slice(0, -1) : t});`, srcLine]);
+        lines.push([`  ${t.endsWith(";") ? t.slice(0, -1) : t});`, node]);
       } else {
         innerDepths[innerDepths.length - 1] += netBraceDepth(node.value);
-        lines.push([emitNode(node), srcLine]);
+        lines.push([emitNode(node), node]);
       }
     } else {
-      lines.push([emitNode(node), srcLine]);
+      lines.push([emitNode(node), node]);
     }
   }
   if (innerDepths.length > 0) {
@@ -73,9 +72,18 @@ function emitNodes(nodes: TseAst["nodes"]): EmittedLine[] {
   return lines;
 }
 
-function leadingNewlines(node: TseAst["nodes"][number]): number {
-  if (node.kind === "text") return 0;
-  return (/^\s*/.exec(node.value)?.[0].match(/\n/g) ?? []).length;
+function lineMappings(genLine: number, code: string, node: TseAst["nodes"][number]): LineMapping[] {
+  const pieces = code.split("\n");
+  const tagCol = node.kind === "text" ? 0 : (node.srcCol ?? 0);
+  const lead = node.kind === "text" ? [""] : (/^\s*/.exec(node.value)?.[0] ?? "").split("\n");
+  const srcLine = node.srcLine + lead.length - 1;
+  const srcCol = lead.length === 1 ? tagCol + lead[0].length : lead[lead.length - 1].length;
+  const at = node.kind === "text" ? 0 : pieces[0].indexOf(node.value.trim().split("\n")[0]);
+  return pieces.map((_, i) =>
+    i === 0
+      ? { genLine, srcLine, genCol: at === -1 ? pieces[0].length : at, srcCol }
+      : { genLine: genLine + i, srcLine: srcLine + i, genCol: 0, srcCol: 0 },
+  );
 }
 
 function contextYield(value: string): string {
@@ -192,10 +200,9 @@ export function virtualizeTseWithDeltas(source: string, scope?: TseScope): Virtu
   ];
   const mappings: LineMapping[] = [];
   let genLine = headerLineCount;
-  for (const [code, srcLine] of emitted) {
-    const count = code.split("\n").length;
-    for (let i = 0; i < count; i++) mappings.push({ genLine: genLine + i, srcLine: srcLine + i });
-    genLine += count;
+  for (const [code, node] of emitted) {
+    mappings.push(...lineMappings(genLine, code, node));
+    genLine += code.split("\n").length;
   }
   return { ts, deltas, mappings };
 }

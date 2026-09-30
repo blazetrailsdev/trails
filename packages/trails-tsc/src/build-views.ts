@@ -122,6 +122,30 @@ function importPath(fromDir: string, file: string): string {
   return JSON.stringify(rel.startsWith(".") ? rel : `./${rel}`);
 }
 
+function constantName(path_: string): string {
+  return camelize(underscore(path_)).split("::").join("");
+}
+
+function helperMethodNames(files: readonly string[]): string[] {
+  const names: string[] = [];
+  for (const file of files) {
+    if (!fs.existsSync(file)) continue;
+    const sf = ts.createSourceFile(file, fs.readFileSync(file, "utf8"), ts.ScriptTarget.ESNext);
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.name.text === "helperMethod"
+      ) {
+        for (const arg of node.arguments) if (ts.isStringLiteral(arg)) names.push(arg.text);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sf);
+  }
+  return names;
+}
+
 function templateScope(
   appDir: string,
   rel: string,
@@ -130,7 +154,7 @@ function templateScope(
 ): TseScope {
   const view = ['import("@blazetrails/actionview").Base'];
   for (const file of helpers) {
-    const name = camelize(underscore(path.posix.basename(file, ".ts").replace(/[-_]helper$/u, "")));
+    const name = constantName(file.replace(/[-_]helper\.ts$/u, ""));
     view.push(
       `(typeof import(${importPath(shimDir, path.join(appDir, "helpers", file))}))["${name}Helper"]`,
     );
@@ -140,25 +164,46 @@ function templateScope(
     'Record<"alert" | "notice", unknown>',
   );
   const prefix = path.posix.dirname(rel);
-  const controller = path.join(appDir, "controllers", `${prefix}-controller.ts`);
+  const controllersDir = path.join(appDir, "controllers");
+  const controller = path.join(
+    controllersDir,
+    `${prefix.split("/").map(dasherize).join("/")}-controller.ts`,
+  );
   if (prefix !== "." && fs.existsSync(controller)) {
-    const klass = `import(${importPath(shimDir, controller)}).${camelize(underscore(path.posix.basename(prefix)))}Controller`;
+    const klass = `import(${importPath(shimDir, controller)}).${constantName(prefix)}Controller`;
     view.push(
       `{ [K in keyof ${klass} as K extends keyof import("@blazetrails/actionpack").ActionController.Base ? never : ${klass}[K] extends (...args: never) => unknown ? never : K]: ${klass}[K] }`,
     );
+    const concerns = path.join(controllersDir, "concerns");
+    const exposed = helperMethodNames([
+      path.join(controllersDir, "application-controller.ts"),
+      controller,
+      ...(fs.existsSync(concerns)
+        ? fs
+            .readdirSync(concerns, { recursive: true, encoding: "utf8" })
+            .map((file) => path.join(concerns, file))
+        : []),
+    ]);
+    if (exposed.length > 0) {
+      view.push(
+        `Pick<${klass}, Extract<${exposed.map((n) => JSON.stringify(n)).join(" | ")}, keyof ${klass}>>`,
+      );
+    }
   }
   const scope: TseScope = { view: view.join(" & ") };
   const partial = /^_([a-z_]\w*)/u.exec(path.posix.basename(rel));
   const element = partial?.[1];
   if (element !== undefined && path.posix.basename(prefix) === pluralize(element)) {
+    const namespace = prefix.split("/").slice(0, -1);
     const model = path.join(
       appDir,
       "models",
-      ...prefix.split("/").slice(0, -1),
+      ...namespace.map(dasherize),
       `${dasherize(element)}.ts`,
     );
     if (fs.existsSync(model)) {
-      scope.locals = `{ ${element}: import(${importPath(shimDir, model)}).${camelize(element)} }`;
+      const klass = constantName([...namespace, element].join("/"));
+      scope.locals = `{ ${element}: import(${importPath(shimDir, model)}).${klass} }`;
     }
   }
   return scope;

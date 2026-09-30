@@ -12,6 +12,7 @@ export interface Token {
   kind: TokenKind;
   value: string;
   srcLine: number;
+  srcCol?: number;
 }
 export class TseSyntaxError extends Error {}
 
@@ -100,6 +101,7 @@ export function tokenize(source: string, trim = true): Token[] {
         kind,
         value: m[3],
         srcLine: line(m.index),
+        srcCol: m.index + 2 + (m[2]?.length ?? 0) - starts[line(m.index)],
       });
       if (isExpression && tailch !== undefined) rspace = undefined;
       if (!trimmed && rspace !== undefined) {

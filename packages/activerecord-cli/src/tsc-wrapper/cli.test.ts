@@ -172,22 +172,23 @@ describe("trails-tsc .tse diagnostic remap", () => {
       endPosition: { line: 40, character: character + "post.title".length },
       sourceLines: [{ line: 40, text: shimLine }],
     } as unknown as Diagnostic;
-    const sourceContent = "<div>\n  <p><%= readingTime(post.title) %></p>\n</div>\n";
+    const sourceContent =
+      "<div>\n  <p><%= post.title %> <%= readingTime(post.title) %></p>\n</div>\n";
     const [remapped] = remapDiagnostics([diagnostic], {
       getDeltasForFile: () => undefined,
       getOriginalText: () => undefined,
       getTseSourceMap: () => ({
         source: "/app/app/views/posts/_post.html.tse",
         sourceContent,
-        lines: new Map([[40, 1]]),
+        lines: new Map([[40, { line: 1, genCol: 13, srcCol: 27 }]]),
       }),
     });
     expect(remapped.fileName).toBe("/app/app/views/posts/_post.html.tse");
-    expect(remapped.startPosition).toEqual({ line: 1, character: 21 });
+    expect(remapped.startPosition).toEqual({ line: 1, character: 39 });
     expect(sourceContent.slice(remapped.pos, remapped.end)).toBe("post.title");
     expect(remapped.messageChain?.at(-1)?.text).toBe("in <%= readingTime(post.title) %>");
     expect(remapped.sourceLines).toEqual([
-      { line: 1, text: "  <p><%= readingTime(post.title) %></p>\n" },
+      { line: 1, text: "  <p><%= post.title %> <%= readingTime(post.title) %></p>\n" },
     ]);
   });
 });

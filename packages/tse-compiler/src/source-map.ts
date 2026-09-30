@@ -15,6 +15,8 @@ export function encodeVlq(value: number): string {
 export interface LineMapping {
   genLine: number;
   srcLine: number;
+  genCol?: number;
+  srcCol?: number;
 }
 
 export interface RawSourceMap {
@@ -36,13 +38,21 @@ export function generateSourceMap(
   const segs: string[] = [];
   let prevGen = 0;
   let prevSrc = 0;
+  let prevSrcCol = 0;
   for (const m of sorted) {
     while (prevGen < m.genLine) {
       segs.push("");
       prevGen++;
     }
-    segs.push(encodeVlq(0) + encodeVlq(0) + encodeVlq(m.srcLine - prevSrc) + encodeVlq(0));
+    const srcCol = m.srcCol ?? 0;
+    segs.push(
+      encodeVlq(m.genCol ?? 0) +
+        encodeVlq(0) +
+        encodeVlq(m.srcLine - prevSrc) +
+        encodeVlq(srcCol - prevSrcCol),
+    );
     prevSrc = m.srcLine;
+    prevSrcCol = srcCol;
     prevGen++;
   }
   return {
@@ -76,13 +86,17 @@ function decodeVlqSegment(segment: string): number[] {
 export function decodeLineMappings(mappings: string): LineMapping[] {
   const out: LineMapping[] = [];
   let srcLine = 0;
+  let srcCol = 0;
   mappings.split(";").forEach((line, genLine) => {
     let first = true;
+    let genCol = 0;
     for (const segment of line.split(",")) {
       const fields = decodeVlqSegment(segment);
-      if (fields.length < 3) continue;
+      if (fields.length < 4) continue;
+      genCol += fields[0];
       srcLine += fields[2];
-      if (first) out.push({ genLine, srcLine });
+      srcCol += fields[3];
+      if (first) out.push({ genLine, srcLine, genCol, srcCol });
       first = false;
     }
   });

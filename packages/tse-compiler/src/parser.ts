@@ -2,10 +2,10 @@ import { tokenize, TseSyntaxError } from "./lexer.js";
 
 export type TseNode =
   | { kind: "text"; value: string; srcLine: number }
-  | { kind: "code"; value: string; srcLine: number }
-  | { kind: "expr"; value: string; srcLine: number }
-  | { kind: "blockExpr"; value: string; srcLine: number }
-  | { kind: "rawExpr"; value: string; srcLine: number };
+  | { kind: "code"; value: string; srcLine: number; srcCol?: number }
+  | { kind: "expr"; value: string; srcLine: number; srcCol?: number }
+  | { kind: "blockExpr"; value: string; srcLine: number; srcCol?: number }
+  | { kind: "rawExpr"; value: string; srcLine: number; srcCol?: number };
 
 export interface TseAst {
   nodes: TseNode[];
@@ -42,7 +42,12 @@ export function parse(source: string, trim = true): TseAst {
         throw new TseSyntaxError(`unknown <%! ... !%> directive: ${tok.value.trim()}`);
       }
     } else {
-      nodes.push({ kind: tok.kind, value: tok.value, srcLine: tok.srcLine } as TseNode);
+      nodes.push({
+        kind: tok.kind,
+        value: tok.value,
+        srcLine: tok.srcLine,
+        srcCol: tok.srcCol,
+      } as TseNode);
     }
   }
   return { nodes, localsSignature, typesAnnotation, formatAnnotation };

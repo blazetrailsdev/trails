@@ -31,9 +31,9 @@ describe("generateSourceMap", () => {
 describe("decodeLineMappings", () => {
   it("round-trips generateSourceMap's line mappings", () => {
     const mappings = [
-      { genLine: 1, srcLine: 0 },
-      { genLine: 3, srcLine: 17 },
-      { genLine: 4, srcLine: 2 },
+      { genLine: 1, srcLine: 0, genCol: 13, srcCol: 4 },
+      { genLine: 3, srcLine: 17, genCol: 2, srcCol: 0 },
+      { genLine: 4, srcLine: 2, genCol: 0, srcCol: 30 },
     ];
     const map = generateSourceMap("out.js", "src.tse", null, mappings);
     expect(decodeLineMappings(map.mappings)).toEqual(mappings);

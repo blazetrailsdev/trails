@@ -24,7 +24,7 @@ export interface ArRemapHost {
 export interface TseSourceMap {
   source: string;
   sourceContent: string;
-  lines: ReadonlyMap<number, number>;
+  lines: ReadonlyMap<number, { line: number; genCol: number; srcCol: number }>;
 }
 
 export interface ArTrailsProgram {
@@ -180,16 +180,12 @@ function remapOneDiagnostic(
 }
 
 function remapTseDiagnostic(d: Diagnostic, unmoved: Diagnostic, tse: TseSourceMap): Diagnostic {
-  const line = tse.lines.get(d.startPosition!.line);
-  if (line === undefined) return unmoved;
+  const mapped = tse.lines.get(d.startPosition!.line);
+  if (mapped === undefined) return unmoved;
+  const { line } = mapped;
   const lineStarts = computeLineStarts(tse.sourceContent);
   const text = tse.sourceContent.slice(lineStarts[line], lineStarts[line + 1]);
-  const virtualText = d.sourceLines?.find((l) => l.line === d.startPosition!.line)?.text ?? "";
-  const span = virtualText.slice(
-    d.startPosition!.character,
-    d.startPosition!.character + d.end - d.pos,
-  );
-  const character = span === "" ? 0 : Math.max(0, text.indexOf(span));
+  const character = mapped.srcCol + Math.max(0, d.startPosition!.character - mapped.genCol);
   const pos = lineStarts[line] + character;
   const open = text.lastIndexOf("<%", character);
   const close = text.indexOf("%>", character);

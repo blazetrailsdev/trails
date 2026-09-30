@@ -334,7 +334,12 @@ async function loadTseSourceMaps(
       maps.set(fileName, {
         source: path.resolve(path.dirname(mapPath), raw.sources[0]),
         sourceContent,
-        lines: new Map(decodeLineMappings(raw.mappings).map((m) => [m.genLine, m.srcLine])),
+        lines: new Map(
+          decodeLineMappings(raw.mappings).map((m) => [
+            m.genLine,
+            { line: m.srcLine, genCol: m.genCol ?? 0, srcCol: m.srcCol ?? 0 },
+          ]),
+        ),
       });
     }),
   );

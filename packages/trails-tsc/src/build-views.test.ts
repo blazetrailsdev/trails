@@ -274,8 +274,19 @@ describe("runCli", () => {
   it("scopes a view to app/helpers, the controller's declared ivars and the partial's model", () => {
     const cwd = mkScratch();
     write(cwd, "app/helpers/posts-helper.ts", "export const PostsHelper = {};");
-    write(cwd, "app/helpers/admin/users_helper.ts", "export const UsersHelper = {};");
-    write(cwd, "app/controllers/posts-controller.ts", "export class PostsController {}");
+    write(cwd, "app/helpers/admin/users-helper.ts", "export const AdminUsersHelper = {};");
+    write(
+      cwd,
+      "app/controllers/posts-controller.ts",
+      'export class PostsController { static { this.helperMethod("currentPost"); } }',
+    );
+    write(
+      cwd,
+      "app/controllers/admin/blog-posts-controller.ts",
+      "export class AdminBlogPostsController {}",
+    );
+    write(cwd, "app/models/admin/blog-post.ts", "export class AdminBlogPost {}");
+    write(cwd, "app/views/admin/blog_posts/_blog_post.html.tse", "<%= blog_post %>");
     write(cwd, "app/models/post.ts", "export class Post {}");
     write(cwd, "app/views/posts/_post.html.tse", "<%= post %>");
     write(cwd, "app/views/layouts/application.html.tse", "<%= yield %>");
@@ -286,7 +297,7 @@ describe("runCli", () => {
       '(typeof import("../../../app/helpers/posts-helper.js"))["PostsHelper"]',
     );
     expect(shim).toContain(
-      '(typeof import("../../../app/helpers/admin/users_helper.js"))["UsersHelper"]',
+      '(typeof import("../../../app/helpers/admin/users-helper.js"))["AdminUsersHelper"]',
     );
     expect(shim).toContain(
       'import("../../../app/controllers/posts-controller.js").PostsController',
@@ -315,6 +326,8 @@ describe("runCli", () => {
     const lines = fs.readFileSync(base, "utf8").split("\n");
     const map = JSON.parse(fs.readFileSync(base + ".map", "utf8"));
     const genLine = lines.findIndex((l) => l.includes("readingTime(1)"));
-    expect(decodeLineMappings(map.mappings)).toContainEqual({ genLine, srcLine: 2 });
+    expect(decodeLineMappings(map.mappings)).toContainEqual(
+      expect.objectContaining({ genLine, srcLine: 2, srcCol: 8 }),
+    );
   });
 });
