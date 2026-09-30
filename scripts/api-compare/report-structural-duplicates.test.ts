@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TsApi } from "./report-ruby-compat.js";
+import type { Decl, TsApi } from "./report-ruby-compat.js";
 import { matches, renderReport, shapeOf } from "./report-structural-duplicates.js";
 
 const replace = (name: string, line: number, literal: string) => ({
@@ -44,6 +44,26 @@ describe("shapeOf", () => {
     };
     expect(shapeOf(decl)).toBe("ref:f|num:1");
   });
+
+  it("keeps the function a call / apply invokes, which the skeleton records only as ref:call", () => {
+    const decl = (recv: string) => ({
+      name: "x",
+      skeleton: ["ref:call"],
+      callArgs: [{ name: "call", args: ["id:this", "id:other"], recv }],
+    });
+    expect(shapeOf(decl("id:cmpint"))).toBe("ref:call|callee:id:cmpint");
+    expect(shapeOf(decl("id:ensureProperType"))).not.toBe(shapeOf(decl("id:cmpint")));
+    expect(shapeOf(decl("call:_createRecord"))).toBe("ref:call|callee:call:_createRecord");
+  });
+});
+
+const hosted = (origin: Decl, candidate: Decl, ...siblings: Decl[]): TsApi => ({
+  packages: {
+    "ruby-compat": {
+      classes: { "tempfile.ts:Tempfile": { instanceMethods: [origin, ...siblings] } },
+    },
+    activerecord: { classes: { "result.ts:Result": { instanceMethods: [candidate] } } },
+  },
 });
 
 describe("matches", () => {
@@ -55,6 +75,7 @@ describe("matches", () => {
         name: "isInclude",
         line: 120,
         shape: "ref:hasOwn|",
+        alias: false,
       },
     ]);
   });
@@ -65,6 +86,26 @@ describe("matches", () => {
         .get("regexpEscape")
         ?.map((s) => s.name),
     ).toEqual(["quoteRegex"]);
+  });
+
+  it("never matches a ruby-compat constructor, which is reused by extending its class", () => {
+    const ctor = { name: "constructor", line: 1, skeleton: ["ref:super"] };
+    expect(matches(hosted(ctor, ctor)).size).toBe(0);
+  });
+
+  it("never matches a ruby-compat method whose one step is a member of its own class", () => {
+    const length = { name: "length", line: 1, skeleton: ["ref:size"] };
+    const size = { name: "size", line: 2, skeleton: ["ref:stat", "ref:size"] };
+    expect(matches(hosted(length, length, size)).has("length")).toBe(false);
+  });
+
+  it("still matches a one-step ruby-compat method that reaches outside its class", () => {
+    const binmode = { name: "binmode", line: 1, skeleton: ["ref:ASCII_8BIT"] };
+    expect(
+      matches(hosted(binmode, binmode))
+        .get("binmode")
+        ?.map((s) => s.name),
+    ).toEqual(["binmode"]);
   });
 
   it("never reports ruby-compat's own definitions as candidates", () => {

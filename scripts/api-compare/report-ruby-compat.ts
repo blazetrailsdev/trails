@@ -46,7 +46,7 @@ export interface Decl {
   line?: number;
   calls?: string[];
   skeleton?: string[];
-  callArgs?: { name: string; args?: string[] }[];
+  callArgs?: { name: string; args?: string[]; recv?: string }[];
   /** `<file>:<name>` of the declaring entry when this one is a barrel clone
    *  (`extract-ts-api.ts:1017`), absent on a real declaration. */
   reExportedFrom?: string;
@@ -85,11 +85,24 @@ export interface TsApi {
  * The last is skipped outright: `reExportedFrom` names the declaring entry, so
  * a barrel clone is identifiable rather than a heuristic, and a re-export is
  * not a declaration site.
+ *
+ * `siblings` is set on a class instance method only: the member names of its
+ * host, the receivers its `this` can reach. A module's members are the
+ * synthesized copies of its file functions, which take the value as an
+ * argument like any top-level function, so they carry none.
  */
-export function declarations(api: TsApi): { package: string; tsFile: string; decl: Decl }[] {
-  const seen = new Map<string, { package: string; tsFile: string; decl: Decl }>();
-  const add = (pkg: string, tsFile: string, decl: Decl): void => {
-    seen.set(`${pkg}/${tsFile}:${decl.line ?? 0} ${decl.name}`, { package: pkg, tsFile, decl });
+export function declarations(
+  api: TsApi,
+): { package: string; tsFile: string; decl: Decl; siblings?: ReadonlySet<string> }[] {
+  type Entry = { package: string; tsFile: string; decl: Decl; siblings?: ReadonlySet<string> };
+  const seen = new Map<string, Entry>();
+  const add = (pkg: string, tsFile: string, decl: Decl, siblings?: ReadonlySet<string>): void => {
+    seen.set(`${pkg}/${tsFile}:${decl.line ?? 0} ${decl.name}`, {
+      package: pkg,
+      tsFile,
+      decl,
+      ...(siblings ? { siblings } : {}),
+    });
   };
   for (const [pkg, entry] of Object.entries(api.packages)) {
     for (const [tsFile, fns] of Object.entries(entry.fileFunctions ?? {})) {
@@ -98,13 +111,25 @@ export function declarations(api: TsApi): { package: string; tsFile: string; dec
         add(pkg, decl.file ?? tsFile, decl);
       }
     }
-    for (const host of [
-      ...Object.values(entry.classes ?? {}),
-      ...Object.values(entry.modules ?? {}),
-    ]) {
-      for (const decl of [...(host.instanceMethods ?? []), ...(host.classMethods ?? [])]) {
-        if (decl.reExportedFrom !== undefined) continue;
-        add(pkg, decl.file ?? host.file ?? "", decl);
+    for (const [hosts, isClass] of [
+      [entry.classes, true],
+      [entry.modules, false],
+    ] as const) {
+      for (const host of Object.values(hosts ?? {})) {
+        const names = isClass
+          ? new Set(
+              [...(host.instanceMethods ?? []), ...(host.classMethods ?? [])].map((d) => d.name),
+            )
+          : undefined;
+        for (const [decls, siblings] of [
+          [host.instanceMethods, names],
+          [host.classMethods, undefined],
+        ] as const) {
+          for (const decl of decls ?? []) {
+            if (decl.reExportedFrom !== undefined) continue;
+            add(pkg, decl.file ?? host.file ?? "", decl, siblings);
+          }
+        }
       }
     }
   }
