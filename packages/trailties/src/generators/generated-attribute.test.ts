@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { toFs } from "@blazetrails/activesupport/core-ext/date/conversions";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { GeneratedAttribute, GeneratorError } from "./generated-attribute.js";
+import { assertFieldDefaultValue, assertFieldType } from "./testing/assertions.js";
 
 describe("GeneratedAttribute", () => {
   it("test_field_name_with_dangerous_attribute_raises_error", () => {
@@ -9,17 +12,45 @@ describe("GeneratedAttribute", () => {
   });
 
   it("test_field_type_returns_number_field", () => {
-    const ft = (s: string) => GeneratedAttribute.parse(s).fieldType();
-    expect(ft("age:integer")).toBe("number_field");
-    expect(ft("body:text")).toBe("textarea");
-    expect(ft("body:rich_text")).toBe("rich_textarea");
-    expect(ft("avatar:attachment")).toBe("file_field");
-    expect(ft("photos:attachments")).toBe("file_field");
-    expect(ft("born:date")).toBe("date_field");
-    expect(ft("at:datetime")).toBe("datetime_field");
-    expect(ft("when:time")).toBe("time_field");
-    expect(ft("admin:boolean")).toBe("checkbox");
-    expect(ft("title:string")).toBe("text_field");
+    assertFieldType("integer", "number_field");
+  });
+
+  it("test_field_type_returns_text_field", () => {
+    for (const attributeType of ["float", "decimal", "string"]) {
+      assertFieldType(attributeType, "text_field");
+    }
+  });
+
+  it("test_field_type_returns_datetime_select", () => {
+    for (const attributeType of ["datetime", "timestamp"]) {
+      assertFieldType(attributeType, "datetime_field");
+    }
+  });
+
+  it("test_field_type_returns_time_select", () => {
+    assertFieldType("time", "time_field");
+  });
+
+  it("test_field_type_returns_date_select", () => {
+    assertFieldType("date", "date_field");
+  });
+
+  it("test_field_type_returns_textarea", () => {
+    assertFieldType("text", "textarea");
+  });
+
+  it("test_field_type_returns_checkbox", () => {
+    assertFieldType("boolean", "checkbox");
+  });
+
+  it("test_field_type_returns_rich_textarea", () => {
+    assertFieldType("rich_text", "rich_textarea");
+  });
+
+  it("test_field_type_returns_file_field", () => {
+    for (const attributeType of ["attachment", "attachments"]) {
+      assertFieldType(attributeType, "file_field");
+    }
   });
 
   it("test_decimal_precision_and_scale_options", () => {
@@ -69,15 +100,15 @@ describe("GeneratedAttribute", () => {
   });
 
   it("test_default_value_is_integer", () => {
-    expect(GeneratedAttribute.parse("count:integer").default()).toBe(1);
+    assertFieldDefaultValue("integer", 1);
   });
 
   it("test_default_value_is_float", () => {
-    expect(GeneratedAttribute.parse("rate:float").default()).toBe(1.5);
+    assertFieldDefaultValue("float", 1.5);
   });
 
   it("test_default_value_is_decimal", () => {
-    expect(GeneratedAttribute.parse("price:decimal").default()).toBe("9.99");
+    assertFieldDefaultValue("decimal", "9.99");
   });
 
   it("test_default_value_is_datetime", () => {
@@ -89,13 +120,11 @@ describe("GeneratedAttribute", () => {
   });
 
   it("test_default_value_is_date", () => {
-    const val = GeneratedAttribute.parse("born:date").default();
-    expect(typeof val).toBe("string");
-    expect(val).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    assertFieldDefaultValue("date", toFs(Temporal.Now.plainDateISO(), "db"));
   });
 
   it("test_default_value_is_string", () => {
-    expect(GeneratedAttribute.parse("title:string").default()).toBe("MyString");
+    assertFieldDefaultValue("string", "MyString");
   });
 
   it("test_default_value_for_type", () => {
@@ -104,22 +133,28 @@ describe("GeneratedAttribute", () => {
   });
 
   it("test_default_value_is_text", () => {
-    expect(GeneratedAttribute.parse("body:text").default()).toBe("MyText");
+    assertFieldDefaultValue("text", "MyText");
   });
 
   it("test_default_value_is_boolean", () => {
-    expect(GeneratedAttribute.parse("admin:boolean").default()).toBe(false);
+    assertFieldDefaultValue("boolean", false);
   });
 
   it("test_default_value_is_nil", () => {
-    for (const t of ["references", "belongs_to", "rich_text", "attachment", "attachments"]) {
-      expect(GeneratedAttribute.parse(`ref:${t}`).default()).toBeNull();
+    for (const attributeType of [
+      "references",
+      "belongs_to",
+      "rich_text",
+      "attachment",
+      "attachments",
+    ]) {
+      assertFieldDefaultValue(attributeType, null);
     }
   });
 
   it("test_default_value_is_empty_string", () => {
-    for (const t of ["digest", "token"]) {
-      expect(GeneratedAttribute.parse(`tok:${t}`).default()).toBe("");
+    for (const attributeType of ["digest", "token"]) {
+      assertFieldDefaultValue(attributeType, "");
     }
   });
 
