@@ -63,8 +63,8 @@ export class Binary extends NodeExpression {
   }
 
   initializeCopy(_other: Binary): void {
-    if (this.left != null && this.left !== false) this.left = rbObjClone(this.left);
-    if (this.right != null && this.right !== false) this.right = rbObjClone(this.right);
+    if (this.left != null) this.left = rbObjClone(this.left);
+    if (this.right != null) this.right = rbObjClone(this.right);
   }
 
   and(other: Node): And {
