@@ -5,6 +5,7 @@ import {
   underscore,
   isBlank,
   pluralize,
+  registerConstant,
 } from "@blazetrails/activesupport";
 import { ArgumentError, RuntimeError, ValueType, defaultValue } from "@blazetrails/activemodel";
 import { Module, include, isSymbol, rbInspect, symbolToS } from "@blazetrails/ruby-compat";
@@ -546,3 +547,5 @@ export function detectNegativeEnumConditionsBang(
     }
   }
 }
+
+registerConstant("ActiveRecord::Enum::EnumType", EnumType);

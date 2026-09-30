@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { StringType } from "@blazetrails/activemodel";
 
 export class SpecializedString extends StringType {
@@ -15,3 +16,8 @@ export class SpecializedString extends StringType {
     return this._type;
   }
 }
+
+registerConstant(
+  "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::SpecializedString",
+  SpecializedString,
+);

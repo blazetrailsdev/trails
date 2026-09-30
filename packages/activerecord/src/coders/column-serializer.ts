@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { rbInspect, rbObjClass } from "@blazetrails/ruby-compat";
 import { SerializationTypeMismatch } from "../errors.js";
@@ -29,10 +30,10 @@ export class ColumnSerializer {
     this.checkArityOfConstructor();
   }
 
-  initWith(coder: { attrName: string; objectClass: ClassLike; coder: CoderLike }): void {
-    this._attrName = coder.attrName;
-    this._objectClass = coder.objectClass;
-    this._coder = coder.coder;
+  initWith(coder: Record<string, unknown>): void {
+    this._attrName = coder["attr_name"] as string;
+    this._objectClass = coder["object_class"] as ClassLike;
+    this._coder = coder["coder"] as CoderLike;
   }
 
   dump(object: unknown): string | null {
@@ -82,3 +83,5 @@ export class ColumnSerializer {
     }
   }
 }
+
+registerConstant("ActiveRecord::Coders::ColumnSerializer", ColumnSerializer);

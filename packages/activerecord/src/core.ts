@@ -9,6 +9,8 @@ import {
   rbModSingletonP,
   rbModToS,
   rbObjHash,
+  basicObjRespondTo,
+  rbObjSingletonClass,
 } from "@blazetrails/ruby-compat";
 import { getApplicationRecordClass } from "./inheritance.js";
 import {
@@ -313,6 +315,13 @@ export function initWithAttributes<T extends CoreRecord>(
   this.initInternals();
   this._newRecord = newRecord;
   this._attributes = attributes;
+  for (const name of attributes.keys() as Iterable<string>) {
+    if (!basicObjRespondTo(this, name, false)) {
+      (
+        rbObjSingletonClass(this) as unknown as { defineAttributeMethod(name: string): void }
+      ).defineAttributeMethod(name);
+    }
+  }
 
   block?.(this);
 

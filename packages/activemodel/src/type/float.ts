@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { ValueType } from "./value.js";
 import { applyNumericMixin } from "./helpers/numeric.js";
 
@@ -30,3 +31,5 @@ export class FloatType extends NumericValueType {
     return (Number.isInteger(toF) ? new Number(toF) : toF) as number;
   }
 }
+
+registerConstant("ActiveModel::Type::Float", FloatType);

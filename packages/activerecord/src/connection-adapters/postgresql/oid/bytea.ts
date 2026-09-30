@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { BinaryType, BinaryData } from "@blazetrails/activemodel";
 import { unescapeBytea } from "../quoting.js";
 
@@ -9,3 +10,5 @@ export class Bytea extends BinaryType {
     return super.deserialize(value);
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Bytea", Bytea);

@@ -1,4 +1,4 @@
-import { isBlank } from "@blazetrails/activesupport";
+import { isBlank, registerConstant } from "@blazetrails/activesupport";
 import { ValueType } from "./value.js";
 import { RangeError } from "../errors.js";
 import { applyNumericMixin, isNonNumericString } from "./helpers/numeric.js";
@@ -110,3 +110,5 @@ export class IntegerType extends NumericValueType {
     return Number.isSafeInteger(num) ? num : value;
   }
 }
+
+registerConstant("ActiveModel::Type::Integer", IntegerType);

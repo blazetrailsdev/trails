@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { ValueType } from "@blazetrails/activemodel";
 
 export class Enum extends ValueType<string> {
@@ -10,3 +11,5 @@ export class Enum extends ValueType<string> {
     return String(value);
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Enum", Enum);

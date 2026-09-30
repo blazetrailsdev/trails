@@ -1,4 +1,4 @@
-import { basicObjRespondTo, type Hash, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { type Hash } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import "./i18n.js";
 import type { Identification } from "@blazetrails/globalid";
@@ -1706,13 +1706,7 @@ export class Base extends Model {
     (ModelSchema.loadSchema as any).call(this);
 
     const attributes = (this as any).attributesBuilder().buildFromDatabase(row, columnTypes ?? {});
-    const record = this.allocate();
-    for (const name of attributes.keys() as Iterable<string>) {
-      if (!basicObjRespondTo(record, name, false)) {
-        (rbObjSingletonClass(record) as unknown as typeof Base).defineAttributeMethod(name);
-      }
-    }
-    return (record as any).initWithAttributes(attributes, false, block);
+    return (this.allocate() as any).initWithAttributes(attributes, false, block);
   }
 
   _newRecord = true;

@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { StringType } from "@blazetrails/activemodel";
 
 export class Data {
@@ -24,3 +25,5 @@ export class Xml extends StringType {
     return cast == null ? null : new Data(cast);
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Xml", Xml);

@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { IntegerType } from "@blazetrails/activemodel";
 
 export class UnsignedInteger extends IntegerType {
@@ -9,3 +10,5 @@ export class UnsignedInteger extends IntegerType {
     return 0;
   }
 }
+
+registerConstant("ActiveRecord::Type::UnsignedInteger", UnsignedInteger);

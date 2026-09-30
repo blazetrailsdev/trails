@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { ValueType, StringType, BinaryData } from "@blazetrails/activemodel";
 import { Serialized } from "../type/serialized.js";
 import { Scheme } from "./scheme.js";
@@ -309,3 +310,5 @@ function isAdditionalValue(value: unknown): boolean {
 }
 
 Encryption.EncryptedAttributeType = EncryptedAttributeType;
+
+registerConstant("ActiveRecord::Encryption::EncryptedAttributeType", EncryptedAttributeType);

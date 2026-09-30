@@ -1,6 +1,6 @@
 import { ArgumentError, kernelFloat, rbEqual } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
-import { isBlank, isPlainObject } from "@blazetrails/activesupport";
+import { isBlank, isPlainObject, registerConstant } from "@blazetrails/activesupport";
 import { ActiveRecord } from "../../../namespaces.js";
 
 ActiveRecord.Point = class Point {
@@ -97,3 +97,5 @@ export class Point extends ValueType {
 function valuesArrayFromHash(value: Record<string, unknown>): [unknown, unknown] {
   return [value.x ?? value["x"], value.y ?? value["y"]];
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Point", Point);

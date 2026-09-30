@@ -53,6 +53,7 @@ import {
   isBlank,
   runLoadHooks,
   trailsRoot,
+  registerConstant,
 } from "@blazetrails/activesupport";
 import { File, FileUtils } from "@blazetrails/ruby-compat";
 import {
@@ -1538,3 +1539,8 @@ export interface SQLite3Adapter {
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
 runLoadHooks("active_record_sqlite3adapter", SQLite3Adapter);
+
+registerConstant(
+  "ActiveRecord::ConnectionAdapters::SQLite3Adapter::SQLite3Integer",
+  SQLite3Integer,
+);

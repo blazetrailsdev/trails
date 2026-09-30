@@ -1,6 +1,6 @@
 import { ValueType } from "@blazetrails/activemodel";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { TimeWithZone } from "@blazetrails/activesupport";
+import { TimeWithZone, registerConstant } from "@blazetrails/activesupport";
 import { ArgumentError, Range, rbEqual, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 export interface RangeSubtype {
@@ -14,16 +14,16 @@ export interface RangeSubtype {
 
 export class RangeType extends ValueType<Range<unknown>> {
   readonly subtype: RangeSubtype;
-  readonly #type: string;
+  private readonly _type: string;
 
   constructor(subtype: RangeSubtype, type: string = "range") {
     super();
     this.subtype = subtype;
-    this.#type = type;
+    this._type = type;
   }
 
   override type(): string {
-    return this.#type;
+    return this._type;
   }
 
   userInputInTimeZone(value: unknown): unknown {
@@ -154,3 +154,5 @@ function inspect(value: unknown): string {
     throw new TypeError("Range inspect: JS Date is not accepted — use a Temporal type");
   return String(value);
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range", RangeType);

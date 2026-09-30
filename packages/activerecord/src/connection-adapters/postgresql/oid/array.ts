@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { ValueType } from "@blazetrails/activemodel";
 import { rbEqual, rbObjAsString } from "@blazetrails/ruby-compat";
 
@@ -247,3 +248,5 @@ export class Data {
     this.values = values;
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Array", Array);

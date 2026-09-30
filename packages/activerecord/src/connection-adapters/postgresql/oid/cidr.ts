@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { ValueType } from "@blazetrails/activemodel";
 import { ArgumentError, IPAddr, rbEql } from "@blazetrails/ruby-compat";
 
@@ -49,3 +50,5 @@ export class Cidr extends ValueType<IPAddr> {
     }
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Cidr", Cidr);

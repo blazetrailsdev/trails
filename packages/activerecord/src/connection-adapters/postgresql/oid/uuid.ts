@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { ValueType } from "@blazetrails/activemodel";
 import { rbObjAsString } from "@blazetrails/ruby-compat";
 
@@ -38,3 +39,5 @@ export class Uuid extends ValueType<string> {
     return `${stripped.slice(0, 8)}-${stripped.slice(8, 12)}-${stripped.slice(12, 16)}-${stripped.slice(16, 20)}-${stripped.slice(20)}`;
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Uuid", Uuid);

@@ -44,8 +44,7 @@ describe("YamlSerializationTest", () => {
     expect(topic!.equals(t)).toBe(true);
   });
 
-  it.skip("roundtrip serialized column", () => {
-    // BLOCKED: psych-dump-type-constants
+  it("roundtrip serialized column", () => {
     const topic = new Topic({ content: { omg: "lol" } });
     expect(yamlLoad(YAML.dump(topic)).content).toEqual({ omg: "lol" });
   });
@@ -57,8 +56,7 @@ describe("YamlSerializationTest", () => {
     expect(topic!.equals(t)).toBe(true);
   });
 
-  it.skip("psych roundtrip new object", () => {
-    // BLOCKED: psych-dump-type-constants
+  it("psych roundtrip new object", () => {
     const topic = new Topic();
     expect(topic).toBeTruthy();
     const t = yamlLoad(YAML.dump(topic));
@@ -70,22 +68,19 @@ describe("YamlSerializationTest", () => {
     expect(() => YAML.dump([Topic.all()])).not.toThrow();
   });
 
-  it.skip("raw types are not changed on round trip", () => {
-    // BLOCKED: psych-dump-type-constants
+  it("raw types are not changed on round trip", () => {
     const topic = new Topic({ parent_id: "123" });
     expect(topic.readAttributeBeforeTypeCast("parent_id")).toBe("123");
     expect(yamlLoad(YAML.dump(topic)).readAttributeBeforeTypeCast("parent_id")).toBe("123");
   });
 
-  it.skip("cast types are not changed on round trip", () => {
-    // BLOCKED: psych-dump-type-constants
+  it("cast types are not changed on round trip", () => {
     const topic = new Topic({ parent_id: "123" });
     expect(topic.parent_id).toBe(123);
     expect(yamlLoad(YAML.dump(topic)).parent_id).toBe(123);
   });
 
-  it.skip("new records remain new after round trip", async () => {
-    // BLOCKED: psych-dump-type-constants
+  it("new records remain new after round trip", async () => {
     let topic = new Topic();
 
     expect(topic.isNewRecord()).toBe(true);
@@ -102,8 +97,7 @@ describe("YamlSerializationTest", () => {
     expect(yamlLoad(YAML.dump(topic)).isNewRecord()).toBe(false);
   });
 
-  it.skip("types of virtual columns are not changed on round trip", async () => {
-    // BLOCKED: psych-dump-type-constants
+  it("types of virtual columns are not changed on round trip", async () => {
     const author = (await Author.select("authors.*, count(posts.id) as posts_count")
       .joins(":posts")
       .group("authors.id")
@@ -131,7 +125,7 @@ describe("YamlSerializationTest", () => {
   });
 
   it.skip("deserializing rails v1 mysql yaml", async () => {
-    // BLOCKED: psych-dump-type-constants
+    // BLOCKED: attribute-set-accepts-lazy-attribute-hash
     const topic = yamlLoad(await yamlFixture("rails_v1_mysql"));
 
     expect(topic.isNewRecord()).toBe(false);
@@ -146,15 +140,13 @@ describe("YamlSerializationTest", () => {
     expect(error.message).toBe("Active Record doesn't know how to load YAML with this format.");
   });
 
-  it.skip("deserializing rails 4 2 0 yaml", async () => {
-    // BLOCKED: psych-dump-type-constants
+  it("deserializing rails 4 2 0 yaml", async () => {
     const payload = await yamlFixture("rails_4_2_0");
     const error = await assertRaises([RuntimeError], {}, () => yamlLoad(payload));
     expect(error.message).toBe("Active Record doesn't know how to load YAML with this format.");
   });
 
-  it.skip("yaml encoding keeps mutations", async () => {
-    // BLOCKED: psych-dump-type-constants
+  it("yaml encoding keeps mutations", async () => {
     const author = (await Author.first())!;
     author.name = "Sean";
     const dumped = yamlLoad<Author>(YAML.dump(author));
@@ -164,8 +156,7 @@ describe("YamlSerializationTest", () => {
     expect(dumped.changes).toEqual(author.changes);
   });
 
-  it.skip("yaml encoding keeps false values", async () => {
-    // BLOCKED: psych-dump-type-constants
+  it("yaml encoding keeps false values", async () => {
     const topic = (await Topic.first())!;
     topic.approved = false;
     const dumped = yamlLoad(YAML.dump(topic));

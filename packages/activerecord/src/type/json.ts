@@ -1,5 +1,5 @@
 import { MutableModule, ValueType, type Mutable } from "@blazetrails/activemodel";
-import { include } from "@blazetrails/activesupport";
+import { include, registerConstant } from "@blazetrails/activesupport";
 import { ActiveSupportJSON } from "@blazetrails/activesupport";
 import { StringKeyedHashAccessor } from "../store.js";
 
@@ -57,3 +57,5 @@ export class Json extends ValueType<unknown> {
 export interface Json extends Mutable {}
 
 include(Json, MutableModule);
+
+registerConstant("ActiveRecord::Type::Json", Json);

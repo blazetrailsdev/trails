@@ -11,6 +11,7 @@ import {
   typeRegistry,
 } from "@blazetrails/activemodel";
 export { ValueType } from "@blazetrails/activemodel";
+import { registerConstant } from "@blazetrails/activesupport";
 import { ActiveRecord } from "./namespaces.js";
 import { AdapterSpecificRegistry } from "./type/adapter-specific-registry.js";
 
@@ -46,6 +47,16 @@ export const Integer = IntegerType;
 export const ImmutableString = ImmutableStringType;
 export const String = StringType;
 export const Value = ValueType;
+
+registerConstant("ActiveRecord::Type::BigInteger", BigIntegerType);
+registerConstant("ActiveRecord::Type::Binary", BinaryType);
+registerConstant("ActiveRecord::Type::Boolean", BooleanType);
+registerConstant("ActiveRecord::Type::Decimal", DecimalType);
+registerConstant("ActiveRecord::Type::Float", FloatType);
+registerConstant("ActiveRecord::Type::Integer", IntegerType);
+registerConstant("ActiveRecord::Type::ImmutableString", ImmutableStringType);
+registerConstant("ActiveRecord::Type::String", StringType);
+registerConstant("ActiveRecord::Type::Value", ValueType);
 
 let _registry = new AdapterSpecificRegistry();
 let _defaultValue: ValueType | undefined;

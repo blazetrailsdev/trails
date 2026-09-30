@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { DateTime } from "./date-time.js";
 
 export class Timestamp extends DateTime {
@@ -5,3 +6,5 @@ export class Timestamp extends DateTime {
     return this.realTypeUnlessAliased("timestamp");
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Timestamp", Timestamp);

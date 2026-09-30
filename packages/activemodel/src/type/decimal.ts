@@ -1,4 +1,4 @@
-import { BigDecimal, toD } from "@blazetrails/activesupport";
+import { BigDecimal, toD, registerConstant } from "@blazetrails/activesupport";
 import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { Rational } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
@@ -74,3 +74,5 @@ export class DecimalType extends NumericValueType {
     return value;
   }
 }
+
+registerConstant("ActiveModel::Type::Decimal", DecimalType);

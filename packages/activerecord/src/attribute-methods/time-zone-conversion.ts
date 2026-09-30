@@ -1,5 +1,10 @@
 import { ValueType } from "@blazetrails/activemodel";
-import { actsLike, TimeWithZone, zone as timeZone } from "@blazetrails/activesupport";
+import {
+  actsLike,
+  TimeWithZone,
+  zone as timeZone,
+  registerConstant,
+} from "@blazetrails/activesupport";
 import {
   type DateOrTime,
   inTimeZone,
@@ -155,3 +160,8 @@ function isCreateTimeZoneConversionAttribute(
 }
 
 AttributeMethods.TimeZoneConversion = TimeZoneConversion;
+
+registerConstant(
+  "ActiveRecord::AttributeMethods::TimeZoneConversion::TimeZoneConverter",
+  TimeZoneConverter,
+);

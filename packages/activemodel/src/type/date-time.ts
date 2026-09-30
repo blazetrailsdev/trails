@@ -10,7 +10,7 @@ import {
   type DateInfinity as DateInfinityType,
   type DateNegativeInfinity as DateNegativeInfinityType,
 } from "./internal/sentinels.js";
-import { include, type Included } from "@blazetrails/activesupport";
+import { include, type Included, registerConstant } from "@blazetrails/activesupport";
 import {
   AcceptsMultiparameterTime,
   type InstanceMethods,
@@ -119,3 +119,5 @@ const acceptsMultiparameterTime = new AcceptsMultiparameterTime({ defaults: { "4
 include(DateTimeType, acceptsMultiparameterTime);
 
 include(DateTimeType, TimeValue);
+
+registerConstant("ActiveModel::Type::DateTime", DateTimeType);

@@ -229,10 +229,10 @@ export abstract class Attribute {
   /** @missingRailsCall key? — PERMANENT */
   initWith(coder: Coder): void {
     const self = this as { -readonly [K in "name" | "type"]: Attribute[K] };
-    self.name = coder["name"] as string | null;
-    this._valueBeforeTypeCast = coder["value_before_type_cast"];
-    self.type = coder["type"] as ValueType | null;
-    this.originalAttribute = coder["original_attribute"] as Attribute | null;
+    self.name = (coder["name"] ?? null) as string | null;
+    this._valueBeforeTypeCast = coder["value_before_type_cast"] ?? null;
+    self.type = (coder["type"] ?? null) as ValueType | null;
+    this.originalAttribute = (coder["original_attribute"] ?? null) as Attribute | null;
     this._hasValue = Object.hasOwn(coder, "value");
     if (this._hasValue) this._value = coder["value"];
   }

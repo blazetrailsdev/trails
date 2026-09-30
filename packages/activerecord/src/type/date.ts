@@ -1,5 +1,5 @@
 import { DateType as ActiveModelDate } from "@blazetrails/activemodel";
-import { include } from "@blazetrails/activesupport";
+import { include, registerConstant } from "@blazetrails/activesupport";
 import { Timezone, type TimezoneOptions } from "./internal/timezone.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Internal::Timezone`; the class/interface merge is how `include()` surfaces on the type side.
@@ -14,3 +14,5 @@ export class Date extends ActiveModelDate {
 }
 
 include(Date, Timezone);
+
+registerConstant("ActiveRecord::Type::Date", Date);

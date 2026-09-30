@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import {
   DisallowedClass,
   parse as yamlParse,
@@ -58,9 +59,21 @@ export class YAMLColumn extends ColumnSerializer {
   ) {
     super(attrName, new SafeCoder(permittedClasses ?? [], unsafeLoad), objectClass);
   }
+
+  override initWith(coder: Record<string, unknown>): void {
+    if (!coder["coder"]) {
+      const permittedClasses = (coder["permitted_classes"] as unknown[] | undefined) ?? [];
+      const unsafeLoad = (coder["unsafe_load"] as boolean | undefined) ?? false;
+      coder["coder"] = new SafeCoder(permittedClasses, unsafeLoad);
+    }
+    super.initWith(coder);
+  }
 }
 
 export interface YamlColumnOptions {
   permittedClasses?: unknown[];
   unsafeLoad?: boolean | null;
 }
+
+registerConstant("ActiveRecord::Coders::YAMLColumn", YAMLColumn);
+registerConstant("ActiveRecord::Coders::YAMLColumn::SafeCoder", SafeCoder);
