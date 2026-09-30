@@ -3,6 +3,8 @@ import * as nodeFs from "node:fs";
 import * as nodeOs from "node:os";
 import * as nodePath from "node:path";
 import { ArgumentError } from "./argument-error.js";
+import { Dir } from "./dir.js";
+import { TypeError } from "./type-error.js";
 import { FileUtils } from "./file-utils.js";
 import { fsAdapterConfig, getFs, getPath, registerFsAdapter } from "./fs-adapter.js";
 
@@ -434,5 +436,94 @@ describe("FileUtils", () => {
     FileUtils.rmRf(tree, { verbose: true });
 
     expect(lines).toEqual([`** rm -rf ${tree}`]);
+  });
+
+  it("cd without a block changes directory and answers 0", () => {
+    const start = Dir.pwd();
+    const dir = nodeFs.realpathSync(root);
+    try {
+      expect(FileUtils.cd(dir)).toBe(0);
+      expect(Dir.pwd()).toBe(dir);
+    } finally {
+      Dir.chdir(start);
+    }
+  });
+
+  it("cd with a block restores the directory and answers the block's value", () => {
+    const start = Dir.pwd();
+    const dir = nodeFs.realpathSync(root);
+
+    expect(FileUtils.cd(dir, {}, (d) => [d, Dir.pwd()])).toEqual([dir, dir]);
+    expect(Dir.pwd()).toBe(start);
+  });
+
+  it("cd with an async block restores the directory only once the block settles", async () => {
+    const start = Dir.pwd();
+    const dir = nodeFs.realpathSync(root);
+
+    const result = FileUtils.cd(dir, {}, async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return Dir.pwd();
+    });
+
+    expect(Dir.pwd()).toBe(dir);
+    await expect(result).resolves.toBe(dir);
+    expect(Dir.pwd()).toBe(start);
+  });
+
+  it("cd with an async block that rejects still restores the directory", async () => {
+    const start = Dir.pwd();
+    const dir = nodeFs.realpathSync(root);
+
+    const result = FileUtils.cd(dir, {}, async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      throw new Error("boom");
+    });
+
+    await expect(result).rejects.toThrow("boom");
+    expect(Dir.pwd()).toBe(start);
+  });
+
+  it("cd with a block that raises restores the directory", () => {
+    const start = Dir.pwd();
+
+    expect(() =>
+      FileUtils.cd(root, {}, () => {
+        throw new Error("boom");
+      }),
+    ).toThrow("boom");
+    expect(Dir.pwd()).toBe(start);
+  });
+
+  it("cd with verbose prints cd and, after an async block settles, cd -", async () => {
+    const lines: string[] = [];
+    FileUtils.fileutilsOutput = { puts: (msg) => lines.push(msg) };
+
+    const result = FileUtils.cd(root, { verbose: true }, async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      lines.push("block");
+    });
+    expect(lines).toEqual([`cd ${root}`]);
+    await result;
+
+    expect(lines).toEqual([`cd ${root}`, "block", "cd -"]);
+  });
+
+  it("cd takes a block with no options", () => {
+    const start = Dir.pwd();
+    const dir = nodeFs.realpathSync(root);
+
+    expect(FileUtils.cd(dir, () => Dir.pwd())).toBe(dir);
+    expect(Dir.pwd()).toBe(start);
+  });
+
+  it("Dir.chdir raises TypeError for a given nil", () => {
+    expect(() => Dir.chdir(null as unknown as string)).toThrow(
+      new TypeError("no implicit conversion of nil into String"),
+    );
+  });
+
+  it("chdir is an alias for cd", () => {
+    expect(FileUtils.chdir).toBe(FileUtils.cd);
   });
 });

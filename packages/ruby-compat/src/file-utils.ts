@@ -542,6 +542,40 @@ export class FileUtils {
    */
   static fileutilsLabel?: string;
 
+  /** `FileUtils.cd` (`vendor/ruby/v3.3.11/lib/fileutils.rb:238-243`), through
+   * `Dir.chdir`, which restores the previous directory once an async block
+   * settles; `cd -` is printed at that point too.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static cd(dir: string, options?: { verbose?: boolean | null }): number;
+  static cd<T>(dir: string, block: (dir: string) => T): T;
+  static cd<T>(dir: string, options: { verbose?: boolean | null }, block: (dir: string) => T): T;
+  static cd<T>(
+    dir: string,
+    options: { verbose?: boolean | null } | ((dir: string) => T) = {},
+    block?: (dir: string) => T,
+  ): number | T {
+    if (typeof options === "function") [options, block] = [{}, options];
+    const { verbose } = options;
+    if (verbose != null && verbose !== false) fuOutputMessage(`cd ${dir}`);
+    const result = block != null ? Dir.chdir(dir, block) : Dir.chdir(dir);
+    if (verbose != null && verbose !== false && block != null) {
+      if (result != null && typeof (result as { then?: unknown }).then === "function") {
+        return Promise.resolve(result).then((value) => {
+          fuOutputMessage("cd -");
+          return value;
+        }) as T;
+      }
+      fuOutputMessage("cd -");
+    }
+    return result;
+  }
+
+  /** `FileUtils.chdir` (`vendor/ruby/v3.3.11/lib/fileutils.rb:246`), an alias of `cd`.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static chdir = FileUtils.cd;
+
   /** `FileUtils.mkdir_p` (`vendor/ruby/v3.3.11/lib/fileutils.rb:365-388`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
