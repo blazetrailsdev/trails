@@ -653,4 +653,3 @@ export function testPathsManifest(): Record<string, string> {
   }
   return out;
 }
-// cache-miss probe (reverted)
