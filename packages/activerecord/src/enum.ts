@@ -22,7 +22,7 @@ import { isReplayingOverColdSchema } from "./attributes.js";
 type EnumValue = number | string | boolean | null;
 
 interface EnumInstanceHost {
-  updateBang(attrs: Record<string, unknown>): Promise<true | undefined>;
+  updateBang(attrs: Record<string, unknown>): Promise<true>;
   readAttribute(name: string): unknown;
   readAttributeForDatabase(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;

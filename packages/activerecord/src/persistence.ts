@@ -305,7 +305,7 @@ interface CounterBangRecord extends AttributeIO {
 }
 
 interface ToggleBangRecord extends AttributeIO {
-  updateAttribute(name: string, value: unknown): Promise<boolean | undefined>;
+  updateAttribute(name: string, value: unknown): Promise<boolean>;
 }
 
 export function increment<T extends AttributeIO>(this: T, attribute: string, by: number = 1): T {
@@ -367,37 +367,37 @@ export async function decrementBang<
 export async function toggleBang<T extends ToggleBangRecord>(
   this: T & { toggle(attribute: string): T },
   attribute: string,
-): Promise<boolean | undefined> {
+): Promise<boolean> {
   return this.toggle(attribute).updateAttribute(attribute, this.readAttribute(attribute));
 }
 
 interface UpdateRecord extends AttributeIO {
-  save(options?: { validate?: boolean }): Promise<boolean | undefined>;
-  saveBang(options?: { validate?: boolean }): Promise<true | undefined>;
+  save(options?: { validate?: boolean }): Promise<boolean>;
+  saveBang(options?: { validate?: boolean }): Promise<true>;
 }
 
 /** @missingRailsCall assign_attributes — CONVERGEABLE update-must-call-assign-attributes-carried-from-0087 */
 export async function update<T extends UpdateRecord>(
   this: T,
   attributes: Record<string, unknown>,
-): Promise<boolean | undefined> {
+): Promise<boolean> {
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
     await self.setAttributes(attributes);
-    return self.save() as Promise<boolean | undefined>;
-  }) as Promise<boolean | undefined>;
+    return self.save() as Promise<boolean>;
+  }) as Promise<boolean>;
 }
 
 /** @missingRailsCall assign_attributes — CONVERGEABLE update-must-call-assign-attributes-carried-from-0087 */
 export async function updateBang<T extends UpdateRecord>(
   this: T,
   attributes: Record<string, unknown>,
-): Promise<true | undefined> {
+): Promise<true> {
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
     await self.setAttributes(attributes);
-    return self.saveBang() as Promise<true | undefined>;
-  }) as Promise<true | undefined>;
+    return self.saveBang() as Promise<true>;
+  }) as Promise<true>;
 }
 
 interface DeleteRecord {
@@ -446,7 +446,7 @@ export async function save<T extends SaveRecord>(
   this: T,
   options?: { validate?: boolean; touch?: boolean },
   block?: (record: T) => void,
-): Promise<boolean | undefined> {
+): Promise<boolean> {
   if (registry()[(this.constructor as { name: string }).name]) {
     return true;
   }
@@ -484,7 +484,7 @@ export async function save<T extends SaveRecord>(
       }
 
       return self.createOrUpdate(options?.touch ?? true, block);
-    })) as boolean | undefined;
+    })) as boolean;
   } catch (e) {
     if (e instanceof RecordInvalid) return false;
     throw e;
@@ -496,13 +496,13 @@ export async function saveBang<
     save(
       o?: { validate?: boolean; touch?: boolean },
       block?: (record: T) => void,
-    ): Promise<boolean | undefined>;
+    ): Promise<boolean>;
   },
 >(
   this: T,
   options?: { validate?: boolean; touch?: boolean },
   block?: (record: T) => void,
-): Promise<true | undefined> {
+): Promise<true> {
   const result = await this.save(options, block);
   if (result === false) {
     if ((this as unknown as { errors: { isAny(): boolean } }).errors.isAny()) {
@@ -543,15 +543,15 @@ export async function destroyBang<T extends DestroyRecord & { destroy(): Promise
 }
 
 interface AttributeSingleSave {
-  save(options?: { validate?: boolean }): Promise<boolean | undefined>;
-  saveBang(options?: { validate?: boolean }): Promise<true | undefined>;
+  save(options?: { validate?: boolean }): Promise<boolean>;
+  saveBang(options?: { validate?: boolean }): Promise<true>;
 }
 
 export async function updateAttribute<T extends AttributeSingleSave>(
   this: T,
   name: string,
   value: unknown,
-): Promise<boolean | undefined> {
+): Promise<boolean> {
   name = String(name);
   verifyReadonlyAttribute.call(this as unknown as PersistencePrivateHost, name);
   (this as unknown as Record<string, unknown>)[name] = value;
@@ -562,7 +562,7 @@ export async function updateAttributeBang<T extends AttributeSingleSave>(
   this: T,
   name: string,
   value: unknown,
-): Promise<true | undefined> {
+): Promise<true> {
   name = String(name);
   verifyReadonlyAttribute.call(this as unknown as PersistencePrivateHost, name);
   (this as unknown as Record<string, unknown>)[name] = value;

@@ -2396,19 +2396,19 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
     by?: number,
     options?: { touch?: boolean | string | string[] },
   ): Promise<this>;
-  toggleBang(attribute: string): Promise<boolean | undefined>;
+  toggleBang(attribute: string): Promise<boolean>;
   save(
     options?: { validate?: boolean; touch?: boolean },
     block?: (record: this) => void,
-  ): Promise<boolean | undefined>;
+  ): Promise<boolean>;
   saveBang(
     options?: { validate?: boolean; touch?: boolean },
     block?: (record: this) => void,
-  ): Promise<true | undefined>;
+  ): Promise<true>;
   destroy(): Promise<this | false>;
   destroyBang(): Promise<this>;
-  update(attrs: Record<string, unknown>): Promise<boolean | undefined>;
-  updateBang(attrs: Record<string, unknown>): Promise<true | undefined>;
+  update(attrs: Record<string, unknown>): Promise<boolean>;
+  updateBang(attrs: Record<string, unknown>): Promise<true>;
   delete(): Promise<this>;
   reload(options?: { lock?: boolean | string; unscoped?: boolean }): Promise<this>;
   initializeDup(other: unknown): void;
@@ -2435,8 +2435,8 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   valuesAt(...keys: string[]): unknown[];
   assignAttributes(attrs: Record<string, unknown>): void;
   setAttributes(attrs: Record<string, unknown>): Promise<void> | void;
-  updateAttribute(name: string, value: unknown): Promise<boolean | undefined>;
-  updateAttributeBang(name: string, value: unknown): Promise<true | undefined>;
+  updateAttribute(name: string, value: unknown): Promise<boolean>;
+  updateAttributeBang(name: string, value: unknown): Promise<true>;
   updateColumn(name: string, value: unknown): Promise<boolean>;
   updateColumns(attrs: Record<string, unknown>): Promise<boolean>;
   clone(): this;

@@ -31,7 +31,7 @@ export function hasSecureToken(
       : `regenerate${attribute.charAt(0).toUpperCase() + attribute.slice(1).replace(/_([a-z])/g, (_, c) => c.toUpperCase())}`;
 
   Object.defineProperty(this.prototype, methodName, {
-    value: function (this: Base): Promise<true | undefined> {
+    value: function (this: Base): Promise<true> {
       return this.updateBang({
         [attribute]: (this.constructor as typeof Base).generateUniqueSecureToken({ length }),
       });
