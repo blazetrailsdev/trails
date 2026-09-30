@@ -243,7 +243,7 @@ function setMethodVisibility(
     if (!defined) {
       throw new NameError(
         M_TBL in module
-          ? `undefined method '${mid}' for module '${String(module)}'`
+          ? `undefined method '${mid}' for module '#<Module>'`
           : `undefined method '${mid}' for class '${module.name}'`,
         mid,
       );

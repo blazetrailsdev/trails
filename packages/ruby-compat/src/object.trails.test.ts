@@ -250,6 +250,9 @@ describe("rbModPrivate on a Module", () => {
 
   it("raises NameError for a name the module does not define", () => {
     expect(() => rbModPrivate(Helper, "nope")).toThrow(NameError);
+    expect(() => rbModPrivate(Helper, "nope")).toThrow(
+      "undefined method 'nope' for module '#<Module>'",
+    );
   });
 });
 
