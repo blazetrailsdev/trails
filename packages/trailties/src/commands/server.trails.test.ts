@@ -3,8 +3,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { env, setEnv } from "@blazetrails/ruby-compat";
-import { Handler } from "@blazetrails/rack";
+import { Handler, MockRequest, type RackApp, type RackEnv } from "@blazetrails/rack";
 import { Trails, _resetTrailsEnv } from "../rails.js";
+import { Application } from "../application.js";
 
 const devServerStarts = vi.hoisted(() => [] as unknown[]);
 
@@ -26,6 +27,7 @@ describe("trails server environment (trails)", () => {
   let savedTrailsEnv: string | undefined;
   let savedNodeEnv: string | undefined;
   let runOptions: Array<Record<string, unknown>>;
+  let runApps: RackApp[];
 
   beforeEach(() => {
     origCwd = process.cwd();
@@ -39,11 +41,13 @@ describe("trails server environment (trails)", () => {
     _resetTrailsEnv();
     devServerStarts.length = 0;
     runOptions = [];
+    runApps = [];
     vi.spyOn(Trails, "initialize").mockResolvedValue({ app: () => () => [200, {}, []] } as never);
     vi.spyOn(Handler.Node, "run").mockImplementation((async (
-      _app: unknown,
+      app: RackApp,
       options: Record<string, unknown>,
     ) => {
+      runApps.push(app);
       runOptions.push(options);
       return { address: () => ({ port: options.Port }) };
     }) as never);
@@ -92,5 +96,38 @@ describe("trails server environment (trails)", () => {
     await serverCommand().parseAsync(["-e", "production"], { from: "user" });
 
     expect(env.TRAILS_ENV).toBe("");
+  });
+
+  describe("serves the application, not its middleware stack", () => {
+    class ServedApp extends Application {}
+    let app: ServedApp;
+
+    beforeEach(() => {
+      app = new ServedApp();
+      app.config.secretKeyBase = "b3c631c314c0bbca50c1b2843150fe33";
+      vi.spyOn(Trails, "initialize").mockResolvedValue(app);
+    });
+
+    async function served(railsApp: RackApp): Promise<RackEnv> {
+      const env = MockRequest.envFor("/posts");
+      await railsApp(env).catch(() => {});
+      return env;
+    }
+
+    it("hands the Node handler Engine#call, which seeds the request env with env_config", async () => {
+      await serverCommand().parseAsync(["-e", "production"], { from: "user" });
+
+      expect(runApps).toHaveLength(1);
+      const env = await served(runApps[0]);
+      expect(env["action_dispatch.key_generator"]).toBe(app.keyGenerator());
+    });
+
+    it("hands the dev server Engine#call, which seeds the request env with env_config", async () => {
+      await serverCommand().parseAsync([], { from: "user" });
+
+      expect(devServerStarts).toHaveLength(1);
+      const env = await served((devServerStarts[0] as { app: RackApp }).app);
+      expect(env["action_dispatch.key_generator"]).toBe(app.keyGenerator());
+    });
   });
 });
