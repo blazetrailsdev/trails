@@ -29,11 +29,10 @@ HTML4.FullSanitizer = FullSanitizer;
 HTML4.LinkSanitizer = LinkSanitizer;
 HTML4.SafeListSanitizer = SafeListSanitizer;
 
+Object.defineProperties(Sanitizer, Object.getOwnPropertyDescriptors(vendorMethods));
+
 export const HTML = {
-  Sanitizer: Object.defineProperties(
-    Sanitizer,
-    Object.getOwnPropertyDescriptors(vendorMethods),
-  ) as typeof Sanitizer & VendorMethods,
+  Sanitizer: Sanitizer as typeof Sanitizer & VendorMethods,
   FullSanitizer: HTML4.FullSanitizer,
   LinkSanitizer: HTML4.LinkSanitizer,
   SafeListSanitizer: HTML4.SafeListSanitizer,

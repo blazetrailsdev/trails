@@ -16,4 +16,9 @@ export const HTML4 = {} as {
   SafeListSanitizer: typeof SafeListSanitizer;
 };
 
-export const HTML5 = {} as { Sanitizer?: VendorMethods };
+export const HTML5 = {} as {
+  Sanitizer?: VendorMethods;
+  FullSanitizer?: typeof FullSanitizer;
+  LinkSanitizer?: typeof LinkSanitizer;
+  SafeListSanitizer?: typeof SafeListSanitizer;
+};

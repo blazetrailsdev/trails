@@ -54,4 +54,20 @@ describe("RailsApiTest", () => {
     expect(HTML.Sanitizer.whiteListSanitizer).toBe(HTML4.SafeListSanitizer);
     expect(HTML4.Sanitizer.whiteListSanitizer).toBe(HTML4.SafeListSanitizer);
   });
+
+  test.skipIf(!HTML.Sanitizer.isHtml5Support())("html5_full_sanitizer", () => {
+    expect(HTML5.Sanitizer!.fullSanitizer).toBe(HTML5.FullSanitizer);
+  });
+
+  test.skipIf(!HTML.Sanitizer.isHtml5Support())("html5_link_sanitizer", () => {
+    expect(HTML5.Sanitizer!.linkSanitizer).toBe(HTML5.LinkSanitizer);
+  });
+
+  test.skipIf(!HTML.Sanitizer.isHtml5Support())("html5_safe_list_sanitizer", () => {
+    expect(HTML5.Sanitizer!.safeListSanitizer).toBe(HTML5.SafeListSanitizer);
+  });
+
+  test.skipIf(!HTML.Sanitizer.isHtml5Support())("html5_white_list_sanitizer", () => {
+    expect(HTML5.Sanitizer!.whiteListSanitizer).toBe(HTML5.SafeListSanitizer);
+  });
 });
