@@ -160,7 +160,7 @@ function rubyPredicateName(prop: string | symbol): string | null {
   return /^is[A-Z]/.test(prop) ? `${underscore(prop.slice(2))}?` : null;
 }
 
-const METHOD_MISSING_HANDLER: ProxyHandler<MimeType> = {
+const METHOD_MISSING_HANDLER: ProxyHandler<MimeType | NullType> = {
   get(target, prop, receiver) {
     if (Reflect.has(target, prop)) return Reflect.get(target, prop, receiver);
     const method = rubyPredicateName(prop);
@@ -190,7 +190,7 @@ export class MimeType {
     this.string = string;
     this.symbol = symbol;
     this.synonyms = synonyms;
-    return new Proxy(this, METHOD_MISSING_HANDLER);
+    return new Proxy<MimeType>(this, METHOD_MISSING_HANDLER);
   }
 
   toString(): string {
@@ -456,20 +456,6 @@ export class MimeType {
   static readonly ALL = new MimeType("*/*", null);
 }
 
-const NULL_TYPE_METHOD_MISSING_HANDLER: ProxyHandler<NullType> = {
-  get(target, prop, receiver) {
-    if (Reflect.has(target, prop)) return Reflect.get(target, prop, receiver);
-    const method = rubyPredicateName(prop);
-    if (method === null || !target.respondToMissing(method, false)) return undefined;
-    return (...args: unknown[]) => target.methodMissing(method, ...args);
-  },
-  has(target, prop) {
-    if (Reflect.has(target, prop)) return true;
-    const method = rubyPredicateName(prop);
-    return method !== null && target.respondToMissing(method, false);
-  },
-};
-
 export class NullType {
   [predicate: `is${string}`]: () => boolean;
   static readonly instance = new NullType();
@@ -478,7 +464,7 @@ export class NullType {
   readonly string = "";
 
   constructor() {
-    return new Proxy(this, NULL_TYPE_METHOD_MISSING_HANDLER);
+    return new Proxy<NullType>(this, METHOD_MISSING_HANDLER);
   }
 
   isNil(): boolean {
