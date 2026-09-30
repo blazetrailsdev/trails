@@ -26,10 +26,13 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { parseForESLint } from "@typescript-eslint/parser";
 import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
-// @ts-expect-error — .mjs rule module has no type declarations.
-import { macroOfCall, siteKey, repoRel } from "../eslint/no-standalone-associations.mjs";
-// @ts-expect-error — .mjs rule module has no type declarations.
-import { mayContainMacroCall } from "../eslint/no-standalone-associations.mjs";
+import {
+  macroOfCall,
+  mayContainMacroCall,
+  siteKey,
+  repoRel,
+  // @ts-expect-error — .mjs rule module has no type declarations.
+} from "../eslint/no-standalone-associations.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OUT_PATH = path.join(ROOT, "eslint/no-standalone-associations-exclude.json");
