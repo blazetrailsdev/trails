@@ -182,11 +182,11 @@ export abstract class Attribute {
     return new Ctor(this.name, this.valueBeforeTypeCast, type, this.originalAttribute);
   }
 
+  abstract typeCast(value: unknown): unknown;
+
   isInitialized(): boolean {
     return true;
   }
-
-  abstract typeCast(value: unknown): unknown;
 
   cameFromUser(): boolean {
     return false;
