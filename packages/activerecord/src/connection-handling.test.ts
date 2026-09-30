@@ -247,14 +247,14 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("prohibit_shard_swapping", async () => {
-    expect(Base.isShardSwappingProhibited()).toBe(false);
+    expect(Base.isShardSwappingProhibited()).toBeNull();
     Base.prohibitShardSwapping(() => {
       expect(Base.isShardSwappingProhibited()).toBe(true);
       expect(() => {
         Base.connectedTo({ role: "writing", shard: "other" }, () => {});
       }).toThrow(/cannot swap.*shard/);
     });
-    expect(Base.isShardSwappingProhibited()).toBe(false);
+    expect(Base.isShardSwappingProhibited()).toBeNull();
   });
 
   it("connection_specification_name defaults to Base", async () => {
@@ -400,9 +400,9 @@ describe("ConnectionHandlingTest", () => {
     const overlap = new Promise<void>((resolve) => {
       resolveOverlap = resolve;
     });
-    let prohibitedBeforeAwait: boolean | undefined;
-    let prohibitedAfterAwait: boolean | undefined;
-    let concurrentProhibited: boolean | undefined;
+    let prohibitedBeforeAwait: boolean | null | undefined;
+    let prohibitedAfterAwait: boolean | null | undefined;
+    let concurrentProhibited: boolean | null | undefined;
 
     const prohibitedTask = new Thread(async () => {
       await Base.prohibitShardSwapping(async () => {
@@ -423,8 +423,8 @@ describe("ConnectionHandlingTest", () => {
 
     expect(prohibitedBeforeAwait).toBe(true);
     expect(prohibitedAfterAwait).toBe(true);
-    expect(concurrentProhibited).toBe(false);
-    expect(Base.isShardSwappingProhibited()).toBe(false);
+    expect(concurrentProhibited).toBeNull();
+    expect(Base.isShardSwappingProhibited()).toBeNull();
   });
 
   it("concurrent async contexts do not interfere", async () => {

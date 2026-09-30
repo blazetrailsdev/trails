@@ -260,8 +260,8 @@ export function prohibitShardSwapping<T>(fn: () => T, enabled: boolean | null = 
   );
 }
 
-export function isShardSwappingProhibited(): boolean {
-  return IsolatedExecutionState.get<boolean>(PROHIBIT_SHARD_SWAPPING_KEY) ?? false;
+export function isShardSwappingProhibited(): boolean | null {
+  return IsolatedExecutionState.get<boolean | null>(PROHIBIT_SHARD_SWAPPING_KEY) ?? null;
 }
 
 export function clearQueryCachesForCurrentThread(this: typeof Base): void {

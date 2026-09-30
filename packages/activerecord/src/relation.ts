@@ -1893,7 +1893,7 @@ export interface Relation<T extends Base> {
   selectValues: (string | Nodes.Node)[];
   groupValues: Array<string | Nodes.Node>;
   orderValues: Array<string | Nodes.Node>;
-  joinsValues: (AssociationSpec | string | Nodes.Join)[];
+  joinsValues: (AssociationSpec | string | Nodes.Join | JoinDependency)[];
   leftOuterJoinsValues: AssociationSpec[];
   referencesValues: Array<string | Nodes.SqlLiteral>;
   extendingValues: object[];

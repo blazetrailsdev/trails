@@ -22,7 +22,7 @@ describe("ShardSelectorTest", () => {
   it("middleware with an explicitly stored nil lock does not lock", async () => {
     const middleware = new ShardSelector(
       async () => {
-        expect(Base.isShardSwappingProhibited()).toBeFalsy();
+        expect(Base.isShardSwappingProhibited()).toBeNull();
         return [200, {}, ["body"]];
       },
       () => "shard_one",

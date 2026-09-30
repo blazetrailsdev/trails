@@ -10,7 +10,6 @@ import type {
 } from "../reflection.js";
 import { RuntimeReflection } from "../reflection.js";
 import { AliasTracker } from "./alias-tracker.js";
-import { constructJoinDependency } from "../relation/query-methods.js";
 import { kernelArray } from "@blazetrails/activesupport";
 import { drop } from "@blazetrails/ruby-compat";
 import { methodMissingProxy } from "@blazetrails/ruby-compat";
@@ -227,9 +226,7 @@ export class AssociationScope {
           const associations = [...new Set([...item.eagerLoadValues, ...item.includesValues])];
 
           if (associations.length > 0) {
-            scope.joinsBang(
-              constructJoinDependency.call(item as never, associations, Nodes.OuterJoin) as never,
-            );
+            scope.joinsBang(item.constructJoinDependency(associations, Nodes.OuterJoin));
           }
         }
 
@@ -239,7 +236,7 @@ export class AssociationScope {
 
         scope.unscopeBang(...item.unscopeValues);
         scope.whereClause = scope.whereClause.plus(item.whereClause);
-        scope.orderValues = unionOrderClauses(item.orderValues, scope.orderValues) as never;
+        scope.orderValues = unionOrderClauses(item.orderValues, scope.orderValues);
       }
     }
 
@@ -274,8 +271,8 @@ function arelTableEql(a: ArelTable | Nodes.TableAlias, b: ArelTable | Nodes.Tabl
  * @internal
  * @noRailsEquivalent CONVERGEABLE union-order-clauses-is-a-second-spelling-of-ruby-array-union
  */
-export function unionOrderClauses(first: unknown[], second: unknown[]): unknown[] {
-  const result: unknown[] = [];
+export function unionOrderClauses<T>(first: T[], second: T[]): T[] {
+  const result: T[] = [];
   const seen = new Set<string>();
   for (const o of [...first, ...second]) {
     const key =

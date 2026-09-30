@@ -145,7 +145,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       const item = this.evalScope(reflection, scopeChainItem, owner) as Relation<Base>;
       scope.unscopeBang(...item.unscopeValues);
       scope.whereClause = scope.whereClause.plus(item.whereClause);
-      scope.orderValues = unionOrderClauses(item.orderValues, scope.orderValues) as never;
+      scope.orderValues = unionOrderClauses(item.orderValues, scope.orderValues);
     }
 
     const finalOrd = scope as { orderValues?: unknown[] };
