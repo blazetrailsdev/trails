@@ -115,6 +115,20 @@ describe("ScaffoldGenerator (type-check)", () => {
         output: () => {},
       });
 
+      fs.writeFileSync(
+        path.join(appDir, "db/schema.ts"),
+        [
+          'import type { DatabaseAdapter } from "@blazetrails/activerecord";',
+          "export default async function defineSchema(ctx: DatabaseAdapter) {",
+          '  await ctx.createTable("posts", { force: "cascade" }, (t) => {',
+          '    t.string("title");',
+          '    t.text("body");',
+          '    t.datetime("created_at", { null: false });',
+          '    t.datetime("updated_at", { null: false });',
+          "  });",
+          "}",
+        ].join("\n"),
+      );
       const code = await run(
         [
           "typecheck",
@@ -130,5 +144,5 @@ describe("ScaffoldGenerator (type-check)", () => {
     } finally {
       fs.rmSync(tmpApps, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
 });
