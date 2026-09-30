@@ -22,7 +22,7 @@ describe("Arel::Nodes::ExtractTest", () => {
 
     it("should not mutate the extract", () => {
       const extract = users.get("timestamp").extract("date");
-      const before = users.get("timestamp").extract("date");
+      const before = extract.dup();
       extract.as("foo");
       expect(extract.eql(before)).toBe(true);
     });

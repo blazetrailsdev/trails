@@ -1,6 +1,6 @@
 import { resolveValue } from "./resolve-value.js";
 import { ArgumentError, NoMethodError } from "../attribute-assignment.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 export { resolveValue };
 
@@ -30,25 +30,13 @@ interface ClusivityHost {
 }
 
 export function checkValidityBang(this: ClusivityHost): void {
-  const d = this.delimiter();
-  if (d === undefined || d === null) {
-    throw new ArgumentError(ERROR_MESSAGE);
-  }
-  const isString = typeof d === "string";
-  const hasIncludeMethod =
-    typeof d === "object" &&
-    d !== null &&
-    (typeof (d as { includes?: unknown }).includes === "function" ||
-      typeof (d as { has?: unknown }).has === "function");
-  const isIterable =
-    Array.isArray(d) ||
-    d instanceof Set ||
-    d instanceof Map ||
-    (typeof d === "object" &&
-      d !== null &&
-      typeof (d as Record<symbol, unknown>)[Symbol.iterator] === "function");
-  const isCallable = typeof d === "function";
-  if (!isString && !hasIncludeMethod && !isIterable && !isCallable && !(d instanceof Range)) {
+  if (
+    !(
+      rbObjRespondTo(this.delimiter(), "isInclude") ||
+      rbObjRespondTo(this.delimiter(), "call") ||
+      rbObjRespondTo(this.delimiter(), "toSym")
+    )
+  ) {
     throw new ArgumentError(ERROR_MESSAGE);
   }
 }
