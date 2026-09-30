@@ -26,6 +26,10 @@
       "default": "./dist/template-builder/testing.js"
     }
   },
+  "scripts": {
+    "build": "tsc && pnpm build:templates",
+    "build:templates": "node -e \"require('fs').cpSync('src/generators/active-record/migration/templates', 'dist/generators/active-record/migration/templates', { recursive: true })\""
+  },
   "files": [
     "dist",
     "bin"
@@ -39,6 +43,7 @@
     "@blazetrails/globalid": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/tse-compiler": "workspace:*",
     "commander": "^14.0.0",
     "vite": "^7.0.0"
   },

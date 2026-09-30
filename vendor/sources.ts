@@ -267,6 +267,20 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "thor",
+    origin: {
+      type: "git",
+      url: "https://github.com/rails/thor.git",
+      ref: "v1.3.2",
+    },
+    packages: [
+      {
+        name: "thor",
+        libPath: "lib/thor",
+      },
+    ],
+  },
+  {
     name: "date",
     origin: {
       type: "git",

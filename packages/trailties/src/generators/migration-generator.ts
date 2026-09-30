@@ -1,4 +1,6 @@
-import { File } from "@blazetrails/ruby-compat";
+import { File, getFs } from "@blazetrails/ruby-compat";
+import { compileJs } from "@blazetrails/tse-compiler";
+import { OutputBuffer } from "@blazetrails/actionview";
 import { GeneratorBase, GeneratorOptions } from "./base.js";
 import { migrationTemplate } from "./migration.js";
 import { nextMigrationNumber } from "./active-record/migration.js";
@@ -45,7 +47,7 @@ export class MigrationGenerator extends GeneratorBase {
 
   private attributes: GeneratedAttribute[] = [];
   private runOptions: MigrationRunOptions = {};
-  private migrationTemplate = "migration.rb";
+  private migrationTemplate = "migration.ts";
   private migrationAction: string | undefined;
   private tableName = "";
   private joinTables: string[] = [];
@@ -62,30 +64,23 @@ export class MigrationGenerator extends GeneratorBase {
       .filter((arg) => !arg.startsWith("-"))
       .map((arg) => GeneratedAttribute.parse(arg));
     this.setLocalAssignsBang(underscore(name));
-    const body =
-      this.migrationTemplate === "create_table_migration.rb"
-        ? this.createTableMigration()
-        : this.migration();
-    const ts = this.isTypeScript();
-    const returnType = ts ? ": Promise<void>" : "";
+    const source = File.expandPath(await this.findInSourcePaths(this.migrationTemplate));
 
     const file = await migrationTemplate(
       this,
-      () => `import { Migration } from "@blazetrails/activerecord";
-
-export class ${this.migrationClassName} extends Migration {
-  async change()${returnType} {
-${body}
-  }
-}
-`,
+      async () => {
+        const render = new Function(
+          `return ${compileJs(await getFs().readFile(source, "utf8"), { escapeIgnore: true }).code.replace(/^export default /u, "")}`,
+        )() as (context: { outputBuffer: OutputBuffer }, locals: object) => OutputBuffer;
+        return render.call(this, { outputBuffer: new OutputBuffer() }, {}).toStr();
+      },
       File.join("db/migrate", `${underscore(name)}${this.ext()}`),
     );
     if (file) this.createdFiles.push(this.relativeToOriginalDestinationRoot(file));
     return this.getCreatedFiles();
   }
 
-  private createTableMigration(): string {
+  protected createTableMigration(): string {
     const table = this.tableName;
     const colLines: string[] = [];
     for (const attribute of this.attributes) {
@@ -120,7 +115,7 @@ ${body}
     return parts.join("\n");
   }
 
-  private migration(): string {
+  protected migration(): string {
     const table = this.tableName;
     const lines: string[] = [];
     if (this.migrationAction === "add") {
@@ -197,7 +192,7 @@ ${body}
   }
 
   private setLocalAssignsBang(fileName: string): void {
-    this.migrationTemplate = "migration.rb";
+    this.migrationTemplate = "migration.ts";
     let m: RegExpMatchArray | null;
     if ((m = fileName.match(/^(add)_.*_to_(.*)/) ?? fileName.match(/^(remove)_.*?_from_(.*)/))) {
       this.migrationAction = m[1];
@@ -212,7 +207,7 @@ ${body}
       }
     } else if ((m = fileName.match(/^create_(.+)/))) {
       this.tableName = this.normalizeTableName(m[1]);
-      this.migrationTemplate = "create_table_migration.rb";
+      this.migrationTemplate = "create_table_migration.ts";
     }
   }
 
@@ -238,3 +233,7 @@ ${body}
     return Base.pluralizeTableNames;
   }
 }
+
+Object.defineProperty(MigrationGenerator, "name", {
+  value: "ActiveRecord::Generators::MigrationGenerator",
+});

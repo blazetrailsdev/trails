@@ -12,6 +12,14 @@ import {
   type PathAdapter,
 } from "@blazetrails/ruby-compat";
 import type { VirtualFS } from "./virtual-fs.js";
+import migrationTemplate from "../../../../trailties/src/generators/active-record/migration/templates/migration.ts.tt?raw";
+import createTableMigrationTemplate from "../../../../trailties/src/generators/active-record/migration/templates/create_table_migration.ts.tt?raw";
+
+const MIGRATION_SOURCE_ROOT = "/.trails/templates/active-record/migration";
+const TEMPLATES: Record<string, string> = {
+  [`${MIGRATION_SOURCE_ROOT}/migration.ts.tt`]: migrationTemplate,
+  [`${MIGRATION_SOURCE_ROOT}/create_table_migration.ts.tt`]: createTableMigrationTemplate,
+};
 
 const posixPath: PathAdapter = {
   join(...parts: string[]): string {
@@ -25,7 +33,14 @@ const posixPath: PathAdapter = {
     return p.split("/").pop() ?? p;
   },
   resolve(...parts: string[]): string {
-    return parts.filter(Boolean).join("/").replace(/\/+/g, "/");
+    const joined = parts.filter(Boolean).join("/");
+    const segments: string[] = [];
+    for (const segment of joined.split("/")) {
+      if (segment === "" || segment === ".") continue;
+      if (segment === "..") segments.pop();
+      else segments.push(segment);
+    }
+    return (joined.startsWith("/") ? "/" : "") + segments.join("/");
   },
   extname(p: string): string {
     const base = p.split("/").pop() ?? "";
@@ -56,7 +71,8 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
   function readFile(path: string, encoding: "utf-8" | "utf8"): Promise<string>;
   function readFile(path: string): Promise<Bytes>;
   function readFile(path: string, encoding?: "utf-8" | "utf8"): Promise<string | Bytes> {
-    const entry = vfs.read(path);
+    const template = TEMPLATES[path];
+    const entry = template !== undefined ? { content: template } : vfs.read(path);
     if (entry === null) {
       return Promise.reject(
         Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), {
@@ -122,7 +138,7 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
       return "/";
     },
     exists(path: string): Promise<boolean> {
-      return Promise.resolve(vfs.exists(path));
+      return Promise.resolve(TEMPLATES[path] !== undefined || vfs.exists(path));
     },
   };
 }
@@ -163,6 +179,10 @@ function applyVfsOverrides(
 }
 
 export class VfsMigrationGenerator extends MigrationGenerator {
+  static {
+    void this.sourceRoot(MIGRATION_SOURCE_ROOT);
+  }
+
   constructor(options: VfsGeneratorOptions) {
     ensureVfsAdapter(options.vfs);
     super({ cwd: "/", output: options.output });

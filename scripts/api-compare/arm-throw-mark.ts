@@ -71,6 +71,7 @@ export const GATED_PACKAGES = [
   "rack-session",
   "rack-test",
   "sqlite3",
+  "thor",
   "trailties",
 ] as const;
 

@@ -367,6 +367,7 @@ describe("vendor/sources.ts", () => {
         "rack-session",
         "rack-test",
         "sqlite3",
+        "thor",
         "trailties",
       ].sort(),
     );
