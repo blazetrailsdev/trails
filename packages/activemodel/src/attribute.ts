@@ -114,11 +114,6 @@ export abstract class Attribute {
     return this._value;
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  valueWithBlock(_block?: (name: string) => unknown): unknown {
-    return this.value;
-  }
-
   get originalValue(): unknown {
     if (this.isAssigned()) {
       return this.originalAttribute!.originalValue;
@@ -187,11 +182,11 @@ export abstract class Attribute {
     return new Ctor(this.name, this.valueBeforeTypeCast, type, this.originalAttribute);
   }
 
-  abstract typeCast(value: unknown): unknown;
-
   isInitialized(): boolean {
     return true;
   }
+
+  abstract typeCast(value: unknown): unknown;
 
   cameFromUser(): boolean {
     return false;
@@ -236,6 +231,11 @@ export abstract class Attribute {
   private changedFromAssignment(): boolean {
     if (!this.isAssigned()) return false;
     return this.type!.isChanged(this.originalValue, this.value, this.valueBeforeTypeCast);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  valueWithBlock(_block?: (name: string) => unknown): unknown {
+    return this.value;
   }
 
   /** @missingRailsCall key? — PERMANENT */
@@ -372,14 +372,6 @@ export class Uninitialized extends Attribute {
     return null;
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  override valueWithBlock(block?: (name: string) => unknown): unknown {
-    if (block !== undefined) {
-      return block(this.name!);
-    }
-    return null;
-  }
-
   override get originalValue(): unknown {
     return UNINITIALIZED_ORIGINAL_VALUE;
   }
@@ -398,6 +390,14 @@ export class Uninitialized extends Attribute {
 
   override withType(type: ValueType | null): Attribute {
     return new Uninitialized(this.name, type);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  override valueWithBlock(block?: (name: string) => unknown): unknown {
+    if (block !== undefined) {
+      return block(this.name!);
+    }
+    return null;
   }
 
   typeCast(): unknown {
