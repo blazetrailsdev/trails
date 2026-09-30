@@ -858,6 +858,7 @@ export class Base extends Metal {
 }
 
 include(Base, ConfigMethods);
+include(Base, AssetPaths);
 include(Base, Cookies);
 Base.prototype.redirectBack = redirectBack;
 Base.prototype.redirectBackOrTo = redirectBackOrTo;
@@ -910,7 +911,6 @@ classAttribute.call(Base, "fragmentCacheKeys", { default: [] });
 Base.helperMethod("combinedFragmentCacheKey");
 
 extend(Base, ConfigMethods);
-include(Base, AssetPaths);
 extend(Base, DefaultHeaders.ClassMethods);
 include(Base, Redirecting);
 include(Base, Instrumentation);

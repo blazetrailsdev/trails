@@ -6,7 +6,9 @@ import {
   include,
   onLoad,
   TopLevel,
+  type CacheStore,
   type Deprecators,
+  type Logger,
 } from "@blazetrails/activesupport";
 import { ActionController, AbstractController } from "@blazetrails/actionpack";
 import {
@@ -31,8 +33,8 @@ export interface ActionControllerConfig {
   allowForgeryProtection?: boolean;
   raiseOnMissingCallbackActions?: boolean;
   defaultProtectFromForgery?: boolean;
-  logger?: unknown;
-  cacheStore?: unknown;
+  logger?: Logger | null;
+  cacheStore?: CacheStore | `:${string}` | readonly [`:${string}`, ...unknown[]] | null;
   javascriptsDir?: string | null;
   stylesheetsDir?: string | null;
   assetHost?: string | null;

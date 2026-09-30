@@ -11,8 +11,7 @@ export interface AssetPathsHost {
   relativeUrlRoot?: string;
 }
 
-/** @internal */
-export type AssetPathsIncludingClass = (new (...args: never[]) => unknown) & {
+type AssetPathsIncludingClass = (new (...args: never[]) => unknown) & {
   configAccessor(...names: string[]): void;
 };
 
