@@ -402,7 +402,7 @@ describe("RequestFormat", () => {
 
   it("format is not nil with unknown format", () => {
     const req = new Request({ QUERY_STRING: "format=hello" });
-    assertNil(req.format.symbol);
+    assertNil(req.format);
   });
 
   it("can override format with parameter positive", () => {
