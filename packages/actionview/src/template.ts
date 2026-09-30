@@ -4,6 +4,7 @@ import {
   pluralize,
   SafeBuffer,
   toSentence,
+  TopLevel,
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
@@ -406,8 +407,8 @@ export class Template {
     const parameters = methodParameters(methodArguments);
     const scope = setStrictLocals != null ? "__strictLocals" : "localAssigns";
 
-    source = `Object.assign(${streaming ? "async " : ""}function ${streaming ? this.streamingMethodName() : this.methodName()}(localAssigns, outputBuffer, __kwargs = {}, _) {${setStrictLocals != null ? kwargsCode(parameters) : ""} this.virtualPath = ${JSON.stringify(this.virtualPath)}; const __yield = _ ? { get yield() { return _(); } } : {}; with (this) { with (__yield) { with (${scope}) {${this.localsCode()} ${code}
-  } } }
+    source = `Object.assign(${streaming ? "async " : ""}function ${streaming ? this.streamingMethodName() : this.methodName()}(localAssigns, outputBuffer, __kwargs = {}, _) {${setStrictLocals != null ? kwargsCode(parameters) : ""} this.virtualPath = ${JSON.stringify(this.virtualPath)}; const __yield = _ ? { get yield() { return _(); } } : {}; with (TopLevel) { with (this) { with (__yield) { with (${scope}) {${this.localsCode()} ${code}
+  } } } }
 }, { parameters: ${JSON.stringify(parameters.map(([type, name]) => (name === undefined ? [type] : [type, name])))} })`;
 
     if (/\p{Surrogate}/u.test(source)) {
@@ -428,20 +429,22 @@ export class Template {
       argumentError: typeof ArgumentError,
       safe: typeof htmlSafe,
       outputBuffer: typeof OutputBuffer,
+      topLevel: typeof TopLevel,
     ) => CompiledMethod;
     try {
       factory = (0, eval)(
-        `(function (ArgumentError, htmlSafe, OutputBuffer) { return ${compiledSource}; })\n//# sourceURL=${this.identifier.replace(/[\r\n\u2028\u2029]/g, "")}`,
+        `(function (ArgumentError, htmlSafe, OutputBuffer, TopLevel) { return ${compiledSource}; })\n//# sourceURL=${this.identifier.replace(/[\r\n\u2028\u2029]/g, "")}`,
       ) as (
         argumentError: typeof ArgumentError,
         safe: typeof htmlSafe,
         outputBuffer: typeof OutputBuffer,
+        topLevel: typeof TopLevel,
       ) => CompiledMethod;
     } catch (error) {
       throw new SyntaxErrorInTemplate(this, this.source, error as Error);
     }
 
-    const method = factory(ArgumentError, htmlSafe, OutputBuffer);
+    const method = factory(ArgumentError, htmlSafe, OutputBuffer, TopLevel);
     mod._compiledMethods.set(methodName, method);
 
     if (!this.isStrictLocals()) return;

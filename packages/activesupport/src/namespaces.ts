@@ -27,6 +27,9 @@ interface ParametersInstance {
 }
 
 export const TopLevel: {
+  I18n?: typeof import("@blazetrails/i18n");
+  ActiveSupport?: typeof ActiveSupport;
+  ActionView?: { name: string };
   Trails?: {
     env: EnvironmentInquirer;
     logger: Logger | null;
@@ -55,3 +58,5 @@ export const TopLevel: {
   ActionCable?: { Engine?: unknown };
   AppBuilder?: new (generator: never) => object;
 } = {};
+
+TopLevel.ActiveSupport = ActiveSupport;

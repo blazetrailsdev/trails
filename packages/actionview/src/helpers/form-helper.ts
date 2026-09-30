@@ -27,6 +27,7 @@ import {
 } from "@blazetrails/ruby-compat";
 
 import { convertToModel, modelNameFromRecordOrClass } from "../model-naming.js";
+export { convertToModel, modelNameFromRecordOrClass } from "../model-naming.js";
 export { domClass, domId } from "../record-identifier.js";
 import { ActionView } from "../namespaces.js";
 import { capture, type CaptureHelperHost } from "./capture-helper.js";
