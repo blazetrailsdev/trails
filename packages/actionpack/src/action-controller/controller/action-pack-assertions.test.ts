@@ -205,18 +205,18 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("redirect url match", async () => {
     await tc.get("redirectExternal");
-    expect(tc.response.redirection).toBe(true);
+    expect(tc.response.isRedirection).toBe(true);
     expect(tc.response.redirectUrl).toMatch(/rubyonrails/);
     expect(tc.response.redirectUrl).not.toMatch(/perloffrails/);
   });
 
   it("redirection", async () => {
     await tc.get("redirectInternal");
-    expect(tc.response.redirection).toBe(true);
+    expect(tc.response.isRedirection).toBe(true);
     await tc.get("redirectExternal");
-    expect(tc.response.redirection).toBe(true);
+    expect(tc.response.isRedirection).toBe(true);
     await tc.get("nothing");
-    expect(tc.response.redirection).toBe(false);
+    expect(tc.response.isRedirection).toBe(false);
   });
 
   it("successful response code", async () => {
@@ -243,7 +243,7 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("assert redirection with extra controller option", async () => {
     await tc.get("redirectToAction");
-    expect(tc.response.redirection).toBe(true);
+    expect(tc.response.isRedirection).toBe(true);
     expect(tc.response.redirectUrl).toContain("flash_me");
   });
 
@@ -269,7 +269,7 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("assert redirection with symbol", async () => {
     await tc.get("redirectToControllerWithSymbol");
-    expect(tc.response.redirection).toBe(true);
+    expect(tc.response.isRedirection).toBe(true);
     expect(tc.response.redirectUrl).toContain("elsewhere");
   });
 

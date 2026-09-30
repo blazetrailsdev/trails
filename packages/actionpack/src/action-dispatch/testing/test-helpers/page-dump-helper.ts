@@ -4,7 +4,7 @@ import {
   LoadError,
   RUBY_PLATFORM,
   getChildProcessAsync,
-  stderr,
+  warn,
 } from "@blazetrails/ruby-compat";
 import { TopLevel } from "@blazetrails/activesupport";
 import { current } from "@blazetrails/activesupport/core-ext/date-time/calculations";
@@ -13,7 +13,7 @@ import { toI } from "@blazetrails/activesupport/core-ext/date-time/conversions";
 export class InvalidResponse extends Error {}
 
 export interface PageDumpHelperHost {
-  response: { redirection: boolean; body: string };
+  response: { isRedirection: boolean; body: string };
   methodName: string;
 }
 
@@ -26,13 +26,13 @@ export const Launchy = {
     });
 
     const platform = RUBY_PLATFORM();
-    if (platform === "darwin") {
-      cp.spawnSync("open", [path]);
-    } else if (platform === "mingw-ucrt") {
-      cp.spawnSync("cmd", ["/c", "start", path]);
-    } else {
-      cp.spawnSync("xdg-open", [path]);
-    }
+    const result =
+      platform === "darwin"
+        ? cp.spawnSync("open", [path])
+        : platform === "mingw-ucrt"
+          ? cp.spawnSync("cmd", ["/c", "start", path])
+          : cp.spawnSync("xdg-open", [path]);
+    if (result.error) throw result.error;
   },
 };
 
@@ -50,7 +50,7 @@ export async function savePage(
   this: PageDumpHelperHost,
   path: string = htmlDumpDefaultPath.call(this),
 ): Promise<string> {
-  if (this.response.redirection) throw new InvalidResponse("Response is a redirection!");
+  if (this.response.isRedirection) throw new InvalidResponse("Response is a redirection!");
   FileUtils.mkdirP(File.dirname(path));
   File.write(path, this.response.body);
   return path;
@@ -62,9 +62,7 @@ export async function openFile(this: PageDumpHelperHost, path: string): Promise<
     await Launchy.open(path);
   } catch (error) {
     if (!(error instanceof LoadError)) throw error;
-    stderr.write(
-      `File saved to ${path}.\nPlease install the launchy gem to open the file automatically.\n`,
-    );
+    warn(`File saved to ${path}.\nPlease install the launchy gem to open the file automatically.`);
   }
 }
 

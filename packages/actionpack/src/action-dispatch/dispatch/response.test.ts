@@ -338,10 +338,10 @@ describe("ResponseTest", () => {
   });
 
   it("redirection predicate", () => {
-    expect(new Response(301).redirection).toBe(true);
-    expect(new Response(302).redirection).toBe(true);
-    expect(new Response(200).redirection).toBe(false);
-    expect(new Response(400).redirection).toBe(false);
+    expect(new Response(301).isRedirection).toBe(true);
+    expect(new Response(302).isRedirection).toBe(true);
+    expect(new Response(200).isRedirection).toBe(false);
+    expect(new Response(400).isRedirection).toBe(false);
   });
 
   it("clientError predicate", () => {
