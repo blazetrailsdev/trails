@@ -73,20 +73,16 @@ function siteKey(s: Site): string {
 }
 
 /**
- * Whether a ruby-compat declaration is a primitive another package could call
- * instead of copying. A constructor is reused by extending its class, never by
- * calling it. A one-step method forwards to its own receiver — Ruby's `alias`
+ * Candidates sharing a ruby-compat export's shape, grouped by export NAME —
+ * `index.ts` re-exports every primitive, so a file-keyed origin would report
+ * each match twice.
+ *
+ * Only a primitive another package could call instead of copying is an origin.
+ * A constructor is reused by extending its class, never by calling it. A
+ * one-step class method forwards to its own receiver — Ruby's `alias`
  * (`Tempfile#length` is `size`, `MatchData#eql?` is `==`) — so a same-shaped
  * member elsewhere aliases its own class rather than re-implementing this one.
  */
-function isPrimitive(origin: Site): boolean {
-  if (origin.name === "constructor") return false;
-  return !(origin.member && origin.steps === 1);
-}
-
-/** Candidates sharing a ruby-compat export's shape, grouped by export NAME —
- *  `index.ts` re-exports every primitive, so a file-keyed origin would report
- *  each match twice. */
 export function matches(api: TsApi): Map<string, Site[]> {
   const all = sites(api);
   const byShape = new Map<string, Site[]>();
@@ -98,7 +94,8 @@ export function matches(api: TsApi): Map<string, Site[]> {
   }
   const found = new Map<string, Site[]>();
   for (const origin of all) {
-    if (origin.package !== "ruby-compat" || !isPrimitive(origin)) continue;
+    if (origin.package !== "ruby-compat" || origin.name === "constructor") continue;
+    if (origin.member && origin.steps === 1) continue;
     const hits = byShape.get(origin.shape);
     if (hits === undefined) continue;
     const seen = new Set((found.get(origin.name) ?? []).map(siteKey));
