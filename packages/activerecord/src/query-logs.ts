@@ -1,11 +1,13 @@
 import {
   ArgumentError,
+  callerLocations,
   ExecutionContext,
   isBlank,
   isPresent,
   threadMattrAccessor,
 } from "@blazetrails/activesupport";
 import { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
+import { LogSubscriber } from "./log-subscriber.js";
 import type { TagValue, QueryLogsFormatter } from "./query-logs-formatter.js";
 
 export { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
@@ -119,19 +121,9 @@ export class QueryLogs {
   }
 
   static querySourceLocation(): string | null {
-    const stack = new Error().stack;
-    if (!stack) return null;
-    const lines = stack.split("\n").slice(2);
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (
-        !trimmed.includes("node_modules") &&
-        !trimmed.includes("query-logs") &&
-        !trimmed.includes("activerecord/dist")
-      ) {
-        const match = trimmed.match(/at\s+(?:.*?\s+\()?(.+):(\d+):\d+\)?$/);
-        if (match) return `${match[1]}:${match[2]}`;
-      }
+    for (const location of callerLocations()) {
+      const frame = LogSubscriber.backtraceCleaner.cleanFrame(String(location));
+      if (frame) return frame;
     }
     return null;
   }

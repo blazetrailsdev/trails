@@ -6,7 +6,7 @@ import {
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./errors.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
-import { drop } from "@blazetrails/ruby-compat";
+import { drop, Module } from "@blazetrails/ruby-compat";
 
 /** @internal */
 export interface ThroughAssociationHost {
@@ -18,6 +18,11 @@ export interface ThroughAssociationHost {
   throughAssociation(): unknown;
   /** @internal */
   ensureMutable(): void;
+  /** @internal */
+  sourceReflection(): {
+    isCollection(): boolean;
+    inverseOf(): { foreignKey(): string | string[] } | null | undefined;
+  };
 }
 
 /** @internal */
@@ -147,85 +152,83 @@ function toArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [value];
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder-3
- */
-export function throughBuildRecord(
-  assoc: { owner: Base; reflection: any },
-  attributes: Record<string, unknown>,
-): void {
-  const srcRefl = sourceReflection(assoc) as any;
-  if (srcRefl?.isCollection?.()) {
-    const inverse = srcRefl.inverseOf?.();
-    const target = throughAssociation.call(assoc as unknown as ThroughAssociationHost)?.target;
+export const ThroughAssociation: Module = new Module((mod) =>
+  mod.include({
+    transaction,
+    throughReflection,
+    throughAssociation,
 
-    if (inverse && target && !Array.isArray(target)) {
-      const primaryKeyValues: unknown[] = toArray(target.id);
-      const foreignKeyColumns: string[] = toArray(inverse.foreignKey()) as string[];
-      primaryKeyValues.map((primaryKeyValue, i) => {
-        const foreignKeyColumn = foreignKeyColumns[i];
-        if (foreignKeyColumn != null) attributes[foreignKeyColumn] = primaryKeyValue;
-      });
-    }
-  }
-}
-
-export const ThroughAssociation = {
-  transaction,
-  throughReflection,
-  throughAssociation,
-
-  targetScope(this: ThroughAssociationHost): any {
-    let scope = super.targetScope();
-    if (!scope) return scope;
-    const ctor = this.owner.constructor as {
-      _reflectOnAssociation?: (n: string) => unknown;
-    };
-    const refl = ctor._reflectOnAssociation?.(this.reflection.name) as
-      | { chain?: Array<{ klass?: { scopeForAssociation?: () => unknown } }> }
-      | null
-      | undefined;
-    const chain = refl?.chain;
-    if (!chain) return scope;
-    for (const reflection of drop(chain, 1)) {
-      let relation = reflection?.klass?.scopeForAssociation?.();
-      if (relation && typeof (relation as { except?: unknown }).except === "function") {
-        relation = (relation as { except: (...keys: string[]) => unknown }).except(
-          "select",
-          "createWith",
-          "includes",
-          "preload",
-          "eagerLoad",
-          "joins",
-          "leftOuterJoins",
-        );
+    targetScope(this: ThroughAssociationHost): any {
+      let scope = ThroughAssociation.superMethod(this, "targetScope")!() as any;
+      if (!scope) return scope;
+      const ctor = this.owner.constructor as {
+        _reflectOnAssociation?: (n: string) => unknown;
+      };
+      const refl = ctor._reflectOnAssociation?.(this.reflection.name) as
+        | { chain?: Array<{ klass?: { scopeForAssociation?: () => unknown } }> }
+        | null
+        | undefined;
+      const chain = refl?.chain;
+      if (!chain) return scope;
+      for (const reflection of drop(chain, 1)) {
+        let relation = reflection?.klass?.scopeForAssociation?.();
+        if (relation && typeof (relation as { except?: unknown }).except === "function") {
+          relation = (relation as { except: (...keys: string[]) => unknown }).except(
+            "select",
+            "createWith",
+            "includes",
+            "preload",
+            "eagerLoad",
+            "joins",
+            "leftOuterJoins",
+          );
+        }
+        if (relation && typeof (scope as { merge?: unknown }).merge === "function") {
+          scope = (scope as { merge: (r: unknown) => unknown }).merge(relation);
+        }
       }
-      if (relation && typeof (scope as { merge?: unknown }).merge === "function") {
-        scope = (scope as { merge: (r: unknown) => unknown }).merge(relation);
+      return scope;
+    },
+
+    constructJoinAttributes,
+
+    staleState(this: ThroughAssociationHost): unknown {
+      if (!(this.throughReflection() as any)?.isBelongsTo?.()) return null;
+      const state = toArray((this.throughReflection() as any).foreignKey())
+        .map((foreignKeyColumn) => (this.owner as any).readAttribute(foreignKeyColumn as string))
+        .filter((value) => value != null);
+      if (state.length === 0) return null;
+      return state.length === 1 ? state[0] : JSON.stringify(state);
+    },
+
+    foreignKeyPresent(this: ThroughAssociationHost): boolean {
+      if (!(this.throughReflection() as any)?.isBelongsTo?.()) return false;
+      return toArray((this.throughReflection() as any).foreignKey()).every(
+        (foreignKeyColumn) => (this.owner as any).readAttribute(foreignKeyColumn as string) != null,
+      );
+    },
+
+    ensureMutable,
+    ensureNotNested,
+
+    buildRecord(
+      this: ThroughAssociationHost,
+      attributes: Record<string, unknown>,
+      block?: (record: Base) => void,
+    ): Base | null {
+      if (this.sourceReflection().isCollection()) {
+        const inverse = this.sourceReflection().inverseOf();
+        const target = (this.throughAssociation() as { target: Base | Base[] | null }).target;
+
+        if (inverse && target && !Array.isArray(target)) {
+          const foreignKeyColumns = toArray(inverse.foreignKey()) as string[];
+          toArray(target.id).map((primaryKeyValue, i) => {
+            attributes[foreignKeyColumns[i]] = primaryKeyValue;
+          });
+        }
       }
-    }
-    return scope;
-  },
 
-  constructJoinAttributes,
-
-  staleState(this: ThroughAssociationHost): unknown {
-    if (!(this.throughReflection() as any)?.isBelongsTo?.()) return null;
-    const state = toArray((this.throughReflection() as any).foreignKey())
-      .map((foreignKeyColumn) => (this.owner as any).readAttribute(foreignKeyColumn as string))
-      .filter((value) => value != null);
-    if (state.length === 0) return null;
-    return state.length === 1 ? state[0] : JSON.stringify(state);
-  },
-
-  foreignKeyPresent(this: ThroughAssociationHost): boolean {
-    if (!(this.throughReflection() as any)?.isBelongsTo?.()) return false;
-    return toArray((this.throughReflection() as any).foreignKey()).every(
-      (foreignKeyColumn) => (this.owner as any).readAttribute(foreignKeyColumn as string) != null,
-    );
-  },
-
-  ensureMutable,
-  ensureNotNested,
-};
+      return ThroughAssociation.superMethod(this, "buildRecord")!(attributes, block) as Base | null;
+    },
+  }),
+);

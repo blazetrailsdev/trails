@@ -18,7 +18,7 @@ export class Owner extends Base {
   declare owner_id: number;
   declare updated_at: RubyTime | Temporal.PlainDateTime;
 
-  private _blocks: Array<(owner: Owner) => void | Promise<void>> = [];
+  private _blocks?: Array<(owner: Owner) => void | Promise<void>>;
 
   static {
     this._primaryKey = "owner_id";
@@ -47,19 +47,18 @@ export class Owner extends Base {
   }
 
   get blocks(): Array<(owner: Owner) => void | Promise<void>> {
-    return this._blocks;
+    return (this._blocks ??= []);
   }
 
   onAfterCommit(block: (owner: Owner) => void | Promise<void>) {
-    this._blocks.push(block);
+    this.blocks.push(block);
   }
 
   async executeBlocks() {
-    const blocks = this._blocks;
-    this._blocks = [];
-    for (const block of blocks) {
+    for (const block of this.blocks) {
       await block(this);
     }
+    this._blocks = [];
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
