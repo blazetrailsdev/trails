@@ -2,7 +2,7 @@ import { ArgumentError } from "../argument-error.js";
 import { IndexError } from "../index-error.js";
 import { rbBuiltinClassName } from "../object.js";
 import { Range } from "../range.js";
-import { RangeError } from "../range-error.js";
+import { RangeError as RbRangeError } from "../range-error.js";
 import { TypeError } from "../type-error.js";
 
 /**
@@ -106,11 +106,11 @@ export function num2long(val: unknown): number {
           : val > 0
             ? "Inf"
             : "-Inf";
-      throw new RangeError(`float ${g} out of range of integer`);
+      throw new RbRangeError(`float ${g} out of range of integer`);
     }
     if (typeof val === "bigint") {
       if (val < 2n ** 63n && -(2n ** 63n) <= val) return Number(val);
-      throw new RangeError("bignum too big to convert into `long'");
+      throw new RbRangeError("bignum too big to convert into `long'");
     }
     const toInt = (val as { toInt?: unknown }).toInt;
     if (typeof toInt !== "function") {
