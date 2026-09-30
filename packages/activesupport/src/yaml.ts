@@ -199,7 +199,7 @@ class YAMLTree {
 
       const ivarsKey = this.accept("ivars");
       const ivarsMap = new yaml.YAMLMap();
-      for (const [ivar, value] of ivars) {
+      for (const [ivar, value] of Object.entries(o)) {
         ivarsMap.add(
           new yaml.Pair(this.accept(`:@${underscore(ivar.replace(/^_/, ""))}`), this.accept(value)),
         );
