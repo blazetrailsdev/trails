@@ -344,6 +344,7 @@ export function registerProcessAdapter(adapter: ProcessAdapter): void {
 
   currentAdapter = adapter;
   stdinBuffer = "";
+  stdinLineno = 0;
   for (const k of Object.keys(envInternal)) delete envInternal[k];
   for (const [key, value] of Object.entries(envSnapshot)) {
     if (value !== undefined) envInternal[key] = value;
@@ -554,6 +555,7 @@ export function __INTERNAL_resetProcessAdapter_TEST_ONLY(): void {
   nodeAutoRegistered = null;
   nodeAttempted = false;
   stdinBuffer = "";
+  stdinLineno = 0;
   for (const k of Object.keys(envInternal)) delete envInternal[k];
   argvInternal.length = 0;
 }
