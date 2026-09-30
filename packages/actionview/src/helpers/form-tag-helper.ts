@@ -1,13 +1,16 @@
 import {
   SafeBuffer,
+  deepMergeBang,
+  deepStringifyKeys,
   extractOptionsBang,
   htmlSafe,
   isBlank,
   presence,
   stringifyKeys,
 } from "@blazetrails/activesupport";
-import { hashDelete, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { type Hash, fetch, hashDelete, rbObjRespondTo, update } from "@blazetrails/ruby-compat";
 
+import { ActionView } from "../namespaces.js";
 import { preventContentExfiltration } from "./content-exfiltration-prevention-helper.js";
 import { tag, type TagHelperHost } from "./tag-helper.js";
 import { methodTag, tokenTag, type UrlHelperHost } from "./url-helper.js";
@@ -16,6 +19,7 @@ export interface FormTagHelperHost extends UrlHelperHost, TagHelperHost {
   urlFor(options: unknown): string;
   fieldId: typeof fieldId;
   fieldName: typeof fieldName;
+  submitTag(value?: unknown, options?: Record<string, unknown> | Hash<string, unknown>): SafeBuffer;
 }
 
 export let embedAuthenticityTokenInRemoteForms: boolean | null = null;
@@ -80,6 +84,17 @@ export function fieldName(
 
 export function utf8EnforcerTag(): SafeBuffer {
   return htmlSafe('<input name="utf8" type="hidden" value="&#x2713;" autocomplete="off" />');
+}
+
+export function submitTag(
+  this: FormTagHelperHost,
+  value: unknown = "Save changes",
+  options: Record<string, unknown> | Hash<string, unknown> = {},
+): SafeBuffer {
+  options = deepStringifyKeys(options) as Record<string, unknown> | Hash<string, unknown>;
+  const tagOptions = update<unknown>({ type: "submit", name: "commit", value: value }, options);
+  setDefaultDisableWith(value, tagOptions);
+  return tag.call(this, "input", tagOptions) as SafeBuffer;
 }
 
 /** @internal */
@@ -173,4 +188,23 @@ export function formTagWithBody(
     output.concat(content instanceof SafeBuffer ? content : String(content));
   }
   return output.safeConcat("</form>");
+}
+
+/** @internal */
+export function setDefaultDisableWith(value: unknown, tagOptions: Record<string, unknown>): void {
+  const data = fetch<Record<string, unknown>>(tagOptions, "data", {});
+
+  if (tagOptions["data-disable-with"] === false || data["disable_with"] === false) {
+    hashDelete(data, "disable_with");
+  } else if (ActionView.Base.automaticallyDisableSubmitTag) {
+    let disableWithText = tagOptions["data-disable-with"];
+    if (disableWithText == null || disableWithText === false)
+      disableWithText = data["disable_with"];
+    if (disableWithText == null || disableWithText === false) {
+      disableWithText = value == null ? "" : String(value);
+    }
+    deepMergeBang(tagOptions, { data: { disable_with: disableWithText } });
+  }
+
+  hashDelete(tagOptions, "data-disable-with");
 }

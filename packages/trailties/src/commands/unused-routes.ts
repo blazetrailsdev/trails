@@ -82,6 +82,15 @@ export class RouteInfo {
 }
 
 export class UnusedRoutesCommand extends Base {
+  static {
+    this.hideCommandBang();
+    this.classOption("controller", {
+      aliases: "-c",
+      desc: "Filter by a specific controller, e.g. PostsController or Admin::PostsController.",
+    });
+    this.classOption("grep", { aliases: "-g", desc: "Grep routes by a specific pattern." });
+  }
+
   /** @internal */
   private _routes: Journey.Route[] | null = null;
 
@@ -130,17 +139,14 @@ export class UnusedRoutesCommand extends Base {
 }
 
 export function unusedRoutesCommand(): Command {
-  const cmd = new Command("unused_routes");
-  cmd
-    .description("Print unused routes")
-    .option(
-      "-c, --controller <controller>",
-      "Filter by a specific controller, e.g. PostsController or Admin::PostsController.",
-    )
-    .option("-g, --grep <pattern>", "Grep routes by a specific pattern.")
-    .action(async (options) => {
-      await new UnusedRoutesCommand(options).perform();
-    });
+  const klass = UnusedRoutesCommand;
+  const cmd = new Command(klass.commandName());
+  for (const [name, option] of Object.entries(klass.classOptions())) {
+    cmd.option([...[option.aliases ?? []].flat(), `--${name} <${name}>`].join(", "), option.desc);
+  }
+  cmd.action(async (options: UnusedRoutesOptions, command: Command) => {
+    await klass.perform(klass.commandName(), command.args, { options });
+  });
 
   return cmd;
 }

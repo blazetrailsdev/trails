@@ -1,13 +1,19 @@
 import type { Command as Program } from "commander";
-import { createProgram } from "./cli.js";
+import type { Base } from "./command/base.js";
 
 export const HELP_MAPPINGS: ReadonlySet<string> = new Set(["-h", "-?", "--help"]);
 export const VERSION_MAPPINGS: ReadonlySet<string> = new Set(["-v", "--version"]);
 
+let _hiddenCommands: (typeof Base)[] | undefined;
+
+export function hiddenCommands(): (typeof Base)[] {
+  return (_hiddenCommands ??= []);
+}
+
 /** @missingRailsArgs invoke_rake — PERMANENT */
 export async function invoke(fullNamespace: string, args: string[] = []): Promise<void> {
   const [namespace, commandName] = splitNamespace(fullNamespace);
-  const command = findByNamespace(namespace, commandName);
+  const command = await findByNamespace(namespace, commandName);
 
   if (command && command.name() === commandName) {
     await command.parent!.parseAsync([commandName, ...args], { from: "user" });
@@ -18,12 +24,16 @@ export async function invoke(fullNamespace: string, args: string[] = []): Promis
   }
 }
 
-/** @missingRailsCall lookup — PERMANENT */
-export function findByNamespace(namespace: string, commandName?: string): Program | undefined {
+/** @missingRailsCall lookup — CONVERGEABLE find-by-namespace-lookup-loads-only-candidates */
+export async function findByNamespace(
+  namespace: string,
+  commandName?: string,
+): Promise<Program | undefined> {
   const lookups = [namespace];
   if (commandName) lookups.push(`${namespace}:${commandName}`);
   lookups.push(...lookups.map((lookup) => `rails:${lookup}`));
 
+  const { createProgram } = await import("./cli.js");
   const namespaces = new Map(createProgram().commands.map((c) => [c.name(), c]));
   const found = lookups.find((lookup) => namespaces.has(lookup));
   return found === undefined ? undefined : namespaces.get(found);
@@ -41,6 +51,7 @@ function splitNamespace(namespace: string): [string, string] {
 
 /** @internal */
 async function invokeRake(task: string, args: string[]): Promise<void> {
+  const { createProgram } = await import("./cli.js");
   const program = createProgram();
   const colon = task.indexOf(":");
   if (colon > 0) {

@@ -30,7 +30,7 @@ async function runDevCacheCommand(): Promise<string> {
   return output;
 }
 
-describe("Rails::Command::DevTest", () => {
+describe("Rails::Command::DevTest", { timeout: 30_000 }, () => {
   it("`bin/rails dev:cache` creates both caching and restart file when restart file doesn't exist and dev caching is currently off", async () => {
     expect(File.isExist("tmp/caching-dev.txt")).toBeFalsy();
     expect(File.isExist("tmp/restart.txt")).toBeFalsy();

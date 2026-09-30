@@ -1,11 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { RouteSet, UrlFor } from "@blazetrails/actionpack";
+import { Conversion, Naming } from "@blazetrails/activemodel";
+import { I18n, extend, isPresent, registerConstant } from "@blazetrails/activesupport";
+import { ArgumentError, include } from "@blazetrails/ruby-compat";
 
 import { Base } from "../../base.js";
 import { LookupContext } from "../../lookup-context.js";
 import { formWithGeneratesIds, setFormWithGeneratesIds } from "../../helpers/form-helper.js";
 import { defaultEnforceUtf8, setDefaultEnforceUtf8 } from "../../helpers/form-tag-helper.js";
 import { urlFor } from "../../helpers/url-helper.js";
+import { RoutingUrlFor } from "../../routing-url-for.js";
+import type { FormBuilder } from "../../helpers/form-helper.js";
 
 function normalizeDom(html: string): string {
   return html
@@ -186,19 +191,47 @@ describe("FormWithActsLikeFormTagTest", () => {
 });
 
 class Post {
-  static modelName = { paramKey: "post" };
+  static {
+    extend(this, Naming);
+    include(this, Conversion);
+  }
+
   persisted = false;
   title: string | null = null;
-  get modelName(): typeof Post.modelName {
-    return Post.modelName;
-  }
+
   isPersisted(): boolean {
     return this.persisted;
   }
-  toModel(): this {
-    return this;
+}
+
+class BlogPost {
+  static moduleName = "Blog";
+  static {
+    Object.defineProperty(this, "name", { value: "Post" });
+    extend(this, Naming);
+    include(this, Conversion);
+  }
+
+  constructor(
+    public title: string,
+    public id: unknown,
+  ) {}
+
+  isPersisted(): boolean {
+    return isPresent(this.id);
   }
 }
+
+registerConstant("Blog", { name: "Blog", useRelativeModelNaming: () => true, Post: BlogPost });
+
+include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
+
+const Routes = new RouteSet();
+Routes.draw((r) => {
+  r.resources("posts", (r) => {
+    r.resources("comments");
+  });
+});
 
 describe("FormWithActsLikeFormForTest", () => {
   let view: Base;
@@ -215,12 +248,33 @@ describe("FormWithActsLikeFormForTest", () => {
       if (options != null && typeof options === "object" && !Array.isArray(options)) return "/";
       return urlFor.call(this, options);
     } as typeof view.urlFor;
-    (view as unknown as { polymorphicPath(): string }).polymorphicPath = () => "/posts/123";
+    include(view.constructor as new (...args: never[]) => unknown, Routes.urlHelpers());
+
+    I18n.backend().storeTranslations("submit", {
+      helpers: {
+        submit: {
+          create: "Create %{model}",
+          update: "Confirm %{model} changes",
+          submit: "Save changes",
+          another_post: {
+            update: "Update your %{model}",
+          },
+          "blog/post": {
+            update: "Update your %{model}",
+          },
+        },
+      },
+    });
 
     const post = new Post();
+    Object.assign(post, { toKey: () => [123], id: 0, toParam: () => "123" });
     post.persisted = true;
     post.title = "Hello World";
     (view as unknown as { post: Post }).post = post;
+  });
+
+  afterEach(() => {
+    I18n.reloadBang();
   });
 
   const titleField = "<input name='post[title]' type='text' value='Hello World' id='post_title' />";
@@ -346,6 +400,93 @@ describe("FormWithActsLikeFormForTest", () => {
       formWith({ scope: "post" }, (f) => concat(f.textField("title")));
 
       const expected = wholeForm("/", null, null, { skipEnforcingUtf8: true }, () => titleField);
+
+      assertDomEqual(expected, rendered);
+    });
+  });
+  it("submit with object as new record and locale strings", () => {
+    I18n.withLocale("submit", () => {
+      post().persisted = false;
+      Object.assign(post(), { toKey: () => null });
+      formWith({ model: post() }, (f: FormBuilder) => concat(f.submit()));
+
+      const expected = wholeForm(
+        "/posts",
+        null,
+        null,
+        {},
+        () =>
+          "<input name='commit' data-disable-with='Create Post' type='submit' value='Create Post' />",
+      );
+
+      assertDomEqual(expected, rendered);
+    });
+  });
+
+  it("submit with object as existing record and locale strings", () => {
+    I18n.withLocale("submit", () => {
+      formWith({ model: post() }, (f: FormBuilder) => concat(f.submit()));
+
+      const expected = wholeForm(
+        "/posts/123",
+        null,
+        null,
+        { method: "patch" },
+        () =>
+          "<input name='commit' data-disable-with='Confirm Post changes' type='submit' value='Confirm Post changes' />",
+      );
+
+      assertDomEqual(expected, rendered);
+    });
+  });
+
+  it("submit without object and locale strings", () => {
+    I18n.withLocale("submit", () => {
+      formWith({ scope: "post" }, (f: FormBuilder) => concat(f.submit({ class: "extra" })));
+
+      const expected = wholeForm(
+        undefined,
+        null,
+        null,
+        {},
+        () =>
+          "<input name='commit' class='extra' data-disable-with='Save changes' type='submit' value='Save changes' />",
+      );
+
+      assertDomEqual(expected, rendered);
+    });
+  });
+
+  it("submit with object which is overwritten by scope option", () => {
+    I18n.withLocale("submit", () => {
+      formWith({ model: post(), scope: "another_post" }, (f: FormBuilder) => concat(f.submit()));
+
+      const expected = wholeForm(
+        "/posts/123",
+        null,
+        null,
+        { method: "patch" },
+        () =>
+          "<input name='commit' data-disable-with='Update your Post' type='submit' value='Update your Post' />",
+      );
+
+      assertDomEqual(expected, rendered);
+    });
+  });
+
+  it("submit with object which is namespaced", () => {
+    const blogPost = new BlogPost("And his name will be forty and four.", 44);
+    I18n.withLocale("submit", () => {
+      formWith({ model: blogPost }, (f: FormBuilder) => concat(f.submit()));
+
+      const expected = wholeForm(
+        "/posts/44",
+        null,
+        null,
+        { method: "patch" },
+        () =>
+          "<input name='commit' data-disable-with='Update your Post' type='submit' value='Update your Post' />",
+      );
 
       assertDomEqual(expected, rendered);
     });

@@ -1,15 +1,21 @@
 import {
   CodeGenerator,
+  I18n,
   SafeBuffer,
   classAttribute,
   constantize,
   cattrAccessor,
+  demodulize,
   extractOptionsBang,
+  humanize,
+  isPlainObject,
   onLoad,
+  underscore,
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   block,
+  Hash,
   except,
   fetch,
   hashDelete,
@@ -357,6 +363,11 @@ export function defaultFormBuilderClass(this: FormHelperHost): typeof FormBuilde
 
 type FieldHelper = (method: unknown, options?: Record<string, unknown>) => unknown;
 
+interface SubmitModel {
+  isPersisted(): boolean;
+  modelName: { human(): string; i18nKey: string };
+}
+
 export class FormBuilder {
   declare static fieldHelpers: string[];
   declare textField: FieldHelper;
@@ -409,6 +420,7 @@ export class FormBuilder {
     });
   }
 
+  declare private static __toPartialPath: string | null | undefined;
   objectName: string | null;
   object: unknown;
   options: Record<string, unknown>;
@@ -436,6 +448,23 @@ export class FormBuilder {
 
   isMultipart(): unknown {
     return this.multipart;
+  }
+
+  static _toPartialPath(): string | null {
+    if (!Object.prototype.hasOwnProperty.call(this, "__toPartialPath")) {
+      const name = underscore(demodulize(this.name));
+      const partialPath = name.replace(/_builder$/, "");
+      this.__toPartialPath = partialPath === name ? null : partialPath;
+    }
+    return this.__toPartialPath!;
+  }
+
+  toPartialPath(): string | null {
+    return (this.constructor as typeof FormBuilder)._toPartialPath();
+  }
+
+  toModel(): this {
+    return this;
   }
 
   constructor(
@@ -478,6 +507,12 @@ export class FormBuilder {
     this._multipart = null;
     const index = options["index"];
     this.index = index != null && index !== false ? index : options["childIndex"];
+  }
+
+  id(): unknown {
+    const html = this.options["html"] as Record<string, unknown> | null | undefined;
+    const id = html?.["id"];
+    return id != null && id !== false ? id : this.options["id"];
   }
 
   fieldId(method: unknown, ...suffixes: unknown[]): string {
@@ -557,10 +592,42 @@ export class FormBuilder {
     return (this._emittedHiddenId ??= null);
   }
 
+  submit(
+    value: unknown = null,
+    options: Record<string, unknown> | Hash<string, unknown> = {},
+  ): SafeBuffer {
+    if (isPlainObject(value) || value instanceof Hash) {
+      [value, options] = [null, value as Record<string, unknown> | Hash<string, unknown>];
+    }
+    if (value == null || value === false) value = this.submitDefaultValue();
+    return this._template.submitTag(value, options);
+  }
+
   private objectifyOptions(options: Record<string, unknown>): Record<string, unknown> {
     const result = merge(this._defaultOptions, options);
     result["object"] = this.object;
     return result;
+  }
+
+  private submitDefaultValue(): string {
+    const object = convertToModel(this.object) as SubmitModel | null | false;
+    const key =
+      object != null && object !== false ? (object.isPersisted() ? "update" : "create") : "submit";
+
+    const model = rbObjRespondTo(object, "modelName")
+      ? (object as SubmitModel).modelName.human()
+      : humanize(this.objectName ?? "");
+
+    const defaults: string[] = [];
+    if (rbObjRespondTo(object, "modelName") && (this.objectName ?? "") === model.toLowerCase()) {
+      defaults.push(`:helpers.submit.${(object as SubmitModel).modelName.i18nKey}.${key}`);
+    } else {
+      defaults.push(`:helpers.submit.${this.objectName ?? ""}.${key}`);
+    }
+    defaults.push(`:helpers.submit.${key}`);
+    defaults.push(`${humanize(key)} ${model}`);
+
+    return I18n.t(defaults.shift(), { model: model, default: defaults }) as string;
   }
 
   private nestedChildIndex(name: string): number {

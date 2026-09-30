@@ -63,7 +63,7 @@ interface ValidationsHost {
   _validationContext?: ValidationContextArg;
   isNewRecord?(): boolean;
   _newRecord?: boolean;
-  errors: { isAny(): boolean };
+  errors: { isEmpty(): boolean };
   isValid(context?: ValidationContextArg): Promise<boolean>;
   association?(name: string): { loaded?: boolean; target?: unknown } | undefined;
   readAttribute(name: string): unknown;
@@ -91,7 +91,7 @@ export async function isValid(
   this._validationContext = effectiveContext;
   try {
     const result = await _superIsValid.call(this, effectiveContext);
-    return result && !this.errors.isAny();
+    return this.errors.isEmpty() && result;
   } finally {
     this._validationContext = previousContext;
   }
