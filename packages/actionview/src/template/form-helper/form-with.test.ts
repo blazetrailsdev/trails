@@ -283,6 +283,14 @@ describe("FormWithActsLikeFormForTest", () => {
     return (view as unknown as { concat(string: unknown): unknown }).concat(string);
   }
 
+  function contentTag(name: string, content: unknown): unknown {
+    return view.contentTag(name, content);
+  }
+
+  function tag(): { span(content: unknown, options: Record<string, unknown>): unknown } {
+    return view.tag() as unknown as ReturnType<typeof tag>;
+  }
+
   function post(): Post {
     return (view as unknown as { post: Post }).post;
   }
@@ -321,6 +329,40 @@ describe("FormWithActsLikeFormForTest", () => {
   it("form with model and false url", () => {
     formWith({ model: new Post(), url: false });
     assertDomEqual(wholeForm(false), rendered);
+  });
+
+  it("form with only url on create", () => {
+    formWith({ url: "/posts" }, (f) => {
+      concat(f.label("title", "Label me"));
+      concat(f.textField("title"));
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      null,
+      null,
+      {},
+      () => '<label for="title">Label me</label>' + '<input type="text" name="title" id="title">',
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form with only url on update", () => {
+    formWith({ url: "/posts/123" }, (f) => {
+      concat(f.label("title", "Label me"));
+      concat(f.textField("title"));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      null,
+      null,
+      {},
+      () => '<label for="title">Label me</label>' + '<input type="text" name="title" id="title">',
+    );
+
+    assertDomEqual(expected, rendered);
   });
 
   it("form with general attributes", () => {
@@ -404,6 +446,70 @@ describe("FormWithActsLikeFormForTest", () => {
       assertDomEqual(expected, rendered);
     });
   });
+  it("form with label passes translation to block version", () => {
+    formWith({ model: new Post() }, (f) => {
+      concat(
+        f.label("title", null, {}, (label) => {
+          concat(contentTag("span", label));
+        }),
+      );
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      null,
+      null,
+      {},
+      () => `<label for="post_title"><span>Title</span></label>`,
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form with label passes label tag builder to block version", () => {
+    formWith({ model: new Post() }, (f) => {
+      concat(
+        f.label("title", null, {}, (builder) => {
+          concat(contentTag("span", builder.translation()));
+        }),
+      );
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      null,
+      null,
+      {},
+      () => `<label for="post_title"><span>Title</span></label>`,
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form with label accesses object through label tag builder", () => {
+    formWith({ model: new Post() }, (f) => {
+      concat(
+        f.label("title", null, {}, (builder) => {
+          concat(
+            tag().span(builder, {
+              class: !(builder.object as Post).isPersisted() ? "new_record" : null,
+            }),
+          );
+        }),
+      );
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      null,
+      null,
+      {},
+      () => `<label for="post_title"><span class="new_record">Title</span></label>`,
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
   it("submit with object as new record and locale strings", () => {
     I18n.withLocale("submit", () => {
       post().persisted = false;
