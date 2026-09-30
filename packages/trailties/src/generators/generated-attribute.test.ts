@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { toFs } from "@blazetrails/activesupport/core-ext/date/conversions";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { GeneratedAttribute, GeneratorError } from "./generated-attribute.js";
 import { assertFieldDefaultValue, assertFieldType } from "./testing/assertions.js";
 
@@ -118,9 +120,7 @@ describe("GeneratedAttribute", () => {
   });
 
   it("test_default_value_is_date", () => {
-    const val = GeneratedAttribute.parse("born:date").default();
-    expect(typeof val).toBe("string");
-    expect(val).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    assertFieldDefaultValue("date", toFs(Temporal.Now.plainDateISO(), "db"));
   });
 
   it("test_default_value_is_string", () => {

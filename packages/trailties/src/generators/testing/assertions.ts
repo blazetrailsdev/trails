@@ -65,7 +65,7 @@ export async function assertClassMethod(
   content: string,
   block?: (body: string) => unknown,
 ): Promise<void> {
-  await assertInstanceMethod(`static ${method}`, content, block);
+  await assertInstanceMethod(`static (?:async )?${method}`, content, block);
 }
 
 export async function assertInstanceMethod(
