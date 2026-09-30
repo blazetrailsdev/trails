@@ -459,7 +459,7 @@ export class MimeType {
 export class AllType extends MimeType {
   static readonly instance = new AllType();
 
-  constructor() {
+  private constructor() {
     super("*/*", null);
   }
 
@@ -481,7 +481,7 @@ export class NullType {
   /** @internal */
   readonly string = "";
 
-  constructor() {
+  private constructor() {
     return new Proxy<NullType>(this, METHOD_MISSING_HANDLER);
   }
 
