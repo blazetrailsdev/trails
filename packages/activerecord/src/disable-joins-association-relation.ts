@@ -88,37 +88,34 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
   }
 
   /** @noRailsEquivalent CONVERGEABLE converge-djar-deferred-chain-walk-mode */
-  async count(column?: string): Promise<number | Map<unknown, number>> {
+  async count(column?: string): Promise<number> {
     if (this._chainWalker) {
       const { relation } = await this._walkOnce();
       const merged = this._composeChainedState(relation);
       return (
         merged as unknown as {
-          count: (col?: string) => Promise<number | Map<unknown, number>>;
+          count: (col?: string) => Promise<number>;
         }
       ).count(column);
     }
     const baseCount = (
       Relation.prototype as unknown as {
-        count: (this: unknown, col?: string) => Promise<number | Map<unknown, number>>;
+        count: (this: unknown, col?: string) => Promise<number>;
       }
     ).count;
     return baseCount.call(this, column);
   }
 
   /** @noRailsEquivalent CONVERGEABLE converge-djar-deferred-chain-walk-mode */
-  override async calculate(
-    operation: "count",
-    column?: string,
-  ): Promise<number | Map<unknown, number>>;
+  override async calculate(operation: "count", column?: string): Promise<number>;
   override async calculate(
     operation: "sum",
     column: string | Nodes.Node | number | null,
-  ): Promise<number | bigint | Map<unknown, number | bigint>>;
+  ): Promise<number | bigint>;
   override async calculate(
     operation: "average" | "minimum" | "maximum",
     column: string,
-  ): Promise<unknown | null | Map<unknown, unknown>>;
+  ): Promise<unknown>;
   override async calculate(
     operation: string,
     columnName?: string | Nodes.Node | number | null,

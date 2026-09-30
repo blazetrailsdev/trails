@@ -18,7 +18,7 @@ function relation(): Relation<Post> {
   return Post.all();
 }
 
-function internals(rel: Relation<Post>): JoinInternals {
+function internals(rel: Relation<Post, boolean>): JoinInternals {
   return rel as unknown as JoinInternals;
 }
 

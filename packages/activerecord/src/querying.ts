@@ -250,7 +250,7 @@ export function _loadFromSql<T extends typeof Base>(
 
 export function from<T extends typeof Base>(
   this: T,
-  source: string | Relation<any> | import("@blazetrails/arel").Nodes.Node,
+  source: string | Relation<any, boolean> | import("@blazetrails/arel").Nodes.Node,
   subqueryName?: string,
 ): Relation<InstanceType<T>> {
   return this.all().from(source, subqueryName);
@@ -273,7 +273,7 @@ export function order<T extends typeof Base>(
 export function group<T extends typeof Base>(
   this: T,
   ...columns: (string | import("@blazetrails/arel").Nodes.Node)[]
-): Relation<InstanceType<T>> {
+): Relation<InstanceType<T>, true> {
   return this.all().group(...columns);
 }
 
@@ -843,7 +843,7 @@ export function rewhere<T extends typeof Base>(
 export function regroup<T extends typeof Base>(
   this: T,
   ...columns: string[]
-): Relation<InstanceType<T>> {
+): Relation<InstanceType<T>, true> {
   return this.all().regroup(...columns);
 }
 

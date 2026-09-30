@@ -518,36 +518,44 @@ export function asyncIds(this: CalculationRelation): Promise<unknown[]> {
   return Promise.resolve(this.async().ids());
 }
 
-export interface CalculationMethods {
-  calculate(operation: "count", column?: string): Promise<number | Map<unknown, number>>;
+type Grouped<G extends boolean, S, M> = boolean extends G ? S | M : G extends true ? M : S;
+
+export interface CalculationMethods<G extends boolean = boolean> {
+  calculate(operation: "count", column?: string): Promise<Grouped<G, number, Map<unknown, number>>>;
   calculate(
     operation: "sum",
     column: string | Nodes.Node | number | null,
-  ): Promise<number | bigint | Map<unknown, number | bigint>>;
+  ): Promise<Grouped<G, number | bigint, Map<unknown, number | bigint>>>;
   calculate(
     operation: "average" | "minimum" | "maximum",
     column: string,
-  ): Promise<unknown | null | Map<unknown, unknown>>;
+  ): Promise<Grouped<G, unknown, Map<unknown, unknown>>>;
   calculate(operation: string, column?: string | Nodes.Node | number | null): Promise<unknown>;
   count(
     column?: string | Nodes.Node | null | CountBlock,
     block?: CountBlock,
-  ): Promise<number | Map<unknown, number>>;
+  ): Promise<Grouped<G, number, Map<unknown, number>>>;
   sum(block: SumBlock): Promise<number | bigint>;
   sum(initialValue: number | string, block: SumBlock): Promise<number | bigint>;
   sum(
     initialValueOrColumn?: string | Nodes.Node | number | null,
-  ): Promise<number | bigint | Map<unknown, number | bigint>>;
-  average(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
-  minimum(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
-  maximum(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
-  asyncCount(columnName?: string): Promise<number | Map<unknown, number>>;
+  ): Promise<Grouped<G, number | bigint, Map<unknown, number | bigint>>>;
+  average(column: string | Nodes.Node): Promise<Grouped<G, unknown, Map<unknown, unknown>>>;
+  minimum(column: string | Nodes.Node): Promise<Grouped<G, unknown, Map<unknown, unknown>>>;
+  maximum(column: string | Nodes.Node): Promise<Grouped<G, unknown, Map<unknown, unknown>>>;
+  asyncCount(columnName?: string): Promise<Grouped<G, number, Map<unknown, number>>>;
   asyncSum(
     identityOrColumn?: string | Nodes.Node | number | null,
-  ): Promise<number | bigint | Map<unknown, number | bigint>>;
-  asyncAverage(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
-  asyncMinimum(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
-  asyncMaximum(columnName: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
+  ): Promise<Grouped<G, number | bigint, Map<unknown, number | bigint>>>;
+  asyncAverage(
+    columnName: string | Nodes.Node,
+  ): Promise<Grouped<G, unknown, Map<unknown, unknown>>>;
+  asyncMinimum(
+    columnName: string | Nodes.Node,
+  ): Promise<Grouped<G, unknown, Map<unknown, unknown>>>;
+  asyncMaximum(
+    columnName: string | Nodes.Node,
+  ): Promise<Grouped<G, unknown, Map<unknown, unknown>>>;
   pluck(
     ...columns: Array<
       | string

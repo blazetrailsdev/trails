@@ -436,18 +436,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return count;
   }
 
-  override async calculate(
-    operation: "count",
-    column?: string,
-  ): Promise<number | Map<unknown, number>>;
+  override async calculate(operation: "count", column?: string): Promise<number>;
   override async calculate(
     operation: "sum",
     column: string | Nodes.Node | number | null,
-  ): Promise<number | bigint | Map<unknown, number | bigint>>;
+  ): Promise<number | bigint>;
   override async calculate(
     operation: "average" | "minimum" | "maximum",
     column: string,
-  ): Promise<unknown | null | Map<unknown, unknown>>;
+  ): Promise<unknown>;
   override async calculate(
     operation: string,
     columnName?: string | Nodes.Node | number | null,

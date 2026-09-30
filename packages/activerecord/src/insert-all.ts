@@ -90,7 +90,7 @@ export class InsertAll {
   private _facts: ResolvedConnectionFacts;
 
   static async execute(
-    relation: Relation<any>,
+    relation: Relation<any, boolean>,
     inserts: Record<string, unknown>[],
     options: InsertAllOptions = {},
   ): Promise<Result> {
@@ -107,7 +107,7 @@ export class InsertAll {
   }
 
   constructor(
-    relation: Relation<any>,
+    relation: Relation<any, boolean>,
     connection: NonNullable<Awaited<ModelClass["connection"]>>,
     inserts: Record<string, unknown>[],
     options: InsertAllOptions = {},
