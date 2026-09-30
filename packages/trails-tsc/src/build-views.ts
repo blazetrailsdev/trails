@@ -224,14 +224,14 @@ function bindCheckedTypes(views: ViewShim[], program: ts.Program): boolean {
         const seen = renders.get(target) ?? { calls: 0, keys: new Map<string, number>() };
         seen.calls++;
         renders.set(target, seen);
-        for (const prop of passed.locals.properties) {
-          if (!(ts.isPropertyAssignment(prop) || ts.isShorthandPropertyAssignment(prop))) continue;
-          if (!ts.isIdentifier(prop.name)) continue;
-          const at = ts.isPropertyAssignment(prop) ? prop.initializer : prop.name;
-          const types = target.locals.get(prop.name.text) ?? new Set<string>();
-          types.add(typeText(checker.getBaseTypeOfLiteralType(checker.getTypeAtLocation(at))));
-          target.locals.set(prop.name.text, types);
-          seen.keys.set(prop.name.text, (seen.keys.get(prop.name.text) ?? 0) + 1);
+        const hash = passed.locals && checker.getTypeAtLocation(passed.locals);
+        for (const prop of hash ? checker.getPropertiesOfType(hash) : []) {
+          const type = checker.getTypeOfSymbolAtLocation(prop, passed.locals!);
+          const types = target.locals.get(prop.name) ?? new Set<string>();
+          types.add(typeText(checker.getBaseTypeOfLiteralType(type)));
+          target.locals.set(prop.name, types);
+          if (prop.flags & ts.SymbolFlags.Optional) continue;
+          seen.keys.set(prop.name, (seen.keys.get(prop.name) ?? 0) + 1);
         }
       }
       ts.forEachChild(node, visit);
@@ -284,7 +284,11 @@ function exposedHelperMethods(checker: ts.TypeChecker, klass: ts.ClassDeclaratio
             ? callee.text
             : "";
         if (name === "helperMethod") {
-          for (const arg of node.arguments) if (ts.isStringLiteral(arg)) names.push(arg.text);
+          const flatten = (arg: ts.Expression): void => {
+            if (ts.isStringLiteral(arg)) names.push(arg.text);
+            else if (ts.isArrayLiteralExpression(arg)) arg.elements.forEach(flatten);
+          };
+          node.arguments.forEach(flatten);
         } else if (name === "include") {
           for (const arg of node.arguments.slice(1)) {
             const included = sourceDeclaration(checker, arg);
@@ -318,12 +322,10 @@ function sourceDeclaration(
 
 function renderedPartial(
   call: ts.CallExpression,
-): { name: string; locals: ts.ObjectLiteralExpression } | undefined {
+): { name: string; locals?: ts.Expression } | undefined {
   if (!ts.isIdentifier(call.expression) || call.expression.text !== "render") return undefined;
   const [first, second] = call.arguments;
-  if (first && ts.isStringLiteral(first) && second && ts.isObjectLiteralExpression(second)) {
-    return { name: first.text, locals: second };
-  }
+  if (first && ts.isStringLiteral(first)) return { name: first.text, locals: second };
   if (!first || !ts.isObjectLiteralExpression(first)) return undefined;
   const option = (key: string): ts.Expression | undefined =>
     first.properties.find(
@@ -331,10 +333,8 @@ function renderedPartial(
         ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === key,
     )?.initializer;
   const partial = option("partial");
-  const locals = option("locals");
-  if (partial && ts.isStringLiteral(partial) && locals && ts.isObjectLiteralExpression(locals)) {
-    return { name: partial.text, locals };
-  }
+  if (partial && ts.isStringLiteral(partial))
+    return { name: partial.text, locals: option("locals") };
   return undefined;
 }
 
@@ -356,14 +356,16 @@ function templateScope(
     'Record<"alert" | "notice", unknown>',
   );
   const prefix = path.posix.dirname(rel);
-  const controllersDir = path.join(appDir, "controllers");
+  const layout = /^layouts\/([^_][^.]*)\./u.exec(rel)?.[1];
+  const controllerPath = layout ?? prefix;
   const file = path.join(
-    controllersDir,
-    `${prefix.split("/").map(dasherize).join("/")}-controller.ts`,
+    appDir,
+    "controllers",
+    `${controllerPath.split("/").map(dasherize).join("/")}-controller.ts`,
   );
   let controller: ViewShim["controller"];
-  if (prefix !== "." && fs.existsSync(file)) {
-    const name = `${constantName(prefix)}Controller`;
+  if (controllerPath !== "." && fs.existsSync(file)) {
+    const name = `${constantName(controllerPath)}Controller`;
     const klass = `import(${importPath(shimDir, file)}).${name}`;
     view.push(
       `{ [K in keyof ${klass} as K extends keyof import("@blazetrails/actionpack").ActionController.Base ? never : ${klass}[K] extends (...args: never) => unknown ? never : K]: ${klass}[K] }`,

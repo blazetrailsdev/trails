@@ -331,6 +331,27 @@ describe("runCli", () => {
     );
     expect(layout).not.toContain("Controller");
     expect(layout).toContain("type ObjectLocals = {};");
+    write(
+      cwd,
+      "app/controllers/application-controller.ts",
+      [
+        "export class ApplicationController {",
+        '  static { this.helperMethod(["signedIn", "currentUser"]); }',
+        "  static helperMethod(..._names: unknown[]): void {}",
+        "  private signedIn(): boolean { return true; }",
+        '  private currentUser(): string { return ""; }',
+        "}",
+      ].join("\n"),
+    );
+    buildViews({ cwd });
+    const applicationLayout = fs.readFileSync(
+      path.join(cwd, ".trails/views/layouts/application.html.tse.ts"),
+      "utf8",
+    );
+    expect(applicationLayout).toContain(
+      'import("../../../app/controllers/application-controller.js").ApplicationController',
+    );
+    expect(applicationLayout).toContain("{ signedIn: () => boolean; currentUser: () => string }");
     const notCollection = fs.readFileSync(
       path.join(cwd, ".trails/views/comments/_post.html.tse.ts"),
       "utf8",
@@ -359,13 +380,19 @@ describe("runCli", () => {
       "app/views/posts/edit.html.tse",
       '<%= render({ partial: "posts/form", locals: { post: "y" } }) %>',
     );
+    write(
+      cwd,
+      "app/views/posts/index.html.tse",
+      '<% const formLocals = { post: true }; %><%= render({ partial: "form", locals: formLocals }) %>',
+    );
+    write(cwd, "app/views/posts/other.html.tse", '<%= render("form") %>');
     write(cwd, "app/views/posts/_form.html.tse", "<%= post %><%= title %>");
     write(cwd, "app/views/posts/_strict.html.tse", "<%# locals: (post:) %><%= post %>");
     write(cwd, "app/views/posts/show.html.tse", '<%= render("strict", { post: 1 }) %>');
     buildViews({ cwd });
     const form = fs.readFileSync(path.join(cwd, ".trails/views/posts/_form.html.tse.ts"), "utf8");
     expect(form).toContain(
-      "type ObjectLocals = { post: string | number; title: string | undefined };",
+      "type ObjectLocals = { post: string | boolean | number | undefined; title: string | undefined };",
     );
     const strict = fs.readFileSync(
       path.join(cwd, ".trails/views/posts/_strict.html.tse.ts"),
