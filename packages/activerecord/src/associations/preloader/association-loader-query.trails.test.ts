@@ -16,6 +16,9 @@ describe("Preloader::Association::LoaderQuery", () => {
     expect(big.hash()).toBe(same.hash());
     expect(big.eql(str)).toBe(false);
     expect(big.hash()).not.toBe(str.hash());
+    expect(big.hash()).not.toBe(
+      new LoaderQuery(scopeWith([Number(9223372036854775808n)]), "author_id").hash(),
+    );
     expect(new LoaderQuery(scopeWith([1n]), "author_id").hash()).toBe(
       new LoaderQuery(scopeWith([1]), "author_id").hash(),
     );
