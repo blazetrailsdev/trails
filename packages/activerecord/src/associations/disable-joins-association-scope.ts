@@ -1,5 +1,4 @@
 import { any } from "@blazetrails/activesupport";
-import { Nodes } from "@blazetrails/arel";
 import type { AliasTracker } from "./alias-tracker.js";
 import {
   AssociationScope,
@@ -116,15 +115,15 @@ export class DisableJoinsAssociationScope extends AssociationScope {
     ordered: boolean,
   ): unknown {
     const klass = (reflection as { klass: typeof Base }).klass;
-    let scope: unknown = (
+    let scope = (
       reflection as unknown as {
         buildScope(table?: unknown): unknown;
         aliasedTable?: unknown;
       }
-    ).buildScope((reflection as { aliasedTable?: unknown }).aliasedTable);
+    ).buildScope((reflection as { aliasedTable?: unknown }).aliasedTable) as Relation<Base>;
     scope = (scope as { where: (c: Map<string[], JoinIds>) => unknown }).where(
       new Map([[keyCols, joinIds]]),
-    );
+    ) as Relation<Base>;
 
     const sfa = (
       klass as unknown as { scopeForAssociation?: () => unknown }
@@ -139,34 +138,20 @@ export class DisableJoinsAssociationScope extends AssociationScope {
         "joins",
         "leftOuterJoins",
       );
-      scope = (scope as { merge: (o: unknown) => unknown }).merge(stripped);
+      scope = (scope as { merge: (o: unknown) => unknown }).merge(stripped) as Relation<Base>;
     }
 
     for (const scopeChainItem of reflection.constraints()) {
-      const item = this.evalScope(reflection, scopeChainItem, owner);
-      const itemUnscope = (item as { unscopeValues?: unknown[] }).unscopeValues ?? [];
-      if (itemUnscope.length > 0) {
-        (scope as { unscopeBang: (...v: unknown[]) => unknown }).unscopeBang(...itemUnscope);
-      }
-      const merged = scope as { whereClause: WhereClause; orderValues?: unknown[] };
-      const itemPredicates =
-        (item as { whereClause?: { predicates?: unknown[] } }).whereClause?.predicates ?? [];
-      if (itemPredicates.length > 0) {
-        merged.whereClause = merged.whereClause.plus(
-          new WhereClause(itemPredicates as Nodes.Node[]),
-        );
-      }
-      const itemOrders = (item as { orderValues?: unknown[] }).orderValues ?? [];
-      if (itemOrders.length > 0) {
-        merged.orderValues = unionOrderClauses(itemOrders, merged.orderValues ?? []);
-      }
-      scope = merged;
+      const item = this.evalScope(reflection, scopeChainItem, owner) as Relation<Base>;
+      scope.unscopeBang(...item.unscopeValues);
+      scope.whereClause = scope.whereClause.plus(item.whereClause);
+      scope.orderValues = unionOrderClauses(item.orderValues, scope.orderValues) as never;
     }
 
     const finalOrd = scope as { orderValues?: unknown[] };
     const finalOrders = (finalOrd.orderValues?.length ?? 0) > 0 ? [1] : [];
     if (finalOrders.length === 0 && ordered) {
-      if ((scope as { _isNone: boolean })._isNone) return scope;
+      if ((scope as unknown as { _isNone: boolean })._isNone) return scope;
       const Ctor = relationClassFor.call(DisableJoinsAssociationRelation, klass);
       const split =
         keyCols.length === 1
