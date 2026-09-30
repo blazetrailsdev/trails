@@ -58,6 +58,8 @@ import {
 } from "@blazetrails/actionview";
 import {
   Base as ActionViewBase,
+  Rendering as ActionViewRendering,
+  _normalizeArgs,
   _processFormat,
   buildViewContextClass,
   isInheritViewContextClass,
@@ -161,9 +163,9 @@ import {
 import {
   DEFAULT_PROTECTED_INSTANCE_VARIABLES,
   DoubleRenderError,
+  Rendering as AbstractControllerRendering,
   render as abstractRender,
   viewAssigns,
-  _normalizeArgs,
   _normalizeRender,
 } from "../abstract-controller/rendering.js";
 
@@ -856,6 +858,8 @@ export class Base extends Metal {
   }
 }
 
+include(Base, AbstractControllerRendering);
+include(Base, ActionViewRendering);
 include(Base, ConfigMethods);
 include(Base, Cookies);
 Base.prototype.redirectBack = redirectBack;
@@ -867,11 +871,7 @@ include(Base, StrongParametersModule);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
 Base.prototype._processOptions = _processOptions;
 Base.prototype._renderTemplate = _renderTemplate;
-Base.prototype.viewRenderer = viewRenderer;
-Base.prototype._processFormat = _processFormat;
 Base.prototype._processVariant = _processVariant;
-Base.prototype._normalizeRender = _normalizeRender;
-Base.prototype._normalizeArgs = _normalizeArgs;
 Base.prototype._normalizeOptions = _normalizeOptions;
 Base.prototype.renderToString = renderToString;
 Base.prototype._setHtmlContentType = _setHtmlContentType;

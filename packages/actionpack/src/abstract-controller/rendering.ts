@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, Module } from "@blazetrails/ruby-compat";
 import { AbstractControllerError } from "./error.js";
 
 const DEFAULT_DOUBLE_RENDER_MESSAGE =
@@ -122,3 +122,16 @@ export function _processFormat(_format: unknown): void {}
 export function _protectedIvars(): readonly string[] {
   return DEFAULT_PROTECTED_INSTANCE_VARIABLES;
 }
+
+export const Rendering = new Module((mod) => {
+  mod.defineMethod("render", render);
+  mod.defineMethod("renderToString", renderToString);
+  mod.defineMethod("viewAssigns", viewAssigns);
+  mod.defineMethod("_normalizeArgs", _normalizeArgs);
+  mod.defineMethod("_normalizeOptions", _normalizeOptions);
+  mod.defineMethod("_processOptions", _processOptions);
+  mod.defineMethod("_processFormat", _processFormat);
+  mod.defineMethod("_processVariant", _processVariant);
+  mod.defineMethod("_normalizeRender", _normalizeRender);
+  mod.defineMethod("_protectedIvars", _protectedIvars);
+});
