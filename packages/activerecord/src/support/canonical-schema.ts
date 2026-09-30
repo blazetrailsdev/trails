@@ -1131,6 +1131,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("parrot_sti_class");
     t.integer("killer_id");
     t.integer("updated_count", { default: 0 });
+    t.integer("integer", { default: 0 });
     t.datetime("created_at", { precision: 0 });
     t.datetime("created_on", { precision: 0 });
     t.datetime("updated_at", { precision: 0 });
@@ -1463,6 +1464,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.integer("toy_id");
     t.string("name");
     t.integer("pet_id");
+    t.integer("integer");
     t.datetime("created_at", { null: false });
     t.datetime("updated_at", { null: false });
   });

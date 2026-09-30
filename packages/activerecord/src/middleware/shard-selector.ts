@@ -1,6 +1,6 @@
 import { fetch } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
-import { Notifications, TopLevel } from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/activesupport";
 
 export interface ShardRequest {
   method: string;
@@ -31,30 +31,6 @@ export class ShardSelector {
     const shard = this.selectedShard(request);
 
     return this.setShard(shard, () => this.app(env));
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE mirrors Resolver#instrumenter (middleware/database_selector/resolver.rb:33), which ShardSelector has no counterpart for.
-   */
-  instrumenter(): typeof Notifications {
-    return Notifications;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE ShardSelector#resolver (middleware/shard_selector.rb:38) under a longer name; the Rails spelling is the convergence.
-   */
-  shardResolver(): ShardResolverFn {
-    return this.resolver;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE the `lock` read off ShardSelector#options (middleware/shard_selector.rb:38), which Ruby indexes inline at its use site.
-   */
-  shardSelectorStrategy(): { lock: boolean } {
-    return { lock: this.options.lock ?? true };
   }
 
   /** @internal */

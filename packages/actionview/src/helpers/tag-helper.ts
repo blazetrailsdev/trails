@@ -12,12 +12,7 @@ import {
   isPresent,
   unwrappedHtmlEscape,
 } from "@blazetrails/activesupport";
-import {
-  raw as _raw,
-  safeJoin as _safeJoin,
-  toSentence as _toSentence,
-  type ToSentenceOptions,
-} from "./output-safety-helper.js";
+import { safeJoin } from "./output-safety-helper.js";
 import {
   ArgumentError,
   BigDecimal,
@@ -573,21 +568,6 @@ export class TagBuilder {
 /** @internal */
 export function tagBuilder(this: TagHelperHost): TagBuilder {
   return (this._tagBuilder ??= createTagBuilderProxy(this));
-}
-
-export function raw(stringish: unknown): SafeBuffer {
-  return _raw(stringish);
-}
-
-export function safeJoin(
-  array: unknown[] | Hash<unknown, unknown> | Record<string, unknown>,
-  sep?: string | SafeBuffer | null,
-): SafeBuffer {
-  return _safeJoin(array, sep);
-}
-
-export function toSentence(array: unknown[], options?: ToSentenceOptions): SafeBuffer {
-  return _toSentence(array, options);
 }
 
 function createTagBuilderProxy(viewContext: TagHelperHost): TagBuilder {

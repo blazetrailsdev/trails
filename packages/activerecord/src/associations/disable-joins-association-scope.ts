@@ -142,12 +142,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       scope = (scope as { merge: (o: unknown) => unknown }).merge(stripped);
     }
 
-    const constraints =
-      (
-        reflection as { constraints?: () => Array<(...args: unknown[]) => unknown> }
-      ).constraints?.() ?? [];
-    for (const scopeChainItem of constraints) {
-      if (typeof scopeChainItem !== "function") continue;
+    for (const scopeChainItem of reflection.constraints()) {
       const item = this.evalScope(reflection, scopeChainItem, owner);
       const itemUnscope = (item as { unscopeValues?: unknown[] }).unscopeValues ?? [];
       if (itemUnscope.length > 0) {

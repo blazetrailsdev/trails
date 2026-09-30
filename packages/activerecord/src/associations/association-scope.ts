@@ -212,12 +212,7 @@ export class AssociationScope {
     const chainHead = chain[0];
     for (let i = chain.length - 1; i >= 0; i--) {
       const reflection = chain[i];
-      const constraints =
-        (
-          reflection as { constraints?: () => Array<(...args: unknown[]) => unknown> }
-        ).constraints?.() ?? [];
-      for (const scopeChainItem of constraints) {
-        if (typeof scopeChainItem !== "function") continue;
+      for (const scopeChainItem of reflection.constraints()) {
         const item = this.evalScope(reflection, scopeChainItem, owner);
 
         if (scopeChainItem === (chainHead as { scope?: unknown } | undefined)?.scope) {
