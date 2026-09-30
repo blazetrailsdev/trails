@@ -12,6 +12,7 @@ import {
   type FilterListEntry,
   type Included,
 } from "@blazetrails/activesupport";
+import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import { b, KeyError, merge, SecureRandom, StringIO } from "@blazetrails/ruby-compat";
 import {
   DEFAULT_OPTIONS,
@@ -117,7 +118,7 @@ class Encoder {
 
 include(Encoder, RackTestUtils);
 
-export class TestCase {
+export class TestCase extends ActiveSupportTestCase {
   /** @internal */
   declare static _controllerClass: ControllerClass | null | undefined;
   declare static is_controllerClass: boolean;
@@ -163,12 +164,12 @@ export class TestCase {
     return typeof candidate === "function" ? (candidate as ControllerClass) : null;
   }
 
-  static setup(this: { prototype: object }, ...args: FilterListEntry<object>[]): void {
-    SetupAndTeardown.setup.call(this.prototype, ...args);
+  static override setup(this: object, ...args: FilterListEntry<object>[]): void {
+    SetupAndTeardown.setup.call((this as { prototype: object }).prototype, ...args);
   }
 
-  static teardown(this: { prototype: object }, ...args: FilterListEntry<object>[]): void {
-    SetupAndTeardown.teardown.call(this.prototype, ...args);
+  static override teardown(this: object, ...args: FilterListEntry<object>[]): void {
+    SetupAndTeardown.teardown.call((this as { prototype: object }).prototype, ...args);
   }
 
   static withRouting(
@@ -178,14 +179,24 @@ export class TestCase {
     routingAssertions.ClassMethods.withRouting.call(this, block);
   }
 
-  /** @internal */
-  beforeSetup(): void {
-    SetupAndTeardown.beforeSetup.call(this);
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE active-support-test-case-carries-setup-and-teardown-instance-side
+   */
+  beforeSetup(): unknown {
+    const result = super.beforeSetup?.();
+    return result instanceof Promise
+      ? result.then(() => SetupAndTeardown.beforeSetup.call(this))
+      : SetupAndTeardown.beforeSetup.call(this);
   }
 
-  /** @internal */
-  afterTeardown(test: Parameters<typeof SetupAndTeardown.afterTeardown>[0]): void {
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE active-support-test-case-carries-setup-and-teardown-instance-side
+   */
+  afterTeardown(test: Parameters<typeof SetupAndTeardown.afterTeardown>[0]): unknown {
     SetupAndTeardown.afterTeardown.call(this, test);
+    return super.afterTeardown?.(test as never);
   }
 
   setup(): void {
@@ -246,6 +257,7 @@ export class TestCase {
   }
 
   constructor(controllerClass: ControllerClass) {
+    super("");
     this._controllerClass = controllerClass;
     this.setupControllerRequestAndResponse();
   }
