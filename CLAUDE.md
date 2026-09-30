@@ -241,7 +241,11 @@ Two rules of thumb cover every field, including ones this table forgets:
 
 - **Rewriting what the work IS** — retitling, resizing `est-loc`, adding a
   dependency, rewriting acceptance criteria — is a markdown edit. Edit the file,
-  commit, open a PR; ingest picks it up when the PR merges.
+  commit, open a PR; ingest picks it up when the PR merges. The one exception
+  is dependency wiring: `tasks set-deps <id> <csv>` (or `--add a,b` /
+  `--remove a,b`; `tasks set-deps-rfc` for `deps-rfc`) rewrites the file on
+  main, refuses a dangling reference or a cycle, commits, pushes and ingests —
+  use it instead of hand-editing `deps:` and asking to push to main.
 - **Recording what HAPPENED to the work** — claimed, in progress, done, blocked,
   closed — is a verb: `tasks claim <id>` (`--assignee <name>` for `assignee`),
   `tasks in-progress <id> --pr trails#N`, `tasks done <id> --pr trails#N`
