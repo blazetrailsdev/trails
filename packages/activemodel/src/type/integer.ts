@@ -1,5 +1,5 @@
 import { isBlank, registerConstant } from "@blazetrails/activesupport";
-import { rbDeclareIvar, toI } from "@blazetrails/ruby-compat";
+import { Range, rbDeclareIvar, toI } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 import { RangeError } from "../errors.js";
 import { applyNumericMixin, isNonNumericString } from "./helpers/numeric.js";
@@ -9,8 +9,11 @@ const DEFAULT_LIMIT = 4;
 const NumericValueType = applyNumericMixin(ValueType<number | bigint>);
 
 export class IntegerType extends NumericValueType {
+  protected _range: Range<number | bigint>;
+
   constructor(options?: { precision?: number; scale?: number; limit?: number }) {
     super(options);
+    this._range = new Range(this.minValue(), this.maxValue(), true);
   }
 
   type(): string {
@@ -39,24 +42,13 @@ export class IntegerType extends NumericValueType {
   }
 
   /** @internal */
-  protected get range(): [number, number] {
-    return [this.minValue(), this.maxValue()];
+  protected get range(): Range<number | bigint> {
+    return this._range;
   }
 
   /** @internal */
   protected isInRange(value: number | bigint | null): boolean {
-    if (value == null) return true;
-    const [min, max] = this.range;
-    let big: bigint;
-    if (typeof value === "bigint") {
-      big = value;
-    } else {
-      if (!isFinite(value)) return false;
-      big = BigInt(Math.trunc(value));
-    }
-    const lowerOk = min === Number.NEGATIVE_INFINITY || big >= BigInt(min);
-    const upperOk = max === Number.POSITIVE_INFINITY || big < BigInt(max);
-    return lowerOk && upperOk;
+    return value == null || this.range.isInclude(value);
   }
 
   /** @internal */
@@ -80,12 +72,12 @@ export class IntegerType extends NumericValueType {
   }
 
   /** @internal */
-  protected maxValue(): number {
-    return 2 ** (this._limit() * 8 - 1);
+  protected maxValue(): number | bigint {
+    return this.narrowBigInt(1n << BigInt(this._limit() * 8 - 1));
   }
 
   /** @internal */
-  protected minValue(): number {
+  protected minValue(): number | bigint {
     return -this.maxValue();
   }
 

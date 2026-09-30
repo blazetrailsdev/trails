@@ -689,7 +689,7 @@ function fieldIvar(obj: object, field: string): string {
 }
 
 function idForVar(obj: object, iv: string): string {
-  if (!/^@[A-Za-z_][A-Za-z0-9_]*$/.test(iv)) {
+  if (!/^@[A-Za-z_\u0080-\u{10FFFF}][A-Za-z0-9_\u0080-\u{10FFFF}]*$/u.test(iv)) {
     throw new NameError(`\`${iv}' is not allowed as an instance variable name`, iv, {
       receiver: obj,
     });
@@ -712,15 +712,18 @@ export function rbObjInstanceVariables(obj: object): string[] {
 
 /**
  * `Kernel#instance_variable_get` (`rb_obj_ivar_get`, `vendor/ruby/v3.3.11/object.c:2880`):
- * the value of ivar `iv`, or `nil` when it is not set. A name that is not an
- * ivar name raises `NameError`.
+ * the value of ivar `iv`, or `nil` when `obj` has no own field for it
+ * (`rb_ivar_get`, `vendor/ruby/v3.3.11/variable.c:1405`), never an inherited
+ * method or accessor. A name that is not an ivar name (`rb_is_instance_name`,
+ * where a non-ASCII character is an identifier character) raises `NameError`.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#instance_variable_get`
  * (`vendor/ruby/v3.3.11/object.c:2880`).
  */
 export function rbObjIvarGet(obj: object, iv: string): unknown {
   const id = idForVar(obj, iv);
-  return (obj as Record<string, unknown>)[ivarField(obj, id)] ?? null;
+  const field = ivarField(obj, id);
+  return Object.hasOwn(obj, field) ? (obj as Record<string, unknown>)[field] : null;
 }
 
 /**

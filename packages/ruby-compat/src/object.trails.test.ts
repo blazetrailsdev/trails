@@ -250,6 +250,9 @@ describe("Kernel#instance_variable_get / instance_variable_set", () => {
     expect(rbObjIvarGet(o, "@items")).toEqual([2]);
     expect(rbObjIvarGet(o, "@foo_bar")).toBe(1);
     expect(rbObjIvarGet(o, "@missing")).toBeNull();
+    expect(rbObjIvarGet(new SubHolder(), "@constructor")).toBeNull();
+    rbObjIvarSet(o, "@é", 4);
+    expect(rbObjIvarGet(o, "@é")).toBe(4);
     rbObjIvarSet(o, "@_cache_key", 3);
     expect(Object.hasOwn(o, "_cacheKey")).toBe(true);
     expect(rbObjInstanceVariables(o)).toContain("@_cache_key");
@@ -261,6 +264,7 @@ describe("Kernel#instance_variable_get / instance_variable_set", () => {
 
   it("raises NameError for a name that is not an ivar name", () => {
     expect(() => rbObjIvarGet(new Holder(), "foo")).toThrow(NameError);
+    expect(() => rbObjIvarGet(new Holder(), "@1a")).toThrow(NameError);
     expect(() => rbObjIvarSet(new Holder(), "foo", 1)).toThrow(
       "`foo' is not allowed as an instance variable name",
     );
