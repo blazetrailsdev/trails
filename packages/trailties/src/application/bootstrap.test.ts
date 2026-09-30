@@ -5,7 +5,6 @@ import { Bootstrap, type BootstrapConfig, type BootstrapHost } from "./bootstrap
 import { Trails } from "../rails.js";
 
 class TestApp extends Bootstrap implements BootstrapHost {
-  logger: Logger | null = null;
   config: BootstrapConfig = { activeSupport: {} };
 }
 
@@ -13,10 +12,12 @@ describe("Bootstrap", () => {
   beforeEach(() => {
     resetLoadHooks();
     Trails.cache = null;
+    Trails.logger = null;
   });
   afterEach(() => {
     resetLoadHooks();
     Trails.cache = null;
+    Trails.logger = null;
   });
 
   describe("class shape", () => {
@@ -31,28 +32,28 @@ describe("Bootstrap", () => {
       const custom = new Logger(null);
       app.config = { activeSupport: {}, logger: custom };
       await app.runInitializers("all");
-      expect(app.logger).toBe(custom);
+      expect(Trails.logger).toBe(custom);
     });
 
     it("falls back to a NullLogger when config.logger is unset", async () => {
       const app = new TestApp();
       await app.runInitializers("all");
-      expect(app.logger).toBeInstanceOf(NullLogger);
+      expect(Trails.logger).toBeInstanceOf(NullLogger);
     });
 
     it("applies config.logLevel to the resulting logger", async () => {
       const app = new TestApp();
       app.config = { activeSupport: {}, logLevel: "warn" };
       await app.runInitializers("all");
-      expect(app.logger?.level).toBe(Logger.WARN);
+      expect(Trails.logger?.level).toBe(Logger.WARN);
     });
 
     it("preserves a pre-existing logger", async () => {
       const app = new TestApp();
       const preset = new Logger(null);
-      app.logger = preset;
+      Trails.logger = preset;
       await app.runInitializers("all");
-      expect(app.logger).toBe(preset);
+      expect(Trails.logger).toBe(preset);
     });
   });
 

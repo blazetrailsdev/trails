@@ -214,6 +214,7 @@ describe("Application", () => {
   describe("initialize!", () => {
     afterEach(() => {
       Trails.application = null;
+      Trails.logger = null;
     });
 
     it("returns false from initialized? before initialize() is called", () => {
@@ -228,7 +229,7 @@ describe("Application", () => {
       const app = IApp2.instance();
       await app.initialize();
       expect(app.initialized()).toBe(true);
-      expect(app.logger).toBeInstanceOf(NullLogger);
+      expect(Trails.logger).toBeInstanceOf(NullLogger);
       expect(Trails.cache).toBeInstanceOf(FileStore);
     });
 
