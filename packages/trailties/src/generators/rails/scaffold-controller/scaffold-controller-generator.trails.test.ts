@@ -3,7 +3,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { registerConstant, unregisterConstant } from "@blazetrails/activesupport";
-import { ScaffoldControllerGenerator } from "./scaffold-controller-generator.js";
+import {
+  ScaffoldControllerGenerator,
+  type ScaffoldControllerGeneratorOptions,
+} from "./scaffold-controller-generator.js";
 import { ActionController, RouteSet, controllerConstants } from "@blazetrails/actionpack";
 import { bodyToString } from "@blazetrails/rack";
 
@@ -76,5 +79,44 @@ describe("ScaffoldControllerGenerator (class collisions)", () => {
       unregisterConstant("Admin::UsersController", UsersController);
       unregisterConstant("Admin", Admin);
     }
+  });
+});
+
+describe("ScaffoldControllerGenerator (route helper declarations)", () => {
+  let tmpDir: string;
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sc-helpers-"));
+    fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
+    fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, "config/routes.ts"),
+      "export function drawRoutes(mapper: Mapper): void {\n}\n",
+    );
+  });
+  afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
+
+  const controller = () =>
+    fs.readFileSync(path.join(tmpDir, "app/controllers/posts-controller.ts"), "utf-8");
+
+  it("declares the index path helper the destroy redirect calls", async () => {
+    await ScaffoldControllerGenerator.start(["Post", "title:string"], {
+      cwd: tmpDir,
+      output: () => {},
+    });
+
+    const content = controller();
+    expect(content).toContain("declare postsPath: (...args: unknown[]) => string;");
+    expect(content).toContain("this.redirectTo(this.postsPath(),");
+  });
+
+  it("declares no path helper for an api controller, which redirects nowhere", async () => {
+    const options: Partial<ScaffoldControllerGeneratorOptions> = { api: true };
+    await ScaffoldControllerGenerator.start(["Post", "title:string"], {
+      cwd: tmpDir,
+      output: () => {},
+      ...options,
+    });
+
+    expect(controller()).not.toContain("postsPath");
   });
 });

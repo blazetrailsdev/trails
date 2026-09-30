@@ -55,6 +55,13 @@ export class ScaffoldControllerGenerator extends NamedBase {
           ? [
               tsField(this.pluralTableName(), `${modelClassName}[]`, { declare: true }),
               tsField(singular, modelClassName, { declare: true }),
+              ...(api
+                ? []
+                : [
+                    tsField(`${this.indexHelper()}Path`, "(...args: unknown[]) => string", {
+                      declare: true,
+                    }),
+                  ]),
             ]
           : [],
         methods: api
