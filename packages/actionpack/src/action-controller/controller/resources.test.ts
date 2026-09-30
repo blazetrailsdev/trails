@@ -117,7 +117,9 @@ describe("ResourcesTest", () => {
 
   it("test_irregular_id_with_no_constraints_should_raise_error", () => {
     const host = makeHost();
-    host.routes!.draw((m) => m.resources("messages"));
+    host.routes!.draw(function () {
+      this.resources("messages");
+    });
     expect(() =>
       assertRecognizes.call(
         host,
@@ -129,9 +131,9 @@ describe("ResourcesTest", () => {
 
   it("test_irregular_id_with_constraints_should_pass", () => {
     const host = makeHost();
-    host.routes!.draw((m) =>
-      m.resources("messages", { constraints: { id: /[0-9]\.[0-9]\.[0-9]/ } }),
-    );
+    host.routes!.draw(function () {
+      this.resources("messages", { constraints: { id: /[0-9]\.[0-9]\.[0-9]/ } });
+    });
     assertRecognizes.call(
       host,
       { controller: "messages", action: "show", id: "1.1.1" },
@@ -141,11 +143,11 @@ describe("ResourcesTest", () => {
 
   it("test_with_path_prefix_constraints", () => {
     const host = makeHost();
-    host.routes!.draw((m) =>
-      m.scope("/thread/:thread_id", (m) =>
-        m.resources("messages", { constraints: { thread_id: /[0-9]\.[0-9]\.[0-9]/ } }),
-      ),
-    );
+    host.routes!.draw(function () {
+      this.scope("/thread/:thread_id", () =>
+        this.resources("messages", { constraints: { thread_id: /[0-9]\.[0-9]\.[0-9]/ } }),
+      );
+    });
     assertRecognizes.call(
       host,
       { controller: "messages", action: "show", thread_id: "1.1.1", id: "1" },
@@ -213,7 +215,9 @@ describe("ResourcesTest", () => {
 
   it("test_should_not_allow_delete_or_patch_or_put_on_collection_path", () => {
     const host = makeHost();
-    host.routes!.draw((m) => m.resources("messages"));
+    host.routes!.draw(function () {
+      this.resources("messages");
+    });
     assertNotRecognizes(
       host,
       { controller: "messages", action: "update" },
@@ -253,7 +257,9 @@ describe("ResourcesTest", () => {
 
   it("test_resource_has_only_show_action", () => {
     const host = makeHost();
-    host.routes!.draw((m) => m.resources("products", { only: "show" }));
+    host.routes!.draw(function () {
+      this.resources("products", { only: "show" });
+    });
     assertResourceAllowedRoutes(host, "products", {}, { id: "1" }, "show", [
       "index",
       "new",
@@ -266,7 +272,9 @@ describe("ResourcesTest", () => {
 
   it("test_resource_has_only_show_action_with_string_value", () => {
     const host = makeHost();
-    host.routes!.draw((m) => m.resources("products", { only: "show" }));
+    host.routes!.draw(function () {
+      this.resources("products", { only: "show" });
+    });
     assertResourceAllowedRoutes(host, "products", {}, { id: "1" }, "show", [
       "index",
       "new",
@@ -279,7 +287,9 @@ describe("ResourcesTest", () => {
 
   it("test_singleton_resource_has_only_show_action", () => {
     const host = makeHost();
-    host.routes!.draw((m) => m.resource("account", { only: "show" }));
+    host.routes!.draw(function () {
+      this.resource("account", { only: "show" });
+    });
     assertSingletonResourceAllowedRoutes(host, "accounts", {}, "show", [
       "new",
       "create",
@@ -291,7 +301,9 @@ describe("ResourcesTest", () => {
 
   it("test_singleton_resource_has_only_show_action_with_string_value", () => {
     const host = makeHost();
-    host.routes!.draw((m) => m.resource("account", { only: "show" }));
+    host.routes!.draw(function () {
+      this.resource("account", { only: "show" });
+    });
     assertSingletonResourceAllowedRoutes(host, "accounts", {}, "show", [
       "new",
       "create",
@@ -303,7 +315,9 @@ describe("ResourcesTest", () => {
 
   it("test_resource_does_not_have_destroy_action", () => {
     const host = makeHost();
-    host.routes!.draw((m) => m.resources("products", { except: "destroy" }));
+    host.routes!.draw(function () {
+      this.resources("products", { except: "destroy" });
+    });
     assertResourceAllowedRoutes(
       host,
       "products",
@@ -316,7 +330,9 @@ describe("ResourcesTest", () => {
 
   it("test_singleton_resource_does_not_have_destroy_action", () => {
     const host = makeHost();
-    host.routes!.draw((m) => m.resource("account", { except: "destroy" }));
+    host.routes!.draw(function () {
+      this.resource("account", { except: "destroy" });
+    });
     assertSingletonResourceAllowedRoutes(
       host,
       "accounts",
@@ -352,11 +368,11 @@ describe("ResourcesTest", () => {
 
   it("test_nested_resource_does_not_inherit_only_option", () => {
     const host = makeHost();
-    host.routes!.draw((m) =>
-      m.resources("products", { only: "show" }, (r) =>
-        r.resources("images", { except: "destroy" }),
-      ),
-    );
+    host.routes!.draw(function () {
+      this.resources("products", { only: "show" }, () =>
+        this.resources("images", { except: "destroy" }),
+      );
+    });
     assertResourceAllowedRoutes(
       host,
       "images",
@@ -370,9 +386,9 @@ describe("ResourcesTest", () => {
 
   it("test_nested_resource_does_not_inherit_only_option_by_default", () => {
     const host = makeHost();
-    host.routes!.draw((m) =>
-      m.resources("products", { only: "show" }, (r) => r.resources("images")),
-    );
+    host.routes!.draw(function () {
+      this.resources("products", { only: "show" }, () => this.resources("images"));
+    });
     assertResourceAllowedRoutes(
       host,
       "images",
@@ -386,11 +402,11 @@ describe("ResourcesTest", () => {
 
   it("test_nested_resource_does_not_inherit_except_option", () => {
     const host = makeHost();
-    host.routes!.draw((m) =>
-      m.resources("products", { except: "show" }, (r) =>
-        r.resources("images", { only: "destroy" }),
-      ),
-    );
+    host.routes!.draw(function () {
+      this.resources("products", { except: "show" }, () =>
+        this.resources("images", { only: "destroy" }),
+      );
+    });
     assertResourceAllowedRoutes(
       host,
       "images",
@@ -404,9 +420,9 @@ describe("ResourcesTest", () => {
 
   it("test_nested_resource_does_not_inherit_except_option_by_default", () => {
     const host = makeHost();
-    host.routes!.draw((m) =>
-      m.resources("products", { except: "show" }, (r) => r.resources("images")),
-    );
+    host.routes!.draw(function () {
+      this.resources("products", { except: "show" }, () => this.resources("images"));
+    });
     assertResourceAllowedRoutes(
       host,
       "images",
@@ -420,13 +436,17 @@ describe("ResourcesTest", () => {
 
   it("test_default_singleton_restful_route_uses_get", () => {
     const host = makeHost();
-    host.routes!.draw((m) => m.resource("product"));
+    host.routes!.draw(function () {
+      this.resource("product");
+    });
     assertRouting.call(host, "/product", { controller: "products", action: "show" });
   });
 
   it("test_assert_routing_accepts_all_as_a_valid_method", () => {
     const host = makeHost();
-    host.routes!.draw((m) => m.match("/products", { to: "products#show", via: ":all" }));
+    host.routes!.draw(function () {
+      this.match("/products", { to: "products#show", via: ":all" });
+    });
     assertRouting.call(
       host,
       { path: "/products", method: "all" },
@@ -436,9 +456,9 @@ describe("ResourcesTest", () => {
 
   it("test_assert_routing_fails_when_not_all_http_methods_are_recognized", () => {
     const host = makeHost();
-    host.routes!.draw((m) =>
-      m.match("/products", { to: "products#show", via: ["get", "post", "put"] }),
-    );
+    host.routes!.draw(function () {
+      this.match("/products", { to: "products#show", via: ["get", "post", "put"] });
+    });
     expect(() =>
       assertRouting.call(
         host,

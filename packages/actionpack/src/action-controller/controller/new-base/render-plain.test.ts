@@ -85,9 +85,9 @@ describe("RenderPlainTest", () => {
   it("rendering text from an action with default options renders the text with the layout", async () => {
     const t = new RenderPlainTest();
     await t.withRouting(async (set: RouteSet) => {
-      set.draw((r) => {
+      set.draw(function () {
         deprecator().silence(() => {
-          r.get(":controller", { action: "index" });
+          this.get(":controller", { action: "index" });
         });
       });
 
@@ -100,9 +100,9 @@ describe("RenderPlainTest", () => {
   it("rendering text from an action with default options renders the text without the layout", async () => {
     const t = new RenderPlainTest();
     await t.withRouting(async (set: RouteSet) => {
-      set.draw((r) => {
+      set.draw(function () {
         deprecator().silence(() => {
-          r.get(":controller", { action: "index" });
+          this.get(":controller", { action: "index" });
         });
       });
 

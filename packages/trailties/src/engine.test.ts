@@ -303,7 +303,7 @@ describe("Engine", () => {
       this.get("/mounted", { to: "mounted#index" });
     });
     expect(r1).toBeInstanceOf(RouteSet);
-    expect(MountedEngine.instance().routes(() => {})).toBe(r1);
+    expect(MountedEngine.instance().routes(function () {})).toBe(r1);
     expect(MountedEngine.instance().hasRoutes()).toBe(true);
   });
 

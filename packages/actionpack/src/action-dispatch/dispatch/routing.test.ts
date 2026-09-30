@@ -127,8 +127,8 @@ class EchoParamsController {
 describe("TestRoutingMapper", () => {
   it("logout", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.delete("/logout", { to: "sessions#destroy", as: "logout" });
+    routes.draw(function () {
+      this.delete("/logout", { to: "sessions#destroy", as: "logout" });
     });
     const m = routes.recognizePath("/logout", { method: "delete" });
     expect(m.controller).toBe("sessions");
@@ -138,9 +138,9 @@ describe("TestRoutingMapper", () => {
 
   it("login", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/login", { to: "sessions#new", as: "login" });
-      r.post("/login", { to: "sessions#create" });
+    routes.draw(function () {
+      this.get("/login", { to: "sessions#new", as: "login" });
+      this.post("/login", { to: "sessions#create" });
     });
     const getM = routes.recognizePath("/login");
     expect(getM.action).toBe("new");
@@ -151,8 +151,8 @@ describe("TestRoutingMapper", () => {
 
   it("session singleton resource", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resource("session");
+    routes.draw(function () {
+      this.resource("session");
     });
 
     expect(routes.recognizePath("/session").action).toBe("show");
@@ -170,8 +170,8 @@ describe("TestRoutingMapper", () => {
 
   it("projects (resources)", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("projects");
+    routes.draw(function () {
+      this.resources("projects");
     });
 
     expect(routes.recognizePath("/projects").action).toBe("index");
@@ -191,9 +191,9 @@ describe("TestRoutingMapper", () => {
 
   it("admin (namespace)", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("admin", (r) => {
-        r.resources("users");
+    routes.draw(function () {
+      this.namespace("admin", () => {
+        this.resources("users");
       });
     });
 
@@ -205,8 +205,8 @@ describe("TestRoutingMapper", () => {
 
   it("root", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.root("pages#home");
+    routes.draw(function () {
+      this.root("pages#home");
     });
     const m = routes.recognizePath("/");
     expect(m.controller).toBe("pages");
@@ -216,9 +216,9 @@ describe("TestRoutingMapper", () => {
 
   it("scoped root", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.scope("/api", { as: "api" }, (r) => {
-        r.get("/status", { to: "status#show", as: "status" });
+    routes.draw(function () {
+      this.scope("/api", { as: "api" }, () => {
+        this.get("/status", { to: "status#show", as: "status" });
       });
     });
     expect(() => routes.recognizePath("/api/status")).not.toThrow();
@@ -227,10 +227,10 @@ describe("TestRoutingMapper", () => {
 
   it("nested namespace", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("api", (r) => {
-        r.namespace("v1", (r) => {
-          r.resources("articles");
+    routes.draw(function () {
+      this.namespace("api", () => {
+        this.namespace("v1", () => {
+          this.resources("articles");
         });
       });
     });
@@ -241,9 +241,9 @@ describe("TestRoutingMapper", () => {
 
   it("nested resources", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("posts", (r) => {
-        r.resources("comments");
+    routes.draw(function () {
+      this.resources("posts", () => {
+        this.resources("comments");
       });
     });
     const m = routes.recognizePath("/posts/3/comments/7");
@@ -253,8 +253,8 @@ describe("TestRoutingMapper", () => {
 
   it("match with multiple via", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.match("/search", { to: "search#index", via: ["GET", "POST"], as: "search" });
+    routes.draw(function () {
+      this.match("/search", { to: "search#index", via: ["GET", "POST"], as: "search" });
     });
     expect(() => routes.recognizePath("/search")).not.toThrow();
     expect(() => routes.recognizePath("/search", { method: "post" })).not.toThrow();
@@ -263,11 +263,11 @@ describe("TestRoutingMapper", () => {
 
   it("multiple draw calls append routes", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/a", { to: "a#index" });
+    routes.draw(function () {
+      this.get("/a", { to: "a#index" });
     });
-    routes.draw((r) => {
-      r.get("/b", { to: "b#index" });
+    routes.draw(function () {
+      this.get("/b", { to: "b#index" });
     });
     expect(() => routes.recognizePath("/a")).not.toThrow();
     expect(() => routes.recognizePath("/b")).not.toThrow();
@@ -275,8 +275,8 @@ describe("TestRoutingMapper", () => {
 
   it("constraints on dynamic segments", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id", { to: "posts#show", as: "post", constraints: { id: /\d+/ } });
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show", as: "post", constraints: { id: /\d+/ } });
     });
     expect(() => routes.recognizePath("/posts/42")).not.toThrow();
     expect(() => routes.recognizePath("/posts/abc")).toThrow(RoutingError);
@@ -284,17 +284,17 @@ describe("TestRoutingMapper", () => {
 
   it("named routes", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/about", { to: "pages#about", as: "about" });
+    routes.draw(function () {
+      this.get("/about", { to: "pages#about", as: "about" });
     });
     expect(routes.pathFor({}, "about")).toBe("/about");
   });
 
   it("getRoutes lists all routes", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.root("pages#home");
-      r.resources("posts");
+    routes.draw(function () {
+      this.root("pages#home");
+      this.resources("posts");
     });
     expect(routes.routes.routes.length).toBe(9);
   });
@@ -311,8 +311,8 @@ describe("TestRoutingMapper", () => {
 
   it("dispatches matched route", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id", { to: "posts#show" });
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show" });
     });
     controllerConstants.set(
       "posts",
@@ -332,8 +332,8 @@ describe("TestRoutingMapper", () => {
   it("sets action_dispatch.request.path_parameters", async () => {
     controllerConstants.delete("posts");
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id", { to: "posts#show" });
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show" });
     });
     const env: Record<string, unknown> = {
       REQUEST_METHOD: "GET",
@@ -348,8 +348,8 @@ describe("TestRoutingMapper", () => {
 
   it("session singleton resource for api app", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resource("session", { except: ["new", "edit"] });
+    routes.draw(function () {
+      this.resource("session", { except: ["new", "edit"] });
     });
     expect(routes.recognizePath("/session").action).toBe("show");
     expect(routes.recognizePath("/session", { method: "post" }).action).toBe("create");
@@ -360,8 +360,8 @@ describe("TestRoutingMapper", () => {
 
   it("resource routes with only and except", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resource("post", { only: ["show", "update", "destroy"] });
+    routes.draw(function () {
+      this.resource("post", { only: ["show", "update", "destroy"] });
     });
     expect(routes.recognizePath("/post").action).toBe("show");
     expect(routes.recognizePath("/post", { method: "put" }).action).toBe("update");
@@ -373,8 +373,8 @@ describe("TestRoutingMapper", () => {
 
   it("resource routes only create update destroy", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resource("profile", { only: ["create", "update", "destroy"] });
+    routes.draw(function () {
+      this.resource("profile", { only: ["create", "update", "destroy"] });
     });
     expect(routes.recognizePath("/profile", { method: "post" }).action).toBe("create");
     expect(routes.recognizePath("/profile", { method: "put" }).action).toBe("update");
@@ -384,8 +384,8 @@ describe("TestRoutingMapper", () => {
 
   it("resources routes only create update destroy", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("products", { only: ["create", "update", "destroy"] });
+    routes.draw(function () {
+      this.resources("products", { only: ["create", "update", "destroy"] });
     });
     expect(routes.recognizePath("/products", { method: "post" }).action).toBe("create");
     expect(routes.recognizePath("/products/1", { method: "put" }).action).toBe("update");
@@ -396,10 +396,10 @@ describe("TestRoutingMapper", () => {
 
   it("projects involvements (nested resources)", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("projects", (r) => {
-        r.resources("involvements");
-        r.resources("attachments");
+    routes.draw(function () {
+      this.resources("projects", () => {
+        this.resources("involvements");
+        this.resources("attachments");
       });
     });
     const m = routes.recognizePath("/projects/1/involvements");
@@ -415,9 +415,9 @@ describe("TestRoutingMapper", () => {
 
   it("projects attachments", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("projects", (r) => {
-        r.resources("attachments");
+    routes.draw(function () {
+      this.resources("projects", () => {
+        this.resources("attachments");
       });
     });
     expect(routes.recognizePath("/projects/1/attachments").controller).toBe("attachments");
@@ -425,8 +425,8 @@ describe("TestRoutingMapper", () => {
 
   it("openid", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.match("openid/login", { to: "openid#login", via: ["GET", "POST"] });
+    routes.draw(function () {
+      this.match("openid/login", { to: "openid#login", via: ["GET", "POST"] });
     });
     expect(routes.recognizePath("/openid/login").controller).toBe("openid");
     expect(routes.recognizePath("/openid/login", { method: "post" }).controller).toBe("openid");
@@ -434,10 +434,10 @@ describe("TestRoutingMapper", () => {
 
   it("namespace with options", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("api", (r) => {
-        r.namespace("v1", (r) => {
-          r.resources("users");
+    routes.draw(function () {
+      this.namespace("api", () => {
+        this.namespace("v1", () => {
+          this.resources("users");
         });
       });
     });
@@ -447,10 +447,10 @@ describe("TestRoutingMapper", () => {
 
   it("namespace containing numbers", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("api", (r) => {
-        r.namespace("v2", (r) => {
-          r.resources("articles");
+    routes.draw(function () {
+      this.namespace("api", () => {
+        this.namespace("v2", () => {
+          this.resources("articles");
         });
       });
     });
@@ -460,9 +460,9 @@ describe("TestRoutingMapper", () => {
 
   it("namespaced roots", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("account", (r) => {
-        r.root("account#index");
+    routes.draw(function () {
+      this.namespace("account", () => {
+        this.root("account#index");
       });
     });
     expect(routes.recognizePath("/account").action).toBe("index");
@@ -472,8 +472,8 @@ describe("TestRoutingMapper", () => {
   it("resource does not modify passed options", () => {
     const options = { only: ["show", "create"] as ("show" | "create")[] };
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resource("user", options);
+    routes.draw(function () {
+      this.resource("user", options);
     });
     expect(options).toEqual({ only: ["show", "create"] });
   });
@@ -481,17 +481,17 @@ describe("TestRoutingMapper", () => {
   it("resources does not modify passed options", () => {
     const options = { only: ["index", "show"] as ("index" | "show")[] };
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("users", options);
+    routes.draw(function () {
+      this.resources("users", options);
     });
     expect(options).toEqual({ only: ["index", "show"] });
   });
 
   it("scoped root as name", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.scope("/api", { as: "api" }, (r) => {
-        r.root("api#index");
+    routes.draw(function () {
+      this.scope("/api", { as: "api" }, () => {
+        this.root("api#index");
       });
     });
     expect(routes.pathFor({}, "api_root")).toBe("/api");
@@ -499,9 +499,9 @@ describe("TestRoutingMapper", () => {
 
   it("projects posts (nested resources)", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("projects", (r) => {
-        r.resources("posts");
+    routes.draw(function () {
+      this.resources("projects", () => {
+        this.resources("posts");
       });
     });
     expect(routes.recognizePath("/projects/1/posts").controller).toBe("posts");
@@ -511,9 +511,9 @@ describe("TestRoutingMapper", () => {
 
   it("root works in the resources scope", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("products", (r) => {
-        r.root({ to: "products#root" });
+    routes.draw(function () {
+      this.resources("products", () => {
+        this.root({ to: "products#root" });
       });
     });
     expect(routeSpec(routes.recognizePath("/products"))).toBe("products#root");
@@ -522,9 +522,9 @@ describe("TestRoutingMapper", () => {
 
   it("module scope", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.scope({ module: "api" }, (r) => {
-        r.resource("token");
+    routes.draw(function () {
+      this.scope({ module: "api" }, () => {
+        this.resource("token");
       });
     });
     expect(routes.recognizePath("/token").action).toBe("show");
@@ -533,9 +533,9 @@ describe("TestRoutingMapper", () => {
 
   it("path scope", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.scope("api", (r) => {
-        r.resource("me");
+    routes.draw(function () {
+      this.scope("api", () => {
+        this.resource("me");
       });
     });
     expect(routes.recognizePath("/api/me").action).toBe("show");
@@ -544,17 +544,17 @@ describe("TestRoutingMapper", () => {
 
   it("dynamic controller segments are deprecated", async () => {
     await assertDeprecated(deprecator(), () => {
-      new RouteSet().draw((r) => {
-        r.get("/:controller", { action: "index" });
+      new RouteSet().draw(function () {
+        this.get("/:controller", { action: "index" });
       });
     });
   });
 
   it("nested resources with constraints", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("posts", { constraints: { id: /\d+/ } }, (r) => {
-        r.resources("comments");
+    routes.draw(function () {
+      this.resources("posts", { constraints: { id: /\d+/ } }, () => {
+        this.resources("comments");
       });
     });
     expect(() => routes.recognizePath("/posts/1/comments")).not.toThrow();
@@ -562,8 +562,8 @@ describe("TestRoutingMapper", () => {
 
   it("index", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/info", { to: "projects#info", as: "info" });
+    routes.draw(function () {
+      this.get("/info", { to: "projects#info", as: "info" });
     });
     expect(routes.pathFor({}, "info")).toBe("/info");
     expect(routes.recognizePath("/info").controller).toBe("projects");
@@ -572,9 +572,9 @@ describe("TestRoutingMapper", () => {
 
   it("normalize namespaced matches", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("account", (r) => {
-        r.get("description", { action: "description", as: "description" });
+    routes.draw(function () {
+      this.namespace("account", () => {
+        this.get("description", { action: "description", as: "description" });
       });
     });
     expect(routes.pathFor({}, "account_description")).toBe("/account/description");
@@ -585,9 +585,9 @@ describe("TestRoutingMapper", () => {
 
   it("session info nested singleton resource", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resource("session", (r) => {
-        r.resource("info");
+    routes.draw(function () {
+      this.resource("session", () => {
+        this.resource("info");
       });
     });
     expect(routes.recognizePath("/session/info").action).toBe("show");
@@ -595,11 +595,11 @@ describe("TestRoutingMapper", () => {
 
   it("member on resource", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("replies", (r) => {
-        r.member((r) => {
-          r.put("answer", { to: "replies#mark_as_answer" });
-          r.delete("answer", { to: "replies#unmark_as_answer" });
+    routes.draw(function () {
+      this.resources("replies", () => {
+        this.member(() => {
+          this.put("answer", { to: "replies#mark_as_answer" });
+          this.delete("answer", { to: "replies#unmark_as_answer" });
         });
       });
     });
@@ -612,11 +612,11 @@ describe("TestRoutingMapper", () => {
 
   it("replies", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("replies", (r) => {
-        r.member((r) => {
-          r.put("answer", { to: "replies#mark_as_answer" });
-          r.delete("answer", { to: "replies#unmark_as_answer" });
+    routes.draw(function () {
+      this.resources("replies", () => {
+        this.member(() => {
+          this.put("answer", { to: "replies#mark_as_answer" });
+          this.delete("answer", { to: "replies#unmark_as_answer" });
         });
       });
     });
@@ -630,9 +630,9 @@ describe("TestRoutingMapper", () => {
 
   it("projects participants", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("projects", (r) => {
-        r.resources("participants");
+    routes.draw(function () {
+      this.resources("projects", () => {
+        this.resources("participants");
       });
     });
     expect(routes.recognizePath("/projects/1/participants").controller).toBe("participants");
@@ -641,9 +641,9 @@ describe("TestRoutingMapper", () => {
 
   it("projects companies", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("projects", (r) => {
-        r.resources("companies");
+    routes.draw(function () {
+      this.resources("projects", () => {
+        this.resources("companies");
       });
     });
     expect(routes.recognizePath("/projects/1/companies").controller).toBe("companies");
@@ -652,9 +652,9 @@ describe("TestRoutingMapper", () => {
 
   it("project manager", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("projects", (r) => {
-        r.resource("manager");
+    routes.draw(function () {
+      this.resources("projects", () => {
+        this.resource("manager");
       });
     });
     expect(routes.recognizePath("/projects/1/manager").action).toBe("show");
@@ -662,9 +662,9 @@ describe("TestRoutingMapper", () => {
 
   it("project images", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("projects", (r) => {
-        r.resources("images");
+    routes.draw(function () {
+      this.resources("projects", () => {
+        this.resources("images");
       });
     });
     expect(routes.recognizePath("/projects/1/images").controller).toBe("images");
@@ -674,9 +674,9 @@ describe("TestRoutingMapper", () => {
 
   it("projects people", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("projects", (r) => {
-        r.resources("people");
+    routes.draw(function () {
+      this.resources("projects", () => {
+        this.resources("people");
       });
     });
     expect(routes.recognizePath("/projects/1/people").controller).toBe("people");
@@ -685,9 +685,9 @@ describe("TestRoutingMapper", () => {
 
   it("account namespace", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("account", (r) => {
-        r.resources("subscriptions");
+    routes.draw(function () {
+      this.namespace("account", () => {
+        this.resources("subscriptions");
       });
     });
     expect(routes.recognizePath("/account/subscriptions").action).toBe("index");
@@ -697,8 +697,8 @@ describe("TestRoutingMapper", () => {
 
   it("resource constraints", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("products", { constraints: { id: /\d{4}/ } });
+    routes.draw(function () {
+      this.resources("products", { constraints: { id: /\d{4}/ } });
     });
     expect(routes.recognizePath("/products/1234").action).toBe("show");
     expect(() => routes.recognizePath("/products/abc")).toThrow(RoutingError);
@@ -706,16 +706,16 @@ describe("TestRoutingMapper", () => {
 
   it("url generator for generic route", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("whatever/:controller/:action", { to: "foo#bar" });
+    routes.draw(function () {
+      this.get("whatever/:controller/:action", { to: "foo#bar" });
     });
     expect(() => routes.recognizePath("/whatever/foo/bar")).not.toThrow();
   });
 
   it("url generator for namespaced generic route", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("whatever/:controller/:action/:id", { to: "foo#bar", constraints: { id: /\d+/ } });
+    routes.draw(function () {
+      this.get("whatever/:controller/:action/:id", { to: "foo#bar", constraints: { id: /\d+/ } });
     });
     expect(() => routes.recognizePath("/whatever/foo/show/1")).not.toThrow();
     expect(() => routes.recognizePath("/whatever/foo/show/abc")).toThrow(RoutingError);
@@ -723,9 +723,9 @@ describe("TestRoutingMapper", () => {
 
   it("resources merges options from scope", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("products", { only: ["index", "show"] }, (r) => {
-        r.resources("images", { only: ["index"] });
+    routes.draw(function () {
+      this.resources("products", { only: ["index", "show"] }, () => {
+        this.resources("images", { only: ["index"] });
       });
     });
     expect(() => routes.recognizePath("/products")).not.toThrow();
@@ -737,8 +737,8 @@ describe("TestRoutingMapper", () => {
 
   it("resource merges options from scope", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resource("account", { only: ["show"] });
+    routes.draw(function () {
+      this.resource("account", { only: ["show"] });
     });
     expect(routes.recognizePath("/account").action).toBe("show");
     expect(() => routes.recognizePath("/account/new")).toThrow(RoutingError);
@@ -747,8 +747,8 @@ describe("TestRoutingMapper", () => {
 
   it("resource merges options from scope hash", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resource("account", { only: ["show"] });
+    routes.draw(function () {
+      this.resource("account", { only: ["show"] });
     });
     expect(routes.recognizePath("/account").action).toBe("show");
     expect(() => routes.recognizePath("/account/new")).toThrow(RoutingError);
@@ -757,42 +757,42 @@ describe("TestRoutingMapper", () => {
   it("match without via", () => {
     const routes = new RouteSet();
     expect(() =>
-      routes.draw((r) => {
-        r.match("/foo/bar", { to: "files#show" });
+      routes.draw(function () {
+        this.match("/foo/bar", { to: "files#show" });
       }),
     ).toThrow(ArgumentError);
   });
 
   it("non greedy regexp", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id", { to: "posts#show", constraints: { id: /\d+?/ } });
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show", constraints: { id: /\d+?/ } });
     });
     expect(() => routes.recognizePath("/posts/1")).not.toThrow();
   });
 
   it("default string params", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts", { to: "posts#index", defaults: { format: "json" } });
+    routes.draw(function () {
+      this.get("/posts", { to: "posts#index", defaults: { format: "json" } });
     });
     expect(routes.recognizePath("/posts").format).toBe("json");
   });
 
   it("default integer params", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts", { to: "posts#index", defaults: { page: "1" } });
+    routes.draw(function () {
+      this.get("/posts", { to: "posts#index", defaults: { page: "1" } });
     });
     expect(routes.recognizePath("/posts").page).toBe("1");
   });
 
   it("symbol scope", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.scope("api", (r) => {
-        r.scope("v2", (r) => {
-          r.resource("me");
+    routes.draw(function () {
+      this.scope("api", () => {
+        this.scope("v2", () => {
+          this.resource("me");
         });
       });
     });
@@ -801,8 +801,8 @@ describe("TestRoutingMapper", () => {
 
   it("update person route", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("people");
+    routes.draw(function () {
+      this.resources("people");
     });
     expect(routes.recognizePath("/people/1", { method: "put" }).action).toBe("update");
     expect(routes.recognizePath("/people/1", { method: "patch" }).action).toBe("update");
@@ -810,9 +810,9 @@ describe("TestRoutingMapper", () => {
 
   it("update project person", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("projects", (r) => {
-        r.resources("people");
+    routes.draw(function () {
+      this.resources("projects", () => {
+        this.resources("people");
       });
     });
     expect(routes.recognizePath("/projects/1/people/2", { method: "put" }).action).toBe("update");
@@ -820,9 +820,9 @@ describe("TestRoutingMapper", () => {
 
   it("forum products", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("forum", (r) => {
-        r.resources("products");
+    routes.draw(function () {
+      this.namespace("forum", () => {
+        this.resources("products");
       });
     });
     expect(routes.recognizePath("/forum/products").action).toBe("index");
@@ -831,8 +831,8 @@ describe("TestRoutingMapper", () => {
 
   it("articles with id", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("articles");
+    routes.draw(function () {
+      this.resources("articles");
     });
     expect(routes.recognizePath("/articles/1").action).toBe("show");
     expect(routes.pathFor({ id: 1 }, "article")).toBe("/articles/1");
@@ -840,8 +840,8 @@ describe("TestRoutingMapper", () => {
 
   it("articles perma", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("articles", { constraints: { id: /\d+/ } });
+    routes.draw(function () {
+      this.resources("articles", { constraints: { id: /\d+/ } });
     });
     expect(routes.recognizePath("/articles/42").action).toBe("show");
     expect(() => routes.recognizePath("/articles/abc")).toThrow(RoutingError);
@@ -849,11 +849,11 @@ describe("TestRoutingMapper", () => {
 
   it("appending routes", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/hello", { to: "hello#index" });
+    routes.draw(function () {
+      this.get("/hello", { to: "hello#index" });
     });
-    routes.draw((r) => {
-      r.get("/goodbye", { to: "goodbye#index" });
+    routes.draw(function () {
+      this.get("/goodbye", { to: "goodbye#index" });
     });
     expect(() => routes.recognizePath("/hello")).not.toThrow();
     expect(() => routes.recognizePath("/goodbye")).not.toThrow();
@@ -862,10 +862,10 @@ describe("TestRoutingMapper", () => {
 
   it("controller option with nesting and leading slash", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("foo", (r) => {
-        r.namespace("bar", (r) => {
-          r.get("baz", { to: "baz#index" });
+    routes.draw(function () {
+      this.namespace("foo", () => {
+        this.namespace("bar", () => {
+          this.get("baz", { to: "baz#index" });
         });
       });
     });
@@ -874,13 +874,13 @@ describe("TestRoutingMapper", () => {
 
   it("multiple nested controller", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("foo", (r) => {
-        r.namespace("bar", (r) => {
-          r.get("baz", { to: "baz#index" });
+    routes.draw(function () {
+      this.namespace("foo", () => {
+        this.namespace("bar", () => {
+          this.get("baz", { to: "baz#index" });
         });
       });
-      r.get("pooh", { to: "pooh#index" });
+      this.get("pooh", { to: "pooh#index" });
     });
     expect(() => routes.recognizePath("/foo/bar/baz")).not.toThrow();
     expect(() => routes.recognizePath("/pooh")).not.toThrow();
@@ -888,8 +888,8 @@ describe("TestRoutingMapper", () => {
 
   it("sprockets", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/assets/*path", { to: "assets#show", as: "asset" });
+    routes.draw(function () {
+      this.get("/assets/*path", { to: "assets#show", as: "asset" });
     });
     expect(() => routes.recognizePath("/assets/application.js")).not.toThrow();
     expect(routes.pathFor({ path: "application.js" }, "asset")).toBe("/assets/application.js");
@@ -897,17 +897,17 @@ describe("TestRoutingMapper", () => {
 
   it("projects status", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/projects/status", { to: "projects#status" });
+    routes.draw(function () {
+      this.get("/projects/status", { to: "projects#status" });
     });
     expect(routes.recognizePath("/projects/status").action).toBe("status");
   });
 
   it("access token rooms", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("access_tokens", (r) => {
-        r.resources("rooms");
+    routes.draw(function () {
+      this.resources("access_tokens", () => {
+        this.resources("rooms");
       });
     });
     expect(routes.recognizePath("/access_tokens/1/rooms").controller).toBe("rooms");
@@ -915,17 +915,17 @@ describe("TestRoutingMapper", () => {
 
   it("resources controller name is not pluralized", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("content");
+    routes.draw(function () {
+      this.resources("content");
     });
     expect(routes.recognizePath("/content").controller).toBe("content");
   });
 
   it("resources are not pluralized", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("transport", (r) => {
-        r.resources("taxis");
+    routes.draw(function () {
+      this.namespace("transport", () => {
+        this.resources("taxis");
       });
     });
     expect(routes.recognizePath("/transport/taxis").action).toBe("index");
@@ -940,9 +940,9 @@ describe("TestRoutingMapper", () => {
 
   it("singleton resources are not singularized", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("medical", (r) => {
-        r.resource("taxis");
+    routes.draw(function () {
+      this.namespace("medical", () => {
+        this.resource("taxis");
       });
     });
     expect(routes.recognizePath("/medical/taxis").action).toBe("show");
@@ -953,8 +953,8 @@ describe("TestRoutingMapper", () => {
 
   it("router removes invalid conditions", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/tickets", { to: "tickets#index", as: "tickets" });
+    routes.draw(function () {
+      this.get("/tickets", { to: "tickets#index", as: "tickets" });
     });
     expect(() => routes.recognizePath("/tickets")).not.toThrow();
     expect(routes.pathFor({}, "tickets")).toBe("/tickets");
@@ -962,9 +962,9 @@ describe("TestRoutingMapper", () => {
 
   it("route defined in resources scope level", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("customers", (r) => {
-        r.get("export", { to: "customers#export" });
+    routes.draw(function () {
+      this.resources("customers", () => {
+        this.get("export", { to: "customers#export" });
       });
     });
     expect(routes.recognizePath("/customers/1/export").action).toBe("export");
@@ -972,8 +972,8 @@ describe("TestRoutingMapper", () => {
 
   it("only should be read from scope", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("clubs", { only: ["index", "show"] });
+    routes.draw(function () {
+      this.resources("clubs", { only: ["index", "show"] });
     });
     expect(() => routes.recognizePath("/clubs")).not.toThrow();
     expect(() => routes.recognizePath("/clubs/1")).not.toThrow();
@@ -983,8 +983,8 @@ describe("TestRoutingMapper", () => {
 
   it("except should be read from scope", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("clubs", { except: ["new", "edit"] });
+    routes.draw(function () {
+      this.resources("clubs", { except: ["new", "edit"] });
     });
     expect(() => routes.recognizePath("/clubs")).not.toThrow();
     expect(() => routes.recognizePath("/clubs/1")).not.toThrow();
@@ -994,8 +994,8 @@ describe("TestRoutingMapper", () => {
 
   it("only option should override scope", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("posts", { only: ["index"] });
+    routes.draw(function () {
+      this.resources("posts", { only: ["index"] });
     });
     expect(() => routes.recognizePath("/posts")).not.toThrow();
     expect(() => routes.recognizePath("/posts/1")).toThrow(RoutingError);
@@ -1003,8 +1003,8 @@ describe("TestRoutingMapper", () => {
 
   it("except option should override scope", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("posts", { except: ["destroy"] });
+    routes.draw(function () {
+      this.resources("posts", { except: ["destroy"] });
     });
     expect(() => routes.recognizePath("/posts/1", { method: "delete" })).toThrow(RoutingError);
     expect(() => routes.recognizePath("/posts")).not.toThrow();
@@ -1012,9 +1012,9 @@ describe("TestRoutingMapper", () => {
 
   it("only option should not inherit", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("posts", { only: ["index", "show"] }, (r) => {
-        r.resources("comments");
+    routes.draw(function () {
+      this.resources("posts", { only: ["index", "show"] }, () => {
+        this.resources("comments");
       });
     });
     expect(() => routes.recognizePath("/posts/1/comments")).not.toThrow();
@@ -1024,9 +1024,9 @@ describe("TestRoutingMapper", () => {
 
   it("except option should not inherit", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("posts", { except: ["destroy"] }, (r) => {
-        r.resources("comments");
+    routes.draw(function () {
+      this.resources("posts", { except: ["destroy"] }, () => {
+        this.resources("comments");
       });
     });
     expect(() => routes.recognizePath("/posts/1/comments/2", { method: "delete" })).not.toThrow();
@@ -1034,8 +1034,8 @@ describe("TestRoutingMapper", () => {
 
   it("projects for api app", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("projects", { except: ["new", "edit"] });
+    routes.draw(function () {
+      this.resources("projects", { except: ["new", "edit"] });
     });
     expect(() => routes.recognizePath("/projects")).not.toThrow();
     expect(() => routes.recognizePath("/projects/1")).not.toThrow();
@@ -1045,8 +1045,8 @@ describe("TestRoutingMapper", () => {
 
   it("constraints are merged from scope", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("movies", { constraints: { id: /\d{4}/ } });
+    routes.draw(function () {
+      this.resources("movies", { constraints: { id: /\d{4}/ } });
     });
     expect(routes.recognizePath("/movies/0001").action).toBe("show");
     expect(() => routes.recognizePath("/movies/00001")).toThrow(RoutingError);
@@ -1054,9 +1054,9 @@ describe("TestRoutingMapper", () => {
 
   it("nested resource constraints", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("lists", { constraints: { id: /\d+/ } }, (r) => {
-        r.resources("todos", { constraints: { id: /\d+/ } });
+    routes.draw(function () {
+      this.resources("lists", { constraints: { id: /\d+/ } }, () => {
+        this.resources("todos", { constraints: { id: /\d+/ } });
       });
     });
     expect(() => routes.recognizePath("/lists/1/todos/2")).not.toThrow();
@@ -1065,16 +1065,16 @@ describe("TestRoutingMapper", () => {
 
   it("URL helpers raise a missing keys error for a nil param", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id", { to: "posts#show", as: "post" });
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show", as: "post" });
     });
     expect(() => routes.pathFor({}, "post")).toThrow(/missing required keys: \[:id\]/);
   });
 
   it("resource with slugs in ids", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("posts", { constraints: { id: /[a-z0-9-]+/ } });
+    routes.draw(function () {
+      this.resources("posts", { constraints: { id: /[a-z0-9-]+/ } });
     });
     expect(routes.recognizePath("/posts/hello-world").action).toBe("show");
     expect(routes.recognizePath("/posts/123-abc").id).toBe("123-abc");
@@ -1082,8 +1082,8 @@ describe("TestRoutingMapper", () => {
 
   it("named character classes in regexp constraints", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/purchases/:token/:filename", {
+    routes.draw(function () {
+      this.get("/purchases/:token/:filename", {
         to: "purchases#fetch",
         constraints: { token: /[a-zA-Z0-9]{10}/, filename: /(.+)/ },
         as: "purchase",
@@ -1097,9 +1097,9 @@ describe("TestRoutingMapper", () => {
 
   it("resources path can be a symbol", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/pages", { to: "wiki_pages#index", as: "wiki_pages" });
-      r.get("/pages/:id", { to: "wiki_pages#show", as: "wiki_page" });
+    routes.draw(function () {
+      this.get("/pages", { to: "wiki_pages#index", as: "wiki_pages" });
+      this.get("/pages/:id", { to: "wiki_pages#show", as: "wiki_page" });
     });
     expect(routes.pathFor({}, "wiki_pages")).toBe("/pages");
     expect(routes.pathFor({ id: "Ruby_on_Rails" }, "wiki_page")).toBe("/pages/Ruby_on_Rails");
@@ -1107,8 +1107,8 @@ describe("TestRoutingMapper", () => {
 
   it("login redirect", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/login", { to: r.redirect("/dashboard"), as: "login" });
+    routes.draw(function () {
+      this.get("/login", { to: this.redirect("/dashboard"), as: "login" });
     });
     const { status, location } = await verifyRedirect(routes, "http://www.example.com/login");
     expect(status).toBe(301);
@@ -1118,8 +1118,8 @@ describe("TestRoutingMapper", () => {
 
   it("logout redirect without to", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/logout", { to: r.redirect("/"), as: "logout" });
+    routes.draw(function () {
+      this.get("/logout", { to: this.redirect("/"), as: "logout" });
     });
     const { status, location } = await verifyRedirect(routes, "http://www.example.com/logout");
     expect(status).toBe(301);
@@ -1128,9 +1128,9 @@ describe("TestRoutingMapper", () => {
 
   it("namespace redirect", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("admin", (r) => {
-        r.get("/old", { to: r.redirect("/admin/new"), as: "old" });
+    routes.draw(function () {
+      this.namespace("admin", () => {
+        this.get("/old", { to: this.redirect("/admin/new"), as: "old" });
       });
     });
     const { status, location } = await verifyRedirect(routes, "http://www.example.com/admin/old");
@@ -1140,16 +1140,16 @@ describe("TestRoutingMapper", () => {
 
   it("redirect with failing constraint", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id", { to: r.redirect("/articles/%{id}"), constraints: { id: /\d+/ } });
+    routes.draw(function () {
+      this.get("/posts/:id", { to: this.redirect("/articles/%{id}"), constraints: { id: /\d+/ } });
     });
     expect(() => routes.recognizePath("/posts/abc")).toThrow(RoutingError);
   });
 
   it("redirect with passing constraint", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id", { to: r.redirect("/articles/%{id}"), constraints: { id: /\d+/ } });
+    routes.draw(function () {
+      this.get("/posts/:id", { to: this.redirect("/articles/%{id}"), constraints: { id: /\d+/ } });
     });
     const { status, location } = await verifyRedirect(routes, "http://www.example.com/posts/123");
     expect(status).toBe(301);
@@ -1158,8 +1158,8 @@ describe("TestRoutingMapper", () => {
 
   it("redirect modulo", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/old/:id", { to: r.redirect("/new/%{id}") });
+    routes.draw(function () {
+      this.get("/old/:id", { to: this.redirect("/new/%{id}") });
     });
     const { status, location } = await verifyRedirect(routes, "http://www.example.com/old/42");
     expect(status).toBe(301);
@@ -1168,8 +1168,8 @@ describe("TestRoutingMapper", () => {
 
   it("redirect proc", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/old/:id", { to: r.redirect((params) => `/new/${params.id}`), as: "old" });
+    routes.draw(function () {
+      this.get("/old/:id", { to: this.redirect((params) => `/new/${params.id}`), as: "old" });
     });
     const { status, location } = await verifyRedirect(routes, "http://www.example.com/old/5");
     expect(status).toBe(301);
@@ -1178,8 +1178,8 @@ describe("TestRoutingMapper", () => {
 
   it("redirect proc with request", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/old", { to: r.redirect((_params, req) => `${req.path}/new`), as: "old" });
+    routes.draw(function () {
+      this.get("/old", { to: this.redirect((_params, req) => `${req.path}/new`), as: "old" });
     });
     const { status, location } = await verifyRedirect(routes, "http://www.example.com/old");
     expect(status).toBe(301);
@@ -1188,8 +1188,8 @@ describe("TestRoutingMapper", () => {
 
   it("redirect hash with subdomain", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/old", { to: r.redirect({ subdomain: "api" }), as: "old" });
+    routes.draw(function () {
+      this.get("/old", { to: this.redirect({ subdomain: "api" }), as: "old" });
     });
     const { status, location } = await verifyRedirect(routes, "http://www.example.com/old");
     expect(status).toBe(301);
@@ -1198,8 +1198,8 @@ describe("TestRoutingMapper", () => {
 
   it("redirect hash with domain and path", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/old", { to: r.redirect({ domain: "other.com", path: "/new" }), as: "old" });
+    routes.draw(function () {
+      this.get("/old", { to: this.redirect({ domain: "other.com", path: "/new" }), as: "old" });
     });
     const { status, location } = await verifyRedirect(routes, "http://www.example.com/old");
     expect(status).toBe(301);
@@ -1208,8 +1208,8 @@ describe("TestRoutingMapper", () => {
 
   it("redirect hash with path", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/old", { to: r.redirect({ path: "/new" }), as: "old" });
+    routes.draw(function () {
+      this.get("/old", { to: this.redirect({ path: "/new" }), as: "old" });
     });
     const { status, location } = await verifyRedirect(routes, "http://www.example.com/old");
     expect(status).toBe(301);
@@ -1218,8 +1218,8 @@ describe("TestRoutingMapper", () => {
 
   it("redirect hash with host", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/old", { to: r.redirect({ host: "other.com" }), as: "old" });
+    routes.draw(function () {
+      this.get("/old", { to: this.redirect({ host: "other.com" }), as: "old" });
     });
     const { status, location } = await verifyRedirect(routes, "http://www.example.com/old");
     expect(status).toBe(301);
@@ -1228,8 +1228,8 @@ describe("TestRoutingMapper", () => {
 
   it("redirect hash path substitution", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id", { to: r.redirect({ path: "/articles/%{id}" }), as: "old_post" });
+    routes.draw(function () {
+      this.get("/posts/:id", { to: this.redirect({ path: "/articles/%{id}" }), as: "old_post" });
     });
     const { status, location } = await verifyRedirect(routes, "http://example.com/posts/42");
     expect(status).toBe(301);
@@ -1238,8 +1238,8 @@ describe("TestRoutingMapper", () => {
 
   it("redirect hash path substitution with catch all", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/old/*path", { to: r.redirect({ path: "/new/%{path}" }) });
+    routes.draw(function () {
+      this.get("/old/*path", { to: this.redirect({ path: "/new/%{path}" }) });
     });
     const { status, location } = await verifyRedirect(routes, "http://example.com/old/a/b/c");
     expect(status).toBe(301);
@@ -1249,8 +1249,8 @@ describe("TestRoutingMapper", () => {
   it("redirect class", async () => {
     const customRedirect = (params: Record<string, string>) => `/custom/${params.id}`;
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/old/:id", { to: r.redirect(customRedirect), as: "old" });
+    routes.draw(function () {
+      this.get("/old/:id", { to: this.redirect(customRedirect), as: "old" });
     });
     const { status, location } = await verifyRedirect(routes, "http://www.example.com/old/7");
     expect(status).toBe(301);
@@ -1259,8 +1259,8 @@ describe("TestRoutingMapper", () => {
 
   it("resources for uncountable names", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("sheep");
+    routes.draw(function () {
+      this.resources("sheep");
     });
     expect(() => routes.recognizePath("/sheep")).not.toThrow();
     expect(() => routes.recognizePath("/sheep/1")).not.toThrow();
@@ -1268,8 +1268,8 @@ describe("TestRoutingMapper", () => {
 
   it("path names", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("posts", { pathNames: { new: "novo", edit: "editar" } });
+    routes.draw(function () {
+      this.resources("posts", { pathNames: { new: "novo", edit: "editar" } });
     });
     expect(() => routes.recognizePath("/posts/novo")).not.toThrow();
     expect(routes.recognizePath("/posts/novo").action).toBe("new");
@@ -1279,9 +1279,9 @@ describe("TestRoutingMapper", () => {
 
   it("projects with resources path names", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("projects", { pathNames: { new: "nuevo" } }, (r) => {
-        r.resources("tasks", { pathNames: { new: "nueva" } });
+    routes.draw(function () {
+      this.resources("projects", { pathNames: { new: "nuevo" } }, () => {
+        this.resources("tasks", { pathNames: { new: "nueva" } });
       });
     });
     expect(routes.recognizePath("/projects/nuevo").action).toBe("new");
@@ -1290,9 +1290,9 @@ describe("TestRoutingMapper", () => {
 
   it("shallow nested resources", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("posts", (r) => {
-        r.resources("comments", { shallow: true });
+    routes.draw(function () {
+      this.resources("posts", () => {
+        this.resources("comments", { shallow: true });
       });
     });
     expect(() => routes.recognizePath("/posts/1/comments")).not.toThrow();
@@ -1304,9 +1304,9 @@ describe("TestRoutingMapper", () => {
 
   it("shallow nested resources inside resource", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resource("account", (r) => {
-        r.resources("posts", { shallow: true });
+    routes.draw(function () {
+      this.resource("account", () => {
+        this.resources("posts", { shallow: true });
       });
     });
     expect(() => routes.recognizePath("/account/posts")).not.toThrow();
@@ -1316,9 +1316,9 @@ describe("TestRoutingMapper", () => {
 
   it("custom resource routes are scoped", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("posts", (r) => {
-        r.get("preview", { to: "posts#preview", as: "preview" });
+    routes.draw(function () {
+      this.resources("posts", () => {
+        this.get("preview", { to: "posts#preview", as: "preview" });
       });
     });
     const m = routes.recognizePath("/posts/1/preview");
@@ -1327,8 +1327,8 @@ describe("TestRoutingMapper", () => {
 
   it("glob parameter accepts regexp", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/*path", { to: "posts#show" });
+    routes.draw(function () {
+      this.get("/posts/*path", { to: "posts#show" });
     });
     const m = routes.recognizePath("/posts/2024/01/hello");
     expect(m.path).toBe("2024/01/hello");
@@ -1336,9 +1336,9 @@ describe("TestRoutingMapper", () => {
 
   it("optional scoped root hierarchy", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("(/:locale)/posts", { to: "posts#index" });
-      r.get("(/:locale)/posts/:id", { to: "posts#show" });
+    routes.draw(function () {
+      this.get("(/:locale)/posts", { to: "posts#index" });
+      this.get("(/:locale)/posts/:id", { to: "posts#show" });
     });
     expect(routeSpec(routes.recognizePath("/posts"))).toBe("posts#index");
     expect(routeSpec(routes.recognizePath("/posts/1"))).toBe("posts#show");
@@ -1347,8 +1347,8 @@ describe("TestRoutingMapper", () => {
 
   it("optional part of segment", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts(/:id)", { to: "posts#index" });
+    routes.draw(function () {
+      this.get("/posts(/:id)", { to: "posts#index" });
     });
     expect(() => routes.recognizePath("/posts")).not.toThrow();
     expect(routes.recognizePath("/posts/1").id).toBe("1");
@@ -1356,8 +1356,8 @@ describe("TestRoutingMapper", () => {
 
   it("url generator for optional prefix dynamic segment", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("(/:locale)/posts", { to: "posts#index", as: "posts" });
+    routes.draw(function () {
+      this.get("(/:locale)/posts", { to: "posts#index", as: "posts" });
     });
     expect(routes.pathFor({ locale: "en" }, "posts")).toBe("/en/posts");
     expect(routes.pathFor({}, "posts")).toBe("/posts");
@@ -1365,8 +1365,8 @@ describe("TestRoutingMapper", () => {
 
   it("url generator for optional suffix static and dynamic segment", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts(/:id)", { to: "posts#show", as: "post" });
+    routes.draw(function () {
+      this.get("/posts(/:id)", { to: "posts#show", as: "post" });
     });
     expect(routes.pathFor({ id: "1" }, "post")).toBe("/posts/1");
     expect(routes.pathFor({}, "post")).toBe("/posts");
@@ -1374,11 +1374,11 @@ describe("TestRoutingMapper", () => {
 
   it("constraints block not carried to following routes", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.constraints({ id: /\d+/ }, () => {
-        r.get("/posts/:id", { to: "posts#show" });
+    routes.draw(function () {
+      this.constraints({ id: /\d+/ }, () => {
+        this.get("/posts/:id", { to: "posts#show" });
       });
-      r.get("/articles/:id", { to: "articles#show" });
+      this.get("/articles/:id", { to: "articles#show" });
     });
     expect(() => routes.recognizePath("/posts/123")).not.toThrow();
     expect(() => routes.recognizePath("/articles/abc")).not.toThrow();
@@ -1386,12 +1386,12 @@ describe("TestRoutingMapper", () => {
 
   it("concerns", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.concern("commentable", (r) => {
+    routes.draw(function () {
+      this.concern("commentable", (r) => {
         r.resources("comments");
       });
-      r.resources("posts", (r) => {
-        r.concerns("commentable");
+      this.resources("posts", () => {
+        this.concerns("commentable");
       });
     });
     expect(() => routes.recognizePath("/posts/1/comments")).not.toThrow();
@@ -1400,8 +1400,8 @@ describe("TestRoutingMapper", () => {
   });
   it("trailing slash", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts", { to: "posts#index", as: "posts" });
+    routes.draw(function () {
+      this.get("/posts", { to: "posts#index", as: "posts" });
     });
     expect(() => routes.recognizePath("/posts/")).not.toThrow();
   });
@@ -1412,9 +1412,9 @@ describe("TestRoutingMapper", () => {
 
   it("namespace without controller segment", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("admin", (r) => {
-        r.get("hello/:controllers/:action");
+    routes.draw(function () {
+      this.namespace("admin", () => {
+        this.get("hello/:controllers/:action");
       });
     });
     const m = routes.recognizePath("/admin/hello/foo/new");
@@ -1423,8 +1423,8 @@ describe("TestRoutingMapper", () => {
 
   it("websocket", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.connect("chat/live", { to: "chat#live" });
+    routes.draw(function () {
+      this.connect("chat/live", { to: "chat#live" });
     });
     expect(routes.recognizePath("/chat/live").action).toBe("live");
     expect(routes.recognizePath("/chat/live", { method: "connect" }).action).toBe("live");
@@ -1432,12 +1432,12 @@ describe("TestRoutingMapper", () => {
 
   it("bookmarks", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.scope("bookmark", { module: "bookmarks", as: "bookmark" }, (r) => {
-        r.get("build", { action: "new", as: "new" });
-        r.post("create", { action: "create", as: "" });
-        r.put("update", { action: "update", as: "update" });
-        r.get("remove", { action: "destroy", as: "remove" });
+    routes.draw(function () {
+      this.scope("bookmark", { module: "bookmarks", as: "bookmark" }, () => {
+        this.get("build", { action: "new", as: "new" });
+        this.post("create", { action: "create", as: "" });
+        this.put("update", { action: "update", as: "update" });
+        this.get("remove", { action: "destroy", as: "remove" });
       });
     });
     expect(routes.recognizePath("/bookmark/build").controller).toBe("bookmarks");
@@ -1455,13 +1455,13 @@ describe("TestRoutingMapper", () => {
 
   it("pagemarks", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.scope("pagemark", { module: "pagemarks", as: "pagemark" }, (r) => {
-        r.get("build", { action: "new", as: "new" });
-        r.post("create", { action: "create", as: "" });
-        r.put("update", { action: "update", as: "update" });
-        r.get("remove", { action: "destroy", as: "remove" });
-        r.get("", { action: "show", as: "show" });
+    routes.draw(function () {
+      this.scope("pagemark", { module: "pagemarks", as: "pagemark" }, () => {
+        this.get("build", { action: "new", as: "new" });
+        this.post("create", { action: "create", as: "" });
+        this.put("update", { action: "update", as: "update" });
+        this.get("remove", { action: "destroy", as: "remove" });
+        this.get("", { action: "show", as: "show" });
       });
     });
     expect(routes.recognizePath("/pagemark/build").controller).toBe("pagemarks");
@@ -1482,11 +1482,11 @@ describe("TestRoutingMapper", () => {
 
   it("global", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.scope({ module: "global" }, (r) => {
-        r.get("global/hide_notice", { action: "hide_notice", as: "global_hide_notice" });
-        r.get("global/export", { action: "export", as: "export_request" });
-        r.get("/export/:id/:file", {
+    routes.draw(function () {
+      this.scope({ module: "global" }, () => {
+        this.get("global/hide_notice", { action: "hide_notice", as: "global_hide_notice" });
+        this.get("global/export", { action: "export", as: "export_request" });
+        this.get("/export/:id/:file", {
           action: "export",
           as: "export_download",
           constraints: { file: /.*/ },
@@ -1507,34 +1507,34 @@ describe("TestRoutingMapper", () => {
 
   it("local", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/local/dashboard", { to: "local#dashboard" });
+    routes.draw(function () {
+      this.get("/local/dashboard", { to: "local#dashboard" });
     });
     expect(routes.recognizePath("/local/dashboard").action).toBe("dashboard");
   });
 
   it("url for with no side effects", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/projects/status(.:format)", { to: "projects#status" });
+    routes.draw(function () {
+      this.get("/projects/status(.:format)", { to: "projects#status" });
     });
     expect(() => routes.recognizePath("/projects/status")).not.toThrow();
   });
 
   it("url for does not modify controller", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/projects/status(.:format)", { to: "projects#status" });
+    routes.draw(function () {
+      this.get("/projects/status(.:format)", { to: "projects#status" });
     });
     expect(() => routes.recognizePath("/projects/status")).not.toThrow();
   });
 
   it("named route with no side effects", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("customers", (r) => {
-        r.member((r) => {
-          r.get("profile", { as: "profile" });
+    routes.draw(function () {
+      this.resources("customers", () => {
+        this.member(() => {
+          this.get("profile", { as: "profile" });
         });
       });
     });
@@ -1545,9 +1545,9 @@ describe("TestRoutingMapper", () => {
 
   it("projects with post action and new path on collection", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("projects", { controller: "project" }, (r) => {
-        r.post("new", { action: "new", on: "collection", as: "new" });
+    routes.draw(function () {
+      this.resources("projects", { controller: "project" }, () => {
+        this.post("new", { action: "new", on: "collection", as: "new" });
       });
     });
     const params = routes.recognizePath("/projects/new", { method: "post" });
@@ -1563,12 +1563,12 @@ describe("TestRoutingMapper", () => {
 
   it("namespace nested in resources", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("clients", (r) => {
-        r.namespace("google", (r) => {
-          r.resource("account", (r) => {
-            r.namespace("secret", (r) => {
-              r.resource("info");
+    routes.draw(function () {
+      this.resources("clients", () => {
+        this.namespace("google", () => {
+          this.resource("account", () => {
+            this.namespace("secret", () => {
+              this.resource("info");
             });
           });
         });
@@ -1588,10 +1588,10 @@ describe("TestRoutingMapper", () => {
 
   it("namespaced shallow routes with module option", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("foo", { module: "bar" }, (r) => {
-        r.resources("posts", { only: ["index", "show"] }, (r) => {
-          r.resources("comments", { only: ["index", "show"], shallow: true });
+    routes.draw(function () {
+      this.namespace("foo", { module: "bar" }, () => {
+        this.resources("posts", { only: ["index", "show"] }, () => {
+          this.resources("comments", { only: ["index", "show"], shallow: true });
         });
       });
     });
@@ -1607,10 +1607,10 @@ describe("TestRoutingMapper", () => {
 
   it("namespaced shallow routes with path option", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("foo", { path: "bar" }, (r) => {
-        r.resources("posts", { only: ["index", "show"] }, (r) => {
-          r.resources("comments", { only: ["index", "show"], shallow: true });
+    routes.draw(function () {
+      this.namespace("foo", { path: "bar" }, () => {
+        this.resources("posts", { only: ["index", "show"] }, () => {
+          this.resources("comments", { only: ["index", "show"], shallow: true });
         });
       });
     });
@@ -1626,10 +1626,10 @@ describe("TestRoutingMapper", () => {
 
   it("namespaced shallow routes with as option", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("foo", { as: "bar" }, (r) => {
-        r.resources("posts", { only: ["index", "show"] }, (r) => {
-          r.resources("comments", { only: ["index", "show"], shallow: true });
+    routes.draw(function () {
+      this.namespace("foo", { as: "bar" }, () => {
+        this.resources("posts", { only: ["index", "show"] }, () => {
+          this.resources("comments", { only: ["index", "show"], shallow: true });
         });
       });
     });
@@ -1645,10 +1645,10 @@ describe("TestRoutingMapper", () => {
 
   it("namespaced shallow routes with shallow path option", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("foo", { shallowPath: "bar" }, (r) => {
-        r.resources("posts", { only: ["index", "show"] }, (r) => {
-          r.resources("comments", { only: ["index", "show"], shallow: true });
+    routes.draw(function () {
+      this.namespace("foo", { shallowPath: "bar" }, () => {
+        this.resources("posts", { only: ["index", "show"] }, () => {
+          this.resources("comments", { only: ["index", "show"], shallow: true });
         });
       });
     });
@@ -1664,10 +1664,10 @@ describe("TestRoutingMapper", () => {
 
   it("namespaced shallow routes with shallow prefix option", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.namespace("foo", { shallowPrefix: "bar" }, (r) => {
-        r.resources("posts", { only: ["index", "show"] }, (r) => {
-          r.resources("comments", { only: ["index", "show"], shallow: true });
+    routes.draw(function () {
+      this.namespace("foo", { shallowPrefix: "bar" }, () => {
+        this.resources("posts", { only: ["index", "show"] }, () => {
+          this.resources("comments", { only: ["index", "show"], shallow: true });
         });
       });
     });
@@ -1705,11 +1705,11 @@ describe("TestRoutingMapper", () => {
 
   it("dynamically generated helpers on collection do not clobber resources url helper", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("replies", (r) => {
-        r.collection((r) => {
-          r.get("page/:page", { to: "replies#index" });
-          r.get(":page", { to: "replies#index" });
+    routes.draw(function () {
+      this.resources("replies", () => {
+        this.collection(() => {
+          this.get("page/:page", { to: "replies#index" });
+          this.get(":page", { to: "replies#index" });
         });
       });
     });
@@ -1722,8 +1722,8 @@ describe("TestRoutingMapper", () => {
 
   it("convention with explicit end", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("sign_in", { to: "sessions#new", as: "sign_in" });
+    routes.draw(function () {
+      this.get("sign_in", { to: "sessions#new", as: "sign_in" });
     });
     const m = routes.recognizePath("/sign_in");
     expect(m.controller).toBe("sessions");
@@ -1737,9 +1737,9 @@ describe("TestRoutingMapper", () => {
 
   it("optional scoped root", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.scope("(:locale)", (r) => {
-        r.root("projects#index");
+    routes.draw(function () {
+      this.scope("(:locale)", () => {
+        this.root("projects#index");
       });
     });
     expect(routes.pathFor({ locale: "en" }, "root")).toBe("/en");
@@ -1756,8 +1756,8 @@ describe("TestRoutingMapper", () => {
 
   it("keyed default string params with match", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.match("/", { to: "pages#show", via: "get", defaults: { id: "home" } });
+    routes.draw(function () {
+      this.match("/", { to: "pages#show", via: "get", defaults: { id: "home" } });
     });
     const m = routes.recognizePath("/");
     expect(m.id).toBe("home");
@@ -1767,8 +1767,8 @@ describe("TestRoutingMapper", () => {
 
   it("keyed default string params with root", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.match("/", { to: "pages#show", via: "get", as: "root", defaults: { id: "home" } });
+    routes.draw(function () {
+      this.match("/", { to: "pages#show", via: "get", as: "root", defaults: { id: "home" } });
     });
     const m = routes.recognizePath("/");
     expect(m.id).toBe("home");
@@ -1785,23 +1785,23 @@ describe("TestRoutingMapper", () => {
   it("invalid route name raises error", () => {
     const routes = new RouteSet();
     expect(() =>
-      routes.draw((r) => {
-        r.get("/products", { to: "products#index", as: "products " });
+      routes.draw(function () {
+        this.get("/products", { to: "products#index", as: "products " });
       }),
     ).toThrow(/Invalid route name/);
     expect(() =>
-      routes.draw((r) => {
-        r.get("/products", { to: "products#index", as: "products!" });
+      routes.draw(function () {
+        this.get("/products", { to: "products#index", as: "products!" });
       }),
     ).toThrow(/Invalid route name/);
     expect(() =>
-      routes.draw((r) => {
-        r.get("/products", { to: "products#index", as: "products index" });
+      routes.draw(function () {
+        this.get("/products", { to: "products#index", as: "products index" });
       }),
     ).toThrow(/Invalid route name/);
     expect(() =>
-      routes.draw((r) => {
-        r.get("/products", { to: "products#index", as: "1products" });
+      routes.draw(function () {
+        this.get("/products", { to: "products#index", as: "1products" });
       }),
     ).toThrow(/Invalid route name/);
   });
@@ -1813,8 +1813,8 @@ describe("TestRoutingMapper", () => {
   it("match with empty via", () => {
     const routes = new RouteSet();
     expect(() =>
-      routes.draw((r) => {
-        r.match("/foo/bar", { to: "files#show", via: [] });
+      routes.draw(function () {
+        this.match("/foo/bar", { to: "files#show", via: [] });
       }),
     ).toThrow(ArgumentError);
   });
@@ -1847,15 +1847,15 @@ describe("TestRoutingMapper", () => {
   it.skip("resource constraints are pushed to scope", () => {});
   it("custom resource actions defined using string", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("customers", (r) => {
-        r.resources("invoices", (r) => {
-          r.get("aged/:months", { on: "collection", action: "aged", as: "aged" });
+    routes.draw(function () {
+      this.resources("customers", () => {
+        this.resources("invoices", () => {
+          this.get("aged/:months", { on: "collection", action: "aged", as: "aged" });
         });
 
-        r.get("inactive", { on: "collection" });
-        r.post("deactivate", { on: "member" });
-        r.get("old", { on: "collection", as: "stale" });
+        this.get("inactive", { on: "collection" });
+        this.post("deactivate", { on: "member" });
+        this.get("old", { on: "collection", as: "stale" });
       });
     });
 
@@ -1895,9 +1895,9 @@ describe("TestRoutingMapper", () => {
 
   it("greedy resource id regexp doesnt match edit and custom action", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("sections", { id: /.+/ } as RouteOptions, (r) => {
-        r.get("preview", { on: "member" });
+    routes.draw(function () {
+      this.resources("sections", { id: /.+/ } as RouteOptions, () => {
+        this.get("preview", { on: "member" });
       });
     });
 
@@ -1922,8 +1922,8 @@ describe("TestRoutingMapper", () => {
   it.skip("head fetch with mount on root", () => {});
   it("dynamic action segments are deprecated", async () => {
     await assertDeprecated(deprecator(), () => {
-      new RouteSet().draw((r) => {
-        r.get("/pages/:action", { controller: "pages" });
+      new RouteSet().draw(function () {
+        this.get("/pages/:action", { controller: "pages" });
       });
     });
   });
@@ -1933,16 +1933,16 @@ describe("TestRoutingMapper", () => {
 describe("ActionController::Routing", () => {
   it("route generation allows passing non string values to generated helper", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id", { to: "posts#show", as: "post" });
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show", as: "post" });
     });
     expect(routes.pathFor({ id: 42 }, "post")).toBe("/posts/42");
   });
 
   it("id with dash", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/journey/:id", { to: "journey#show" });
+    routes.draw(function () {
+      this.get("/journey/:id", { to: "journey#show" });
     });
     const m = routes.recognizePath("/journey/faithfully-omg");
     expect(m.id).toBe("faithfully-omg");
@@ -1950,9 +1950,9 @@ describe("ActionController::Routing", () => {
 
   it("regexp precedence", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id", { to: "posts#show", constraints: { id: /\d+/ } });
-      r.get("/posts/:slug", { to: "posts#show_by_slug" });
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show", constraints: { id: /\d+/ } });
+      this.get("/posts/:slug", { to: "posts#show_by_slug" });
     });
     const m1 = routes.recognizePath("/posts/123");
     expect(m1.action).toBe("show");
@@ -1970,8 +1970,8 @@ describe("ActionController::Routing", () => {
 
   it("dash with custom regexp", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/journey/:id", { to: "journey#show", constraints: { id: /\d+/ } });
+    routes.draw(function () {
+      this.get("/journey/:id", { to: "journey#show", constraints: { id: /\d+/ } });
     });
     expect(() => routes.recognizePath("/journey/123")).not.toThrow();
     expect(() => routes.recognizePath("/journey/abc")).toThrow(RoutingError);
@@ -1979,8 +1979,8 @@ describe("ActionController::Routing", () => {
 
   it("pre dash", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id", { to: "posts#show" });
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show" });
     });
     const m = routes.recognizePath("/posts/omg-faithfully");
     expect(m.id).toBe("omg-faithfully");
@@ -1988,8 +1988,8 @@ describe("ActionController::Routing", () => {
 
   it("pre dash with custom regexp", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id", { to: "posts#show", constraints: { id: /\d+/ } });
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show", constraints: { id: /\d+/ } });
     });
     expect(() => routes.recognizePath("/posts/123")).not.toThrow();
     expect(() => routes.recognizePath("/posts/omg-123")).toThrow(RoutingError);
@@ -1997,16 +1997,16 @@ describe("ActionController::Routing", () => {
 
   it("empty string match", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/", { to: "home#index" });
+    routes.draw(function () {
+      this.get("/", { to: "home#index" });
     });
     expect(routes.recognizePath("/").action).toBe("index");
   });
 
   it("symbols with dashes", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/my-route/:id", { to: "my_controller#show" });
+    routes.draw(function () {
+      this.get("/my-route/:id", { to: "my_controller#show" });
     });
     const m = routes.recognizePath("/my-route/123");
     expect(m.id).toBe("123");
@@ -2014,8 +2014,8 @@ describe("ActionController::Routing", () => {
 
   it("id encoding", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id", { to: "posts#show" });
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show" });
     });
     const m = routes.recognizePath("/posts/hello%20world");
     expect(m.id).toBe("hello world");
@@ -2025,30 +2025,30 @@ describe("ActionController::Routing", () => {
 describe("TestAppendingRoutes", () => {
   it("goodbye should be available", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/goodbye", { to: "goodbye#index" });
+    routes.draw(function () {
+      this.get("/goodbye", { to: "goodbye#index" });
     });
-    routes.draw((r) => {
-      r.get("/hello", { to: "hello#index" });
+    routes.draw(function () {
+      this.get("/hello", { to: "hello#index" });
     });
     expect(() => routes.recognizePath("/goodbye")).not.toThrow();
   });
 
   it("hello should not be overwritten", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/hello", { to: "hello#first" });
+    routes.draw(function () {
+      this.get("/hello", { to: "hello#first" });
     });
-    routes.draw((r) => {
-      r.get("/hello", { to: "hello#second" });
+    routes.draw(function () {
+      this.get("/hello", { to: "hello#second" });
     });
     expect(routes.recognizePath("/hello").action).toBe("first");
   });
 
   it("missing routes are still missing", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/hello", { to: "hello#index" });
+    routes.draw(function () {
+      this.get("/hello", { to: "hello#index" });
     });
     expect(() => routes.recognizePath("/random")).toThrow(RoutingError);
   });
@@ -2090,9 +2090,9 @@ describe("TestDefaultScope", () => {
 describe("TestRecognizePath", () => {
   it("hash constraints dont leak between routes", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/hash/:foo", { to: "pages#show", constraints: { foo: /foo/ } });
-      r.get("/hash/:bar", { to: "pages#show_bar" });
+    routes.draw(function () {
+      this.get("/hash/:foo", { to: "pages#show", constraints: { foo: /foo/ } });
+      this.get("/hash/:bar", { to: "pages#show_bar" });
     });
     const m = routes.recognizePath("/hash/bar");
     expect(m.action).toBe("show_bar");
@@ -2107,16 +2107,16 @@ describe("TestRecognizePath", () => {
 describe("TestTildeAndMinusPaths", () => {
   it("recognizes tilde path", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/~user", { to: "users#show" });
+    routes.draw(function () {
+      this.get("/~user", { to: "users#show" });
     });
     expect(() => routes.recognizePath("/~user")).not.toThrow();
   });
 
   it("recognizes minus path", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/young-and-fine", { to: "pages#show" });
+    routes.draw(function () {
+      this.get("/young-and-fine", { to: "pages#show" });
     });
     expect(() => routes.recognizePath("/young-and-fine")).not.toThrow();
   });
@@ -2125,8 +2125,8 @@ describe("TestTildeAndMinusPaths", () => {
 describe("TestUnicodePaths", () => {
   it("recognizes unicode path", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/ほげ", { to: "pages#show" });
+    routes.draw(function () {
+      this.get("/ほげ", { to: "pages#show" });
     });
     expect(() => routes.recognizePath("/%E3%81%BB%E3%81%92")).not.toThrow();
   });
@@ -2135,8 +2135,8 @@ describe("TestUnicodePaths", () => {
 describe("TestUrlGenerationErrors", () => {
   it("URL helpers raise message with mixed parameters when generation fails", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/posts/:id/comments/:comment_id", { to: "comments#show", as: "post_comment" });
+    routes.draw(function () {
+      this.get("/posts/:id/comments/:comment_id", { to: "comments#show", as: "post_comment" });
     });
     expect(() => routes.pathFor({ id: 1 }, "post_comment")).toThrow(/comment_id/);
   });
@@ -2148,8 +2148,8 @@ describe("TestUrlGenerationErrors", () => {
 
   it("URL helpers raise a 'missing keys' error for a nil param with optimized helpers", () => {
     const Routes = new RouteSet();
-    Routes.draw((app) => {
-      app.get("/products/:id", { to: "products#show", as: "product" });
+    Routes.draw(function () {
+      this.get("/products/:id", { to: "products#show", as: "product" });
     });
     const message =
       'No route matches {:action=>"show", :controller=>"products", :id=>nil}, missing required keys: [:id]';
@@ -2194,18 +2194,18 @@ describe("TestGlobRoutingMapper", () => {
 
 describe("TestOptimizedNamedRoutes", () => {
   const Routes = new RouteSet();
-  Routes.draw((app) => {
+  Routes.draw(function () {
     const ok = (_env: Record<string, unknown>) => [
       200,
       { "Content-Type": "text/plain" },
       bodyFromString(""),
     ];
-    app.get("/foo", { to: ok, as: "foo" });
-    app.get("/post(/:action(/:id))", { to: ok, as: "posts" });
-    app.get("/:foo/:foo_type/bars/:id", { to: ok, as: "bar" });
-    app.get("/projects/:id.:format", { to: ok, as: "project" });
-    app.get("/pages/:id", { to: ok, as: "page" });
-    app.get("/wiki/*page", { to: ok, as: "wiki" });
+    this.get("/foo", { to: ok, as: "foo" });
+    this.get("/post(/:action(/:id))", { to: ok, as: "posts" });
+    this.get("/:foo/:foo_type/bars/:id", { to: ok, as: "bar" });
+    this.get("/projects/:id.:format", { to: ok, as: "project" });
+    this.get("/pages/:id", { to: ok, as: "page" });
+    this.get("/wiki/*page", { to: ok, as: "wiki" });
   });
 
   const urlHelpers = () =>
@@ -2274,26 +2274,26 @@ describe("TestNamedRouteUrlHelpers", () => {
 
 describe("TestUrlConstraints", () => {
   const Routes = new RouteSet();
-  Routes.draw((app) => {
+  Routes.draw(function () {
     const ok = (_env: Record<string, unknown>) => [
       200,
       { "Content-Type": "text/plain" },
       bodyFromString(""),
     ];
 
-    app.constraints({ subdomain: "admin" }, () => {
-      app.get("/", { to: ok, as: "admin_root" });
+    this.constraints({ subdomain: "admin" }, () => {
+      this.get("/", { to: ok, as: "admin_root" });
     });
 
-    app.scope({ constraints: { protocol: "https://" } }, () => {
-      app.get("/", { to: ok, as: "secure_root" });
+    this.scope({ constraints: { protocol: "https://" } }, () => {
+      this.get("/", { to: ok, as: "secure_root" });
     });
 
-    app.get("/", { to: ok, as: "alternate_root", constraints: { port: 8080 } });
+    this.get("/", { to: ok, as: "alternate_root", constraints: { port: 8080 } });
 
-    app.get("/search", { to: ok, constraints: { subdomain: false } });
+    this.get("/search", { to: ok, constraints: { subdomain: false } });
 
-    app.get("/logs", { to: ok, constraints: { subdomain: true } });
+    this.get("/logs", { to: ok, constraints: { subdomain: true } });
   });
 
   let t: IntegrationTest;
@@ -2385,9 +2385,9 @@ describe("TestFormatConstraints", () => {
 describe("TestCallableConstraintValidation", () => {
   it("constraint with object not callable", () => {
     expect(() => {
-      new RouteSet().draw((r) => {
+      new RouteSet().draw(function () {
         const ok = () => [200, { "Content-Type": "text/plain" }, []];
-        r.get("/test", { to: ok as never, constraints: new (class {})() as never });
+        this.get("/test", { to: ok as never, constraints: new (class {})() as never });
       });
     }).toThrow(ArgumentError);
   });
@@ -2415,11 +2415,11 @@ describe("TestErrorsInController", () => {
 describe("TestPartialDynamicPathSegments", () => {
   it("paths with partial dynamic segments are recognised", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/songs/song-:song", { to: "songs#show" });
-      r.get("/songs/:song-song", { to: "songs#show2" });
-      r.get("/:artist/song-:song", { to: "songs#artist_show" });
-      r.get("/:artist/:song-song", { to: "songs#artist_show2" });
+    routes.draw(function () {
+      this.get("/songs/song-:song", { to: "songs#show" });
+      this.get("/songs/:song-song", { to: "songs#show2" });
+      this.get("/:artist/song-:song", { to: "songs#artist_show" });
+      this.get("/:artist/:song-song", { to: "songs#artist_show2" });
     });
     let m = routes.recognizePath("/songs/song-changes");
     expect(m.song).toBe("changes");
@@ -2446,8 +2446,8 @@ describe("TestPathParameters", () => {
 describe("TestInternalRoutingParams", () => {
   it("paths with partial dynamic segments are recognised", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/test_internal/:internal", { to: "internal#internal" });
+    routes.draw(function () {
+      this.get("/test_internal/:internal", { to: "internal#internal" });
     });
     const m = routes.recognizePath("/test_internal/123");
     expect(m.internal).toBe("123");
@@ -2472,16 +2472,16 @@ describe("TestHttpMethods", () => {
 describe("TestUriPathEscaping", () => {
   it("escapes slash in generated path segment", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/:segment", { to: "test#show", as: "segment" });
+    routes.draw(function () {
+      this.get("/:segment", { to: "test#show", as: "segment" });
     });
     expect(routes.pathFor({ segment: "a b/c+d" }, "segment")).toBe("/a%20b%2Fc+d");
   });
 
   it("unescapes recognized path segment", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/:segment", { to: "test#show", as: "segment" });
+    routes.draw(function () {
+      this.get("/:segment", { to: "test#show", as: "segment" });
     });
     const m = routes.recognizePath("/a%20b%2Fc+d");
     expect(m.segment).toBe("a b/c+d");
@@ -2489,16 +2489,16 @@ describe("TestUriPathEscaping", () => {
 
   it("does not escape slash in generated path splat", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/*splat", { to: "test#show", as: "splat" });
+    routes.draw(function () {
+      this.get("/*splat", { to: "test#show", as: "splat" });
     });
     expect(routes.pathFor({ splat: "a b/c+d" }, "splat")).toBe("/a%20b/c+d");
   });
 
   it("unescapes recognized path splat", () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.get("/*splat", { to: "test#show", as: "splat" });
+    routes.draw(function () {
+      this.get("/*splat", { to: "test#show", as: "splat" });
     });
     const m = routes.recognizePath("/a%20b/c+d");
     expect(m.splat).toBe("a b/c+d");

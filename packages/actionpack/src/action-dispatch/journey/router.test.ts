@@ -53,8 +53,8 @@ function _generate(
 describe("TestRouter", () => {
   it("dashes", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/foo-bar-baz", { to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/foo-bar-baz", { to: "foo#bar" });
     });
 
     const env = railsEnv({ PATH_INFO: "/foo-bar-baz" });
@@ -67,8 +67,8 @@ describe("TestRouter", () => {
 
   it("unicode", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/ほげ", { to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/ほげ", { to: "foo#bar" });
     });
 
     const env = railsEnv({ PATH_INFO: "/%E3%81%BB%E3%81%92" });
@@ -81,9 +81,9 @@ describe("TestRouter", () => {
 
   it("regexp first precedence", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/whois/:domain", { constraints: { domain: /\w+\.[\w.]+/ }, to: "foo#bar" });
-      r.get("/whois/:id(.:format)", { to: "foo#baz" });
+    routeSet.draw(function () {
+      this.get("/whois/:domain", { constraints: { domain: /\w+\.[\w.]+/ }, to: "foo#bar" });
+      this.get("/whois/:id(.:format)", { to: "foo#baz" });
     });
 
     const env = railsEnv({ PATH_INFO: "/whois/example.com" });
@@ -101,8 +101,8 @@ describe("TestRouter", () => {
 
   it("required parts verified are anchored", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/foo/:id", { constraints: { id: /\d/ }, anchor: false, to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/foo/:id", { constraints: { id: /\d/ }, anchor: false, to: "foo#bar" });
     });
 
     expect(() => routeSet.urlFor({ controller: "foo", action: "bar", id: "10" }, null)).toThrow(
@@ -112,8 +112,8 @@ describe("TestRouter", () => {
 
   it("required parts are verified when building", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/foo/:id", { constraints: { id: /\d+/ }, anchor: false, to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/foo/:id", { constraints: { id: /\d+/ }, anchor: false, to: "foo#bar" });
     });
 
     const [path] = _generate(routeSet, null, { controller: "foo", action: "bar", id: "10" }, {});
@@ -124,8 +124,8 @@ describe("TestRouter", () => {
 
   it("only required parts are verified", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/foo(/:id)", { constraints: { id: /\d/ }, to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/foo(/:id)", { constraints: { id: /\d/ }, to: "foo#bar" });
     });
 
     let [path] = _generate(routeSet, null, { controller: "foo", action: "bar", id: "10" }, {});
@@ -141,8 +141,8 @@ describe("TestRouter", () => {
   it("knows what parts are missing from named route", () => {
     const routeName = "gorby_thunderhorse";
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/foo/:id", { as: routeName, constraints: { id: /\d+/ }, to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/foo/:id", { as: routeName, constraints: { id: /\d+/ }, to: "foo#bar" });
     });
 
     let error: Error | undefined;
@@ -177,8 +177,8 @@ describe("TestRouter", () => {
 
   it("x cascade", async () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/messages(.:format)", { to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/messages(.:format)", { to: "foo#bar" });
     });
     const resp = await routeSet.router.serve(
       railsEnv({ REQUEST_METHOD: "GET", PATH_INFO: "/lol" }),
@@ -191,8 +191,8 @@ describe("TestRouter", () => {
   it("clear trailing slash from script name on root unanchored routes", async () => {
     const app = () => [200, {}, ["success!"]] as const;
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/weblog", { to: app });
+    routeSet.draw(function () {
+      this.get("/weblog", { to: app });
     });
 
     const env = railsEnv({ SCRIPT_NAME: "", PATH_INFO: "/weblog" });
@@ -203,8 +203,8 @@ describe("TestRouter", () => {
 
   it("defaults merge correctly", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/foo(/:id)", { to: "foo#bar", defaults: { id: null } });
+    routeSet.draw(function () {
+      this.get("/foo(/:id)", { to: "foo#bar", defaults: { id: null } });
     });
 
     let env = railsEnv({ PATH_INFO: "/foo/10" });
@@ -220,8 +220,8 @@ describe("TestRouter", () => {
 
   it("recognize with unbound regexp", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/foo", { anchor: false, to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/foo", { anchor: false, to: "foo#bar" });
     });
 
     const env = railsEnv({ PATH_INFO: "/foo/bar" });
@@ -234,8 +234,8 @@ describe("TestRouter", () => {
 
   it("bound regexp keeps path info", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/foo", { to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/foo", { to: "foo#bar" });
     });
 
     const env = railsEnv({ PATH_INFO: "/foo" });
@@ -250,14 +250,14 @@ describe("TestRouter", () => {
 
   it("path not found", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
+    routeSet.draw(function () {
       for (const path of [
         "/messages(.:format)",
         "/messages/new(.:format)",
         "/messages/:id/edit(.:format)",
         "/messages/:id(.:format)",
       ]) {
-        r.get(path, { to: "foo#bar" });
+        this.get(path, { to: "foo#bar" });
       }
     });
     const env = railsEnv({ PATH_INFO: "/messages/unknown/path" });
@@ -271,8 +271,8 @@ describe("TestRouter", () => {
 
   it("required part in recall", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/messages/:a/:b", { to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/messages/:a/:b", { to: "foo#bar" });
     });
 
     const [path] = _generate(
@@ -286,8 +286,8 @@ describe("TestRouter", () => {
 
   it("splat in recall", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/*path", { to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/*path", { to: "foo#bar" });
     });
 
     const [path] = _generate(routeSet, null, { controller: "foo", action: "bar" }, { path: "b" });
@@ -296,9 +296,9 @@ describe("TestRouter", () => {
 
   it("recall should be used when scoring", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/messages/:action(/:id(.:format))", { to: "foo#bar" });
-      r.get("/messages/:id(.:format)", { to: "bar#baz" });
+    routeSet.draw(function () {
+      this.get("/messages/:action(/:id(.:format))", { to: "foo#bar" });
+      this.get("/messages/:id(.:format)", { to: "bar#baz" });
     });
 
     const [path] = _generate(routeSet, null, { controller: "foo", id: 10 }, { action: "index" });
@@ -307,8 +307,8 @@ describe("TestRouter", () => {
 
   it("nil path parts are ignored", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/:controller(/:action(.:format))", { to: "tasks#lol" });
+    routeSet.draw(function () {
+      this.get("/:controller(/:action(.:format))", { to: "tasks#lol" });
     });
 
     const params = { controller: "tasks", format: null };
@@ -321,8 +321,8 @@ describe("TestRouter", () => {
   it("generate slash", () => {
     const params: Record<string, string> = { controller: "tasks", action: "show" };
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/", { ...params });
+    routeSet.draw(function () {
+      this.get("/", { ...params });
     });
 
     const [path] = _generate(routeSet, null, params, {});
@@ -331,8 +331,8 @@ describe("TestRouter", () => {
 
   it("generate id", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/:controller(/:action)", { to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/:controller(/:action)", { to: "foo#bar" });
     });
 
     const [path, params] = _generate(
@@ -347,8 +347,8 @@ describe("TestRouter", () => {
 
   it("generate escapes", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/:controller(/:action)", { to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/:controller(/:action)", { to: "foo#bar" });
     });
 
     const [path] = _generate(routeSet, null, { controller: "tasks", action: "a/b c+d" }, {});
@@ -357,8 +357,8 @@ describe("TestRouter", () => {
 
   it("generate escapes with namespaced controller", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/:controller(/:action)", { to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/:controller(/:action)", { to: "foo#bar" });
     });
 
     const [path] = _generate(routeSet, null, { controller: "admin/tasks", action: "a/b c+d" }, {});
@@ -367,8 +367,8 @@ describe("TestRouter", () => {
 
   it("generate extra params", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/:controller(/:action)", { to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/:controller(/:action)", { to: "foo#bar" });
     });
 
     const [path, params] = _generate(
@@ -383,8 +383,8 @@ describe("TestRouter", () => {
 
   it("generate missing keys no matches different format keys", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/:controller/:action/:name", { to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/:controller/:action/:name", { to: "foo#bar" });
     });
     const primaryParameters = {
       id: 1,
@@ -417,8 +417,8 @@ describe("TestRouter", () => {
 
   it("generate uses recall if needed", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/:controller(/:action(/:id))", { to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/:controller(/:action(/:id))", { to: "foo#bar" });
     });
 
     const [path, params] = _generate(
@@ -433,8 +433,8 @@ describe("TestRouter", () => {
 
   it("generate with name", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/:controller(/:action)", { to: "foo#bar", as: "tasks" });
+    routeSet.draw(function () {
+      this.get("/:controller(/:action)", { to: "foo#bar", as: "tasks" });
     });
 
     const [path, params] = _generate(
@@ -454,8 +454,8 @@ describe("TestRouter", () => {
   } as Record<string, Record<string, string>>)) {
     it(`recognize ${Object.keys(expected).join(" ")}`, () => {
       const routeSet = new RouteSet();
-      routeSet.draw((r) => {
-        r.get("/:controller(/:action(/:id))", { to: "foo#bar" });
+      routeSet.draw(function () {
+        this.get("/:controller(/:action(/:id))", { to: "foo#bar" });
       });
       const route = [...routeSet.router.routes][0];
 
@@ -478,8 +478,8 @@ describe("TestRouter", () => {
   } as const)) {
     it(`recognize ${name}`, () => {
       const routeSet = new RouteSet();
-      routeSet.draw((r) => {
-        r.get("/:segment/*splat", { to: "foo#bar" });
+      routeSet.draw(function () {
+        this.get("/:segment/*splat", { to: "foo#bar" });
       });
 
       const env = railsEnv({ PATH_INFO: requestPath });
@@ -498,8 +498,8 @@ describe("TestRouter", () => {
 
   it("namespaced controller", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/:controller(/:action(/:id))", { constraints: { controller: /.+?/ } });
+    routeSet.draw(function () {
+      this.get("/:controller(/:action(/:id))", { constraints: { controller: /.+?/ } });
     });
     const route = [...routeSet.router.routes][0];
 
@@ -521,8 +521,8 @@ describe("TestRouter", () => {
 
   it("recognize literal", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/books(/:action(.:format))", { controller: "books" });
+    routeSet.draw(function () {
+      this.get("/books(/:action(.:format))", { controller: "books" });
     });
     const route = [...routeSet.router.routes][0];
 
@@ -540,8 +540,8 @@ describe("TestRouter", () => {
 
   it("recognize head route", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.match("/books(/:action(.:format))", { via: "head", to: "foo#bar" });
+    routeSet.draw(function () {
+      this.match("/books(/:action(.:format))", { via: "head", to: "foo#bar" });
     });
 
     const env = railsEnv({
@@ -559,8 +559,8 @@ describe("TestRouter", () => {
 
   it("recognize head request as get route", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/books(/:action(.:format))", { to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/books(/:action(.:format))", { to: "foo#bar" });
     });
 
     const env = railsEnv({ PATH_INFO: "/books/list.rss", REQUEST_METHOD: "HEAD" });
@@ -575,8 +575,8 @@ describe("TestRouter", () => {
 
   it("recognize cares about get verbs", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.match("/books(/:action(.:format))", { to: "foo#bar", via: "get" });
+    routeSet.draw(function () {
+      this.match("/books(/:action(.:format))", { to: "foo#bar", via: "get" });
     });
 
     const env = railsEnv({ PATH_INFO: "/books/list.rss", REQUEST_METHOD: "POST" });
@@ -591,8 +591,8 @@ describe("TestRouter", () => {
 
   it("recognize cares about post verbs", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.match("/books(/:action(.:format))", { to: "foo#bar", via: "post" });
+    routeSet.draw(function () {
+      this.match("/books(/:action(.:format))", { to: "foo#bar", via: "post" });
     });
 
     const env = railsEnv({ PATH_INFO: "/books/list.rss", REQUEST_METHOD: "POST" });
@@ -607,8 +607,8 @@ describe("TestRouter", () => {
 
   it("multi verb recognition", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.match("/books(/:action(.:format))", { to: "foo#bar", via: ["post", "get"] });
+    routeSet.draw(function () {
+      this.match("/books(/:action(.:format))", { to: "foo#bar", via: ["post", "get"] });
     });
 
     for (const verb of ["POST", "GET"]) {
@@ -634,8 +634,8 @@ describe("TestRouter", () => {
 
   it("eager load with routes", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((r) => {
-      r.get("/foo-bar", { to: "foo#bar" });
+    routeSet.draw(function () {
+      this.get("/foo-bar", { to: "foo#bar" });
     });
     expect(routeSet.router.eagerLoadBang()).toBeUndefined();
   });

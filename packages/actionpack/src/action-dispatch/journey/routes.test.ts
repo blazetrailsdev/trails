@@ -79,10 +79,10 @@ describe("TestRoutes", () => {
 
   it("first name wins", () => {
     const routeSet = new RouteSet();
-    routeSet.draw((mapper) => {
-      mapper.get("/hello", { to: "foo#bar", as: "aaron" });
+    routeSet.draw(function () {
+      this.get("/hello", { to: "foo#bar", as: "aaron" });
       expect(() => {
-        mapper.get("/aaron", { to: "foo#bar", as: "aaron" });
+        this.get("/aaron", { to: "foo#bar", as: "aaron" });
       }).toThrow(ArgumentError);
     });
   });

@@ -50,8 +50,8 @@ class CaptureEnvController {
 describe("Controller routing integration", () => {
   it("dispatches GET / to root route", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.root("pages#home");
+    routes.draw(function () {
+      this.root("pages#home");
     });
     const match = routes.recognizePath("/");
     expect(match.controller).toBe("pages");
@@ -60,8 +60,8 @@ describe("Controller routing integration", () => {
 
   it("dispatches resource routes to correct actions", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.resources("posts");
+    routes.draw(function () {
+      this.resources("posts");
     });
 
     expect(routes.recognizePath("/posts").action).toBe("index");
@@ -75,8 +75,8 @@ describe("Controller routing integration", () => {
 
   it("path params include route parameters", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.get("/posts/:id", { to: "posts#show" });
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show" });
     });
     const match = routes.recognizePath("/posts/42");
     expect(match.id).toBe("42");
@@ -84,8 +84,8 @@ describe("Controller routing integration", () => {
 
   it("named route generates path", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.get("/posts/:id", { to: "posts#show", as: "post" });
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show", as: "post" });
     });
     expect(routes.pathFor({ id: "5" }, "post")).toBe("/posts/5");
   });
@@ -93,17 +93,17 @@ describe("Controller routing integration", () => {
   it("named route generates full URL", () => {
     const routes = new RouteSet();
     routes.setDefaultUrlOptions({ host: "example.com" });
-    routes.draw((map) => {
-      map.get("/posts/:id", { to: "posts#show", as: "post" });
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show", as: "post" });
     });
     expect(routes.urlFor({ id: "5" }, "post")).toBe("http://example.com/posts/5");
   });
 
   it("first matching route wins", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.get("/posts/special", { to: "posts#special", as: "special_post" });
-      map.get("/posts/:id", { to: "posts#show" });
+    routes.draw(function () {
+      this.get("/posts/special", { to: "posts#special", as: "special_post" });
+      this.get("/posts/:id", { to: "posts#show" });
     });
     const match = routes.recognizePath("/posts/special");
     expect(match.action).toBe("special");
@@ -111,25 +111,25 @@ describe("Controller routing integration", () => {
 
   it("unmatched route returns null", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.get("/posts", { to: "posts#index" });
+    routes.draw(function () {
+      this.get("/posts", { to: "posts#index" });
     });
     expect(() => routes.recognizePath("/users")).toThrow(RoutingError);
   });
 
   it("wrong method returns null", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.get("/posts", { to: "posts#index" });
+    routes.draw(function () {
+      this.get("/posts", { to: "posts#index" });
     });
     expect(() => routes.recognizePath("/posts", { method: "post" })).toThrow(RoutingError);
   });
 
   it("namespace prefixes path and controller", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.namespace("admin", (admin) => {
-        admin.resources("posts");
+    routes.draw(function () {
+      this.namespace("admin", () => {
+        this.resources("posts");
       });
     });
     const match = routes.recognizePath("/admin/posts");
@@ -139,9 +139,9 @@ describe("Controller routing integration", () => {
 
   it("scope with module option", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.scope("/api", { module: "api" }, (scope) => {
-        scope.get("/posts", { to: "posts#index" });
+    routes.draw(function () {
+      this.scope("/api", { module: "api" }, () => {
+        this.get("/posts", { to: "posts#index" });
       });
     });
     const match = routes.recognizePath("/api/posts");
@@ -150,8 +150,8 @@ describe("Controller routing integration", () => {
 
   it("constraints filter routes", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.get("/posts/:id", { to: "posts#show", constraints: { id: /\d+/ } });
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show", constraints: { id: /\d+/ } });
     });
     expect(() => routes.recognizePath("/posts/123")).not.toThrow();
     expect(() => routes.recognizePath("/posts/abc")).toThrow(RoutingError);
@@ -159,11 +159,11 @@ describe("Controller routing integration", () => {
 
   it("multiple draw calls append routes", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.get("/a", { to: "posts#index" });
+    routes.draw(function () {
+      this.get("/a", { to: "posts#index" });
     });
-    routes.draw((map) => {
-      map.get("/b", { to: "pages#home" });
+    routes.draw(function () {
+      this.get("/b", { to: "pages#home" });
     });
     expect(() => routes.recognizePath("/a")).not.toThrow();
     expect(() => routes.recognizePath("/b")).not.toThrow();
@@ -171,8 +171,8 @@ describe("Controller routing integration", () => {
 
   it("clear removes all routes", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.get("/posts", { to: "posts#index" });
+    routes.draw(function () {
+      this.get("/posts", { to: "posts#index" });
     });
     routes.clearBang();
     expect(() => routes.recognizePath("/posts")).toThrow(RoutingError);
@@ -180,9 +180,9 @@ describe("Controller routing integration", () => {
 
   it("nested resources generate correct paths", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.resources("posts", {}, (posts) => {
-        posts.resources("comments");
+    routes.draw(function () {
+      this.resources("posts", {}, () => {
+        this.resources("comments");
       });
     });
     const match = routes.recognizePath("/posts/1/comments");
@@ -196,10 +196,10 @@ describe("Controller routing integration", () => {
 
   it("member routes within resources", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.resources("posts", {}, (posts) => {
-        posts.member((m) => {
-          m.post("/publish", { to: "posts#publish" });
+    routes.draw(function () {
+      this.resources("posts", {}, () => {
+        this.member(() => {
+          this.post("/publish", { to: "posts#publish" });
         });
       });
     });
@@ -209,10 +209,10 @@ describe("Controller routing integration", () => {
 
   it("collection routes within resources", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.resources("posts", {}, (posts) => {
-        posts.collection((c) => {
-          c.get("/search", { to: "posts#search" });
+    routes.draw(function () {
+      this.resources("posts", {}, () => {
+        this.collection(() => {
+          this.get("/search", { to: "posts#search" });
         });
       });
     });
@@ -222,8 +222,8 @@ describe("Controller routing integration", () => {
 
   it("singular resource routes", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.resource("session");
+    routes.draw(function () {
+      this.resource("session");
     });
     expect(() => routes.recognizePath("/session")).not.toThrow();
     expect(() => routes.recognizePath("/session", { method: "post" })).not.toThrow();
@@ -233,8 +233,8 @@ describe("Controller routing integration", () => {
 
   it("route defaults are merged into params", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.get("/posts", { to: "posts#index", defaults: { format: "json" } });
+    routes.draw(function () {
+      this.get("/posts", { to: "posts#index", defaults: { format: "json" } });
     });
     const route = routes.recognizePath("/posts");
     expect(route.format).toBe("json");
@@ -242,8 +242,8 @@ describe("Controller routing integration", () => {
 
   it("call returns 404 for unmatched", async () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.get("/posts", { to: "posts#index" });
+    routes.draw(function () {
+      this.get("/posts", { to: "posts#index" });
     });
     const [status] = await routes.call({ REQUEST_METHOD: "GET", PATH_INFO: "/nope" });
     expect(status).toBe(404);
@@ -255,8 +255,8 @@ describe("Controller routing integration", () => {
       "posts",
       CaptureEnvController as unknown as DispatchableControllerClass,
     );
-    routes.draw((map) => {
-      map.get("/posts/:id", { to: "posts#show" });
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show" });
     });
     await routes.call({ REQUEST_METHOD: "GET", PATH_INFO: "/posts/42" });
     const pathParams = capturedEnv["action_dispatch.request.path_parameters"] as Record<
@@ -270,18 +270,18 @@ describe("Controller routing integration", () => {
 
   it("route inspector lists all routes", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.get("/posts", { to: "posts#index", as: "posts" });
-      map.get("/posts/:id", { to: "posts#show", as: "post" });
+    routes.draw(function () {
+      this.get("/posts", { to: "posts#index", as: "posts" });
+      this.get("/posts/:id", { to: "posts#show", as: "post" });
     });
     expect(routes.routes.routes.length).toBe(2);
   });
 
   it("named routes map", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.get("/posts", { to: "posts#index", as: "posts" });
-      map.get("/about", { to: "pages#about", as: "about" });
+    routes.draw(function () {
+      this.get("/posts", { to: "posts#index", as: "posts" });
+      this.get("/about", { to: "pages#about", as: "about" });
     });
     const named = routes.namedRoutes.routes;
     expect(named.has("posts")).toBe(true);
@@ -295,9 +295,9 @@ describe("Controller routing integration", () => {
 
   it("shallow nested resources", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.resources("posts", { shallow: true }, (posts) => {
-        posts.resources("comments");
+    routes.draw(function () {
+      this.resources("posts", { shallow: true }, () => {
+        this.resources("comments");
       });
     });
     const index = routes.recognizePath("/posts/1/comments");
@@ -309,8 +309,8 @@ describe("Controller routing integration", () => {
 
   it("resources with only option", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.resources("posts", { only: ["index", "show"] });
+    routes.draw(function () {
+      this.resources("posts", { only: ["index", "show"] });
     });
     expect(() => routes.recognizePath("/posts")).not.toThrow();
     expect(() => routes.recognizePath("/posts/1")).not.toThrow();
@@ -320,8 +320,8 @@ describe("Controller routing integration", () => {
 
   it("resources with except option", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.resources("posts", { except: ["destroy"] });
+    routes.draw(function () {
+      this.resources("posts", { except: ["destroy"] });
     });
     expect(() => routes.recognizePath("/posts")).not.toThrow();
     expect(() => routes.recognizePath("/posts/1", { method: "delete" })).toThrow(RoutingError);
@@ -329,10 +329,10 @@ describe("Controller routing integration", () => {
 
   it("deeply nested namespace", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.namespace("api", (api) => {
-        api.namespace("v1", (v1) => {
-          v1.resources("posts");
+    routes.draw(function () {
+      this.namespace("api", () => {
+        this.namespace("v1", () => {
+          this.resources("posts");
         });
       });
     });
@@ -342,8 +342,8 @@ describe("Controller routing integration", () => {
 
   it("resources generate named routes for path generation", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.resources("posts");
+    routes.draw(function () {
+      this.resources("posts");
     });
     expect(routes.pathFor({}, "posts")).toBe("/posts");
     expect(routes.pathFor({ id: "3" }, "post")).toBe("/posts/3");
@@ -353,8 +353,8 @@ describe("Controller routing integration", () => {
 
   it("match with multiple verbs", () => {
     const routes = new RouteSet();
-    routes.draw((map) => {
-      map.match("/login", { to: "sessions#create", via: ["get", "post"] });
+    routes.draw(function () {
+      this.match("/login", { to: "sessions#create", via: ["get", "post"] });
     });
     expect(() => routes.recognizePath("/login")).not.toThrow();
     expect(() => routes.recognizePath("/login", { method: "post" })).not.toThrow();

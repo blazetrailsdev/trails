@@ -466,16 +466,16 @@ CspIntegrationController.contentSecurityPolicy({ only: ["api"] }, (p) => {
 
 function buildCspApp() {
   const app = new IntegrationTest();
-  app.routes.draw((r) => {
-    r.get("/", { to: "csp#index" });
-    r.get("/inline", { to: "csp#inline" });
-    r.get("/conditional", { to: "csp#conditional" });
-    r.get("/report-only", { to: "csp#reportOnly" });
-    r.get("/script-src", { to: "csp#scriptSrc" });
-    r.get("/style-src", { to: "csp#styleSrc" });
-    r.get("/no-policy", { to: "csp#noPolicy" });
-    r.get("/api", { to: "csp#api" });
-    r.get("/not-modified", { to: "csp#notModified" });
+  app.routes.draw(function () {
+    this.get("/", { to: "csp#index" });
+    this.get("/inline", { to: "csp#inline" });
+    this.get("/conditional", { to: "csp#conditional" });
+    this.get("/report-only", { to: "csp#reportOnly" });
+    this.get("/script-src", { to: "csp#scriptSrc" });
+    this.get("/style-src", { to: "csp#styleSrc" });
+    this.get("/no-policy", { to: "csp#noPolicy" });
+    this.get("/api", { to: "csp#api" });
+    this.get("/not-modified", { to: "csp#notModified" });
   });
   app.app = buildApp(app.routes);
   controllerConstants.set("csp", CspIntegrationController);
@@ -602,9 +602,9 @@ describe("DefaultContentSecurityPolicyIntegrationTest", () => {
       p.scriptSrc(() => ":https");
     });
     const app = new IntegrationTest();
-    app.routes.draw((r) => {
-      r.get("/redirect", { to: "csp#redirect" });
-      r.get("/", { to: "csp#index" });
+    app.routes.draw(function () {
+      this.get("/redirect", { to: "csp#redirect" });
+      this.get("/", { to: "csp#index" });
     });
     app.app = buildApp(app.routes);
 
@@ -634,8 +634,8 @@ describe("NonceDirectiveContentSecurityPolicyIntegrationTest", () => {
       p.styleSrc(() => ":https");
     });
     const app = new IntegrationTest();
-    app.routes.draw((r) => {
-      r.get("/", { to: "csp#index" });
+    app.routes.draw(function () {
+      this.get("/", { to: "csp#index" });
     });
     app.app = buildApp(app.routes);
 

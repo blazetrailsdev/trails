@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { stringSplit } from "@blazetrails/ruby-compat";
-import { Mapper } from "../../routing/mapper.js";
 import type { MountableApp } from "../../routing/mapper.js";
-import { RouteSet } from "../../routing/route-set.js";
+import { RouteSet, type DrawCallback } from "../../routing/route-set.js";
 import { ConsoleFormatter, RoutesFormatter, RoutesInspector } from "../../routing/inspector.js";
 
 class MountedRackApp {
@@ -44,23 +43,23 @@ describe("RoutesInspectorTest", () => {
   });
 
   function draw(
-    cb: (r: Mapper) => void,
+    cb: DrawCallback,
     opts: { formatter?: RoutesFormatter; grep?: string; controller?: string } = {},
   ): string[] {
-    set.draw(cb as Parameters<typeof set.draw>[0]);
+    set.draw(cb);
     const { formatter = new ConsoleFormatter.Sheet(), ...filter } = opts;
     return stringSplit(new RoutesInspector(set.routes.routes).format(formatter, filter), "\n");
   }
 
   it("displaying routes for engines", () => {
     const engine = engineClass();
-    engine.routes().draw((r) => {
-      r.get("/cart", { to: "cart#show" });
+    engine.routes().draw(function () {
+      this.get("/cart", { to: "cart#show" });
     });
 
-    const output = draw((r) => {
-      r.get("/custom/assets", { to: "custom_assets#show" });
-      r.mount(engine as unknown as MountableApp, { at: "/blog", as: "blog" });
+    const output = draw(function () {
+      this.get("/custom/assets", { to: "custom_assets#show" });
+      this.mount(engine as unknown as MountableApp, { at: "/blog", as: "blog" });
     });
 
     expect(output).toEqual([
@@ -75,10 +74,10 @@ describe("RoutesInspectorTest", () => {
 
   it("displaying routes for engines without routes", () => {
     const engine = engineClass();
-    engine.routes().draw(() => {});
+    engine.routes().draw(function () {});
 
-    const output = draw((r) => {
-      r.mount(engine as unknown as MountableApp, { at: "/blog", as: "blog" });
+    const output = draw(function () {
+      this.mount(engine as unknown as MountableApp, { at: "/blog", as: "blog" });
     });
 
     expect(output).toEqual([
@@ -90,8 +89,8 @@ describe("RoutesInspectorTest", () => {
   });
 
   it("cart inspect", () => {
-    const output = draw((r) => {
-      r.get("/cart", { to: "cart#show" });
+    const output = draw(function () {
+      this.get("/cart", { to: "cart#show" });
     });
     expect(output).toEqual([
       "Prefix Verb URI Pattern     Controller#Action",
@@ -102,8 +101,8 @@ describe("RoutesInspectorTest", () => {
   it.skip("articles inspect with multiple verbs", () => {});
 
   it("inspect shows custom assets", () => {
-    const output = draw((r) => {
-      r.get("/custom/assets", { to: "custom_assets#show" });
+    const output = draw(function () {
+      this.get("/custom/assets", { to: "custom_assets#show" });
     });
     expect(output).toEqual([
       "       Prefix Verb URI Pattern              Controller#Action",
@@ -112,8 +111,8 @@ describe("RoutesInspectorTest", () => {
   });
 
   it("inspect routes shows resources route", () => {
-    const output = draw((r) => {
-      r.resources("articles");
+    const output = draw(function () {
+      this.resources("articles");
     });
     expect(output).toEqual([
       "      Prefix Verb   URI Pattern                  Controller#Action",
@@ -129,8 +128,8 @@ describe("RoutesInspectorTest", () => {
   });
 
   it("inspect routes shows root route", () => {
-    const output = draw((r) => {
-      r.root("pages#main");
+    const output = draw(function () {
+      this.root("pages#main");
     });
     expect(output).toEqual([
       "Prefix Verb URI Pattern Controller#Action",
@@ -153,8 +152,8 @@ describe("RoutesInspectorTest", () => {
   it.skip("rails routes shows route with rack app", () => {});
 
   it("rails routes shows named route with mounted rack app", () => {
-    const output = draw((r) => {
-      r.mount(mountedRackApp, { at: "/foo" });
+    const output = draw(function () {
+      this.mount(mountedRackApp, { at: "/foo" });
     });
     expect(output).toEqual([
       "          Prefix Verb URI Pattern Controller#Action",
@@ -163,8 +162,8 @@ describe("RoutesInspectorTest", () => {
   });
 
   it("rails routes shows overridden named route with mounted rack app with name", () => {
-    const output = draw((r) => {
-      r.mount(mountedRackApp, { at: "/foo", as: "blog" });
+    const output = draw(function () {
+      this.mount(mountedRackApp, { at: "/foo", as: "blog" });
     });
     expect(output).toEqual([
       "Prefix Verb URI Pattern Controller#Action",
@@ -177,9 +176,9 @@ describe("RoutesInspectorTest", () => {
   it.skip("rails routes dont show app mounted in assets prefix", () => {});
 
   it("rails routes shows route defined in under assets prefix", () => {
-    const output = draw((r) => {
-      r.scope("/sprockets", () => {
-        r.get("/foo", { to: "foo#bar" });
+    const output = draw(function () {
+      this.scope("/sprockets", () => {
+        this.get("/foo", { to: "foo#bar" });
       });
     });
     expect(output).toEqual([
@@ -192,9 +191,9 @@ describe("RoutesInspectorTest", () => {
 
   it("routes can be filtered", () => {
     const output = draw(
-      (r) => {
-        r.resources("articles");
-        r.resources("posts");
+      function () {
+        this.resources("articles");
+        this.resources("posts");
       },
       { grep: "posts" },
     );
@@ -215,8 +214,8 @@ describe("RoutesInspectorTest", () => {
 
   it("no routes matched filter when expanded", () => {
     const output = draw(
-      (r) => {
-        r.get("photos/:id", { to: "photos#show" });
+      function () {
+        this.get("photos/:id", { to: "photos#show" });
       },
       { grep: "rails/dummy", formatter: new ConsoleFormatter.Expanded() },
     );
@@ -227,7 +226,7 @@ describe("RoutesInspectorTest", () => {
   });
 
   it("not routes when expanded", () => {
-    const output = draw(() => {}, {
+    const output = draw(function () {}, {
       grep: "rails/dummy",
       formatter: new ConsoleFormatter.Expanded(),
     });
@@ -246,8 +245,8 @@ describe("RoutesInspectorTest", () => {
 
   it("routes with undefined filter", () => {
     const output = draw(
-      (r) => {
-        r.get("photos/:id", { to: "photos#show" });
+      function () {
+        this.get("photos/:id", { to: "photos#show" });
       },
       { controller: "Rails::MissingController" },
     );
@@ -259,8 +258,8 @@ describe("RoutesInspectorTest", () => {
 
   it("no routes matched filter", () => {
     const output = draw(
-      (r) => {
-        r.get("photos/:id", { to: "photos#show" });
+      function () {
+        this.get("photos/:id", { to: "photos#show" });
       },
       { grep: "rails/dummy" },
     );
@@ -271,7 +270,7 @@ describe("RoutesInspectorTest", () => {
   });
 
   it("no routes were defined", () => {
-    const output = draw(() => {}, { grep: "Rails::DummyController" });
+    const output = draw(function () {}, { grep: "Rails::DummyController" });
     expect(output).toEqual([
       "You don't have any routes defined!",
       "",
@@ -286,22 +285,22 @@ describe("RoutesInspectorTest", () => {
   it.skip("route with proc handler", () => {});
 
   it("digit-leading path segment does not produce an inferred name", () => {
-    const output = draw((r) => {
-      r.get("/123", { to: "pages#show" });
+    const output = draw(function () {
+      this.get("/123", { to: "pages#show" });
     });
     expect(output[1]).toMatch(/^\s+GET\s/);
   });
 
   it("explicit as:'' does not trigger path-based name inference", () => {
-    const output = draw((r) => {
-      r.get("/health", { to: "health#show", as: "" });
+    const output = draw(function () {
+      this.get("/health", { to: "health#show", as: "" });
     });
     expect(output[1]).toMatch(/^\s+GET\s/);
   });
 
   it("format false suppresses (.:format) suffix", () => {
-    const output = draw((r) => {
-      r.get("/health", { to: "health#show", format: false });
+    const output = draw(function () {
+      this.get("/health", { to: "health#show", format: false });
     });
     expect(output).toEqual([
       "Prefix Verb URI Pattern Controller#Action",

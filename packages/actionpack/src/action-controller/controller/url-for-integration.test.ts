@@ -7,8 +7,7 @@ import { rbInspect, URI } from "@blazetrails/ruby-compat";
 
 import type { Base } from "../base.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
-import type { Mapper } from "../../action-dispatch/routing/mapper.js";
-import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
+import type { DrawCallback, RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { RoutingTestHelpers, RoutingVerbs } from "../../test-helpers/abstract-unit.js";
 
 class Model {
@@ -19,17 +18,17 @@ class Model {
   }
 }
 
-const Mapping = (r: Mapper) => {
-  r.namespace("admin", () => {
-    r.resources("users");
-    r.resources("posts");
+const Mapping: DrawCallback = function () {
+  this.namespace("admin", () => {
+    this.resources("users");
+    this.resources("posts");
   });
 
-  r.namespace("api", () => {
-    r.root({ to: "users#index" });
+  this.namespace("api", () => {
+    this.root({ to: "users#index" });
   });
 
-  r.get("/blog(/:year(/:month(/:day)))", {
+  this.get("/blog(/:year(/:month(/:day)))", {
     to: "posts#show_date",
     constraints: {
       year: /(19|20)\d\d/,
@@ -40,7 +39,7 @@ const Mapping = (r: Mapper) => {
     month: null,
   });
 
-  r.get("archive/:year", {
+  this.get("archive/:year", {
     controller: "archive",
     action: "index",
     defaults: { year: null },
@@ -48,20 +47,20 @@ const Mapping = (r: Mapper) => {
     as: "blog",
   });
 
-  r.resources("people");
+  this.resources("people");
 
-  r.get("symbols", { controller: "symbols", action: "show", name: "as_symbol" });
-  r.get("id_default(/:id)", { to: "foo#id_default", id: 1 });
-  r.match("get_or_post", { to: "foo#get_or_post", via: ["get", "post"] });
-  r.get("optional/:optional", { to: "posts#index" });
-  r.get("projects/:project_id", { to: "project#index", as: "project" });
-  r.get("clients", { to: "projects#index" });
+  this.get("symbols", { controller: "symbols", action: "show", name: "as_symbol" });
+  this.get("id_default(/:id)", { to: "foo#id_default", id: 1 });
+  this.match("get_or_post", { to: "foo#get_or_post", via: ["get", "post"] });
+  this.get("optional/:optional", { to: "posts#index" });
+  this.get("projects/:project_id", { to: "project#index", as: "project" });
+  this.get("clients", { to: "projects#index" });
 
-  r.get("ignorecase/geocode/:postalcode", {
+  this.get("ignorecase/geocode/:postalcode", {
     to: "geocode#show",
     postalcode: /hx\d\d-\d[a-z]{2}/i,
   });
-  r.get("extended/geocode/:postalcode", {
+  this.get("extended/geocode/:postalcode", {
     to: "geocode#show",
     constraints: {
       postalcode: /\d{5}(-\d{4})?/,
@@ -69,18 +68,18 @@ const Mapping = (r: Mapper) => {
     as: "geocode",
   });
 
-  r.get("news(.:format)", { to: "news#index" });
+  this.get("news(.:format)", { to: "news#index" });
 
   deprecator().silence(() => {
-    r.get("comment/:id(/:action)", { to: "comments#show" });
-    r.get("ws/:controller(/:action(/:id))", { ws: true });
-    r.get("account(/:action)", { to: "account#subscription" });
-    r.get("pages/:page_id/:controller(/:action(/:id))");
-    r.get(":controller/ping", { action: "ping" });
-    r.get(":controller(/:action(/:id))(.:format)");
+    this.get("comment/:id(/:action)", { to: "comments#show" });
+    this.get("ws/:controller(/:action(/:id))", { ws: true });
+    this.get("account(/:action)", { to: "account#subscription" });
+    this.get("pages/:page_id/:controller(/:action(/:id))");
+    this.get(":controller/ping", { action: "ping" });
+    this.get(":controller(/:action(/:id))(.:format)");
   });
 
-  r.root({ to: "news#index" });
+  this.root({ to: "news#index" });
 };
 
 class URLForIntegrationTest {

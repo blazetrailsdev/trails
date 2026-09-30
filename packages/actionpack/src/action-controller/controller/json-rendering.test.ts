@@ -111,8 +111,8 @@ describe("Controller JSON rendering integration", () => {
     }
 
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("posts");
+    routes.draw(function () {
+      this.resources("posts");
     });
     controllerConstants.set("posts", PostsController as unknown as DispatchableControllerClass);
 
@@ -128,8 +128,8 @@ describe("Controller JSON rendering integration", () => {
 
   it("returns 404 for unmatched routes", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("posts");
+    routes.draw(function () {
+      this.resources("posts");
     });
 
     const [status, , body] = await routes.call({

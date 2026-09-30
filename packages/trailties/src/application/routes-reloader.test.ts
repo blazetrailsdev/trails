@@ -18,7 +18,7 @@ const makeRouteSet = (): Counted => {
       const mapper = {
         get: (path: string) => void r.calls.push(`get ${path}`),
       } as unknown as Mapper;
-      block.call(mapper, mapper);
+      block.call(mapper);
     },
   };
   return r;

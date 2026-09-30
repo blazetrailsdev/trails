@@ -15,29 +15,29 @@ class Reviewable {
 }
 
 const Routes = new RouteSet();
-Routes.draw((app) => {
-  app.concern("commentable", null, (mapper, options) => {
-    mapper.resources("comments", options);
+Routes.draw(function () {
+  this.concern("commentable", null, function (options) {
+    this.resources("comments", options);
   });
 
-  app.concern("image_attachable", null, (mapper) => {
-    mapper.resources("images", { only: "index" });
+  this.concern("image_attachable", null, function () {
+    this.resources("images", { only: "index" });
   });
 
-  app.concern("reviewable", Reviewable);
+  this.concern("reviewable", Reviewable);
 
-  app.resources("posts", { concerns: ["commentable", "image_attachable", "reviewable"] }, (app) => {
-    app.resource("video", { concerns: "commentable" }, (app) => {
-      app.concerns("reviewable", { as: "video_reviews" });
+  this.resources("posts", { concerns: ["commentable", "image_attachable", "reviewable"] }, () => {
+    this.resource("video", { concerns: "commentable" }, () => {
+      this.concerns("reviewable", { as: "video_reviews" });
     });
   });
 
-  app.resource("picture", { concerns: "commentable" }, (app) => {
-    app.resources("posts", { concerns: "commentable" });
+  this.resource("picture", { concerns: "commentable" }, () => {
+    this.resources("posts", { concerns: "commentable" });
   });
 
-  app.scope("/videos", (app) => {
-    app.concerns("commentable", { except: "destroy" });
+  this.scope("/videos", () => {
+    this.concerns("commentable", { except: "destroy" });
   });
 });
 
@@ -119,8 +119,8 @@ describe("RoutingConcernsTest", () => {
   it("with an invalid concern name", () => {
     let e: unknown;
     try {
-      new RouteSet().draw((app) => {
-        app.resources("posts", { concerns: "foo" });
+      new RouteSet().draw(function () {
+        this.resources("posts", { concerns: "foo" });
       });
     } catch (error) {
       e = error;

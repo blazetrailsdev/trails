@@ -18,19 +18,19 @@ function makeEnv(
 
 function buildEngineRoutes(): RouteSet {
   const routes = new RouteSet();
-  routes.draw((r) => {
-    r.get("/relative_path_root", { to: r.redirect("") });
-    r.get("/relative_path_redirect", { to: r.redirect("foo") });
-    r.get("/relative_option_root", { to: r.redirect({ path: "" }) });
-    r.get("/relative_option_redirect", { to: r.redirect({ path: "foo" }) });
-    r.get("/relative_custom_root", { to: r.redirect(() => "") });
-    r.get("/relative_custom_redirect", { to: r.redirect(() => "foo") });
-    r.get("/absolute_path_root", { to: r.redirect("/") });
-    r.get("/absolute_path_redirect", { to: r.redirect("/foo") });
-    r.get("/absolute_option_root", { to: r.redirect({ path: "/" }) });
-    r.get("/absolute_option_redirect", { to: r.redirect({ path: "/foo" }) });
-    r.get("/absolute_custom_root", { to: r.redirect(() => "/") });
-    r.get("/absolute_custom_redirect", { to: r.redirect(() => "/foo") });
+  routes.draw(function () {
+    this.get("/relative_path_root", { to: this.redirect("") });
+    this.get("/relative_path_redirect", { to: this.redirect("foo") });
+    this.get("/relative_option_root", { to: this.redirect({ path: "" }) });
+    this.get("/relative_option_redirect", { to: this.redirect({ path: "foo" }) });
+    this.get("/relative_custom_root", { to: this.redirect(() => "") });
+    this.get("/relative_custom_redirect", { to: this.redirect(() => "foo") });
+    this.get("/absolute_path_root", { to: this.redirect("/") });
+    this.get("/absolute_path_redirect", { to: this.redirect("/foo") });
+    this.get("/absolute_option_root", { to: this.redirect({ path: "/" }) });
+    this.get("/absolute_option_redirect", { to: this.redirect({ path: "/foo" }) });
+    this.get("/absolute_custom_root", { to: this.redirect(() => "/") });
+    this.get("/absolute_custom_redirect", { to: this.redirect(() => "/foo") });
   });
   return routes;
 }

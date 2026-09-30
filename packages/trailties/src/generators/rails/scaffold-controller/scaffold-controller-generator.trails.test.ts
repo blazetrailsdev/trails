@@ -23,8 +23,8 @@ describe("ScaffoldControllerGenerator (dispatch)", () => {
     }
 
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("posts");
+    routes.draw(function () {
+      this.resources("posts");
     });
     controllerConstants.set("posts", PostsController as never);
 
@@ -47,8 +47,8 @@ describe("ScaffoldControllerGenerator (dispatch)", () => {
     }
 
     const routes = new RouteSet();
-    routes.draw((r) => {
-      r.resources("posts");
+    routes.draw(function () {
+      this.resources("posts");
     });
     include(PostsController, routes.urlHelpers());
     controllerConstants.set("posts", PostsController as never);

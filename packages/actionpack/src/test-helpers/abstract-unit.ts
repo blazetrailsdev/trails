@@ -83,9 +83,9 @@ export const FIXTURE_LOAD_PATH = new URL("./fixtures", import.meta.url).pathname
 
 export const SharedTestRoutes = new RouteSet();
 
-SharedTestRoutes.draw((r) => {
+SharedTestRoutes.draw(function () {
   deprecator().silence(() => {
-    r.get(":controller(/:action)");
+    this.get(":controller(/:action)");
   });
 });
 
@@ -94,8 +94,8 @@ export const SharedRoutes = new Module();
 SharedRoutes.defineMethod("beforeSetup", function (this: { routes?: RouteSet }): unknown {
   this.routes = new RouteSet();
   deprecator().silence(() => {
-    this.routes!.draw((r) => {
-      r.get(":controller(/:action)");
+    this.routes!.draw(function () {
+      this.get(":controller(/:action)");
     });
   });
   return SharedRoutes.superMethod(this, "beforeSetup")?.();
@@ -157,9 +157,9 @@ IntegrationTest.buildApp = buildApp;
 
 IntegrationTest.app = IntegrationTest.buildApp();
 
-(IntegrationTest.app as RoutedRackApp).routes.draw((r) => {
+(IntegrationTest.app as RoutedRackApp).routes.draw(function () {
   deprecator().silence(() => {
-    r.get(":controller(/:action)");
+    this.get(":controller(/:action)");
   });
 });
 

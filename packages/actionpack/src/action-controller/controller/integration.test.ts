@@ -244,8 +244,8 @@ describe("RackLintIntegrationTest", () => {
   it("integration test follows rack SPEC", async () => {
     const t = new RackLintIntegrationTest();
     await t.withRouting(async (set: RouteSet) => {
-      set.draw((r) => {
-        r.get("/", { to: (_: RackEnv): RackResponse => [200, {}, bodyFromString("")] });
+      set.draw(function () {
+        this.get("/", { to: (_: RackEnv): RackResponse => [200, {}, bodyFromString("")] });
       });
 
       await t.get("/");
@@ -365,12 +365,12 @@ class IntegrationProcessTest extends IntegrationTest {
         include(controller, set.urlHelpers());
         const to = controller as unknown as MountableApp;
 
-        set.draw((r) => {
-          r.get("moved", { to: r.redirect("/method") });
+        set.draw(function () {
+          this.get("moved", { to: this.redirect("/method") });
 
           deprecator().silence(() => {
-            r.match(":action", { to, via: ["get", "post"], as: "action" });
-            r.get("get/:action", { to, as: "get_action" });
+            this.match(":action", { to, via: ["get", "post"], as: "action" });
+            this.get("get/:action", { to, as: "get_action" });
           });
         });
         include(rbObjSingletonClass(this) as typeof IntegrationProcessTest, set.urlHelpers());
@@ -894,8 +894,8 @@ describe("ApplicationIntegrationTest", () => {
     static call(): void {}
 
     static {
-      this.routes().draw((r) => {
-        r.get("baz", { to: "application_integration_test/test#index", as: "baz" });
+      this.routes().draw(function () {
+        this.get("baz", { to: "application_integration_test/test#index", as: "baz" });
       });
     }
   }
@@ -915,16 +915,16 @@ describe("ApplicationIntegrationTest", () => {
       include(TestController, SharedTestRoutes.urlHelpers());
       controllerConstants.set("application_integration_test/metal", MetalController);
       controllerConstants.set("application_integration_test/test", TestController);
-      this.routes.draw((r) => {
-        r.get("", { to: "application_integration_test/test#index", as: "empty_string" });
+      this.routes.draw(function () {
+        this.get("", { to: "application_integration_test/test#index", as: "empty_string" });
 
-        r.get("metal", { to: "application_integration_test/metal#new", as: "new_metal" });
+        this.get("metal", { to: "application_integration_test/metal#new", as: "new_metal" });
 
-        r.get("foo", { to: "application_integration_test/test#index", as: "foo" });
-        r.get("bar", { to: "application_integration_test/test#index", as: "bar" });
+        this.get("foo", { to: "application_integration_test/test#index", as: "foo" });
+        this.get("bar", { to: "application_integration_test/test#index", as: "bar" });
 
-        r.mount(MountedApp as unknown as MountableApp, { at: "/mounted", as: "mounted" });
-        r.get("fooz", {
+        this.mount(MountedApp as unknown as MountableApp, { at: "/mounted", as: "mounted" });
+        this.get("fooz", {
           to: (_env: RackEnv): RackResponse => [
             200,
             { [X_CASCADE]: "pass" },
@@ -932,7 +932,7 @@ describe("ApplicationIntegrationTest", () => {
           ],
           anchor: false,
         });
-        r.get("fooz", { to: "application_integration_test/test#index" });
+        this.get("fooz", { to: "application_integration_test/test#index" });
       });
     }
 
@@ -1019,8 +1019,8 @@ describe("EnvironmentFilterIntegrationTest", () => {
 
     static {
       controllerConstants.set("environment_filter_integration_test/test", TestController);
-      this.routes.draw((r) => {
-        r.match("/post", { to: "environment_filter_integration_test/test#post", via: "post" });
+      this.routes.draw(function () {
+        this.match("/post", { to: "environment_filter_integration_test/test#post", via: "post" });
       });
     }
 
@@ -1057,8 +1057,8 @@ describe("ControllerWithHeadersMethodIntegrationTest", () => {
     t = new IntegrationTest();
     controllerConstants.set("controller_with_headers_method_integration_test/test", TestController);
     await t.withRouting(async (routes: RouteSet) => {
-      routes.draw((r) => {
-        r.get("/ok", { to: "controller_with_headers_method_integration_test/test#index" });
+      routes.draw(function () {
+        this.get("/ok", { to: "controller_with_headers_method_integration_test/test#index" });
       });
 
       await t.get("/ok");
@@ -1118,14 +1118,14 @@ describe("UrlOptionsIntegrationTest", () => {
       include(BarController, SharedTestRoutes.urlHelpers());
       controllerConstants.set("url_options_integration_test/foo", FooController);
       controllerConstants.set("url_options_integration_test/bar", BarController);
-      this.routes.draw((r) => {
-        r.defaultUrlOptions = { host: "foo.com" };
+      this.routes.draw(function () {
+        this.defaultUrlOptions = { host: "foo.com" };
 
-        r.scope({ module: "url_options_integration_test" }, () => {
-          r.get("/foo", { to: "foo#index", as: "foos" });
-          r.get("/foo/:id", { to: "foo#show", as: "foo" });
-          r.get("/foo/:id/edit", { to: "foo#edit", as: "edit_foo" });
-          r.get("/bar", { to: "bar#index", as: "bars" });
+        this.scope({ module: "url_options_integration_test" }, () => {
+          this.get("/foo", { to: "foo#index", as: "foos" });
+          this.get("/foo/:id", { to: "foo#show", as: "foo" });
+          this.get("/foo/:id/edit", { to: "foo#edit", as: "edit_foo" });
+          this.get("/bar", { to: "bar#index", as: "bars" });
         });
       });
     }
@@ -1205,8 +1205,8 @@ describe("HeadWithStatusActionIntegrationTest", () => {
 
     static {
       controllerConstants.set("head_with_status_action_integration_test/foo", FooController);
-      this.routes.draw((r) => {
-        r.get("/foo/status", { to: "head_with_status_action_integration_test/foo#status" });
+      this.routes.draw(function () {
+        this.get("/foo/status", { to: "head_with_status_action_integration_test/foo#status" });
       });
     }
   }
@@ -1239,9 +1239,9 @@ describe("IntegrationWithRoutingTest", () => {
     controllerConstants.set(`${klassNamespace}/foo`, FooController);
 
     await t.withRouting(async (routes: RouteSet) => {
-      routes.draw((r) => {
-        r.namespace(klassNamespace, () => {
-          r.resources("foo", { path: "/with" } as RouteOptions);
+      routes.draw(function () {
+        this.namespace(klassNamespace, () => {
+          this.resources("foo", { path: "/with" } as RouteOptions);
         });
       });
 
@@ -1251,9 +1251,9 @@ describe("IntegrationWithRoutingTest", () => {
     });
 
     await t.withRouting(async (routes: RouteSet) => {
-      routes.draw((r) => {
-        r.namespace(klassNamespace, () => {
-          r.resources("foo", { path: "/routing" } as RouteOptions);
+      routes.draw(function () {
+        this.namespace(klassNamespace, () => {
+          this.resources("foo", { path: "/routing" } as RouteOptions);
         });
       });
 
@@ -1278,9 +1278,9 @@ describe("IntegrationRequestsWithoutSetup", () => {
   it("request", async () => {
     t = new IntegrationTest();
     await t.withRouting(async (routes: RouteSet) => {
-      routes.draw((r) => {
+      routes.draw(function () {
         deprecator().silence(() => {
-          r.get(":action", { to: FooController as unknown as MountableApp });
+          this.get(":action", { to: FooController as unknown as MountableApp });
         });
       });
 
@@ -1339,9 +1339,9 @@ describe("IntegrationRequestEncodersTest", () => {
 
   const postToFoos = async (as: string, block: () => void): Promise<void> => {
     await t.withRouting(async (routes: RouteSet) => {
-      routes.draw((r) => {
+      routes.draw(function () {
         deprecator().silence(() => {
-          r.post(":action", { to: FooController as unknown as MountableApp });
+          this.post(":action", { to: FooController as unknown as MountableApp });
         });
       });
 
@@ -1353,9 +1353,9 @@ describe("IntegrationRequestEncodersTest", () => {
 
   it("standard json encoding works", async () => {
     await t.withRouting(async (routes: RouteSet) => {
-      routes.draw((r) => {
+      routes.draw(function () {
         deprecator().silence(() => {
-          r.post(":action", { to: FooController as unknown as MountableApp });
+          this.post(":action", { to: FooController as unknown as MountableApp });
         });
       });
 
@@ -1382,9 +1382,9 @@ describe("IntegrationRequestEncodersTest", () => {
 
   it("doesnt mangle request path", async () => {
     await t.withRouting(async (routes: RouteSet) => {
-      routes.draw((r) => {
+      routes.draw(function () {
         deprecator().silence(() => {
-          r.post(":action", { to: FooController as unknown as MountableApp });
+          this.post(":action", { to: FooController as unknown as MountableApp });
         });
       });
 
@@ -1442,9 +1442,9 @@ describe("IntegrationRequestEncodersTest", () => {
 
   it("parsed body without as option", async () => {
     await t.withRouting(async (routes: RouteSet) => {
-      routes.draw((r) => {
+      routes.draw(function () {
         deprecator().silence(() => {
-          r.get(":action", { to: FooController as unknown as MountableApp });
+          this.get(":action", { to: FooController as unknown as MountableApp });
         });
       });
 
@@ -1456,9 +1456,9 @@ describe("IntegrationRequestEncodersTest", () => {
 
   it("get parameters with as option", async () => {
     await t.withRouting(async (routes: RouteSet) => {
-      routes.draw((r) => {
+      routes.draw(function () {
         deprecator().silence(() => {
-          r.get(":action", { to: FooController as unknown as MountableApp });
+          this.get(":action", { to: FooController as unknown as MountableApp });
         });
       });
 
@@ -1470,9 +1470,9 @@ describe("IntegrationRequestEncodersTest", () => {
 
   it("get request with json uses method override and sends a post request", async () => {
     await t.withRouting(async (routes: RouteSet) => {
-      routes.draw((r) => {
+      routes.draw(function () {
         deprecator().silence(() => {
-          r.get(":action", { to: FooController as unknown as MountableApp });
+          this.get(":action", { to: FooController as unknown as MountableApp });
         });
       });
 
@@ -1486,9 +1486,9 @@ describe("IntegrationRequestEncodersTest", () => {
 
   it("get request with json excludes null query string", async () => {
     await t.withRouting(async (routes: RouteSet) => {
-      routes.draw((r) => {
+      routes.draw(function () {
         deprecator().silence(() => {
-          r.get(":action", { to: FooController as unknown as MountableApp });
+          this.get(":action", { to: FooController as unknown as MountableApp });
         });
       });
 
@@ -1527,8 +1527,8 @@ describe("IntegrationFileUploadTest", () => {
 
     static {
       controllerConstants.set("integration_file_upload_test/integration", IntegrationController);
-      this.routes.draw((r) => {
-        r.post("test_file_upload", {
+      this.routes.draw(function () {
+        this.post("test_file_upload", {
           to: "integration_file_upload_test/integration#test_file_upload",
         });
       });
@@ -1594,9 +1594,9 @@ describe("PageDumpIntegrationTest", () => {
 
     static {
       controllerConstants.set("page_dump_integration_test/foo", FooController);
-      this.routes.draw((r) => {
-        r.get("/", { to: "page_dump_integration_test/foo#index" });
-        r.get("/redirect", { to: "page_dump_integration_test/foo#redirect" });
+      this.routes.draw(function () {
+        this.get("/", { to: "page_dump_integration_test/foo#index" });
+        this.get("/redirect", { to: "page_dump_integration_test/foo#redirect" });
       });
     }
   }

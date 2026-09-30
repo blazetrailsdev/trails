@@ -49,7 +49,7 @@ class TestApp extends Finisher {
             `get ${path} -> ${options.to}${options.internal === true ? " (internal)" : ""}`,
           ),
       } as unknown as Mapper;
-      block.call(mapper, mapper);
+      block.call(mapper);
     },
     append: (block) => {
       const mapper = {
@@ -58,7 +58,7 @@ class TestApp extends Finisher {
             `get ${path} -> ${options.to}${options.internal === true ? " (internal)" : ""}`,
           ),
       } as unknown as Mapper;
-      block.call(mapper, mapper);
+      block.call(mapper);
     },
     defineMountedHelper: (name) => this.mountedHelpers.push(name),
   };
