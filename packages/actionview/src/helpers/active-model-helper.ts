@@ -16,6 +16,7 @@ export interface ActiveModelInstanceTag {
 }
 
 type Host = ActiveModelInstanceTag & {
+  _activeModelObject?: unknown;
   _methodName: string;
   _templateObject: unknown;
   isObjectHasErrors(): boolean;
@@ -24,6 +25,16 @@ type Host = ActiveModelInstanceTag & {
 };
 
 export const ActiveModelInstanceTag = new Module();
+
+function object(this: Host): unknown {
+  if (this._activeModelObject == null || this._activeModelObject === false) {
+    const object = ActiveModelInstanceTag.superMethod(this, "object")!();
+    this._activeModelObject = rbObjRespondTo(object, "toModel")
+      ? (object as { toModel(): unknown }).toModel()
+      : object;
+  }
+  return this._activeModelObject;
+}
 
 function contentTag(this: Host, type: string, options: unknown, ...args: unknown[]): unknown {
   const _super = () =>
@@ -79,7 +90,7 @@ function isTagGenerateErrors(this: Host, options: Record<string, unknown>): bool
 }
 
 ActiveModelInstanceTag.moduleEval((m) =>
-  Object.assign(m, {
+  Object.assign(Object.defineProperty(m, "object", { get: object, configurable: true }), {
     contentTag,
     tag,
     errorWrapping,
