@@ -24,6 +24,7 @@ describe("Engine#buildRequest", () => {
   it("Application#buildRequest records ORIGINAL_FULLPATH and ORIGINAL_SCRIPT_NAME", () => {
     class RequestApp extends Application {}
     Application.register(RequestApp);
+    RequestApp.instance().config.secretKeyBase = "b3c631c314c0bbca50c1b2843150fe33";
     const env = MockRequest.envFor("/posts?page=2", { SCRIPT_NAME: "/app" });
 
     RequestApp.instance().buildRequest(env);

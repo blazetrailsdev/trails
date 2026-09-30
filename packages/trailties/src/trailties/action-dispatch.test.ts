@@ -3,11 +3,7 @@ import { Deprecators } from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
-import {
-  Trailtie,
-  type ActionDispatchConfig,
-  type ContentSecurityPolicyConfig,
-} from "./action-dispatch.js";
+import { Trailtie, type ActionDispatchConfig } from "./action-dispatch.js";
 import { URL as HttpURL } from "@blazetrails/actionpack";
 import { QueryParser } from "@blazetrails/actionpack";
 import { RequestUtils } from "@blazetrails/actionpack";
@@ -21,7 +17,6 @@ function cfg(): ActionDispatchConfig {
 
 describe("ActionDispatch::Trailtie", () => {
   let savedConfig: ActionDispatchConfig;
-  let savedCspConfig: ContentSecurityPolicyConfig;
   let savedTldLength: number;
   let savedStrictQuery: boolean | null;
   let savedPerformDeepMunge: boolean;
@@ -31,9 +26,6 @@ describe("ActionDispatch::Trailtie", () => {
 
   beforeEach(() => {
     savedConfig = { ...cfg() };
-    savedCspConfig = {
-      ...(Trailtie.config.get("contentSecurityPolicy") as ContentSecurityPolicyConfig),
-    };
     savedTldLength = HttpURL.tldLength;
     savedStrictQuery = QueryParser.strictQueryStringSeparator;
     savedPerformDeepMunge = RequestUtils.performDeepMunge;
@@ -44,7 +36,6 @@ describe("ActionDispatch::Trailtie", () => {
 
   afterEach(() => {
     Trailtie.config.set("actionDispatch", savedConfig);
-    Trailtie.config.set("contentSecurityPolicy", savedCspConfig);
     HttpURL.tldLength = savedTldLength;
     QueryParser.strictQueryStringSeparator = savedStrictQuery;
     RequestUtils.performDeepMunge = savedPerformDeepMunge;
@@ -89,14 +80,6 @@ describe("ActionDispatch::Trailtie", () => {
     cfg().defaultCharset = "iso-8859-1";
     await runTrailtieInitializers(Trailtie, app);
     expect(Response.defaultCharset).toBe("iso-8859-1");
-  });
-
-  it("seeds Rails-compatible defaults on config.contentSecurityPolicy", () => {
-    const c = Trailtie.config.get("contentSecurityPolicy") as ContentSecurityPolicyConfig;
-    expect(c.policy).toBeNull();
-    expect(c.reportOnly).toBe(false);
-    expect(c.nonceGenerator).toBeNull();
-    expect(c.nonceDirectives).toBeNull();
   });
 
   it("runInitializers resets Response.defaultCharset to utf-8 when cfg is null", async () => {

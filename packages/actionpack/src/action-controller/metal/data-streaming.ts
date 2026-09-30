@@ -1,6 +1,6 @@
 import { File } from "@blazetrails/ruby-compat";
 import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
-import { MimeType } from "../../action-dispatch/http/mime-type.js";
+import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
 
 export const DEFAULT_SEND_FILE_TYPE = "application/octet-stream";
 export const DEFAULT_SEND_FILE_DISPOSITION = "attachment";
@@ -45,10 +45,9 @@ export function sendFileHeadersBang(
   }
 
   if (typeProvided && !contentType.includes("/")) {
-    if (!MimeType.isRegistered(contentType)) {
-      throw new TypeError(`Unknown MIME type ${String(options.type)}`);
-    }
-    contentType = MimeType.lookup(contentType).toString();
+    const extension = Mime.get(contentType);
+    if (!extension) throw new TypeError(`Unknown MIME type ${String(options.type)}`);
+    contentType = extension.toString();
   } else if (!typeProvided && options.filename) {
     const ext = File.extname(options.filename).toLowerCase().replace(/^\./, "");
     const guessed = MimeType.lookupByExtension(ext);

@@ -1,4 +1,4 @@
-import { MimeType } from "../action-dispatch/http/mime-type.js";
+import { Mime, MimeType } from "../action-dispatch/http/mime-type.js";
 
 export abstract class Collector {
   abstract custom(mime: MimeType, ...args: unknown[]): unknown;
@@ -15,7 +15,8 @@ const COLLECTOR_HANDLER: ProxyHandler<Collector> = {
     if (Reflect.has(target, prop)) return Reflect.get(target, prop, receiver);
     if (RESERVED_KEYS.has(prop)) return undefined;
     if (typeof prop !== "string") return undefined;
-    if (!MimeType.isRegistered(prop)) {
+    const mimeConstant = Mime.get(prop);
+    if (!mimeConstant) {
       return (): never => {
         throw new TypeError(
           `To respond to a custom format, register it as a MIME type first. ` +
@@ -23,23 +24,22 @@ const COLLECTOR_HANDLER: ProxyHandler<Collector> = {
         );
       };
     }
-    const mime = MimeType.lookup(prop);
     return (...args: unknown[]): unknown => {
       const fn = Reflect.get(target, "custom", receiver);
-      return fn.call(receiver, mime, ...args);
+      return fn.call(receiver, mimeConstant, ...args);
     };
   },
 
   has(target, prop) {
     if (Reflect.has(target, prop)) return true;
     if (RESERVED_KEYS.has(prop)) return false;
-    return typeof prop === "string" && MimeType.isRegistered(prop);
+    return typeof prop === "string" && Mime.get(prop) !== undefined;
   },
 };
 
 /** @internal */
 export function generateMethodForMime(mime: MimeType | string): void {
-  if (typeof mime === "string" && !MimeType.isRegistered(mime)) {
+  if (typeof mime === "string" && !Mime.get(mime)) {
     throw new TypeError(`generateMethodForMime: unknown MIME ${JSON.stringify(mime)}`);
   }
 }

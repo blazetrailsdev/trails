@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { MimeType } from "../mime-type.js";
+import { EXTENSION_LOOKUP, Mime, MimeType } from "../http/mime-type.js";
 
 describe("MimeTypeTest", () => {
   it("parse single", () => {
@@ -9,10 +9,20 @@ describe("MimeTypeTest", () => {
   });
 
   it("unregister", () => {
-    const custom = MimeType.register("text/x-custom-test", ":x_custom_test");
-    expect(MimeType.lookup("x_custom_test")).toBe(custom);
-    MimeType.unregister(":x_custom_test");
-    expect(MimeType.lookupByExtension("x_custom_test")).toBeUndefined();
+    expect(Mime.get(":mobile")).toBeUndefined();
+
+    try {
+      const mime = MimeType.register("text/x-mobile", ":mobile");
+      expect(Mime.get(":mobile")).toBe(mime);
+      expect(MimeType.lookup("text/x-mobile")).toBe(mime);
+      expect(MimeType.lookupByExtension(":mobile")).toBe(mime);
+
+      MimeType.unregister(":mobile");
+      expect(Mime.get(":mobile")).toBeUndefined();
+      expect(MimeType.lookupByExtension(":mobile")).toBeUndefined();
+    } finally {
+      MimeType.unregister(":mobile");
+    }
   });
 
   it("parse text with trailing star at the beginning", () => {
@@ -99,11 +109,12 @@ describe("MimeTypeTest", () => {
   });
 
   it("custom type", () => {
-    const custom = MimeType.register("application/x-testing123", ":testing123");
-    expect(custom.string).toBe("application/x-testing123");
-    expect(custom.symbol).toBe(":testing123");
-    expect(MimeType.lookup("testing123")).toBe(custom);
-    MimeType.unregister(":testing123");
+    try {
+      const type = MimeType.register("image/foo", ":foo");
+      expect(Mime.get(":foo")).toBe(type);
+    } finally {
+      MimeType.unregister(":foo");
+    }
   });
 
   it("custom type with type aliases", () => {
@@ -124,15 +135,29 @@ describe("MimeTypeTest", () => {
     MimeType.unregister(":callback_test");
   });
 
+  it("custom type with extension aliases", () => {
+    try {
+      MimeType.register("text/foobar", ":foobar", [], ["foo", "bar"]);
+      for (const extension of ["foobar", "foo", "bar"]) {
+        expect(EXTENSION_LOOKUP.get(extension)).toBe(Mime.get(":foobar"));
+      }
+    } finally {
+      MimeType.unregister(":foobar");
+    }
+  });
+
   it("register alias", () => {
-    MimeType.registerAlias(":html", ":xhtml");
-    expect(MimeType.lookup("xhtml")).toBe(MimeType.lookup("html"));
+    try {
+      MimeType.registerAlias("application/xhtml+xml", ":foobar");
+      expect(Mime.get(":html")!.equals(EXTENSION_LOOKUP.get("foobar"))).toBe(true);
+    } finally {
+      MimeType.unregister(":foobar");
+    }
   });
 
   it("type should be equal to symbol", () => {
-    const html = MimeType.lookup("html");
-    expect(html).toBeDefined();
-    expect(html?.equals(":html")).toBe(true);
+    expect(Mime.get(":html")!.equals("application/xhtml+xml")).toBe(true);
+    expect(Mime.get(":html")!.equals(":html")).toBe(true);
   });
 
   it("type convenience methods", () => {
@@ -143,8 +168,10 @@ describe("MimeTypeTest", () => {
   });
 
   it("references gives preference to symbols before strings", () => {
-    const html = MimeType.lookup("html");
-    expect(html?.ref()).toBe(":html");
+    expect(Mime.get(":html")!.ref()).toBe(":html");
+    const another = MimeType.lookup("foo/bar");
+    expect(another.toSym()).toBeNull();
+    expect(another.ref()).toBe("foo/bar");
   });
 
   it("regexp matcher", () => {
@@ -196,15 +223,16 @@ describe("MimeTypeTest", () => {
     expect(MimeType.lookupByExtension("exttest")).toBeUndefined();
   });
 
-  it("unregister sweeps aliases too — type is no longer reachable via any key", () => {
-    MimeType.register("application/aliased", ":aliased");
-    MimeType.registerAlias(":aliased", ":aliased_alias");
-    expect(MimeType.lookup("aliased_alias")?.symbol).toBe(":aliased");
-    MimeType.unregister(":aliased");
-    expect(MimeType.isRegistered("aliased")).toBe(false);
-    expect(MimeType.isRegistered("aliased_alias")).toBe(false);
-    expect(MimeType.isRegistered("application/aliased")).toBe(false);
-    expect(MimeType.lookupByExtension("aliased")).toBeUndefined();
+  it("holds a reference to mime symbols", () => {
+    const oldSymbols = Mime.symbols();
+    try {
+      MimeType.registerAlias("application/xhtml+xml", ":foobar");
+      const newSymbols = Mime.symbols();
+
+      expect(newSymbols).toBe(oldSymbols);
+    } finally {
+      MimeType.unregister(":foobar");
+    }
   });
 
   it("all() picks up a newly registered type and drops it on unregister", () => {

@@ -1,6 +1,6 @@
 import { Request } from "../http/request.js";
 import { Headers } from "../http/headers.js";
-import { MimeType } from "../http/mime-type.js";
+import { Mime } from "../http/mime-type.js";
 import {
   isPresent,
   reverseMergeBang,
@@ -246,9 +246,9 @@ export class IntegrationTest extends TestCase {
         wrappedHeaders.set(
           "HTTP_ACCEPT",
           [
-            MimeType.lookup("js").toString(),
-            MimeType.lookup("html").toString(),
-            MimeType.lookup("xml").toString(),
+            Mime.get(":js")!.toString(),
+            Mime.get(":html")!.toString(),
+            Mime.get(":xml")!.toString(),
             "text/xml",
             "*/*",
           ].join(", "),

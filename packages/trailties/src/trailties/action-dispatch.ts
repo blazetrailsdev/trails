@@ -9,9 +9,7 @@ import {
   RequestUtils,
   CacheConfig,
   Response,
-  ContentSecurityPolicy,
   ExceptionWrapper,
-  type NonceGenerator,
   type CustomProxies,
 } from "@blazetrails/actionpack";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
@@ -44,19 +42,17 @@ export interface ActionDispatchConfig {
   defaultHeaders: Record<string, string>;
   cookiesRotations: RotationConfiguration;
   alwaysWriteCookie?: boolean;
+  encryptedCookieCipher?: string | null;
+  signedCookieDigest?: string | null;
+  cookiesSerializer?: string | null;
+  cookiesDigest?: string | null;
+  cookiesSameSiteProtection?: unknown;
 }
 
 declare module "../trailtie/configuration.js" {
   interface Configuration {
     actionDispatch: ActionDispatchConfig;
   }
-}
-
-export interface ContentSecurityPolicyConfig {
-  policy: ContentSecurityPolicy | null;
-  reportOnly: boolean;
-  nonceGenerator: NonceGenerator | null;
-  nonceDirectives: readonly string[] | null;
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -102,13 +98,6 @@ export class Trailtie extends BaseTrailtie {
       },
       cookiesRotations: new RotationConfiguration(),
     } satisfies ActionDispatchConfig);
-
-    this.config.set("contentSecurityPolicy", {
-      policy: null,
-      reportOnly: false,
-      nonceGenerator: null,
-      nonceDirectives: null,
-    } satisfies ContentSecurityPolicyConfig);
 
     this.initializer("action_dispatch.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("actionDispatch", deprecator());

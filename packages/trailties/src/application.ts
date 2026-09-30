@@ -1,11 +1,11 @@
 import {
-  ArgumentError,
   dasherize,
   deepMerge,
   EncryptedConfiguration,
   getEnv,
   isPlainObject,
   OrderedOptions,
+  ParameterFilter,
   runLoadHooks,
   setTrailsRoot,
   underscore,
@@ -154,6 +154,9 @@ export class Application extends Engine {
   async initialize(group: InitializerGroup = "default"): Promise<this> {
     if (this._initialized) throw new Error("Application has been already initialized.");
     setTrailsRoot(() => this.config.root);
+    if (getEnv("SECRET_KEY_BASE_DUMMY") != null || Trails.env["local?"]()) {
+      await this.config.loadLocalSecret();
+    }
     await this.runInitializers(group, this);
     this._initialized = true;
     return this;
@@ -219,16 +222,11 @@ export class Application extends Engine {
     return this.initialized() && (await this.routesReloader().executeUnlessLoaded());
   }
 
-  secretKeyBase(): string | null {
-    return this.config.secretKeyBase ?? getEnv("SECRET_KEY_BASE") ?? null;
+  secretKeyBase(): string {
+    return this.config.secretKeyBase;
   }
 
-  keyGenerator(secretKeyBase: string | null = this.secretKeyBase()): CachingKeyGenerator {
-    if (secretKeyBase === null) {
-      throw new ArgumentError(
-        `Missing \`secret_key_base\` for '${Trails.env}' environment, set this string with \`bin/rails credentials:edit\``,
-      );
-    }
+  keyGenerator(secretKeyBase: string = this.secretKeyBase()): CachingKeyGenerator {
     let gen = this._keyGenerators.get(secretKeyBase);
     if (!gen) {
       gen = new CachingKeyGenerator(new KeyGenerator(secretKeyBase, { iterations: 1000 }));
@@ -241,16 +239,49 @@ export class Application extends Engine {
     return new MessageVerifier(this.keyGenerator().generateKey(verifierName));
   }
 
-  /** @missingRailsCall key_generator — CONVERGEABLE port-application-env-config-for-action-dispatch-keys */
   override envConfig(): Record<string, unknown> {
     return (this._appEnvConfig ??= {
       ...super.envConfig(),
+      "action_dispatch.parameter_filter": this.filterParameters(),
+      "action_dispatch.redirect_filter": this.config.filterRedirect,
+      "action_dispatch.secret_key_base": this.secretKeyBase(),
+      "action_dispatch.show_exceptions": this.config.actionDispatch.showExceptions,
+      "action_dispatch.show_detailed_exceptions": this.config.considerAllRequestsLocal,
       "action_dispatch.log_rescued_responses": this.config.actionDispatch.logRescuedResponses,
       "action_dispatch.debug_exception_log_level": rbConstGet(
         Logger,
         symbolToS(this.config.actionDispatch.debugExceptionLogLevel).toUpperCase(),
       ),
       "action_dispatch.logger": Trails.logger,
+      "action_dispatch.backtrace_cleaner": Trails.backtraceCleaner,
+      "action_dispatch.key_generator": this.keyGenerator(),
+      "action_dispatch.http_auth_salt": this.config.actionDispatch.httpAuthSalt,
+      "action_dispatch.signed_cookie_salt": this.config.actionDispatch.signedCookieSalt,
+      "action_dispatch.encrypted_cookie_salt": this.config.actionDispatch.encryptedCookieSalt,
+      "action_dispatch.encrypted_signed_cookie_salt":
+        this.config.actionDispatch.encryptedSignedCookieSalt,
+      "action_dispatch.authenticated_encrypted_cookie_salt":
+        this.config.actionDispatch.authenticatedEncryptedCookieSalt,
+      "action_dispatch.use_authenticated_cookie_encryption":
+        this.config.actionDispatch.useAuthenticatedCookieEncryption,
+      "action_dispatch.encrypted_cookie_cipher": this.config.actionDispatch.encryptedCookieCipher,
+      "action_dispatch.signed_cookie_digest": this.config.actionDispatch.signedCookieDigest,
+      "action_dispatch.cookies_serializer": this.config.actionDispatch.cookiesSerializer,
+      "action_dispatch.cookies_digest": this.config.actionDispatch.cookiesDigest,
+      "action_dispatch.cookies_rotations": this.config.actionDispatch.cookiesRotations,
+      "action_dispatch.cookies_same_site_protection": this.coerceSameSiteProtection(
+        this.config.actionDispatch.cookiesSameSiteProtection,
+      ),
+      "action_dispatch.use_cookies_with_metadata":
+        this.config.actionDispatch.useCookiesWithMetadata,
+      "action_dispatch.content_security_policy": this.config.contentSecurityPolicy(),
+      "action_dispatch.content_security_policy_report_only":
+        this.config.contentSecurityPolicyReportOnly,
+      "action_dispatch.content_security_policy_nonce_generator":
+        this.config.contentSecurityPolicyNonceGenerator,
+      "action_dispatch.content_security_policy_nonce_directives":
+        this.config.contentSecurityPolicyNonceDirectives,
+      "action_dispatch.permissions_policy": this.config.permissionsPolicy(),
     });
   }
 
@@ -312,6 +343,23 @@ export class Application extends Engine {
     } else {
       throw new RuntimeError(`Could not load configuration. No such file - ${yaml}.ts`);
     }
+  }
+
+  /** @internal */
+  private coerceSameSiteProtection(protection: unknown): unknown {
+    return typeof protection === "function" ? protection : () => protection;
+  }
+
+  /** @internal */
+  private filterParameters(): Array<string | RegExp | ((key: string, value: unknown) => unknown)> {
+    if (this.config.precompileFilterParameters) {
+      this.config.filterParameters.splice(
+        0,
+        this.config.filterParameters.length,
+        ...ParameterFilter.precompileFilters(this.config.filterParameters),
+      );
+    }
+    return this.config.filterParameters;
   }
 }
 

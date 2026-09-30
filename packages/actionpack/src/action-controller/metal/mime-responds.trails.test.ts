@@ -89,8 +89,8 @@ describe("Collector#custom", () => {
 
   it("keeps the first registration across repeated custom calls", () => {
     const collector = collect();
-    collector.custom("html", () => "first");
-    collector.custom("html", () => "second");
+    collector.custom(MimeType.HTML, () => "first");
+    collector.custom(MimeType.HTML, () => "second");
 
     collector.negotiateFormat(requestFor("html"));
     expect(collector.response?.()).toBe("first");

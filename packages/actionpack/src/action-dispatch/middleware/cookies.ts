@@ -10,7 +10,7 @@
  *   `ActiveSupport::TimeWithZone` Rails stores.
  */
 
-import { include, KeyError, rbEqual } from "@blazetrails/ruby-compat";
+import { include, isSymbol, KeyError, rbEqual, symbolToS } from "@blazetrails/ruby-compat";
 import { extractOptionsBang, isPlainObject, isPresent } from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
@@ -715,10 +715,10 @@ export function serializer(this: SerializedCookieJarsHost): CookieSerializer {
   const configured = cookiesSerializer.call(this.request);
   if (configured == null) {
     this._serializer = SerializerWithFallback.get("marshal");
-  } else if (configured === "hybrid") {
+  } else if (configured === ":hybrid") {
     this._serializer = SerializerWithFallback.get("json_allow_marshal");
-  } else if (typeof configured === "string") {
-    this._serializer = SerializerWithFallback.get(configured);
+  } else if (isSymbol(configured)) {
+    this._serializer = SerializerWithFallback.get(symbolToS(configured));
   } else {
     this._serializer = configured as CookieSerializer;
   }

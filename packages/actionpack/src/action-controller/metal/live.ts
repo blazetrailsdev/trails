@@ -1,5 +1,5 @@
 import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
-import { MimeType } from "../../action-dispatch/http/mime-type.js";
+import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 import type { CookieResponse } from "../../action-dispatch/middleware/cookies.js";
 import {
@@ -245,7 +245,7 @@ export async function sendStream(
       : typeof type === "symbol"
         ? (() => {
             const desc = type.description;
-            return desc && MimeType.isRegistered(desc) ? MimeType.lookup(desc).toString() : null;
+            return desc ? (Mime.get(desc)?.toString() ?? null) : null;
           })()
         : null;
   if (!resolved) {

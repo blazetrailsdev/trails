@@ -423,7 +423,7 @@ describe("CookiesTest", () => {
 
   it("signed cookie using json serializer", () => {
     const mockRequest = {
-      env: cookieEnv({ "action_dispatch.cookies_serializer": "json" }),
+      env: cookieEnv({ "action_dispatch.cookies_serializer": ":json" }),
       cookies: {},
     };
     const jar = CookieJar.build(mockRequest as any, {});
@@ -460,7 +460,7 @@ describe("CookiesTest", () => {
 
   it("encrypted cookie using json serializer", () => {
     const mockRequest = {
-      env: cookieEnv({ "action_dispatch.cookies_serializer": "json" }),
+      env: cookieEnv({ "action_dispatch.cookies_serializer": ":json" }),
       cookies: {},
     };
     const jar = CookieJar.build(mockRequest as any, {});
@@ -485,20 +485,23 @@ describe("CookiesTest", () => {
 
   it("signed cookie using hybrid serializer can migrate marshal dumped value to json", () => {
     const marshalJar = new CookieJar(
-      cookieRequest({ "action_dispatch.cookies_serializer": "marshal" }),
+      cookieRequest({ "action_dispatch.cookies_serializer": ":marshal" }),
     );
     marshalJar.signed.set("user_id", 45);
     const marshalValue = marshalJar.get("user_id")!;
 
-    const jar = CookieJar.build(cookieRequest({ "action_dispatch.cookies_serializer": "hybrid" }), {
-      user_id: marshalValue,
-    });
+    const jar = CookieJar.build(
+      cookieRequest({ "action_dispatch.cookies_serializer": ":hybrid" }),
+      {
+        user_id: marshalValue,
+      },
+    );
 
     expect(jar.get("user_id")).not.toBe(45);
     expect(jar.signed.get("user_id")).toBe(45);
 
     const jsonJar = CookieJar.build(
-      cookieRequest({ "action_dispatch.cookies_serializer": "json" }),
+      cookieRequest({ "action_dispatch.cookies_serializer": ":json" }),
       { user_id: jar.get("user_id")! },
     );
     expect(jsonJar.signed.get("user_id")).toBe(45);

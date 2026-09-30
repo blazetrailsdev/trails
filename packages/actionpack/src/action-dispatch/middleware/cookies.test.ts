@@ -241,7 +241,7 @@ describe("SerializedCookieJars", () => {
   });
 
   it("isReserialize is true when the payload was not produced by JSON", () => {
-    const host = serializedHost({ "action_dispatch.cookies_serializer": "json" });
+    const host = serializedHost({ "action_dispatch.cookies_serializer": ":json" });
     expect(isReserialize.call(host, "not-json")).toBe(true);
     expect(isReserialize.call(host, '{"ok":true}')).toBe(false);
   });
@@ -270,7 +270,7 @@ describe("SerializedCookieJars", () => {
   });
 
   it("serializer falls back to JSON for symbol-style config values", () => {
-    const host = serializedHost({ "action_dispatch.cookies_serializer": "json" });
+    const host = serializedHost({ "action_dispatch.cookies_serializer": ":json" });
     expect(serializer.call(host).dump("x")).toBe('"x"');
   });
 });

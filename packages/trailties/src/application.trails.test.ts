@@ -4,6 +4,7 @@ import { Trailtie as BaseTrailtie } from "./trailtie.js";
 import { Trailtie as ActiveRecordTrailtie } from "./trailties/active-record.js";
 import { Logger } from "@blazetrails/activesupport";
 import { Dir, File, FileUtils, NameError, SecureRandom } from "@blazetrails/ruby-compat";
+import { MockRequest } from "@blazetrails/rack";
 import { Application } from "./application.js";
 
 describe("Application framework railtie initializers", () => {
@@ -84,10 +85,16 @@ describe("Application framework railtie initializers", () => {
   });
 });
 
+function makeBasicApp<T extends typeof Application>(klass: T): InstanceType<T> {
+  const app = new klass() as InstanceType<T>;
+  app.config.secretKeyBase = "b3c631c314c0bbca50c1b2843150fe33";
+  return app;
+}
+
 describe("Application#env_config", () => {
   it("maps config.action_dispatch.debug_exception_log_level to its Logger constant (application.rb:325)", () => {
     class LogLevelApp extends Application {}
-    const app = new LogLevelApp();
+    const app = makeBasicApp(LogLevelApp);
     app.config.actionDispatch.debugExceptionLogLevel = ":error";
 
     expect(app.envConfig()["action_dispatch.debug_exception_log_level"]).toBe(Logger.ERROR);
@@ -95,13 +102,33 @@ describe("Application#env_config", () => {
 
   it("raises NameError for a level Logger has no constant for, as const_get does", () => {
     class BadLogLevelApp extends Application {}
-    const app = new BadLogLevelApp();
+    const app = makeBasicApp(BadLogLevelApp);
+    const saved = app.config.actionDispatch.debugExceptionLogLevel;
     (app.config.actionDispatch as { debugExceptionLogLevel: string }).debugExceptionLogLevel =
       ":loud";
 
-    expect(() => app.envConfig()).toThrow(
-      new NameError("uninitialized constant Logger::LOUD", "LOUD"),
-    );
+    try {
+      expect(() => app.envConfig()).toThrow(
+        new NameError("uninitialized constant Logger::LOUD", "LOUD"),
+      );
+    } finally {
+      app.config.actionDispatch.debugExceptionLogLevel = saved;
+    }
+  });
+
+  it("seeds a request env with the action_dispatch cookie keys a signed jar reads, and the content_security_policy keys (application.rb:333-346)", () => {
+    class CookieApp extends Application {}
+    const app = makeBasicApp(CookieApp);
+    const policy = app.config.contentSecurityPolicy((p) => p.defaultSrc(":self"));
+    const env = MockRequest.envFor("/");
+
+    const request = app.buildRequest(env);
+
+    expect(env["action_dispatch.key_generator"]).toBe(app.keyGenerator());
+    expect(env["action_dispatch.content_security_policy"]).toBe(policy);
+    const jar = request.cookieJar();
+    jar.signed.set("user_id", "42");
+    expect(jar.signed.get("user_id")).toBe("42");
   });
 });
 
