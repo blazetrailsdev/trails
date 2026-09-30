@@ -25,9 +25,7 @@ describe("AppGenerator (trails-only)", () => {
     }).run();
 
     const pkg = JSON.parse(File.read(File.join(tmpDir, "my-app", "package.json")));
-    expect(pkg.scripts.build).toBe(
-      "trails-tsc-views build --views app/views && trails-tsc --schema db/schema.ts",
-    );
+    expect(pkg.scripts.build).toBe("trails-tsc --schema db/schema.ts");
     expect(pkg.devDependencies["@blazetrails/activerecord-cli"]).toBeDefined();
     expect(File.isExist(File.join(tmpDir, "my-app", "db", "schema.ts"))).toBe(false);
   });

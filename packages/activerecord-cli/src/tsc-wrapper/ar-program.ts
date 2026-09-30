@@ -191,8 +191,17 @@ function remapTseDiagnostic(d: Diagnostic, unmoved: Diagnostic, tse: TseSourceMa
   );
   const character = span === "" ? 0 : Math.max(0, text.indexOf(span));
   const pos = lineStarts[line] + character;
+  const open = text.lastIndexOf("<%", character);
+  const close = text.indexOf("%>", character);
+  const tag = open === -1 || close === -1 ? undefined : text.slice(open, close + 2);
   return {
     ...unmoved,
+    messageChain: tag
+      ? [
+          ...(unmoved.messageChain ?? []),
+          { pos: 0, end: 0, code: d.code, category: d.category, text: `in ${tag}` },
+        ]
+      : unmoved.messageChain,
     fileName: tse.source,
     pos,
     end: pos + (d.end - d.pos),

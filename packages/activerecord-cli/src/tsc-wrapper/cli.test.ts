@@ -185,10 +185,75 @@ describe("trails-tsc .tse diagnostic remap", () => {
     expect(remapped.fileName).toBe("/app/app/views/posts/_post.html.tse");
     expect(remapped.startPosition).toEqual({ line: 1, character: 21 });
     expect(sourceContent.slice(remapped.pos, remapped.end)).toBe("post.title");
+    expect(remapped.messageChain?.at(-1)?.text).toBe("in <%= readingTime(post.title) %>");
     expect(remapped.sourceLines).toEqual([
       { line: 1, text: "  <p><%= readingTime(post.title) %></p>\n" },
     ]);
   });
+});
+
+describe("trails-tsc .tse views", () => {
+  itIfCliBin(
+    "rebuilds the ts-plugin's viewsDir and reports a helper misuse at the .tse line",
+    async () => {
+      const { execFileSync } = await import("node:child_process");
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-views-"));
+      const write = (rel: string, body: string): void => {
+        fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+        fs.writeFileSync(path.join(root, rel), body);
+      };
+      write(
+        "stubs/actionview.d.ts",
+        "export interface TemplateRegistry {}\nexport type TemplateLocals<T> = T;\nexport declare class Base {}\n",
+      );
+      write(
+        "stubs/actionpack.d.ts",
+        "export declare namespace ActionController { class Base {} }\n",
+      );
+      write(
+        "app/helpers/posts-helper.ts",
+        "export const PostsHelper = { readingTime(words: number): string { return String(words); } };\n",
+      );
+      write("app/models/post.ts", "export class Post { title: string | null = null; }\n");
+      write(
+        "app/views/posts/_post.html.tse",
+        "<div>\n  <p><%= readingTime(post.title) %></p>\n</div>\n",
+      );
+      write(
+        "tsconfig.json",
+        JSON.stringify({
+          compilerOptions: {
+            target: "ES2022",
+            module: "ESNext",
+            moduleResolution: "Bundler",
+            strict: true,
+            noEmit: true,
+            types: [],
+            paths: {
+              "@blazetrails/actionview": ["./stubs/actionview.d.ts"],
+              "@blazetrails/actionpack": ["./stubs/actionpack.d.ts"],
+            },
+            plugins: [{ name: "@blazetrails/trails-tsc/ts-plugin", viewsDir: "app/views" }],
+          },
+          include: ["app", ".trails/views"],
+        }),
+      );
+      let stderr = "";
+      try {
+        execFileSync("node", [CLI_BIN_PATH, "-p", path.join(root, "tsconfig.json")], {
+          encoding: "utf8",
+          stdio: ["pipe", "pipe", "pipe"],
+          cwd: root,
+        });
+      } catch (err) {
+        stderr = (err as { stderr?: string }).stderr ?? "";
+      }
+      expect(fs.existsSync(path.join(root, ".trails/views/posts/_post.html.tse.ts"))).toBe(true);
+      expect(stderr).toContain("app/views/posts/_post.html.tse(2,22): error TS2345");
+      expect(stderr).toContain("in <%= readingTime(post.title) %>");
+    },
+    30_000,
+  );
 });
 
 describe("trails-tsc transitive extends — Phase 1b.3", () => {

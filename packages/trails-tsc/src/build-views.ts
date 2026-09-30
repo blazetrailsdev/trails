@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import ts from "typescript-5";
+import { camelize, dasherize, pluralize, underscore } from "@blazetrails/activesupport";
 import { parse, generateSourceMap } from "@blazetrails/tse-compiler";
 import {
   virtualizeTseWithDeltas,
@@ -116,10 +117,6 @@ function allHelpersFromPath(helpersDir: string): string[] {
   return names.sort();
 }
 
-function camelize(name: string): string {
-  return name.replace(/(?:^|[-_])([a-z\d])/gu, (_, c: string) => c.toUpperCase());
-}
-
 function importPath(fromDir: string, file: string): string {
   const rel = path.relative(fromDir, file).split(path.sep).join("/").replace(/\.ts$/u, ".js");
   return JSON.stringify(rel.startsWith(".") ? rel : `./${rel}`);
@@ -133,7 +130,7 @@ function templateScope(
 ): TseScope {
   const view = ['import("@blazetrails/actionview").Base'];
   for (const file of helpers) {
-    const name = camelize(path.posix.basename(file, ".ts").replace(/[-_]helper$/u, ""));
+    const name = camelize(underscore(path.posix.basename(file, ".ts").replace(/[-_]helper$/u, "")));
     view.push(
       `(typeof import(${importPath(shimDir, path.join(appDir, "helpers", file))}))["${name}Helper"]`,
     );
@@ -145,20 +142,20 @@ function templateScope(
   const prefix = path.posix.dirname(rel);
   const controller = path.join(appDir, "controllers", `${prefix}-controller.ts`);
   if (prefix !== "." && fs.existsSync(controller)) {
-    const klass = `import(${importPath(shimDir, controller)}).${camelize(path.posix.basename(prefix))}Controller`;
+    const klass = `import(${importPath(shimDir, controller)}).${camelize(underscore(path.posix.basename(prefix)))}Controller`;
     view.push(
       `{ [K in keyof ${klass} as K extends keyof import("@blazetrails/actionpack").ActionController.Base ? never : ${klass}[K] extends (...args: never) => unknown ? never : K]: ${klass}[K] }`,
     );
   }
   const scope: TseScope = { view: view.join(" & ") };
   const partial = /^_([a-z_]\w*)/u.exec(path.posix.basename(rel));
-  if (partial !== null && prefix !== ".") {
-    const element = partial[1];
+  const element = partial?.[1];
+  if (element !== undefined && path.posix.basename(prefix) === pluralize(element)) {
     const model = path.join(
       appDir,
       "models",
       ...prefix.split("/").slice(0, -1),
-      `${element.replace(/_/gu, "-")}.ts`,
+      `${dasherize(element)}.ts`,
     );
     if (fs.existsSync(model)) {
       scope.locals = `{ ${element}: import(${importPath(shimDir, model)}).${camelize(element)} }`;

@@ -217,7 +217,7 @@ export class AppGenerator extends AppBase {
             },
           },
           scripts: {
-            build: "trails-tsc-views build --views app/views && trails-tsc --schema db/schema.ts",
+            build: "trails-tsc --schema db/schema.ts",
             test: "vitest run",
             trails: TRAILS,
             dev: `${TRAILS} server`,

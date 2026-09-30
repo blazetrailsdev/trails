@@ -279,6 +279,7 @@ describe("runCli", () => {
     write(cwd, "app/models/post.ts", "export class Post {}");
     write(cwd, "app/views/posts/_post.html.tse", "<%= post %>");
     write(cwd, "app/views/layouts/application.html.tse", "<%= yield %>");
+    write(cwd, "app/views/comments/_post.html.tse", "<%= post %>");
     buildViews({ cwd });
     const shim = fs.readFileSync(path.join(cwd, ".trails/views/posts/_post.html.tse.ts"), "utf8");
     expect(shim).toContain(
@@ -299,6 +300,11 @@ describe("runCli", () => {
     );
     expect(layout).not.toContain("Controller");
     expect(layout).toContain("type ObjectLocals = {};");
+    const notCollection = fs.readFileSync(
+      path.join(cwd, ".trails/views/comments/_post.html.tse.ts"),
+      "utf8",
+    );
+    expect(notCollection).toContain("type ObjectLocals = {};");
   });
 
   it("writes a source map pointing each shim line at its .tse line", () => {

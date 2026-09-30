@@ -21,7 +21,7 @@ import {
 } from "./ar-program.js";
 import type { SchemaColumnValue } from "@blazetrails/activerecord/type-virtualization/synthesize.js";
 import { parseSchemaTs } from "./schema-ts-parser.js";
-import { decodeLineMappings } from "@blazetrails/trails-tsc";
+import { buildViews, decodeLineMappings } from "@blazetrails/trails-tsc";
 import type { TseSourceMap } from "./ar-program.js";
 
 type RichColumnValue = Extract<SchemaColumnValue, object>;
@@ -302,6 +302,16 @@ function handleBuildMode(args: string[]): void {
   process.exit(status);
 }
 
+function buildConfiguredViews(configPath: string): void {
+  const { config } = tsApi().readConfigFile(configPath) as {
+    config?: { compilerOptions?: { plugins?: { name?: string; viewsDir?: string }[] } };
+  };
+  const plugins = config?.compilerOptions?.plugins ?? [];
+  const plugin = plugins.find((p) => p.name === "@blazetrails/trails-tsc/ts-plugin");
+  if (plugin?.viewsDir === undefined) return;
+  buildViews({ cwd: path.dirname(configPath), viewsDir: plugin.viewsDir });
+}
+
 async function loadTseSourceMaps(
   program: ArTrailsProgram["program"],
 ): Promise<Map<string, TseSourceMap>> {
@@ -358,6 +368,7 @@ export async function main(): Promise<void> {
   }
 
   const schemaColumnsByTable = loadSchemaColumns(args);
+  buildConfiguredViews(configPath);
   const { program, host, configDiagnostics } = createArTrailsProgram(configPath, {
     schemaColumnsByTable,
   });
