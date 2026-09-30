@@ -1131,10 +1131,10 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("parrot_sti_class");
     t.integer("killer_id");
     t.integer("updated_count", { default: 0 });
-    t.datetime("created_at");
-    t.datetime("created_on");
-    t.datetime("updated_at");
-    t.datetime("updated_on");
+    t.datetime("created_at", { precision: 0 });
+    t.datetime("created_on", { precision: 0 });
+    t.datetime("updated_at", { precision: 0 });
+    t.datetime("updated_on", { precision: 0 });
   });
 
   await define("pirates", {}, (t) => {
