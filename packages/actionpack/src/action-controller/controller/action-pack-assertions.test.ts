@@ -167,7 +167,7 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("session exist", async () => {
     await tc.get("sessionStuffing");
-    expect(tc.session["xmas"]).toBe("turkey");
+    expect(tc.session.get("xmas")).toBe("turkey");
   });
 
   it("redirection location", async () => {

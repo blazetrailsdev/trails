@@ -74,6 +74,10 @@ class PostsController extends Base {
     await this.render({ plain: "ok" });
   }
 
+  async xhrFlag() {
+    await this.render({ json: { xhr: this.request.isXmlHttpRequest } });
+  }
+
   async flashAlert() {
     this.flash.set("alert", "Danger!");
     await this.render({ plain: "ok" });
@@ -133,8 +137,8 @@ describe("TestCaseTest", () => {
     });
 
     it("sets XHR flag", async () => {
-      await tc.get("index", { xhr: true });
-      expect(tc.request.isXmlHttpRequest).toBe(true);
+      await tc.get("xhrFlag", { xhr: true });
+      expect(JSON.parse(tc.responseBody).xhr).toBe(true);
     });
 
     it("passes session data", async () => {
@@ -320,7 +324,7 @@ describe("TestCaseTest", () => {
 
     it("session set by controller is available", async () => {
       await tc.post("create", { params: { title: "My Post" } });
-      expect(tc.session["lastCreated"]).toBe("My Post");
+      expect(tc.session.get("lastCreated")).toBe("My Post");
     });
 
     it("reset clears session", async () => {
@@ -334,10 +338,11 @@ describe("TestCaseTest", () => {
   describe("reset", () => {
     it("clears controller, request, response", async () => {
       await tc.get("index");
+      const { controller, request, response } = tc;
       tc.reset();
-      expect(tc.controller).toBeUndefined();
-      expect(tc.request).toBeUndefined();
-      expect(tc.response).toBeUndefined();
+      expect(tc.controller).not.toBe(controller);
+      expect(tc.request).not.toBe(request);
+      expect(tc.response).not.toBe(response);
     });
   });
 
@@ -403,24 +408,24 @@ describe("TestCaseTest", () => {
     it("process with session kwarg", async () => {
       const stc = new TestCase(SessionController);
       await stc.process("noOp", { method: "GET", session: { string: "value1", symbol: "value2" } });
-      expect(stc.session["string"]).toBe("value1");
-      expect(stc.session["symbol"]).toBe("value2");
+      expect(stc.session.get("string")).toBe("value1");
+      expect(stc.session.get("symbol")).toBe("value2");
     });
 
     it("process merges session arg", async () => {
       const stc = new TestCase(SessionController);
-      stc.session["foo"] = "bar";
+      stc.session.set("foo", "bar");
       await stc.get("noOp", { session: { bar: "baz" } });
-      expect(stc.session["foo"]).toBe("bar");
-      expect(stc.session["bar"]).toBe("baz");
+      expect(stc.session.get("foo")).toBe("bar");
+      expect(stc.session.get("bar")).toBe("baz");
     });
 
     it("merged session arg is retained across requests", async () => {
       const stc = new TestCase(SessionController);
       await stc.get("noOp", { session: { foo: "bar" } });
-      expect(stc.session["foo"]).toBe("bar");
+      expect(stc.session.get("foo")).toBe("bar");
       await stc.get("noOp");
-      expect(stc.session["foo"]).toBe("bar");
+      expect(stc.session.get("foo")).toBe("bar");
     });
 
     it("process with symbol method", async () => {
@@ -475,7 +480,7 @@ describe("TestCaseTest", () => {
 });
 
 class TestController extends Base {
-  _counter: number | undefined = undefined;
+  declare _counter: number | undefined;
 
   async noOp() {
     await this.render({ plain: "dummy" });
@@ -582,14 +587,14 @@ describe("TestCaseTest", () => {
 
   it("process with session", async () => {
     await tc.process("setSession");
-    expect(tc.session["string"]).toBe("A wonder");
-    expect(tc.session["symbol"]).toBe("it works");
+    expect(tc.session.get("string")).toBe("A wonder");
+    expect(tc.session.get("symbol")).toBe("it works");
   });
 
   it("process overwrites existing session arg", async () => {
-    tc.session["foo"] = "bar";
+    tc.session.set("foo", "bar");
     await tc.get("noOp", { session: { foo: "baz" } });
-    expect(tc.session["foo"]).toBe("baz");
+    expect(tc.session.get("foo")).toBe("baz");
   });
 
   it("fixture file upload should be able access to tempfile", () => {
@@ -627,16 +632,21 @@ describe("TestCaseTest", () => {
     await tc.get("testRemoteAddr");
     expect(tc.responseBody).toBe("0.0.0.0");
 
-    await tc.get("testRemoteAddr", { env: { REMOTE_ADDR: "192.0.0.1" } });
+    tc.request.remoteAddr = "192.0.0.1";
+    await tc.get("testRemoteAddr");
     expect(tc.responseBody).toBe("192.0.0.1");
   });
 
-  it.skip("header properly reset after remote http request", async () => {});
+  it("header properly reset after remote http request", async () => {
+    await tc.get("testParams", { xhr: true });
+    expect(tc.request.env["HTTP_X_REQUESTED_WITH"]).toBeUndefined();
+    expect(tc.request.env["HTTP_ACCEPT"]).toBeUndefined();
+  });
 
   it("xhr with session", async () => {
     await tc.get("setSession", { xhr: true });
-    expect(tc.session["string"]).toBe("A wonder");
-    expect(tc.session["symbol"]).toBe("it works");
+    expect(tc.session.get("string")).toBe("A wonder");
+    expect(tc.session.get("symbol")).toBe("it works");
   });
 
   it("params reset between post requests", async () => {

@@ -213,7 +213,7 @@ describe("ActionController::Base#verify_authenticity_token", () => {
     ResetController.protectFromForgery({ with: "reset_session" });
     const tc = new TestCase(ResetController);
     await tc.post("create", { session: { _csrf_token: token, user_id: 1 } });
-    expect(tc.session.user_id).toBeUndefined();
-    expect(tc.session._csrf_token).toBeUndefined();
+    expect(tc.session.get("user_id")).toBeUndefined();
+    expect(tc.session.get("_csrf_token")).toBeUndefined();
   });
 });

@@ -27,15 +27,24 @@ import {
   Utils as RackTestUtils,
 } from "@blazetrails/rack-test";
 import { Mime } from "../action-dispatch/http/mime-type.js";
-import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
+import { CookieJar, type CookieResponse } from "../action-dispatch/middleware/cookies.js";
+import { cookies, type TestProcessHost } from "../action-dispatch/testing/test-process.js";
 import type { RouteSet } from "../action-dispatch/routing/route-set.js";
 import * as routingAssertions from "../action-dispatch/testing/assertions/routing.js";
-import type { Metal } from "./metal.js";
+import { Metal } from "./metal.js";
+import { Functional } from "./metal/testing.js";
 import { _computeRedirectToLocation } from "./metal/redirecting.js";
+
+include(Metal, Functional);
+
+declare module "./metal.js" {
+  /* eslint-disable-next-line @typescript-eslint/no-empty-object-type -- Ruby `class Metal; include Testing::Functional; end` (`actionpack/lib/action_controller/test_case.rb:16-18`). */
+  interface Metal extends Included<typeof Functional> {}
+}
 
 type ControllerClass = new () => Metal;
 
@@ -184,19 +193,24 @@ export class TestCase {
 
   controller!: Metal;
 
-  request!: Request;
+  request!: TestRequest;
 
   response!: Response;
 
-  session: Record<string, unknown> = {};
+  get session(): TestSession {
+    return this.request.session as unknown as TestSession;
+  }
 
   get flash(): FlashHash {
     return (this.controller as any).flash ?? new FlashHash();
   }
 
-  get cookies(): Record<string, string | undefined> {
-    return this.response?.cookies ?? {};
+  get cookies(): CookieJar {
+    return cookies.call(this as unknown as TestProcessHost);
   }
+
+  /** @internal */
+  _cookieJar?: CookieJar;
 
   get responseBody(): string {
     return this.response?.body ?? this.controller?.responseBody ?? "";
@@ -208,6 +222,29 @@ export class TestCase {
 
   constructor(controllerClass: ControllerClass) {
     this._controllerClass = controllerClass;
+    this.setupControllerRequestAndResponse();
+  }
+
+  setupControllerRequestAndResponse(): void {
+    const klass = this._controllerClass;
+    if (klass) {
+      if (!this.controller) {
+        try {
+          this.controller = new klass();
+        } catch {
+          this.controller = undefined!;
+        }
+      }
+    }
+
+    this.request = TestRequest.create(this.controller?.constructor ?? klass);
+    this.response = this.buildResponse();
+    this.response.request = this.request;
+
+    if (this.controller) {
+      this.controller.request = this.request;
+      this.controller.params = {};
+    }
   }
 
   async get(action: string, options: RequestOptions = {}): Promise<void> {
@@ -287,10 +324,9 @@ export class TestCase {
   }
 
   reset(): void {
-    this.session = {};
     this.controller = undefined!;
-    this.request = undefined!;
-    this.response = undefined!;
+    this._cookieJar = undefined;
+    this.setupControllerRequestAndResponse();
   }
 
   async process(action: string, options: RequestOptions = {}): Promise<void> {
@@ -300,73 +336,66 @@ export class TestCase {
       session,
       body,
       flash,
-      format,
       xhr = false,
       as,
       env: extraEnv = {},
       headers,
     } = options;
+    let { format } = options;
 
     const httpMethod = String(method).toUpperCase();
 
-    const env: Record<string, unknown> = {
-      ...TestRequest.defaultEnv(),
-      REQUEST_METHOD: httpMethod,
-      PATH_INFO: (params as Record<string, unknown>)?.["path"] ?? `/${action}`,
-      HTTP_HOST: "test.host",
-      SERVER_NAME: "test.host",
-      SERVER_PORT: "80",
-      "rack.session": new TestSession({ ...this.session, ...(session ?? {}) }),
-      ...extraEnv,
-    };
+    this.controller.clearInstanceVariablesBetweenRequests();
 
-    if (as) env["CONTENT_TYPE"] = formatToMime(as);
+    this.cookies.update(this.request.cookies);
+    this.cookies.updateCookiesFromJar();
+    this.request.setHeader("HTTP_COOKIE", this.cookies.toHeader());
+    this.request.deleteHeader("action_dispatch.cookies");
 
+    this.request = new TestRequest(
+      this.scrubEnvBang(this.request.env),
+      this.request.session as unknown as TestSession,
+      this.controller.constructor,
+    );
+    this.response = this.buildResponse();
+    this.response.request = this.request;
+    this.controller.recycleBang();
+
+    if (body) {
+      this.request.setHeader("RAW_POST_DATA", body);
+    }
+
+    this.request.setHeader("REQUEST_METHOD", httpMethod);
+
+    if (as) {
+      this.request.contentType = formatToMime(as);
+      format ??= as;
+    }
+
+    const parameters: Record<string, unknown> = { ...(params ?? {}) };
+
+    if (format) {
+      parameters["format"] = format;
+    }
+
+    for (const [key, value] of Object.entries(extraEnv)) this.request.setHeader(key, value);
     if (headers) {
       for (const [name, value] of Object.entries(headers)) {
         const envKey = name.startsWith("HTTP_")
           ? name
           : "HTTP_" + name.toUpperCase().replace(/-/g, "_");
-        env[envKey] = value;
+        this.request.setHeader(envKey, value);
       }
     }
 
-    if (body) {
-      env["RAW_POST_DATA"] = body;
-      env["rack.input"] = new StringIO(body);
-    }
-
-    if (xhr) {
-      env["HTTP_X_REQUESTED_WITH"] = "XMLHttpRequest";
-      env["HTTP_ACCEPT"] ??= [
-        Mime.get("js"),
-        Mime.get("html"),
-        Mime.get("xml"),
-        "text/xml",
-        "*/*",
-      ].join(", ");
-    }
-
-    this.request = new Request(env);
-    this.response = this.buildResponse();
-    this.response.request = this.request;
-
-    const parameters: Record<string, unknown> = { ...(params ?? {}) };
-    const resolvedFormat = format ?? as;
-    if (resolvedFormat) parameters["format"] = resolvedFormat;
-    if (params || resolvedFormat) (this.request as any).parameters = parameters;
-
-    this.controller = new this._controllerClass();
-
-    (this.request as any).env["action_dispatch.request.path_parameters"] = {
-      controller: (
-        this._controllerClass as unknown as typeof import("./metal.js").Metal
-      ).controllerPath(),
+    this.setupRequest(
+      (this._controllerClass as unknown as typeof import("./metal.js").Metal).controllerPath(),
       action,
-    };
-
-    this.request.flash!.update(flash ?? {});
-
+      parameters,
+      session,
+      flash,
+      xhr,
+    );
     await this.processControllerResponse(action, xhr);
   }
 
@@ -390,14 +419,78 @@ export class TestCase {
     return fn();
   }
   /** @internal */
-  private async processControllerResponse(action: string, _xhr: boolean): Promise<void> {
+  private setupRequest(
+    controllerClassName: string,
+    action: string,
+    parameters: Record<string, unknown>,
+    session: Record<string, unknown> | undefined,
+    flash: Record<string, string> | undefined,
+    xhr: boolean,
+  ): void {
+    this.request.setHeader("PATH_INFO", parameters["path"] ?? `/${action}`);
+    if (Object.keys(parameters).length > 0) (this.request as any).parameters = parameters;
+    this.request.setHeader("action_dispatch.request.path_parameters", {
+      controller: controllerClassName,
+      action,
+    });
+
+    if (session) this.request.session.update(session);
+    this.request.flash!.update(flash ?? {});
+
+    if (xhr) {
+      this.request.setHeader("HTTP_X_REQUESTED_WITH", "XMLHttpRequest");
+      this.request.fetchHeader("HTTP_ACCEPT", (k) => {
+        this.request.setHeader(
+          k,
+          [Mime.get("js"), Mime.get("html"), Mime.get("xml"), "text/xml", "*/*"].join(", "),
+        );
+      });
+    }
+
+    this.request.fetchHeader("SCRIPT_NAME", (k) => {
+      this.request.setHeader(
+        k,
+        (this.controller as unknown as { config(): { relativeUrlRoot?: string } }).config()
+          .relativeUrlRoot,
+      );
+    });
+  }
+
+  /** @internal */
+  private async processControllerResponse(action: string, xhr: boolean): Promise<void> {
     try {
+      this.controller.recycleBang();
+
       await this.wrapExecution(() =>
         this.controller.dispatch(action, this.request, this.response).then(() => {}),
       );
     } finally {
-      for (const key of Object.keys(this.session)) delete this.session[key];
-      Object.assign(this.session, (this.request.session as unknown as TestSession).toHash());
+      this.request = this.controller.request as TestRequest;
+      this.response = this.controller.response;
+
+      if (this.request.isHaveCookieJar()) {
+        if (!this.request.cookieJar().isCommitted()) {
+          this.request.cookieJar().write(this.response as unknown as CookieResponse);
+          this.cookies.update(this.request.cookieJar().toHash());
+          this.cookies.update(this.response.cookies as Record<string, string>);
+        }
+      }
+      this.response.toRack();
+
+      const flashValue = this.request.flash!.toSessionValue();
+      if (flashValue) {
+        this.request.session.set("flash", flashValue);
+      } else {
+        this.request.session.delete("flash");
+      }
+
+      if (xhr) {
+        this.request.deleteHeader("HTTP_X_REQUESTED_WITH");
+        this.request.deleteHeader("HTTP_ACCEPT");
+      }
+      this.request.queryString = "";
+
+      this.response.sentBang();
     }
   }
 

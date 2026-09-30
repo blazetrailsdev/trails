@@ -24,7 +24,7 @@ import {
   NullSerializer,
 } from "@blazetrails/activesupport/message-encryptor";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { Response } from "@blazetrails/rack";
+import { Response, escape as rackEscape } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { ActionDispatch } from "../../namespaces.js";
 
@@ -235,6 +235,19 @@ export class CookieJar implements Iterable<[string, string]> {
     return this;
   }
 
+  updateCookiesFromJar(): void {
+    const requestJar = cookieJar.call(this.request)._cookies;
+    const setCookies = Object.fromEntries(
+      [...requestJar].filter(([k]) => !(this._deletedCookies.has(k) || this._setCookies.has(k))),
+    );
+
+    if (setCookies) this.update(setCookies);
+  }
+
+  toHeader(): string {
+    return [...this._cookies].map(([k, v]) => `${this.escape(k)}=${this.escape(v)}`).join("; ");
+  }
+
   set(name: string, options: string | SetCookieOptions | null): string | undefined {
     let value: string;
     if (isPlainObject(options)) {
@@ -350,6 +363,11 @@ export class CookieJar implements Iterable<[string, string]> {
   }
 
   static alwaysWriteCookie = false;
+
+  /** @internal */
+  private escape(string: string): string {
+    return rackEscape(string);
+  }
 
   /** @internal */
   private isWriteCookie(cookie: SetCookieOptions): boolean {
