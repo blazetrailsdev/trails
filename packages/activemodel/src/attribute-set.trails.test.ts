@@ -175,6 +175,15 @@ describe("AttributeSet over a LazyAttributeHash store", () => {
     expect(() => new AttributeSet({}).reverseMergeBang(set)).toThrow(NoMethodError);
   });
 
+  it("== compares LazyAttributeHash stores by their materialized attributes", () => {
+    const set = new AttributeSet(new LazyAttributeHash(types, { name: "Bob" }));
+    expect(set.equals(new AttributeSet(new LazyAttributeHash(types, { name: "Bob" })))).toBe(true);
+    expect(set.equals(new AttributeSet(new LazyAttributeHash(types, { name: "Al" })))).toBe(false);
+    expect(new AttributeSet({}).equals(new AttributeSet(new LazyAttributeHash({}, {})))).toBe(
+      false,
+    );
+  });
+
   it("initializeClone keeps a frozen store frozen", () => {
     const set = new AttributeSet({
       foo: Attribute.fromDatabase("foo", 1, typeRegistry.lookup("integer")),

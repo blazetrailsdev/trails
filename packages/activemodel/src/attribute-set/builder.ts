@@ -8,6 +8,7 @@ import {
   except,
   fetch,
   hasKey,
+  rbEqual,
   transformValues,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "../type/value.js";
@@ -281,6 +282,14 @@ export class LazyAttributeHash {
       return built;
     }
     return Attribute.null(name);
+  }
+
+  equals(other: unknown): boolean {
+    if (other instanceof LazyAttributeHash) {
+      return rbEqual(this.materialize(), other.materialize());
+    } else {
+      return rbEqual(this.materialize(), other);
+    }
   }
 
   private initializeDup(_: LazyAttributeHash): void {

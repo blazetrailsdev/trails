@@ -12,6 +12,7 @@ import {
   hasKey,
   rbFPublicSend,
   rbInspect,
+  rbEqual,
   rbObjClone,
   transformValues as hashTransformValues,
 } from "@blazetrails/ruby-compat";
@@ -214,14 +215,7 @@ export class AttributeSet {
   }
 
   equals(other: unknown): boolean {
-    if (!(other instanceof AttributeSet)) return false;
-    const attributes = transformValues(this.attributes(), (attr) => attr);
-    const otherAttributes = transformValues(other.attributes(), (attr) => attr);
-    const names = Object.keys(attributes);
-    if (names.length !== Object.keys(otherAttributes).length) return false;
-    return names.every(
-      (name) => hasKey(otherAttributes, name) && attributes[name].equals(otherAttributes[name]),
-    );
+    return other instanceof AttributeSet && rbEqual(this.attributes(), other.attributes());
   }
 
   toHash(): Record<string, unknown> {
