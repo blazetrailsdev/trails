@@ -30,6 +30,8 @@ import {
   AdminClassNameThatDoesNotFollowCONVENTIONS2,
 } from "./test-helpers/models/admin/randomly-named-c1.js";
 import { Bulb } from "./test-helpers/models/bulb.js";
+import { Dog } from "./test-helpers/models/dog.js";
+import { OtherDog } from "./test-helpers/models/other-dog.js";
 import { Comment } from "./test-helpers/models/comment.js";
 import { TrafficLight } from "./test-helpers/models/traffic-light.js";
 import { Movie } from "./test-helpers/models/movie.js";
@@ -1197,6 +1199,23 @@ describe("FixtureClassNamesTest", () => {
 
   it("fixture_class_names returns nil for unregistered identifier", () => {
     expect(klass.fixtureClassNames["unregistered_identifier"]).toBeUndefined();
+  });
+});
+
+describe("SameNameDifferentDatabaseFixturesTest", () => {
+  const { self, dogs, otherDogs } = fixtures(["dogs", "otherDogs"]);
+
+  it("fixtures are properly loaded", async () => {
+    FixtureSet.resetCache();
+    await FixtureSet.createFixtures(
+      TS_FIXTURES_ROOT,
+      ["dogs", "other_dogs"],
+      (self().constructor as unknown as { fixtureClassNames: Record<string, typeof Base> })
+        .fixtureClassNames,
+    );
+
+    expect(dogs("sophie")).toBeInstanceOf(Dog);
+    expect(otherDogs("lassie")).toBeInstanceOf(OtherDog);
   });
 });
 

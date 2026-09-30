@@ -1,6 +1,7 @@
 import { Table as ArelTable, Nodes } from "@blazetrails/arel";
 import { TableMetadata } from "../table-metadata.js";
 import type { Base } from "../base.js";
+import type { Relation } from "../relation.js";
 import type {
   AssociationReflection,
   AbstractReflection,
@@ -9,8 +10,6 @@ import type {
 } from "../reflection.js";
 import { RuntimeReflection } from "../reflection.js";
 import { AliasTracker } from "./alias-tracker.js";
-import { WhereClause } from "../relation/where-clause.js";
-import { constructJoinDependency } from "../relation/query-methods.js";
 import { kernelArray } from "@blazetrails/activesupport";
 import { drop } from "@blazetrails/ruby-compat";
 import { methodMissingProxy } from "@blazetrails/ruby-compat";
@@ -84,24 +83,12 @@ export class AssociationScope {
 
   scope(association: AssociationScopeable): unknown {
     const { owner, reflection, klass } = association;
-    const scopeRelation = klass.unscoped() as {
-      aliasTracker: () => AliasTracker;
-    };
-    let scope: unknown = scopeRelation;
-    const chain = this.getChain(reflection, association, scopeRelation.aliasTracker());
-    const extensions =
-      typeof (reflection as { extensions?: () => unknown[] }).extensions === "function"
-        ? (reflection as { extensions: () => unknown[] }).extensions()
-        : [];
-    if (extensions.length > 0) {
-      scope = (scope as { extendingBang: (...m: unknown[]) => unknown }).extendingBang(
-        ...extensions,
-      );
-    }
+    let scope: Relation<Base> = klass.unscoped();
+    const chain = this.getChain(reflection, association, scope.aliasTracker());
+
+    scope.extendingBang(...reflection.extensions());
     scope = this.addConstraints(scope, owner, chain);
-    if (!reflection.isCollection()) {
-      scope = (scope as { limit: (n: number) => unknown }).limit(1);
-    }
+    if (!reflection.isCollection()) scope.limitBang(1);
     return scope;
   }
 
@@ -115,28 +102,28 @@ export class AssociationScope {
   }
 
   private applyScope(
-    scope: unknown,
+    scope: Relation<Base>,
     table: ArelTable | Nodes.TableAlias,
     key: string,
     value: unknown,
-  ): unknown {
-    const w = scope as {
-      where: (c: Record<string, unknown> | unknown) => unknown;
-      table?: ArelTable;
-    };
-    if (w.table && !arelTableEql(w.table, table)) {
+  ): Relation<Base> {
+    if (scope.table && !arelTableEql(scope.table, table)) {
       const meta = new TableMetadata(null, table as unknown as ArelTable);
       const nodes = meta.predicateBuilder.buildFromHash({ [key]: value });
-      let result: unknown = scope;
+      let result = scope;
       for (const node of nodes) {
-        result = (result as { where: (c: unknown) => unknown }).where(node);
+        result = result.where(node);
       }
       return result;
     }
-    return w.where({ [key]: value });
+    return scope.where({ [key]: value });
   }
 
-  private lastChainScope(scope: unknown, reflection: ChainReflection, owner: Base): unknown {
+  private lastChainScope(
+    scope: Relation<Base>,
+    reflection: ChainReflection,
+    owner: Base,
+  ): Relation<Base> {
     const primaryKey = kernelArray(reflection.joinPrimaryKey());
     const foreignKey = kernelArray(reflection.joinForeignKey);
 
@@ -174,10 +161,10 @@ export class AssociationScope {
   }
 
   private nextChainScope(
-    scope: unknown,
+    scope: Relation<Base>,
     reflection: ChainReflection,
     nextReflection: ChainReflection,
-  ): unknown {
+  ): Relation<Base> {
     const primaryKey = kernelArray(reflection.joinPrimaryKey());
     const foreignKey = kernelArray(reflection.joinForeignKey);
 
@@ -196,13 +183,15 @@ export class AssociationScope {
       scope = this.applyScope(scope, table, reflection.type, value);
     }
 
-    return (scope as { joinsBang: (node: Nodes.Join) => unknown }).joinsBang(
-      this.join(foreignTable, constraints) as Nodes.Join,
-    );
+    return scope.joinsBang(this.join(foreignTable, constraints));
   }
 
   /** @missingRailsCall empty? — PERMANENT */
-  private addConstraints(scope: unknown, owner: Base, chain: Array<ChainReflection>): unknown {
+  private addConstraints(
+    scope: Relation<Base>,
+    owner: Base,
+    chain: Array<ChainReflection>,
+  ): Relation<Base> {
     const last = chain[chain.length - 1];
     scope = this.lastChainScope(scope, last, owner);
     for (let i = 0; i < chain.length - 1; i++) {
@@ -212,83 +201,28 @@ export class AssociationScope {
     const chainHead = chain[0];
     for (let i = chain.length - 1; i >= 0; i--) {
       const reflection = chain[i];
-      const constraints =
-        (
-          reflection as { constraints?: () => Array<(...args: unknown[]) => unknown> }
-        ).constraints?.() ?? [];
-      for (const scopeChainItem of constraints) {
-        if (typeof scopeChainItem !== "function") continue;
+      for (const scopeChainItem of reflection.constraints()) {
         const item = this.evalScope(reflection, scopeChainItem, owner);
 
-        if (scopeChainItem === (chainHead as { scope?: unknown } | undefined)?.scope) {
-          (scope as { mergeBang: (other: unknown) => unknown }).mergeBang(
-            (item as { except: (...skips: string[]) => unknown }).except(
-              "where",
-              "includes",
-              "unscope",
-              "order",
-            ),
-          );
-        } else if (
-          (
-            ((item as { referencesValues?: Array<string | Nodes.SqlLiteral> }).referencesValues ??
-              []) as unknown[]
-          ).length > 0
-        ) {
-          (scope as { mergeBang: (other: unknown) => unknown }).mergeBang(
-            (item as { only: (...onlies: string[]) => unknown }).only("joins", "leftOuterJoins"),
-          );
+        if (scopeChainItem === chainHead.scope) {
+          scope.mergeBang(item.except("where", "includes", "unscope", "order"));
+        } else if (item.referencesValues.length > 0) {
+          scope.mergeBang(item.only("joins", "leftOuterJoins"));
 
-          const itemValues = item as {
-            includesValues?: unknown[];
-            eagerLoadValues?: unknown[];
-          };
-          const associations = [
-            ...new Set([
-              ...(itemValues.eagerLoadValues ?? []),
-              ...(itemValues.includesValues ?? []),
-            ]),
-          ];
+          const associations = [...new Set([...item.eagerLoadValues, ...item.includesValues])];
+
           if (associations.length > 0) {
-            (scope as { joinsBang: (...values: unknown[]) => unknown }).joinsBang(
-              constructJoinDependency.call(
-                itemValues as never,
-                associations as never,
-                Nodes.OuterJoin,
-              ),
-            );
+            scope.joinsBang(item.constructJoinDependency(associations, Nodes.OuterJoin));
           }
         }
 
-        const allIncludes = (
-          reflection as { allIncludes?: (cb: () => void) => unknown } | undefined
-        )?.allIncludes?.bind(reflection);
-        if (allIncludes) {
-          allIncludes(() => {
-            const itemIncludes = (item as { includesValues?: unknown[] }).includesValues ?? [];
-            if (itemIncludes.length === 0) return;
-            const host = scope as { includesValues?: unknown[] };
-            const current = host.includesValues ?? [];
-            host.includesValues = [...current, ...itemIncludes.filter((v) => !current.includes(v))];
-          });
-        }
-        const itemUnscope = (item as { unscopeValues?: unknown[] }).unscopeValues ?? [];
-        if (itemUnscope.length > 0) {
-          (scope as { unscopeBang: (...v: unknown[]) => unknown }).unscopeBang(...itemUnscope);
-        }
-        const merged = scope as { whereClause: WhereClause; orderValues?: unknown[] };
-        const itemPredicates =
-          (item as { whereClause?: { predicates?: unknown[] } }).whereClause?.predicates ?? [];
-        if (itemPredicates.length > 0) {
-          merged.whereClause = merged.whereClause.plus(
-            new WhereClause(itemPredicates as Nodes.Node[]),
-          );
-        }
-        const itemOrders = (item as { orderValues?: unknown[] }).orderValues ?? [];
-        if (itemOrders.length > 0) {
-          merged.orderValues = unionOrderClauses(itemOrders, merged.orderValues ?? []);
-        }
-        scope = merged;
+        reflection.allIncludes(() => {
+          scope.includesValues = [...new Set([...scope.includesValues, ...item.includesValues])];
+        });
+
+        scope.unscopeBang(...item.unscopeValues);
+        scope.whereClause = scope.whereClause.plus(item.whereClause);
+        scope.orderValues = unionOrderClauses(item.orderValues, scope.orderValues);
       }
     }
 
@@ -300,13 +234,15 @@ export class AssociationScope {
     reflection: AbstractReflection,
     scope: (...args: unknown[]) => unknown,
     owner: Base,
-  ): unknown {
-    const relation = reflection.buildScope((reflection as ChainReflection).aliasedTable);
-    return scope.call(relation, owner) || relation;
+  ): Relation<Base> {
+    const relation: Relation<Base> = reflection.buildScope(
+      (reflection as ChainReflection).aliasedTable,
+    );
+    return (scope.call(relation, owner) as Relation<Base> | null) || relation;
   }
 
   /** @internal */
-  private join(table: unknown, constraint: unknown): unknown {
+  private join(table: unknown, constraint: unknown): Nodes.Join {
     return new Nodes.LeadingJoin(table as never, new Nodes.On(constraint as never));
   }
 }
@@ -323,8 +259,8 @@ function arelTableEql(a: ArelTable | Nodes.TableAlias, b: ArelTable | Nodes.Tabl
  * @internal
  * @noRailsEquivalent CONVERGEABLE union-order-clauses-is-a-second-spelling-of-ruby-array-union
  */
-export function unionOrderClauses(first: unknown[], second: unknown[]): unknown[] {
-  const result: unknown[] = [];
+export function unionOrderClauses<T>(first: T[], second: T[]): T[] {
+  const result: T[] = [];
   const seen = new Set<string>();
   for (const o of [...first, ...second]) {
     const key =

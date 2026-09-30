@@ -13799,20 +13799,6 @@
   {
     "package": "actionview",
     "rubyFile": "helpers/tag_helper.rb",
-    "rubyName": "raw",
-    "digest": "78bbc28e4ad51d8d",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "helpers/tag_helper.rb",
-    "rubyName": "safe_join",
-    "digest": "d8446ddb9d39462d",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "helpers/tag_helper.rb",
     "rubyName": "self_closing_tag_string",
     "digest": "d065d367a79be347",
     "ref": "v8.0.2"
@@ -13850,13 +13836,6 @@
     "rubyFile": "helpers/tag_helper.rb",
     "rubyName": "tag_string",
     "digest": "e6a5b4a7a607bbe2",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "helpers/tag_helper.rb",
-    "rubyName": "to_sentence",
-    "digest": "0e3c29f3a094cad4",
     "ref": "v8.0.2"
   },
   {

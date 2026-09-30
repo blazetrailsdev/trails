@@ -174,7 +174,7 @@ interface QueryMethodsHost {
   selectValues: any[];
   groupValues: Array<string | Nodes.Node>;
   orderValues: Array<string | Nodes.Node>;
-  joinsValues: (AssociationSpec | string | Nodes.Join)[];
+  joinsValues: (AssociationSpec | string | Nodes.Join | JoinDependency)[];
   leftOuterJoinsValues: AssociationSpec[];
   referencesValues: Array<string | Nodes.SqlLiteral>;
   extendingValues: object[];
@@ -649,7 +649,7 @@ function joins(this: QueryMethodsHost, ...args: JoinSpec[]): any {
   return joinsBang.apply(this.spawn(), args as (string | Nodes.Join)[]);
 }
 
-function joinsBang(this: QueryMethodsHost, ...args: (string | Nodes.Join)[]): any {
+function joinsBang(this: QueryMethodsHost, ...args: (string | Nodes.Join | JoinDependency)[]): any {
   for (const arg of args) {
     if (!this.joinsValues.some((seen) => structuralUnionEq(seen, arg)))
       this.joinsValues = [...this.joinsValues, arg];

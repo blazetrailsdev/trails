@@ -1,13 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from "vitest";
 import { CodeGenerator } from "@blazetrails/activesupport";
-import {
-  tag as _tag,
-  TagBuilder,
-  tagBuilder as _tagBuilder,
-  safeJoin,
-  toSentence,
-} from "../helpers/tag-helper.js";
+import { tag as _tag, TagBuilder, tagBuilder as _tagBuilder } from "../helpers/tag-helper.js";
+import { safeJoin, toSentence } from "../helpers/output-safety-helper.js";
 import { Base } from "../base.js";
 import { submitTag as _submitTag } from "../helpers/form-tag-helper.js";
 import { Hash } from "@blazetrails/ruby-compat";

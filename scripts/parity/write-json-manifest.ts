@@ -46,6 +46,7 @@ const PRETTIER_BIN = path.join(REPO_ROOT, "node_modules/.bin/prettier");
 // do nothing for them and the churn trap would stay armed. Emitted manifests
 // are always formatted, regardless of what ignores them elsewhere.
 const IGNORE_BYPASS = ["--ignore-path", "/dev/null"];
+const PRETTIER_CONFIG = ["--config", path.join(REPO_ROOT, ".prettierrc.json")];
 
 interface PendingWrite {
   outPath: string;
@@ -76,10 +77,14 @@ function commit(writes: PendingWrite[]): void {
     return { tmp, outPath: w.outPath };
   });
   try {
-    execFileSync(PRETTIER_BIN, IGNORE_BYPASS.concat("--write", ...staged.map((s) => s.tmp)), {
-      encoding: "utf8",
-      maxBuffer: 64 * 1024 * 1024,
-    });
+    execFileSync(
+      PRETTIER_BIN,
+      [...IGNORE_BYPASS, ...PRETTIER_CONFIG, "--write", ...staged.map((s) => s.tmp)],
+      {
+        encoding: "utf8",
+        maxBuffer: 64 * 1024 * 1024,
+      },
+    );
   } catch (err) {
     for (const s of staged) fs.rmSync(s.tmp, { force: true });
     throw new Error(
