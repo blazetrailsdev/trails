@@ -413,7 +413,7 @@ export class TestCase {
   }
 
   /** @internal */
-  _responseKlass: typeof Response = TestResponse;
+  _responseKlass!: typeof Response;
 
   /** @internal */
   buildResponse(klass: typeof Response): Response {
