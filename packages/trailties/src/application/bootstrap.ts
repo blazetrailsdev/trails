@@ -20,23 +20,19 @@ export interface BootstrapConfig {
 }
 
 export interface BootstrapHost {
-  logger: Logger | null;
   config: BootstrapConfig;
 }
 
 export abstract class Bootstrap extends Initializable implements BootstrapHost {
-  abstract logger: Logger | null;
   abstract config: BootstrapConfig;
 }
 
 Bootstrap.initializer("load_environment_hook", { group: "all" }, function () {});
 
 Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, function () {
-  if (!this.logger) {
-    this.logger = this.config.logger ?? new NullLogger();
-  }
+  TopLevel.Trails!.logger ??= this.config.logger ?? new NullLogger();
   const level = this.config.logLevel;
-  if (level !== undefined) this.logger.level = level;
+  if (level !== undefined) TopLevel.Trails!.logger.level = level;
 });
 
 Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, function () {

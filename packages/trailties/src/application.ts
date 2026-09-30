@@ -45,7 +45,6 @@ export class Application extends Engine {
   private _deprecators?: Deprecators;
   readonly executor: typeof Executor = class extends Executor {};
   readonly reloader: typeof Reloader = class extends Reloader {};
-  logger: Logger | null = null;
   readonly reloaders: unknown[] = [];
 
   constructor() {

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { ActionController } from "@blazetrails/actionpack";
 import { env, setEnv } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Trails } from "./rails.js";
@@ -14,6 +15,7 @@ describe("a generated app's config files configure the application", () => {
   afterEach(() => {
     setEnv("TRAILS_ENV", previousEnv);
     Trails.application = null;
+    Trails.logger = null;
     Application.appClass = null;
   });
 
@@ -34,5 +36,8 @@ describe("a generated app's config files configure the application", () => {
     expect(Trails.application!.config.filterParameters).toEqual(
       expect.arrayContaining(["passw", "email", "cvv", "cvc"]),
     );
+    expect(ActionController.Base.allowForgeryProtection).toBe(false);
+    expect(Trails.logger).not.toBeNull();
+    expect(ActionController.Base.logger).toBe(Trails.logger);
   }, 15_000);
 });

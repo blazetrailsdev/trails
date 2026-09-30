@@ -74,6 +74,31 @@ export class Trailtie extends BaseTrailtie {
       includeAllHelpers: true,
     } satisfies ActionControllerConfig);
 
+    this.initializer(
+      "action_controller.deprecator",
+      { before: "load_environment_config" },
+      (app) => {
+        (app as TrailtieApp).deprecators.set("actionController", ActionController.deprecator());
+      },
+    );
+
+    this.initializer(
+      "action_controller.set_helpers_path",
+      { after: "prepend_helpers_path" },
+      async (app) => {
+        const helpersPaths = (app as TrailtieApp).config.helpersPaths;
+        ActionController.setHelpersPath(helpersPaths);
+
+        const names = await ActionController.loadApplicationHelperNames();
+        ActionController.setApplicationHelpers(names, await helperConstants(helpersPaths));
+
+        onLoad("action_controller", (base: unknown) => {
+          (base as ActionController.HelpersPathControllerClass).helpersPath =
+            ActionController.helpersPath();
+        });
+      },
+    );
+
     this.initializer("action_controller.set_configs", async (app) => {
       const paths = (app as TrailtieApp).config.paths();
       const options = this.config.get("actionController") as ActionControllerConfig;
@@ -116,31 +141,6 @@ export class Trailtie extends BaseTrailtie {
         }
       });
     });
-
-    this.initializer(
-      "action_controller.deprecator",
-      { before: "load_environment_config" },
-      (app) => {
-        (app as TrailtieApp).deprecators.set("actionController", ActionController.deprecator());
-      },
-    );
-
-    this.initializer(
-      "action_controller.set_helpers_path",
-      { after: "prepend_helpers_path" },
-      async (app) => {
-        const helpersPaths = (app as TrailtieApp).config.helpersPaths;
-        ActionController.setHelpersPath(helpersPaths);
-
-        const names = await ActionController.loadApplicationHelperNames();
-        ActionController.setApplicationHelpers(names, await helperConstants(helpersPaths));
-
-        onLoad("action_controller", (base: unknown) => {
-          (base as ActionController.HelpersPathControllerClass).helpersPath =
-            ActionController.helpersPath();
-        });
-      },
-    );
 
     this.initializer("action_controller.request_forgery_protection", () => {
       const options = this.config.get("actionController") as ActionControllerConfig;
