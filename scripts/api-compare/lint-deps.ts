@@ -505,6 +505,10 @@ export function methodUsesDepImport(
             if (importedNames.has(n.text) || knownIdentifiers.has(n.text)) {
               found = true;
               recordRef(n.text);
+              if (collectRefs && transitive && importedNames.has(n.text)) {
+                const owner = moduleFunctionOwner(n, transitive.checker);
+                if (owner) collectRefs.add(owner);
+              }
               if (!collectRefs) return;
             }
             if (transitive && transitive.taintedSymbols.size > 0) {
@@ -538,6 +542,23 @@ export function methodUsesDepImport(
   };
   check(node, false);
   return found;
+}
+
+// Ruby names a module function through its module: `ActiveModel::Type.default_value`
+// (activerecord/lib/arel/nodes/homogeneous_in.rb:51) extracts the dep ref `Type`.
+// The port is a top-level function of the file mirroring that module
+// (activemodel/src/type.ts's `defaultValue`), imported by its bare name, so the
+// module it belongs to is the declaring file's basename.
+export function moduleFunctionOwner(id: ts.Identifier, checker: ts.TypeChecker): string | null {
+  const sym = checker.getSymbolAtLocation(id);
+  if (!sym) return null;
+  const resolved = sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym;
+  const decl = resolved.declarations?.[0];
+  if (!decl || !ts.isFunctionDeclaration(decl) || !ts.isSourceFile(decl.parent)) return null;
+  return path
+    .basename(decl.getSourceFile().fileName)
+    .replace(/(\.d)?\.ts$/, "")
+    .replace(/-/g, "");
 }
 
 function isDeclarationName(id: ts.Identifier): boolean {

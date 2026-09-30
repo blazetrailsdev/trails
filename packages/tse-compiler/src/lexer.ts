@@ -16,7 +16,7 @@ export interface Token {
 }
 export class TseSyntaxError extends Error {}
 
-const TAG_RE = /<%%|%%>|<%!([\s\S]*?)!%>|<%(==|=|-|#)?([\s\S]*?)([-=])?%>([ \t]*\r?\n)?/g;
+const TAG_RE = /<%!([\s\S]*?)!%>|<%(==|=|-|#|%)?([\s\S]*?)([-=])?%>([ \t]*\r?\n)?/g;
 const KIND: Record<string, TokenKind> = { "=": "expr", "==": "rawExpr", "#": "comment" };
 
 function buildLineStarts(source: string): number[] {
@@ -61,9 +61,7 @@ export function tokenize(source: string, trim = true): Token[] {
     if (buf.length === 0) bufStartOffset = last;
     buf += source.slice(last, m.index);
     last = m.index + m[0].length;
-    if (m[0] === "<%%") buf += "<%";
-    else if (m[0] === "%%>") buf += "%>";
-    else if (m[1] !== undefined) {
+    if (m[1] !== undefined) {
       flush();
       tokens.push({
         kind: "typesMagic",
@@ -94,6 +92,10 @@ export function tokenize(source: string, trim = true): Token[] {
         }
       }
       isBol = rspace !== undefined;
+      if (m[2] === "%") {
+        buf += `${lspace ?? ""}<%${m[3]}${tailch ?? ""}%>${rspace ?? ""}`;
+        continue;
+      }
       const trimmed = !isExpression && trim && lspace !== undefined && rspace !== undefined;
       if (!trimmed && lspace !== undefined) buf += lspace;
       flush();

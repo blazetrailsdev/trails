@@ -9,6 +9,7 @@ import {
   collectTaintedSymbols,
   isImportFromPackage,
   methodUsesDepImport,
+  moduleFunctionOwner,
 } from "./lint-deps.js";
 
 function makeSourceFile(source: string): ts.SourceFile {
@@ -376,6 +377,32 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
       skipLibCheck: true,
     });
   }
+
+  it("credits an imported module function to the module its file mirrors", () => {
+    const dir = writePkg({
+      "type.ts": `
+        export class ValueType {}
+        export function defaultValue() { return new ValueType(); }
+      `,
+      "consumer.ts": `
+        import { ValueType, defaultValue } from "./type.js";
+        export const procForBinds = () => [defaultValue(), new ValueType()];
+      `,
+    });
+    const program = programFor(dir);
+    const checker = program.getTypeChecker();
+    const consumerSf = program.getSourceFiles().find((sf) => sf.fileName.endsWith("consumer.ts"))!;
+    const owners = new Map<string, string | null>();
+    const visit = (n: ts.Node) => {
+      if (ts.isIdentifier(n) && (ts.isCallExpression(n.parent) || ts.isNewExpression(n.parent))) {
+        owners.set(n.text, moduleFunctionOwner(n, checker));
+      }
+      ts.forEachChild(n, visit);
+    };
+    visit(consumerSf);
+    expect(owners.get("defaultValue")).toBe("type");
+    expect(owners.get("ValueType")).toBe(null);
+  });
 
   it("credits a method that calls a same-package wrapper of the dep", () => {
     const pkg = "@blazetrails/activesupport";
