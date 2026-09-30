@@ -2,7 +2,7 @@
 import { main } from "../dist/tsc-wrapper/cli.js";
 
 try {
-  main();
+  await main();
 } catch (err) {
   const msg = err instanceof Error ? err.message : String(err);
   process.stderr.write(`trails-tsc: ${msg}\n`);

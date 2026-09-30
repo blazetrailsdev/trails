@@ -157,6 +157,117 @@ describe("trails-tsc diagnostic remap — Phase 1b.2", () => {
   });
 });
 
+describe("trails-tsc .tse diagnostic remap", () => {
+  it("moves a compiled view's diagnostic to the .tse line and the span's column", () => {
+    const shimLine = "  _ob.append(readingTime(post.title));";
+    const character = shimLine.indexOf("post.title");
+    const diagnostic = {
+      fileName: "/app/.trails/views/posts/_post.html.tse.ts",
+      pos: 900,
+      end: 900 + "post.title".length,
+      code: 2345,
+      category: 1,
+      text: "Argument of type 'string | null' is not assignable to parameter of type 'number'.",
+      startPosition: { line: 40, character },
+      endPosition: { line: 40, character: character + "post.title".length },
+      sourceLines: [{ line: 40, text: shimLine }],
+    } as unknown as Diagnostic;
+    const sourceContent =
+      "<div>\n  <p><%= post.title %> <%= readingTime(post.title) %></p>\n</div>\n";
+    const [remapped] = remapDiagnostics([diagnostic], {
+      getDeltasForFile: () => undefined,
+      getOriginalText: () => undefined,
+      getTseSourceMap: () => ({
+        source: "/app/app/views/posts/_post.html.tse",
+        sourceContent,
+        lines: new Map([[40, { line: 1, genCol: 13, srcCol: 27 }]]),
+      }),
+    });
+    expect(remapped.fileName).toBe("/app/app/views/posts/_post.html.tse");
+    expect(remapped.startPosition).toEqual({ line: 1, character: 39 });
+    expect(sourceContent.slice(remapped.pos, remapped.end)).toBe("post.title");
+    expect(remapped.messageChain?.at(-1)?.text).toBe("in <%= readingTime(post.title) %>");
+    expect(remapped.sourceLines).toEqual([
+      { line: 1, text: "  <p><%= post.title %> <%= readingTime(post.title) %></p>\n" },
+    ]);
+  });
+});
+
+describe("trails-tsc .tse views", () => {
+  itIfCliBin(
+    "rebuilds the ts-plugin's viewsDir and reports a helper misuse at the .tse line",
+    async () => {
+      const { execFileSync } = await import("node:child_process");
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-views-"));
+      const write = (rel: string, body: string): void => {
+        fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+        fs.writeFileSync(path.join(root, rel), body);
+      };
+      write(
+        "stubs/actionview.d.ts",
+        "export interface TemplateRegistry {}\nexport type TemplateLocals<T> = T;\nexport declare class Base {}\n",
+      );
+      write(
+        "stubs/actionpack.d.ts",
+        "export declare namespace ActionController { class Base {} }\n",
+      );
+      write(
+        "app/helpers/posts-helper.ts",
+        "export const PostsHelper = { readingTime(words: number): string { return String(words); } };\n",
+      );
+      write("app/models/post.ts", "export class Post { title: string | null = null; }\n");
+      write(
+        "app/views/posts/_post.html.tse",
+        "<div>\n  <p><%= readingTime(post.title) %></p>\n</div>\n",
+      );
+      write(
+        "tsconfig.json",
+        JSON.stringify({
+          compilerOptions: {
+            target: "ES2022",
+            module: "ESNext",
+            moduleResolution: "Bundler",
+            strict: true,
+            noEmit: true,
+            types: [],
+            paths: {
+              "@blazetrails/actionview": ["./stubs/actionview.d.ts"],
+              "@blazetrails/actionpack": ["./stubs/actionpack.d.ts"],
+            },
+            plugins: [{ name: "@blazetrails/trails-tsc/ts-plugin", viewsDir: "app/views" }],
+          },
+          include: ["app", ".trails/views"],
+        }),
+      );
+      let stderr = "";
+      try {
+        execFileSync("node", [CLI_BIN_PATH, "-p", path.join(root, "tsconfig.json")], {
+          encoding: "utf8",
+          stdio: ["pipe", "pipe", "pipe"],
+          cwd: root,
+        });
+      } catch (err) {
+        stderr = (err as { stderr?: string }).stderr ?? "";
+      }
+      expect(fs.existsSync(path.join(root, ".trails/views/posts/_post.html.tse.ts"))).toBe(true);
+      expect(stderr).toContain("app/views/posts/_post.html.tse(2,22): error TS2345");
+      expect(stderr).toContain("in <%= readingTime(post.title) %>");
+      fs.rmSync(path.join(root, ".trails"), { recursive: true, force: true });
+      try {
+        execFileSync("node", [CLI_BIN_PATH, "-b", root], {
+          encoding: "utf8",
+          stdio: ["pipe", "pipe", "pipe"],
+          cwd: root,
+        });
+      } catch {
+        void 0;
+      }
+      expect(fs.existsSync(path.join(root, ".trails/views/posts/_post.html.tse.ts"))).toBe(true);
+    },
+    30_000,
+  );
+});
+
 describe("trails-tsc transitive extends — Phase 1b.3", () => {
   const TRANSITIVE_DIR = path.resolve(FIXTURES_DIR, "transitive");
 

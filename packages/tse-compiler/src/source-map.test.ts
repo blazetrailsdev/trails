@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { encodeVlq, generateSourceMap } from "./source-map.js";
+import { decodeLineMappings, encodeVlq, generateSourceMap } from "./source-map.js";
 
 describe("encodeVlq", () => {
   it("encodes known values", () => {
@@ -25,5 +25,17 @@ describe("generateSourceMap", () => {
     expect(lines[1]).not.toBe("");
     expect(lines[2]).toBe("");
     expect(lines[3]).not.toBe("");
+  });
+});
+
+describe("decodeLineMappings", () => {
+  it("round-trips generateSourceMap's line mappings", () => {
+    const mappings = [
+      { genLine: 1, srcLine: 0, genCol: 13, srcCol: 4 },
+      { genLine: 3, srcLine: 17, genCol: 2, srcCol: 0 },
+      { genLine: 4, srcLine: 2, genCol: 0, srcCol: 30 },
+    ];
+    const map = generateSourceMap("out.js", "src.tse", null, mappings);
+    expect(decodeLineMappings(map.mappings)).toEqual(mappings);
   });
 });

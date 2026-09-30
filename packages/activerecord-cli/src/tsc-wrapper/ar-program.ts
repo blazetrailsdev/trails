@@ -18,6 +18,13 @@ export interface CreateArTrailsProgramOptions {
 export interface ArRemapHost {
   getDeltasForFile(fileName: string): readonly LineDelta[] | undefined;
   getOriginalText(fileName: string): string | undefined;
+  getTseSourceMap?(fileName: string): TseSourceMap | undefined;
+}
+
+export interface TseSourceMap {
+  source: string;
+  sourceContent: string;
+  lines: ReadonlyMap<number, { line: number; genCol: number; srcCol: number }>;
 }
 
 export interface ArTrailsProgram {
@@ -135,6 +142,9 @@ function remapOneDiagnostic(
   const unmoved = relatedInformation ? { ...d, relatedInformation } : d;
   if (!d.fileName || !d.startPosition) return unmoved;
 
+  const tse = host.getTseSourceMap?.(d.fileName);
+  if (tse) return remapTseDiagnostic(d, unmoved, tse);
+
   const deltas = host.getDeltasForFile(d.fileName);
   if (!deltas || deltas.length === 0) return unmoved;
 
@@ -166,6 +176,34 @@ function remapOneDiagnostic(
       if (line === null) return [];
       return [{ line, text: originalText.slice(lineStarts[line], lineStarts[line + 1]) }];
     }),
+  };
+}
+
+function remapTseDiagnostic(d: Diagnostic, unmoved: Diagnostic, tse: TseSourceMap): Diagnostic {
+  const mapped = tse.lines.get(d.startPosition!.line);
+  if (mapped === undefined) return unmoved;
+  const { line } = mapped;
+  const lineStarts = computeLineStarts(tse.sourceContent);
+  const text = tse.sourceContent.slice(lineStarts[line], lineStarts[line + 1]);
+  const character = mapped.srcCol + Math.max(0, d.startPosition!.character - mapped.genCol);
+  const pos = lineStarts[line] + character;
+  const open = text.lastIndexOf("<%", character);
+  const close = text.indexOf("%>", character);
+  const tag = open === -1 || close === -1 ? undefined : text.slice(open, close + 2);
+  return {
+    ...unmoved,
+    messageChain: tag
+      ? [
+          ...(unmoved.messageChain ?? []),
+          { pos: 0, end: 0, code: d.code, category: d.category, text: `in ${tag}` },
+        ]
+      : unmoved.messageChain,
+    fileName: tse.source,
+    pos,
+    end: pos + (d.end - d.pos),
+    startPosition: { line, character },
+    endPosition: { line, character: character + (d.end - d.pos) },
+    sourceLines: [{ line, text }],
   };
 }
 
