@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { ImmutableStringType } from "./immutable-string.js";
 
 export class StringType extends ImmutableStringType {
@@ -23,3 +24,5 @@ export class StringType extends ImmutableStringType {
     return String(value);
   }
 }
+
+registerConstant("ActiveModel::Type::String", StringType);

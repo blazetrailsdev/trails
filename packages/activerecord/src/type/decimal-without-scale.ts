@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { BigIntegerType } from "@blazetrails/activemodel";
 
 export class DecimalWithoutScale extends BigIntegerType {
@@ -10,3 +11,5 @@ export class DecimalWithoutScale extends BigIntegerType {
     return JSON.stringify(s);
   }
 }
+
+registerConstant("ActiveRecord::Type::DecimalWithoutScale", DecimalWithoutScale);

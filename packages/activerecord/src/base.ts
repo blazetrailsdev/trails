@@ -1,4 +1,4 @@
-import { basicObjRespondTo, type Hash, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { type Hash } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import "./i18n.js";
 import type { Identification } from "@blazetrails/globalid";
@@ -1656,23 +1656,8 @@ export class Base extends Model {
   declare static _counterCacheColumns: string[];
   declare static counterCachedAssociationNames: string[];
 
-  static _instantiate<T extends typeof Base>(
-    this: T,
-    row: Record<string, unknown>,
-    block?: (record: InstanceType<T>) => void,
-    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-  ): InstanceType<T> {
-    const klass = discriminateClassForRecord(this, row);
-    if (klass !== this) {
-      return klass._instantiate(
-        row,
-        block as ((record: Base) => void) | undefined,
-        columnTypes,
-      ) as InstanceType<T>;
-    }
-
-    (ModelSchema.loadSchema as any).call(this);
-
+  /** @noRailsEquivalent PERMANENT */
+  static allocate<T extends typeof Base>(this: T): InstanceType<T> {
     const hadOwnSuppress = Object.prototype.hasOwnProperty.call(
       this,
       "_suppressInitializeCallback",
@@ -1700,23 +1685,28 @@ export class Base extends Model {
         delete (this as any)._suppressAbstractCheck;
       }
     }
-    (record as any).initWithAttributes(
-      (this as any).attributesBuilder().buildFromDatabase(row, columnTypes ?? {}),
-    );
-    for (const name of (record as any)._attributes.keys() as Iterable<string>) {
-      if (!basicObjRespondTo(record, name, false)) {
-        (rbObjSingletonClass(record) as unknown as typeof Base).defineAttributeMethod(name);
-      }
-    }
-    record._newRecord = false;
-    record.changesApplied();
-    if (this._strictLoadingByDefault) {
-      record._strictLoading = true;
-    }
-    block?.(record);
-    void runCallbacks(record, "find", undefined, { strict: "sync" });
-    void runCallbacks(record, "initialize", undefined, { strict: "sync" });
     return record;
+  }
+
+  static _instantiate<T extends typeof Base>(
+    this: T,
+    row: Record<string, unknown>,
+    block?: (record: InstanceType<T>) => void,
+    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
+  ): InstanceType<T> {
+    const klass = discriminateClassForRecord(this, row);
+    if (klass !== this) {
+      return klass._instantiate(
+        row,
+        block as ((record: Base) => void) | undefined,
+        columnTypes,
+      ) as InstanceType<T>;
+    }
+
+    (ModelSchema.loadSchema as any).call(this);
+
+    const attributes = (this as any).attributesBuilder().buildFromDatabase(row, columnTypes ?? {});
+    return (this.allocate() as any).initWithAttributes(attributes, false, block);
   }
 
   _newRecord = true;
@@ -2153,6 +2143,7 @@ export class Base extends Model {
   }
 
   declare equals: (other: unknown) => boolean;
+  declare encodeWith: (coder: Record<string, unknown>) => void;
 
   declare eql: (other: unknown) => boolean;
 
@@ -2802,7 +2793,9 @@ include(Base, {
   attributeNamesForSerialization: Serialization.attributeNamesForSerialization,
 });
 include(Base, {
+  initWith: _Core.initWith,
   initWithAttributes: _Core.initWithAttributes,
+  encodeWith: _Core.encodeWith,
   initAttributes: _Core.initAttributes,
   fullInspect: _Core.fullInspect,
   destroyAssociationAsyncJob: _Core.destroyAssociationAsyncJob,

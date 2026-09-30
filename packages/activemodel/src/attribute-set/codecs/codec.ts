@@ -7,7 +7,7 @@ import type { ValueType } from "../../type/value.js";
 /** @noRailsEquivalent PERMANENT */
 export interface AttributeSetCoder {
   attributes?: AttributeSet;
-  conciseAttributes?: Attribute[];
+  concise_attributes?: Attribute[];
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -41,7 +41,7 @@ export function toEnvelope(coder: AttributeSetCoder): AttributeSetEnvelope {
   const envelope: AttributeSetEnvelope = { v: 1, types: {}, values: {} };
   const defaultAttributes: string[] = [];
 
-  for (const attr of coder.conciseAttributes ?? []) {
+  for (const attr of coder["concise_attributes"] ?? []) {
     if (!attr.isInitialized()) {
       defaultAttributes.push(attr.name!);
       continue;
@@ -68,7 +68,7 @@ export function fromEnvelope(envelope: AttributeSetEnvelope): AttributeSetCoder 
     conciseAttributes.push(Attribute.uninitialized(name, null));
   }
 
-  return { conciseAttributes };
+  return { concise_attributes: conciseAttributes };
 }
 
 function lookupType(typeKey: string | null): ValueType | null {

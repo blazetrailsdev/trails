@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { ArgumentError, ValueType } from "@blazetrails/activemodel";
 import { stringInspect } from "@blazetrails/ruby-compat";
 
@@ -130,3 +131,5 @@ function escapeHstore(value: string | null | undefined): string {
   if (value === "") return '""';
   return `"${String(value).replace(/(["\\])/g, "\\$1")}"`;
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Hstore", Hstore);

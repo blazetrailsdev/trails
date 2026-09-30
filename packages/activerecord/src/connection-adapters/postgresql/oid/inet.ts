@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { Cidr } from "./cidr.js";
 
 export class Inet extends Cidr {
@@ -5,3 +6,5 @@ export class Inet extends Cidr {
     return "inet";
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Inet", Inet);

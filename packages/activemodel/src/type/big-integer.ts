@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { IntegerType } from "./integer.js";
 
 export class BigIntegerType extends IntegerType {
@@ -24,3 +25,5 @@ export class BigIntegerType extends IntegerType {
     return super.castValue(value);
   }
 }
+
+registerConstant("ActiveModel::Type::BigInteger", BigIntegerType);

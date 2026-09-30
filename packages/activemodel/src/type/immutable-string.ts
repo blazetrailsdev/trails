@@ -1,10 +1,10 @@
-import { BigDecimal, Duration } from "@blazetrails/activesupport";
+import { BigDecimal, Duration, registerConstant } from "@blazetrails/activesupport";
 import { ValueType } from "./value.js";
 
 export interface ImmutableStringTypeOptions {
-  precision?: number;
-  scale?: number;
-  limit?: number;
+  precision?: number | null;
+  scale?: number | null;
+  limit?: number | null;
   true?: string;
   false?: string;
 }
@@ -43,3 +43,5 @@ export class ImmutableStringType extends ValueType<string> {
     return Object.freeze(str);
   }
 }
+
+registerConstant("ActiveModel::Type::ImmutableString", ImmutableStringType);

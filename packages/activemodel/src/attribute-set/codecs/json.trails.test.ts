@@ -10,7 +10,7 @@ const integerType = typeRegistry.lookup("integer");
 
 describe("jsonCodec", () => {
   const coder: AttributeSetCoder = {
-    conciseAttributes: [
+    concise_attributes: [
       Attribute.fromUser("name", "Alice", stringType),
       Attribute.fromUser("age", 30, integerType),
     ],
@@ -28,9 +28,9 @@ describe("jsonCodec", () => {
 
   it("decodes a JSON string back to a coder", () => {
     const decoded = jsonCodec.decode(jsonCodec.encode(coder));
-    expect(decoded.conciseAttributes!.map((attr) => attr.name)).toEqual(["name", "age"]);
-    expect(decoded.conciseAttributes![0].type!.type()).toBe("string");
-    expect(decoded.conciseAttributes![0].valueBeforeTypeCast).toBe("Alice");
+    expect(decoded["concise_attributes"]!.map((attr) => attr.name)).toEqual(["name", "age"]);
+    expect(decoded["concise_attributes"]![0].type!.type()).toBe("string");
+    expect(decoded["concise_attributes"]![0].valueBeforeTypeCast).toBe("Alice");
   });
 
   it("round-trips encode/decode", () => {
@@ -41,19 +41,19 @@ describe("jsonCodec", () => {
 
   it("carries a nil type through as null", () => {
     const nilTyped: AttributeSetCoder = {
-      conciseAttributes: [Attribute.fromUser("name", "Alice", null)],
+      concise_attributes: [Attribute.fromUser("name", "Alice", null)],
     };
     expect(JSON.parse(jsonCodec.encode(nilTyped)).types.name).toBeNull();
-    expect(jsonCodec.decode(jsonCodec.encode(nilTyped)).conciseAttributes![0].type).toBeNull();
+    expect(jsonCodec.decode(jsonCodec.encode(nilTyped))["concise_attributes"]![0].type).toBeNull();
   });
 
   it("carries an uninitialized attribute through as itself", () => {
     const uninitialized: AttributeSetCoder = {
-      conciseAttributes: [Attribute.uninitialized("score", integerType)],
+      concise_attributes: [Attribute.uninitialized("score", integerType)],
     };
     const encoded = jsonCodec.encode(uninitialized);
     expect(JSON.parse(encoded).defaultAttributes).toEqual(["score"]);
-    const decoded = jsonCodec.decode(encoded).conciseAttributes![0];
+    const decoded = jsonCodec.decode(encoded)["concise_attributes"]![0];
     expect(decoded.isInitialized()).toBe(false);
     expect(decoded.name).toBe("score");
   });
@@ -75,13 +75,13 @@ describe("jsonCodec", () => {
 
   it("encodes bigint values as strings without throwing", () => {
     const bigintCoder: AttributeSetCoder = {
-      conciseAttributes: [
+      concise_attributes: [
         Attribute.fromUser("id", BigInt("9007199254740993"), typeRegistry.lookup("big_integer")),
       ],
     };
     const encoded = jsonCodec.encode(bigintCoder);
     expect(encoded).toContain('"9007199254740993"');
-    expect(jsonCodec.decode(encoded).conciseAttributes![0].valueBeforeTypeCast).toBe(
+    expect(jsonCodec.decode(encoded)["concise_attributes"]![0].valueBeforeTypeCast).toBe(
       "9007199254740993",
     );
   });

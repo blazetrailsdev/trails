@@ -2,8 +2,10 @@ import { ValueType } from "./type/value.js";
 import { defaultValue } from "./type.js";
 import { MissingAttributeError } from "./attribute-methods.js";
 import { rbEqual } from "@blazetrails/ruby-compat";
-import { isDuplicable } from "@blazetrails/activesupport";
+import { isDuplicable, registerConstant } from "@blazetrails/activesupport";
+import { ActiveModel } from "./namespaces.js";
 import type { UserProvidedDefault } from "./attribute/user-provided-default.js";
+import type { Coder } from "@blazetrails/activesupport/yaml";
 
 function dupValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.slice();
@@ -27,6 +29,11 @@ export abstract class Attribute {
   static readonly [rubyNamespace]: string = "ActiveModel";
 
   declare static UserProvidedDefault: typeof UserProvidedDefault;
+  declare static FromDatabase: typeof FromDatabase;
+  declare static FromUser: typeof FromUser;
+  declare static WithCastValue: typeof WithCastValue;
+  declare static Null: typeof Null;
+  declare static Uninitialized: typeof Uninitialized;
 
   readonly name: string | null;
   protected _valueBeforeTypeCast: unknown;
@@ -219,6 +226,27 @@ export abstract class Attribute {
     return this.type!.isChanged(this.originalValue, this.value, this.valueBeforeTypeCast);
   }
 
+  /** @missingRailsCall key? — PERMANENT */
+  initWith(coder: Coder): void {
+    const self = this as { -readonly [K in "name" | "type"]: Attribute[K] };
+    self.name = (coder["name"] ?? null) as string | null;
+    this._valueBeforeTypeCast = coder["value_before_type_cast"] ?? null;
+    self.type = (coder["type"] ?? null) as ValueType | null;
+    this.originalAttribute = (coder["original_attribute"] ?? null) as Attribute | null;
+    this._hasValue = Object.hasOwn(coder, "value");
+    if (this._hasValue) this._value = coder["value"];
+  }
+
+  encodeWith(coder: Coder): void {
+    coder["name"] = this.name;
+    if (this.valueBeforeTypeCast != null) {
+      coder["value_before_type_cast"] = this.valueBeforeTypeCast;
+    }
+    if (this.type) coder["type"] = this.type;
+    if (this.originalAttribute) coder["original_attribute"] = this.originalAttribute;
+    if (this._hasValue) coder["value"] = this.value;
+  }
+
   deepDup(): Attribute {
     return this.dup();
   }
@@ -363,3 +391,17 @@ export class Uninitialized extends Attribute {
     return undefined;
   }
 }
+
+Attribute.FromDatabase = FromDatabase;
+Attribute.FromUser = FromUser;
+Attribute.WithCastValue = WithCastValue;
+Attribute.Null = Null;
+Attribute.Uninitialized = Uninitialized;
+ActiveModel.Attribute = Attribute;
+
+registerConstant("ActiveModel::Attribute", Attribute);
+registerConstant("ActiveModel::Attribute::FromDatabase", FromDatabase);
+registerConstant("ActiveModel::Attribute::FromUser", FromUser);
+registerConstant("ActiveModel::Attribute::WithCastValue", WithCastValue);
+registerConstant("ActiveModel::Attribute::Null", Null);
+registerConstant("ActiveModel::Attribute::Uninitialized", Uninitialized);

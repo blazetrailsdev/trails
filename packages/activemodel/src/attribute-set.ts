@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { Attribute, Uninitialized } from "./attribute.js";
 import {
   FrozenError,
@@ -197,3 +198,5 @@ export class AttributeSet {
     }
   }
 }
+
+registerConstant("ActiveModel::AttributeSet", AttributeSet);

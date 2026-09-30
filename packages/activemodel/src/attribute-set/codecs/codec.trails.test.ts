@@ -28,10 +28,10 @@ afterEach(() => {
 
 describe.each(codecs)("%s with a type outside ActiveModel's registry", (_name, codec) => {
   const unregistered: AttributeSetCoder = {
-    conciseAttributes: [Attribute.fromUser("name", "Alice", new UnregisteredType())],
+    concise_attributes: [Attribute.fromUser("name", "Alice", new UnregisteredType())],
   };
   const nilTyped: AttributeSetCoder = {
-    conciseAttributes: [Attribute.fromUser("name", "Alice", null)],
+    concise_attributes: [Attribute.fromUser("name", "Alice", null)],
   };
 
   it("encodes distinguishably from an attribute with a nil type", () => {
@@ -41,19 +41,19 @@ describe.each(codecs)("%s with a type outside ActiveModel's registry", (_name, c
   it("decodes to the default value type, not a nil type", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const decoded = codec.decode(codec.encode(unregistered));
-    expect(decoded.conciseAttributes![0].type).toBeInstanceOf(ValueType);
-    expect(decoded.conciseAttributes![0].type!.type()).toBeUndefined();
-    expect(decoded.conciseAttributes![0].valueBeforeTypeCast).toBe("Alice");
+    expect(decoded["concise_attributes"]![0].type).toBeInstanceOf(ValueType);
+    expect(decoded["concise_attributes"]![0].type!.type()).toBeUndefined();
+    expect(decoded["concise_attributes"]![0].valueBeforeTypeCast).toBe("Alice");
   });
 
   it("still decodes a nil type as a nil type", () => {
     const decoded = codec.decode(codec.encode(nilTyped));
-    expect(decoded.conciseAttributes![0].type).toBeNull();
+    expect(decoded["concise_attributes"]![0].type).toBeNull();
   });
 
   it("keys each unregistered type distinctly, so the one-time warn stays per-type", () => {
     const other: AttributeSetCoder = {
-      conciseAttributes: [Attribute.fromUser("name", "Alice", new OtherUnregisteredType())],
+      concise_attributes: [Attribute.fromUser("name", "Alice", new OtherUnregisteredType())],
     };
     expect(codec.encode(unregistered)).not.toEqual(codec.encode(other));
   });

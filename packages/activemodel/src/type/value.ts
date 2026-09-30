@@ -1,27 +1,25 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { rbInspect as inspect, rbEqual } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "../attribute-assignment.js";
 
+export interface ValueType<T = unknown> {
+  readonly precision: number | null;
+  readonly scale: number | null;
+  readonly limit: number | null;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ValueType<T = unknown> {
-  #precision?: number;
-  #limit?: number;
-  protected readonly _scale?: number;
-
-  get precision(): number | undefined {
-    return this.#precision;
-  }
-
-  get scale(): number | undefined {
-    return this._scale;
-  }
-
-  get limit(): number | undefined {
-    return this.#limit;
-  }
-
-  constructor(options?: { precision?: number; scale?: number; limit?: number }) {
-    if (options?.precision !== undefined) this.#precision = options.precision;
-    if (options?.scale !== undefined) this._scale = options.scale;
-    if (options?.limit !== undefined) this.#limit = options.limit;
+  constructor(options?: {
+    precision?: number | null;
+    scale?: number | null;
+    limit?: number | null;
+  }) {
+    const self = this as { -readonly [K in "precision" | "scale" | "limit"]: number | null };
+    const proto = Object.getPrototypeOf(this) as object;
+    if (!("precision" in proto)) self.precision = options?.precision ?? null;
+    if (!("scale" in proto)) self.scale = options?.scale ?? null;
+    if (!("limit" in proto)) self.limit = options?.limit ?? null;
   }
 
   isSerializable(value: unknown, _block?: (castValue: unknown) => void): boolean {
@@ -140,3 +138,5 @@ export class ValueType<T = unknown> {
     return result;
   }
 }
+
+registerConstant("ActiveModel::Type::Value", ValueType);

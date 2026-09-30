@@ -1,5 +1,5 @@
 import { ValueType } from "@blazetrails/activemodel";
-import { Duration } from "@blazetrails/activesupport";
+import { Duration, registerConstant } from "@blazetrails/activesupport";
 
 export class Interval extends ValueType<Duration> {
   override type(): string {
@@ -40,3 +40,5 @@ export class Interval extends ValueType<Duration> {
     return `"${serialized.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Interval", Interval);

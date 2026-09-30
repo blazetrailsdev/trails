@@ -72,7 +72,7 @@ type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
  * Static members resolve separately, through the constructor chain
  * `klass -> delegator -> superclass` that `Object.setPrototypeOf` links.
  *
- * `@delegate_dc_obj` (`delegate.rb:405`) is a plain `_`-prefixed property rather
+ * `@delegate_dc_obj` (`delegate.rb:405`) is a plain `delegateDcObj` property rather
  * than a `#private` field: a `#` field is unreachable through the
  * `method_missing` Proxy, whose `get` rebinds the receiver
  * (see CLAUDE.md, "Method visibility is a side table").
@@ -87,7 +87,7 @@ export function DelegateClass<T extends MixinBase>(
   Object.setPrototypeOf(delegator, superclass);
   delegator.prototype = superclass.prototype;
   const klass = class extends delegator {
-    declare _delegateDcObj: unknown;
+    declare delegateDcObj: unknown;
 
     constructor(...args: ConstructorParameters<MixinBase>) {
       super();
@@ -96,13 +96,13 @@ export function DelegateClass<T extends MixinBase>(
     }
 
     __getobj__(): unknown {
-      if (!("_delegateDcObj" in this)) throw new ArgumentError("not delegated");
-      return this._delegateDcObj;
+      if (!("delegateDcObj" in this)) throw new ArgumentError("not delegated");
+      return this.delegateDcObj;
     }
 
     __setobj__(obj: unknown): void {
       if ((this as unknown) === obj) throw new ArgumentError("cannot delegate to self");
-      this._delegateDcObj = obj;
+      this.delegateDcObj = obj;
     }
   };
 

@@ -1,4 +1,4 @@
-import { ActiveSupportJSON } from "@blazetrails/activesupport";
+import { ActiveSupportJSON, registerConstant } from "@blazetrails/activesupport";
 
 export class JSON {
   static dump(obj: unknown): string {
@@ -11,3 +11,5 @@ export class JSON {
     return ActiveSupportJSON.decode(json);
   }
 }
+
+registerConstant("ActiveRecord::Coders::JSON", JSON);

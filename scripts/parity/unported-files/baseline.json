@@ -294,10 +294,6 @@
     "reason": "Ruby fork() + Marshal — process forking and binary serialization have no Node.js equivalent."
   },
   {
-    "testFile": "yaml_serialization_test.rb",
-    "reason": "Tests YAML round-trips of arbitrary Ruby objects (Psych encoding). No Node.js equivalent; JSON is the default column serialization format in Trails."
-  },
-  {
     "testFile": "cases/binary_test.rb",
     "className": "BinaryTest",
     "tests": ["load save"],

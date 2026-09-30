@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { ValueType } from "@blazetrails/activemodel";
 
 export class Data {
@@ -44,3 +45,5 @@ export class Bit extends ValueType<string> {
     return String(value);
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Bit", Bit);

@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { Attribute, FromUser } from "../attribute.js";
 import { ValueType } from "../type/value.js";
 
@@ -44,3 +45,4 @@ export class UserProvidedDefault extends FromUser {
 }
 
 Attribute.UserProvidedDefault = UserProvidedDefault;
+registerConstant("ActiveModel::Attribute::UserProvidedDefault", UserProvidedDefault);

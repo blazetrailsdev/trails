@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import {
   DateType,
@@ -30,3 +31,5 @@ export class Date extends DateType {
     return super.typeCastForSchema(value);
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Date", Date);

@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { kernelFloat, rbEqual } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 
@@ -39,3 +40,5 @@ export class LegacyPoint extends ValueType {
     return s.endsWith(".0") ? s.slice(0, -2) : s;
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::LegacyPoint", LegacyPoint);

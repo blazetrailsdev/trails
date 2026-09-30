@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { StringType } from "@blazetrails/activemodel";
 
 export class Macaddr extends StringType {
@@ -25,3 +26,5 @@ export class Macaddr extends StringType {
     return rawOldValue !== newValue;
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Macaddr", Macaddr);

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import * as YAML from "@blazetrails/activesupport/yaml";
 import { Base, ConfigurationError } from "./index.js";
 
 import { AdminUser } from "./test-helpers/models/admin/user.js";
@@ -344,13 +345,14 @@ describe("StoreTest", () => {
     expect(john.params.size).toBe(0);
   });
 
-  it.skip("dump, load and dump again a model", async () => {
-    // BLOCKED: store-yaml-dump-load-model-round-trip
-    const loaded = await AdminUser.find(john.id);
-    expect(loaded.id).toEqual(john.id);
+  it("dump, load and dump again a model", () => {
+    const dumped = YAML.dump(john);
+    const loaded = YAML.unsafeLoad(dumped);
+    expect(john.equals(loaded)).toBe(true);
 
-    const secondLoaded = await AdminUser.find(loaded.id);
-    expect(secondLoaded.id).toEqual(john.id);
+    const secondDump = YAML.dump(loaded);
+    const secondLoaded = YAML.unsafeLoad(secondDump);
+    expect(john.equals(secondLoaded)).toBe(true);
   });
 
   it("read store attributes through accessors with default suffix", () => {

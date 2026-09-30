@@ -1,5 +1,5 @@
 import type { Time } from "@blazetrails/date";
-import { actsLike, TimeWithZone, isBlank } from "@blazetrails/activesupport";
+import { actsLike, TimeWithZone, isBlank, registerConstant } from "@blazetrails/activesupport";
 import { DateTime } from "./date-time.js";
 
 export class TimestampWithTimeZone extends DateTime {
@@ -20,3 +20,8 @@ export class TimestampWithTimeZone extends DateTime {
     }
   }
 }
+
+registerConstant(
+  "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::TimestampWithTimeZone",
+  TimestampWithTimeZone,
+);

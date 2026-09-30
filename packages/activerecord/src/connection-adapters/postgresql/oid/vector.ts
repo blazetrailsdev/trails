@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { ValueType } from "@blazetrails/activemodel";
 
 export class Vector extends ValueType<unknown> {
@@ -14,3 +15,5 @@ export class Vector extends ValueType<unknown> {
     return value;
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Vector", Vector);

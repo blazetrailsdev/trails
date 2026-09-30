@@ -11,6 +11,7 @@ import {
   isBlank,
   include,
   type Included,
+  registerConstant,
 } from "@blazetrails/activesupport";
 import { Rational } from "@blazetrails/ruby-compat";
 import {
@@ -69,7 +70,7 @@ export class TimeType extends ValueType<TimeWithZone | RubyTime> {
         seconds = new Rational(value.epochNanoseconds, 1_000_000_000n);
       } else if (value instanceof Temporal.PlainDateTime) {
         seconds = new Rational(
-          value.toZonedDateTime(this.#zoneId()).epochNanoseconds,
+          value.toZonedDateTime(this.zoneId()).epochNanoseconds,
           1_000_000_000n,
         );
       }
@@ -107,7 +108,7 @@ export class TimeType extends ValueType<TimeWithZone | RubyTime> {
   }
 
   /** @internal */
-  #zoneId(): string {
+  private zoneId(): string {
     return this.isUtc ? "UTC" : Temporal.Now.timeZoneId();
   }
 }
@@ -120,3 +121,5 @@ const acceptsMultiparameterTime = new AcceptsMultiparameterTime({
 include(TimeType, acceptsMultiparameterTime);
 
 include(TimeType, TimeValue);
+
+registerConstant("ActiveModel::Type::Time", TimeType);

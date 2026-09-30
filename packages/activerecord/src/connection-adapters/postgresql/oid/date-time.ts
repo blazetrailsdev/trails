@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
 import { format } from "@blazetrails/ruby-compat";
 import { DateTime as ArDateTime } from "../../../type/date-time.js";
@@ -35,3 +36,5 @@ export class DateTime extends ArDateTime {
     return pgDatetimeConfig.datetimeType === realType ? "datetime" : realType;
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::DateTime", DateTime);

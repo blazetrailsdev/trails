@@ -1,4 +1,4 @@
-import { BigDecimal } from "@blazetrails/activesupport";
+import { BigDecimal, registerConstant } from "@blazetrails/activesupport";
 import { DecimalType } from "@blazetrails/activemodel";
 
 export class Money extends DecimalType {
@@ -25,3 +25,5 @@ export class Money extends DecimalType {
     return super.castValue(str);
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Money", Money);

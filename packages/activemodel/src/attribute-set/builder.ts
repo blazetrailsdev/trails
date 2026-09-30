@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { Attribute, Uninitialized } from "../attribute.js";
 import type { Block } from "@blazetrails/ruby-compat";
 import {
@@ -137,7 +138,7 @@ export class LazyAttributeSet extends AttributeSet {
 }
 
 export class LazyAttributeHash {
-  private delegate: Record<string, Attribute>;
+  private _delegateHash: Record<string, Attribute>;
   private types: Record<string, ValueType>;
   private values: Record<string, unknown>;
   private additionalTypes: Record<string, ValueType>;
@@ -175,19 +176,19 @@ export class LazyAttributeHash {
     this.additionalTypes = additionalTypes;
     this.materialized = false;
     this.defaultAttributes = defaultAttributes;
-    this.delegate = Object.setPrototypeOf(delegateHash, null) as Record<string, Attribute>;
+    this._delegateHash = Object.setPrototypeOf(delegateHash, null) as Record<string, Attribute>;
   }
 
   isKey(key: string): boolean {
-    return hasKey(this.delegate, key) || hasKey(this.values, key) || hasKey(this.types, key);
+    return hasKey(this._delegateHash, key) || hasKey(this.values, key) || hasKey(this.types, key);
   }
 
   getAttribute(key: string): Attribute {
-    return this.delegate[key] ?? this.assignDefaultValue(key);
+    return this._delegateHash[key] ?? this.assignDefaultValue(key);
   }
 
   set(key: string, value: Attribute): void {
-    this.delegate[key] = value;
+    this._delegateHash[key] = value;
   }
 
   deepDup(): LazyAttributeHash {
@@ -196,7 +197,7 @@ export class LazyAttributeHash {
       this.values,
       this.additionalTypes,
       this.defaultAttributes,
-      transformValues(this.delegate, (attr) => attr.dup()),
+      transformValues(this._delegateHash, (attr) => attr.dup()),
     );
     copy.materialized = this.materialized;
     return copy;
@@ -218,7 +219,13 @@ export class LazyAttributeHash {
     Record<string, Attribute>,
     Record<string, Attribute>,
   ] {
-    return [this.types, this.values, this.additionalTypes, this.defaultAttributes, this.delegate];
+    return [
+      this.types,
+      this.values,
+      this.additionalTypes,
+      this.defaultAttributes,
+      this._delegateHash,
+    ];
   }
 
   static marshalLoad(
@@ -242,12 +249,12 @@ export class LazyAttributeHash {
         this.materialized = true;
       }
     }
-    return this.delegate;
+    return this._delegateHash;
   }
 
   /** @internal */
   delegateHash(): Record<string, Attribute> {
-    return this.delegate;
+    return this._delegateHash;
   }
 
   /** @internal */
@@ -263,14 +270,18 @@ export class LazyAttributeHash {
 
     if (valuePresent) {
       const attr = Attribute.fromDatabase(name, value, type);
-      this.delegate[name] = attr;
+      this._delegateHash[name] = attr;
       return attr;
     } else if (hasKey(this.types, name)) {
       const attr = this.defaultAttributes[name];
       const built = attr ? attr.dup() : Attribute.uninitialized(name, type);
-      this.delegate[name] = built;
+      this._delegateHash[name] = built;
       return built;
     }
     return Attribute.null(name);
   }
 }
+
+registerConstant("ActiveModel::AttributeSet::Builder", Builder);
+registerConstant("ActiveModel::LazyAttributeSet", LazyAttributeSet);
+registerConstant("ActiveModel::LazyAttributeHash", LazyAttributeHash);

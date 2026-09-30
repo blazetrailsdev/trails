@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/activesupport";
 import { rbEqual } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 
@@ -67,3 +68,6 @@ export class Data {
     return true;
   }
 }
+
+registerConstant("ActiveModel::Type::Binary", BinaryType);
+registerConstant("ActiveModel::Type::Binary::Data", Data);

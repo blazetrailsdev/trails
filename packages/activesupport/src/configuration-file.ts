@@ -26,7 +26,10 @@ export class ConfigurationFile {
     return new ConfigurationFile(contentPath).parse(options);
   }
 
-  /** @missingRailsCall load — PERMANENT */
+  /**
+   * @missingRailsCall load — PERMANENT
+   * @missingRailsCall unsafe_load — CONVERGEABLE configuration-file-parse-through-psych-unsafe-load
+   */
   parse({
     context,
     ...options

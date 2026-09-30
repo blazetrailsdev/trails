@@ -1,4 +1,4 @@
-import { BigDecimal, toD } from "@blazetrails/activesupport";
+import { BigDecimal, toD, registerConstant } from "@blazetrails/activesupport";
 import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { Rational } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
@@ -49,7 +49,7 @@ export class DecimalType extends NumericValueType {
 
   /** @internal */
   protected convertFloatToBigDecimal(value: number): BigDecimal {
-    if (this.precision !== undefined) {
+    if (this.precision != null) {
       return new BigDecimal(this.applyScale(value), this.floatPrecision());
     }
     return new BigDecimal(String(value));
@@ -66,7 +66,7 @@ export class DecimalType extends NumericValueType {
   protected applyScale(value: number): number;
   protected applyScale(value: BigDecimal | null): BigDecimal | null;
   protected applyScale(value: BigDecimal | number | null): BigDecimal | number | null {
-    if (this.scale === undefined) return value;
+    if (this.scale == null) return value;
     if (value instanceof BigDecimal) return value.round(this.scale);
     if (typeof value === "number") {
       return Number(new BigDecimal(String(value)).round(this.scale).toString("F"));
@@ -74,3 +74,5 @@ export class DecimalType extends NumericValueType {
     return value;
   }
 }
+
+registerConstant("ActiveModel::Type::Decimal", DecimalType);

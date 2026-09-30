@@ -9,6 +9,8 @@ import {
   rbModSingletonP,
   rbModToS,
   rbObjHash,
+  basicObjRespondTo,
+  rbObjSingletonClass,
 } from "@blazetrails/ruby-compat";
 import { getApplicationRecordClass } from "./inheritance.js";
 import {
@@ -42,6 +44,8 @@ import { cachedTableExists, columnsHash, isSchemaLoaded } from "./model-schema.j
 import { StatementCache } from "./statement-cache.js";
 import { withConnection } from "./connection-handling.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
+import type { AttributeSet, YAMLEncoder } from "@blazetrails/activemodel";
+import { LegacyYamlAdapter } from "./legacy-yaml-adapter.js";
 import { classAttribute, included, runCallbacks } from "@blazetrails/activesupport";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 
@@ -288,13 +292,43 @@ export function strictLoadingBang<T extends StrictLoadingFields>(
   return value;
 }
 
-export function initWithAttributes(
-  this: CoreRecord & { _attributes: any; _newRecord: boolean },
+type YamlHost = { yamlEncoder(): YAMLEncoder };
+
+export function initWith(
+  this: CoreRecord & {
+    initWithAttributes(attributes: unknown, newRecord: boolean, block?: unknown): unknown;
+  },
+  coder: Record<string, unknown>,
+  block?: (record: CoreRecord) => void,
+): void {
+  coder = LegacyYamlAdapter.convert(coder);
+  const attributes = (this.constructor as unknown as YamlHost).yamlEncoder().decode(coder);
+  this.initWithAttributes(attributes, coder["new_record"] as boolean, block);
+}
+
+export function initWithAttributes<T extends CoreRecord>(
+  this: T & { _attributes: any; _newRecord: boolean; initInternals(): void },
   attributes: any,
   newRecord = false,
-): void {
+  block?: (record: T) => void,
+): T {
+  this.initInternals();
   this._newRecord = newRecord;
   this._attributes = attributes;
+  for (const name of attributes.keys() as Iterable<string>) {
+    if (!basicObjRespondTo(this, name, false)) {
+      (
+        rbObjSingletonClass(this) as unknown as { defineAttributeMethod(name: string): void }
+      ).defineAttributeMethod(name);
+    }
+  }
+
+  block?.(this);
+
+  void runCallbacks(this, "find", undefined, { strict: "sync" });
+  void runCallbacks(this, "initialize", undefined, { strict: "sync" });
+
+  return this;
 }
 
 export function initAttributes(
@@ -312,6 +346,16 @@ export function initAttributes(
 }
 
 type StrictLoadingModeHost = CoreRecord & { _strictLoadingMode?: StrictLoadingMode };
+
+/** @missingRailsName attributes — PERMANENT */
+export function encodeWith(
+  this: CoreRecord & { _attributes: AttributeSet; isNewRecord(): boolean },
+  coder: Record<string, unknown>,
+): void {
+  (this.constructor as unknown as YamlHost).yamlEncoder().encode(this._attributes, coder);
+  coder["new_record"] = this.isNewRecord();
+  coder["active_record_yaml_version"] = 2;
+}
 
 export function strictLoadingMode(this: StrictLoadingModeHost): StrictLoadingMode {
   return this._strictLoadingMode ?? "all";

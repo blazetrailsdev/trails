@@ -1,5 +1,5 @@
 import { MutableModule, ValueType, BinaryData, type Mutable } from "@blazetrails/activemodel";
-import { include } from "@blazetrails/activesupport";
+import { include, registerConstant } from "@blazetrails/activesupport";
 import { DelegateClass, rbEqual } from "@blazetrails/ruby-compat";
 import { IndifferentHashAccessor } from "../store.js";
 import type { ColumnSerializer } from "../coders/column-serializer.js";
@@ -84,3 +84,5 @@ export class Serialized extends DelegateClass(ValueType) {
 export interface Serialized extends Mutable {}
 
 include(Serialized, MutableModule);
+
+registerConstant("ActiveRecord::Type::Serialized", Serialized);
