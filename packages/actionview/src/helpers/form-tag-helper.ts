@@ -4,7 +4,9 @@ import {
   deepStringifyKeys,
   extractOptionsBang,
   htmlSafe,
+  humanize,
   isBlank,
+  isPlainObject,
   presence,
   stringifyKeys,
 } from "@blazetrails/activesupport";
@@ -12,13 +14,14 @@ import { type Hash, fetch, hashDelete, rbObjRespondTo, update } from "@blazetrai
 
 import { ActionView } from "../namespaces.js";
 import { preventContentExfiltration } from "./content-exfiltration-prevention-helper.js";
-import { tag, type TagHelperHost } from "./tag-helper.js";
+import { contentTag, tag, type TagHelperHost } from "./tag-helper.js";
 import { methodTag, tokenTag, type UrlHelperHost } from "./url-helper.js";
 
 export interface FormTagHelperHost extends UrlHelperHost, TagHelperHost {
   urlFor(options: unknown): string;
   fieldId: typeof fieldId;
   fieldName: typeof fieldName;
+  contentTag: typeof contentTag;
   submitTag(value?: unknown, options?: Record<string, unknown> | Hash<string, unknown>): SafeBuffer;
 }
 
@@ -80,6 +83,31 @@ export function fieldName(
   } else {
     return `${objectName}[${methodName}]${names}${multiple != null && multiple !== false ? "[]" : ""}`;
   }
+}
+
+export function labelTag(
+  this: FormTagHelperHost,
+  name: unknown = null,
+  contentOrOptions: unknown = null,
+  options: Record<string, unknown> | null = null,
+  block?: () => unknown,
+): SafeBuffer {
+  if (block !== undefined && isPlainObject(contentOrOptions)) {
+    options = contentOrOptions = stringifyKeys(contentOrOptions as Record<string, unknown>);
+  } else {
+    options ??= {};
+    options = stringifyKeys(options);
+  }
+  if (!(isBlank(name) || Object.hasOwn(options, "for"))) options["for"] = sanitizeToId(name);
+  return this.contentTag(
+    "label",
+    contentOrOptions != null && contentOrOptions !== false
+      ? contentOrOptions
+      : humanize(String(name ?? "")),
+    options,
+    undefined,
+    block,
+  );
 }
 
 export function utf8EnforcerTag(): SafeBuffer {
@@ -188,6 +216,13 @@ export function formTagWithBody(
     output.concat(content instanceof SafeBuffer ? content : String(content));
   }
   return output.safeConcat("</form>");
+}
+
+/** @internal */
+export function sanitizeToId(name: unknown): string {
+  return String(name ?? "")
+    .replaceAll("]", "")
+    .replace(/[^-a-zA-Z0-9:.]/g, "_");
 }
 
 /** @internal */

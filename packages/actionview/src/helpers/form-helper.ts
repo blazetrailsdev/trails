@@ -36,6 +36,7 @@ import {
   htmlOptionsForForm,
   type FormTagHelperHost,
 } from "./form-tag-helper.js";
+import { Label, type LabelBuilder } from "./tags/label.js";
 import { PasswordField } from "./tags/password-field.js";
 import { HiddenField } from "./tags/hidden-field.js";
 import { TextArea } from "./tags/text-area.js";
@@ -58,6 +59,7 @@ const __LINE__ = 0;
 
 export interface FormHelperHost extends FormTagHelperHost, CaptureHelperHost {
   hiddenField: typeof hiddenField;
+  label: typeof label;
   defaultFormBuilder: unknown;
   polymorphicPath?(record: unknown, options: Record<string, unknown>): string;
 }
@@ -131,6 +133,17 @@ export function formWith(
     const htmlOptions = htmlOptionsForFormWith.call(this, url, model, options);
     return formTagHtml.call(this, htmlOptions);
   }
+}
+
+export function label(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  contentOrOptions: unknown = null,
+  options: Record<string, unknown> | null = null,
+  block?: (builder: LabelBuilder) => unknown,
+): unknown {
+  return new Label(objectName, method, this, contentOrOptions, options).render(block);
 }
 
 export function textField(
@@ -581,6 +594,21 @@ export class FormBuilder {
       }
     });
     this.prototype.textArea = this.prototype.textarea;
+  }
+
+  label(
+    method: unknown,
+    text: unknown = null,
+    options: Record<string, unknown> = {},
+    block?: (builder: LabelBuilder) => unknown,
+  ): unknown {
+    return this._template.label(
+      this.objectName,
+      method,
+      text,
+      this.objectifyOptions(options),
+      block,
+    );
   }
 
   hiddenField(method: unknown, options: Record<string, unknown> = {}): unknown {
