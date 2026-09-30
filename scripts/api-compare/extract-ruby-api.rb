@@ -4423,4 +4423,3 @@ def normalize_class_info(info)
 end
 
 run if __FILE__ == $PROGRAM_NAME
-# cache-miss probe (reverted)
