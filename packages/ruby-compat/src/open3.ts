@@ -24,7 +24,7 @@ export const Open3 = {
    * reaches.
    *
    * `popen2e` hands the child one pipe as both `:out` and `:err`
-   * (`open3.rb:516-517`). Node's `spawn` has no way to create a pipe before the
+   * (`open3.rb:519-520`). Node's `spawn` has no way to create a pipe before the
    * child exists, so the two streams arrive on separate pipes and are joined
    * in arrival order; output the child interleaves across them within one
    * read may land in a different order than Ruby's.
