@@ -21,6 +21,8 @@
       "@blazetrails/date": ["../../date/src/index.ts"],
       "@blazetrails/did-you-mean": ["../../did-you-mean/src/index.ts"],
       "@blazetrails/tse-compiler": ["../../tse-compiler/src/index.ts"],
+      "@blazetrails/html-sanitizer": ["../../html-sanitizer/src/index.ts"],
+      "@blazetrails/nokogiri": ["../../nokogiri/src/index.ts"],
       "@blazetrails/actionview/tse-modules": ["../types/tse-modules.d.ts"]
     }
   },
