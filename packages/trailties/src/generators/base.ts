@@ -361,6 +361,11 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     config: GeneratorOptions & { invocations?: Invocations },
     block?: (instance: GeneratorBase) => void,
   ): Promise<string[]> {
+    if (["-h", "-?", "--help", "-D"].includes(givenArgs[0] as string)) {
+      (this as unknown as typeof GeneratorBase).classOptionsHelp(config.output);
+      return [];
+    }
+
     const argumentsList: unknown[] = [];
     for (const item of givenArgs) {
       if (typeof item === "string" && /^-/.test(item)) break;
@@ -431,13 +436,20 @@ export abstract class GeneratorBase implements GeneratorActionsState {
         `No value provided for required options '${nonAssignedRequired.join("', '")}'`,
       );
 
-    const attributes = Array.isArray(toParse[1]) ? toParse[1] : toParse.slice(1);
+    const attributes = Array.isArray(toParse[1]) ? toParse[1] : [];
+    if (!Array.isArray(toParse[1])) {
+      for (const value of toParse.slice(1)) {
+        if (typeof value === "string" && /^-{1,2}\S+/.test(value)) break;
+        attributes.push(value);
+      }
+    }
     const instance = new this({
       ...rest,
       ...options,
       name: (toParse[0] as string | undefined) ?? "",
       attributes: attributes as string[],
     });
+    if (args.length > 0) args[0] = (instance.options as { name?: unknown }).name ?? args[0];
     instance._initializer = [args, opts, config];
     instance._invocations = invocations ?? new Map();
     block?.(instance);
@@ -571,7 +583,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
       givenOpts ?? null,
       givenConfig ?? null,
     );
-    return GeneratorBase.dispatch.call(
+    const files = await GeneratorBase.dispatch.call(
       klass as unknown as GeneratorConstructor,
       command,
       parsedArgs,
@@ -581,6 +593,8 @@ export abstract class GeneratorBase implements GeneratorActionsState {
         instance.parentOptions = this.options as unknown as Record<string, unknown>;
       },
     );
+    this.createdFiles.push(...files);
+    return files;
   }
 
   /**

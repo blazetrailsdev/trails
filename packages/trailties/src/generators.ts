@@ -232,6 +232,27 @@ export class Generators {
     Generators.hiddenNamespaces().push(...namespaces);
   }
 
+  /** @missingRailsArgs print_generators — PERMANENT */
+  static async help(
+    command: string = "generate",
+    output: (msg: string) => void = console.log,
+  ): Promise<void> {
+    output("Usage:");
+    output(`  bin/trails ${command} GENERATOR [args] [options]`);
+    output("");
+    output("General options:");
+    output("  -h, [--help]     # Print generator's options and usage");
+    output("  -p, [--pretend]  # Run but do not make any changes");
+    output("  -f, [--force]    # Overwrite files that already exist");
+    output("  -s, [--skip]     # Skip files that already exist");
+    output("  -q, [--quiet]    # Suppress status output");
+    output("");
+    output("Please choose a generator below.");
+    output("");
+
+    await Generators.printGenerators(output);
+  }
+
   static async sortedGroups(): Promise<Array<[string, string[]]>> {
     const namespaces = (await Generators.publicNamespaces()).sort();
 
@@ -254,23 +275,6 @@ export class Generators {
     for (const n of Generators.hiddenNamespaces()) groups.delete(n);
 
     return [["rails", rails], ...[...groups.entries()].sort(([a], [b]) => (a < b ? -1 : 1))];
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  static namespacesForHelp(): Array<{
-    name: string;
-    namespace: string;
-    hidden: boolean;
-    klass: GeneratorClass;
-  }> {
-    return Generators.subclasses().map((k) => {
-      const name = k.namespace.startsWith("rails:")
-        ? k.namespace.slice("rails:".length)
-        : k.namespace;
-      const hidden =
-        HIDDEN_FROM_LISTING.includes(name) || Generators.hiddenNamespaces().includes(name);
-      return { name, namespace: k.namespace, hidden, klass: k };
-    });
   }
 
   /** @missingRailsArgs print_list — PERMANENT */

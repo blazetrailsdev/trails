@@ -151,6 +151,13 @@ export class Trailtie extends BaseTrailtie {
       queues: {},
     } satisfies ActiveRecordConfig);
 
+    this.config.appGenerators((g) =>
+      (g as unknown as Record<string, (namespace: string, configuration: object) => void>).orm(
+        "active_record",
+        { migration: true, timestamps: true },
+      ),
+    );
+
     Object.assign(this.config.actionDispatch.rescueResponses, {
       "ActiveRecord::RecordNotFound": ":not_found",
       "ActiveRecord::StaleObjectError": ":conflict",

@@ -1,15 +1,20 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { GeneratorError } from "./generated-attribute.js";
-import { ModelGenerator } from "./model-generator.js";
 import { Application } from "../application.js";
 import { Trails } from "../rails.js";
 import "../trailties/active-record.js";
 import "../test-unit/trailtie.js";
 
 class ModelGeneratorApp extends Application {}
+let ModelGenerator: typeof import("./rails/model/model-generator.js").ModelGenerator;
+
+beforeAll(async () => {
+  await ModelGeneratorApp.instance().loadGenerators();
+  ({ ModelGenerator } = await import("./rails/model/model-generator.js"));
+});
 
 beforeEach(async () => {
   Trails.application = ModelGeneratorApp.instance();
@@ -32,7 +37,10 @@ afterEach(() => {
 });
 
 function makeGen() {
-  return new ModelGenerator({ cwd: tmpDir, output: () => {} });
+  return {
+    run: (name: string, args: string[]) =>
+      ModelGenerator.start([name, ...args], { cwd: tmpDir, output: () => {} }),
+  };
 }
 
 describe("ModelGeneratorTest", () => {

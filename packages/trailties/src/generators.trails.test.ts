@@ -59,18 +59,17 @@ describe("GeneratorsTest", () => {
   });
 
   it("every generator directory is reachable as a trails generate subcommand", async () => {
-    const generate = createProgram().commands.find((c) => c.name() === "generate")!;
-    const subNames = generate.commands.map((c) => c.name());
     for (const dir of await generatorDirectories()) {
-      expect(subNames).toContain(dir);
+      expect((await Generators.findByNamespace(`rails:${dir}`))?.namespace).toEqual(`rails:${dir}`);
     }
   });
 
   it("a namespace Rails hides is registered but not advertised", async () => {
-    const generate = createProgram().commands.find((c) => c.name() === "generate")!;
-    const help = generate.helpInformation();
+    const lines: string[] = [];
+    await Generators.help("generate", (line) => lines.push(line));
+    const help = lines.join("\n");
     for (const name of ["devcontainer", "resource_route", "master_key"]) {
-      expect(generate.commands.map((c) => c.name())).toContain(name);
+      expect(await Generators.findByNamespace(name)).not.toBeNull();
       expect(help).not.toMatch(new RegExp(`^\\s+${name}\\b`, "m"));
     }
     expect(help).toMatch(/^\s+helper\b/m);
@@ -102,12 +101,13 @@ describe("GeneratorsTest", () => {
     expect(seen).toEqual([true, false]);
   });
 
-  it("a lookup-registered subcommand advertises its generator's class options", () => {
-    const generate = createProgram().commands.find((c) => c.name() === "generate")!;
-    const sub = generate.commands.find((c) => c.name() === "generator")!;
-    let help = "";
-    sub.configureOutput({ writeOut: (str) => (help += str) });
-    sub.outputHelp();
+  it("a lookup-registered subcommand advertises its generator's class options", async () => {
+    const lines: string[] = [];
+    await Generators.invoke("generator", ["--help"], {
+      cwd: "/tmp",
+      output: (line) => lines.push(line),
+    });
+    const help = lines.join("\n");
     expect(help).toMatch(
       /\[--namespace\], \[--no-namespace\], \[--skip-namespace\]\s+# Namespace generator/,
     );

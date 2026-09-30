@@ -4,7 +4,6 @@ import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { Dir, argv } from "@blazetrails/ruby-compat";
 import { setAppPath } from "./app-path.js";
 import { invoke } from "./command.js";
-import { Generators } from "./generators.js";
 
 const root = Dir.pwd();
 const fs = getFs();
@@ -18,8 +17,6 @@ for (const candidate of [
     break;
   }
 }
-
-await Generators.lookupBang();
 
 const [, , command = "", ...args] = argv;
 await invoke(command, args);

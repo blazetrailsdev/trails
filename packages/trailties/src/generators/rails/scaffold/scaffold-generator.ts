@@ -1,24 +1,6 @@
 import { ResourceGenerator } from "../resource/resource-generator.js";
-import { ModelGenerator } from "../../model-generator.js";
-import type { NamedBaseOptions } from "../../named-base.js";
 
-export class ScaffoldGenerator extends ResourceGenerator {
-  /** @noRailsEquivalent CONVERGEABLE rails-model-generator-hooks-orm-active-record-model */
-  override async run(): Promise<string[]> {
-    const modelGen = new ModelGenerator({
-      cwd: this.cwd,
-      output: this.output,
-      behavior: this.behavior,
-      pretend: this.options.pretend,
-      force: this.options.force,
-      skip: this.options.skip,
-    });
-    this.createdFiles.push(
-      ...(await modelGen.run(this.name, (this.options as NamedBaseOptions).attributes ?? [])),
-    );
-    return this.getCreatedFiles();
-  }
-}
+export class ScaffoldGenerator extends ResourceGenerator {}
 
 Object.defineProperty(ScaffoldGenerator, "name", { value: "Rails::Generators::ScaffoldGenerator" });
 ScaffoldGenerator.removeHookFor("resourceController");

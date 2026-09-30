@@ -1,6 +1,5 @@
 import { Dir } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
-import { ModelGenerator } from "../generators/model-generator.js";
 import { MigrationGenerator } from "../generators/migration-generator.js";
 import { Generators } from "../generators.js";
 import { bootApplicationBang, loadGenerators } from "../command/actions.js";
@@ -10,33 +9,6 @@ export function generateCommand(): Command {
   const cmd = new Command("generate");
   cmd.alias("g");
   cmd.description("Generate models, controllers, migrations, and scaffolds");
-
-  cmd
-    .command("model")
-    .description("Generate a model with attributes")
-    .argument("<name>", "Model name (e.g. User)")
-    .argument("[attributes...]", "Attributes as name:type pairs")
-    .option("--no-migration", "Skip migration generation")
-    .option("--no-test", "Skip test file generation")
-    .option("--no-timestamps", "Skip timestamps in migration")
-    .action(
-      async (
-        name: string,
-        attributes: string[],
-        opts: { migration: boolean; test: boolean; timestamps: boolean },
-      ) => {
-        if (APP_PATH != null) {
-          await bootApplicationBang();
-          await loadGenerators();
-        }
-        const gen = new ModelGenerator({ cwd: Dir.pwd(), output: console.log });
-        await gen.run(name, attributes, {
-          migration: opts.migration,
-          test: opts.test,
-          timestamps: opts.timestamps,
-        });
-      },
-    );
 
   cmd
     .command("migration")
@@ -52,32 +24,24 @@ export function generateCommand(): Command {
       await gen.run(name, columns);
     });
 
-  const registered = new Set(cmd.commands.map((c) => c.name()));
-  for (const { name, namespace, hidden, klass } of Generators.namespacesForHelp()) {
-    if (registered.has(name)) continue;
-    cmd
-      .command(name, { hidden })
-      .description(`Run the ${name} generator`)
-      .argument("[args...]", "Generator arguments")
-      .allowUnknownOption()
-      .addHelpText("after", () => {
-        const lines = [""];
-        klass.classOptionsHelp((line) => lines.push(line));
-        return lines.join("\n");
-      })
-      .action(async (args: string[]) => {
-        if (APP_PATH != null) {
-          await bootApplicationBang();
-          await loadGenerators();
-        }
+  cmd
+    .argument("[generator]", "Generator name")
+    .argument("[args...]", "Generator arguments")
+    .allowUnknownOption()
+    .passThroughOptions()
+    .action(async (generator: string | undefined, args: string[]) => {
+      if (APP_PATH != null) {
+        await bootApplicationBang();
+        await loadGenerators();
+      }
+      if (!generator) return Generators.help("generate", console.log);
 
-        await Generators.invoke(namespace, args, {
-          cwd: Dir.pwd(),
-          output: console.log,
-          behavior: "invoke",
-        });
+      await Generators.invoke(generator, args, {
+        cwd: Dir.pwd(),
+        output: console.log,
+        behavior: "invoke",
       });
-  }
+    });
 
   return cmd;
 }

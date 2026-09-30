@@ -1,12 +1,22 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { fileURLToPath } from "node:url";
 import { run } from "@blazetrails/activerecord-cli";
-import { ScaffoldGenerator } from "./scaffold-generator.js";
 import { AppGenerator } from "../../app-generator.js";
 import { parseTs } from "../../../template-builder/testing.js";
+import { Application } from "../../../application.js";
+import "../../../trailties/active-record.js";
+import "../../../test-unit/trailtie.js";
+
+class ScaffoldGeneratorApp extends Application {}
+let ScaffoldGenerator: typeof import("./scaffold-generator.js").ScaffoldGenerator;
+
+beforeAll(async () => {
+  await ScaffoldGeneratorApp.instance().loadGenerators();
+  ({ ScaffoldGenerator } = await import("./scaffold-generator.js"));
+});
 
 let tmpDir: string;
 beforeEach(() => {
@@ -97,12 +107,10 @@ describe("ScaffoldGenerator (type-check)", () => {
         path.join(packagesDir, "activerecord-cli", "node_modules", "@types", "node"),
         path.join(appDir, "node_modules", "@types", "node"),
       );
-      await new ScaffoldGenerator({
+      await ScaffoldGenerator.start(["Post", "title:string", "body:text"], {
         cwd: appDir,
         output: () => {},
-        name: "Post",
-        attributes: ["title:string", "body:text"],
-      }).run();
+      });
 
       const code = await run(
         [

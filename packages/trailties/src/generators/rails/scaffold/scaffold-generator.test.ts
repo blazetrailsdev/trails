@@ -1,15 +1,21 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { assertNoMatch } from "@blazetrails/activesupport";
 import * as Assertions from "../../testing/assertions.js";
-import { ScaffoldGenerator } from "./scaffold-generator.js";
 import { Application } from "../../../application.js";
 import { Trails } from "../../../rails.js";
 import "../../../trailties/active-record.js";
+import "../../../test-unit/trailtie.js";
 
 class ScaffoldGeneratorApp extends Application {}
+let ScaffoldGenerator: typeof import("./scaffold-generator.js").ScaffoldGenerator;
+
+beforeAll(async () => {
+  await ScaffoldGeneratorApp.instance().loadGenerators();
+  ({ ScaffoldGenerator } = await import("./scaffold-generator.js"));
+});
 
 beforeEach(() => {
   Trails.application = ScaffoldGeneratorApp.instance();

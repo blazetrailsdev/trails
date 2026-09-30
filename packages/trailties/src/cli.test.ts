@@ -65,10 +65,7 @@ describe("CLI", () => {
     const program = createProgram();
     const gen = program.commands.find((c) => c.name() === "generate");
     const subNames = gen?.commands.map((c) => c.name());
-    expect(subNames).toContain("model");
     expect(subNames).toContain("migration");
-    expect(subNames).toContain("controller");
-    expect(subNames).toContain("scaffold");
   });
 
   it("db command has subcommands", () => {
