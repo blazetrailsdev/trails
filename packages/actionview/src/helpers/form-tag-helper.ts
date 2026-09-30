@@ -13,6 +13,7 @@ import {
 import { type Hash, fetch, hashDelete, rbObjRespondTo, update } from "@blazetrails/ruby-compat";
 
 import { ActionView } from "../namespaces.js";
+import type { capture } from "./capture-helper.js";
 import { preventContentExfiltration } from "./content-exfiltration-prevention-helper.js";
 import { contentTag, tag, type TagHelperHost } from "./tag-helper.js";
 import { methodTag, tokenTag, type UrlHelperHost } from "./url-helper.js";
@@ -22,6 +23,7 @@ export interface FormTagHelperHost extends UrlHelperHost, TagHelperHost {
   fieldId: typeof fieldId;
   fieldName: typeof fieldName;
   contentTag: typeof contentTag;
+  capture: typeof capture;
   submitTag(value?: unknown, options?: Record<string, unknown> | Hash<string, unknown>): SafeBuffer;
 }
 
@@ -86,12 +88,20 @@ export function fieldName(
 }
 
 export function labelTag(
-  this: FormTagHelperHost,
+  this: {
+    contentTag(
+      name: string,
+      contentOrOptionsWithBlock?: unknown,
+      options?: Record<string, unknown> | null,
+      escape?: boolean,
+      block?: () => unknown,
+    ): unknown;
+  },
   name: unknown = null,
   contentOrOptions: unknown = null,
   options: Record<string, unknown> | null = null,
   block?: () => unknown,
-): SafeBuffer {
+): unknown {
   if (block !== undefined && isPlainObject(contentOrOptions)) {
     options = contentOrOptions = stringifyKeys(contentOrOptions as Record<string, unknown>);
   } else {

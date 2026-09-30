@@ -7,7 +7,6 @@ import {
 } from "@blazetrails/activesupport";
 import { dup, hashDelete, mergeBang } from "@blazetrails/ruby-compat";
 
-import { capture, type CaptureHelperHost } from "../capture-helper.js";
 import { labelTag } from "../form-tag-helper.js";
 import { Base } from "./base.js";
 import { Translator } from "./translator.js";
@@ -105,18 +104,14 @@ export class Label extends Base {
 
     let content: unknown;
     if (block !== undefined) {
-      content = capture.call(
-        this._templateObject as CaptureHelperHost,
-        block as (...args: unknown[]) => unknown,
-        builder,
-      );
+      content = this._templateObject.capture(block, builder);
     } else if (isPresent(this._content)) {
       content = this._content instanceof SafeBuffer ? this._content : String(this._content);
     } else {
       content = this.renderComponent(builder);
     }
 
-    return labelTag.call(this as never, nameAndId["id"], content, options);
+    return labelTag.call(this, nameAndId["id"], content, options);
   }
 
   private renderComponent(builder: LabelBuilder): unknown {
