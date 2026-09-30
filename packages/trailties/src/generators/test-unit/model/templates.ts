@@ -1,18 +1,15 @@
-import { dasherize } from "../../base.js";
 import type { ModelGenerator } from "./model-generator.js";
 
 type Template = (this: ModelGenerator) => string;
 
 const unitTest: Template = function () {
   const className = this.className().split("::").join("");
-  const root = "../".repeat(this.classPathParts.length + 2);
-  return `import { describe, it, expect } from "vitest";
-import { ${className} } from "${root}app/models/${dasherize(this.filePath())}.js";
+  const root = "../".repeat(this.classPathParts.length + 1);
+  return `import { describe, it } from "vitest";
+import "${root}test-helper.js";
 
-describe("${className}", () => {
-  it("exists", () => {
-    expect(${className}).toBeDefined();
-  });
+describe("${className}Test", () => {
+  it.todo("the truth");
 });
 `;
 };

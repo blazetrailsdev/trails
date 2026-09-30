@@ -289,11 +289,8 @@ describe("ModelGeneratorTest", () => {
   });
 
   it("invokes default test framework", async () => {
-    const gen = makeGen();
-    const files = await gen.run("Account", ["name:string", "age:integer"]);
-    expect(files).toContain("test/models/account.test.ts");
-    const content = fs.readFileSync(path.join(tmpDir, "test/models/account.test.ts"), "utf-8");
-    expect(content).toContain('describe("Account"');
+    await makeGen().run("Account", ["name:string", "age:integer"]);
+    await assertFile("test/models/account.test.ts", /describe\("AccountTest"/);
 
     await assertFile("test/fixtures/accounts.yml", /name: MyString/, /age: 1/);
     assertGeneratedFixture("test/fixtures/accounts.yml", {
