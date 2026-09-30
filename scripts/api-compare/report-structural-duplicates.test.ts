@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TsApi } from "./report-ruby-compat.js";
+import type { Decl, TsApi } from "./report-ruby-compat.js";
 import { matches, renderReport, shapeOf } from "./report-structural-duplicates.js";
 
 const replace = (name: string, line: number, literal: string) => ({
@@ -44,6 +44,23 @@ describe("shapeOf", () => {
     };
     expect(shapeOf(decl)).toBe("ref:f|num:1");
   });
+
+  it("keeps the function a call / apply invokes, which the skeleton records only as ref:call", () => {
+    const decl = (recv: string) => ({
+      name: "x",
+      skeleton: ["ref:call"],
+      callArgs: [{ name: "call", args: ["id:this", "id:other"], recv }],
+    });
+    expect(shapeOf(decl("id:cmpint"))).toBe("ref:call|callee:cmpint");
+    expect(shapeOf(decl("id:ensureProperType"))).not.toBe(shapeOf(decl("id:cmpint")));
+  });
+});
+
+const hosted = (origin: Decl, candidate: Decl): TsApi => ({
+  packages: {
+    "ruby-compat": { classes: { "tempfile.ts:Tempfile": { instanceMethods: [origin] } } },
+    activerecord: { classes: { "result.ts:Result": { instanceMethods: [candidate] } } },
+  },
 });
 
 describe("matches", () => {
@@ -55,6 +72,8 @@ describe("matches", () => {
         name: "isInclude",
         line: 120,
         shape: "ref:hasOwn|",
+        steps: 1,
+        member: false,
       },
     ]);
   });
@@ -65,6 +84,16 @@ describe("matches", () => {
         .get("regexpEscape")
         ?.map((s) => s.name),
     ).toEqual(["quoteRegex"]);
+  });
+
+  it("never matches a ruby-compat constructor, which is reused by extending its class", () => {
+    const ctor = { name: "constructor", line: 1, skeleton: ["ref:super"] };
+    expect(matches(hosted(ctor, ctor)).size).toBe(0);
+  });
+
+  it("never matches a one-step ruby-compat method, which aliases its own receiver", () => {
+    const length = { name: "length", line: 1, skeleton: ["ref:size"] };
+    expect(matches(hosted(length, length)).size).toBe(0);
   });
 
   it("never reports ruby-compat's own definitions as candidates", () => {

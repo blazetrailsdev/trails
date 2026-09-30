@@ -20,20 +20,35 @@ import { type Decl, type TsApi, declarations, runReport } from "./report-ruby-co
 
 const TS_API_PATH = path.join(OUTPUT_DIR, "ts-api.json");
 
-export type Site = { package: string; tsFile: string; name: string; line: number; shape: string };
+const DISPATCH_CALLS = new Set(["call", "apply"]);
+
+export type Site = {
+  package: string;
+  tsFile: string;
+  name: string;
+  line: number;
+  shape: string;
+  steps: number;
+  member: boolean;
+};
 
 /**
  * The comparable shape of a body — the `skeleton` `extract-ts-api.ts` computes
  * (control flow and call sequence, identifiers erased), then the literal
  * arguments it passes, which for some primitives are the whole signal. `id:`
  * args are identifiers and `?` a literal the extractor could not represent, so
- * neither is kept. `undefined` for a body with no skeleton (an overload
- * signature), which cannot compare.
+ * neither is kept — except the receiver of a `call` / `apply`, which is the
+ * function being invoked: the skeleton records that step as `ref:call`, so
+ * erasing it too would make every one-line `helper.call(this)` delegation
+ * match `cmpint.call(this, other) < 0`. `undefined` for a body with no
+ * skeleton (an overload signature), which cannot compare.
  */
 export function shapeOf(decl: Decl): string | undefined {
   if (decl.skeleton === undefined || decl.skeleton.length === 0) return undefined;
   const literals: string[] = [];
   for (const call of decl.callArgs ?? []) {
+    if (DISPATCH_CALLS.has(call.name) && call.recv?.startsWith("id:"))
+      literals.push(`callee:${call.recv.slice(3)}`);
     for (const arg of call.args ?? [])
       if (!arg.startsWith("id:") && arg !== "?") literals.push(arg);
   }
@@ -44,16 +59,29 @@ export function shapeOf(decl: Decl): string | undefined {
  *  yields each once. */
 export function sites(api: TsApi): Site[] {
   const out: Site[] = [];
-  for (const { package: pkg, tsFile, decl } of declarations(api)) {
+  for (const { package: pkg, tsFile, decl, member } of declarations(api)) {
     const shape = shapeOf(decl);
     if (shape === undefined) continue;
-    out.push({ package: pkg, tsFile, name: decl.name, line: decl.line ?? 0, shape });
+    const steps = decl.skeleton?.length ?? 0;
+    out.push({ package: pkg, tsFile, name: decl.name, line: decl.line ?? 0, shape, steps, member });
   }
   return out;
 }
 
 function siteKey(s: Site): string {
   return `${s.package}/${s.tsFile}:${s.line} ${s.name}`;
+}
+
+/**
+ * Whether a ruby-compat declaration is a primitive another package could call
+ * instead of copying. A constructor is reused by extending its class, never by
+ * calling it. A one-step method forwards to its own receiver — Ruby's `alias`
+ * (`Tempfile#length` is `size`, `MatchData#eql?` is `==`) — so a same-shaped
+ * member elsewhere aliases its own class rather than re-implementing this one.
+ */
+function isPrimitive(origin: Site): boolean {
+  if (origin.name === "constructor") return false;
+  return !(origin.member && origin.steps === 1);
 }
 
 /** Candidates sharing a ruby-compat export's shape, grouped by export NAME —
@@ -70,7 +98,7 @@ export function matches(api: TsApi): Map<string, Site[]> {
   }
   const found = new Map<string, Site[]>();
   for (const origin of all) {
-    if (origin.package !== "ruby-compat") continue;
+    if (origin.package !== "ruby-compat" || !isPrimitive(origin)) continue;
     const hits = byShape.get(origin.shape);
     if (hits === undefined) continue;
     const seen = new Set((found.get(origin.name) ?? []).map(siteKey));

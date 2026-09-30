@@ -46,7 +46,7 @@ export interface Decl {
   line?: number;
   calls?: string[];
   skeleton?: string[];
-  callArgs?: { name: string; args?: string[] }[];
+  callArgs?: { name: string; args?: string[]; recv?: string }[];
   /** `<file>:<name>` of the declaring entry when this one is a barrel clone
    *  (`extract-ts-api.ts:1017`), absent on a real declaration. */
   reExportedFrom?: string;
@@ -85,26 +85,44 @@ export interface TsApi {
  * The last is skipped outright: `reExportedFrom` names the declaring entry, so
  * a barrel clone is identifiable rather than a heuristic, and a re-export is
  * not a declaration site.
+ *
+ * `member` marks a class instance method, whose receiver is its own `this`; a
+ * module's members are the synthesized copies of its file functions, which
+ * take the value as an argument like any top-level function.
  */
-export function declarations(api: TsApi): { package: string; tsFile: string; decl: Decl }[] {
-  const seen = new Map<string, { package: string; tsFile: string; decl: Decl }>();
-  const add = (pkg: string, tsFile: string, decl: Decl): void => {
-    seen.set(`${pkg}/${tsFile}:${decl.line ?? 0} ${decl.name}`, { package: pkg, tsFile, decl });
+export function declarations(
+  api: TsApi,
+): { package: string; tsFile: string; decl: Decl; member: boolean }[] {
+  const seen = new Map<string, { package: string; tsFile: string; decl: Decl; member: boolean }>();
+  const add = (pkg: string, tsFile: string, decl: Decl, member: boolean): void => {
+    seen.set(`${pkg}/${tsFile}:${decl.line ?? 0} ${decl.name}`, {
+      package: pkg,
+      tsFile,
+      decl,
+      member,
+    });
   };
   for (const [pkg, entry] of Object.entries(api.packages)) {
     for (const [tsFile, fns] of Object.entries(entry.fileFunctions ?? {})) {
       for (const decl of fns) {
         if (decl.reExportedFrom !== undefined) continue;
-        add(pkg, decl.file ?? tsFile, decl);
+        add(pkg, decl.file ?? tsFile, decl, false);
       }
     }
-    for (const host of [
-      ...Object.values(entry.classes ?? {}),
-      ...Object.values(entry.modules ?? {}),
-    ]) {
-      for (const decl of [...(host.instanceMethods ?? []), ...(host.classMethods ?? [])]) {
-        if (decl.reExportedFrom !== undefined) continue;
-        add(pkg, decl.file ?? host.file ?? "", decl);
+    for (const [hosts, isClass] of [
+      [entry.classes, true],
+      [entry.modules, false],
+    ] as const) {
+      for (const host of Object.values(hosts ?? {})) {
+        for (const [decls, member] of [
+          [host.instanceMethods, isClass],
+          [host.classMethods, false],
+        ] as const) {
+          for (const decl of decls ?? []) {
+            if (decl.reExportedFrom !== undefined) continue;
+            add(pkg, decl.file ?? host.file ?? "", decl, member);
+          }
+        }
       }
     }
   }
