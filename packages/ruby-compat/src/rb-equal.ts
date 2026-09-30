@@ -70,6 +70,9 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
     }
     return equalOrEql(x, y, eql);
   }
+  if (!eql && (typeof a === "number" || typeof a === "bigint") && typeof b === "object") {
+    return equalOrEql(b, a, eql);
+  }
   /* Ruby's `Date#==` (`vendor/ruby/v3.3.11/ext/date/date_core.c:6902` `d_lite_equal`) is
      `<=>`-based (`vendor/ruby/v3.3.11/ext/date/date_core.c:6810` `d_lite_cmp`), so it
      answers `false` for an operand of another class instead of raising, and a

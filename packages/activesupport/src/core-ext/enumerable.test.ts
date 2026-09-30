@@ -15,12 +15,52 @@ import {
   maximum,
 } from "../enumerable-utils.js";
 import { compactBlank as hashCompactBlank, compactBlankBang } from "../hash-utils.js";
-import { TypeError, toI } from "@blazetrails/ruby-compat";
-import { assertRaise, assertRaises } from "../testing/assertions.js";
+import {
+  Complex,
+  TypeError,
+  complex,
+  rational,
+  rbEqual,
+  rbObjClass,
+  toI,
+} from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { assertEqual, assertRaise, assertRaises } from "../testing/assertions.js";
+import "./enumerable.js";
 import { Array as ArrayExt } from "./array/access.js";
 
 class Payment {
   constructor(readonly price: number | null) {}
+
+  equals(other: unknown): boolean {
+    return (
+      other instanceof Payment &&
+      other.constructor === this.constructor &&
+      rbEqual(this.price, other.price)
+    );
+  }
+}
+
+class SummablePayment extends Payment {
+  plus(p: SummablePayment): SummablePayment {
+    return new SummablePayment(this.price! + p.price!);
+  }
+}
+
+class Money {
+  constructor(readonly value: number) {}
+
+  plus(other: Money): Money {
+    return new Money(this.value + other.value);
+  }
+
+  coerce(other: number): [Money, Money] {
+    return [new Money(other), this];
+  }
+
+  equals(other: Money): boolean {
+    return other.value === this.value;
+  }
 }
 
 class GenericEnumerable<T> implements Iterable<T> {
@@ -33,6 +73,11 @@ class GenericEnumerable<T> implements Iterable<T> {
 
 function range(first: number, last: number): number[] {
   return Array.from({ length: last - first + 1 }, (_, i) => first + i);
+}
+
+function assertTypedEqual(e: unknown, v: unknown, cls: string, msg?: string): void {
+  expect(rbObjClass(v), msg).toBe(cls);
+  assertEqual(e, v, msg);
 }
 
 class ExpandedPayment {
@@ -51,10 +96,76 @@ describe("EnumerableTests", () => {
     expect(maximum([], () => 0)).toBeUndefined();
   });
 
-  it.skip("sums", () => {
-    // BLOCKED: activesupport-sum-has-no-float-or-complex-seat
-    expect(sum([1, 2, 3])).toBe(6);
-    expect(sum([1, 2, 3], (x) => x * 2)).toBe(12);
+  it("sums", async () => {
+    let enum_: GenericEnumerable<any> = new GenericEnumerable([5, 15, 10]);
+    expect(sum(enum_)).toEqual(30);
+    expect(sum(enum_, (i: number) => i * 2)).toEqual(60);
+
+    enum_ = new GenericEnumerable(["a", "b", "c"]);
+    expect(sum(enum_, "")).toEqual("abc");
+    expect(sum(enum_, "", (i: string) => i.repeat(2))).toEqual("aabbcc");
+    await assertRaises([TypeError], {}, () => {
+      sum(enum_);
+    });
+    await assertRaises([TypeError], {}, () => {
+      sum(enum_, (i: string) => i.repeat(2));
+    });
+
+    let payments: GenericEnumerable<any> = new GenericEnumerable([
+      new Payment(5),
+      new Payment(15),
+      new Payment(10),
+    ]);
+    expect(sum(payments, (p: Payment) => p.price!)).toEqual(30);
+    expect(sum(payments, (p: Payment) => p.price! * 2)).toEqual(60);
+
+    payments = new GenericEnumerable([new SummablePayment(5), new SummablePayment(15)]);
+    await assertRaises([TypeError], {}, () => {
+      sum(payments);
+    });
+    expect(sum(payments, new SummablePayment(0))).toEqual(new SummablePayment(20));
+    expect(sum(payments, new SummablePayment(0), (p: Payment) => p)).toEqual(
+      new SummablePayment(20),
+    );
+    await assertRaises([TypeError], {}, () => {
+      sum(payments, (p: Payment) => p);
+    });
+
+    let sum_: any = sum(new GenericEnumerable<unknown>([3, rational(5, 1)]));
+    assertTypedEqual(8, sum_, "Rational");
+
+    sum_ = sum(new GenericEnumerable<unknown>([3, rational(5, 1)]), new Number(0.0));
+    assertTypedEqual(8.0, sum_, "Float");
+
+    sum_ = sum(new GenericEnumerable<unknown>([3, rational(5, 1), new Number(7.0)]));
+    assertTypedEqual(15.0, sum_, "Float");
+
+    sum_ = sum(new GenericEnumerable<unknown>([3, rational(5, 1), complex(7)]));
+    assertTypedEqual(complex(15), sum_, "Complex");
+    assertTypedEqual(15, sum_.real, "Rational");
+    assertTypedEqual(0, sum_.imag, "Integer");
+
+    sum_ = sum(new GenericEnumerable<unknown>([3.5, 5]));
+    assertTypedEqual(8.5, sum_, "Float");
+
+    sum_ = sum(new GenericEnumerable<unknown>([2, 8.5]));
+    assertTypedEqual(10.5, sum_, "Float");
+
+    sum_ = sum(new GenericEnumerable<unknown>([rational(1, 2), 1]));
+    assertTypedEqual(rational(3, 2), sum_, "Rational");
+
+    sum_ = sum(new GenericEnumerable<unknown>([rational(1, 2), rational(1, 3)]));
+    assertTypedEqual(rational(5, 6), sum_, "Rational");
+
+    sum_ = sum(
+      new GenericEnumerable<unknown>([new Number(2.0), Complex.I.multiply(new Number(3.0))]),
+    );
+    assertTypedEqual(complex(2.0, 3.0), sum_, "Complex");
+    assertTypedEqual(2.0, sum_.real, "Float");
+    assertTypedEqual(3.0, sum_.imag, "Float");
+
+    sum_ = sum(new GenericEnumerable([1, 2]), 10, (v: number) => v * 2);
+    assertTypedEqual(16, sum_, "Integer");
   });
 
   it("nil sums", async () => {
@@ -76,20 +187,105 @@ describe("EnumerableTests", () => {
     expect(sum(payments, (p) => (toI(p.price) as number) * 2)).toEqual(60);
   });
 
-  it.skip("empty sums", () => {
-    // BLOCKED: activesupport-sum-has-no-float-or-complex-seat
-    expect(sum([])).toBe(0);
+  it("empty sums", () => {
+    expect(sum(new GenericEnumerable([]))).toEqual(0);
+    expect(sum(new GenericEnumerable([]), [])).toEqual([]);
+    expect(sum(new GenericEnumerable<number>([]), (i: number) => i + 10)).toEqual(0);
+    expect(sum(new GenericEnumerable<number>([]), [], (i: number) => i + 10)).toEqual([]);
+    expect(sum(new GenericEnumerable([]), new Payment(0))).toEqual(new Payment(0));
+    assertTypedEqual(0.0, sum(new GenericEnumerable([]), new Number(0.0)), "Float");
   });
 
-  it.skip("range sums", () => {
-    // BLOCKED: activesupport-sum-has-no-float-or-complex-seat
-    const range = Array.from({ length: 5 }, (_, i) => i + 1);
-    expect(sum(range)).toBe(15);
+  it("range sums", async () => {
+    expect(new Range(1, 4).sum(undefined, (i: number) => i * 2)).toEqual(20);
+    expect(new Range(1, 4).sum()).toEqual(10);
+    expect(new Range(1, 4.5).sum()).toEqual(10);
+    expect(new Range(1, 4, true).sum()).toEqual(6);
+    await assertRaises([TypeError], {}, () => {
+      new Range("a", "c").sum();
+    });
+    expect(new Range("a", "c").sum("")).toEqual("abc");
+    expect(new Range(0, 10_000_000).sum()).toEqual(50_000_005_000_000);
+    expect(new Range(10, 0).sum()).toEqual(0);
+    expect(new Range(10, 0).sum(5)).toEqual(5);
+    expect(new Range(10, 10).sum()).toEqual(10);
+    expect(new Range(10, 10, true).sum(42)).toEqual(42);
+    assertTypedEqual(
+      20.0,
+      new Range(1, 4).sum(new Number(0.0), (i: number) => i * 2),
+      "Float",
+    );
+    assertTypedEqual(10.0, new Range(1, 4).sum(new Number(0.0)), "Float");
+    assertTypedEqual(20.0, new Range(1, 4).sum(new Number(10.0)), "Float");
+    assertTypedEqual(5.0, new Range(10, 0).sum(new Number(5.0)), "Float");
   });
 
-  it.skip("array sums", () => {
-    // BLOCKED: activesupport-sum-has-no-float-or-complex-seat
-    expect(sum([5, 10, 15])).toBe(30);
+  it("array sums", async () => {
+    let enum_: any[] = [5, 15, 10];
+    expect(sum(enum_)).toEqual(30);
+    expect(sum(enum_, (i: number) => i * 2)).toEqual(60);
+
+    enum_ = ["a", "b", "c"];
+    await assertRaises([TypeError], {}, () => {
+      sum(enum_);
+    });
+    expect(sum(enum_, "")).toEqual("abc");
+    await assertRaises([TypeError], {}, () => {
+      sum(enum_, (i: string) => i.repeat(2));
+    });
+    expect(sum(enum_, "", (i: string) => i.repeat(2))).toEqual("aabbcc");
+
+    let payments: Payment[] = [new Payment(5), new Payment(15), new Payment(10)];
+    expect(sum(payments, (p) => p.price!)).toEqual(30);
+    expect(sum(payments, (p) => p.price! * 2)).toEqual(60);
+
+    payments = [new SummablePayment(5), new SummablePayment(15)];
+    await assertRaises([TypeError], {}, () => {
+      sum(payments);
+    });
+    expect(sum(payments, new SummablePayment(0))).toEqual(new SummablePayment(20));
+    await assertRaises([TypeError], {}, () => {
+      sum(payments, (p: Payment) => p);
+    });
+    expect(sum(payments, new SummablePayment(0), (p: Payment) => p)).toEqual(
+      new SummablePayment(20),
+    );
+
+    expect(sum([new Money(1), new Money(2)])).toEqual(new Money(3));
+
+    let sum_: any = sum([3, rational(5, 1)]);
+    assertTypedEqual(8, sum_, "Rational");
+
+    sum_ = sum([3, rational(5, 1)], new Number(0.0));
+    assertTypedEqual(8.0, sum_, "Float");
+
+    sum_ = sum([3, rational(5, 1), new Number(7.0)]);
+    assertTypedEqual(15.0, sum_, "Float");
+
+    sum_ = sum([3, rational(5, 1), complex(7)]);
+    assertTypedEqual(complex(15), sum_, "Complex");
+    assertTypedEqual(15, sum_.real, "Rational");
+    assertTypedEqual(0, sum_.imag, "Integer");
+
+    sum_ = sum([3.5, 5]);
+    assertTypedEqual(8.5, sum_, "Float");
+
+    sum_ = sum([2, 8.5]);
+    assertTypedEqual(10.5, sum_, "Float");
+
+    sum_ = sum([rational(1, 2), 1]);
+    assertTypedEqual(rational(3, 2), sum_, "Rational");
+
+    sum_ = sum([rational(1, 2), rational(1, 3)]);
+    assertTypedEqual(rational(5, 6), sum_, "Rational");
+
+    sum_ = sum([new Number(2.0), Complex.I.multiply(new Number(3.0))]);
+    assertTypedEqual(complex(2.0, 3.0), sum_, "Complex");
+    assertTypedEqual(2.0, sum_.real, "Float");
+    assertTypedEqual(3.0, sum_.imag, "Float");
+
+    sum_ = sum([1, 2], 10, (v: number) => v * 2);
+    assertTypedEqual(16, sum_, "Integer");
   });
 
   it("many", () => {
