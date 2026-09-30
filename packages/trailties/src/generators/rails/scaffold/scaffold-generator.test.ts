@@ -32,7 +32,7 @@ function setupRoutes() {
   fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
-    "Trails.application!.routes().draw((mapper) => {\n});\n",
+    "Trails.application!.routes().draw(function () {\n});\n",
   );
 }
 
@@ -157,13 +157,13 @@ describe("ScaffoldGeneratorTest", () => {
   it("scaffold generator on revoke does not mutilate routes", async () => {
     await runGenerator("product_line");
     expect(readFile("config/routes.ts")).toBe(
-      'Trails.application!.routes().draw((mapper) => {\n  mapper.resources("product_lines");\n});\n',
+      'Trails.application!.routes().draw(function () {\n  this.resources("product_lines");\n});\n',
     );
 
     await runGenerator("product_line", [], { behavior: "revoke" });
 
     expect(readFile("config/routes.ts")).toBe(
-      "Trails.application!.routes().draw((mapper) => {\n});\n",
+      "Trails.application!.routes().draw(function () {\n});\n",
     );
   });
 
@@ -265,7 +265,7 @@ describe("ScaffoldGeneratorTest (JavaScript project)", () => {
     fs.mkdirSync(path.join(jsTmpDir, "config"));
     fs.writeFileSync(
       path.join(jsTmpDir, "config/routes.ts"),
-      "Trails.application!.routes().draw((mapper) => {\n});\n",
+      "Trails.application!.routes().draw(function () {\n});\n",
     );
     jsLines = [];
   });

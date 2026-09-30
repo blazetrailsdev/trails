@@ -11,7 +11,7 @@ function setupRoutes() {
   fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
-    "Trails.application!.routes().draw((mapper) => {\n});\n",
+    "Trails.application!.routes().draw(function () {\n});\n",
   );
 }
 
@@ -85,8 +85,8 @@ describe("ControllerGeneratorTest", () => {
     const gen = makeGen();
     await gen.run("Account", ["foo", "bar"]);
     const routes = readFile("config/routes.ts");
-    expect(routes).toContain('mapper.get("account/foo")');
-    expect(routes).toContain('mapper.get("account/bar")');
+    expect(routes).toContain('this.get("account/foo")');
+    expect(routes).toContain('this.get("account/bar")');
   });
 
   it("skip routes", async () => {
@@ -127,27 +127,27 @@ describe("ControllerGeneratorTest", () => {
     const gen = makeGen();
     await gen.run("admin/dashboard", ["index"]);
     const routes = readFile("config/routes.ts");
-    expect(routes).toContain('mapper.namespace("admin"');
-    expect(routes).toContain('mapper.get("dashboard/index")');
+    expect(routes).toContain('this.namespace("admin"');
+    expect(routes).toContain('this.get("dashboard/index")');
   });
 
   it("namespaced routes with multiple actions are created in routes", async () => {
     const gen = makeGen();
     await gen.run("admin/dashboard", ["index", "show"]);
     const routes = readFile("config/routes.ts");
-    expect(routes).toContain('mapper.namespace("admin"');
-    expect(routes).toContain('mapper.get("dashboard/index")');
-    expect(routes).toContain('mapper.get("dashboard/show")');
+    expect(routes).toContain('this.namespace("admin"');
+    expect(routes).toContain('this.get("dashboard/index")');
+    expect(routes).toContain('this.get("dashboard/show")');
   });
 
   it("deeply nested namespace routes are created in routes", async () => {
     const gen = makeGen();
     await gen.run("admin/api/dashboard", ["index"]);
     const routes = readFile("config/routes.ts");
-    expect(routes).toContain('mapper.namespace("admin"');
-    expect(routes).toContain('mapper.namespace("api"');
-    expect(routes).toMatch(/mapper\.namespace\("admin"[\s\S]*mapper\.namespace\("api"/);
-    expect(routes).toContain('mapper.get("dashboard/index")');
+    expect(routes).toContain('this.namespace("admin"');
+    expect(routes).toContain('this.namespace("api"');
+    expect(routes).toMatch(/this\.namespace\("admin"[\s\S]*this\.namespace\("api"/);
+    expect(routes).toContain('this.get("dashboard/index")');
   });
 
   it("does not add routes when action is not specified", async () => {
@@ -185,7 +185,7 @@ describe("ControllerGeneratorTest (JavaScript project)", () => {
     fs.mkdirSync(path.join(jsTmpDir, "config"));
     fs.writeFileSync(
       path.join(jsTmpDir, "config/routes.ts"),
-      "Trails.application!.routes().draw((mapper) => {\n});\n",
+      "Trails.application!.routes().draw(function () {\n});\n",
     );
     jsLines = [];
   });

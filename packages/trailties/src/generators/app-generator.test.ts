@@ -491,7 +491,7 @@ describe("AppGenerator", () => {
 
     const routes = fs.readFileSync(appPath("config/routes.ts"), "utf-8");
     expect(routes).toContain(`import { Trails } from "@blazetrails/trailties";`);
-    expect(routes).toContain("Trails.application!.routes().draw((mapper) => {");
+    expect(routes).toContain("Trails.application!.routes().draw(function () {");
     expect(routes).not.toContain(": any");
   });
 

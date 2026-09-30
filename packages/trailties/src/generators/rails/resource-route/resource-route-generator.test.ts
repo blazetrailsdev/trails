@@ -13,7 +13,7 @@ beforeEach(() => {
   fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
-    "Trails.application!.routes().draw((mapper) => {\n});\n",
+    "Trails.application!.routes().draw(function () {\n});\n",
   );
 });
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
@@ -21,18 +21,18 @@ afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 describe("ResourceRouteGeneratorTest", () => {
   it("add resource route", async () => {
     await mk("product").addResourceRoute();
-    expect(read()).toContain('mapper.resources("products");');
+    expect(read()).toContain('this.resources("products");');
   });
 
   it("nests namespaces", async () => {
     await mk("admin/users/product").addResourceRoute();
     expect(read()).toBe(
-      'Trails.application!.routes().draw((mapper) => {\n  mapper.namespace("admin", () => {\n    mapper.namespace("users", () => {\n      mapper.resources("products");\n    });\n  });\n});\n',
+      'Trails.application!.routes().draw(function () {\n  this.namespace("admin", () => {\n    this.namespace("users", () => {\n      this.resources("products");\n    });\n  });\n});\n',
     );
   });
 
   it("skips when actions are present", async () => {
     await mk("product", ["index"]).addResourceRoute();
-    expect(read()).not.toContain("mapper.resources");
+    expect(read()).not.toContain("this.resources");
   });
 });

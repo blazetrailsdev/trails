@@ -22,7 +22,7 @@ beforeEach(() => {
   fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
-    "Trails.application!.routes().draw((mapper) => {\n});\n",
+    "Trails.application!.routes().draw(function () {\n});\n",
   );
 });
 
@@ -228,12 +228,12 @@ describe("ScaffoldControllerGeneratorTest", () => {
 
   it("add routes", async () => {
     await runGenerator("User");
-    expect(read("config/routes.ts")).toContain('mapper.resources("users")');
+    expect(read("config/routes.ts")).toContain('this.resources("users")');
   });
 
   it("skip routes", async () => {
     await runGenerator("User", [], { skipRoutes: true });
-    expect(read("config/routes.ts")).not.toContain('mapper.resources("users")');
+    expect(read("config/routes.ts")).not.toContain('this.resources("users")');
   });
 
   it("default orm is used", async () => {
@@ -309,9 +309,9 @@ describe("ScaffoldControllerGeneratorTest", () => {
     expect(parseTs(c).diagnostics).toEqual([]);
     expect(fs.existsSync(path.join(tmpDir, "app/helpers/admin/accounts-helper.ts"))).toBe(true);
     const routes = read("config/routes.ts");
-    expect(routes).toContain('mapper.namespace("admin"');
-    expect(routes).toContain('mapper.resources("accounts")');
-    expect(routes).not.toContain('mapper.resources("admin/accounts")');
+    expect(routes).toContain('this.namespace("admin"');
+    expect(routes).toContain('this.resources("accounts")');
+    expect(routes).not.toContain('this.resources("admin/accounts")');
   });
 
   it("singularizes plural input for model + params key", async () => {
@@ -326,8 +326,8 @@ describe("ScaffoldControllerGeneratorTest", () => {
   it("uses underscored namespace in routes (not dasherized)", async () => {
     await runGenerator("admin_panel/users");
     const routes = read("config/routes.ts");
-    expect(routes).toContain('mapper.namespace("admin_panel"');
-    expect(routes).not.toContain('mapper.namespace("admin-panel"');
+    expect(routes).toContain('this.namespace("admin_panel"');
+    expect(routes).not.toContain('this.namespace("admin-panel"');
     expect(routes.match(/\n\n\n/)).toBeNull();
   });
 });

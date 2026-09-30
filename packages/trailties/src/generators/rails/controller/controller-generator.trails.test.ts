@@ -14,7 +14,7 @@ beforeEach(() => {
   fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
-    "Trails.application!.routes().draw((mapper) => {\n});\n",
+    "Trails.application!.routes().draw(function () {\n});\n",
   );
 });
 
@@ -44,7 +44,7 @@ describe("ControllerGenerator view and controller file naming", () => {
     const gen = makeGen();
     await gen.run("AdminUsers", ["index"]);
     const routes = fs.readFileSync(path.join(tmpDir, "config/routes.ts"), "utf8");
-    expect(routes).toContain('mapper.get("admin_users/index")');
+    expect(routes).toContain('this.get("admin_users/index")');
     expect(routes).not.toContain("admin-users");
   });
 

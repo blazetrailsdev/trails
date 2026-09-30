@@ -235,7 +235,7 @@ export class Generator {
   }
 }
 
-export type DrawCallback = (mapper: Mapper) => void;
+export type DrawCallback = (this: Mapper, mapper: Mapper) => void;
 
 export class Dispatcher extends Endpoint {
   private readonly _raiseOnNameError: boolean;
@@ -950,7 +950,11 @@ export class RouteSet {
   /** @internal */
   evalBlock(block: DrawCallback): void {
     const mapper = new Mapper(this);
-    block(mapper);
+    if (this.defaultScope) {
+      mapper.withDefaultScope(this.defaultScope, block);
+    } else {
+      block.call(mapper, mapper);
+    }
   }
 
   append(block: DrawCallback): void {

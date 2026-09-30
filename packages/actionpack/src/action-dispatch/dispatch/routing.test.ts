@@ -28,6 +28,7 @@ beforeEach(() => {
     "api/v1/users",
     "api/v2/articles",
     "articles",
+    "blog/posts",
     "assets",
     "attachments",
     "b",
@@ -2056,14 +2057,12 @@ describe("TestAppendingRoutes", () => {
 
 describe("TestDefaultScope", () => {
   it("default scope", () => {
-    const routes = new RouteSet();
-    routes.draw((r) => {
-      r.scope("api", { as: "api" }, (r) => {
-        r.resources("posts");
-      });
+    const DefaultScopeRoutes = new RouteSet();
+    DefaultScopeRoutes.defaultScope = { module: "blog" };
+    DefaultScopeRoutes.draw(function () {
+      this.resources("posts");
     });
-    expect(() => routes.recognizePath("/api/posts")).not.toThrow();
-    expect(routes.pathFor({}, "api_posts")).toBe("/api/posts");
+    expect(routeSpec(DefaultScopeRoutes.recognizePath("/posts"))).toBe("blog/posts#index");
   });
 });
 

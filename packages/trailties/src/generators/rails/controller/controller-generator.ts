@@ -87,7 +87,7 @@ ${cases}
     if (actions.length === 0) return;
     const fileName = underscore(namespaceParts[namespaceParts.length - 1]);
     const routingCode = actions
-      .map((action) => `mapper.get(${JSON.stringify(`${fileName}/${action}`)});`)
+      .map((action) => `this.get(${JSON.stringify(`${fileName}/${action}`)});`)
       .join("\n");
     const regularClassPath = namespaceParts.slice(0, -1).map((p) => underscore(p));
     await this.route(routingCode, { namespace: regularClassPath });

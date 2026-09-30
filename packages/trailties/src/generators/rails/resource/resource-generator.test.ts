@@ -27,7 +27,7 @@ beforeEach(() => {
   fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
-    "Trails.application!.routes().draw((mapper) => {\n});\n",
+    "Trails.application!.routes().draw(function () {\n});\n",
   );
   ModelHelpers.skipWarn = false;
 });
@@ -43,7 +43,7 @@ describe("ResourceGeneratorTest", () => {
 
   it("resource routes are added", async () => {
     await ResourceGenerator.start(["Account"], opts());
-    expect(routes()).toContain('mapper.resources("accounts");');
+    expect(routes()).toContain('this.resources("accounts");');
   });
 
   it("resource controller with pluralized class name", async () => {

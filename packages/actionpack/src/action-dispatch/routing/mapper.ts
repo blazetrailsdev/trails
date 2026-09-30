@@ -1,6 +1,6 @@
 import { Redirect, redirect as redirectFactory } from "./redirection.js";
 import { Endpoint } from "./endpoint.js";
-import { Dispatcher, StaticDispatcher, type RouteSet } from "./route-set.js";
+import { Dispatcher, StaticDispatcher, type DrawCallback, type RouteSet } from "./route-set.js";
 import type { DispatchableControllerClass } from "./dispatcher.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
@@ -2093,8 +2093,10 @@ export class Mapper {
   }
 
   /** @internal */
-  withDefaultScope(scope: ScopeOptions, callback: MapperCallback): void {
-    this.scope(scope, callback);
+  withDefaultScope(scope: ScopeOptions, block: DrawCallback): void {
+    this.scope(scope, () => {
+      block.call(this, this);
+    });
   }
 
   /** @internal */

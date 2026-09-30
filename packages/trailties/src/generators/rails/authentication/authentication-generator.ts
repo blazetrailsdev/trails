@@ -95,8 +95,8 @@ export class AuthenticationGenerator extends GeneratorBase {
 
   /** @missingRailsArgs route — PERMANENT */
   private async configureAuthenticationRoutes(): Promise<void> {
-    await this.route(`mapper.resources("passwords", { param: "token" });`);
-    await this.route(`mapper.resource("session");`);
+    await this.route(`this.resources("passwords", { param: "token" });`);
+    await this.route(`this.resource("session");`);
   }
 
   private enableBcrypt(): void {

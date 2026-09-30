@@ -17,7 +17,7 @@ beforeEach(() => {
   fs.mkdirSync(path.join(tmpDir, "config"));
   fs.writeFileSync(
     path.join(tmpDir, "config/routes.ts"),
-    "Trails.application!.routes().draw((mapper) => {\n});\n",
+    "Trails.application!.routes().draw(function () {\n});\n",
   );
   fs.writeFileSync(path.join(tmpDir, "tsconfig.json"), "{}");
 });
