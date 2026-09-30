@@ -28,7 +28,6 @@ beforeEach(() => {
     "api/v1/users",
     "api/v2/articles",
     "articles",
-    "blog/posts",
     "assets",
     "attachments",
     "b",
@@ -2056,13 +2055,35 @@ describe("TestAppendingRoutes", () => {
 });
 
 describe("TestDefaultScope", () => {
-  it("default scope", () => {
-    const DefaultScopeRoutes = new RouteSet();
-    DefaultScopeRoutes.defaultScope = { module: "blog" };
-    DefaultScopeRoutes.draw(function () {
-      this.resources("posts");
-    });
-    expect(routeSpec(DefaultScopeRoutes.recognizePath("/posts"))).toBe("blog/posts#index");
+  class PostsController extends EchoParamsController {
+    static override async dispatch(
+      action: string,
+      req: Request,
+    ): Promise<[number, Record<string, string>, ReturnType<typeof bodyFromString>]> {
+      const body = `${req.pathParameters["controller"]}#${action}`;
+      return [200, { "content-type": "text/plain" }, bodyFromString(body)];
+    }
+  }
+
+  const DefaultScopeRoutes = new RouteSet();
+  DefaultScopeRoutes.defaultScope = { module: "blog" };
+  DefaultScopeRoutes.draw(function () {
+    this.resources("posts");
+  });
+
+  beforeEach(() => {
+    controllerConstants.set(
+      "blog/posts",
+      PostsController as unknown as DispatchableControllerClass,
+    );
+  });
+  afterEach(() => {
+    controllerConstants.delete("blog/posts");
+  });
+
+  it("default scope", async () => {
+    const [, , body] = await DefaultScopeRoutes.call(MockRequest.envFor("/posts"));
+    expect(await bodyToString(body)).toBe("blog/posts#index");
   });
 });
 
