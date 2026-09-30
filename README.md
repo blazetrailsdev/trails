@@ -7,14 +7,19 @@ Ruby source, translated by a fixed set of naming rules. Progress is measured by
 running Rails' own test suite, ported test for test, and by matching the Rails
 public API method by method.
 
-It is pre-release. Nothing is published to npm yet, so you run it from a
-checkout of this repository. The data layer (ActiveRecord, ActiveModel, Arel)
-is the most complete part. The web stack (ActionPack, ActionView, trailties)
-boots a generated app, serves routes, renders templates and reads from the
-database, but has rough edges. The [quickstart](#quickstart) below shows what
-works today and lists what does not.
+The full Rails scaffold pipeline runs on it. `trails new` generates an app,
+`generate scaffold` writes the model, migration, controller, views, route and
+tests, `db:migrate` builds the table, and `trails server` serves working CRUD
+pages: Rails' scaffold views in the generated layout, forms with CSRF
+protection, flash notices, validation errors, and view reloading in
+development. The model is typed from the schema by `trails-tsc`, and the
+scaffold's functional tests, ported from Rails' templates, pass. The
+[quickstart](#quickstart) walks through all of it.
 
-- [Quickstart](#quickstart), verified end to end on 2026-09-27
+It is pre-release. Nothing is published to npm yet, so you run it from a
+checkout of this repository.
+
+- [Quickstart](#quickstart), verified end to end on 2026-09-30
 - [Models: the ActiveRecord surface](#models-the-activerecord-surface)
 - [Typed models with `trails-tsc`](#typed-models-with-trails-tsc)
 - [Packages](#packages)
@@ -27,9 +32,8 @@ works today and lists what does not.
 
 Every command and every output block in this section was run on 2026-09-30
 against `main` at `98d96082e4`, on Linux with Node 24.16.0 and SQLite, with
-`TRAILS_ENV` and `NODE_ENV` unset. Where a step does not work yet, the failure
-and its stories are linked. See [what is not wired up
-yet](#what-is-not-wired-up-yet) below.
+`TRAILS_ENV` and `NODE_ENV` unset. No step needs a workaround. The two
+[known gaps](#known-gaps) are linked where they show.
 
 ### 1. Build the framework from a checkout
 
@@ -219,9 +223,9 @@ trails> await Post.where({ title: "Hello" }).count()
 
 ### 5. Serve it
 
-The scaffold generates a full CRUD controller (`index` through `destroy`, with
-a `setPost` before-action and `postParams()` over `params.expect`), and views
-ported from Rails' scaffold templates.
+The scaffold is a complete CRUD resource: a controller with `index` through
+`destroy`, a `setPost` before-action and `postParams()` over `params.expect`,
+and views ported from Rails' scaffold templates.
 
 ```sh
 bin/trails server -p 3927   # the default port is 3000; this run used 3927
@@ -233,8 +237,7 @@ bin/trails server -p 3927   # the default port is 3000; this run used 3927
 => Ctrl+C to stop
 ```
 
-`GET /up` answers `200 OK`. Open `http://localhost:3927/posts` and the scaffold works
-as it does in Rails:
+Open `http://localhost:3927/posts` and the scaffold works as it does in Rails:
 
 - `/posts`, `/posts/:id`, `/posts/new` and `/posts/:id/edit` render Rails'
   scaffold views inside the generated layout, titled from `contentFor("title")`.
@@ -307,52 +310,14 @@ app/models/check.ts(4,7): error TS2322: Type 'string | null' is not assignable t
 
 The build also passes after `generate scaffold`.
 
-### What is not wired up yet
+### Known gaps
 
-Two gaps are left in the steps above, both in RFC `0142-trailties-surfaced-deviations`:
+Both are in RFC `0142-trailties-surfaced-deviations`:
 
 | Symptom                                                                                                                                                                                                                 | Story                                                                    |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | `bin/trails routes` prints `You don't have any routes defined!`: the command reads the route table before the lazily loaded routes file is drawn                                                                        | `trails-routes-command-shows-no-routes-under-lazy-route-set`             |
 | The first `pnpm test` in a new app fails with `attempt to write a readonly database`: both test files' workers create and load `storage/test.sqlite3` at once. Every later run passes all seven ported controller tests | `generated-app-first-test-run-races-maintain-test-schema-across-workers` |
-
-Fixed on `main` since this README was first drafted at `b4f622ae87`, each
-re-run for this quickstart:
-
-- `config.action_controller` settings, such as the test env's `allowForgeryProtection = false`, not reaching `ActionController::Base` (#8281)
-- `generate scaffold` going through the ORM hook, in Rails' order: `invoke active_record` first, then the migration before the model (#8270)
-- `trails server` serving the middleware stack instead of the application, so no request saw `env_config` (#8261)
-- Rack rejecting the `:lax` Symbol for `same_site` (#8259)
-- a cold `Post.new(attrs)` raising `UnknownAttributeError` on a first-request form POST: the schema is now warmed at boot (#8258)
-- the scaffold writing no `test/fixtures/posts.yml` (#8262)
-- the scaffold controller's route helpers failing `trails-tsc` (#8260)
-- the port of `Application#env_config` (#8256)
-- `form.label` (#8257) and `form.submit` (#8247)
-- the generated layout, now a port of Rails' `application.html.erb` (#8255)
-- the scaffold's controller tests, now ported from Rails' `functional_test.rb.tt` (#8253)
-- the default CSRF protection, `InvalidAuthenticityToken` on a token-less `POST` (#8244, #8248)
-- dev-mode view reloading (#8246)
-- `form.textField` / `textarea` (#8249)
-- the scaffold's controller failing the app's `trails-tsc` build (#8250)
-- `ar typecheck` failing on a new `ar new` project (#8241)
-- the generated `db.ts` `connect()` resolving `default_env` without `TRAILS_ENV` (#8236)
-- polymorphic routes calling `persisted()` and dispatching snake_case helpers, and `formWith`'s `builder is not a constructor` (#8230)
-- the console prompting before models loaded (#8232)
-- `Rack::MethodOverride`, `Flash` and the rest of the Rack layer missing from the default middleware stack (#8234)
-- `pnpm test` finding no tests in a new app (#8235)
-- `generate scaffold` writing `router.resources(...)`, which threw at boot (#8218)
-- booting a script, `routes` or `console` without `TRAILS_ENV` (#8201)
-- scaffolded controllers that never read the model (#8217)
-- scaffold views that diverged from Rails' templates (#8219)
-- `trails-tsc` typing enum attributes as columns and scopes as statics only (#8216)
-- the comment-only `db/schema.ts` that broke the first migrate (#8200)
-- the console realm bug (#8200)
-- generated controllers extending `ActionController.Base` (#8198)
-- the join-table migration generator (#8198)
-- the new app's `trails-tsc` build (#8198)
-- `ar`'s generated `db.ts` (#8198)
-- cold association creates, `ar`'s `default_env` and `ar runner`'s TS loading (#8197)
-- a plain-node import of built actionpack crashing every `trails` command (#8203, RFC 0141)
 
 ## Models: the ActiveRecord surface
 
@@ -572,29 +537,29 @@ Outside a trailties app, dump the schema from a live database with
 Every package under `packages/`. "Rails source" names the upstream it ports.
 The parity figures are in the [next section](#status-and-parity-snapshot).
 
-| Package                         | Rails source                       | What it is, and how usable it is today                                                                                                                                                                                                                           |
-| ------------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@blazetrails/activerecord`     | `activerecord`                     | The ORM: persistence, querying, associations, validations, callbacks, enums, migrations, schema dumping, transactions, encryption, fixtures. SQLite, PostgreSQL and MySQL adapters. The most complete package, and the one to evaluate first.                    |
-| `@blazetrails/activemodel`      | `activemodel`                      | Attributes and type casting, validations, callbacks, dirty tracking, errors, naming, serialization, `has_secure_password`. Near-complete.                                                                                                                        |
-| `@blazetrails/arel`             | `activerecord/lib/arel`            | The SQL AST, managers and per-dialect visitors that ActiveRecord builds its queries with. Near-complete. Class names drive visitor dispatch, so do not minify them.                                                                                              |
-| `@blazetrails/activesupport`    | `activesupport`                    | Inflector, core extensions, `HashWithIndifferentAccess`, callbacks, concerns, notifications, caching, message verifiers and encryptors, time zones, `Duration`, JSON, testing helpers. Broad and mostly complete.                                                |
-| `@blazetrails/activerecord-cli` | the `rails db:*` tasks, standalone | The `ar` CLI for using ActiveRecord without trailties: `ar new`, `generate:model` / `migration`, `db:*`, `console`, `runner`, `models:dump`, plus the `trails-tsc` binary. Works.                                                                                |
-| `@blazetrails/actionpack`       | `actionpack`                       | ActionDispatch (routing and Journey, request/response, middleware, cookies, sessions, CSP, integration testing) and ActionController (Metal, Base, API, parameters, rendering, filters, rescue). Routing and dispatch are solid; controller coverage is partial. |
-| `@blazetrails/actionview`       | `actionview`                       | Template lookup and rendering, layouts, partials, and helpers (tag, URL, form, asset, text, number, date, sanitize). Templates are TSE, the trails analogue of ERB. Renders a generated app's views; many helpers and tests are still unported.                  |
-| `@blazetrails/trailties`        | `railties`                         | The `trails` CLI (`new`, `generate`, `server`, `db`, `routes`, `console`, `credentials`), application boot and initializers, engines, generators, the Vite-backed dev server. Boots and serves a generated app; the generators have known bugs (above).          |
-| `@blazetrails/rack`             | `rack` gem                         | Rack: the request/response interface, `Builder`, and the standard middleware. Nearly complete.                                                                                                                                                                   |
-| `@blazetrails/rack-session`     | `rack-session` gem                 | `Rack::Session::Abstract::Persisted`, the cookie store, the pool store and the encryptor that ActionDispatch's session stores build on. Partial.                                                                                                                 |
-| `@blazetrails/rack-test`        | `rack-test` gem                    | `Rack::Test::Session`, cookie jar, uploaded files and multipart, used by integration tests. Nearly complete.                                                                                                                                                     |
-| `@blazetrails/globalid`         | `globalid` gem                     | `GlobalID`, `SignedGlobalID` and the locator. Nearly complete.                                                                                                                                                                                                   |
-| `@blazetrails/i18n`             | `i18n` gem                         | `I18n` config, simple and fallback backends, interpolation, pluralization and exceptions. The whole gem test suite is ported.                                                                                                                                    |
-| `@blazetrails/date`             | `date` gem                         | Ruby's `Date` / `DateTime`, built on Temporal (`@js-temporal/polyfill`). Re-exports `Temporal`, which is how trails represents time values. The ported date gem tests all pass.                                                                                  |
-| `@blazetrails/did-you-mean`     | `did_you_mean` gem                 | `SpellChecker` with Jaro-Winkler and Levenshtein distances, for "Did you mean?" error suggestions. The parts trails uses are complete.                                                                                                                           |
-| `@blazetrails/ruby-compat`      | Ruby core / stdlib                 | Ruby primitives that Rails calls and does not define (`Range`, `Rational`, `Enumerator`, `String#succ`, `Hash#fetch` semantics, `Kernel#respond_to?`, monitors, `method_missing` proxies). A leaf package; see its [README](packages/ruby-compat/README.md).     |
-| `@blazetrails/tse-compiler`     | `erubi` gem                        | The TSE (Trails Server Embedded) template compiler: lexer, parser and JS emitter with source maps. Used by actionview and the view build.                                                                                                                        |
-| `@blazetrails/trails-tsc`       | none                               | A TypeScript 5.9 compiler wrapper with a plugin host. Today it builds and type-checks `.tse` views (`trails-tsc-views`) and provides the views language-service plugin. The model `trails-tsc` binary lives in `activerecord-cli`.                               |
-| `@blazetrails/html-sanitizer`   | `rails-html-sanitizer` gem         | `FullSanitizer`, `LinkSanitizer` and `SafeListSanitizer`, over `sanitize-html`. Small, and nothing in the workspace depends on it yet.                                                                                                                           |
-| `@blazetrails/nokogiri`         | `nokogiri` gem (XML SAX only)      | The slice of Nokogiri's XML SAX parser that ActiveSupport's `XmlMini` needs, over `libxml2-wasm`. Small.                                                                                                                                                         |
-| `@blazetrails/website`          | none                               | Private. The project website and docs site (SvelteKit + VitePress), including the guides linked above. Not a library.                                                                                                                                            |
+| Package                         | Rails source                       | What it is, and how usable it is today                                                                                                                                                                                                                                                                                                            |
+| ------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@blazetrails/activerecord`     | `activerecord`                     | The ORM: persistence, querying, associations, validations, callbacks, enums, migrations, schema dumping, transactions, encryption, fixtures. SQLite, PostgreSQL and MySQL adapters. The most complete package, and the one to evaluate first.                                                                                                     |
+| `@blazetrails/activemodel`      | `activemodel`                      | Attributes and type casting, validations, callbacks, dirty tracking, errors, naming, serialization, `has_secure_password`. Near-complete.                                                                                                                                                                                                         |
+| `@blazetrails/arel`             | `activerecord/lib/arel`            | The SQL AST, managers and per-dialect visitors that ActiveRecord builds its queries with. Near-complete. Class names drive visitor dispatch, so do not minify them.                                                                                                                                                                               |
+| `@blazetrails/activesupport`    | `activesupport`                    | Inflector, core extensions, `HashWithIndifferentAccess`, callbacks, concerns, notifications, caching, message verifiers and encryptors, time zones, `Duration`, JSON, testing helpers. Broad and mostly complete.                                                                                                                                 |
+| `@blazetrails/activerecord-cli` | the `rails db:*` tasks, standalone | The `ar` CLI for using ActiveRecord without trailties: `ar new`, `generate:model` / `migration`, `db:*`, `console`, `runner`, `models:dump`, plus the `trails-tsc` binary. Works.                                                                                                                                                                 |
+| `@blazetrails/actionpack`       | `actionpack`                       | ActionDispatch (routing and Journey, request/response, middleware, cookies, sessions, CSP, integration testing) and ActionController (Metal, Base, API, parameters, rendering, filters, rescue). Runs the full scaffold request cycle: routing, sessions, flash, CSRF protection and strong parameters. Coverage is in the parity snapshot below. |
+| `@blazetrails/actionview`       | `actionview`                       | Template lookup and rendering, layouts, partials, and helpers (tag, URL, form, asset, text, number, date, sanitize). Templates are TSE, the trails analogue of ERB. Renders Rails' scaffold views, including `formWith` and its form builder. Coverage is in the parity snapshot below.                                                           |
+| `@blazetrails/trailties`        | `railties`                         | The `trails` CLI (`new`, `generate`, `server`, `db`, `routes`, `console`, `credentials`), application boot and initializers, engines, generators, the Vite-backed dev server. Generates and serves a complete scaffolded app.                                                                                                                     |
+| `@blazetrails/rack`             | `rack` gem                         | Rack: the request/response interface, `Builder`, and the standard middleware. Nearly complete.                                                                                                                                                                                                                                                    |
+| `@blazetrails/rack-session`     | `rack-session` gem                 | `Rack::Session::Abstract::Persisted`, the cookie store, the pool store and the encryptor that ActionDispatch's session stores build on. Partial.                                                                                                                                                                                                  |
+| `@blazetrails/rack-test`        | `rack-test` gem                    | `Rack::Test::Session`, cookie jar, uploaded files and multipart, used by integration tests. Nearly complete.                                                                                                                                                                                                                                      |
+| `@blazetrails/globalid`         | `globalid` gem                     | `GlobalID`, `SignedGlobalID` and the locator. Nearly complete.                                                                                                                                                                                                                                                                                    |
+| `@blazetrails/i18n`             | `i18n` gem                         | `I18n` config, simple and fallback backends, interpolation, pluralization and exceptions. The whole gem test suite is ported.                                                                                                                                                                                                                     |
+| `@blazetrails/date`             | `date` gem                         | Ruby's `Date` / `DateTime`, built on Temporal (`@js-temporal/polyfill`). Re-exports `Temporal`, which is how trails represents time values. The ported date gem tests all pass.                                                                                                                                                                   |
+| `@blazetrails/did-you-mean`     | `did_you_mean` gem                 | `SpellChecker` with Jaro-Winkler and Levenshtein distances, for "Did you mean?" error suggestions. The parts trails uses are complete.                                                                                                                                                                                                            |
+| `@blazetrails/ruby-compat`      | Ruby core / stdlib                 | Ruby primitives that Rails calls and does not define (`Range`, `Rational`, `Enumerator`, `String#succ`, `Hash#fetch` semantics, `Kernel#respond_to?`, monitors, `method_missing` proxies). A leaf package; see its [README](packages/ruby-compat/README.md).                                                                                      |
+| `@blazetrails/tse-compiler`     | `erubi` gem                        | The TSE (Trails Server Embedded) template compiler: lexer, parser and JS emitter with source maps. Used by actionview and the view build.                                                                                                                                                                                                         |
+| `@blazetrails/trails-tsc`       | none                               | A TypeScript 5.9 compiler wrapper with a plugin host. Today it builds and type-checks `.tse` views (`trails-tsc-views`) and provides the views language-service plugin. The model `trails-tsc` binary lives in `activerecord-cli`.                                                                                                                |
+| `@blazetrails/html-sanitizer`   | `rails-html-sanitizer` gem         | `FullSanitizer`, `LinkSanitizer` and `SafeListSanitizer`, over `sanitize-html`. Small, and nothing in the workspace depends on it yet.                                                                                                                                                                                                            |
+| `@blazetrails/nokogiri`         | `nokogiri` gem (XML SAX only)      | The slice of Nokogiri's XML SAX parser that ActiveSupport's `XmlMini` needs, over `libxml2-wasm`. Small.                                                                                                                                                                                                                                          |
+| `@blazetrails/website`          | none                               | Private. The project website and docs site (SvelteKit + VitePress), including the guides linked above. Not a library.                                                                                                                                                                                                                             |
 
 ## Status and parity snapshot
 
