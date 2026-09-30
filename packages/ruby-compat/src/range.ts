@@ -247,6 +247,12 @@ export class Range<T = unknown> {
     yield* this.step(1);
   }
 
+  /** `vendor/ruby/v3.3.11/range.c:934` `range_each`, as JS's iteration protocol.
+   * @noRailsEquivalent PERMANENT */
+  *[Symbol.iterator](): Generator<T> {
+    yield* this.each();
+  }
+
   /** @noRailsEquivalent PERMANENT */
   map<R>(block: (value: T) => R): R[] {
     const ary: R[] = [];

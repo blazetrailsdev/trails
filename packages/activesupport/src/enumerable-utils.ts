@@ -3,39 +3,60 @@ import {
   NoMethodError,
   Rational,
   TypeError,
+  numericPlus,
   rbBuiltinClassName,
+  rbDbl2num,
   rbEqual,
+  rbFloatTypeP,
+  rbIntegerTypeP,
   rbObjClass,
 } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat/range";
+import { SoleItemExpectedError } from "./core-ext/enumerable.js";
 import { isPlainObject, valuesAt } from "./hash-utils.js";
 import { isBlank } from "./string-utils.js";
 
-/**
- * Ruby core `Enumerable#sum` (`vendor/ruby/v3.3.11/enum.c:4760` `enum_sum`), which
- * Rails' `core_ext/enumerable.rb` inherits rather than defines: `init` (default
- * `0`) is added to each element (or each block value) by the element's own `+`.
- */
-export function sum(collection: Iterable<number>): number;
-export function sum<T>(collection: Iterable<T>, block: (element: T) => number): number;
-export function sum<T>(collection: Iterable<T>, ...args: unknown[]): unknown;
-export function sum<T>(collection: Iterable<T>, ...args: unknown[]): unknown {
-  const block =
-    typeof args[args.length - 1] === "function"
-      ? (args.pop() as (element: T) => unknown)
-      : undefined;
-  let v: unknown = args.length === 0 ? 0 : args[0];
-  for (const element of collection) {
-    const i = block ? block(element) : element;
-    v = sumIterSomeValue(v, i);
+interface EnumSumMemo {
+  v: unknown;
+  r: Rational | undefined;
+  n: number;
+  f: number;
+  c: number;
+  blockGiven: boolean;
+  floatValue: boolean;
+}
+
+/** `sum_iter_normalize_memo` (`vendor/ruby/v3.3.11/enum.c:4539`). */
+function sumIterNormalizeMemo(memo: EnumSumMemo): void {
+  memo.v = numericPlus(memo.n, memo.v);
+  memo.n = 0;
+  if (memo.r !== undefined) memo.v = numericPlus(memo.r, memo.v);
+  memo.r = undefined;
+}
+
+/** `sum_iter_fixnum` (`vendor/ruby/v3.3.11/enum.c:4554`). */
+function sumIterFixnum(i: number, memo: EnumSumMemo): void {
+  memo.n += i;
+  if (!Number.isSafeInteger(memo.n)) {
+    memo.v = numericPlus(BigInt(memo.n), memo.v);
+    memo.n = 0;
   }
-  return v;
+}
+
+/** `sum_iter_bignum` (`vendor/ruby/v3.3.11/enum.c:4564`). */
+function sumIterBignum(i: bigint, memo: EnumSumMemo): void {
+  memo.v = numericPlus(i, memo.v);
+}
+
+/** `sum_iter_rational` (`vendor/ruby/v3.3.11/enum.c:4570`). */
+function sumIterRational(i: Rational, memo: EnumSumMemo): void {
+  if (memo.r === undefined) memo.r = i;
+  else memo.r = memo.r.add(i);
 }
 
 /** `sum_iter_some_value` (`vendor/ruby/v3.3.11/enum.c:4581`): `memo->v + i`. */
 function sumIterSomeValue(v: unknown, i: unknown): unknown {
-  if (typeof v === "number" || typeof v === "bigint" || v instanceof Rational) {
-    return numericPlus(v, i);
-  }
+  if (rbIntegerTypeP(v) || rbFloatTypeP(v) || v instanceof Rational) return numericPlus(v, i);
   if (typeof v === "string") {
     if (typeof i !== "string") {
       throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(i)} into String`);
@@ -55,30 +76,114 @@ function sumIterSomeValue(v: unknown, i: unknown): unknown {
   );
 }
 
-/**
- * `Integer#+` / `Float#+` / `Rational#+` (`vendor/ruby/v3.3.11/numeric.c:3983` `rb_int_plus`,
- * `numeric.c:1176` `rb_float_plus`, `vendor/ruby/v3.3.11/rational.c:724` `rb_rational_plus`); a
- * non-numeric addend goes through `rb_num_coerce_bin` (`numeric.c:477`).
- */
-function numericPlus(v: number | bigint | Rational, i: unknown): unknown {
-  if (i instanceof Rational || v instanceof Rational) {
-    const [r, other] = v instanceof Rational ? [v, i] : [i as Rational, v];
-    if (typeof other === "number" && !Number.isInteger(other)) return r.toF() + other;
-    if (typeof other === "number" || typeof other === "bigint" || other instanceof Rational) {
-      return r.add(other);
+/** `sum_iter_Kahan_Babuska` (`vendor/ruby/v3.3.11/enum.c:4587`). */
+function sumIterKahanBabuska(i: unknown, memo: EnumSumMemo): void {
+  let x: number;
+  if (rbFloatTypeP(i)) x = i.valueOf();
+  else if (typeof i === "number") x = i;
+  else if (typeof i === "bigint") x = Number(i);
+  else if (i instanceof Rational) x = i.toF();
+  else {
+    memo.v = rbDbl2num(memo.f);
+    memo.floatValue = false;
+    memo.v = sumIterSomeValue(memo.v, i);
+    return;
+  }
+  const f = memo.f;
+  if (Number.isNaN(f)) return;
+  else if (!Number.isFinite(x)) {
+    if (!Number.isNaN(x) && !Number.isFinite(f) && x > 0 !== f > 0) {
+      i = rbDbl2num(f);
+      x = NaN;
     }
-  } else if (typeof i === "number" || typeof i === "bigint") {
-    if (typeof v === typeof i) return (v as number) + (i as number);
-    const [n, b] = typeof v === "bigint" ? [i as number, v] : [v, i as bigint];
-    return Number.isInteger(n) ? BigInt(n) + b : n + Number(b);
+    memo.v = i;
+    memo.f = x;
+    return;
+  } else if (!Number.isFinite(f)) return;
+
+  let c = memo.c;
+  const t = f + x;
+  if (Math.abs(f) >= Math.abs(x)) c += f - t + x;
+  else c += x - t + f;
+  memo.f = t;
+  memo.c = c;
+}
+
+/** `sum_iter` (`vendor/ruby/v3.3.11/enum.c:4641`). */
+function sumIter<T>(i: unknown, memo: EnumSumMemo, block?: (element: T) => unknown): void {
+  if (memo.blockGiven) i = block!(i as T);
+
+  if (memo.floatValue) {
+    sumIterKahanBabuska(i, memo);
+  } else if (rbIntegerTypeP(memo.v) || rbFloatTypeP(memo.v) || memo.v instanceof Rational) {
+    if (typeof i === "number" && Number.isInteger(i)) sumIterFixnum(i, memo);
+    else if (typeof i === "bigint") sumIterBignum(i, memo);
+    else if (i instanceof Rational) sumIterRational(i, memo);
+    else if (rbFloatTypeP(i)) {
+      sumIterNormalizeMemo(memo);
+      memo.f = memo.v instanceof Rational ? memo.v.toF() : Number((memo.v as number).valueOf());
+      memo.c = 0.0;
+      memo.floatValue = true;
+      sumIterKahanBabuska(i, memo);
+    } else {
+      sumIterNormalizeMemo(memo);
+      memo.v = sumIterSomeValue(memo.v, i);
+    }
+  } else {
+    memo.v = sumIterSomeValue(memo.v, i);
   }
-  // `do_coerce` (`vendor/ruby/v3.3.11/numeric.c:455`).
-  const coerce = (i as { coerce?: unknown } | null)?.coerce;
-  if (typeof coerce !== "function") {
-    throw new TypeError(`${rbBuiltinClassName(i)} can't be coerced into ${rbObjClass(v)}`);
+}
+
+/** `int_range_sum` (`vendor/ruby/v3.3.11/enum.c:4701`). */
+function intRangeSum(beg: number | bigint, end: number | bigint, excl: boolean, init: unknown) {
+  if (excl) end = typeof end === "bigint" ? end - 1n : end - 1;
+  if (BigInt(end) >= BigInt(beg)) {
+    const a = ((BigInt(end) - BigInt(beg) + 1n) * (BigInt(end) + BigInt(beg))) / 2n;
+    return numericPlus(init, Number.isSafeInteger(Number(a)) ? Number(a) : a);
   }
-  const [x, y] = coerce.call(i, v) as [unknown, unknown];
-  return sumIterSomeValue(x, y);
+  return init;
+}
+
+/** Ruby core `Enumerable#sum` (`vendor/ruby/v3.3.11/enum.c:4760` `enum_sum`). */
+export function sum(collection: Iterable<number>): number;
+export function sum<T>(collection: Iterable<T>, block: (element: T) => number): number;
+export function sum<T>(collection: Iterable<T>, ...args: unknown[]): unknown;
+export function sum<T>(collection: Iterable<T>, ...args: unknown[]): unknown {
+  const block =
+    typeof args[args.length - 1] === "function"
+      ? (args.pop() as (element: T) => unknown)
+      : undefined;
+  const memo: EnumSumMemo = {
+    v: args.length === 0 ? 0 : args[0],
+    blockGiven: block !== undefined,
+    n: 0,
+    r: undefined,
+    f: 0.0,
+    c: 0.0,
+    floatValue: false,
+  };
+
+  if ((memo.floatValue = rbFloatTypeP(memo.v))) {
+    memo.f = memo.v.valueOf();
+    memo.c = 0.0;
+  }
+
+  if (collection instanceof Range) {
+    const { begin: beg, end, excludeEnd: excl } = collection as Range<unknown>;
+    if (!memo.blockGiven && !memo.floatValue && rbIntegerTypeP(beg) && rbIntegerTypeP(end)) {
+      return intRangeSum(beg, end, excl, memo.v);
+    }
+  }
+
+  for (const element of collection) sumIter(element, memo, block);
+
+  if (memo.floatValue) {
+    return rbDbl2num(memo.f + memo.c);
+  } else {
+    if (memo.n !== 0) memo.v = numericPlus(memo.n, memo.v);
+    if (memo.r !== undefined) memo.v = numericPlus(memo.r, memo.v);
+    return memo.v;
+  }
 }
 
 export function indexBy<T, K extends string | number>(
@@ -274,7 +379,7 @@ export function pick<T, K extends keyof T>(
 
 export function sole<T>(collection: T[], fn?: (item: T) => boolean): T {
   const filtered = fn ? collection.filter(fn) : collection;
-  if (filtered.length === 0) throw new Error("no matching element found");
-  if (filtered.length > 1) throw new Error(`multiple elements found (${filtered.length})`);
+  if (filtered.length === 0) throw new SoleItemExpectedError("no item found");
+  if (filtered.length > 1) throw new SoleItemExpectedError("multiple items found");
   return filtered[0];
 }

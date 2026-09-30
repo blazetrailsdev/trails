@@ -1,7 +1,10 @@
+import { Complex } from "./complex.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { NilClass } from "./nil-class.js";
 import { NoMethodError } from "./no-method-error.js";
-import { rbObjClass } from "./object.js";
+import { rbBuiltinClassName, rbObjClass } from "./object.js";
+import { Rational } from "./rational.js";
+import { TypeError } from "./type-error.js";
 import { rbStrToI } from "./string/convert.js";
 import { isSymbol } from "./symbol.js";
 
@@ -59,4 +62,59 @@ export function toI(obj: unknown): number | bigint {
     return (obj as { toI(): number | bigint }).toI();
   }
   throw new NoMethodError(`undefined method 'to_i' for an instance of ${rbObjClass(obj)}`);
+}
+
+/**
+ * `RB_FLOAT_TYPE_P` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:263`)
+ * over the Float seats `rbObjClass` reads: a fractional `number`, or a boxed one.
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbFloatTypeP(x: unknown): x is number {
+  return x instanceof Number || (typeof x === "number" && !Number.isInteger(x));
+}
+
+/**
+ * `DBL2NUM` (`vendor/ruby/v3.3.11/include/ruby/internal/arithmetic/double.h:29`), boxed when whole-valued.
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbDbl2num(d: number): number {
+  return (Number.isInteger(d) ? new Number(d) : d) as number;
+}
+
+/**
+ * `RB_INTEGER_TYPE_P` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:94`).
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbIntegerTypeP(x: unknown): x is number | bigint {
+  return typeof x === "bigint" || (typeof x === "number" && Number.isInteger(x));
+}
+
+/**
+ * `fix_plus` (`vendor/ruby/v3.3.11/numeric.c:3942`), `rb_float_plus` (`numeric.c:1176`),
+ * `rb_rational_plus` (`vendor/ruby/v3.3.11/rational.c:724`), else `rb_num_coerce_bin`.
+ * @noRailsEquivalent PERMANENT
+ */
+export function numericPlus(x: unknown, y: unknown): unknown {
+  if (rbFloatTypeP(x)) {
+    if (rbIntegerTypeP(y) || rbFloatTypeP(y)) return rbDbl2num(x.valueOf() + Number(y.valueOf()));
+  } else if (x instanceof Rational) {
+    if (rbIntegerTypeP(y)) return x.add(y);
+    if (rbFloatTypeP(y)) return rbDbl2num(x.toF() + y.valueOf());
+    if (y instanceof Rational) return x.add(y);
+  } else if (rbIntegerTypeP(x)) {
+    if (rbIntegerTypeP(y)) {
+      if (typeof x === typeof y) return (x as number) + (y as number);
+      return BigInt(x) + BigInt(y);
+    }
+    if (rbFloatTypeP(y)) return rbDbl2num(Number(x) + y.valueOf());
+    if (y instanceof Complex) return y.plus(x);
+  }
+  // `do_coerce` (`vendor/ruby/v3.3.11/numeric.c:455`).
+  const coerce = (y as { coerce?: unknown } | null)?.coerce;
+  if (typeof coerce !== "function") {
+    throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClass(x)}`);
+  }
+  const [a, b] = coerce.call(y, x) as [unknown, unknown];
+  if (rbIntegerTypeP(a) || rbFloatTypeP(a) || a instanceof Rational) return numericPlus(a, b);
+  return (a as { plus(other: unknown): unknown }).plus(b);
 }

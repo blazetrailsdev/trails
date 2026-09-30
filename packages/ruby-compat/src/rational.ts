@@ -5,6 +5,10 @@
  * and Rails calls the function, so both ship here.
  */
 import { FloatDomainError } from "./float-domain-error.js";
+import { rbIntegerTypeP } from "./numeric.js";
+import { rbObjClass } from "./object.js";
+import { rbEqual } from "./rb-equal.js";
+import { TypeError } from "./type-error.js";
 
 /** Ruby core `ZeroDivisionError`, what `rb_num_zerodiv`
  * (`vendor/ruby/v3.3.11/numeric.c:206`) raises for a denominator of zero.
@@ -149,6 +153,34 @@ export class Rational {
       );
     }
     return new Rational(this.numerator + BigInt(other) * this.denominator, this.denominator);
+  }
+
+  /** `vendor/ruby/v3.3.11/rational.c:1128` `nurat_eqeq_p` (`Rational#==`). A Float
+   * operand compares as a double; anything else is asked `other == self`.
+   * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
+  equals(other: unknown): boolean {
+    if (rbIntegerTypeP(other)) {
+      if (this.numerator === 0n && BigInt(other) === 0n) return true;
+      if (this.denominator !== 1n) return false;
+      return this.numerator === BigInt(other);
+    } else if (other instanceof Number || typeof other === "number") {
+      return this.toF() === other.valueOf();
+    } else if (other instanceof Rational) {
+      if (this.numerator === 0n && other.numerator === 0n) return true;
+      return this.numerator === other.numerator && this.denominator === other.denominator;
+    } else {
+      return rbEqual(other, this);
+    }
+  }
+
+  /** `vendor/ruby/v3.3.11/rational.c:1170` `nurat_coerce` (`Rational#coerce`), for the
+   * Integer, Float and Rational operands this port needs.
+   * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
+  coerce(other: unknown): [unknown, unknown] {
+    if (rbIntegerTypeP(other)) return [new Rational(other, 1), this];
+    else if (other instanceof Number || typeof other === "number") return [other, this.toF()];
+    else if (other instanceof Rational) return [other, this];
+    throw new TypeError(`${rbObjClass(other)} can't be coerced into Rational`);
   }
 
   /** `vendor/ruby/v3.3.11/rational.c:861` `rb_rational_mul` (`Rational#*`), for the

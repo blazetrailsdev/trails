@@ -388,6 +388,7 @@ export {
 
 export * from "./time-ext.js";
 import "./core-ext/time/calculations.js";
+import "./core-ext/enumerable.js";
 export * from "./core-ext/time/conversions.js";
 export { rfc3339 } from "./time-ext.js";
 export * from "./core-ext/time/compatibility.js";

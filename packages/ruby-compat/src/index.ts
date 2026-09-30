@@ -168,6 +168,8 @@ export { NameError } from "./name-error.js";
 export { NilClass } from "./nil-class.js";
 export { NoMethodError } from "./no-method-error.js";
 export { anybits, round, toI } from "./numeric.js";
+export { numericPlus, rbDbl2num, rbFloatTypeP, rbIntegerTypeP } from "./numeric.js";
+export { Complex, complex } from "./complex.js";
 export { NotImplementedError } from "./not-implemented-error.js";
 export { prepend } from "./prepend.js";
 export { Process } from "./process.js";
