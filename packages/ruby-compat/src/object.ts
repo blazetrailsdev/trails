@@ -123,8 +123,9 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
  * `empty?` for (`array.c:2686`, `hash.c:3023`, `string.c:2243`), whose JS
  * values carry no such member. `isInclude` is bound for the same receivers and
  * `Set`, which define `include?` (`array.c:8679`, `hash.c:7255`,
- * `string.c:12215`, `lib/set.rb:393`), and `toSym` for a String
- * (`string.c:12212`).
+ * `string.c:12215`, `lib/set.rb:393`), and `toSym` for every JS string
+ * (`string.c:12212`), which spells both a Ruby String and a Ruby Symbol
+ * (`":name"`); Symbol answers `to_sym` too (`symbol.rb:8`).
  *
  * A class receiver (a non-writable `prototype`, which a plain function, the
  * JS spelling of a `Proc`, does not have) answers `Module#respond_to?`: its static data fields hold
@@ -146,17 +147,7 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
 export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true): boolean {
   if (typeof obj === "string" && (mid === "toStr" || mid === "toSym")) return true;
   if (
-    mid === "isInclude" &&
-    (typeof obj === "string" ||
-      Array.isArray(obj) ||
-      obj instanceof Set ||
-      obj instanceof Map ||
-      isPlainHash(obj))
-  ) {
-    return true;
-  }
-  if (
-    mid === "isEmpty" &&
+    (mid === "isEmpty" || mid === "isInclude") &&
     (typeof obj === "string" ||
       Array.isArray(obj) ||
       obj instanceof Set ||
