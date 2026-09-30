@@ -841,6 +841,7 @@ jobs:
           scripts/rails-file-structure-collisions.test.ts
           scripts/deprecated-manifest-diff.test.ts
           scripts/ci-suite-coverage.test.ts
+          scripts/ci/bg-gates.test.mjs
           scripts/mixin-declaration-drift.test.ts
           scripts/mysql-grant-namespaces.test.ts
           scripts/stale-story-references.test.ts
@@ -1671,12 +1672,37 @@ jobs:
           key: vendor-sources-${{ hashFiles('vendor/sources.ts', 'vendor/sources.lock.json', 'vendor/fetch.ts') }}
       - name: Fetch upstream Ruby sources
         run: pnpm vendor:fetch
+      - name: Start background gates
+        run: |
+          node scripts/ci/bg-gates.mjs start <<'SPEC'
+          ts-api: pnpm exec tsx scripts/api-compare/extract-ts-api.ts
+          ruby-api: cd scripts/api-compare && LIB_PATHS_JSON=$(pnpm --silent -C ../.. vendor:fetch --print-lib-paths) LIB_ENTRY_FILES_JSON=$(pnpm --silent -C ../.. vendor:fetch --print-lib-entry-files) LOCKFILE_PATH=$GITHUB_WORKSPACE/vendor/sources.lock.json ruby extract-ruby-api.rb
+          ruby-tests: cd scripts/test-compare && TEST_PATHS_JSON=$(pnpm --silent -C ../.. vendor:fetch --print-test-paths) ruby extract-ruby-tests.rb
+          deprecated: pnpm exec tsx scripts/build-rails-privates-manifest.ts --check-deprecated
+          eslint-excludes: pnpm exec tsx scripts/generate-standalone-associations-exclude.ts && pnpm exec tsx scripts/test-deps/rails-test-deps.ts && pnpm exec tsx scripts/test-deps/build-fixture-baseline.ts
+          privates-manifest after ruby-api,deprecated: pnpm exec tsx scripts/build-rails-privates-manifest.ts
+          method-order-manifest after ruby-api: RAILS_STRUCTURE_REPORT=1 pnpm exec tsx scripts/build-rails-file-structure-manifest.ts
+          test-names-manifest after ruby-tests: pnpm exec tsx scripts/build-rails-test-names-manifest.ts
+          rails-private after privates-manifest: pnpm exec eslint --no-inline-config --config eslint/rails-private-jsdoc.config.mjs packages
+          method-order after privates-manifest,eslint-excludes,method-order-manifest,test-names-manifest: pnpm exec eslint packages/arel/src packages/activemodel/src
+          test-names after privates-manifest,eslint-excludes,method-order-manifest,test-names-manifest: pnpm exec eslint packages/actionview/src packages/arel/src packages/date/src packages/did-you-mean/src packages/i18n/src --max-warnings 0
+          dep-lint after ruby-api: pnpm exec tsx scripts/api-compare/lint-deps.ts
+          detached-jsdoc: pnpm exec tsx scripts/api-compare/lint-detached-jsdoc-tags.ts
+          test-compare after ruby-tests: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/compare.ts --gates --check
+          assertions after test-compare: pnpm exec tsx scripts/test-compare/lint-assertion-mismatches.ts --no-regen
+          closure after ruby-tests: pnpm exec tsx scripts/test-compare/closure-cli.ts --check
+          schema-tests: pnpm vitest run scripts/schema-compare
+          fixtures: pnpm exec tsx scripts/fixtures-compare/compare.ts --package activerecord --ci
+          models: pnpm exec tsx scripts/fixtures-compare/compare.ts --models
+          legacy-names: pnpm exec tsx scripts/parity/lint-legacy-script-names.ts
+          schema: pnpm exec tsx scripts/schema-compare/compare.ts
+          missing-call-reasons: pnpm exec tsx scripts/api-compare/lint-missing-rails-call-reasons.ts
+          conventions-doc: pnpm exec tsx scripts/parity/conventions-doc.ts --check
+          SPEC
       - name: Extract Ruby API
-        run: cd scripts/api-compare && LIB_PATHS_JSON=$(pnpm --silent -C ../.. vendor:fetch --print-lib-paths) LIB_ENTRY_FILES_JSON=$(pnpm --silent -C ../.. vendor:fetch --print-lib-entry-files) LOCKFILE_PATH=$GITHUB_WORKSPACE/vendor/sources.lock.json ruby extract-ruby-api.rb
-      - name: Extract Ruby tests
-        run: cd scripts/test-compare && TEST_PATHS_JSON=$(pnpm --silent -C ../.. vendor:fetch --print-test-paths) ruby extract-ruby-tests.rb
+        run: node scripts/ci/bg-gates.mjs wait ruby-api
       - name: API comparison
-        run: pnpm exec tsx scripts/api-compare/extract-ts-api.ts && pnpm exec tsx scripts/api-compare/compare.ts
+        run: node scripts/ci/bg-gates.mjs wait ts-api && pnpm exec tsx scripts/api-compare/compare.ts
       - name: API comparison (privates)
         run: pnpm exec tsx scripts/api-compare/compare.ts --privates
       - name: Extra-surface tag gates
@@ -1686,13 +1712,6 @@ jobs:
         # api-compare manifests the step above already wrote. No --exclude-glob:
         # an exclusion disarms the stale gate (see extra-surface.ts `main()`).
         run: pnpm exec tsx scripts/api-compare/extra-surface.ts
-      - name: Legacy compare-script name gate
-        # RFC 0092. Fails on any retired compare-script spelling reintroduced
-        # anywhere outside vendor/rails and build output — the aliases in the
-        # root package.json are a shim for out-of-repo callers, not a licence to
-        # write the old names. The fix is the parity:* spelling, never a new
-        # allowlist row. Read-only; needs no Ruby or artifact.
-        run: pnpm exec tsx scripts/parity/lint-legacy-script-names.ts
       - name: Arity excludes gate
         # Fails on a malformed or STALE entry in
         # scripts/api-compare/arity-exclude.json (the reasoned suppression file
@@ -1705,22 +1724,6 @@ jobs:
         # file for the inheritance check, applied by the API comparison step
         # above). Excludes only shrink — delete a converged entry by hand.
         run: pnpm exec tsx scripts/api-compare/lint-inheritance-excludes.ts
-      - name: Missing-call reasons gate
-        # Enforces the `@missingRailsCall` empty-reason contract (the same
-        # `parseJsdoc` check `parity:api:build` uses) over every JSDoc block
-        # under packages/*/src. Read-only and artifact-free: `parity:api:build`
-        # itself is opt-in and rewrites files, so without this step a
-        # hand-authored bare tag would sit undetected. See the bullet in
-        # docs/infrastructure/api-build-stub-generation-plan.md.
-        run: pnpm exec tsx scripts/api-compare/lint-missing-rails-call-reasons.ts
-      - name: Detached JSDoc tag blocks gate
-        # Flags `@internal` / `@noRailsEquivalent` blocks separated from the
-        # declaration they document (a `//` comment between the block and the
-        # signature is the usual shape). The tag then stops applying to that
-        # declaration — the member reads as unjustified public surface, or the
-        # tag excuses a neighbour it was never written for, and both look
-        # exactly like "no tag was written". Read-only; no Ruby needed.
-        run: pnpm exec tsx scripts/api-compare/lint-detached-jsdoc-tags.ts
       - name: Body-pins gate
         # Source-hash pinning (RFC 0025). Fails when a pinned pair's normalized
         # Rails body digest drifts from the current vendored source
@@ -1868,17 +1871,40 @@ jobs:
           git --no-pager diff --stat -- "$baseline" "$mark"
           git --no-pager diff -- "$baseline" "$mark"
           exit 1
+      - name: Legacy compare-script name gate
+        # RFC 0092. Fails on any retired compare-script spelling reintroduced
+        # anywhere outside vendor/rails and build output — the aliases in the
+        # root package.json are a shim for out-of-repo callers, not a licence to
+        # write the old names. The fix is the parity:* spelling, never a new
+        # allowlist row. Read-only; needs no Ruby or artifact.
+        run: node scripts/ci/bg-gates.mjs wait legacy-names
+      - name: Missing-call reasons gate
+        # Enforces the `@missingRailsCall` empty-reason contract (the same
+        # `parseJsdoc` check `parity:api:build` uses) over every JSDoc block
+        # under packages/*/src. Read-only and artifact-free: `parity:api:build`
+        # itself is opt-in and rewrites files, so without this step a
+        # hand-authored bare tag would sit undetected. See the bullet in
+        # docs/infrastructure/api-build-stub-generation-plan.md.
+        run: node scripts/ci/bg-gates.mjs wait missing-call-reasons
+      - name: Detached JSDoc tag blocks gate
+        # Flags `@internal` / `@noRailsEquivalent` blocks separated from the
+        # declaration they document (a `//` comment between the block and the
+        # signature is the usual shape). The tag then stops applying to that
+        # declaration — the member reads as unjustified public surface, or the
+        # tag excuses a neighbour it was never written for, and both look
+        # exactly like "no tag was written". Read-only; no Ruby needed.
+        run: node scripts/ci/bg-gates.mjs wait detached-jsdoc
       - name: Conventions doc up to date
         # docs/ruby-ts-conventions.md is generated from explainConventions()
         # in conventions.ts; fail if it drifts so the agent-facing doc can't
         # go stale. Regenerate with `pnpm parity:api:conventions`.
-        run: pnpm exec tsx scripts/parity/conventions-doc.ts --check
+        run: node scripts/ci/bg-gates.mjs wait conventions-doc
       - name: Deprecation manifest up to date
         # eslint/rails-deprecated-methods.json is generated from the vendored
         # Ruby; fail if it drifts — a partial regeneration silently DROPS
         # entries and with them the rails-deprecated-jsdoc coverage for those
         # methods. Regenerate with `pnpm rails-privates:manifest`.
-        run: pnpm exec tsx scripts/build-rails-privates-manifest.ts --check-deprecated
+        run: node scripts/ci/bg-gates.mjs wait deprecated
       - name: ESLint exclude baselines up to date
         # Both baselines are generated grandfather lists that only shrink as
         # sites convert. Nothing read them back, so they drifted ~200 rows loose
@@ -1887,9 +1913,7 @@ jobs:
         # `pnpm fixture-baseline:refresh`.
         run: |
           set -euo pipefail
-          pnpm exec tsx scripts/generate-standalone-associations-exclude.ts
-          pnpm exec tsx scripts/test-deps/rails-test-deps.ts
-          pnpm exec tsx scripts/test-deps/build-fixture-baseline.ts
+          node scripts/ci/bg-gates.mjs wait eslint-excludes
           baselines='eslint/no-standalone-associations-exclude.json eslint/expected-fixtures-exclude.json'
           if git diff --quiet -- $baselines; then
             echo "ESLint exclude baselines are in sync with a fresh regeneration."
@@ -1905,15 +1929,15 @@ jobs:
         # against scripts/schema-compare/invented-baseline.json — pre-existing
         # debt only, and the baseline must never grow. Shape divergences on
         # shared tables are report-only for now (`--verbose` lists them).
-        run: pnpm exec tsx scripts/schema-compare/compare.ts
+        run: node scripts/ci/bg-gates.mjs wait schema
       - name: Schema comparison unit tests
         # scripts/schema-compare/compare.test.ts parses the REAL vendored
         # test/schema/schema.rb (not just synthetic snippets), so it only has
         # signal after the vendor:fetch step above — hence here rather than in
         # the unit-tests job, where the rest of the compare tooling's tests run.
-        run: pnpm vitest run scripts/schema-compare
+        run: node scripts/ci/bg-gates.mjs wait schema-tests
       - name: Dependency lint
-        run: pnpm exec tsx scripts/api-compare/lint-deps.ts
+        run: node scripts/ci/bg-gates.mjs wait dep-lint
       - name: Rails-private JSDoc lint
         # Needs rails-api.json (extracted above) to enforce
         # blazetrails/rails-private-jsdoc. The standalone Lint job has no Ruby
@@ -1925,9 +1949,7 @@ jobs:
         # rather than re-running the whole ruleset (which would duplicate the
         # Lint job). Linting only packages/arel/src here left activesupport,
         # activemodel, actionpack, actionview and activerecord unenforced.
-        run: |
-          pnpm exec tsx scripts/build-rails-privates-manifest.ts
-          pnpm exec eslint --no-inline-config --config eslint/rails-private-jsdoc.config.mjs packages
+        run: node scripts/ci/bg-gates.mjs wait privates-manifest rails-private
       - name: Rails-private runtime artifact up to date
         # The step above regenerated everything the privates builder emits,
         # including the committed TS module a runtime package imports (the JSON
@@ -1958,38 +1980,41 @@ jobs:
         # (to stderr, non-failing) any manifest bucket that matched no container
         # — a renamed class past the fallback, or a module ported as a class —
         # so the silent-drop surface stays visible in the job log.
-        env:
-          RAILS_STRUCTURE_REPORT: "1"
-        run: pnpm exec tsx scripts/build-rails-file-structure-manifest.ts && pnpm exec eslint packages/arel/src packages/activemodel/src
+        run: node scripts/ci/bg-gates.mjs wait method-order-manifest method-order
+      - name: Extract Ruby tests
+        run: node scripts/ci/bg-gates.mjs wait ruby-tests
       - name: Rails test-name parity ratchet
         # Only-shrink per-file gate on TS-only tests sitting in Rails-named
         # test files (RFC 0124). The manifest needs the Ruby test extraction
         # above, so like the file-structure rule this is the only job that can
         # enforce it. Tighten after moving tests out with
         # `pnpm parity:test:names:tighten`.
-        run: pnpm exec tsx scripts/build-rails-test-names-manifest.ts && pnpm exec eslint packages/actionview/src packages/arel/src packages/date/src packages/did-you-mean/src packages/i18n/src --max-warnings 0
+        run: node scripts/ci/bg-gates.mjs wait test-names-manifest test-names
       - name: Test comparison
         # --gates prints the adapter/feature gate-mismatch breakdown; --check
         # fails the step if activerecord's gate-mismatch count is non-zero
         # (hard zero, no baseline — RFC 0032 ar-gate-fidelity-burndown).
-        run: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/compare.ts --gates --check
+        run: node scripts/ci/bg-gates.mjs wait test-compare
       - name: Assertion-mismatch ratchet
         # Only-shrink gate on the assertion-count / kind / value totals inside
         # name-matched tests (RFC 0025). Reads output/convention-comparison.json
         # written by the step above — --no-regen because CI must not pay for the
         # extraction twice. Reseed after convergence with
         # `pnpm parity:test:assertions:reseed`.
-        run: pnpm exec tsx scripts/test-compare/lint-assertion-mismatches.ts --no-regen
+        run: node scripts/ci/bg-gates.mjs wait assertions
       - name: AR-closure test manifest guard
         # Fails when a file under vendor/rails/v8.0.2/activesupport/test/ is neither
         # derived by R1/R2 nor aliased nor listed out-of-closure, so a vendor
         # bump cannot land a new Rails test file silently on either side of the
         # boundary (RFC 0105). Manifest only — it moves no denominator.
-        run: pnpm exec tsx scripts/test-compare/closure-cli.ts --check
+        run: node scripts/ci/bg-gates.mjs wait closure
       - name: Fixtures comparison
-        run: pnpm exec tsx scripts/fixtures-compare/compare.ts --package activerecord --ci
+        run: node scripts/ci/bg-gates.mjs wait fixtures
       - name: Models comparison
-        run: pnpm exec tsx scripts/fixtures-compare/compare.ts --models
+        run: node scripts/ci/bg-gates.mjs wait models
+      - name: Background gate timings
+        if: always()
+        run: node scripts/ci/bg-gates.mjs summary
 
   schema-parity-rails:
     name: Schema Parity (Rails side)
