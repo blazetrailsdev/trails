@@ -1,14 +1,15 @@
-/** @noRailsEquivalent PERMANENT */
-import { temporalClassName, temporalTag } from "../temporal-tag.js";
+/** @noRailsEquivalent CONVERGEABLE arel-visitor-class-names-onto-ruby-compat */
+import { temporalTag } from "@blazetrails/ruby-compat";
+import { temporalClassName } from "../temporal-tag.js";
 
 const rubyNamespace: unique symbol = Symbol.for("@blazetrails:rubyNamespace");
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE arel-visitor-class-names-onto-ruby-compat */
 export function setRubyNamespace(ctor: object, nesting: string): void {
   Object.defineProperty(ctor, rubyNamespace, { value: nesting });
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE arel-visitor-class-names-onto-ruby-compat */
 export function rubyConstantName(ctor: object): string | null {
   const { name, [rubyNamespace]: nesting } = ctor as {
     name?: string;

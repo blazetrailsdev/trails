@@ -14,7 +14,6 @@ import { Grouping } from "./nodes/grouping.js";
 import { BitwiseNot } from "./nodes/unary-operation.js";
 import type { NodeOrValue } from "./nodes/binary.js";
 
-/** @noRailsEquivalent PERMANENT */
 export interface MathModule {
   multiply(other: NodeOrValue): Multiplication;
   add(other: NodeOrValue): Grouping;

@@ -46,7 +46,7 @@ export class Attribute extends Node {
     return this.relation.isAbleToTypeCast();
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE arel-struct-and-string-protocol-from-ruby-compat */
   hash(): number {
     return rbHash([this.constructor, this.relation, this.name]);
   }

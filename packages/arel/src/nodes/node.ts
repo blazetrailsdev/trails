@@ -57,7 +57,7 @@ export class Node {
    * copies neither frozen state nor extended modules, so they are already
    * `dup` + `initialize_copy` (`object.c:543-547`), not `Object#clone`.
    *
-   * @noRailsEquivalent PERMANENT
+   * @noRailsEquivalent CONVERGEABLE arel-copy-hooks-onto-rbobjclone-initialize-copy
    */
   dup(): this {
     return cloneSlot(this);

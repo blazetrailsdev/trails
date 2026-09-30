@@ -1,4 +1,3 @@
-/** @noRailsEquivalent PERMANENT */
 export interface ArelConnection {
   /** @internal */
   quoteTableName(name: unknown): string;
