@@ -1,6 +1,6 @@
+import { rbObjClone } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import type { Table } from "../table.js";
 
@@ -35,12 +35,10 @@ export class InsertStatement extends Node {
     );
   }
 
-  clone(): this {
-    const copy = objectClone(this);
-    copy.columns = [...this.columns];
-    if (this.values) copy.values = cloneSlot(this.values);
-    if (this.select) copy.select = cloneSlot(this.select);
-    return copy;
+  initializeCopy(_other: InsertStatement): void {
+    this.columns = rbObjClone(this.columns);
+    if (this.values != null) this.values = rbObjClone(this.values);
+    if (this.select != null) this.select = rbObjClone(this.select);
   }
 }
 

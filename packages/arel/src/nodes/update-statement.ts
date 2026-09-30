@@ -1,6 +1,6 @@
+import { rbObjClone } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import type { Table } from "../table.js";
 
@@ -56,11 +56,9 @@ export class UpdateStatement extends Node {
     );
   }
 
-  clone(): this {
-    const copy = objectClone(this);
-    copy.wheres = [...this.wheres];
-    copy.values = [...this.values];
-    return copy;
+  initializeCopy(_other: UpdateStatement): void {
+    this.wheres = rbObjClone(this.wheres);
+    this.values = rbObjClone(this.values);
   }
 }
 

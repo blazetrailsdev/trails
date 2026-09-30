@@ -1,6 +1,6 @@
+import { rbObjClone } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import type { Table } from "../table.js";
 
@@ -53,11 +53,9 @@ export class DeleteStatement extends Node {
     );
   }
 
-  clone(): this {
-    const copy = objectClone(this);
-    if (this.relation) copy.relation = cloneSlot(this.relation);
-    if (this.wheres) copy.wheres = [...this.wheres];
-    return copy;
+  initializeCopy(_other: DeleteStatement): void {
+    if (this.relation != null) this.relation = rbObjClone(this.relation);
+    if (this.wheres != null) this.wheres = rbObjClone(this.wheres);
   }
 }
 

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { rbObjDup } from "@blazetrails/ruby-compat";
 import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { Table, Visitors } from "../index.js";
 import { uniq } from "../test-helpers/uniq.js";
@@ -22,7 +23,7 @@ describe("Arel::Nodes::ExtractTest", () => {
 
     it("should not mutate the extract", () => {
       const extract = users.get("timestamp").extract("date");
-      const before = extract.dup();
+      const before = rbObjDup(extract);
       extract.as("foo");
       expect(extract.eql(before)).toBe(true);
     });

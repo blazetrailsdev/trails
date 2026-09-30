@@ -1,6 +1,6 @@
+import { rbObjClone } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { cloneSlot, objectClone } from "../clone-support.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { buildQuoted } from "./casted.js";
@@ -59,12 +59,10 @@ export class Case extends NodeExpression {
     return this;
   }
 
-  clone(): this {
-    const copy = objectClone(this);
-    if (this.case) copy.case = cloneSlot(this.case);
-    copy.conditions = this.conditions.map((x) => x.clone());
-    if (this.default) copy.default = cloneSlot(this.default);
-    return copy;
+  initializeCopy(_other: Case): void {
+    if (this.case != null) this.case = rbObjClone(this.case);
+    this.conditions = this.conditions.map((x) => rbObjClone(x));
+    if (this.default != null) this.default = rbObjClone(this.default);
   }
 }
 

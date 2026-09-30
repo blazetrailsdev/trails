@@ -1089,6 +1089,31 @@ describe("rbObjClone", () => {
     expect(clone.inner).not.toBe(obj.inner);
     expect(Object.isFrozen(clone)).toBe(true);
   });
+
+  it("returns a special object as is", () => {
+    expect(rbObjClone(1)).toBe(1);
+    expect(rbObjClone("a")).toBe("a");
+    expect(rbObjClone(null)).toBe(null);
+  });
+
+  it("allocates an array as an array holding the same elements", () => {
+    const node = {};
+    const ary = [node, 2];
+    const clone = rbObjClone(ary);
+    expect(Array.isArray(clone)).toBe(true);
+    expect(clone).not.toBe(ary);
+    expect(clone).toEqual(ary);
+    expect(clone[0]).toBe(node);
+    clone.push(3);
+    expect(ary).toHaveLength(2);
+  });
+
+  it("keeps a frozen array frozen", () => {
+    const clone = rbObjClone(Object.freeze([1, 2]));
+    expect(Array.isArray(clone)).toBe(true);
+    expect(clone).toEqual([1, 2]);
+    expect(Object.isFrozen(clone)).toBe(true);
+  });
 });
 
 describe("rbObjDup", () => {
@@ -1119,6 +1144,23 @@ describe("rbObjDup", () => {
       }
     }
     expect(rbObjDup(new Host()).copied).toBe(true);
+  });
+
+  it("returns a special object as is", () => {
+    expect(rbObjDup(1)).toBe(1);
+    expect(rbObjDup("a")).toBe("a");
+    expect(rbObjDup(null)).toBe(null);
+  });
+
+  it("allocates an array as an unfrozen array holding the same elements", () => {
+    const ary: unknown[] = Object.freeze([{}, 2]) as unknown[];
+    const dup = rbObjDup(ary);
+    expect(Array.isArray(dup)).toBe(true);
+    expect(dup).not.toBe(ary);
+    expect(dup[0]).toBe(ary[0]);
+    expect(Object.isFrozen(dup)).toBe(false);
+    dup.push(3);
+    expect(ary).toHaveLength(2);
   });
 });
 

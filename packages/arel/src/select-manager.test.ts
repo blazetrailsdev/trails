@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { rbObjClone } from "@blazetrails/ruby-compat";
 import {
   type ArelEngine,
   Table,
@@ -146,7 +147,7 @@ describe("SelectManagerTest", () => {
     it("creates new cores", () => {
       const table = new Table("users", { as: "foo" });
       const mgr = table.from();
-      const m2 = mgr.clone();
+      const m2 = rbObjClone(mgr);
       m2.project("foo");
       expect(mgr.toSql()).not.toEqual(m2.toSql());
     });
@@ -154,8 +155,8 @@ describe("SelectManagerTest", () => {
     it("makes updates to the correct copy", () => {
       const table = new Table("users", { as: "foo" });
       const mgr = table.from();
-      const m2 = mgr.clone();
-      const m3 = m2.clone();
+      const m2 = rbObjClone(mgr);
+      const m3 = rbObjClone(m2);
       m2.project("foo");
       expect(mgr.toSql()).not.toEqual(m2.toSql());
       expect(m3.toSql()).toEqual(mgr.toSql());

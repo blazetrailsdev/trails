@@ -1,9 +1,10 @@
+import { rbObjClone } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 
 export class Comment extends Node {
-  readonly values: string[];
+  values: string[];
 
   constructor(values: string[]) {
     super();
@@ -20,6 +21,10 @@ export class Comment extends Node {
       this.constructor === other.constructor &&
       rbEqual(this.values, other.values)
     );
+  }
+
+  initializeCopy(_other: Comment): void {
+    this.values = rbObjClone(this.values);
   }
 }
 

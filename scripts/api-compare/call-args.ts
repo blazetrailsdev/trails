@@ -990,6 +990,24 @@ function argSimilarity(ruby: CallSite, ts: CallSite): number {
  *  produced is the one baseline row this constant retires. */
 const TS_CALL_HOMONYMS = new Set(["call"]);
 
+/** A receiverless zero-argument Ruby site is a self-reader, and a TS site that
+ *  passes arguments to a plain local is a send to a collaborator, so the two
+ *  are different calls that merely share a name. `crud.rb:25`'s
+ *  `um.offset(offset)` holds both on the Ruby side: the outer `um.offset` is
+ *  `weak` and dropped by {@link comparableRubySites}, and the inner `offset`
+ *  reader has no TS site, because `this.offset` is a getter. Without this
+ *  check the reader pairs against `um.offset(this.offset)` (`crud.ts`) and
+ *  reports a shape row for a body that is line-for-line. */
+function isSelfReaderAgainstLocalSend(ruby: CallSite, ts: CallSite): boolean {
+  return (
+    ruby.recv === undefined &&
+    ruby.args.length === 0 &&
+    ruby.flags.length === 0 &&
+    ts.args.length > 0 &&
+    ts.recv?.startsWith("id:") === true
+  );
+}
+
 /**
  * Pair the call sites of one already name-matched (Ruby, TS) method pair: each
  * Ruby site named `x` against the TS site whose name is a faithful spelling of
@@ -1028,6 +1046,7 @@ export function pairCallSites(
     tsSites.forEach((ts, tsIdx) => {
       if (!keys.has(ts.name)) return;
       if (TS_CALL_HOMONYMS.has(ts.name)) return;
+      if (isSelfReaderAgainstLocalSend(ruby, ts)) return;
       candidates.push({
         rubyIdx,
         tsIdx,

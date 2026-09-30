@@ -1,3 +1,4 @@
+import { rbObjClone } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
@@ -60,6 +61,10 @@ export class Window extends Node {
       rbEqual(this.partitions, other.partitions)
     );
   }
+
+  initializeCopy(_other: Window): void {
+    this.orders = this.orders.map((x) => rbObjClone(x));
+  }
 }
 
 export class NamedWindow extends Window {
@@ -76,6 +81,11 @@ export class NamedWindow extends Window {
 
   override eql(other: unknown): boolean {
     return super.eql(other) && rbEqual(this.name, (other as NamedWindow).name);
+  }
+
+  override initializeCopy(other: NamedWindow): void {
+    super.initializeCopy(other);
+    this.name = rbObjClone(other.name);
   }
 }
 

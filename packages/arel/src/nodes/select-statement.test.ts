@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { rbObjClone } from "@blazetrails/ruby-compat";
 import { Nodes } from "../index.js";
 import type { Node } from "./node.js";
 import { assertNotSame } from "../test-helpers/assertions.js";
@@ -11,7 +12,7 @@ describe("Arel::Nodes::SelectStatement", () => {
     it("clones cores", () => {
       const statement = new Nodes.SelectStatement(words("a", "b", "c"));
 
-      const dolly = statement.clone();
+      const dolly = rbObjClone(statement);
       expect(dolly.cores).toEqual(statement.cores);
       assertNotSame(statement.cores, dolly.cores);
     });
