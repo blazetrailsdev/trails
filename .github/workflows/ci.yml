@@ -1672,11 +1672,6 @@ jobs:
           key: vendor-sources-${{ hashFiles('vendor/sources.ts', 'vendor/sources.lock.json', 'vendor/fetch.ts') }}
       - name: Fetch upstream Ruby sources
         run: pnpm vendor:fetch
-      # The two Ruby extractions read only the vendored clones (pinned by
-      # sources.lock.json), the paths vendor:fetch prints for them, the
-      # interpreter's Ripper, and their own .rb files (neither requires a local
-      # file — only stdlib). Hash exactly those; the manifests are a pure
-      # function of them.
       - name: Ruby extraction inputs
         id: ruby-extraction-key
         run: |
@@ -1688,10 +1683,6 @@ jobs:
           pnpm --silent vendor:fetch --print-test-paths > "$dir/test-paths.json"
           ruby -e 'print RUBY_DESCRIPTION' > "$dir/ruby-version.txt"
           echo "hash=$(cat "$dir"/* | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
-      # Exact-match only — no restore-keys. A manifest extracted from other
-      # sources or another extractor would gate the PR against the wrong
-      # Rails. Restore and save are split so a miss is saved as soon as both
-      # extractions finish, not only when every later gate in the job passes.
       - name: Restore Ruby extraction outputs
         id: ruby-extraction
         uses: actions/cache/restore@v4
