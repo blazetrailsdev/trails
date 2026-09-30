@@ -1,4 +1,5 @@
-import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
+import { Struct, type StructInstance } from "@blazetrails/ruby-compat";
 import { Arel, Attributes } from "../namespaces.js";
 import { Node } from "../nodes/node.js";
 import { SqlLiteral } from "../nodes/sql-literal.js";
@@ -45,20 +46,6 @@ export class Attribute extends Node {
   isAbleToTypeCast(): boolean {
     return this.relation.isAbleToTypeCast();
   }
-
-  /** @noRailsEquivalent CONVERGEABLE arel-struct-and-string-protocol-from-ruby-compat */
-  hash(): number {
-    return rbHash([this.constructor, this.relation, this.name]);
-  }
-
-  eql(other: unknown): boolean {
-    return (
-      other instanceof Attribute &&
-      this.constructor === other.constructor &&
-      rbEqual(this.relation, other.relation) &&
-      rbEqual(this.name, other.name)
-    );
-  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -71,7 +58,8 @@ export interface Attribute
     ExpressionsModule,
     AliasPredicationModule,
     OrderPredicationsModule,
-    MathModule {
+    MathModule,
+    StructInstance {
   /** @internal */
   isInfinity(value: unknown): 1 | -1 | 0;
   /** @internal */
@@ -82,6 +70,7 @@ export interface Attribute
   notBetween(other: RangeLike): Node;
 }
 
+include(Attribute, Struct.new("relation", "name"));
 include(Attribute, Expressions);
 include(Attribute, Predications);
 include(Attribute, AliasPredication);

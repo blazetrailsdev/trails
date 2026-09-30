@@ -3,6 +3,7 @@ import { cmp } from "../comparable.js";
 import { Encoding } from "../encoding.js";
 import { IndexError } from "../index-error.js";
 import { format } from "../kernel-format.js";
+import { included } from "../include.js";
 import { NoMethodError } from "../no-method-error.js";
 import { Range } from "../range.js";
 import { rbEqual } from "../rb-equal.js";
@@ -88,7 +89,7 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
     compareTo: rbDefineMethod(1, (self, other) => rbStrCmpM(self.string, other)),
     equals: rbDefineMethod(1, (self, other) => rbStrEqual(self.string, other)),
     caseEquals: rbDefineMethod(1, (self, other) => rbStrEqual(self.string, other)),
-    eql: rbDefineMethod(1, (self, other) => typeof other === "string" && self.string === other),
+    eql: rbDefineMethod(1, (self, other) => rbStrEql(self.string, other)),
     hash: rbDefineMethod(0, (self) => rbHash(self.string)),
     casecmp: rbDefineMethod(1, (self, other) => casecmp(self.string, other)),
     isCasecmp: rbDefineMethod(1, (self, other) => isCasecmp(self.string, other)),
@@ -213,6 +214,58 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
   } satisfies Record<string, Method>,
 );
 
+const stringClasses = new WeakSet<object>();
+
+function isTString(value: unknown): boolean {
+  if (typeof value === "string") return true;
+  if (typeof value !== "object" || value === null) return false;
+  for (let proto = Object.getPrototypeOf(value); proto; proto = Object.getPrototypeOf(proto)) {
+    if (stringClasses.has(proto)) return true;
+  }
+  return false;
+}
+
+function rbStrEql(str1: string, str2: unknown): boolean {
+  if (!isTString(str2)) return false;
+  return str1 === String(str2);
+}
+
+/**
+ * `rb_cString` (`vendor/ruby/v3.3.11/string.c:12119`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export interface StringInstance {
+  eql(other: unknown): boolean;
+  hash(): number;
+}
+
+/**
+ * `rb_cString` (`vendor/ruby/v3.3.11/string.c:12119`) as the superclass of
+ * `class X < String`, for a class that JS already gives another superclass:
+ * it `include`s the String methods it answers, each sent through
+ * {@link STRING_METHOD_TABLE} at call time with the receiver's `to_s` as its
+ * string, so an entry a package reopening String assigns is found too. An
+ * instance of the including class is a `T_STRING` to `rb_str_eql`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function stringSuperclass<M extends keyof StringInstance>(
+  ...methods: M[]
+): Pick<StringInstance, M> {
+  const mod: Record<string | symbol, unknown> = {
+    [included](klass: { prototype: object }): void {
+      stringClasses.add(klass.prototype);
+    },
+  };
+  for (const method of methods) {
+    mod[method] = function (this: object, ...args: unknown[]): unknown {
+      return rbStrSend(String(this), method, ...args)[0];
+    };
+  }
+  return mod as unknown as Pick<StringInstance, M>;
+}
+
 const JS_STRING_METHODS = new Set(Object.getOwnPropertyNames(String.prototype));
 
 /**
@@ -273,8 +326,10 @@ export function rbStrMatch(x: string, y: unknown): unknown {
 /**
  * `rb_define_method` (`vendor/ruby/v3.3.11/class.c:2134`) with a fixed `argc`, which MRI
  * checks.
+ *
+ * @noRailsEquivalent PERMANENT
  */
-function rbDefineMethod<A extends unknown[]>(
+export function rbDefineMethod<A extends unknown[]>(
   argc: number,
   func: (self: StringReceiver, ...args: A) => unknown,
 ): Method {

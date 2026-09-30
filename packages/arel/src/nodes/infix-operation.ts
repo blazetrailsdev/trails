@@ -1,5 +1,10 @@
 import { Nodes } from "../namespaces.js";
 import { Binary, type NodeOrValue } from "./binary.js";
+import type { PredicationsModule } from "../predications.js";
+import type { MathModule } from "../math.js";
+import type { AliasPredicationModule } from "../alias-predication.js";
+import type { OrderPredicationsModule } from "../order-predications.js";
+import type { ExpressionsModule } from "../expressions.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class InfixOperation extends Binary {
@@ -87,26 +92,14 @@ export class BitwiseShiftRight extends InfixOperation {
   }
 }
 
-/**
- * Declaration merging: tell TypeScript that InfixOperation instances carry
- * the Predications + Math method surfaces mixed in from index.ts via
- * `include()`. The runtime wiring lives there to avoid a circular module
- * cycle between infix-operation.ts and math.ts.
- * Inline `typeof import(...)` keeps the mixin modules out of this file's
- * static import graph (math.ts imports InfixOperation for its class
- * references; a static reverse import would cycle).
- * See node-expression.ts for why these use the explicit module interfaces.
- *
- * @noRailsEquivalent TypeScript-only mixin typing; Ruby `include` needs no type surface.
- */
-type _Predications = import("../predications.js").PredicationsModule;
-type _Math = import("../math.js").MathModule;
-type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
-type _OrderPredications = import("../order-predications.js").OrderPredicationsModule;
-type _Expressions = import("../expressions.js").ExpressionsModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface InfixOperation
-  extends _Predications, _Math, _Expressions, _AliasPredication, _OrderPredications {}
+  extends
+    PredicationsModule,
+    MathModule,
+    ExpressionsModule,
+    AliasPredicationModule,
+    OrderPredicationsModule {}
 
 Nodes.InfixOperation = InfixOperation;
 Nodes.BitwiseAnd = BitwiseAnd;

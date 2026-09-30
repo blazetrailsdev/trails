@@ -4,6 +4,7 @@ import { Visitors } from "./namespaces.js";
 import { PlainString } from "./collectors/plain-string.js";
 import { Limit, Offset } from "./nodes/unary.js";
 import { buildQuoted } from "./nodes/casted.js";
+import type { FactoryMethodsModule } from "./factory-methods.js";
 
 type StatementMethodsHost = {
   ast: {
@@ -75,15 +76,6 @@ export abstract class TreeManager {
   }
 }
 
-/**
- * Methods supplied by the FactoryMethods mixin (runtime wiring in ./index.ts).
- * See node.ts for why this uses the explicit `FactoryMethodsModule` interface
- * rather than `Included<typeof FactoryMethods>`.
- *
- * @noRailsEquivalent TypeScript-only mixin typing; Ruby `include` needs no type surface.
- */
-type _FactoryMethodsModule = import("./factory-methods.js").FactoryMethodsModule;
-
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
    @typescript-eslint/no-unsafe-declaration-merging */
-export interface TreeManager extends _FactoryMethodsModule {}
+export interface TreeManager extends FactoryMethodsModule {}

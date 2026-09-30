@@ -496,16 +496,3 @@ export const Predications: PredicationsModule = {
     return isNil || this.isInfinity(value) !== 0 || this.isUnboundable(value) !== 0;
   },
 };
-
-/**
- * Pins GroupingFolders (above) against the real folder implementations. The
- * interface exists only because the *_any/*_all variants cannot name
- * `Predications` while it is still being defined; this assertion makes the two
- * declarations fail to compile if they ever disagree, so the second
- * declaration cannot become the kind of drifting duplicate this file just
- * removed from the *_any/*_all fold paths.
- *
- * @noRailsEquivalent TypeScript-only compile-time assertion; Ruby reopens the module instead.
- */
-const _groupingFoldersMatchImplementation: GroupingFolders = Predications;
-void _groupingFoldersMatchImplementation;

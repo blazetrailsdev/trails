@@ -23,16 +23,6 @@ import "./nodes/equality.js";
 import "./nodes/in.js";
 import "./nodes/casted.js";
 
-/**
- * Mix Predications + Math into NodeExpression (so every expression-valued
- * node — Function, Unary, Case, Casted, ...) and into InfixOperation
- * separately (it extends Binary, not NodeExpression). Done here at package
- * init rather than inside node-expression.ts / infix-operation.ts because
- * the mixin modules transitively import those files via their target-node
- * imports, creating a module-load cycle.
- *
- * @noRailsEquivalent ESM load order forces the mixin wiring here; Ruby `include`s in each class body.
- */
 import { include } from "@blazetrails/activesupport";
 import { Node } from "./nodes/node.js";
 import { NodeExpression } from "./nodes/node-expression.js";
