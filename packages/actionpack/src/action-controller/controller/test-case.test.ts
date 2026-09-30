@@ -480,7 +480,7 @@ describe("TestCaseTest", () => {
 });
 
 class TestController extends Base {
-  _counter: number | undefined = undefined;
+  declare _counter: number | undefined;
 
   async noOp() {
     await this.render({ plain: "dummy" });
