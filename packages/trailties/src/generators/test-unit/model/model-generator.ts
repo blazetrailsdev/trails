@@ -3,6 +3,11 @@ import { dasherize } from "../../base.js";
 import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
 import { TEMPLATES } from "./templates.js";
 
+export interface ModelGeneratorOptions extends NamedBaseOptions {
+  fixture?: boolean;
+  fixtureReplacement?: string | null;
+}
+
 export class ModelGenerator extends NamedBase {
   static readonly RESERVED_YAML_KEYWORDS = [
     "y",
@@ -16,9 +21,8 @@ export class ModelGenerator extends NamedBase {
     "null",
   ];
 
-  declare options: NamedBaseOptions & { fixture?: boolean; fixtureReplacement?: string | null };
-
   static {
+    this.checkClassCollision({ suffix: "Test" });
     this.commands().push("createTestFile", "createFixtureFile");
   }
 
@@ -36,7 +40,10 @@ export class ModelGenerator extends NamedBase {
 
   /** @missingRailsCall template — CONVERGEABLE generators-have-no-thor-source-paths-or-template-files */
   createFixtureFile(): void {
-    if (this.options.fixture && this.options.fixtureReplacement == null) {
+    if (
+      (this.options as ModelGeneratorOptions).fixture &&
+      (this.options as ModelGeneratorOptions).fixtureReplacement == null
+    ) {
       this.createFile(
         File.join("test/fixtures", ...this.classPathParts, `${this.fixtureFileName()}.yml`),
         TEMPLATES.fixtures.call(this),
@@ -56,5 +63,4 @@ export class ModelGenerator extends NamedBase {
 
 Object.defineProperty(ModelGenerator, "name", { value: "TestUnit::Generators::ModelGenerator" });
 ModelGenerator.classOption("fixture", { type: "boolean" });
-ModelGenerator.checkClassCollision({ suffix: "Test" });
 ModelGenerator.hookFor("fixtureReplacement");

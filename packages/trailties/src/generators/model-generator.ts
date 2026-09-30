@@ -105,6 +105,7 @@ export class ${className} extends ${parentClass} {${staticBlock}}
     if (test) {
       const klass = await Generators.findByNamespace("test_unit", "active_record", "model");
       if (klass) {
+        this.sayStatus("invoke", "test_unit", "white");
         this.createdFiles.push(
           ...(await klass.start([name, ...args], {
             cwd: this.cwd,
@@ -115,6 +116,8 @@ export class ${className} extends ${parentClass} {${staticBlock}}
             skip: this.options.skip,
           })),
         );
+      } else {
+        this.sayStatus("error", "test_unit [not found]", "red");
       }
     }
 
