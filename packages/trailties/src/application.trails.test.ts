@@ -182,7 +182,7 @@ describe("Configuration#loadDefaults 6.1", () => {
     c.loadDefaults("6.1");
 
     const sameSite = (c.get("actionDispatch") as Record<string, unknown>).cookiesSameSiteProtection;
-    expect(sameSite).toBe("lax");
+    expect(sameSite).toBe(":lax");
     expect(Utils.setCookieHeader("k", { value: "v", sameSite })).toBe("k=v; samesite=lax");
   });
 });
