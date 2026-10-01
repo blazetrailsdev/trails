@@ -18,7 +18,7 @@ import {
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { NoMethodError } from "./no-method-error.js";
-import { Module, extend, include } from "./include.js";
+import { Module, extend, include, rbModConstSet } from "./include.js";
 
 describe("Object#inspect", () => {
   it("renders nested arrays, hashes, nil, strings and numbers as MRI does", () => {
@@ -262,10 +262,13 @@ describe("rbModPrivate on a Module", () => {
   it("raises NameError for a name the module does not define", () => {
     expect(() => rbModPrivate(Helper, "nope")).toThrow(NameError);
     expect(() => rbModPrivate(Helper, "nope")).toThrow(
-      "undefined method 'nope' for module '#<Module>'",
+      /^undefined method 'nope' for module '#<Module:0x[0-9a-f]+>'$/,
     );
-    const Named = Object.assign(new Module(), { name: "Named" });
-    expect(() => rbModPrivate(Named, "nope")).toThrow("undefined method 'nope' for module 'Named'");
+    class Owner {}
+    const Named = rbModConstSet(Owner, "Named", new Module());
+    expect(() => rbModPrivate(Named, "nope")).toThrow(
+      "undefined method 'nope' for module 'Owner::Named'",
+    );
   });
 });
 

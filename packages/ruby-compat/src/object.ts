@@ -244,7 +244,7 @@ function setMethodVisibility(
       throw new NameError(
         "prototype" in module
           ? `undefined method '${mid}' for class '${module.name}'`
-          : `undefined method '${mid}' for module '${moduleInspect(module)}'`,
+          : `undefined method '${mid}' for module '${rbInspect(module)}'`,
         mid,
       );
     }
@@ -252,11 +252,6 @@ function setMethodVisibility(
     if (!table) methodVisibilities.set(owner, (table = new Map()));
     table.set(mid, visi);
   }
-}
-
-function moduleInspect(module: object): string {
-  const name = (module as { name?: unknown }).name;
-  return typeof name === "string" ? name : "#<Module>";
 }
 
 function lookupSetter(obj: object, name: string): ((value: unknown) => unknown) | undefined {
