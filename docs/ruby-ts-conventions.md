@@ -187,6 +187,12 @@ parity:api skips these Ruby methods, but only within the listed files — they
 have a real TS surface elsewhere, so the skip is file-scoped to avoid silencing
 a genuine gap:
 
+- `Thor::Runner` (`runner.rb`, the `thor` executable that installs and runs Thorfiles) is not ported, and these `Thor::Util` members exist only for it: `namespaces_in_content` and `load_thorfile` evaluate a Thorfile inside `Thor::Sandbox` (util.rb:58-70, :153-166), and `user_home`, `thor_root`, `thor_root_glob` and `globs_for` (util.rb:168-216) locate the Thorfiles installed under `~/.thor`. railties never reaches them. Scoped to thor's util.rb.
+  - `namespaces_in_content`, `load_thorfile`, `user_home`, `thor_root`, `thor_root_glob`, `globs_for` (only in: `util.rb`)
+- `Thor::Util.escape_html` (util.rb:280-282) is `CGI.escapeHTML`, called only by `Thor::Shell::HTML`, which is not ported: there is no terminal rendering HTML. Scoped to thor's util.rb.
+  - `escape_html` (only in: `util.rb`)
+- `Thor::Base.subclass_files` (base.rb:137-139) groups subclasses by the `caller` file that defined them (`register_klass_file`, base.rb:144-150), and its only reader is `Thor::Runner`, which is not ported. Scoped to thor's base.rb.
+  - `subclass_files` (only in: `base.rb`)
 - Ruby's match operators on ActiveModel::Name, which delegates `=~` and `!~` to `@name` along with `==`/`===`/`<=>`/`eql?`/`match?` (naming.rb:151-152). `String#=~` answers the Integer OFFSET of the match (string.c `rb_str_match`) and `!~` its negation (Object#!~, object.c) — a different value from the boolean `match?` already ported as `match`, so neither can share that spelling, and TypeScript has no operator to overload for either. Nothing in trails consumes a match offset, so a port would exist only to be named. Scoped to naming.rb so the operators stay expected wherever a real offset-returning surface is ported.
   - `=~`, `!~` (only in: `naming.rb`)
 - The GC and allocation counters on Notifications::Event (notifications/instrumenter.rb:174-186, :213-227): `gc_time` and `allocations` are differences of `now_gc` / `now_allocations`, which read `GC.total_time` and `GC.stat(:total_allocated_objects)`. A JS engine exposes neither — there is no counter to read without a `node:*` import the trails packages are forbidden — and a port returning a constant would report `0` allocations and `0` GC time for every event, i.e. read as measured when nothing was measured. Scoped to notifications/instrumenter.rb so the names stay expected anywhere a real counter is ported.

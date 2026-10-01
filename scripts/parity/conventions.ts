@@ -696,6 +696,42 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "`Thor::Runner` (`runner.rb`, the `thor` executable that installs and runs " +
+      "Thorfiles) is not ported, and these `Thor::Util` members exist only for it: " +
+      "`namespaces_in_content` and `load_thorfile` evaluate a Thorfile inside " +
+      "`Thor::Sandbox` (util.rb:58-70, :153-166), and `user_home`, `thor_root`, " +
+      "`thor_root_glob` and `globs_for` (util.rb:168-216) locate the Thorfiles " +
+      "installed under `~/.thor`. railties never reaches them. Scoped to thor's " +
+      "util.rb.",
+    names: [
+      "namespaces_in_content",
+      "load_thorfile",
+      "user_home",
+      "thor_root",
+      "thor_root_glob",
+      "globs_for",
+    ],
+    rubyFiles: ["util.rb"],
+  },
+  {
+    reason:
+      "`Thor::Util.escape_html` (util.rb:280-282) is `CGI.escapeHTML`, called " +
+      "only by `Thor::Shell::HTML`, which is not ported: there is no terminal " +
+      "rendering HTML. Scoped to thor's util.rb.",
+    names: ["escape_html"],
+    rubyFiles: ["util.rb"],
+  },
+  {
+    reason:
+      "`Thor::Base.subclass_files` (base.rb:137-139) groups subclasses by the " +
+      "`caller` file that defined them (`register_klass_file`, base.rb:144-150), " +
+      "and its only reader is `Thor::Runner`, which is not ported. Scoped to " +
+      "thor's base.rb.",
+    names: ["subclass_files"],
+    rubyFiles: ["base.rb"],
+  },
+  {
+    reason:
       "Ruby's match operators on ActiveModel::Name, which delegates `=~` and " +
       "`!~` to `@name` along with `==`/`===`/`<=>`/`eql?`/`match?` " +
       "(naming.rb:151-152). `String#=~` answers the Integer OFFSET of the " +

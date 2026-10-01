@@ -155,6 +155,28 @@ const MSPEC_MAP: Record<string, CanonicalKind> = {
   should_be_kind_of: "instanceOf",
 };
 
+const RSPEC_MAP: Record<string, CanonicalKind> = {
+  expect_to_eq: "equal",
+  expect_not_to_eq: "notEqual",
+  expect_to_eql: "equal",
+  expect_to_be: "equal",
+  expect_not_to_be: "notEqual",
+  expect_to_be_nil: "nil",
+  expect_not_to_be_nil: "notNil",
+  expect_to_be_falsey: "falsy",
+  expect_to_be_empty: "empty",
+  expect_to_include: "includes",
+  expect_not_to_include: "excludes",
+  expect_to_match: "match",
+  expect_not_to_match: "noMatch",
+  expect_to_raise_error: "raises",
+  expect_not_to_raise_error: "nothingRaised",
+  expect_to_be_a: "instanceOf",
+  expect_to_be_kind_of: "instanceOf",
+  expect_to_respond_to: "respondTo",
+  expect_not_to_respond_to: "notRespondTo",
+};
+
 // trails/vitest matcher name → canonical kind. The extractor hands us the
 // terminal matcher of an `expect(...).matcher(...)` chain (a `not:` prefix marks
 // a negated chain, folded via NEGATION in normalizeTrailsKind).
@@ -253,7 +275,7 @@ const SPEC_FORM_ALIAS: Record<string, string> = {
  */
 export function normalizeRailsKind(name: string): CanonicalKind | null {
   const builtin = AREL_HELPER_ALIAS[name] ?? SPEC_FORM_ALIAS[name] ?? name;
-  const direct = RAILS_MAP[builtin] ?? MSPEC_MAP[name];
+  const direct = RAILS_MAP[builtin] ?? MSPEC_MAP[name] ?? RSPEC_MAP[name];
   if (direct) return direct;
   // Spec forms: `must_equal` ~ `assert_equal`, `wont_equal` ~ `refute_equal`.
   const must = /^must_(.+)$/.exec(name);

@@ -277,6 +277,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "thor",
         libPath: "lib/thor",
+        testPath: "spec",
       },
     ],
   },

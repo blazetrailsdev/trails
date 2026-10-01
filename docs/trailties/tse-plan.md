@@ -75,7 +75,7 @@ Source: gem `erubi` upstream; actionview subclasses it in
   - `<%= expr %>` — ruby expression, output result
   - `<%== expr %>` — output without escaping (raw)
   - `<%# comment %>` — comment, dropped
-  - `<%% %>` / `%%>` — literal `<% %>` / `%>`
+  - `<%% … %>` — Erubi's `%` indicator: the tag is emitted as literal `<% … %>`; `%%>` is plain text
 - **Trim modes** decide how surrounding whitespace/newlines are eaten:
   - `<%- code -%>` — strip leading + trailing whitespace on the line.
   - `<%= expr -%>` — strip trailing newline only.
@@ -353,7 +353,7 @@ direct port of that boundary.
 | `<%- stmt -%>`                                    | `<%- stmt -%>`                     | Statement + trim surrounding whitespace                             |
 | `<%= expr -%>`                                    | `<%= expr -%>`                     | Output + trim trailing newline                                      |
 | `<%# comment %>`                                  | `<%# comment %>`                   | Dropped                                                             |
-| `<%% / %%>`                                       | `<%% / %%>`                        | Literal `<%` / `%>`                                                 |
+| `<%% … %>`                                        | `<%% … %>`                         | Literal `<% … %>` tag (`%%>` is plain text, as in Erubi)            |
 | `<%= helper do %>...<% end %>`                    | `<%= helper do %>...<% end %>`     | Block-form output expression — see below                            |
 | `<%# locals: (name:, count: 0) %>`                | `<%# locals: (name:, count: 0) %>` | Rails-style names + defaults — drives runtime binding               |
 | `<%! types: { name: string; count?: number } !%>` | _(none)_                           | TSE-only — optional TS types for tsc (coexists with `locals:` line) |
@@ -725,7 +725,7 @@ Concretely (matching upstream erubi's lexer):
   detection. A `-%>` followed by `\r\n` on Windows still strips
   correctly (we normalize line endings to `\n` before lex, matching
   Rails' `source.b` + encoding handling).
-- `<%%` / `%%>` escape to literal `<%` / `%>` (same as ERB).
+- `<%% … %>` emits a literal `<% … %>` tag (Erubi's `%` indicator, `erubi.rb:53,190-191`); `%%>` is plain text.
 - `<%#` opens a comment that runs to the matching `%>`. Comment bodies
   may contain anything except `%>` — same restriction as `<% %>`. The
   comment AND its trailing newline are dropped from output (Erubi

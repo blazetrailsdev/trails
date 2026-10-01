@@ -80,6 +80,11 @@
       "kind": 0,
       "value": 0
     },
+    "thor": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    },
     "trailties": {
       "assertionCount": 5,
       "kind": 17,

@@ -406,9 +406,11 @@ describe("vendor/sources.ts", () => {
         "rack-session",
         "rack-test",
         "ruby-compat",
+        "thor",
         "trailties",
       ].sort(),
     );
+    expect(m["thor"].endsWith("vendor/thor/v1.3.2/spec")).toBe(true);
     expect(m["activerecord"].endsWith("vendor/rails/v8.0.2/activerecord/test/cases")).toBe(true);
     expect(m["rack"].endsWith("vendor/rack/v3.1.14/test")).toBe(true);
     expect(m["globalid"].endsWith("vendor/globalid/v1.3.0/test/cases")).toBe(true);

@@ -81,6 +81,7 @@ import {
 import { PATH_SEGMENT_ALIASES } from "@blazetrails/parity/conventions";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 import { testPathsManifest } from "../../vendor/sources.js";
+import { ROOT_DIR as API_ROOT_DIR, packageSrcDir } from "../api-compare/config.js";
 import { classifyTestFile, closureFiles } from "./closure-manifest.js";
 
 const SCRIPT_DIR = __dirname;
@@ -136,14 +137,17 @@ const RUBY_COMPAT_SPEC_TS_FILES: Record<string, string> = {
  * `-behavior.test.ts`.
  */
 export function rubyToConventionTs(rubyFile: string, pkg: string): string {
-  if (pkg === "rack-test") {
+  if (pkg === "rack-test" || pkg === "thor") {
     // Specs are reported relative to `spec`, so each repeats the gem's
     // `lib/rack/test` root as a leading `rack/` (plus a further `test/` below
     // `rack/test_spec.rb`). Drop both, the same redundant-leading-segment case
     // as rack-session above, so both sides land on `packages/rack-test/src/<x>`.
-    let rest = rubyFile.startsWith("rack/") ? rubyFile.slice("rack/".length) : rubyFile;
-    if (rest.startsWith("test/")) rest = rest.slice("test/".length);
-    const dir = path.dirname(rest);
+    let rest = rubyFile;
+    if (pkg === "rack-test") {
+      if (rest.startsWith("rack/")) rest = rest.slice("rack/".length);
+      if (rest.startsWith("test/")) rest = rest.slice("test/".length);
+    }
+    const dir = path.dirname(rest).replace(/_/g, "-");
     const base = path.basename(rest, ".rb").replace(/_spec$/, "");
     const tsFile = base.replace(/_/g, "-") + ".test.ts";
     return dir === "." ? tsFile : path.join(dir, tsFile);
@@ -1543,6 +1547,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   i18n: "packages/i18n/src/",
   date: "packages/date/src/",
   "ruby-compat": "packages/ruby-compat/src/",
+  thor: `${path.relative(API_ROOT_DIR, packageSrcDir("thor")).split(path.sep).join("/")}/`,
 };
 
 function extractRelativeTsPath(fullPath: string, pkg: string): string {
