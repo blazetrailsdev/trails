@@ -24,7 +24,7 @@ describeIfSqlite("SQLite3JSONTest", () => {
 
   jsonSharedTestCases({ columnType });
 
-  it("test_default", async () => {
+  it("default", async () => {
     const defaultVal = { users: "read", posts: ["read", "write"] };
     await connection.addColumn("json_data_type", "permissions", columnType, {
       default: defaultVal,

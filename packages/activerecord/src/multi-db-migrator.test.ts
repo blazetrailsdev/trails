@@ -278,4 +278,18 @@ describe("MultiDbMigratorTest", () => {
     await migratorB.forward();
     expect(await migratorB.currentVersion()).toBe(3);
   });
+
+  it("internal metadata stores environment", async () => {
+    let migrator: MigrationContext | undefined;
+    try {
+      const currentEnv = (await Base.leaseConnection()).pool.dbConfig.envName;
+      const migrationsPath = MIGRATIONS_ROOT + "/valid";
+      migrator = new MigrationContext([migrationsPath], schemaMigrationB, internalMetadataB);
+
+      await migrator.up();
+      expect(await internalMetadataB.get("environment")).toBe(currentEnv);
+    } finally {
+      if (migrator) await migrator.down();
+    }
+  });
 });
