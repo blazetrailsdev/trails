@@ -409,7 +409,7 @@ export abstract class SchemaDumper {
 
       const tableOptions = await this.tableOptions(table);
       if (isPresent(tableOptions)) {
-        opts.push(this.formatOptions(tableOptions));
+        opts.push(this.formatOptions(tableOptions!));
       }
 
       opts.push('force: "cascade"');
@@ -503,7 +503,7 @@ export abstract class SchemaDumper {
   }
 
   /** @internal */
-  protected tableOptions(_tableName: string): Promise<Record<string, unknown>> {
+  protected tableOptions(_tableName: string): Promise<Record<string, unknown> | null> {
     return Promise.resolve({});
   }
 

@@ -1,4 +1,6 @@
 import {
+  aryDelete,
+  aryDeleteIf,
   Fiber,
   isMonOwned,
   Mutex,
@@ -210,10 +212,6 @@ export class LeaseRegistry {
 
   clear(): void {
     this._map = new WeakMap();
-  }
-
-  _peek(context: object): Lease | undefined {
-    return this._map.get(context);
   }
 }
 
@@ -504,24 +502,15 @@ export class ConnectionPool implements ReapablePool {
   async clearReloadableConnections(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
     await this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () =>
       synchronize.call(this, async () => {
-        for (const conn of this._connections ?? []) {
+        for (const conn of this._connections!) {
           if (conn.isInUse()) {
             conn.stealBang();
             this.checkin(conn);
           }
-          if ((conn as unknown as { requiresReloading?: () => boolean }).requiresReloading?.()) {
-            await (
-              conn as unknown as { disconnectBang?: () => void | Promise<void> }
-            ).disconnectBang?.();
-          }
+          if (conn.requiresReloading()) await conn.disconnectBang();
         }
-        if (this._connections) {
-          this._connections = this._connections.filter(
-            (conn) =>
-              !(conn as unknown as { requiresReloading?: () => boolean }).requiresReloading?.(),
-          );
-        }
-        this._available?.clear();
+        aryDeleteIf(this._connections!, (conn) => conn.requiresReloading());
+        this._available!.clear();
       }),
     );
   }
@@ -612,34 +601,21 @@ export class ConnectionPool implements ReapablePool {
     }
   }
 
-  async flush(minimumIdle?: number | null): Promise<void> {
-    await Promise.all(this._flush(minimumIdle));
-  }
-
-  private _flush(minimumIdle?: number | null): Array<Promise<void>> {
-    if (minimumIdle === undefined) minimumIdle = this._idleTimeout;
-    if (minimumIdle === null) return [];
-    if (this.isDiscarded()) return [];
-    if (!this._connections || !this._available) return [];
-
-    const idleConnections = this._connections.filter(
+  async flush(minimumIdle: number | null = this._idleTimeout): Promise<void> {
+    if (minimumIdle == null) return;
+    if (this.isDiscarded()) return;
+    const idleConnections = this._connections!.filter(
       (conn) => !conn.isInUse() && conn.secondsIdle >= minimumIdle,
     );
     for (const conn of idleConnections) {
       conn.lease();
-      this._available.delete(conn);
-      const connIdx = this._connections.indexOf(conn);
-      if (connIdx >= 0) this._connections.splice(connIdx, 1);
+      this._available!.delete(conn);
+      aryDelete(this._connections!, conn);
     }
 
-    const draining: Array<Promise<void>> = [];
     for (const conn of idleConnections) {
-      const closed = (
-        conn as unknown as { disconnectBang?: () => void | Promise<void> }
-      ).disconnectBang?.();
-      if (closed) draining.push(closed);
+      await conn.disconnectBang();
     }
-    return draining;
   }
 
   async flushBang(): Promise<void> {
@@ -1093,14 +1069,15 @@ async function acquireConnection(this: Pool, checkoutTimeout: number): Promise<D
 export function removeConnectionFromThreadCache(
   pool: Pool,
   conn: DatabaseAdapter,
-  ownerThread?: object,
+  ownerThread: Thread | Fiber | null = conn.owner,
 ): void {
-  const owner = ownerThread ?? IsolatedExecutionState.context();
-  pool._leases?._peek(owner)?.clear(conn);
+  if (ownerThread) {
+    pool._leases.get(ownerThread).clear(conn);
+  }
 }
 
 /** @internal */
-function release(pool: Pool, conn: DatabaseAdapter, ownerThread?: object): void {
+function release(pool: Pool, conn: DatabaseAdapter, ownerThread?: Thread | Fiber | null): void {
   removeConnectionFromThreadCache(pool, conn, ownerThread);
 }
 

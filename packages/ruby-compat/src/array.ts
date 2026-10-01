@@ -382,6 +382,42 @@ function subseq<T>(ary: readonly T[], beg: number, len: number): T[] | null {
 }
 
 /**
+ * Ruby `Array#delete_if` (`vendor/ruby/v3.3.11/array.c:4330` `rb_ary_delete_if`):
+ * removes, in place, every element the block answers truthily for
+ * (`reject_bang_i`, `array.c:4225`) and answers the receiver. When the block
+ * raises, the elements not yet visited are kept after the ones already
+ * retained (`select_bang_ensure`, `array.c:3841`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function aryDeleteIf<T>(ary: T[], block: (item: T) => unknown): T[] {
+  let i1 = 0;
+  let i2 = 0;
+  try {
+    for (; i1 < ary.length; i1++) {
+      const v = ary[i1];
+      const result = block(v);
+      if (result != null && result !== false) continue;
+      if (i1 !== i2) {
+        ary[i2] = v;
+      }
+      i2++;
+    }
+  } finally {
+    const len = ary.length;
+    if (i2 < len && i2 < i1) {
+      let tail = 0;
+      if (i1 < len) {
+        tail = len - i1;
+        ary.copyWithin(i2, i1, len);
+      }
+      ary.length = i2 + tail;
+    }
+  }
+  return ary;
+}
+
+/**
  * Ruby `Array#delete` (`vendor/ruby/v3.3.11/array.c:3973` `rb_ary_delete`): removes, in
  * place, every element `==` to `item` (`rb_equal`, so a record matches by
  * `ActiveRecord::Core#==`, not identity) and answers the last one removed.

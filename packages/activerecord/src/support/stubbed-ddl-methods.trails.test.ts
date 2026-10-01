@@ -54,6 +54,14 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
     "supportsCheckConstraints",
     "capability read — decides whether the renderer emits inline CHECK constraints",
   ],
+  [
+    "supportsExclusionConstraints",
+    "capability read — decides whether the renderer emits inline EXCLUDE constraints",
+  ],
+  [
+    "supportsUniqueConstraints",
+    "capability read — decides whether the renderer emits inline UNIQUE constraints",
+  ],
   ["supportsPartialIndex", "capability read — decides whether an index renders its WHERE clause"],
   ["supportsIndexInclude", "capability read — decides whether an index renders INCLUDE (...)"],
   [

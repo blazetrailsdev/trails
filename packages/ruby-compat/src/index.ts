@@ -128,6 +128,7 @@ export type { ZlibAdapter, GzipWriterIO, GzipWriterHandle } from "./zlib-adapter
 export {
   aryCount,
   aryDelete,
+  aryDeleteIf,
   aryPop,
   arySlice,
   compact,

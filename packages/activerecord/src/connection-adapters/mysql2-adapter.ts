@@ -9,7 +9,7 @@ import {
 } from "./abstract-mysql-adapter.js";
 import { StringType, ImmutableStringType } from "@blazetrails/activemodel";
 import { Text as TextType } from "../type/text.js";
-import { rtest } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
 import { TypeMap } from "../type/type-map.js";
 import * as Type from "../type.js";
 import { UnsignedInteger } from "../type/unsigned-integer.js";
@@ -273,7 +273,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private _database: string | undefined;
 
   override errorNumber(exception: Error & { errno?: number }): number | null {
-    return exception.errno ?? null;
+    if (rbObjRespondTo(exception, "errno")) return exception.errno as number;
+    return null;
   }
 
   override isConnected(): boolean {
@@ -290,14 +291,20 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   override async active(): Promise<boolean> {
-    if (!this.isConnected()) return false;
-    try {
-      const conn = await this._ensureClient();
-      await conn.ping();
-      return true;
-    } catch {
-      return false;
+    if (this.isConnected()) {
+      return await this.lock.synchronize(async () => {
+        const ping = await this._rawConnection?.ping().then(
+          () => true,
+          () => false,
+        );
+        if (ping) {
+          this.verifiedBang();
+          return true;
+        }
+        return false;
+      });
     }
+    return false;
   }
 
   override async disconnectBang(): Promise<void> {

@@ -4,7 +4,7 @@
  *
  * @noRailsEquivalent PERMANENT
  */
-export class Enumerator {
+export class Enumerator<T = unknown> {
   /** @noRailsEquivalent PERMANENT */
   constructor(
     private obj: object,
@@ -23,6 +23,18 @@ export class Enumerator {
     const meth = (this.obj as Record<string, (...args: unknown[]) => unknown>)[this.meth];
     return meth.call(this.obj, ...this.args, block);
   }
+
+  /**
+   * `enumerator_each` (`vendor/ruby/v3.3.11/enumerator.c:613`) run to completion
+   * into a snapshot, which a `for…of` then walks.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  *[Symbol.iterator](): Generator<T> {
+    const buffer: T[] = [];
+    this.each((value: T) => buffer.push(value));
+    yield* buffer;
+  }
 }
 
 /**
@@ -31,6 +43,10 @@ export class Enumerator {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function toEnum(obj: object, meth: string = "each", ...args: unknown[]): Enumerator {
-  return new Enumerator(obj, meth, args);
+export function toEnum<T = unknown>(
+  obj: object,
+  meth: string = "each",
+  ...args: unknown[]
+): Enumerator<T> {
+  return new Enumerator<T>(obj, meth, args);
 }

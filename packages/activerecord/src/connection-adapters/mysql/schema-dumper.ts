@@ -6,7 +6,7 @@ import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.
 import { quotedScope } from "./schema-statements.js";
 
 interface MysqlAdapterLike {
-  tableOptions(tableName: string): Promise<Record<string, string>>;
+  tableOptions(tableName: string): Promise<Record<string, string | null> | null>;
   internalExecQuery(sql: string, name?: string | null): Promise<Result>;
   quote(value: unknown): string;
   quoteColumnName(name: unknown): string;
@@ -150,7 +150,9 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected override async tableOptions(tableName: string): Promise<Record<string, unknown>> {
+  protected override async tableOptions(
+    tableName: string,
+  ): Promise<Record<string, unknown> | null> {
     if (!this.connection) return {};
     return this.connection.tableOptions(tableName);
   }

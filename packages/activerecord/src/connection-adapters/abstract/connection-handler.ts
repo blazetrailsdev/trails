@@ -2,7 +2,7 @@ import type { ConnectionPool } from "./connection-pool.js";
 import { DatabaseConfig } from "../../database-configurations/database-config.js";
 import type { HashConfig } from "../../database-configurations/hash-config.js";
 import { ActiveRecord } from "../../namespaces.js";
-import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { isSymbol, symbolToS, toEnum, type Enumerator } from "@blazetrails/ruby-compat";
 import { PoolConfig } from "../pool-config.js";
 import { PoolManager } from "../pool-manager.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
@@ -89,20 +89,21 @@ export class ConnectionHandler {
     return this.connectionPoolList();
   }
 
+  eachConnectionPool(role?: string | null): Enumerator<ConnectionPool>;
   eachConnectionPool(block: (pool: ConnectionPool) => void): void;
   eachConnectionPool(role: string | null | undefined, block: (pool: ConnectionPool) => void): void;
   eachConnectionPool(
-    role: string | null | undefined | ((pool: ConnectionPool) => void),
+    role?: string | null | ((pool: ConnectionPool) => void),
     block?: (pool: ConnectionPool) => void,
-  ): void {
-    const cb = typeof role === "function" ? role : block!;
-    const effectiveRole = typeof role === "function" ? null : role === "all" ? null : role;
+  ): Enumerator<ConnectionPool> | void {
+    if (typeof role === "function") [role, block] = [null, role];
+    if (role === "all") role = null;
+    if (!block) return toEnum<ConnectionPool>(this, "eachConnectionPool", role);
+
     for (const manager of this._connectionNameToPoolManager.values()) {
-      const configs =
-        effectiveRole == null ? manager.poolConfigs() : manager.poolConfigs(effectiveRole);
-      for (const pc of configs) {
-        cb(pc.pool);
-      }
+      manager.eachPoolConfig(role ?? undefined, (poolConfig) => {
+        block(poolConfig.pool);
+      });
     }
   }
 
@@ -171,34 +172,22 @@ export class ConnectionHandler {
   }
 
   clearActiveConnectionsBang(role?: string | null): void {
-    this.eachConnectionPool(role, (pool) => {
+    for (const pool of this.eachConnectionPool(role)) {
       pool.releaseConnection();
       (pool as unknown as QueryCachePool).disableQueryCacheBang();
-    });
+    }
   }
 
   async clearReloadableConnectionsBang(role?: string | null): Promise<void> {
-    const draining: Array<Promise<void>> = [];
-    this.eachConnectionPool(role, (pool) => {
-      draining.push(pool.clearReloadableConnectionsBang());
-    });
-    await Promise.all(draining);
+    for (const pool of this.eachConnectionPool(role)) await pool.clearReloadableConnectionsBang();
   }
 
   async clearAllConnectionsBang(role?: string | null): Promise<void> {
-    const draining: Array<Promise<void>> = [];
-    this.eachConnectionPool(role, (pool) => {
-      draining.push(pool.disconnectBang());
-    });
-    await Promise.all(draining);
+    for (const pool of this.eachConnectionPool(role)) await pool.disconnectBang();
   }
 
   async flushIdleConnectionsBang(role?: string | null): Promise<void> {
-    const draining: Array<Promise<void>> = [];
-    this.eachConnectionPool(role, (pool) => {
-      draining.push(pool.flushBang());
-    });
-    await Promise.all(draining);
+    for (const pool of this.eachConnectionPool(role)) await pool.flushBang();
   }
 
   retrieveConnection(
