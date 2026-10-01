@@ -75,7 +75,7 @@ type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
  * `@delegate_dc_obj` (`delegate.rb:405`) is a plain `delegateDcObj` property rather
  * than a `#private` field: a `#` field is unreachable through the
  * `method_missing` Proxy, whose `get` rebinds the receiver
- * (see CLAUDE.md, "Method visibility is a side table").
+ * (see CLAUDE.md, "Method visibility is compile-time only").
  *
  * @noRailsEquivalent PERMANENT
  */

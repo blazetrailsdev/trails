@@ -271,7 +271,7 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "defined?(@first), respond_to?(:topics, false) (fixtures_test.rb:756-773). trails has " +
       "only the non-instantiating mode, so the flag selects nothing and there is no ivar " +
       "whose absence could be observed; JS also has no runtime method visibility to test " +
-      "(see CLAUDE.md, 'Method visibility is a side table'). 'accessor " +
+      "(see CLAUDE.md, 'Method visibility is compile-time only'). 'accessor " +
       "methods', the case in this class that asserts the accessor itself, IS ported.",
   },
   {
@@ -760,6 +760,22 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "Ruby fork() + Marshal — process forking and binary serialization have no Node.js equivalent.",
   },
   // --- Permanently not-portable: Ruby serialization formats ---
+  {
+    testFile: "attribute_methods_test.rb",
+    className: "AttributeMethodsTest",
+    tests: [
+      "attribute readers respect access control",
+      "attribute writers respect access control",
+      "attribute predicates respect access control",
+      "bulk updates respect access control",
+    ],
+    reason:
+      "Each `privatize`s a reader, writer or predicate and asserts Ruby's visibility on it: " +
+      "`assert_not_respond_to`, `assert_raise(NoMethodError)` on the direct call, and " +
+      "`public_send` refused by a private writer so mass assignment raises " +
+      "UnknownAttributeError (attribute_methods_test.rb:998-1033). trails carries no method " +
+      "visibility at run time (see CLAUDE.md, 'Method visibility is compile-time only').",
+  },
   {
     testFile: "attribute_methods_test.rb",
     className: "AttributeMethodsTest",

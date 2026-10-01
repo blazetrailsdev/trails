@@ -393,4 +393,32 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
       "cannot carry the Float-ness the assertion is about. The file's other eleven " +
       "`to_xml` cases are portable and stay counted.",
   },
+  {
+    testFile: "core_ext/module_test.rb",
+    className: "ModuleTest",
+    tests: [
+      "private delegate",
+      "private delegate prefixed",
+      "private delegate with private option",
+      "some public some private delegate with private option",
+      "private delegate prefixed with private option",
+    ],
+    reason:
+      "Each asserts `assert_not_respond_to place, :street` for a delegate made private by " +
+      "`private(*delegate(...))` or `delegate ..., private: true` " +
+      "(core_ext/module_test.rb:500-590). trails carries no method visibility at run time " +
+      "(see CLAUDE.md, 'Method visibility is compile-time only'), so a defined delegate " +
+      "answers `respond_to?` at both arities. The file's other delegate cases stay counted.",
+  },
+  {
+    testFile: "configurable_test.rb",
+    className: "ConfigurableActiveSupport",
+    tests: ["the config_accessor method should not be publicly callable"],
+    reason:
+      "Asserts `assert_raises NoMethodError` on calling the private class method " +
+      "`config_accessor` from outside the class body (configurable_test.rb:125-131, " +
+      "`private :config_accessor`, configurable.rb:129). trails carries no method " +
+      "visibility at run time (see CLAUDE.md, 'Method visibility is compile-time only'). " +
+      "The file's other nine cases stay counted.",
+  },
 ];

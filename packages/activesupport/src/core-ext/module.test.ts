@@ -524,7 +524,7 @@ describe("ModuleTest", () => {
   });
 
   it.skip("private delegate", () => {
-    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
+    // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {
@@ -543,7 +543,7 @@ describe("ModuleTest", () => {
   });
 
   it.skip("private delegate prefixed", () => {
-    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
+    // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {
@@ -568,7 +568,7 @@ describe("ModuleTest", () => {
   });
 
   it.skip("private delegate with private option", () => {
-    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
+    // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {
@@ -587,7 +587,7 @@ describe("ModuleTest", () => {
   });
 
   it.skip("some public some private delegate with private option", () => {
-    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
+    // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {
@@ -606,7 +606,7 @@ describe("ModuleTest", () => {
   });
 
   it.skip("private delegate prefixed with private option", () => {
-    // BLOCKED: activesupport-delegate-private-and-ruby-method-semantics
+    // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
     class Location {
       "@place": Somewhere;
       constructor(place: Somewhere) {

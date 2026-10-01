@@ -169,10 +169,11 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
  * A writer `name=` is answered by a JS accessor's setter, the entry
  * {@link rbFSend} dispatches it to.
  *
- * A PRIVATE entry, and under `BOUND_RESPONDS` a PROTECTED one, answers `0`
- * when `pub` is set (`method_boundp`, `vm_method.c:1788-1818`), so the name
- * falls through to `respond_to_missing?`. JS carries no visibility of its own;
- * the entry's is what {@link rbModPrivate} / {@link rbModProtected} recorded.
+ * `method_boundp` (`vm_method.c:1788-1818`) answers `0` for a PRIVATE entry,
+ * and under `BOUND_RESPONDS` a PROTECTED one, when `pub` is set. A JS entry
+ * carries no visibility, so a defined name answers the same at both `pub`
+ * values and `pub` reaches only `respond_to_missing?` (see CLAUDE.md, "Method
+ * visibility is compile-time only").
  *
  * @noRailsEquivalent PERMANENT — Ruby core `basic_obj_respond_to`
  * (`vendor/ruby/v3.3.11/vm_method.c:2864`).
@@ -198,11 +199,6 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
     o && !(klass && o === Function.prototype);
     o = Object.getPrototypeOf(o) as object | null
   ) {
-    const visi = methodVisibilities.get(o)?.get(mid);
-    if (visi !== undefined) {
-      if (pub && visi !== "public") break;
-      return true;
-    }
     const entry = Object.getOwnPropertyDescriptor(o, mid);
     if (entry) {
       if (!("value" in entry)) return true;
@@ -223,114 +219,46 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   return ret != null && ret !== false;
 }
 
-type MethodVisibility = "public" | "protected" | "private";
-
-const methodVisibilities = new WeakMap<object, Map<string, MethodVisibility>>();
-
-function methodEntryVisi(obj: unknown, mid: string): MethodVisibility | undefined {
-  for (let o: object | null = Object(obj); o; o = Object.getPrototypeOf(o) as object | null) {
-    const visi = methodVisibilities.get(o)?.get(mid);
-    if (visi !== undefined) return visi;
-    if (Object.getOwnPropertyDescriptor(o, mid)) return "public";
-  }
-  return undefined;
-}
-
-function setMethodVisibility(
-  module: { prototype: object; name: string },
-  mids: string[],
-  visi: MethodVisibility,
-): void {
-  const owner = module.prototype;
-  for (const mid of mids) {
-    const defined =
-      mid in owner ||
-      (mid.endsWith("=") && typeof lookupSetter(owner, mid.slice(0, -1)) === "function");
-    if (!defined) {
-      throw new NameError(`undefined method '${mid}' for class '${module.name}'`, mid);
-    }
-    let table = methodVisibilities.get(owner);
-    if (!table) methodVisibilities.set(owner, (table = new Map()));
-    table.set(mid, visi);
-  }
-}
-
-function lookupSetter(obj: object, name: string): ((value: unknown) => unknown) | undefined {
-  for (let o: object | null = obj; o; o = Object.getPrototypeOf(o) as object | null) {
-    const desc = Object.getOwnPropertyDescriptor(o, name);
-    if (desc) return desc.set;
-  }
-  return undefined;
-}
-
-/**
- * `Module#private` with method names (`rb_mod_private`, `vendor/ruby/v3.3.11/vm_method.c:2516`,
- * through `set_method_visibility`, `:2388`): records each instance method of
- * `module` as PRIVATE, where {@link basicObjRespondTo} and {@link rbFPublicSend}
- * read it. A JS accessor's setter answers the Ruby writer `name=`.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Module#private` (`vendor/ruby/v3.3.11/vm_method.c:2516`).
- */
-export function rbModPrivate(module: { prototype: object; name: string }, ...mids: string[]): void {
-  setMethodVisibility(module, mids, "private");
-}
-
-/**
- * `Module#protected` with method names (`rb_mod_protected`,
- * `vendor/ruby/v3.3.11/vm_method.c:2482`); see {@link rbModPrivate}.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Module#protected` (`vendor/ruby/v3.3.11/vm_method.c:2482`).
- */
-export function rbModProtected(
-  module: { prototype: object; name: string },
-  ...mids: string[]
-): void {
-  setMethodVisibility(module, mids, "protected");
-}
-
-function checkDefinitionVisibility(
-  mod: { prototype: object },
-  mid: string,
-): MethodVisibility | undefined {
+function checkDefinitionVisibility(mod: { prototype: object }, mid: string): boolean {
   for (
     let o: object | null = mod.prototype;
     o && o !== Object.prototype;
     o = Object.getPrototypeOf(o) as object | null
   ) {
-    const visi = methodVisibilities.get(o)?.get(mid);
-    if (visi !== undefined) return visi;
     const me = Object.getOwnPropertyDescriptor(o, mid);
-    if (me) return typeof me.value === "function" || me.get ? "public" : undefined;
+    if (me) return typeof me.value === "function" || me.get !== undefined;
   }
-  return undefined;
+  return false;
 }
 
 /**
  * `Module#public_method_defined?` (`rb_mod_public_method_defined`,
  * `vendor/ruby/v3.3.11/vm_method.c:2098`, through `check_definition_visibility`,
- * `:1988`): whether `mod`'s instances have a PUBLIC method `mid`, reading the
- * visibility {@link rbModPrivate} / {@link rbModProtected} recorded. A JS method
- * or accessor is a method entry; a data property is not, and neither is an
- * `Object.prototype` member, which no Ruby class defines.
+ * `:1988`): whether `mod`'s instances have a method `mid`. A JS method entry
+ * carries no visibility, so every defined one is PUBLIC (see CLAUDE.md, "Method
+ * visibility is compile-time only"). A JS method or accessor is a method
+ * entry; a data property is not, and neither is an `Object.prototype` member,
+ * which no Ruby class defines.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Module#public_method_defined?`
  * (`vendor/ruby/v3.3.11/vm_method.c:2098`).
  */
 export function rbModPublicMethodDefined(mod: { prototype: object }, mid: string): boolean {
-  return checkDefinitionVisibility(mod, mid) === "public";
+  return checkDefinitionVisibility(mod, mid);
 }
 
 /**
  * `Kernel#public_send` (`rb_f_public_send`, `vendor/ruby/v3.3.11/vm_eval.c:1350`): `send`
- * restricted to public methods, so a PRIVATE or PROTECTED entry raises
- * `NoMethodError` instead of being called. The nearest entry answers: a writer
+ * restricted to public methods. A JS entry carries no visibility, so a defined
+ * name dispatches exactly as {@link rbFSend} does (see CLAUDE.md, "Method
+ * visibility is compile-time only"). The nearest entry answers: a writer
  * `name=` is either a `name=` method or a JS accessor's `name` setter. An
  * unbound name goes to the receiver's `method_missing`.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#public_send` (`vendor/ruby/v3.3.11/vm_eval.c:1350`).
  */
 export function rbFPublicSend(recv: unknown, mid: string, ...args: unknown[]): unknown {
-  return sendInternal(args.length, [mid, ...args], recv, "public");
+  return sendInternal(args.length, [mid, ...args], recv);
 }
 
 /**
@@ -342,26 +270,11 @@ export function rbFPublicSend(recv: unknown, mid: string, ...args: unknown[]): u
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#send` (`vendor/ruby/v3.3.11/vm_eval.c:1330`).
  */
 export function rbFSend(recv: unknown, mid: string, ...args: unknown[]): unknown {
-  return sendInternal(args.length, [mid, ...args], recv, "fcall");
+  return sendInternal(args.length, [mid, ...args], recv);
 }
 
-function sendInternal(
-  argc: number,
-  argv: [string, ...unknown[]],
-  recv: unknown,
-  scope: "public" | "fcall",
-): unknown {
+function sendInternal(argc: number, argv: [string, ...unknown[]], recv: unknown): unknown {
   const [mid, ...args] = argv;
-  if (scope === "public") {
-    const visi = methodEntryVisi(recv, mid);
-    if (visi === "private" || visi === "protected") {
-      throw new NoMethodError(
-        `${visi} method '${mid}' called for an instance of ${rbObjClass(recv)}`,
-        mid,
-        { receiver: recv },
-      );
-    }
-  }
   const obj = Object(recv) as Record<string, unknown>;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   for (let o: object | null = obj; o; o = Object.getPrototypeOf(o) as object | null) {
