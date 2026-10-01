@@ -1279,7 +1279,13 @@ thread, so a re-entry is always nested in the holder's own call; a
 `Promise.all` inside `withinNewTransaction` starts sibling calls that share
 the holder's async context. So ruby-compat's `synchronize` (`monitor.ts`) runs
 each entry under an owner of its own and serializes re-entries under one
-holder: a nested call re-enters at once, siblings take turns. For the same
+holder: a nested call re-enters at once, siblings take turns. A pinned
+connection's `ThreadLoadInterlockAwareMonitor`
+(`concurrency/load_interlock_aware_monitor.rb:36-68`) keeps Rails' `@owner` /
+`@count` / `@mutex` bodies, which exclude another `Thread`, and its prepended
+`synchronize` runs the block through that same ruby-compat `synchronize`
+where Rails has `Thread.handle_interrupt(EXCEPTION_IMMEDIATE, &block)`
+(`:18-28`), so the owning thread's sibling promises still take turns. For the same
 reason `SQLite3Adapter#disconnectBang` closes the handle under `lock`, where
 Rails' `disconnect!` (`sqlite3_adapter.rb:221-226`) closes it after `super`
 releases `@lock`: a statement can be in flight on the adapter from the same

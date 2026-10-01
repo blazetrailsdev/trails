@@ -30,7 +30,7 @@ type AnyFunction = (...args: never) => unknown;
 type ModuleHooks = {
   [included]?: (klass: unknown) => void;
   [extended]?: (klass: unknown) => void;
-  [initialize]?: (this: object) => void;
+  [initialize]?: (this: object, ...args: never[]) => void;
 };
 
 /**
@@ -606,40 +606,47 @@ const prependedInstanceInitializers = Symbol.for(
  * `include_modules_at` skips a module whose method table it finds in the
  * superclass chain (vendor/ruby/v3.3.11/class.c:1281,1291,1296).
  *
+ * `args` are the arguments a bare `super` forwards
+ * (vendor/ruby/v3.3.11/vm_insnhelper.c:5620 `rb_vm_invokesuper`), which is how
+ * `Thor::Shell#initialize(args, options, config)` (thor/shell.rb:44-48) reads
+ * `config[:shell]`.
+ *
  * Mirrors: the `super` call in a class whose ancestry carries module
  * `initialize` definitions — vendor/ruby/v3.3.11/class.c:1179 `rb_include_module`.
  *
  * @noRailsEquivalent PERMANENT — Ruby reaches these through `super`;
  * JavaScript has no construction hook a mixin can splice into.
  */
-export function initializeIncludedModules(instance: object): void {
-  const chain: Array<Array<(this: object) => void>> = [];
+export function initializeIncludedModules(instance: object, ...args: unknown[]): void {
+  const chain: Array<Array<(this: object, ...args: unknown[]) => void>> = [];
   for (
     let proto: object | null = Object.getPrototypeOf(instance) as object | null;
     proto;
     proto = Object.getPrototypeOf(proto) as object | null
   ) {
-    const level: Array<(this: object) => void> = [];
+    const level: Array<(this: object, ...args: unknown[]) => void> = [];
     for (const registry of [instanceInitializers, prependedInstanceInitializers]) {
       if (!Object.prototype.hasOwnProperty.call(proto, registry)) continue;
       level.push(
-        ...((proto as Record<symbol, unknown>)[registry] as Array<(this: object) => void>),
+        ...((proto as Record<symbol, unknown>)[registry] as Array<
+          (this: object, ...args: unknown[]) => void
+        >),
       );
     }
     if (level.length !== 0) chain.unshift(level);
   }
   for (const initializers of chain) {
-    for (const initializer of initializers) initializer.call(instance);
+    for (const initializer of initializers) initializer.call(instance, ...args);
   }
 }
 
 function trackInstanceInitializer(
   proto: object,
-  initializer: (this: object) => void,
+  initializer: (this: object, ...args: never[]) => void,
   registry: symbol = instanceInitializers,
 ): void {
   let list = (proto as Record<symbol, unknown>)[registry] as
-    | Array<(this: object) => void>
+    | Array<(this: object, ...args: never[]) => void>
     | undefined;
   if (!Object.prototype.hasOwnProperty.call(proto, registry)) {
     list = [];

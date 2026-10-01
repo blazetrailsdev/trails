@@ -1168,22 +1168,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "ActiveSupport::Concurrency::LoadInterlockAwareMonitor " +
-      "(concurrency/load_interlock_aware_monitor.rb) is a Ruby `Monitor` " +
-      "subclass whose only purpose is to release the Dependencies interlock " +
-      "while a thread blocks on the lock, so a competing thread can keep " +
-      "autoloading. Both halves are absent from the port: JS has no threads to " +
-      "serialize with a reentrant mutex and no `Thread.handle_interrupt`, and " +
-      "there is no interlock to permit loads through (see the dependencies.rb " +
-      "group). RFC 0073's permanent-connection-checkout work does not change " +
-      "that — it converges where a connection is held, not what guards constant " +
-      "loading — and trails' load-interlock suite is a permanent skip. Scoped to " +
-      "this file so `synchronize` and `initialize` stay expected elsewhere.",
-    names: ["mon_enter", "synchronize", "initialize", "mon_try_enter", "mon_exit"],
-    rubyFiles: ["concurrency/load_interlock_aware_monitor.rb"],
-  },
-  {
-    reason:
       "MemoryStore#synchronize (memory_store.rb:191-193) is `@monitor." +
       "synchronize(&block)` — the Monitor that makes MemoryStore thread-safe " +
       "across Ruby threads. JavaScript has no threads and no preemption inside " +

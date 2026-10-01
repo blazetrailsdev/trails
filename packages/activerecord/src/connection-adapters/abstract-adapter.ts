@@ -23,6 +23,7 @@ import {
   LoadInterlockAwareMonitor,
   Notifications,
   NullLock,
+  ThreadLoadInterlockAwareMonitor,
 } from "@blazetrails/activesupport";
 import {
   Fiber,
@@ -804,7 +805,8 @@ export class AbstractAdapter implements Quoting {
 
   pool: ConnectionPool | NullPool = new NullPool();
   logger: unknown = null;
-  lock: LoadInterlockAwareMonitor | NullLock = new LoadInterlockAwareMonitor();
+  lock: ThreadLoadInterlockAwareMonitor | LoadInterlockAwareMonitor | NullLock =
+    new LoadInterlockAwareMonitor();
 
   get owner(): Thread | Fiber | null {
     return this._owner;
@@ -953,7 +955,13 @@ export class AbstractAdapter implements Quoting {
   }
 
   setLockThread(lockThread: unknown): void {
-    this.lock = lockThread != null ? new LoadInterlockAwareMonitor() : NullLock;
+    if (lockThread instanceof Thread) {
+      this.lock = new ThreadLoadInterlockAwareMonitor();
+    } else if (lockThread instanceof Fiber) {
+      this.lock = new LoadInterlockAwareMonitor();
+    } else {
+      this.lock = NullLock;
+    }
   }
 
   checkIfWriteQuery(sql: string | null): void {
