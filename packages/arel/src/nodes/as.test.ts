@@ -8,7 +8,7 @@ describe("As", () => {
       const attr = new Table("users").get("id");
       const as = attr.as(sql("foo"));
       expect(as.left).toBe(attr);
-      expect((as.right as Nodes.SqlLiteral).value).toBe("foo");
+      expect((as.right as Nodes.SqlLiteral).toString()).toBe("foo");
     });
 
     it("converts right to SqlLiteral if a string", () => {

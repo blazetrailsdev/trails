@@ -9,7 +9,7 @@ describe("Function alias slot", () => {
       const fn = new Nodes.NamedFunction("COUNT", []);
       fn.alias = "total";
       expect(fn.alias).toBeInstanceOf(Nodes.SqlLiteral);
-      expect((fn.alias as Nodes.SqlLiteral).value).toBe("total");
+      expect((fn.alias as Nodes.SqlLiteral).toString()).toBe("total");
     });
 
     it("accepts a Node directly", () => {

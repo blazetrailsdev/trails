@@ -9,7 +9,7 @@ describe("TestNode", () => {
   it("is equal with equal ivars (checks left/right)", () => {
     const a = users.get("name").as("n");
     const b = users.get("name").as("n");
-    expect((a.right as Nodes.SqlLiteral).value).toBe((b.right as Nodes.SqlLiteral).value);
+    expect((a.right as Nodes.SqlLiteral).toString()).toBe((b.right as Nodes.SqlLiteral).toString());
   });
 
   it("sets default case from else", () => {

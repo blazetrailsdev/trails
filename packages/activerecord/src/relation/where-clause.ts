@@ -175,7 +175,7 @@ export class WhereClause {
   /** @internal */
   private nonEmptyPredicates(): (Nodes.Node | string)[] {
     return this.predicates.filter(
-      (n) => n !== "" && !(n instanceof Nodes.SqlLiteral && n.value === ""),
+      (n) => n !== "" && !(n instanceof Nodes.SqlLiteral && n.toString() === ""),
     );
   }
 

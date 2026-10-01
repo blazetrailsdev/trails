@@ -95,7 +95,7 @@ describe("sanitizeSql", () => {
       }
     }
     const result = SubPost.sanitizeSqlForOrder(["field(id, ?)", [1, 2]]);
-    expect((result as { value?: string }).value).toBe("id, 1, 2");
+    expect(String(result)).toBe("id, 1, 2");
     expect(disallowCalled).toBe(true);
   });
 
@@ -110,7 +110,7 @@ describe("sanitizeSql", () => {
     }
     const result = SubPost.sanitizeSqlForOrder([arelSql("field(id, ?)"), [1, 3, 2]]);
     expect(sanitizeCalled).toBe(true);
-    expect((result as { value?: string }).value).toBe("field(id, 1,3,2)");
+    expect(String(result)).toBe("field(id, 1,3,2)");
   });
 
   it("sanitizeSqlForOrder returns the full array unchanged when the first element has no bind", () => {

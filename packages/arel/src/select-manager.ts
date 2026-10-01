@@ -142,7 +142,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
     if (relation == null) return this;
 
     if (typeof relation === "string" || relation instanceof SqlLiteral) {
-      const text = typeof relation === "string" ? relation : relation.value;
+      const text = typeof relation === "string" ? relation : relation.toString();
       if (text.length === 0) throw new EmptyJoinError();
       klass = StringJoin as unknown as new (left: Node | Table, right: Node | null) => Join;
     }

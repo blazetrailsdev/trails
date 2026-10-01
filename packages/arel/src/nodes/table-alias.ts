@@ -15,10 +15,6 @@ interface TypeCastable {
 }
 
 export class TableAlias extends Binary {
-  constructor(relation: Node | Table, name: string | SqlLiteral) {
-    super(relation, name);
-  }
-
   get name(): string | SqlLiteral {
     return this.right as string | SqlLiteral;
   }
@@ -37,6 +33,12 @@ export class TableAlias extends Binary {
 
   get tableAlias(): string | SqlLiteral {
     return this.name;
+  }
+
+  get(name: string): Attribute {
+    return this.relation instanceof Table
+      ? this.relation.get(name, this)
+      : new Attribute(this, name);
   }
 
   get tableName(): string {
@@ -62,13 +64,7 @@ export class TableAlias extends Binary {
   }
 
   private get nameString(): string {
-    return this.name instanceof SqlLiteral ? this.name.value : this.name;
-  }
-
-  get(name: string): Attribute {
-    return this.relation instanceof Table
-      ? this.relation.get(name, this)
-      : new Attribute(this, name);
+    return this.name instanceof SqlLiteral ? this.name.toString() : this.name;
   }
 }
 

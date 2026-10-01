@@ -993,7 +993,7 @@ export class PostgreSQLAdapter
       sql += ` ON CONFLICT ${insert.conflictTarget()} DO UPDATE SET `;
       const raw = insert.rawUpdateSql();
       if (raw) {
-        sql += raw.value;
+        sql += raw.toString();
       } else {
         sql += insert.touchModelTimestampsUnless(
           (column) =>

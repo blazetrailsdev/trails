@@ -245,6 +245,7 @@ export { sliceBang } from "./string/slice.js";
 export {
   rbDefineMethod,
   rbStrMatch,
+  rbStrInit,
   rbStrRespondTo,
   rbStrSend,
   STRING_METHOD_TABLE,

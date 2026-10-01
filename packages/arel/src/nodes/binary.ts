@@ -6,9 +6,6 @@ import { Attributes, Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
-import { And, Or } from "./nary.js";
-import { Not } from "./unary.js";
-import { Grouping } from "./grouping.js";
 import type { Cte } from "./cte.js";
 import type { SelectManager } from "../select-manager.js";
 import type { Table } from "../table.js";
@@ -39,11 +36,8 @@ export const FetchAttribute = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class Binary extends NodeExpression {
-  left: NodeOrValue;
-  right: NodeOrValue;
-
-  constructor(left: NodeOrValue, right: NodeOrValue) {
+export class Binary<L = NodeOrValue, R = NodeOrValue> extends NodeExpression {
+  constructor(left: L, right: R) {
     super();
     this.left = left;
     this.right = right;
@@ -65,18 +59,6 @@ export class Binary extends NodeExpression {
   initializeCopy(_other: Binary): void {
     if (this.left != null) this.left = rbObjClone(this.left);
     if (this.right != null) this.right = rbObjClone(this.right);
-  }
-
-  and(other: Node): And {
-    return new And([this, other]);
-  }
-
-  or(other: Node): Grouping {
-    return new Grouping(new Or([this, other]));
-  }
-
-  not(): Not {
-    return new Not(this);
   }
 }
 
@@ -199,8 +181,10 @@ include(IsNotDistinctFrom as unknown as Includable, fetchAttributeModule);
 include(NotIn as unknown as Includable, fetchAttributeModule);
 
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-export interface Binary extends _AliasPredication {}
+export interface Binary<L = NodeOrValue, R = NodeOrValue> extends _AliasPredication {
+  left: L;
+  right: R;
+}
 
 rbSetClassPathString(Binary, Nodes, "Binary");
 Nodes.Binary = Binary;

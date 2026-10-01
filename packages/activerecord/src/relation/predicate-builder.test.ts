@@ -105,7 +105,7 @@ describe("PredicateBuilderTest", () => {
 
   it("references with schema", () => {
     const refs = PredicateBuilder.references(["schema.table.column"]);
-    expect(refs.map((r) => r.value)).toEqual(["schema.table"]);
+    expect(refs.map((r) => r.toString())).toEqual(["schema.table"]);
   });
 
   it("build from hash with schema", () => {

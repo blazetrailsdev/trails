@@ -37,7 +37,7 @@ describe("TableTest (trails)", () => {
     expect(aliased).toBeInstanceOf(Nodes.As);
     expect(aliased.left).toBe(users);
     expect(aliased.right).toBeInstanceOf(Nodes.SqlLiteral);
-    expect((aliased.right as Nodes.SqlLiteral).value).toBe("u");
+    expect((aliased.right as Nodes.SqlLiteral).toString()).toBe("u");
     expect(users.alias("u")).toBeInstanceOf(Nodes.TableAlias);
   });
 });

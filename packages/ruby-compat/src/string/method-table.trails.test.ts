@@ -5,9 +5,9 @@ import { NoMethodError } from "../no-method-error.js";
 import { Range } from "../range.js";
 import { TypeError } from "../type-error.js";
 import { bytes } from "./bytes.js";
-import { include } from "../include.js";
+import { include, rbObjClone } from "../include.js";
 import { rbHash } from "../rb-hash.js";
-import { rbStrSend, stringSuperclass, type StringInstance } from "./method-table.js";
+import { rbStrInit, rbStrSend, stringSuperclass, type StringInstance } from "./method-table.js";
 
 type Row = [string, string, unknown[], unknown];
 
@@ -1058,9 +1058,8 @@ describe("STRING_METHOD_TABLE blocks and enumerators", () => {
 
 describe("stringSuperclass", () => {
   class Literal {
-    constructor(public value: string) {}
-    toString(): string {
-      return this.value;
+    constructor(value: unknown) {
+      rbStrInit(this, value);
     }
   }
   include(Literal, stringSuperclass("eql", "hash"));
@@ -1079,6 +1078,13 @@ describe("stringSuperclass", () => {
       "undefinedStringMethod" as keyof StringInstance,
     ) as unknown as Record<string, (this: object) => unknown>;
     expect(() => mod.undefinedStringMethod.call(literal("a"))).toThrow(NoMethodError);
+  });
+
+  it("holds the contents String#initialize is given, and answers them from to_s", () => {
+    expect(literal("a").toString()).toBe("a");
+    expect(`${new Literal(new Literal("a"))}`).toBe("a");
+    expect(rbObjClone(literal("a")).toString()).toBe("a");
+    expect(() => new Literal(1)).toThrow(TypeError);
   });
 
   it("hashes as its String contents", () => {

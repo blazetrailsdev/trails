@@ -18,18 +18,9 @@ export class Descending extends Ordering {
   isDescending(): boolean {
     return true;
   }
-
-  nullsFirst(): NullsFirst {
-    return new NullsFirst(this);
-  }
-
-  nullsLast(): NullsLast {
-    return new NullsLast(this);
-  }
 }
 
 import { Ascending } from "./ascending.js";
-import { NullsFirst, NullsLast } from "./ordering.js";
 
 rbSetClassPathString(Descending, Nodes, "Descending");
 Nodes.Descending = Descending;

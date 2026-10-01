@@ -742,7 +742,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   private tablesInString(string: Nodes.Node | string | null | undefined): string[] {
-    if (string instanceof Nodes.SqlLiteral) string = string.value;
+    if (string instanceof Nodes.SqlLiteral) string = string.toString();
     else if (string instanceof Nodes.Node) string = string.toSql();
     if (!string) return [];
     const matches = string.match(/[a-zA-Z_][\w.]+(?=.?\.)/g) ?? [];

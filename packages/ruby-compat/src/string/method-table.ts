@@ -215,6 +215,7 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
 );
 
 const stringClasses = new WeakSet<object>();
+const RSTRING_PTR = Symbol("RSTRING_PTR");
 
 function isTString(value: unknown): boolean {
   if (typeof value === "string") return true;
@@ -246,7 +247,10 @@ export interface StringInstance {
  * it `include`s the String methods it answers, each sent through
  * {@link STRING_METHOD_TABLE} at call time with the receiver's `to_s` as its
  * string, so an entry a package reopening String assigns is found too. An
- * instance of the including class is a `T_STRING` to `rb_str_eql`.
+ * instance of the including class is a `T_STRING` to `rb_str_eql`, holds the
+ * contents {@link rbStrInit} gave it, and answers them from `to_s`
+ * (`rb_str_to_s`, `vendor/ruby/v3.3.11/string.c:6648`), which is a plain String
+ * for a subclass instance.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -257,6 +261,9 @@ export function stringSuperclass<M extends keyof StringInstance>(
     [included](klass: { prototype: object }): void {
       stringClasses.add(klass.prototype);
     },
+    toString(this: Record<symbol, string>): string {
+      return this[RSTRING_PTR];
+    },
   };
   for (const method of methods) {
     mod[method] = function (this: object, ...args: unknown[]): unknown {
@@ -264,6 +271,17 @@ export function stringSuperclass<M extends keyof StringInstance>(
     };
   }
   return mod as unknown as Pick<StringInstance, M>;
+}
+
+/**
+ * `String#initialize` (`vendor/ruby/v3.3.11/string.c:1832` `rb_str_init`), for
+ * the `super(string)` of a class whose superclass is {@link stringSuperclass}:
+ * the receiver's contents become `orig`'s, read through `StringValue`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbStrInit(str: object, orig: unknown = ""): void {
+  (str as Record<symbol, string>)[RSTRING_PTR] = isTString(orig) ? String(orig) : stringValue(orig);
 }
 
 const JS_STRING_METHODS = new Set(Object.getOwnPropertyNames(String.prototype));

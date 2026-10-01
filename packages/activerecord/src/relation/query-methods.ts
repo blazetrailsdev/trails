@@ -264,7 +264,7 @@ function referencesBang(
 }
 
 function referenceName(reference: string | Nodes.SqlLiteral): string {
-  return reference instanceof Nodes.SqlLiteral ? reference.value : reference;
+  return reference instanceof Nodes.SqlLiteral ? reference.toString() : reference;
 }
 
 function unionReferences(
@@ -1463,7 +1463,7 @@ export function columnReferences(orderArgs: unknown[]): Nodes.SqlLiteral[] {
   const refs: string[] = [];
   for (const arg of orderArgs) {
     if (Array.isArray(arg)) {
-      refs.push(...columnReferences(arg).map((ref) => ref.value));
+      refs.push(...columnReferences(arg).map((ref) => ref.toString()));
     } else if (typeof arg === "string") {
       const term = isRubySymbol(arg) ? symbolToName(arg) : arg;
       const t = extractTableNameFrom(term);

@@ -4,6 +4,7 @@ import {
   stringSuperclass,
   type StringInstance,
   rbSetClassPathString,
+  rbStrInit,
 } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "./node.js";
@@ -15,13 +16,12 @@ import type { ExpressionsModule } from "../expressions.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SqlLiteral extends Node {
-  readonly value: string;
   readonly retryable: boolean;
 
   constructor(string: string | SqlLiteral, options?: { retryable?: boolean }) {
     super();
-    this.value = string instanceof SqlLiteral ? string.value : string;
     this.retryable = options?.retryable ?? false;
+    rbStrInit(this, string);
   }
 
   fetchAttribute(_block?: (attr: Node) => boolean): boolean | undefined {
@@ -30,10 +30,6 @@ export class SqlLiteral extends Node {
 
   encodeWith(coder: { scalar: string }): void {
     coder.scalar = this.toString();
-  }
-
-  toString(): string {
-    return this.value;
   }
 
   plus(other: unknown): Fragments {

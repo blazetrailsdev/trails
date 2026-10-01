@@ -89,15 +89,13 @@ export class NamedWindow extends Window {
   }
 }
 
-export class Rows extends Unary {
-  declare expr: Node | null;
+export class Rows extends Unary<Node | null> {
   constructor(expr: Node | null = null) {
     super(expr);
   }
 }
 
-export class Range extends Unary {
-  declare expr: Node | null;
+export class Range extends Unary<Node | null> {
   constructor(expr: Node | null = null) {
     super(expr);
   }

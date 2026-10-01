@@ -666,7 +666,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       sql += ` ON CONFLICT ${insert.conflictTarget()} DO UPDATE SET `;
       const raw = insert.rawUpdateSql();
       if (raw) {
-        sql += raw.value;
+        sql += raw.toString();
       } else {
         sql += insert.touchModelTimestampsUnless((column) => `${column} IS excluded.${column}`);
         sql += insert
