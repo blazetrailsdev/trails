@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { registerConstant, unregisterConstant } from "../../inflector.js";
+import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import { moduleParent, moduleParentName, moduleParents } from "../../module-ext.js";
 import { assertNil } from "../../testing/assertions.js";
 

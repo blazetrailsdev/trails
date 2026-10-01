@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { BinaryType, BinaryData } from "@blazetrails/activemodel";
 import { unescapeBytea } from "../quoting.js";
 

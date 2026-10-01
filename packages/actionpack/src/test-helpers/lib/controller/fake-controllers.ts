@@ -1,4 +1,5 @@
-import { registerConstant, underscore } from "@blazetrails/activesupport";
+import { underscore } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../../action-controller/base.js";
 import { controllerConstants } from "../../../action-dispatch/http/request.js";
 import type { DispatchableControllerClass } from "../../../action-dispatch/routing/dispatcher.js";

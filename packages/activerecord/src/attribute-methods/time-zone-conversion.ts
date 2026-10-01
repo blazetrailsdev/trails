@@ -1,17 +1,12 @@
 import { ValueType } from "@blazetrails/activemodel";
-import {
-  actsLike,
-  TimeWithZone,
-  zone as timeZone,
-  registerConstant,
-} from "@blazetrails/activesupport";
+import { actsLike, TimeWithZone, zone as timeZone } from "@blazetrails/activesupport";
 import {
   type DateOrTime,
   inTimeZone,
 } from "@blazetrails/activesupport/core-ext/date-and-time/zones";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { classAttribute, included } from "@blazetrails/activesupport";
-import { DelegateClass, rbEqual } from "@blazetrails/ruby-compat";
+import { DelegateClass, rbEqual, registerConstant } from "@blazetrails/ruby-compat";
 import { AttributeMethods } from "../namespaces.js";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
 

@@ -1,9 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, Temporal, Time } from "@blazetrails/date";
 import { Coder, dump, loadTags, unsafeLoad } from "./yaml.js";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
-import { registerConstant, unregisterConstant } from "./inflector.js";
 
 class Point {
   x = 1;

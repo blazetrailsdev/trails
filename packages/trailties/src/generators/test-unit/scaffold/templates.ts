@@ -11,7 +11,8 @@ function header(this: ScaffoldGenerator) {
   const preamble = `import { describe, it } from "vitest";
 import { IntegrationTest } from "@blazetrails/actionpack";
 import type { FixtureSetAccessor } from "@blazetrails/activerecord/test-fixtures";
-import { assertDifference, registerConstant } from "@blazetrails/activesupport";
+import { assertDifference } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { ${modelClassName} } from "../${root}app/models/${this.filePath()}.js";
 import "${root}test-helper.js";
 

@@ -13,7 +13,7 @@ import { AssociationNotFoundError } from "./associations/errors.js";
 import { AssociationScope } from "./associations/association-scope.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
 export { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
-import { Autoload, registerConstant, unregisterConstant } from "@blazetrails/activesupport";
+import { Autoload } from "@blazetrails/activesupport";
 import { registerSubclass } from "./inheritance.js";
 import { flushPendingCounterCacheColumns } from "./counter-cache.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
@@ -22,7 +22,13 @@ import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
 import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-and-belongs-to-many.js";
 import * as Reflection from "./reflection.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
-import { Module, include, rbInspect } from "@blazetrails/ruby-compat";
+import {
+  Module,
+  include,
+  rbInspect,
+  registerConstant,
+  unregisterConstant,
+} from "@blazetrails/ruby-compat";
 
 export type CollectionCallback<K extends string> =
   | string

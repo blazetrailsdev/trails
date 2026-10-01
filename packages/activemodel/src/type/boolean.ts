@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 
 export class BooleanType extends ValueType<boolean> {

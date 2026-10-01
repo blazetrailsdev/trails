@@ -2,12 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import {
-  assertMatch,
-  assertNoMatch,
-  registerConstant,
-  unregisterConstant,
-} from "@blazetrails/activesupport";
+import { assertMatch, assertNoMatch } from "@blazetrails/activesupport";
+import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import * as Assertions from "../../testing/assertions.js";
 import { ActiveModel } from "../../active-model.js";
 import { ScaffoldControllerGenerator } from "./scaffold-controller-generator.js";

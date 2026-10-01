@@ -13,13 +13,13 @@ import {
   deconstantize,
   constantize,
   safeConstantize,
-  _resetConstants,
   foreignKey,
   humanize,
   parameterize,
   ordinal,
   ordinalize,
 } from "./index.js";
+import { resetConstants } from "@blazetrails/ruby-compat";
 import { Inflections, Uncountables, inflections } from "./inflector/inflections.js";
 import { I18n } from "./i18n.js";
 import {
@@ -364,7 +364,7 @@ describe("InflectorTest", () => {
   });
 
   beforeEach(() => {
-    _resetConstants();
+    resetConstants();
     registerConstantizeFixtures();
   });
 

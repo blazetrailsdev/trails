@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Bit } from "./bit.js";
 
 export class BitVarying extends Bit {

@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { UnsignedInteger } from "../../../type/unsigned-integer.js";
 
 export class Oid extends UnsignedInteger {

@@ -1,4 +1,5 @@
-import { Autoload, extend, registerConstant, type Extended } from "@blazetrails/activesupport";
+import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Attribute } from "./attribute.js";
 import type { Error } from "./error.js";
 import type {

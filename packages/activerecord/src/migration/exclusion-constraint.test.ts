@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { assertNoChanges, assertRaises, registerConstant } from "@blazetrails/activesupport";
-import { Module } from "@blazetrails/ruby-compat";
+import { assertNoChanges, assertRaises } from "@blazetrails/activesupport";
+import { Module, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { Rollback, StatementInvalid } from "../errors.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";

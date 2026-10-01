@@ -1,10 +1,9 @@
-import { registerConstant } from "@blazetrails/activesupport";
 import {
   DisallowedClass,
   parse as yamlParse,
   stringify as yamlStringify,
 } from "@blazetrails/activesupport/yaml";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash, registerConstant } from "@blazetrails/ruby-compat";
 import { ColumnSerializer } from "./column-serializer.js";
 import { useYamlUnsafeLoad, yamlColumnPermittedClasses } from "../active-record.js";
 

@@ -11,7 +11,7 @@ import {
   typeRegistry,
 } from "@blazetrails/activemodel";
 export { ValueType } from "@blazetrails/activemodel";
-import { registerConstant } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 import { AdapterSpecificRegistry } from "./type/adapter-specific-registry.js";
 

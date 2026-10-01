@@ -1,6 +1,5 @@
-import { registerConstant } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rbInspect, rbObjClass } from "@blazetrails/ruby-compat";
+import { rbInspect, rbObjClass, registerConstant } from "@blazetrails/ruby-compat";
 import { SerializationTypeMismatch } from "../errors.js";
 
 type CoderLike = { dump(obj: unknown): string | null; load(payload: unknown): unknown };

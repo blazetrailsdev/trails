@@ -1,4 +1,5 @@
-import { Autoload, extend, registerConstant, type Extended } from "@blazetrails/activesupport";
+import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationRelation as AssociationRelationClass } from "./association-relation.js";
 import type { AliasTracker } from "./associations/alias-tracker.js";
 import type { AssociationScope } from "./associations/association-scope.js";

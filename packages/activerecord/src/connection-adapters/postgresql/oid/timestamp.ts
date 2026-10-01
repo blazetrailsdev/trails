@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { DateTime } from "./date-time.js";
 
 export class Timestamp extends DateTime {

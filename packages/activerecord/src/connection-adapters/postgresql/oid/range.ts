@@ -1,7 +1,13 @@
 import { ValueType } from "@blazetrails/activemodel";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { TimeWithZone, registerConstant } from "@blazetrails/activesupport";
-import { ArgumentError, Range, rbEqual, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { TimeWithZone } from "@blazetrails/activesupport";
+import {
+  ArgumentError,
+  Range,
+  rbEqual,
+  rbObjRespondTo,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 
 export interface RangeSubtype {
   cast(value: unknown): unknown;

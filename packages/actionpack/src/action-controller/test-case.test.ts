@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { registerConstant, unregisterConstant } from "@blazetrails/activesupport";
 import { SessionId } from "@blazetrails/rack-session";
 import { TestCase, TestRequest, LiveTestResponse, TestSession } from "./test-case.js";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import { UploadedFile } from "@blazetrails/rack-test";
 import { UploadedFile as HttpUploadedFile } from "../action-dispatch/http/upload.js";
 import { Base } from "./base.js";

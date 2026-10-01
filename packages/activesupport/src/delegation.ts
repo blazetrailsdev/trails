@@ -1,5 +1,5 @@
-import { ArgumentError, NilClass, NoMethodError } from "@blazetrails/ruby-compat";
-import { constantize, registeredConstantName, safeConstantize } from "./inflector.js";
+import { ArgumentError, NilClass, NoMethodError, rbModName } from "@blazetrails/ruby-compat";
+import { constantize, safeConstantize } from "./inflector.js";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 
 export class DelegationError extends Error {
@@ -72,7 +72,7 @@ export namespace Delegation {
 
     let receiver: string;
     if (typeof to !== "string") {
-      const name = registeredConstantName(to) ?? (to as { name?: string }).name;
+      const name = rbModName(to as new () => unknown);
       if (name == null || name === "") {
         throw new ArgumentError(`Can't delegate to anonymous class or module: ${String(to)}`);
       }

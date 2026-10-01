@@ -1,5 +1,5 @@
-import { BigDecimal, toD, registerConstant } from "@blazetrails/activesupport";
-import { rbInspect as inspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { BigDecimal, toD } from "@blazetrails/activesupport";
+import { rbInspect as inspect, rbObjRespondTo, registerConstant } from "@blazetrails/ruby-compat";
 import { Rational } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 import { applyNumericMixin } from "./helpers/numeric.js";

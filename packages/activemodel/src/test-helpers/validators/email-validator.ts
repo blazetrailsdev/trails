@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { EachValidator } from "../../validator.js";
 import type { ValidatableRecord } from "../../validator.js";
 

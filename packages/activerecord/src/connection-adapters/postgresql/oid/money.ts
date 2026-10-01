@@ -1,4 +1,5 @@
-import { BigDecimal, registerConstant } from "@blazetrails/activesupport";
+import { BigDecimal } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { DecimalType } from "@blazetrails/activemodel";
 
 export class Money extends DecimalType {

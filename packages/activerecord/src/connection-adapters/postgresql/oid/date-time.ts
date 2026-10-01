@@ -1,6 +1,5 @@
-import { registerConstant } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
-import { format } from "@blazetrails/ruby-compat";
+import { format, registerConstant } from "@blazetrails/ruby-compat";
 import { DateTime as ArDateTime } from "../../../type/date-time.js";
 import { pgDatetimeConfig } from "../pg-datetime-config.js";
 import {

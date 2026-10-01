@@ -1,5 +1,9 @@
-import { registerConstant } from "@blazetrails/activesupport";
-import { rbDeclareIvar, rbInspect as inspect, rbEqual } from "@blazetrails/ruby-compat";
+import {
+  rbDeclareIvar,
+  rbInspect as inspect,
+  rbEqual,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { NoMethodError } from "../attribute-assignment.js";
 
 export class ValueType<T = unknown> {

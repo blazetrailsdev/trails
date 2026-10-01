@@ -1,8 +1,7 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { registerModel } from "../../associations.js";
 import { Base } from "../../base.js";
-import { Module, Range } from "@blazetrails/ruby-compat";
-import { registerConstant } from "@blazetrails/activesupport";
+import { Module, Range, registerConstant } from "@blazetrails/ruby-compat";
 
 registerConstant("MyApplication", new Module());
 registerConstant("MyApplication::Business", new Module());

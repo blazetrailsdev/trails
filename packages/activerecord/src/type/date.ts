@@ -1,5 +1,6 @@
 import { DateType as ActiveModelDate } from "@blazetrails/activemodel";
-import { include, registerConstant } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Timezone, type TimezoneOptions } from "./internal/timezone.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Internal::Timezone`; the class/interface merge is how `include()` surfaces on the type side.

@@ -1,5 +1,4 @@
-import { registerConstant } from "@blazetrails/activesupport";
-import { rbEqual } from "@blazetrails/ruby-compat";
+import { rbEqual, registerConstant } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 
 const textEncoder = new TextEncoder();

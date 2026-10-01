@@ -1,6 +1,6 @@
-import { DelegateClass } from "@blazetrails/ruby-compat";
+import { DelegateClass, registerConstant } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
-import { TimeWithZone, registerConstant } from "@blazetrails/activesupport";
+import { TimeWithZone } from "@blazetrails/activesupport";
 import { TimeType as ActiveModelTime } from "@blazetrails/activemodel";
 import { include } from "@blazetrails/activesupport";
 import { Timezone, type TimezoneOptions } from "./internal/timezone.js";

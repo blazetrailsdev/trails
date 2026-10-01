@@ -1,12 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { setApp, _resetApp } from "./config.js";
-import {
-  assertDeprecated,
-  registerConstant,
-  _resetConstants,
-  assertNil,
-} from "@blazetrails/activesupport";
+import { assertDeprecated, assertNil } from "@blazetrails/activesupport";
+import { registerConstant, resetConstants } from "@blazetrails/ruby-compat";
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
 import { Locator, BlockLocator, _resetLocators, type LocatorModel } from "./locator.js";
@@ -101,7 +97,7 @@ describe("GlobalLocatorTest", () => {
   });
   afterEach(() => {
     _resetApp();
-    _resetConstants();
+    resetConstants();
   });
 
   it("by GID", async () => {
@@ -565,7 +561,7 @@ describe("ScopedRecordLocatingTest", () => {
   });
   afterEach(() => {
     _resetApp();
-    _resetConstants();
+    resetConstants();
     PersonScoped._findAllowed = false;
   });
 
@@ -595,7 +591,7 @@ describe("Locator (non-Rails coverage)", () => {
   });
   afterEach(() => {
     _resetApp();
-    _resetConstants();
+    resetConstants();
   });
 
   it("returns null when model class isn't registered", async () => {
@@ -633,7 +629,7 @@ describe("Locator (non-Rails coverage)", () => {
 describe("Locator without model finder", () => {
   beforeEach(() => {
     setApp(TEST_APP);
-    _resetConstants();
+    resetConstants();
   });
   afterEach(() => _resetApp());
 
@@ -649,7 +645,7 @@ describe("Locator non-Rails coverage — per-app dispatch helpers", () => {
   });
   afterEach(() => {
     _resetApp();
-    _resetConstants();
+    resetConstants();
     _resetLocators();
   });
 

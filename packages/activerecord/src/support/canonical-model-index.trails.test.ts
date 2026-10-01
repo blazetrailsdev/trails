@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { canonicalModelIndex } from "./canonical-model-index.js";
 import { autoloadModel, modelRegistry, registerModel } from "../associations.js";
-import { constantize, registerConstant, safeConstantize } from "@blazetrails/activesupport";
+import { constantize, safeConstantize } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 
 function resolve(name: string): unknown {
   autoloadModel(name);

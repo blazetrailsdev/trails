@@ -1,5 +1,6 @@
 import { ValueType } from "@blazetrails/activemodel";
-import { Duration, registerConstant } from "@blazetrails/activesupport";
+import { Duration } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 
 export class Interval extends ValueType<Duration> {
   override type(): string {

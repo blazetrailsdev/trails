@@ -1,4 +1,126 @@
+import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
+import { classpaths } from "./object.js";
+import { TypeError } from "./type-error.js";
+
+const _constants = new Map<string, unknown>();
+
+/**
+ * `rb_const_set` (`vendor/ruby/v3.3.11/variable.c:3674`) on `rb_cObject`: JS
+ * has no table of top-level constants, so a class or module is seated here
+ * under its full Ruby path. Like `const_set` (`vendor/ruby/v3.3.11/variable.c:3648-3654`),
+ * it names a class or module that has no permanent classpath yet, which
+ * `rbModName` reads. A trails module can be a plain object, so an object is
+ * named too.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function registerConstant(name: string, value: unknown): void {
+  _constants.set(name, value);
+  if (
+    (typeof value === "object" && value !== null) ||
+    (typeof value === "function" &&
+      Object.getOwnPropertyDescriptor(value, "prototype")?.writable === false)
+  ) {
+    if (classpaths.get(value)?.permanent !== true) {
+      classpaths.set(value, { path: name, permanent: true });
+    }
+  }
+}
+
+/**
+ * `rb_const_remove` (`vendor/ruby/v3.3.11/variable.c:3313`) on `rb_cObject`,
+ * for the seat `registerConstant` wrote.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function unregisterConstant(name: string, expected: unknown): void {
+  if (_constants.get(name) !== expected) return;
+  _constants.delete(name);
+}
+
+/**
+ * `rb_const_defined` (`vendor/ruby/v3.3.11/variable.c:3527`) on `rb_cObject`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function isRegisteredConstant(name: string): boolean {
+  return _constants.has(name);
+}
+
+/**
+ * The seat `registerConstant` wrote (`vendor/ruby/v3.3.11/variable.c:3674`
+ * `rb_const_set` on `rb_cObject`), or `undefined`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function registeredConstant(name: string): unknown {
+  return _constants.get(name);
+}
+
+/**
+ * Empties the table `registerConstant` (`vendor/ruby/v3.3.11/variable.c:3674`
+ * `rb_const_set` on `rb_cObject`) fills.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function resetConstants(): void {
+  _constants.clear();
+}
+
+/**
+ * `rb_path_to_class` (`vendor/ruby/v3.3.11/variable.c:432-474`), behind
+ * `Psych::ClassLoader#path2class` (`vendor/ruby/v3.3.11/ext/psych/psych_to_ruby.c:22`).
+ * `rb_const_search` (`vendor/ruby/v3.3.11/variable.c:3190`) reads a segment
+ * from the `rb_cObject` table and then from the namespace before it, without
+ * its ancestors. The table seats a constant under its full path and not
+ * every prefix of it, so a seated path is read whole. A JS global is not a
+ * top-level Ruby constant, as for `constantize`, and only a constant-shaped
+ * own property is a constant. `rb_namespace_p`
+ * (`vendor/ruby/v3.3.11/variable.c:83`) admits a function or an object: a trails
+ * module can be a plain object.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbPathToClass(pathname: string): unknown {
+  let pbeg = 0;
+  let p = 0;
+  const pend = pathname.length;
+  let c: unknown = Object;
+
+  if (pend === 0 || pathname[0] === "#") {
+    throw new ArgumentError(`can't retrieve anonymous class ${pathname}`);
+  }
+  while (p < pend) {
+    if (_constants.has(pathname)) p = pend;
+    while (p < pend && pathname[p] !== ":") p++;
+    const id = pathname.slice(pbeg, p);
+    const path = pathname.slice(0, p);
+    if (p < pend && pathname[p] === ":") {
+      if (pend - p < 2 || pathname[p + 1] !== ":") {
+        throw new ArgumentError(`undefined class/module ${pathname.slice(0, p)}`);
+      }
+      p += 2;
+      pbeg = p;
+    }
+    if (id === "") {
+      throw new ArgumentError(`undefined class/module ${pathname.slice(0, p)}`);
+    }
+    c = _constants.has(path)
+      ? _constants.get(path)
+      : c !== Object && /^[A-Z]/.test(id) && Object.prototype.hasOwnProperty.call(c, id)
+        ? (c as Record<string, unknown>)[id]
+        : undefined;
+    if (c === undefined) {
+      throw new ArgumentError(`undefined class/module ${pathname.slice(0, p)}`);
+    }
+    if (c === null || (typeof c !== "object" && typeof c !== "function")) {
+      throw new TypeError(`${pathname} does not refer to class/module`);
+    }
+  }
+
+  return c;
+}
 
 /**
  * The miss arm of `rb_const_get_0` (`vendor/ruby/v3.3.11/variable.c:3120`), which hands

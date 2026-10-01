@@ -1,6 +1,5 @@
-import { registerConstant } from "@blazetrails/activesupport";
 import { ArgumentError, ValueType } from "@blazetrails/activemodel";
-import { stringInspect } from "@blazetrails/ruby-compat";
+import { stringInspect, registerConstant } from "@blazetrails/ruby-compat";
 
 import { StringKeyedHashAccessor } from "../../../store.js";
 

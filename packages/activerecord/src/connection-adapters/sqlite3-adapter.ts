@@ -1,5 +1,5 @@
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import { anybits, fetch, hasKey, merge } from "@blazetrails/ruby-compat";
+import { anybits, fetch, hasKey, merge, registerConstant } from "@blazetrails/ruby-compat";
 import type {
   SqliteConnection,
   SqliteDriver,
@@ -53,7 +53,6 @@ import {
   isBlank,
   runLoadHooks,
   trailsRoot,
-  registerConstant,
 } from "@blazetrails/activesupport";
 import { File, FileUtils } from "@blazetrails/ruby-compat";
 import {

@@ -1,6 +1,5 @@
 import { expect } from "vitest";
-import { NameError } from "@blazetrails/ruby-compat";
-import { registerConstant } from "./inflector.js";
+import { NameError, registerConstant } from "@blazetrails/ruby-compat";
 
 class AceBaseCase {}
 class AceBaseCaseDice {}
