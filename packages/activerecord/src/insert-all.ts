@@ -546,7 +546,6 @@ export class Builder implements InsertBuilder {
     return this.quoteColumns(this._insertAll.updatableColumns());
   }
 
-  /** @missingRailsArgs filter_map — PERMANENT */
   touchModelTimestampsUnless(block: (col: string) => string): string {
     if (!this._insertAll.updateDuplicates() || !this._insertAll.recordTimestamps()) {
       return "";
