@@ -37,7 +37,6 @@
   "packages/activerecord/src/encryption/message-serializer.ts",
   "packages/activerecord/src/encryption/test-helpers.ts",
   "packages/activerecord/src/enum.ts",
-  "packages/activerecord/src/fixtures.ts",
   "packages/activerecord/src/insert-all.ts",
   "packages/activerecord/src/locking/pessimistic.ts",
   "packages/activerecord/src/migration.ts",

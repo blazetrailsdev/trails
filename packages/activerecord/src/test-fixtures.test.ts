@@ -5,7 +5,7 @@ import { onLoad } from "@blazetrails/activesupport";
 import { resolveFixtureNames } from "./test-fixtures.js";
 import { fixtureRegistry, isJoinTableEntry } from "./test-helpers/fixtures-registry.js";
 import { registerModel } from "./associations.js";
-import { FixtureSet } from "./fixtures.js";
+import { Fixture, FixtureSet } from "./fixtures.js";
 import { Base } from "./base.js";
 import "./relation.js";
 import { fixtures, TestFixtures } from "./test-fixtures.js";
@@ -16,6 +16,7 @@ import { Post } from "./test-helpers/models/post.js";
 import { LiveParrot, DeadParrot } from "./test-helpers/models/parrot.js";
 import { Cucumber, Cabbage, RedCabbage } from "./test-helpers/models/vegetables.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { insertFixturesSet } from "./connection-adapters/abstract/database-statements.js";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
 import { NullPool } from "./connection-adapters/abstract/connection-pool.js";
 
@@ -46,6 +47,7 @@ function makeAdapter(): DatabaseAdapter {
       await fn();
     },
     executeBatch: vi.fn(async () => {}),
+    insertFixturesSet,
     schemaCache: {
       dataSourceExists: async () => true,
       columnsHash: async (table: string) => doubleColumnsHash(table, DOUBLE_ONLY_COLUMNS),
@@ -469,6 +471,24 @@ describe("useFixtures seeds composite-primary-key tables", () => {
 
   it("round-trips every composite-PK row by its full key tuple", () => {
     expect(cpkOrderTags.all().length).toBe(3);
+  });
+
+  it("Fixture#find locates a composite-primary-key row by its full key tuple", async () => {
+    const book = cpkBooks("cpk_book_with_generated_pk");
+    const modelClass = book.constructor as typeof Base;
+    expect(modelClass.primaryKey).toEqual(["author_id", "id"]);
+    const fixture = new Fixture(
+      {
+        author_id: book.readAttribute("author_id"),
+        id: book.readAttribute("id"),
+        title: "ignored by the primary-key slice",
+      },
+      modelClass,
+    );
+    const found = await fixture.find();
+    expect(found.readAttribute("author_id")).toEqual(book.readAttribute("author_id"));
+    expect(found.readAttribute("id")).toEqual(book.readAttribute("id"));
+    expect(found.readAttribute("title")).toBe("Generated author's book");
   });
 
   it("generates both key columns for a composite-PK row that supplies neither", () => {

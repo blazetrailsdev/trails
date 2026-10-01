@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import { File as FixtureFile } from "./fixture-set/file.js";
-import { FixtureSet } from "./fixtures.js";
+import { Fixture, FixtureError, FixtureSet, FormatError } from "./fixtures.js";
+import { StandardError } from "@blazetrails/ruby-compat";
 import { OID_NAMESPACE, onLoad, uuidV5 } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { insertFixturesSet } from "./connection-adapters/abstract/database-statements.js";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
 import "./relation.js";
 
@@ -26,6 +28,7 @@ function makeAdapter(): DatabaseAdapter {
     releaseSavepoint: vi.fn(async () => {}),
     rollbackToSavepoint: vi.fn(async () => {}),
     executeBatch: vi.fn(async () => {}),
+    insertFixturesSet,
     schemaCache: {
       columnsHash: async (table: string) => doubleColumnsHash(table, DOUBLE_ONLY_COLUMNS),
     },
@@ -257,6 +260,26 @@ describe("FixtureSet (trails)", () => {
 
   it("default_fixture_model_name singularizes and camelizes when table names are pluralized", () => {
     expect(FixtureSet.defaultFixtureModelName("users")).toBe("User");
+  });
+
+  it("all_loaded_fixtures is readable and writable on the instance as well as the class", () => {
+    const instance = Object.create(FixtureSet.prototype) as FixtureSet;
+    expect(instance.allLoadedFixtures).toBe(FixtureSet.allLoadedFixtures);
+
+    const original = FixtureSet.allLoadedFixtures;
+    try {
+      const replaced = {};
+      instance.allLoadedFixtures = replaced;
+      expect(FixtureSet.allLoadedFixtures).toBe(replaced);
+    } finally {
+      FixtureSet.allLoadedFixtures = original;
+    }
+  });
+
+  it("Fixture::FormatError < Fixture::FixtureError < StandardError", () => {
+    expect(new FormatError("bad")).toBeInstanceOf(FixtureError);
+    expect(new FixtureError("bad")).toBeInstanceOf(StandardError);
+    expect(Fixture.FormatError).toBe(FormatError);
   });
 
   it("runs the active_record_fixture_set load hook with FixtureSet", () => {
