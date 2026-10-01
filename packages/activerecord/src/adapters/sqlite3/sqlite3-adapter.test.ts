@@ -26,6 +26,7 @@ import {
   capture,
 } from "@blazetrails/activesupport";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
+import { withExampleTable } from "../../support/ddl-helper.js";
 import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
 import { StatementInvalid, StatementTimeout } from "../../errors.js";
 import { BusyException } from "../../sqlite/errors.js";
@@ -110,8 +111,6 @@ afterEach(async () => {
   await adapter.execute(`DROP TABLE IF EXISTS auto_inc`);
   await adapter.execute(`DROP TABLE IF EXISTS cpk`);
   await adapter.execute(`DROP TABLE IF EXISTS cpk_table`);
-  // eslint-disable-next-line blazetrails/require-canonical-rebuild -- sqlite3_adapter_test.rb:591 names it, on a private :memory: database
-  await adapter.execute(`DROP TABLE IF EXISTS people`);
   await adapter.execute(`DROP TABLE IF EXISTS foos`);
   await adapter.execute(`DROP TABLE IF EXISTS ex`);
   await adapter.execute(`DROP TABLE IF EXISTS json_defs`);
@@ -766,10 +765,14 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   it("tables", async () => {
     await createExampleTable();
     expect(await adapter.tables()).toEqual(["ex"]);
-    await adapter.execute(
-      `CREATE TABLE "people" ("id" integer PRIMARY KEY AUTOINCREMENT, "number" integer)`,
+    await withExampleTable(
+      adapter,
+      "people",
+      "id integer PRIMARY KEY AUTOINCREMENT, number integer",
+      async () => {
+        expect((await adapter.tables()).sort()).toEqual(["ex", "people"].sort());
+      },
     );
-    expect((await adapter.tables()).sort()).toEqual(["ex", "people"].sort());
   });
 
   it("columns", async () => {

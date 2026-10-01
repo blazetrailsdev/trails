@@ -9,7 +9,7 @@ import { fixtures } from "../../test-fixtures.js";
 
 let adapter: SQLite3Adapter;
 
-fixtures({}, { useTransactionalTests: false });
+fixtures([]);
 
 beforeEach(async () => {
   adapter = new BetterSQLite3Adapter({ database: ":memory:" });
