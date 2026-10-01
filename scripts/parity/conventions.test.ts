@@ -664,8 +664,6 @@ describe("SCOPED_SKIP_GROUPS", () => {
   });
 
   it("never overlaps the global SKIP set (scoped names stay file-local)", () => {
-    // A group naming its `tsMirrorName` is the exception: there the scoped
-    // entry SCORES a globally skipped name in its files (`Case#then`).
     for (const g of SCOPED_SKIP_GROUPS.filter((g) => g.tsMirrorName === undefined)) {
       for (const name of g.names) expect(SKIP.has(name)).toBe(false);
     }

@@ -146,8 +146,6 @@ const ORDER_ONLY_CANDIDATES: Record<string, string[]> = {
 // `operatorCandidates` (when supplied by a caller that knows the container's
 // Ruby fqn) resolves a class-specific operator spelling; it takes lowest
 // precedence so a real `rubyMethodToTs` mapping always wins.
-// `rubyFile` resolves a scoped skip's `tsMirrorName` (`Arel::Nodes::Case#then`,
-// nodes/case.rb:19), which names the port of a method the global skip drops.
 const pushMethod = (
   list: string[],
   seen: Set<string>,
