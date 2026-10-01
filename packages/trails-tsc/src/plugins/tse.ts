@@ -8,7 +8,7 @@ import {
   type LocalEntry,
   type LineMapping,
 } from "@blazetrails/tse-compiler";
-import type { LineDelta, TscPlugin, VirtualizeOutput } from "../plugin.js";
+import type { LineDelta } from "../plugin.js";
 
 export { parseLocalsSignature };
 export { LocalsSignatureError as TseLocalsSignatureError };
@@ -313,30 +313,4 @@ function isReference(node: ts.Identifier): boolean {
   };
   if (ts.isShorthandPropertyAssignment(parent)) return true;
   return parent.name !== node && parent.propertyName !== node && parent.label !== node;
-}
-
-function errorShim(filePath: string, msg: string): string {
-  const safe = JSON.stringify(`${filePath}: ${msg}`);
-  return [
-    `// .tse virtualization failed: ${safe}`,
-    `const __tseFailure: never = ${safe};`,
-    `export default __tseFailure;`,
-    "",
-  ].join("\n");
-}
-
-export function createTsePlugin(): TscPlugin {
-  return {
-    name: "tse",
-    extensions: [".tse"],
-    virtualize(filePath, source): VirtualizeOutput {
-      try {
-        const { ts, deltas } = virtualizeTseWithDeltas(source);
-        return { ts, deltas };
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { ts: errorShim(filePath, msg) };
-      }
-    },
-  };
 }

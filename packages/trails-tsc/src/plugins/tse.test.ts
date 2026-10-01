@@ -1,36 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  createTsePlugin,
-  TseLocalsSignatureError,
-  virtualizeTse,
-  virtualizeTseWithDeltas,
-} from "./tse.js";
+import { TseLocalsSignatureError, virtualizeTse, virtualizeTseWithDeltas } from "./tse.js";
 import { diagnose } from "./tse-diagnose.js";
-
-describe("createTsePlugin", () => {
-  it("claims the .tse extension", () => {
-    const plugin = createTsePlugin();
-    expect(plugin.name).toBe("tse");
-    expect(plugin.extensions).toEqual([".tse"]);
-  });
-
-  it("virtualizes through the host hook", () => {
-    const plugin = createTsePlugin();
-    const out = plugin.virtualize("/x/show.html.tse", "<h1><%= 1 %></h1>");
-    expect(out?.ts).toContain("export default function render(");
-    expect(out?.ts).toContain('_ob.safeAppend("<h1>");');
-    expect(out?.ts).toContain("_ob.append(1);");
-  });
-
-  it("emits an error shim instead of throwing when virtualization fails", () => {
-    const plugin = createTsePlugin();
-    const out = plugin.virtualize("/x/bad.tse", "<%# locals: (a: (1, 2) %>");
-    expect(out?.ts).toContain("/x/bad.tse");
-    expect(out?.ts).toContain(".tse virtualization failed");
-    const diags = diagnose(out!.ts);
-    expect(diags.length).toBeGreaterThan(0);
-  });
-});
 
 describe("virtualizeTse", () => {
   it("defaults to Record<string, unknown> when no locals declared", () => {
