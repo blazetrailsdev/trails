@@ -102,7 +102,12 @@ import {
   scopedSkipMirrorName,
   snakeToCamel,
 } from "@blazetrails/parity/conventions";
-import { TS_PARENT_ALIASES, resolveModuleName } from "./compare.js";
+import {
+  TS_PARENT_ALIASES,
+  buildEntitiesByName,
+  resolveEntityByDeclaringFile,
+  resolveModuleName,
+} from "./compare.js";
 import { operatorSpelling } from "./operator-order-spelling.js";
 import { isSourceUnported } from "@blazetrails/parity/unported-files";
 import { manifestIsStale } from "./build-freshness.js";
@@ -851,6 +856,11 @@ interface PackageTotals {
    */
   totalInterfaceExempt: number;
   /**
+   * Moved names dropped as a trails-only class's override of an inherited
+   * member (`collectOverrideOnlyNames`). Reported for the same reason.
+   */
+  totalOverrideExempt: number;
+  /**
    * The `rubyFile === null` slice of the totals above — files no Rails file
    * maps onto. Broken out so a consumer can tell how much of a package's
    * extra surface comes from that population (it was unmeasured before this
@@ -944,6 +954,10 @@ type-only shape Ruby leaves to duck typing, so no Ruby counterpart is possible,
 and its MEMBERS are exempt with it. An interface name that does appear in Rails
 stays scored (as moved), members included — that is the drift case a blanket
 exemption would hide.
+
+A class whose name appears nowhere in Rails cannot hold a misplaced port, so a
+member it overrides from the class it \`extends\` is not counted as moved and
+needs no tag. An override on a class Rails does name stays scored.
 
 Reasoned exceptions: an extra is allowed by tagging its TS declaration
 \`@noRailsEquivalent <reason>\` in JSDoc. Allowed extras are subtracted from the
@@ -1307,6 +1321,65 @@ export function collectInterfaceMemberOnlyNames(
   }
   for (const name of others) members.delete(name);
   return members;
+}
+
+/**
+ * Member names a file contributes ONLY as a class's override of a member that
+ * class inherits through its `extends` clause — mapped to the overriding
+ * classes.
+ *
+ * RFC 0120, decided here: a class with no Rails counterpart at all cannot hold
+ * a misplaced port, so its override of an inherited member is not `moved`. It
+ * sits on the only class that can declare it. `DeferredIdsIn extends Nodes.In`
+ * (`relation/predicate-builder/deferred-distinct-pk-in.ts`) overrides `invert`
+ * and declares a `constructor`; both were charged to activerecord as moved
+ * surface crediting `Arel::Nodes::Binary#invert` (`arel/nodes/binary.rb`) and
+ * an unrelated `#initialize`. No route retires that row: the override cannot be
+ * deleted, and a `@noRailsEquivalent` receipt asserts the name is not Rails',
+ * which is false.
+ *
+ * The exemption is deliberately NOT unconditional on overrides. It rides on the
+ * overriding CLASS's verdict, which the scorer applies: an override on a class
+ * named after something Rails declares may be a real port sitting in the wrong
+ * file (`postgresql/schema-statements-class.ts`, ~80 names of
+ * `PostgreSQL::SchemaStatements`), so its members stay scored.
+ *
+ * A name anything else in the file also contributes — a member no ancestor
+ * declares, an interface member, a top-level function, any declaration name —
+ * is excluded, on the same reasoning as `collectInterfaceOnlyNames`: the extra
+ * set is a flat Set of bare names, so one name carries one verdict.
+ */
+export function collectOverrideOnlyNames(
+  file: string,
+  classes: ClassInfo[],
+  modules: ClassInfo[],
+  fileFunctions: MethodInfo[] | undefined,
+  fileConstants: string[] | undefined,
+  inherits: (klass: ClassInfo, name: string) => boolean,
+): Map<string, string[]> {
+  const overrides = new Map<string, string[]>();
+  const others = new Set<string>();
+  for (const { name, owner, interfaceMemberOf } of walkTsFileSurface(
+    file,
+    classes,
+    modules,
+    fileFunctions,
+    fileConstants,
+  )) {
+    const klass =
+      owner === null || interfaceMemberOf !== null
+        ? undefined
+        : classes.find((c) => c.file === file && c.name === owner);
+    if (klass === undefined || !inherits(klass, name)) {
+      others.add(name);
+      continue;
+    }
+    const owners = overrides.get(name);
+    if (owners === undefined) overrides.set(name, [klass.name]);
+    else if (!owners.includes(klass.name)) owners.push(klass.name);
+  }
+  for (const name of others) overrides.delete(name);
+  return overrides;
 }
 
 /**
@@ -1989,6 +2062,7 @@ function buildPackageReport(
     totalMoved: 0,
     totalAllowlisted: 0,
     totalInterfaceExempt: 0,
+    totalOverrideExempt: 0,
     noCounterpartFiles: 0,
     noCounterpartExtras: 0,
     noCounterpartNovel: 0,
@@ -2133,6 +2207,41 @@ function buildPackageReport(
     }
   }
 
+  // The `extends` walk `collectOverrideOnlyNames` asks about. Dep packages are
+  // indexed too, so the chain crosses a package boundary the way compare.ts's
+  // inheritance propagation does (`DeferredIdsIn extends Nodes.In` is arel's).
+  const foreignEntities = new Set<ClassInfo>();
+  const entityPackages = new Map<ClassInfo, string>();
+  const entitiesByName = buildEntitiesByName(pkg, ts, foreignEntities, entityPackages);
+  const superclassOf = (klass: ClassInfo): ClassInfo | null => {
+    const short = klass.superclass?.split(/::|\./).pop();
+    if (!short) return null;
+    // A dep's `superclassFile` is relative to ITS src dir, so only that
+    // package's entities are candidates for it.
+    const ownerPkg = entityPackages.get(klass);
+    const candidates = (entitiesByName.get(short) ?? []).filter(
+      (c) => !foreignEntities.has(klass) || entityPackages.get(c) === ownerPkg,
+    );
+    return resolveEntityByDeclaringFile(
+      candidates,
+      klass.file ?? "",
+      klass.superclassFile,
+      undefined,
+      (c) => !foreignEntities.has(klass) && foreignEntities.has(c),
+      (c) => entityPackages.get(c),
+    );
+  };
+  const inheritsMember = (klass: ClassInfo, name: string): boolean => {
+    const visited = new Set<ClassInfo>([klass]);
+    for (let cursor = superclassOf(klass); cursor !== null; cursor = superclassOf(cursor)) {
+      if (visited.has(cursor)) return false;
+      visited.add(cursor);
+      if ([...cursor.instanceMethods, ...cursor.classMethods].some((m) => m.name === name))
+        return true;
+    }
+    return false;
+  };
+
   const rubyFileByTsFile = new Map<string, string>();
   for (const rf of rubyFileNames) rubyFileByTsFile.set(rubyFileToTs(rf, pkg), rf);
 
@@ -2223,6 +2332,14 @@ function buildPackageReport(
       fileFns,
       fileConsts,
     );
+    const overrideOnly = collectOverrideOnlyNames(
+      expectedTs,
+      classes,
+      modules,
+      fileFns,
+      fileConsts,
+      inheritsMember,
+    );
 
     const scopedAllowed = new Map<string, Set<string>>();
     const allowed =
@@ -2297,6 +2414,9 @@ function buildPackageReport(
     const scored: ExtraName[] = [];
     let allowlistedCount = 0;
     let interfaceExemptCount = 0;
+    let overrideExemptCount = 0;
+    const trailsOnly = (klass: string): boolean =>
+      !allowed.has(klass) && !scopedAllows(klass) && !globalRubyCandidates.has(klass);
     for (const name of tsNames) {
       const allowKey = allowKeyOf({ package: pkg, tsFile: expectedTs, name });
       // A tag on a name the scorer already allows covers no extra — it asserts
@@ -2314,6 +2434,15 @@ function buildPackageReport(
       }
       const owners = globalRubyCandidates.get(name);
       const kind: ExtraKind = owners ? "moved" : "novel";
+      // Exempt by the overriding class's verdict — see
+      // `collectOverrideOnlyNames`. AFTER the tag check, like the interface
+      // exemption below: ruby-compat's package contract puts a receipt on
+      // every member, an override's `constructor` included, and that receipt
+      // must keep matching.
+      if (kind === "moved" && overrideOnly.get(name)?.every(trailsOnly) === true) {
+        overrideExemptCount++;
+        continue;
+      }
       // Exempt by kind — see `collectInterfaceOnlyNames`. Deliberately AFTER
       // the tag check: an interface tagged to cover its MEMBERS keeps matching
       // its own name, so the tag doesn't go stale and the inheritance in
@@ -2370,6 +2499,7 @@ function buildPackageReport(
     }
     result.totalAllowlisted += allowlistedCount;
     result.totalInterfaceExempt += interfaceExemptCount;
+    result.totalOverrideExempt += overrideExemptCount;
     if (extras.length === 0) continue;
 
     // Sort novel before moved, then alphabetical — novel is the higher-signal
@@ -2520,6 +2650,11 @@ function printHumanReport(report: Report, topN: number, maxDetail: number, verbo
   console.log(
     `${p.dim}  Excluded by kind: ${interfaceExempt} novel \`interface\` declaration name(s) and member(s) — type-only shapes Ruby ` +
       `leaves to duck typing. An interface name Rails DOES use stays scored as moved.${p.reset}`,
+  );
+  const overrideExempt = report.packages.reduce((n, pkg) => n + pkg.totalOverrideExempt, 0);
+  console.log(
+    `${p.dim}  Excluded as overrides: ${overrideExempt} moved name(s) a class with no Rails counterpart overrides from the ` +
+      `class it \`extends\`. An override on a class Rails DOES name stays scored as moved.${p.reset}`,
   );
   console.log(
     `\n${p.dim}@noRailsEquivalent tags: ${report.tagged.total} tag(s), ` +

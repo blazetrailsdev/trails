@@ -2695,6 +2695,138 @@ describe("buildReport — interface declaration names", () => {
   });
 });
 
+describe("buildReport — overrides on a class with no Rails counterpart", () => {
+  const run = (ruby: ApiManifest, ts: ApiManifest) =>
+    buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+
+  const ruby: ApiManifest = {
+    source: "ruby",
+    generatedAt: "",
+    packages: {
+      activemodel: {
+        classes: {
+          "ActiveModel::Binary": rubyClass({
+            name: "Binary",
+            file: "binary.rb",
+            instance: [method("initialize"), method("invert")],
+          }),
+          "ActiveModel::Quoting": rubyClass({
+            name: "Quoting",
+            file: "quoting.rb",
+            instance: [method("quoted_table_name")],
+          }),
+        },
+        modules: {},
+      },
+    },
+  };
+
+  const tsClass = (name: string, file: string, members: string[], superclass?: string) => ({
+    name,
+    file,
+    includes: [],
+    extends: [],
+    instanceMethods: members.map((m) => method(m)),
+    classMethods: [],
+    ...(superclass !== undefined ? { superclass, superclassFile: "binary.ts" } : {}),
+  });
+
+  const tsWith = (...subclasses: ClassInfo[]): ApiManifest => ({
+    source: "typescript" as const,
+    generatedAt: "",
+    packages: {
+      activemodel: {
+        classes: {
+          "binary.ts:Binary": tsClass("Binary", "binary.ts", ["constructor", "invert"]),
+          ...Object.fromEntries(subclasses.map((c) => [`${c.file}:${c.name}`, c])),
+        },
+        modules: {},
+      },
+    },
+  });
+
+  it("does not count a trails-only subclass's override of an inherited member as moved", () => {
+    const report = run(
+      ruby,
+      tsWith(
+        tsClass("DeferredIn", "deferred.ts", ["constructor", "innerRelations", "invert"], "Binary"),
+      ),
+    );
+    expect(report.packages[0].extraFiles[0].extras).toEqual([
+      { name: "DeferredIn", kind: "novel" },
+      { name: "innerRelations", kind: "novel" },
+    ]);
+    expect(report.packages[0].totalMoved).toBe(0);
+    expect(report.packages[0].totalOverrideExempt).toBe(2);
+  });
+
+  it("follows the chain past an intermediate class that does not declare the member", () => {
+    const report = run(
+      ruby,
+      tsWith(tsClass("DeferredBase", "deferred-base.ts", [], "Binary"), {
+        ...tsClass("DeferredIn", "deferred.ts", ["invert"], "DeferredBase"),
+        superclassFile: "deferred-base.ts",
+      }),
+    );
+    expect(report.packages[0].totalMoved).toBe(0);
+    expect(report.packages[0].totalOverrideExempt).toBe(1);
+  });
+
+  it("still scores an override on a class Rails names elsewhere", () => {
+    // The `postgresql/schema-statements-class.ts` shape: the class is a port
+    // sitting in the wrong file, so its overrides are the misplaced surface.
+    const report = run(ruby, tsWith(tsClass("Quoting", "deferred.ts", ["invert"], "Binary")));
+    expect(report.packages[0].extraFiles[0].extras).toMatchObject([
+      { name: "invert", kind: "moved" },
+      { name: "Quoting", kind: "moved" },
+    ]);
+    expect(report.packages[0].totalOverrideExempt).toBe(0);
+  });
+
+  it("still scores a moved name no ancestor declares", () => {
+    const report = run(
+      ruby,
+      tsWith(tsClass("DeferredIn", "deferred.ts", ["quotedTableName"], "Binary")),
+    );
+    expect(report.packages[0].extraFiles[0].extras).toMatchObject([
+      { name: "DeferredIn", kind: "novel" },
+      { name: "quotedTableName", kind: "moved" },
+    ]);
+    expect(report.packages[0].totalOverrideExempt).toBe(0);
+  });
+
+  it("still scores an override name a class with no superclass also declares", () => {
+    const report = run(
+      ruby,
+      tsWith(
+        tsClass("DeferredIn", "deferred.ts", ["invert"], "Binary"),
+        tsClass("Standalone", "deferred.ts", ["invert"]),
+      ),
+    );
+    expect(report.packages[0].extraFiles[0].extras).toMatchObject([
+      { name: "DeferredIn", kind: "novel" },
+      { name: "Standalone", kind: "novel" },
+      { name: "invert", kind: "moved" },
+    ]);
+    expect(report.packages[0].totalOverrideExempt).toBe(0);
+  });
+
+  it("keeps a tag on an exempt override matching, so the tag is not stale", () => {
+    const ts = tsWith(tsClass("DeferredIn", "deferred.ts", ["invert"], "Binary"));
+    ts.packages.activemodel.classes["deferred.ts:DeferredIn"].instanceMethods[0].noRailsEquivalent =
+      "PERMANENT";
+    const report = run(ruby, ts);
+    expect(report.tagged.stale).toEqual([]);
+    expect(report.tagged.matched).toBe(1);
+    expect(report.packages[0].totalOverrideExempt).toBe(0);
+  });
+});
+
 describe("buildReport — re-export clones", () => {
   it("charges a barrel only with the classes it declares itself", () => {
     const ruby: ApiManifest = {

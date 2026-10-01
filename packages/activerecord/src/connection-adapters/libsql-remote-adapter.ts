@@ -1,4 +1,4 @@
-/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: constructor. */
+/** @noRailsEquivalent PERMANENT */
 import type { SqliteDriver } from "../sqlite-adapter.js";
 import { libsqlRemoteDriver } from "../sqlite/libsql.js";
 import type { SQLite3Config } from "./pool-config.js";
@@ -14,7 +14,6 @@ export class LibSQLRemoteAdapter extends SQLite3Adapter {
     return libsqlRemoteDriver;
   }
 
-  /** @noRailsEquivalent PERMANENT */
   override supportsConcurrentConnections(): boolean {
     return true;
   }
