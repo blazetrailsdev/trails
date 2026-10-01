@@ -909,7 +909,10 @@ class TestExtractor
     true
   end
 
+  LOOP_KIND_OF_CLASSES = { "Array" => Array, "Hash" => Hash, "String" => String, "Symbol" => LoopSymbolName }.freeze
+
   def eval_loop_condition(node, bindings)
+    return eval_loop_kind_of(node, bindings) if node.is_a?(Array) && node[0] == :method_add_arg
     return nil unless node.is_a?(Array) && node[0] == :binary
     _, left, op, right = node
     return nil unless left.is_a?(Array) && left[0] == :call && %w[length size].include?(ident_name(left[3]))
@@ -918,6 +921,22 @@ class TestExtractor
     bound = bindings[ident_name(receiver[1])]
     return nil unless bound.is_a?(Array) && right.is_a?(Array) && right[0] == :@int
     %i[> >= < <= ==].include?(op) ? bound.length.public_send(op, Integer(right[1])) : nil
+  end
+
+  # `<var>.kind_of?(Array)` / `.is_a?(Array)` on a bound element, the test
+  # `[ :all, [] ].each do |scope|` names its cases by at inflector_test.rb:615-617.
+  def eval_loop_kind_of(node, bindings)
+    call = node[1]
+    return nil unless call.is_a?(Array) && call[0] == :call && %w[kind_of? is_a?].include?(ident_name(call[3]))
+    receiver = call[1]
+    return nil unless receiver.is_a?(Array) && %i[var_ref vcall].include?(receiver[0])
+    args = positional_args(node[2])
+    path = args && args.length == 1 ? const_path(args[0]) : nil
+    klass = path && path[:segments].length == 1 ? LOOP_KIND_OF_CLASSES[path[:segments].first] : nil
+    name = ident_name(receiver[1])
+    return nil unless klass && bindings.key?(name)
+    bound = bindings[name]
+    klass == String ? bound.is_a?(String) && !bound.is_a?(LoopSymbolName) : bound.is_a?(klass)
   end
 
   # Collect every same-file `CONST = [...]`, name → the array's literal element
@@ -1221,15 +1240,23 @@ class TestExtractor
   # name: the block variable itself, `.name` / `.to_s` / `.inspect` on it, `.gsub` with two
   # string literals (`klass.name.gsub('::', '_')`), `Regexp.escape` on a bound
   # string (`:"test_to_regexp_#{Regexp.escape(path)}"` at
-  # journey/path/pattern_test.rb:28) and `.keys.map(&:to_s).join(<literal>)` on a
+  # journey/path/pattern_test.rb:28), `.keys.map(&:to_s).join(<literal>)` on a
   # bound hash (`"test_recognize_#{expected.keys.map(&:to_s).join('_')}"` at
-  # journey/router_test.rb:320).
+  # journey/router_test.rb:320), and a ternary between two of those on a
+  # `kind_of?` test (`#{scope.kind_of?(Array) ? "no_arguments" : scope}` at
+  # inflector_test.rb:617).
   def eval_loop_expr(node, bindings)
     return nil unless node.is_a?(Array)
     case node[0]
     when :var_ref, :vcall
       bound = bindings[ident_name(node[1])]
       bound.is_a?(String) ? bound : nil
+    when :string_literal
+      interpolated_name(node, bindings)
+    when :ifop
+      taken = eval_loop_condition(node[1], bindings)
+      return nil if taken.nil?
+      eval_loop_expr(taken ? node[2] : node[3], bindings)
     when :call
       receiver = eval_loop_expr(node[1], bindings)
       return nil if receiver.nil?

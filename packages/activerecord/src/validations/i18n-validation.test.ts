@@ -47,27 +47,44 @@ describe("I18nValidationTest", () => {
     return replied;
   }
 
-  it("validates_uniqueness_of on generated message ", async () => {
-    Topic.validatesUniquenessOf("title", {});
-    topic.title = (await uniqueTopic()).title;
+  const COMMON_CASES: [string, Record<string, unknown>, Record<string, unknown>][] = [
+    ["given no options", {}, {}],
+    ["given custom message", { message: "custom" }, { message: "custom" }],
+    ["given if condition", { if: () => true }, {}],
+    ["given unless condition", { unless: () => false }, {}],
+    ["given option that is not reserved", { format: "jpg" }, { format: "jpg" }],
+    ["given on condition", { on: ["create", "update"] }, {}],
+  ];
 
-    const spy = vi.spyOn(ActiveModelError, "generateMessage");
-    await topic.isValid();
-    void topic.errors.messages;
-    expect(spy).toHaveBeenCalledExactlyOnceWith("title", ":taken", topic, { value: "unique!" });
-  });
+  for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
+    it(`validates_uniqueness_of on generated message ${name}`, async () => {
+      Topic.validatesUniquenessOf("title", validationOptions);
+      topic.title = (await uniqueTopic()).title;
 
-  it("validates_associated on generated message ", async () => {
-    Topic.validatesAssociated("replies", {});
-    const replies = await (await repliedTopic()).replies;
-
-    const spy = vi.spyOn(ActiveModelError, "generateMessage");
-    await (await repliedTopic()).save();
-    void (await repliedTopic()).errors.messages;
-    expect(spy).toHaveBeenCalledExactlyOnceWith("replies", ":invalid", await repliedTopic(), {
-      value: replies,
+      const spy = vi.spyOn(ActiveModelError, "generateMessage");
+      await topic.isValid();
+      void topic.errors.messages;
+      expect(spy).toHaveBeenCalledExactlyOnceWith("title", ":taken", topic, {
+        ...generateMessageOptions,
+        value: "unique!",
+      });
     });
-  });
+  }
+
+  for (const [name, validationOptions, generateMessageOptions] of COMMON_CASES) {
+    it(`validates_associated on generated message ${name}`, async () => {
+      Topic.validatesAssociated("replies", validationOptions);
+      const replies = await (await repliedTopic()).replies;
+
+      const spy = vi.spyOn(ActiveModelError, "generateMessage");
+      await (await repliedTopic()).save();
+      void (await repliedTopic()).errors.messages;
+      expect(spy).toHaveBeenCalledExactlyOnceWith("replies", ":invalid", await repliedTopic(), {
+        ...generateMessageOptions,
+        value: replies,
+      });
+    });
+  }
 
   it("validates associated finds custom model key translation", async () => {
     I18n.backend().storeTranslations("en", {
