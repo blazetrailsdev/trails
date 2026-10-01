@@ -39,7 +39,6 @@ describe("Thor::Error", () => {
       setFormatter(null);
     }
     expect(formatter()).toBe(Formatter);
-    expect(new (formatter())()).toBeInstanceOf(Formatter);
   });
 
   it("answers the message it was built with through to_s", () => {
