@@ -107,7 +107,7 @@ export class Model {
     modelName: ModelName;
   }>;
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE activemodel-ruby-classpath-carriers-onto-rb-mod-name */
   declare static moduleName?: string;
 
   declare static modelName: ModelName;
@@ -131,7 +131,7 @@ export class Model {
   /** @internal */
   declare static _parseValidatesOptions: Extended<typeof Validates>["_parseValidatesOptions"];
 
-  /** @missingRailsCall assign_attributes — PERMANENT */
+  /** @missingRailsCall assign_attributes — CONVERGEABLE activemodel-api-initialize-concern-constructor */
   constructor(attributes: Record<string, unknown> = {}) {
     const ctor = this.constructor as typeof Model;
 

@@ -99,7 +99,7 @@ describe("naming (trails-only)", () => {
       expect(`${new ModelName("Post")}`).toBe("Post");
     });
 
-    it("Symbol.toPrimitive coerces to the class name in string concatenation", () => {
+    it("string concatenation coerces to the class name", () => {
       const mn = new ModelName("Post");
       expect("Model: " + mn).toBe("Model: Post");
     });
@@ -193,7 +193,7 @@ describe("naming (trails-only)", () => {
       expect(barePost.compare(adminOther)).toBe(1);
     });
 
-    it("== operator coerces via Symbol.toPrimitive to the class name", () => {
+    it("== operator coerces to the class name", () => {
       const mn: unknown = new ModelName("Post");
 
       expect(mn == "Post").toBe(true);

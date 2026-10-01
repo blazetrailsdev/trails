@@ -181,7 +181,6 @@ export const ClassMethods = {
   setDefineMethodAttribute,
 };
 
-/** @noRailsEquivalent PERMANENT */
 export type AttributesClassHalf = AttributeRegistrationClassHalf &
   AttributeMethodsClassHalf &
   Extended<typeof ClassMethods> & {
@@ -193,8 +192,6 @@ export type AttributesClassHalf = AttributeRegistrationClassHalf &
     _aliasesByAttributeName: Map<string, string[]>;
   };
 
-/** @noRailsEquivalent PERMANENT */
 export type AttributeRegistrationClassHalf = Extended<typeof AttributeRegistrationClassMethods>;
 
-/** @noRailsEquivalent PERMANENT */
 export type AttributeMethodsClassHalf = Extended<typeof AttributeMethodsClassMethods>;

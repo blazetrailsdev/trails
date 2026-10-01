@@ -24,7 +24,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE attribute-set-and-serialization-plain-object-hash-helpers */
 function frozenErrorRaisingStore(attributes: Record<string, Attribute>): Record<string, Attribute> {
   const raiseIfFrozen = (target: Record<string, Attribute>): void => {
     if (Object.isFrozen(target)) {
@@ -250,13 +250,6 @@ export class AttributeSet {
     Object.freeze(this.attributes());
     Object.freeze(this);
     return this;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  *[Symbol.iterator](): IterableIterator<[string, unknown]> {
-    for (const name of this.keys()) {
-      yield [name, this.fetchValue(name)];
-    }
   }
 }
 

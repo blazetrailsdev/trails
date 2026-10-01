@@ -10,7 +10,7 @@ export const VERSION = {
   },
 };
 
-/** @missingRailsCall new — PERMANENT */
+/** @missingRailsCall new — CONVERGEABLE activemodel-port-version-and-gem-version */
 export function gemVersion(): string {
   return VERSION.STRING;
 }

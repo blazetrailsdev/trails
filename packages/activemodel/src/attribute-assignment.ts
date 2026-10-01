@@ -108,7 +108,7 @@ export { ArgumentError, TypeError, NameError, NoMethodError, NotImplementedError
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE update-must-call-assign-attributes-carried-from-0087
  */
 export function assertAssignedSynchronously(
   pending: Promise<void> | void,

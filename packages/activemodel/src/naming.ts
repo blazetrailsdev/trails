@@ -176,11 +176,6 @@ export class ModelName {
     return this.name;
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  [Symbol.toPrimitive](_hint: string): string {
-    return this.name;
-  }
-
   asJson(_options?: unknown): string {
     return this.name;
   }
@@ -273,7 +268,7 @@ export class ModelName {
 
 include(ModelName, ToJsonWithActiveSupportEncoder);
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE unify-ruby-class-name-message-helpers */
 function builtinClassName(value: unknown): string {
   if (value === null || value === undefined) return "nil";
   if (typeof value === "boolean") return String(value);

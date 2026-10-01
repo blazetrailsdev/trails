@@ -357,7 +357,7 @@ export const ClassMethods = {
 
   /**
    * @internal
-   * @missingRailsArgs new — PERMANENT
+   * @missingRailsArgs new — CONVERGEABLE attribute-method-patterns-cache-onto-concurrent-map
    */
   attributeMethodPatternsCache(this: ClassMethodsHost): Map<string, Array<AttributeMethod>> {
     const h = this as AttributeMethodHost & {
@@ -448,7 +448,6 @@ export const ClassMethods = {
 };
 
 export const InstanceMethods = {
-  /** @missingRailsCall super — PERMANENT */
   methodMissing(this: InstanceMethodsHost, method: string, ...args: unknown[]): unknown {
     if (this.isRespondToWithoutAttributes(method, true)) {
       throw new NoMethodError(
@@ -547,7 +546,7 @@ export const AttributeMethods = {
   },
 };
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE attribute-methods-inline-generate-method-and-affix-parameters */
 function generateMethodFor(pattern: AttributeMethodPattern): string {
   return pattern.proxyTarget.endsWith("=")
     ? camelize(`set_define_method_${pattern.proxyTarget.slice(0, -1)}`, false)
@@ -567,7 +566,7 @@ function sendProxyTarget(record: ReadWriteHost, targetName: string, args: unknow
   return target.call(record, ...args);
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE attribute-methods-inline-generate-method-and-affix-parameters */
 function extractParameters(
   affixes: Array<string | { parameters?: string | null | false }>,
 ): string | null | false {
@@ -655,7 +654,7 @@ export function defineMethodAttribute(
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE attribute-methods-construction-time-resurrection-has-no-rails-site
  */
 export function initInternals(this: { constructor: ClassMethodsHost }, super_: () => void): void {
   _resurrectAttributeMethods(this.constructor);

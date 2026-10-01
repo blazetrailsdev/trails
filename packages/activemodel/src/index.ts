@@ -76,7 +76,6 @@ export { ModelName, Naming } from "./naming.js";
 export { Conversion } from "./conversion.js";
 export { Translation } from "./translation.js";
 export type { ModelLike } from "./naming.js";
-/** @noRailsEquivalent PERMANENT */
 export { Dirty, initAttributes as dirtyInitAttributes } from "./dirty.js";
 export type { DirtyOptions } from "./dirty.js";
 export type {
@@ -88,7 +87,6 @@ export { serializableHash } from "./serialization.js";
 export type { SerializeOptions, SerializableHash } from "./serialization.js";
 
 export { JSON as JSONSerializer } from "./serializers/json.js";
-/** @noRailsEquivalent PERMANENT */
 export { typeRegistry } from "./type/registry.js";
 
 export { StringType } from "./type/string.js";
@@ -144,7 +142,6 @@ export {
 } from "./secure-password.js";
 export { SerializeCastValue } from "./type/serialize-cast-value.js";
 export { Builder as AttributeSetBuilder } from "./attribute-set/builder.js";
-/** @noRailsEquivalent PERMANENT */
 export {
   DateInfinity,
   DateNegativeInfinity,

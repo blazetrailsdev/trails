@@ -368,7 +368,7 @@ function isSerializableCollection(value: unknown): value is Iterable<unknown> {
   return typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function";
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE attribute-set-and-serialization-plain-object-hash-helpers */
 function safeSet(target: Record<string, unknown>, key: string, value: unknown): void {
   Object.defineProperty(target, key, {
     value,

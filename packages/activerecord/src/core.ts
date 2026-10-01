@@ -121,7 +121,7 @@ export const ClassMethods = {
 
 interface CoreRecord {
   id: unknown;
-  _attributes: Iterable<[string, unknown]>;
+  _attributes: AttributeSet;
   _newRecord: boolean;
   readAttribute(name: string): unknown;
   isPersisted(): boolean;
@@ -132,7 +132,11 @@ export function inspect(this: CoreRecord): string {
 }
 
 export async function prettyPrint(
-  this: CoreRecord & { _attributes: any; constructor: { prototype: object } },
+  this: CoreRecord & {
+    _attributes: any;
+    _hasAttribute(attrName: string): boolean;
+    constructor: { prototype: object };
+  },
   pp: PrettyPrinter,
 ): Promise<void> {
   if (isCustomInspectMethodDefined.call(this)) {
@@ -145,10 +149,7 @@ export async function prettyPrint(
       pp.text("not initialized");
       return;
     }
-    const knownKeys = new Set<string>(
-      Array.from(this._attributes as Iterable<[string, unknown]>).map(([k]) => k),
-    );
-    const attrNames = attributesForInspect.call(this).filter((name) => knownKeys.has(name));
+    const attrNames = attributesForInspect.call(this).filter((name) => this._hasAttribute(name));
     await pp.seplist(
       attrNames,
       () => pp.text(","),
@@ -758,16 +759,13 @@ export function isCustomInspectMethodDefined(this: {
 
 /** @internal */
 export function inspectWithAttributes(
-  this: CoreRecord & { _attributes: any },
+  this: CoreRecord & { _attributes: any; _hasAttribute(attrName: string): boolean },
   attributesToList: string[],
 ): string {
   const ctor = this.constructor as { name: string };
   if (!this._attributes) return `#<${ctor.name} not initialized>`;
-  const knownKeys = new Set<string>(
-    Array.from(this._attributes as Iterable<[string, unknown]>).map(([k]) => k),
-  );
   const parts = attributesToList
-    .filter((name) => knownKeys.has(name))
+    .filter((name) => this._hasAttribute(name))
     .map(
       (name) =>
         `${name}: ${(this as unknown as { attributeForInspect(attr: string): string }).attributeForInspect(name)}`,
@@ -785,7 +783,7 @@ export function attributesForInspect(this: CoreRecord): string[] {
 /** @internal */
 export function allAttributesForInspect(this: CoreRecord): string[] {
   if (!this._attributes) return [];
-  return Array.from(this._attributes).map(([k]) => k);
+  return (this as unknown as { attributeNames(): string[] }).attributeNames();
 }
 
 /** @internal */
