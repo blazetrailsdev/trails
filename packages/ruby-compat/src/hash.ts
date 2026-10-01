@@ -3,6 +3,7 @@ import { KeyError } from "./key-error.js";
 import { rbInspect } from "./object.js";
 import { rbEql } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
+import { RuntimeError } from "./runtime-error.js";
 
 const BLOCK = Symbol.for("@blazetrails/ruby-compat:block");
 
@@ -289,7 +290,7 @@ export function eachPair<T>(
   block: PairBlock<T>,
 ): Record<string, T> | Map<string, T> {
   if (hash instanceof Map) {
-    for (const [key, value] of hash) block(key, value);
+    hash.forEach((value, key) => block(key, value));
     return hash;
   }
   for (const key of Object.keys(hash)) {
@@ -479,6 +480,7 @@ export class Hash<K, V> extends Map<K, V> {
   #frozen = false;
   #eqlKeys = new Map<number, K[]>();
   #identhash = false;
+  #iterLev = 0;
 
   /**
    * `Hash.new` (`vendor/ruby/v3.3.11/hash.c:1782` `rb_hash_initialize`): a block is
@@ -707,9 +709,7 @@ export class Hash<K, V> extends Map<K, V> {
    * the receiver is returned. The rehash into an `identhash` table keeps every
    * entry, since two stored keys were never `eql?`, so only the `eql?` index
    * goes. A JS string is a primitive with no identity apart from its value, so
-   * two equal Strings stay one key where Ruby makes them two. The
-   * `hash_iterating_p` raise (`hash.c:4435`) has no port: a `Map` iterator that
-   * is abandoned never reports its end, so there is no `iter_lev` to read.
+   * two equal Strings stay one key where Ruby makes them two.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Hash#compare_by_identity` (`vendor/ruby/v3.3.11/hash.c:4427`).
    */
@@ -717,10 +717,45 @@ export class Hash<K, V> extends Map<K, V> {
     if (this.isCompareByIdentity()) return this;
 
     this.modifyCheck();
+    if (this.hashIteratingP()) {
+      throw new RuntimeError("compare_by_identity during iteration");
+    }
+
     this.#identhash = true;
     this.#eqlKeys.clear();
 
     return this;
+  }
+
+  /**
+   * `rb_hash_foreach` (`vendor/ruby/v3.3.11/hash.c:1438`), the walk every
+   * yielding Hash method goes through: it raises the receiver's `iter_lev`
+   * for the length of the walk and lowers it in an `ensure`. A `for…of` over
+   * the hash is not counted: an iterator that is abandoned never reports its
+   * end, so nothing could lower the level again.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `rb_hash_foreach` (`vendor/ruby/v3.3.11/hash.c:1438`).
+   */
+  override forEach(
+    callbackfn: (value: V, key: K, map: Map<K, V>) => void,
+    thisArg?: unknown,
+  ): void {
+    if (this.size === 0) return;
+    if (this.#frozen) {
+      super.forEach(callbackfn, thisArg);
+    } else {
+      this.#iterLev++;
+      try {
+        super.forEach(callbackfn, thisArg);
+      } finally {
+        this.#iterLev--;
+      }
+    }
+  }
+
+  /** `hash_iterating_p` (`vendor/ruby/v3.3.11/hash.c:1339`). */
+  private hashIteratingP(): boolean {
+    return this.#iterLev > 0;
   }
 
   /**

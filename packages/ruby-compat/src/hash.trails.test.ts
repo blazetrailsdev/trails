@@ -25,6 +25,7 @@ import {
 import { KeyError } from "./key-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { IndexError } from "./index-error.js";
+import { RuntimeError } from "./runtime-error.js";
 
 describe("Hash#fetch", () => {
   it("looks up an object key in a Map, keeping a stored nil or false", () => {
@@ -590,6 +591,35 @@ describe("Hash#compare_by_identity", () => {
     expect(() => new Hash().freeze().compareByIdentity()).toThrow(FrozenError);
     const h = new Hash().compareByIdentity().freeze();
     expect(h.compareByIdentity()).toBe(h);
+  });
+
+  it("raises RuntimeError during iteration, and not once the iteration has ended", () => {
+    const h = new Hash<string, number>();
+    h.set("a", 1);
+    eachPair(h, () => {
+      expect(() => h.compareByIdentity()).toThrow(RuntimeError);
+      expect(() => h.compareByIdentity()).toThrow("compare_by_identity during iteration");
+    });
+    h.forEach(() => {
+      h.forEach(() => {});
+      expect(() => h.compareByIdentity()).toThrow(RuntimeError);
+    });
+    expect(h.isCompareByIdentity()).toBe(false);
+    expect(() =>
+      eachPair(h, () => {
+        throw new IndexError("stop");
+      }),
+    ).toThrow(IndexError);
+    expect(h.compareByIdentity().isCompareByIdentity()).toBe(true);
+  });
+
+  it("raises FrozenError rather than RuntimeError while iterating a frozen hash", () => {
+    const h = new Hash<string, number>();
+    h.set("a", 1);
+    h.freeze();
+    eachPair(h, () => {
+      expect(() => h.compareByIdentity()).toThrow(FrozenError);
+    });
   });
 
   it("carries over a dup, as hash_copy copies the table's type", () => {
