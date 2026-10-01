@@ -1,6 +1,6 @@
 import { inflections } from "./inflector/inflections.js";
 import { NameError } from "./core-ext/name-error.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { rbCObjectConstTbl, regexpEscape } from "@blazetrails/ruby-compat";
 import { I18n } from "./i18n.js";
 
 /** @internal */
@@ -178,7 +178,7 @@ export function deconstantize(path: string): string {
   return "";
 }
 
-const _constants = new Map<string, unknown>();
+const _constants = rbCObjectConstTbl;
 
 /** @noRailsEquivalent PERMANENT */
 export function registerConstant(name: string, value: unknown): void {

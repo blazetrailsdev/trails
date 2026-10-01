@@ -15,7 +15,8 @@ import { NoMethodError } from "./no-method-error.js";
  * @boundary: a JS `number` is the seat for both `Integer` and `Float`, so
  *  which one it is is read off the value; a Temporal value carrying an instant
  *  is a Ruby `Time`, by the same reading `cmp` orders it with, and so are a JS
- *  `Date` and a `Temporal.PlainTime`. `Temporal.PlainDate` and
+ *  `Date` and a `Temporal.PlainTime`. A function is a `Class` when its
+ *  `prototype` is non-writable and a `Proc` otherwise. `Temporal.PlainDate` and
  *  `Temporal.PlainDateTime` are the seats of `Date` and `DateTime`. Any other
  *  object answers its class's {@link rbModToS}, which is how Ruby interpolates
  *  the class `rb_obj_class` returns.
@@ -31,6 +32,9 @@ export function rbObjClass(x: unknown): string {
   if (typeof x === "string") return "String";
   const branded = (x as Comparable)[rubyClass];
   if (branded != null) return branded;
+  if (typeof x === "function") {
+    return Object.getOwnPropertyDescriptor(x, "prototype")?.writable === false ? "Class" : "Proc";
+  }
   if (hasEpochNanoseconds(x)) return "Time";
   const tag = temporalTag(x);
   if (tag === "Temporal.PlainDate") return "Date";

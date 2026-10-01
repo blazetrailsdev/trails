@@ -222,7 +222,13 @@ export { Enumerator, toEnum } from "./enumerator.js";
 export { RUBY_PLATFORM } from "./ruby-platform.js";
 export { rbEql, rbEqq, rbEqual } from "./rb-equal.js";
 export { rbHash, rbObjHash } from "./rb-hash.js";
-export { rbConstGet, rbConstMissing, rbModConstMissing } from "./variable.js";
+export {
+  rbCObjectConstTbl,
+  rbConstGet,
+  rbConstMissing,
+  rbModConstMissing,
+  rbPathToClass,
+} from "./variable.js";
 export { isEmpty } from "./ruby-empty.js";
 export { RuntimeError } from "./runtime-error.js";
 export { Exception } from "./exception.js";
@@ -276,6 +282,7 @@ export type { TempfileBasename } from "./tempfile.js";
 export { temporalTag } from "./temporal-tag.js";
 export { TypeError } from "./type-error.js";
 export { setVerbose, verbose } from "./verbose.js";
+export { Marshal } from "./marshal.js";
 export { Zlib } from "./zlib.js";
 export {
   BadURIError,
