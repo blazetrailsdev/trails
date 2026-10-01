@@ -326,17 +326,22 @@ function bindCheckedTypes(
     visit(sf);
   }
   const members = new Map<Controller, Map<string, string>>();
+  const layouts = new Map<Controller, Set<string> | "every">();
+  const existing = new Set(views.flatMap((v) => (v.layout === undefined ? [] : [v.layout])));
   for (const controller of controllers) {
     const klass = controllerClass(program, controller);
-    if (klass) members.set(controller, controllerMembers(checker, klass, typeText));
+    if (!klass) continue;
+    members.set(controller, controllerMembers(checker, klass, typeText));
+    layouts.set(controller, layoutsOf(checker, controllers, existing, klass));
   }
   for (const view of views) {
     const rendering =
       view.layout === undefined
         ? view.controller && [view.controller]
-        : controllers.filter(
-            (c) => layoutOf(checker, program, controllers, views, c) === view.layout,
-          );
+        : controllers.filter((c) => {
+            const rendered = layouts.get(c);
+            return rendered === "every" || rendered?.has(view.layout!);
+          });
     const merged = new Map<string, Set<string>>();
     for (const controller of rendering ?? []) {
       for (const [name, type] of members.get(controller) ?? []) {
@@ -388,40 +393,96 @@ function controllerMembers(
     if (type.getCallSignatures().length > 0) continue;
     members.set(prop.name, typeText(type));
   }
-  for (const name of exposedHelperMethods(checker, klass)) {
-    const member = instance.getProperty(name);
-    if (member) members.set(name, typeText(checker.getTypeOfSymbolAtLocation(member, klass)));
+  for (const { name, call } of classMacros(checker, klass)) {
+    for (const arg of call.arguments.flatMap(stringLiterals)) {
+      const member = name === "helperMethod" && instance.getProperty(arg);
+      if (member) members.set(arg, typeText(checker.getTypeOfSymbolAtLocation(member, klass)));
+      if (name === "addFlashTypes") members.set(arg, "unknown");
+    }
   }
   return members;
 }
 
-function layoutOf(
-  checker: ts.TypeChecker,
-  program: ts.Program,
-  controllers: readonly Controller[],
-  views: readonly ViewShim[],
-  controller: Controller,
-): string | undefined {
-  const layouts = new Set(views.flatMap((v) => (v.layout === undefined ? [] : [v.layout])));
-  let klass = controllerClass(program, controller);
-  while (klass) {
-    const current = klass;
-    const owner = controllers.find(
-      (c) => c.file === current.getSourceFile().fileName && c.name === current.name?.text,
-    );
-    if (owner && layouts.has(owner.path)) return owner.path;
-    const superclass = current.heritageClauses?.find(
-      (h) => h.token === ts.SyntaxKind.ExtendsKeyword,
-    )?.types[0];
-    const parent = superclass && sourceDeclaration(checker, superclass.expression);
-    klass = parent && ts.isClassDeclaration(parent) ? parent : undefined;
-  }
-  return undefined;
+function stringLiterals(arg: ts.Expression): string[] {
+  if (ts.isStringLiteral(arg)) return [arg.text];
+  return ts.isArrayLiteralExpression(arg) ? arg.elements.flatMap(stringLiterals) : [];
 }
 
-function exposedHelperMethods(checker: ts.TypeChecker, klass: ts.ClassDeclaration): string[] {
-  const names: string[] = [];
+function superclassOf(
+  checker: ts.TypeChecker,
+  klass: ts.ClassDeclaration,
+): ts.ClassDeclaration | undefined {
+  const superclass = klass.heritageClauses?.find((h) => h.token === ts.SyntaxKind.ExtendsKeyword)
+    ?.types[0];
+  const parent = superclass && sourceDeclaration(checker, superclass.expression);
+  return parent && ts.isClassDeclaration(parent) ? parent : undefined;
+}
+
+function layoutsOf(
+  checker: ts.TypeChecker,
+  controllers: readonly Controller[],
+  existing: ReadonlySet<string>,
+  klass: ts.ClassDeclaration,
+): Set<string> | "every" {
+  const layouts = new Set<string>();
+  const add = (value: ts.Expression): boolean => {
+    if (ts.isStringLiteral(value) && !value.text.startsWith(":")) {
+      layouts.add(value.text.replace(/^layouts\//u, ""));
+    } else if (value.kind !== ts.SyntaxKind.FalseKeyword) {
+      return false;
+    }
+    return true;
+  };
+  const implied = (from: ts.ClassDeclaration | undefined): void => {
+    for (let current = from; current; current = superclassOf(checker, current)) {
+      const file = current.getSourceFile().fileName;
+      const owner = controllers.find((c) => c.file === file && c.name === current.name?.text);
+      if (owner && existing.has(owner.path)) return void layouts.add(owner.path);
+    }
+  };
+  const declared = classMacros(checker, klass).filter((m) => m.name === "layout");
+  const nearest = declared.filter((m) => m.depth === declared[0].depth).at(-1);
+  const [value, conditions] = nearest?.call.arguments ?? [];
+  if (value === undefined || value.kind === ts.SyntaxKind.NullKeyword) implied(klass);
+  else if (!add(value)) return "every";
+  else if (conditions !== undefined) implied(klass);
+  let every = false;
+  const visit = (node: ts.Node): void => {
+    const callee = ts.isCallExpression(node) ? node.expression : undefined;
+    if (
+      callee &&
+      ts.isPropertyAccessExpression(callee) &&
+      callee.expression.kind === ts.SyntaxKind.ThisKeyword &&
+      callee.name.text === "render"
+    ) {
+      for (const options of (node as ts.CallExpression).arguments.slice(0, 2)) {
+        const layout = ts.isObjectLiteralExpression(options) && option(options, "layout");
+        if (!layout || layout.kind === ts.SyntaxKind.NullKeyword) continue;
+        if (layout.kind === ts.SyntaxKind.TrueKeyword) implied(klass);
+        else if (!add(layout)) every = true;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  for (let current: typeof klass | undefined = klass; current; ) {
+    visit(current);
+    current = superclassOf(checker, current);
+  }
+  return every ? "every" : layouts;
+}
+
+const CLASS_MACROS = ["helperMethod", "layout", "addFlashTypes"];
+
+interface ClassMacro {
+  name: string;
+  call: ts.CallExpression;
+  depth: number;
+}
+
+function classMacros(checker: ts.TypeChecker, klass: ts.ClassDeclaration): ClassMacro[] {
+  const macros: ClassMacro[] = [];
   const scanned = new Set<ts.Node>();
+  let depth = 0;
   const macro = (node: ts.Node, isSelf: (receiver?: ts.Expression) => boolean): void => {
     if (ts.isFunctionLike(node)) return;
     if (ts.isCallExpression(node)) {
@@ -429,12 +490,8 @@ function exposedHelperMethods(checker: ts.TypeChecker, klass: ts.ClassDeclaratio
       const [receiver, name] = ts.isPropertyAccessExpression(callee)
         ? [callee.expression, callee.name.text]
         : [undefined, ts.isIdentifier(callee) ? callee.text : ""];
-      if (name === "helperMethod" && isSelf(receiver)) {
-        const flatten = (arg: ts.Expression): void => {
-          if (ts.isStringLiteral(arg)) names.push(arg.text);
-          else if (ts.isArrayLiteralExpression(arg)) arg.elements.forEach(flatten);
-        };
-        node.arguments.forEach(flatten);
+      if (CLASS_MACROS.includes(name) && isSelf(receiver)) {
+        macros.push({ name, call: node, depth });
       } else if (name === "include" && isSelf(node.arguments[0])) {
         for (const arg of node.arguments.slice(1)) {
           const included = sourceDeclaration(checker, arg);
@@ -496,14 +553,12 @@ function exposedHelperMethods(checker: ts.TypeChecker, klass: ts.ClassDeclaratio
     for (const statement of declaration.getSourceFile().statements) {
       if (ts.isExpressionStatement(statement)) macro(statement, atTopLevel);
     }
-    const superclass = declaration.heritageClauses?.find(
-      (h) => h.token === ts.SyntaxKind.ExtendsKeyword,
-    )?.types[0];
-    const parent = superclass && sourceDeclaration(checker, superclass.expression);
-    if (parent && ts.isClassDeclaration(parent)) scanClass(parent);
+    const parent = superclassOf(checker, declaration);
+    depth++;
+    if (parent) scanClass(parent);
   };
   scanClass(klass);
-  return names;
+  return macros;
 }
 
 function sourceDeclaration(
