@@ -40,6 +40,7 @@ export class UserController extends Base {}
 export class UsersController extends Base {}
 
 for (const [mod, constants] of Object.entries({ Admin, Api })) {
+  registerConstant(mod, constants);
   for (const [name, klass] of Object.entries(constants)) {
     Object.defineProperty(klass, "name", { value: `${mod}::${name}` });
   }
