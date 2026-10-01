@@ -1,4 +1,5 @@
 import { Nodes, Visitors } from "../namespaces.js";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";
@@ -117,4 +118,5 @@ export class PostgreSQL extends ToSql {
   }
 }
 
+rbSetClassPathString(PostgreSQL, Visitors, "PostgreSQL");
 Visitors.PostgreSQL = PostgreSQL;

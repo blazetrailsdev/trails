@@ -1,4 +1,5 @@
 import { Nodes } from "../namespaces.js";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { Node } from "./node.js";
 import { Unary } from "./unary.js";
 
@@ -18,5 +19,7 @@ export class BitwiseNot extends UnaryOperation {
   }
 }
 
+rbSetClassPathString(UnaryOperation, Nodes, "UnaryOperation");
 Nodes.UnaryOperation = UnaryOperation;
+rbSetClassPathString(BitwiseNot, Nodes, "BitwiseNot");
 Nodes.BitwiseNot = BitwiseNot;

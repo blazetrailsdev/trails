@@ -21,23 +21,6 @@ import { deprecator } from "./deprecator.js";
 
 const PROHIBIT_SHARD_SWAPPING_KEY = Symbol.for("ar_prohibit_shard_swapping");
 
-const QUERY_CONNECTION_KEY = Symbol.for("ar_query_connection");
-
-/**
- * The connection yielded by the enclosing internal `with_connection` wrap
- * ({@link withConnection}), or `null` outside one. Internal query and
- * transaction code reads this *threaded* connection instead of the deprecated
- * `Model.connection` getter, so it never flips the lease permanent — mirroring
- * Rails, which threads the `with_connection` block's `connection` parameter
- * through its query/transaction code rather than re-resolving `.connection`.
- *
- * @internal
- * @noRailsEquivalent CONVERGEABLE reads the connection Ruby threads as with_connection's block parameter (connection_handling.rb:309).
- */
-export function currentQueryConnection(): DatabaseAdapter | null {
-  return IsolatedExecutionState.get<DatabaseAdapter>(QUERY_CONNECTION_KEY) ?? null;
-}
-
 function isBaseClass(klass: typeof Base): boolean {
   return Object.prototype.hasOwnProperty.call(klass, "_isActiveRecordBase");
 }
@@ -284,15 +267,7 @@ export function withConnection<T>(
   options?: { preventPermanentCheckout?: boolean; checkoutTimeout?: number },
 ): Promise<T> {
   try {
-    return Promise.resolve(
-      this.connectionPool().withConnection((conn) => {
-        const prevValue = IsolatedExecutionState.get<DatabaseAdapter>(QUERY_CONNECTION_KEY);
-        IsolatedExecutionState.set(QUERY_CONNECTION_KEY, conn);
-        return Promise.resolve(fn(conn)).finally(() => {
-          IsolatedExecutionState.set(QUERY_CONNECTION_KEY, prevValue);
-        });
-      }, options),
-    ) as Promise<T>;
+    return Promise.resolve(this.connectionPool().withConnection(fn, options)) as Promise<T>;
   } catch (err) {
     return Promise.reject(err);
   }

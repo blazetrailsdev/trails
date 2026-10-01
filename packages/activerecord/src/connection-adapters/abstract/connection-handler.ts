@@ -1,7 +1,7 @@
 import type { ConnectionPool } from "./connection-pool.js";
 import { DatabaseConfig } from "../../database-configurations/database-config.js";
 import type { HashConfig } from "../../database-configurations/hash-config.js";
-import { configurationsStore as configurations } from "../../database-configurations.js";
+import { ActiveRecord } from "../../namespaces.js";
 import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { PoolConfig } from "../pool-config.js";
 import { PoolManager } from "../pool-manager.js";
@@ -313,7 +313,7 @@ export class ConnectionHandler {
     role: string,
     shard: string,
   ): Promise<PoolConfig> {
-    const dbConfig = configurations().resolve(config);
+    const dbConfig = ActiveRecord.Base.configurations().resolve(config);
     await dbConfig.validateBang();
     if (!dbConfig.adapter) {
       throw new AdapterNotSpecified("database configuration does not specify adapter");

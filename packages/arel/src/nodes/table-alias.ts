@@ -1,4 +1,5 @@
 import { Nodes } from "../namespaces.js";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { Node } from "./node.js";
 import { Binary } from "./binary.js";
 import { Cte } from "./cte.js";
@@ -71,4 +72,5 @@ export class TableAlias extends Binary {
   }
 }
 
+rbSetClassPathString(TableAlias, Nodes, "TableAlias");
 Nodes.TableAlias = TableAlias;

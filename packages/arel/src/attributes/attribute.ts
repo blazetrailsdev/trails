@@ -1,5 +1,5 @@
 import { include } from "@blazetrails/activesupport";
-import { Struct, type StructInstance } from "@blazetrails/ruby-compat";
+import { rbSetClassPathString, Struct, type StructInstance } from "@blazetrails/ruby-compat";
 import { Arel, Attributes } from "../namespaces.js";
 import { Node } from "../nodes/node.js";
 import { SqlLiteral } from "../nodes/sql-literal.js";
@@ -9,7 +9,6 @@ import { Predications, type PredicationsModule, type RangeLike } from "../predic
 import { AliasPredication, type AliasPredicationModule } from "../alias-predication.js";
 import { OrderPredications, type OrderPredicationsModule } from "../order-predications.js";
 import { Math as MathMixin, type MathModule } from "../math.js";
-import { setRubyNamespace } from "../visitors/ruby-class.js";
 
 export interface RelationLike {
   name: string | Node;
@@ -77,6 +76,6 @@ include(Attribute, AliasPredication);
 include(Attribute, OrderPredications);
 include(Attribute, MathMixin);
 
+rbSetClassPathString(Attribute, Attributes, "Attribute");
 Attributes.Attribute = Attribute;
 Arel.Attribute = Attributes.Attribute;
-setRubyNamespace(Attribute, "Arel::Attributes");

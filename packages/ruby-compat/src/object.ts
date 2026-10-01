@@ -4,6 +4,7 @@ import { rubyClass, type Comparable } from "./comparable.js";
 import { TypeError } from "./type-error.js";
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
+import { temporalTag } from "./temporal-tag.js";
 import { NoMethodError } from "./no-method-error.js";
 
 /**
@@ -13,7 +14,11 @@ import { NoMethodError } from "./no-method-error.js";
  *
  * @boundary: a JS `number` is the seat for both `Integer` and `Float`, so
  *  which one it is is read off the value; a Temporal value carrying an instant
- *  is a Ruby `Time`, by the same reading `cmp` orders it with.
+ *  is a Ruby `Time`, by the same reading `cmp` orders it with, and so are a JS
+ *  `Date` and a `Temporal.PlainTime`. `Temporal.PlainDate` and
+ *  `Temporal.PlainDateTime` are the seats of `Date` and `DateTime`. Any other
+ *  object answers its class's {@link rbModToS}, which is how Ruby interpolates
+ *  the class `rb_obj_class` returns.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_class` (`vendor/ruby/v3.3.11/object.c:296`).
  */
@@ -27,8 +32,37 @@ export function rbObjClass(x: unknown): string {
   const branded = (x as Comparable)[rubyClass];
   if (branded != null) return branded;
   if (hasEpochNanoseconds(x)) return "Time";
+  const tag = temporalTag(x);
+  if (tag === "Temporal.PlainDate") return "Date";
+  if (tag === "Temporal.PlainDateTime") return "DateTime";
+  if (tag === "Temporal.PlainTime") return "Time";
   if (isPlainHash(x)) return "Hash";
-  return (x as object).constructor?.name ?? typeof x;
+  const klass = (x as object).constructor as (abstract new (...args: never) => unknown) | undefined;
+  if (klass === Date) return "Time";
+  return typeof klass === "function" ? rbModToS(klass) : typeof x;
+}
+
+/**
+ * `rb_set_class_path_string` (`vendor/ruby/v3.3.11/variable.c:407`), by which
+ * `declare_under` (`vendor/ruby/v3.3.11/vm_insnhelper.c:5375`) paths a class
+ * after the cbase it is declared in: `under`'s path, `::`, and `name`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbSetClassPathString(
+  klass: abstract new (...args: never) => unknown,
+  under: { readonly name: string | null },
+  name: string,
+): void {
+  const permanent =
+    typeof under === "function"
+      ? (classpaths.get(under)?.permanent ?? Boolean(under.name))
+      : under.name != null;
+  const str =
+    typeof under === "function"
+      ? rbModToS(under as abstract new (...args: never) => unknown)
+      : (under.name ?? rbAnyToS(under));
+  classpaths.set(klass, { path: `${str}::${name}`, permanent });
 }
 
 function hasEpochNanoseconds(value: unknown): value is { epochNanoseconds: bigint } {
@@ -563,8 +597,16 @@ function inspectAry(ary: unknown[], recursing: Set<object>): string {
 
 function isPlainHash(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null) return false;
-  const proto: unknown = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
+  for (
+    let proto: object | null = Object.getPrototypeOf(value);
+    proto !== null;
+    proto = Object.getPrototypeOf(proto)
+  ) {
+    if (proto === Object.prototype) return true;
+    const klass: unknown = Object.getOwnPropertyDescriptor(proto, "constructor")?.value;
+    if (typeof klass === "function" && klass.prototype === proto) return false;
+  }
+  return true;
 }
 
 /**

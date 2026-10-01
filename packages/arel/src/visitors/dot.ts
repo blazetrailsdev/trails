@@ -5,9 +5,8 @@ import { Visitor } from "./visitor.js";
 import { Nodes, Visitors } from "../namespaces.js";
 import { PlainString } from "../collectors/plain-string.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
-import { temporalClassName } from "../temporal-tag.js";
-import { isHashAnalogue, rubyConstantName } from "./ruby-class.js";
 import { camelize } from "@blazetrails/activesupport";
+import { rbObjClass, rbSetClassPathString } from "@blazetrails/ruby-compat";
 
 type AppendableCollector = { append(s: string): unknown; value: string };
 
@@ -314,7 +313,7 @@ export class Dot extends Visitor {
 
   protected visitEdge(o: object, method: string): void {
     if (!(camelize(method, false) in o)) {
-      const klass = rubyConstantName(o.constructor) ?? "Object";
+      const klass = rbObjClass(o);
       // eslint-disable-next-line blazetrails/rails-error-parity -- Ruby raises NoMethodError/TypeError here; TypeError is its JS analogue, not a missing ported class.
       throw new TypeError(`undefined method '${method}' for ${klass}`);
     }
@@ -347,7 +346,7 @@ export class Dot extends Visitor {
       }
     }
 
-    const node = new Node(this.classNameOf(object), this.nextId++);
+    const node = new Node(rbObjClass(object), this.nextId++);
     if (seenKey !== undefined) {
       this.seen.set(seenKey, node);
     }
@@ -405,23 +404,6 @@ export class Dot extends Visitor {
     this.visitEdge(o, "expressions");
     this.visitEdge(o, "alias");
   }
-
-  private classNameOf(o: unknown): string {
-    if (o === null) return "NilClass";
-    if (o === undefined) return "NilClass";
-    if (typeof o === "string") return "String";
-    if (typeof o === "number") return Number.isInteger(o) ? "Integer" : "Float";
-    if (typeof o === "boolean") return o ? "TrueClass" : "FalseClass";
-    if (typeof o === "bigint") return "Integer";
-    // boundary: legacy JS Date values stringify to Rails' `Time` class name.
-    if (o instanceof Date) return "Time";
-    const temporalClass = temporalClassName(o);
-    if (temporalClass) return temporalClass;
-    if (isHashAnalogue(o)) return "Hash";
-    const ctor = (o as { constructor?: { name?: string } }).constructor;
-    if (!ctor) return "Object";
-    return rubyConstantName(ctor) ?? ctor.name ?? "Object";
-  }
 }
 
 export class Node {
@@ -447,4 +429,5 @@ export class Edge {
   }
 }
 
+rbSetClassPathString(Dot, Visitors, "Dot");
 Visitors.Dot = Dot;

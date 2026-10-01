@@ -20,12 +20,7 @@ import {
   StatementInvalid,
   StrictLoadingViolationError,
 } from "./errors.js";
-import {
-  DatabaseConfigurations,
-  configurationsStore,
-  setConfigurationsStore,
-  type RawConfigurations,
-} from "./database-configurations.js";
+import { DatabaseConfigurations, type RawConfigurations } from "./database-configurations.js";
 import type { HashConfig } from "./database-configurations/hash-config.js";
 import {
   Notifications,
@@ -416,15 +411,16 @@ export function destroyAssociationAsyncJob(this: CoreHost, value?: any): any {
   return this._destroyAssociationAsyncJob ?? null;
 }
 
+let _configurations!: DatabaseConfigurations;
+
 export function configurations(
   config?: RawConfigurations | DatabaseConfigurations | HashConfig[],
 ): DatabaseConfigurations {
   if (config !== undefined) {
-    setConfigurationsStore(
-      config instanceof DatabaseConfigurations ? config : new DatabaseConfigurations(config),
-    );
+    _configurations =
+      config instanceof DatabaseConfigurations ? config : new DatabaseConfigurations(config);
   }
-  return configurationsStore();
+  return _configurations;
 }
 
 export function isApplicationRecordClass(this: CoreHost): boolean {

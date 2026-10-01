@@ -18,6 +18,7 @@ import { NamedWindow } from "./nodes/window.js";
 import { Table } from "./table.js";
 import { sql } from "./arel.js";
 import { Arel } from "./namespaces.js";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { Comment } from "./nodes/comment.js";
 import { Lateral } from "./nodes/unary.js";
 import { And } from "./nodes/nary.js";
@@ -298,4 +299,5 @@ export interface SelectManager extends _FactoryMethodsModule, Crud {}
 
 include(SelectManager, Crud);
 
+rbSetClassPathString(SelectManager, Arel, "SelectManager");
 Arel.SelectManager = SelectManager;

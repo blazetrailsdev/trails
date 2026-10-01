@@ -1,4 +1,5 @@
 import { Nodes } from "../namespaces.js";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { Node } from "./node.js";
 import { Unary } from "./unary.js";
 
@@ -14,4 +15,5 @@ export class Grouping extends Unary {
   }
 }
 
+rbSetClassPathString(Grouping, Nodes, "Grouping");
 Nodes.Grouping = Grouping;

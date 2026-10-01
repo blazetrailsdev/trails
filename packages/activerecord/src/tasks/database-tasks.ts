@@ -1,9 +1,5 @@
 import type { DatabaseConfigOptions } from "../database-configurations/database-config.js";
-import {
-  DatabaseConfigurations,
-  configurationsStore,
-  setConfigurationsStore,
-} from "../database-configurations.js";
+import { DatabaseConfigurations } from "../database-configurations.js";
 import type { RawConfigurations } from "../database-configurations.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { Migration, ProtectedEnvironmentError } from "../migration.js";
@@ -55,11 +51,11 @@ export class DatabaseTasks {
     return "primary";
   }
   static get databaseConfiguration(): DatabaseConfigurations | null {
-    return configurationsStore();
+    return ActiveRecord.Base.configurations();
   }
 
   static set databaseConfiguration(value: DatabaseConfigurations | null) {
-    setConfigurationsStore(value ?? new DatabaseConfigurations({}));
+    ActiveRecord.Base.configurations(value ?? new DatabaseConfigurations({}));
   }
 
   private static _dbDir: string | null = null;
@@ -437,7 +433,7 @@ export class DatabaseTasks {
 
   /** @internal */
   static async eachLocalConfiguration(block: (dbConfig: HashConfig) => unknown): Promise<void> {
-    for (const dbConfig of configurationsStore().configsFor()) {
+    for (const dbConfig of ActiveRecord.Base.configurations().configsFor()) {
       if (!dbConfig.database) continue;
 
       if (this.isLocalDatabase(dbConfig)) {

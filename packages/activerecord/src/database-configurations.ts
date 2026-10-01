@@ -28,25 +28,6 @@ type DbConfigHandler = (
   config: DatabaseConfigOptions,
 ) => HashConfig | null | undefined;
 
-let _configurations: DatabaseConfigurations | undefined;
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE reads the configurations slot ActiveRecord::Base.configurations names directly (core.rb:77).
- */
-export function configurationsStore(): DatabaseConfigurations {
-  _configurations ??= new DatabaseConfigurations({});
-  return _configurations;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE writes that same configurations slot (core.rb:71); Ruby assigns through the Base accessor.
- */
-export function setConfigurationsStore(configs: DatabaseConfigurations): void {
-  _configurations = configs;
-}
-
 function isHash(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

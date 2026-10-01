@@ -55,8 +55,15 @@ describe("Visitor dispatch", () => {
   it("throws TypeError for nodes with no handler", () => {
     const v = new TestVisitor();
     expect(() => v.accept(new C())).toThrow(TypeError);
-    expect(() => v.accept(new C())).toThrow(/Cannot visit Arel::Nodes::C/);
+    expect(() => v.accept(new C())).toThrow(/Cannot visit C/);
     expect(() => v.accept(new C())).not.toThrow(UnsupportedVisitError);
+  });
+
+  it("raises TypeError for an anonymous class with no handler, and walks its ancestors for one", () => {
+    const v = new TestVisitor();
+    expect(() => v.accept(new (class extends C {})())).toThrow(TypeError);
+    expect(() => v.accept(new (class extends C {})())).toThrow(/Cannot visit #<Class:0x[0-9a-f]+>/);
+    expect(v.accept(new (class extends A {})())).toBe("A");
   });
 
   it("falls through to an ancestor's handler when its own dispatch entry names a missing method", () => {

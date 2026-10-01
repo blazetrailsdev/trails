@@ -1,4 +1,5 @@
 import { Nodes } from "../namespaces.js";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { rbHash } from "@blazetrails/activesupport";
 import { NodeExpression } from "./node-expression.js";
 
@@ -17,4 +18,5 @@ type _AliasPredication = import("../alias-predication.js").AliasPredicationModul
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface True extends _AliasPredication {}
 
+rbSetClassPathString(True, Nodes, "True");
 Nodes.True = True;

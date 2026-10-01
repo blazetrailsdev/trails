@@ -1,4 +1,5 @@
 import { include } from "@blazetrails/activesupport";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { Binary, NotIn, FetchAttribute } from "./binary.js";
 import type { Node } from "./node.js";
@@ -18,4 +19,5 @@ include(
   FetchAttribute as unknown as Record<string, (...args: unknown[]) => unknown>,
 );
 
+rbSetClassPathString(In, Nodes, "In");
 Nodes.In = In;

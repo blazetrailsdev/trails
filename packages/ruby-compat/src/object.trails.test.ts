@@ -14,8 +14,13 @@ import {
   rbObjInstanceVariables,
   rbObjIvarGet,
   rbObjIvarSet,
+  rbModName,
+  rbModToS,
+  rbObjClass,
+  rbSetClassPathString,
 } from "./object.js";
 import { Module } from "./include.js";
+import { cmp } from "./comparable.js";
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { NoMethodError } from "./no-method-error.js";
@@ -319,5 +324,63 @@ describe("Class#superclass", () => {
 
     expect(rbClassSuperclass(Child)).toBe(Parent);
     expect(rbClassSuperclass(Parent)).toBeNull();
+  });
+});
+
+describe("Module#name", () => {
+  const Outer = { name: "Outer::Space" };
+  class Base {}
+  class Derived extends Base {}
+  class Nested {}
+  rbSetClassPathString(Base, Outer, "Base");
+  rbSetClassPathString(Nested, Base, "Nested");
+
+  it("is the path rb_set_class_path_string gave the class under its cbase", () => {
+    expect(rbModName(Base)).toBe("Outer::Space::Base");
+    expect(rbModName(Nested)).toBe("Outer::Space::Base::Nested");
+    expect(rbModToS(Base)).toBe("Outer::Space::Base");
+  });
+
+  it("is the class's own name while unpathed, and nil for an anonymous class", () => {
+    expect(rbModName(Derived)).toBe("Derived");
+    expect(rbModName(class {})).toBeNull();
+    expect(rbModName(class extends Base {})).toBeNull();
+  });
+
+  it("is what rb_obj_class reports for an instance", () => {
+    expect(rbObjClass(new Base())).toBe("Outer::Space::Base");
+    expect(rbObjClass(new Derived())).toBe("Derived");
+    expect(rbObjClass(new (class extends Base {})())).toMatch(/^#<Class:0x[0-9a-f]+>$/);
+  });
+});
+
+describe("rb_obj_class over trails' date and hash seats", () => {
+  const tagged = (tag: string) => ({ [Symbol.toStringTag]: tag });
+
+  it("answers Date, DateTime and Time for the Temporal plain shapes and a JS Date", () => {
+    expect(rbObjClass(tagged("Temporal.PlainDate"))).toBe("Date");
+    expect(rbObjClass(tagged("Temporal.PlainDateTime"))).toBe("DateTime");
+    expect(rbObjClass(tagged("Temporal.PlainTime"))).toBe("Time");
+    expect(rbObjClass(new Date(0))).toBe("Time");
+    expect(rbObjClass(new (class Stamp extends Date {})(0))).toBe("Stamp");
+  });
+
+  it("orders two PlainTimes by their own compare, not on an instant they do not carry", () => {
+    class PlainTime {
+      readonly [Symbol.toStringTag] = "Temporal.PlainTime";
+      constructor(readonly hour: number) {}
+      static compare(l: PlainTime, r: PlainTime): number {
+        return Math.sign(l.hour - r.hour);
+      }
+    }
+    expect(cmp(new PlainTime(1), new PlainTime(2))).toBe(-1);
+  });
+
+  it("answers Hash for a record whose prototype chain holds no class", () => {
+    class Klass {}
+    expect(rbObjClass(Object.create({ inherited: "x" }))).toBe("Hash");
+    expect(rbObjClass(Object.create(Object.create(null)))).toBe("Hash");
+    expect(rbObjClass(Object.create({ constructor: Klass }))).toBe("Hash");
+    expect(rbObjClass(new Klass())).toBe("Klass");
   });
 });

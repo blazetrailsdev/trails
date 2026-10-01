@@ -1,4 +1,5 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
@@ -60,23 +61,38 @@ export class OptimizerHints extends Unary {
 }
 export class RollUp extends Unary {}
 
+rbSetClassPathString(Not, Nodes, "Not");
 Nodes.Not = Not;
 
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface Unary extends _AliasPredication {}
 
+rbSetClassPathString(Unary, Nodes, "Unary");
 Nodes.Unary = Unary;
+rbSetClassPathString(Offset, Nodes, "Offset");
 Nodes.Offset = Offset;
+rbSetClassPathString(Limit, Nodes, "Limit");
 Nodes.Limit = Limit;
+rbSetClassPathString(Lock, Nodes, "Lock");
 Nodes.Lock = Lock;
+rbSetClassPathString(DistinctOn, Nodes, "DistinctOn");
 Nodes.DistinctOn = DistinctOn;
+rbSetClassPathString(Bin, Nodes, "Bin");
 Nodes.Bin = Bin;
+rbSetClassPathString(On, Nodes, "On");
 Nodes.On = On;
+rbSetClassPathString(Lateral, Nodes, "Lateral");
 Nodes.Lateral = Lateral;
+rbSetClassPathString(GroupingElement, Nodes, "GroupingElement");
 Nodes.GroupingElement = GroupingElement;
+rbSetClassPathString(Cube, Nodes, "Cube");
 Nodes.Cube = Cube;
+rbSetClassPathString(GroupingSet, Nodes, "GroupingSet");
 Nodes.GroupingSet = GroupingSet;
+rbSetClassPathString(Group, Nodes, "Group");
 Nodes.Group = Group;
+rbSetClassPathString(OptimizerHints, Nodes, "OptimizerHints");
 Nodes.OptimizerHints = OptimizerHints;
+rbSetClassPathString(RollUp, Nodes, "RollUp");
 Nodes.RollUp = RollUp;
