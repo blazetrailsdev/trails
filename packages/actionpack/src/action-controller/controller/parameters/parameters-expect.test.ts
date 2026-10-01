@@ -4,7 +4,11 @@ import { Date, DateTime, Time } from "@blazetrails/date";
 import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { UploadedFile } from "../../../action-dispatch/http/upload.js";
-import { Parameters, ParameterMissing } from "../../metal/strong-parameters.js";
+import {
+  ExpectedParameterMissing,
+  Parameters,
+  ParameterMissing,
+} from "../../metal/strong-parameters.js";
 
 const thisFile = new URL(import.meta.url).pathname;
 
@@ -12,7 +16,7 @@ describe("ParametersExpectTest", () => {
   it("key to array: returns only permitted scalar keys", () => {
     const inner = new Parameters({ name: "John", admin: true });
     const params = new Parameters({ person: inner });
-    const result = params.expect({ person: ["name"] }) as Parameters;
+    const result = params.expect({ person: ["name"] });
     expect(result.get("name")).toBe("John");
     expect(result.has("admin")).toBe(false);
   });
@@ -21,7 +25,7 @@ describe("ParametersExpectTest", () => {
     const address = new Parameters({ city: "NYC", secret: "x" });
     const person = new Parameters({ name: "John", address });
     const params = new Parameters({ person });
-    const result = params.expect({ person: ["name", { address: ["city"] }] }) as Parameters;
+    const result = params.expect({ person: ["name", { address: ["city"] }] });
     expect(result.get("name")).toBe("John");
   });
 
@@ -44,33 +48,41 @@ describe("ParametersExpectTest", () => {
   });
 
   it("key to array of keys: raises when params is an array", () => {
-    const params = new Parameters({ items: ["a", "b"] });
-    expect(() => params.expect({ items: ["name"] })).toThrow(ParameterMissing);
+    const params = new Parameters({ name: "Martin", pies: [{ flavor: "pumpkin" }] });
+
+    expect(() => params.expect({ pies: ["flavor"] })).toThrow(ParameterMissing);
+    expect(() => params.expectBang({ pies: ["flavor"] })).toThrow(ExpectedParameterMissing);
   });
 
   it("key to explicit array: returns permitted array", () => {
-    const params = new Parameters({ tags: ["ruby", "rails"] });
-    const result = params.expect({ tags: [] });
-    expect(result).toEqual(["ruby", "rails"]);
+    const params = new Parameters({
+      name: "Martin",
+      pies: [{ flavor: "pumpkin" }, { flavor: "chicken pot" }],
+    });
+    const pies = params.expect({ pies: [["flavor"]] }) as Parameters[];
+
+    expect(pies[0].toH()).toEqual({ flavor: "pumpkin" });
+    expect(pies[1].toH()).toEqual({ flavor: "chicken pot" });
   });
 
   it("key to explicit array: returns array when params is a hash", () => {
-    const inner = new Parameters({ "0": "a", "1": "b" });
-    const params = new Parameters({ items: inner });
-    const result = params.expect({ items: ["0", "1"] });
-    expect(result).toBeInstanceOf(Parameters);
-    expect((result as Parameters).get("0")).toBe("a");
+    const params = new Parameters({ name: "Martin", pies: { flavor: "pumpkin" } });
+
+    expect(() => params.expect({ pies: [["flavor"]] })).toThrow(ParameterMissing);
+    expect(() => params.expectBang({ pies: [["flavor"]] })).toThrow(ExpectedParameterMissing);
   });
 
   it("key to explicit array: returns empty array when params empty array", () => {
-    const params = new Parameters({ tags: [] });
-    expect(() => params.expect({ tags: [] })).toThrow(ParameterMissing);
+    const params = new Parameters({ name: "Martin", pies: [] });
+
+    expect(() => params.expect({ pies: [["flavor"]] })).toThrow(ParameterMissing);
+    expect(() => params.expectBang({ pies: [["flavor"]] })).toThrow(ExpectedParameterMissing);
   });
 
   it("key to mixed array: returns permitted params", () => {
     const inner = new Parameters({ name: "John", age: 22, admin: true });
     const params = new Parameters({ person: inner });
-    const result = params.expect({ person: ["name", "age"] }) as Parameters;
+    const result = params.expect({ person: ["name", "age"] });
     expect(result.get("name")).toBe("John");
     expect(result.get("age")).toBe(22);
     expect(result.has("admin")).toBe(false);
@@ -80,7 +92,7 @@ describe("ParametersExpectTest", () => {
     const deep = new Parameters({ city: "NYC" });
     const inner = new Parameters({ address: deep });
     const params = new Parameters({ person: inner });
-    const result = params.expect({ person: [{ address: ["city"] }] }) as Parameters;
+    const result = params.expect({ person: [{ address: ["city"] }] });
     const address = result.get("address") as Parameters;
     expect(address.get("city")).toBe("NYC");
   });
@@ -90,7 +102,7 @@ describe("ParametersExpectTest", () => {
     const params = new Parameters({ person: inner });
     const result = params.expect({ person: ["name"] });
     expect(result).toBeInstanceOf(Parameters);
-    expect((result as Parameters).get("name")).toBe("John");
+    expect(result.get("name")).toBe("John");
   });
 
   it("array of keys: returns multiple permitted params", () => {
@@ -161,7 +173,7 @@ describe("ParametersExpectTest", () => {
   it("key: unknown keys are filtered out", () => {
     const inner = new Parameters({ name: "John", admin: true });
     const params = new Parameters({ person: inner });
-    const result = params.expect({ person: ["name"] }) as Parameters;
+    const result = params.expect({ person: ["name"] });
     expect(result.has("admin")).toBe(false);
   });
 

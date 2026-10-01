@@ -43,3 +43,41 @@ describe("ForbiddenAttributesProtectionUpdateTest", () => {
     await expect(person!.update(new ProtectedParams({}))).resolves.toBe(true);
   });
 });
+
+describe("ForbiddenAttributesProtectionNewTest", () => {
+  fixtures(["people"]);
+
+  it("permitted attributes can be used for new and build", () => {
+    for (const person of [
+      Person.new(new ProtectedParams({ first_name: "Guille" }).permitBang()),
+      Person.build(new ProtectedParams({ first_name: "Guille" }).permitBang()),
+    ]) {
+      expect(person.readAttribute("first_name")).toBe("Guille");
+    }
+  });
+
+  it("forbidden attributes cannot be used for new and build", () => {
+    expect(() => Person.new(new ProtectedParams({ first_name: "Guille" }))).toThrow(
+      ForbiddenAttributesError,
+    );
+    expect(() => Person.build(new ProtectedParams({ first_name: "Guille" }))).toThrow(
+      ForbiddenAttributesError,
+    );
+  });
+
+  it("new inside a scope assigns permitted params over the scope's attributes", () => {
+    const person = Person.where({ gender: "f" }).scoping(() =>
+      Person.new(new ProtectedParams({ first_name: "Guille" }).permitBang()),
+    );
+    expect(person.readAttribute("first_name")).toBe("Guille");
+    expect(person.readAttribute("gender")).toBe("f");
+  });
+
+  it("new inside a scope still checks permitted", () => {
+    expect(() =>
+      Person.where({ gender: "f" }).scoping(() =>
+        Person.new(new ProtectedParams({ first_name: "Guille" })),
+      ),
+    ).toThrow(ForbiddenAttributesError);
+  });
+});

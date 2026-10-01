@@ -163,6 +163,7 @@ export interface VirtualizeTseResult {
 export interface TseScope {
   view: string;
   locals?: string;
+  resolved?: boolean;
 }
 
 export function virtualizeTse(source: string, scope?: TseScope): string {
@@ -178,7 +179,9 @@ export function virtualizeTseWithDeltas(source: string, scope?: TseScope): Virtu
   const body = emitted.map(([code]) => code);
 
   const header: string[] = [buildPreamble(needsNoExtraKeys)];
-  if (scope !== undefined) header.push(...scopeTypes(scope, ast.localsSignature !== null));
+  if (scope !== undefined) {
+    header.push(...scopeTypes(scope, ast.localsSignature !== null || scope.resolved === true));
+  }
   header.push(
     "export default function render(",
     ...(scope === undefined ? [] : ["  this: View,"]),
@@ -214,7 +217,7 @@ export function virtualizeTseWithDeltas(source: string, scope?: TseScope): Virtu
   return { ts, deltas, mappings };
 }
 
-function scopeTypes(scope: TseScope, strictLocals: boolean): string[] {
+function scopeTypes(scope: TseScope, localsKnown: boolean): string[] {
   return [
     `type View = ${scope.view};`,
     `type ObjectLocals = ${scope.locals ?? "{}"};`,
@@ -224,7 +227,7 @@ function scopeTypes(scope: TseScope, strictLocals: boolean): string[] {
     "    ? OmitThisParameter<View[K]>",
     "    : K extends keyof typeof globalThis",
     "      ? (typeof globalThis)[K]",
-    `      : ${strictLocals ? "never" : "any"};`,
+    `      : ${localsKnown ? "never" : "any"};`,
   ];
 }
 

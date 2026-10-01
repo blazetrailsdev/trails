@@ -130,17 +130,17 @@ function mk(name: string, body: string, ts: boolean): Method {
 }
 
 function paramsMethod(singular: string, attrs: string[], ts: boolean): Method {
-  const returnType = "Record<string, unknown>";
-  const cast = ts ? ` as ${returnType}` : "";
+  const returnType = ts && attrs.length === 0 ? "Record<string, unknown>" : undefined;
+  const cast = returnType ? ` as ${returnType}` : "";
   const list =
     attrs.length === 0
       ? `return this.params.fetch("${singular}", {})${cast};`
-      : `return this.params.expect({ ${singular}: [${attrs.map((a) => `"${a}"`).join(", ")}] })${cast};`;
+      : `return this.params.expect({ ${singular}: [${attrs.map((a) => `"${a}"`).join(", ")}] });`;
   return tsMethod({
     name: `${camelize(singular, false)}Params`,
     visibility: "private",
     params: [],
-    returnType: ts ? returnType : undefined,
+    returnType,
     body: tsBody`${list}`,
   });
 }
