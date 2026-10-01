@@ -14,6 +14,7 @@ const TYPE_TRUE = 0x54;
 const TYPE_FALSE = 0x46;
 const TYPE_FIXNUM = 0x69;
 
+const TYPE_UCLASS = 0x43;
 const TYPE_OBJECT = 0x6f;
 const TYPE_FLOAT = 0x66;
 const TYPE_BIGNUM = 0x6c;
@@ -43,10 +44,7 @@ interface DumpArg {
   numEntries: number;
 }
 
-/**
- * `RB_TYPE_P(obj, T_OBJECT)` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:96`):
- * neither a core value nor a JS built-in holding internal slots.
- */
+/** `RB_TYPE_P(obj, T_OBJECT)` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:96`). */
 function tObjectP(obj: unknown): obj is object {
   return Object.prototype.toString.call(obj) === "[object Object]" && rbObjClass(obj) !== "Hash";
 }
@@ -59,11 +57,7 @@ function mustNotBeAnonymous(type: string, path: string): string {
   return path;
 }
 
-/**
- * `class2path` (`vendor/ruby/v3.3.11/marshal.c:273`). Its
- * `rb_path_to_class(path) != rb_class_real(klass)` check (`:279`) is
- * `ruby-compat-marshal-load-core-types`.
- */
+/** `class2path` (`vendor/ruby/v3.3.11/marshal.c:273`). */
 function class2path(klass: AnyClass): string {
   const path = rbModName(klass) ?? rbModToS(klass);
 
@@ -87,7 +81,7 @@ function wBytes(s: ArrayLike<number>, n: number, arg: DumpArg): void {
   wNbyte(s, n, arg);
 }
 
-/** `w_cstr` (`vendor/ruby/v3.3.11/marshal.c:313`), over the string's UTF-8 bytes. */
+/** `w_cstr` (`vendor/ruby/v3.3.11/marshal.c:313`). */
 function wCstr(s: string, arg: DumpArg): void {
   const bytes = new TextEncoder().encode(s);
   wBytes(bytes, bytes.length, arg);
@@ -144,10 +138,7 @@ function rubyMarshalWriteLong(x: number, buf: number[]): number {
   return i + 1;
 }
 
-/**
- * `w_float` (`vendor/ruby/v3.3.11/marshal.c:427`). `ruby_dtoa(d, 0, …)` is the
- * shortest round-tripping digit string, which `toExponential()` also answers.
- */
+/** `w_float` (`vendor/ruby/v3.3.11/marshal.c:427`). */
 function wFloat(d: number, arg: DumpArg): void {
   if (d === Infinity || d === -Infinity) {
     if (d < 0) wCstr("-inf", arg);
@@ -187,7 +178,7 @@ function wFloat(d: number, arg: DumpArg): void {
   }
 }
 
-/** `w_encivar` (`vendor/ruby/v3.3.11/marshal.c:480`); `is_ascii_string` is the 7-bit test. */
+/** `w_encivar` (`vendor/ruby/v3.3.11/marshal.c:480`). */
 function wEncivar(str: string, arg: DumpArg): boolean | string | null {
   const encname = encodingName(str);
   if (encname === null || /^[\0-\x7f]*$/.test(str)) {
@@ -229,11 +220,7 @@ function wUnique(s: string, arg: DumpArg): void {
   wSymbol(`:${s}`, arg);
 }
 
-/**
- * `w_class` (`vendor/ruby/v3.3.11/marshal.c:572`). `rb_class_real(CLASS_OF(obj))`
- * is `obj.constructor`, which a singleton class leaves answering the real
- * class. `w_extended` (`marshal.c:550`) is not ported.
- */
+/** `w_class` (`vendor/ruby/v3.3.11/marshal.c:572`). */
 function wClass(type: number, obj: object, arg: DumpArg): void {
   const klass = obj.constructor as AnyClass;
   wByte(type, arg);
@@ -241,10 +228,17 @@ function wClass(type: number, obj: object, arg: DumpArg): void {
   wUnique(path, arg);
 }
 
-/**
- * `encoding_name` (`vendor/ruby/v3.3.11/marshal.c:661`). A JS string carries no
- * encoding tag and is UTF-8, `Qtrue`; nothing else is `rb_enc_capable`.
- */
+/** `w_uclass` (`vendor/ruby/v3.3.11/marshal.c:590`). */
+function wUclass(obj: object, sup: AnyClass, arg: DumpArg): void {
+  const klass = obj.constructor as AnyClass | undefined;
+
+  if (klass !== undefined && klass !== sup) {
+    wByte(TYPE_UCLASS, arg);
+    wUnique(class2path(klass), arg);
+  }
+}
+
+/** `encoding_name` (`vendor/ruby/v3.3.11/marshal.c:661`). */
 function encodingName(obj: unknown): boolean | string | null {
   if (typeof obj === "string") {
     return true;
@@ -270,16 +264,12 @@ function wEncoding(encname: boolean | string | null, arg: DumpArg, limit: number
   return 1;
 }
 
-/**
- * `has_ivars` (`vendor/ruby/v3.3.11/marshal.c:713`). Its generic-ivar count has
- * no seat: a JS string holds no ivars, and an Array's or Hash's own keys are
- * its elements.
- */
+/** `has_ivars` (`vendor/ruby/v3.3.11/marshal.c:713`). */
 function hasIvars(encname: boolean | string | null): number {
   return encname !== null ? 1 : 0;
 }
 
-/** `w_ivar_each` (`vendor/ruby/v3.3.11/marshal.c:736`), with `w_obj_each` (`:629`) as its body. */
+/** `w_ivar_each` (`vendor/ruby/v3.3.11/marshal.c:736`) over `w_obj_each` (`marshal.c:629`). */
 function wIvarEach(obj: object, num: number, arg: DumpArg, limit: number): void {
   if (!num) return;
   for (const id of rbObjInstanceVariables(obj)) {
@@ -337,17 +327,7 @@ function wRemember(obj: unknown, arg: DumpArg): void {
   arg.data.set(obj, arg.numEntries++);
 }
 
-/**
- * `w_object` (`vendor/ruby/v3.3.11/marshal.c:846`). The arms ported are the ones
- * a schema-cache dump holds; `marshal_dump` (`:910`), `_dump` (`:918`),
- * `w_uclass` (`:590`) and the Class, Module, Regexp and Struct arms are not,
- * and every value outside them takes the `T_DATA` arm's `TypeError`.
- *
- * `arg->data` is an identity table. A JS string, Float or Integer has no
- * identity apart from its value, so equal ones are the same entry and the
- * second is a `TYPE_LINK`, as a deduplicated Ruby String's is. `-0.0` is keyed
- * apart from `0.0`, which a `Map` would otherwise read as the same key.
- */
+/** `w_object` (`vendor/ruby/v3.3.11/marshal.c:846`). */
 function wObject(obj: unknown, arg: DumpArg, limit: number): void {
   let hasiv = 0;
   let encname: boolean | string | null = null;
@@ -417,6 +397,7 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
       wByte(TYPE_STRING, arg);
       wCstr(obj, arg);
     } else if (Array.isArray(obj)) {
+      wUclass(obj, Array, arg);
       wByte(TYPE_ARRAY, arg);
       {
         const len = obj.length;
@@ -430,6 +411,11 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
         }
       }
     } else if (obj instanceof Map || rbObjClass(obj) === "Hash") {
+      wUclass(obj as object, obj instanceof Hash ? Hash : obj instanceof Map ? Map : Object, arg);
+      if (obj instanceof Hash && obj.isCompareByIdentity()) {
+        wByte(TYPE_UCLASS, arg);
+        wSymbol(":Hash", arg);
+      }
       const ifnone = obj instanceof Hash ? (obj.default() ?? null) : null;
       const procDefault = obj instanceof Hash && obj.defaultProc() !== undefined;
       if (ifnone === null && !procDefault) {
@@ -461,12 +447,8 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
 }
 
 /**
- * Ruby's `Marshal` (`vendor/ruby/v3.3.11/marshal.c:2555`), format 4.8, over the
- * types a schema-cache dump holds
- * (`vendor/rails/v8.0.2/activerecord/lib/active_record/connection_adapters/schema_cache.rb:416-418`):
- * `nil`, `true`, `false`, Integer, Float, String, Symbol, Array, Hash and a
- * plain ivar object. The marshalled data is an ASCII-8BIT String, one
- * character per byte. `Marshal.load` is `ruby-compat-marshal-load-core-types`.
+ * Ruby's `Marshal` (`vendor/ruby/v3.3.11/marshal.c:2555`), format 4.8. The
+ * marshalled data is an ASCII-8BIT String, one character per byte.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Marshal`
  * (`vendor/ruby/v3.3.11/marshal.c:2555`), which Rails calls without defining.
@@ -475,7 +457,28 @@ export const Marshal = {
   /**
    * `Marshal.dump(obj, limit = -1)` (`marshal_dump`,
    * `vendor/ruby/v3.3.11/marshal.c:1207`, over `rb_marshal_dump_limited`,
-   * `marshal.c:1228`). The `anIO` port is not ported.
+   * `marshal.c:1228`, and `w_object`, `marshal.c:846`), for the types a
+   * schema-cache dump holds
+   * (`vendor/rails/v8.0.2/activerecord/lib/active_record/connection_adapters/schema_cache.rb:416-418`):
+   * `nil`, `true`, `false`, Integer, Float, String, Symbol, Array, Hash and a
+   * plain ivar object. Any other value takes the `T_DATA` arm's `TypeError`.
+   *
+   * @boundary: a JS string carries no encoding tag, so `encoding_name`
+   *  (`marshal.c:661`) answers UTF-8 for every String and `has_ivars`
+   *  (`marshal.c:713`) finds no ivars on a String, Array or Hash. `arg->data`
+   *  is an identity table, and a JS string, Float or Integer has no identity
+   *  apart from its value, so equal ones are one entry and the second is a
+   *  `TYPE_LINK`, as a deduplicated Ruby String's is; `-0.0` is keyed apart
+   *  from `0.0`, which a `Map` reads as one key. `ruby_dtoa(d, 0, …)`
+   *  (`marshal.c:444`) is the shortest round-tripping digit string, which
+   *  `toExponential()` also answers.
+   *
+   * Not ported: the `anIO` argument; `w_extended` (`marshal.c:550`) and the
+   * `marshal_dump` arm (`marshal.c:910`), which are
+   * `ruby-compat-has-no-marshal-for-schema-cache-and-debug`; `class2path`'s
+   * `rb_path_to_class` check (`marshal.c:279`), which is
+   * `ruby-compat-marshal-load-core-types`; and the `_dump`, Class, Module,
+   * Regexp and Struct arms, which nothing calls.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Marshal.dump` (`vendor/ruby/v3.3.11/marshal.c:1207`).
    */

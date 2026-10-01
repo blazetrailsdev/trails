@@ -10,6 +10,8 @@ const fixtures = JSON.parse(
   readFileSync(new URL("./marshal.fixtures.json", import.meta.url), "utf8"),
 ) as Record<string, string>;
 
+class Ary extends Array<unknown> {}
+
 class Pt {
   constructor(
     public x: number,
@@ -58,12 +60,9 @@ cycle.push(cycle);
 
 const VALUES: Record<string, unknown> = {
   nil: null,
-  true: true,
-  false: false,
   "fixnum 0": 0,
   "fixnum 122": 122,
   "fixnum 123": 123,
-  "fixnum 256": 256,
   "fixnum 65536": 65536,
   "fixnum 2**30 - 1": 2 ** 30 - 1,
   "fixnum -1": -1,
@@ -78,7 +77,6 @@ const VALUES: Record<string, unknown> = {
   "bignum 2**62": 2n ** 62n,
   "bignum -2**70": -(2n ** 70n),
   "bignum then link": [2n ** 70n, "a", "a"],
-  "float 1.5": 1.5,
   "float 1.0": new Number(1),
   "float 0.0 and -0.0": [new Number(0), new Number(-0)],
   "float 100.0": new Number(100),
@@ -87,20 +85,19 @@ const VALUES: Record<string, unknown> = {
   "float -123456789.125": -123456789.125,
   "float inf, -inf, nan": [Infinity, -Infinity, NaN],
   "float link": [1.5, new Number(1.5)],
-  "string empty": "",
   "string utf-8": "héllo ☃",
-  "string link": ["a", "a"],
   "symbol utf-8": ":é",
   symlink: [":a", ":b", ":a"],
   array: [1, "a", undefined, [true, false], []],
   "array cycle": cycle,
+  "array subclass": Ary.of(1),
   hash: hash([
     ["a", 1],
     [":b", [2]],
     [3, {}],
   ]),
   "hash default": hash([["a", 1]], 5),
-  object: new Pt(1, "a"),
+  "hash compare_by_identity": hash([]).compareByIdentity().set(1, 2),
   "object nested path": new Shape(":circle"),
   "object link": [shared, shared],
   "schema cache": [

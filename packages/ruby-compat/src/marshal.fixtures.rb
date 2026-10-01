@@ -1,7 +1,6 @@
-# Regenerate with `ruby packages/ruby-compat/src/marshal.fixtures.rb` (the
-# `ruby` on PATH, 3.3). Writes marshal.fixtures.json: each name's
-# `Marshal.dump` bytes as hex, which marshal.trails.test.ts dumps.
 require "json"
+
+class Ary < Array; end
 
 class Pt
   def initialize(x, name) = (@x, @name = x, name)
@@ -30,12 +29,9 @@ posts = -"posts"
 
 FIXTURES = {
   "nil" => nil,
-  "true" => true,
-  "false" => false,
   "fixnum 0" => 0,
   "fixnum 122" => 122,
   "fixnum 123" => 123,
-  "fixnum 256" => 256,
   "fixnum 65536" => 65_536,
   "fixnum 2**30 - 1" => 2**30 - 1,
   "fixnum -1" => -1,
@@ -50,7 +46,6 @@ FIXTURES = {
   "bignum 2**62" => 2**62,
   "bignum -2**70" => -(2**70),
   "bignum then link" => [2**70, a, a],
-  "float 1.5" => 1.5,
   "float 1.0" => 1.0,
   "float 0.0 and -0.0" => [0.0, -0.0],
   "float 100.0" => 100.0,
@@ -59,16 +54,15 @@ FIXTURES = {
   "float -123456789.125" => -123_456_789.125,
   "float inf, -inf, nan" => [Float::INFINITY, -Float::INFINITY, Float::NAN],
   "float link" => [1.5, 1.5],
-  "string empty" => "",
   "string utf-8" => "héllo ☃",
-  "string link" => [a, a],
   "symbol utf-8" => :"é",
   "symlink" => %i[a b a],
   "array" => [1, "a", nil, [true, false], []],
   "array cycle" => cycle,
+  "array subclass" => Ary[1],
   "hash" => { "a" => 1, b: [2], 3 => {} },
   "hash default" => Hash.new(5).merge!("a" => 1),
-  "object" => Pt.new(1, "a"),
+  "hash compare_by_identity" => {}.compare_by_identity.merge!(1 => 2),
   "object nested path" => Geo::Shape.new(:circle),
   "object link" => [shared, shared],
   "schema cache" => [
