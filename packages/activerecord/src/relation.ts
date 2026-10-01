@@ -1088,7 +1088,8 @@ export class Relation<T extends Base, G extends boolean = false> {
             );
             const built = (node instanceof DeferredIdsNotIn ? clause.invert() : clause).predicates;
             const at = predicates.indexOf(node);
-            if (at !== -1) predicates.splice(at, 1, ...built);
+            if (at === -1) continue;
+            predicates.splice(at, 1, ...built);
             i = at + built.length - 1;
             continue;
           }

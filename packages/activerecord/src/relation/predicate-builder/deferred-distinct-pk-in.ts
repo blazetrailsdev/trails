@@ -17,7 +17,10 @@ export class DeferredPluck implements PromiseLike<unknown[]> {
 
   /** @noRailsEquivalent PERMANENT */
   ids(): Promise<unknown[]> {
-    return (this.plucked ??= this.relation.pluck(...this.columnNames));
+    return (this.plucked ??= this.relation.pluck(...this.columnNames).catch((error) => {
+      this.plucked = undefined;
+      throw error;
+    }));
   }
 
   /** @noRailsEquivalent PERMANENT */

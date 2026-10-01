@@ -27,7 +27,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T,
 
   /**
    * @internal
-   * @noRailsEquivalent PERMANENT
+   * @noRailsEquivalent CONVERGEABLE relation-subclasses-inherit-clone-without-overrides
    */
   override clone(): Relation<T> {
     const Ctor = relationClassFor.call(DisableJoinsAssociationRelation, this.model);
