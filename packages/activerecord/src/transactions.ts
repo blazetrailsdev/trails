@@ -261,7 +261,7 @@ export function restoreTransactionRecordState(this: Base, forceRestoreState = fa
       r._destroyed = restoreState.destroyed;
       r._attributes = (restoreState.attributes as AttributeSet).map((attr) => {
         const value = r._attributes.fetchValue(attr.name);
-        if (attr.value !== value) attr = attr.withValueFromUser(value);
+        if (attr.value() !== value) attr = attr.withValueFromUser(value);
         return attr;
       });
       r._mutationsFromDatabase = null;

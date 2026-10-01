@@ -112,7 +112,7 @@ export function renderBind(connection: any, attr: unknown): [string | null, unkn
   let value: unknown;
   if (attr instanceof Attribute) {
     const isBinary = (attr.type as any)?.binary?.() ?? (attr.type as any)?.isBinary?.() ?? false;
-    if (isBinary && attr.value != null && attr.value !== false) {
+    if (isBinary && attr.value() != null && attr.value() !== false) {
       value = `<${byteSize(attr.valueForDatabase)} bytes of binary data>`;
     } else {
       value = normalizeBindValue(connection?.typeCast?.(attr.valueForDatabase));

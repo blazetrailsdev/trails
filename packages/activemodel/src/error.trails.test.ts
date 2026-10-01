@@ -138,7 +138,9 @@ describe("Error and Errors surface", () => {
     class Parent extends Model {
       declare static attribute: AttributesClassHalf["attribute"];
 
-      static i18nScope = "activemodel";
+      static get i18nScope(): string {
+        return "activemodel";
+      }
       static {
         include(this, Attributes);
         this.attribute("name", "string");
@@ -178,7 +180,9 @@ describe("Error and Errors surface", () => {
     class ARModel extends Model {
       declare static attribute: AttributesClassHalf["attribute"];
 
-      static i18nScope = "activerecord";
+      static get i18nScope(): string {
+        return "activerecord";
+      }
       static {
         include(this, Attributes);
         this.attribute("name", "string");

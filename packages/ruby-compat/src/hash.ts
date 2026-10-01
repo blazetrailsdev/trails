@@ -19,7 +19,11 @@ export function block<F extends (...args: never[]) => unknown>(
 ): F & { readonly [BLOCK]: true };
 /** @noRailsEquivalent PERMANENT — Ruby's `&` block-pass, whose `rb_block_given_p` (`vendor/ruby/v3.3.11/eval.c:866`) TypeScript has no equivalent of; one mark serves every yield signature. */
 export function block(fn: (...args: never[]) => unknown): unknown {
-  return Object.assign((...args: never[]) => fn(...args), { [BLOCK]: true as const });
+  const blk = function (this: unknown, ...args: never[]): unknown {
+    return fn.apply(this, args);
+  };
+  Object.defineProperty(blk, "length", { value: fn.length });
+  return Object.assign(blk, { [BLOCK]: true as const });
 }
 
 /**

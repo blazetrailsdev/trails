@@ -34,14 +34,24 @@ export class UserProvidedDefault extends FromUser {
     return new UserProvidedDefault(this.name, this.userProvidedValue, type, this.originalAttribute);
   }
 
-  marshalDump(): [string | null, unknown, ValueType | null, Attribute | null] {
-    return [this.name, this.valueBeforeTypeCast, this.type, this.originalAttribute];
+  marshalDump(): unknown[] {
+    const result = [this.name, this.valueBeforeTypeCast, this.type, this.originalAttribute];
+    if (this._hasValue) result.push(this.value());
+    return result;
   }
 
   static marshalLoad(
-    values: [string | null, unknown, ValueType | null, Attribute | null],
+    values:
+      | [string | null, unknown, ValueType | null, Attribute | null]
+      | [string | null, unknown, ValueType | null, Attribute | null, unknown],
   ): UserProvidedDefault {
-    return new UserProvidedDefault(values[0], values[1], values[2], values[3]);
+    const [name, userProvidedValue, type, originalAttribute, value] = values;
+    const attribute = new UserProvidedDefault(name, userProvidedValue, type, originalAttribute);
+    if (values.length === 5) {
+      attribute._value = value;
+      attribute._hasValue = true;
+    }
+    return attribute;
   }
 }
 

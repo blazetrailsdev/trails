@@ -1,4 +1,4 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { block, kernelThrow } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import {
   Value,
@@ -1142,5 +1142,35 @@ describe("CallbackObject dispatch", () => {
     const inst = new Model();
     (inst as any).runCallbacks("save", () => log.push("body"));
     expect(log).toEqual(["pre", "body", "post"]);
+  });
+});
+
+describe("setCallback with a block (trails)", () => {
+  it("puts the block ahead of the positional filters, after the options", () => {
+    const target = {
+      ran: [] as string[],
+      named() {
+        this.ran.push("named");
+      },
+      on: true,
+    };
+    defineCallbacks(target, "save");
+    setCallback(
+      target,
+      "save",
+      "before",
+      ":named",
+      { if: (t: typeof target) => t.on },
+      block(function (this: typeof target) {
+        this.ran.push("block");
+      }),
+    );
+    runCallbacks(target, "save");
+    expect(target.ran).toEqual(["block", "named"]);
+
+    target.ran = [];
+    target.on = false;
+    runCallbacks(target, "save");
+    expect(target.ran).toEqual([]);
   });
 });

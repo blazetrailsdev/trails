@@ -32,7 +32,7 @@ describe("ExplainTest", () => {
     expect(sql).toMatch("SELECT");
     if (binds.length > 0) {
       expect(binds.length).toBe(1);
-      expect((binds[binds.length - 1] as { value: unknown }).value).toBe("honda");
+      expect((binds[binds.length - 1] as { value(): unknown }).value()).toBe("honda");
     } else {
       expect(sql).toMatch("honda");
     }

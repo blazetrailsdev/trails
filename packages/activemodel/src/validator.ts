@@ -90,11 +90,11 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
 }
 
 export class BlockValidator<TBase extends object = object> extends EachValidator<TBase> {
-  private block: (record: ValidatableRecord<TBase>, attribute: string, value: unknown) => void;
+  private block?: (record: ValidatableRecord<TBase>, attribute: string, value: unknown) => void;
 
   constructor(
     options: Record<string, unknown> & { attributes?: string | string[] },
-    block: (record: ValidatableRecord<TBase>, attribute: string, value: unknown) => void,
+    block?: (record: ValidatableRecord<TBase>, attribute: string, value: unknown) => void,
   ) {
     super(options);
     this.block = block;
@@ -102,6 +102,6 @@ export class BlockValidator<TBase extends object = object> extends EachValidator
 
   /** @internal */
   validateEach(record: ValidatableRecord<TBase>, attribute: string, value: unknown): void {
-    this.block(record, attribute, value);
+    this.block!(record, attribute, value);
   }
 }

@@ -9,9 +9,10 @@ import { Errors } from "./errors.js";
 import { ModelName } from "./naming.js";
 import { humanAttributeName } from "./translation.js";
 import { Validations } from "./validations.js";
+import { BlockValidator } from "./validator.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range, block } from "@blazetrails/ruby-compat";
 
 describe("ValidationsTest (trails)", () => {
   describe("presence", () => {
@@ -2361,5 +2362,60 @@ describe("validate with several filters", () => {
       }
       void Blocky;
     }).not.toThrow();
+  });
+
+  describe("validate with a block (validations.rb:160-185)", () => {
+    it("takes the block after the options and runs it under them", async () => {
+      class Blocky extends Model {
+        static {
+          this.validate(
+            { on: "create" },
+            block((record: Blocky) => {
+              record.errors.add("base", "from the block");
+            }),
+          );
+        }
+      }
+
+      expect(await new Blocky().isValid()).toBe(true);
+      const record = new Blocky();
+      expect(await record.isValid("create")).toBe(false);
+      expect(record.errors.fullMessages).toEqual(["from the block"]);
+    });
+
+    it("checks the option keys when the block is the only filter", () => {
+      class Blocky extends Model {}
+      expect(() =>
+        Blocky.validate(
+          { presence: true } as never,
+          block((_record: Blocky) => undefined),
+        ),
+      ).toThrow(/Unknown key: :presence/);
+    });
+  });
+
+  describe("validatesWith with a block (validations/with.rb:88-105)", () => {
+    it("passes the block to the validator's constructor", async () => {
+      const seen: unknown[] = [];
+      class Blocky extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
+        static {
+          include(this, Attributes);
+          this.attribute("title", "string");
+          this.validatesWith(
+            BlockValidator,
+            { attributes: ["title"] },
+            block((_record: object, attribute: string, value: unknown) => {
+              seen.push([attribute, value]);
+            }),
+          );
+        }
+      }
+      interface Blocky extends Attributes {}
+
+      await new Blocky({ title: "hi" }).isValid();
+      expect(seen).toEqual([["title", "hi"]]);
+    });
   });
 });

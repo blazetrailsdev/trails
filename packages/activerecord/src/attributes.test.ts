@@ -664,8 +664,8 @@ describe("DefaultAttributesTest", () => {
     };
 
     const defaults = Post._defaultAttributes();
-    expect(defaults.getAttribute("views").value).toBe(0);
-    expect(defaults.getAttribute("title").value).toBe("untitled");
+    expect(defaults.getAttribute("views").value()).toBe(0);
+    expect(defaults.getAttribute("title").value()).toBe("untitled");
   });
 
   it("user attribute() declaration overrides schema column type via pending queue", () => {
@@ -707,7 +707,7 @@ describe("DefaultAttributesTest", () => {
 
     const defaults = Post._defaultAttributes();
     expect(defaults.getAttribute("score").type!.type()).toBe("string");
-    expect(defaults.getAttribute("score").value).toBe("5");
+    expect(defaults.getAttribute("score").value()).toBe("5");
   });
 });
 
@@ -775,6 +775,6 @@ describe("ResetDefaultAttributesCascadeTest", () => {
 
     const after = (SpecialPost as any)._defaultAttributes();
     expect(after.keys()).toContain("score");
-    expect(after.getAttribute("score").value).toBe(0);
+    expect(after.getAttribute("score").value()).toBe(0);
   });
 });

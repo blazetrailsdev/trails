@@ -150,7 +150,7 @@ export class LogSubscriber extends BaseLogSubscriber {
   private resolveBindAttribute(attr: unknown): {
     name?: string;
     type?: { isBinary?: () => boolean; binary?: () => boolean };
-    value?: unknown;
+    value?: () => unknown;
     valueForDatabase?: unknown;
   } | null {
     if (attr instanceof Attribute) return attr as never;
@@ -164,9 +164,9 @@ export class LogSubscriber extends BaseLogSubscriber {
     const resolved = this.resolveBindAttribute(attr);
     if (resolved) {
       const isBinary = resolved.type?.isBinary?.() ?? resolved.type?.binary?.() ?? false;
-      if (isBinary && resolved.value != null) {
+      if (isBinary && resolved.value?.() != null) {
         const raw = resolved.valueForDatabase;
-        const bytes = byteLength(raw ?? resolved.value);
+        const bytes = byteLength(raw ?? resolved.value?.());
         value = `<${bytes} bytes of binary data>`;
       }
       return [resolved.name ?? null, value];

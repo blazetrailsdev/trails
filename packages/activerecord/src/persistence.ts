@@ -992,7 +992,7 @@ export async function _createRecord(
     const lockCol = ctor.lockingColumn;
     const defaults = ctor._defaultAttributes();
     if (defaults.isKey(lockCol) && this._readAttribute(lockCol) == null) {
-      this._writeAttribute(lockCol, defaults.getAttribute(lockCol).value);
+      this._writeAttribute(lockCol, defaults.getAttribute(lockCol).value());
     }
   }
 

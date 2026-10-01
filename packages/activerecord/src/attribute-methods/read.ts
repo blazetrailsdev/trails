@@ -1,5 +1,5 @@
 import type { AttributeSet } from "@blazetrails/activemodel";
-import { AttrNames, AttributeMethods, completeHalfAccessor } from "@blazetrails/activemodel";
+import { AttrNames, completeHalfAccessor } from "@blazetrails/activemodel";
 import type { CodeGenerator } from "@blazetrails/activesupport";
 import { AttributeMethods as AttributeMethodsNamespace } from "../namespaces.js";
 
@@ -60,21 +60,21 @@ export function defineMethodAttribute(
   canonicalName: string,
   { owner, as = canonicalName }: { owner: CodeGenerator; as?: string },
 ): void {
-  const { methodName } = AttrNames.defineAttributeAccessorMethod(owner, canonicalName);
-  const tempMethodName = AttributeMethods.ClassMethods.buildMangledName(methodName);
   completeHalfAccessor(this, as, "get", function (this: ReadRecord) {
     return readGeneratedAttribute(this, canonicalName);
   });
-  owner.defineCachedMethod(tempMethodName, { namespace: "active_record", as }, (batch) => {
-    batch.push((mod) => {
-      Object.defineProperty(mod, tempMethodName, {
-        get(this: ReadRecord) {
-          return readGeneratedAttribute(this, canonicalName);
-        },
-        set(this: { writeAttribute(n: string, v: unknown): void }, value: unknown) {
-          this.writeAttribute(canonicalName, value);
-        },
-        configurable: true,
+  AttrNames.defineAttributeAccessorMethod(owner, canonicalName, {}, (tempMethodName) => {
+    owner.defineCachedMethod(tempMethodName, { namespace: "active_record", as }, (batch) => {
+      batch.push((mod) => {
+        Object.defineProperty(mod, tempMethodName, {
+          get(this: ReadRecord) {
+            return readGeneratedAttribute(this, canonicalName);
+          },
+          set(this: { writeAttribute(n: string, v: unknown): void }, value: unknown) {
+            this.writeAttribute(canonicalName, value);
+          },
+          configurable: true,
+        });
       });
     });
   });

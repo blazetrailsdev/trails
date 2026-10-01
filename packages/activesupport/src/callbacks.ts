@@ -1,4 +1,4 @@
-import { kernelCatch, NoMethodError, RuntimeError } from "@blazetrails/ruby-compat";
+import { kernelCatch, NoMethodError, rbBlockGivenP, RuntimeError } from "@blazetrails/ruby-compat";
 
 import { kernelArray } from "./array-utils.js";
 import { ArgumentError } from "./hash-utils.js";
@@ -1069,9 +1069,12 @@ export namespace Callbacks {
     name: string,
     ...filterList: FilterListEntry<T>[]
   ): void {
+    const block = rbBlockGivenP(filterList[filterList.length - 1])
+      ? (filterList.pop() as AnyCallback)
+      : null;
     const [type, filters, options] = normalizeCallbackParams(
       filterList as Parameters<typeof normalizeCallbackParams>[0],
-      null,
+      block,
     );
     const chains = getCallbackChains(target);
     const chain = chains.get(name);
@@ -1098,9 +1101,12 @@ export namespace Callbacks {
     name: string,
     ...filterList: FilterListEntry<T>[]
   ): void {
+    const block = rbBlockGivenP(filterList[filterList.length - 1])
+      ? (filterList.pop() as AnyCallback)
+      : null;
     const [type, filters, options] = normalizeCallbackParams(
       filterList as Parameters<typeof normalizeCallbackParams>[0],
-      null,
+      block,
     );
     if (!("raise" in options)) options.raise = true;
 

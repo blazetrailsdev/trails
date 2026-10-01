@@ -13,8 +13,8 @@ describe("AttributeSetTest", () => {
     const builder = new Builder({ foo: new IntegerType(), bar: new FloatType() });
     const attributes = builder.buildFromDatabase({ foo: "1.1", bar: "2.2" });
 
-    expect(attributes.getAttribute("foo").value).toEqual(1);
-    expect(attributes.getAttribute("bar").value).toEqual(2.2);
+    expect(attributes.getAttribute("foo").value()).toEqual(1);
+    expect(attributes.getAttribute("bar").value()).toEqual(2.2);
     expect(attributes.getAttribute("foo").name).toEqual("foo");
     expect(attributes.getAttribute("bar").name).toEqual("bar");
   });
@@ -26,8 +26,8 @@ describe("AttributeSetTest", () => {
       { bar: new IntegerType() },
     );
 
-    expect(attributes.getAttribute("foo").value).toEqual(3.3);
-    expect(attributes.getAttribute("bar").value).toEqual(4);
+    expect(attributes.getAttribute("foo").value()).toEqual(3.3);
+    expect(attributes.getAttribute("bar").value()).toEqual(4);
   });
 
   it("[] returns a null object", () => {
@@ -44,17 +44,17 @@ describe("AttributeSetTest", () => {
     const builder = new Builder({ foo: new IntegerType(), bar: new StringType() });
     const attributes = builder.buildFromDatabase({ foo: 1, bar: "foo" });
 
-    void attributes.getAttribute("foo").value;
-    void attributes.getAttribute("bar").value;
+    void attributes.getAttribute("foo").value();
+    void attributes.getAttribute("bar").value();
 
     const duped = attributes.deepDup();
     duped.writeFromDatabase("foo", 2);
-    (duped.getAttribute("bar").value as string[]).push("bar");
+    (duped.getAttribute("bar").value() as string[]).push("bar");
 
-    expect(attributes.getAttribute("foo").value).toEqual(1);
-    expect(duped.getAttribute("foo").value).toEqual(2);
-    expect(attributes.getAttribute("bar").value).toEqual("foobar");
-    expect(duped.getAttribute("bar").value).toEqual("foobar");
+    expect(attributes.getAttribute("foo").value()).toEqual(1);
+    expect(duped.getAttribute("foo").value()).toEqual(2);
+    expect(attributes.getAttribute("bar").value()).toEqual("foobar");
+    expect(duped.getAttribute("bar").value()).toEqual("foobar");
   });
 
   // BLOCKED: assertions-immutable-js-string-values
@@ -62,17 +62,17 @@ describe("AttributeSetTest", () => {
     const builder = new Builder({ foo: new IntegerType(), bar: new StringType() });
     const attributes = builder.buildFromDatabase({ foo: 1, bar: "foo" });
 
-    void attributes.getAttribute("foo").value;
-    void attributes.getAttribute("bar").value;
+    void attributes.getAttribute("foo").value();
+    void attributes.getAttribute("bar").value();
 
     const duped = attributes.deepDup();
     duped.writeFromDatabase("foo", 2);
-    (duped.getAttribute("bar").value as string[]).push("bar");
+    (duped.getAttribute("bar").value() as string[]).push("bar");
 
-    expect(attributes.getAttribute("foo").value).toEqual(1);
-    expect(duped.getAttribute("foo").value).toEqual(2);
-    expect(attributes.getAttribute("bar").value).toEqual("foo");
-    expect(duped.getAttribute("bar").value).toEqual("foobar");
+    expect(attributes.getAttribute("foo").value()).toEqual(1);
+    expect(duped.getAttribute("foo").value()).toEqual(2);
+    expect(attributes.getAttribute("bar").value()).toEqual("foo");
+    expect(duped.getAttribute("bar").value()).toEqual("foobar");
   });
 
   it("freezing cloned set does not freeze original", () => {
@@ -264,7 +264,9 @@ describe("AttributeSetTest", () => {
   it("#map returns a new attribute set with the changes applied", () => {
     const builder = new Builder({ foo: new IntegerType(), bar: new IntegerType() });
     const attributes = builder.buildFromDatabase({ foo: "1", bar: "2" });
-    const newAttributes = attributes.map((attr) => attr.withCastValue((attr.value as number) + 1));
+    const newAttributes = attributes.map((attr) =>
+      attr.withCastValue((attr.value() as number) + 1),
+    );
 
     expect(newAttributes.fetchValue("foo")).toEqual(2);
     expect(newAttributes.fetchValue("bar")).toEqual(3);

@@ -4,7 +4,7 @@
    how `include()` surfaces those members on the type side. */
 import { describe, expect, it } from "vitest";
 
-import { InstanceMethods, defineMethodAttribute } from "./attribute-methods.js";
+import { AttrNames, InstanceMethods, defineMethodAttribute } from "./attribute-methods.js";
 import { Model } from "./index.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 import { include } from "@blazetrails/activesupport";
@@ -422,5 +422,29 @@ describe("attributeNames (instance)", () => {
     expect(u.attributeNames()).toEqual(User.attributeNames());
     expect(u.attributeNames()).toContain("name");
     expect(u.attributeNames()).toContain("age");
+  });
+});
+
+describe("AttrNames.defineAttributeAccessorMethod (attribute_methods.rb:577-589)", () => {
+  const yielded = (attrName: string, writer: boolean): [string, string] => {
+    let seen: [string, string] | undefined;
+    AttrNames.defineAttributeAccessorMethod(null, attrName, { writer }, (name, expr) => {
+      seen = [name, expr];
+    });
+    return seen!;
+  };
+
+  it("yields the method name and a quoted literal for a def-safe name", () => {
+    expect(yielded("title", false)).toEqual(["title", "'title'"]);
+    expect(yielded("title", true)).toEqual(["title=", "'title'"]);
+  });
+
+  it("yields a __temp__ name and a constant reference for any other name", () => {
+    const [reader, expr] = yielded("my_column(omg)", false);
+    expect(reader).toMatch(/^__temp__[0-9a-f]+$/);
+    expect(expr).toBe(
+      `::ActiveModel::AttributeMethods::AttrNames::ATTR_${reader.slice("__temp__".length)}`,
+    );
+    expect(yielded("my_column(omg)", true)[0]).toBe(`${reader}=`);
   });
 });

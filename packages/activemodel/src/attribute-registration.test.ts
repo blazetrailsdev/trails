@@ -74,9 +74,9 @@ describe("AttributeRegistrationTest", () => {
     });
 
     expect(attributes.getAttribute("foo").type).toBe(TYPE_1);
-    expect(attributes.getAttribute("foo").value).toEqual(123);
+    expect(attributes.getAttribute("foo").value()).toEqual(123);
     expect(attributes.getAttribute("bar").type).toBe(TYPE_2);
-    expect(attributes.getAttribute("bar").value).toEqual(456);
+    expect(attributes.getAttribute("bar").value()).toEqual(456);
   });
 
   it("default value can be nil", () => {
@@ -143,8 +143,8 @@ describe("AttributeRegistrationTest", () => {
     expect(parent._defaultAttributes().getAttribute("foo").type).toBe(
       child._defaultAttributes().getAttribute("foo").type,
     );
-    expect(parent._defaultAttributes().getAttribute("foo").value).toBe(
-      child._defaultAttributes().getAttribute("foo").value,
+    expect(parent._defaultAttributes().getAttribute("foo").value()).toBe(
+      child._defaultAttributes().getAttribute("foo").value(),
     );
   });
 
@@ -209,10 +209,10 @@ describe("AttributeRegistrationTest", () => {
 
     expect(child._defaultAttributes().getAttribute("foo").type).toBe(TYPE_1);
     expect(child._defaultAttributes().getAttribute("bar").type).toBe(TYPE_2);
-    expect(child._defaultAttributes().getAttribute("foo").value).toEqual(456);
-    expect(child._defaultAttributes().getAttribute("bar").value).toEqual(789);
-    expect(parent._defaultAttributes().getAttribute("foo").value).toEqual(123);
-    assertNil(parent._defaultAttributes().getAttribute("bar").value);
+    expect(child._defaultAttributes().getAttribute("foo").value()).toEqual(456);
+    expect(child._defaultAttributes().getAttribute("bar").value()).toEqual(789);
+    expect(parent._defaultAttributes().getAttribute("foo").value()).toEqual(123);
+    assertNil(parent._defaultAttributes().getAttribute("bar").value());
   });
 
   it(".decorate_attributes decorates specified attributes", () => {

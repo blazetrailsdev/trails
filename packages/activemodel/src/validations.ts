@@ -9,6 +9,8 @@ import {
   runCallbacks,
 } from "@blazetrails/activesupport";
 
+import { block as rbBlock, rbBlockGivenP } from "@blazetrails/ruby-compat";
+
 import { Errors } from "./errors.js";
 import { inspectAccessor } from "./validations/_accessor.js";
 import { BlockValidator, EachValidator, Validator } from "./validator.js";
@@ -146,6 +148,11 @@ type ValidateFilter<T extends ValidatableRecord> =
   | ValidatorLike;
 
 export type ValidateArgs<T extends ValidatableRecord = ValidatableRecord> =
+  | [
+      ...filters: Array<ValidateFilter<T>>,
+      options: ConditionalOptions,
+      block: (record: T) => unknown,
+    ]
   | [...filters: Array<ValidateFilter<T>>, options: ConditionalOptions]
   | Array<ValidateFilter<T>>;
 
@@ -172,15 +179,20 @@ export const ClassMethods = {
     block: (record: T, attribute: string, value: unknown) => void,
     options: ConditionalOptions = {},
   ): void {
-    this.validatesWith(BlockValidator, this._mergeAttributes([...attrNames, options]), block);
+    this.validatesWith(
+      BlockValidator,
+      this._mergeAttributes([...attrNames, options]),
+      rbBlock(block),
+    );
   },
 
   validate<T extends ValidatableRecord = ValidatableRecord>(
     this: ValidationsClassHost,
     ...args: ValidateArgs<T>
   ): void {
-    const extracted = extractOptionsBang(args as unknown[]);
     const filters = args as unknown[];
+    const block = rbBlockGivenP(filters[filters.length - 1]) ? filters.pop() : undefined;
+    const extracted = extractOptionsBang(filters);
     let options = extracted as ConditionalOptions;
 
     if (filters.every((arg) => typeof arg === "string" && arg.startsWith(":"))) {
@@ -225,6 +237,7 @@ export const ClassMethods = {
       "validate",
       ...(filters as Array<string | ((record: object) => unknown)>),
       options as CallbackConditions,
+      ...(block !== undefined ? [block as (record: object) => unknown] : []),
     );
   },
 

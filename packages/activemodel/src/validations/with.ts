@@ -1,4 +1,5 @@
 import { extractOptionsBang } from "@blazetrails/activesupport";
+import { rbBlockGivenP } from "@blazetrails/ruby-compat";
 
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
@@ -46,31 +47,30 @@ export interface ValidatesWithClassHost {
   ): void;
 }
 
-export async function validatesWith(this: ValidatableRecord, ...args: unknown[]): Promise<void> {
+export async function validatesWith(
+  this: ValidatableRecord,
+  ...args: Array<ValidatorClass | Record<string, unknown> | ValidatorBlock>
+): Promise<void> {
+  const block = rbBlockGivenP(args[args.length - 1]) ? (args.pop() as ValidatorBlock) : undefined;
   const options = extractOptionsBang(args);
-  const klasses = args;
   options.class = this.constructor;
 
-  for (const klass of klasses as ValidatorClass[]) {
-    const validator = new klass({ ...options });
+  for (const klass of args as ValidatorClass[]) {
+    const validator = new klass({ ...options }, block);
     await validator.validate(this);
   }
 }
 
 export const ClassMethods = {
-  validatesWith(this: ValidatesWithClassHost, ...args: unknown[]): void {
-    const last = args[args.length - 1];
-    const block =
-      args.length > 1 &&
-      typeof last === "function" &&
-      !/^class[\s{]/.test(Function.prototype.toString.call(last))
-        ? (args.pop() as ValidatorBlock)
-        : undefined;
+  validatesWith(
+    this: ValidatesWithClassHost,
+    ...args: Array<ValidatorClass | Record<string, unknown> | ValidatorBlock>
+  ): void {
+    const block = rbBlockGivenP(args[args.length - 1]) ? (args.pop() as ValidatorBlock) : undefined;
     const options = extractOptionsBang(args);
-    const klasses = args;
     options.class = this;
 
-    for (const klass of klasses as ValidatorClass[]) {
+    for (const klass of args as ValidatorClass[]) {
       const validator = new klass({ ...options }, block);
 
       const _validators = new Map(this._validators);

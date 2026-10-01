@@ -123,7 +123,7 @@ describe("AttributeSetTest", () => {
       bar: Attribute.fromDatabase("bar", 2, intType),
     });
     const seen: unknown[] = [];
-    set.eachValue((attr) => seen.push(attr.value));
+    set.eachValue((attr) => seen.push(attr.value()));
     expect(seen).toEqual([1, 2]);
   });
 
@@ -136,8 +136,8 @@ describe("AttributeSetTest", () => {
   it("treats an Object.prototype name as an ordinary absent attribute", () => {
     const set = new AttributeSet({});
     expect(set.isKey("toString")).toBe(false);
-    expect(set.getAttribute("toString").value).toBeNull();
-    expect(set.getAttribute("constructor").value).toBeNull();
+    expect(set.getAttribute("toString").value()).toBeNull();
+    expect(set.getAttribute("constructor").value()).toBeNull();
   });
 
   it("stores __proto__ as an ordinary key", () => {

@@ -32,7 +32,7 @@ describe("AttributeRegistration internals", () => {
 
     parent.attribute("age", "integer", { default: 42 });
 
-    expect(child._defaultAttributes().getAttribute("age").value).toBe(42);
+    expect(child._defaultAttributes().getAttribute("age").value()).toBe(42);
   });
 
   it("reset_default_attributes cascade propagates through multiple inheritance levels", () => {
@@ -50,6 +50,6 @@ describe("AttributeRegistration internals", () => {
 
     base.attribute("new_attr", "integer", { default: 7 });
 
-    expect(leaf._defaultAttributes().getAttribute("new_attr").value).toBe(7);
+    expect(leaf._defaultAttributes().getAttribute("new_attr").value()).toBe(7);
   });
 });

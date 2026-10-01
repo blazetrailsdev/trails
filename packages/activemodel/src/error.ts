@@ -161,7 +161,7 @@ export class Error {
     };
 
     let defaults: unknown[];
-    if (baseClass?.i18nScope != null) {
+    if (rbObjRespondTo(baseClass, "i18nScope")) {
       const i18nScope = baseClass.i18nScope;
       attribute = attribute.replace(/\[\d+\]/g, "");
 
