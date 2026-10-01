@@ -240,6 +240,10 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // rack-test cookie_jar.rb:150 `def [](name)` / :160 `def []=(name, value)` /
   // :197 `def <<(new_cookie)` → cookie-jar.ts `CookieJar#get` / `set` / `push`.
   "Rack::Test::CookieJar": { "[]": ["get"], "[]=": ["set"], "<<": ["push"] },
+  // thor core_ext/hash_with_indifferent_access.rb:18 `def [](key)` / :22
+  // `def []=(key, value)` → core-ext/hash-with-indifferent-access.ts
+  // `HashWithIndifferentAccess#get` / `set`.
+  "Thor::CoreExt::HashWithIndifferentAccess": { "[]": ["get"], "[]=": ["set"] },
 };
 
 // `fqn#operator` keys this process has actually resolved. A key that is never

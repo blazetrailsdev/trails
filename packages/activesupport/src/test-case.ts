@@ -81,7 +81,10 @@ export class TestCase {
   static setup = setup;
   static teardown = teardown;
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE after-teardown-takes-a-test-parameter-rails-does-not-have
+   */
   beforeSetup(): unknown {
     const runSetup = (): unknown => {
       taggedLoggingBeforeSetup();
@@ -93,7 +96,10 @@ export class TestCase {
     return result instanceof Promise ? result.then(runSetup) : runSetup();
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE after-teardown-takes-a-test-parameter-rails-does-not-have
+   */
   afterTeardown(test: RunningTest): unknown {
     const withoutAssertions = (): void => {
       testsWithoutAssertionsAfterTeardown({
