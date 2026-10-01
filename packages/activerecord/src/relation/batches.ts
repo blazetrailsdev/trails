@@ -1,5 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { kernelArray as Array } from "@blazetrails/activesupport";
+import { kernelArray as Array, pluck } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/ruby-compat";
 import { stripThenable } from "./thenable.js";
 import { BatchEnumerator } from "./batches/batch-enumerator.js";
@@ -445,9 +445,7 @@ export async function* batchOnUnloadedRelation(
     let yieldedRelation: any;
     if (load) {
       const records = await batchRelation.records();
-      values = records.map((record: any) =>
-        cursor.length > 1 ? cursor.map((key) => record.get(key)) : record.get(cursor[0]),
-      );
+      values = pluck<any, string>(records, ...cursor);
       yieldedRelation = this.where(new Map([[cursor, values]]));
       yieldedRelation.loadRecords(records);
     } else if ((emptyScope && useRanges !== false) || useRanges) {

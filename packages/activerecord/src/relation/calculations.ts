@@ -974,7 +974,7 @@ export function typeFor(
 export function lookupCastTypeFromJoinDependencies(
   rel: CalculationRelation,
   name: string,
-  joinDependencies?: JoinDependency[],
+  joinDependencies: JoinDependency[] = buildJoinDependencies.call(rel as any),
 ): unknown {
   let found: unknown = null;
   eachJoinDependencies.call(rel as any, joinDependencies, (join: any) => {

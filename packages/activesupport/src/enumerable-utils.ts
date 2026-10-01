@@ -196,10 +196,16 @@ export function groupBy<T, K>(collection: T[], fn: (item: T) => K): Map<K, T[]> 
 
 export function pluck<T, K extends keyof T>(collection: T[], ...keys: K[]): T[K][] | T[K][][] {
   if (keys.length > 1) {
-    return collection.map((element) => keys.map((key) => element[key]));
+    return collection.map((element) =>
+      keys.map((key) =>
+        typeof (element as any)?.get === "function" ? (element as any).get(key) : element[key],
+      ),
+    );
   } else {
     const key = keys[0];
-    return collection.map((element) => element[key]);
+    return collection.map((element) =>
+      typeof (element as any)?.get === "function" ? (element as any).get(key) : element[key],
+    );
   }
 }
 

@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { inGroupsOf, kernelArray, toFs } from "./array-utils.js";
+import { pluck } from "./enumerable-utils.js";
+
+describe("pluck (trails)", () => {
+  it("reads through an element's `get`, the port of Ruby's `[]`", () => {
+    const rows = [new Map([["id", 1]]), new Map([["id", 2]])] as unknown as { id: number }[];
+    expect(pluck(rows, "id")).toEqual([1, 2]);
+    const record = { id: [7, 8], get: (key: string) => (key === "id" ? 8 : 7) };
+    expect(pluck([record], "id")).toEqual([8]);
+    expect(pluck([record], "id", "get")).toEqual([[8, 7]]);
+  });
+});
 
 describe("KernelArrayTest (trails)", () => {
   it("returns an empty array for nil", () => {
