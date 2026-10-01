@@ -110,7 +110,7 @@ afterEach(async () => {
   await adapter.execute(`DROP TABLE IF EXISTS auto_inc`);
   await adapter.execute(`DROP TABLE IF EXISTS cpk`);
   await adapter.execute(`DROP TABLE IF EXISTS cpk_table`);
-  // eslint-disable-next-line blazetrails/require-canonical-rebuild
+  // eslint-disable-next-line blazetrails/require-canonical-rebuild -- sqlite3_adapter_test.rb:591 names it, on a private :memory: database
   await adapter.execute(`DROP TABLE IF EXISTS people`);
   await adapter.execute(`DROP TABLE IF EXISTS foos`);
   await adapter.execute(`DROP TABLE IF EXISTS ex`);
