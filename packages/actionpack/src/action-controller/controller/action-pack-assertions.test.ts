@@ -286,23 +286,23 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("empty flash", async () => {
     await tc.get("flashMeNaked");
-    expect(tc.flash.isEmpty()).toBe(true);
+    expect(tc.flash().isEmpty()).toBe(true);
   });
 
   it("flash exist", async () => {
     await tc.get("flashMe");
-    expect(tc.flash.isEmpty()).toBe(false);
-    expect(tc.flash.get("hello")).toBeTruthy();
+    expect(tc.flash().isEmpty()).toBe(false);
+    expect(tc.flash().get("hello")).toBeTruthy();
   });
 
   it("flash does not exist", async () => {
     await tc.get("nothing");
-    expect(tc.flash.isEmpty()).toBe(true);
+    expect(tc.flash().isEmpty()).toBe(true);
   });
 
   it("session exist", async () => {
     await tc.get("sessionStuffing");
-    expect(tc.session.get("xmas")).toBe("turkey");
+    expect(tc.session().get("xmas")).toBe("turkey");
   });
 
   it("redirection location", async () => {
