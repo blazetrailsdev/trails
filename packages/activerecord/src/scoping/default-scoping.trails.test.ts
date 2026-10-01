@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import "../index.js";
+import { Default } from "./default.js";
+import { defaultExtensions } from "./named.js";
 import {
   Developer,
   DeveloperOrderedBySalary,
@@ -24,5 +26,41 @@ describe("scopeAttributes?", () => {
       expect(Developer.isScopeAttributes()).toBe(true);
     });
     expect(Developer.isScopeAttributes()).toBe(false);
+  });
+});
+
+describe("build_default_scope", () => {
+  it("defaults its relation to the model's own relation", () => {
+    const withDefault = Default.buildDefaultScope.call(DeveloperOrderedBySalary);
+    const withExplicit = Default.buildDefaultScope.call(
+      DeveloperOrderedBySalary,
+      DeveloperOrderedBySalary.relation(),
+    );
+
+    expect(withDefault.toSql()).toBe(withExplicit.toSql());
+    expect(withDefault.toSql()).toMatch(/ORDER BY/);
+  });
+});
+
+describe("default_extensions", () => {
+  const extensions = [{ one: () => 1 }];
+
+  it("answers the association scope's extensions", () => {
+    const host = {
+      currentScope: () => ({ isEmptyScope: true }),
+      relation: () => ({ extensions }),
+    };
+
+    expect(defaultExtensions.call(host)).toBe(extensions);
+  });
+
+  it("falls back to the default scope, then to no extensions", () => {
+    const host = {
+      abstractClass: true,
+      currentScope: () => ({ isEmptyScope: true }),
+      relation: () => undefined,
+    };
+
+    expect(defaultExtensions.call(host)).toEqual([]);
   });
 });

@@ -1,6 +1,7 @@
 import { Scheme, type SchemeOptions } from "./scheme.js";
 import { Configuration } from "./errors.js";
 import { type ValueType } from "@blazetrails/activemodel";
+import { filterMap } from "@blazetrails/activesupport";
 import { Module, include } from "@blazetrails/ruby-compat";
 import { initializeGeneratedModules } from "../attribute-methods.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
@@ -16,9 +17,9 @@ import { Encryption } from "../encryption.js";
  * @internal
  */
 export function globalPreviousSchemesFor(scheme: Scheme): Scheme[] {
-  return Encryption.config.previousSchemes.flatMap((previousScheme) =>
-    scheme.isCompatibleWith(previousScheme) ? [scheme.merge(previousScheme)] : [],
-  );
+  return filterMap(Encryption.config.previousSchemes, (previousScheme) => {
+    if (scheme.isCompatibleWith(previousScheme)) return scheme.merge(previousScheme);
+  });
 }
 
 /** @internal */
