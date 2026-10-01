@@ -725,28 +725,15 @@ describe("runCli", () => {
         "export class ApplicationController { render(..._args: unknown[]): void {} }",
       ].join("\n"),
     );
-    for (const [file, name, body] of [
-      [
-        "comments",
-        "CommentsController",
+    for (const [file, body] of Object.entries({
+      comments:
         'declare comments: number[]; show(): void { const options = { layout: "admin" } as const; this.render("show", options); }',
-      ],
-      [
-        "drafts",
-        "DraftsController",
+      drafts:
         'declare drafts: bigint; show(options: { layout: "admin" | false }): void { this.render({ layout: "posts", ...options, action: "show" }); }',
-      ],
-      [
-        "wide",
-        "WideController",
-        'declare wide: symbol; show(options: Record<string, unknown>): void { this.render("show", options); }',
-      ],
-      [
-        "posts",
-        "PostsController",
-        'declare posts: string[]; static { layout.call(this, "application"); }',
-      ],
-    ]) {
+      wide: 'declare wide: symbol; show(options: Record<string, unknown>): void { this.render("show", options); }',
+      posts: 'declare posts: string[]; static { layout.call(this, "application"); }',
+    })) {
+      const name = `${file[0].toUpperCase()}${file.slice(1)}Controller`;
       write(
         cwd,
         `app/controllers/${file}-controller.ts`,

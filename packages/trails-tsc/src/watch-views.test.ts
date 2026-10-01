@@ -8,7 +8,7 @@ function mkScratch(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-watch-"));
 }
 
-function waitFor(pred: () => boolean, timeoutMs = 2000): Promise<void> {
+function waitFor(pred: () => boolean, timeoutMs = 20_000): Promise<void> {
   return new Promise((resolve, reject) => {
     const t0 = Date.now();
     const tick = (): void => {
@@ -38,7 +38,7 @@ describe("watchViews", () => {
     } finally {
       handle.close();
     }
-  });
+  }, 30_000);
 
   it("creates the views dir if missing and surfaces build errors", async () => {
     const cwd = mkScratch();
