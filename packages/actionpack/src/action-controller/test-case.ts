@@ -72,9 +72,9 @@ LiveBuffer.queueSize = null;
 type ControllerClass = new () => Metal;
 
 export interface RequestOptions {
-  params?: Record<string, unknown> | null;
+  params?: Record<string, unknown>;
   headers?: Record<string, string>;
-  session?: Record<string, unknown> | null;
+  session?: Record<string, unknown>;
   flash?: Record<string, string>;
   body?: string;
   format?: string;
@@ -414,7 +414,7 @@ export class TestCase extends ActiveSupportTestCase {
     controllerClassName: string,
     action: string,
     parameters: Record<string, unknown>,
-    session: Record<string, unknown> | null | undefined,
+    session: Record<string, unknown> | undefined,
     flash: Record<string, string> | undefined,
     xhr: boolean,
   ): void {
@@ -433,7 +433,7 @@ export class TestCase extends ActiveSupportTestCase {
       queryStringKeys,
     );
 
-    if (session != null) this.request.session.update(session);
+    if (session) this.request.session.update(session);
     this.request.flash!.update(flash ?? {});
 
     if (xhr) {

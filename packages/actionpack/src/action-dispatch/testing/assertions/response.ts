@@ -8,7 +8,13 @@
  * resolve from `this` at call time, per the CLAUDE.md mixin pattern.
  */
 
-import { assert, assertEqual, isPlainObject } from "@blazetrails/activesupport";
+import {
+  assert,
+  assertEqual,
+  isPlainObject,
+  isPresent,
+  UnexpectedError,
+} from "@blazetrails/activesupport";
 import { rbEqq } from "@blazetrails/ruby-compat";
 import { AssertionResponse } from "../assertion-response.js";
 import { _computeRedirectToLocation } from "../../../action-controller/metal/redirecting.js";
@@ -23,6 +29,7 @@ export interface AssertionResponseLike {
   status: number;
   body?: string;
   location?: string;
+  isRedirection?: boolean;
   getHeader?: (key: string) => string | undefined;
 }
 
@@ -111,21 +118,16 @@ export function codeWithName(codeOrName: number | string): string {
 
 /** @internal */
 export function locationIfRedirected(host: AssertionResponseHost): string {
-  const status = host.response.status;
-  if (status < 300 || status > 399) return "";
-  const location = host.response.getHeader?.("location");
-  if (!location) return "";
-  const normalized = normalizeArgumentToRedirection.call(host, location);
-  return ` redirect to <${String(normalized)}>`;
+  if (!(host.response.isRedirection && isPresent(host.response.location))) return "";
+  const location = normalizeArgumentToRedirection.call(host, host.response.location);
+  return ` redirect to <${location}>`;
 }
 
 /** @internal */
 export function exceptionIfPresent(host: AssertionResponseHost): string {
   const ex = host.request?.env?.["action_dispatch.exception"];
-  if (!ex) return "";
-  const name = ex instanceof Error ? ex.name || "Error" : "Error";
-  const message = ex instanceof Error ? ex.message : String(ex);
-  return `\n\nException while processing request: ${name}: ${message}\n`;
+  if (ex == null || ex === false) return "";
+  return `\n\nException while processing request: ${new UnexpectedError(ex as Error).message}\n`;
 }
 
 /** @internal */

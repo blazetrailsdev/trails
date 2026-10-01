@@ -44,6 +44,7 @@ describe("InfoControllerTest", () => {
     include(InfoController, routes.urlHelpers());
 
     tc = new TestCase(InfoController);
+    tc.routes = routes;
     remoteAddr = "127.0.0.1";
     Info.properties = new PropertyList();
     Info.property("Hello", "World");
@@ -221,6 +222,10 @@ describe("InfoControllerTest", () => {
   });
 
   test("index redirects to /rails/info/routes", async () => {
+    tc.routes!.draw(function () {
+      this.get("/rails/info", { to: "rails/info#index" });
+      this.get("/rails/info/routes", { to: "rails/info#routes" });
+    });
     await get("index");
     expect(tc.response.status).toBe(302);
     expect(tc.response.getHeader("location")).toBe("http://test.host/rails/info/routes");

@@ -3,6 +3,8 @@ import {
   Assertion,
   assertEmpty,
   assertEqual,
+  assertMatch,
+  assertNil,
   assertRespondTo,
   isBlank,
   toQuery,
@@ -512,6 +514,33 @@ class TestController extends Base {
 }
 Object.defineProperty(TestController, "name", { value: "TestCaseTest::TestController" });
 
+class DefaultUrlOptionsCachingController extends Base {
+  declare _dynamicOpt: string | undefined;
+
+  static {
+    this.beforeAction(function (this: DefaultUrlOptionsCachingController) {
+      this._dynamicOpt = "opt";
+    });
+  }
+
+  async testUrlOptionsReset() {
+    await this.render({ plain: this.urlFor() });
+  }
+}
+const defaultUrlOptions = Object.getOwnPropertyDescriptor(Base.prototype, "defaultUrlOptions")!;
+Object.defineProperty(DefaultUrlOptionsCachingController.prototype, "defaultUrlOptions", {
+  get(this: DefaultUrlOptionsCachingController) {
+    if (this._dynamicOpt !== undefined) {
+      return { ...defaultUrlOptions.get!.call(this), dynamic_opt: this._dynamicOpt };
+    } else {
+      return defaultUrlOptions.get!.call(this);
+    }
+  },
+});
+Object.defineProperty(DefaultUrlOptionsCachingController, "name", {
+  value: "TestCaseTest::DefaultUrlOptionsCachingController",
+});
+
 class TestCaseTest extends TestCase {
   override setup(): void {
     super.setup();
@@ -543,8 +572,12 @@ describe("TestCaseTest", () => {
   // BLOCKED: action-controller-test-case-has-no-assert-select
   it.skip("assert select with body", () => {});
 
-  // BLOCKED: port-test-case-test-url-options-reset
-  it.skip("url options reset", () => {});
+  it("url options reset", async () => {
+    tc.controller = new DefaultUrlOptionsCachingController();
+    await tc.get("testUrlOptionsReset");
+    assertNil(tc.request.params["dynamic_opt"]);
+    assertMatch(/dynamic_opt=opt/, tc.response.body);
+  });
 
   it("raw post handling", async () => {
     const params = { page: { name: "page name" }, "some key": 123 };

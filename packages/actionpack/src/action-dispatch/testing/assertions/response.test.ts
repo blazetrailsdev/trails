@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { assertRedirectedTo, type AssertionResponseHost } from "./response.js";
+import { describe, expect, it, vi } from "vitest";
+import { assertRedirectedTo, assertResponse, type AssertionResponseHost } from "./response.js";
 
 function host(status: number, headers: Record<string, string> = {}): AssertionResponseHost {
   return {
@@ -12,6 +12,15 @@ function host(status: number, headers: Record<string, string> = {}): AssertionRe
     request: { protocol: "http://", hostWithPort: () => "www.example.com" },
   };
 }
+
+describe("assertResponse", () => {
+  it("does not build the message for a passing assertion", () => {
+    const message = vi.fn(() => "unused");
+    assertResponse.call(host(200), "success", message);
+    assertResponse.call(host(200), 200, message);
+    expect(message).not.toHaveBeenCalled();
+  });
+});
 
 describe("assertRedirectedTo", () => {
   it("passes when location matches exact string", () => {
