@@ -24,7 +24,11 @@
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { rubyMethodToTs, rubyFileToTs } from "@blazetrails/parity/conventions";
+import {
+  rubyMethodToTs,
+  rubyFileToTs,
+  scopedSkipMirrorName,
+} from "@blazetrails/parity/conventions";
 import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
 import { mergeBySourceLine } from "./api-compare/source-order.js";
 import {
@@ -107,13 +111,11 @@ const manifest: Manifest = { files: {} };
 // toward method-existence coverage — every object inherits them). But when a
 // Rails class *overrides* one it is a real definition with a real source
 // POSITION and a real TS spelling, so method-ORDER must place it. Without this,
-// `rubyMethodToTs("nil?")` returns null and the rule treats the override (e.g.
-// `Casted#nil?` at casted.rb:15, which sits BETWEEN value_before_type_cast and
-// value_for_database) as an unmapped TS-only helper and shoves it past the
-// mapped block — actively degrading fidelity. Map the common overridables to
-// the candidates rubyMethodToTs would produce if they weren't skipped.
+// `rubyMethodToTs("initialize_clone")` returns null and the rule treats the
+// override as an unmapped TS-only helper and shoves it past the mapped block —
+// actively degrading fidelity. Map the common overridables to the candidates
+// rubyMethodToTs would produce if they weren't skipped.
 const ORDER_ONLY_CANDIDATES: Record<string, string[]> = {
-  "nil?": ["isNil", "nil"],
   hash: ["hash"],
   "eql?": ["isEql", "eql"],
   initialize_dup: ["initializeDup"],
@@ -149,9 +151,14 @@ const pushMethod = (
   seen: Set<string>,
   name: string,
   isStatic: boolean,
-  operatorCandidates?: string[],
+  operatorCandidates: string[] | undefined,
+  rubyFile: string,
 ) => {
-  const candidates = rubyMethodToTs(name) ?? ORDER_ONLY_CANDIDATES[name] ?? operatorCandidates;
+  const candidates =
+    rubyMethodToTs(name) ??
+    scopedSkipMirrorName(name, rubyFile) ??
+    ORDER_ONLY_CANDIDATES[name] ??
+    operatorCandidates;
   if (!candidates || candidates.length === 0) return;
   for (const ts of candidates) {
     const entry = isStatic ? `static ${ts}` : ts;
@@ -273,7 +280,7 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
         noteClass(file, className, host.fqn);
         const b = bucketFor(file, host.fqn);
         const opCandidates = operatorSpelling(host.fqn, m.name, m.isStatic);
-        pushMethod(b.names, b.seen, m.name, m.isStatic, opCandidates);
+        pushMethod(b.names, b.seen, m.name, m.isStatic, opCandidates, file);
       }
     }
   };
@@ -300,7 +307,7 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
           const b = bucketFor(file, mixin.parentFqn);
           const isStatic = mixin.extendsSingleton || m.isStatic;
           const opCandidates = operatorSpelling(mixin.parentFqn, m.name, isStatic);
-          pushMethod(b.names, b.seen, m.name, isStatic, opCandidates);
+          pushMethod(b.names, b.seen, m.name, isStatic, opCandidates, file);
         }
         continue;
       }
@@ -312,8 +319,9 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
         tagStatic(host.instanceMethods, false),
         tagStatic(host.classMethods, true),
       )) {
-        const b = bucketFor(m.file ?? host.file, FUNCTIONS_KEY);
-        pushMethod(b.names, b.seen, m.name, false, operatorSpelling(host.fqn, m.name));
+        const file = m.file ?? host.file;
+        const b = bucketFor(file, FUNCTIONS_KEY);
+        pushMethod(b.names, b.seen, m.name, false, operatorSpelling(host.fqn, m.name), file);
       }
     }
   };

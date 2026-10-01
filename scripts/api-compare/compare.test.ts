@@ -370,6 +370,13 @@ describe("significantMissingCalls", () => {
     }
   });
 
+  it("drops nil?, which ports as `x == null` on a receiver that may be nil and so emits no callee", () => {
+    expect(SIGNIFICANT_CALLS.has("nil?")).toBe(false);
+    expect(
+      significantMissingCalls("translate", ["nil?", "lookup"], new Set(["lookup"]), () => true),
+    ).toEqual([]);
+  });
+
   it("significantCallsForReceivers drops a positional-array name only when EVERY site of THIS row proved array", () => {
     const sig = significantCallsForReceivers({ first: ["array"], last: ["array", "expr"] });
     // Every site proven array: dropped.
@@ -1864,6 +1871,15 @@ describe("dedupeRubyMethodInto", () => {
     expect([...scored.keys()]).toEqual(["initialize_dup"]);
     const skipped = new Map<string, SeenRubyMethod>();
     dedupeRubyMethodInto(skipped, rm("initialize_dup"), "Foo", "x.rb", false, "date");
+    expect(skipped.size).toBe(0);
+  });
+
+  it("expects a globally skipped name where a scoped skip names its TS mirror", () => {
+    const scored = new Map<string, SeenRubyMethod>();
+    dedupeRubyMethodInto(scored, rm("then"), "Arel::Nodes::Case", "nodes/case.rb");
+    expect(scored.get("then")!.tsMirrorNames).toEqual(["then"]);
+    const skipped = new Map<string, SeenRubyMethod>();
+    dedupeRubyMethodInto(skipped, rm("then"), "ActiveRecord::Relation", "relation.rb");
     expect(skipped.size).toBe(0);
   });
 
@@ -3864,6 +3880,16 @@ describe("rubyDefinitionBreakdown", () => {
       sameNameCollapse: 1,
       ownRow: 4,
     });
+  });
+
+  it("gives a globally skipped name its own row where a scoped skip names its TS mirror", () => {
+    const breakdown = rubyDefinitionBreakdown(
+      [entity("Arel::Nodes::Case", "nodes/case.rb", ["then"]), entity("Foo", "foo.rb", ["then"])],
+      "arel",
+      () => true,
+    );
+    expect(breakdown.ownRow).toBe(1);
+    expect(breakdown.rowlessFile).toBe(1);
   });
 
   it("counts only the definitions the mode admits", () => {

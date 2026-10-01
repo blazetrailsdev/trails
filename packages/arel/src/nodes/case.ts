@@ -25,24 +25,6 @@ export class Case extends NodeExpression {
     return this;
   }
 
-  else(expression: Node | unknown): this {
-    this.default = new Else(buildQuoted(expression === undefined ? null : expression));
-    return this;
-  }
-  hash(): number {
-    return rbHash([this.case, this.conditions, this.default]);
-  }
-
-  eql(other: unknown): boolean {
-    return (
-      other instanceof Case &&
-      this.constructor === other.constructor &&
-      rbEqual(this.case, other.case) &&
-      rbEqual(this.conditions, other.conditions) &&
-      rbEqual(this.default, other.default)
-    );
-  }
-
   then(onFulfilled: (v: unknown) => unknown, onRejected: (e: unknown) => unknown): void;
   then(expression: Node | unknown): this;
 
@@ -57,6 +39,25 @@ export class Case extends NodeExpression {
       expression === undefined ? null : expression,
     );
     return this;
+  }
+
+  else(expression: Node | unknown): this {
+    this.default = new Else(buildQuoted(expression === undefined ? null : expression));
+    return this;
+  }
+
+  hash(): number {
+    return rbHash([this.case, this.conditions, this.default]);
+  }
+
+  eql(other: unknown): boolean {
+    return (
+      other instanceof Case &&
+      this.constructor === other.constructor &&
+      rbEqual(this.case, other.case) &&
+      rbEqual(this.conditions, other.conditions) &&
+      rbEqual(this.default, other.default)
+    );
   }
 
   initializeCopy(_other: Case): void {
