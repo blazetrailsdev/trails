@@ -1,18 +1,18 @@
 import { registerConstant } from "@blazetrails/activesupport";
-import { rbInspect as inspect, rbEqual } from "@blazetrails/ruby-compat";
+import { rbDeclareIvar, rbInspect as inspect, rbEqual } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "../attribute-assignment.js";
 
 export class ValueType<T = unknown> {
-  private __precision: number | null;
-  private __scale: number | null;
+  private _precision: number | null;
+  private _scale: number | null;
   private __limit: number | null;
 
   get precision(): number | null {
-    return this.__precision;
+    return this._precision;
   }
 
   get scale(): number | null {
-    return this.__scale;
+    return this._scale;
   }
 
   get limit(): number | null {
@@ -28,8 +28,8 @@ export class ValueType<T = unknown> {
     limit?: number | null;
     scale?: number | null;
   } = {}) {
-    this.__precision = precision;
-    this.__scale = scale;
+    this._precision = precision;
+    this._scale = scale;
     this.__limit = limit;
   }
 
@@ -149,5 +149,9 @@ export class ValueType<T = unknown> {
     return result;
   }
 }
+
+rbDeclareIvar(ValueType, "@precision", "_precision");
+rbDeclareIvar(ValueType, "@scale", "_scale");
+rbDeclareIvar(ValueType, "@limit", "__limit");
 
 registerConstant("ActiveModel::Type::Value", ValueType);
