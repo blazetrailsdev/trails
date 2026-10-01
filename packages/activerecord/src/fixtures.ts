@@ -82,9 +82,9 @@ export class FixtureSet {
   static cachedFixtures(
     connectionPool: ConnectionPool,
     keysToFetch: readonly string[] | null = null,
-  ): FixtureSet[] {
+  ): (FixtureSet | undefined)[] {
     if (keysToFetch) {
-      return valuesAt(this.cacheForConnectionPool(connectionPool), ...keysToFetch) as FixtureSet[];
+      return valuesAt(this.cacheForConnectionPool(connectionPool), ...keysToFetch);
     } else {
       return Object.values(this.cacheForConnectionPool(connectionPool));
     }
@@ -180,7 +180,7 @@ export class FixtureSet {
       );
       this.cacheFixtures(connectionPool, fixturesMap);
     }
-    return this.cachedFixtures(connectionPool, fixtureSetNames);
+    return this.cachedFixtures(connectionPool, fixtureSetNames) as FixtureSet[];
   }
 
   private static async readAndInsert(
