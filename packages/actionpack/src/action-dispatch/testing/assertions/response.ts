@@ -52,18 +52,18 @@ export function assertRedirectedTo(
   urlOptions: unknown = {},
   options: { status?: number | string } | string = {},
   message?: string,
-): void {
+): true {
   if (!isPlainObject(options)) [options, message] = [{}, options];
 
   const status = (options as { status?: number | string }).status ?? "redirect";
   assertResponse.call(this, status, message);
-  if (rbEqq(urlOptions, this.response.location)) return;
+  if (rbEqq(urlOptions, this.response.location)) return true;
 
   const redirectIs = normalizeArgumentToRedirection.call(this, this.response.location);
   const redirectExpected = normalizeArgumentToRedirection.call(this, urlOptions);
 
   message ??= `Expected response to be a redirect to <${redirectExpected}> but was a redirect to <${redirectIs}>`;
-  assert(rbEqq(redirectExpected, redirectIs), message);
+  return assert(rbEqq(redirectExpected, redirectIs), message);
 }
 
 /** @internal */

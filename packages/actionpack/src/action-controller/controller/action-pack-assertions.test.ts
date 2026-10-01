@@ -131,7 +131,7 @@ const Admin = { InnerModuleController };
 
 describe("ActionPackAssertionsControllerTest", () => {
   let tc: TestCase;
-  const assertRedirectedTo = (...args: Parameters<TestCase["assertRedirectedTo"]>): void =>
+  const assertRedirectedTo = (...args: Parameters<TestCase["assertRedirectedTo"]>): true =>
     tc.assertRedirectedTo(...args);
   beforeEach(async () => {
     tc = new TestCase(ActionPackAssertionsController);
