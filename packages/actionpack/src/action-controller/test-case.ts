@@ -399,9 +399,7 @@ export class TestCase extends ActiveSupportTestCase {
   }
 
   /** @internal */
-  buildResponse(
-    klass: typeof TestResponse | typeof LiveTestResponse,
-  ): TestResponse | LiveTestResponse {
+  buildResponse(klass: TestCase["_responseKlass"]): TestCase["response"] {
     return klass.create();
   }
 
@@ -469,7 +467,7 @@ export class TestCase extends ActiveSupportTestCase {
       );
     } finally {
       this.request = this.controller.request as TestRequest;
-      this.response = this.controller.response as TestResponse | LiveTestResponse;
+      this.response = this.controller.response as TestCase["response"];
 
       if (this.request.isHaveCookieJar()) {
         if (!this.request.cookieJar().isCommitted()) {

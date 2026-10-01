@@ -21,10 +21,7 @@ export async function watchViews(opts: WatchViewsOptions = {}): Promise<WatchHan
   const viewsDir = path.resolve(cwd, opts.viewsDir ?? "app/views");
   const debounceMs = opts.debounceMs ?? 50;
 
-  const runBuild = async (
-    trigger?: string,
-    kind: "initial" | "change" = "change",
-  ): Promise<void> => {
+  const runBuild = async (trigger?: string, kind: "initial" | "change" = "change") => {
     try {
       const result = await buildViews(opts);
       opts.onRebuild?.({ kind, trigger, result });

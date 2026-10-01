@@ -98,11 +98,8 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
   return { count: files.length, files };
 }
 
-function exists(p: string): Promise<boolean> {
-  return fs.access(p).then(
-    () => true,
-    () => false,
-  );
+async function exists(p: string): Promise<boolean> {
+  return (await fs.stat(p).catch(() => null)) !== null;
 }
 
 async function deepestExisting(p: string): Promise<string> {
