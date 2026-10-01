@@ -50,6 +50,8 @@ describe("Thor::Arguments", () => {
       ),
     );
     expect(new Arguments([hash]).parse(["a:"])).toEqual({ hash: { a: "" } });
+    const parsed = new Arguments([hash]).parse(["__proto__:x"]).hash as Record<string, string>;
+    expect(Object.keys(parsed)).toEqual(["__proto__"]);
   });
 
   it("dispatches the type to its parse method by name", () => {

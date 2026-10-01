@@ -1,6 +1,7 @@
 import {
   aryDelete,
   arySlice,
+  first,
   format,
   isEmpty,
   isInclude,
@@ -96,7 +97,7 @@ export class Arguments {
 
   /** @internal */
   protected peek(): unknown {
-    return this.pile[0];
+    return first(this.pile);
   }
 
   /** @internal */
@@ -124,7 +125,7 @@ export class Arguments {
    */
   protected parseHash(name: string): unknown {
     if (rbObjClass(this.peek()) === "Hash") return this.shift();
-    const hash: Record<string, string> = {};
+    const hash = Object.create(null) as Record<string, string>;
 
     while (this.isCurrentIsValue() && (this.peek() as string).includes(":")) {
       const [key, value] = stringSplit(this.shift() as string, ":", 2);
