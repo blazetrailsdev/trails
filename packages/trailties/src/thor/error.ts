@@ -25,7 +25,7 @@ export class Error extends StandardError {
   /** @noRailsEquivalent CONVERGEABLE ruby-compat-exception-message-dispatches-to-to-s */
   constructor(message?: string) {
     super(message);
-    this.#mesg = message ?? new.target.name;
+    this.#mesg = this.message;
     delete (this as { message?: string }).message;
   }
 
