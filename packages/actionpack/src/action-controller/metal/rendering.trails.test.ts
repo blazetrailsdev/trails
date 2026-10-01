@@ -1,5 +1,6 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import type { Base } from "../base.js";
+import { _normalizeOptions } from "./rendering.js";
 import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.js";
 
 declare module "@blazetrails/actionview" {
@@ -7,6 +8,14 @@ declare module "@blazetrails/actionview" {
     "render_types/post": { post: string; highlight?: boolean };
   }
 }
+
+describe("Rendering#_normalize_options status", () => {
+  it("maps both spellings of a Rack status symbol that RenderOptions admits", () => {
+    expect(_normalizeOptions({ status: "unprocessable_entity" }).status).toBe(422);
+    expect(_normalizeOptions({ status: ":created" }).status).toBe(201);
+    expect(_normalizeOptions({ status: "404 Not Found" }).status).toBe(404);
+  });
+});
 
 describe("Rendering#render types", () => {
   it("accepts rendering.rb's positional forms and option keys and rejects unknown ones", () => {
