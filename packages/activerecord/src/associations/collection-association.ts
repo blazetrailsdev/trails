@@ -374,16 +374,9 @@ export abstract class CollectionAssociation extends Association {
       return this.target.length;
     } else if (this._associationIds) {
       return this._associationIds.length;
-    } else if (
-      !isEmpty(
-        (this.associationScope() as { groupValues?: unknown[] } | undefined)?.groupValues ?? [],
-      )
-    ) {
+    } else if (!isEmpty(this.associationScope().groupValues)) {
       return Promise.resolve(this.loadTarget()).then((target) => target.length);
-    } else if (
-      !(this.associationScope() as { distinctValue?: boolean } | undefined)?.distinctValue &&
-      !isEmpty(this.target)
-    ) {
+    } else if (!this.associationScope().distinctValue && !isEmpty(this.target)) {
       const unsavedRecords = this.target.filter((record) => record.isNewRecord());
       return (this as unknown as { countRecords(): Promise<number> })
         .countRecords()

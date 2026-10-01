@@ -122,7 +122,7 @@ export class JoinAssociation extends JoinPart {
 
       joins.push(new joinType(table, new Nodes.On(nodes)));
 
-      if (others.length > 0) {
+      if (!isEmpty(others)) {
         const sources: Nodes.Node[] = [...arel.joinSources()] as Nodes.Node[];
         joins.push(...sources);
         const lastIdx = joins.length - 1;
