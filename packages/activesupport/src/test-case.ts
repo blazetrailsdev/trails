@@ -101,11 +101,20 @@ export class TestCase {
       if (test.failures.length > 0) throw test.failures[0];
     };
     const callSuper = (): unknown => {
-      timeHelpersAfterTeardown();
+      let raised: [unknown] | undefined;
+      try {
+        timeHelpersAfterTeardown();
+      } catch (e) {
+        raised = [e];
+      }
+      const afterSuper = (): void => {
+        if (raised) throw raised[0];
+        withoutAssertions();
+      };
       const result = (
         Object.getPrototypeOf(TestCase.prototype) as Partial<TestCase>
       ).afterTeardown?.call(this, test);
-      return result instanceof Promise ? result.then(withoutAssertions) : withoutAssertions();
+      return result instanceof Promise ? result.then(afterSuper) : afterSuper();
     };
     const result = setupAndTeardownAfterTeardown.call(this, test);
     return result instanceof Promise ? result.then(callSuper) : callSuper();

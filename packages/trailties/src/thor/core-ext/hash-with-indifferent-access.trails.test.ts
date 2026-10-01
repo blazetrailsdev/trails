@@ -32,21 +32,16 @@ describe("Thor::CoreExt::HashWithIndifferentAccess (trails)", () => {
     expect([...hash.keys()]).toEqual(["skipGit"]);
   });
 
-  it("raises FrozenError for a write to a frozen hash, by []= or by assignment", () => {
-    const hash = options<{ skipGit: boolean; force?: boolean }>({ skipGit: true }).freeze();
+  it("stores an assignment through []=, which raises FrozenError once the hash is frozen", () => {
+    const hash = options<{ skipGit: boolean; force?: boolean; quiet?: boolean }>({ skipGit: true });
+    (hash as { quiet?: boolean }).quiet = true;
+    expect([hash.get("quiet"), Object.keys(hash)]).toEqual([true, []]);
 
+    hash.freeze();
     expect(() => hash.set("force", true)).toThrow(FrozenError);
     expect(() => {
       (hash as { force?: boolean }).force = true;
     }).toThrow(FrozenError);
-    expect(hash.key("force")).toBe(false);
-  });
-
-  it("stores an assigned property as a key", () => {
-    const hash = options<{ force?: boolean }>({});
-    (hash as { force?: boolean }).force = true;
-
-    expect(hash.get("force")).toBe(true);
-    expect(Object.keys(hash)).toEqual([]);
+    expect(hash.hasKey("force")).toBe(false);
   });
 });

@@ -76,7 +76,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return slice(this, ...keys.map((key) => this.convertKey(key)));
   }
 
-  key(key: string): boolean {
+  hasKey(key: string): boolean {
     return super.has(this.convertKey(key));
   }
 

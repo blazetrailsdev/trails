@@ -391,66 +391,53 @@ describe("Hash#default", () => {
     expect(copy.default()).toBeUndefined();
   });
 
-  it("dups a Hash subclass into its own class without going through its []=, as rb_hash_dup does", () => {
-    class Upcased extends Hash<string, number> {
-      override set(key: string, value: number): this {
-        return super.set(key.toUpperCase(), value);
-      }
+  class Upcased extends Hash<string, number> {
+    override set(key: string, value: number): this {
+      return super.set(key.toUpperCase(), value);
     }
+  }
+
+  it("dups a Hash subclass into its own class without going through its []=, as rb_hash_dup does", () => {
     const hash = new Upcased();
     Hash.prototype.set.call(hash, "a", 1);
 
-    const copy = dup(hash);
-    expect(copy).toBeInstanceOf(Upcased);
-    expect([...copy]).toEqual([["a", 1]]);
+    expect(dup(hash)).toBeInstanceOf(Upcased);
+    expect([...dup(hash)]).toEqual([["a", 1]]);
     expect(hash.toH().constructor).toBe(Hash);
   });
 
   it("replaces the table and the default without going through a subclass's []=, as rb_hash_replace does", () => {
-    class Upcased extends Hash<string, number> {
-      override set(key: string, value: number): this {
-        return super.set(key.toUpperCase(), value);
-      }
-    }
-    const hash = new Upcased();
-    hash.set("stale", 0);
-    const other = new Hash<string, number>(7);
-    other.set("a", 1);
+    const hash = new Upcased().set("stale", 0);
+    const other = new Hash<string, number>(7).set("a", 1);
 
     expect(hash.replace(other)).toBe(hash);
-    expect([...hash]).toEqual([["a", 1]]);
-    expect(hash.default()).toBe(7);
+    expect([[...hash], hash.default()]).toEqual([[["a", 1]], 7]);
     expect([...hash.replace({ b: 2 })]).toEqual([["b", 2]]);
     expect(() => hash.freeze().replace(other)).toThrow(FrozenError);
   });
 
-  it("slices a Hash into a bare Hash of the keys it holds, in argument order", () => {
-    const hash = new Hash<string, number>();
-    hash.set("a", 1).set("b", 2);
+  it("slices and updates a Hash receiver, the conflict block included", () => {
+    const hash = new Hash<string, number>().set("a", 1).set("b", 2);
 
     const result = slice(hash, "b", "missing", "a");
-    expect(result.constructor).toBe(Hash);
-    expect([...result]).toEqual([
-      ["b", 2],
-      ["a", 1],
+    expect([result.constructor, [...result]]).toEqual([
+      Hash,
+      [
+        ["b", 2],
+        ["a", 1],
+      ],
     ]);
-  });
-
-  it("updates a Hash receiver through its own []=, conflict block included", () => {
-    const hash = new Hash<string, number>();
-    hash.set("a", 1);
-
-    expect(update(hash, { a: 2, b: 3 })).toBe(hash);
-    expect([...hash]).toEqual([
-      ["a", 2],
-      ["b", 3],
-    ]);
+    expect(update(hash, { a: 2, c: 3 })).toBe(hash);
     update(
       hash,
       new Map([["a", 10]]),
       block((_key: string, oldValue: number, newValue: number) => oldValue + newValue),
     );
-    expect(hash.get("a")).toBe(12);
+    expect([...hash]).toEqual([
+      ["a", 12],
+      ["b", 2],
+      ["c", 3],
+    ]);
   });
 
   it("dups a plain object into a new object", () => {

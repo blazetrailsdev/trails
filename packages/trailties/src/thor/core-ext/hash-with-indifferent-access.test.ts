@@ -62,10 +62,10 @@ describe("Thor::CoreExt::HashWithIndifferentAccess", () => {
   });
 
   it("has key checkable by either strings or symbols", () => {
-    expect(hash.key("foo")).toBe(true);
-    expect(hash.key(":foo")).toBe(true);
-    expect(hash.key("nothing")).toBe(false);
-    expect(hash.key(":nothing")).toBe(false);
+    expect(hash.hasKey("foo")).toBe(true);
+    expect(hash.hasKey(":foo")).toBe(true);
+    expect(hash.hasKey("nothing")).toBe(false);
+    expect(hash.hasKey(":nothing")).toBe(false);
   });
 
   it("handles magic boolean predicates", () => {

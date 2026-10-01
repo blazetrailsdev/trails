@@ -1,5 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 
+const travelBack = vi.hoisted(() => ({ raises: null as Error | null }));
+vi.mock("./time-helpers.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./time-helpers.js")>();
+  return {
+    ...original,
+    afterTeardown: () => {
+      if (travelBack.raises) throw travelBack.raises;
+      original.afterTeardown();
+    },
+  };
+});
+
 import { Assertion, UnexpectedError } from "./assertions.js";
 import { afterTeardown, beforeSetup, prepended, setup, teardown } from "./setup-and-teardown.js";
 import {
@@ -144,52 +156,82 @@ describe("TestCase lifecycle hooks", () => {
     ChildTest.setup(function (this: ChildTest) {
       this.ran.push("child");
     });
-
     const parent = new ParentTest("a test");
     const child = new ChildTest("a test");
     parent.beforeSetup();
     child.beforeSetup();
-
     expect(parent.ran).toEqual(["parent"]);
     expect(child.ran).toEqual(["parent", "child"]);
   });
 
-  it("reaches a module included beneath the class through super, before the setup chain", async () => {
-    class FixturesTest extends TestCase {}
-    const ran: string[] = [];
+  const running = (): RunningTest => ({
+    assertions: 1,
+    skipped: false,
+    error: false,
+    name: "a test",
+    sourceLocation: ["some_test.ts", 12],
+    failures: [],
+  });
+
+  async function includedBeneath(
+    klass: typeof TestCase,
+    ran: string[],
+    block: () => unknown,
+  ): Promise<void> {
     const Fixtures = new Module();
-    Fixtures.defineMethod("beforeSetup", async function (this: object) {
+    Fixtures.defineMethod("beforeSetup", async () => {
       await Promise.resolve();
       ran.push("before_setup");
-      return Fixtures.superMethod(this, "beforeSetup")?.();
     });
-    Fixtures.defineMethod("afterTeardown", async function () {
-      await Promise.resolve();
-      ran.push("after_teardown");
-    });
-    const proto = TestCase.prototype;
+    Fixtures.defineMethod("afterTeardown", () => ran.push("after_teardown"));
+    const proto = klass.prototype;
     const parent = Object.getPrototypeOf(proto);
-    include(TestCase, Fixtures);
+    include(klass, Fixtures);
     try {
-      FixturesTest.setup(() => ran.push("setup"));
-      FixturesTest.teardown(async () => {
-        await Promise.resolve();
-        ran.push("teardown");
-      });
-      const instance = new FixturesTest("a test");
-      await instance.beforeSetup();
-      await instance.afterTeardown({
-        assertions: 1,
-        skipped: false,
-        error: false,
-        name: "a test",
-        sourceLocation: ["some_test.ts", 12],
-        failures: [],
-      });
+      await block();
     } finally {
       Object.setPrototypeOf(proto, parent);
     }
+  }
 
+  it("reaches a module included beneath the class through super, before the setup chain", async () => {
+    class FixturesTest extends TestCase {}
+    const ran: string[] = [];
+    FixturesTest.setup(() => ran.push("setup"));
+    FixturesTest.teardown(async () => {
+      await Promise.resolve();
+      ran.push("teardown");
+    });
+    await includedBeneath(TestCase, ran, async () => {
+      const instance = new FixturesTest("a test");
+      await instance.beforeSetup();
+      await instance.afterTeardown(running());
+    });
     expect(ran).toEqual(["before_setup", "setup", "teardown", "after_teardown"]);
+  });
+
+  it("records a rejected async teardown callback as a failure, then runs the hook beneath", async () => {
+    class RejectsTest extends TestCase {}
+    const raised = new TypeError("boom");
+    const ran: string[] = [];
+    RejectsTest.teardown(() => Promise.reject(raised));
+    const test = running();
+    await expect(
+      includedBeneath(TestCase, ran, () => new RejectsTest("a test").afterTeardown(test)),
+    ).rejects.toBeInstanceOf(UnexpectedError);
+    expect(ran).toEqual(["after_teardown"]);
+    expect(test.failures.map((failure) => (failure as UnexpectedError).error)).toEqual([raised]);
+  });
+
+  it("still runs the hook beneath when travel_back raises, then re-raises", async () => {
+    vi.resetModules();
+    const { TestCase: Reloaded } = await import("../test-case.js");
+    const ran: string[] = [];
+    travelBack.raises = new RangeError("travel_back");
+    await expect(
+      includedBeneath(Reloaded, ran, () => new Reloaded("a test").afterTeardown(running())),
+    ).rejects.toBe(travelBack.raises);
+    travelBack.raises = null;
+    expect(ran).toEqual(["after_teardown"]);
   });
 });
