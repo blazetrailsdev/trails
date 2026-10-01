@@ -81,7 +81,8 @@ describe("ACLogSubscriberTest", () => {
     oldEnableFragmentCacheLogging = caching.enableFragmentCacheLogging!;
     caching.enableFragmentCacheLogging = true;
 
-    controller = new TestCase(LogSubscribersController);
+    controller = new TestCase();
+    controller.controller = new LogSubscribersController();
 
     await controller.beforeSetup();
     const controllerClass = LogSubscribersController as unknown as CachingClassMethods;

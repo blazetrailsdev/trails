@@ -6,6 +6,7 @@ import {
   Delegation as ActiveSupportDelegation,
   inGroups,
   inGroupsOf,
+  isPlainObject,
   publicInstanceMethods,
   split,
   toSentence,
@@ -167,13 +168,10 @@ export class ClassSpecificRelation {
   }
 }
 
-export function create(
-  this: FamilyCtor,
-  model: typeof Base,
-  kwargs: { table?: any; predicateBuilder?: any } = {},
-): any {
-  const { table, predicateBuilder } = kwargs;
-  return new (relationClassFor.call(this, model))(model, table, predicateBuilder);
+export function create(this: FamilyCtor, model: typeof Base, ...args: any[]): any {
+  const [kwargs] = args;
+  if (isPlainObject(kwargs)) args = [kwargs.table, kwargs.predicateBuilder];
+  return new (relationClassFor.call(this, model))(model, ...args);
 }
 
 /** @internal */

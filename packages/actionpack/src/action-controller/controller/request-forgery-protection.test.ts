@@ -108,7 +108,8 @@ describe("ActionController::RequestForgeryProtection", () => {
   let oldRequestForgeryProtectionToken: string | null;
 
   beforeEach(async () => {
-    tc = new TestCase(RequestForgeryProtectionControllerUsingResetSession);
+    tc = new TestCase();
+    tc.controller = new RequestForgeryProtectionControllerUsingResetSession();
     await tc.beforeSetup();
     oldRequestForgeryProtectionToken = Base.requestForgeryProtectionToken;
     Base.requestForgeryProtectionToken = "custom_authenticity_token";
@@ -346,7 +347,8 @@ describe("ActionController::RequestForgeryProtection", () => {
 
 describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
   it("raised exception message explains why it occurred", async () => {
-    const tc = new TestCase(RequestForgeryProtectionControllerUsingException);
+    const tc = new TestCase();
+    tc.controller = new RequestForgeryProtectionControllerUsingException();
     await tc.beforeSetup();
     const oldRequestForgeryProtectionToken = Base.requestForgeryProtectionToken;
     const oldSetting = Base.forgeryProtectionOriginCheck;
@@ -390,7 +392,8 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
     let oldRequestForgeryProtectionToken: string | null;
 
     beforeEach(async () => {
-      tc = new TestCase(RequestForgeryProtectionControllerUsingException);
+      tc = new TestCase();
+      tc.controller = new RequestForgeryProtectionControllerUsingException();
       await tc.beforeSetup();
       oldRequestForgeryProtectionToken = Base.requestForgeryProtectionToken;
       Base.requestForgeryProtectionToken = "custom_authenticity_token";
@@ -506,7 +509,8 @@ describe("RequestForgeryProtectionControllerUsingNullSessionTest", () => {
   it.skip("should allow to set encrypted cookies", () => {});
 
   it("should allow reset_session", async () => {
-    const tc = new TestCase(RequestForgeryProtectionControllerUsingNullSession);
+    const tc = new TestCase();
+    tc.controller = new RequestForgeryProtectionControllerUsingNullSession();
     await tc.beforeSetup();
     await tc.post("tryToResetSession");
     tc.assertResponse("ok");
@@ -520,7 +524,8 @@ describe("CustomAuthenticityParamControllerTest", () => {
   let oldRequestForgeryProtectionToken: string | null;
 
   beforeEach(async () => {
-    tc = new TestCase(CustomAuthenticityParamController);
+    tc = new TestCase();
+    tc.controller = new CustomAuthenticityParamController();
     await tc.beforeSetup();
     oldLogger = Base.logger;
     logger = new MockLogger();
@@ -613,7 +618,8 @@ describe("PrependProtectForgeryBaseControllerTest", () => {
 
 describe("FreeCookieControllerTest", () => {
   it("should allow all methods without token", async () => {
-    const tc = new TestCase(FreeCookieController);
+    const tc = new TestCase();
+    tc.controller = new FreeCookieController();
     await tc.beforeSetup();
     for (const method of ["post", "patch", "put", "delete"] as const) {
       await tc[method]("index");

@@ -1066,6 +1066,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   /** @internal */
   _materializeDeferredDistinctPkPredicates(): Promise<void> | void {
+    if (this.isNullRelation()) return;
     const predicates = this.whereClause.predicates;
     if (
       !predicates.some((node) => node instanceof DeferredIdsNotIn || node instanceof DeferredIdsIn)
@@ -1076,11 +1077,23 @@ export class Relation<T extends Base, G extends boolean = false> {
       for (let i = 0; i < predicates.length; i++) {
         const node = predicates[i];
         if (node instanceof DeferredIdsNotIn || node instanceof DeferredIdsIn) {
-          const attribute = node.left as Arel.Attribute;
           const ids: unknown[] = [];
           for (const rel of node.innerRelations) {
             ids.push(...(await rel.ids()));
           }
+          if (node.left instanceof Nodes.Grouping) {
+            const key = (node.left.expr as Arel.Attribute[]).map((attribute) => attribute.name);
+            const clause = new WhereClause(
+              this.predicateBuilder.buildFromHash(new Map([[key, ids]])),
+            );
+            const built = (node instanceof DeferredIdsNotIn ? clause.invert() : clause).predicates;
+            const at = predicates.indexOf(node);
+            if (at === -1) continue;
+            predicates.splice(at, 1, ...built);
+            i = at + built.length - 1;
+            continue;
+          }
+          const attribute = node.left as Arel.Attribute;
           const built = this.predicateBuilder.build(attribute, ids);
           predicates[i] = node instanceof DeferredIdsNotIn ? built.invert() : built;
         }

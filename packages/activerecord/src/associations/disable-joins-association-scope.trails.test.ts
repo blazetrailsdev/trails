@@ -111,7 +111,8 @@ describe("DisableJoinsAssociationScope", () => {
       reflection,
       klass: reflection.klass,
     }) as DisableJoinsAssociationRelation<Base>;
-    expect(built).toBeInstanceOf(DisableJoinsAssociationRelation);
+    expect(built).not.toBeInstanceOf(DisableJoinsAssociationRelation);
+    expect(built.toSql()).toMatch(/djs_post_id\W+IN \(SELECT \W?djs_posts\W+id\W+FROM/);
 
     const records = await built;
     expect(records.map((r: any) => r.body).sort()).toEqual(["c1", "c2"]);
@@ -205,6 +206,11 @@ describe("DisableJoinsAssociationScope", () => {
       klass: reflection.klass,
     }) as DisableJoinsAssociationRelation<Base>;
 
+    await expect(built.limit(-1)).rejects.toThrow("attempt to take negative size");
+    await expect(built.limit(NaN)).rejects.toThrow("float NaN out of range of integer");
+    await expect(built.first(1)).rejects.toThrow(
+      "undefined method 'limit' for an instance of Array",
+    );
     const limited = built.limit(1) as Promise<Base[]> | DisableJoinsAssociationRelation<Base>;
     const records = await limited;
     expect(records.length).toBe(1);
@@ -248,15 +254,8 @@ describe("DisableJoinsAssociationScope", () => {
     expect(viaToArray.isLoaded).toBe(true);
   });
   it("a malformed composite join id raises the predicate builder's Array expectation", () => {
-    const reflection = { klass: DjsPost, buildScope: () => DjsPost.all(), constraints: () => [] };
-    expect(() =>
-      (DisableJoinsAssociationScope.create() as any)._addConstraintsDj(
-        reflection,
-        ["djs_author_id", "title"],
-        [1],
-        null,
-        false,
-      ),
-    ).toThrow('Expected corresponding value for ["djs_author_id", "title"] to be an Array');
+    expect(() => DjsPost.where(new Map([[["djs_author_id", "title"], [1]]]))).toThrow(
+      'Expected corresponding value for ["djs_author_id", "title"] to be an Array',
+    );
   });
 });

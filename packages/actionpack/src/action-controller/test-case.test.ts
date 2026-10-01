@@ -80,7 +80,8 @@ describe("TestCase class helpers", () => {
   it("controllerClassName returns the controller's path", () => {
     class Sub extends TestCase {}
     Sub.tests(PostsController);
-    const tc = new Sub(PostsController);
+    const tc = new Sub();
+    tc.setupControllerRequestAndResponse();
     expect(tc.controllerClassName()).toBe("posts");
   });
 

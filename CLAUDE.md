@@ -777,6 +777,14 @@ counterpart for:
   carrying the thunks, and `Relation#_materializeDeferredDistinctPkPredicates`
   drains them on the way to SQL. The pair exists so `invert()` keeps working
   (`WhereClause#invert`) while the ids are still unresolved.
+  `DisableJoinsAssociationScope#last_scope_chain`
+  (`associations/disable_joins_association_scope.rb:22-34`) is the third site:
+  its `record_ids = records.pluck(foreign_key)` is a `DeferredPluck`, which
+  `where(key => join_ids)` parks as a `DeferredIdsIn` (over a `Grouping` of
+  attributes for a composite key) and which
+  `DisableJoinsAssociationRelation#ids` awaits. So `scope` stays synchronous
+  and the relation it returns has Rails' one `(klass, key, ids)` mode; the
+  plucks run when that relation first reaches SQL, not at scope build.
 - **The synchronous eager builders behind `toSql`** — `Relation#toSql`,
   `_buildEagerOperandManager`, `_applyEagerJoinDependency`,
   `_materializeDeferredDistinctPkPredicates` (all `relation.ts`), and the

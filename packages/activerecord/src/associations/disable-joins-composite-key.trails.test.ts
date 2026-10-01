@@ -117,6 +117,7 @@ describe("DJAS — composite key support", () => {
       const reflection = (CkShop as any)._reflectOnAssociation("ckLineItemsThroughOrders");
       const items = (await shop.association("ckLineItemsThroughOrders").loadTarget()) as Base[];
       expect(items.map((i: any) => i.sku).sort()).toEqual(["sku-1", "sku-2"]);
+      expect(await shop.association("ckLineItemsThroughOrders").scope().invertWhere()).toEqual([]);
     } finally {
       Notifications.unsubscribe(sub);
     }
@@ -255,21 +256,5 @@ describe("DJAS — composite key support", () => {
     );
     expect(await djar.ids()).toEqual([[1n, 100n]]);
     await expect(djar.toArray()).resolves.toEqual([]);
-  });
-
-  it("DisableJoinsAssociationRelation key normalization: single-element array collapses to string", async () => {
-    const djarTuples = new DisableJoinsAssociationRelation(CkLineItem, ["sku"], [["a"], ["b"]]);
-    expect(djarTuples.key).toBe("sku");
-    expect(await djarTuples.ids()).toEqual(["a", "b"]);
-
-    const djar = new DisableJoinsAssociationRelation(
-      CkLineItem,
-      ["ck_order_shop_id", "ck_order_number"],
-      [[1, 100]],
-    );
-    const returned = (await djar.ids()) as unknown[][];
-    returned.push([999, 999]);
-    returned[0][1] = 42;
-    expect(await djar.ids()).toEqual([[1, 100]]);
   });
 });

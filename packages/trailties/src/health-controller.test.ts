@@ -10,7 +10,8 @@ describe("HealthController", () => {
   it("health controller renders green success page", async () => {
     class HealthControllerTest extends ActionController.TestCase {}
     HealthControllerTest.tests(HealthController);
-    const t = new HealthControllerTest(HealthController);
+    const t = new HealthControllerTest();
+    await t.beforeSetup();
     t.routes = new RouteSet();
     t.routes.draw(function () {
       this.get("/up", { to: "rails/health#show", as: "rails_health_check" });
@@ -28,7 +29,8 @@ describe("HealthController", () => {
     }
     class HealthControllerTest extends ActionController.TestCase {}
     HealthControllerTest.tests(FailingController);
-    const t = new HealthControllerTest(FailingController);
+    const t = new HealthControllerTest();
+    await t.beforeSetup();
     t.routes = new RouteSet();
     t.routes.draw(function () {
       this.get("/up", { to: "rails/health#show", as: "rails_health_check" });

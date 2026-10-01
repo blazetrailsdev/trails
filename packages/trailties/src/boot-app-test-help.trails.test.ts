@@ -71,7 +71,7 @@ describe("test_help wires a booted app into the test case classes", () => {
       const session = testCase as BootAppIntegrationTest;
       expect(session.routes).toBe(Trails.application!.routes());
 
-      const controllerTest = new ActionController.TestCase(ActionController.Base) as unknown as {
+      const controllerTest = new ActionController.TestCase() as unknown as {
         routes?: unknown;
         beforeSetup(): void;
       };
@@ -110,7 +110,8 @@ describe("test_help wires a booted app into the test case classes", () => {
   it("renders a view through ActionController::TestCase", async () => {
     const { PostsController } =
       await import("./__fixtures__/boot-app/app/controllers/posts-controller.js");
-    const controllerTest = new ActionController.TestCase(PostsController);
+    const controllerTest = new ActionController.TestCase();
+    controllerTest.controller = new PostsController();
     await controllerTest.beforeSetup();
     await controllerTest.get("show");
     expect(controllerTest.response.status).toBe(200);

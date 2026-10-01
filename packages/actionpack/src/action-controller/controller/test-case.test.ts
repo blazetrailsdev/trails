@@ -119,10 +119,12 @@ class PostsController extends Base {
 }
 
 describe("TestCaseTest", () => {
+  class PostsControllerTest extends TestCase {}
+  PostsControllerTest.tests(PostsController);
   let tc: TestCase;
 
   beforeEach(async () => {
-    tc = new TestCase(PostsController);
+    tc = new PostsControllerTest();
     await tc.beforeSetup();
   });
 
@@ -399,7 +401,8 @@ describe("TestCaseTest", () => {
         }
       }
 
-      const mtc = new TestCase(SimpleMetal);
+      const mtc = new TestCase();
+      mtc.controller = new SimpleMetal();
       await mtc.beforeSetup();
       await mtc.get("index");
       expect(mtc.responseBody).toBe("metal response");
@@ -635,7 +638,7 @@ describe("TestCaseTest", () => {
     tc.assertRouting(...args);
 
   beforeEach(async () => {
-    tc = new TestCaseTest(TestController);
+    tc = new TestCaseTest();
     await tc.beforeSetup();
     tc.setup();
   });

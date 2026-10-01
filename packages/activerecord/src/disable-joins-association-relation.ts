@@ -1,267 +1,81 @@
 import { Relation, type LoadedRelation } from "./relation.js";
 import { ActiveRecord } from "./namespaces.js";
 import { relationClassFor } from "./relation/delegation.js";
-import { rbEql, rbHash, uniq } from "@blazetrails/ruby-compat";
+import { rbEql, rbFSend, rbHash, take, uniq } from "@blazetrails/ruby-compat";
 import { stripThenable } from "./relation/thenable.js";
 import type { Base } from "./base.js";
-import type * as Arel from "@blazetrails/arel";
-import type { Nodes } from "@blazetrails/arel";
 
 export type DjarKey = string | string[];
-export type DjarIds = unknown[] | unknown[][];
+export type DjarIds = unknown[] | PromiseLike<unknown[]>;
 
 export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T, boolean> {
   /** @internal */
   static override _railsClassName = "ActiveRecord::DisableJoinsAssociationRelation";
 
   readonly key: DjarKey;
-  private _storedIds: DjarIds;
-  private _composite: boolean;
-  private _chainWalker?: () => Promise<{ relation: Relation<T> }>;
-  private _walkPromise?: Promise<{ relation: Relation<T> }>;
+  private readonly _ids: DjarIds;
 
-  constructor(klass: typeof Base, key: string, ids: unknown[]);
-  constructor(klass: typeof Base, key: string[], ids: unknown[][]);
   constructor(klass: typeof Base, key: DjarKey, ids: DjarIds) {
     super(klass);
-    let normalizedKey: DjarKey = key;
-    let normalizedIds: DjarIds = ids;
-    if (Array.isArray(key) && key.length === 1) {
-      normalizedKey = key[0];
-      normalizedIds = (ids as unknown[]).map((id) => (Array.isArray(id) ? id[0] : id));
-    }
-    this.key = normalizedKey;
-    this._composite = Array.isArray(normalizedKey);
-    this._storedIds = uniq(normalizedIds as unknown[]) as DjarIds;
+    this._ids = ids;
+    this.key = key;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE converge-djar-deferred-chain-walk-mode */
-  static deferred<T extends Base>(
-    klass: typeof Base,
-    chainWalker: () => Promise<{ relation: Relation<T> }>,
-  ): DisableJoinsAssociationRelation<T> {
-    const Ctor = relationClassFor.call(DisableJoinsAssociationRelation, klass);
-    const relation = new Ctor(klass, "", []) as DisableJoinsAssociationRelation<T>;
-    relation._chainWalker = chainWalker;
-    return relation;
-  }
-
-  private _composeChainedState(walkerResult: Relation<T>): Relation<T> {
-    type ComposeFields = {
-      orderValues?: unknown[];
-      selectValues?: unknown[];
-    };
-    const source = walkerResult as unknown as ComposeFields;
-    const sourceOrders = [...(source.orderValues ?? [])];
-    const sourceSelects = [...(source.selectValues ?? [])];
-
-    const merged = (walkerResult as unknown as { merge: (o: unknown) => Relation<T> }).merge(this);
-    const target = merged as unknown as ComposeFields;
-    const overlay = this as unknown as ComposeFields & { reorderingValue?: boolean };
-    const overlayOrders = overlay.orderValues ?? [];
-    const overlaySelects = overlay.selectValues ?? [];
-    const isReordering = overlay.reorderingValue ?? false;
-
-    if (isReordering) {
-      target.orderValues = [...overlayOrders];
-    } else {
-      target.orderValues = [...sourceOrders, ...overlayOrders];
-    }
-
-    if (sourceSelects && sourceSelects.length > 0) {
-      target.selectValues = Array.from(new Set([...sourceSelects, ...overlaySelects]));
-    }
-
-    return merged;
-  }
-
-  override async ids(): Promise<DjarIds> {
-    if (this._chainWalker) {
-      const { relation } = await this._walkOnce();
-      const merged = this._composeChainedState(relation);
-      return (merged as unknown as { ids: () => Promise<DjarIds> }).ids();
-    }
-    if (this._composite) {
-      return (this._storedIds as unknown[][]).map((t) => Array.from(t));
-    }
-    return (this._storedIds as unknown[]).slice();
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-djar-deferred-chain-walk-mode */
-  async count(column?: string): Promise<number | Map<unknown, number>> {
-    if (this._chainWalker) {
-      const { relation } = await this._walkOnce();
-      const merged = this._composeChainedState(relation);
-      return (
-        merged as unknown as {
-          count: (col?: string) => Promise<number | Map<unknown, number>>;
-        }
-      ).count(column);
-    }
-    const baseCount = (
-      Relation.prototype as unknown as {
-        count: (this: unknown, col?: string) => Promise<number | Map<unknown, number>>;
-      }
-    ).count;
-    return baseCount.call(this, column);
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-djar-deferred-chain-walk-mode */
-  override async calculate(
-    operation: "count",
-    column?: string,
-  ): Promise<number | Map<unknown, number>>;
-  override async calculate(
-    operation: "sum",
-    column: string | Nodes.Node | number | null,
-  ): Promise<number | bigint | Map<unknown, number | bigint>>;
-  override async calculate(
-    operation: "average" | "minimum" | "maximum",
-    column: string,
-  ): Promise<unknown | null | Map<unknown, unknown>>;
-  override async calculate(
-    operation: string,
-    columnName?: string | Nodes.Node | number | null,
-  ): Promise<unknown>;
-  override async calculate(
-    operation: string,
-    columnName?: string | Nodes.Node | number | null,
-  ): Promise<unknown> {
-    if (this._chainWalker && !(this as unknown as { _isNone: boolean })._isNone) {
-      const { relation } = await this._walkOnce();
-      const merged = this._composeChainedState(relation);
-      return merged.calculate(operation, columnName as string);
-    }
-    return (
-      Relation.prototype as unknown as {
-        calculate: (
-          this: unknown,
-          operation: string,
-          columnName?: string | Nodes.Node | number | null,
-        ) => Promise<unknown>;
-      }
-    ).calculate.call(this, operation, columnName);
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE converge-djar-deferred-chain-walk-mode */
-  override async pluck(
-    ...columnNames: Array<string | Arel.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
-  ): Promise<unknown[]> {
-    if (this._chainWalker && !(this as unknown as { _isNone: boolean })._isNone) {
-      const { relation } = await this._walkOnce();
-      const merged = this._composeChainedState(relation);
-      return merged.pluck(...columnNames);
-    }
-    return (
-      Relation.prototype as unknown as {
-        pluck: (
-          this: unknown,
-          ...columnNames: Array<string | Arel.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
-        ) => Promise<unknown[]>;
-      }
-    ).pluck.call(this, ...columnNames);
-  }
-
-  private _walkOnce(): Promise<{ relation: Relation<T> }> {
-    if (!this._walkPromise) {
-      this._walkPromise = this._chainWalker!();
-    }
-    return this._walkPromise;
+  override async ids(): Promise<unknown[]> {
+    return uniq(await this._ids);
   }
 
   /**
    * @internal
-   * @noRailsEquivalent PERMANENT
+   * @noRailsEquivalent CONVERGEABLE relation-subclasses-inherit-clone-without-overrides
    */
   override clone(): Relation<T> {
     const Ctor = relationClassFor.call(DisableJoinsAssociationRelation, this.model);
-    const copy = new Ctor(this.model, this.key, []) as DisableJoinsAssociationRelation<T>;
-    copy._adoptNormalizedState(this);
-    const rel = copy as unknown as Relation<T>;
+    const rel = new Ctor(this.model, this.key, this._ids) as Relation<T>;
     rel.initializeCopy(this as unknown as Relation<T>);
     return rel;
   }
 
-  private _adoptNormalizedState(source: DisableJoinsAssociationRelation<T>): void {
-    this._composite = source._composite;
-    this._storedIds = source._storedIds;
-    this._chainWalker = source._chainWalker;
-  }
-
-  protected override async execQueries(block?: (record: T) => void): Promise<T[]> {
-    if (this._chainWalker) {
-      const { relation } = await this._walkOnce();
-      const merged = this._composeChainedState(relation);
-      if (merged instanceof DisableJoinsAssociationRelation && !merged._chainWalker) {
-        const bounds = merged as unknown as {
-          limitValue?: number | null;
-          offsetValue?: number | null;
-        };
-        const limitVal = bounds.limitValue ?? null;
-        const offsetVal = bounds.offsetValue ?? null;
-        if (limitVal !== null || offsetVal !== null) {
-          bounds.limitValue = null;
-          bounds.offsetValue = null;
-          const ordered = await merged;
-          const start = offsetVal ?? 0;
-          return ordered.slice(start, limitVal == null ? undefined : start + limitVal);
-        }
-      }
-      return merged.toArray();
-    }
-    return super.execQueries(block);
-  }
-
-  override async load(block?: (record: T) => void): Promise<LoadedRelation<this>> {
-    await super.load(block);
-    if (this._chainWalker) return stripThenable(this);
-    const records = this._records;
-
-    const keyCols = Array.isArray(this.key) ? this.key : [this.key];
-    const composite = this._composite;
-    const recordKey = (record: T): unknown =>
-      composite ? keyCols.map((c) => record._readAttribute(c)) : record._readAttribute(keyCols[0]);
-
-    const recordsById = new Map<number, T[]>();
-    for (const record of records) {
-      const k = rbHash(recordKey(record));
-      const bucket = recordsById.get(k);
-      if (bucket) bucket.push(record);
-      else recordsById.set(k, [record]);
-    }
-
-    const ordered = (this._storedIds as unknown[]).flatMap((id) =>
-      (recordsById.get(rbHash(id)) ?? []).filter((record) => rbEql(recordKey(record), id)),
-    );
-
-    this._records = ordered;
-    return stripThenable(this);
-  }
-
-  /** @missingRailsCall take — PERMANENT */
-  // @ts-expect-error — deliberate Rails-fidelity deviation in loaded-chain mode: returns Array, not Relation
-  override limit(value: number | null): Relation<T> | Promise<T[]> {
-    if (this._chainWalker) return Relation.prototype.limit.call(this, value) as Relation<T>;
-    return (async () => {
-      const records = await this.toArray();
-      return value === null ? records : records.slice(0, value);
-    })();
+  // @ts-expect-error — Rails' override returns an Array, not a Relation (activerecord/lib/active_record/disable_joins_association_relation.rb:13-15)
+  override async limit(value: number | null): Promise<T[]> {
+    const records = await this.toArray();
+    return take(records, value as number);
   }
 
   override first(): Promise<T | null>;
   override first(n: number): Promise<T[]>;
-  /**
-   * @missingRailsCall limit — PERMANENT
-   * @missingRailsArgs first — CONVERGEABLE converge-djar-deferred-chain-walk-mode
-   */
+  /** @missingRailsCall limit — PERMANENT */
   override async first(limit?: number): Promise<T | T[] | null> {
-    if (this._chainWalker) {
-      const { relation } = await this._walkOnce();
-      const merged = this._composeChainedState(relation);
-      return limit === undefined ? merged.first() : merged.first(limit);
-    }
     const records = await this.toArray();
-    return limit === undefined ? (records[0] ?? null) : records.slice(0, limit);
+    if (limit != null) {
+      return (rbFSend(records, "limit", limit) as Relation<T>).first();
+    } else {
+      return records[0] ?? null;
+    }
+  }
+
+  override async load(block?: (record: T) => void): Promise<LoadedRelation<this>> {
+    await super.load(block);
+    const records = this._records;
+
+    const key = this.key;
+    const recordKey = (record: T): unknown =>
+      Array.isArray(key)
+        ? key.map((column) => record._readAttribute(column))
+        : record._readAttribute(key);
+
+    const recordsById = new Map<number, T[]>();
+    for (const record of records) {
+      const hash = rbHash(recordKey(record));
+      const bucket = recordsById.get(hash);
+      if (bucket) bucket.push(record);
+      else recordsById.set(hash, [record]);
+    }
+
+    this._records = (await this.ids()).flatMap((id) =>
+      (recordsById.get(rbHash(id)) ?? []).filter((record) => rbEql(recordKey(record), id)),
+    );
+    return stripThenable(this);
   }
 }
 

@@ -23,7 +23,7 @@ describe("InfoControllerTest", () => {
   const get = (action: string, options: { params?: Record<string, unknown> } = {}) =>
     tc.get(action, { ...options, env: { REMOTE_ADDR: remoteAddr } });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     Trails.application = InfoControllerTestApp.instance();
     const routes = Trails.application.routes() as unknown as RouteSet;
     routes.clearBang();
@@ -43,7 +43,9 @@ describe("InfoControllerTest", () => {
 
     include(InfoController, routes.urlHelpers());
 
-    tc = new TestCase(InfoController);
+    tc = new TestCase();
+    tc.controller = new InfoController();
+    await tc.beforeSetup();
     tc.routes = routes;
     remoteAddr = "127.0.0.1";
     Info.properties = new PropertyList();

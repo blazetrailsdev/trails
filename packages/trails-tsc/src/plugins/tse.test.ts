@@ -337,6 +337,18 @@ describe("virtualizeTse", () => {
       expect(diagnose(virtualizeTse("<%= readingTime(this.posts.length) %>", scope))).toEqual([]);
     });
 
+    it("keeps every overload of a this-typed helper callable bare", () => {
+      const overloaded = {
+        view: `{ ${["a: string", "a: number, b: boolean", "a: 1, b: 2, c: 3", "a: [], b: [], c: [], d: []", "a: null"].map((params, i) => `tag(this: { x: 1 }, ${params}): ${i}`).join("; ")}; posts: string[] }`,
+      };
+      const calls = 'tag("p")|tag(2, true)|tag(1, 2, 3)|tag([], [], [], [])|tag(null)'.split("|");
+      const body = calls.map((call, i) => `<% const r${i}: ${i} = ${call} %>`).join("");
+      expect(diagnose(virtualizeTse(body + "<%= posts.length %>", overloaded))).toEqual([]);
+      expect(diagnose(virtualizeTse("<%= tag(2) %>", overloaded))).not.toEqual([]);
+      const single = diagnose(virtualizeTse("<%= readingTime(post.title) %>", scope)).join("\n");
+      expect(single).not.toMatch(/No overload matches this call/);
+    });
+
     it("leaves an unknown name `any` without strict locals and `never` with them", () => {
       expect(diagnose(virtualizeTse("<%= mystery.anything() %>", scope))).toEqual([]);
       const strict = virtualizeTse("<%# locals: () %><%= mystery.anything() %>", scope);
