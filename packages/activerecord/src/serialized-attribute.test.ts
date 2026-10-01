@@ -2,7 +2,7 @@ import { rbInspect } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { ValueType, MissingAttributeError } from "@blazetrails/activemodel";
-import { Base, SerializationTypeMismatch } from "./index.js";
+import { Base, SerializationTypeMismatch, registerModel } from "./index.js";
 
 import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -58,6 +58,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { coder: MyObject });
       }
     }
+    registerModel(MyObjectTopic);
     const myobj = new MyObject("value1", "value2");
     const topic = await MyObjectTopic.create({ content: myobj as any });
     expect((topic as any).content).toEqual(myobj);
@@ -73,6 +74,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("object", { coder: MyObject });
       }
     }
+    registerModel(AliasTopic);
     const myobj = new MyObject("value1", "value2");
     const topic = (await AliasTopic.create({ object: myobj } as any)) as unknown as AliasTopic;
     expect((topic as any).object).toEqual(myobj);
@@ -87,6 +89,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { type: HashObject, default: { key: "value" } });
       }
     }
+    registerModel(DefaultTopic);
     const t = new DefaultTopic();
     expect((t as any).content).toEqual({ key: "value" });
   });
@@ -99,6 +102,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(CustomDefaultTopic);
     const t = new CustomDefaultTopic();
     expect((t as any).content).toEqual({ key: "value" });
   });
@@ -109,7 +113,9 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(HashContentTopic);
     class HashImportantTopic extends HashContentTopic {}
+    registerModel(HashImportantTopic);
     const hash = { content1: "value1", content2: "value2" };
     const topic = await HashImportantTopic.create({ content: hash as any });
     expect((topic as any).content).toEqual(hash);
@@ -123,7 +129,9 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(HashBaseTopic);
     class SubTopic extends HashBaseTopic {}
+    registerModel(SubTopic);
     const t = new SubTopic({ content: { foo: "bar" } } as any);
     expect((t as any).content).toEqual({ foo: "bar" });
     await t.save();
@@ -137,6 +145,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { coder: JSON });
       }
     }
+    registerModel(JsonTopic);
     const orig = new JsonTopic({ content: { foo: "bar" } } as any);
     const clone = orig.dup();
     expect((orig as any).content).toEqual((clone as any).content);
@@ -148,6 +157,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { coder: JSON });
       }
     }
+    registerModel(JsonTopic);
     const myPost = posts("welcome");
     const t = new JsonTopic({ content: myPost } as any);
     await t.save();
@@ -164,6 +174,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { coder: JSON });
       }
     }
+    registerModel(JsonTopic);
     const t = (await JsonTopic.create({ title: "test" } as any)) as unknown as InstanceType<
       typeof JsonTopic
     >;
@@ -181,6 +192,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { coder: JSON });
       }
     }
+    registerModel(JsonTopic);
     const t = await JsonTopic.create({ title: "test", content: "placeholder" as any });
     await ((await Base.leaseConnection()) as any).execute(
       `UPDATE topics SET content = NULL WHERE id = ${(t as any).id}`,
@@ -195,6 +207,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("important", { type: HashObject });
       }
     }
+    registerModel(LocalImportantTopic);
     const hash = { important1: "value1", important2: "value2" };
     const topic = await LocalImportantTopic.create({ important: hash as any });
     expect((topic as any).important).toEqual(hash);
@@ -209,6 +222,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { coder: JSON });
       }
     }
+    registerModel(JsonTopic);
     const myobj = new Date("2008-01-01T01:00:00Z").toISOString();
     const topic = await (await JsonTopic.create({ content: myobj as any })).reload();
     expect((topic as any).content).toEqual(myobj);
@@ -220,6 +234,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { coder: JSON });
       }
     }
+    registerModel(JsonTopic);
     const myobj = "Yes";
     const topic = await (await JsonTopic.create({ content: myobj as any })).reload();
     expect((topic as any).content).toEqual(myobj);
@@ -244,6 +259,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { coder: JSON });
       }
     }
+    registerModel(JsonTopic);
     expect(await new JsonTopic({ content: null } as any).save()).toBeTruthy();
     expect(await JsonTopic.where({ content: null }).count()).toEqual(1);
   });
@@ -254,6 +270,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(HashTopic);
     expect(await new HashTopic({ content: null } as any).save()).toBeTruthy();
     expect(await HashTopic.where({ content: null }).count()).toEqual(1);
   });
@@ -268,6 +285,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(FlexTopic);
     const topic = new FlexTopic({ content: { zomg: true } } as any);
     expect(await topic.save()).toBeTruthy();
     FlexTopic.serialize("content", { type: Array });
@@ -281,6 +299,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(HashTopic);
     const settings = { color: "blue" };
     const topic = new HashTopic({ content: settings } as any);
     expect(await topic.save()).toBeTruthy();
@@ -294,6 +313,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { type: Array });
       }
     }
+    registerModel(ArrayTopic);
     const settings = [{ color: "green" }];
     const topic = await ArrayTopic.create({ content: settings as any });
     const found = await ArrayTopic.where({ content: settings }).take();
@@ -306,6 +326,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(HashTopic);
     const settings = { color: "green" };
     const topic = await HashTopic.create({ content: settings as any });
     const found = await HashTopic.where({ content: settings }).take();
@@ -318,6 +339,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(HashTopic);
     const settings = { color: "green" };
     const topic = await HashTopic.create({ content: settings as any });
     const found = await HashTopic.where({ content: [settings, { herring: "red" }] }).take();
@@ -330,6 +352,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(HashTopic);
     const topic = new HashTopic();
     expect((topic as any).content.constructor).toEqual(Object);
     expect((topic as any).readAttribute("content").constructor).toEqual(Object);
@@ -351,6 +374,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { coder: JSON });
       }
     }
+    registerModel(JsonTopic);
     let topic: any = new JsonTopic({ content: true } as any);
     expect(await topic.save()).toBeTruthy();
     topic = await topic.reload();
@@ -363,6 +387,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { coder: JSON });
       }
     }
+    registerModel(JsonTopic);
     let topic: any = new JsonTopic({ content: false } as any);
     expect(await topic.save()).toBeTruthy();
     topic = await topic.reload();
@@ -385,6 +410,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { coder: someClass });
       }
     }
+    registerModel(CoderTopic);
     const topic = new CoderTopic({ content: { foo: "my value" } } as any);
     await topic.save();
     const reloaded = await CoderTopic.find(topic.id as number);
@@ -416,6 +442,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(FlexTopic);
     const topic = await FlexTopic.create({ content: { zomg: true } as any });
     FlexTopic.serialize("content", { type: Array });
     const reloaded = await FlexTopic.find(topic.id as number);
@@ -438,6 +465,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { coder: JSON });
       }
     }
+    registerModel(JsonTopic);
     const t = await JsonTopic.create({ content: "first" as any });
     expect((t as any).content).toBe("first");
     await t.updateColumn("content", ["second"]);
@@ -452,6 +480,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { coder: JSON });
       }
     }
+    registerModel(JsonTopic);
     const t = await JsonTopic.create({ content: "first" as any });
     expect((t as any).content).toBe("first");
     await t.updateAttribute("content", "second");
@@ -466,6 +495,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { type: Array });
       }
     }
+    registerModel(ArrayTopic);
     const topic = new ArrayTopic({ content: null } as any);
     expect(topic.attributeChanged("content")).toBeFalsy();
   });
@@ -480,6 +510,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(HashTopic);
     const topic = await HashTopic.create({ content: { things: "stuff" } as any });
     const reloaded = await HashTopic.find(topic.id as number);
     delete (reloaded as any).content["things"];
@@ -502,6 +533,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(HashTopic);
     const topic = await HashTopic.create({ content: {} as any });
     const topic2 = await HashTopic.create({ content: null as any });
     const found = await HashTopic.where({ content: null });
@@ -535,6 +567,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(HashTopic);
     const topic = await HashTopic.create({ content: { foo: "bar" } as any });
     await topic.updateAttribute("content", null);
     const found = await HashTopic.where({ content: null });
@@ -583,6 +616,7 @@ describe("SerializedAttributeTest", () => {
         this.serialize("content", { coder });
       }
     }
+    registerModel(CoderTopic);
     const topic = await CoderTopic.create({ content: "bar" as any });
     void (topic as any).content;
     expect(topic.isChanged).toBeFalsy();
@@ -602,6 +636,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
         this.serialize("content", { type: Array });
       }
     }
+    registerModel(ArrayTopic);
     const myobj = ["value1"];
     const topic = await ArrayTopic.create({ content: myobj as any });
     expect((topic as any).content).toEqual(myobj);
@@ -617,6 +652,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(DefaultTopic);
     const t = new DefaultTopic();
     expect((t as any).content).toEqual({ key: "value" });
   });
@@ -627,6 +663,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(HashTopic);
     const topic = await HashTopic.create({ content: { foo: "bar" } as any });
     await topic.updateAttribute("content", null);
     const found = await HashTopic.where({ content: null });
@@ -641,6 +678,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(DefaultTopic);
     const t = new DefaultTopic();
     expect((t as any).content).toEqual({ key: "value" });
   });
@@ -651,7 +689,9 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(HashBaseTopic);
     class SubTopic extends HashBaseTopic {}
+    registerModel(SubTopic);
     const t = new SubTopic({ content: { foo: "bar" } } as any);
     expect((t as any).content).toEqual({ foo: "bar" });
     await t.save();
@@ -667,6 +707,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
         this.serialize("object", { type: HashObject });
       }
     }
+    registerModel(AliasTopic);
     const myobj = { somevalue: "thevalue" };
     const topic = (await AliasTopic.create({ object: myobj } as any)) as unknown as AliasTopic;
     expect((topic as any).object).toEqual(myobj);
@@ -680,6 +721,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(FlexTopic);
     const topic = await FlexTopic.create({ content: { zomg: true } as any });
     FlexTopic.serialize("content", { type: Array });
     const reloaded = await FlexTopic.find(topic.id as number);
@@ -702,6 +744,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(HashTopic);
     const myobj = { somevalue: "thevalue" };
     const topic = await HashTopic.create({ content: myobj as any });
     const found = await HashTopic.select("id", "content").find(topic.id as number);
@@ -716,6 +759,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
         this.serialize("content", { type: HashObject });
       }
     }
+    registerModel(FlexTopic);
     const topic = new FlexTopic({ content: { somevalue: "thevalue" } } as any);
     expect(await topic.save()).toBeTruthy();
     FlexTopic.serialize("content", { type: Array });

@@ -7,6 +7,7 @@ import { Attributes, type AttributesClassHalf } from "../../attributes.js";
 import { Dirty } from "../../dirty.js";
 import { defineModelCallbacks } from "../../callbacks.js";
 import { hasSecurePassword } from "../../secure-password.js";
+import type { Password } from "../../bcrypt.js";
 
 const SecurePasswordModel = Model as unknown as {
   new (attributes?: Record<string, unknown>): Model & {
@@ -44,8 +45,8 @@ export class User extends SecurePasswordModel {
 }
 
 export interface User extends Attributes, Dirty {
-  password_digest: string | null;
-  recovery_password_digest: string | null;
+  password_digest: string | Password | null;
+  recovery_password_digest: string | Password | null;
   recovery_password: unknown;
   passwordConfirmation: unknown;
   passwordChallenge: unknown;

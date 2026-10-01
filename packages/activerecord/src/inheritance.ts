@@ -216,16 +216,16 @@ export function getStiBase(modelClass: object): typeof Base {
 }
 
 /** @internal */
-export function findStiClass(baseClass: typeof Base, typeName: string): typeof Base {
-  typeName = baseClass.baseClass
-    .typeForAttribute(baseClass.inheritanceColumn as string)!
+export function findStiClass(this: typeof Base, typeName: string): typeof Base {
+  typeName = this.baseClass
+    .typeForAttribute(this.inheritanceColumn as string)!
     .cast(typeName) as string;
 
-  const subclass = baseClass.stiClassFor(typeName);
+  const subclass = this.stiClassFor(typeName);
 
-  if (!(subclass === baseClass || baseClass.descendants.includes(subclass))) {
+  if (!(subclass === this || this.descendants.includes(subclass))) {
     throw new SubclassNotFound(
-      `Invalid single-table inheritance type: ${qualifiedName(subclass)} is not a subclass of ${qualifiedName(baseClass)}`,
+      `Invalid single-table inheritance type: ${qualifiedName(subclass)} is not a subclass of ${qualifiedName(this)}`,
     );
   }
 
@@ -314,21 +314,14 @@ export function ensureProperType(this: Base): void {
 
 /** @internal */
 export function discriminateClassForRecord(
-  modelClass: typeof Base,
+  this: typeof Base,
   record: Record<string, unknown>,
 ): typeof Base {
-  if (modelClass.usingSingleTableInheritance(record)) {
-    const inheritCol = modelClass.inheritanceColumn;
-    if (inheritCol === null) return modelClass;
-    const castValue = castInheritanceColumnValue(
-      baseClass.call(modelClass),
-      inheritCol,
-      record[inheritCol],
-    );
-    const typeName = (castValue as string | null) ?? String(record[inheritCol]);
-    return findStiClassForRow(modelClass, typeName);
+  if (this.usingSingleTableInheritance(record)) {
+    return this.findStiClass(record[this.inheritanceColumn as string] as string);
+  } else {
+    return this;
   }
-  return modelClass;
 }
 
 /** @internal */
@@ -336,21 +329,10 @@ export function usingSingleTableInheritance(
   this: typeof Base,
   record: Record<string, unknown>,
 ): boolean {
-  const modelClass = this;
-  const inheritCol = modelClass.inheritanceColumn;
-  if (inheritCol === null) return false;
-  if (!isPresent(record[inheritCol])) return false;
-  return stiColumnIsAttribute(modelClass, inheritCol, record);
-}
-
-/** @internal */
-function stiColumnIsAttribute(
-  modelClass: typeof Base,
-  inheritCol: string,
-  record: Record<string, unknown>,
-): boolean {
-  if (Object.prototype.hasOwnProperty.call(record, inheritCol)) return true;
-  return modelClass._hasAttribute(inheritCol);
+  return (
+    isPresent(record[this.inheritanceColumn as string]) &&
+    this._hasAttribute(this.inheritanceColumn as string)
+  );
 }
 
 /** @internal */
@@ -368,7 +350,7 @@ export function typeCondition(
 
 /** @internal */
 export function subclassFromAttributes(
-  modelClass: typeof Base,
+  this: typeof Base,
   attrs: Record<string, unknown> | null | undefined,
 ): typeof Base | null {
   if (!attrs) return null;
@@ -382,13 +364,12 @@ export function subclassFromAttributes(
 
   if (!attrsHash || typeof attrsHash !== "object") return null;
 
-  const inheritCol = modelClass.inheritanceColumn;
-  if (inheritCol === null) return null;
-  if (!modelClass._hasAttribute(inheritCol)) return null;
+  const subclassName = attrsHash[this.inheritanceColumn as string];
 
-  const cast = castStiValueFromAttrs(modelClass, attrsHash, inheritCol);
-  if (!cast.found) return null;
-  return findStiClass(modelClass, cast.value as string);
+  if (isPresent(subclassName)) {
+    return this.findStiClass(subclassName as string);
+  }
+  return null;
 }
 
 /** @internal */
@@ -415,14 +396,6 @@ function findStiClassInHierarchy(baseClass: typeof Base, typeName: string): type
     if (stiName(klass) === typeName || klass === registered) return klass;
   }
   return null;
-}
-
-/** @internal */
-function findStiClassForRow(baseClass: typeof Base, typeName: string): typeof Base {
-  const found = findStiClassInHierarchy(baseClass, typeName);
-  if (found) return found;
-  if (stiEnabled(baseClass)) return findStiClass(baseClass, typeName);
-  return baseClass;
 }
 
 /**
@@ -476,7 +449,7 @@ export function subclassFromAttributesForNew(
     const typeName = cast.value as string;
     const found = findStiClassInHierarchy(modelClass, typeName);
     if (found) return found;
-    return findStiClass(modelClass, typeName);
+    return modelClass.findStiClass(typeName);
   };
 
   let subclass = resolve(attrs);

@@ -34,7 +34,7 @@ import { _registerBase as _registerBaseWithSchemaDumper } from "./schema-dumper.
 import { _registerBase as _registerBaseWithAsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 import { _registerBase as _registerBaseWithDatabaseStatements } from "./connection-adapters/abstract/database-statements.js";
 import {
-  discriminateClassForRecord,
+  discriminateClassForRecord as _discriminateClassForRecord,
   stiName,
   polymorphicName as inheritancePolymorphicName,
   computeType as inheritanceComputeType,
@@ -47,7 +47,9 @@ import {
   baseClass as _inheritanceBaseClass,
   isBaseClass as _isBaseClass,
   ensureProperType as _ensureProperType,
+  subclassFromAttributes as _subclassFromAttributes,
   subclassFromAttributesForNew,
+  findStiClass as _findStiClass,
   isDescendsFromActiveRecord as _isDescendsFromActiveRecord,
   usingSingleTableInheritance as _usingSingleTableInheritance,
   qualifiedName,
@@ -1674,7 +1676,7 @@ export class Base extends Model {
     block?: (record: InstanceType<T>) => void,
     columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
   ): InstanceType<T> {
-    const klass = discriminateClassForRecord(this, row);
+    const klass = this.discriminateClassForRecord(row);
     if (klass !== this) {
       return klass._instantiate(
         row,
@@ -2069,7 +2071,16 @@ export class Base extends Model {
   static isDescendsFromActiveRecord = _isDescendsFromActiveRecord;
 
   /** @internal */
+  static discriminateClassForRecord = _discriminateClassForRecord;
+
+  /** @internal */
   static usingSingleTableInheritance = _usingSingleTableInheritance;
+
+  /** @internal */
+  static findStiClass = _findStiClass;
+
+  /** @internal */
+  static subclassFromAttributes = _subclassFromAttributes;
 
   /** @internal */
   static generateAssociationWriter = _NestedAttributes.generateAssociationWriter;

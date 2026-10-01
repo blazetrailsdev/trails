@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { Base, Transaction } from "./index.js";
 import type { DatabaseStatementsHost } from "./connection-adapters/abstract/database-statements.js";
 import { Topic } from "./test-helpers/models/topic.js";
+import "./test-helpers/models/reply.js";
 import { Rollback } from "./errors.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationEvent } from "@blazetrails/activesupport";

@@ -146,6 +146,8 @@ class ReadonlyAuthorPost extends Post {
   }
 }
 
+registerModel([ReadonlyTitlePost, NonRaisingPost, ReadonlyAuthorPost]);
+
 class Weird extends Base {}
 
 function timeToA(time: any): unknown[] {

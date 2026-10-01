@@ -4,8 +4,7 @@
 import { assertRespondTo, assertNotRespondTo, assertNil } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import bcrypt from "bcryptjs";
-import { Engine } from "./bcrypt.js";
+import { Engine, Password } from "./bcrypt.js";
 import { hasSecurePassword, SecurePassword } from "./secure-password.js";
 import { Validations } from "./validations.js";
 import { User } from "./test-helpers/models/user.js";
@@ -27,7 +26,7 @@ beforeEach(() => {
   pilot = new Pilot();
 
   existingUser = new User();
-  existingUser.password_digest = bcrypt.hashSync("password", Engine.MIN_COST);
+  existingUser.password_digest = Password.create("password", { cost: Engine.MIN_COST });
   existingUser.changesApplied();
 });
 
@@ -257,7 +256,7 @@ describe("SecurePasswordTest", () => {
 
   it("setting a blank password should not change an existing password", () => {
     existingUser.password = "";
-    expect(bcrypt.compareSync("password", existingUser.password_digest!)).toBeTruthy();
+    expect((existingUser.password_digest as Password).equals("password")).toBeTruthy();
   });
 
   it("setting a nil password should clear an existing password", () => {
@@ -300,7 +299,7 @@ describe("SecurePasswordTest", () => {
 
   it("password_salt", () => {
     user.password = "secret";
-    expect(user.passwordSalt).toEqual(bcrypt.getSalt(user.password_digest!));
+    expect(user.passwordSalt).toEqual((user.password_digest as Password).salt);
   });
 
   it("password_salt should return nil when password is nil", () => {
@@ -317,7 +316,7 @@ describe("SecurePasswordTest", () => {
     SecurePassword.minCost = false;
 
     user.password = "secret";
-    expect(bcrypt.getRounds(user.password_digest!)).toEqual(Engine.DEFAULT_COST);
+    expect((user.password_digest as Password).cost).toEqual(Engine.DEFAULT_COST);
   });
 
   it("Password digest cost honors bcrypt cost attribute when min_cost is false", () => {
@@ -327,7 +326,7 @@ describe("SecurePasswordTest", () => {
       Engine.cost = 5;
 
       user.password = "secret";
-      expect(bcrypt.getRounds(user.password_digest!)).toEqual(Engine.cost);
+      expect((user.password_digest as Password).cost).toEqual(Engine.cost);
     } finally {
       Engine.cost = originalBcryptCost;
     }
@@ -337,7 +336,7 @@ describe("SecurePasswordTest", () => {
     SecurePassword.minCost = true;
 
     user.password = "secret";
-    expect(bcrypt.getRounds(user.password_digest!)).toEqual(Engine.MIN_COST);
+    expect((user.password_digest as Password).cost).toEqual(Engine.MIN_COST);
   });
 
   it("password reset token", () => {

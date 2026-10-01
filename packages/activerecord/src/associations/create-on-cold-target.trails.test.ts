@@ -27,6 +27,7 @@ describe("association create on a target whose schema is not reflected yet", () 
 
       static {
         this.tableName = "posts";
+        this.inheritanceColumn = "not_there";
         this.hasMany("cold_comments", { className: "ColdComment", foreignKey: "post_id" });
       }
     }
@@ -38,6 +39,7 @@ describe("association create on a target whose schema is not reflected yet", () 
     class ColdAuthoredPost extends Base {
       static {
         this.tableName = "posts";
+        this.inheritanceColumn = "not_there";
         this.belongsTo("author", { className: "ColdAuthor" });
       }
     }
