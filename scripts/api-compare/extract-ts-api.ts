@@ -5545,12 +5545,24 @@ export function extractOptionKeys(
   // an enumerable contract — treat the param as uncheckable. Inline-literal index
   // signatures don't survive `getTypeFromTypeNode`, so check syntax too.
   if (hasSyntacticIndexSignature(tn)) return null;
-  const type = checker.getTypeFromTypeNode(tn);
+  let type = checker.getTypeFromTypeNode(tn);
   if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return null;
   const hasStringIndex = checker
     .getIndexInfosOfType(type)
     .some((i) => (i.keyType.flags & (ts.TypeFlags.String | ts.TypeFlags.Number)) !== 0);
   if (hasStringIndex) return null;
+  // Ruby `def m(role, types:, options:)` (delegated_type.rb:237) carries its
+  // options hash as a KEYWORD, which ports as a property of the trailing kwargs
+  // bag. The Ruby side reads keys off that `options` var, so the keys to diff
+  // against are the property's, not the bag's. The two names are the ones
+  // extract-ruby-api.rb `option_var_names` reads an options hash off.
+  const nested = type.getProperty("options") ?? type.getProperty("opts");
+  if (nested) {
+    const nestedType = checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(nested, last));
+    if (nestedType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return null;
+    if (checker.getIndexInfosOfType(nestedType).length > 0) return null;
+    type = nestedType;
+  }
   const names = checker
     .getPropertiesOfType(type)
     .map((s) => s.getName())

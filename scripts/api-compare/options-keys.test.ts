@@ -103,4 +103,26 @@ describe("matchOptionKeysAgainst", () => {
     );
     expect(verdict).toEqual({ comparable: true, missingInTs: [], extraInTs: [] });
   });
+
+  it("empties extraInTs when the Ruby body forwards its options hash to a callee", () => {
+    // serializers/json.rb:96-103 `as_json` reads only `:root` and hands
+    // `options` to `serializable_hash`, which reads the rest.
+    const ts = [["except", "include", "methods", "only", "root"]];
+    expect(matchOptionKeysAgainst(["root"], ts, [], true)).toEqual({
+      comparable: true,
+      missingInTs: [],
+      extraInTs: [],
+    });
+    expect(matchOptionKeysAgainst(["root"], ts)).toMatchObject({
+      extraInTs: ["except", "include", "methods", "only"],
+    });
+  });
+
+  it("still reports a key the forwarding Ruby body reads itself", () => {
+    expect(matchOptionKeysAgainst(["root", "prefix"], [["root", "only"]], [], true)).toEqual({
+      comparable: true,
+      missingInTs: ["prefix"],
+      extraInTs: [],
+    });
+  });
 });

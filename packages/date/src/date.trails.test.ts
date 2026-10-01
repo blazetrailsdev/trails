@@ -43,6 +43,15 @@ describe("Date", () => {
     expect(RubyDate.civil(2001, 2, 3.5).equals(RubyDate.civil(2001, 2, 3))).toBe(true);
   });
 
+  it("checks every argument Date.new is given, as date_initialize's argc switch does", () => {
+    const nil = undefined as unknown as number;
+    expect(() => new RubyDate(2020, nil)).toThrow(new TypeError("invalid month (not numeric)"));
+    expect(() => new RubyDate(2020, 6, nil)).toThrow(new TypeError("invalid day (not numeric)"));
+    expect(() => new RubyDate(nil, 6)).toThrow(new TypeError("invalid year (not numeric)"));
+    expect(new RubyDate(2020).toS()).toBe("2020-01-01");
+    expect(new RubyDate().toS()).toBe("-4712-01-01");
+  });
+
   it("seats Date.today's civil triple under GREGORIAN, so the reform only changes the start", () => {
     const today = RubyDate.today();
     const jd = new RubyDate(today.year, today.month, today.day, RubyDate.GREGORIAN).jd;

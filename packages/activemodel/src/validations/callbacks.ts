@@ -75,10 +75,12 @@ type Conditional = ((record: unknown) => boolean) | string;
 interface CallbackOptions {
   on?: string | string[] | null;
   if?: Conditional | Conditional[];
-  unless?: Conditional | Conditional[];
 }
 
-export type ValidationCallbackOptions = CallbackOptions & { prepend?: boolean };
+export type ValidationCallbackOptions = CallbackOptions & {
+  unless?: Conditional | Conditional[];
+  prepend?: boolean;
+};
 
 interface CallbackHostRecord {
   validationContext?: string | string[] | null;

@@ -4375,6 +4375,7 @@ export function main() {
       const rubyBlockOwners = new Map<string, string[]>();
       // First-sighting Ruby option keys per name (mirrors rubyParamsByName).
       const rubyOptionKeysByName = new Map<string, string[]>();
+      const rubyOptionKeysForwarded = new Set<string>();
       // First-sighting Ruby body call-set per name (advisory calls-parity check).
       const rubyCallsByName = new Map<string, string[]>();
       // Same first-sighting keying: the inert-receiver subset of that call-set
@@ -4444,6 +4445,7 @@ export function main() {
           }
           if (rm.option_keys && !rubyOptionKeysByName.has(rm.name)) {
             rubyOptionKeysByName.set(rm.name, rm.option_keys);
+            if (rm.option_keys_forwarded) rubyOptionKeysForwarded.add(rm.name);
           }
           rubyOwnersByName.set(
             rm.name,
@@ -4496,7 +4498,12 @@ export function main() {
         const positionalParams = (rubyParamsByName.get(rubyName) ?? [])
           .filter((p) => p.kind === "required" || p.kind === "optional")
           .map((p) => p.name);
-        const verdict = matchOptionKeysAgainst(rubyKeys, candidates, positionalParams);
+        const verdict = matchOptionKeysAgainst(
+          rubyKeys,
+          candidates,
+          positionalParams,
+          rubyOptionKeysForwarded.has(rubyName),
+        );
         if (!verdict.comparable) return;
         optionKeysCompared++;
         if (verdict.missingInTs.length === 0 && verdict.extraInTs.length === 0) return;

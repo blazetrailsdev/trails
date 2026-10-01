@@ -152,10 +152,7 @@ export function _wrapperEnabled(this: ParamsWrapperHost): boolean {
   }
 }
 
-/**
- * @internal
- * @missingRailsArgs merge! — PERMANENT
- */
+/** @internal */
 export function _performParameterWrapping(this: ParamsWrapperHost): void {
   const wrappedHash = _wrapParameters.call(this, this.request.requestParameters);
   const wrappedKeys = Object.keys(this.request.requestParameters);

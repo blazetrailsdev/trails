@@ -317,20 +317,20 @@ export class SchemaCreation {
   }
 
   /** @internal */
-  protected async addColumnOptionsBang(sql: string, options: ColumnOptions): Promise<string> {
+  protected async addColumnOptionsBang(
+    sql: string,
+    options: ColumnOptions & { column?: unknown },
+  ): Promise<string> {
     if (this.optionsIncludeDefault(options)) {
-      sql += ` DEFAULT ${await this.conn.quoteDefaultExpression(
-        options.default,
-        (options as Record<string, unknown>)["column"],
-      )}`;
+      sql += ` DEFAULT ${await this.conn.quoteDefaultExpression(options.default, options.column)}`;
     }
     if (options.null === false) {
       sql += " NOT NULL";
     }
-    if (options.autoIncrement) {
+    if (options.autoIncrement === true) {
       sql += " AUTO_INCREMENT";
     }
-    if (options.primaryKey) {
+    if (options.primaryKey === true) {
       sql += " PRIMARY KEY";
     }
     return sql;

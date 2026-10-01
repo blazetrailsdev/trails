@@ -95,6 +95,18 @@ describe("DateType cast and serialize coverage", () => {
     expect(p.newDateFor(2024, 1, 15)?.toString()).toBe("2024-01-15");
   });
 
+  it("builds the date through ::Date.new, reform gap and negative day included", () => {
+    class Probe extends Types.DateType {
+      newDateFor(y: number, m: number, d: number) {
+        return this.newDate(y, m, d);
+      }
+    }
+    expect(type.cast("1582-10-10")).toBe(null);
+    expect(type.cast("1582-10-04")?.toString()).toBe("1582-10-04");
+    expect(type.cast("June 2020")).toBe(null);
+    expect(new Probe().newDateFor(2020, 2, -1)?.toString()).toBe("2020-02-29");
+  });
+
   it("cast month-name string", () => {
     const result = type.cast("July 4, 2020");
     expect(result).toBeInstanceOf(Temporal.PlainDate);

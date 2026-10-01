@@ -7,6 +7,7 @@ import {
   tableize,
   underscore,
 } from "@blazetrails/activesupport";
+import { hashDelete, merge } from "@blazetrails/ruby-compat";
 import { autoloadModel } from "./associations.js";
 
 export interface DelegatedTypeOptions {
@@ -17,44 +18,17 @@ export interface DelegatedTypeOptions {
   primaryKey?: string;
 }
 
-const delegatedTypeRegistry = new WeakMap<
-  object,
-  Map<string, DelegatedTypeOptions & { foreignKey: string; foreignType: string }>
->();
-
 export function delegatedType(
-  modelClass: typeof Base,
+  this: typeof Base,
   role: string,
-  options: DelegatedTypeOptions,
+  { types, ...options }: DelegatedTypeOptions,
 ): void {
-  const foreignKey = options.foreignKey ?? `${role}_id`;
-  const foreignType = options.foreignType ?? `${role}_type`;
-  const primaryKey = options.primaryKey ?? "id";
-  const config = { ...options, foreignKey, foreignType, primaryKey };
-
-  const {
-    types: _types,
-    scope,
-    ...assocOptions
-  } = options as DelegatedTypeOptions & { types?: unknown; scope?: (...args: any[]) => any };
-  (modelClass as any).belongsTo(role, scope ?? null, {
-    ...assocOptions,
-    polymorphic: true,
-    foreignKey,
-    foreignType,
-  });
-
-  if (!delegatedTypeRegistry.has(modelClass)) {
-    delegatedTypeRegistry.set(modelClass, new Map());
-  }
-  delegatedTypeRegistry.get(modelClass)!.set(role, config);
-
-  if (!(modelClass as any)._delegatedTypes) {
-    (modelClass as any)._delegatedTypes = new Map();
-  }
-  (modelClass as any)._delegatedTypes.set(role, config);
-
-  defineDelegatedTypeMethods(modelClass, role, { types: options.types, options });
+  this.belongsTo(
+    role,
+    hashDelete(options as Record<string, unknown>, "scope") as DelegatedTypeOptions["scope"] | null,
+    merge(options, { polymorphic: true }),
+  );
+  this.defineDelegatedTypeMethods(role, { types: types, options: options });
 }
 
 function defineMethod(mixin: any, methodName: string, body: (...args: any[]) => any): void {
@@ -67,22 +41,22 @@ function defineMethod(mixin: any, methodName: string, body: (...args: any[]) => 
 
 /** @internal */
 export function defineDelegatedTypeMethods(
-  modelClass: typeof Base,
+  this: typeof Base,
   role: string,
-  { types, options }: { types: string[]; options: DelegatedTypeOptions },
+  { types, options }: { types: string[]; options: Omit<DelegatedTypeOptions, "types" | "scope"> },
 ): void {
   const primaryKey = options.primaryKey ?? "id";
   const roleType = options.foreignType ?? `${role}_type`;
   const roleId = options.foreignKey ?? `${role}_id`;
 
-  Object.defineProperty(modelClass, `${role}Types`, {
+  Object.defineProperty(this, `${role}Types`, {
     get() {
       return types.map(String);
     },
     configurable: true,
   });
 
-  Object.defineProperty(modelClass.prototype, `${role}Class`, {
+  Object.defineProperty(this.prototype, `${role}Class`, {
     get(this: Base) {
       const typeName = this.readAttribute(roleType) as string | null;
       if (!typeName) return null;
@@ -92,7 +66,7 @@ export function defineDelegatedTypeMethods(
     configurable: true,
   });
 
-  Object.defineProperty(modelClass.prototype, `${role}Name`, {
+  Object.defineProperty(this.prototype, `${role}Name`, {
     get(this: Base) {
       const typeName = this.readAttribute(roleType) as string | null;
       if (!typeName) return null;
@@ -103,7 +77,7 @@ export function defineDelegatedTypeMethods(
   });
 
   defineMethod(
-    modelClass.prototype,
+    this.prototype,
     `build${camelize(role, true)}`,
     function (this: Base, attrs: Record<string, unknown> = {}): Base {
       const typeName = this.readAttribute(roleType) as string | null;
@@ -127,15 +101,15 @@ export function defineDelegatedTypeMethods(
     const singularName = camelize(singularSnake, false);
     const predicateSuffix = camelize(singularSnake, true);
 
-    (modelClass as any).scope(scopeName, function (this: any) {
+    (this as any).scope(scopeName, function (this: any) {
       return this.where({ [roleType]: typeName });
     });
 
-    defineMethod(modelClass.prototype, `is${predicateSuffix}`, function (this: Base): boolean {
+    defineMethod(this.prototype, `is${predicateSuffix}`, function (this: Base): boolean {
       return this.readAttribute(roleType) === typeName;
     });
 
-    Object.defineProperty(modelClass.prototype, singularName, {
+    Object.defineProperty(this.prototype, singularName, {
       get(this: Base) {
         if (this.readAttribute(roleType) !== typeName) return null;
         return (this as unknown as Record<string, unknown>)[role];
@@ -144,7 +118,7 @@ export function defineDelegatedTypeMethods(
     });
 
     const fkAccessorName = camelize(`${singularSnake}_${primaryKey}`, false);
-    Object.defineProperty(modelClass.prototype, fkAccessorName, {
+    Object.defineProperty(this.prototype, fkAccessorName, {
       get(this: Base) {
         if (this.readAttribute(roleType) !== typeName) return null;
         return this.readAttribute(roleId);

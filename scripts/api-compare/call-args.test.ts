@@ -262,6 +262,17 @@ describe("compareCallArgs built-in receiver as argument 1", () => {
     const ruby = { ...site("camelize", []), recv: "call:to_s" };
     expect(compareCallArgs(ruby, site("camelize", ["id:name"])).verdict).toBe("match");
   });
+
+  it("strips the chained receiver of Hash#merge!", () => {
+    // comparability.rb:10 `options.except(*COMPARE_CHECKS.keys).merge!(count:, value:)`
+    // → `mergeBang(except(this.options, ...), { count, value })`.
+    const kwargs = "kwargs{count=id:option_value,value=id:value}";
+    const ruby = { ...site("merge!", [kwargs]), recv: "call:except" };
+    expect(compareCallArgs(ruby, site("mergeBang", ["call:except", kwargs])).verdict).toBe("match");
+    expect(
+      compareCallArgs(ruby, site("mergeBang", ["call:except", "id:extra", kwargs])).verdict,
+    ).toBe("mismatch");
+  });
 });
 
 describe("compareCallArgs Regexp flag argument", () => {

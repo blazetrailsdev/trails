@@ -4,7 +4,6 @@ import { adapterType } from "./test-adapter.js";
 import { travel, travelBack, assertRespondTo } from "@blazetrails/activesupport";
 import { fixtures } from "./test-fixtures.js";
 import { Base } from "./base.js";
-import { delegatedType } from "./index.js";
 import { Entry } from "./test-helpers/models/entry.js";
 import { Message } from "./test-helpers/models/message.js";
 import { Comment } from "./test-helpers/models/comment.js";
@@ -122,7 +121,7 @@ describe("DelegatedTypeTest", () => {
         this.attribute("entryable_type", "string");
       }
     }
-    delegatedType(UuidEntry, "entryable", {
+    UuidEntry.delegatedType("entryable", {
       types: ["UuidMessage", "UuidComment"],
       primaryKey: "uuid",
       foreignKey: "entryable_uuid",
@@ -178,8 +177,8 @@ describe("DelegatedTypeTest", () => {
     const reflection = Entry._reflectOnAssociation("entryable");
     expect(reflection).not.toBeNull();
     expect((reflection as any).options?.polymorphic).toBe(true);
-    expect((reflection as any).options?.foreignKey).toBe("entryable_id");
-    expect((reflection as any).options?.foreignType).toBe("entryable_type");
+    expect((reflection as any).foreignKey()).toBe("entryable_id");
+    expect((reflection as any).foreignType).toBe("entryable_type");
   });
 
   it("namespaced types", () => {
@@ -191,7 +190,7 @@ describe("DelegatedTypeTest", () => {
     }
     class NoticeMsg extends Base {}
     registerModel("Access::NoticeMessage", NoticeMsg);
-    delegatedType(Entry3, "entryable", { types: ["Access::NoticeMessage"] });
+    Entry3.delegatedType("entryable", { types: ["Access::NoticeMessage"] });
     expect(typeof (Entry3 as any).accessNoticeMessages).toBe("function");
     const e = new Entry3({ entryable_type: "Access::NoticeMessage", entryable_id: 7 });
     expect((e as any).isAccessNoticeMessage()).toBe(true);
@@ -216,7 +215,7 @@ describe("DelegatedTypeTest", () => {
         this.attribute("entryable_type", "string");
       }
     }
-    delegatedType(Entry4, "entryable", { types: ["Access::NoticeMessage"] });
+    Entry4.delegatedType("entryable", { types: ["Access::NoticeMessage"] });
     const e = new Entry4({ entryable_type: "Access::NoticeMessage" });
     const built = (e as any).buildEntryable({ body: "hi" });
     expect(built).toBeInstanceOf(AccessNoticeMessage);

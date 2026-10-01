@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
-import { delegatedType } from "./index.js";
 
 describe("delegatedType :scope option", () => {
   it("forwards the scope proc to the generated belongsTo reflection", () => {
@@ -11,7 +10,7 @@ describe("delegatedType :scope option", () => {
         this.tableName = "entries";
       }
     }
-    delegatedType(Entry as unknown as typeof Base, "entryable", {
+    Entry.delegatedType("entryable", {
       types: ["Message", "Comment"],
       scope,
     });
