@@ -295,6 +295,17 @@ describe("aryDeleteIf", () => {
     expect(aryDeleteIf(ary, () => false)).toBe(ary);
     expect(ary).toEqual([1, 2]);
   });
+
+  it("keeps the unvisited elements when the block raises", () => {
+    const ary = [1, 2, 3, 4, 5];
+    expect(() =>
+      aryDeleteIf(ary, (item) => {
+        if (item === 4) throw new Error("boom");
+        return item % 2 === 0;
+      }),
+    ).toThrow("boom");
+    expect(ary).toEqual([1, 3, 4, 5]);
+  });
 });
 
 describe("aryDelete", () => {
