@@ -39,6 +39,7 @@ export {
   rbObjInstanceVariables,
   rbObjIvarGet,
   rbObjIvarSet,
+  rbClassSuperclass,
   rbModSingletonP,
   rbModToS,
   rbObjClass,

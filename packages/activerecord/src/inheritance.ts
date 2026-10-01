@@ -12,6 +12,7 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { rbClassSuperclass } from "@blazetrails/ruby-compat";
 import { DescendantsTracker, demodulize } from "@blazetrails/activesupport";
 import { applicationRecordClass, setApplicationRecordClass } from "./active-record.js";
 
@@ -24,6 +25,8 @@ export const Inheritance = {
   [included](base: object): void {
     classAttribute.call(base, "storeFullClassName", { instanceWriter: false, default: true });
     classAttribute.call(base, "storeFullStiClass", { instanceWriter: false, default: true });
+
+    setBaseClass(base as typeof Base);
   },
 };
 
@@ -66,7 +69,7 @@ function computeTypeCandidates(baseClass: typeof Base, typeName: string): string
 export function isDescendsFromActiveRecord(this: typeof Base): boolean {
   const modelClass = this;
   if (Object.prototype.hasOwnProperty.call(modelClass, "_isActiveRecordBase")) return false;
-  const superclass = Object.getPrototypeOf(modelClass) as typeof Base | null;
+  const superclass = rbClassSuperclass(modelClass);
   if (!superclass || superclass === Function.prototype || typeof superclass.name !== "string")
     return true;
   if (superclass.abstractClass) return isDescendsFromActiveRecord.call(superclass);
@@ -92,7 +95,7 @@ export function setBaseClass(modelClass: typeof Base): void {
       );
     }
 
-    const superclass = Object.getPrototypeOf(modelClass) as typeof Base;
+    const superclass = rbClassSuperclass(modelClass)!;
     if (superclass === ActiveRecord.Base || superclass.abstractClass) {
       klass._computedBaseClass = modelClass;
     } else {
@@ -136,8 +139,8 @@ export function polymorphicName(modelClass: typeof Base): string {
 
 /** @noRailsEquivalent PERMANENT */
 export function registerSubclass(klass: typeof Base): void {
-  const parent = Object.getPrototypeOf(klass) as typeof Base;
-  if (!parent || parent === Function.prototype) return;
+  const parent = rbClassSuperclass(klass);
+  if (!parent) return;
   if (klass.name) registerModelConstant(klass.name, klass);
   DescendantsTracker.registerSubclass(parent as never, klass as never);
 }

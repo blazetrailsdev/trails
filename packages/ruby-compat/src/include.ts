@@ -22,7 +22,7 @@
 
 import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
-import { FL_SINGLETON, rbAnyToS, rbModToS } from "./object.js";
+import { FL_SINGLETON, T_ICLASS, rbAnyToS, rbModToS } from "./object.js";
 
 type AnyClass = new (...args: never[]) => unknown;
 type ModuleObject = object;
@@ -391,6 +391,7 @@ export class Module {
     links.members.add(link);
     links.refs.add(ref);
     singletonReaper.register(link, { mod: this, ref });
+    Object.defineProperty(link, T_ICLASS, { value: this });
     Object.setPrototypeOf(obj, link);
   }
 

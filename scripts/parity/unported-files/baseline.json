@@ -55,14 +55,6 @@
     "reason": "Trilogy adapter implementation; excluded along with adapters/trilogy."
   },
   {
-    "testFile": "schema_loading_test.rb",
-    "reason": "Tests ActiveSupport.on_load / Zeitwerk autoload hooks triggered from background threads. No Node.js equivalent; ES module loading is synchronous and non-concurrent."
-  },
-  {
-    "testFile": "reload_models_test.rb",
-    "reason": "Tests class reloading via ActiveSupport::Dependencies / Zeitwerk in a forked process. No Node.js equivalent; ES modules are cached for the process lifetime."
-  },
-  {
     "testFile": "adapter_test.rb",
     "className": "AdapterThreadSafetyTest",
     "tests": ["#active? is synchronized", "#verify! is synchronized"],
@@ -72,34 +64,6 @@
     "testFile": "adapters/sqlite3/sqlite3_adapter_test.rb",
     "tests": ["supports extensions", "respond to enable extension", "respond to disable extension"],
     "reason": "Rails' SQLite3::Database exposes load_extension / enable_load_extension via the sqlite3-ruby C bindings. better-sqlite3 does not expose the SQLITE_LOAD_EXTENSION entry points, so supports_extensions? / enable_extension / disable_extension cannot be implemented against the driver Trails uses."
-  },
-  {
-    "testFile": "inheritance_test.rb",
-    "className": "InheritanceTest",
-    "tests": [
-      "compute type no method error",
-      "compute type on undefined method",
-      "compute type argument error"
-    ],
-    "reason": "Registers an Object.autoload for a model whose file raises during require, so the exception surfaces from constantize inside compute_type. JS has no autoload/require hook — a module either resolves at import time or the constant simply doesn't exist."
-  },
-  {
-    "testFile": "inheritance_test.rb",
-    "className": "InheritanceTest",
-    "tests": ["base class activerecord error"],
-    "reason": "Asserts `Class.new { include ActiveRecord::Inheritance }` raises ActiveRecordError via Ruby's Module#included hook. Trails mixes modules in statically; there is no runtime include on an arbitrary class to guard."
-  },
-  {
-    "testFile": "inheritance_test.rb",
-    "className": "InheritanceTest",
-    "tests": ["new with autoload paths"],
-    "reason": "Stands up a Zeitwerk loader at runtime so STI dispatch resolves a constant from an autoload path. JS has no runtime constant autoloading; trails resolves subclasses via explicit registerSubclass."
-  },
-  {
-    "testFile": "inheritance_test.rb",
-    "className": "InheritanceComputeTypeTest",
-    "tests": ["instantiation doesnt try to require corresponding file"],
-    "reason": "Exercises Ruby constant-lookup/dependencies integration: a DB type with no top-level constant raises RecordNotFound, then const_set on the test class vs on Firm changes which constant compute_type sees. JS has no const_missing/autoload namespace walk."
   },
   {
     "testFile": "connection_handlers_sharding_db_test.rb",
@@ -234,28 +198,6 @@
     "testFile": "connection_adapters/standalone_connection_test.rb",
     "tests": ["async fallback"],
     "reason": "select_all(async: true) returns a FutureResult::Complete from the thread-backed load_async infrastructure, which is excluded (see the future_result.rb entry)."
-  },
-  {
-    "testFile": "base_test.rb",
-    "tests": [
-      "new threads get default the default connection handler",
-      "changing a connection handler in a main thread does not poison the other threads",
-      "connection_handler can be overridden",
-      "marshal round trip",
-      "marshal inspected round trip",
-      "marshal new record round trip",
-      "marshalling with associations 6 1",
-      "marshalling with associations 7 1",
-      "marshal between processes",
-      "marshalling new record round trip with associations",
-      "respect internal encoding",
-      "default in local time",
-      "switching default time zone",
-      "mutating time objects",
-      "generated association methods module name",
-      "generated relation methods module name"
-    ],
-    "reason": "GVL / Ruby Thread semantics, Marshal binary serialization, Encoding.default_internal, with_env_tz (process-level ENV[\"TZ\"] reload), and Ruby Module#inspect for namespaced generated-method modules — all Ruby-only with no Node.js equivalent."
   },
   {
     "testFile": "hstore_test.rb",
@@ -757,17 +699,6 @@
       "automatic inverse does not suppress name error from incidental code"
     ],
     "reason": "Ruby Symbol type for class_name and const_missing hook for NameError discrimination have no JavaScript equivalent."
-  },
-  {
-    "testFile": "modules_test.rb",
-    "tests": [
-      "module spanning associations",
-      "module spanning has and belongs to many associations",
-      "associations spanning cross modules",
-      "find account and include company",
-      "eager loading in modules"
-    ],
-    "reason": "Ruby Module#ancestors / constant-path lookup for cross-module association resolution. No JS equivalent for namespace-scoped class discovery."
   },
   {
     "testFile": "serialized_attribute_test.rb",

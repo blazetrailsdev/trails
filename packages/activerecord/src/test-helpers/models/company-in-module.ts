@@ -1,7 +1,4 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import type { Developer } from "./developer.js";
-import type { Firm } from "./company.js";
-import type { Project } from "./project.js";
 import { registerModel } from "../../associations.js";
 import { Base } from "../../base.js";
 import { Module, Range } from "@blazetrails/ruby-compat";
@@ -27,7 +24,13 @@ export class MyAppBusinessCompany extends Base {
   static _demodulizedName = "Company";
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class MyAppBusinessFirm extends MyAppBusinessCompany {
+  declare clients: AssociationProxy<MyAppBusinessClient>;
+  declare clientsSortedDesc: AssociationProxy<MyAppBusinessClient>;
+  declare clientsOfFirm: AssociationProxy<MyAppBusinessClient>;
+  declare clientsLikeMs: AssociationProxy<MyAppBusinessClient>;
+
   static moduleName = "MyApplication::Business";
   static _demodulizedName = "Firm";
 
@@ -37,49 +40,42 @@ export class MyAppBusinessFirm extends MyAppBusinessCompany {
       function (this: any) {
         return this.order("id");
       },
-      {
-        foreignKey: "firm_id",
-        dependent: "destroy",
-      },
+      { dependent: "destroy" },
     );
     this.hasMany(
       "clientsSortedDesc",
       function (this: any) {
         return this.order("id DESC");
       },
-      {
-        className: "Client",
-        foreignKey: "firm_id",
-      },
+      { className: "Client" },
     );
     this.hasMany(
       "clientsOfFirm",
       function (this: any) {
         return this.order("id");
       },
-      {
-        foreignKey: "client_of",
-        className: "Client",
-      },
+      { foreignKey: "client_of", className: "Client" },
     );
     this.hasMany(
       "clientsLikeMs",
       function (this: any) {
         return this.where("name = 'Microsoft'").order("id");
       },
-      {
-        className: "Client",
-        foreignKey: "firm_id",
-      },
+      { className: "Client" },
     );
     this.hasOne("account", {
       className: "MyApplication::Billing::Account",
-      foreignKey: "firm_id",
       dependent: "destroy",
     });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface MyAppBusinessFirm {
+  get account(): MyAppBillingAccount | null | Promise<MyAppBillingAccount | null>;
+  set account(value: MyAppBillingAccount | null);
+}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class MyAppBusinessClient extends MyAppBusinessCompany {
   static moduleName = "MyApplication::Business";
   static _demodulizedName = "Client";
@@ -89,6 +85,13 @@ export class MyAppBusinessClient extends MyAppBusinessCompany {
     this.belongsTo("firmWithOtherName", { className: "Firm", foreignKey: "client_of" });
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface MyAppBusinessClient {
+  get firm(): MyAppBusinessFirm | null | Promise<MyAppBusinessFirm | null>;
+  set firm(value: MyAppBusinessFirm | null);
+  get firmWithOtherName(): MyAppBusinessFirm | null | Promise<MyAppBusinessFirm | null>;
+  set firmWithOtherName(value: MyAppBusinessFirm | null);
+}
 
 export class MyAppBusinessClientContact extends Base {
   static moduleName = "MyApplication::Business::Client";
@@ -96,7 +99,8 @@ export class MyAppBusinessClientContact extends Base {
 }
 
 export class MyAppBusinessDeveloper extends Base {
-  declare projects: AssociationProxy<Project>;
+  declare projects: AssociationProxy<MyAppBusinessProject>;
+  declare name: string;
 
   static moduleName = "MyApplication::Business";
   static _demodulizedName = "Developer";
@@ -108,7 +112,7 @@ export class MyAppBusinessDeveloper extends Base {
 }
 
 export class MyAppBusinessProject extends Base {
-  declare developers: AssociationProxy<Developer>;
+  declare developers: AssociationProxy<MyAppBusinessDeveloper>;
 
   static moduleName = "MyApplication::Business";
   static _demodulizedName = "Project";
@@ -224,8 +228,8 @@ export interface MyAppBillingAccount {
   set firm(value: MyAppBusinessFirm | null);
   get qualifiedBillingFirm(): MyAppBillingFirm | null | Promise<MyAppBillingFirm | null>;
   set qualifiedBillingFirm(value: MyAppBillingFirm | null);
-  get unqualifiedBillingFirm(): Firm | null | Promise<Firm | null>;
-  set unqualifiedBillingFirm(value: Firm | null);
+  get unqualifiedBillingFirm(): MyAppBillingFirm | null | Promise<MyAppBillingFirm | null>;
+  set unqualifiedBillingFirm(value: MyAppBillingFirm | null);
 }
 
 for (const klass of [

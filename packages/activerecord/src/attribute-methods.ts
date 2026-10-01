@@ -1,6 +1,11 @@
 import { CodeGenerator, include, Module, TimeWithZone, toFs } from "@blazetrails/activesupport";
 import { AttributeMethods as AMAttributeMethods, Model } from "@blazetrails/activemodel";
-import { isEmpty, rbInspect as inspect, rbModConstSet } from "@blazetrails/ruby-compat";
+import {
+  isEmpty,
+  rbClassSuperclass,
+  rbInspect as inspect,
+  rbModConstSet,
+} from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
   AttributeMethods,
@@ -315,7 +320,7 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
     return false;
   }
   if (typeof this.isBaseClass === "function" && !this.isBaseClass()) {
-    const superclass = Object.getPrototypeOf(this) as AttributeMethodsHost | null;
+    const superclass = rbClassSuperclass(this);
     if (superclass && typeof superclass.defineAttributeMethods === "function") {
       superclass.defineAttributeMethods();
     }
@@ -337,7 +342,7 @@ export function generateAliasAttributes(this: AttributeMethodsHost): void {
   if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
     initializeGeneratedModules.call(this);
   }
-  const superclass = Object.getPrototypeOf(this) as AttributeMethodsHost | null;
+  const superclass = rbClassSuperclass(this);
   if (
     superclass &&
     !Object.prototype.hasOwnProperty.call(superclass, "_isActiveRecordBase") &&
@@ -409,7 +414,7 @@ export function isInstanceMethodAlreadyImplemented(
     );
   }
 
-  const superclass = Object.getPrototypeOf(this);
+  const superclass = rbClassSuperclass(this);
   if (Object.prototype.hasOwnProperty.call(superclass ?? {}, "_isActiveRecordBase")) {
     return AttributeMethods.ClassMethods.isInstanceMethodAlreadyImplemented.call(
       this as any,
@@ -445,9 +450,7 @@ export function isMethodDefinedWithin(
   this: AttributeMethodsHost,
   name: string,
   klass: any,
-  superklass: any = Object.getPrototypeOf(klass) === Function.prototype
-    ? Object
-    : Object.getPrototypeOf(klass),
+  superklass: any = rbClassSuperclass(klass) ?? Object,
 ): boolean {
   if (name in klass.prototype) {
     if (superklass?.prototype != null && name in superklass.prototype) {

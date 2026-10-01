@@ -15,6 +15,7 @@ import {
   Logger,
   TimeWithZone,
   assert,
+  assertEqual,
   assertNot,
   assertNotEmpty,
   assertNotPredicate,
@@ -183,6 +184,16 @@ describe("BasicsTest", async () => {
   afterEach(async () => {
     vi.restoreAllMocks();
     while (cleanupConnections.length > 0) await cleanupConnections.pop()!();
+  });
+
+  it("generated association methods module name", () => {
+    const mod = Post.generatedAssociationMethods();
+    assertEqual("Post::GeneratedAssociationMethods", mod.inspect());
+  });
+
+  it("generated relation methods module name", () => {
+    const mod = Post.generatedRelationMethods();
+    assertEqual("Post::GeneratedRelationMethods", mod.inspect());
   });
 
   it("arel attribute normalization", () => {
