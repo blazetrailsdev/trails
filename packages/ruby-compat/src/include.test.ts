@@ -2,7 +2,6 @@ import { describe, it, expect, expectTypeOf } from "vitest";
 import { NameError } from "./name-error.js";
 import { rbModToS } from "./object.js";
 import {
-  rbClassSuperclass,
   include,
   rbModConstSet,
   prepend,
@@ -1267,29 +1266,5 @@ describe("Module#const_set", () => {
     expect(() => rbModConstSet(class N {}, "foo", 1)).toThrow(
       new NameError("wrong constant name foo", "foo"),
     );
-  });
-});
-
-describe("Class#superclass", () => {
-  it("skips the link an extended Module puts above the class", () => {
-    class Parent {}
-    class Child extends Parent {}
-    const mod = new Module((m) => {
-      m.defineMethod("greet", function () {
-        return "hi";
-      });
-    });
-    mod.extendObject(Child);
-
-    expect(Object.getPrototypeOf(Child)).not.toBe(Parent);
-    expect(rbClassSuperclass(Child)).toBe(Parent);
-  });
-
-  it("answers the parent of a class nothing was extended onto, and null at the root", () => {
-    class Parent {}
-    class Child extends Parent {}
-
-    expect(rbClassSuperclass(Child)).toBe(Parent);
-    expect(rbClassSuperclass(Parent)).toBeNull();
   });
 });

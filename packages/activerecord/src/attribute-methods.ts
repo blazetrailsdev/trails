@@ -414,7 +414,7 @@ export function isInstanceMethodAlreadyImplemented(
     );
   }
 
-  const superclass = Object.getPrototypeOf(this);
+  const superclass = rbClassSuperclass(this);
   if (Object.prototype.hasOwnProperty.call(superclass ?? {}, "_isActiveRecordBase")) {
     return AttributeMethods.ClassMethods.isInstanceMethodAlreadyImplemented.call(
       this as any,
@@ -450,9 +450,7 @@ export function isMethodDefinedWithin(
   this: AttributeMethodsHost,
   name: string,
   klass: any,
-  superklass: any = Object.getPrototypeOf(klass) === Function.prototype
-    ? Object
-    : Object.getPrototypeOf(klass),
+  superklass: any = rbClassSuperclass(klass) ?? Object,
 ): boolean {
   if (name in klass.prototype) {
     if (superklass?.prototype != null && name in superklass.prototype) {

@@ -82,6 +82,30 @@ export function rbObjSingletonClass(obj: object): abstract new (...args: never) 
 }
 
 /**
+ * `T_ICLASS` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:140`), the
+ * type of the hidden class an `extend` splices above its receiver. A link
+ * carries the module it stands for under this key.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const T_ICLASS = Symbol.for("@blazetrails/ruby-compat:T_ICLASS");
+
+/**
+ * `rb_class_superclass` (`vendor/ruby/v3.3.11/object.c:2191`), `Class#superclass`:
+ * the next `T_CLASS` in the ancestry, so the iclass an `extend` put above the
+ * class is skipped, where `Object.getPrototypeOf` answers it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbClassSuperclass<T extends object>(klass: T): T | null {
+  let superclass = Object.getPrototypeOf(klass) as object | null;
+  while (superclass && Object.prototype.hasOwnProperty.call(superclass, T_ICLASS)) {
+    superclass = Object.getPrototypeOf(superclass) as object | null;
+  }
+  return superclass === Function.prototype ? null : (superclass as T | null);
+}
+
+/**
  * `rb_mod_singleton_p` (`vendor/ruby/v3.3.11/object.c:3050`), `Module#singleton_class?`.
  *
  * @noRailsEquivalent PERMANENT

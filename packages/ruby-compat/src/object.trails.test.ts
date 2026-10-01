@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  rbClassSuperclass,
   basicObjRespondTo,
   rbInspect as inspect,
   rbObjInspect,
@@ -15,6 +16,7 @@ import {
   rbObjIvarGet,
   rbObjIvarSet,
 } from "./object.js";
+import { Module } from "./include.js";
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { NoMethodError } from "./no-method-error.js";
@@ -293,5 +295,29 @@ describe("Kernel#instance_variable_get / instance_variable_set", () => {
     expect(() => rbObjIvarSet(new Holder(), "foo", 1)).toThrow(
       "`foo' is not allowed as an instance variable name",
     );
+  });
+});
+
+describe("Class#superclass", () => {
+  it("skips the link an extended Module puts above the class", () => {
+    class Parent {}
+    class Child extends Parent {}
+    const mod = new Module((m) => {
+      m.defineMethod("greet", function () {
+        return "hi";
+      });
+    });
+    mod.extendObject(Child);
+
+    expect(Object.getPrototypeOf(Child)).not.toBe(Parent);
+    expect(rbClassSuperclass(Child)).toBe(Parent);
+  });
+
+  it("answers the parent of a class nothing was extended onto, and null at the root", () => {
+    class Parent {}
+    class Child extends Parent {}
+
+    expect(rbClassSuperclass(Child)).toBe(Parent);
+    expect(rbClassSuperclass(Parent)).toBeNull();
   });
 });

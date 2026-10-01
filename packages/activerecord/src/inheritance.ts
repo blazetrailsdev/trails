@@ -139,8 +139,8 @@ export function polymorphicName(modelClass: typeof Base): string {
 
 /** @noRailsEquivalent PERMANENT */
 export function registerSubclass(klass: typeof Base): void {
-  const parent = Object.getPrototypeOf(klass) as typeof Base;
-  if (!parent || parent === Function.prototype) return;
+  const parent = rbClassSuperclass(klass);
+  if (!parent) return;
   if (klass.name) registerModelConstant(klass.name, klass);
   DescendantsTracker.registerSubclass(parent as never, klass as never);
 }
