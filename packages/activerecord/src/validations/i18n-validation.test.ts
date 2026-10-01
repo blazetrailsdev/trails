@@ -12,7 +12,7 @@ describe("I18nValidationTest", () => {
   let topic: Topic;
   let unique: Topic | undefined;
   let replied: Topic | undefined;
-  let oldLoadPath: string[];
+  let oldLoadPath: (string | string[])[];
   let oldBackend: ReturnType<typeof I18n.backend>;
 
   beforeEach(async () => {
