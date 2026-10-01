@@ -1719,7 +1719,10 @@ describe(
     const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 
     // Returns a map of "<fqn>#<method>" -> the method's expanded option_keys.
-    function optionKeys(fixtures: Record<string, string>): Record<string, string[] | undefined> {
+    function optionKeys(
+      fixtures: Record<string, string>,
+      field = "option_keys",
+    ): Record<string, string[] | true | null | undefined> {
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), "optkeys-rb-"));
       try {
         for (const [rel, src] of Object.entries(fixtures)) {
@@ -1738,7 +1741,7 @@ describe(
         out = {}
         (ex.classes.to_a + ex.modules.to_a).each do |fqn, info|
           (info[:instanceMethods] + info[:classMethods]).each do |m|
-            out["#{fqn}##{m[:name]}"] = m[:option_keys]
+            out["#{fqn}##{m[:name]}"] = m[:${field}]
           end
         end
         puts JSON.generate(out)
@@ -1771,6 +1774,47 @@ describe(
       `,
       });
       expect(r["Bar::Rel#build"]).toEqual(["top_a", "top_b"]);
+    });
+
+    it("flags a body that hands its options var whole to a callee", () => {
+      const r = optionKeys(
+        {
+          "fwd.rb": `
+        class Rel
+          def as_json(options = nil)
+            root = options[:root]
+            serializable_hash(options).as_json
+          end
+
+          def splatted(name, **options)
+            options[:on]
+            build(name, **options)
+          end
+
+          def after_star(*args, options)
+            options[:on]
+            build(*args, options)
+          end
+
+          def zsuper(options = {})
+            options[:on]
+            super
+          end
+
+          def reads_only(options)
+            options[:on] = Array(options[:on])
+            options.fetch(:if, nil)
+          end
+        end
+      `,
+        },
+        "option_keys_forwarded",
+      );
+      expect(r["Rel#as_json"]).toBe(true);
+      expect(r["Rel#splatted"]).toBe(true);
+      expect(r["Rel#after_star"]).toBe(true);
+      expect(r["Rel#zsuper"]).toBe(true);
+      expect(r["Rel#reads_only"]).toBeNull();
     });
   },
 );

@@ -137,6 +137,7 @@ export {
   partition,
   sort,
   toA,
+  isIntersect,
   union,
   uniq,
   unpack1,

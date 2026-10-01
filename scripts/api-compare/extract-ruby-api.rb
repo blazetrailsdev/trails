@@ -2078,6 +2078,9 @@ class ApiExtractor
     entry[:skeleton] = skeleton unless skeleton.empty?
     opt_keys = collect_option_keys(body, entry[:params], fqn)
     entry[:option_keys] = opt_keys unless opt_keys.empty?
+    if !opt_keys.empty? && forwards_option_var?(body, option_var_names(entry[:params]))
+      entry[:option_keys_forwarded] = true
+    end
     record_file_hash_keys(opt_keys)
     record_file_hash_keys(collect_ivar_option_keys(body))
     digest = body_digest(body)
@@ -3366,6 +3369,21 @@ class ApiExtractor
       end
     end
     names
+  end
+
+  def forwards_option_var?(node, vars)
+    return false unless node.is_a?(Array)
+    case node[0]
+    when :zsuper
+      return true
+    when :assoc_splat
+      return true if option_var?(node[1], vars)
+    when :args_add_block
+      list = node[1]
+      list = list[1..] if list.is_a?(Array) && list[0] == :args_add_star
+      return true if list.is_a?(Array) && list.any? { |arg| option_var?(arg, vars) }
+    end
+    node.any? { |child| forwards_option_var?(child, vars) }
   end
 
   def walk_for_option_keys(node, vars, consts, keys)

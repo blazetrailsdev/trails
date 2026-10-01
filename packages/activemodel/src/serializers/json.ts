@@ -17,6 +17,7 @@ import {
   ToJsonWithActiveSupportEncoder,
   type Included,
 } from "@blazetrails/activesupport";
+import { first } from "@blazetrails/ruby-compat";
 import { Serializers } from "../namespaces.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -51,7 +52,7 @@ export class JSON {
     const root = includeRoot.length > 0 ? includeRoot[0] : ctor.includeRootInJson;
     let hash = ActiveSupportJSON.decode(json);
     if (root !== false && root != null) {
-      hash = Object.values(hash as object)[0];
+      hash = first(Object.values(hash as object));
     }
     void this.setAttributes(hash);
     return this;

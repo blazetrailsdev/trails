@@ -4404,7 +4404,7 @@ function minusDd(self: Date, other: Date): Rational {
 }
 
 /** @internal */
-function checkNumeric(obj: unknown, field: string): void {
+function checkNumeric(obj: unknown, field: string): asserts obj is number | bigint | Rational {
   if (!kNumericP(obj)) throw new TypeError(`invalid ${field} (not numeric)`);
 }
 
@@ -4552,9 +4552,9 @@ export class Date {
     of?: number,
   );
   constructor(
-    year: number | bigint | typeof SEAT | Temporal.PlainDate = -4712,
+    year?: number | bigint | typeof SEAT | Temporal.PlainDate,
     month?: number | bigint,
-    day: number | Rational = 1,
+    day?: number | Rational,
     start = DEFAULT_SG,
     df?: number,
     sf?: Rational,
@@ -4582,7 +4582,9 @@ export class Date {
         `wrong number of arguments (given ${arguments.length}, expected 0..4)`,
       );
     }
-    month ??= 1;
+    if (arguments.length < 3) day = 1;
+    if (arguments.length < 2) month = 1;
+    if (arguments.length < 1) year = -4712;
     checkNumeric(day, "day");
     checkNumeric(month, "month");
     checkNumeric(year, "year");

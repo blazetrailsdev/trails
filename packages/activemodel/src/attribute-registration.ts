@@ -1,4 +1,5 @@
 import { DescendantsTracker, extend, included, registerSubclass } from "@blazetrails/activesupport";
+import { block as rbBlock, fetch } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
 import { defaultValue } from "./type.js";
 import { typeRegistry } from "./type/registry.js";
@@ -192,11 +193,11 @@ export const ClassMethods = {
   ): ValueType | null {
     attributeName = this.resolveAttributeName(attributeName);
 
-    const types = this.attributeTypes();
     if (block) {
-      return Object.hasOwn(types, attributeName) ? types[attributeName] : block();
+      return fetch(this.attributeTypes(), attributeName, rbBlock(block));
+    } else {
+      return this.attributeTypes()[attributeName];
     }
-    return types[attributeName];
   },
 
   /** @internal */

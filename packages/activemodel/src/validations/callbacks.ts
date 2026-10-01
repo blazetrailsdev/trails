@@ -4,9 +4,11 @@ import {
   extend,
   include,
   included,
+  kernelArray as array,
   prepend,
   runCallbacks,
 } from "@blazetrails/activesupport";
+import { hasKey, isIntersect } from "@blazetrails/ruby-compat";
 import type { CallbackConditions, CallbackObject } from "../callbacks.js";
 
 export const ClassMethods = {
@@ -75,10 +77,12 @@ type Conditional = ((record: unknown) => boolean) | string;
 interface CallbackOptions {
   on?: string | string[] | null;
   if?: Conditional | Conditional[];
-  unless?: Conditional | Conditional[];
 }
 
-export type ValidationCallbackOptions = CallbackOptions & { prepend?: boolean };
+export type ValidationCallbackOptions = CallbackOptions & {
+  unless?: Conditional | Conditional[];
+  prepend?: boolean;
+};
 
 interface CallbackHostRecord {
   validationContext?: string | string[] | null;
@@ -99,18 +103,14 @@ export async function runValidationsBang(
 
 /** @internal */
 export function setOptionsForCallback(options: CallbackOptions): void {
-  if (!Object.prototype.hasOwnProperty.call(options, "on")) return;
-  const onArr = Array.isArray(options.on) ? options.on : options.on == null ? [] : [options.on];
-  options.on = onArr;
-  const contextGuard = (o: unknown) => {
-    const ctx = (o as CallbackHostRecord).validationContext;
-    const ctxArr = Array.isArray(ctx) ? ctx : ctx == null ? [] : [ctx];
-    return onArr.some((on) => ctxArr.includes(on));
-  };
-  const existingIf = options.if;
-  const existingArr =
-    existingIf == null ? [] : Array.isArray(existingIf) ? existingIf : [existingIf];
-  options.if = [contextGuard, ...existingArr];
+  if (hasKey(options, "on")) {
+    options.on = array(options.on);
+    options.if = [
+      (o: unknown) =>
+        isIntersect(options.on as string[], array((o as CallbackHostRecord).validationContext)),
+      ...array(options.if),
+    ];
+  }
 }
 
 /** @internal */

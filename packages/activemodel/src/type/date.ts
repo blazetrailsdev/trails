@@ -6,7 +6,7 @@ import {
   type DateParts,
 } from "@blazetrails/date";
 import { include, registerConstant } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo, StandardError } from "@blazetrails/ruby-compat";
 import { toFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import {
   AcceptsMultiparameterTime,
@@ -91,16 +91,15 @@ export class DateType extends ValueType<DateCastResult> {
     mon: number | null | undefined,
     mday: number | null | undefined,
   ): Temporal.PlainDate | null {
-    if (year == null || (year === 0 && mon === 0 && mday === 0)) return null;
-    if (mon == null || mday == null) return null;
-    try {
-      return Temporal.PlainDate.from(
-        { year: Number(year), month: mon, day: mday },
-        { overflow: "reject" },
-      );
-    } catch {
-      return null;
+    if (!(year == null || (year === 0 && mon === 0 && mday === 0))) {
+      try {
+        return new RubyDate(year, mon as number, mday as number).toDate();
+      } catch (error) {
+        if (!(error instanceof StandardError || error instanceof TypeError)) throw error;
+        return null;
+      }
     }
+    return null;
   }
 
   /** @internal */

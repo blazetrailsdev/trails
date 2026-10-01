@@ -7,6 +7,7 @@ import {
   aryPop,
   arySlice,
   compact,
+  isIntersect,
   pack,
   partition,
   sort,
@@ -329,5 +330,18 @@ describe("Array#|", () => {
     expect(union<unknown>([["a", "asc"], "b", "b"], [["a", "asc"], { x: 1 }, { x: 1 }, 1])).toEqual(
       [["a", "asc"], "b", { x: 1 }, 1],
     );
+  });
+});
+
+describe("Array#intersect?", () => {
+  it("answers whether the arrays share an element, compared by eql?", () => {
+    expect(isIntersect([1, 2, 3], [3, 4, 5])).toBe(true);
+    expect(isIntersect([1, 2, 3], [5, 6, 7])).toBe(false);
+    expect(isIntersect<unknown>([["a", "asc"]], [["a", "asc"]])).toBe(true);
+  });
+
+  it("answers false when either array is empty", () => {
+    expect(isIntersect([], [1])).toBe(false);
+    expect(isIntersect([1], [])).toBe(false);
   });
 });

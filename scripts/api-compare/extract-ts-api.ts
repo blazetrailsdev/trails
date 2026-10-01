@@ -5528,7 +5528,10 @@ function typeAdmitsBoolean(type: ts.Type): boolean {
  * options-shaped trailing param), null (uncheckable — `any`/`unknown` or a
  * string-index bag like `Record<string, unknown>`, distinct from `[]`), or the
  * sorted/deduped property names. Only interface/type-literal/intersection
- * trailing params are inspected.
+ * trailing params are inspected. A trailing kwargs bag that carries the options
+ * hash as its `options` / `opts` property (Ruby `def m(role, types:, options:)`,
+ * delegated_type.rb:237) is read through to that property, since those are the
+ * names extract-ruby-api.rb `option_var_names` reads keys off.
  */
 export function extractOptionKeys(
   parameters: ts.NodeArray<ts.ParameterDeclaration>,
@@ -5545,12 +5548,19 @@ export function extractOptionKeys(
   // an enumerable contract — treat the param as uncheckable. Inline-literal index
   // signatures don't survive `getTypeFromTypeNode`, so check syntax too.
   if (hasSyntacticIndexSignature(tn)) return null;
-  const type = checker.getTypeFromTypeNode(tn);
+  let type = checker.getTypeFromTypeNode(tn);
   if (type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return null;
   const hasStringIndex = checker
     .getIndexInfosOfType(type)
     .some((i) => (i.keyType.flags & (ts.TypeFlags.String | ts.TypeFlags.Number)) !== 0);
   if (hasStringIndex) return null;
+  const nested = type.getProperty("options") ?? type.getProperty("opts");
+  if (nested) {
+    const nestedType = checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(nested, last));
+    if (nestedType.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) return null;
+    if (checker.getIndexInfosOfType(nestedType).length > 0) return null;
+    type = nestedType;
+  }
   const names = checker
     .getPropertiesOfType(type)
     .map((s) => s.getName())

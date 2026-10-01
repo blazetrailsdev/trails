@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Date as RubyDate, Temporal } from "@blazetrails/date";
 import { plainDate } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Types, ValueType } from "../index.js";
 
@@ -93,6 +93,38 @@ describe("DateType cast and serialize coverage", () => {
     expect(p.newDateFor(2024, 2, 30)).toBe(null);
     expect(p.newDateFor(0, 0, 0)).toBe(null);
     expect(p.newDateFor(2024, 1, 15)?.toString()).toBe("2024-01-15");
+  });
+
+  it("builds the date through ::Date.new, reform gap and negative day included", () => {
+    class Probe extends Types.DateType {
+      newDateFor(y: number, m: number, d: number) {
+        return this.newDate(y, m, d);
+      }
+    }
+    expect(type.cast("1582-10-10")).toBe(null);
+    expect(type.cast("1582-10-04")?.toString()).toBe("1582-10-04");
+    expect(type.cast("June 2020")).toBe(null);
+    expect(new Probe().newDateFor(2020, 2, -1)?.toString()).toBe("2020-02-29");
+  });
+
+  it("keeps the civil triple of a date before the 1582 reform", () => {
+    expect(type.cast("1500-01-01")?.toString()).toBe("1500-01-01");
+    expect(type.cast("1000-03-01")?.toString()).toBe("1000-03-01");
+    expect(type.cast("1582-10-15")?.toString()).toBe("1582-10-15");
+  });
+
+  it("rescues only what ::Date.new raises", () => {
+    class Probe extends Types.DateType {
+      newDateFor(y: number, m: number, d: number) {
+        return this.newDate(y, m, d);
+      }
+    }
+    const boom = vi.spyOn(RubyDate.prototype, "toDate").mockImplementation(() => {
+      throw new RangeError("boom");
+    });
+    expect(() => new Probe().newDateFor(2020, 1, 1)).toThrow(RangeError);
+    boom.mockRestore();
+    expect(new Probe().newDateFor(2020, undefined as unknown as number, 1)).toBe(null);
   });
 
   it("cast month-name string", () => {

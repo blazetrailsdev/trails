@@ -415,10 +415,7 @@ export function _objectForFormBuilder(object: unknown): unknown {
   return Array.isArray(object) ? object.at(-1) : object;
 }
 
-/**
- * @internal
- * @missingRailsArgs merge! — PERMANENT
- */
+/** @internal */
 export function htmlOptionsForFormWith(
   this: FormHelperHost,
   urlForOptions: unknown = null,

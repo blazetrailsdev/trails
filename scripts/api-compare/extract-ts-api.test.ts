@@ -3654,6 +3654,27 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     ).toEqual(["lock", "readonly"]);
   });
 
+  it("reads option keys off an options hash carried as a keyword", () => {
+    const info = extractFromFiles("/p", {
+      "delegated-type.ts": `
+        export function defineDelegatedTypeMethods(
+          role: string,
+          { types, options }: { types: string[]; options: { foreignKey?: string; primaryKey?: string } },
+        ): void {}
+        export function bag(kwargs: { types: string[]; options: Record<string, unknown> }): void {}
+      `,
+    });
+    const fns = Object.values(info.modules).flatMap((m) => [
+      ...m.instanceMethods,
+      ...m.classMethods,
+    ]);
+    expect(fns.find((m) => m.name === "defineDelegatedTypeMethods")!.optionKeys).toEqual([
+      "foreignKey",
+      "primaryKey",
+    ]);
+    expect(fns.find((m) => m.name === "bag")!.optionKeys).toBeNull();
+  });
+
   it("extracts parameters onto a synthesized __mixin constructor", () => {
     const info = extractFromFiles("/p", {
       "attributes.ts": `

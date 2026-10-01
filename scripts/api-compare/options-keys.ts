@@ -88,15 +88,24 @@ export type OptionKeyVerdict =
  * (the Ruby method's positional param names) are dropped from the Ruby side so a
  * positional arg leaked into the symbol set never false-positives (see
  * `positionalSet`).
+ *
+ * `forwarded` says the Ruby body hands its options hash WHOLE to a callee
+ * (`serializable_hash(options)`, serializers/json.rb:103). The keys that callee
+ * reads are then missing from `rubyKeys` by construction, while the TS options
+ * TYPE has to declare them for the forwarding call to type-check — so a TS-only
+ * key there is the callee's contract, not an extra arm, and `extraInTs` is
+ * emptied. `missingInTs` is unaffected: a key the Ruby body itself reads must
+ * still be in the type.
  */
 export function matchOptionKeysAgainst(
   rubyKeys: string[],
   candidates: (string[] | null)[],
   positionalParams: string[] = [],
+  forwarded = false,
 ): OptionKeyVerdict {
   const checkable = candidates.filter((c): c is string[] => c !== null);
   if (checkable.length === 0) return { comparable: false };
   const tsUnion = [...new Set(checkable.flat())];
   const { missingInTs, extraInTs } = diffOptionKeys(rubyKeys, tsUnion, positionalParams);
-  return { comparable: true, missingInTs, extraInTs };
+  return { comparable: true, missingInTs, extraInTs: forwarded ? [] : extraInTs };
 }

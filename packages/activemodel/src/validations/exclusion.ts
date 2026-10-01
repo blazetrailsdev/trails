@@ -17,7 +17,6 @@ export interface ExclusionValidator extends Clusivity {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ExclusionValidator extends EachValidator {
-  /** @missingRailsArgs merge! — PERMANENT */
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     if (this.isInclude(record, value)) {
       record.errors.add(

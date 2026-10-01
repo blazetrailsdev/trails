@@ -271,10 +271,7 @@ import {
   renderBind as _renderBind,
   buildExplainClause as _buildExplainClause,
 } from "./explain.js";
-import {
-  delegatedType as _delegatedType,
-  defineDelegatedTypeMethods as _defineDelegatedTypeMethods,
-} from "./delegated-type.js";
+import * as DelegatedType from "./delegated-type.js";
 import * as _Reflection from "./reflection.js";
 import "./associations/belongs-to-association.js";
 import "./associations/belongs-to-polymorphic-association.js";
@@ -1116,29 +1113,10 @@ export class Base extends Model {
   /** @internal */
   declare static buildExplainClause: typeof _buildExplainClause;
 
-  static delegatedType(
-    role: string,
-    options: import("./delegated-type.js").DelegatedTypeOptions,
-  ): void {
-    _delegatedType(this, role, options);
-  }
+  declare static delegatedType: typeof DelegatedType.delegatedType;
 
   /** @internal */
-  static defineDelegatedTypeMethods(
-    role: string,
-    {
-      types,
-      options,
-    }: {
-      types: string[];
-      options: Omit<import("./delegated-type.js").DelegatedTypeOptions, "types">;
-    },
-  ): void {
-    _defineDelegatedTypeMethods(this, role, {
-      types,
-      options: options as import("./delegated-type.js").DelegatedTypeOptions,
-    });
-  }
+  declare static defineDelegatedTypeMethods: typeof DelegatedType.defineDelegatedTypeMethods;
 
   declare static store: typeof _StoreClassMethods.store;
 
@@ -2566,6 +2544,7 @@ extend(Base, {
   assertValidEnumOptions: _EnumModule.assertValidEnumOptions,
   detectNegativeEnumConditionsBang: _EnumModule.detectNegativeEnumConditionsBang,
 });
+extend(Base, DelegatedType);
 extend(Base, {
   collectingQueriesForExplain: _collectingQueriesForExplain,
   execExplain: _execExplain,

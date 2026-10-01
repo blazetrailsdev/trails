@@ -79,6 +79,7 @@ export const EXTRACTOR_OUTPUT_FIELDS = [
   "localSkeleton",
   "internal",
   "option_keys",
+  "option_keys_forwarded",
   "optionKeys",
   "declaredIn",
   "noRailsEquivalent",

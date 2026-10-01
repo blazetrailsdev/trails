@@ -255,6 +255,9 @@ export interface MethodInfo {
   /** Ruby-side option symbols consumed from an `options`/`opts`/`**kwargs`
    *  param (raw snake_case); advisory under-approximation. See options-keys.ts. */
   option_keys?: string[];
+  /** Ruby-side only: the body hands the options var whole to a callee, so the
+   *  keys that callee reads are not in `option_keys`. See options-keys.ts. */
+  option_keys_forwarded?: boolean;
   /**
    * TS-side only: this entry is a `set` accessor. Ruby spells the writer as its
    * OWN method (`where_clause=`), but conventions.ts maps that onto the bare

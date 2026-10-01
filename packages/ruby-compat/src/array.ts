@@ -527,6 +527,21 @@ export function union<T>(ary1: readonly T[], ary2: readonly T[]): T[] {
 }
 
 /**
+ * Ruby `Array#intersect?` (`vendor/ruby/v3.3.11/array.c:5680` `rb_ary_intersect_p`):
+ * whether the two arrays share an element, compared by `eql?` as
+ * `rb_ary_includes_by_eql` does. An empty array on either side answers false.
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#intersect?`
+ *   (`vendor/ruby/v3.3.11/array.c:5680`).
+ */
+export function isIntersect<T>(ary1: readonly T[], ary2: readonly T[]): boolean {
+  if (ary1.length === 0 || ary2.length === 0) return false;
+  for (const v of ary1) {
+    if (ary2.some((e) => rbEql(e, v))) return true;
+  }
+  return false;
+}
+
+/**
  * Ruby `Array#sort` without a block (`vendor/ruby/v3.3.11/array.c:3473` `rb_ary_sort`):
  * a sorted copy, ordered by `sort_2` (`array.c:3301`), which sends `<=>` and
  * hands the answer to `rb_cmpint`, so a `nil` `<=>` raises
