@@ -923,8 +923,6 @@ class TestExtractor
     %i[> >= < <= ==].include?(op) ? bound.length.public_send(op, Integer(right[1])) : nil
   end
 
-  # `<var>.kind_of?(Array)` / `.is_a?(Array)` on a bound element, the test
-  # `[ :all, [] ].each do |scope|` names its cases by at inflector_test.rb:615-617.
   def eval_loop_kind_of(node, bindings)
     call = node[1]
     return nil unless call.is_a?(Array) && call[0] == :call && %w[kind_of? is_a?].include?(ident_name(call[3]))
@@ -1240,11 +1238,9 @@ class TestExtractor
   # name: the block variable itself, `.name` / `.to_s` / `.inspect` on it, `.gsub` with two
   # string literals (`klass.name.gsub('::', '_')`), `Regexp.escape` on a bound
   # string (`:"test_to_regexp_#{Regexp.escape(path)}"` at
-  # journey/path/pattern_test.rb:28), `.keys.map(&:to_s).join(<literal>)` on a
+  # journey/path/pattern_test.rb:28) and `.keys.map(&:to_s).join(<literal>)` on a
   # bound hash (`"test_recognize_#{expected.keys.map(&:to_s).join('_')}"` at
-  # journey/router_test.rb:320), and a ternary between two of those on a
-  # `kind_of?` test (`#{scope.kind_of?(Array) ? "no_arguments" : scope}` at
-  # inflector_test.rb:617).
+  # journey/router_test.rb:320).
   def eval_loop_expr(node, bindings)
     return nil unless node.is_a?(Array)
     case node[0]
