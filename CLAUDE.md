@@ -1072,14 +1072,14 @@ That is the whole constraint, and it splits Rails' sections in two:
 This is a genuine language shortcoming, ratified repo-wide here. If one of those
 bodies ever gains an `await`, it gains the monitor in the same change.
 
-## Method visibility is a side table (`Module#private`, `basic_obj_respond_to`'s `pub`)
+## Method visibility is compile-time only (`Module#private`, `basic_obj_respond_to`'s `pub`)
 
 Ruby's `basic_obj_respond_to` (`vendor/ruby/v3.3.11/vm_method.c:2864-2879`) takes a
 `pub` flag and hands it to `method_boundp` (`:1788-1818`), so `respond_to?(:m)`
-and `respond_to?(:m, true)` can answer differently for the same receiver: a
-PRIVATE entry, and under `BOUND_RESPONDS` a PROTECTED one, answers `0` when
-`pub` is set and falls through to `respond_to_missing?`. Visibility is a
-property of the method entry, readable at run time.
+and `respond_to?(:m, true)` can answer differently for the same receiver, and
+`Kernel#public_send` (`vm_eval.c:1350`) raises `NoMethodError` "private method
+'…' called for …" where `send` dispatches. Visibility is a property of the
+method entry, readable at run time.
 
 JS has no such fact of its own, and both of its would-be carriers fail in
 opposite directions:
@@ -1091,31 +1091,59 @@ opposite directions:
   runtime residue: it is emitted as an ordinary property, so `in` reports it at
   BOTH `pub` values, where Ruby hides it at `pub = 1`.
 
-**The carrier is a side table in ruby-compat.** `rbModPrivate(klass, ...mids)` /
-`rbModProtected(klass, ...mids)` (`packages/ruby-compat/src/object.ts`, the
-ports of `rb_mod_private` / `rb_mod_protected`, `vm_method.c:2482-2516`) record
-`(klass.prototype, mid) → visibility`, raising `NameError` for a name the class
-does not answer as `check_and_export_method` does; a JS accessor's setter
-answers the writer `name=`. The TS `private` / `protected` keyword stays beside
-the call for the type checker; the call is what Ruby sees. Two readers consult
-the table:
+**trails has no runtime privates.** A Rails-private method is marked `private` /
+`protected` in TypeScript, and `@internal` per `blazetrails/rails-private-jsdoc`,
+and that is the whole port. No side table, no `#private` emulation, no Proxy.
 
-- `basicObjRespondTo` walks the chain as before, but an entry recorded in the
-  table is the entry at that owner, and under `pub` a non-public one sends the
-  name to `respondToMissing`, exactly `method_boundp`'s `0`.
-- `rbFPublicSend` (`Kernel#public_send`, `vm_eval.c:1350`) raises
-  `NoMethodError` "private method '…' called for …" off the same table, so
+A side table in ruby-compat (`rbModPrivate` / `rbModProtected` recording
+`(klass.prototype, mid) → visibility`, read by `basicObjRespondTo` and
+`rbFPublicSend`) was the alternative. It shipped in #8113 and was removed:
+
+- **Cost on a hot path.** `rbFPublicSend` walked the whole prototype chain a
+  second time, with a `WeakMap` lookup per level, before dispatching. Measured
+  on the built `ruby-compat` (8-level chain, 2M iterations, best of 5): `rbFSend`
+  626 ns/op, `rbFPublicSend` 1,063 ns/op — ~440 ns, 70% over `send`.
   `ActiveModel::AttributeAssignment#_assign_attribute`
-  (`attribute_assignment.rb:67-76`) is a `public_send` with its Rails rescue.
+  (`attribute_assignment.rb:67-76`) is a `public_send` per mass-assigned
+  attribute, so every `new Post({...})` / `update` paid it, and
+  `basicObjRespondTo` made the same lookup per level.
+- **Almost nothing used it.** The only production registration was five names on
+  `ActionDispatch::Request`.
+- **It could not deliver the behaviour.** `topic.title` is a plain property read
+  with no caller context, so it cannot raise while `send(:title)` succeeds.
+- **Completing it is worse.** Full fidelity means registering every Rails-private
+  method at module load and keeping a second source of truth in sync with the TS
+  `private` keyword.
 
-The table does NOT reach a plain property access. `topic.title` carries no
-caller context, so it cannot raise while `send(:title)` succeeds; the
-`assert_raise(NoMethodError) { topic.title }` arms of "attribute
-readers/writers/predicates respect access control"
-(`activerecord/test/cases/attribute_methods_test.rb:998-1026`) remain a
-separate decision (`activerecord-private-attribute-methods-are-still-public`).
-The `pub` parameter is therefore live, and `ActiveModel::AttributeMethods`'
-two `super` calls (`attribute_methods.rb:528-533`) differ in it as in Rails.
+As a consequence:
+
+- Ruby `private` / `protected` ports as the TS keyword plus `@internal`. Nothing
+  is recorded at run time, and `Module#private` / `Module#protected` /
+  `private_constant` are not ported.
+- `respond_to?(m)` and `respond_to?(m, true)` answer the same for a defined
+  method. `basicObjRespondTo`'s `pub` and `rbObjRespondTo`'s `priv` stay, and
+  reach only `respondToMissing` / an overridden `isRespondTo`, so
+  `ActiveModel::AttributeMethods`' two `super` calls
+  (`attribute_methods.rb:528-533`) are still ported as two calls.
+- `rbFPublicSend` dispatches a defined method exactly as `rbFSend` does. It still
+  raises `NoMethodError` for an undefined name and still goes to `methodMissing`,
+  so a Rails `public_send` keeps its `rbFPublicSend` spelling and its rescue.
+  `rbModPublicMethodDefined` (`Module#public_method_defined?`) answers "defined".
+- A Rails test whose assertions turn on private / protected visibility at run
+  time is permanently unportable for that arm: `assert_not_respond_to` on a
+  private method, `assert_raise(NoMethodError)` on a private call, a `public_send`
+  refused by a private writer ("attribute readers/writers/predicates respect
+  access control" and "bulk updates respect access control",
+  `activerecord/test/cases/attribute_methods_test.rb:998-1033`). Port the
+  assertions that do not depend on it; park the rest as `it.skip` under a
+  `PERMANENT-SKIP:` line citing this section.
+- Code whose Rails body branches on visibility (Thor's `public_method?` /
+  `private_method?` deciding what is a command) needs an explicit mechanism
+  decided per class, not a general visibility table.
+
+This is a genuine language shortcoming, ratified repo-wide here. There is no
+story to add a runtime visibility carrier, and a new instance is not a new
+decision to argue.
 
 ## Schema reflection peeks at a warm cache (`load_schema!`'s `schema_cache.columns_hash`)
 

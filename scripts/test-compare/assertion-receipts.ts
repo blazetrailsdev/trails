@@ -47,6 +47,16 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
         'attributes_test.rb:45 `assert_kind_of Float` — a JS number has no Float class; the port asserts `rbObjClass(...)` equals "Float", the boxed Float seat FloatType#castValue produces',
     },
   ],
+  "activemodel:attribute_methods_test.rb › AttributeMethodsTest › should not interfere with respond_to? if the attribute has a private/protected method":
+    [
+      {
+        kind: "assert_not_respond_to",
+        value: null,
+        as: null,
+        reason:
+          'attribute_methods_test.rb:319 `assert_not_respond_to m, :private_method` — a JS method entry carries no visibility, so a defined method answers `respond_to?` at both arities (CLAUDE.md, "Method visibility is compile-time only")',
+      },
+    ],
   "activesupport:core_ext/duration_test.rb › DurationTest › is a": [
     {
       kind: "assert_kind_of",

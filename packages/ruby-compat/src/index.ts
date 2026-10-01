@@ -46,9 +46,7 @@ export {
   rbObjSingletonClass,
   rbFPublicSend,
   rbFSend,
-  rbModPrivate,
   rbModPublicMethodDefined,
-  rbModProtected,
   rtest,
 } from "./object.js";
 export {

@@ -303,11 +303,10 @@ describe("Mapper::Mapping#build_conditions", () => {
     const set = new RouteSet();
     new Mapper(set).get("/foo", {
       to: "posts#index",
-      constraints: { ip: "127.0.0.1", checkMethod: "GET", hasOwnProperty: "x" },
+      constraints: { ip: "127.0.0.1", hasOwnProperty: "x" },
     });
     const [route] = set.routes.routes;
     expect(Object.keys(route.conditions)).toContain("ip");
-    expect(Object.keys(route.conditions)).not.toContain("checkMethod");
     expect(Object.keys(route.conditions)).not.toContain("hasOwnProperty");
   });
 });

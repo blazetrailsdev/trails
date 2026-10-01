@@ -8,7 +8,6 @@ import {
   rbObjRespondTo,
   rbFPublicSend,
   rbFSend,
-  rbModPrivate,
   rbModPublicMethodDefined,
   rbDeclareIvar,
   rbObjInstanceVariables,
@@ -195,11 +194,7 @@ class Req {
   subdomain(): string {
     return "clients";
   }
-  secret(): string {
-    return "s";
-  }
 }
-rbModPrivate(Req, "secret");
 
 describe("rbFSend", () => {
   it("calls a method, a getter, or reads a field by name", () => {
@@ -209,10 +204,10 @@ describe("rbFSend", () => {
     expect(rbFSend(req, "field")).toBe("f");
   });
 
-  it("calls a private method where public_send raises", () => {
+  it("public_send dispatches a defined method as send does", () => {
     const req = new Req();
-    expect(rbFSend(req, "secret")).toBe("s");
-    expect(() => rbFPublicSend(req, "secret")).toThrow(NoMethodError);
+    expect(rbFPublicSend(req, "subdomain")).toBe(rbFSend(req, "subdomain"));
+    expect(() => rbFPublicSend(req, "nope")).toThrow(NoMethodError);
   });
 
   it("raises NoMethodError for an unbound name", () => {
@@ -228,8 +223,7 @@ describe("rbModPublicMethodDefined", () => {
     expect(rbModPublicMethodDefined(SubReq, "subdomain")).toBe(true);
   });
 
-  it("does not answer a private method, a field, an Object.prototype member, or an unknown name", () => {
-    expect(rbModPublicMethodDefined(Req, "secret")).toBe(false);
+  it("does not answer a field, an Object.prototype member, or an unknown name", () => {
     expect(rbModPublicMethodDefined(Req, "field")).toBe(false);
     expect(rbModPublicMethodDefined(Req, "hasOwnProperty")).toBe(false);
     expect(rbModPublicMethodDefined(Req, "nope")).toBe(false);

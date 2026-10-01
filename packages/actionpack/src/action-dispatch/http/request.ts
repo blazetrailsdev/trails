@@ -1,5 +1,5 @@
 import { camelize, NameError, presence, toSentence, underscore } from "@blazetrails/activesupport";
-import { rbModPrivate, rbStrDump } from "@blazetrails/ruby-compat";
+import { rbStrDump } from "@blazetrails/ruby-compat";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
   parseNestedQuery,
@@ -1136,14 +1136,5 @@ Request.prototype.formatFromPathExtension = function (this: Request) {
 Request.prototype.isParamsReadable = function (this: Request) {
   return _paramsReadable.call(mimeHost(this));
 };
-
-rbModPrivate(
-  Request,
-  "checkMethod",
-  "defaultSession",
-  "readBodyStream",
-  "resetStream",
-  "fallbackRequestParameters",
-);
 
 ActionDispatch.Request = Request;

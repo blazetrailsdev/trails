@@ -20,13 +20,7 @@ import {
   TimeType,
   UnknownAttributeError as AMUnknownAttributeError,
 } from "@blazetrails/activemodel";
-import {
-  ArgumentError,
-  Module,
-  basicObjRespondTo,
-  NoMethodError,
-  rbModPrivate,
-} from "@blazetrails/ruby-compat";
+import { ArgumentError, Module, basicObjRespondTo, NoMethodError } from "@blazetrails/ruby-compat";
 import { Base, DangerousAttributeError, Type, UnknownAttributeError } from "./index.js";
 
 import { GeneratedAttributeMethods } from "./attribute-methods.js";
@@ -756,7 +750,7 @@ describe("AttributeMethodsTest", () => {
     expect(CanonicalTopic.skipTimeZoneConversionForAttributes).toEqual(["field_a"]);
     expect(Minimalistic.skipTimeZoneConversionForAttributes).toEqual(["field_b"]);
   });
-  // BLOCKED: activerecord-private-attribute-methods-are-still-public
+  // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
   it.skip("attribute predicates respect access control", async () => {
     class Target extends Base {
       static {
@@ -773,12 +767,12 @@ describe("AttributeMethodsTest", () => {
     assertIncludes(exception.message, "private method");
     expect(topic["title?"]).toBeTruthy();
   });
-  it("bulk updates respect access control", async () => {
+  // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
+  it.skip("bulk updates respect access control", async () => {
     class Target extends Base {
       static {
         this.tableName = "topics";
         this.attribute("title", "string");
-        rbModPrivate(this, "title=");
       }
       private set title(_value: string) {}
     }
@@ -1716,7 +1710,7 @@ describe("AttributeMethodsTest", () => {
     await assertNothingRaised(() => klass.defineAttributeMethod("bar"));
   });
 
-  // BLOCKED: activerecord-private-attribute-methods-are-still-public
+  // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
   it.skip("attribute readers respect access control", async () => {
     class Target extends Base {
       static {
@@ -1737,7 +1731,7 @@ describe("AttributeMethodsTest", () => {
     expect(topic.title).toBe("I'm private");
   });
 
-  // BLOCKED: activerecord-private-attribute-methods-are-still-public
+  // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
   it.skip("attribute writers respect access control", async () => {
     class Target extends Base {
       static {
