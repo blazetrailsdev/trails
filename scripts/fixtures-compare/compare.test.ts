@@ -47,7 +47,6 @@ describe("stripErb ERB expanders", () => {
     expect(rendered).toBe("x10=0;x11=1;");
   });
   it("renders a Ruby string's `#{v}` interpolation as a template literal", () => {
-    // categories_ordered.yml: `name: <%= "Category #{i}" %>`.
     const { rendered } = stripErb('<% 2.times do |i| %>n: <%= "Category #{i+1}" %>;<% end %>');
     expect(rendered).toBe("n: Category 1;n: Category 2;");
   });
@@ -472,7 +471,6 @@ describe("compareFile", () => {
     expect(r.status).toBe("ERB-UNSUPPORTED");
   });
   it("compares a HABTM label on both rows instead of dropping the Rails side", async () => {
-    // dead_parrots.yml: `treasures: [ruby, sapphire]` on a DeadParrot row in `parrots`.
     const tables = new Map([["dead_parrots", { table: "parrots", modelClass: "DeadParrot", declared: true }]]); // prettier-ignore
     const schema: Schema = {
       parrots: { name: "string", parrot_sti_class: "string", killer_id: "integer" },
@@ -486,8 +484,6 @@ describe("compareFile", () => {
     expect(canonicalizeRailsRow({ treasures: ["ruby"] }, {}, new Set(["name"]), "parrots")).toEqual({ treasures: ["ruby"] }); // prettier-ignore
   });
   it("compares a key both rows spell the same way verbatim, column or not", async () => {
-    // naked/yml/parrots.yml carries `arrr` / `foobar` so create_fixtures raises
-    // on them (fixtures_test.rb:557-563); the TS fixture mirrors the bad keys.
     const tables = new Map([["naked/yml/parrots", { table: "parrots", modelClass: "Parrot", declared: true }]]); // prettier-ignore
     const rows = new Map([["naked/yml/parrots", { george: { arrr: "Curious George", foobar: "Foobar" } }]]); // prettier-ignore
     const r = await compareFile("naked/yml/parrots.yml", rows, empty, undefined, { parrots: { name: "string" } }, new Map(), tables); // prettier-ignore

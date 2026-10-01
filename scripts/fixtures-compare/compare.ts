@@ -51,25 +51,30 @@ export const FIXTURE_SCHEMA: Schema = {
 /**
  * Directories a Rails test passes as the fixtures path in place of
  * FIXTURES_ROOT, so a set's name is its path below that directory
- * (`test_fixtures.rb:59-63`).
+ * (`test_fixtures.rb:59-63`): `all` at `fixtures_test.rb:1239`, `naked/yml` at
+ * `:542-566`, `primary_key_error` at `:1638`, and `reserved_words` at
+ * `reserved_word_test.rb:139`.
  */
 export const FIXTURE_PATHS: readonly string[] = [
-  "all", // fixtures_test.rb:1239
-  "naked/yml", // fixtures_test.rb:542-566
-  "primary_key_error", // fixtures_test.rb:1638
-  "reserved_words", // reserved_word_test.rb:139
+  "all",
+  "naked/yml",
+  "primary_key_error",
+  "reserved_words",
 ];
 
 /**
  * The class Rails loads a set under where the models manifest cannot derive
  * it: a `set_fixture_class` (`test_fixtures.rb:52-54`), a class handed to
- * `FixtureSet.new`, or a model the test file defines itself.
+ * `FixtureSet.new`, or a model the test file defines itself. From
+ * `fixtures_test.rb`: `bad_posts` at `:989`, `categories_ordered` at `:573`,
+ * `fk_object_to_point_to` at `:880`, and the three `randomly_named_*` sets at
+ * `:1498-1503`.
  */
 export const FIXTURE_CLASS_NAMES: Readonly<Record<string, string>> = {
-  bad_posts: "Post", // fixtures_test.rb:989
-  categories_ordered: "Category", // fixtures_test.rb:573
-  fk_object_to_point_to: "FkObjectToPointTo", // fixtures_test.rb:880
-  randomly_named_a9: "ClassNameThatDoesNotFollowCONVENTIONS", // fixtures_test.rb:1498-1503
+  bad_posts: "Post",
+  categories_ordered: "Category",
+  fk_object_to_point_to: "FkObjectToPointTo",
+  randomly_named_a9: "ClassNameThatDoesNotFollowCONVENTIONS",
   "admin/randomly_named_a9": "Admin::ClassNameThatDoesNotFollowCONVENTIONS1",
   "admin/randomly_named_b0": "Admin::ClassNameThatDoesNotFollowCONVENTIONS2",
 };
@@ -226,9 +231,6 @@ function fixtureIdValue(label: string): number {
   return ((crc ^ 0xffffffff) >>> 0) % FIXTURE_MAX_ID;
 }
 
-// An output expression the TS spelling evaluates identically: integers,
-// `+ - * ( ) [ ]` and the loop variables in scope. `/` is excluded — Ruby
-// integer division truncates toward -∞ and JS `/` is float division.
 const arithmetic = (expr: string, vars: readonly string[]): boolean =>
   /^[\d\s+\-*()[\]]+$/.test(
     expr.replace(new RegExp(`\\b(?:${vars.join("|") || "(?!)"})\\b`, "g"), "0"),
@@ -238,8 +240,10 @@ const arithmetic = (expr: string, vars: readonly string[]): boolean =>
  * Rails' fixture templates are ERB with Ruby in the tags; trails spells the
  * same template as TSE (`fixture-set/test-data/developers.yml`). Transliterates
  * the loop tags and output expressions to that spelling; an output expression
- * outside the arithmetic grammar becomes ERB_SKIP_SENTINEL, and any other
- * control tag is left as Ruby for `stripErb` to report.
+ * outside the arithmetic grammar (integers, `+ - * ( ) [ ]` and the loop
+ * variables; no `/`, which truncates in Ruby and not in JS) becomes
+ * ERB_SKIP_SENTINEL, and any other control tag is left as Ruby for `stripErb`
+ * to report.
  */
 function erbToTse(text: string): string {
   const vars: string[] = [];
@@ -303,14 +307,16 @@ function expandIdentify(text: string): string {
   );
 }
 
+/**
+ * Renders a Rails fixture template to YAML text. An opaque output expression
+ * (`2.weeks.ago.to_fs(:db)`, `binary(...)`) becomes ERB_SKIP_SENTINEL so the
+ * per-attribute diff skips only that attribute; a control tag with no TSE
+ * spelling marks the whole file unsupported.
+ */
 export function stripErb(text: string): { rendered: string; unsupported: boolean } {
   let r = text.replace(/<%=\s*ActiveRecord::Base\.connection\.adapter_name\s*%>/g, "SQLite");
   r = expandIdentify(r);
-  // Any other opaque `<%= ... %>` output (`2.weeks.ago.to_fs(:db)`,
-  // `binary(...)`) is sentinelized by `erbToTse`, so YAML parses and the
-  // per-attr diff can skip just that attribute.
   r = erbToTse(r);
-  // A control tag still spelled in Ruby (unhandled control flow) marks the whole file.
   if (/<%(?!=|\s*(?:for \(|\} %>))/.test(r)) return { rendered: r, unsupported: true };
   return { rendered: r.includes("<%") ? renderTse(r) : r, unsupported: false };
 }
@@ -326,8 +332,6 @@ function loadRailsYaml(file: string, basename: string): { ok: true; data: Fixtur
   if (unsupported) return { ok: false, reason: "ERB-UNSUPPORTED" };
   let parsed: unknown;
   try {
-    // Psych keeps the last of a repeated key, and the library's duplicate
-    // check is quadratic in a map's size (citations.yml renders 65536 rows).
     parsed = parseYaml(rendered, { merge: true, uniqueKeys: false });
   } catch {
     return { ok: false, reason: "YAML-PARSE-ERR" };
@@ -693,6 +697,8 @@ function computeTableName(classes: ReadonlyMap<string, RubyClass>, klass: RubyCl
  * default model name when it constantizes (`fixtures.rb:544-548`), else the
  * file's `_fixture.model_class` (`fixtures.rb:792`); then that class's table
  * name, or `default_fixture_table_name` (`fixtures.rb:550-554`) with no class.
+ * The manifest names a class nested in a class (`Post::CategoryPost`) by its
+ * last segment, so a file's `model_class` is also looked up that way.
  */
 export function fixtureTable(
   name: string,
@@ -705,7 +711,6 @@ export function fixtureTable(
     .map((segment, i, all) => camelize(i === all.length - 1 ? singularize(segment) : segment))
     .join("::");
   const passed = FIXTURE_CLASS_NAMES[name];
-  // The manifest names a class nested in a class (`Post::CategoryPost`) by its last segment.
   const klass =
     classes.get(passed ?? defaultName) ??
     (passed || !fileModelClass
@@ -773,9 +778,6 @@ export function schemaCheck(
       if (labelAttrs?.has(attr)) continue;
       if (COMPOSITE_FK_LABEL_ATTRS[snake]?.has(attr)) continue;
       if (belongsTo.has(attr)) continue;
-      // A key Rails' own row spells the same way is the fixture's data, not
-      // drift: `naked/yml/parrots.yml` carries `arrr` / `foobar` so that
-      // `create_fixtures` raises on them (fixtures_test.rb:557-563).
       if (Object.keys(railsRows[rowName] ?? {}).some((k) => normalizeSymbolKey(k) === attr))
         continue;
       notes.push(`schema-extra-col: ${rowName}.${attr} not in schema["${snake}"]`);
@@ -817,8 +819,6 @@ export function canonicalizeRailsRow(railsRow: Row, tsRow: Row, columns: Set<str
     if (known(k) || Object.hasOwn(tsRow, k) || COMPOSITE_FK_LABEL_ATTRS[table]?.has(k)) { out[k] = v; continue; }
     const assocKey = k.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
     if (belongsTo.has(assocKey) && Object.hasOwn(tsRow, assocKey)) { out[assocKey] = v; continue; } // prettier-ignore
-    // A HABTM label stays on the Rails row under the TS spelling, so a TS row
-    // that drops it surfaces as missing-in-ts.
     if (HABTM_LABEL_ATTRS[table]?.has(assocKey)) { out[assocKey] = v; continue; }
     // Rails' `replace_belongs_to_keys` also handles polymorphic shorthand —
     // `assoc: label (Type)` splits into `<col>` + `<assoc>_type`. Shared
@@ -907,8 +907,9 @@ export async function compareFile(yamlPath: string, yamlByTable: Map<string, Fix
       anyDiff = true;
     }
     const skipAttrs = SKIP_ATTRS[snake];
-    // A declared HABTM / has_many:through label (`sharedComputers`) is a list
-    // of labels on both sides, not a column value: skip it once both carry it.
+    // A declared HABTM / has_many:through label (`sharedComputers`) is TS-only:
+    // canonicalizeRailsRow already dropped its snake form from the Rails side, so
+    // it would otherwise read as extra-in-ts. Skip it symmetrically.
     const labelAttrs = HABTM_LABEL_ATTRS[tableSnake];
     for (const attr of new Set([...Object.keys(railsRow), ...Object.keys(tsRow)])) {
       // Intentionally-unmirrored columns (binary blobs) are soft skips, even
@@ -1027,9 +1028,6 @@ async function main(): Promise<void> {
       fixtureTable(fixtureSetName(snake, files), fileModelClass, classes, railsTables),
     );
   }
-  // The id index is keyed by the table a set loads into. Sets sharing a table
-  // merge; FIXTURES_ROOT's own files go last so their rows win a label clash
-  // with a set only ever loaded from another fixtures directory.
   const yamlByTableName = new Map<string, FixtureMap>();
   const subdirsFirst = [...yamlByTable].sort(([a], [b]) => Number(b.includes("/")) - Number(a.includes("/"))); // prettier-ignore
   for (const [snake, rows] of subdirsFirst) {
@@ -1063,8 +1061,6 @@ async function main(): Promise<void> {
   }
   const n = (s: Status): number => results.filter((r) => r.status === s).length;
   const other = results.length - n("MATCH") - n("DIFF") - n("MISSING") - n("ERB-UNSUPPORTED");
-  // A set whose table no Rails schema file declares (the test creates it, or
-  // never loads the set) has nothing to port.
   const evaluated = results
     .filter(schemaEvaluated)
     .filter((r) => r.schemaPorted || r.schemaDeclared);
