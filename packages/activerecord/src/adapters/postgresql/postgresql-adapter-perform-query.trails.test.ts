@@ -5,10 +5,13 @@ import { Value } from "../../type.js";
 import { Base } from "../../base.js";
 import type { AbstractAdapter } from "../../connection-adapters/abstract-adapter.js";
 import { ReadOnlyError, StatementInvalid } from "../../errors.js";
+import { fixtures } from "../../test-fixtures.js";
 
 describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
   let adapter: PostgreSQLAdapter;
   let connection: AbstractAdapter;
+
+  fixtures({}, { useTransactionalTests: false });
 
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);

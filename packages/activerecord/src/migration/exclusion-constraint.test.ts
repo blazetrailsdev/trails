@@ -30,6 +30,7 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
   });
 
   afterEach(async () => {
+    // eslint-disable-next-line blazetrails/require-canonical-rebuild
     await connection.dropTable("invoices", { ifExists: true });
   });
 

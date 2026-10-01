@@ -5,8 +5,11 @@ import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { ReadOnlyError } from "../../errors.js";
 import { Result } from "../../result.js";
+import { fixtures } from "../../test-fixtures.js";
 
 let adapter: SQLite3Adapter;
+
+fixtures({}, { useTransactionalTests: false });
 
 beforeEach(async () => {
   adapter = new BetterSQLite3Adapter({ database: ":memory:" });

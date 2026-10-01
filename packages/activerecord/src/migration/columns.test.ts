@@ -16,6 +16,7 @@ import { assertDifference, assertRaises } from "@blazetrails/activesupport";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 import { adapterSupports } from "../support/supports.js";
 import { rbInspect } from "@blazetrails/ruby-compat";
+import { fixtures } from "../test-fixtures.js";
 
 const mariaDbRejectsUniqueColumnDrop =
   adapterType === "mysql" && isMariaDb && (serverVersion?.compare("10.2.8") ?? -1) >= 0;
@@ -33,6 +34,8 @@ include(ColumnsTest, TestHelper);
 
 describe("Migration", () => {
   const self = new ColumnsTest();
+
+  fixtures({}, { useTransactionalTests: false });
 
   beforeEach(() => self.setup());
   afterEach(() => self.teardown());

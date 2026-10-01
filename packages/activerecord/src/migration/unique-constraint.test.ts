@@ -32,6 +32,7 @@ describeIfSupports("unique_constraints", "Migration", () => {
   });
 
   afterEach(async () => {
+    // eslint-disable-next-line blazetrails/require-canonical-rebuild
     await connection.dropTable("sections", { ifExists: true });
   });
 

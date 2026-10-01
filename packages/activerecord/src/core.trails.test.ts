@@ -89,11 +89,11 @@ describe("connection checkout for directly-assigned adapters", () => {
   beforeEach(async () => {
     adapter = new BetterSQLite3Adapter({ database: ":memory:" });
     await adapter.execute(
-      "CREATE TABLE topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, approved INTEGER DEFAULT 0)",
+      "CREATE TABLE direct_topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, approved INTEGER DEFAULT 0)",
     );
     const adp = adapter;
     class TopicWithDirectAdapter extends Base {
-      static tableName = "topics";
+      static tableName = "direct_topics";
       static {
         this.connectionSpecificationName = "TopicWithDirectAdapter";
         this.attribute("id", new IntegerType());
@@ -106,12 +106,12 @@ describe("connection checkout for directly-assigned adapters", () => {
   });
 
   afterEach(async () => {
-    await adapter.execute("DROP TABLE IF EXISTS topics");
+    await adapter.execute("DROP TABLE IF EXISTS direct_topics");
     await adapter.disconnectBang();
   });
 
   it("find resolves through the assigned adapter without a pool", async () => {
-    await adapter.execute("INSERT INTO topics (id, title) VALUES (42, 'Alice')");
+    await adapter.execute("INSERT INTO direct_topics (id, title) VALUES (42, 'Alice')");
     expect((await DirectTopic.find(42)).readAttribute("title")).toBe("Alice");
     expect((await DirectTopic.findBy({ title: "Alice" }))!.id).toBe(42);
   });

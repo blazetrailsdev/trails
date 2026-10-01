@@ -192,27 +192,27 @@ describe("LibSQLAdapter — local-file smoke", () => {
     removeFiles();
     adapter = new LibSQLAdapter({ database: dbPath });
     await adapter.execute(
-      "CREATE TABLE items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)",
+      "CREATE TABLE libsql_items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)",
     );
   });
 
   afterAll(async () => {
-    await adapter.execute("DROP TABLE IF EXISTS items");
+    await adapter.execute("DROP TABLE IF EXISTS libsql_items");
     await adapter.disconnectBang();
     removeFiles();
   });
 
   it("inserts and selects rows through the adapter", async () => {
-    await adapter.execute("INSERT INTO items (name) VALUES ('apple')");
-    await adapter.execute("INSERT INTO items (name) VALUES ('banana')");
-    const rows = (await adapter.execute("SELECT name FROM items ORDER BY id"))!;
+    await adapter.execute("INSERT INTO libsql_items (name) VALUES ('apple')");
+    await adapter.execute("INSERT INTO libsql_items (name) VALUES ('banana')");
+    const rows = (await adapter.execute("SELECT name FROM libsql_items ORDER BY id"))!;
     expect(rows.map((r) => (r as { name: string }).name)).toEqual(["apple", "banana"]);
   });
 
   it("reflects schema ops via the shared SQLite3Adapter dialect", async () => {
     const tables = await adapter.tables();
-    expect(tables).toContain("items");
-    const columns = await adapter.columns("items");
+    expect(tables).toContain("libsql_items");
+    const columns = await adapter.columns("libsql_items");
     expect(columns.map((c) => c.name)).toContain("name");
   });
 });
@@ -242,8 +242,8 @@ describe("SqliteDriver — libsql restoreFromPath", () => {
     removeTempFiles();
     const tpl = await libsqlDriver.open({ database: templatePath });
     await tpl.exec(
-      "CREATE TABLE gadgets (id INTEGER PRIMARY KEY, label TEXT);" +
-        "INSERT INTO gadgets (label) VALUES ('alpha'), ('beta');",
+      "CREATE TABLE libsql_items (id INTEGER PRIMARY KEY, label TEXT);" +
+        "INSERT INTO libsql_items (label) VALUES ('alpha'), ('beta');",
     );
     await tpl.close();
   });
@@ -254,7 +254,7 @@ describe("SqliteDriver — libsql restoreFromPath", () => {
     await libsqlDriver.restoreFromPath!(templatePath, destPath);
 
     const probe = await libsqlDriver.open({ database: destPath });
-    const count = (await (await probe.prepare("SELECT count(*) AS c FROM gadgets")).get()) as {
+    const count = (await (await probe.prepare("SELECT count(*) AS c FROM libsql_items")).get()) as {
       c: number;
     };
     expect(count.c).toBe(2);
