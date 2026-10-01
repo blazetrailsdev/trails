@@ -29,8 +29,13 @@ describe("Thor::Error", () => {
   });
 
   it("formats the corrections with the formatter DidYouMean currently holds", () => {
-    const parens = { messageFor: (corrections: string[]) => ` (${corrections.join(", ")}?)` };
-    expect(setFormatter(parens)).toBe(parens);
+    class Parens extends Formatter {
+      static override messageFor(corrections: string[]): string {
+        return ` (${corrections.join(", ")}?)`;
+      }
+    }
+    expect(setFormatter(Parens)).toBe(Parens);
+    expect(new (formatter())()).toBeInstanceOf(Parens);
     try {
       expect(new UndefinedCommandError("instal", ["install"], null).message).toBe(
         'Could not find command "instal". ("install"?)',
@@ -39,6 +44,7 @@ describe("Thor::Error", () => {
       setFormatter(null);
     }
     expect(formatter()).toBe(Formatter);
+    expect(new (formatter())()).toBeInstanceOf(Formatter);
   });
 
   it("answers the message it was built with through to_s", () => {
