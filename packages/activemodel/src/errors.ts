@@ -326,8 +326,9 @@ export class Errors<TBase extends object = object> {
   }
 
   inspect(): string {
-    const details = this._errors.map((e) => e.inspect());
-    return `#<ActiveModel::Errors [${details.join(", ")}]>`;
+    const inspection = rbInspect(this._errors);
+
+    return `#<ActiveModel::Errors ${inspection}>`;
   }
 }
 

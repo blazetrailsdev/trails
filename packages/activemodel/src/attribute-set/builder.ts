@@ -200,7 +200,7 @@ export class LazyAttributeHash {
   }
 
   private initializeDup(_: LazyAttributeHash): void {
-    this._delegateHash = dup(this._delegateHash);
+    this._delegateHash = dup(this.delegateHash());
   }
 
   eachKey(fn: (key: string) => void): void {

@@ -71,6 +71,23 @@ describe("Error and Errors surface", () => {
     expect(str).toContain("blank");
   });
 
+  it("inspect renders the type with to_s and the options with inspect", () => {
+    const errors = new Errors({});
+    errors.add("name", ":blank");
+    errors.add("name", "is odd");
+    expect(errors.objects[0].inspect()).toBe(
+      "#<ActiveModel::Error attribute=name, type=blank, options={}>",
+    );
+    expect(errors.objects[1].inspect()).toBe(
+      "#<ActiveModel::Error attribute=name, type=is odd, options={}>",
+    );
+    expect(errors.inspect()).toBe(
+      "#<ActiveModel::Errors [" +
+        "#<ActiveModel::Error attribute=name, type=blank, options={}>, " +
+        "#<ActiveModel::Error attribute=name, type=is odd, options={}>]>",
+    );
+  });
+
   it("full_messages doesn't require the base object to respond to :errors", () => {
     const errors = new Errors(new Person());
     errors.add("name", ":blank");

@@ -1,5 +1,13 @@
 import { classAttribute, humanize, deepDup, isPlainObject } from "@blazetrails/activesupport";
-import { except, kernelCatch, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  except,
+  isSymbol,
+  kernelCatch,
+  rbInspect,
+  rbObjDup,
+  rbObjRespondTo,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 import { MissingTranslation, type TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 import { ActiveModel } from "./namespaces.js";
@@ -205,6 +213,9 @@ export class Error {
   }
 
   initializeDup(_other: Error): void {
+    this.attribute = rbObjDup(this.attribute);
+    this.rawType = rbObjDup(this.rawType);
+    this.type = rbObjDup(this.type);
     this.options = deepDup(this.options);
   }
 
@@ -274,13 +285,7 @@ export class Error {
   }
 
   inspect(): string {
-    let optionsStr: string;
-    try {
-      optionsStr = JSON.stringify(this.options);
-    } catch {
-      optionsStr = "{...}";
-    }
-    return `#<ActiveModel::Error attribute=${this.attribute}, type=${this.type}, options=${optionsStr}>`;
+    return `#<ActiveModel::Error attribute=${this.attribute}, type=${isSymbol(this.type) ? symbolToS(this.type) : this.type}, options=${rbInspect(this.options)}>`;
   }
 }
 
