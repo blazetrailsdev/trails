@@ -656,11 +656,11 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     assertNotEmpty(await george.treasures);
 
     await assertNoDifference(
-      async () => (await Pirate.all()).length,
+      async () => Number(await Pirate.count()),
       null,
       async () => {
         await assertNoDifference(
-          async () => (await Treasure.all()).length,
+          async () => Number(await Treasure.count()),
           null,
           async () => {
             await (george as any).destroyAssociations();
@@ -672,7 +672,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     assertEmpty(
       (
         await (
-          await Base.leaseConnection()
+          await Parrot.leaseConnection()
         ).selectAll(`SELECT * FROM parrots_pirates WHERE parrot_id = ${george.id}`)
       ).toArray(),
     );
@@ -681,7 +681,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     assertEmpty(
       (
         await (
-          await Base.leaseConnection()
+          await Parrot.leaseConnection()
         ).selectAll(`SELECT * FROM parrots_treasures WHERE parrot_id = ${george.id}`)
       ).toArray(),
     );
@@ -886,17 +886,19 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("updating attributes on non rich associations", async () => {
-    const welcome = (await categories("technology").posts)[0];
+    const welcome = (await categories("technology").posts.first())!;
     welcome.title = "Something else";
-    expect(await (welcome as any).saveBang()).toBeTruthy();
+    assert(await welcome.saveBang());
   });
 
   it("habtm respects select", async () => {
     for (const o of await categories("technology").selectTestingPosts.reload()) {
       assertRespondTo(o, "correctness_marker");
     }
-    const first = (await categories("technology").selectTestingPosts)[0] as any;
-    assertRespondTo(first, "correctness_marker");
+    assertRespondTo(
+      await categories("technology").selectTestingPosts.first(),
+      "correctness_marker",
+    );
   });
 
   it("habtm selects all columns by default", async () => {
@@ -1128,9 +1130,13 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const george = parrots("george");
     await redbeard.parrots.push(george);
     expect(await george.pirates.count()).toBe(2);
-    await (await Pirate.find(redbeard.id)).destroy();
+    await (
+      await Pirate.includes("parrots")
+        .where({ parrot: await redbeard.parrot })
+        .find(redbeard.id)
+    ).destroy();
     expect(await george.pirates.count()).toBe(1);
-    expect((await Pirate.where({ id: redbeard.id })).length).toBe(0);
+    expect(await Pirate.where({ id: redbeard.id })).toEqual([]);
   });
 
   it("has and belongs to many associations on new records use null relations", async () => {
