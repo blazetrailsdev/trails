@@ -11,9 +11,9 @@ import {
   rbModToS,
   rbObjHash,
   basicObjRespondTo,
+  rbFPublicSend,
   rbObjSingletonClass,
 } from "@blazetrails/ruby-compat";
-import { getApplicationRecordClass } from "./inheritance.js";
 import {
   NameError,
   RecordNotFound,
@@ -28,6 +28,7 @@ import {
   ParameterFilter,
   isPlainObject,
   constantize,
+  filterMap,
 } from "@blazetrails/activesupport";
 import { AsynchronousQueriesTracker, type Session } from "./asynchronous-queries-tracker.js";
 import { _reflectOnAssociation, reflectOnAggregation } from "./reflection.js";
@@ -82,7 +83,11 @@ export const Core = {
 };
 
 import { ActiveRecord } from "./namespaces.js";
-import { actionOnStrictLoadingViolation, writingRole } from "./active-record.js";
+import {
+  actionOnStrictLoadingViolation,
+  applicationRecordClass,
+  writingRole,
+} from "./active-record.js";
 
 export const ClassMethods = {
   /** @missingRailsCall table_exists? — PERMANENT */
@@ -417,16 +422,20 @@ export function configurations(
   config?: RawConfigurations | DatabaseConfigurations | HashConfig[],
 ): DatabaseConfigurations {
   if (config !== undefined) {
-    _configurations =
-      config instanceof DatabaseConfigurations ? config : new DatabaseConfigurations(config);
+    _configurations = new DatabaseConfigurations(config);
   }
   return _configurations;
 }
 
-export function isApplicationRecordClass(this: CoreHost): boolean {
-  const explicit = getApplicationRecordClass();
-  if (explicit) return (this as unknown) === explicit;
-  return (this as unknown) === (globalThis as Record<string, unknown>)["ApplicationRecord"];
+export function isApplicationRecordClass(this: CoreHost): boolean | undefined {
+  if (applicationRecordClass() != null) {
+    return (this as unknown) === applicationRecordClass();
+  } else {
+    const ApplicationRecord = (globalThis as Record<string, unknown>)["ApplicationRecord"];
+    if (ApplicationRecord !== undefined && (this as unknown) === ApplicationRecord) {
+      return true;
+    }
+  }
 }
 
 export type ConnectedToEntry = {
@@ -763,15 +772,16 @@ export function inspectWithAttributes(
   this: CoreRecord & { _attributes: any; _hasAttribute(attrName: string): boolean },
   attributesToList: string[],
 ): string {
-  const ctor = this.constructor as { name: string };
-  if (!this._attributes) return `#<${ctor.name} not initialized>`;
-  const parts = attributesToList
-    .filter((name) => this._hasAttribute(name))
-    .map(
-      (name) =>
-        `${name}: ${(this as unknown as { attributeForInspect(attr: string): string }).attributeForInspect(name)}`,
-    );
-  return `#<${ctor.name} ${parts.join(", ")}>`;
+  const inspection = this._attributes
+    ? filterMap(attributesToList, (name) => {
+        name = String(name);
+        if (this._hasAttribute(name)) {
+          return `${name}: ${(this as unknown as { attributeForInspect(attr: string): string }).attributeForInspect(name)}`;
+        }
+      }).join(", ")
+    : "not initialized";
+
+  return `#<${(this.constructor as { name: string }).name} ${inspection}>`;
 }
 
 export function attributesForInspect(this: CoreRecord): string[] {
@@ -832,12 +842,13 @@ export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {
   if (keys.length === 0) return this.all().findBy(conditions);
   await this.ensureSchemaLoaded();
   const aliases: Record<string, string> = (this as any).attributeAliases ?? {};
-  const resolvedKeys: string[] = [];
+  const resolvedKeys: (string | string[])[] = [];
   const values: unknown[] = [];
 
   for (const rawKey of keys) {
-    let key = aliases[rawKey] ?? rawKey;
+    let key: string | string[] = aliases[rawKey] ?? rawKey;
     let value = conditions[rawKey];
+    let compositePrimaryKey = false;
 
     if (reflectOnAggregation(this as any, key)) return this.all().findBy(conditions);
 
@@ -846,14 +857,30 @@ export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {
     if (!reflection) {
       if (respondsToId(value)) value = (value as any).id;
     } else if (reflection.belongsTo() && !reflection.isPolymorphic()) {
-      const fk = reflection.joinForeignKey;
+      key = reflection.joinForeignKey;
       const pkey = reflection.joinPrimaryKey();
-      if (Array.isArray(fk) || Array.isArray(pkey)) return this.all().findBy(conditions);
-      key = fk;
-      if (respondsTo(value, pkey)) value = (value as any)[pkey];
+
+      if (Array.isArray(pkey)) {
+        if (pkey.every((attribute) => respondsTo(value, attribute))) {
+          value = pkey.map((attribute) => {
+            if (attribute === "id") {
+              return (value as any).id_value;
+            } else {
+              return rbFPublicSend(value, attribute);
+            }
+          });
+          compositePrimaryKey = true;
+        }
+      } else {
+        if (respondsTo(value, pkey)) value = rbFPublicSend(value, pkey);
+      }
     }
 
-    if (!hasKey(columnsHash.call(this as any), key) || StatementCache.unsupportedValue(value)) {
+    if (
+      !compositePrimaryKey &&
+      (!hasKey(columnsHash.call(this as any), key as string) ||
+        StatementCache.unsupportedValue(value))
+    ) {
       return this.all().findBy(conditions);
     }
 
@@ -873,15 +900,25 @@ function respondsTo(value: unknown, name: string): boolean {
 }
 
 /** @internal */
-async function cachedFindBy(this: CoreHost, keys: string[], values: unknown[]): Promise<any> {
+async function cachedFindBy(
+  this: CoreHost,
+  keys: (string | string[])[],
+  values: unknown[],
+): Promise<any> {
   return withConnection.call(this as any, async (connection: any) => {
     const statement = cachedFindByStatement.call(this, connection, keys, (params: any) => {
-      const wheres: Record<string, unknown> = {};
-      for (const key of keys) wheres[key] = params.bind();
+      const wheres = new Map<string | string[], unknown>();
+      for (const key of keys) {
+        if (Array.isArray(key)) {
+          wheres.set(key, [key.map(() => params.bind())]);
+        } else {
+          wheres.set(key, params.bind());
+        }
+      }
       return (this as any).where(wheres).limit(1);
     });
     try {
-      const records = await statement.execute(values, connection, { allowRetry: true });
+      const records = await statement.execute(values.flat(), connection, { allowRetry: true });
       return records[0] ?? null;
     } catch (e) {
       if (e instanceof ActiveModelRangeError) return null;

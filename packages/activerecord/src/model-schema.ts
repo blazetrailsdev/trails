@@ -436,9 +436,10 @@ export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | vo
       } | null
     )?.clearCacheBang?.();
   } catch {}
-  (this as { _findByStatementCache?: unknown })._findByStatementCache = undefined;
   clearAdapterDataSourceCache(this);
+
   this.reloadSchemaFromCache();
+  (this as unknown as typeof Base).initializeFindByCache();
   return rewarmDataSourceCache(this);
 }
 

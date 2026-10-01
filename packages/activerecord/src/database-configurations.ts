@@ -41,12 +41,8 @@ export class DatabaseConfigurations {
 
   private _configurations: HashConfig[];
 
-  constructor(configurations: RawConfigurations | HashConfig[] = {}) {
-    if (Array.isArray(configurations)) {
-      this._configurations = configurations;
-    } else {
-      this._configurations = this.buildConfigs(configurations);
-    }
+  constructor(configurations: RawConfigurations | HashConfig[] | DatabaseConfigurations = {}) {
+    this._configurations = this.buildConfigs(configurations);
   }
 
   get empty(): boolean {
@@ -146,7 +142,10 @@ export class DatabaseConfigurations {
   }
 
   /** @missingRailsName compact — PERMANENT */
-  private buildConfigs(configs: RawConfigurations | HashConfig[]): HashConfig[] {
+  private buildConfigs(
+    configs: RawConfigurations | HashConfig[] | DatabaseConfigurations,
+  ): HashConfig[] {
+    if (configs instanceof DatabaseConfigurations) return configs.configurations;
     if (Array.isArray(configs)) return configs;
 
     const dbConfigs: (HashConfig | null)[] = Object.entries(configs).flatMap(([envName, config]) =>

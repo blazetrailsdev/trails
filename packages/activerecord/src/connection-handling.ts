@@ -201,13 +201,10 @@ export function connectingTo(
   options: { role?: string; shard?: string; preventWrites?: boolean },
 ): void {
   const { role = this.defaultRole, shard = this.defaultShard } = options;
-  const preventWrites = role === readingRole() || !!options.preventWrites;
-  appendToConnectedToStack({
-    role,
-    shard,
-    preventWrites,
-    klasses: [this],
-  });
+  let { preventWrites = false } = options;
+  if (role === readingRole()) preventWrites = true;
+
+  appendToConnectedToStack({ role, shard, preventWrites, klasses: [this] });
 }
 
 export function isConnectedTo(
@@ -321,7 +318,7 @@ Either use \`with_connection\` or \`lease_connection\`.
   }
 }
 
-export function isPrimaryClass(this: typeof Base): boolean {
+export function isPrimaryClass(this: typeof Base): boolean | undefined {
   return (this as unknown) === ActiveRecord.Base || coreIsApplicationRecordClass.call(this as any);
 }
 

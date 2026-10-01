@@ -454,6 +454,11 @@ describe("eachValue", () => {
     expect(eachValue(h, (v) => seen.push(v))).toBe(h);
     expect(seen).toEqual([1, 2]);
   });
+
+  it("enumerates the values when no block is given", () => {
+    expect(eachValue({ a: 1, b: null }).every((v) => v == null)).toBe(false);
+    expect(eachValue({ a: null, b: null }).every((v) => v == null)).toBe(true);
+  });
 });
 
 describe("hashDelete", () => {

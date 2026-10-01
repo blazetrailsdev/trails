@@ -47,24 +47,37 @@ function castInheritanceColumnValue(
 export function computeType(baseClass: typeof Base, typeName: string): typeof Base {
   if (typeName.startsWith("::")) {
     return constantize(typeName) as typeof Base;
-  }
-  const candidates = computeTypeCandidates(baseClass, typeName);
-  for (const candidate of candidates) {
-    const klass = safeConstantize(candidate) as typeof Base | undefined;
-    if (klass && qualifiedName(klass) === candidate) return klass;
-  }
-  throw new NameError(`uninitialized constant ${candidates[0]}`, candidates[0]);
-}
+  } else {
+    const klass = baseClass as typeof Base & { _typeCandidatesCache: Map<string, string> };
+    if (!Object.prototype.hasOwnProperty.call(klass, "_typeCandidatesCache")) {
+      klass._typeCandidatesCache = new Map();
+    }
+    const typeCandidate = klass._typeCandidatesCache.get(typeName);
+    let typeConstant: typeof Base | null | undefined;
+    if (
+      typeCandidate != null &&
+      (typeConstant = safeConstantize(typeCandidate) as typeof Base | null | undefined) != null
+    ) {
+      return typeConstant;
+    }
 
-/** @internal */
-function computeTypeCandidates(baseClass: typeof Base, typeName: string): string[] {
-  const segs = qualifiedName(baseClass).split("::");
-  const candidates: string[] = [];
-  for (let i = segs.length; i > 0; i--) {
-    candidates.push(`${segs.slice(0, i).join("::")}::${typeName}`);
+    const candidates: string[] = [];
+    const name = qualifiedName(baseClass);
+    for (const match of name.matchAll(/::|$/g)) {
+      candidates.unshift(`${name.slice(0, match.index)}::${typeName}`);
+    }
+    candidates.push(typeName);
+
+    for (const candidate of candidates) {
+      const constant = safeConstantize(candidate) as typeof Base | null | undefined;
+      if (constant != null && candidate === qualifiedName(constant)) {
+        klass._typeCandidatesCache.set(typeName, candidate);
+        return constant;
+      }
+    }
+
+    throw new NameError(`uninitialized constant ${candidates[0]}`, candidates[0]);
   }
-  candidates.push(typeName);
-  return candidates;
 }
 
 export function isDescendsFromActiveRecord(this: typeof Base): boolean {

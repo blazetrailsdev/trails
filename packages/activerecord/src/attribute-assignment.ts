@@ -1,5 +1,5 @@
 import { AttributeAssignmentError, MultiparameterAssignmentErrors } from "./errors.js";
-import { isEmpty, rbInspect } from "@blazetrails/ruby-compat";
+import { eachValue, isEmpty, rbInspect } from "@blazetrails/ruby-compat";
 
 interface AttributeAssignmentHost {
   writeAttribute(key: string, value: unknown): void;
@@ -88,7 +88,7 @@ export function executeCallstackForMultiparameterAttributes(
   for (const [name, valuesWithEmptyParameters] of Object.entries(callstack)) {
     let values: Record<number, unknown> | null;
     try {
-      if (Object.values(valuesWithEmptyParameters).every((v) => v == null)) {
+      if (eachValue(valuesWithEmptyParameters).every((v) => v == null)) {
         values = null;
       } else {
         values = valuesWithEmptyParameters;

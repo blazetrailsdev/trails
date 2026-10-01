@@ -241,6 +241,12 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   if (typeof obj === "string" && (mid === "toStr" || mid === "toSym")) return true;
   if (Array.isArray(obj) && mid === "toAry") return true;
   if (
+    mid === "get" &&
+    (typeof obj === "string" || Array.isArray(obj) || obj instanceof Map || isPlainHash(obj))
+  ) {
+    return true;
+  }
+  if (
     (mid === "isEmpty" || mid === "isInclude") &&
     (typeof obj === "string" ||
       Array.isArray(obj) ||

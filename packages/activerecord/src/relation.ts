@@ -549,8 +549,13 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   async isEmpty(): Promise<boolean> {
-    if (this.isLoaded) return (await this.records()).length === 0;
-    return !(await this.isExists());
+    if (this.isNullRelation()) return true;
+
+    if (this.isLoaded) {
+      return (await this.records()).length === 0;
+    } else {
+      return !(await this.isExists());
+    }
   }
 
   async isAny(args?: EnumerablePattern<T>): Promise<boolean> {
@@ -788,7 +793,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
     return this.model.withConnection(async (c) => {
       const arel = this.isEagerLoading
-        ? await this.applyJoinDependency({}, (relation) => relation.arel())
+        ? (await this.applyJoinDependency()).arel()
         : this.buildArel(c);
       arel.source.left = this.table;
       const groupValuesArelColumns = this.arelColumns(uniq(this.groupValues)) as Nodes.Node[];
@@ -826,7 +831,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
     return this.model.withConnection(async (c) => {
       const arel = this.isEagerLoading
-        ? await this.applyJoinDependency({}, (relation) => relation.arel())
+        ? (await this.applyJoinDependency()).arel()
         : this.buildArel(c);
       arel.source.left = this.table;
       const groupValuesArelColumns = this.arelColumns(uniq(this.groupValues)) as Nodes.Node[];
@@ -979,10 +984,26 @@ export class Relation<T extends Base, G extends boolean = false> {
    * @internal
    * @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
    */
+  applyJoinDependency(options?: {
+    eagerLoading?: boolean;
+  }): Omit<Relation<T, G>, "then"> | Promise<Omit<Relation<T, G>, "then">>;
+  /** @internal */
   applyJoinDependency<R>(
-    { eagerLoading = this.groupValues.length === 0 }: { eagerLoading?: boolean },
+    options: { eagerLoading?: boolean },
     block: (relation: Relation<T, G>, joinDependency: JoinDependency) => R | Promise<R>,
-  ): R | Promise<R> {
+  ): R | Promise<R>;
+  /** @internal */
+  applyJoinDependency<R>(
+    { eagerLoading = this.groupValues.length === 0 }: { eagerLoading?: boolean } = {},
+    block?: (relation: Relation<T, G>, joinDependency: JoinDependency) => R | Promise<R>,
+  ): unknown {
+    const yieldRelation = (): unknown => {
+      if (block) {
+        return block(relation, joinDependency);
+      } else {
+        return stripThenable(relation);
+      }
+    };
     const joinDependency = QueryMethods.constructJoinDependency.call(
       this as any,
       [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
@@ -1021,10 +1042,10 @@ export class Relation<T extends Base, G extends boolean = false> {
             ).distinctRelationForPrimaryKey(relation),
           ),
         ),
-      ).then(() => block(relation, joinDependency));
+      ).then(yieldRelation);
     }
 
-    return block(relation, joinDependency);
+    return yieldRelation();
   }
 
   /** @internal */
@@ -1776,7 +1797,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     const currentScope = (modelClass as any).currentScope(true);
     return (record: T) => {
       (modelClass as any).setCurrentScope(currentScope ?? null);
-      return block?.(record);
+      if (block) return block(record);
     };
   }
 

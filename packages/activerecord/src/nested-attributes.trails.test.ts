@@ -140,11 +140,11 @@ describe("nested attributes save wrapper argument forwarding (trails-only)", () 
   });
 
   it("assigns scalar attributes before nested ones within one update", async () => {
+    const pirate = await Pirate.createBang({ catchphrase: "Arr" });
     Pirate.acceptsNestedAttributesFor("ship", {
-      rejectIf: (_attrs, record) => cols(record).catchphrase !== "Aye",
+      rejectIf: () => cols(pirate).catchphrase !== "Aye",
     });
 
-    const pirate = await Pirate.createBang({ catchphrase: "Arr" });
     await pirate.update({
       shipAttributes: { name: "Black Pearl" },
       catchphrase: "Aye",
@@ -154,6 +154,19 @@ describe("nested attributes save wrapper argument forwarding (trails-only)", () 
     expect(cols(ship as Base).name).toBe("Black Pearl");
 
     Pirate.acceptsNestedAttributesFor("ship");
+  });
+
+  it("converts a permitted? collection and its members with to_h", async () => {
+    Pirate.acceptsNestedAttributesFor("parrots");
+    const params = <T>(hash: T) =>
+      Object.assign(Object.create({ toH: () => hash }), { permitted: true });
+
+    const pirate = await Pirate.createBang({ catchphrase: "Arr" });
+    await (
+      pirate as unknown as { setParrotsAttributes(v: unknown): Promise<void> }
+    ).setParrotsAttributes(params([params({ name: "Polly" })]));
+
+    expect(pirate.parrots.target.map((parrot) => cols(parrot).name)).toEqual(["Polly"]);
   });
 
   it("assigns constructor nested attributes without the property setter", async () => {
@@ -197,13 +210,13 @@ describe("nested attributes assignment ordering (trails-only)", () => {
     const config = Pirate.nestedAttributesOptions.ship;
     const originalRejectIf = config.rejectIf;
     const observed: unknown[] = [];
-    config.rejectIf = (_attrs: Record<string, unknown>, record: Base) => {
-      observed.push((record as Pirate).catchphrase);
+    const pirate = new Pirate();
+    config.rejectIf = () => {
+      observed.push(pirate.catchphrase);
       return false;
     };
 
     try {
-      const pirate = new Pirate();
       await pirate.assignAttributes({
         shipAttributes: { name: "The Black Rock" },
         catchphrase: "Aye",

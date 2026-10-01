@@ -7,7 +7,7 @@ import { fixtures } from "./test-fixtures.js";
 
 const stubConfigurations = (configs: unknown[]): DatabaseConfigurations => {
   const dc = new DatabaseConfigurations(configs as never);
-  vi.spyOn(dc, "configsFor").mockReturnValue(configs as never);
+  vi.spyOn(DatabaseConfigurations.prototype, "configsFor").mockReturnValue(configs as never);
   return dc;
 };
 

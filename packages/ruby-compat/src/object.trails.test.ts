@@ -148,6 +148,15 @@ describe("Object#respond_to?", () => {
     expect(basicObjRespondTo({}, "toAry")).toBe(false);
   });
 
+  it("answers [] for an Array, a Hash and a String, whose JS values index without a method", () => {
+    for (const obj of ["abc", [1], new Map(), {}]) {
+      expect(basicObjRespondTo(obj, "get")).toBe(true);
+    }
+    expect(basicObjRespondTo(new Set([1]), "get")).toBe(false);
+    expect(basicObjRespondTo(null, "get")).toBe(false);
+    expect(basicObjRespondTo(true, "get")).toBe(false);
+  });
+
   it("answers include? for the core collections and to_sym for a String, which their JS values do not define", () => {
     for (const obj of ["abc", [1], new Set([1]), new Map(), {}]) {
       expect(basicObjRespondTo(obj, "isInclude")).toBe(true);

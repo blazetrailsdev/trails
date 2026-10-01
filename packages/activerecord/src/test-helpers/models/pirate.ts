@@ -1,4 +1,5 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { hashDelete, kernelThrow } from "@blazetrails/ruby-compat";
+import { isPresent } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { CollectionProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
@@ -152,6 +153,10 @@ export class Pirate extends Base {
     return this._shipLog;
   }
   private _shipLog?: string[];
+
+  rejectEmptyShipsOnCreate(attributes: Record<string, unknown>): boolean {
+    return isPresent(hashDelete(attributes, "_reject_me_if_new")) && !this.isPersisted();
+  }
 
   cancelSaveCallbackMethod() {
     kernelThrow(":abort");
