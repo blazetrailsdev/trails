@@ -4,6 +4,8 @@ import {
   isSymbol,
   kernelCatch,
   rbInspect,
+  rbModConstSet,
+  rbModName,
   rbObjDup,
   rbObjRespondTo,
   symbolToS,
@@ -279,14 +281,12 @@ export class Error {
   }
 
   deepDup(): this {
-    const copy = Object.assign(Object.create(Object.getPrototypeOf(this) as object) as this, this);
-    copy.initializeDup(this);
-    return copy;
+    return rbObjDup(this);
   }
 
   inspect(): string {
-    return `#<ActiveModel::Error attribute=${this.attribute}, type=${isSymbol(this.type) ? symbolToS(this.type) : this.type}, options=${rbInspect(this.options)}>`;
+    return `#<${rbModName(this.constructor as typeof Error) ?? ""} attribute=${this.attribute}, type=${isSymbol(this.type) ? symbolToS(this.type) : this.type}, options=${rbInspect(this.options)}>`;
   }
 }
 
-ActiveModel.Error = Error;
+rbModConstSet(ActiveModel, "Error", Error);

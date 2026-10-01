@@ -1,6 +1,6 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import { NameError } from "./name-error.js";
-import { rbModToS } from "./object.js";
+import { rbModName, rbModToS } from "./object.js";
 import {
   include,
   rbModConstSet,
@@ -1241,6 +1241,19 @@ describe("Module#const_set", () => {
     expect((Topic as unknown as { Generated: Module }).Generated).toBe(mod);
     expect(mod.name).toBe("Topic::Generated");
     expect(mod.inspect()).toBe("Topic::Generated");
+  });
+
+  it("names a class after the constant it is bound to", () => {
+    const Namespace = { name: "Namespace" };
+    class Topic {}
+    expect(rbModName(Topic)).toBe("Topic");
+    expect(rbModConstSet(Namespace, "Topic", Topic)).toBe(Topic);
+    expect(rbModName(Topic)).toBe("Namespace::Topic");
+    expect(rbModToS(Topic)).toBe("Namespace::Topic");
+    class Reply {}
+    rbModConstSet(Topic, "Reply", Reply);
+    expect(rbModName(Reply)).toBe("Namespace::Topic::Reply");
+    expect(rbModName((() => class {})())).toBeNull();
   });
 
   it("gives a module bound under an anonymous owner a temporary path until a named owner binds it", () => {
