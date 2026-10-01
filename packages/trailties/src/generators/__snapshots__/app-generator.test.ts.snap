@@ -396,7 +396,7 @@ await import("../config/environment.js");
 await import("@blazetrails/trailties/test-help");
 
 // Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
-(TestCase as typeof TestCase & { fixtures(...names: string[]): void }).fixtures(":all");
+TestCase.fixtures(":all");
 
 // Add more helper methods to be used by all tests here...
 "

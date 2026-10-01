@@ -4,12 +4,8 @@ import { assertValidKeys, isBlank, isPlainObject } from "@blazetrails/activesupp
 import { Relation } from "../relation.js";
 import type { ValueMethod } from "../relation.js";
 import type { AssociationSpec } from "./query-methods.js";
-import {
-  arelColumns,
-  constructJoinDependency,
-  QueryMethods,
-  structuralUnionEq,
-} from "./query-methods.js";
+import { union } from "@blazetrails/ruby-compat";
+import { arelColumns, constructJoinDependency, QueryMethods } from "./query-methods.js";
 
 export class Merger {
   readonly relation: any;
@@ -78,22 +74,10 @@ export class Merger {
 
     if (this.other.model === rel.model) {
       if (this.other.preloadValues.length > 0) {
-        const preloadValues = rel.preloadValues;
-        rel.preloadValues = preloadValues.concat(
-          this.other.preloadValues.filter(
-            (v: AssociationSpec) =>
-              !preloadValues.some((seen: unknown) => structuralUnionEq(seen, v)),
-          ),
-        );
+        rel.preloadValues = union(rel.preloadValues, this.other.preloadValues);
       }
       if (this.other.includesValues.length > 0) {
-        const includesValues = rel.includesValues;
-        rel.includesValues = includesValues.concat(
-          this.other.includesValues.filter(
-            (v: AssociationSpec) =>
-              !includesValues.some((seen: unknown) => structuralUnionEq(seen, v)),
-          ),
-        );
+        rel.includesValues = union(rel.includesValues, this.other.includesValues);
       }
       return;
     }
@@ -117,10 +101,7 @@ export class Merger {
     const joinsValues = other.joinsValues ?? [];
     if (joinsValues.length === 0) return;
     if (other.model === rel.model) {
-      for (const v of joinsValues) {
-        if (!rel.joinsValues.some((existing: unknown) => structuralUnionEq(existing, v)))
-          rel.joinsValues = [...rel.joinsValues, v];
-      }
+      rel.joinsValues = union(rel.joinsValues, joinsValues);
       return;
     }
 
@@ -147,10 +128,7 @@ export class Merger {
     const otherLeft = other.leftOuterJoinsValues ?? [];
     if (otherLeft.length === 0) return;
     if (other.model === rel.model) {
-      for (const v of otherLeft) {
-        if (!rel.leftOuterJoinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
-          rel.leftOuterJoinsValues = [...rel.leftOuterJoinsValues, v];
-      }
+      rel.leftOuterJoinsValues = union(rel.leftOuterJoinsValues, otherLeft);
       return;
     }
 

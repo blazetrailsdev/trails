@@ -133,6 +133,7 @@ export {
   pack,
   sort,
   toA,
+  union,
   uniq,
   unpack1,
 } from "./array.js";

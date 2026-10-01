@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
 import { TypeError } from "./type-error.js";
-import { aryDelete, aryPop, arySlice, compact, pack, sort, toA, uniq, unpack1 } from "./array.js";
+import {
+  aryDelete,
+  aryPop,
+  arySlice,
+  compact,
+  pack,
+  sort,
+  toA,
+  union,
+  uniq,
+  unpack1,
+} from "./array.js";
 import { Range } from "./range.js";
 import { byteslice } from "./string/byte-methods.js";
 
@@ -281,5 +292,13 @@ describe("Array#sort", () => {
       new ArgumentError("comparison of Integer with A failed"),
     );
     expect(() => sort(["a", 1])).toThrow(new ArgumentError("comparison of String with 1 failed"));
+  });
+});
+
+describe("Array#|", () => {
+  it("keeps first occurrences across both arrays, deduplicated by eql?", () => {
+    expect(union<unknown>([["a", "asc"], "b", "b"], [["a", "asc"], { x: 1 }, { x: 1 }, 1])).toEqual(
+      [["a", "asc"], "b", { x: 1 }, 1],
+    );
   });
 });

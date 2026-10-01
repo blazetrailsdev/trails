@@ -4,7 +4,7 @@ import { Nodes, Table, fetchAttribute } from "@blazetrails/arel";
 import type { AbstractReflection } from "../../reflection.js";
 import { JoinPart } from "./join-part.js";
 import { aliasedArelTableForReflection, type AliasTracker } from "../alias-tracker.js";
-import { structuralUnionEq } from "../../relation/query-methods.js";
+import { union } from "@blazetrails/ruby-compat";
 
 type JoinType = typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
 type TableResolver = (
@@ -98,12 +98,7 @@ export class JoinAssociation extends JoinPart {
       const scope = refl.joinScope(table, foreignTable, foreignKlass);
 
       if (scope && scope.referencesValues.length > 0) {
-        const associations = [...scope.eagerLoadValues];
-        for (const spec of scope.includesValues) {
-          if (!associations.some((seen: unknown) => structuralUnionEq(seen, spec))) {
-            associations.push(spec);
-          }
-        }
+        const associations = union(scope.eagerLoadValues, scope.includesValues);
 
         if (associations.length > 0) {
           scope.joinsBang(scope.constructJoinDependency(associations, Nodes.OuterJoin));

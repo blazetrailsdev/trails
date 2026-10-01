@@ -1,11 +1,8 @@
 import { any } from "@blazetrails/activesupport";
 import type { Table, Nodes } from "@blazetrails/arel";
 import type { AliasTracker } from "./alias-tracker.js";
-import {
-  AssociationScope,
-  type AssociationScopeable,
-  unionOrderClauses,
-} from "./association-scope.js";
+import { union } from "@blazetrails/ruby-compat";
+import { AssociationScope, type AssociationScopeable } from "./association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
 import { relationClassFor } from "../relation/delegation.js";
 import type { Relation } from "../relation.js";
@@ -134,7 +131,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       const item = this.evalScope(reflection, scopeChainItem, owner);
       scope.unscopeBang(...item.unscopeValues);
       scope.whereClause = scope.whereClause.plus(item.whereClause);
-      scope.orderValues = unionOrderClauses(item.orderValues, scope.orderValues);
+      scope.orderValues = union(item.orderValues, scope.orderValues);
     }
 
     if (scope.orderValues.length === 0 && ordered) {

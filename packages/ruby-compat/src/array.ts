@@ -481,6 +481,18 @@ export function uniq<T>(ary: readonly T[]): T[] {
 }
 
 /**
+ * Ruby `Array#|` (`vendor/ruby/v3.3.11/array.c:5600` `rb_ary_or`): `ary1`'s
+ * elements then `ary2`'s, deduplicated across both the way `uniq` is — by
+ * `hash`/`eql?` (`rb_ary_union`, `array.c:5562`), so two separately built
+ * `eql?` tuples or Hashes collapse where a JS `includes` would keep both.
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#|`
+ *   (`vendor/ruby/v3.3.11/array.c:5600`).
+ */
+export function union<T>(ary1: readonly T[], ary2: readonly T[]): T[] {
+  return uniq([...ary1, ...ary2]);
+}
+
+/**
  * Ruby `Array#sort` without a block (`vendor/ruby/v3.3.11/array.c:3473` `rb_ary_sort`):
  * a sorted copy, ordered by `sort_2` (`array.c:3301`), which sends `<=>` and
  * hands the answer to `rb_cmpint`, so a `nil` `<=>` raises
