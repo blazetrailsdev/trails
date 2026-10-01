@@ -179,10 +179,10 @@ export type RelationName = string | { readonly [relationNameBrand]: never };
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /** @internal */
 export class ExplainProxy<T extends Base> {
-  private readonly _relation: Relation<T>;
+  private readonly _relation: Relation<T, boolean>;
   private readonly _options: ExplainOption[];
 
-  constructor(relation: Relation<T>, options: ExplainOption[]) {
+  constructor(relation: Relation<T, boolean>, options: ExplainOption[]) {
     this._relation = relation;
     this._options = options;
   }
@@ -269,7 +269,7 @@ const ENUMERABLE_DELEGATES = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class Relation<T extends Base> {
+export class Relation<T extends Base, G extends boolean = false> {
   /** @internal */
   static _railsClassName = "ActiveRecord::Relation";
 
@@ -470,7 +470,7 @@ export class Relation<T extends Base> {
    * @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
    * @missingRailsCall load — PERMANENT
    */
-  loadAsync(): Relation<T> {
+  loadAsync(): Relation<T, G> {
     this._model.connectionPool().withConnectionSync((c: DatabaseAdapter) => {
       if (!this.isLoaded) {
         const asyncEnabled = c.asyncEnabled?.() === true;
@@ -599,8 +599,8 @@ export class Relation<T extends Base> {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  async presence(): Promise<LoadedRelation<Relation<T>> | null> {
-    return (await isPresent(this)) ? stripThenable(this as Relation<T>) : null;
+  async presence(): Promise<LoadedRelation<Relation<T, G>> | null> {
+    return (await isPresent(this)) ? stripThenable(this as Relation<T, G>) : null;
   }
 
   async detect(fn: (record: T, index: number, all: T[]) => unknown): Promise<T | undefined> {
@@ -980,7 +980,7 @@ export class Relation<T extends Base> {
    */
   applyJoinDependency<R>(
     { eagerLoading = this.groupValues.length === 0 }: { eagerLoading?: boolean },
-    block: (relation: Relation<T>, joinDependency: JoinDependency) => R | Promise<R>,
+    block: (relation: Relation<T, G>, joinDependency: JoinDependency) => R | Promise<R>,
   ): R | Promise<R> {
     const joinDependency = QueryMethods.constructJoinDependency.call(
       this as any,
@@ -1121,7 +1121,7 @@ export class Relation<T extends Base> {
     jd: JoinDependency,
     basePk: string | string[],
     limitedIds?: unknown[],
-  ): Relation<T> {
+  ): Relation<T, G> {
     let rel = this.except("includes", "eagerLoad", "preload");
     QueryMethods.joinsBang.call(rel as any, jd as any);
     if (
@@ -1181,7 +1181,7 @@ export class Relation<T extends Base> {
     jd: JoinDependency,
     basePk: string | string[],
     distinctSelectSql?: string,
-  ): Relation<T> {
+  ): Relation<T, G> {
     const relation = this.except("includes", "eagerLoad", "preload");
     QueryMethods.joinsBang.call(relation as any, jd as any);
     const values =
@@ -1685,7 +1685,7 @@ export class Relation<T extends Base> {
         );
       }
     } else {
-      let collection: Relation<T> = this;
+      let collection: Relation<T, G> = this;
       if (this.isEagerLoading) {
         await this.applyJoinDependency({}, (relation) => {
           collection = relation;
@@ -1743,7 +1743,7 @@ export class Relation<T extends Base> {
     return this.cacheKey();
   }
 
-  initializeCopy(other: Relation<T>): void {
+  initializeCopy(other: Relation<T, G>): void {
     this._table = other._table;
     this._values = { ...other._values };
     this._withIsRecursive = other._withIsRecursive;
@@ -1752,9 +1752,9 @@ export class Relation<T extends Base> {
     this.skipPreloadingValue = other.skipPreloadingValue;
   }
 
-  clone(): Relation<T> {
+  clone(): Relation<T, G> {
     const ctor = relationClassFor.call(Relation, this._model as unknown as typeof Base);
-    const rel = new ctor(this._model) as Relation<T>;
+    const rel = new ctor(this._model) as Relation<T, G>;
     rel.initializeCopy(this);
     return rel;
   }
@@ -1762,7 +1762,7 @@ export class Relation<T extends Base> {
   _execScope(...args: unknown[]): unknown {
     this._delegateToModel = true;
     const registry = this.model.scopeRegistry();
-    const body = args.pop() as (this: Relation<T>, ...rest: unknown[]) => unknown;
+    const body = args.pop() as (this: Relation<T, G>, ...rest: unknown[]) => unknown;
     try {
       return this._scoping(null, registry, false, () => body.call(this, ...args) || this);
     } finally {
@@ -1883,7 +1883,7 @@ ActiveRecord.Relation = Relation;
 export interface RelationScopes<T extends Base> {}
 /* eslint-enable @typescript-eslint/no-empty-object-type */
 
-export interface Relation<T extends Base> extends RelationScopes<T> {
+export interface Relation<T extends Base, G extends boolean = false> extends RelationScopes<T> {
   isNullRelation(): boolean;
   then<TResult1 = T[], TResult2 = never>(
     onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
@@ -1897,7 +1897,7 @@ export interface Relation<T extends Base> extends RelationScopes<T> {
   finally(onfinally?: (() => void) | null): Promise<T[]>;
 }
 
-export interface Relation<T extends Base> {
+export interface Relation<T extends Base, G extends boolean = false> {
   includesValues: AssociationSpec[];
   eagerLoadValues: AssociationSpec[];
   preloadValues: AssociationSpec[];
@@ -1928,8 +1928,8 @@ export interface Relation<T extends Base> {
   fromClause: FromClause;
 }
 
-export interface Relation<T extends Base>
-  extends Included<typeof QueryMethods>, Included<typeof Explain>, CalculationMethods {
+export interface Relation<T extends Base, G extends boolean = false>
+  extends Included<typeof QueryMethods>, Included<typeof Explain>, CalculationMethods<G> {
   find(block: (record: T) => unknown): Promise<T | null>;
   find(ids: unknown[]): Promise<T[]>;
   find(id: unknown): Promise<T>;
@@ -1971,40 +1971,46 @@ export interface Relation<T extends Base>
     key?: string | string[],
     notFoundIds?: unknown[],
   ): never;
-  unscope(...args: UnscopeArg[]): Relation<T>;
-  lock(locks?: string | boolean | null): Relation<T>;
-  none(): Relation<T>;
-  readonly(value?: boolean): Relation<T>;
-  strictLoading(value?: boolean): Relation<T>;
-  createWith(value: Record<string, unknown> | null): Relation<T>;
-  from(value: string | Relation<any> | Nodes.Node, subqueryName?: string): Relation<T>;
-  extending<M extends Record<string, (...args: any[]) => any>>(mod: M): Relation<T> & M;
+  unscope<A extends UnscopeArg[]>(
+    ...args: A
+  ): Relation<T, UnscopeArg extends A[number] ? boolean : ":group" extends A[number] ? false : G>;
+  lock(locks?: string | boolean | null): Relation<T, G>;
+  none(): Relation<T, G>;
+  readonly(value?: boolean): Relation<T, G>;
+  strictLoading(value?: boolean): Relation<T, G>;
+  createWith(value: Record<string, unknown> | null): Relation<T, G>;
+  from(value: string | Relation<any, boolean> | Nodes.Node, subqueryName?: string): Relation<T, G>;
+  extending<M extends Record<string, (...args: any[]) => any>>(mod: M): Relation<T, G> & M;
   extending<M extends Record<string, (...args: any[]) => any>>(
     mod: M | undefined,
-  ): Relation<T> & Partial<M>;
-  extending(...modules: Module[]): Relation<T>;
-  extending(fn: (rel: Relation<T>) => void): Relation<T>;
-  extending(): Relation<T>;
-  optimizerHints(...args: string[]): Relation<T>;
-  annotate(...args: string[]): Relation<T>;
-  includes(...args: AssociationSpec[]): Relation<T>;
-  all(): Relation<T>;
-  eagerLoad(...args: AssociationSpec[]): Relation<T>;
-  preload(...args: AssociationSpec[]): Relation<T>;
+  ): Relation<T, G> & Partial<M>;
+  extending(...modules: Module[]): Relation<T, G>;
+  extending(fn: (rel: Relation<T, G>) => void): Relation<T, G>;
+  extending(): Relation<T, G>;
+  optimizerHints(...args: string[]): Relation<T, G>;
+  annotate(...args: string[]): Relation<T, G>;
+  includes(...args: AssociationSpec[]): Relation<T, G>;
+  all(): Relation<T, G>;
+  eagerLoad(...args: AssociationSpec[]): Relation<T, G>;
+  preload(...args: AssociationSpec[]): Relation<T, G>;
   extractAssociated(association: string): Promise<Base[]>;
-  references(...tableNames: Array<string | Nodes.SqlLiteral>): Relation<T>;
+  references(...tableNames: Array<string | Nodes.SqlLiteral>): Relation<T, G>;
   with(
-    ...args: Array<Record<string, Relation<any> | string | Array<Relation<any> | string>>>
-  ): Relation<T>;
+    ...args: Array<
+      Record<string, Relation<any, boolean> | string | Array<Relation<any, boolean> | string>>
+    >
+  ): Relation<T, G>;
   withRecursive(
-    ...args: Array<Record<string, Relation<any> | string | Array<Relation<any> | string>>>
-  ): Relation<T>;
-  joins(...nodes: Nodes.Join[]): Relation<T>;
-  joins(specArray: JoinSpec[]): Relation<T>;
-  joins(hashSpec: Record<string, AssociationSpec | AssociationSpec[]>): Relation<T>;
-  joins(...args: Array<JoinSpec>): Relation<T>;
-  leftOuterJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T>;
-  leftJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T>;
+    ...args: Array<
+      Record<string, Relation<any, boolean> | string | Array<Relation<any, boolean> | string>>
+    >
+  ): Relation<T, G>;
+  joins(...nodes: Nodes.Join[]): Relation<T, G>;
+  joins(specArray: JoinSpec[]): Relation<T, G>;
+  joins(hashSpec: Record<string, AssociationSpec | AssociationSpec[]>): Relation<T, G>;
+  joins(...args: Array<JoinSpec>): Relation<T, G>;
+  leftOuterJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T, G>;
+  leftJoins(...args: Array<AssociationSpec | AssociationSpec[]>): Relation<T, G>;
   arel(aliases?: AliasTracker): SelectManager;
   /** @internal */
   assertModifiableBang(): void;
@@ -2020,50 +2026,56 @@ export interface Relation<T extends Base>
   /** @internal */
   arelColumnsFromHash(fields: Record<PropertyKey, unknown>): unknown[];
   select(fn: (record: T) => boolean): Promise<T[]>;
-  select(...fields: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T>;
+  select(...fields: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T, G>;
   reselect(
     ...args: (string | Nodes.Node | Record<string, unknown> | readonly (string | Nodes.Node)[])[]
-  ): Relation<T>;
-  group(...args: (string | Nodes.Node)[]): Relation<T>;
-  regroup(...args: string[]): Relation<T>;
-  order(...args: OrderArg[]): Relation<T>;
-  inOrderOf(column: string | Nodes.Node, values: unknown[], filter?: boolean): Relation<T>;
-  reorder(...args: OrderArg[]): Relation<T>;
-  where(): WhereChain<Relation<T>>;
-  where(args: undefined): WhereChain<Relation<T>>;
-  where(args: Record<string, unknown> | null): Relation<T>;
-  where(args: Map<unknown, unknown>): Relation<T>;
-  where(sql: string, ...binds: unknown[]): Relation<T>;
-  where(args: Nodes.Node): Relation<T>;
-  where(args: unknown[]): Relation<T>;
-  rewhere(conditions: Record<string, unknown> | null): Relation<T>;
-  invertWhere(): Relation<T>;
-  structurallyCompatible(other: Relation<T>): boolean;
-  and(other: Relation<T>): Relation<T>;
-  or(other: Relation<T>): Relation<T>;
-  excluding(...records: unknown[]): Relation<T>;
-  without(...records: unknown[]): Relation<T>;
-  having(condition: string, ...binds: unknown[]): Relation<T>;
-  having(condition: Record<string, unknown>): Relation<T>;
-  having(condition: Nodes.Node): Relation<T>;
+  ): Relation<T, G>;
+  group(...args: (string | Nodes.Node)[]): Relation<T, true>;
+  regroup(...args: string[]): Relation<T, true>;
+  order(...args: OrderArg[]): Relation<T, G>;
+  inOrderOf(column: string | Nodes.Node, values: unknown[], filter?: boolean): Relation<T, G>;
+  reorder(...args: OrderArg[]): Relation<T, G>;
+  where(): WhereChain<Relation<T, G>>;
+  where(args: undefined): WhereChain<Relation<T, G>>;
+  where(args: Record<string, unknown> | null): Relation<T, G>;
+  where(args: Map<unknown, unknown>): Relation<T, G>;
+  where(sql: string, ...binds: unknown[]): Relation<T, G>;
+  where(args: Nodes.Node): Relation<T, G>;
+  where(args: unknown[]): Relation<T, G>;
+  rewhere(conditions: Record<string, unknown> | null): Relation<T, G>;
+  invertWhere(): Relation<T, G>;
+  structurallyCompatible(other: Relation<T, boolean>): boolean;
+  and(other: Relation<T, boolean>): Relation<T, G>;
+  or(other: Relation<T, boolean>): Relation<T, G>;
+  excluding(...records: unknown[]): Relation<T, G>;
+  without(...records: unknown[]): Relation<T, G>;
+  having(condition: string, ...binds: unknown[]): Relation<T, G>;
+  having(condition: Record<string, unknown>): Relation<T, G>;
+  having(condition: Nodes.Node): Relation<T, G>;
   having(
     condition: string | Record<string, unknown> | Nodes.Node,
     ...binds: unknown[]
-  ): Relation<T>;
-  limit(value: number | string | null): Relation<T>;
-  offset(value: number | string | null): Relation<T>;
-  distinct(value?: boolean): Relation<T>;
-  reverseOrder(): Relation<T>;
-  spawn(): Relation<T>;
-  merge<U extends Base>(other: Relation<U>): Relation<T>;
-  merge(other: Partial<Record<ValueMethod, unknown>>): Relation<T>;
-  mergeBang(other: any): Relation<T>;
-  except(...skips: Array<ExceptSkip>): Relation<T>;
-  only(...onlies: Array<ExceptSkip>): Relation<T>;
+  ): Relation<T, G>;
+  limit(value: number | string | null): Relation<T, G>;
+  offset(value: number | string | null): Relation<T, G>;
+  distinct(value?: boolean): Relation<T, G>;
+  reverseOrder(): Relation<T, G>;
+  spawn(): Relation<T, G>;
+  merge<U extends Base, H extends boolean>(
+    other: Relation<U, H>,
+  ): Relation<T, [G] extends [true] ? true : [H] extends [true] ? true : G | H>;
+  merge(other: Partial<Record<ValueMethod, unknown>>): Relation<T, G>;
+  mergeBang(other: any): Relation<T, G>;
+  except<A extends ExceptSkip[]>(
+    ...skips: A
+  ): Relation<T, string extends A[number] ? boolean : "group" extends A[number] ? false : G>;
+  only<A extends ExceptSkip[]>(
+    ...onlies: A
+  ): Relation<T, string extends A[number] ? boolean : "group" extends A[number] ? G : false>;
   /** @internal */
-  relationWith(values: Record<string, unknown>): Relation<T>;
+  relationWith(values: Record<string, unknown>): Relation<T, G>;
   /** @internal */
-  constructRelationForExists(conditions: unknown): Relation<T>;
+  constructRelationForExists(conditions: unknown): Relation<T, G>;
   /** @internal */
   usingLimitableReflections(reflections: Array<{ isCollection(): boolean }>): boolean;
   /** @internal */
@@ -2087,7 +2099,7 @@ export interface Relation<T extends Base>
   /** @internal */
   findLast(limit?: number): Promise<T | T[] | null>;
   /** @internal */
-  orderedRelation(): Relation<T>;
+  orderedRelation(): Relation<T, G>;
   /** @internal */
   _orderColumns(): string[];
   /** @internal */
@@ -2098,12 +2110,12 @@ export interface Relation<T extends Base>
   findInBatches(opts?: FindEachOptions): AsyncGenerator<T[]> & { size(): Promise<number> };
   inBatches(
     opts: InBatchesOptions,
-    block: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
+    block: (relation: LoadedRelation<Relation<T, G>>) => void | Promise<void>,
   ): Promise<null>;
-  inBatches(opts?: InBatchesOptions): BatchEnumerator<LoadedRelation<Relation<T>>>;
+  inBatches(opts?: InBatchesOptions): BatchEnumerator<LoadedRelation<Relation<T, G>>>;
 }
 
-export interface Relation<T extends Base> {
+export interface Relation<T extends Base, G extends boolean = false> {
   length(): Promise<number>;
   each(fn: (record: T, index: number) => void): Promise<T[]>;
   join(separator?: string): Promise<string>;

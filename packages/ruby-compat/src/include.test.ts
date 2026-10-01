@@ -1,7 +1,9 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import { NameError } from "./name-error.js";
+import { rbModToS } from "./object.js";
 import {
   include,
+  rbModConstSet,
   prepend,
   extend,
   included,
@@ -1211,5 +1213,42 @@ describe("Module#dup", () => {
     expect(copy.label).toBe("original");
     expect(copy.instanceMethods()).toEqual(["greet", "extra"]);
     expect(mod.instanceMethods()).toEqual(["greet"]);
+  });
+});
+
+describe("Module#const_set", () => {
+  it("names an anonymous module after the constant it is bound to", () => {
+    class Topic {}
+    const mod = new Module();
+    expect(mod.name).toBeNull();
+    expect(rbModConstSet(Topic, "Generated", mod)).toBe(mod);
+    expect((Topic as unknown as { Generated: Module }).Generated).toBe(mod);
+    expect(mod.name).toBe("Topic::Generated");
+    expect(mod.inspect()).toBe("Topic::Generated");
+  });
+
+  it("gives a module bound under an anonymous owner a temporary path until a named owner binds it", () => {
+    const owner = new Module();
+    const mod = new Module();
+    rbModConstSet(owner, "X", mod);
+    expect(mod.name).toBe(`${owner.inspect()}::X`);
+    class N {}
+    rbModConstSet(N, "Z", mod);
+    expect(mod.name).toBe("N::Z");
+  });
+
+  it("paths a module under an anonymous class by the class's temporary path", () => {
+    const owner = (() => class {})();
+    const mod = new Module();
+    rbModConstSet(owner, "X", mod);
+    expect(owner.name).toBe("");
+    expect(mod.name).toMatch(/^#<Class:0x[0-9a-f]{16}>::X$/);
+    expect(mod.name).toBe(`${rbModToS(owner)}::X`);
+  });
+
+  it("raises NameError for a name that is not a constant name", () => {
+    expect(() => rbModConstSet(class N {}, "foo", 1)).toThrow(
+      new NameError("wrong constant name foo", "foo"),
+    );
   });
 });

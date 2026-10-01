@@ -88,7 +88,7 @@ describe("query chaining DX", () => {
     expectTypeOf(Post.reselect("title")).toMatchTypeOf<Relation<Post>>();
     expectTypeOf(Post.reorder("title ASC")).toMatchTypeOf<Relation<Post>>();
     expectTypeOf(Post.rewhere({ title: "x" })).toMatchTypeOf<Relation<Post>>();
-    expectTypeOf(Post.regroup("title")).toMatchTypeOf<Relation<Post>>();
+    expectTypeOf(Post.regroup("title")).toMatchTypeOf<Relation<Post, true>>();
   });
 
   it("Post.annotate / extending / unscope / createWith return Relation<Post>", () => {

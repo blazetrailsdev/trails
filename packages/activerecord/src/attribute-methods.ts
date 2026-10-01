@@ -1,6 +1,6 @@
 import { CodeGenerator, include, Module, TimeWithZone, toFs } from "@blazetrails/activesupport";
 import { AttributeMethods as AMAttributeMethods, Model } from "@blazetrails/activemodel";
-import { isEmpty, rbInspect as inspect } from "@blazetrails/ruby-compat";
+import { isEmpty, rbInspect as inspect, rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
   AttributeMethods,
@@ -120,20 +120,10 @@ export function accessedFields(this: AttributeRecord): string[] {
   return this._attributes.accessed();
 }
 
-export class GeneratedAttributeMethods extends Module {
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE generated-attribute-methods-name-comes-from-const-set
-   */
-  ownerName?: string;
-
-  /** @noRailsEquivalent CONVERGEABLE generated-attribute-methods-name-comes-from-const-set */
-  inspect(): string {
-    return `${this.ownerName}::GeneratedAttributeMethods`;
-  }
-}
+export class GeneratedAttributeMethods extends Module {}
 
 export interface AttributeMethodsHost {
+  new (...args: never[]): unknown;
   name: string;
   _attributeMethodsGenerated?: boolean;
   _aliasAttributesMassGenerated?: boolean;
@@ -236,11 +226,14 @@ export function initializeGeneratedModules(this: AttributeMethodsHost): void {
   if (previous instanceof Module) {
     previous.removeMethod(...previous.instanceMethods());
   }
-  this._generatedAttributeMethods = new GeneratedAttributeMethods();
-  this._generatedAttributeMethods.ownerName = this.name;
+  this._generatedAttributeMethods = rbModConstSet(
+    this,
+    "GeneratedAttributeMethods",
+    new GeneratedAttributeMethods(),
+  );
   this._attributeMethodsGenerated = false;
   this._aliasAttributesMassGenerated = false;
-  include(this as unknown as new (...args: unknown[]) => unknown, this._generatedAttributeMethods);
+  include(this, this._generatedAttributeMethods);
   _coreInitializeGeneratedModules.call(
     this as unknown as ThisParameterType<typeof _coreInitializeGeneratedModules>,
   );

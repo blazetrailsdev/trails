@@ -100,7 +100,7 @@ describe("basic CRUD DX — defining and using a model", () => {
   });
 
   it("User.count / exists / pluck have concrete return types", () => {
-    expectTypeOf(User.count).returns.resolves.toEqualTypeOf<number | Map<unknown, number>>();
+    expectTypeOf(User.count).returns.resolves.toEqualTypeOf<number>();
     expectTypeOf(User.isExists).returns.resolves.toBeBoolean();
     expectTypeOf(User.pluck).returns.resolves.toEqualTypeOf<unknown[]>();
   });

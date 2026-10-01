@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, expectTypeOf } from "vitest";
 import { Base } from "./index.js";
 import type { JoinDependency } from "./associations/join-dependency.js";
 import { lookupCastTypeFromJoinDependencies, typeFor } from "./relation/calculations.js";
@@ -95,15 +95,15 @@ describe("multi-field grouped calculation key shape", () => {
 
   it("uniqs repeated group fields and keys by a scalar", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
-    const result = (await Account.group("firm_id", "firm_id").count()) as Map<unknown, number>;
+    const result = await Account.group("firm_id", "firm_id").count();
     expect([...result.keys()].every((k) => !Array.isArray(k))).toBe(true);
     expect(result.get(6)).toBe(2);
   });
 
   it("does not collapse distinct groups sharing their first field", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
-    const single = (await Account.group("firm_id").count()) as Map<unknown, number>;
-    const multi = (await Account.group("firm_id", "credit_limit").count()) as Map<unknown, number>;
+    const single = await Account.group("firm_id").count();
+    const multi = await Account.group("firm_id", "credit_limit").count();
     expect(single.get(6)).toBe(2);
     const firmSix = [...multi.entries()].filter(([k]) => (k as unknown[])[0] === 6);
     expect(firmSix.map(([, v]) => v)).toEqual([1, 1]);
@@ -143,10 +143,7 @@ describe("grouped calculation HAVING on a composite-FK belongs_to", () => {
     await CpkChapter.create({ id: [1, 11], book_id: 1, title: "ch-2" });
     await CpkChapter.create({ id: [1, 12], book_id: 2, title: "ch-3" });
 
-    const result = (await CpkChapter.group("book").having("COUNT(*) > 1").count()) as Map<
-      unknown,
-      number
-    >;
+    const result = await CpkChapter.group("book").having("COUNT(*) > 1").count();
 
     const entries = [...result.entries()] as [{ id: unknown[] } | null, number][];
     expect(entries).toHaveLength(1);
@@ -168,8 +165,8 @@ describe("ungrouped calculation HAVING", () => {
 
   it("emits HAVING with no GROUP BY on the count paths", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
-    const total = (await Account.count()) as number;
-    const credited = (await Account.where("credit_limit IS NOT NULL").count()) as number;
+    const total = await Account.count();
+    const credited = await Account.where("credit_limit IS NOT NULL").count();
     expect(total).toBeGreaterThan(1);
     expect(credited).toBeGreaterThan(1);
 
@@ -218,7 +215,7 @@ describe("empty-scope aggregate identities", () => {
 
   it("sums the identity value when no column is given", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
-    const rows = (await Account.count()) as number;
+    const rows = await Account.count();
     expect(await Account.sum()).toBe(0);
     expect(await Account.sum(1000)).toBe(1000 * rows);
     expect(await Account.calculate("sum", 1000)).toBe(1000 * rows);
@@ -250,7 +247,7 @@ describe("empty-scope aggregate identities", () => {
 
   it("sums bigint block return values onto the default identity", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
-    const rows = BigInt((await Account.count()) as number);
+    const rows = BigInt(await Account.count());
     expect(await Account.sum(() => 1n)).toBe(rows);
     expect(await Account.sum(1000, () => 1n)).toBe(1000n + rows);
   });
@@ -292,5 +289,42 @@ describe("empty-scope aggregate identities", () => {
   it("returns no ids for a none relation", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
     expect(await Account.none().ids()).toEqual([]);
+  });
+});
+
+describe("calculation result type follows group_values", () => {
+  fixtures(["companies", "accounts"]);
+
+  it("types an ungrouped count as the scalar and a grouped one as the Map", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const n: number = await Account.count();
+    const grouped = await Account.where({ firm_id: 6 }).group("firm_id").count();
+    expectTypeOf(grouped).toEqualTypeOf<Map<unknown, number>>();
+    expect(n).toBe(await Account.all().count());
+    expect(grouped.get(6)).toBe(2);
+  });
+
+  it("keeps a grouped relation's Map type through the chainables that follow group", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const grouped = Account.group("firm_id");
+    type GroupedCount = Map<unknown, number>;
+    expectTypeOf(
+      grouped.where({ firm_id: 6 }).count,
+    ).returns.resolves.toEqualTypeOf<GroupedCount>();
+    expectTypeOf(
+      grouped.order("firm_id").limit(5).count,
+    ).returns.resolves.toEqualTypeOf<GroupedCount>();
+    expectTypeOf(
+      grouped.having("COUNT(*) > 0").invertWhere().count,
+    ).returns.resolves.toEqualTypeOf<GroupedCount>();
+    expectTypeOf(Account.all().merge(grouped).count).returns.resolves.toEqualTypeOf<GroupedCount>();
+    expectTypeOf(grouped.unscope(":group").count).returns.resolves.toEqualTypeOf<number>();
+    expectTypeOf(grouped.except("group").count).returns.resolves.toEqualTypeOf<number>();
+    expectTypeOf(grouped.only("where").count).returns.resolves.toEqualTypeOf<number>();
+    expectTypeOf(grouped.only("group").count).returns.resolves.toEqualTypeOf<GroupedCount>();
+    expect((await Account.all().merge(grouped).count()).get(6)).toBe(2);
+    expect(await grouped.unscope(":group").count()).toBe(await Account.count());
+    const counts = await grouped.where({ firm_id: 6 }).order("firm_id").limit(5).count();
+    expect(counts.get(6)).toBe(2);
   });
 });

@@ -22,7 +22,7 @@
 
 import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
-import { FL_SINGLETON } from "./object.js";
+import { FL_SINGLETON, rbAnyToS, rbModToS } from "./object.js";
 
 type AnyClass = new (...args: never[]) => unknown;
 type ModuleObject = object;
@@ -32,6 +32,48 @@ type ModuleHooks = {
   [extended]?: (klass: unknown) => void;
   [initialize]?: (this: object) => void;
 };
+
+const classpaths = new WeakMap<Module, { path: string; permanent: boolean }>();
+
+/**
+ * Mirrors: Ruby's Module#const_set — vendor/ruby/v3.3.11/object.c:2545
+ * `rb_mod_const_set`, which raises `NameError` for a name that is not a
+ * constant name (`id_for_var`, object.c:2220-2240): an uppercase or titlecase
+ * letter (`rb_sym_constant_char_p`, vendor/ruby/v3.3.11/symbol.c:218-250), then
+ * identifier characters (`is_identchar`, symbol.c:54). It then calls `const_set`
+ * (vendor/ruby/v3.3.11/variable.c:3607). Binding a module names it after the
+ * owner (variable.c:3648-3668): permanently under a named owner, and under an
+ * anonymous one with the owner's temporary path, until a named owner re-paths
+ * it. `Module#name` and `Module#inspect` read that path.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+ */
+export function rbModConstSet<T>(
+  mod: Module | (abstract new (...args: never) => unknown),
+  id: string,
+  value: T,
+): T {
+  if (!/^[\p{Lu}\p{Lt}](?:\w|\P{ASCII})*$/u.test(id)) {
+    throw new NameError(`wrong constant name ${id}`, id);
+  }
+  Object.defineProperty(mod, id, { value, writable: true, enumerable: true, configurable: true });
+  if (value instanceof Module) {
+    const valPath = classpaths.get(value);
+    const parentalPathPermanent =
+      mod instanceof Module ? classpaths.get(mod)?.permanent === true : Boolean(mod.name);
+    const parentalPath = parentalPathPermanent
+      ? mod.name
+      : mod instanceof Module
+        ? mod.inspect()
+        : rbModToS(mod);
+    if (parentalPathPermanent && valPath?.permanent !== true) {
+      classpaths.set(value, { path: `${parentalPath}::${id}`, permanent: true });
+    } else if (!parentalPathPermanent && valPath === undefined) {
+      classpaths.set(value, { path: `${parentalPath}::${id}`, permanent: false });
+    }
+  }
+  return value;
+}
 
 /**
  * Ruby's `Module.new` — an anonymous module built at runtime and populated
@@ -66,6 +108,29 @@ export class Module {
    */
   constructor(block?: (mod: Module) => void) {
     if (block !== undefined) block(this);
+  }
+
+  /**
+   * Mirrors: Ruby's Module#name — vendor/ruby/v3.3.11/variable.c:122
+   * `rb_mod_name`: the classpath `const_set` gave the module, or `nil` while
+   * it is anonymous.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  get name(): string | null {
+    return classpaths.get(this)?.path ?? null;
+  }
+
+  /**
+   * Mirrors: Ruby's Module#inspect — vendor/ruby/v3.3.11/object.c:1710
+   * `rb_mod_to_s`, which renders `rb_class_name`: the classpath, or the
+   * `#<Klass:0x…>` path `make_temporary_path` (vendor/ruby/v3.3.11/variable.c:320)
+   * gives an anonymous one.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  inspect(): string {
+    return this.name ?? rbAnyToS(this);
   }
 
   /**

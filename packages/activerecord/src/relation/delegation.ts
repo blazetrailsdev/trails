@@ -21,6 +21,7 @@ import {
   compact,
   include,
   rbEql,
+  rbModConstSet,
   rbObjRespondTo,
   uniq,
 } from "@blazetrails/ruby-compat";
@@ -103,6 +104,7 @@ export class DelegateCache {
     let methods = _generatedRelationMethodsByModel.get(this);
     if (!methods) {
       methods = new GeneratedRelationMethods();
+      rbModConstSet(this, "GeneratedRelationMethods", methods);
       _generatedRelationMethodsByModel.set(this, methods);
     }
     return methods;

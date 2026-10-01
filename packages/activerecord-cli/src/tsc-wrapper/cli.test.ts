@@ -334,7 +334,7 @@ describe("trails-tsc scopes and enums", () => {
       }
       node.forEachChild(visit);
     });
-    expect(probed["chained"]).toBe("Relation<Post>");
+    expect(probed["chained"]).toBe("Relation<Post, false>");
     expect(probed["status"]).toBe('"archived" | "draft"');
   });
 });

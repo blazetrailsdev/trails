@@ -10,7 +10,7 @@ import type { Nodes } from "@blazetrails/arel";
 export type DjarKey = string | string[];
 export type DjarIds = unknown[] | unknown[][];
 
-export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T> {
+export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T, boolean> {
   /** @internal */
   static override _railsClassName = "ActiveRecord::DisableJoinsAssociationRelation";
 

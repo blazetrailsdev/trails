@@ -1,4 +1,5 @@
 import { NoMethodError, extend } from "@blazetrails/ruby-compat";
+import type { HasManyThroughAssociation } from "./has-many-through-association.js";
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
 import { QueryMethods } from "../relation/query-methods.js";
@@ -67,21 +68,8 @@ function sameRecordList(a: Base[], b: Base[]): boolean {
   return a.length === b.length && a.every((record, i) => record.equals(b[i]));
 }
 
-/** @internal */
-interface ThroughAssociationHandle {
-  _throughScope?: unknown;
-  concat(...records: Base[]): Promise<Base[] | undefined>;
-  insertRecord(
-    record: Base,
-    validate?: boolean,
-    raise?: boolean,
-    block?: (record: Base) => void,
-  ): Promise<boolean>;
-  transaction<R>(block: () => Promise<R>): Promise<R | undefined>;
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class CollectionProxy<T extends Base = Base> extends Relation<T> {
+export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean> {
   /** @internal */
   static override _railsClassName = "ActiveRecord::Associations::CollectionProxy";
 
@@ -214,13 +202,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     attributes: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
-    const association = this._association.owner.association(
-      this._assocName,
-    ) as unknown as CollectionAssociation;
     return (
       Array.isArray(attributes)
-        ? association.build(attributes, block as (record: Base) => void)
-        : association.build(attributes, block as (record: Base) => void)
+        ? this._association.build(attributes, block as (record: Base) => void)
+        : this._association.build(attributes, block as (record: Base) => void)
     ) as T | T[];
   }
 
@@ -261,18 +246,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return stripThenable(this);
     }
 
-    const assoc = this._association.owner.association(this._assocName) as unknown as {
-      concat: (...records: Base[]) => Promise<Base[] | undefined>;
-    };
-    const concatResult = await assoc.concat(...(records as unknown as Base[]));
+    const concatResult = await this._association.concat(...(records as unknown as Base[]));
     if (!concatResult) return false;
     return stripThenable(this);
   }
 
   private async _pushThrough(records: T[], throughScope?: unknown): Promise<void> {
-    const assoc = this._association.owner.association(
-      this._assocName,
-    ) as unknown as ThroughAssociationHandle;
+    const assoc = this._association as HasManyThroughAssociation;
     const previousThroughScope = assoc._throughScope;
     if (throughScope != null) assoc._throughScope = throughScope;
     try {
@@ -357,10 +337,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override find(...ids: unknown[]): Promise<T | T[]>;
   override async find(...args: unknown[]): Promise<T | T[] | null> {
     if (typeof args[args.length - 1] === "function") return super.find(...args);
-    const assoc = this._association.owner.association(this._assocName) as unknown as {
-      find(...args: unknown[]): Promise<Base | Base[] | null>;
-    };
-    return (await assoc.find(...args)) as T | T[];
+    return (await this._association.find(...args)) as T | T[];
   }
 
   override async pluck(
@@ -389,10 +366,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   scope(): any {
-    const assoc = this._association.owner.association(this._assocName) as unknown as {
-      scope(): unknown;
-    };
-    return (this._scope ??= assoc.scope() as any);
+    return (this._scope ??= this._association.scope());
   }
   async loadTarget(): Promise<T[]> {
     return (await this._association.loadTarget()) as T[];

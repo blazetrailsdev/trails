@@ -559,7 +559,7 @@ export function _inlinePolymorphicKeys(
   return { fkCols: [scalarFk], ownerKeyCols: Array.isArray(ownerKey) ? ownerKey : [ownerKey] };
 }
 
-/** @noRailsEquivalent CONVERGEABLE disambiguate-association-vs-collection-proxy-accessor */
+/** @noRailsEquivalent CONVERGEABLE delete-collection-proxy-for-inline-association-reader */
 export function collectionProxyFor<T extends Base = Base>(
   record: Base,
   assocName: string,
