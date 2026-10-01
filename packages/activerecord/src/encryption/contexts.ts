@@ -8,6 +8,7 @@ import { EncryptingOnlyEncryptor } from "./encrypting-only-encryptor.js";
 export class Contexts {
   declare static defaultContext: Context;
   declare static customContexts: Context[] | null;
+  declare defaultContext: Context;
   declare customContexts: Context[] | null;
 
   static [included](base: object): void {
