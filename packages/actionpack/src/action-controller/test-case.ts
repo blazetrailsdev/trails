@@ -7,6 +7,7 @@ import {
   include,
   isAnonymous,
   isBlank,
+  isModuleIncluded,
   isPlainObject,
   runLoadHooks,
   SetupAndTeardown,
@@ -44,9 +45,8 @@ import { htmlDocument, type HtmlDocumentHost } from "../action-dispatch/testing/
 import type { XmlDocument } from "@blazetrails/nokogiri";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
-import { FlashHash } from "../action-dispatch/middleware/flash.js";
-import { CookieJar, type CookieResponse } from "../action-dispatch/middleware/cookies.js";
-import { cookies, type TestProcessHost } from "../action-dispatch/testing/test-process.js";
+import type { CookieJar, CookieResponse } from "../action-dispatch/middleware/cookies.js";
+import { TestProcess } from "../action-dispatch/testing/test-process.js";
 import type { RouteSet } from "../action-dispatch/routing/route-set.js";
 import * as responseAssertions from "../action-dispatch/testing/assertions/response.js";
 import * as routingAssertions from "../action-dispatch/testing/assertions/routing.js";
@@ -121,6 +121,10 @@ class Encoder {
 
 include(Encoder, RackTestUtils);
 
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActionDispatch::TestProcess` (`actionpack/lib/action_controller/test_case.rb:373`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface TestCase extends Included<typeof TestProcess> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class TestCase extends ActiveSupportTestCase {
   /** @internal */
   declare static _controllerClass: ControllerClass | null | undefined;
@@ -234,25 +238,13 @@ export class TestCase extends ActiveSupportTestCase {
 
   request!: TestRequest;
 
-  response!: Response;
-
-  get session(): TestSession {
-    return this.request.session as unknown as TestSession;
-  }
-
-  get flash(): FlashHash {
-    return (this.controller as any).flash ?? new FlashHash();
-  }
-
-  get cookies(): CookieJar {
-    return cookies.call(this as unknown as TestProcessHost);
-  }
+  response!: TestResponse | LiveTestResponse;
 
   /** @internal */
   _cookieJar?: CookieJar;
 
   /** @internal */
-  _responseKlass!: typeof Response;
+  _responseKlass!: typeof TestResponse | typeof LiveTestResponse;
 
   get responseBody(): string {
     return this.response?.body ?? this.controller?.responseBody ?? "";
@@ -273,6 +265,7 @@ export class TestCase extends ActiveSupportTestCase {
 
     const klass = this._controllerClass ?? (this.constructor as typeof TestCase).controllerClass;
     if (klass) {
+      if (isModuleIncluded(klass, Live)) this._responseKlass = LiveTestResponse;
       if (!this.controller) {
         try {
           this.controller = new klass();
@@ -352,9 +345,9 @@ export class TestCase extends ActiveSupportTestCase {
     this._htmlDocument?.dispose();
     this._htmlDocument = undefined;
 
-    this.cookies.update(this.request.cookies);
-    this.cookies.updateCookiesFromJar();
-    this.request.setHeader("HTTP_COOKIE", this.cookies.toHeader());
+    this.cookies().update(this.request.cookies);
+    this.cookies().updateCookiesFromJar();
+    this.request.setHeader("HTTP_COOKIE", this.cookies().toHeader());
     this.request.deleteHeader("action_dispatch.cookies");
 
     this.request = new TestRequest(
@@ -394,7 +387,7 @@ export class TestCase extends ActiveSupportTestCase {
     }
 
     this.setupRequest(this.controllerClassName(), action, parameters, session, flash, xhr);
-    await this.processControllerResponse(action, this.cookies, xhr);
+    await this.processControllerResponse(action, this.cookies(), xhr);
   }
 
   /** @internal */
@@ -408,7 +401,7 @@ export class TestCase extends ActiveSupportTestCase {
   }
 
   /** @internal */
-  buildResponse(klass: typeof Response): Response {
+  buildResponse(klass: TestCase["_responseKlass"]): TestCase["response"] {
     return klass.create();
   }
 
@@ -476,7 +469,7 @@ export class TestCase extends ActiveSupportTestCase {
       );
     } finally {
       this.request = this.controller.request as TestRequest;
-      this.response = this.controller.response;
+      this.response = this.controller.response as TestCase["response"];
 
       if (this.request.isHaveCookieJar()) {
         if (!this.request.cookieJar().isCommitted()) {
@@ -543,6 +536,8 @@ export class TestCase extends ActiveSupportTestCase {
     }
   }
 }
+
+include(TestCase, TestProcess);
 
 const proto = TestCase.prototype as unknown as Record<string, unknown>;
 proto.assertResponse = responseAssertions.assertResponse;

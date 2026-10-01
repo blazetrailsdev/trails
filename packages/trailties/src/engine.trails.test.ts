@@ -63,3 +63,24 @@ describe("Railtie class-level method_missing", () => {
     expect(output).toContain("cart GET  /cart(.:format) cart#show");
   });
 });
+
+describe("Engine.isolate_namespace", () => {
+  it("names the engine after the module, scopes its routes and defines the module's railtie readers", () => {
+    class IsolatedEngine extends Engine {}
+    Engine.register(
+      IsolatedEngine,
+      new URL("./__fixtures__/initializer-engine", import.meta.url).pathname,
+    );
+    const mod: Parameters<typeof Engine.isolateNamespace>[0] = { name: "Blog::Admin" };
+    IsolatedEngine.isolateNamespace(mod);
+    const routes = IsolatedEngine.instance().routes();
+
+    expect(IsolatedEngine.engineName()).toBe("blog_admin");
+    expect(IsolatedEngine.isolated()).toBe(true);
+    expect(routes.defaultScope).toEqual({ module: "blog/admin" });
+    expect(mod.trailtieNamespace!()).toBe(IsolatedEngine);
+    expect(mod.tableNamePrefix).toBe("blog_admin_");
+    expect(mod.useRelativeModelNaming!()).toBe(true);
+    expect(mod.trailtieRoutesUrlHelpers!()).toBe(routes.urlHelpers());
+  });
+});

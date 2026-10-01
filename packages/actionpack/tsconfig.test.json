@@ -2,26 +2,22 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "composite": true,
-    "outDir": "dist",
-    "rootDir": "src"
+    "outDir": "dist-test",
+    "rootDir": "src",
+    "paths": {
+      "@blazetrails/trailties/engine": ["../trailties/src/engine.ts"]
+    }
   },
-  "include": ["src"],
-  "exclude": [
+  "include": [
     "src/action-controller/controller/test-case.test.ts",
     "src/action-dispatch/dispatch/routing-assertions.test.ts",
     "src/action-dispatch/dispatch/routing/inspector.test.ts"
   ],
   "references": [
+    { "path": "./tsconfig.json" },
     { "path": "../ruby-compat" },
-    { "path": "../actionview" },
-    { "path": "../activemodel" },
     { "path": "../activesupport" },
-    { "path": "../date" },
-    { "path": "../did-you-mean" },
-    { "path": "../i18n" },
-    { "path": "../rack" },
-    { "path": "../rack-session" },
     { "path": "../rack-test" },
-    { "path": "../nokogiri" }
+    { "path": "../trailties" }
   ]
 }

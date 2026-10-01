@@ -255,7 +255,7 @@ function flattenDiagnosticMessageText(d: Diagnostic, newLine: string, indent = 0
   return result;
 }
 
-function handleBuildMode(args: string[]): void {
+async function handleBuildMode(args: string[]): Promise<void> {
   const buildIdx = args.findIndex((a) => a === "--build" || a === "-b");
   if (buildIdx === -1) return;
 
@@ -285,7 +285,7 @@ function handleBuildMode(args: string[]): void {
   const schemaColumnsByTable = loadSchemaColumns(args);
   for (const root of rootConfigs) {
     const isDir = fs.existsSync(root) && fs.statSync(root).isDirectory();
-    buildConfiguredViews(isDir ? path.join(root, "tsconfig.json") : root);
+    await buildConfiguredViews(isDir ? path.join(root, "tsconfig.json") : root);
   }
   const builder = createArSolutionBuilder(rootConfigs, {
     verbose,
@@ -306,14 +306,14 @@ function handleBuildMode(args: string[]): void {
   process.exit(status);
 }
 
-function buildConfiguredViews(configPath: string): void {
+async function buildConfiguredViews(configPath: string): Promise<void> {
   const { config } = tsApi().readConfigFile(configPath) as {
     config?: { compilerOptions?: { plugins?: { name?: string; viewsDir?: string }[] } };
   };
   const plugins = config?.compilerOptions?.plugins ?? [];
   const plugin = plugins.find((p) => p.name === "@blazetrails/trails-tsc/ts-plugin");
   if (plugin?.viewsDir === undefined) return;
-  buildViews({ cwd: path.dirname(configPath), viewsDir: plugin.viewsDir });
+  await buildViews({ cwd: path.dirname(configPath), viewsDir: plugin.viewsDir });
 }
 
 async function loadTseSourceMaps(
@@ -357,7 +357,7 @@ export async function main(): Promise<void> {
 
   handleHelp(args);
   handlePrintVirtualized(args);
-  handleBuildMode(args);
+  await handleBuildMode(args);
 
   let configPath: string | undefined;
   for (let i = 0; i < args.length; i++) {
@@ -379,7 +379,7 @@ export async function main(): Promise<void> {
   }
 
   const schemaColumnsByTable = loadSchemaColumns(args);
-  buildConfiguredViews(configPath);
+  await buildConfiguredViews(configPath);
   const { program, host, configDiagnostics } = createArTrailsProgram(configPath, {
     schemaColumnsByTable,
   });

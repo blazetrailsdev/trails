@@ -113,6 +113,7 @@ export class Configuration {
 
   isRespondTo(key: string): boolean {
     if (!key.startsWith("_")) {
+      if (Object.prototype.hasOwnProperty.call(this, key)) return true;
       for (let proto = Object.getPrototypeOf(this); proto; proto = Object.getPrototypeOf(proto)) {
         if (Object.prototype.hasOwnProperty.call(proto, key)) return true;
       }

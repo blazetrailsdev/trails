@@ -6,10 +6,11 @@ import {
   Notifications,
   onLoad,
   TopLevel,
+  underscore,
   type Extended,
   type Included,
 } from "@blazetrails/activesupport";
-import { File, getFs, getPath } from "@blazetrails/ruby-compat";
+import { File, getFs, getPath, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import {
   MiddlewareStack,
   type DrawCallback,
@@ -21,12 +22,21 @@ import {
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Root } from "./paths.js";
 import type { RouteSetLike } from "./application/routes-reloader.js";
-import { Trailtie } from "./trailtie.js";
+import { generateRailtieName, Trailtie } from "./trailtie.js";
 import { Trailties } from "./engine/trailties.js";
 import { EngineConfiguration } from "./engine/configuration.js";
 import type { MiddlewareStackProxy } from "./configuration.js";
 import { LazyRouteSet } from "./engine/lazy-route-set.js";
 import { readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
+
+type IsolatedNamespace = {
+  name: string;
+  trailtieNamespace?: () => typeof Engine;
+  tableNamePrefix?: string;
+  useRelativeModelNaming?: () => boolean;
+  trailtieHelpersPaths?: () => Promise<string[]>;
+  trailtieRoutesUrlHelpers?: (includePathHelpers?: boolean) => unknown;
+};
 
 export class Engine extends Trailtie {
   declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
@@ -69,6 +79,46 @@ export class Engine extends Trailtie {
 
   static engineName(name?: string): string {
     return this.railtieName(name);
+  }
+
+  static isolateNamespace(mod: IsolatedNamespace): void {
+    this.engineName(generateRailtieName(mod.name));
+
+    this.config.defaultScope = { module: underscore(mod.name) };
+
+    this.isolated(true);
+
+    if (!rbObjRespondTo(mod, "trailtieNamespace")) {
+      const [name, railtie] = [this.engineName(), this] as const;
+      mod.trailtieNamespace = () => railtie;
+
+      if (!rbObjRespondTo(mod, "tableNamePrefix")) {
+        Object.defineProperty(mod, "tableNamePrefix", {
+          configurable: true,
+          get: () => `${name}_`,
+        });
+
+        onLoad("active_record", (base: { tableNamePrefix: string }) => {
+          Object.defineProperty(mod, "tableNamePrefix", {
+            configurable: true,
+            get: () => `${base.tableNamePrefix}${name}_`,
+          });
+        });
+      }
+
+      if (!rbObjRespondTo(mod, "useRelativeModelNaming")) {
+        mod.useRelativeModelNaming = () => true;
+      }
+
+      if (!rbObjRespondTo(mod, "trailtieHelpersPaths")) {
+        mod.trailtieHelpersPaths = () => railtie.instance().helpersPaths();
+      }
+
+      if (!rbObjRespondTo(mod, "trailtieRoutesUrlHelpers")) {
+        mod.trailtieRoutesUrlHelpers = (includePathHelpers = true) =>
+          railtie.instance().routes().urlHelpers(includePathHelpers);
+      }
+    }
   }
 
   static async find(path: string): Promise<Engine | undefined> {

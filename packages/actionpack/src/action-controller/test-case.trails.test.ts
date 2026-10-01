@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { BigDecimal } from "@blazetrails/activesupport";
+import { BigDecimal, include } from "@blazetrails/activesupport";
 import { b, StringIO } from "@blazetrails/ruby-compat";
 import { UploadedFile } from "@blazetrails/rack-test";
 import {
+  LiveTestResponse,
   TestCase,
   TestRequest,
   TestSession,
@@ -103,6 +104,12 @@ describe("ActionController::Live under test_case.rb", () => {
     order.push("after-call");
     await p;
     expect(order).toEqual(["inside", "after-call"]);
+  });
+
+  it("builds a LiveTestResponse for a controller that includes Live", () => {
+    class LiveController extends Base {}
+    include(LiveController, Live);
+    expect(new TestCase(LiveController).response).toBeInstanceOf(LiveTestResponse);
   });
 });
 

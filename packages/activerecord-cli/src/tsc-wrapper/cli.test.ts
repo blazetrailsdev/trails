@@ -195,11 +195,11 @@ describe("trails-tsc .tse diagnostic remap", () => {
 });
 
 describe("trails-tsc .tse diagnostic span end", () => {
-  function remapSpan(source: string, from: string, to: string): [string, Diagnostic] {
+  async function remapSpan(source: string, from: string, to: string) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-span-"));
     fs.mkdirSync(path.join(root, "app/views/posts"), { recursive: true });
     fs.writeFileSync(path.join(root, "app/views/posts/show.html.tse"), source);
-    buildViews({ cwd: root });
+    await buildViews({ cwd: root });
     const shim = path.join(root, ".trails/views/posts/show.html.tse.ts");
     const text = fs.readFileSync(shim, "utf8");
     const map = JSON.parse(fs.readFileSync(shim + ".map", "utf8"));
@@ -229,21 +229,22 @@ describe("trails-tsc .tse diagnostic span end", () => {
       getOriginalText: () => undefined,
       getTseSourceMap: () => ({ source: "show.html.tse", sourceContent: source, lines }),
     });
-    return [source.slice(remapped.pos, remapped.end), remapped];
+    return [source.slice(remapped.pos, remapped.end), remapped] as const;
   }
 
-  it("maps a span crossing two lines of a multi-line tag through each line's own mapping", () => {
+  it("maps a span crossing two lines of a multi-line tag through each line's own mapping", async () => {
     const source = "<p>\n  <% const total = sum(\n       1, 2); %>\n</p>\n";
-    const [span, remapped] = remapSpan(source, "sum(", "2)");
+    const [span, remapped] = await remapSpan(source, "sum(", "2)");
     expect(span).toBe("sum(\n       1, 2)");
     expect(remapped.startPosition).toEqual({ line: 1, character: 19 });
     expect(remapped.endPosition).toEqual({ line: 2, character: 12 });
     expect(remapped.sourceLines?.map((l) => l.line)).toEqual([1, 2]);
   });
 
-  it("clamps a span around a yield's re-emitted call to the argument the template wrote", () => {
-    expect(remapSpan("<main><%= yield(123) %></main>\n", "context.yield(", "123)")[0]).toBe("123");
-    expect(remapSpan("<main><%= yield(123) %></main>\n", "123", "123")[0]).toBe("123");
+  it("clamps a span around a yield's re-emitted call to the argument the template wrote", async () => {
+    const [span] = await remapSpan("<main><%= yield(123) %></main>\n", "context.yield(", "123)");
+    expect(span).toBe("123");
+    expect((await remapSpan("<main><%= yield(123) %></main>\n", "123", "123"))[0]).toBe("123");
   });
 });
 

@@ -31,6 +31,7 @@ import {
   RuntimeError,
 } from "@blazetrails/ruby-compat";
 import { UploadedFile } from "@blazetrails/rack-test";
+import { Engine } from "@blazetrails/trailties/engine";
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { TestCase } from "../test-case.js";
 import { Base } from "../base.js";
@@ -40,10 +41,6 @@ import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { InvalidType } from "../../action-dispatch/http/mime-negotiation.js";
 import { Response } from "../../action-dispatch/http/response.js";
 import { TestResponse } from "../../action-dispatch/testing/test-response.js";
-import type {
-  fixtureFileUpload,
-  redirectToUrl,
-} from "../../action-dispatch/testing/test-process.js";
 import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
 import { ContentController } from "../../test-helpers/lib/controller/fake-controllers.js";
 
@@ -337,22 +334,22 @@ describe("TestCaseTest", () => {
   describe("flash", () => {
     it("assertFlash passes when flash is set", async () => {
       await tc.get("flashNotice");
-      expect(tc.flash.get("notice")).toBe("Success!");
+      expect(tc.flash().get("notice")).toBe("Success!");
     });
 
     it("assertFlash throws when flash is not set", async () => {
       await tc.get("index");
-      expect(tc.flash.get("notice")).toBeUndefined();
+      expect(tc.flash().get("notice")).toBeUndefined();
     });
 
     it("assertNoFlash passes when flash is not set", async () => {
       await tc.get("index");
-      expect(tc.flash.has("alert")).toBe(false);
+      expect(tc.flash().has("alert")).toBe(false);
     });
 
     it("flash accessor returns flash hash", async () => {
       await tc.get("flashNotice");
-      expect(tc.flash.get("notice")).toBe("Success!");
+      expect(tc.flash().get("notice")).toBe("Success!");
     });
   });
 
@@ -370,7 +367,7 @@ describe("TestCaseTest", () => {
 
     it("session set by controller is available", async () => {
       await tc.post("create", { params: { title: "My Post" } });
-      expect(tc.session.get("lastCreated")).toBe("My Post");
+      expect(tc.session().get("lastCreated")).toBe("My Post");
     });
 
     it("reset clears session", async () => {
@@ -599,9 +596,7 @@ Object.defineProperty(DefaultUrlOptionsCachingController, "name", {
 });
 
 class TestCaseTest extends TestCase {
-  declare fixtureFileUpload: OmitThisParameter<typeof fixtureFileUpload>;
-  declare redirectToUrl: OmitThisParameter<typeof redirectToUrl>;
-
+  declare response: TestResponse;
   static fixturePaths(): string[] {
     return [];
   }
@@ -724,58 +719,58 @@ describe("TestCaseTest", () => {
 
   it("process without flash", async () => {
     await tc.process("setFlash");
-    assertEqual("><", tc.flash.get("test"));
+    assertEqual("><", tc.flash().get("test"));
   });
 
   it("process with flash", async () => {
     await tc.process("setFlash", { method: "GET", flash: { test: "value" } });
-    assertEqual(">value<", tc.flash.get("test"));
+    assertEqual(">value<", tc.flash().get("test"));
   });
 
   it("process with flash now", async () => {
     await tc.process("setFlashNow", { method: "GET", flash: { test_now: "value_now" } });
-    assertEqual(">value_now<", tc.flash.get("test_now"));
+    assertEqual(">value_now<", tc.flash().get("test_now"));
   });
 
   it("process delete flash", async () => {
     await tc.process("setFlash");
     await tc.process("deleteFlash");
-    assertEmpty(tc.flash);
-    assertEmpty(tc.session);
+    assertEmpty(tc.flash());
+    assertEmpty(tc.session());
   });
 
   it("process with session", async () => {
     await tc.process("setSession");
-    expect(tc.session.get("string")).toBe("A wonder");
-    expect(tc.session.get("symbol")).toBe("it works");
+    expect(tc.session().get("string")).toBe("A wonder");
+    expect(tc.session().get("symbol")).toBe("it works");
   });
 
   it("process with session kwarg", async () => {
     await tc.process("noOp", { method: "GET", session: { string: "value1", symbol: "value2" } });
-    assertEqual("value1", tc.session.get("string"));
-    assertEqual("value1", tc.session.get("string"));
-    assertEqual("value2", tc.session.get("symbol"));
-    assertEqual("value2", tc.session.get("symbol"));
+    assertEqual("value1", tc.session().get("string"));
+    assertEqual("value1", tc.session().get("string"));
+    assertEqual("value2", tc.session().get("symbol"));
+    assertEqual("value2", tc.session().get("symbol"));
   });
 
   it("process merges session arg", async () => {
-    tc.session.set("foo", "bar");
+    tc.session().set("foo", "bar");
     await tc.get("noOp", { session: { bar: "baz" } });
-    assertEqual("bar", tc.session.get("foo"));
-    assertEqual("baz", tc.session.get("bar"));
+    assertEqual("bar", tc.session().get("foo"));
+    assertEqual("baz", tc.session().get("bar"));
   });
 
   it("merged session arg is retained across requests", async () => {
     await tc.get("noOp", { session: { foo: "bar" } });
-    assertEqual("bar", tc.session.get("foo"));
+    assertEqual("bar", tc.session().get("foo"));
     await tc.get("noOp");
-    assertEqual("bar", tc.session.get("foo"));
+    assertEqual("bar", tc.session().get("foo"));
   });
 
   it("process overwrites existing session arg", async () => {
-    tc.session.set("foo", "bar");
+    tc.session().set("foo", "bar");
     await tc.get("noOp", { session: { foo: "baz" } });
-    assertEqual("baz", tc.session.get("foo"));
+    assertEqual("baz", tc.session().get("foo"));
   });
 
   it("session is cleared from controller after reset session", async () => {
@@ -957,8 +952,8 @@ describe("TestCaseTest", () => {
       parsedParams,
     );
 
-    assertEqual("bar", tc.session.get("foo"));
-    assertEqual("created", tc.flash.get("notice"));
+    assertEqual("bar", tc.session().get("foo"));
+    assertEqual("created", tc.flash().get("notice"));
   });
 
   it("params passing with integer", async () => {
@@ -1169,22 +1164,22 @@ describe("TestCaseTest", () => {
 
     assertEqual(
       "A wonder",
-      tc.session.get("string"),
+      tc.session().get("string"),
       "A value stored in the session should be available by string key",
     );
     assertEqual(
       "A wonder",
-      tc.session.get("string"),
+      tc.session().get("string"),
       "Test session hash should allow indifferent access",
     );
     assertEqual(
       "it works",
-      tc.session.get("symbol"),
+      tc.session().get("symbol"),
       "Test session hash should allow indifferent access",
     );
     assertEqual(
       "it works",
-      tc.session.get("symbol"),
+      tc.session().get("symbol"),
       "Test session hash should allow indifferent access",
     );
   });
@@ -1289,21 +1284,21 @@ describe("TestCaseTest", () => {
   });
 
   it("should have knowledge of client side cookie state even if they are not set", async () => {
-    tc.cookies.set("foo", "bar");
+    tc.cookies().set("foo", "bar");
     await tc.get("noOp");
-    assertEqual("bar", tc.cookies.get("foo"));
+    assertEqual("bar", tc.cookies().get("foo"));
   });
 
   it("cookies should be escaped properly", async () => {
-    tc.cookies.set("foo", "+");
+    tc.cookies().set("foo", "+");
     await tc.get("renderCookie");
     assertEqual("+", tc.response.body);
   });
 
   it("should detect if cookie is deleted", async () => {
-    tc.cookies.set("foo", "bar");
+    tc.cookies().set("foo", "bar");
     await tc.get("deleteCookie");
-    assertNil(tc.cookies.get("foo"));
+    assertNil(tc.cookies().get("foo"));
   });
 
   it("multiple mixed method process should scrub rack input", async () => {
@@ -1460,12 +1455,12 @@ describe("TestCaseTest", () => {
 
   it("parsed body without as option", async () => {
     await tc.post("renderJson", { body: { foo: "heyo" } });
-    assertEqual({ foo: "heyo" }, (tc.response as TestResponse).parsedBody);
+    assertEqual({ foo: "heyo" }, tc.response.parsedBody);
   });
 
   it("parsed body with as option", async () => {
     await tc.post("renderJson", { body: JSON.stringify({ foo: "heyo" }), as: "json" });
-    assertEqual({ foo: "heyo" }, (tc.response as TestResponse).parsedBody);
+    assertEqual({ foo: "heyo" }, tc.response.parsedBody);
   });
 
   it("reset instance variables after each request", async () => {
@@ -1601,14 +1596,75 @@ describe("ResponseDefaultHeadersTest", () => {
   });
 });
 
+const EngineControllerTests = { name: "EngineControllerTests" };
+
+class EngineControllerTestsEngine extends Engine {
+  declare static routes: () => RouteSet;
+
+  static {
+    Object.defineProperty(this, "name", { value: "EngineControllerTests::Engine" });
+    Engine.register(this, File.dirname(FIXTURE_LOAD_PATH));
+    this.isolateNamespace(EngineControllerTests);
+
+    this.routes().draw(function () {
+      this.get("/", { to: "bar#index" });
+    });
+  }
+}
+
+class BarController extends Base {
+  async index() {
+    await this.render({ plain: "bar" });
+  }
+}
+Object.defineProperty(BarController, "name", { value: "EngineControllerTests::BarController" });
+
+class BarControllerTest extends TestCase {
+  static {
+    this.tests(BarController);
+  }
+}
+
 describe("BarControllerTest", () => {
-  // BLOCKED: actionpack-tests-cannot-load-rails-engine
-  it.skip("engine controller route", () => {});
+  let tc: BarControllerTest;
+
+  beforeEach(async () => {
+    tc = new BarControllerTest();
+    await tc.beforeSetup();
+    tc.setup();
+  });
+  afterEach(() => tc.afterTeardown({ failures: [] }));
+
+  it("engine controller route", async () => {
+    await tc.get("index");
+    assertEqual("bar", tc.response.body);
+  });
 });
 
+class BarControllerTestWithExplicitRouteSet extends TestCase {
+  static {
+    this.tests(BarController);
+  }
+
+  override setup(): void {
+    this.routes = EngineControllerTestsEngine.routes();
+  }
+}
+
 describe("BarControllerTestWithExplicitRouteSet", () => {
-  // BLOCKED: actionpack-tests-cannot-load-rails-engine
-  it.skip("engine controller route", () => {});
+  let tc: BarControllerTestWithExplicitRouteSet;
+
+  beforeEach(async () => {
+    tc = new BarControllerTestWithExplicitRouteSet();
+    await tc.beforeSetup();
+    tc.setup();
+  });
+  afterEach(() => tc.afterTeardown({ failures: [] }));
+
+  it("engine controller route", async () => {
+    await tc.get("index");
+    assertEqual("bar", tc.response.body);
+  });
 });
 
 describe("InferringClassNameTest", () => {

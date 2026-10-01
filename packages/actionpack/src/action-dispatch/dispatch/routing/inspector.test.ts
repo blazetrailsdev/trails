@@ -1,31 +1,25 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
-import { stringSplit } from "@blazetrails/ruby-compat";
+import { File, stringSplit } from "@blazetrails/ruby-compat";
+import { Engine } from "@blazetrails/trailties/engine";
 import type { MountableApp } from "../../routing/mapper.js";
 import { RouteSet, type DrawCallback } from "../../routing/route-set.js";
 import { ConsoleFormatter, RoutesFormatter, RoutesInspector } from "../../routing/inspector.js";
+import { FIXTURE_LOAD_PATH } from "../../../test-helpers/abstract-unit.js";
 
 class MountedRackApp {
   static call(_env: Record<string, unknown>): void {}
 }
 const mountedRackApp = MountedRackApp as unknown as MountableApp;
 
-class Engine {}
-
 function engineClass(): typeof Engine & { routes(): RouteSet } {
-  return class extends Engine {
-    static _routes = new RouteSet();
-
-    static routes(): RouteSet {
-      return this._routes;
-    }
-
+  const engine = class extends Engine {
     static inspect(): string {
       return "Blog::Engine";
     }
-
-    static call(_env: Record<string, unknown>): void {}
   };
+  Engine.register(engine, File.dirname(FIXTURE_LOAD_PATH));
+  return engine as unknown as typeof Engine & { routes(): RouteSet };
 }
 
 describe("RoutesInspectorTest", () => {

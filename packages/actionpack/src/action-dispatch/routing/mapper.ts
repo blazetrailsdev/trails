@@ -55,7 +55,7 @@ export type MountableApp =
   | ((env: RackEnv) => RackResponse | Promise<RackResponse>)
   | { call: (env: RackEnv) => RackResponse | Promise<RackResponse> };
 
-type RailsApp = MountableApp & { railtieName: string; routes(): RouteSet };
+type RailsApp = MountableApp & { railtieName(): string; routes(): RouteSet };
 
 export type CallableConstraint =
   | ((...args: never[]) => unknown)
@@ -1522,7 +1522,7 @@ export class Mapper {
   /** @internal */
   appName(app: MountableApp, railsApp: boolean): string | undefined {
     if (railsApp) {
-      return (app as { railtieName?: string }).railtieName;
+      return (app as RailsApp).railtieName();
     } else if (
       typeof app === "function" &&
       Object.getOwnPropertyDescriptor(app, "prototype")?.writable === false

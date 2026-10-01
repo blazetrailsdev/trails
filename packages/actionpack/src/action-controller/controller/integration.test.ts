@@ -883,7 +883,9 @@ describe("ApplicationIntegrationTest", () => {
   }
 
   class MountedApp {
-    static railtieName = "application_integration_test_mounted_app";
+    static railtieName(): string {
+      return "application_integration_test_mounted_app";
+    }
 
     static _routes?: RouteSet;
 

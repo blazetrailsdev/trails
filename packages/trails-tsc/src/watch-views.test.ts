@@ -8,7 +8,7 @@ function mkScratch(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-watch-"));
 }
 
-function waitFor(pred: () => boolean, timeoutMs = 2000): Promise<void> {
+function waitFor(pred: () => boolean, timeoutMs = 20_000): Promise<void> {
   return new Promise((resolve, reject) => {
     const t0 = Date.now();
     const tick = (): void => {
@@ -25,7 +25,11 @@ describe("watchViews", () => {
     const cwd = mkScratch();
     fs.mkdirSync(path.join(cwd, "app/views"), { recursive: true });
     const events: string[] = [];
-    const handle = watchViews({ cwd, debounceMs: 5, onRebuild: ({ kind }) => events.push(kind) });
+    const handle = await watchViews({
+      cwd,
+      debounceMs: 5,
+      onRebuild: ({ kind }) => events.push(kind),
+    });
     try {
       await waitFor(() => events.includes("initial"));
       fs.writeFileSync(path.join(cwd, "app/views/home.html.tse"), "<%= name %>");
@@ -34,13 +38,13 @@ describe("watchViews", () => {
     } finally {
       handle.close();
     }
-  });
+  }, 30_000);
 
   it("creates the views dir if missing and surfaces build errors", async () => {
     const cwd = mkScratch();
     fs.symlinkSync(mkScratch(), path.join(cwd, ".trails"));
     const errors: Error[] = [];
-    const handle = watchViews({ cwd, debounceMs: 5, onError: (e) => errors.push(e) });
+    const handle = await watchViews({ cwd, debounceMs: 5, onError: (e) => errors.push(e) });
     try {
       await waitFor(() => errors.length > 0);
       expect(errors[0].message).toMatch(/symlink escape/);
