@@ -604,14 +604,12 @@ export class ConnectionPool implements ReapablePool {
 
   async flush(minimumIdle: number | null = this._idleTimeout): Promise<void> {
     if (minimumIdle == null) return;
-
     if (this.isDiscarded()) return;
     const idleConnections = this._connections!.filter(
       (conn) => !conn.isInUse() && conn.secondsIdle >= minimumIdle,
     );
     for (const conn of idleConnections) {
       conn.lease();
-
       this._available!.delete(conn);
       aryDelete(this._connections!, conn);
     }

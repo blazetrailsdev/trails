@@ -25,14 +25,14 @@ export class Enumerator<T = unknown> {
   }
 
   /**
-   * `enumerator_next` (`vendor/ruby/v3.3.11/enumerator.c:921`), the external
-   * iteration a `for…of` drives.
+   * `enumerator_each` (`vendor/ruby/v3.3.11/enumerator.c:613`) run to completion
+   * into a snapshot, which a `for…of` then walks.
    *
    * @noRailsEquivalent PERMANENT
    */
   *[Symbol.iterator](): Generator<T> {
     const buffer: T[] = [];
-    this.each(((value: T) => buffer.push(value)) as (...args: never[]) => unknown);
+    this.each((value: never) => buffer.push(value));
     yield* buffer;
   }
 }

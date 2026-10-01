@@ -262,7 +262,7 @@ export type TransactionConnection = DatabaseAdapter & {
   rollbackDbTransaction?(): void | Promise<void>;
   restartDbTransaction?(): void | Promise<void>;
   resetIsolationLevel?(): void | Promise<void>;
-  supportsLazyTransactions?(): boolean;
+  supportsLazyTransactions(): boolean;
   supportsRestartDbTransaction?(): Promise<boolean>;
   addTransactionRecord?(record: unknown): void;
   lock?: MonitorMixin;
@@ -872,10 +872,9 @@ export class TransactionManager {
 
       if (!transaction.isMaterialized()) {
         if (
-          this._connection.supportsLazyTransactions?.() &&
+          this._connection.supportsLazyTransactions() &&
           this.isLazyTransactionsEnabled() &&
-          _lazy &&
-          !isolation
+          _lazy
         ) {
           this._hasUnmaterializedTransactions = true;
         } else {
@@ -984,38 +983,37 @@ export class TransactionManager {
           isolation: options.isolation,
           joinable: options.joinable,
         });
-        let error: unknown;
+        let failed = false;
+        let result: T;
         try {
-          return await fn(transaction.userTransaction);
-        } catch (e) {
-          error = e;
+          result = await fn(transaction.userTransaction);
+        } catch (error) {
+          failed = true;
           await this.rollbackTransaction();
           await this.afterFailureActions(transaction, error);
 
           throw error;
-        } finally {
-          if (!error) {
-            if ((Thread.current().status as string) === "aborting") {
-              await this.rollbackTransaction();
-            } else {
-              try {
-                await this.commitTransaction();
-              } catch (e) {
-                if (e instanceof ConnectionFailed) {
-                  if (!transaction.state.isCompleted()) transaction.invalidateBang();
-                  // eslint-disable-next-line no-unsafe-finally -- Ruby's `ensure` re-raises the commit failure over the block's return.
-                  throw e;
-                } else {
-                  if (!transaction.state.isCompleted()) {
-                    await this.rollbackTransaction(transaction);
-                  }
-                  // eslint-disable-next-line no-unsafe-finally -- Ruby's `ensure` re-raises the commit failure over the block's return.
-                  throw e;
+        }
+        if (!failed) {
+          if ((Thread.current().status as string) === "aborting") {
+            await this.rollbackTransaction();
+          } else {
+            try {
+              await this.commitTransaction();
+            } catch (e) {
+              if (e instanceof ConnectionFailed) {
+                if (!transaction.state.isCompleted()) transaction.invalidateBang();
+                throw e;
+              } else {
+                if (!transaction.state.isCompleted()) {
+                  await this.rollbackTransaction(transaction);
                 }
+                throw e;
               }
             }
           }
         }
+        return result;
       } finally {
         if (!transaction || !transaction.state.isCompleted()) {
           await this._connection.throwAwayBang?.();

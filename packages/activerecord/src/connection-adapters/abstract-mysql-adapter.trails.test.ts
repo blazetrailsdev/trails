@@ -355,7 +355,7 @@ function tableOptions(createTableInfo: string, tableComment: string | null) {
   return adapter.tableOptions("t");
 }
 
-describe("AbstractMysqlAdapter#tableOptions", () => {
+describe("parseTableOptions", () => {
   it("returns empty object for ENGINE=InnoDB only (default — not emitted)", async () => {
     expect(await tableOptions(showCreate("t", "ENGINE=InnoDB"), null)).toEqual({});
   });
@@ -402,7 +402,7 @@ describe("AbstractMysqlAdapter#tableOptions", () => {
     expect(opts).toEqual({ charset: "utf8mb4", comment: "hello world" });
   });
 
-  it("returns null when createInfo has no options (NO_TABLE_OPTIONS mode)", async () => {
+  it("returns empty object when createInfo has no options (NO_TABLE_OPTIONS mode)", async () => {
     expect(await tableOptions(showCreate("t", ""), null)).toBeNull();
   });
 
