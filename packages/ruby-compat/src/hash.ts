@@ -751,6 +751,17 @@ export class Hash<K, V> extends Map<K, V> {
   }
 
   /**
+   * `Map#entries`, the pair walk under another name, so it goes through
+   * `rb_hash_foreach` (`vendor/ruby/v3.3.11/hash.c:1438`) as `Hash#each_pair`
+   * does (`hash.c:3149`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_pair` (`vendor/ruby/v3.3.11/hash.c:3149`).
+   */
+  override entries(): Generator<[K, V], undefined, unknown> {
+    return this[Symbol.iterator]();
+  }
+
+  /**
    * `Map#forEach`, walked through `rb_hash_foreach`
    * (`vendor/ruby/v3.3.11/hash.c:1438`) as `Hash#each_pair` is (`hash.c:3149`).
    *

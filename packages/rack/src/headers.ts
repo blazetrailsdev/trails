@@ -344,10 +344,11 @@ export class Headers extends Hash<string, string> {
   }
 
   shift(): [string, string] | undefined {
-    const first = this.entries().next();
-    if (first.done) return undefined;
-    this.delete(first.value[0]);
-    return first.value;
+    for (const first of this) {
+      this.delete(first[0]);
+      return first;
+    }
+    return undefined;
   }
 
   dup(): Headers {

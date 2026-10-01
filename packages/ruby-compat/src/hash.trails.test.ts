@@ -607,6 +607,9 @@ describe("Hash#compare_by_identity", () => {
     for (const _pair of h) {
       expect(() => h.compareByIdentity()).toThrow(RuntimeError);
     }
+    for (const _pair of h.entries()) {
+      expect(() => h.compareByIdentity()).toThrow(RuntimeError);
+    }
     expect(h.isCompareByIdentity()).toBe(false);
     expect(() =>
       eachPair(h, () => {
