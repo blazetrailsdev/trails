@@ -1765,4 +1765,19 @@ export const POSTGRESQL_SPECIFIC_SCHEMA: Schema = {
     },
     primaryKey: ["message_id"],
   },
+  uuid_parents: {
+    columns: {
+      id: { type: "uuid", defaultFunction: "gen_random_uuid()" },
+      name: "string",
+    },
+    primaryKey: ["id"],
+  },
+  uuid_children: {
+    columns: {
+      id: { type: "uuid", defaultFunction: "gen_random_uuid()" },
+      name: "string",
+      uuid_parent_id: "uuid",
+    },
+    primaryKey: ["id"],
+  },
 };

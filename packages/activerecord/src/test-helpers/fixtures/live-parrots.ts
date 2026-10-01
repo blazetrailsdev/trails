@@ -1,6 +1,7 @@
 export const liveParrotFixtureData = {
   dusty: {
     name: "Dusty Bluebird",
+    treasures: ["ruby", "sapphire"],
     parrot_sti_class: "LiveParrot",
   },
 };

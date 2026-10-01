@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from "vitest";
 // prettier-ignore
-import { belongsToAssociationsByClass, stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, modelDeclarationDrift, buildIdIndexForTest, loadRailsYamlForTest, withoutIgnoredFixtures, COMPOSITE_FK_LABEL_ATTRS } from "./compare.js";
+import { belongsToAssociationsByClass, stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, modelDeclarationDrift, buildIdIndexForTest, loadRailsYamlForTest, withoutIgnoredFixtures, COMPOSITE_FK_LABEL_ATTRS, fixtureSetName, fixtureTable } from "./compare.js";
 import type { RubyClass } from "./compare.js";
 import type { Schema } from "../../packages/activerecord/src/support/schema-types.js";
 
@@ -13,7 +13,7 @@ const cmp = (ts: unknown, rails: unknown, notes: string[] = []) =>
 it("stripErb stubs adapter_name; flags other tags as unsupported", () => {
   expect(stripErb("a <%= ActiveRecord::Base.connection.adapter_name %> b")).toEqual({ rendered: "a SQLite b", unsupported: false }); // prettier-ignore
   expect(stripErb("<% 3.times do |z| %>x<% end %>").unsupported).toBe(false);
-  expect(stripErb("<% [[1,2],[3,4]].each do |s| %>x<% end %>").unsupported).toBe(true);
+  expect(stripErb("<% if adapter %>x<% end %>").unsupported).toBe(true);
   expect(stripErb("id: 1").unsupported).toBe(false);
 });
 
@@ -46,15 +46,21 @@ describe("stripErb ERB expanders", () => {
     const { rendered } = stripErb("<% 2.times do |i| %>x<%= i+10 %>=<%= i*i %>;<% end %>");
     expect(rendered).toBe("x10=0;x11=1;");
   });
-  it("interpolates `#{v}` inside loop bodies", () => {
-    const { rendered } = stripErb("<% 2.times do |i| %>n=#{i+1};<% end %>");
-    expect(rendered).toBe("n=1;n=2;");
+  it("renders a Ruby string's `#{v}` interpolation as a template literal", () => {
+    // categories_ordered.yml: `name: <%= "Category #{i}" %>`.
+    const { rendered } = stripErb('<% 2.times do |i| %>n: <%= "Category #{i+1}" %>;<% end %>');
+    expect(rendered).toBe("n: Category 1;n: Category 2;");
   });
-  it("skips loops above the row-count cap so YAML parsing doesn't stall", () => {
-    // citations.yml expands 65536 rows in Rails. We leave it as
-    // ERB-UNSUPPORTED rather than spend seconds parsing megabytes.
-    const out = stripErb("<% 65536.times do |i| %>r_<%= i %>:\n  id: <%= i %>\n<% end %>");
-    expect(out.unsupported).toBe(true);
+  it("expands an array-literal `.each do |set|` loop with indexed output (mixins.yml)", () => {
+    const { rendered, unsupported } = stripErb("<%\n[[4001, 0],\n  [4002, 4001]].each do |set| %>t_<%= set[0] %>: <%= set[1]%>;<% end %>"); // prettier-ignore
+    expect(unsupported).toBe(false);
+    expect(rendered).toBe("t_4001: 0;t_4002: 4001;");
+  });
+  it("renders citations.yml's 65536-row loop with Rails' row count", () => {
+    const out = stripErb("<% 65536.times do |i| %>\nr_<%= i %>:\n  id: <%= i*i %>\n<% end %>");
+    expect(out.unsupported).toBe(false);
+    expect(out.rendered.match(/^r_\d+:$/gm)).toHaveLength(65536);
+    expect(out.rendered).toContain("r_65535:\n  id: 4294836225\n");
   });
   it("falls back to sentinel on `/` (Ruby integer-div vs JS float-div mismatch)", () => {
     // Ruby `5/2 = 2` (truncate toward -∞); JS `5/2 = 2.5`. Silently producing
@@ -461,25 +467,86 @@ describe("compareFile", () => {
       "YAML-PARSE-ERR",
     );
   });
-  it("promotes allow-listed ERB-UNSUPPORTED to ERB-ALLOWED so the strict flip ignores them", async () => {
-    // mixins/paragraphs/citations are documented stragglers — their TS side
-    // is the source of truth, the Rails YAML never reduces. Allow-list lets
-    // PR 7b flip strict without re-classifying these as failures.
+  it("keeps ERB-UNSUPPORTED for every file: no fixture is allow-listed", async () => {
     const r = await compareFile("paragraphs.yml", empty, empty, "ERB-UNSUPPORTED");
-    expect(r.status).toBe("ERB-ALLOWED");
-    // Non-allow-listed files keep the original status.
-    const other = await compareFile("not_on_the_list.yml", empty, empty, "ERB-UNSUPPORTED");
-    expect(other.status).toBe("ERB-UNSUPPORTED");
+    expect(r.status).toBe("ERB-UNSUPPORTED");
   });
-  it("records `tsBase` on the ERB-ALLOWED result so a deleted TS counterpart can be caught", async () => {
-    // ERB-ALLOWED files are the TS-as-source-of-truth bucket; the
-    // promotion in compareFile only succeeds when the TS counterpart
-    // exists (else falls back to MISSING). Asserting on `tsBase` makes
-    // that contract visible: if mixins.ts is removed from the tree, this
-    // resolves to null and the status branch flips to MISSING.
-    const r = await compareFile("mixins.yml", empty, empty, "ERB-UNSUPPORTED");
-    expect(r.status).toBe("ERB-ALLOWED");
-    expect(r.tsBase).toBe("mixins.ts");
+  it("compares a HABTM label on both rows instead of dropping the Rails side", async () => {
+    // dead_parrots.yml: `treasures: [ruby, sapphire]` on a DeadParrot row in `parrots`.
+    const tables = new Map([["dead_parrots", { table: "parrots", modelClass: "DeadParrot", declared: true }]]); // prettier-ignore
+    const schema: Schema = {
+      parrots: { name: "string", parrot_sti_class: "string", killer_id: "integer" },
+    };
+    const rails = { name: "Dusty DeadBird", parrot_sti_class: "DeadParrot", killer: "blackbeard" };
+    const compare = (row: Record<string, unknown>) =>
+      compareFile("dead_parrots.yml", new Map([["dead_parrots", { deadbird: row }]]), empty, undefined, schema, new Map([["DeadParrot", new Set(["killer"])]]), tables); // prettier-ignore
+    const both = await compare({ ...rails, treasures: ["ruby", "sapphire"] });
+    expect([both.status, both.attrsSkipped, both.schemaPorted]).toEqual(["MATCH", 1, true]);
+    expect((await compare(rails)).notes).toEqual(["extra-in-ts: deadbird.treasures"]);
+    expect(canonicalizeRailsRow({ treasures: ["ruby"] }, {}, new Set(["name"]), "parrots")).toEqual({ treasures: ["ruby"] }); // prettier-ignore
+  });
+  it("compares a key both rows spell the same way verbatim, column or not", async () => {
+    // naked/yml/parrots.yml carries `arrr` / `foobar` so create_fixtures raises
+    // on them (fixtures_test.rb:557-563); the TS fixture mirrors the bad keys.
+    const tables = new Map([["naked/yml/parrots", { table: "parrots", modelClass: "Parrot", declared: true }]]); // prettier-ignore
+    const rows = new Map([["naked/yml/parrots", { george: { arrr: "Curious George", foobar: "Foobar" } }]]); // prettier-ignore
+    const r = await compareFile("naked/yml/parrots.yml", rows, empty, undefined, { parrots: { name: "string" } }, new Map(), tables); // prettier-ignore
+    expect([r.status, r.attrsMatched, r.schemaExtras]).toEqual(["MATCH", 2, 0]);
+  });
+});
+
+describe("fixtureSetName", () => {
+  const files = new Set(["categories", "categories/special_categories", "categories/subsubdir/arbitrary_filename", "admin/accounts", "all/namespaced/accounts", "naked/yml/trees", "primary_key_error/primary_key_error"]); // prettier-ignore
+  it("folds a file under a sibling `<dir>.yml` into that set (fixtures.rb:784)", () => {
+    expect(fixtureSetName("categories/special_categories", files)).toBe("categories");
+    expect(fixtureSetName("categories/subsubdir/arbitrary_filename", files)).toBe("categories");
+    expect(fixtureSetName("admin/accounts", files)).toBe("admin/accounts");
+  });
+  it("names a set relative to the fixtures directory its test passes", () => {
+    expect(fixtureSetName("all/namespaced/accounts", files)).toBe("namespaced/accounts");
+    expect(fixtureSetName("naked/yml/trees", files)).toBe("trees");
+    expect(fixtureSetName("primary_key_error/primary_key_error", files)).toBe("primary_key_error");
+  });
+});
+
+describe("fixtureTable", () => {
+  const klass = (qualifiedName: string, rest: Partial<RubyClass> = {}): [string, RubyClass] => [
+    qualifiedName,
+    { name: qualifiedName, qualifiedName, parent: "ActiveRecord::Base", tableName: null, associations: [], validations: [], scopes: [], callbacks: [], attributes: [], attrs: [], ...rest }, // prettier-ignore
+  ];
+  const classes = new Map([
+    klass("Parrot"),
+    klass("DeadParrot", { parent: "Parrot" }),
+    klass("ARUnit2Model", { abstractClass: true }),
+    klass("Course", { parent: "ARUnit2Model" }),
+    klass("Aircraft", { pluralizeTableNames: false }),
+    klass("Admin::Account", { tableNamePrefix: "admin_" }),
+    klass("Post"),
+    klass("CategoryPost", { tableName: "categories_posts" }),
+    klass("EncryptedBookThatIgnoresCase", { tableName: "encrypted_books" }),
+    klass("Account"),
+  ]);
+  const rails = new Set(["parrots", "courses", "aircraft", "admin_accounts", "posts", "fk_object_to_point_tos"]); // prettier-ignore
+  const table = (name: string, modelClass?: string) => fixtureTable(name, modelClass, classes, rails); // prettier-ignore
+
+  it("uses the base class's table for an STI subclass, skipping an abstract parent", () => {
+    expect(table("dead_parrots")).toEqual({ table: "parrots", modelClass: "DeadParrot", declared: true }); // prettier-ignore
+    expect(table("courses").table).toBe("courses");
+  });
+  it("honours table_name, pluralize_table_names and a module's table_name_prefix", () => {
+    expect(table("encrypted_book_that_ignores_cases").table).toBe("encrypted_books");
+    expect(table("aircrafts").table).toBe("aircraft");
+    expect(table("admin/accounts").table).toBe("admin_accounts");
+  });
+  it("prefers the passed class, then the default name, then the file's model_class", () => {
+    expect(table("bad_posts", "BadPostModel").table).toBe("posts");
+    expect(table("posts", "Parrot").table).toBe("posts");
+    expect(table("other_posts", "Post").table).toBe("posts");
+    expect(table("categories_posts", "Post::CategoryPost").table).toBe("categories_posts");
+    expect(table("fk_object_to_point_to").table).toBe("fk_object_to_point_tos");
+  });
+  it("falls back to default_fixture_table_name when no class resolves", () => {
+    expect(table("namespaced/accounts")).toEqual({ table: "namespaced_accounts", modelClass: null, declared: false }); // prettier-ignore
   });
 });
 
@@ -529,6 +596,11 @@ describe("datetime / serialized-YAML tolerance", () => {
 });
 
 describe("enum-symbol comparator", () => {
+  it("resolves a boolean-valued enum member (Book's `boolean_status`)", () => {
+    const notes: string[] = [];
+    expect(compareValue(true, ":enabled", "awdr.boolean_status", new Map(), notes, "books")).toBe(true); // prettier-ignore
+    expect(compareValue(true, ":disabled", "awdr.boolean_status", new Map(), notes, "books")).toBe(false); // prettier-ignore
+  });
   it("counts unmapped `:symbol` ↔ integer pairs as a soft skip, not a DIFF", () => {
     // An enum-shaped pair on a table/column with no ENUM_MAPS entry should
     // bump the per-row attrsSkipped counter and return true so unported enum
