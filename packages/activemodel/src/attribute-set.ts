@@ -161,7 +161,7 @@ export class AttributeSet {
   }
 
   fetchValue(name: string, block?: (name: string) => unknown): unknown {
-    return this.getAttribute(name).valueWithBlock(block);
+    return this.getAttribute(name).value(block);
   }
 
   writeFromDatabase(name: string, value: unknown): void {
@@ -237,7 +237,7 @@ export class AttributeSet {
   toHash(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const name of this.keys()) {
-      result[name] = this.getAttribute(name).value;
+      result[name] = this.getAttribute(name).value();
     }
     return result;
   }

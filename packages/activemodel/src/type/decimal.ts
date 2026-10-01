@@ -1,5 +1,5 @@
 import { BigDecimal, toD, registerConstant } from "@blazetrails/activesupport";
-import { rbInspect as inspect } from "@blazetrails/ruby-compat";
+import { rbInspect as inspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Rational } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 import { applyNumericMixin } from "./helpers/numeric.js";
@@ -37,11 +37,11 @@ export class DecimalType extends NumericValueType {
         castedValue = new BigDecimal(0);
       }
     } else {
-      const toDMethod = (value as { toD?: unknown }).toD;
-      castedValue =
-        typeof toDMethod === "function"
-          ? (toDMethod as () => BigDecimal).call(value)
-          : this.castValue(String(value));
+      if (rbObjRespondTo(value, "toD")) {
+        castedValue = (value as { toD(): BigDecimal }).toD();
+      } else {
+        castedValue = this.castValue(String(value));
+      }
     }
 
     return this.applyScale(castedValue);

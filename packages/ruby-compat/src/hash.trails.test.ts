@@ -480,3 +480,14 @@ describe("Hash keys by eql?", () => {
     expect(h.has(first)).toBe(false);
   });
 });
+
+describe("block (a marked `&block`)", () => {
+  it("keeps the block's arity and passes the receiver an instance_exec gives it", () => {
+    const receiver = { name: "david" };
+    const blk = block(function (this: { name: string }, greeting: string) {
+      return `${greeting} ${this.name}`;
+    });
+    expect(blk.length).toBe(1);
+    expect(blk.call(receiver, "hello")).toBe("hello david");
+  });
+});

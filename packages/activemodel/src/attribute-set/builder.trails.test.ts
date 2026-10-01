@@ -87,19 +87,19 @@ describe("LazyAttributeHash", () => {
   it("assignDefaultValue materializes from the value/type tables", () => {
     const hash = new LazyAttributeHash({ age: intType }, { age: "42" });
     const attr = hash.assignDefaultValue("age");
-    expect(attr.value).toBe(42);
+    expect(attr.value()).toBe(42);
   });
 
   it("assignDefaultValue returns Attribute.null for unknown names", () => {
     const hash = new LazyAttributeHash({}, {});
     const attr = hash.assignDefaultValue("missing");
-    expect(attr.value).toBeNull();
+    expect(attr.value()).toBeNull();
   });
 
   it("transform_values materializes and maps every attribute", () => {
     const hash = new LazyAttributeHash({ age: intType }, { age: "42" });
     const result = hash.transformValues((attr) => attr);
-    expect(result["age"].value).toBe(42);
+    expect(result["age"].value()).toBe(42);
   });
 
   it("transform_values is generic over the block result", () => {
@@ -114,14 +114,14 @@ describe("LazyAttributeHash", () => {
       { age: "42", name: "Alice" },
     );
     const seen: unknown[] = [];
-    hash.eachValue((attr) => seen.push(attr.value));
+    hash.eachValue((attr) => seen.push(attr.value()));
     expect(seen).toContain(42);
     expect(seen).toContain("Alice");
   });
 
   it("fetch returns the materialized attribute for the given name", () => {
     const hash = new LazyAttributeHash({ age: intType }, { age: "42" });
-    expect(hash.fetch("age").value).toBe(42);
+    expect(hash.fetch("age").value()).toBe(42);
   });
 
   it("fetch raises for an unknown name without a block", () => {
@@ -145,8 +145,8 @@ describe("LazyAttributeHash", () => {
   it("treats an Object.prototype name as an ordinary absent key", () => {
     const hash = new LazyAttributeHash({}, {});
     expect(hash.isKey("toString")).toBe(false);
-    expect(hash.getAttribute("toString").value).toBeNull();
-    expect(hash.getAttribute("constructor").value).toBeNull();
+    expect(hash.getAttribute("toString").value()).toBeNull();
+    expect(hash.getAttribute("constructor").value()).toBeNull();
   });
 
   it("stores __proto__ as an ordinary key", () => {

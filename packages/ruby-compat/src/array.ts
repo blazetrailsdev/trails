@@ -214,6 +214,15 @@ export function pack(ary: ReadonlyArray<string | number | bigint>, fmt: string):
 }
 
 /**
+ * @noRailsEquivalent PERMANENT — Ruby core `String#unpack1`, the `h` directive
+ * (`vendor/ruby/v3.3.11/pack.c:1125`).
+ */
+export function unpack1(
+  str: string,
+  fmt: `h${string}`,
+  options?: { offset?: number },
+): string | null;
+/**
  * `String#unpack1` (`vendor/ruby/v3.3.11/pack.c:1621` `pack_unpack1`), which is
  * `pack_unpack_internal` (`pack.c:936`) in `UNPACK_1` mode: the first item
  * the format pushes, or nil when none does. Narrowed to the directives
@@ -229,11 +238,16 @@ export function pack(ary: ReadonlyArray<string | number | bigint>, fmt: string):
  * @noRailsEquivalent PERMANENT — Ruby core `String#unpack1`
  * (`vendor/ruby/v3.3.11/pack.c:1621`).
  */
+export function unpack1(str: string, fmt: string, options?: { offset?: number }): number | null;
+/**
+ * @noRailsEquivalent PERMANENT — Ruby core `String#unpack1`
+ * (`vendor/ruby/v3.3.11/pack.c:1621`).
+ */
 export function unpack1(
   str: string,
   fmt: string,
   { offset = 0 }: { offset?: number } = {},
-): number | null {
+): number | string | null {
   if (offset < 0) throw new ArgumentError("offset can't be negative");
   const send = str.length;
   if (offset > send) throw new ArgumentError("offset outside of string");
@@ -298,6 +312,17 @@ export function unpack1(
         return tmp.getFloat64(0, true);
       }
       continue;
+    }
+    if (type === "h") {
+      if (fmt[p - 1] === "*" || len > (send - s) * 2) len = (send - s) * 2;
+      let bits = 0;
+      let bitstr = "";
+      for (let i = 0; i < len; i++) {
+        if (i & 1) bits >>= 4;
+        else bits = str.charCodeAt(s++) & 0xff;
+        bitstr += "0123456789abcdef"[bits & 15];
+      }
+      return bitstr;
     }
     if (type === "@") {
       if (len > str.length) throw new ArgumentError("@ outside of string");

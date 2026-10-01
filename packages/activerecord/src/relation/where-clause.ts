@@ -252,6 +252,7 @@ function extractNodeValue(node: unknown): unknown {
   if (node instanceof Nodes.Casted) return node.valueBeforeTypeCast();
   if (node instanceof Nodes.BindParam) {
     const val = node.value;
+    if (val instanceof ModelAttribute) return val.value();
     if (val && typeof val === "object" && "value" in val) {
       return (val as { value: unknown }).value;
     }

@@ -89,10 +89,6 @@ export function setDefineMethodAttribute(
   canonicalName: string,
   { owner, as = canonicalName }: { owner: CodeGenerator; as?: string },
 ): void {
-  const { methodName } = AttrNames.defineAttributeAccessorMethod(owner, canonicalName, {
-    writer: true,
-  });
-  const tempMethodName = AttributeMethodsClassMethods.buildMangledName(methodName);
   completeHalfAccessor(
     this,
     as,
@@ -101,17 +97,31 @@ export function setDefineMethodAttribute(
       this._writeAttribute(canonicalName, value);
     },
   );
-  owner.defineCachedMethod(tempMethodName, { namespace: "active_model", as: `${as}=` }, (batch) => {
-    batch.push((mod) => {
-      Object.defineProperty(mod, tempMethodName, {
-        value: function (this: { _writeAttribute(n: string, v: unknown): void }, value: unknown) {
-          this._writeAttribute(canonicalName, value);
+  AttrNames.defineAttributeAccessorMethod(
+    owner,
+    canonicalName,
+    { writer: true },
+    (tempMethodName) => {
+      owner.defineCachedMethod(
+        tempMethodName,
+        { namespace: "active_model", as: `${as}=` },
+        (batch) => {
+          batch.push((mod) => {
+            Object.defineProperty(mod, tempMethodName, {
+              value: function (
+                this: { _writeAttribute(n: string, v: unknown): void },
+                value: unknown,
+              ) {
+                this._writeAttribute(canonicalName, value);
+              },
+              writable: true,
+              configurable: true,
+            });
+          });
         },
-        writable: true,
-        configurable: true,
-      });
-    });
-  });
+      );
+    },
+  );
 }
 
 export function freeze<T>(this: AttributeInstanceHost, super_: () => T): T {

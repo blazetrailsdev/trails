@@ -61,7 +61,7 @@ describe("JoinDependency Arel node construction", () => {
     expect(typeEq).toBeInstanceOf(Nodes.Equality);
     expect((typeEq.left as any).name).toBe("owner_type");
     const typeVal = typeEq.right as any;
-    const resolvedType = typeVal?.value?._valueBeforeTypeCast ?? typeVal?.value ?? typeVal?.val;
+    const resolvedType = typeVal.value();
     expect(resolvedType).toBe("Owner");
 
     const eq = and.children[1] as Nodes.Equality;
@@ -99,7 +99,7 @@ describe("JoinDependency Arel node construction", () => {
     const typeEq = and.children[0] as Nodes.Equality;
     expect((typeEq.left as any).name).toBe("owner_type");
     const typeVal = typeEq.right as any;
-    const resolvedType = typeVal?.value?._valueBeforeTypeCast ?? typeVal?.value ?? typeVal?.val;
+    const resolvedType = typeVal.value();
     expect(resolvedType).toBe("StiOwner");
   });
 

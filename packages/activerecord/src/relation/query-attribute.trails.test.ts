@@ -26,7 +26,7 @@ const intType = new IntType();
 describe("QueryAttribute", () => {
   it("does not cast value via type", () => {
     const attr = new QueryAttribute("age", "25", intType);
-    expect(attr.value).toBe("25");
+    expect(attr.value()).toBe("25");
     expect(attr.typeCast("25")).toBe("25");
   });
 
@@ -40,9 +40,9 @@ describe("QueryAttribute", () => {
       serialize: (v: unknown) => v,
     };
     const attr = new QueryAttribute("n", "42", countingType);
-    void attr.value;
-    void attr.value;
-    void attr.value;
+    void attr.value();
+    void attr.value();
+    void attr.value();
     expect(callCount).toBe(0);
   });
 
@@ -71,7 +71,7 @@ describe("QueryAttribute", () => {
       serialize: (v: unknown) => v,
     };
     const attr = new QueryAttribute("name", "raw", trackingType).withCastValue("already-cast");
-    expect(attr.value).toBe("already-cast");
+    expect(attr.value()).toBe("already-cast");
     expect(castCalled).toBe(false);
   });
 
@@ -121,7 +121,7 @@ describe("QueryAttribute", () => {
   it("valueBeforeTypeCast preserves original value", () => {
     const attr = new QueryAttribute("age", "25", intType);
     expect(attr.valueBeforeTypeCast).toBe("25");
-    expect(attr.value).toBe("25");
+    expect(attr.value()).toBe("25");
   });
 
   it("isUnboundable reports the sign of `value <=> 0` for an out-of-range bound", () => {

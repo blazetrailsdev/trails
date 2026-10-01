@@ -34,13 +34,13 @@ describe("AttributeTest", () => {
   it("from_database + read type casts from database", () => {
     const attribute = Attribute.fromDatabase(null, "a value", type);
 
-    expect(attribute.value).toEqual("deserialize(a value)");
+    expect(attribute.value()).toEqual("deserialize(a value)");
   });
 
   it("from_user + read type casts from user", () => {
     const attribute = Attribute.fromUser(null, "a value", type);
 
-    expect(attribute.value).toEqual("cast(a value)");
+    expect(attribute.value()).toEqual("cast(a value)");
   });
 
   it("reading memoizes the value", () => {
@@ -52,8 +52,8 @@ describe("AttributeTest", () => {
 
     const attribute = Attribute.fromDatabase(null, "whatever", type);
 
-    void attribute.value;
-    void attribute.value;
+    void attribute.value();
+    void attribute.value();
     expect(count).toEqual(1);
   });
 
@@ -66,8 +66,8 @@ describe("AttributeTest", () => {
 
     const attribute = Attribute.fromDatabase(null, "whatever", type);
 
-    void attribute.value;
-    void attribute.value;
+    void attribute.value();
+    void attribute.value();
     expect(count).toEqual(1);
   });
 
@@ -136,14 +136,14 @@ describe("AttributeTest", () => {
   it.skip("duping dups the value", () => {
     const attribute = Attribute.fromDatabase(null, "a value", type);
 
-    expect(attribute.value).not.toBe(attribute.dup().value);
+    expect(attribute.value()).not.toBe(attribute.dup().value());
   });
 
   it("duping does not dup the value if it is not dupable", () => {
     type.deserialize = (value: unknown): unknown => value;
     const attribute = Attribute.fromDatabase(null, false, type);
 
-    expect(attribute.value).toBe(attribute.dup().value);
+    expect(attribute.value()).toBe(attribute.dup().value());
   });
 
   it("duping does not eagerly type cast if we have not yet type cast", () => {
@@ -176,16 +176,16 @@ describe("AttributeTest", () => {
     const old = Attribute.fromDatabase(null, "old", new MyType());
     const newAttribute = old.withValueFromUser("new");
 
-    expect(old.value).toEqual("old from database");
-    expect(newAttribute.value).toEqual("new from user");
+    expect(old.value()).toEqual("old from database");
+    expect(newAttribute.value()).toEqual("new from user");
   });
 
   it("with_value_from_database returns a new attribute with the value from the database", () => {
     const old = Attribute.fromUser(null, "old", new MyType());
     const newAttribute = old.withValueFromDatabase("new");
 
-    expect(old.value).toEqual("old from user");
-    expect(newAttribute.value).toEqual("new from database");
+    expect(old.value()).toEqual("old from user");
+    expect(newAttribute.value()).toEqual("new from database");
   });
 
   it("uninitialized attributes yield their name if a block is given to value", () => {
@@ -193,12 +193,12 @@ describe("AttributeTest", () => {
     const foo = Attribute.uninitialized("foo", null);
     const bar = Attribute.uninitialized("bar", null);
 
-    expect(foo.valueWithBlock(block)).toEqual("foo!");
-    expect(bar.valueWithBlock(block)).toEqual("bar!");
+    expect(foo.value(block)).toEqual("foo!");
+    expect(bar.value(block)).toEqual("bar!");
   });
 
   it("uninitialized attributes have no value", () => {
-    expect(Attribute.uninitialized("foo", null).value).toBeNull();
+    expect(Attribute.uninitialized("foo", null).value()).toBeNull();
   });
 
   it("attributes equal other attributes with the same constructor arguments", () => {
@@ -238,7 +238,7 @@ describe("AttributeTest", () => {
 
   it("an attribute has been read when its value is calculated", () => {
     const attribute = Attribute.fromDatabase("foo", 1, new ValueType());
-    void attribute.value;
+    void attribute.value();
     expect(attribute.hasBeenRead()).toBeTruthy();
   });
 
@@ -272,7 +272,7 @@ describe("AttributeTest", () => {
   // BLOCKED: assertions-immutable-js-string-values
   it.skip("an attribute is changed if it has been mutated", () => {
     const attribute = Attribute.fromDatabase("foo", "bar", new StringType());
-    (attribute.value as string[]).push("!");
+    (attribute.value() as string[]).push("!");
 
     expect(attribute.changedInPlace()).toBeTruthy();
     expect(attribute.isChanged()).toBeTruthy();
@@ -302,12 +302,12 @@ describe("AttributeTest", () => {
     type.deserialize = (value: unknown): unknown => new deserializedValueClass(value);
 
     const original = Attribute.fromDatabase("foo", 123, type);
-    expect((original.value as deserializedValueClass).id).toEqual(123);
+    expect((original.value() as deserializedValueClass).id).toEqual(123);
 
     const forgotten = original.forgettingAssignment();
-    expect((forgotten.value as deserializedValueClass).id).toEqual(123);
+    expect((forgotten.value() as deserializedValueClass).id).toEqual(123);
 
-    expect(original.value).not.toBe(forgotten.value);
+    expect(original.value()).not.toBe(forgotten.value());
   });
 
   it("with_value_from_user validates the value", () => {
@@ -319,8 +319,8 @@ describe("AttributeTest", () => {
     };
 
     const attribute = Attribute.fromDatabase("foo", 1, type);
-    expect(attribute.value).toEqual(1);
-    expect(attribute.withValueFromUser(2).value).toEqual(2);
+    expect(attribute.value()).toEqual(1);
+    expect(attribute.withValueFromUser(2).value()).toEqual(2);
     expect(() => {
       attribute.withValueFromUser(1);
     }).toThrow(ArgumentError);
@@ -329,8 +329,8 @@ describe("AttributeTest", () => {
   // BLOCKED: assertions-immutable-js-string-values
   it.skip("with_type preserves mutations", () => {
     const attribute = Attribute.fromDatabase("foo", "", new ValueType());
-    (attribute.value as string[]).push("1");
+    (attribute.value() as string[]).push("1");
 
-    expect(attribute.withType(new IntegerType()).value).toEqual(1);
+    expect(attribute.withType(new IntegerType()).value()).toEqual(1);
   });
 });

@@ -54,7 +54,7 @@ describe("Attribute — trails-only coverage", () => {
   it("#with_user_default creates a UserProvidedDefault attribute", () => {
     const attr = Attribute.fromDatabase("name", null, typeRegistry.lookup("string"));
     const withDefault = attr.withUserDefault("fallback");
-    expect(withDefault.value).toBe("fallback");
+    expect(withDefault.value()).toBe("fallback");
   });
 
   it("from_user came_from_user? checks value_constructed_by_mass_assignment", () => {
@@ -80,7 +80,7 @@ describe("Attribute — trails-only coverage", () => {
     const attr = Attribute.fromUser("age", "42", intType);
     attr.cameFromUser();
     expect(receivedValue).toBe("42");
-    expect(attr.value).toBe(42);
+    expect(attr.value()).toBe(42);
   });
 
   it("from_database came_from_user? returns false", () => {
@@ -179,7 +179,7 @@ describe("Attribute — trails-only coverage", () => {
     it("returns true when type.isChangedInPlace returns true (StringType: raw vs new value differ)", () => {
       const stringType = typeRegistry.lookup("string");
       const attr = Attribute.fromDatabase("name", "hello", stringType, "world");
-      void attr.value;
+      void attr.value();
       expect(attr.changedInPlace()).toBe(true);
     });
 
@@ -192,7 +192,7 @@ describe("Attribute — trails-only coverage", () => {
     it("returns false for immutable type even after value is read", () => {
       const intType = typeRegistry.lookup("integer");
       const attr = Attribute.fromDatabase("count", 5, intType);
-      void attr.value;
+      void attr.value();
       expect(attr.changedInPlace()).toBe(false);
     });
   });
@@ -224,7 +224,7 @@ describe("Attribute — trails-only coverage", () => {
 
       const attr = Attribute.fromDatabase("data", '{"x":1}', mutableType);
       void attr.valueForDatabase;
-      (attr.value as Record<string, number>).x = 99;
+      (attr.value() as Record<string, number>).x = 99;
       expect(attr.valueForDatabase).toBe('{"x":99}');
     });
   });
@@ -249,12 +249,12 @@ describe("Attribute — trails-only coverage", () => {
       type.deserialize = (v: unknown) => (typeof v === "string" ? JSON.parse(v) : v);
 
       const attr = Attribute.fromDatabase("data", '["a"]', type as never);
-      void attr.value;
+      void attr.value();
       const duped = attr.deepDup();
-      (duped.value as string[]).push("b");
+      (duped.value() as string[]).push("b");
 
-      expect(attr.value).toEqual(["a"]);
-      expect(duped.value).toEqual(["a", "b"]);
+      expect(attr.value()).toEqual(["a"]);
+      expect(duped.value()).toEqual(["a", "b"]);
     });
   });
 });

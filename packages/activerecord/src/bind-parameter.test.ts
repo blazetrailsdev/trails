@@ -259,7 +259,7 @@ describe("BindParameterTest", () => {
     try {
       await Topic.find(1);
       const message = subscriber.events.find((e) =>
-        (e.payload.binds as any[])?.some((attr) => attr?.value === 1),
+        (e.payload.binds as any[])?.some((attr) => attr?.value() === 1),
       );
       expect(message).toBeTruthy();
     } finally {

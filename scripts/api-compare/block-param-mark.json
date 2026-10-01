@@ -40,14 +40,8 @@
     }
   },
   "activemodel": {
-    "total": 7,
-    "byFile": {
-      "attribute.rb": 2,
-      "attribute_methods.rb": 1,
-      "model.rb": 1,
-      "validations.rb": 1,
-      "validations/with.rb": 2
-    }
+    "total": 0,
+    "byFile": {}
   },
   "activerecord": {
     "total": 9,

@@ -57,7 +57,7 @@ export class QueryAttribute extends Attribute {
   }
 
   protected override _valueForDatabase(): unknown {
-    return this.type!.serialize(this.value);
+    return this.type!.serialize(this.value());
   }
 
   isNil(): boolean {

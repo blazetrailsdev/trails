@@ -36,7 +36,9 @@ class Manager extends Person {
     return (this as unknown as Record<string, unknown>)[attr];
   }
 
-  static i18nScope = "activemodel";
+  static get i18nScope(): string {
+    return "activemodel";
+  }
 
   static override lookupAncestors(): Array<ModelLike & { modelName: ModelName }> {
     return [this];

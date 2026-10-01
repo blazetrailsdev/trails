@@ -3,7 +3,6 @@ import {
   Model,
   MissingAttributeError,
   AttrNames,
-  AttributeMethods,
   completeHalfAccessor,
 } from "@blazetrails/activemodel";
 import { included, type CodeGenerator } from "@blazetrails/activesupport";
@@ -54,26 +53,29 @@ export function setDefineMethodAttribute(
   canonicalName: string,
   { owner, as = canonicalName }: { owner: CodeGenerator; as?: string },
 ): void {
-  const { methodName } = AttrNames.defineAttributeAccessorMethod(owner, canonicalName, {
-    writer: true,
-  });
-  const tempMethodName = AttributeMethods.ClassMethods.buildMangledName(methodName);
   completeHalfAccessor(this, as, "set", function (this: WriteRecord, value: unknown) {
     this._writeAttribute(canonicalName, value);
   });
-  owner.defineCachedMethod(
-    tempMethodName,
-    { namespace: "active_record", as: `${as}=` },
-    (batch) => {
-      batch.push((mod) => {
-        Object.defineProperty(mod, tempMethodName, {
-          value: function (this: WriteRecord, value: unknown) {
-            this._writeAttribute(canonicalName, value);
-          },
-          writable: true,
-          configurable: true,
-        });
-      });
+  AttrNames.defineAttributeAccessorMethod(
+    owner,
+    canonicalName,
+    { writer: true },
+    (tempMethodName) => {
+      owner.defineCachedMethod(
+        tempMethodName,
+        { namespace: "active_record", as: `${as}=` },
+        (batch) => {
+          batch.push((mod) => {
+            Object.defineProperty(mod, tempMethodName, {
+              value: function (this: WriteRecord, value: unknown) {
+                this._writeAttribute(canonicalName, value);
+              },
+              writable: true,
+              configurable: true,
+            });
+          });
+        },
+      );
     },
   );
 }

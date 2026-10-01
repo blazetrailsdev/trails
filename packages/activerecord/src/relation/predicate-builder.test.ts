@@ -169,7 +169,7 @@ describe("PredicateBuilderTest", () => {
       const [node] = builder.buildFromHash({ age: new Range(18, 65) });
       const [sql, binds] = compileWithBinds(new Visitors.ToSql(testConnection), node);
       expect(sql).toMatch(/BETWEEN \? AND \?/);
-      expect(binds.map((b) => (b as { value: unknown }).value)).toEqual([18, 65]);
+      expect(binds.map((b) => (b as { value(): unknown }).value())).toEqual([18, 65]);
     });
 
     it("does not dereference a plain object literal to its id", () => {
@@ -177,14 +177,14 @@ describe("PredicateBuilderTest", () => {
       const node = builder.build(table.get("title"), { id: 5 });
       const [sql, binds] = compileWithBinds(new Visitors.ToSql(testConnection), node);
       expect(sql).toContain('"posts"."title" = ?');
-      expect((binds[0] as { value: unknown }).value).toEqual({ id: 5 });
+      expect((binds[0] as { value(): unknown }).value()).toEqual({ id: 5 });
     });
 
     it("does not dereference a plain object literal inside an array", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("title"), [{ id: 5 }]);
       const [, binds] = compileWithBinds(new Visitors.ToSql(testConnection), node);
-      expect((binds[0] as { value: unknown }).value).toEqual({ id: 5 });
+      expect((binds[0] as { value(): unknown }).value()).toEqual({ id: 5 });
     });
 
     it("does not dereference a non-Base object carrying an id inside an array", () => {
@@ -203,7 +203,7 @@ describe("PredicateBuilderTest", () => {
       const [sql, binds] = compileWithBinds(new Visitors.ToSql(testConnection), node);
       expect(sql).toMatch(/>= \?/);
       expect(sql).toMatch(/< \?/);
-      expect(binds.map((b) => (b as { value: unknown }).value)).toEqual([18, 65]);
+      expect(binds.map((b) => (b as { value(): unknown }).value())).toEqual([18, 65]);
     });
 
     it("forces equality for a force-equality type instead of dispatching to a handler", () => {
@@ -219,7 +219,7 @@ describe("PredicateBuilderTest", () => {
       expect(sql).toContain('"posts"."tags" = ?');
       expect(sql).not.toMatch(/IN \(/);
       expect(binds).toHaveLength(1);
-      expect((binds[0] as { value: unknown }).value).toEqual([1, 2]);
+      expect((binds[0] as { value(): unknown }).value()).toEqual([1, 2]);
     });
   });
 
@@ -254,7 +254,7 @@ describe("PredicateBuilderTest", () => {
       expect(sql).toMatch(/^NOT \(/);
       expect(sql).toMatch(/>= \?/);
       expect(sql).toMatch(/< \?/);
-      expect(binds.map((b) => (b as { value: unknown }).value)).toEqual([18, 65]);
+      expect(binds.map((b) => (b as { value(): unknown }).value())).toEqual([18, 65]);
     });
 
     it("does not dereference a plain object literal to its id when negated", () => {
@@ -262,7 +262,7 @@ describe("PredicateBuilderTest", () => {
       const node = builder.build(table.get("title"), { id: 5 }).invert();
       const sql = new Visitors.ToSql(testConnection).compile(node);
       expect(sql).toContain('"posts"."title" !=');
-      const bound = (node as unknown as { right: { value: unknown } }).right.value;
+      const bound = (node as unknown as { right: { value(): unknown } }).right.value();
       expect(bound).toEqual({ id: 5 });
     });
 
@@ -285,7 +285,7 @@ describe("PredicateBuilderTest", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const qa = builder.buildBindAttribute("name", "alice");
       expect(qa.name).toBe("name");
-      expect(qa.value).toBe("alice");
+      expect(qa.value()).toBe("alice");
     });
 
     it("BasicObjectHandler routes through buildBindAttribute", () => {
@@ -365,7 +365,7 @@ describe("PredicateBuilderTest", () => {
         .predicates as Nodes.Node[];
       const sql = nodes.map((n) => new Visitors.ToSql(testConnection).compile(n)).join(" AND ");
       expect(sql).toContain('"authors"."name"');
-      const bound = (nodes[0] as unknown as { right: { value: unknown } }).right.value;
+      const bound = (nodes[0] as unknown as { right: { value(): unknown } }).right.value();
       expect(bound).toBe("Rails");
       expect(sql).not.toContain('"posts"."authors"');
       expect(sql).toMatch(/NOT\b|!=|<>/);

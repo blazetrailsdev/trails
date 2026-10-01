@@ -80,7 +80,7 @@ export class LazyAttributeSet extends AttributeSet {
   override fetchValue(name: string, block?: (name: string) => unknown): unknown {
     const attr = this._attributes[name];
     if (attr) {
-      return attr.valueWithBlock(block);
+      return attr.value(block);
     }
 
     if (hasKey(this.castedValues, name)) return this.castedValues[name];
@@ -100,7 +100,7 @@ export class LazyAttributeSet extends AttributeSet {
       return casted;
     } else {
       const attr = this.defaultAttribute(name, valuePresent, value);
-      return attr.valueWithBlock(block);
+      return attr.value(block);
     }
   }
 

@@ -363,7 +363,7 @@ describe("LogSubscriberTest", () => {
           {
             name: "data",
             type: { binary: () => true },
-            value: "some binary data",
+            value: () => "some binary data",
             valueForDatabase: "some binary data",
           },
         ],
@@ -382,7 +382,7 @@ describe("LogSubscriberTest", () => {
           {
             name: "data",
             type: { binary: () => true },
-            value: '{"a":1}',
+            value: () => '{"a":1}',
             valueForDatabase: '{"a":1}',
           },
         ],

@@ -35,8 +35,8 @@ export abstract class Attribute {
   readonly type: ValueType | null;
   /** @internal */
   originalAttribute: Attribute | null;
-  private _value: unknown;
-  private _hasValue: boolean;
+  protected _value: unknown;
+  protected _hasValue: boolean;
   private _cachedValueForDatabase: unknown;
   protected _hasValueForDatabase: boolean;
 
@@ -101,7 +101,7 @@ export abstract class Attribute {
     this._hasValueForDatabase = false;
   }
 
-  get value(): unknown {
+  value(_?: (name: string) => unknown): unknown {
     if (!this._hasValue) {
       this._value = this.typeCast(this.valueBeforeTypeCast);
       this._hasValue = true;
@@ -120,7 +120,7 @@ export abstract class Attribute {
   get valueForDatabase(): unknown {
     if (
       !this._hasValueForDatabase ||
-      this.type!.isChangedInPlace(this._cachedValueForDatabase, this.value)
+      this.type!.isChangedInPlace(this._cachedValueForDatabase, this.value())
     ) {
       this._cachedValueForDatabase = this._valueForDatabase();
       this._hasValueForDatabase = true;
@@ -130,11 +130,11 @@ export abstract class Attribute {
 
   /** @internal */
   protected _valueForDatabase(): unknown {
-    return this.type!.serialize(this.value);
+    return this.type!.serialize(this.value());
   }
 
   isSerializable(block?: (castValue: unknown) => void): boolean {
-    return this.type!.isSerializable(this.value, block);
+    return this.type!.isSerializable(this.value(), block);
   }
 
   isChanged(): boolean {
@@ -143,7 +143,8 @@ export abstract class Attribute {
 
   changedInPlace(): boolean {
     return (
-      this.hasBeenRead() && this.type!.isChangedInPlace(this.originalValueForDatabase(), this.value)
+      this.hasBeenRead() &&
+      this.type!.isChangedInPlace(this.originalValueForDatabase(), this.value())
     );
   }
 
@@ -166,7 +167,7 @@ export abstract class Attribute {
 
   withType(type: ValueType | null): Attribute {
     if (this.changedInPlace()) {
-      return this.withValueFromUser(this.value).withType(type);
+      return this.withValueFromUser(this.value()).withType(type);
     }
     const Ctor = this.constructor as new (
       name: string | null,
@@ -225,12 +226,7 @@ export abstract class Attribute {
 
   private changedFromAssignment(): boolean {
     if (!this.isAssigned()) return false;
-    return this.type!.isChanged(this.originalValue, this.value, this.valueBeforeTypeCast);
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE track-getter-vs-method-shape */
-  valueWithBlock(_block?: (name: string) => unknown): unknown {
-    return this.value;
+    return this.type!.isChanged(this.originalValue, this.value(), this.valueBeforeTypeCast);
   }
 
   initWith(coder: Coder): void {
@@ -250,7 +246,7 @@ export abstract class Attribute {
     }
     if (this.type) coder["type"] = this.type;
     if (this.originalAttribute) coder["original_attribute"] = this.originalAttribute;
-    if (this._hasValue) coder["value"] = this.value;
+    if (this._hasValue) coder["value"] = this.value();
   }
 
   deepDup(): Attribute {
@@ -305,9 +301,9 @@ export class FromUser extends Attribute {
   protected override _valueForDatabase(): unknown {
     const compatible = this.type!.itselfIfSerializeCastValueCompatible();
     if (compatible === this.type) {
-      return this.type!.serializeCastValue(this.value);
+      return this.type!.serializeCastValue(this.value());
     }
-    return this.type!.serialize(this.value);
+    return this.type!.serialize(this.value());
   }
 }
 
@@ -352,8 +348,11 @@ export class Uninitialized extends Attribute {
     super(name, null, type);
   }
 
-  get value(): unknown {
-    return this.valueWithBlock();
+  override value(block?: (name: string) => unknown): unknown {
+    if (block !== undefined) {
+      return block(this.name!);
+    }
+    return null;
   }
 
   override get originalValue(): unknown {
@@ -374,14 +373,6 @@ export class Uninitialized extends Attribute {
 
   override withType(type: ValueType | null): Attribute {
     return new Uninitialized(this.name, type);
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE track-getter-vs-method-shape */
-  override valueWithBlock(block?: (name: string) => unknown): unknown {
-    if (block !== undefined) {
-      return block(this.name!);
-    }
-    return null;
   }
 
   typeCast(): unknown {

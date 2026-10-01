@@ -5006,7 +5006,15 @@ export function main() {
           for (const blockOwner of rubyBlockOwners.get(`${level}|${rubyName}`) ?? []) {
             blockParamsCompared++;
             const short = blockOwner.split("::").at(-1) ?? blockOwner;
-            const ownerSigs = tsBlockSigsByFileOwnerName.get(tsFile)?.get(`${short}#${tsName}`);
+            const seat = tsOwnerSeat(
+              short,
+              tsStaticOwnersByFileName.get(tsFile)?.get(tsName),
+              tsInstanceOwnersByFileName.get(tsFile)?.get(tsName),
+            );
+            const ownerSigs =
+              seat !== undefined && seat !== level
+                ? undefined
+                : tsBlockSigsByFileOwnerName.get(tsFile)?.get(`${short}#${tsName}`);
             const sigs = ownerSigs ?? tsBlockSigsByFileName.get(tsFile)?.get(tsName) ?? [];
             if (dropsBlock(true, sigs)) {
               blockParamMismatches.push({

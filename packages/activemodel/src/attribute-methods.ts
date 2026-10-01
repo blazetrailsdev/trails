@@ -1,10 +1,12 @@
 import {
+  b,
   basicObjRespondTo,
   block,
   fetch,
   hasKey,
   isInclude,
   rbFSend,
+  unpack1,
 } from "@blazetrails/ruby-compat";
 import {
   camelize,
@@ -40,21 +42,24 @@ export class MissingAttributeError extends globalThis.Error {
 export namespace AttrNames {
   const DEF_SAFE_NAME = /^[a-zA-Z_]\w*$/;
 
+  /** @missingRailsCall const_set — CONVERGEABLE attr-names-and-build-mangled-name-open-code-unpack1-h */
   export function defineAttributeAccessorMethod(
     owner: unknown,
     attrName: string,
-    { writer = false }: { writer?: boolean } = {},
-  ): { methodName: string; attrNameRef: string } {
-    const methodName = writer ? `${attrName}=` : attrName;
-    if (DEF_SAFE_NAME.test(attrName)) {
-      return { methodName, attrNameRef: `'${attrName}'` };
+    { writer = false }: { writer?: boolean },
+    block: (tempMethodName: string, attrNameExpr: string) => void,
+  ): void {
+    const methodName = `${attrName}${writer ? "=" : ""}`;
+    // eslint-disable-next-line no-control-regex -- Ruby's `ascii_only?` (attribute_methods.rb:579)
+    if (/^[\x00-\x7f]*$/.test(attrName) && DEF_SAFE_NAME.test(attrName)) {
+      block(methodName, `'${attrName}'`);
+    } else {
+      const safeName = unpack1(b(attrName), "h*");
+      const constName = `ATTR_${safeName}`;
+      const tempMethodName = `__temp__${safeName}${writer ? "=" : ""}`;
+      const attrNameExpr = `::ActiveModel::AttributeMethods::AttrNames::${constName}`;
+      block(tempMethodName, attrNameExpr);
     }
-    const escaped = attrName
-      .replace(/\\/g, "\\\\")
-      .replace(/'/g, "\\'")
-      .replace(/\r/g, "\\r")
-      .replace(/\n/g, "\\n");
-    return { methodName, attrNameRef: `'${escaped}'` };
   }
 }
 
@@ -420,10 +425,7 @@ export const ClassMethods = {
   /** @internal */
   buildMangledName(name: string): string {
     if (NAME_COMPILABLE_REGEXP.test(name)) return name;
-    const hex = Array.from(name)
-      .map((c) => c.charCodeAt(0).toString(16).padStart(2, "0"))
-      .join("");
-    return `__temp__${hex}`;
+    return `__temp__${unpack1(b(name), "h*")}`;
   },
 
   /** @internal */
@@ -630,28 +632,28 @@ export function defineMethodAttribute(
   { owner, as = canonicalName }: { owner: CodeGenerator; as?: string },
 ): void {
   if (as === canonicalName && isDefinedByAClassBody(this, as)) return;
-  const { methodName } = AttrNames.defineAttributeAccessorMethod(owner, canonicalName);
-  const mangledName = ClassMethods.buildMangledName(methodName);
-  owner.defineCachedMethod(mangledName, { namespace: "active_model", as }, (sources) => {
-    sources.push((mod) => {
-      Object.defineProperty(mod, mangledName, {
-        get(
-          this: ReadWriteHost & {
-            attribute(n: string): unknown;
-            _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
+  AttrNames.defineAttributeAccessorMethod(owner, canonicalName, {}, (tempMethodName) => {
+    owner.defineCachedMethod(tempMethodName, { namespace: "active_model", as }, (sources) => {
+      sources.push((mod) => {
+        Object.defineProperty(mod, tempMethodName, {
+          get(
+            this: ReadWriteHost & {
+              attribute(n: string): unknown;
+              _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
+            },
+          ) {
+            if (!this._attributes.getAttribute(canonicalName).isInitialized()) {
+              throw new MissingAttributeError(
+                `missing attribute '${canonicalName}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
+              );
+            }
+            return this.attribute(canonicalName);
           },
-        ) {
-          if (!this._attributes.getAttribute(canonicalName).isInitialized()) {
-            throw new MissingAttributeError(
-              `missing attribute '${canonicalName}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
-            );
-          }
-          return this.attribute(canonicalName);
-        },
-        set(this: ReadWriteHost, value: unknown) {
-          this._writeAttribute(canonicalName, value);
-        },
-        configurable: true,
+          set(this: ReadWriteHost, value: unknown) {
+            this._writeAttribute(canonicalName, value);
+          },
+          configurable: true,
+        });
       });
     });
   });

@@ -631,7 +631,7 @@ describe("ValidatableRecord<TBase> type tests", () => {
   });
 
   it("BlockValidator<User> callback receives ValidatableRecord<User>", () => {
-    type BlockFn = ConstructorParameters<typeof BlockValidator<User>>[1];
+    type BlockFn = NonNullable<ConstructorParameters<typeof BlockValidator<User>>[1]>;
     expectTypeOf<Parameters<BlockFn>[0]>().toEqualTypeOf<ValidatableRecord<User>>();
   });
 
