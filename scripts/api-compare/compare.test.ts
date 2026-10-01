@@ -370,6 +370,13 @@ describe("significantMissingCalls", () => {
     }
   });
 
+  it("drops nil?, which ports as `x == null` on a receiver that may be nil and so emits no callee", () => {
+    expect(SIGNIFICANT_CALLS.has("nil?")).toBe(false);
+    expect(
+      significantMissingCalls("translate", ["nil?", "lookup"], new Set(["lookup"]), () => true),
+    ).toEqual([]);
+  });
+
   it("significantCallsForReceivers drops a positional-array name only when EVERY site of THIS row proved array", () => {
     const sig = significantCallsForReceivers({ first: ["array"], last: ["array", "expr"] });
     // Every site proven array: dropped.
