@@ -1229,7 +1229,12 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "skip because everywhere else Ruby's `then` is `Kernel#then` or a " +
       "promise's continuation, which JS answers with the thenable `await` " +
       'calls (CLAUDE.md § "`Relation` is evaluated by an async query"). ' +
-      "Scoped to nodes/case.rb so this one definition is scored.",
+      "Scoped to nodes/case.rb so this one definition is scored. Having a " +
+      "`then` member makes every `Case` a thenable, so `await` and an `async` " +
+      "return call it with a resolver and a rejecter; the Rails body alone " +
+      "would store the resolver as the `when` result and never settle. The " +
+      "port therefore rejects when handed two functions, which no Arel " +
+      "caller passes.",
     names: ["then"],
     rubyFiles: ["nodes/case.rb"],
     tsMirrorName: "then",
