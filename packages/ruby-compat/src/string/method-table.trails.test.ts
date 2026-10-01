@@ -1087,6 +1087,12 @@ describe("stringSuperclass", () => {
     expect(() => new Literal(1)).toThrow(TypeError);
   });
 
+  it("is empty until String#initialize runs, as String.allocate is", () => {
+    const allocated = Object.create(Literal.prototype) as Literal & StringInstance;
+    expect(allocated.toString()).toBe("");
+    expect(allocated.eql("")).toBe(true);
+  });
+
   it("hashes as its String contents", () => {
     expect(literal("a").hash()).toBe(rbHash("a"));
   });

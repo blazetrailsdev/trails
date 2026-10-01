@@ -250,7 +250,9 @@ export interface StringInstance {
  * instance of the including class is a `T_STRING` to `rb_str_eql`, holds the
  * contents {@link rbStrInit} gave it, and answers them from `to_s`
  * (`rb_str_to_s`, `vendor/ruby/v3.3.11/string.c:6648`), which is a plain String
- * for a subclass instance.
+ * for a subclass instance. One `initialize` never ran on is empty, as the
+ * String allocator leaves it (`empty_str_alloc`,
+ * `vendor/ruby/v3.3.11/string.c:858`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -262,7 +264,7 @@ export function stringSuperclass<M extends keyof StringInstance>(
       stringClasses.add(klass.prototype);
     },
     toString(this: Record<symbol, string>): string {
-      return this[RSTRING_PTR];
+      return this[RSTRING_PTR] ?? "";
     },
   };
   for (const method of methods) {
