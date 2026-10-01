@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { Thread } from "@blazetrails/ruby-compat";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { NoMethodError, Thread } from "@blazetrails/ruby-compat";
 import { Encryption } from "../encryption.js";
 import { Context } from "./context.js";
 import { NullEncryptor } from "./null-encryptor.js";
@@ -55,6 +55,35 @@ describe("ActiveRecord::Encryption::Contexts accessors", () => {
       expect(Encryption.context.cipher).toBe(Encryption.defaultContext.cipher);
       expect(Encryption.defaultContext.encryptor).not.toBe(encryptor);
     });
+  });
+
+  it("a property Context has no writer for raises NoMethodError and pops the context", () => {
+    const block = vi.fn();
+
+    expect(() =>
+      Encryption.withEncryptionContext({ encryptr: new NullEncryptor() } as never, block),
+    ).toThrow(NoMethodError);
+
+    expect(block).not.toHaveBeenCalled();
+    expect(Encryption.customContexts).toEqual([]);
+    expect(Encryption.context).toBe(Encryption.defaultContext);
+  });
+
+  it("an async block in another thread pops that thread's stack when it settles", async () => {
+    const thread = new Thread(async () => {
+      const result = await Encryption.withEncryptionContext(
+        { frozenEncryption: true },
+        async () => {
+          await Promise.resolve();
+          return Encryption.context.frozenEncryption;
+        },
+      );
+      return [result, Encryption.customContexts];
+    });
+    await thread.join();
+
+    expect(await thread.value()).toEqual([true, []]);
+    expect(Encryption.customContexts).toBeNull();
   });
 
   it("custom_contexts is thread-local: another thread does not see an open context", () => {

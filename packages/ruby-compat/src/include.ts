@@ -820,6 +820,10 @@ type CallableMethods<M extends object> = {
 
 export type Included<M extends object> = CallableMethods<M>;
 
+function isClass(klass: object): klass is AnyClass {
+  return typeof klass === "function";
+}
+
 function featureHook(mod: unknown, name: string): ((base: unknown) => void) | undefined {
   if (!(mod instanceof Module)) return undefined;
   const hook = (mod as unknown as Record<string, unknown>)[name];
@@ -834,11 +838,17 @@ function featureHook(mod: unknown, name: string): ((base: unknown) => void) | un
  * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
  * uses but does not define.
  */
-export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
+export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass | Module): void {
   const appendFeatures = featureHook(mod, "appendFeatures");
   if (appendFeatures) {
     appendFeatures(klass);
     featureHook(mod, "included")?.(klass);
+    return;
+  }
+  if (!isClass(klass)) {
+    if (typeof (mod as ModuleHooks)[included] === "function") {
+      (mod as ModuleHooks)[included]!(klass);
+    }
     return;
   }
   if (isModuleMethodTablePresent(klass, mod)) {
