@@ -41,7 +41,7 @@ describe("Mysql2Adapter#internalExecute → castResult duplicate columns", () =>
       materializeTransactions: false,
     })) as Mysql2RawResult;
 
-    expect(rawResult.fields.map((f) => f.name)).toEqual(["a", "a"]);
+    expect(rawResult.fields).toEqual(["a", "a"]);
     expect(rawResult.rows).toEqual([[1, 2]]);
 
     const result = (adapter as unknown as { castResult(r: Mysql2RawResult): Result }).castResult(

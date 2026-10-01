@@ -4,6 +4,7 @@ import {
   leaseMysqlAdapter,
   Mysql2Adapter,
 } from "../abstract-mysql-adapter/test-helper.js";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 import { ReadOnlyError, RecordNotUnique } from "../../errors.js";
 import type { Mysql2RawResult } from "../../connection-adapters/mysql2/database-statements.js";
@@ -40,6 +41,19 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
     expect(((await adapter.execute(`SELECT nick FROM pq`)) as Mysql2RawResult).rows).toEqual([
       ["a"],
     ]);
+  });
+
+  it("the driver casts numerics, so castResult reports no column types", async () => {
+    await adapter.execute(`INSERT INTO pq (nick) VALUES ('a'), ('b')`);
+    const result = await adapter.selectAll(
+      `SELECT 1.10 AS scaled, SUM(id) AS summed, 9007199254740993 AS big FROM pq`,
+    );
+    expect(result.columnTypes).toEqual({});
+    const [scaled, summed, big] = result.rows[0];
+    expect(scaled).toBeInstanceOf(BigDecimal);
+    expect((scaled as BigDecimal).toString()).toBe(new BigDecimal("1.10").toString());
+    expect(summed).toBe(3);
+    expect(big).toBe(9007199254740993n);
   });
 
   it("update and delete source affected rows through the affectedRows port", async () => {

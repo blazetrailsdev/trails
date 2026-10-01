@@ -1,5 +1,5 @@
 import { Autoload, extend, Notifications, type Extended } from "@blazetrails/activesupport";
-import { rbEqual } from "@blazetrails/ruby-compat";
+import { Hash, rbEqual } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import type { Result } from "../result.js";
 import type { AssociationSpec } from "../relation/query-methods.js";
@@ -13,7 +13,6 @@ import { JoinPart } from "./join-dependency/join-part.js";
 import { AssociationNotFoundError, EagerLoadPolymorphicError } from "./errors.js";
 import { ConfigurationError, ConnectionNotDefined } from "../errors.js";
 import {
-  AliasCounts,
   AliasTracker,
   aliasedArelTableFor,
   aliasedArelTableForReflection,
@@ -524,8 +523,8 @@ export class JoinDependency {
   }
 
   /** @internal */
-  private _baseAliases(): AliasCounts {
-    const aliases = new AliasCounts(() => 0);
+  private _baseAliases(): Hash<string, number> {
+    const aliases = new Hash<string, number>(0);
     aliases.set(this._baseAlias, 1);
     return aliases;
   }

@@ -1,4 +1,11 @@
-import { basicObjRespondTo, hasKey } from "@blazetrails/ruby-compat";
+import {
+  basicObjRespondTo,
+  block,
+  fetch,
+  hasKey,
+  isInclude,
+  rbFSend,
+} from "@blazetrails/ruby-compat";
 import {
   camelize,
   classAttribute,
@@ -136,6 +143,7 @@ export interface InstanceMethodsHost extends InstanceHost, Included<typeof Insta
 }
 
 const NAME_COMPILABLE_REGEXP = /^[a-zA-Z_]\w*[!?=]?$/;
+const CALL_COMPILABLE_REGEXP = /^[a-zA-Z_]\w*[!?]?$/;
 
 export const ClassMethods = {
   attributeMethodPrefix(
@@ -337,7 +345,11 @@ export const ClassMethods = {
 
   /** @internal */
   resolveAttributeName(this: ClassMethodsHost, name: string): string {
-    return this.attributeAliases?.[name] ?? name;
+    return fetch(
+      this.attributeAliases,
+      name,
+      block((key) => key),
+    );
   },
 
   /** @internal */
@@ -425,11 +437,19 @@ export const ClassMethods = {
     { namespace, as }: { namespace: string; as: string },
   ): void {
     codeGenerator.defineCachedMethod(mangledName, { namespace, as }, (batch) => {
+      let body: (self: ReadWriteHost, args: unknown[]) => unknown;
+      if (CALL_COMPILABLE_REGEXP.test(targetName)) {
+        body = (self, args) => sendProxyTarget(self, targetName, [...callArgs, ...args]);
+      } else {
+        callArgs.unshift(targetName);
+        body = (self, args) => rbFSend(self, callArgs[0], ...callArgs.slice(1), ...args);
+      }
+
       batch.push((mod) => {
         if (parameters === false) {
           Object.defineProperty(mod, mangledName, {
             get(this: ReadWriteHost) {
-              return sendProxyTarget(this, targetName, callArgs);
+              return body(this, []);
             },
             configurable: true,
           });
@@ -437,7 +457,7 @@ export const ClassMethods = {
         }
         Object.defineProperty(mod, mangledName, {
           value: function (this: ReadWriteHost, ...args: unknown[]) {
-            return sendProxyTarget(this, targetName, [...callArgs, ...args]);
+            return body(this, args);
           },
           writable: true,
           configurable: true,
@@ -500,9 +520,7 @@ export const InstanceMethods = {
 
   /** @internal */
   isAttributeMethod(this: InstanceMethodsHost, attrName: string): boolean {
-    return (
-      this.isRespondToWithoutAttributes("attributes") && Object.hasOwn(this.attributes, attrName)
-    );
+    return this.isRespondToWithoutAttributes("attributes") && isInclude(this.attributes, attrName);
   },
 
   /** @internal */

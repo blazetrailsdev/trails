@@ -13,6 +13,7 @@ import {
   fetch,
   hasKey,
   hashDelete,
+  isInclude,
   keepIf,
   merge,
   mergeBang,
@@ -109,6 +110,13 @@ describe("Hash#key?", () => {
   it("is true for a stored null and false for an absent key", () => {
     expect(hasKey({ offset: null }, "offset")).toBe(true);
     expect(hasKey({}, "offset")).toBe(false);
+  });
+});
+
+describe("Hash#include?", () => {
+  it("is Hash#key?", () => {
+    expect(isInclude({ offset: null }, "offset")).toBe(true);
+    expect(isInclude({}, "toString")).toBe(false);
   });
 });
 

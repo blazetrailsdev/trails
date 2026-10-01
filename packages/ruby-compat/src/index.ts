@@ -66,6 +66,7 @@ export {
   hasKey,
   hashDelete,
   inspect,
+  isInclude,
   merge,
   mergeBang,
   rbBlockGivenP,
