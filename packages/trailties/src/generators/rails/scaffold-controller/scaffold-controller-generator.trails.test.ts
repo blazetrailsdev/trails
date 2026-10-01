@@ -2,7 +2,8 @@ import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { include, registerConstant, unregisterConstant } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
+import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import {
   ScaffoldControllerGenerator,
   type ScaffoldControllerGeneratorOptions,

@@ -1,6 +1,6 @@
-import { ArgumentError, kernelFloat, rbEqual } from "@blazetrails/ruby-compat";
+import { ArgumentError, kernelFloat, rbEqual, registerConstant } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
-import { isBlank, isPlainObject, registerConstant } from "@blazetrails/activesupport";
+import { isBlank, isPlainObject } from "@blazetrails/activesupport";
 import { ActiveRecord } from "../../../namespaces.js";
 
 ActiveRecord.Point = class Point {

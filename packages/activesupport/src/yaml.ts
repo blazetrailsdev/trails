@@ -8,9 +8,11 @@ import {
   rbObjIvarGet,
   rbObjIvarSet,
   rbObjRespondTo,
+  rbModName,
+  rbModToS,
+  rbPathToClass,
 } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, DateTime, Temporal, Time } from "@blazetrails/date";
-import { constantize, registeredConstantName } from "./inflector.js";
 export type { CollectionTag, YAMLMap } from "yaml";
 
 const yaml = await import("yaml").catch(() => {
@@ -44,10 +46,6 @@ export class Coder {
   constructor(tag: string | null) {
     Object.defineProperty(this, coderTag, { value: tag });
   }
-}
-
-function className(klass: { name?: string }): string | undefined {
-  return registeredConstantName(klass) ?? klass.name;
 }
 
 const TIME =
@@ -108,8 +106,9 @@ class YAMLTree {
   private visitObject(o: object): Node {
     let tag = dumpTags.get(o.constructor);
     if (tag === undefined) {
-      const klass = o.constructor === Object ? undefined : className(o.constructor);
-      tag = ["!ruby/object", klass].filter((part) => part !== undefined).join(":");
+      const klass =
+        o.constructor === Object ? undefined : rbModName(o.constructor as new () => unknown);
+      tag = ["!ruby/object", klass].filter((part) => part != null).join(":");
     }
     const map = new yaml.YAMLMap();
     map.tag = tag;
@@ -119,7 +118,7 @@ class YAMLTree {
   }
 
   private visitClass(o: { name?: string }): Node {
-    const name = className(o);
+    const name = rbModName(o as new () => unknown);
     if (!name) throw new TypeError(`can't dump anonymous class: ${String(o)}`);
     const scalar = new yaml.Scalar(name);
     scalar.tag = "!ruby/class";
@@ -197,7 +196,7 @@ class YAMLTree {
     const ivars = rbObjInstanceVariables(o);
     if (ivars.length > 0) {
       const node = new yaml.YAMLMap();
-      node.tag = `!ruby/hash-with-ivars:${className(o.constructor)}`;
+      node.tag = `!ruby/hash-with-ivars:${rbModToS(o.constructor as new () => unknown)}`;
       this.register(o, node);
 
       const ivarsKey = this.accept("ivars");
@@ -215,7 +214,7 @@ class YAMLTree {
       return node;
     } else {
       const node = new yaml.YAMLMap();
-      node.tag = `!ruby/hash:${className(o.constructor)}`;
+      node.tag = `!ruby/hash:${rbModToS(o.constructor as new () => unknown)}`;
       this.register(o, node);
       for (const [k, v] of o) node.add(new yaml.Pair(this.accept(k), this.accept(v)));
       return node;
@@ -246,8 +245,9 @@ class YAMLTree {
   private dumpCoder(o: { encodeWith(coder: Coder): void }): Node {
     let tag = dumpTags.get(o.constructor);
     if (tag === undefined) {
-      const klass = o.constructor === Object ? undefined : className(o.constructor);
-      tag = ["!ruby/object", klass].filter((part) => part !== undefined).join(":");
+      const klass =
+        o.constructor === Object ? undefined : rbModName(o.constructor as new () => unknown);
+      tag = ["!ruby/object", klass].filter((part) => part != null).join(":");
     }
     const c = new Coder(tag);
     o.encodeWith(c);
@@ -406,7 +406,7 @@ class ToRuby {
   }
 
   private resolveClass(klassname: string): RubyClass {
-    return (CACHE[klassname] ?? constantize(klassname)) as RubyClass;
+    return (CACHE[klassname] ?? rbPathToClass(klassname)) as RubyClass;
   }
 }
 

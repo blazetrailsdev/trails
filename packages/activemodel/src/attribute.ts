@@ -1,8 +1,8 @@
 import { ValueType } from "./type/value.js";
 import { defaultValue } from "./type.js";
 import { MissingAttributeError } from "./attribute-methods.js";
-import { hasKey, rbEqual, rbSetClassPathString } from "@blazetrails/ruby-compat";
-import { isDuplicable, registerConstant } from "@blazetrails/activesupport";
+import { hasKey, rbEqual, rbSetClassPathString, registerConstant } from "@blazetrails/ruby-compat";
+import { isDuplicable } from "@blazetrails/activesupport";
 import { ActiveModel } from "./namespaces.js";
 import type { UserProvidedDefault } from "./attribute/user-provided-default.js";
 import type { Coder } from "@blazetrails/activesupport/yaml";

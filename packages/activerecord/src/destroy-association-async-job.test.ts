@@ -1,4 +1,5 @@
-import { NameError, registerConstant, unregisterConstant } from "@blazetrails/activesupport";
+import { NameError } from "@blazetrails/activesupport";
+import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import { afterAll, describe, expect, it } from "vitest";
 import { Base } from "./base.js";
 import { ConfigurationError } from "./errors.js";

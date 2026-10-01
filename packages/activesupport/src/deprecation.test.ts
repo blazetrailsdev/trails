@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NameError, StandardError, Thread, rbEqual, stderr } from "@blazetrails/ruby-compat";
+import {
+  NameError,
+  StandardError,
+  Thread,
+  rbEqual,
+  stderr,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { Module, rbModConstSet } from "@blazetrails/ruby-compat/include";
 import {
   Deprecation,
@@ -18,7 +25,6 @@ import { deprecate } from "./core-ext/module/deprecation.js";
 import { sole } from "./enumerable-utils.js";
 import { VERSION } from "./gem-version.js";
 import { ArgumentError } from "./hash-utils.js";
-import { registerConstant } from "./inflector.js";
 import { Logger } from "./logger.js";
 import { Notifications } from "./notifications.js";
 import { TopLevel } from "./namespaces.js";

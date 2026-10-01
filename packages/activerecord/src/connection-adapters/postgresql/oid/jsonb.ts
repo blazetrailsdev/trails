@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Json } from "../../../type/json.js";
 
 export class Jsonb extends Json {

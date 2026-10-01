@@ -1,5 +1,4 @@
-import { registerConstant } from "@blazetrails/activesupport";
-import { kernelFloat, rbEqual } from "@blazetrails/ruby-compat";
+import { kernelFloat, rbEqual, registerConstant } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 
 export class LegacyPoint extends ValueType {

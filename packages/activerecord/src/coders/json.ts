@@ -1,4 +1,5 @@
-import { ActiveSupportJSON, registerConstant } from "@blazetrails/activesupport";
+import { ActiveSupportJSON } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 
 export class JSON {
   static dump(obj: unknown): string {

@@ -1,7 +1,6 @@
 import {
   camelize,
   constantize,
-  isRegisteredConstant,
   underscore as _underscore,
   dasherize as _dasherize,
   extractOptionsBang,
@@ -21,6 +20,7 @@ import {
   rbInspect,
   regexpEscape,
   RuntimeError,
+  isRegisteredConstant,
 } from "@blazetrails/ruby-compat";
 import { Generators, type GeneratorClass } from "../generators.js";
 import { GeneratorError } from "./generated-attribute.js";

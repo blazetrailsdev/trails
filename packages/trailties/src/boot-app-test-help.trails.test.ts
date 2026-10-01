@@ -1,11 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { ActionController } from "@blazetrails/actionpack";
-import { registerConstant } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TestDatabases } from "@blazetrails/activerecord/test-databases";
 import type { FixtureSetAccessor } from "@blazetrails/activerecord/test-fixtures";
 import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
-import { env, includedModules, setEnv } from "@blazetrails/ruby-compat";
+import { env, includedModules, setEnv, registerConstant } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Trails } from "./rails.js";
 

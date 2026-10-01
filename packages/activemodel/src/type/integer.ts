@@ -1,5 +1,5 @@
-import { isBlank, registerConstant } from "@blazetrails/activesupport";
-import { Range, rbDeclareIvar, toI } from "@blazetrails/ruby-compat";
+import { isBlank } from "@blazetrails/activesupport";
+import { Range, rbDeclareIvar, toI, registerConstant } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 import { RangeError } from "../errors.js";
 import { applyNumericMixin, isNonNumericString } from "./helpers/numeric.js";

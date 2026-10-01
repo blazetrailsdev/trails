@@ -1,11 +1,10 @@
-import { registerConstant } from "@blazetrails/activesupport";
 import { ValueType, StringType, BinaryData } from "@blazetrails/activemodel";
 import { Serialized } from "../type/serialized.js";
 import { Scheme } from "./scheme.js";
 import type { EncryptorLike } from "./encryptor.js";
 import { Encryption } from "../encryption.js";
 import { Encoding, Decryption, Base } from "./errors.js";
-import { rtest } from "@blazetrails/ruby-compat";
+import { rtest, registerConstant } from "@blazetrails/ruby-compat";
 import { NullEncryptor } from "./null-encryptor.js";
 import {
   normalizeEncoding as _normalizeEncoding,

@@ -6,7 +6,7 @@ import {
   DeprecatedObjectProxy,
 } from "./proxy-wrappers.js";
 import { extend, include, prepend } from "@blazetrails/ruby-compat/include";
-import { registerConstant } from "../inflector.js";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { assertPredicate } from "../testing/assertions.js";
 import { assertDeprecated, assertNotDeprecated } from "../testing/deprecation.js";
 

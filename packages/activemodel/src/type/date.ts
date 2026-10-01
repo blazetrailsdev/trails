@@ -5,8 +5,8 @@ import {
   Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
-import { include, registerConstant } from "@blazetrails/activesupport";
-import { rbObjRespondTo, StandardError } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/activesupport";
+import { rbObjRespondTo, StandardError, registerConstant } from "@blazetrails/ruby-compat";
 import { toFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import {
   AcceptsMultiparameterTime,

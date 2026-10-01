@@ -1,4 +1,5 @@
-import { BigDecimal, Duration, registerConstant } from "@blazetrails/activesupport";
+import { BigDecimal, Duration } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 
 export interface ImmutableStringTypeOptions {

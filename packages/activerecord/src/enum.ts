@@ -5,10 +5,16 @@ import {
   underscore,
   isBlank,
   pluralize,
-  registerConstant,
 } from "@blazetrails/activesupport";
 import { ArgumentError, RuntimeError, ValueType, defaultValue } from "@blazetrails/activemodel";
-import { Module, include, isSymbol, rbInspect, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  Module,
+  include,
+  isSymbol,
+  rbInspect,
+  symbolToS,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import {
   dangerousAttributeMethods,
   isDangerousAttributeMethod,

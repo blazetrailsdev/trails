@@ -1,6 +1,6 @@
 import { MutableModule, ValueType, BinaryData, type Mutable } from "@blazetrails/activemodel";
-import { include, registerConstant } from "@blazetrails/activesupport";
-import { DelegateClass, rbEqual } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/activesupport";
+import { DelegateClass, rbEqual, registerConstant } from "@blazetrails/ruby-compat";
 import { IndifferentHashAccessor } from "../store.js";
 import type { ColumnSerializer } from "../coders/column-serializer.js";
 

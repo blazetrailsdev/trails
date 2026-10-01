@@ -223,7 +223,17 @@ export { Enumerator, toEnum } from "./enumerator.js";
 export { RUBY_PLATFORM } from "./ruby-platform.js";
 export { rbEql, rbEqq, rbEqual } from "./rb-equal.js";
 export { rbHash, rbObjHash } from "./rb-hash.js";
-export { rbConstGet, rbConstMissing, rbModConstMissing } from "./variable.js";
+export {
+  resetConstants,
+  isRegisteredConstant,
+  rbConstGet,
+  rbConstMissing,
+  rbModConstMissing,
+  rbPathToClass,
+  registerConstant,
+  registeredConstant,
+  unregisterConstant,
+} from "./variable.js";
 export { isEmpty } from "./ruby-empty.js";
 export { RuntimeError } from "./runtime-error.js";
 export { Exception } from "./exception.js";

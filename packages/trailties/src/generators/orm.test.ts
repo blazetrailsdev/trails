@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { registerConstant, unregisterConstant } from "@blazetrails/activesupport";
+import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import { ActiveModel } from "./active-model.js";
 import { ScaffoldControllerGenerator } from "./rails/scaffold-controller/scaffold-controller-generator.js";
 

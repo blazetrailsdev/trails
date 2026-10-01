@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { include } from "@blazetrails/ruby-compat";
+import { include, registerConstant } from "@blazetrails/ruby-compat";
 
-import { registerConstant } from "./inflector.js";
 import { Rescuable, rescueFrom, handleRescue } from "./rescuable.js";
 
 class WraithAttack extends Error {}

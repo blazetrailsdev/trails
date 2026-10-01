@@ -1,6 +1,5 @@
-import { registerConstant } from "@blazetrails/activesupport";
 import { ValueType } from "@blazetrails/activemodel";
-import { rbEqual, rbObjAsString } from "@blazetrails/ruby-compat";
+import { rbEqual, rbObjAsString, registerConstant } from "@blazetrails/ruby-compat";
 
 const STRUCTURAL_CHARS = /[{}"\\ \t\n\r\v\f]/;
 const NULL_LITERAL = /^null$/i;

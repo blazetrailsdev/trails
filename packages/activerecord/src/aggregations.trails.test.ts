@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 
-import { registerConstant, unregisterConstant } from "@blazetrails/activesupport";
+import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 
 import { Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { NameError } from "@blazetrails/ruby-compat/name-error";
-import { constantize, registerConstant, unregisterConstant } from "./inflector.js";
+import { constantize } from "./inflector.js";
+import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 
 describe("constantize walks seated constants like Object.const_get", () => {
   const Bar = {};

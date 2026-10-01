@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { setApp, _resetApp } from "./config.js";
-import { registerConstant, _resetConstants } from "@blazetrails/activesupport";
+import { registerConstant, resetConstants } from "@blazetrails/ruby-compat";
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
 import {
@@ -41,7 +41,7 @@ describe("GlobalIdentificationTest", () => {
   });
   afterEach(() => {
     _resetApp();
-    _resetConstants();
+    resetConstants();
   });
 
   it("creates a Global ID from self", () => {
@@ -124,7 +124,7 @@ describe("Locator.locateSigned + locateManySigned", () => {
   });
   afterEach(() => {
     _resetApp();
-    _resetConstants();
+    resetConstants();
   });
 
   it("locate_signed finds a record by valid SGID", async () => {

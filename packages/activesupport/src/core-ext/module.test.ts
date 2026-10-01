@@ -1,8 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { ArgumentError, NoMethodError } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  NoMethodError,
+  registerConstant,
+  unregisterConstant,
+} from "@blazetrails/ruby-compat";
 import { delegate, delegateMissingTo } from "../module-ext.js";
 import { DelegationError } from "../delegation.js";
-import { registerConstant, unregisterConstant } from "../inflector.js";
 import {
   assert,
   assertNot,

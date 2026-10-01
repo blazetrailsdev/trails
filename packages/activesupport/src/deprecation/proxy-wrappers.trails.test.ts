@@ -1,12 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Deprecation } from "../deprecation.js";
-import { NameError, rbEqual } from "@blazetrails/ruby-compat";
+import { NameError, rbEqual, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import {
   DeprecatedConstantProxy,
   DeprecatedInstanceVariableProxy,
   DeprecatedObjectProxy,
 } from "./proxy-wrappers.js";
-import { registerConstant, unregisterConstant } from "../inflector.js";
 import { assertDeprecated } from "../testing/deprecation.js";
 
 class Record {

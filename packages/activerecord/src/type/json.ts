@@ -1,5 +1,6 @@
 import { MutableModule, ValueType, type Mutable } from "@blazetrails/activemodel";
-import { include, registerConstant } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { ActiveSupportJSON } from "@blazetrails/activesupport";
 import { StringKeyedHashAccessor } from "../store.js";
 

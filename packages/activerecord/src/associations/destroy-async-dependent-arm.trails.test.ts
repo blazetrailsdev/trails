@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { registerConstant, unregisterConstant } from "@blazetrails/activesupport";
+import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";

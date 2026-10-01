@@ -11,9 +11,8 @@ import {
   isBlank,
   include,
   type Included,
-  registerConstant,
 } from "@blazetrails/activesupport";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, registerConstant } from "@blazetrails/ruby-compat";
 import {
   AcceptsMultiparameterTime,
   type InstanceMethods,

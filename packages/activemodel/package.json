@@ -10,10 +10,6 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
-    "./yaml": {
-      "types": "./dist/attribute-set/codecs/yaml.d.ts",
-      "default": "./dist/attribute-set/codecs/yaml.js"
-    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

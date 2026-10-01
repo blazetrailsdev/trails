@@ -1,4 +1,3 @@
-import { registerConstant } from "@blazetrails/activesupport";
 import { Attribute } from "../attribute.js";
 import type { Block } from "@blazetrails/ruby-compat";
 import {
@@ -13,6 +12,7 @@ import {
   rbEqual,
   rbObjDup,
   transformValues,
+  registerConstant,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "../type/value.js";
 import { AttributeSet } from "../attribute-set.js";

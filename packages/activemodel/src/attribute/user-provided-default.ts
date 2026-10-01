@@ -1,5 +1,4 @@
-import { registerConstant } from "@blazetrails/activesupport";
-import { rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbSetClassPathString, registerConstant } from "@blazetrails/ruby-compat";
 import { Attribute, FromUser } from "../attribute.js";
 import { ValueType } from "../type/value.js";
 

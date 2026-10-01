@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { setApp, _resetApp } from "./config.js";
-import { registerConstant, _resetConstants, assertNil } from "@blazetrails/activesupport";
+import { assertNil } from "@blazetrails/activesupport";
+import { registerConstant, resetConstants } from "@blazetrails/ruby-compat";
 import { GlobalID } from "./global-id.js";
 import { GID } from "./uri/gid.js";
 import { type LocatorModel } from "./locator.js";
@@ -104,7 +105,7 @@ describe("GlobalIDParamEncodedTest", () => {
   });
   afterEach(() => {
     _resetApp();
-    _resetConstants();
+    resetConstants();
   });
 
   it("parsing", () => {
@@ -142,7 +143,7 @@ describe("GlobalIDCreationTest", () => {
   });
   afterEach(() => {
     _resetApp();
-    _resetConstants();
+    resetConstants();
   });
 
   it("find", async () => {

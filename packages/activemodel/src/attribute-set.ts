@@ -1,6 +1,5 @@
 import {
   isPlainObject,
-  registerConstant,
   reverseMergeBang as hashReverseMergeBang,
 } from "@blazetrails/activesupport";
 import { Attribute } from "./attribute.js";
@@ -21,6 +20,7 @@ import {
   rbEqual,
   rbObjClone,
   transformValues as hashTransformValues,
+  registerConstant,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
 

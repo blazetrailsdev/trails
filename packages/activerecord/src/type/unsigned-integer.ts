@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { IntegerType } from "@blazetrails/activemodel";
 
 export class UnsignedInteger extends IntegerType {

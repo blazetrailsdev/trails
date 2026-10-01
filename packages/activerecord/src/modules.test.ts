@@ -6,10 +6,12 @@ import {
   assertNotNil,
   assertNothingRaised,
   constantize,
+} from "@blazetrails/activesupport";
+import {
   isRegisteredConstant,
   registerConstant,
   unregisterConstant,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/ruby-compat";
 import { Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { assertNoQueries } from "./testing/query-assertions.js";

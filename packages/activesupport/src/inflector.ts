@@ -1,6 +1,6 @@
 import { inflections } from "./inflector/inflections.js";
 import { NameError } from "./core-ext/name-error.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { isRegisteredConstant, regexpEscape, registeredConstant } from "@blazetrails/ruby-compat";
 import { I18n } from "./i18n.js";
 
 /** @internal */
@@ -178,37 +178,6 @@ export function deconstantize(path: string): string {
   return "";
 }
 
-const _constants = new Map<string, unknown>();
-
-/** @noRailsEquivalent PERMANENT */
-export function registerConstant(name: string, value: unknown): void {
-  _constants.set(name, value);
-}
-
-/** @noRailsEquivalent PERMANENT */
-export function unregisterConstant(name: string, expected: unknown): void {
-  if (_constants.get(name) !== expected) return;
-  _constants.delete(name);
-}
-
-/** @noRailsEquivalent PERMANENT */
-export function isRegisteredConstant(name: string): boolean {
-  return _constants.has(name);
-}
-
-/** @noRailsEquivalent PERMANENT */
-export function registeredConstantName(value: unknown): string | undefined {
-  for (const [name, registered] of _constants) {
-    if (registered === value) return name;
-  }
-  return undefined;
-}
-
-/** @internal */
-export function _resetConstants(): void {
-  _constants.clear();
-}
-
 function isValidConstantPath(path: string): boolean {
   if (path.length === 0) return false;
   return path.split("::").every((segment) => /^[A-Z]\w*$/.test(segment));
@@ -219,13 +188,13 @@ export function constantize(camelCasedWord: string): unknown {
   if (!isValidConstantPath(path)) {
     throw new NameError(`wrong constant name ${camelCasedWord}`);
   }
-  if (_constants.has(path)) return _constants.get(path);
+  if (isRegisteredConstant(path)) return registeredConstant(path);
   const segments = path.split("::");
   let receiver: unknown = Object;
   for (let i = 1; i <= segments.length; i++) {
     const key = segments.slice(0, i).join("::");
-    const value = _constants.has(key)
-      ? _constants.get(key)
+    const value = isRegisteredConstant(key)
+      ? registeredConstant(key)
       : i > 1 &&
           receiver != null &&
           (typeof receiver === "object" || typeof receiver === "function")

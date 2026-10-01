@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { BigIntegerType } from "@blazetrails/activemodel";
 
 export class DecimalWithoutScale extends BigIntegerType {

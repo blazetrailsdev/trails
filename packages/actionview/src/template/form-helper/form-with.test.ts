@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RouteSet, UrlFor } from "@blazetrails/actionpack";
 import { Conversion, Naming } from "@blazetrails/activemodel";
-import { I18n, extend, isPresent, registerConstant } from "@blazetrails/activesupport";
-import { ArgumentError, include } from "@blazetrails/ruby-compat";
+import { I18n, extend, isPresent } from "@blazetrails/activesupport";
+import { ArgumentError, include, registerConstant } from "@blazetrails/ruby-compat";
 
 import { Base } from "../../base.js";
 import { LookupContext } from "../../lookup-context.js";

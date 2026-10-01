@@ -1,4 +1,3 @@
-import { registerConstant } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import {
   DateType,
@@ -7,7 +6,7 @@ import {
   type DateInfinityType,
   type DateNegativeInfinityType,
 } from "@blazetrails/activemodel";
-import { format } from "@blazetrails/ruby-compat";
+import { format, registerConstant } from "@blazetrails/ruby-compat";
 
 export class Date extends DateType {
   override castValue(
