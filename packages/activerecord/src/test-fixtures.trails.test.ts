@@ -152,3 +152,81 @@ describe("TestFixtures#method_missing", () => {
     expect(instance.developers).toBeUndefined();
   });
 });
+
+describe("TestFixtures#before_setup / #after_teardown", () => {
+  type Lifecycle = { beforeSetup(): Promise<void>; afterTeardown(): Promise<void> };
+  let calls: string[];
+  let testCase: Lifecycle;
+
+  function build(superclass: new () => object): new () => Lifecycle {
+    const k = class extends superclass {
+      async setupFixtures() {
+        calls.push("setup_fixtures");
+      }
+      async teardownFixtures() {
+        calls.push("teardown_fixtures");
+      }
+    };
+    include(k, TestFixtures);
+    return k as unknown as new () => Lifecycle;
+  }
+
+  beforeEach(() => {
+    calls = [];
+    testCase = new (build(
+      class {
+        beforeSetup() {
+          calls.push("super before_setup");
+        }
+        afterTeardown() {
+          calls.push("super after_teardown");
+        }
+      },
+    ))();
+  });
+
+  it("splices the module beneath the includer's prototype", () => {
+    const proto = Object.getPrototypeOf(testCase) as object;
+    expect(Object.prototype.hasOwnProperty.call(proto, "beforeSetup")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(Object.getPrototypeOf(proto), "beforeSetup")).toBe(
+      true,
+    );
+  });
+
+  it("before_setup sets up fixtures, then calls super", async () => {
+    await testCase.beforeSetup();
+    expect(calls).toEqual(["setup_fixtures", "super before_setup"]);
+  });
+
+  it("after_teardown calls super, then tears down fixtures", async () => {
+    await testCase.afterTeardown();
+    expect(calls).toEqual(["super after_teardown", "teardown_fixtures"]);
+  });
+
+  it("after_teardown tears down fixtures when super raises", async () => {
+    testCase = new (build(
+      class {
+        afterTeardown() {
+          throw new Error("super raised");
+        }
+      },
+    ))();
+    await expect(testCase.afterTeardown()).rejects.toThrow("super raised");
+    expect(calls).toEqual(["teardown_fixtures"]);
+  });
+
+  it("an includer's own before_setup outranks the module's and reaches it through super", async () => {
+    const k = class {
+      async beforeSetup(): Promise<void> {
+        calls.push("own before_setup");
+        await (Object.getPrototypeOf(k.prototype) as Lifecycle).beforeSetup.call(this);
+      }
+      async setupFixtures() {
+        calls.push("setup_fixtures");
+      }
+    };
+    include(k, TestFixtures);
+    await new k().beforeSetup();
+    expect(calls).toEqual(["own before_setup", "setup_fixtures"]);
+  });
+});
