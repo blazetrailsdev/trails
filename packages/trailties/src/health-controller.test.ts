@@ -18,7 +18,7 @@ describe("HealthController", () => {
     });
     await t.get("show");
     expect(t.controller.status).toBe(200);
-    expect(t.responseBody).toMatch(/background-color: green/);
+    expect(t.response.body).toMatch(/background-color: green/);
   });
 
   it("health controller renders red internal server error page", async () => {
@@ -37,6 +37,6 @@ describe("HealthController", () => {
     });
     await t.get("show");
     expect(t.controller.status).toBe(500);
-    expect(t.responseBody).toMatch(/background-color: red/);
+    expect(t.response.body).toMatch(/background-color: red/);
   });
 });

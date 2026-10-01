@@ -57,20 +57,20 @@ describe("RenderTest", () => {
 
   test("rendered format without format", async () => {
     await testCase.get("inlineRenderedFormatWithoutFormat");
-    expect(testCase.responseBody).toBe("test");
+    expect(testCase.response.body).toBe("test");
     expect(testCase.response.mediaType).toBe("text/html");
   });
 
   test("accessing params in template", async () => {
     await testCase.get("accessingParamsInTemplate", { params: { name: "David" } });
-    expect(testCase.responseBody).toBe("Hello: David");
+    expect(testCase.response.body).toBe("Hello: David");
   });
 
   test("accessing local assigns in inline template", async () => {
     await testCase.get("accessingLocalAssignsInInlineTemplate", {
       params: { local_name: "Local David" },
     });
-    expect(testCase.responseBody).toBe("Goodbye, Local David");
+    expect(testCase.response.body).toBe("Goodbye, Local David");
     expect(testCase.response.mediaType).toBe("text/html");
   });
 });

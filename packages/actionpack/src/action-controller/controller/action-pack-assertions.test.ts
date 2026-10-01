@@ -148,24 +148,24 @@ describe("ActionPackAssertionsControllerTest", () => {
   it("get request", async () => {
     await expect(tc.get("raiseExceptionOnGet")).rejects.toThrow("get");
     await tc.get("raiseExceptionOnPost");
-    expect(tc.responseBody).toContain("GET");
+    expect(tc.response.body).toContain("GET");
   });
 
   it("post request", async () => {
     await expect(tc.post("raiseExceptionOnPost")).rejects.toThrow("post");
     await tc.post("raiseExceptionOnGet");
-    expect(tc.responseBody).toContain("POST");
+    expect(tc.response.body).toContain("POST");
   });
 
   it("get post request switch", async () => {
     await tc.post("raiseExceptionOnGet");
-    expect(tc.responseBody).toContain("POST");
+    expect(tc.response.body).toContain("POST");
     await tc.get("raiseExceptionOnPost");
-    expect(tc.responseBody).toContain("GET");
+    expect(tc.response.body).toContain("GET");
     await tc.post("raiseExceptionOnGet");
-    expect(tc.responseBody).toContain("POST");
+    expect(tc.response.body).toContain("POST");
     await tc.get("raiseExceptionOnPost");
-    expect(tc.responseBody).toContain("GET");
+    expect(tc.response.body).toContain("GET");
   });
 
   it("string constraint", async () => {
@@ -369,7 +369,7 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("render based on parameters", async () => {
     await tc.get("renderBasedOnParameters", { params: { name: "David" } });
-    expect(tc.responseBody).toBe("Mr. David");
+    expect(tc.response.body).toBe("Mr. David");
   });
 
   it("assert redirection fails with incorrect controller", async () => {
@@ -450,7 +450,7 @@ describe("ActionPackAssertionsControllerTest", () => {
     await tc2.beforeSetup();
     await tc2.get("show");
     tc2.assertResponse(500);
-    expect(tc2.responseBody).toBe("Boom");
+    expect(tc2.response.body).toBe("Boom");
   });
 });
 

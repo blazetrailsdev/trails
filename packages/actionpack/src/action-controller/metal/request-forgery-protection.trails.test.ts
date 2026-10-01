@@ -165,10 +165,10 @@ describe("ActionController::Base#verify_authenticity_token", () => {
     const tc = new TestCase();
     tc.controller = new PostsController();
     await tc.beforeSetup();
+    tc.request.env["HTTP_X_CSRF_TOKEN"] = token;
     await tc.post("create", {
       session: { _csrf_token: token },
       params: { authenticity_token: "bogus" },
-      headers: { "X-CSRF-Token": token },
     });
     tc.assertResponse("created");
   });
@@ -179,11 +179,11 @@ describe("ActionController::Base#verify_authenticity_token", () => {
       const tc = new TestCase();
       tc.controller = new PostsController();
       await tc.beforeSetup();
+      tc.request.setHeader("HTTP_ORIGIN", "http://bad.host");
       await expect(
         tc.post("create", {
           session: { _csrf_token: token },
           params: { authenticity_token: token },
-          headers: { Origin: "http://bad.host" },
         }),
       ).rejects.toThrow(
         "HTTP Origin header (http://bad.host) didn't match request.base_url (http://test.host)",

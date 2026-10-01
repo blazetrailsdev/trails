@@ -23,7 +23,8 @@ describe("Rails::ApplicationController", () => {
     tc.routes.draw(function () {
       this.get("/rails/info/properties", { to: "rails/info#properties" });
     });
-    await tc.get("properties", { env: { REMOTE_ADDR: "127.0.0.1" } });
+    tc.request.env["REMOTE_ADDR"] = "127.0.0.1";
+    await tc.get("properties");
 
     expect(tc.request.contentSecurityPolicyNonceGenerator).toBeNull();
     const policy = tc.request.contentSecurityPolicy!.build();
