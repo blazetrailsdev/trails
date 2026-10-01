@@ -6,6 +6,7 @@ import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { Duration } from "@blazetrails/activesupport";
 import { Error as ModelError } from "./error.js";
+import { NestedError } from "./nested-error.js";
 import { Range } from "@blazetrails/ruby-compat";
 import { Errors, Model } from "./index.js";
 import { I18n } from "./i18n.js";
@@ -69,6 +70,54 @@ describe("Error and Errors surface", () => {
     expect(str).toContain("ActiveModel::Errors");
     expect(str).toContain("name");
     expect(str).toContain("blank");
+  });
+
+  it("inspect renders the type with to_s and the options with inspect", () => {
+    const errors = new Errors({});
+    errors.add("name", ":blank");
+    errors.add("name", "is odd");
+    expect(errors.objects[0].inspect()).toBe(
+      "#<ActiveModel::Error attribute=name, type=blank, options={}>",
+    );
+    expect(errors.objects[1].inspect()).toBe(
+      "#<ActiveModel::Error attribute=name, type=is odd, options={}>",
+    );
+    expect(errors.inspect()).toBe(
+      "#<ActiveModel::Errors [" +
+        "#<ActiveModel::Error attribute=name, type=blank, options={}>, " +
+        "#<ActiveModel::Error attribute=name, type=is odd, options={}>]>",
+    );
+  });
+
+  it("inspect renders the receiver's class name", () => {
+    class LocalError extends ModelError {}
+    const error = new ModelError({} as never, "name", ":blank");
+    expect(new NestedError({}, error).inspect()).toBe(
+      "#<ActiveModel::NestedError attribute=name, type=blank, options={}>",
+    );
+    expect(new LocalError({} as never, "name", ":blank").inspect()).toBe(
+      "#<LocalError attribute=name, type=blank, options={}>",
+    );
+    class LocalErrors extends Errors {}
+    expect(new LocalErrors({}).inspect()).toBe("#<LocalErrors []>");
+  });
+
+  it("dup gives the copy its own options and its own errors", () => {
+    const errors = new Errors({});
+    const error = errors.add("name", ":too_short", { count: 3, tags: ["a"] });
+    const copy = error.deepDup();
+    expect(copy).toBeInstanceOf(ModelError);
+    expect(copy.options).toEqual(error.options);
+    expect(copy.options).not.toBe(error.options);
+    expect(copy.options.tags).not.toBe(error.options.tags);
+    expect([copy.attribute, copy.rawType, copy.type]).toEqual(["name", ":too_short", ":too_short"]);
+
+    const duped = errors.dup();
+    expect(duped).toBeInstanceOf(Errors);
+    expect(duped.objects).toHaveLength(1);
+    expect(duped.objects[0]).not.toBe(error);
+    duped.add("name", ":blank");
+    expect(errors.objects).toHaveLength(1);
   });
 
   it("full_messages doesn't require the base object to respond to :errors", () => {

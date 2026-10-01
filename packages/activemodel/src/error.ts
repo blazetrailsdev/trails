@@ -1,5 +1,15 @@
 import { classAttribute, humanize, deepDup, isPlainObject } from "@blazetrails/activesupport";
-import { except, kernelCatch, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  except,
+  isSymbol,
+  kernelCatch,
+  rbInspect,
+  rbModConstSet,
+  rbModName,
+  rbObjDup,
+  rbObjRespondTo,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 import { MissingTranslation, type TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 import { ActiveModel } from "./namespaces.js";
@@ -205,6 +215,9 @@ export class Error {
   }
 
   initializeDup(_other: Error): void {
+    this.attribute = rbObjDup(this.attribute);
+    this.rawType = rbObjDup(this.rawType);
+    this.type = rbObjDup(this.type);
     this.options = deepDup(this.options);
   }
 
@@ -268,20 +281,12 @@ export class Error {
   }
 
   deepDup(): this {
-    const copy = Object.assign(Object.create(Object.getPrototypeOf(this) as object) as this, this);
-    copy.initializeDup(this);
-    return copy;
+    return rbObjDup(this);
   }
 
   inspect(): string {
-    let optionsStr: string;
-    try {
-      optionsStr = JSON.stringify(this.options);
-    } catch {
-      optionsStr = "{...}";
-    }
-    return `#<ActiveModel::Error attribute=${this.attribute}, type=${this.type}, options=${optionsStr}>`;
+    return `#<${rbModName(this.constructor as typeof Error) ?? ""} attribute=${isSymbol(this.attribute) ? symbolToS(this.attribute) : this.attribute}, type=${isSymbol(this.type) ? symbolToS(this.type) : this.type}, options=${rbInspect(this.options)}>`;
   }
 }
 
-ActiveModel.Error = Error;
+rbModConstSet(ActiveModel, "Error", Error);

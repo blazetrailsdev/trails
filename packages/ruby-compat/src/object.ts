@@ -106,6 +106,15 @@ export function rbClassSuperclass<T extends object>(klass: T): T | null {
 }
 
 /**
+ * The `classpath` seat `RCLASS_SET_CLASSPATH`
+ * (`vendor/ruby/v3.3.11/internal/class.h:258`) writes: the path `const_set`
+ * gave a class or module, and whether it is permanent.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const classpaths = new WeakMap<object, { path: string; permanent: boolean }>();
+
+/**
  * `rb_mod_singleton_p` (`vendor/ruby/v3.3.11/object.c:3050`), `Module#singleton_class?`.
  *
  * @noRailsEquivalent PERMANENT
@@ -139,7 +148,18 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
 
     return s;
   }
-  return klass.name || `#<Class:${objAddress(klass)}>`;
+  return classpaths.get(klass)?.path ?? (klass.name || `#<Class:${objAddress(klass)}>`);
+}
+
+/**
+ * `rb_mod_name` (`vendor/ruby/v3.3.11/variable.c:122-127`), `Module#name`: the
+ * classpath `const_set` gave the class, else the name its definition gave it,
+ * or `nil` while it is anonymous.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModName(klass: abstract new (...args: never) => unknown): string | null {
+  return classpaths.get(klass)?.path ?? (klass.name || null);
 }
 
 /**

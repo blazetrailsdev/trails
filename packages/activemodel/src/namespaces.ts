@@ -7,6 +7,7 @@ import type {
   StrictValidationFailed,
   UnknownAttributeError,
 } from "./errors.js";
+import type { NestedError } from "./nested-error.js";
 import type { JSON } from "./serializers/json.js";
 import type { ValidationError } from "./validations.js";
 
@@ -24,6 +25,7 @@ export const ActiveModel = { name: "ActiveModel", loadPath } as AutoloadModule &
   Attribute: typeof Attribute;
   Errors: typeof Errors;
   Error: typeof Error;
+  NestedError: typeof NestedError;
   RangeError: typeof RangeError;
   StrictValidationFailed: typeof StrictValidationFailed;
   UnknownAttributeError: typeof UnknownAttributeError;

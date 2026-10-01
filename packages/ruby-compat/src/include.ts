@@ -22,7 +22,7 @@
 
 import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
-import { FL_SINGLETON, T_ICLASS, rbAnyToS, rbModToS } from "./object.js";
+import { FL_SINGLETON, T_ICLASS, classpaths, rbAnyToS, rbModName, rbModToS } from "./object.js";
 
 type AnyClass = new (...args: never[]) => unknown;
 type ModuleObject = object;
@@ -33,8 +33,6 @@ type ModuleHooks = {
   [initialize]?: (this: object) => void;
 };
 
-const classpaths = new WeakMap<Module, { path: string; permanent: boolean }>();
-
 /**
  * Mirrors: Ruby's Module#const_set — vendor/ruby/v3.3.11/object.c:2545
  * `rb_mod_const_set`, which raises `NameError` for a name that is not a
@@ -42,14 +40,18 @@ const classpaths = new WeakMap<Module, { path: string; permanent: boolean }>();
  * letter (`rb_sym_constant_char_p`, vendor/ruby/v3.3.11/symbol.c:218-250), then
  * identifier characters (`is_identchar`, symbol.c:54). It then calls `const_set`
  * (vendor/ruby/v3.3.11/variable.c:3607). Binding a module names it after the
- * owner (variable.c:3648-3668): permanently under a named owner, and under an
- * anonymous one with the owner's temporary path, until a named owner re-paths
- * it. `Module#name` and `Module#inspect` read that path.
+ * owner (variable.c:3648-3668), as it does a class: permanently under a named
+ * owner, and under an anonymous one with the owner's temporary path, until a
+ * named owner re-paths it. `Module#name` and `Module#inspect` read that path.
+ * `rb_namespace_p` (variable.c:83) admits a class or a module: a class here is a function
+ * whose `prototype` is non-writable, which holds for `class` syntax and the
+ * built-in constructors and for no arrow, bound or `function` function — the
+ * test `rbInspect` applies before rendering a value through `rbModToS`.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
  */
 export function rbModConstSet<T>(
-  mod: Module | (abstract new (...args: never) => unknown),
+  mod: Module | (abstract new (...args: never) => unknown) | { readonly name: string },
   id: string,
   value: T,
 ): T {
@@ -57,15 +59,22 @@ export function rbModConstSet<T>(
     throw new NameError(`wrong constant name ${id}`, id);
   }
   Object.defineProperty(mod, id, { value, writable: true, enumerable: true, configurable: true });
-  if (value instanceof Module) {
+  if (
+    value instanceof Module ||
+    (typeof value === "function" &&
+      Object.getOwnPropertyDescriptor(value, "prototype")?.writable === false)
+  ) {
+    const klass = mod as abstract new (...args: never) => unknown;
     const valPath = classpaths.get(value);
     const parentalPathPermanent =
       mod instanceof Module ? classpaths.get(mod)?.permanent === true : Boolean(mod.name);
     const parentalPath = parentalPathPermanent
-      ? mod.name
+      ? mod instanceof Module
+        ? mod.name
+        : rbModName(klass)
       : mod instanceof Module
         ? mod.inspect()
-        : rbModToS(mod);
+        : rbModToS(klass);
     if (parentalPathPermanent && valPath?.permanent !== true) {
       classpaths.set(value, { path: `${parentalPath}::${id}`, permanent: true });
     } else if (!parentalPathPermanent && valPath === undefined) {

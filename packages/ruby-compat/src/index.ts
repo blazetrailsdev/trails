@@ -41,6 +41,7 @@ export {
   rbObjIvarSet,
   rbClassSuperclass,
   rbModSingletonP,
+  rbModName,
   rbModToS,
   rbObjClass,
   rbObjRespondTo,

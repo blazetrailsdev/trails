@@ -10,6 +10,7 @@ import {
   hasKey,
   rbDeclareIvar,
   rbEqual,
+  rbObjDup,
   transformValues,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "../type/value.js";
@@ -200,7 +201,7 @@ export class LazyAttributeHash {
   }
 
   private initializeDup(_: LazyAttributeHash): void {
-    this._delegateHash = dup(this._delegateHash);
+    this._delegateHash = dup(this.delegateHash());
   }
 
   eachKey(fn: (key: string) => void): void {
@@ -290,9 +291,7 @@ export class LazyAttributeHash {
   }
 
   dup(): LazyAttributeHash {
-    const dup = Object.assign(Object.create(Object.getPrototypeOf(this) as object), this) as this;
-    dup.initializeDup(this);
-    return dup;
+    return rbObjDup(this);
   }
 }
 

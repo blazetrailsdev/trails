@@ -170,6 +170,19 @@ describe("LazyAttributeHash", () => {
     expect(Object.hasOwn(hash.except("age"), "__proto__")).toBe(true);
   });
 
+  it("dup copies the delegate hash, so a write to the copy does not reach the receiver", () => {
+    const hash = new LazyAttributeHash({ age: intType }, { age: "42" });
+    const age = hash.getAttribute("age");
+    const copy = hash.dup();
+    expect(copy).toBeInstanceOf(LazyAttributeHash);
+    expect(copy.delegateHash()).not.toBe(hash.delegateHash());
+    expect(copy.getAttribute("age")).toBe(age);
+    copy.set("name", Attribute.null("name"));
+    expect(Object.keys(hash.delegateHash())).toEqual(["age"]);
+    expect(copy.isKey("constructor")).toBe(false);
+    expect(copy.getAttribute("constructor").name).toBe("constructor");
+  });
+
   it("deep_dup carries the receiver's materialized flag", () => {
     const hash = new LazyAttributeHash({ age: intType }, { age: "42" });
     hash.transformValues((attr) => attr);

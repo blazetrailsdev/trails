@@ -1,4 +1,6 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Error as ActiveModelError } from "./error.js";
+import { ActiveModel } from "./namespaces.js";
 
 interface ErrorLike {
   attribute: string;
@@ -26,3 +28,5 @@ export class NestedError extends ActiveModelError {
     return this.innerError.message;
   }
 }
+
+rbModConstSet(ActiveModel, "NestedError", NestedError);

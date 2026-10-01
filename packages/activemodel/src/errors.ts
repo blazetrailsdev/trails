@@ -12,6 +12,9 @@ import {
   isEmpty,
   rbEqual,
   rbInspect,
+  rbModConstSet,
+  rbModName,
+  rbObjDup,
   transformValues,
 } from "@blazetrails/ruby-compat";
 import { Error as ActiveModelError } from "./error.js";
@@ -294,9 +297,7 @@ export class Errors<TBase extends object = object> {
   }
 
   dup(): this {
-    const duped = Object.assign(Object.create(Object.getPrototypeOf(this) as object) as this, this);
-    duped.initializeDup(this);
-    return duped;
+    return rbObjDup(this);
   }
 
   /** @noRailsEquivalent CONVERGEABLE errors-symbol-iterator-comes-from-ruby-compat-enumerable */
@@ -326,8 +327,9 @@ export class Errors<TBase extends object = object> {
   }
 
   inspect(): string {
-    const details = this._errors.map((e) => e.inspect());
-    return `#<ActiveModel::Errors [${details.join(", ")}]>`;
+    const inspection = rbInspect(this._errors);
+
+    return `#<${rbModName(this.constructor as typeof Errors) ?? ""} ${inspection}>`;
   }
 }
 
@@ -369,7 +371,7 @@ export class UnknownAttributeError<TRecord extends object = object> extends glob
   }
 }
 
-ActiveModel.Errors = Errors;
+rbModConstSet(ActiveModel, "Errors", Errors);
 ActiveModel.RangeError = RangeError;
 ActiveModel.StrictValidationFailed = StrictValidationFailed;
 ActiveModel.UnknownAttributeError = UnknownAttributeError;
