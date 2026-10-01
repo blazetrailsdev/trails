@@ -1,12 +1,5 @@
+import { rbModName, rbObjClass, rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { Visitors } from "../namespaces.js";
-import { isHashAnalogue, rubyClassName, rubyConstantName } from "./ruby-class.js";
-
-function describeClass(object: unknown): string {
-  const rubyClass = rubyClassName(object);
-  if (rubyClass !== null) return rubyClass;
-  const ctor = (object as { constructor?: object } | null | undefined)?.constructor;
-  return (ctor && rubyConstantName(ctor)) ?? typeof object;
-}
 
 export type NodeCtor = abstract new (...args: never[]) => object;
 
@@ -50,7 +43,7 @@ export abstract class Visitor {
     const methodName = this.dispatchMethod(object);
     if (!methodName) {
       // eslint-disable-next-line blazetrails/rails-error-parity -- Ruby raises NoMethodError/TypeError here; TypeError is its JS analogue, not a missing ported class.
-      throw new TypeError(`Cannot visit ${describeClass(object)}`);
+      throw new TypeError(`Cannot visit ${rbObjClass(object)}`);
     }
     const fn = (this as unknown as Record<string, unknown>)[methodName] as (
       n: unknown,
@@ -60,16 +53,15 @@ export abstract class Visitor {
   }
 
   private dispatchMethod(object: unknown): string | undefined {
-    if (!isHashAnalogue(object)) {
+    const klass = rbObjClass(object);
+    if (klass !== "Hash") {
       const ctor = (object as { constructor?: NodeCtor } | null | undefined)?.constructor;
       if (typeof ctor === "function") {
         const byCtor = this.resolveDispatch(ctor);
         if (byCtor) return byCtor;
       }
     }
-    const rubyClass = rubyClassName(object);
-    if (rubyClass === null) return undefined;
-    const byName = `visit${rubyClass}`;
+    const byName = `visit${klass.replaceAll("::", "")}`;
     return this.respondsTo(byName) ? byName : undefined;
   }
 
@@ -92,11 +84,11 @@ export abstract class Visitor {
     return undefined;
   }
 
-  private deriveDispatch(ctor: NodeCtor): string | undefined {
-    const klassName = rubyConstantName(ctor);
-    if (klassName === null) return undefined;
-    return `visit${klassName.replaceAll("::", "")}`;
+  private deriveDispatch(klass: NodeCtor): string | undefined {
+    const name = rbModName(klass);
+    return name === null ? undefined : `visit${name.replaceAll("::", "")}`;
   }
 }
 
+rbSetClassPathString(Visitor, Visitors, "Visitor");
 Visitors.Visitor = Visitor;

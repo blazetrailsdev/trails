@@ -1,12 +1,11 @@
 import { Nodes } from "../namespaces.js";
 import { ArgumentError, rbEqual, rbHash, symbolizeKeys } from "@blazetrails/activesupport";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect, rbModName, rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { BindError } from "../errors.js";
 import { Fragments } from "./fragments.js";
-import { rubyConstantName } from "../visitors/ruby-class.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class BoundSqlLiteral extends NodeExpression {
@@ -90,7 +89,7 @@ export class BoundSqlLiteral extends NodeExpression {
 
   inspect(): string {
     const namedBinds = this.namedBinds && symbolizeKeys(this.namedBinds);
-    return `#<${rubyConstantName(this.constructor)} ${rbInspect(this.sqlWithPlaceholders)} ${rbInspect(namedBinds || this.positionalBinds)}>`;
+    return `#<${rbModName(this.constructor as typeof BoundSqlLiteral)} ${rbInspect(this.sqlWithPlaceholders)} ${rbInspect(namedBinds || this.positionalBinds)}>`;
   }
 }
 
@@ -98,4 +97,5 @@ type _AliasPredication = import("../alias-predication.js").AliasPredicationModul
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface BoundSqlLiteral extends _AliasPredication {}
 
+rbSetClassPathString(BoundSqlLiteral, Nodes, "BoundSqlLiteral");
 Nodes.BoundSqlLiteral = BoundSqlLiteral;

@@ -1,4 +1,5 @@
 import { Nodes } from "../namespaces.js";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 
@@ -42,4 +43,5 @@ export class BindParam extends Node {
   }
 }
 
+rbSetClassPathString(BindParam, Nodes, "BindParam");
 Nodes.BindParam = BindParam;

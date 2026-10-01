@@ -1,6 +1,10 @@
 import { Nodes } from "../namespaces.js";
 import { ArgumentError, include } from "@blazetrails/activesupport";
-import { stringSuperclass, type StringInstance } from "@blazetrails/ruby-compat";
+import {
+  stringSuperclass,
+  type StringInstance,
+  rbSetClassPathString,
+} from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "./node.js";
 import { Fragments } from "./fragments.js";
@@ -51,4 +55,5 @@ export interface SqlLiteral
 
 include(SqlLiteral, stringSuperclass("eql", "hash", "isBlank"));
 
+rbSetClassPathString(SqlLiteral, Nodes, "SqlLiteral");
 Nodes.SqlLiteral = SqlLiteral;

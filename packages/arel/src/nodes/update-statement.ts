@@ -1,4 +1,4 @@
-import { rbObjClone } from "@blazetrails/ruby-compat";
+import { rbObjClone, rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
@@ -62,4 +62,5 @@ export class UpdateStatement extends Node {
   }
 }
 
+rbSetClassPathString(UpdateStatement, Nodes, "UpdateStatement");
 Nodes.UpdateStatement = UpdateStatement;

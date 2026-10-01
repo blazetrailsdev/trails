@@ -1,4 +1,4 @@
-import { rbObjClone } from "@blazetrails/ruby-compat";
+import { rbObjClone, rbSetClassPathString } from "@blazetrails/ruby-compat";
 import type { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import type { Temporal } from "@blazetrails/date";
 import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
@@ -202,20 +202,37 @@ type _AliasPredication = import("../alias-predication.js").AliasPredicationModul
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface Binary extends _AliasPredication {}
 
+rbSetClassPathString(Binary, Nodes, "Binary");
 Nodes.Binary = Binary;
+rbSetClassPathString(Assignment, Nodes, "Assignment");
 Nodes.Assignment = Assignment;
+rbSetClassPathString(As, Nodes, "As");
 Nodes.As = As;
+rbSetClassPathString(Between, Nodes, "Between");
 Nodes.Between = Between;
+rbSetClassPathString(NotEqual, Nodes, "NotEqual");
 Nodes.NotEqual = NotEqual;
+rbSetClassPathString(GreaterThan, Nodes, "GreaterThan");
 Nodes.GreaterThan = GreaterThan;
+rbSetClassPathString(GreaterThanOrEqual, Nodes, "GreaterThanOrEqual");
 Nodes.GreaterThanOrEqual = GreaterThanOrEqual;
+rbSetClassPathString(LessThan, Nodes, "LessThan");
 Nodes.LessThan = LessThan;
+rbSetClassPathString(LessThanOrEqual, Nodes, "LessThanOrEqual");
 Nodes.LessThanOrEqual = LessThanOrEqual;
+rbSetClassPathString(IsDistinctFrom, Nodes, "IsDistinctFrom");
 Nodes.IsDistinctFrom = IsDistinctFrom;
+rbSetClassPathString(IsNotDistinctFrom, Nodes, "IsNotDistinctFrom");
 Nodes.IsNotDistinctFrom = IsNotDistinctFrom;
+rbSetClassPathString(NotIn, Nodes, "NotIn");
 Nodes.NotIn = NotIn;
+rbSetClassPathString(Join, Nodes, "Join");
 Nodes.Join = Join;
+rbSetClassPathString(Union, Nodes, "Union");
 Nodes.Union = Union;
+rbSetClassPathString(UnionAll, Nodes, "UnionAll");
 Nodes.UnionAll = UnionAll;
+rbSetClassPathString(Intersect, Nodes, "Intersect");
 Nodes.Intersect = Intersect;
+rbSetClassPathString(Except, Nodes, "Except");
 Nodes.Except = Except;

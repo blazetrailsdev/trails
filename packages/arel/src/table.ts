@@ -10,7 +10,7 @@ import { SqlLiteral } from "./nodes/sql-literal.js";
 import { StringJoin } from "./nodes/string-join.js";
 import type { Join } from "./nodes/binary.js";
 import { TableAlias } from "./nodes/table-alias.js";
-import { setRubyNamespace } from "./visitors/ruby-class.js";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 
 export interface TableKlass {
   readonly attributeAliases?: Record<string, string>;
@@ -143,5 +143,5 @@ type _AliasPredication = import("./alias-predication.js").AliasPredicationModule
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export interface Table extends _FactoryMethodsModule, _AliasPredication {}
 
+rbSetClassPathString(Table, Arel, "Table");
 Arel.Table = Table;
-setRubyNamespace(Table, "Arel");

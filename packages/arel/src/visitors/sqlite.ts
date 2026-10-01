@@ -1,4 +1,5 @@
 import { Nodes, Visitors } from "../namespaces.js";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import "../nodes/index.js";
 import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
@@ -87,4 +88,5 @@ export class SQLite extends ToSql {
   }
 }
 
+rbSetClassPathString(SQLite, Visitors, "SQLite");
 Visitors.SQLite = SQLite;

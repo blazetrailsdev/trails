@@ -1,4 +1,5 @@
 import { Nodes } from "../namespaces.js";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { Node } from "./node.js";
 import type { PredicationsModule } from "../predications.js";
 import type { MathModule } from "../math.js";
@@ -12,4 +13,5 @@ export abstract class NodeExpression extends Node {}
 export interface NodeExpression
   extends PredicationsModule, MathModule, ExpressionsModule, OrderPredicationsModule {}
 
+rbSetClassPathString(NodeExpression, Nodes, "NodeExpression");
 Nodes.NodeExpression = NodeExpression;

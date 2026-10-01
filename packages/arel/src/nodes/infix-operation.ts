@@ -1,4 +1,5 @@
 import { Nodes } from "../namespaces.js";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { Binary, type NodeOrValue } from "./binary.js";
 import type { PredicationsModule } from "../predications.js";
 import type { MathModule } from "../math.js";
@@ -101,16 +102,29 @@ export interface InfixOperation
     AliasPredicationModule,
     OrderPredicationsModule {}
 
+rbSetClassPathString(InfixOperation, Nodes, "InfixOperation");
 Nodes.InfixOperation = InfixOperation;
+rbSetClassPathString(BitwiseAnd, Nodes, "BitwiseAnd");
 Nodes.BitwiseAnd = BitwiseAnd;
+rbSetClassPathString(BitwiseOr, Nodes, "BitwiseOr");
 Nodes.BitwiseOr = BitwiseOr;
+rbSetClassPathString(BitwiseXor, Nodes, "BitwiseXor");
 Nodes.BitwiseXor = BitwiseXor;
+rbSetClassPathString(BitwiseShiftLeft, Nodes, "BitwiseShiftLeft");
 Nodes.BitwiseShiftLeft = BitwiseShiftLeft;
+rbSetClassPathString(BitwiseShiftRight, Nodes, "BitwiseShiftRight");
 Nodes.BitwiseShiftRight = BitwiseShiftRight;
+rbSetClassPathString(Addition, Nodes, "Addition");
 Nodes.Addition = Addition;
+rbSetClassPathString(Subtraction, Nodes, "Subtraction");
 Nodes.Subtraction = Subtraction;
+rbSetClassPathString(Multiplication, Nodes, "Multiplication");
 Nodes.Multiplication = Multiplication;
+rbSetClassPathString(Division, Nodes, "Division");
 Nodes.Division = Division;
+rbSetClassPathString(Concat, Nodes, "Concat");
 Nodes.Concat = Concat;
+rbSetClassPathString(Contains, Nodes, "Contains");
 Nodes.Contains = Contains;
+rbSetClassPathString(Overlaps, Nodes, "Overlaps");
 Nodes.Overlaps = Overlaps;

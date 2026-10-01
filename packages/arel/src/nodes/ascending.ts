@@ -1,4 +1,5 @@
 import { Nodes } from "../namespaces.js";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { Ordering } from "./ordering.js";
 
 export class Ascending extends Ordering {
@@ -30,4 +31,5 @@ export class Ascending extends Ordering {
 import { Descending } from "./descending.js";
 import { NullsFirst, NullsLast } from "./ordering.js";
 
+rbSetClassPathString(Ascending, Nodes, "Ascending");
 Nodes.Ascending = Ascending;

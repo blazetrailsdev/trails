@@ -1,4 +1,5 @@
 import { Nodes } from "../namespaces.js";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import { buildQuoted } from "./casted.js";
@@ -90,4 +91,5 @@ export class HomogeneousIn extends Node {
   }
 }
 
+rbSetClassPathString(HomogeneousIn, Nodes, "HomogeneousIn");
 Nodes.HomogeneousIn = HomogeneousIn;

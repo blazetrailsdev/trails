@@ -1,4 +1,5 @@
 import { Nodes } from "../namespaces.js";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import { Unary } from "./unary.js";
@@ -20,4 +21,5 @@ export class Extract extends Unary {
   }
 }
 
+rbSetClassPathString(Extract, Nodes, "Extract");
 Nodes.Extract = Extract;

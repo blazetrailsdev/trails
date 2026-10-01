@@ -1,4 +1,5 @@
 import { Nodes } from "../namespaces.js";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { Function } from "./function.js";
 import type { NodeOrValue } from "./binary.js";
 
@@ -13,4 +14,5 @@ export class Count extends Function {
   }
 }
 
+rbSetClassPathString(Count, Nodes, "Count");
 Nodes.Count = Count;

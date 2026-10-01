@@ -1,6 +1,6 @@
 import { Nodes } from "../namespaces.js";
 import { SQLString } from "../collectors/sql-string.js";
-import { setRubyNamespace } from "../visitors/ruby-class.js";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import type { FactoryMethodsModule } from "../factory-methods.js";
 
 export interface ArelEngine {
@@ -53,6 +53,6 @@ export class Node {
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
    @typescript-eslint/no-unsafe-declaration-merging */
 export interface Node extends FactoryMethodsModule {}
-setRubyNamespace(Node, "Arel::Nodes");
+rbSetClassPathString(Node, Nodes, "Node");
 
 Nodes.Node = Node;

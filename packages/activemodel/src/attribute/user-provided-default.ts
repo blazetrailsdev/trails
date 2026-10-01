@@ -1,4 +1,5 @@
 import { registerConstant } from "@blazetrails/activesupport";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { Attribute, FromUser } from "../attribute.js";
 import { ValueType } from "../type/value.js";
 
@@ -44,5 +45,6 @@ export class UserProvidedDefault extends FromUser {
   }
 }
 
+rbSetClassPathString(UserProvidedDefault, Attribute, "UserProvidedDefault");
 Attribute.UserProvidedDefault = UserProvidedDefault;
 registerConstant("ActiveModel::Attribute::UserProvidedDefault", UserProvidedDefault);

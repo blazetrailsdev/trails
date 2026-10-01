@@ -162,15 +162,3 @@ export {
   CheckConstraintDefinition,
   TableDefinition,
 } from "./connection-adapters/abstract/schema-definitions.js";
-
-/**
- * Returns the default primary key name used when creating tables.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::TableDefinition#default_primary_key (private)
- *
- * @internal
- * @noRailsEquivalent CONVERGEABLE TableDefinition#default_primary_key (abstract/schema_definitions.rb:170) hoisted to a free function; the port splits that file.
- */
-export function defaultPrimaryKey(): string {
-  return "id";
-}

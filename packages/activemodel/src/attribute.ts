@@ -1,7 +1,7 @@
 import { ValueType } from "./type/value.js";
 import { defaultValue } from "./type.js";
 import { MissingAttributeError } from "./attribute-methods.js";
-import { hasKey, rbEqual } from "@blazetrails/ruby-compat";
+import { hasKey, rbEqual, rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { isDuplicable, registerConstant } from "@blazetrails/activesupport";
 import { ActiveModel } from "./namespaces.js";
 import type { UserProvidedDefault } from "./attribute/user-provided-default.js";
@@ -22,12 +22,7 @@ export const UNINITIALIZED_ORIGINAL_VALUE: unique symbol = Symbol.for(
   "@blazetrails/activemodel/UNINITIALIZED_ORIGINAL_VALUE",
 );
 
-const rubyNamespace: unique symbol = Symbol.for("@blazetrails:rubyNamespace");
-
 export abstract class Attribute {
-  /** @noRailsEquivalent CONVERGEABLE activemodel-ruby-classpath-carriers-onto-rb-mod-name */
-  static readonly [rubyNamespace]: string = "ActiveModel";
-
   declare static UserProvidedDefault: typeof UserProvidedDefault;
   declare static FromDatabase: typeof FromDatabase;
   declare static FromUser: typeof FromUser;
@@ -279,8 +274,6 @@ export abstract class Attribute {
 }
 
 export class FromDatabase extends Attribute {
-  /** @noRailsEquivalent CONVERGEABLE activemodel-ruby-classpath-carriers-onto-rb-mod-name */
-  static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   typeCast(value: unknown): unknown {
     return this.type!.deserialize(value);
   }
@@ -300,8 +293,6 @@ export class FromDatabase extends Attribute {
 }
 
 export class FromUser extends Attribute {
-  /** @noRailsEquivalent CONVERGEABLE activemodel-ruby-classpath-carriers-onto-rb-mod-name */
-  static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   typeCast(value: unknown): unknown {
     return this.type!.cast(value);
   }
@@ -321,8 +312,6 @@ export class FromUser extends Attribute {
 }
 
 export class WithCastValue extends Attribute {
-  /** @noRailsEquivalent CONVERGEABLE activemodel-ruby-classpath-carriers-onto-rb-mod-name */
-  static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   typeCast(value: unknown): unknown {
     return value;
   }
@@ -333,8 +322,6 @@ export class WithCastValue extends Attribute {
 }
 
 export class Null extends Attribute {
-  /** @noRailsEquivalent CONVERGEABLE activemodel-ruby-classpath-carriers-onto-rb-mod-name */
-  static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   constructor(name: string | null) {
     super(name, null, defaultValue());
   }
@@ -361,8 +348,6 @@ export class Null extends Attribute {
 }
 
 export class Uninitialized extends Attribute {
-  /** @noRailsEquivalent CONVERGEABLE activemodel-ruby-classpath-carriers-onto-rb-mod-name */
-  static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   constructor(name: string | null, type: ValueType | null) {
     super(name, null, type);
   }
@@ -404,6 +389,12 @@ export class Uninitialized extends Attribute {
   }
 }
 
+rbSetClassPathString(Attribute, ActiveModel, "Attribute");
+rbSetClassPathString(FromDatabase, Attribute, "FromDatabase");
+rbSetClassPathString(FromUser, Attribute, "FromUser");
+rbSetClassPathString(WithCastValue, Attribute, "WithCastValue");
+rbSetClassPathString(Null, Attribute, "Null");
+rbSetClassPathString(Uninitialized, Attribute, "Uninitialized");
 Attribute.FromDatabase = FromDatabase;
 Attribute.FromUser = FromUser;
 Attribute.WithCastValue = WithCastValue;
