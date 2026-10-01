@@ -54,8 +54,8 @@ export class PostsController extends ApplicationController {
     this.post = await Post.find(this.params.expect("id"));
   }
 
-  private postParams(): Record<string, unknown> {
-    return this.params.expect({ post: ["title", "views"] }) as Record<string, unknown>;
+  private postParams() {
+    return this.params.expect({ post: ["title", "views"] });
   }
 }
 "
