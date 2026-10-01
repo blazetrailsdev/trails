@@ -4,6 +4,7 @@ import { Fixture, FixtureError, FixtureSet, FormatError } from "./fixtures.js";
 import { StandardError } from "@blazetrails/ruby-compat";
 import { OID_NAMESPACE, onLoad, uuidV5 } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { insertFixturesSet } from "./connection-adapters/abstract/database-statements.js";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
 import "./relation.js";
 
@@ -27,6 +28,7 @@ function makeAdapter(): DatabaseAdapter {
     releaseSavepoint: vi.fn(async () => {}),
     rollbackToSavepoint: vi.fn(async () => {}),
     executeBatch: vi.fn(async () => {}),
+    insertFixturesSet,
     schemaCache: {
       columnsHash: async (table: string) => doubleColumnsHash(table, DOUBLE_ONLY_COLUMNS),
     },

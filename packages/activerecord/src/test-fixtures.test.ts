@@ -16,6 +16,7 @@ import { Post } from "./test-helpers/models/post.js";
 import { LiveParrot, DeadParrot } from "./test-helpers/models/parrot.js";
 import { Cucumber, Cabbage, RedCabbage } from "./test-helpers/models/vegetables.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { insertFixturesSet } from "./connection-adapters/abstract/database-statements.js";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
 import { NullPool } from "./connection-adapters/abstract/connection-pool.js";
 
@@ -46,6 +47,7 @@ function makeAdapter(): DatabaseAdapter {
       await fn();
     },
     executeBatch: vi.fn(async () => {}),
+    insertFixturesSet,
     schemaCache: {
       dataSourceExists: async () => true,
       columnsHash: async (table: string) => doubleColumnsHash(table, DOUBLE_ONLY_COLUMNS),

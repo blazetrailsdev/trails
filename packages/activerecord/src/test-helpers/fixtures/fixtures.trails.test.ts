@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { File as FixtureFile } from "../../fixture-set/file.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../connection-adapters/abstract-adapter.js";
+import { insertFixturesSet } from "../../connection-adapters/abstract/database-statements.js";
 import { FixtureSet } from "../../fixtures.js";
 import { adminAccountsFixtureData } from "./admin/accounts.js";
 import { adminUsersFixtureData } from "./admin/users.js";
@@ -29,6 +30,7 @@ function makeAdapter(): DatabaseAdapter {
     releaseSavepoint: vi.fn(async () => {}),
     rollbackToSavepoint: vi.fn(async () => {}),
     executeBatch: vi.fn(async () => {}),
+    insertFixturesSet,
     schemaCache: { columnsHash: async (table: string) => doubleColumnsHash(table) },
     lookupCastTypeFromColumn: () => ({ serialize: (v: unknown) => v }),
     quoteString: (v: string) => v.replace(/'/g, "''"),

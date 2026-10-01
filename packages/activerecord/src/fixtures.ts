@@ -1,4 +1,3 @@
-import { insertFixturesSet } from "./connection-adapters/abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
 import { ActiveRecordError, StatementInvalid } from "./errors.js";
@@ -38,21 +37,6 @@ export class FixtureClassNotFound extends ActiveRecordError {
 
 type BaseClass = typeof Base;
 type FixtureAttrs = Record<string, unknown>;
-
-/** @internal */
-export async function checkAllForeignKeysValidBang(conn: DatabaseAdapter): Promise<void> {
-  if (!verifyForeignKeysForFixtures()) return;
-
-  try {
-    await conn.checkAllForeignKeysValidBang();
-  } catch (e) {
-    if (!(e instanceof StatementInvalid)) throw e;
-    throw new RuntimeError(
-      `Foreign key violations found in your fixture data. Ensure you aren't referring to labels that don't exist on associations. Error from database:\n\n${e.message}`,
-      { cause: e },
-    );
-  }
-}
 
 const contextClasses = new WeakMap<object, new () => object>();
 
@@ -246,13 +230,9 @@ export class FixtureSet {
       }
 
       await pool.withConnection(async (conn) => {
-        await insertFixturesSet.call(
-          conn as unknown as ThisParameterType<typeof insertFixturesSet>,
-          tableRowsForConnection,
-          Object.keys(tableRowsForConnection),
-        );
+        await conn.insertFixturesSet(tableRowsForConnection, Object.keys(tableRowsForConnection));
 
-        await checkAllForeignKeysValidBang(conn);
+        await this.checkAllForeignKeysValidBang(conn);
 
         if (rbObjRespondTo(conn, "resetPkSequenceBang")) {
           for (const fs of set)
@@ -261,6 +241,20 @@ export class FixtureSet {
             ).resetPkSequenceBang(fs.tableName);
         }
       });
+    }
+  }
+
+  private static async checkAllForeignKeysValidBang(conn: DatabaseAdapter): Promise<void> {
+    if (!verifyForeignKeysForFixtures()) return;
+
+    try {
+      await conn.checkAllForeignKeysValidBang();
+    } catch (e) {
+      if (!(e instanceof StatementInvalid)) throw e;
+      throw new RuntimeError(
+        `Foreign key violations found in your fixture data. Ensure you aren't referring to labels that don't exist on associations. Error from database:\n\n${e.message}`,
+        { cause: e },
+      );
     }
   }
 
