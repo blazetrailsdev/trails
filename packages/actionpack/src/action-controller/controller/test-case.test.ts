@@ -3,25 +3,43 @@ import {
   Assertion,
   assertEmpty,
   assertEqual,
+  assertIncludes,
   assertMatch,
   assertNil,
+  assertNotIncludes,
+  assertNothingRaised,
+  assertNotEqual,
+  assertPredicate,
+  assertRaise,
   assertRespondTo,
   isBlank,
   toQuery,
 } from "@blazetrails/activesupport";
-import { rbObjId } from "@blazetrails/ruby-compat";
-import { describe, it, expect, beforeEach } from "vitest";
+import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/reporting";
+import {
+  Encoding,
+  File,
+  rbObjClass,
+  rbObjId,
+  rbObjIvarGet,
+  rbObjIvarSet,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
+import { UploadedFile } from "@blazetrails/rack-test";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { TestCase } from "../test-case.js";
 import { Base } from "../base.js";
 import { Metal } from "../metal.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
+import { Response } from "../../action-dispatch/http/response.js";
 import { TestResponse } from "../../action-dispatch/testing/test-response.js";
-import {
+import type {
   fixtureFileUpload,
-  type TestProcessHost,
+  redirectToUrl,
 } from "../../action-dispatch/testing/test-process.js";
 import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
+import { ContentController } from "../../test-helpers/lib/controller/fake-controllers.js";
 
 class PostsController extends Base {
   async index() {
@@ -417,7 +435,7 @@ describe("TestCaseTest", () => {
 });
 
 class TestController extends Base {
-  declare _counter: number | undefined;
+  declare counter: number | undefined;
 
   async noOp() {
     await this.render({ plain: "dummy" });
@@ -495,17 +513,36 @@ class TestController extends Base {
     });
   }
 
+  async testFileUpload() {
+    await this.render({ plain: (this.params.get("file") as UploadedFile).size() });
+  }
+
+  async renderCookie() {
+    await this.render({ plain: this.cookies().get("foo") });
+  }
+
+  async deleteCookie() {
+    this.cookies().delete("foo");
+    await this.render({ plain: "ok" });
+  }
+
   async renderJson() {
     await this.render({ json: this.request.rawPost });
   }
 
   async boom() {
-    throw new Error("boom!");
+    throw new RuntimeError("boom!");
   }
 
   async incrementCount() {
-    this._counter = (this._counter ?? 0) + 1;
-    await this.render({ plain: String(this._counter) });
+    this.counter ??= 0;
+    this.counter += 1;
+    await this.render({ plain: this.counter });
+  }
+
+  async originalFullpath() {
+    this.request.setHeader("PATH_INFO", "/new");
+    await this.render({ plain: this.request.originalFullpath });
   }
 
   async create() {
@@ -542,6 +579,17 @@ Object.defineProperty(DefaultUrlOptionsCachingController, "name", {
 });
 
 class TestCaseTest extends TestCase {
+  declare fixtureFileUpload: OmitThisParameter<typeof fixtureFileUpload>;
+  declare redirectToUrl: OmitThisParameter<typeof redirectToUrl>;
+
+  static fixturePaths(): string[] {
+    return [];
+  }
+
+  static {
+    this.fileFixturePath = `${FIXTURE_LOAD_PATH}/multipart`;
+  }
+
   override setup(): void {
     super.setup();
     this.controller = new TestController();
@@ -699,15 +747,6 @@ describe("TestCaseTest", () => {
     assertEqual("baz", tc.session.get("foo"));
   });
 
-  it("fixture file upload should be able access to tempfile", () => {
-    const file = fixtureFileUpload.call(
-      tc as unknown as TestProcessHost,
-      FILES_DIR + "/ruby_on_rails.jpg",
-      "image/jpeg",
-    );
-    assertRespondTo(file, "tempfile");
-  });
-
   it("session is cleared from controller after reset session", async () => {
     await tc.process("setSession");
     await tc.process("resetTheSession");
@@ -799,75 +838,134 @@ describe("TestCaseTest", () => {
     expect(tc.request.env["HTTP_ACCEPT"]).toBeUndefined();
   });
 
+  it("xhr with params", async () => {
+    await tc.get("testParams", { params: { id: 1 }, xhr: true });
+
+    assertEqual({ id: "1", ...controllerInfo }, JSON.parse(tc.response.body));
+  });
+
   it("xhr with session", async () => {
     await tc.get("setSession", { xhr: true });
-    expect(tc.session.get("string")).toBe("A wonder");
-    expect(tc.session.get("symbol")).toBe("it works");
+
+    assertEqual(
+      "A wonder",
+      tc.session.get("string"),
+      "A value stored in the session should be available by string key",
+    );
+    assertEqual(
+      "A wonder",
+      tc.session.get("string"),
+      "Test session hash should allow indifferent access",
+    );
+    assertEqual(
+      "it works",
+      tc.session.get("symbol"),
+      "Test session hash should allow indifferent access",
+    );
+    assertEqual(
+      "it works",
+      tc.session.get("symbol"),
+      "Test session hash should allow indifferent access",
+    );
   });
 
   it("params reset between post requests", async () => {
     await tc.post("noOp", { params: { foo: "bar" } });
-    expect(tc.request.parameters["foo"]).toBe("bar");
+    assertEqual("bar", tc.request.params["foo"]);
 
     await tc.post("noOp");
-    expect(tc.request.parameters["foo"]).toBeUndefined();
+    assertPredicate(tc.request.params["foo"], isBlank);
+  });
+
+  it("filtered parameters reset between requests", async () => {
+    await tc.get("noOp", { params: { foo: "bar" } });
+    assertEqual("bar", tc.request.filteredParameters()["foo"]);
+
+    await tc.get("noOp", { params: { foo: "baz" } });
+    assertEqual("baz", tc.request.filteredParameters()["foo"]);
   });
 
   it("raw post reset between post requests", async () => {
-    await tc.post("noOp", { body: "foo=bar" });
-    expect(tc.request.rawPost).toBe("foo=bar");
+    await tc.post("noOp", { params: { foo: "bar" } });
+    assertEqual("foo=bar", tc.request.rawPost);
 
-    await tc.post("noOp", { body: "foo=baz" });
-    expect(tc.request.rawPost).toBe("foo=baz");
+    await tc.post("noOp", { params: { foo: "baz" } });
+    assertEqual("foo=baz", tc.request.rawPost);
   });
 
-  it.skip("request protocol is reset after request", async () => {
-    await tc.get("testProtocol");
-    expect(tc.responseBody).toBe("http://");
+  it("content length reset after post request", async () => {
+    await tc.post("noOp", { params: { foo: "bar" } });
+    assertNotEqual(0, tc.request.contentLength);
 
-    await tc.get("testProtocol", { env: { HTTPS: "on" } });
-    expect(tc.responseBody).toBe("https://");
-
-    await tc.get("testProtocol");
-    expect(tc.responseBody).toBe("http://");
+    await tc.get("noOp");
+    assertEqual(0, tc.request.contentLength);
   });
 
-  it.skip("request format", async () => {
+  it("path is kept after the request", async () => {
+    await tc.get("testParams", { params: { id: "foo" } });
+    assertEqual("/test_case_test/test/testParams/foo", tc.request.path);
+  });
+
+  it("path params reset between request", async () => {
+    await tc.get("testParams", { params: { id: "foo" } });
+    assertEqual("foo", tc.request.pathParameters["id"]);
+
+    await tc.get("testParams");
+    assertNil(tc.request.pathParameters["id"]);
+  });
+
+  it("request protocol is reset after request", async () => {
+    await tc.get("testProtocol");
+    assertEqual("http://", tc.response.body);
+
+    tc.request.env["HTTPS"] = "on";
+    await tc.get("testProtocol");
+    assertEqual("https://", tc.response.body);
+
+    delete tc.request.env["HTTPS"];
+    await tc.get("testProtocol");
+    assertEqual("http://", tc.response.body);
+  });
+
+  it("request format", async () => {
     await tc.get("testFormat", { params: { format: "html" } });
-    expect(tc.responseBody).toBe("text/html");
+    assertEqual("text/html", tc.response.body);
 
     await tc.get("testFormat", { params: { format: "json" } });
-    expect(tc.responseBody).toBe("application/json");
+    assertEqual("application/json", tc.response.body);
 
     await tc.get("testFormat", { params: { format: "xml" } });
-    expect(tc.responseBody).toBe("application/xml");
+    assertEqual("application/xml", tc.response.body);
 
     await tc.get("testFormat");
-    expect(tc.responseBody).toBe("text/html");
+    assertEqual("text/html", tc.response.body);
   });
 
   it("request format kwarg", async () => {
     await tc.get("testFormat", { format: "html" });
-    expect(tc.responseBody).toBe("text/html");
+    assertEqual("text/html", tc.response.body);
 
     await tc.get("testFormat", { format: "json" });
-    expect(tc.responseBody).toBe("application/json");
+    assertEqual("application/json", tc.response.body);
 
     await tc.get("testFormat", { format: "xml" });
-    expect(tc.responseBody).toBe("application/xml");
+    assertEqual("application/xml", tc.response.body);
 
     await tc.get("testFormat");
-    expect(tc.responseBody).toBe("text/html");
+    assertEqual("text/html", tc.response.body);
   });
 
   it("request format kwarg overrides params", async () => {
     await tc.get("testFormat", { format: "json", params: { format: "html" } });
-    expect(tc.responseBody).toBe("application/json");
+    assertEqual("application/json", tc.response.body);
   });
 
   it("request format kwarg doesnt mutate params", async () => {
     const params = Object.freeze({ foo: "bar" });
-    await expect(tc.get("testFormat", { format: "json", params })).resolves.not.toThrow();
+
+    await assertNothingRaised(async () => {
+      await tc.get("testFormat", { format: "json", params });
+    });
   });
 
   it("using as json sets request content type to json", async () => {
@@ -888,28 +986,450 @@ describe("TestCaseTest", () => {
     expect(tc.request.pathParameters["id"]).toBe("12345");
   });
 
-  it("exception in action reaches test", async () => {
-    await expect(tc.process("boom", { method: "GET" })).rejects.toThrow("boom!");
+  it("should have knowledge of client side cookie state even if they are not set", async () => {
+    tc.cookies.set("foo", "bar");
+    await tc.get("noOp");
+    assertEqual("bar", tc.cookies.get("foo"));
   });
 
-  it.skip("request state is cleared after exception", async () => {
-    await expect(tc.process("boom", { method: "GET", params: { q: "test1" } })).rejects.toThrow();
+  it("cookies should be escaped properly", async () => {
+    tc.cookies.set("foo", "+");
+    await tc.get("renderCookie");
+    assertEqual("+", tc.response.body);
+  });
+
+  it("should detect if cookie is deleted", async () => {
+    tc.cookies.set("foo", "bar");
+    await tc.get("deleteCookie");
+    assertNil(tc.cookies.get("foo"));
+  });
+
+  it("multiple mixed method process should scrub rack input", async () => {
+    await tc.post("testParams", { params: { id: 1, foo: "an foo" } });
+    assertEqual({ id: "1", foo: "an foo", ...controllerInfo }, JSON.parse(tc.response.body));
+
+    await tc.get("testParams", { params: { bar: "an bar" } });
+    assertEqual({ bar: "an bar", ...controllerInfo }, JSON.parse(tc.response.body));
+  });
+
+  for (const variable of ["controller", "response", "request"] as const) {
+    for (const method of ["get", "post", "put", "delete", "head", "process"] as const) {
+      it(`${variable} missing for ${method} raises error`, async () => {
+        delete (tc as Partial<TestCaseTest>)[variable];
+        try {
+          await tc[method]("testRemoteAddr");
+          assert(false, "expected RuntimeError, got nothing");
+        } catch (error) {
+          if (error instanceof RuntimeError) {
+            assertMatch(new RegExp(`@${variable} is nil`), error.message);
+          } else if (error instanceof Assertion) {
+            throw error;
+          } else {
+            assert(false, `expected RuntimeError, got ${rbObjClass(error as object)}`);
+          }
+        }
+      });
+    }
+  }
+
+  const READ_BINARY = "rb:binary";
+  const READ_PLAIN = "r:binary";
+
+  it("test uploaded file", () => {
+    const filename = "ruby_on_rails.jpg";
+    const path = `${FILES_DIR}/${filename}`;
+    const contentType = "image/png";
+    const expected = File.read(path, { encoding: Encoding.BINARY });
+
+    const file = new UploadedFile(path, contentType);
+    assertEqual(filename, file.originalFilename);
+    assertEqual(contentType, file.contentType);
+    assertEqual(file.path, file.localPath);
+    assertEqual(expected, file.read());
+
+    const newContentType = "new content_type";
+    file.contentType = newContentType;
+    assertEqual(newContentType, file.contentType);
+  });
+
+  it("test uploaded file with binary", () => {
+    const filename = "ruby_on_rails.jpg";
+    const path = `${FILES_DIR}/${filename}`;
+    const contentType = "image/png";
+
+    const binaryUploadedFile = new UploadedFile(path, contentType, true);
+    assertEqual(File.open(path, READ_BINARY).read(), binaryUploadedFile.read());
+
+    const plainUploadedFile = new UploadedFile(path, contentType);
+    assertEqual(File.open(path, READ_PLAIN).read(), plainUploadedFile.read());
+  });
+
+  it("fixture file upload with binary", () => {
+    const filename = "ruby_on_rails.jpg";
+    const path = `${FILES_DIR}/${filename}`;
+    const contentType = "image/jpeg";
+
+    const binaryFileUpload = tc.fixtureFileUpload(path, contentType, true);
+    assertEqual(File.open(path, READ_BINARY).read(), binaryFileUpload.read());
+
+    const plainFileUpload = tc.fixtureFileUpload(path, contentType);
+    assertEqual(File.open(path, READ_PLAIN).read(), plainFileUpload.read());
+  });
+
+  it("fixture file upload should be able access to tempfile", () => {
+    const file = tc.fixtureFileUpload(FILES_DIR + "/ruby_on_rails.jpg", "image/jpeg");
+    assertRespondTo(file, "tempfile");
+  });
+
+  it("fixture file upload", async () => {
+    await tc.post("testFileUpload", {
+      params: {
+        file: tc.fixtureFileUpload(FILES_DIR + "/ruby_on_rails.jpg", "image/jpeg"),
+      },
+    });
+    assertEqual("45142", tc.response.body);
+  });
+
+  it("fixture file upload ignores fixture paths given full path", () => {
+    const fixturePaths = vi
+      .spyOn(TestCaseTest, "fixturePaths")
+      .mockReturnValue([import.meta.dirname]);
+    try {
+      const uploadedFile = tc.fixtureFileUpload(`${FILES_DIR}/ruby_on_rails.jpg`, "image/jpeg");
+      assertEqual(
+        File.open(`${FILES_DIR}/ruby_on_rails.jpg`, READ_PLAIN).read(),
+        uploadedFile.read(),
+      );
+    } finally {
+      fixturePaths.mockRestore();
+    }
+  });
+
+  it("fixture file upload ignores empty fixture paths", () => {
+    const uploadedFile = tc.fixtureFileUpload(`${FILES_DIR}/ruby_on_rails.jpg`, "image/jpeg");
+    assertEqual(
+      File.open(`${FILES_DIR}/ruby_on_rails.jpg`, READ_PLAIN).read(),
+      uploadedFile.read(),
+    );
+  });
+
+  it("action dispatch uploaded file upload", async () => {
+    const filename = "ruby_on_rails.jpg";
+    const path = `${FILES_DIR}/${filename}`;
+    await tc.post("testFileUpload", {
+      params: { file: new UploadedFile(path, "image/jpeg", true) },
+    });
+    assertEqual("45142", tc.response.body);
+  });
+
+  it("test uploaded file exception when file doesnt exist", async () => {
+    await assertRaise([RuntimeError], {}, () => {
+      new UploadedFile("non_existent_file");
+    });
+  });
+
+  it("redirect url only cares about location header", async () => {
+    await tc.get("create");
+    tc.assertResponse("created");
+
+    assertEqual("/resource", tc.response.redirectUrl);
+    assertEqual(tc.response.redirectUrl, tc.redirectToUrl());
+
+    await assertRaise([Assertion], {}, () => {
+      tc.assertRedirectedTo("/resource");
+    });
+  });
+
+  it("exception in action reaches test", async () => {
+    await assertRaise([RuntimeError], {}, async () => {
+      await tc.process("boom", { method: "GET" });
+    });
+  });
+
+  it("request state is cleared after exception", async () => {
+    await assertRaise([RuntimeError], {}, async () => {
+      await tc.process("boom", { method: "GET", params: { q: "test1" } });
+    });
+
     await tc.process("testQueryString", { method: "GET", params: { q: "test2" } });
-    expect(tc.responseBody).toContain("q=test2");
+
+    assertEqual("q=test2", tc.response.body);
+  });
+
+  it("parsed body without as option", async () => {
+    await tc.post("renderJson", { body: { foo: "heyo" } });
+    assertEqual({ foo: "heyo" }, (tc.response as TestResponse).parsedBody);
+  });
+
+  it("parsed body with as option", async () => {
+    await tc.post("renderJson", { body: JSON.stringify({ foo: "heyo" }), as: "json" });
+    assertEqual({ foo: "heyo" }, (tc.response as TestResponse).parsedBody);
   });
 
   it("reset instance variables after each request", async () => {
     await tc.get("incrementCount");
-    expect(tc.responseBody).toBe("1");
+    assertEqual("1", tc.response.body);
 
     await tc.get("incrementCount");
-    expect(tc.responseBody).toBe("1");
+    assertEqual("1", tc.response.body);
   });
 
-  it.skip("parsed body without as option", async () => {});
+  it("can read instance variables before and after request", async () => {
+    silenceWarnings(() => {
+      assertNil(rbObjIvarGet(tc.controller, "@counter"));
+    });
 
-  it("parsed body with as option", async () => {
-    await tc.post("renderJson", { body: JSON.stringify({ foo: "heyo" }), as: "json" });
-    expect(tc.parsedBody).toEqual({ foo: "heyo" });
+    await tc.get("incrementCount");
+    assertEqual("1", tc.response.body);
+    assertEqual(1, rbObjIvarGet(tc.controller, "@counter"));
+
+    await tc.get("incrementCount");
+    assertEqual("1", tc.response.body);
+    assertEqual(1, rbObjIvarGet(tc.controller, "@counter"));
+  });
+
+  it("ivars are not reset if they are given a value before any requests", async () => {
+    rbObjIvarSet(tc.controller, "@counter", 3);
+
+    await tc.get("incrementCount");
+    assertEqual("4", tc.response.body);
+    assertEqual(4, rbObjIvarGet(tc.controller, "@counter"));
+
+    await tc.get("incrementCount");
+    assertEqual("5", tc.response.body);
+    assertEqual(5, rbObjIvarGet(tc.controller, "@counter"));
+
+    await tc.get("incrementCount");
+    assertEqual("6", tc.response.body);
+    assertEqual(6, rbObjIvarGet(tc.controller, "@counter"));
+  });
+
+  it("ivars are reset if they are given a value after some requests", async () => {
+    await tc.get("incrementCount");
+    assertEqual("1", tc.response.body);
+    assertEqual(1, rbObjIvarGet(tc.controller, "@counter"));
+
+    rbObjIvarSet(tc.controller, "@counter", 3);
+
+    await tc.get("incrementCount");
+    assertEqual("1", tc.response.body);
+    assertEqual(1, rbObjIvarGet(tc.controller, "@counter"));
+  });
+
+  it("original fullpath doesnt change when path is changed", async () => {
+    await tc.get("originalFullpath");
+    assertEqual("/test_case_test/test/originalFullpath", tc.response.body);
+  });
+});
+
+class ResponseDefaultHeadersTestController extends Base {
+  async removeHeader() {
+    this.headers.delete(this.params.get("header") as string);
+    this.head("ok", { C: "3" });
+  }
+
+  async leaveAlone() {
+    this.head("ok");
+  }
+}
+Object.defineProperty(ResponseDefaultHeadersTestController, "name", {
+  value: "ResponseDefaultHeadersTest::TestController",
+});
+
+class ResponseDefaultHeadersTest extends TestCase {
+  original: typeof Response.defaultHeaders;
+  defaults!: Record<string, string>;
+
+  override beforeSetup(): unknown {
+    this.original = Response.defaultHeaders;
+    this.defaults = { A: "1", B: "2" };
+    Response.defaultHeaders = this.defaults;
+    return super.beforeSetup();
+  }
+
+  static {
+    this.teardown(function (this: ResponseDefaultHeadersTest) {
+      Response.defaultHeaders = this.original;
+    });
+  }
+
+  override setup(): void {
+    super.setup();
+    this.controller = new ResponseDefaultHeadersTestController();
+    this.request.env["PATH_INFO"] = null;
+    this.routes = new RouteSet();
+    this.routes.draw(function () {
+      deprecator().silence(() => {
+        this.get(":controller(/:action(/:id))");
+      });
+    });
+  }
+}
+
+describe("ResponseDefaultHeadersTest", () => {
+  let tc: ResponseDefaultHeadersTest;
+
+  beforeEach(async () => {
+    tc = new ResponseDefaultHeadersTest();
+    await tc.beforeSetup();
+    tc.setup();
+  });
+
+  afterEach(() => {
+    tc.afterTeardown({ failures: [] });
+  });
+
+  it("response contains default headers", async () => {
+    await tc.get("leaveAlone");
+
+    const expectedHeaders = { ...tc.defaults, "Content-Type": "text/html" };
+
+    for (const [key, value] of Object.entries(expectedHeaders)) {
+      assertEqual(value, tc.response.headers.get(key));
+    }
+  });
+
+  it("response deletes a default header", async () => {
+    await tc.get("removeHeader", { params: { header: "A" } });
+    tc.assertResponse("ok");
+
+    assertNotIncludes(tc.response.headers, "A");
+    assertIncludes(tc.response.headers, "B");
+    assertIncludes(tc.response.headers, "C");
+  });
+});
+
+describe("BarControllerTest", () => {
+  // BLOCKED: actionpack-tests-cannot-load-rails-engine
+  it.skip("engine controller route", () => {});
+});
+
+describe("BarControllerTestWithExplicitRouteSet", () => {
+  // BLOCKED: actionpack-tests-cannot-load-rails-engine
+  it.skip("engine controller route", () => {});
+});
+
+describe("InferringClassNameTest", () => {
+  const determineClass = (name: string) => TestCase.determineDefaultControllerClass(name);
+
+  it("determine controller class", () => {
+    assertEqual(ContentController, determineClass("ContentControllerTest"));
+  });
+
+  it("determine controller class with nonsense name", () => {
+    assertNil(determineClass("HelloGoodBye"));
+  });
+
+  it("determine controller class with sensible name where no controller exists", () => {
+    assertNil(determineClass("NoControllerWithThisNameTest"));
+  });
+});
+
+class ManuallySetNameTest extends TestCase {
+  static {
+    this.tests(ContentController);
+  }
+}
+
+describe("ManuallySetNameTest", () => {
+  it("controller class can be set manually not just inferred", () => {
+    assertEqual(ContentController, ManuallySetNameTest.controllerClass);
+  });
+});
+
+class ManuallySetSymbolNameTest extends TestCase {
+  static {
+    this.tests("content");
+  }
+}
+
+describe("ManuallySetSymbolNameTest", () => {
+  it("set controller class using symbol", () => {
+    assertEqual(ContentController, ManuallySetSymbolNameTest.controllerClass);
+  });
+});
+
+class ManuallySetStringNameTest extends TestCase {
+  static {
+    this.tests("content");
+  }
+}
+
+describe("ManuallySetStringNameTest", () => {
+  it("set controller class using string", () => {
+    assertEqual(ContentController, ManuallySetStringNameTest.controllerClass);
+  });
+});
+
+describe("NamedRoutesControllerTest", () => {
+  // BLOCKED: routing-assertions-method-missing-delegates-to-controller
+  it.skip("should be able to use named routes before a request is done", () => {});
+});
+
+class AnonymousControllerTest extends TestCase {
+  override setup(): void {
+    this.controller = new (class extends Base {
+      async index() {
+        await this.render({ plain: this.params.get("controller") as string });
+      }
+    })();
+
+    this.routes = new RouteSet();
+    this.routes.draw(function () {
+      deprecator().silence(() => {
+        this.get(":controller(/:action(/:id))");
+      });
+    });
+  }
+}
+
+describe("AnonymousControllerTest", () => {
+  it("controller name", async () => {
+    const tc = new AnonymousControllerTest();
+    await tc.beforeSetup();
+    tc.setup();
+
+    await tc.get("index");
+    assertEqual("anonymous", tc.response.body);
+  });
+});
+
+class RoutingDefaultsTest extends TestCase {
+  override setup(): void {
+    this.controller = new (class extends Base {
+      async post() {
+        await this.render({ plain: this.request.fullpath });
+      }
+
+      async project() {
+        await this.render({ plain: this.request.fullpath });
+      }
+    })();
+
+    this.routes = new RouteSet();
+    this.routes.draw(function () {
+      this.get("/posts/:id", { to: "anonymous#post", bucket_type: "post" });
+      this.get("/projects/:id", { to: "anonymous#project", defaults: { bucket_type: "project" } });
+    });
+  }
+}
+
+describe("RoutingDefaultsTest", () => {
+  let tc: RoutingDefaultsTest;
+
+  beforeEach(async () => {
+    tc = new RoutingDefaultsTest();
+    await tc.beforeSetup();
+    tc.setup();
+  });
+
+  it("route option can be passed via process", async () => {
+    await tc.get("post", { params: { id: 1, bucket_type: "post" } });
+    assertEqual("/posts/1", tc.response.body);
+  });
+
+  it("route default is not required for building request uri", async () => {
+    await tc.get("project", { params: { id: 2 } });
+    assertEqual("/projects/2", tc.response.body);
   });
 });

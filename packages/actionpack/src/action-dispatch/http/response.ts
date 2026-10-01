@@ -1,5 +1,5 @@
 import { include, presence } from "@blazetrails/activesupport";
-import { File, IO, IOError } from "@blazetrails/ruby-compat";
+import { File, IO, IOError, stringSplit } from "@blazetrails/ruby-compat";
 import {
   deleteSetCookieHeaderBang,
   Headers,
@@ -372,11 +372,11 @@ export class Response {
     const cookies: Record<string, string | undefined> = {};
     let header: string | string[] | undefined = this.getHeader(SET_COOKIE);
     if (header != null) {
-      if (typeof header === "string") header = header.split("\n");
+      if (typeof header === "string") header = stringSplit(header, "\n");
       for (const cookie of header) {
-        const pair = cookie.split(";")[0];
-        if (pair) {
-          const [key, value] = pair.split("=").map((v) => unescape(v));
+        const pair = stringSplit(cookie, ";")[0];
+        if (pair != null) {
+          const [key, value] = stringSplit(pair, "=").map((v) => unescape(v));
           cookies[key] = value;
         }
       }

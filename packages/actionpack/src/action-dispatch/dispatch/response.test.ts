@@ -121,7 +121,7 @@ describe("ResponseTest", () => {
       expires: new Date(Date.UTC(2005, 9, 10, 5)),
     });
     res.deleteCookie("login");
-    expect(res.cookies).toEqual({ user_name: "david", login: "" });
+    expect(res.cookies).toStrictEqual({ user_name: "david", login: undefined });
   });
 
   it("read ETag and Cache-Control", () => {
@@ -277,7 +277,7 @@ describe("ResponseTest", () => {
     const res = new Response();
     res.setCookie("token", "val");
     res.deleteCookie("token");
-    expect(res.cookies.token).toBe("");
+    expect(res.cookies.token).toBeUndefined();
   });
 
   it("Response.create with no body", () => {

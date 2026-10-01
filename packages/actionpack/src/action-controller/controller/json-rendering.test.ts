@@ -93,6 +93,7 @@ describe("Controller JSON rendering integration", () => {
         REQUEST_METHOD: "POST",
         PATH_INFO: "/posts",
         CONTENT_TYPE: "application/json",
+        CONTENT_LENGTH: "20",
         "rack.input": JSON.stringify({ title: "New Post" }),
       }),
       new Response(),
@@ -196,6 +197,7 @@ describe("Controller JSON rendering integration", () => {
         PATH_INFO: "/posts/5",
         QUERY_STRING: "page=2",
         CONTENT_TYPE: "application/json",
+        CONTENT_LENGTH: "19",
         "rack.input": JSON.stringify({ title: "Updated" }),
         "action_dispatch.request.path_parameters": {
           controller: "posts",

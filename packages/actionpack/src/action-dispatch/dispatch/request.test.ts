@@ -347,7 +347,7 @@ describe("RequestParamsParsing", () => {
 
   it("content length when missing", () => {
     const req = new Request({});
-    expect(req.contentLength).toBeUndefined();
+    expect(req.contentLength).toBe(0);
   });
 
   it.skip("request_parameters raises BadRequest when content length lower than actual data length for a multipart request", () => {});

@@ -2,6 +2,8 @@ import {
   ActiveSupportJSON,
   camelize,
   classAttribute,
+  constantize,
+  ConstantLookup,
   include,
   isAnonymous,
   isBlank,
@@ -14,7 +16,15 @@ import {
   type Included,
 } from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
-import { b, KeyError, merge, SecureRandom, StringIO } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  b,
+  KeyError,
+  merge,
+  RuntimeError,
+  SecureRandom,
+  StringIO,
+} from "@blazetrails/ruby-compat";
 import {
   DEFAULT_OPTIONS,
   Persisted,
@@ -76,7 +86,7 @@ export interface RequestOptions {
   headers?: Record<string, string>;
   session?: Record<string, unknown>;
   flash?: Record<string, string>;
-  body?: string;
+  body?: string | Record<string, unknown>;
   format?: string;
   xhr?: boolean;
   as?: string;
@@ -124,18 +134,14 @@ export class TestCase extends ActiveSupportTestCase {
 
   static tests(controllerClass: ControllerClass | string): void {
     if (typeof controllerClass === "string") {
-      const constantName = `${camelize(controllerClass)}Controller`;
-      const klass = (globalThis as Record<string, unknown>)[constantName];
-      if (typeof klass !== "function") {
-        throw new Error(`uninitialized constant ${constantName}`);
-      }
-      this._controllerClass = klass as ControllerClass;
-      return;
+      this.controllerClass = constantize(
+        `${camelize(controllerClass)}Controller`,
+      ) as ControllerClass;
+    } else if (typeof controllerClass === "function") {
+      this.controllerClass = controllerClass;
+    } else {
+      throw new ArgumentError("controller class must be a String, Symbol, or Class");
     }
-    if (typeof controllerClass !== "function") {
-      throw new Error("controller class must be a String or Class");
-    }
-    this._controllerClass = controllerClass;
   }
 
   static get controllerClass(): ControllerClass | null {
@@ -151,10 +157,10 @@ export class TestCase extends ActiveSupportTestCase {
   }
 
   static determineDefaultControllerClass(name: string): ControllerClass | null {
-    if (!name) return null;
-    const stripped = name.replace(/Test$/, "");
-    const candidate = (globalThis as Record<string, unknown>)[stripped];
-    return typeof candidate === "function" ? (candidate as ControllerClass) : null;
+    return (ConstantLookup.determineConstantFromTestName(
+      name,
+      (constant) => typeof constant === "function" && constant.prototype instanceof Metal,
+    ) ?? null) as ControllerClass | null;
   }
 
   static override setup(this: object, ...args: FilterListEntry<object>[]): void {
@@ -222,7 +228,7 @@ export class TestCase extends ActiveSupportTestCase {
     return isAnonymous(klass) ? "anonymous" : klass.controllerPath();
   }
 
-  private _controllerClass: ControllerClass;
+  private _controllerClass: ControllerClass | undefined;
 
   controller!: Metal;
 
@@ -256,7 +262,7 @@ export class TestCase extends ActiveSupportTestCase {
     return JSON.parse(this.responseBody);
   }
 
-  constructor(controllerClass: ControllerClass) {
+  constructor(controllerClass?: ControllerClass) {
     super("");
     this._controllerClass = controllerClass;
     this.setupControllerRequestAndResponse();
@@ -265,7 +271,7 @@ export class TestCase extends ActiveSupportTestCase {
   setupControllerRequestAndResponse(): void {
     this._responseKlass = TestResponse;
 
-    const klass = this._controllerClass;
+    const klass = this._controllerClass ?? (this.constructor as typeof TestCase).controllerClass;
     if (klass) {
       if (!this.controller) {
         try {
@@ -530,7 +536,9 @@ export class TestCase extends ActiveSupportTestCase {
   private checkRequiredIvars(): void {
     for (const ivName of ["routes", "controller", "request", "response"] as const) {
       if (this[ivName] == null) {
-        throw new Error(`@${ivName} is nil: make sure you set it in your test's setup method.`);
+        throw new RuntimeError(
+          `@${ivName} is nil: make sure you set it in your test's setup method.`,
+        );
       }
     }
   }

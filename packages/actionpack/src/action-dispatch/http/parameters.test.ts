@@ -160,6 +160,7 @@ describe("parameterParsers registry", () => {
     const req = new Request({
       REQUEST_METHOD: "POST",
       CONTENT_TYPE: "application/json",
+      CONTENT_LENGTH: "7",
       "rack.input": input,
     });
     expect(req.rawPost).toBe('{"a":1}');
@@ -175,6 +176,7 @@ describe("parameterParsers registry", () => {
     const req = new Request({
       REQUEST_METHOD: "POST",
       CONTENT_TYPE: "application/xml",
+      CONTENT_LENGTH: "7",
       "rack.input": "<root/>",
     });
     expect(req.requestParameters).toEqual({ parsed: "<root/>" });

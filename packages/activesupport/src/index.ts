@@ -626,6 +626,7 @@ export {
   BacktraceFilter,
   Minitest,
 } from "./testing/assertions.js";
+export { ConstantLookup } from "./testing/constant-lookup.js";
 export { beforeSetup, setTaggedLogger } from "./testing/tagged-logging.js";
 export { silenceStream, quietly, capture } from "./testing/stream.js";
 export * as SetupAndTeardown from "./testing/setup-and-teardown.js";

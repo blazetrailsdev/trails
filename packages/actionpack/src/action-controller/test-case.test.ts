@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { registerConstant, unregisterConstant } from "@blazetrails/activesupport";
 import { SessionId } from "@blazetrails/rack-session";
 import { TestCase, TestRequest, LiveTestResponse, TestSession } from "./test-case.js";
 import { StringIO } from "@blazetrails/ruby-compat";
@@ -59,13 +60,13 @@ describe("TestCase class helpers", () => {
   });
 
   it("tests(string) resolves <Name>Controller via globalThis", () => {
-    (globalThis as Record<string, unknown>).WidgetController = PostsController;
+    registerConstant("WidgetController", PostsController);
     try {
       class Sub extends TestCase {}
       Sub.tests("widget");
       expect(Sub.controllerClass).toBe(PostsController);
     } finally {
-      delete (globalThis as Record<string, unknown>).WidgetController;
+      unregisterConstant("WidgetController", PostsController);
     }
   });
 
@@ -84,12 +85,12 @@ describe("TestCase class helpers", () => {
   });
 
   it("determineDefaultControllerClass strips trailing Test and looks up", () => {
-    (globalThis as Record<string, unknown>).BooksController = PostsController;
+    registerConstant("BooksController", PostsController);
     try {
       expect(TestCase.determineDefaultControllerClass("BooksControllerTest")).toBe(PostsController);
       expect(TestCase.determineDefaultControllerClass("MissingTest")).toBeNull();
     } finally {
-      delete (globalThis as Record<string, unknown>).BooksController;
+      unregisterConstant("BooksController", PostsController);
     }
   });
 });

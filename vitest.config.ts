@@ -126,6 +126,10 @@ const alias = {
     __dirname,
     "packages/activesupport/src/message-encryptor.ts",
   ),
+  "@blazetrails/activesupport/core-ext/kernel/reporting": path.resolve(
+    __dirname,
+    "packages/activesupport/src/core-ext/kernel/reporting.ts",
+  ),
   "@blazetrails/activesupport/core-ext/date/calculations": path.resolve(
     __dirname,
     "packages/activesupport/src/core-ext/date/calculations.ts",

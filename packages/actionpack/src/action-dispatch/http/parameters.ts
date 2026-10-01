@@ -37,7 +37,7 @@ export interface ParametersHost {
   deleteHeader(key: string): void;
   queryParameters: Record<string, unknown>;
   requestParameters: Record<string, unknown>;
-  contentLength: number | undefined;
+  contentLength: number;
   contentMimeType: MimeType | null;
   rawPost: string;
   logger?: { debug(message: string): void } | null;
