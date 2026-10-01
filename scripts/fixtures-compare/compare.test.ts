@@ -59,6 +59,9 @@ describe("stripErb ERB expanders", () => {
     const out = stripErb("<% 2.times do |i| %>a<%= i %>;<% end %>b: <%= i %>");
     expect(out).toEqual({ rendered: `a0;a1;b: ${ERB_SKIP_SENTINEL}`, unsupported: false });
     expect(stripErb("<% 1.times do |i| %>x<% end %><% end %>").unsupported).toBe(true);
+    const nested = stripErb("<% 2.times do |i| %><% if i %>a<% end %><%= i %><% end %>");
+    expect(nested.unsupported).toBe(true);
+    expect(nested.rendered).toContain("<% if i %>a<% end %><%= i %><% end %>");
   });
   it("renders citations.yml's 65536-row loop with Rails' row count", () => {
     const out = stripErb("<% 65536.times do |i| %>\nr_<%= i %>:\n  id: <%= i*i %>\n<% end %>");

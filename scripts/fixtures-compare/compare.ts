@@ -244,11 +244,14 @@ const arithmetic = (expr: string, vars: readonly string[]): boolean =>
  * variables; no `/`, which truncates in Ruby and not in JS) becomes
  * ERB_SKIP_SENTINEL, and any other control tag is left as Ruby for `stripErb`
  * to report. A loop variable is in scope until its loop's `end`, and an `end`
- * with no loop open is left as Ruby too.
+ * with no loop open is left as Ruby too. Nothing after a tag left as Ruby is
+ * transliterated, so its own `end` never closes an enclosing loop.
  */
 function erbToTse(text: string): string {
   const vars: string[] = [];
+  let ruby = false;
   return text.replace(/<%(=?)([\s\S]*?)%>/g, (tag: string, output: string, source: string) => {
+    if (ruby) return tag;
     const code = source.trim();
     if (output) {
       if (arithmetic(code, vars)) return tag;
@@ -271,6 +274,7 @@ function erbToTse(text: string): string {
       vars.push(m[2]);
       return `<% for (const ${m[2]} of ${m[1]}) { %>`;
     }
+    ruby = true;
     return tag;
   });
 }
