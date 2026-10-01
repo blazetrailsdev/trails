@@ -2037,7 +2037,7 @@ export function buildWithExpressionFromValue(
 export function buildWithValueFromHash(
   this: QueryMethodsHost,
   hash: Record<string, unknown>,
-): unknown[] {
+): Nodes.TableAlias[] {
   return Object.entries(hash).map(
     ([name, value]) =>
       new Nodes.TableAlias(
@@ -2301,7 +2301,7 @@ export function buildJoins(
  * @internal
  * @missingRailsCall empty? — PERMANENT
  */
-export function buildWith(this: QueryMethodsHost, arel: any): unknown {
+export function buildWith(this: QueryMethodsHost, arel: SelectManager): SelectManager | undefined {
   if (this.withValues.length === 0) return;
 
   const withStatements = this.withValues.map((withValue) =>

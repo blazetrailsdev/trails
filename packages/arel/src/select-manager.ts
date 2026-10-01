@@ -18,13 +18,21 @@ import { NamedWindow } from "./nodes/window.js";
 import { Table } from "./table.js";
 import { sql } from "./arel.js";
 import { Arel, Nodes } from "./namespaces.js";
-import { isSymbol, rbConstGet, rbSetClassPathString, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  capitalize,
+  isSymbol,
+  rbConstGet,
+  rbSetClassPathString,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 import { Comment } from "./nodes/comment.js";
 import { Lateral } from "./nodes/unary.js";
 import { And } from "./nodes/nary.js";
 import { JoinSource } from "./nodes/join-source.js";
 import { Crud } from "./crud.js";
 import { include } from "@blazetrails/activesupport";
+
+type Subqueries = Node | Subqueries[];
 
 const UNION_NODE_CLASSES: Record<
   string,
@@ -249,16 +257,17 @@ export class SelectManager extends TreeManager<SelectStatement> {
     return new Lateral(base);
   }
 
-  with(...subqueries: (string | Node | Node[])[]): this {
+  with(...subqueries: (string | Subqueries)[]): this {
     let nodeClass: typeof With;
     if (isSymbol(subqueries[0])) {
-      const name = symbolToS(subqueries.shift() as string);
-      const capitalized = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-      nodeClass = rbConstGet(Nodes, `With${capitalized}`) as typeof With;
+      nodeClass = rbConstGet(
+        Nodes,
+        `With${capitalize(symbolToS(subqueries.shift() as string), [])}`,
+      ) as typeof With;
     } else {
       nodeClass = With;
     }
-    this.ast.with = new nodeClass(subqueries.flat(Infinity) as Node[]);
+    this.ast.with = new nodeClass((subqueries as unknown[]).flat(Infinity) as Node[]);
 
     return this;
   }
