@@ -374,18 +374,13 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     testFile: "trilogy_adapter_test.rb",
     reason: "Trilogy adapter implementation; excluded along with adapters/trilogy.",
   },
-  // --- Permanently not-portable: GVL / thread-model ---
-  {
-    testFile: "schema_loading_test.rb",
-    reason:
-      "Tests ActiveSupport.on_load / Zeitwerk autoload hooks triggered from background threads. " +
-      "No Node.js equivalent; ES module loading is synchronous and non-concurrent.",
-  },
+  // --- Permanently not-portable: class reloading ---
   {
     testFile: "reload_models_test.rb",
     reason:
-      "Tests class reloading via ActiveSupport::Dependencies / Zeitwerk in a forked process. " +
-      "No Node.js equivalent; ES modules are cached for the process lifetime.",
+      "Removes the Owner constant and `Kernel.load`s models/owner.rb again, simulating " +
+      "development class reloading. An ES module is evaluated once per process and trails has " +
+      'no class unload to re-evaluate it after (CLAUDE.md § "Trails has no autoloader").',
   },
   {
     testFile: "adapter_test.rb",
@@ -443,17 +438,9 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     ],
     reason:
       "Registers an Object.autoload for a model whose file raises during require, so the " +
-      "exception surfaces from constantize inside compute_type. JS has no autoload/require " +
-      "hook — a module either resolves at import time or the constant simply doesn't exist.",
-  },
-  {
-    testFile: "inheritance_test.rb",
-    className: "InheritanceTest",
-    tests: ["base class activerecord error"],
-    reason:
-      "Asserts `Class.new { include ActiveRecord::Inheritance }` raises ActiveRecordError via " +
-      "Ruby's Module#included hook. Trails mixes modules in statically; there is no runtime " +
-      "include on an arbitrary class to guard.",
+      "exception surfaces from constantize inside compute_type. Naming a constant loads no " +
+      "file in ESM, so there is no load for the exception to come from (CLAUDE.md § " +
+      '"Trails has no autoloader").',
   },
   {
     testFile: "inheritance_test.rb",
@@ -461,30 +448,18 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     tests: ["new with autoload paths"],
     reason:
       "Stands up a Zeitwerk loader at runtime so STI dispatch resolves a constant from an " +
-      "autoload path. JS has no runtime constant autoloading; trails resolves subclasses via " +
-      "explicit registerSubclass.",
+      "autoload path. Zeitwerk is not ported and trails has no loader graph to push a " +
+      'directory onto (CLAUDE.md § "Trails has no autoloader").',
   },
   {
     testFile: "inheritance_test.rb",
     className: "InheritanceComputeTypeTest",
     tests: ["instantiation doesnt try to require corresponding file"],
     reason:
-      "Exercises Ruby constant-lookup/dependencies integration: a DB type with no top-level " +
-      "constant raises RecordNotFound, then const_set on the test class vs on Firm changes " +
-      "which constant compute_type sees. JS has no const_missing/autoload namespace walk.",
-  },
-  {
-    testFile: "modules_test.rb",
-    tests: [
-      "module spanning associations",
-      "module spanning has and belongs to many associations",
-      "associations spanning cross modules",
-      "find account and include company",
-      "eager loading in modules",
-    ],
-    reason:
-      "Ruby Module#ancestors / constant-path lookup for cross-module association resolution. " +
-      "No JS equivalent for namespace-scoped class discovery.",
+      "Not loader residue: the SubclassNotFound arm needs a Firm subclass that compute_type " +
+      "cannot reach from Firm's lexical scope, and trails' instantiate finds any tracked " +
+      "descendant by sti_name before it tries the constant. Portable once story " +
+      "discriminate-class-for-record-should-call-find-sti-class lands.",
   },
   // --- Permanently not-portable: per-test GVL / serialization in mixed files ---
   {
@@ -731,17 +706,11 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "default in local time",
       "switching default time zone",
       "mutating time objects",
-      // Ruby Module#inspect — assert generated mixin Module's #inspect returns
-      // "Post::GeneratedAssociationMethods" / "Post::GeneratedRelationMethods".
-      // TS has no Module objects with namespaced #inspect; generated method bags
-      // are plain prototype-extension objects with no inspectable class name.
-      "generated association methods module name",
-      "generated relation methods module name",
     ],
     reason:
-      "GVL / Ruby Thread semantics, Marshal binary serialization, Encoding.default_internal, " +
-      'with_env_tz (process-level ENV["TZ"] reload), and Ruby Module#inspect for ' +
-      "namespaced generated-method modules — all Ruby-only with no Node.js equivalent.",
+      "GVL / Ruby Thread semantics, Marshal binary serialization, Encoding.default_internal " +
+      'and with_env_tz (process-level ENV["TZ"] reload) — all Ruby-only with no Node.js ' +
+      "equivalent.",
   },
   {
     testFile: "hstore_test.rb",

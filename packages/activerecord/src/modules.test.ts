@@ -1,7 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { assertNot, assertNothingRaised } from "@blazetrails/activesupport";
+import {
+  assertEqual,
+  assertNil,
+  assertNot,
+  assertNotNil,
+  assertNothingRaised,
+  constantize,
+  isRegisteredConstant,
+  registerConstant,
+  unregisterConstant,
+} from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
+import { assertNoQueries } from "./testing/query-assertions.js";
 import {
   MyAppBusinessCompany,
   MyAppBusinessFirm,
@@ -16,6 +27,8 @@ import {
   MyAppBusinessSuffixedNestedCompany,
   MyAppBusinessSuffixedFirm,
   MyAppBillingAccount,
+  MyAppBillingFirm,
+  MyAppBillingNestedFirm,
 } from "./test-helpers/models/company-in-module.js";
 import { ShopCollection } from "./test-helpers/models/shop.js";
 import { ShopProduct } from "./test-helpers/models/shop.js";
@@ -31,26 +44,56 @@ describe("ModulesTest", () => {
     "variants",
   ]);
 
-  let _prevStoreFullStiClass: boolean;
+  let undefinedConsts: Record<string, unknown>;
+
   beforeEach(() => {
-    _prevStoreFullStiClass = Base.storeFullStiClass;
+    undefinedConsts = {};
+
+    for (const constant of ["Firm", "Client"]) {
+      if (isRegisteredConstant(constant)) {
+        undefinedConsts[constant] = constantize(constant);
+        unregisterConstant(constant, undefinedConsts[constant]);
+      }
+    }
+
     Base.storeFullStiClass = false;
   });
+
   afterEach(() => {
-    Base.storeFullStiClass = _prevStoreFullStiClass;
+    for (const [constant, value] of Object.entries(undefinedConsts)) {
+      if (value != null) registerConstant(constant, value);
+    }
+
+    Base.storeFullStiClass = true;
   });
 
-  it.skip("module spanning associations", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
+  it("module spanning associations", async () => {
+    const firm = await MyAppBusinessFirm.first();
+    assertNot(await firm!.clients.isEmpty(), "Firm should have clients");
+    assertNil(
+      (firm!.constructor as typeof MyAppBusinessFirm).tableName!.match("::"),
+      "Firm shouldn't have the module appear in its table name",
+    );
   });
-  it.skip("module spanning has and belongs to many associations", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
+
+  it("module spanning has and belongs to many associations", async () => {
+    const project = await MyAppBusinessProject.first();
+    await project!.developers.push(await MyAppBusinessDeveloper.create({ name: "John" }));
+    assertEqual("John", (await project!.developers.last())!.name);
   });
-  it.skip("associations spanning cross modules", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
+
+  it("associations spanning cross modules", async () => {
+    const account = await MyAppBillingAccount.all().mergeBang({ order: "id" }).first();
+    expect(await account!.firm).toBeInstanceOf(MyAppBusinessFirm);
+    expect(await account!.qualifiedBillingFirm).toBeInstanceOf(MyAppBillingFirm);
+    expect(await account!.unqualifiedBillingFirm).toBeInstanceOf(MyAppBillingFirm);
+    expect(await account!.nestedQualifiedBillingFirm).toBeInstanceOf(MyAppBillingNestedFirm);
+    expect(await account!.nestedUnqualifiedBillingFirm).toBeInstanceOf(MyAppBillingNestedFirm);
   });
-  it.skip("find account and include company", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
+
+  it("find account and include company", async () => {
+    const account = await MyAppBillingAccount.all().mergeBang({ includes: "firm" }).find(1);
+    expect(await account.firm).toBeInstanceOf(MyAppBusinessFirm);
   });
 
   it("table name", () => {
@@ -72,8 +115,23 @@ describe("ModulesTest", () => {
     });
   });
 
-  it.skip("eager loading in modules", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — ruby-module-semantics
+  it("eager loading in modules", async () => {
+    const clients: MyAppBusinessClient[] = [];
+
+    await assertNothingRaised(async () => {
+      clients.push(
+        await MyAppBusinessClient.references("accounts")
+          .mergeBang({ includes: { firm: "account" }, where: "accounts.id IS NOT NULL" })
+          .find(3),
+      );
+      clients.push(await MyAppBusinessClient.includes({ firm: "account" }).find(3));
+    });
+
+    for (const client of clients) {
+      await assertNoQueries(false, async () => {
+        assertNotNil(await (await client.firm)!.account);
+      });
+    }
   });
 
   it("module table name prefix", () => {

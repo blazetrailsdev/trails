@@ -6,6 +6,7 @@ import {
   include,
   rbEql,
   rbHash,
+  rbModConstSet,
   rbModSingletonP,
   rbModToS,
   rbObjHash,
@@ -582,7 +583,11 @@ export function generatedAssociationMethods(this: CoreHost): Module {
       (this as unknown as { initializeGeneratedModules(): void }).initializeGeneratedModules();
       return this._generatedAssociationMethods!;
     }
-    const mod = new Module();
+    const mod = rbModConstSet(
+      this as unknown as new (...args: unknown[]) => unknown,
+      "GeneratedAssociationMethods",
+      new Module(),
+    );
     include(this as unknown as new (...args: unknown[]) => unknown, mod);
     this._generatedAssociationMethods = mod;
   }

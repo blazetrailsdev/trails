@@ -6,18 +6,25 @@ import {
   assertNothingRaised,
   assertPredicate,
   assertNotPredicate,
+  assertRaise,
   assertRaises,
 } from "@blazetrails/activesupport";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { include, regexpEscape } from "@blazetrails/ruby-compat";
 import { Nodes } from "@blazetrails/arel";
 import { assertQueriesMatch } from "./testing/query-assertions.js";
 import { classify, underscore } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import * as Type from "./type.js";
 import { fixtures } from "./test-fixtures.js";
-import { stiName, isBaseClass, baseClass, registerSubclass } from "./inheritance.js";
+import { Inheritance, stiName, isBaseClass, baseClass, registerSubclass } from "./inheritance.js";
 import { registerModel } from "./associations.js";
-import { SubclassNotFound, RecordNotFound, NotImplementedError, NameError } from "./errors.js";
+import {
+  ActiveRecordError,
+  SubclassNotFound,
+  RecordNotFound,
+  NotImplementedError,
+  NameError,
+} from "./errors.js";
 import {
   AbstractCompany,
   Company,
@@ -201,8 +208,10 @@ describe("InheritanceTest", () => {
     assertNotPredicate(TightDescendant, (k) => isBaseClass(k));
   });
 
-  it.skip("base class activerecord error", () => {
-    // PERMANENT-SKIP: Ruby-only (scripts/api-compare/unported-files.ts) — ruby-module-semantics
+  it("base class activerecord error", async () => {
+    await assertRaise([ActiveRecordError], {}, () => {
+      include(class {}, Inheritance);
+    });
   });
 
   it("a bad type column", async () => {

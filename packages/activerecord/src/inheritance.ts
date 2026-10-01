@@ -24,6 +24,8 @@ export const Inheritance = {
   [included](base: object): void {
     classAttribute.call(base, "storeFullClassName", { instanceWriter: false, default: true });
     classAttribute.call(base, "storeFullStiClass", { instanceWriter: false, default: true });
+
+    setBaseClass(base as typeof Base);
   },
 };
 
