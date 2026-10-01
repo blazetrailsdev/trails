@@ -1,0 +1,496 @@
+import { ArgumentError } from "./argument-error.js";
+import { Hash } from "./hash.js";
+import { rbFloatTypeP, rbIntegerTypeP } from "./numeric.js";
+import { rbModName, rbModToS, rbObjClass, rbObjInstanceVariables, rbObjIvarGet } from "./object.js";
+import { RuntimeError } from "./runtime-error.js";
+import { isSymbol, symbolToS } from "./symbol.js";
+import { TypeError } from "./type-error.js";
+
+const MARSHAL_MAJOR = 4;
+const MARSHAL_MINOR = 8;
+
+const TYPE_NIL = 0x30;
+const TYPE_TRUE = 0x54;
+const TYPE_FALSE = 0x46;
+const TYPE_FIXNUM = 0x69;
+
+const TYPE_OBJECT = 0x6f;
+const TYPE_FLOAT = 0x66;
+const TYPE_BIGNUM = 0x6c;
+const TYPE_STRING = 0x22;
+const TYPE_ARRAY = 0x5b;
+const TYPE_HASH = 0x7b;
+const TYPE_HASH_DEF = 0x7d;
+
+const TYPE_SYMBOL = 0x3a;
+const TYPE_SYMLINK = 0x3b;
+
+const TYPE_IVAR = 0x49;
+const TYPE_LINK = 0x40;
+
+const FIXNUM_MAX = 2n ** 62n - 1n;
+const FIXNUM_MIN = -(2n ** 62n);
+
+const NEGATIVE_ZERO = Symbol("-0.0");
+
+type AnyClass = abstract new (...args: never) => unknown;
+
+/** `struct dump_arg` (`vendor/ruby/v3.3.11/marshal.c:171`). */
+interface DumpArg {
+  str: number[];
+  symbols: Map<string, number>;
+  data: Map<unknown, number>;
+  numEntries: number;
+}
+
+/**
+ * `RB_TYPE_P(obj, T_OBJECT)` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:96`):
+ * neither a core value nor a JS built-in holding internal slots.
+ */
+function tObjectP(obj: unknown): obj is object {
+  return Object.prototype.toString.call(obj) === "[object Object]" && rbObjClass(obj) !== "Hash";
+}
+
+/** `must_not_be_anonymous` (`vendor/ruby/v3.3.11/marshal.c:256`). */
+function mustNotBeAnonymous(type: string, path: string): string {
+  if (path[0] === "#") {
+    throw new TypeError(`can't dump anonymous ${type} ${path}`);
+  }
+  return path;
+}
+
+/**
+ * `class2path` (`vendor/ruby/v3.3.11/marshal.c:273`). Its
+ * `rb_path_to_class(path) != rb_class_real(klass)` check (`:279`) is
+ * `ruby-compat-marshal-load-core-types`.
+ */
+function class2path(klass: AnyClass): string {
+  const path = rbModName(klass) ?? rbModToS(klass);
+
+  mustNotBeAnonymous(typeof klass === "function" ? "class" : "module", path);
+  return path;
+}
+
+/** `w_nbyte` (`vendor/ruby/v3.3.11/marshal.c:290`). */
+function wNbyte(s: ArrayLike<number>, n: number, arg: DumpArg): void {
+  for (let i = 0; i < n; i++) arg.str.push(s[i]);
+}
+
+/** `w_byte` (`vendor/ruby/v3.3.11/marshal.c:301`). */
+function wByte(c: number, arg: DumpArg): void {
+  wNbyte([c & 0xff], 1, arg);
+}
+
+/** `w_bytes` (`vendor/ruby/v3.3.11/marshal.c:307`). */
+function wBytes(s: ArrayLike<number>, n: number, arg: DumpArg): void {
+  wLong(n, arg);
+  wNbyte(s, n, arg);
+}
+
+/** `w_cstr` (`vendor/ruby/v3.3.11/marshal.c:313`), over the string's UTF-8 bytes. */
+function wCstr(s: string, arg: DumpArg): void {
+  const bytes = new TextEncoder().encode(s);
+  wBytes(bytes, bytes.length, arg);
+}
+
+/** `w_short` (`vendor/ruby/v3.3.11/marshal.c:316`). */
+function wShort(x: number, arg: DumpArg): void {
+  wByte((x >> 0) & 0xff, arg);
+  wByte((x >> 8) & 0xff, arg);
+}
+
+/** `w_long` (`vendor/ruby/v3.3.11/marshal.c:323`). */
+function wLong(x: number, arg: DumpArg): void {
+  const buf: number[] = [];
+  const i = rubyMarshalWriteLong(x, buf);
+  if (i < 0) {
+    throw new TypeError("long too big to dump");
+  }
+  wNbyte(buf, i, arg);
+}
+
+/** `ruby_marshal_write_long` (`vendor/ruby/v3.3.11/marshal.c:334`). */
+function rubyMarshalWriteLong(x: number, buf: number[]): number {
+  let i: number;
+
+  if (x < -0x80000000 || x > 0x7fffffff) {
+    return -1;
+  }
+
+  if (x === 0) {
+    buf[0] = 0;
+    return 1;
+  }
+  if (0 < x && x < 123) {
+    buf[0] = x + 5;
+    return 1;
+  }
+  if (-124 < x && x < 0) {
+    buf[0] = (x - 5) & 0xff;
+    return 1;
+  }
+  for (i = 1; i < 5; i++) {
+    buf[i] = x & 0xff;
+    x = x >> 8;
+    if (x === 0) {
+      buf[0] = i;
+      break;
+    }
+    if (x === -1) {
+      buf[0] = -i & 0xff;
+      break;
+    }
+  }
+  return i + 1;
+}
+
+/**
+ * `w_float` (`vendor/ruby/v3.3.11/marshal.c:427`). `ruby_dtoa(d, 0, …)` is the
+ * shortest round-tripping digit string, which `toExponential()` also answers.
+ */
+function wFloat(d: number, arg: DumpArg): void {
+  if (d === Infinity || d === -Infinity) {
+    if (d < 0) wCstr("-inf", arg);
+    else wCstr("inf", arg);
+  } else if (Number.isNaN(d)) {
+    wCstr("nan", arg);
+  } else if (d === 0.0) {
+    if (Object.is(d, -0)) wCstr("-0", arg);
+    else wCstr("0", arg);
+  } else {
+    let buf = "";
+    const [mant, exp] = Math.abs(d).toExponential().split("e");
+    const p = mant.replace(".", "");
+    const decpt = Number(exp) + 1;
+    const digs = p.length;
+    if (d < 0) buf += "-";
+    if (decpt < -3 || decpt > digs) {
+      buf += p[0];
+      if (digs - 1 > 0) buf += ".";
+      buf += p.slice(1);
+      buf += `e${decpt - 1}`;
+    } else if (decpt > 0) {
+      buf += p.slice(0, decpt);
+      if (digs - decpt > 0) {
+        buf += ".";
+        buf += p.slice(decpt);
+      }
+    } else {
+      buf += "0";
+      buf += ".";
+      if (decpt) {
+        buf += "0".repeat(-decpt);
+      }
+      buf += p;
+    }
+    wCstr(buf, arg);
+  }
+}
+
+/** `w_encivar` (`vendor/ruby/v3.3.11/marshal.c:480`); `is_ascii_string` is the 7-bit test. */
+function wEncivar(str: string, arg: DumpArg): boolean | string | null {
+  const encname = encodingName(str);
+  if (encname === null || /^[\0-\x7f]*$/.test(str)) {
+    return null;
+  }
+  wByte(TYPE_IVAR, arg);
+  return encname;
+}
+
+/** `w_encname` (`vendor/ruby/v3.3.11/marshal.c:492`). */
+function wEncname(encname: boolean | string | null, arg: DumpArg): void {
+  if (encname !== null) {
+    wLong(1, arg);
+    wEncoding(encname, arg, 1);
+  }
+}
+
+/** `w_symbol` (`vendor/ruby/v3.3.11/marshal.c:504`). */
+function wSymbol(sym: string, arg: DumpArg): void {
+  const num = arg.symbols.get(sym);
+
+  if (num !== undefined) {
+    wByte(TYPE_SYMLINK, arg);
+    wLong(num, arg);
+  } else {
+    const origSym = sym;
+    sym = symbolToS(sym);
+    const encname = wEncivar(sym, arg);
+    wByte(TYPE_SYMBOL, arg);
+    wCstr(sym, arg);
+    arg.symbols.set(origSym, arg.symbols.size);
+    wEncname(encname, arg);
+  }
+}
+
+/** `w_unique` (`vendor/ruby/v3.3.11/marshal.c:528`). */
+function wUnique(s: string, arg: DumpArg): void {
+  mustNotBeAnonymous("class", s);
+  wSymbol(`:${s}`, arg);
+}
+
+/**
+ * `w_class` (`vendor/ruby/v3.3.11/marshal.c:572`). `rb_class_real(CLASS_OF(obj))`
+ * is `obj.constructor`, which a singleton class leaves answering the real
+ * class. `w_extended` (`marshal.c:550`) is not ported.
+ */
+function wClass(type: number, obj: object, arg: DumpArg): void {
+  const klass = obj.constructor as AnyClass;
+  wByte(type, arg);
+  const path = class2path(klass);
+  wUnique(path, arg);
+}
+
+/**
+ * `encoding_name` (`vendor/ruby/v3.3.11/marshal.c:661`). A JS string carries no
+ * encoding tag and is UTF-8, `Qtrue`; nothing else is `rb_enc_capable`.
+ */
+function encodingName(obj: unknown): boolean | string | null {
+  if (typeof obj === "string") {
+    return true;
+  } else {
+    return null;
+  }
+}
+
+/** `w_encoding` (`vendor/ruby/v3.3.11/marshal.c:694`). */
+function wEncoding(encname: boolean | string | null, arg: DumpArg, limit: number): number {
+  if (limit >= 0) ++limit;
+  switch (encname) {
+    case false:
+    case true:
+      wSymbol(":E", arg);
+      wObject(encname, arg, limit);
+      return 1;
+    case null:
+      return 0;
+  }
+  wSymbol(":encoding", arg);
+  wObject(encname, arg, limit);
+  return 1;
+}
+
+/**
+ * `has_ivars` (`vendor/ruby/v3.3.11/marshal.c:713`). Its generic-ivar count has
+ * no seat: a JS string holds no ivars, and an Array's or Hash's own keys are
+ * its elements.
+ */
+function hasIvars(encname: boolean | string | null): number {
+  return encname !== null ? 1 : 0;
+}
+
+/** `w_ivar_each` (`vendor/ruby/v3.3.11/marshal.c:736`), with `w_obj_each` (`:629`) as its body. */
+function wIvarEach(obj: object, num: number, arg: DumpArg, limit: number): void {
+  if (!num) return;
+  for (const id of rbObjInstanceVariables(obj)) {
+    wSymbol(`:${id}`, arg);
+    wObject(rbObjIvarGet(obj, id), arg, limit);
+  }
+}
+
+/** `w_ivar` (`vendor/ruby/v3.3.11/marshal.c:763`). */
+function wIvar(num: number, encname: boolean | string | null, arg: DumpArg, limit: number): void {
+  wLong(num, arg);
+  wEncoding(encname, arg, limit);
+}
+
+/** `w_objivar` (`vendor/ruby/v3.3.11/marshal.c:780`). */
+function wObjivar(obj: object, arg: DumpArg, limit: number): void {
+  const num = rbObjInstanceVariables(obj).length;
+
+  wLong(num, arg);
+  wIvarEach(obj, num, arg, limit);
+}
+
+/** `w_bigfixnum` (`vendor/ruby/v3.3.11/marshal.c:792`). */
+function wBigfixnum(obj: bigint, arg: DumpArg): void {
+  wByte(TYPE_BIGNUM, arg);
+
+  let num = obj;
+
+  const sign = num < 0n ? 0x2d : 0x2b;
+  wByte(sign, arg);
+
+  if (num < 0n) num = -num;
+
+  let slen = 0;
+  {
+    let slenNum = num;
+    while (slenNum) {
+      slen++;
+      slenNum = slenNum >> 16n;
+    }
+  }
+
+  wLong(slen, arg);
+
+  for (let i = 0; i < slen; i++) {
+    wShort(Number(num & 0xffffn), arg);
+    num = num >> 16n;
+  }
+
+  arg.numEntries++;
+}
+
+/** `w_remember` (`vendor/ruby/v3.3.11/marshal.c:840`). */
+function wRemember(obj: unknown, arg: DumpArg): void {
+  arg.data.set(obj, arg.numEntries++);
+}
+
+/**
+ * `w_object` (`vendor/ruby/v3.3.11/marshal.c:846`). The arms ported are the ones
+ * a schema-cache dump holds; `marshal_dump` (`:910`), `_dump` (`:918`),
+ * `w_uclass` (`:590`) and the Class, Module, Regexp and Struct arms are not,
+ * and every value outside them takes the `T_DATA` arm's `TypeError`.
+ *
+ * `arg->data` is an identity table. A JS string, Float or Integer has no
+ * identity apart from its value, so equal ones are the same entry and the
+ * second is a `TYPE_LINK`, as a deduplicated Ruby String's is. `-0.0` is keyed
+ * apart from `0.0`, which a `Map` would otherwise read as the same key.
+ */
+function wObject(obj: unknown, arg: DumpArg, limit: number): void {
+  let hasiv = 0;
+  let encname: boolean | string | null = null;
+
+  if (limit === 0) {
+    throw new ArgumentError("exceed depth limit");
+  }
+
+  if (obj === null || obj === undefined) {
+    wByte(TYPE_NIL, arg);
+  } else if (obj === true) {
+    wByte(TYPE_TRUE, arg);
+  } else if (obj === false) {
+    wByte(TYPE_FALSE, arg);
+  } else if (rbIntegerTypeP(obj) && FIXNUM_MIN <= BigInt(obj) && BigInt(obj) <= FIXNUM_MAX) {
+    if (-0x40000000 <= obj && obj <= 0x3fffffff) {
+      wByte(TYPE_FIXNUM, arg);
+      wLong(Number(obj), arg);
+    } else {
+      wBigfixnum(BigInt(obj), arg);
+    }
+  } else if (isSymbol(obj)) {
+    wSymbol(obj, arg);
+  } else {
+    if (rbFloatTypeP(obj)) obj = obj.valueOf();
+    else if (rbIntegerTypeP(obj)) obj = BigInt(obj);
+
+    const key = Object.is(obj, -0) ? NEGATIVE_ZERO : obj;
+    const num = arg.data.get(key);
+    if (num !== undefined) {
+      wByte(TYPE_LINK, arg);
+      wLong(num, arg);
+      return;
+    }
+
+    if (limit > 0) limit--;
+
+    if (typeof obj === "number") {
+      wRemember(key, arg);
+      wByte(TYPE_FLOAT, arg);
+      wFloat(obj, arg);
+      return;
+    }
+
+    wRemember(key, arg);
+
+    hasiv = hasIvars((encname = encodingName(obj)));
+    if (hasiv) wByte(TYPE_IVAR, arg);
+
+    if (typeof obj === "bigint") {
+      wByte(TYPE_BIGNUM, arg);
+      {
+        const sign = obj >= 0n ? 0x2b : 0x2d;
+        const d: number[] = [];
+
+        for (let num = obj < 0n ? -obj : obj; num; num = num >> 16n) {
+          d.push(Number(num & 0xffffn));
+        }
+
+        wByte(sign, arg);
+        wLong(d.length, arg);
+        for (let j = 0; j < d.length; j++) {
+          wShort(d[j], arg);
+        }
+      }
+    } else if (typeof obj === "string") {
+      wByte(TYPE_STRING, arg);
+      wCstr(obj, arg);
+    } else if (Array.isArray(obj)) {
+      wByte(TYPE_ARRAY, arg);
+      {
+        const len = obj.length;
+
+        wLong(len, arg);
+        for (let i = 0; i < obj.length; i++) {
+          wObject(obj[i], arg, limit);
+          if (len !== obj.length) {
+            throw new RuntimeError("array modified during dump");
+          }
+        }
+      }
+    } else if (obj instanceof Map || rbObjClass(obj) === "Hash") {
+      const ifnone = obj instanceof Hash ? (obj.default() ?? null) : null;
+      const procDefault = obj instanceof Hash && obj.defaultProc() !== undefined;
+      if (ifnone === null && !procDefault) {
+        wByte(TYPE_HASH, arg);
+      } else if (procDefault) {
+        throw new TypeError("can't dump hash with default proc");
+      } else {
+        wByte(TYPE_HASH_DEF, arg);
+      }
+      const pairs = obj instanceof Map ? [...obj] : Object.entries(obj as object);
+      wLong(pairs.length, arg);
+      for (const [key, value] of pairs) {
+        wObject(key, arg, limit);
+        wObject(value, arg, limit);
+      }
+      if (ifnone !== null) {
+        wObject(ifnone, arg, limit);
+      }
+    } else if (tObjectP(obj)) {
+      wClass(TYPE_OBJECT, obj, arg);
+      wObjivar(obj, arg, limit);
+    } else {
+      throw new TypeError(`no _dump_data is defined for class ${rbObjClass(obj)}`);
+    }
+  }
+  if (hasiv) {
+    wIvar(hasiv, encname, arg, limit);
+  }
+}
+
+/**
+ * Ruby's `Marshal` (`vendor/ruby/v3.3.11/marshal.c:2555`), format 4.8, over the
+ * types a schema-cache dump holds
+ * (`vendor/rails/v8.0.2/activerecord/lib/active_record/connection_adapters/schema_cache.rb:416-418`):
+ * `nil`, `true`, `false`, Integer, Float, String, Symbol, Array, Hash and a
+ * plain ivar object. The marshalled data is an ASCII-8BIT String, one
+ * character per byte. `Marshal.load` is `ruby-compat-marshal-load-core-types`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Marshal`
+ * (`vendor/ruby/v3.3.11/marshal.c:2555`), which Rails calls without defining.
+ */
+export const Marshal = {
+  /**
+   * `Marshal.dump(obj, limit = -1)` (`marshal_dump`,
+   * `vendor/ruby/v3.3.11/marshal.c:1207`, over `rb_marshal_dump_limited`,
+   * `marshal.c:1228`). The `anIO` port is not ported.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Marshal.dump` (`vendor/ruby/v3.3.11/marshal.c:1207`).
+   */
+  dump(obj: unknown, limit: number = -1): string {
+    const arg: DumpArg = { str: [], symbols: new Map(), data: new Map(), numEntries: 0 };
+
+    wByte(MARSHAL_MAJOR, arg);
+    wByte(MARSHAL_MINOR, arg);
+
+    wObject(obj, arg, limit);
+
+    let port = "";
+    for (let i = 0; i < arg.str.length; i += 0x8000) {
+      port += String.fromCharCode(...arg.str.slice(i, i + 0x8000));
+    }
+    return port;
+  },
+};
