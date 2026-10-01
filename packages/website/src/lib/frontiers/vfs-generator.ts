@@ -99,9 +99,8 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
 
   function beneath(path: string): string[] {
     const prefix = path.endsWith("/") ? path : `${path}/`;
-    return [...vfs.list().map((file) => file.path), ...made].filter((entry) =>
-      entry.startsWith(prefix),
-    );
+    const files = vfs.list().map((file) => file.path);
+    return [...files, ...Object.keys(TEMPLATES), ...made].filter((e) => e.startsWith(prefix));
   }
 
   function isDirectory(path: string): boolean {
@@ -142,7 +141,7 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
   }
 
   function mkdirSync(path: string): void {
-    made.add(trim(path));
+    for (let dir = trim(path); dir !== "/"; dir = posixPath.dirname(dir)) made.add(dir);
   }
 
   function rmdirSync(path: string): void {
@@ -152,6 +151,7 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
   }
 
   function unlinkSync(path: string): void {
+    mkdirSync(posixPath.dirname(path));
     if (!vfs.delete(path)) throw errno("ENOENT", "unlink", path);
   }
 

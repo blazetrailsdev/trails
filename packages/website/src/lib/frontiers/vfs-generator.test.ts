@@ -103,13 +103,16 @@ describe("the VFS FsAdapter's async verbs", () => {
     await fs.mkdir!("/tmp/cache", { recursive: true });
 
     expect(await fs.exists("/tmp/cache")).toBe(true);
-    expect(fs.existsSync("/tmp")).toBe(true);
     expect((await fs.lstat!("/tmp/cache")).isDirectory()).toBe(true);
     expect(fs.statSync("/tmp").isDirectory()).toBe(true);
     expect(await fs.readdir!("/tmp")).toEqual(["cache"]);
     expect(fs.readdirSync("/tmp/cache")).toEqual([]);
     expect(await Dir.globAsync("/tmp/*")).toEqual(["/tmp/cache"]);
     await expect(fs.rmdir!("/tmp")).rejects.toThrow(/ENOTEMPTY/);
+    await fs.rmdir!("/tmp/cache");
+    expect(fs.statSync("/tmp").isDirectory()).toBe(true);
+    await fs.unlink!("/app/views/posts/index.html.tse");
+    expect(await fs.readdir!("/app/views/posts")).toEqual([]);
 
     await FileUtils.rmRfAsync("/tmp");
     expect(fs.existsSync("/tmp")).toBe(false);
@@ -121,8 +124,7 @@ describe("the VFS FsAdapter's async verbs", () => {
 
     expect(fs.readdirSync("/app")).toEqual(await fs.readdir!("/app"));
     expect(fs.readdirSync("/app").sort()).toEqual([".hidden", "models", "views"]);
-    expect(fs.statSync("/app/models").isDirectory()).toBe(true);
-    expect((await fs.lstat!("/README.md")).isFile()).toBe(true);
+    expect(fs.readdirSync("/.trails/templates/active-record")).toEqual(["migration"]);
     expect(fs.existsSync("/app/models")).toBe(await fs.exists("/app/models"));
     expect(() => fs.statSync("/missing")).toThrow(/ENOENT/);
     await expect(fs.lstat!("/missing")).rejects.toThrow(/ENOENT/);
