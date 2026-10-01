@@ -341,13 +341,7 @@ describe("virtualizeTse", () => {
       const overloaded = {
         view: `{ ${["a: string", "a: number, b: boolean", "a: 1, b: 2, c: 3", "a: [], b: [], c: [], d: []", "a: null"].map((params, i) => `tag(this: { x: 1 }, ${params}): ${i}`).join("; ")}; posts: string[] }`,
       };
-      const calls = [
-        'tag("p")',
-        "tag(2, true)",
-        "tag(1, 2, 3)",
-        "tag([], [], [], [])",
-        "tag(null)",
-      ];
+      const calls = 'tag("p")|tag(2, true)|tag(1, 2, 3)|tag([], [], [], [])|tag(null)'.split("|");
       const body = calls.map((call, i) => `<% const r${i}: ${i} = ${call} %>`).join("");
       expect(diagnose(virtualizeTse(body + "<%= posts.length %>", overloaded))).toEqual([]);
       expect(diagnose(virtualizeTse("<%= tag(2) %>", overloaded))).not.toEqual([]);

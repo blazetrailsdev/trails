@@ -112,6 +112,7 @@ describe("DisableJoinsAssociationScope", () => {
       klass: reflection.klass,
     }) as DisableJoinsAssociationRelation<Base>;
     expect(built).not.toBeInstanceOf(DisableJoinsAssociationRelation);
+    expect(built.toSql()).toMatch(/"djs_post_id" IN \(SELECT "djs_posts"."id" FROM/);
 
     const records = await built;
     expect(records.map((r: any) => r.body).sort()).toEqual(["c1", "c2"]);
@@ -205,6 +206,10 @@ describe("DisableJoinsAssociationScope", () => {
       klass: reflection.klass,
     }) as DisableJoinsAssociationRelation<Base>;
 
+    await expect(built.limit(-1)).rejects.toThrow("attempt to take negative size");
+    await expect(built.first(1)).rejects.toThrow(
+      "undefined method 'limit' for an instance of Array",
+    );
     const limited = built.limit(1) as Promise<Base[]> | DisableJoinsAssociationRelation<Base>;
     const records = await limited;
     expect(records.length).toBe(1);

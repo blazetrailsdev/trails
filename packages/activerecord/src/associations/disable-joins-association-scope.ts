@@ -44,22 +44,17 @@ export class DisableJoinsAssociationScope extends AssociationScope {
 
   private lastScopeChain(reverseChain: ChainEntry[], owner: Base): [ChainEntry, boolean, JoinIds] {
     const firstItem = reverseChain.shift()!;
-    const firstForeignKey = firstItem.joinForeignKey;
     const firstScope: [ChainEntry, boolean, JoinIds] = [
       firstItem,
       false,
-      [
-        Array.isArray(firstForeignKey)
-          ? firstForeignKey.map((column) => owner._readAttribute(column))
-          : owner._readAttribute(firstForeignKey),
-      ],
+      [owner._readAttribute(firstItem.joinForeignKey as string)],
     ];
 
     return reverseChain.reduce(([reflection, ordered, joinIds], nextReflection) => {
       const key = reflection.joinPrimaryKey();
       const records = addConstraints.call(this, reflection, key, joinIds, owner, ordered);
       const foreignKey = nextReflection.joinForeignKey;
-      const recordIds = new DeferredPluck(records, [foreignKey].flat());
+      const recordIds = new DeferredPluck(records as Relation<Base>, [foreignKey].flat());
       const recordsOrdered = records != null && any(records.orderValues);
 
       return [nextReflection, recordsOrdered, recordIds];

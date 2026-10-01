@@ -1,12 +1,9 @@
 import type * as Arel from "@blazetrails/arel";
 import { Nodes } from "@blazetrails/arel";
+import type { Relation } from "../../relation.js";
+import type { Base } from "../../base.js";
 
 type DeferredIds = { ids(): Promise<unknown[]> };
-
-type Pluckable = {
-  pluck(...columnNames: string[]): Promise<unknown[]>;
-  select(...fields: string[]): unknown;
-};
 
 /** @noRailsEquivalent PERMANENT */
 export class DeferredPluck implements PromiseLike<unknown[]> {
@@ -14,7 +11,7 @@ export class DeferredPluck implements PromiseLike<unknown[]> {
 
   /** @noRailsEquivalent PERMANENT */
   constructor(
-    private readonly relation: Pluckable,
+    private readonly relation: Relation<Base, boolean>,
     private readonly columnNames: string[],
   ) {}
 
@@ -33,11 +30,7 @@ export class DeferredPluck implements PromiseLike<unknown[]> {
 
   /** @noRailsEquivalent PERMANENT */
   in(left: Arel.Attribute | Nodes.Grouping): DeferredIdsIn {
-    return new DeferredIdsIn(
-      left,
-      (this.relation.select(...this.columnNames) as { arel(): Nodes.Node }).arel(),
-      [this],
-    );
+    return new DeferredIdsIn(left, this.relation.select(...this.columnNames).arel().ast, [this]);
   }
 }
 

@@ -1,7 +1,7 @@
 import { Relation, type LoadedRelation } from "./relation.js";
 import { ActiveRecord } from "./namespaces.js";
 import { relationClassFor } from "./relation/delegation.js";
-import { rbEql, rbHash, uniq } from "@blazetrails/ruby-compat";
+import { rbEql, rbFSend, rbHash, take, uniq } from "@blazetrails/ruby-compat";
 import { stripThenable } from "./relation/thenable.js";
 import type { Base } from "./base.js";
 
@@ -36,19 +36,19 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T,
     return rel;
   }
 
-  /** @missingRailsCall take — PERMANENT */
   // @ts-expect-error — Rails' override returns an Array, not a Relation (activerecord/lib/active_record/disable_joins_association_relation.rb:13-15)
   override async limit(value: number | null): Promise<T[]> {
     const records = await this.toArray();
-    return records.slice(0, value as number);
+    return take(records, value as number);
   }
 
   override first(): Promise<T | null>;
   override first(n: number): Promise<T[]>;
+  /** @missingRailsCall limit — PERMANENT */
   override async first(limit?: number): Promise<T | T[] | null> {
     const records = await this.toArray();
     if (limit != null) {
-      return (records as unknown as Relation<T>).limit(limit).first();
+      return (rbFSend(records, "limit", limit) as Relation<T>).first();
     } else {
       return records[0] ?? null;
     }

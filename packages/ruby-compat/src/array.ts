@@ -493,6 +493,16 @@ export function toA<T>(ary: T[]): T[] {
 }
 
 /**
+ * Ruby `Array#take` (`vendor/ruby/v3.3.11/array.c:7532` `rb_ary_take`): the first `n` elements.
+ * @noRailsEquivalent PERMANENT
+ */
+export function take<T>(ary: readonly T[], n: number): T[] {
+  if (n == null) throw new TypeError("no implicit conversion from nil to integer");
+  if (n < 0) throw new ArgumentError("attempt to take negative size");
+  return ary.slice(0, n);
+}
+
+/**
  * Ruby `Array#drop` (`vendor/ruby/v3.3.11/array.c:7594` `rb_ary_drop`): every element
  * after the first `n`.
  *

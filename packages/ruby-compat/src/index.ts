@@ -136,6 +136,7 @@ export {
   pack,
   partition,
   sort,
+  take,
   toA,
   isIntersect,
   union,
