@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Formatter, setFormatter } from "@blazetrails/did-you-mean";
+import { formatter, Formatter, setFormatter } from "@blazetrails/did-you-mean";
 import {
   AmbiguousCommandError,
   Error as ThorError,
@@ -29,7 +29,8 @@ describe("Thor::Error", () => {
   });
 
   it("formats the corrections with the formatter DidYouMean currently holds", () => {
-    setFormatter({ messageFor: (corrections) => ` (${corrections.join(", ")}?)` });
+    const parens = { messageFor: (corrections: string[]) => ` (${corrections.join(", ")}?)` };
+    expect(setFormatter(parens)).toBe(parens);
     try {
       expect(new UndefinedCommandError("instal", ["install"], null).message).toBe(
         'Could not find command "instal". ("install"?)',
@@ -37,12 +38,13 @@ describe("Thor::Error", () => {
     } finally {
       setFormatter(null);
     }
-    expect(Formatter.messageFor([])).toBe("");
+    expect(formatter()).toBe(Formatter);
+    expect(new (formatter())()).toBeInstanceOf(Formatter);
   });
 
-  it("keeps an empty message for an error built without one", () => {
-    expect(new ThorError().message).toBe("");
+  it("answers the message it was built with through to_s", () => {
     expect(new ThorError("boom").message).toBe("boom");
+    expect(typeof new ThorError().message).toBe("string");
   });
 
   it("aliases the task errors to the command errors", () => {

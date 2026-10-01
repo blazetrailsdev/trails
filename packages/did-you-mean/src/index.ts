@@ -13,10 +13,10 @@ interface FormatterLike {
 
 let ractorFormatter: FormatterLike | null = null;
 
-export function formatter(): FormatterLike {
-  return ractorFormatter || Formatter;
+export function formatter<T extends FormatterLike = typeof Formatter>(): T {
+  return (ractorFormatter || Formatter) as T;
 }
 
-export function setFormatter(formatter: FormatterLike | null): void {
-  ractorFormatter = formatter;
+export function setFormatter<T extends FormatterLike | null>(formatter: T): T {
+  return (ractorFormatter = formatter) as T;
 }
