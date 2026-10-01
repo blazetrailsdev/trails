@@ -135,6 +135,12 @@ describe("Object#respond_to?", () => {
     expect(basicObjRespondTo({}, "toStr")).toBe(false);
   });
 
+  it("answers to_ary for an Array, which Array.prototype does not define", () => {
+    // vendor/ruby/v3.3.11/array.c:8619 rb_define_method(rb_cArray, "to_ary", rb_ary_to_ary_m, 0).
+    expect(basicObjRespondTo([], "toAry")).toBe(true);
+    expect(basicObjRespondTo({}, "toAry")).toBe(false);
+  });
+
   it("answers include? for the core collections and to_sym for a String, which their JS values do not define", () => {
     for (const obj of ["abc", [1], new Set([1]), new Map(), {}]) {
       expect(basicObjRespondTo(obj, "isInclude")).toBe(true);

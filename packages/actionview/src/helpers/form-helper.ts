@@ -853,13 +853,14 @@ export class FormBuilder {
     association = convertToModel(association);
 
     if (rbObjRespondTo(association, "isPersisted")) {
-      const records = rbFPublicSend(this.object, associationName);
-      if (Array.isArray(records) || rbObjRespondTo(records, "toAry")) association = [association];
-    } else if (!(Array.isArray(association) || rbObjRespondTo(association, "toAry"))) {
+      if (rbObjRespondTo(rbFPublicSend(this.object, associationName), "toAry")) {
+        association = [association];
+      }
+    } else if (!rbObjRespondTo(association, "toAry")) {
       association = rbFPublicSend(this.object, associationName);
     }
 
-    if (Array.isArray(association) || rbObjRespondTo(association, "toAry")) {
+    if (rbObjRespondTo(association, "toAry")) {
       const explicitChildIndex = options["childIndex"];
       const output = new SafeBuffer();
       for (const child of association as Iterable<unknown>) {
