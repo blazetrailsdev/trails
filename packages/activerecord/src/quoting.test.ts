@@ -2,7 +2,7 @@ import { quotingHost } from "./support/quoting-host.js";
 import { BinaryData } from "@blazetrails/activemodel";
 import { describe, it, expect, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { assertRaises, minutes, BigDecimal, toFs } from "@blazetrails/activesupport";
+import { assertRaises, minutes, BigDecimal, Chars, toFs } from "@blazetrails/activesupport";
 import {
   quote as quoteFn,
   quoteString,
@@ -186,7 +186,8 @@ describe("QuotingTest", () => {
     expect(hostQuote(Temporal.Now.plainDateTimeISO())).toBe("'lol'");
   });
   it("quote as mb chars no column", () => {
-    expect(quote("lo\\l")).toBe("'lo\\\\l'");
+    const string = new Chars("lo\\l");
+    expect(quote(string)).toBe("'lo\\\\l'");
   });
 });
 

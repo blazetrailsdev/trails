@@ -20,7 +20,7 @@
  */
 
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
+import { BigDecimal, Chars, TimeWithZone } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type ValueType } from "@blazetrails/activemodel";
 import { rbObjAsString, rbObjClass } from "@blazetrails/ruby-compat";
 import type { TypeMap } from "../../type/type-map.js";
@@ -66,6 +66,7 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
     if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");
     return `'${this.quoteString(desc)}'`;
   }
+  if (value instanceof Chars) return `'${this.quoteString(value.toS())}'`;
   if (typeof value === "boolean") return value ? this.quotedTrue() : this.quotedFalse();
   if (value === null || value === undefined) return "NULL";
   if (value instanceof BigDecimal) return value.toString("F");
@@ -100,6 +101,7 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (typeof value === "symbol") return value.description ?? String(value);
+  if (value instanceof Chars) return value.toS();
   if (value instanceof BinaryData) return value.bytes;
   if (typeof value === "boolean") return value ? this.unquotedTrue() : this.unquotedFalse();
   if (value === null || value === undefined) return value;

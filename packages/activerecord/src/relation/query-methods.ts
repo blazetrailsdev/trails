@@ -1322,8 +1322,11 @@ export function buildNamedBoundSqlLiteral(
 
   try {
     return new Nodes.BoundSqlLiteral(`(${statement})`, null, boundValues);
-  } catch (e: any) {
-    throw new PreparedStatementInvalid(e?.message ?? String(e), { cause: e });
+  } catch (error) {
+    if (error instanceof Arel.BindError) {
+      throw new PreparedStatementInvalid(error.message, { cause: error });
+    }
+    throw error;
   }
 }
 
@@ -1351,8 +1354,11 @@ export function buildBoundSqlLiteral(
 
   try {
     return new Nodes.BoundSqlLiteral(`(${statement})`, boundValues, null);
-  } catch (e: any) {
-    throw new PreparedStatementInvalid(e?.message ?? String(e), { cause: e });
+  } catch (error) {
+    if (error instanceof Arel.BindError) {
+      throw new PreparedStatementInvalid(error.message, { cause: error });
+    }
+    throw error;
   }
 }
 

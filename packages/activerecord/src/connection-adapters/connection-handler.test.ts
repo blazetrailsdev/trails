@@ -540,7 +540,7 @@ describe("ConnectionHandlerTest", () => {
   });
 
   it("prevent writes", async () => {
-    expect(handler.preventWrites).toBe(false);
+    expect(handler.preventWrites).toBeNull();
     handler.preventWrites = true;
     expect(handler.preventWrites).toBe(true);
     handler.preventWrites = false;

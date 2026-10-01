@@ -1,4 +1,4 @@
-import { block, fetch, KeyError } from "@blazetrails/ruby-compat";
+import { block, fetch, KeyError, transformValues } from "@blazetrails/ruby-compat";
 import { FutureResult, type Complete } from "./future-result.js";
 
 export type ColumnType = { deserialize(value: unknown): unknown };
@@ -13,16 +13,16 @@ const IDENTITY_TYPE: ColumnType = {
 };
 
 export class IndexedRow {
-  readonly #columnIndexes: Record<string, number>;
-  readonly #row: unknown[];
+  private readonly columnIndexes: Record<string, number>;
+  private readonly row: unknown[];
 
   constructor(columnIndexes: Record<string, number>, row: unknown[]) {
-    this.#columnIndexes = columnIndexes;
-    this.#row = row;
+    this.columnIndexes = columnIndexes;
+    this.row = row;
   }
 
   get size(): number {
-    return Object.keys(this.#columnIndexes).length;
+    return Object.keys(this.columnIndexes).length;
   }
 
   get length(): number {
@@ -30,36 +30,36 @@ export class IndexedRow {
   }
 
   keys(): string[] {
-    return Object.keys(this.#columnIndexes);
+    return Object.keys(this.columnIndexes);
   }
 
   eachKey(block: (key: string) => void): void {
-    for (const key of Object.keys(this.#columnIndexes)) block(key);
+    for (const key of Object.keys(this.columnIndexes)) block(key);
   }
 
   isKey(column: string): boolean {
-    return Object.prototype.hasOwnProperty.call(this.#columnIndexes, column);
+    return Object.prototype.hasOwnProperty.call(this.columnIndexes, column);
   }
 
   get(column: string): unknown {
-    const i = this.#columnIndexes[column];
-    return i === undefined ? undefined : this.#row[i];
+    const i = this.columnIndexes[column];
+    return i === undefined ? undefined : this.row[i];
   }
 
   fetch(column: string, fallback?: () => unknown): unknown {
-    if (Object.prototype.hasOwnProperty.call(this.#columnIndexes, column)) {
-      return this.#row[this.#columnIndexes[column]];
+    if (Object.prototype.hasOwnProperty.call(this.columnIndexes, column)) {
+      return this.row[this.columnIndexes[column]];
     }
     if (fallback) return fallback();
     throw new KeyError(`key not found: "${column}"`);
   }
 
+  toH(): Record<string, unknown> {
+    return transformValues(this.columnIndexes, (index) => this.row[index]);
+  }
+
   toHash(): Record<string, unknown> {
-    const out: Record<string, unknown> = {};
-    for (const [key, index] of Object.entries(this.#columnIndexes)) {
-      out[key] = this.#row[index];
-    }
-    return out;
+    return this.toH();
   }
 
   equals(other: unknown): boolean {

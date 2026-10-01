@@ -11,10 +11,11 @@ import {
   NameError,
   symbolizeKeys,
   Autoload,
+  Benchmark,
   extend,
   type Extended,
 } from "@blazetrails/activesupport";
-import { stdout, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { format, stdout, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Dir, File, FileUtils, StandardError } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Zlib } from "@blazetrails/ruby-compat";
@@ -859,17 +860,31 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   async migrate(direction: "up" | "down"): Promise<void> {
     if (typeof this[direction] !== "function") return;
-    this.announce(direction === "up" ? "migrating" : "reverting");
-    let timeElapsed = 0;
+    switch (direction) {
+      case "up":
+        this.announce("migrating");
+        break;
+      case "down":
+        this.announce("reverting");
+        break;
+    }
+
+    let timeElapsed: number | null = null;
     const pool = (await _DatabaseTasks!.migrationConnection()).pool as ConnectionPool;
     await pool.withConnection(async (conn) => {
-      const start = Date.now();
-      await this.execMigration(conn, direction);
-      timeElapsed = (Date.now() - start) / 1000;
+      timeElapsed = await Benchmark.realtime(() => this.execMigration(conn, direction));
     });
-    const elapsed = timeElapsed.toFixed(4);
-    this.announce(`${direction === "up" ? "migrated" : "reverted"} (${elapsed}s)`);
-    this.write();
+
+    switch (direction) {
+      case "up":
+        this.announce(format("migrated (%.4fs)", timeElapsed));
+        this.write();
+        break;
+      case "down":
+        this.announce(format("reverted (%.4fs)", timeElapsed));
+        this.write();
+        break;
+    }
   }
 
   isReverting(): boolean {
@@ -920,14 +935,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   async sayWithTime<T>(message: string, fn: () => Promise<T>): Promise<T> {
     this.say(message);
-    const start = Date.now();
-    const result = await fn();
-    const elapsed = ((Date.now() - start) / 1000).toFixed(4);
-    this.say(`${elapsed}s`, true);
-    if (typeof result === "number") {
-      this.say(`${result} rows`, true);
-    }
-    return result;
+    let result: T | null = null;
+    const timeElapsed = await Benchmark.realtime(async () => {
+      result = await fn();
+    });
+    this.say(format("%.4fs", timeElapsed), true);
+    if (Number.isInteger(result)) this.say(`${result} rows`, true);
+    return result as T;
   }
 
   async suppressMessages(fn: () => Promise<void>): Promise<void> {

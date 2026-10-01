@@ -3,6 +3,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 import type { SerializeOptions } from "@blazetrails/activemodel";
 import {
   type RenameKeyOptions,
+  Delegation as ActiveSupportDelegation,
   inGroups,
   inGroupsOf,
   publicInstanceMethods,
@@ -21,6 +22,7 @@ import {
   compact,
   include,
   rbEql,
+  rbFPublicSend,
   rbModConstSet,
   rbObjRespondTo,
   uniq,
@@ -115,14 +117,23 @@ export class GeneratedRelationMethods extends Module {
   /**
    * @missingRailsCall define_method — PERMANENT
    * @missingRailsCall include? — PERMANENT
-   * @missingRailsCall match? — PERMANENT
    */
   generateMethod(method: string): void {
     if (this.moduleEval((mod) => Object.prototype.hasOwnProperty.call(mod, method))) return;
 
-    const fn = function (this: any, ...args: any[]) {
-      return this.scoping(() => this._model[method](...args));
-    };
+    let fn: AnyCallable;
+    if (
+      /^[a-zA-Z_]\w*[!?]?$/.test(method) &&
+      !ActiveSupportDelegation.RESERVED_METHOD_NAMES.has(String(method))
+    ) {
+      fn = function (this: any, ...args: any[]) {
+        return this.scoping(() => this._model[method](...args));
+      };
+    } else {
+      fn = function (this: any, ...args: any[]) {
+        return this.scoping(() => rbFPublicSend(this._model, method, ...args));
+      };
+    }
     this.moduleEval((mod) => {
       mod[method] = fn;
     });
