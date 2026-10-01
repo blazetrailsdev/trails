@@ -3,6 +3,7 @@ import {
   NoMethodError,
   TypeError,
   classpaths,
+  rbFSend,
   rbModAncestors,
   rbModName,
   rbModToS,
@@ -15,8 +16,6 @@ import { Visitors } from "../namespaces.js";
 export type NodeCtor = abstract new (...args: never[]) => object;
 
 type Klass = NodeCtor | string;
-
-type DispatchMethod = (object: unknown, collector?: unknown) => unknown;
 
 function objectClass(object: unknown): Klass {
   const klass = (object as { constructor?: unknown } | null | undefined)?.constructor;
@@ -48,7 +47,8 @@ export abstract class Visitor {
     if (!Object.prototype.hasOwnProperty.call(this, "_dispatchCache")) {
       this._dispatchCache = new Hash<Klass, string>((hash, klass) => {
         const name = typeof klass === "string" ? klass : rbModName(klass);
-        const dispatchMethod = `visit_${(name ?? "").replaceAll("::", "_")}`.replace(/_(?=.)/g, "");
+        const path = (name ?? "").replaceAll("::", "");
+        const dispatchMethod = path === "" ? "visit_" : `visit${path}`;
         hash.set(klass, dispatchMethod);
         return dispatchMethod;
       }).compareByIdentity();
@@ -68,20 +68,16 @@ export abstract class Visitor {
       try {
         dispatchMethod = this.dispatch.get(objectClass(object));
         if (collector != null && collector !== false) {
-          return (this as unknown as Record<string, DispatchMethod>)[dispatchMethod!](
-            object,
-            collector,
-          );
+          return rbFSend(this, dispatchMethod!, object, collector);
         } else {
-          return (this as unknown as Record<string, DispatchMethod>)[dispatchMethod!](object);
+          return rbFSend(this, dispatchMethod!, object);
         }
       } catch (e) {
-        if (!(e instanceof NoMethodError || e instanceof globalThis.TypeError)) throw e;
+        if (!(e instanceof NoMethodError)) throw e;
         if (rbObjRespondTo(this, dispatchMethod!, true)) throw e;
-        const klass = objectClass(object);
-        const superklass = (
-          typeof klass === "string" ? [klass] : (rbModAncestors(klass) as Klass[])
-        ).find((klass) => rbObjRespondTo(this, this.dispatch.get(klass)!, true));
+        const superklass = (rbModAncestors(objectClass(object)) as Klass[]).find((klass) =>
+          rbObjRespondTo(this, this.dispatch.get(klass)!, true),
+        );
         if (superklass == null) throw new TypeError(`Cannot visit ${rbObjClass(object)}`);
         this.dispatch.set(objectClass(object), this.dispatch.get(superklass)!);
       }

@@ -798,6 +798,26 @@ describe("Module#ancestors", () => {
     include(User, second);
     expect(rbModAncestors(User)).toEqual([User, second, first, Base, inherited, Object]);
   });
+
+  it("lists MRI's ancestors for a core class seated by name", () => {
+    expect(rbModAncestors("DateTime")).toEqual([
+      "DateTime",
+      "Date",
+      "Comparable",
+      "Object",
+      "Kernel",
+      "BasicObject",
+    ]);
+    expect(rbModAncestors("Integer")).toEqual([
+      "Integer",
+      "Numeric",
+      "Comparable",
+      "Object",
+      "Kernel",
+      "BasicObject",
+    ]);
+    expect(rbModAncestors("NilClass")).toEqual(["NilClass", "Object", "Kernel", "BasicObject"]);
+  });
 });
 
 describe("Included<>", () => {

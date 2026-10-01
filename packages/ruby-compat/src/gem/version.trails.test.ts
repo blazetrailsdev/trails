@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ArgumentError } from "./argument-error.js";
-import { Gem } from "./gem.js";
-import { stderr } from "./process-adapter.js";
+import { ArgumentError } from "../argument-error.js";
+import { Gem } from "../gem.js";
+import { stderr } from "../process-adapter.js";
 
 describe("Gem::Version", () => {
   afterEach(() => {

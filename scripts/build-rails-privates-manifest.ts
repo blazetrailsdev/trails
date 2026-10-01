@@ -180,6 +180,7 @@ if (!hasRailsApi) {
 interface RubyMethod {
   name: string;
   visibility: "public" | "private" | "protected";
+  included?: boolean;
 }
 interface RubyEntity {
   fqn: string;
@@ -353,6 +354,11 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
           if (!isClassMethodsHalf) {
             noteInstance(host.file, m.name, m.visibility);
             noteEntityInstance(host.file, hostName, m.name, m.visibility);
+          }
+        }
+        if (ent !== host) {
+          for (const m of ent.classMethods ?? []) {
+            if (m.included) note(host.file, m.name, m.visibility);
           }
         }
       }

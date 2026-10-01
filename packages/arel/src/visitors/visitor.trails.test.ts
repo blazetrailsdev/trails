@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { NoMethodError, TypeError, rbFSend } from "@blazetrails/ruby-compat";
+import { Temporal } from "@blazetrails/date";
 import { Node } from "../nodes/node.js";
 import { Visitor } from "./visitor.js";
 import { UnsupportedVisitError } from "./to-sql.js";
@@ -101,6 +102,24 @@ describe("Visitor dispatch", () => {
     expect(() => v.accept(new B())).toThrow(NoMethodError);
     expect(() => v.accept(new C())).toThrow(globalThis.TypeError);
     expect(() => v.accept(new C())).not.toThrow(/Cannot visit/);
+  });
+
+  it("walks a core class's ancestors: a DateTime reaches visit_Date", () => {
+    class DateVisitor extends Visitor {
+      visitDate(): string {
+        return "Date";
+      }
+    }
+    expect(new DateVisitor().accept(Temporal.PlainDateTime.from("2024-01-02T03:04:05"))).toBe(
+      "Date",
+    );
+    expect(() => new DateVisitor().accept(1)).toThrow(/Cannot visit Integer/);
+  });
+
+  it("keeps an underscore that is part of the class name", () => {
+    class Some_Thing {}
+    class UnderscoreVisitor extends Visitor {}
+    expect(UnderscoreVisitor.dispatchCache().get(Some_Thing)).toBe("visitSome_Thing");
   });
 
   it("keys the dispatch cache by identity and names a method after the class path", () => {

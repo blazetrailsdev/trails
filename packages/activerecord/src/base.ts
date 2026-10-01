@@ -2040,7 +2040,6 @@ export class Base extends Model {
 
   static shardSelector: unknown = null;
 
-  /** @internal */
   declare static attributesForInspect: ":all" | string[];
   declare static isAttributesForInspect: () => boolean;
 

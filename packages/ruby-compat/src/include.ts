@@ -767,19 +767,37 @@ export function includedModules(mod: { prototype: object }): unknown[] {
   return result;
 }
 
+const CORE_ANCESTORS: Record<string, string[]> = {
+  Integer: ["Numeric", "Comparable"],
+  Float: ["Numeric", "Comparable"],
+  String: ["Comparable"],
+  Symbol: ["Comparable"],
+  Class: ["Module"],
+  Time: ["Comparable"],
+  Date: ["Comparable"],
+  DateTime: ["Date", "Comparable"],
+  Hash: ["Enumerable"],
+};
+
 /**
- * Ruby's `Module#ancestors` for a class: the class, the modules mixed into
- * it most recently first, and then the same for each superclass up to
- * `Object`. `rb_mod_ancestors` reads the iclass of an included module off the
+ * Ruby's `Module#ancestors`: the class, the modules mixed into it most
+ * recently first, and then the same for each superclass up to `Object`.
+ * `rb_mod_ancestors` reads the iclass of an included module off the
  * superclass chain; the registry `include()` keeps on each prototype is that
  * record here.
+ *
+ * A core class with no JS class object is the name `rbObjClass` answers for
+ * its instances, and its ancestors are the names MRI lists for it.
  *
  * Mirrors: Ruby's Module#ancestors — vendor/ruby/v3.3.11/class.c:1570
  * `rb_mod_ancestors`.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
  */
-export function rbModAncestors(mod: { prototype: object }): unknown[] {
+export function rbModAncestors(mod: { prototype: object } | string): unknown[] {
+  if (typeof mod === "string") {
+    return [mod, ...(CORE_ANCESTORS[mod] ?? []), "Object", "Kernel", "BasicObject"];
+  }
   const ary: unknown[] = [];
   for (let p: object | null = mod.prototype; p; p = Object.getPrototypeOf(p) as object | null) {
     if (Object.prototype.hasOwnProperty.call(p, "constructor")) {
