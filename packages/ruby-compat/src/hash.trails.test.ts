@@ -391,6 +391,21 @@ describe("Hash#default", () => {
     expect(copy.default()).toBeUndefined();
   });
 
+  it("dups a Hash subclass into its own class without going through its []=, as rb_hash_dup does", () => {
+    class Upcased extends Hash<string, number> {
+      override set(key: string, value: number): this {
+        return super.set(key.toUpperCase(), value);
+      }
+    }
+    const hash = new Upcased();
+    Hash.prototype.set.call(hash, "a", 1);
+
+    const copy = dup(hash);
+    expect(copy).toBeInstanceOf(Upcased);
+    expect([...copy]).toEqual([["a", 1]]);
+    expect(hash.toH().constructor).toBe(Hash);
+  });
+
   it("dups a plain object into a new object", () => {
     const hash = { a: 1 };
     const copy = dup(hash);

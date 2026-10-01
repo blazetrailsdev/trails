@@ -448,8 +448,8 @@ export function valuesAt(
 
 /**
  * Ruby `Hash#dup` (`vendor/ruby/v3.3.11/object.c:591` `rb_obj_dup`), which for a Hash
- * allocates through `rb_hash_dup` (`vendor/ruby/v3.3.11/hash.c:1584`): a NEW hash with
- * the same pairs in the same order, carrying the receiver's `default` /
+ * allocates through `rb_hash_dup` (`vendor/ruby/v3.3.11/hash.c:1584`): a NEW hash of
+ * the receiver's class (`rb_obj_class(hash)`) with the same pairs in the same order, carrying the receiver's `default` /
  * `default_proc` over — `hash_dup` passes `RHASH_IFNONE(hash)` and the
  * `RHASH_PROC_DEFAULT` flag through to the allocation, which a plain object
  * spread has nowhere to put. The flag is what decides which of the two seats
@@ -476,13 +476,21 @@ export function dup(
   if (!(hash instanceof Hash)) {
     return Object.assign(Object.create(null) as Record<string, unknown>, hash);
   }
-  const ret = new Hash<unknown, unknown>();
+  return hashDup(hash, hash.constructor as new () => Hash<unknown, unknown>);
+}
+
+/**
+ * `hash_dup` (`vendor/ruby/v3.3.11/hash.c:1576`): a `klass` allocation holding a
+ * `hash_copy` of the table, which is not written through `klass`'s `[]=`.
+ */
+function hashDup<K, V>(hash: Hash<K, V>, klass: new () => Hash<K, V>): Hash<K, V> {
+  const ret = new klass();
   const defaultProc = hash.defaultProc();
   if (defaultProc) ret.setDefaultProc(defaultProc);
   else ret.setDefault(hash.default());
   if (hash.isCompareByIdentity()) ret.compareByIdentity();
   for (const [key, value] of hash) {
-    ret.set(key, value);
+    Hash.prototype.set.call(ret, key, value);
   }
   return ret;
 }
@@ -660,7 +668,7 @@ export class Hash<K, V> extends Map<K, V> {
    */
   toH(): Hash<K, V> {
     if (this.constructor === Hash) return this;
-    return dup(this);
+    return hashDup(this, Hash<K, V>);
   }
 
   /**
