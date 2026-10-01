@@ -299,7 +299,7 @@ export class Errors<TBase extends object = object> {
     return duped;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE errors-symbol-iterator-comes-from-ruby-compat-enumerable */
   [Symbol.iterator](): IterableIterator<ActiveModelError> {
     return this._errors[Symbol.iterator]();
   }

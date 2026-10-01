@@ -654,7 +654,7 @@ export function defineMethodAttribute(
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE attribute-methods-construction-time-resurrection-has-no-rails-site
  */
 export function initInternals(this: { constructor: ClassMethodsHost }, super_: () => void): void {
   _resurrectAttributeMethods(this.constructor);
