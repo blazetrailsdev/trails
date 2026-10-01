@@ -181,24 +181,23 @@ async function assertIncludes(
 }
 
 describe("HasAndBelongsToManyAssociationsTest", () => {
-  const { developers, projects, computers } = fixtures([
-    "developers",
-    "projects",
-    "developersProjects",
-    "computers",
+  const { categories, developers, projects, parrots, pirates, computers } = fixtures([
+    "accounts",
+    "companies",
     "categories",
     "posts",
     "categoriesPosts",
-    "authors",
-    "categorizations",
-    "tags",
-    "taggings",
+    "developers",
+    "projects",
+    "developersProjects",
     "parrots",
     "pirates",
     "parrotsPirates",
     "treasures",
-    "parrotsTreasures",
     "priceEstimates",
+    "tags",
+    "taggings",
+    "computers",
   ]);
 
   withSecondPool();
@@ -488,14 +487,11 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("creation respects hash condition", async () => {
-    const general = await Category.find(1);
-    const post = general.postWithConditions.build({ body: " " });
+    const post = categories("general").postWithConditions.build({ body: " " });
     assert(await post.save());
     expect(post.title).toBe("Yet Another Testing Title");
 
-    const anotherPost = await general.postWithConditions.create({
-      body: " ",
-    });
+    const anotherPost = await categories("general").postWithConditions.create({ body: " " });
     assertPredicate(anotherPost, (r) => r.isPersisted());
     expect(anotherPost.title).toBe("Yet Another Testing Title");
   });
@@ -655,16 +651,16 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("destroy associations destroys multiple associations", async () => {
-    const george = (await Parrot.findBy({ name: "Curious George" })) as Parrot;
+    const george = parrots("george");
     assertNotEmpty(await george.pirates);
     assertNotEmpty(await george.treasures);
 
     await assertNoDifference(
-      async () => (await Pirate.all()).length,
+      async () => Number(await Pirate.count()),
       null,
       async () => {
         await assertNoDifference(
-          async () => (await Treasure.all()).length,
+          async () => Number(await Treasure.count()),
           null,
           async () => {
             await (george as any).destroyAssociations();
@@ -676,7 +672,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     assertEmpty(
       (
         await (
-          await Base.leaseConnection()
+          await Parrot.leaseConnection()
         ).selectAll(`SELECT * FROM parrots_pirates WHERE parrot_id = ${george.id}`)
       ).toArray(),
     );
@@ -685,7 +681,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     assertEmpty(
       (
         await (
-          await Base.leaseConnection()
+          await Parrot.leaseConnection()
         ).selectAll(`SELECT * FROM parrots_treasures WHERE parrot_id = ${george.id}`)
       ).toArray(),
     );
@@ -890,19 +886,19 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("updating attributes on non rich associations", async () => {
-    const technology = await Category.find(2);
-    const welcome = (await technology.posts)[0];
+    const welcome = (await categories("technology").posts.first())!;
     welcome.title = "Something else";
-    expect(await (welcome as any).saveBang()).toBeTruthy();
+    assert(await welcome.saveBang());
   });
 
   it("habtm respects select", async () => {
-    const technology = await Category.find(2);
-    for (const o of await technology.selectTestingPosts.reload()) {
+    for (const o of await categories("technology").selectTestingPosts.reload()) {
       assertRespondTo(o, "correctness_marker");
     }
-    const first = (await technology.selectTestingPosts)[0] as any;
-    assertRespondTo(first, "correctness_marker");
+    assertRespondTo(
+      await categories("technology").selectTestingPosts.first(),
+      "correctness_marker",
+    );
   });
 
   it("habtm selects all columns by default", async () => {
@@ -966,10 +962,8 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("find scoped grouped", async () => {
-    const general = await Category.find(1);
-    expect((await general.postsGroupedByTitle).length).toBe(5);
-    const technology = await Category.find(2);
-    expect((await technology.postsGroupedByTitle).length).toBe(1);
+    expect((await categories("general").postsGroupedByTitle).length).toBe(5);
+    expect((await categories("technology").postsGroupedByTitle).length).toBe(1);
   });
 
   it("find scoped grouped having", async () => {
@@ -1067,8 +1061,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("has many through polymorphic has manys works", async () => {
-    const redbeard = (await Pirate.findBy({ catchphrase: "Avast!" })) as Pirate;
-    const prices = (await redbeard.treasureEstimates).map((e: any) => e.price);
+    const prices = (await pirates("redbeard").treasureEstimates).map((e: any) => e.price);
     expect(new Set(prices)).toEqual(new Set(["$10.00", "$20.00"]));
   });
 
@@ -1133,13 +1126,17 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   });
 
   it("destruction does not error without primary key", async () => {
-    const redbeard = (await Pirate.findBy({ catchphrase: "Avast!" })) as Pirate;
-    const george = (await Parrot.findBy({ name: "Curious George" })) as Parrot;
+    const redbeard = pirates("redbeard");
+    const george = parrots("george");
     await redbeard.parrots.push(george);
     expect(await george.pirates.count()).toBe(2);
-    await (await Pirate.find(redbeard.id)).destroy();
+    await (
+      await Pirate.includes("parrots")
+        .where({ parrot: await redbeard.parrot })
+        .find(redbeard.id)
+    ).destroy();
     expect(await george.pirates.count()).toBe(1);
-    expect((await Pirate.where({ id: redbeard.id })).length).toBe(0);
+    expect(await Pirate.where({ id: redbeard.id })).toEqual([]);
   });
 
   it("has and belongs to many associations on new records use null relations", async () => {

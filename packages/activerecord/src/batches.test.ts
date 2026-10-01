@@ -30,15 +30,7 @@ import { errorOnIgnoredOrder, setErrorOnIgnoredOrder } from "./active-record.js"
 registerModel([Tagging, Tag]);
 
 describe("EachTest", () => {
-  const { posts } = fixtures([
-    "posts",
-    "taggings",
-    "developers",
-    "subscribers",
-    "cpkOrders",
-    "cpkBooks",
-    "cpkAuthors",
-  ] as const);
+  const { posts } = fixtures(["posts", "subscribers", "developers", "cpkOrders"]);
 
   it("each should execute one query per batch", async () => {
     const total = Number(await Post.count());
