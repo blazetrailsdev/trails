@@ -4,7 +4,7 @@ import { Nodes, Table, fetchAttribute } from "@blazetrails/arel";
 import type { AbstractReflection } from "../../reflection.js";
 import { JoinPart } from "./join-part.js";
 import { aliasedArelTableForReflection, type AliasTracker } from "../alias-tracker.js";
-import { union } from "@blazetrails/ruby-compat";
+import { first, isEmpty, union } from "@blazetrails/ruby-compat";
 
 type JoinType = typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
 type TableResolver = (
@@ -19,7 +19,7 @@ export class JoinAssociation extends JoinPart {
   private _readonly?: boolean;
   private _strictLoading?: boolean;
 
-  constructor(reflection: AbstractReflection, children?: JoinPart[]) {
+  constructor(reflection: AbstractReflection, children?: JoinAssociation[]) {
     super(reflection.klass, children);
     this.reflection = reflection;
   }
@@ -45,10 +45,6 @@ export class JoinAssociation extends JoinPart {
     return this.isMatch(other);
   }
 
-  /**
-   * @missingRailsCall empty? — PERMANENT
-   * @missingRailsCall first — PERMANENT
-   */
   joinConstraints(
     foreignTable: Table | Nodes.TableAlias,
     foreignKlass: typeof Base,
@@ -97,16 +93,16 @@ export class JoinAssociation extends JoinPart {
 
       const scope = refl.joinScope(table, foreignTable, foreignKlass);
 
-      if (scope && scope.referencesValues.length > 0) {
+      if (!isEmpty(scope.referencesValues)) {
         const associations = union(scope.eagerLoadValues, scope.includesValues);
 
-        if (associations.length > 0) {
+        if (!isEmpty(associations)) {
           scope.joinsBang(scope.constructJoinDependency(associations, Nodes.OuterJoin));
         }
       }
 
       const arel = scope.arel(aliasTracker);
-      let nodes: Nodes.Node = arel.constraints[0];
+      let nodes: Nodes.Node = first(arel.constraints)!;
 
       const others: Nodes.Node[] = [];
       if (nodes instanceof Nodes.And) {
@@ -126,7 +122,7 @@ export class JoinAssociation extends JoinPart {
 
       joins.push(new joinType(table, new Nodes.On(nodes)));
 
-      if (others.length > 0) {
+      if (!isEmpty(others)) {
         const sources: Nodes.Node[] = [...arel.joinSources()] as Nodes.Node[];
         joins.push(...sources);
         const lastIdx = joins.length - 1;

@@ -1,4 +1,4 @@
-import { aryDelete, kernelCatch, rbEqual } from "@blazetrails/ruby-compat";
+import { aryDelete, isEmpty, kernelCatch, rbEqual } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { underscore, compactBlank, indexBy, valuesAt } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -66,7 +66,7 @@ export abstract class CollectionAssociation extends Association {
     throw new CollectionIdsAssignmentError(this.reflection.name);
   }
 
-  /** @missingRailsCall empty? — PERMANENT */
+  /** @missingRailsCall empty? — CONVERGEABLE collection-association-ids-reader-plucks-through-enumerable-pluck */
   async idsReader(): Promise<unknown[]> {
     const pk = this.associationPrimaryKey();
     const keys = Array.isArray(pk) ? pk : [pk];
@@ -369,21 +369,14 @@ export abstract class CollectionAssociation extends Association {
     return this.deleteOrDestroy(records as Array<Base | number | string | bigint>, "destroy");
   }
 
-  /** @missingRailsCall empty? — PERMANENT */
   size(): Promise<number> | number {
     if (!this.findTargetNeeded() || this.isLoaded()) {
       return this.target.length;
     } else if (this._associationIds) {
       return this._associationIds.length;
-    } else if (
-      ((this.associationScope() as { groupValues?: unknown[] } | undefined)?.groupValues ?? [])
-        .length > 0
-    ) {
+    } else if (!isEmpty(this.associationScope().groupValues)) {
       return Promise.resolve(this.loadTarget()).then((target) => target.length);
-    } else if (
-      !(this.associationScope() as { distinctValue?: boolean } | undefined)?.distinctValue &&
-      this.target.length > 0
-    ) {
+    } else if (!this.associationScope().distinctValue && !isEmpty(this.target)) {
       const unsavedRecords = this.target.filter((record) => record.isNewRecord());
       return (this as unknown as { countRecords(): Promise<number> })
         .countRecords()

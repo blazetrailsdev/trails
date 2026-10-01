@@ -22,7 +22,7 @@ export class HasAndBelongsToMany {
     this.options = options;
   }
 
-  /** @missingRailsCall call — PERMANENT */
+  /** @missingRailsCall call — CONVERGEABLE call-gate-credits-invoking-a-proc-valued-member-as-proc-call */
   throughModel(): any {
     const builder = this;
     const lhsModel = this.lhsModel;

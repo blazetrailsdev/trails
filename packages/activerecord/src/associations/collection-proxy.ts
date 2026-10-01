@@ -134,7 +134,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     };
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE association-symbol-iterators-come-from-ruby-compat-enumerable */
   [Symbol.iterator](): IterableIterator<T> {
     return this.target[Symbol.iterator]();
   }
@@ -482,7 +482,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     return this;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE collection-proxy-async-iterator-has-no-rails-counterpart */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {
     const records = await this.loadTarget();
     for (const record of records) {

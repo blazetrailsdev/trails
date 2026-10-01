@@ -96,6 +96,7 @@ export const RECEIVER_KEYED_RUBY_COMPAT_EXPORTS = new Map<
   string,
   { tsExport: string; receiver: ReceiverKind }
 >([
+  ["Array#count", { tsExport: "aryCount", receiver: "array" }],
   ["Hash#delete", { tsExport: "hashDelete", receiver: "hash" }],
   ["Hash#except", { tsExport: "except", receiver: "hash" }],
   ["Hash#fetch", { tsExport: "fetch", receiver: "hash" }],

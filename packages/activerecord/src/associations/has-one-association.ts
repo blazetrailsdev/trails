@@ -1,4 +1,4 @@
-import { kernelThrow, rbEqual } from "@blazetrails/ruby-compat";
+import { fetch, kernelThrow, rbEqual } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { DeleteRestrictionError } from "./errors.js";
@@ -43,7 +43,6 @@ export class HasOneAssociation extends SingularAssociation {
     }
   }
 
-  /** @missingRailsCall fetch — PERMANENT */
   async delete(
     method: string | undefined = this.reflection.options.dependent as string | undefined,
   ): Promise<void> {
@@ -86,10 +85,7 @@ export class HasOneAssociation extends SingularAssociation {
           associationClass: String(this.reflection.klass.name),
           associationIds: [id],
           associationPrimaryKeyColumn: primaryKeyColumn,
-          ensuringOwnerWasMethod:
-            "ensuringOwnerWas" in this.reflection.options
-              ? (this.reflection.options as any).ensuringOwnerWas
-              : null,
+          ensuringOwnerWasMethod: fetch(this.reflection.options, "ensuringOwnerWas", null),
         });
         break;
       }

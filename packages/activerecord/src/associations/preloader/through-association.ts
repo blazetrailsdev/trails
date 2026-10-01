@@ -4,7 +4,8 @@ import type { AssociationReflection, ThroughReflection } from "../../reflection.
 import { Association } from "./association.js";
 import { Associations } from "../../namespaces.js";
 import { WhereClause } from "../../relation/where-clause.js";
-import { pluralize, singularize } from "@blazetrails/activesupport";
+import { any, pluralize, singularize } from "@blazetrails/activesupport";
+import { first, rbObjRespondTo, uniq } from "@blazetrails/ruby-compat";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
 
@@ -30,10 +31,6 @@ export class ThroughAssociation extends Association {
     return this._throughPreloadedRecords;
   }
 
-  /**
-   * @missingRailsCall any? — PERMANENT
-   * @missingRailsCall first — PERMANENT
-   */
   async recordsByOwner(): Promise<Map<Base, Base[]>> {
     if (this._recordsByOwner !== undefined) return this._recordsByOwner;
 
@@ -47,7 +44,7 @@ export class ThroughAssociation extends Association {
 
       let throughRecords = (await this.throughRecordsByOwner()).get(owner) ?? [];
 
-      if (this.owners[0].association(this.throughReflection!.name).loaded) {
+      if (first(this.owners)!.association(this.throughReflection!.name).loaded) {
         const sourceType = this.reflection.options.sourceType;
         if (sourceType) {
           throughRecords = throughRecords.filter(
@@ -60,7 +57,7 @@ export class ThroughAssociation extends Association {
       let records = throughRecords.flatMap((record) => sourceRecordsByOwner.get(record) ?? []);
 
       records = records.filter((record) => record != null);
-      if (this.scope?.orderValues?.length > 0) {
+      if (any(this.scope.orderValues)) {
         const preloadIndex = await this.preloadIndex();
         records.sort((a, b) => (preloadIndex.get(a) ?? 0) - (preloadIndex.get(b) ?? 0));
       }
@@ -100,7 +97,6 @@ export class ThroughAssociation extends Association {
     return runnable;
   }
 
-  /** @missingRailsCall map — PERMANENT */
   async futureClasses(): Promise<(typeof Base)[]> {
     if (this.isRun()) return [];
 
@@ -122,26 +118,10 @@ export class ThroughAssociation extends Association {
     for (const loader of throughPreloaders) {
       throughClasses.push(...(await loader.futureClasses()));
     }
-    const sourceRefl = this.sourceReflection;
-    const sourceClasses: (typeof Base)[] = [];
-    if (sourceRefl) {
-      try {
-        for (const chainRefl of sourceRefl.chain) {
-          if (!(chainRefl as any).isPolymorphic?.()) {
-            try {
-              sourceClasses.push(chainRefl.klass);
-            } catch {}
-          }
-        }
-      } catch {}
-    }
-
-    const seen = new Set<typeof Base>();
-    return [...throughClasses, ...sourceClasses].filter((k) => {
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    });
+    const sourceClasses = this.sourceReflection!.chain.filter(
+      (reflection) => !(rbObjRespondTo(reflection, "isPolymorphic") && reflection.isPolymorphic()),
+    ).map((reflection) => reflection.klass);
+    return uniq([...throughClasses, ...sourceClasses]);
   }
 
   private async dataAvailable(): Promise<boolean> {
@@ -194,7 +174,7 @@ export class ThroughAssociation extends Association {
     return [...(await this.throughRecordsByOwner()).values()].flat();
   }
 
-  /** @missingRailsCall map — PERMANENT */
+  /** @missingRailsCall map — CONVERGEABLE preloader-through-records-by-owner-map-awaits-each-loader */
   private async sourceRecordsByOwner(): Promise<Map<Base, Base[]>> {
     if (this._sourceRecordsByOwner === undefined) {
       const recordsByOwner: Map<Base, Base[]>[] = [];
@@ -204,7 +184,7 @@ export class ThroughAssociation extends Association {
     return this._sourceRecordsByOwner;
   }
 
-  /** @missingRailsCall map — PERMANENT */
+  /** @missingRailsCall map — CONVERGEABLE preloader-through-records-by-owner-map-awaits-each-loader */
   private async throughRecordsByOwner(): Promise<Map<Base, Base[]>> {
     if (this._throughRecordsByOwner === undefined) {
       const recordsByOwner: Map<Base, Base[]>[] = [];

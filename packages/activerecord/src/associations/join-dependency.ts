@@ -1,5 +1,5 @@
 import { Autoload, extend, Notifications, type Extended } from "@blazetrails/activesupport";
-import { Hash, rbEqual } from "@blazetrails/ruby-compat";
+import { first, Hash, isEmpty, partition, rbEqual } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import type { Result } from "../result.js";
 import type { AssociationSpec } from "../relation/query-methods.js";
@@ -144,7 +144,7 @@ export class JoinDependency {
   }
 
   /** @internal */
-  private addAssociation(reflection: any): JoinPart {
+  private addAssociation(reflection: any): JoinAssociation {
     const targetModel: typeof Base = reflection.klass;
     const targetTable: string = (targetModel as any).tableName;
 
@@ -156,7 +156,7 @@ export class JoinDependency {
   }
 
   /** @internal */
-  private build(associations: Record<string, any>, baseKlass: typeof Base): JoinPart[] {
+  private build(associations: Record<string, any>, baseKlass: typeof Base): JoinAssociation[] {
     return Object.keys(associations).flatMap((name) => {
       const right = associations[name];
       const reflection = this.findReflection(baseKlass, name);
@@ -225,32 +225,25 @@ export class JoinDependency {
     return joinRoot.children.flatMap((child) => this.makeConstraints(joinRoot, child, joinType));
   }
 
-  /**
-   * @internal
-   * @missingRailsCall map — PERMANENT
-   */
+  /** @internal */
   private walk(
     left: JoinPart,
     right: JoinPart,
     joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
   ): Nodes.Join[] {
-    const intersection: [JoinPart, JoinPart][] = [];
-    const missing: JoinPart[] = [];
-
-    for (const r of right.children) {
-      const l = left.children.find((lc) => r.isMatch(lc));
-      if (l) intersection.push([l, r]);
-      else missing.push(r);
-    }
+    const [intersection, missing] = partition(
+      right.children.map((node1): [JoinAssociation | undefined, JoinAssociation] => [
+        left.children.find((node2) => node1.isMatch(node2)),
+        node1,
+      ]),
+      first,
+    );
 
     const joins = intersection.flatMap(([l, r]) => {
-      if (r instanceof JoinAssociation) {
-        r.table = l.table;
-      }
-      return this.walk(l, r, joinType);
+      r.table = l!.table;
+      return this.walk(l!, r, joinType);
     });
-
-    return joins.concat(missing.flatMap((n) => this.makeConstraints(left, n, joinType)));
+    return joins.concat(missing.flatMap(([, n]) => this.makeConstraints(left, n, joinType)));
   }
 
   /** @internal */
@@ -394,20 +387,14 @@ export class JoinDependency {
     return [...parents.values()];
   }
 
-  /** @missingRailsCall empty? — PERMANENT */
   applyColumnAliases(relation: any): any {
-    this._joinRootAlias = (relation?.selectValues?.length ?? 0) === 0;
+    this._joinRootAlias = isEmpty(relation.selectValues);
     this._aliasesCache = undefined;
     return relation._selectBang(() => this.aliases().columns());
   }
 
   each(block: (part: JoinPart) => void): void {
     this.joinRoot.each(block);
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  [Symbol.iterator](): Iterator<JoinPart> {
-    return this.joinRoot[Symbol.iterator]();
   }
 
   static makeTree(associations: any): Record<string, any> {

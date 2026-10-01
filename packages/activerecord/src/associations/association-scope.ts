@@ -11,7 +11,7 @@ import type {
 import { RuntimeReflection } from "../reflection.js";
 import { AliasTracker } from "./alias-tracker.js";
 import { kernelArray } from "@blazetrails/activesupport";
-import { drop, union } from "@blazetrails/ruby-compat";
+import { drop, isEmpty, union } from "@blazetrails/ruby-compat";
 import { methodMissingProxy } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 
@@ -186,7 +186,6 @@ export class AssociationScope {
     return scope.joinsBang(this.join(foreignTable, constraints));
   }
 
-  /** @missingRailsCall empty? — PERMANENT */
   private addConstraints(
     scope: Relation<Base>,
     owner: Base,
@@ -206,12 +205,12 @@ export class AssociationScope {
 
         if (scopeChainItem === chainHead.scope) {
           scope.mergeBang(item.except("where", "includes", "unscope", "order"));
-        } else if (item.referencesValues.length > 0) {
+        } else if (!isEmpty(item.referencesValues)) {
           scope.mergeBang(item.only("joins", "leftOuterJoins"));
 
           const associations = union(item.eagerLoadValues, item.includesValues);
 
-          if (associations.length > 0) {
+          if (!isEmpty(associations)) {
             scope.joinsBang(item.constructJoinDependency(associations, Nodes.OuterJoin));
           }
         }
