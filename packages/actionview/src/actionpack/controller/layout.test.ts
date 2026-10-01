@@ -108,7 +108,7 @@ class DefaultLayoutController extends LayoutTest {}
 class StreamingLayoutController extends LayoutTest {
   override render(...args: unknown[]): void | Promise<void> {
     const options = extractOptionsBang(args);
-    return super.render(...args, { ...options, stream: true });
+    return super.render(...(args as [string]), { ...options, stream: true });
   }
 }
 
