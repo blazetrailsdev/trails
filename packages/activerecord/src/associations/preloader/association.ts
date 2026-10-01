@@ -1,5 +1,5 @@
 import { wrap } from "@blazetrails/activesupport";
-import { rbEqual } from "@blazetrails/ruby-compat";
+import { Hash, rbEqual } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
 
@@ -154,7 +154,7 @@ export class Association {
   }
 
   async loadRecords(rawRecords?: Base[]): Promise<void> {
-    this._recordsByOwner = new Map();
+    this._recordsByOwner = new Hash<Base, Base[]>().compareByIdentity();
 
     rawRecords ||= await this.loaderQuery().recordsFor([this]);
 

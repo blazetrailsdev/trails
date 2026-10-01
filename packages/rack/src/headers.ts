@@ -343,13 +343,6 @@ export class Headers extends Hash<string, string> {
     return fn ? arr.sort(fn) : arr.sort((a, b) => a[0].localeCompare(b[0]));
   }
 
-  shift(): [string, string] | undefined {
-    const first = this.entries().next();
-    if (first.done) return undefined;
-    this.delete(first.value[0]);
-    return first.value;
-  }
-
   dup(): Headers {
     const h = new Headers();
     if (this.defaultProc()) h.setDefaultProc(this.defaultProc());
@@ -386,12 +379,8 @@ export class Headers extends Hash<string, string> {
     return (key: string) => this.get(key);
   }
 
-  compareByIdentity(): never {
-    throw new TypeError("Headers cannot compare by identity");
-  }
-
-  get isCompareByIdentity(): boolean {
-    return false;
+  override compareByIdentity(): never {
+    throw new TypeError("Rack::Headers cannot compare by identity, use regular Hash");
   }
 
   deconstructKeys(): Headers {

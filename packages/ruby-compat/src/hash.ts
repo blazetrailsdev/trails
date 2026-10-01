@@ -3,8 +3,10 @@ import { KeyError } from "./key-error.js";
 import { rbInspect } from "./object.js";
 import { rbEql } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
+import { RuntimeError } from "./runtime-error.js";
 
 const BLOCK = Symbol.for("@blazetrails/ruby-compat:block");
+const UNDEF = Symbol("Qundef");
 
 /** @noRailsEquivalent PERMANENT — Ruby's `&block`, read back by `rb_block_given_p` (`vendor/ruby/v3.3.11/eval.c:866`); TypeScript has no such syntax, and a stored default may itself be callable, so the block carries a mark instead. */
 export type Block<T> = ((key: string) => T) & { readonly [BLOCK]: true };
@@ -422,7 +424,8 @@ export function valuesAt(
  * `RHASH_PROC_DEFAULT` flag through to the allocation, which a plain object
  * spread has nowhere to put. The flag is what decides which of the two seats
  * the value lands in, so the port reads the receiver's seat rather than
- * testing the value's type.
+ * testing the value's type. `hash_copy` (`vendor/ruby/v3.3.11/hash.c:1530`)
+ * copies the table with its type, so an identity hash dups into one.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#dup` (`vendor/ruby/v3.3.11/object.c:591`).
  */
 export function dup<K, V>(hash: Hash<K, V>): Hash<K, V>;
@@ -447,6 +450,7 @@ export function dup(
   const defaultProc = hash.defaultProc();
   if (defaultProc) ret.setDefaultProc(defaultProc);
   else ret.setDefault(hash.default());
+  if (hash.isCompareByIdentity()) ret.compareByIdentity();
   for (const [key, value] of hash) {
     ret.set(key, value);
   }
@@ -476,6 +480,9 @@ export class Hash<K, V> extends Map<K, V> {
   #defaultProc?: DefaultProc<K, V>;
   #frozen = false;
   #eqlKeys = new Map<number, K[]>();
+  #stHash = new WeakMap<object, number>();
+  #identhash = false;
+  #iterLev = 0;
 
   /**
    * `Hash.new` (`vendor/ruby/v3.3.11/hash.c:1782` `rb_hash_initialize`): a block is
@@ -546,8 +553,9 @@ export class Hash<K, V> extends Map<K, V> {
   override set(key: K, value: V): this {
     this.modifyCheck();
     const stored = this.hashStlikeLookup(key);
-    if (stored === key && isObjectKey(key) && !super.has(key)) {
+    if (stored === key && !this.#identhash && isObjectKey(key) && !super.has(key)) {
       const h = rbHash(key);
+      this.#stHash.set(key, h);
       const bucket = this.#eqlKeys.get(h);
       if (bucket) bucket.push(key);
       else this.#eqlKeys.set(h, [key]);
@@ -570,10 +578,12 @@ export class Hash<K, V> extends Map<K, V> {
    * (`vendor/ruby/v3.3.11/hash.c:2084`) through the `hash` / `eql?` pair
    * (`rb_any_hash`, `hash.c:241`; `rb_any_cmp`, `hash.c:126`). A JS
    * `Map` keys an object by identity, so two equal Arrays would otherwise be
-   * two entries. A primitive's identity is already its `eql?`.
+   * two entries. A primitive's identity is already its `eql?`. An identity
+   * hash's table type is `identhash` (`vendor/ruby/v3.3.11/hash.c:375`), whose
+   * `rb_ident_cmp` is the `Map`'s own comparison.
    */
   private hashStlikeLookup(key: K): K {
-    if (!isObjectKey(key)) return key;
+    if (this.#identhash || !isObjectKey(key)) return key;
     return this.#eqlKeys.get(rbHash(key))?.find((stored) => rbEql(stored, key)) ?? key;
   }
 
@@ -680,20 +690,145 @@ export class Hash<K, V> extends Map<K, V> {
    */
   override delete(key: K, block?: (key: K) => V): MapBoundaryReturn {
     this.modifyCheck();
-    const stored = this.hashStlikeLookup(key);
-    if (super.has(stored)) {
-      const val = super.get(stored);
-      super.delete(stored);
-      if (isObjectKey(stored)) {
-        const h = rbHash(stored);
-        const bucket = this.#eqlKeys.get(h)!;
-        bucket.splice(bucket.indexOf(stored), 1);
-        if (bucket.length === 0) this.#eqlKeys.delete(h);
-      }
-      return val;
-    }
+    const val = this.deleteEntry(key);
+
+    if (val !== UNDEF) return val;
     if (block) return block(key);
     return undefined;
+  }
+
+  /**
+   * `rb_hash_delete_entry` (`vendor/ruby/v3.3.11/hash.c:2383`): the stored
+   * value, or `Qundef` for a key that was not there.
+   */
+  private deleteEntry(key: K): V | undefined | typeof UNDEF {
+    const stored = this.hashStlikeLookup(key);
+    if (!super.has(stored)) return UNDEF;
+    const val = super.get(stored);
+    this.stDeleteEntry(stored);
+    return val;
+  }
+
+  /**
+   * Removes a stored entry from its bin by the hash the entry was stored
+   * under, as `st_table_entry.hash` holds it (`vendor/ruby/v3.3.11/st.c:134`),
+   * so a key whose `hash` has changed since is still found.
+   */
+  private stDeleteEntry(stored: K): void {
+    super.delete(stored);
+    if (!this.#identhash && isObjectKey(stored)) {
+      const h = this.#stHash.get(stored)!;
+      const bucket = this.#eqlKeys.get(h)!;
+      bucket.splice(bucket.indexOf(stored), 1);
+      if (bucket.length === 0) this.#eqlKeys.delete(h);
+    }
+  }
+
+  /**
+   * `Hash#shift` (`vendor/ruby/v3.3.11/hash.c:2492` `rb_hash_shift`): removes
+   * the first entry and returns it as a `[key, value]` pair, `nil` for an
+   * empty hash, after `rb_hash_modify_check`. The entry is removed directly,
+   * with no lookup of its key, as `st_shift` does (`hash.c:2515`). MRI takes
+   * it through `rb_hash_foreach` only while the hash is being iterated,
+   * because `st_shift` may not run then; a `Map` drops its first entry
+   * either way.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#shift` (`vendor/ruby/v3.3.11/hash.c:2492`).
+   */
+  shift(): [K, V] | undefined {
+    this.modifyCheck();
+    const first = super.entries().next();
+    if (!first.done) {
+      this.stDeleteEntry(first.value[0]);
+      return first.value;
+    }
+    return undefined;
+  }
+
+  /**
+   * `Hash#compare_by_identity` (`vendor/ruby/v3.3.11/hash.c:4427`
+   * `rb_hash_compare_by_id`): keys are compared by identity from here on, and
+   * the receiver is returned. The rehash into an `identhash` table keeps every
+   * entry, since two stored keys were never `eql?`, so only the `eql?` index
+   * goes. A JS string is a primitive with no identity apart from its value, so
+   * two equal Strings stay one key where Ruby makes them two.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#compare_by_identity` (`vendor/ruby/v3.3.11/hash.c:4427`).
+   */
+  compareByIdentity(): this {
+    if (this.isCompareByIdentity()) return this;
+
+    this.modifyCheck();
+    if (this.hashIteratingP()) {
+      throw new RuntimeError("compare_by_identity during iteration");
+    }
+
+    this.#identhash = true;
+    this.#eqlKeys.clear();
+
+    return this;
+  }
+
+  /**
+   * `rb_hash_foreach` (`vendor/ruby/v3.3.11/hash.c:1438`), the walk every
+   * yielding Hash method goes through: it raises the receiver's `iter_lev`
+   * for the length of the walk and lowers it in an `ensure`. A `for…of` that
+   * ends, breaks or throws closes the iterator and lowers the level. One left
+   * part-way keeps it raised, as a suspended `hash.each` Enumerator does.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `rb_hash_foreach` (`vendor/ruby/v3.3.11/hash.c:1438`).
+   */
+  override *[Symbol.iterator](): Generator<[K, V], undefined, unknown> {
+    if (this.size === 0) return;
+    if (this.#frozen) {
+      yield* super[Symbol.iterator]();
+    } else {
+      this.#iterLev++;
+      try {
+        yield* super[Symbol.iterator]();
+      } finally {
+        this.#iterLev--;
+      }
+    }
+  }
+
+  /**
+   * `Map#entries`, the pair walk under another name, so it goes through
+   * `rb_hash_foreach` (`vendor/ruby/v3.3.11/hash.c:1438`) as `Hash#each_pair`
+   * does (`hash.c:3149`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_pair` (`vendor/ruby/v3.3.11/hash.c:3149`).
+   */
+  override entries(): Generator<[K, V], undefined, unknown> {
+    return this[Symbol.iterator]();
+  }
+
+  /**
+   * `Map#forEach`, walked through `rb_hash_foreach`
+   * (`vendor/ruby/v3.3.11/hash.c:1438`) as `Hash#each_pair` is (`hash.c:3149`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_pair` (`vendor/ruby/v3.3.11/hash.c:3149`).
+   */
+  override forEach(
+    callbackfn: (value: V, key: K, map: Map<K, V>) => void,
+    thisArg?: unknown,
+  ): void {
+    for (const [key, value] of this) callbackfn.call(thisArg, value, key, this);
+  }
+
+  /** `hash_iterating_p` (`vendor/ruby/v3.3.11/hash.c:1339`). */
+  private hashIteratingP(): boolean {
+    return this.#iterLev > 0;
+  }
+
+  /**
+   * `Hash#compare_by_identity?` (`vendor/ruby/v3.3.11/hash.c:4474`
+   * `rb_hash_compare_by_id_p`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#compare_by_identity?` (`vendor/ruby/v3.3.11/hash.c:4474`).
+   */
+  isCompareByIdentity(): boolean {
+    return this.#identhash;
   }
 
   /**
