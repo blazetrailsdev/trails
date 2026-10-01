@@ -495,8 +495,12 @@ const THOR_ONLY_CALL = "bash scripts/ci/thor-only.sh";
 
 /**
  * The whole-surface comparison scripts scripts/ci/thor-comparison.sh does not
- * run, each with why a thor-only diff cannot move its answer. The first four
- * premises are asserted by scripts/api-compare/scope.test.ts.
+ * run, each with why a thor-only diff cannot move its answer. The population
+ * premises are asserted by scripts/api-compare/scope.test.ts: extra-surface's
+ * GATED_PACKAGES, param-name-mark's (which the block-param ratchet gates by
+ * too), and the dependency rules. The receipt-audit package and the
+ * method-order and test-name lint paths, which ci.yml states, are asserted by
+ * the test that reads this table.
  */
 const THOR_COMPARISON_SKIPS: Record<string, string> = {
   "scripts/api-compare/lint-extra-surface-ratchet.ts": "thor is not in its GATED_PACKAGES",
@@ -1397,6 +1401,16 @@ describe("CI runs every tooling test suite", () => {
     expect(scripts.size).toBeGreaterThan(30);
     expect([...scripts].filter((s) => !run.includes(s) && !skipped.includes(s))).toEqual([]);
     expect(skipped.filter((s) => !scripts.has(s) || run.includes(s))).toEqual([]);
+
+    const lines = steps.flatMap((step) => (step.run ?? "").split("\n").map((l) => l.trim()));
+    expect(lines.some((l) => l.includes("receipt-audit.ts --package activerecord --gate"))).toBe(
+      true,
+    );
+    for (const id of ["method-order", "test-names"]) {
+      const lint = lines.filter((l) => l.startsWith(`${id} after `));
+      expect(lint).toHaveLength(1);
+      expect(lint[0]).not.toContain("packages/trailties");
+    }
   });
 
   it("keeps comparison_affected off for website-only changes", async () => {

@@ -24,10 +24,9 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { serializeBaseline } from "./baseline-json.js";
 import { OUTPUT_DIR, ROOT_DIR, SCRIPT_DIR } from "./config.js";
-import { scopeMismatch, scopeOf } from "./scope.js";
+import { scopeMismatch, scopeOf, scopedMarks } from "./scope.js";
 import {
   exceedances,
-  scopedMarks,
   staleMarks,
   tightened,
   type AmbiguousParentCounts as PackageCounts,

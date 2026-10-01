@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { GATE_ENFORCED_PACKAGES } from "../test-compare/compare.js";
 import { GATED_PACKAGES as EXTRA_SURFACE_GATED } from "./extra-surface-mark.js";
-import { scopedMarks } from "./lint-ambiguous-parents.js";
 import { RULES as DEP_RULES } from "./lint-deps.js";
 import { GATED_PACKAGES as PARAM_NAME_GATED } from "./param-name-mark.js";
-import { inScope, scopeMismatch, scopeOf } from "./scope.js";
+import { inScope, scopeMismatch, scopeOf, scopedMarks } from "./scope.js";
 
 describe("scopeOf", () => {
   it("is null without --package, and the named package with it", () => {
@@ -51,6 +50,7 @@ describe("scopeMismatch", () => {
 describe("scopedMarks", () => {
   it("holds only the scope's mark against a scoped measurement", () => {
     expect(scopedMarks({ actiondispatch: 1, thor: 2 }, "thor")).toEqual({ thor: 2 });
+    expect(scopedMarks({ actiondispatch: 1, thor: 0 }, "thor")).toEqual({ thor: 0 });
     expect(scopedMarks({ actiondispatch: 1 }, "thor")).toEqual({});
     expect(scopedMarks({ actiondispatch: 1 }, null)).toEqual({ actiondispatch: 1 });
   });

@@ -32,7 +32,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
-import { scopeMismatch, scopeOf } from "./scope.js";
+import { scopeMismatch, scopeOf, scopedMarks } from "./scope.js";
 import { compareArms, type SkeletonArtifact } from "./report-arms.js";
 import {
   MARK_PATH,
@@ -82,7 +82,7 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
     return 1;
   }
 
-  const marks = scope === null ? committed : committed[scope] ? { [scope]: committed[scope] } : {};
+  const marks = scopedMarks(committed, scope);
   const current = measure(artifact.skeletons.flatMap((s) => compareArms(s) ?? []));
   const grew = exceedances(marks, current);
   const stale = staleMarks(marks, current);

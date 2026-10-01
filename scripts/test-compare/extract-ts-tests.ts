@@ -5,6 +5,7 @@ import type { TestManifest, TestPackageInfo } from "./types.js";
 import { extractTestsFromSource } from "./extract-ts-core.js";
 import { PKG_SRC_DIRS } from "./compare.js";
 import { PACKAGE_DIR_OVERRIDES } from "../api-compare/config.js";
+import { scopeOf } from "../api-compare/scope.js";
 
 export { extractTestsFromSource } from "./extract-ts-core.js";
 
@@ -128,7 +129,4 @@ function extractPackageTests(files: string[]): TestPackageInfo {
   return pkgInfo;
 }
 
-if (require.main === module) {
-  const at = process.argv.indexOf("--package");
-  main(at === -1 ? null : process.argv[at + 1]);
-}
+if (require.main === module) main(scopeOf(process.argv.slice(2)));

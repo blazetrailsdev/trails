@@ -44,7 +44,7 @@ import {
   violations,
   writeMark,
 } from "./assertion-ratchet.js";
-import { scopeMismatch, scopeOf } from "../api-compare/scope.js";
+import { scopeMismatch, scopeOf, scopedMarks } from "../api-compare/scope.js";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
@@ -182,8 +182,7 @@ export async function main(
       return 1;
     }
   }
-  const mark =
-    scope === null ? committed : { ...committed, packages: { [scope]: committed.packages[scope] } };
+  const mark = { ...committed, packages: scopedMarks(committed.packages, scope) };
 
   const missing = missingFromArtifact(current, mark);
   if (missing.length > 0) {

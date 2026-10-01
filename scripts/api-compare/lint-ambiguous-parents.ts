@@ -20,7 +20,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { serializeBaseline } from "./baseline-json.js";
 import { OUTPUT_DIR, ROOT_DIR, SCRIPT_DIR } from "./config.js";
-import { scopeMismatch, scopeOf } from "./scope.js";
+import { scopeMismatch, scopeOf, scopedMarks } from "./scope.js";
 
 export const MARK_PATH = path.join(SCRIPT_DIR, "ambiguous-parent-mark.json");
 
@@ -77,19 +77,6 @@ export function tightened(
   return next;
 }
 
-/**
- * The marks a scoped run holds against its measurement: the scope's own, since
- * a package the artifact never compared counts zero and would read as
- * converged. Unscoped, every mark.
- */
-export function scopedMarks(
-  marks: AmbiguousParentCounts,
-  scope: string | null,
-): AmbiguousParentCounts {
-  if (scope === null) return marks;
-  return marks[scope] === undefined ? {} : { [scope]: marks[scope] };
-}
-
 export async function loadMarks(): Promise<AmbiguousParentCounts> {
   return JSON.parse(await fs.readFile(MARK_PATH, "utf-8")) as AmbiguousParentCounts;
 }
@@ -102,7 +89,11 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
   const artifact = path.join(OUTPUT_DIR, "ambiguous-parents.json");
   const current = JSON.parse(await fs.readFile(artifact, "utf-8")) as AmbiguousParentCounts;
   if (scope !== null) {
-    const measured = [scope, ...Object.keys(current)];
+    const comparison = path.join(OUTPUT_DIR, "api-comparison.json");
+    const { results } = JSON.parse(await fs.readFile(comparison, "utf-8")) as {
+      results: { package: string }[];
+    };
+    const measured = results.map((r) => r.package);
     const mismatch = scopeMismatch("ambiguous-parent gate", measured, scope);
     if (mismatch !== null) {
       console.error(mismatch);

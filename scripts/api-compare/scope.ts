@@ -33,6 +33,16 @@ export function inScope<T extends { package?: string }>(
 }
 
 /**
+ * The marks a scoped gate holds against its measurement: the scope's own, since
+ * a package the artifact never compared measures zero and would read as
+ * converged. Unscoped, every mark.
+ */
+export function scopedMarks<T>(marks: Record<string, T>, scope: string | null): Record<string, T> {
+  if (scope === null) return marks;
+  return marks[scope] === undefined ? {} : { [scope]: marks[scope] };
+}
+
+/**
  * Why an artifact cannot drive a gate scoped to `scope`, or null when its
  * population is exactly that package. A wider artifact is refused as well as a
  * narrower one: the scoped arm judges one package's rows, so passing it over a
