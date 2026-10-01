@@ -1,5 +1,6 @@
 import { ArgumentError } from "../argument-error.js";
 import { warn } from "../kernel-warn.js";
+import { rbObjAsString } from "../object.js";
 import { Deprecate } from "./deprecate.js";
 
 const VERSION_PATTERN = "[0-9]+(?:\\.[0-9a-zA-Z]+)*(-[0-9A-Za-z-]+(\\.[0-9A-Za-z-]+)*)?";
@@ -36,7 +37,7 @@ export class Version {
   static isCorrect(version: string | number | null): boolean {
     if (version == null) Version.nilVersionsAreDiscouragedBang();
 
-    return Version.ANCHORED_VERSION_PATTERN.test(version == null ? "" : String(version));
+    return Version.ANCHORED_VERSION_PATTERN.test(rbObjAsString(version));
   }
 
   private static nilVersionsAreDiscouragedBang(): void {
@@ -56,9 +57,9 @@ export class Version {
 
     if (typeof version === "string" && /^\s*$/.test(version)) version = 0;
 
-    this.#version = version == null ? "" : String(version);
+    this.#version = rbObjAsString(version);
 
-    if (typeof version !== "number") {
+    if (!Number.isInteger(version)) {
       this.#version = this.#version.trim();
       this.#version = this.#version.replaceAll("-", ".pre.");
     }

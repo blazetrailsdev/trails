@@ -1,24 +1,30 @@
 import type { UnportedFile } from "./types.js";
 
+const STORIES: Record<string, string> = {
+  activerecord: "activerecord-port-version-and-gem-version",
+  activesupport: "activesupport-port-version-rb",
+  actionview: "actionview-port-version-rb",
+  trailties: "trailties-port-version-rb",
+};
+
 /**
- * `version.rb`, one entry per package that has not ported it. activemodel
- * has (`packages/activemodel/src/version.ts`), so it carries no entry. Each
- * remaining package leaves by deleting its name here. Schema: ./types.ts.
+ * `version.rb`, one entry per package that has not ported it. A package
+ * leaves by deleting its name from `STORIES`. Schema: ./types.ts.
  */
 export const VERSION_UNPORTED_FILES: UnportedFile[] = [
-  "activerecord",
-  "activesupport",
-  "actionpackversion",
-  "actionview",
-  "trailties",
-  "rack",
-  "i18n",
-].map((pkg) => ({
-  pattern: "/version.rb",
-  package: pkg,
-  reason:
-    "`Module.version` returns `gem_version` (e.g. active_record/version.rb:8), " +
-    "and this package has not ported it yet. Anchored (leading `/`) so it " +
-    "cannot also exclude `gem_version.rb`, which IS ported and owns real " +
-    "surface (`ActionPack.gem_version`).",
-}));
+  ...Object.entries(STORIES).map(([pkg, story]) => ({
+    pattern: "/version.rb",
+    package: pkg,
+    reason:
+      `\`Module.version\` is not ported yet (story ${story}). Anchored ` +
+      "(leading `/`) so it cannot also exclude `gem_version.rb`, which owns " +
+      "real surface (`ActionPack.gem_version`).",
+  })),
+  {
+    pattern: "/version.rb",
+    package: "i18n",
+    reason:
+      "`i18n/version.rb` defines only the `I18n::VERSION` constant. trails " +
+      "carries the version in package.json, so there is no method to port.",
+  },
+];

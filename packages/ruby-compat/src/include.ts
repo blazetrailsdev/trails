@@ -787,7 +787,9 @@ const CORE_ANCESTORS: Record<string, string[]> = {
  * record here.
  *
  * A core class with no JS class object is the name `rbObjClass` answers for
- * its instances, and its ancestors are the names MRI lists for it.
+ * its instances, and its ancestors are the names MRI lists for it. `Kernel`
+ * and `BasicObject`, which every ancestry ends with after `Object`, are
+ * names for the same reason.
  *
  * Mirrors: Ruby's Module#ancestors — vendor/ruby/v3.3.11/class.c:1570
  * `rb_mod_ancestors`.
@@ -796,16 +798,18 @@ const CORE_ANCESTORS: Record<string, string[]> = {
  */
 export function rbModAncestors(mod: { prototype: object } | string): unknown[] {
   if (typeof mod === "string") {
-    return [mod, ...(CORE_ANCESTORS[mod] ?? []), "Object", "Kernel", "BasicObject"];
+    return [mod, ...(CORE_ANCESTORS[mod] ?? []), Object, "Kernel", "BasicObject"];
   }
   const ary: unknown[] = [];
   for (let p: object | null = mod.prototype; p; p = Object.getPrototypeOf(p) as object | null) {
     if (Object.prototype.hasOwnProperty.call(p, "constructor")) {
       ary.push((p as { constructor: unknown }).constructor);
     }
-    if (!Object.prototype.hasOwnProperty.call(p, includedModulesKey)) continue;
-    const mods = [...((p as Record<symbol, unknown>)[includedModulesKey] as Set<unknown>)];
-    for (const m of mods.reverse()) if (!ary.includes(m)) ary.push(m);
+    if (Object.prototype.hasOwnProperty.call(p, includedModulesKey)) {
+      const mods = [...((p as Record<symbol, unknown>)[includedModulesKey] as Set<unknown>)];
+      for (const m of mods.reverse()) if (!ary.includes(m)) ary.push(m);
+    }
+    if (p === Object.prototype) ary.push("Kernel", "BasicObject");
   }
   return ary;
 }

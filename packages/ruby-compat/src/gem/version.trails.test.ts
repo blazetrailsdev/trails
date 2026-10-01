@@ -12,6 +12,8 @@ describe("Gem::Version", () => {
     expect(new Gem.Version("8.0.2").version).toBe("8.0.2");
     expect(`${new Gem.Version(" 1.2 ")}`).toBe("1.2");
     expect(new Gem.Version(3).version).toBe("3");
+    expect(new Gem.Version(1.5).version).toBe("1.5");
+    expect(new Gem.Version(1.0e-5).version).toBe("1.0e.pre.05");
   });
 
   it("reads an empty version as 0 and a dash as a prerelease segment", () => {

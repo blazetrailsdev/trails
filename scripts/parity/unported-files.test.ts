@@ -96,7 +96,8 @@ describe("isSourceUnported package scoping", () => {
     // `gem_version.rb` is ported and owns real surface.
     expect(isSourceUnported("version.rb", "activesupport")).toBe(true);
     expect(isSourceUnported("version.rb", "activemodel")).toBe(false);
-    expect(isSourceUnported("action_pack/version.rb", "actionpackversion")).toBe(true);
+    expect(isSourceUnported("action_view/version.rb", "actionview")).toBe(true);
+    expect(isSourceUnported("action_pack/version.rb", "actionpackversion")).toBe(false);
     expect(isSourceUnported("gem_version.rb", "actionpackversion")).toBe(false);
   });
 
