@@ -32,7 +32,7 @@ export class Enumerator<T = unknown> {
    */
   *[Symbol.iterator](): Generator<T> {
     const buffer: T[] = [];
-    this.each((value: never) => buffer.push(value));
+    this.each((value: T) => buffer.push(value));
     yield* buffer;
   }
 }

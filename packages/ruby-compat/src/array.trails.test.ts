@@ -4,6 +4,7 @@ import { TypeError } from "./type-error.js";
 import {
   aryCount,
   aryDelete,
+  aryDeleteIf,
   aryPop,
   arySlice,
   compact,
@@ -273,6 +274,26 @@ describe("arySlice", () => {
     expect(() => arySlice([1, 2, 3], 0, undefined)).toThrow(TypeError);
     expect(() => arySlice([1, 2, 3], undefined as never)).toThrow(TypeError);
     expect(() => arySlice([1, 2, 3], undefined as never, 1)).toThrow(TypeError);
+  });
+});
+
+describe("aryDeleteIf", () => {
+  it("removes every element the block answers truthily for, in place", () => {
+    const ary = [1, 2, 3, 4];
+    expect(aryDeleteIf(ary, (item) => item % 2 === 0)).toBe(ary);
+    expect(ary).toEqual([1, 3]);
+  });
+
+  it("keeps an element the block answers nil or false for", () => {
+    const ary = [0, "", null, false];
+    aryDeleteIf(ary, (item) => item);
+    expect(ary).toEqual([null, false]);
+  });
+
+  it("returns the receiver when nothing matched", () => {
+    const ary = [1, 2];
+    expect(aryDeleteIf(ary, () => false)).toBe(ary);
+    expect(ary).toEqual([1, 2]);
   });
 });
 

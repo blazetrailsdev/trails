@@ -1,5 +1,6 @@
 import {
   aryDelete,
+  aryDeleteIf,
   Fiber,
   isMonOwned,
   Mutex,
@@ -508,9 +509,7 @@ export class ConnectionPool implements ReapablePool {
           }
           if (conn.requiresReloading()) await conn.disconnectBang();
         }
-        for (let i = this._connections!.length - 1; i >= 0; i--) {
-          if (this._connections![i].requiresReloading()) this._connections!.splice(i, 1);
-        }
+        aryDeleteIf(this._connections!, (conn) => conn.requiresReloading());
         this._available!.clear();
       }),
     );
