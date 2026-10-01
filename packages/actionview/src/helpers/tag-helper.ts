@@ -19,7 +19,6 @@ import {
   Hash,
   Module,
   rbInspect,
-  rbModPrivate,
 } from "@blazetrails/ruby-compat";
 import { CaptureHelper, capture, type CaptureHelperHost } from "./capture-helper.js";
 import { OutputSafetyHelper, safeJoin } from "./output-safety-helper.js";
@@ -599,5 +598,4 @@ export const TagHelper = new Module((mod) => {
     Object.assign(m, { tag, contentTag, tokenList, classNames, cdataSection, escapeOnce });
     Object.assign(m, { buildTagValues, tagBuilder });
   });
-  rbModPrivate(mod, "buildTagValues", "tagBuilder");
 });

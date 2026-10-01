@@ -22,7 +22,7 @@
 
 import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
-import { FL_SINGLETON, M_TBL, rbAnyToS, rbModToS } from "./object.js";
+import { FL_SINGLETON, rbAnyToS, rbModToS } from "./object.js";
 
 type AnyClass = new (...args: never[]) => unknown;
 type ModuleObject = object;
@@ -108,16 +108,6 @@ export class Module {
    */
   constructor(block?: (mod: Module) => void) {
     if (block !== undefined) block(this);
-  }
-
-  /**
-   * The module's method table (`RCLASS_M_TBL`,
-   * vendor/ruby/v3.3.11/class.c:1145), which `rbModPrivate` records on.
-   *
-   * @noRailsEquivalent PERMANENT
-   */
-  get [M_TBL](): object {
-    return carrierOf(this);
   }
 
   /**
@@ -477,10 +467,7 @@ export class Module {
       const set = table[registry];
       if (set) table[registry] = { ...set, value: new Set(set.value as Set<unknown>) };
     }
-    delete table[M_TBL];
-    const copyTable = Object.create(null, table) as Record<string, unknown>;
-    Object.defineProperty(copyTable, M_TBL, { value: copyTable });
-    carriers.set(copy, copyTable);
+    carriers.set(copy, Object.create(null, table) as Record<string, unknown>);
     const nested = nestedModules.get(this);
     if (nested) nestedModules.set(copy, [...nested]);
     return copy;
@@ -495,7 +482,6 @@ function carrierOf(mod: Module): Record<string, unknown> {
   let carrier = carriers.get(mod);
   if (!carrier) {
     carrier = Object.create(null) as Record<string, unknown>;
-    Object.defineProperty(carrier, M_TBL, { value: carrier });
     carriers.set(mod, carrier);
   }
   return carrier;

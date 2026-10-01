@@ -10,15 +10,7 @@ import {
   presence,
   stringifyKeys,
 } from "@blazetrails/activesupport";
-import {
-  Hash,
-  Module,
-  fetch,
-  hashDelete,
-  rbModPrivate,
-  rbObjRespondTo,
-  update,
-} from "@blazetrails/ruby-compat";
+import { Hash, Module, fetch, hashDelete, rbObjRespondTo, update } from "@blazetrails/ruby-compat";
 
 import { ActionView } from "../namespaces.js";
 import type { capture } from "./capture-helper.js";
@@ -272,13 +264,4 @@ export const FormTagHelper = new Module((mod) => {
     Object.assign(m, { htmlOptionsForForm, extraTagsForForm, formTagHtml, formTagWithBody });
     Object.assign(m, { sanitizeToId, setDefaultDisableWith });
   });
-  rbModPrivate(
-    mod,
-    "htmlOptionsForForm",
-    "extraTagsForForm",
-    "formTagHtml",
-    "formTagWithBody",
-    "sanitizeToId",
-    "setDefaultDisableWith",
-  );
 });

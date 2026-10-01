@@ -48,17 +48,6 @@ function hasEpochNanoseconds(value: unknown): value is { epochNanoseconds: bigin
 export const FL_SINGLETON = Symbol.for("@blazetrails/ruby-compat:FL_SINGLETON");
 
 /**
- * A module's method table, `RCLASS_M_TBL`, which `rb_include_class_new`
- * (`vendor/ruby/v3.3.11/class.c:1145`) hands the iclass of every includer, so
- * one table answers for the module and every class that includes it. A
- * `Module`'s carrier holds itself under this key, and the key rides onto each
- * includer's link with the carrier's other entries.
- *
- * @noRailsEquivalent PERMANENT
- */
-export const M_TBL = Symbol.for("@blazetrails/ruby-compat:M_TBL");
-
-/**
  * `rb_obj_singleton_class` (`vendor/ruby/v3.3.11/object.c:288`), Ruby's
  * `Kernel#singleton_class`, over `singleton_class_of` (`vendor/ruby/v3.3.11/class.c:2215`):
  * the receiver's own class, created on first call and inserted between the
@@ -185,7 +174,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
     o && !(klass && o === Function.prototype);
     o = Object.getPrototypeOf(o) as object | null
   ) {
-    const visi = methodVisibilitiesOf(o)?.get(mid);
+    const visi = methodVisibilities.get(o)?.get(mid);
     if (visi !== undefined) {
       if (pub && visi !== "public") break;
       return true;
@@ -214,39 +203,27 @@ type MethodVisibility = "public" | "protected" | "private";
 
 const methodVisibilities = new WeakMap<object, Map<string, MethodVisibility>>();
 
-function methodVisibilitiesOf(o: object): Map<string, MethodVisibility> | undefined {
-  const mTbl = Object.getOwnPropertyDescriptor(o, M_TBL)?.value as object | undefined;
-  return methodVisibilities.get(mTbl ?? o);
-}
-
 function methodEntryVisi(obj: unknown, mid: string): MethodVisibility | undefined {
   for (let o: object | null = Object(obj); o; o = Object.getPrototypeOf(o) as object | null) {
-    const visi = methodVisibilitiesOf(o)?.get(mid);
+    const visi = methodVisibilities.get(o)?.get(mid);
     if (visi !== undefined) return visi;
     if (Object.getOwnPropertyDescriptor(o, mid)) return "public";
   }
   return undefined;
 }
 
-type MethodTableOwner = { prototype: object; name: string } | { readonly [M_TBL]: object };
-
 function setMethodVisibility(
-  module: MethodTableOwner,
+  module: { prototype: object; name: string },
   mids: string[],
   visi: MethodVisibility,
 ): void {
-  const owner = "prototype" in module ? module.prototype : module[M_TBL];
+  const owner = module.prototype;
   for (const mid of mids) {
     const defined =
       mid in owner ||
       (mid.endsWith("=") && typeof lookupSetter(owner, mid.slice(0, -1)) === "function");
     if (!defined) {
-      throw new NameError(
-        "prototype" in module
-          ? `undefined method '${mid}' for class '${module.name}'`
-          : `undefined method '${mid}' for module '${rbInspect(module)}'`,
-        mid,
-      );
+      throw new NameError(`undefined method '${mid}' for class '${module.name}'`, mid);
     }
     let table = methodVisibilities.get(owner);
     if (!table) methodVisibilities.set(owner, (table = new Map()));
@@ -266,12 +243,11 @@ function lookupSetter(obj: object, name: string): ((value: unknown) => unknown) 
  * `Module#private` with method names (`rb_mod_private`, `vendor/ruby/v3.3.11/vm_method.c:2516`,
  * through `set_method_visibility`, `:2388`): records each instance method of
  * `module` as PRIVATE, where {@link basicObjRespondTo} and {@link rbFPublicSend}
- * read it. A JS accessor's setter answers the Ruby writer `name=`. A `Module`
- * records on its method table ({@link M_TBL}), which its includers share.
+ * read it. A JS accessor's setter answers the Ruby writer `name=`.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Module#private` (`vendor/ruby/v3.3.11/vm_method.c:2516`).
  */
-export function rbModPrivate(module: MethodTableOwner, ...mids: string[]): void {
+export function rbModPrivate(module: { prototype: object; name: string }, ...mids: string[]): void {
   setMethodVisibility(module, mids, "private");
 }
 
@@ -281,7 +257,10 @@ export function rbModPrivate(module: MethodTableOwner, ...mids: string[]): void 
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Module#protected` (`vendor/ruby/v3.3.11/vm_method.c:2482`).
  */
-export function rbModProtected(module: MethodTableOwner, ...mids: string[]): void {
+export function rbModProtected(
+  module: { prototype: object; name: string },
+  ...mids: string[]
+): void {
   setMethodVisibility(module, mids, "protected");
 }
 
@@ -294,7 +273,7 @@ function checkDefinitionVisibility(
     o && o !== Object.prototype;
     o = Object.getPrototypeOf(o) as object | null
   ) {
-    const visi = methodVisibilitiesOf(o)?.get(mid);
+    const visi = methodVisibilities.get(o)?.get(mid);
     if (visi !== undefined) return visi;
     const me = Object.getOwnPropertyDescriptor(o, mid);
     if (me) return typeof me.value === "function" || me.get ? "public" : undefined;

@@ -18,7 +18,6 @@ import {
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { NoMethodError } from "./no-method-error.js";
-import { Module, extend, include, rbModConstSet } from "./include.js";
 
 describe("Object#inspect", () => {
   it("renders nested arrays, hashes, nil, strings and numbers as MRI does", () => {
@@ -218,57 +217,6 @@ describe("rbFSend", () => {
 
   it("raises NoMethodError for an unbound name", () => {
     expect(() => rbFSend(new Req(), "nope")).toThrow(NoMethodError);
-  });
-});
-
-describe("rbModPrivate on a Module", () => {
-  const Helper = new Module((mod) => {
-    mod.moduleEval((m) => {
-      Object.assign(m, {
-        shown(): string {
-          return "shown";
-        },
-        hidden(): string {
-          return "hidden";
-        },
-      });
-    });
-    rbModPrivate(mod, "hidden");
-  });
-  class Includer {}
-  include(Includer, Helper);
-
-  it("records the visibility on the method table every includer shares", () => {
-    const obj = new Includer();
-    expect(rbObjRespondTo(obj, "shown")).toBe(true);
-    expect(rbObjRespondTo(obj, "hidden")).toBe(false);
-    expect(rbObjRespondTo(obj, "hidden", true)).toBe(true);
-    expect(rbFPublicSend(obj, "shown")).toBe("shown");
-    expect(() => rbFPublicSend(obj, "hidden")).toThrow(NoMethodError);
-    expect(rbFSend(obj, "hidden")).toBe("hidden");
-  });
-
-  it("records on a class's own prototype when the class is extended with a Module", () => {
-    class Extended {
-      secret(): string {
-        return "s";
-      }
-    }
-    extend(Extended, Helper);
-    rbModPrivate(Extended, "secret");
-    expect(() => rbFPublicSend(new Extended(), "secret")).toThrow(NoMethodError);
-  });
-
-  it("raises NameError for a name the module does not define", () => {
-    expect(() => rbModPrivate(Helper, "nope")).toThrow(NameError);
-    expect(() => rbModPrivate(Helper, "nope")).toThrow(
-      /^undefined method 'nope' for module '#<Module:0x[0-9a-f]+>'$/,
-    );
-    class Owner {}
-    const Named = rbModConstSet(Owner, "Named", new Module());
-    expect(() => rbModPrivate(Named, "nope")).toThrow(
-      "undefined method 'nope' for module 'Owner::Named'",
-    );
   });
 });
 

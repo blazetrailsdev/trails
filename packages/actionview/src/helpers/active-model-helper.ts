@@ -1,5 +1,5 @@
 import { isPresent } from "@blazetrails/activesupport";
-import { Module, rbModPrivate, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Module, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { ActionView } from "../namespaces.js";
 
@@ -92,9 +92,3 @@ ActiveModelInstanceTag.moduleEval((m) => {
   Object.assign(m, { contentTag, tag, errorWrapping, errorMessage });
   Object.assign(m, { isObjectHasErrors, isSelectMarkupHelper, isTagGenerateErrors });
 });
-rbModPrivate(
-  ActiveModelInstanceTag,
-  "isObjectHasErrors",
-  "isSelectMarkupHelper",
-  "isTagGenerateErrors",
-);
