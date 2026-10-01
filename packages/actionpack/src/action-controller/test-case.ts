@@ -82,7 +82,7 @@ LiveBuffer.queueSize = null;
 type ControllerClass = new () => Metal;
 
 export interface RequestOptions {
-  params?: Record<string, unknown>;
+  params?: Record<string, unknown> | null;
   headers?: Record<string, string>;
   session?: Record<string, unknown>;
   flash?: Record<string, string>;

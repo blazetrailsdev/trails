@@ -2,6 +2,7 @@ import type { Base } from "./base.js";
 import { modelRegistry, registerModelConstant } from "./associations.js";
 import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
 import { ActiveRecord } from "./namespaces.js";
+import { IndexedRow } from "./result.js";
 import {
   camelize,
   classAttribute,
@@ -315,10 +316,15 @@ export function ensureProperType(this: Base): void {
 /** @internal */
 export function discriminateClassForRecord(
   this: typeof Base,
-  record: Record<string, unknown>,
+  record: Record<string, unknown> | IndexedRow,
 ): typeof Base {
   if (this.usingSingleTableInheritance(record)) {
-    return this.findStiClass(record[this.inheritanceColumn as string] as string);
+    const inheritanceColumn = this.inheritanceColumn as string;
+    return this.findStiClass(
+      (record instanceof IndexedRow
+        ? record.get(inheritanceColumn)
+        : record[inheritanceColumn]) as string,
+    );
   } else {
     return this;
   }
@@ -327,11 +333,13 @@ export function discriminateClassForRecord(
 /** @internal */
 export function usingSingleTableInheritance(
   this: typeof Base,
-  record: Record<string, unknown>,
+  record: Record<string, unknown> | IndexedRow,
 ): boolean {
+  const inheritanceColumn = this.inheritanceColumn as string;
   return (
-    isPresent(record[this.inheritanceColumn as string]) &&
-    this._hasAttribute(this.inheritanceColumn as string)
+    isPresent(
+      record instanceof IndexedRow ? record.get(inheritanceColumn) : record[inheritanceColumn],
+    ) && this._hasAttribute(inheritanceColumn)
   );
 }
 

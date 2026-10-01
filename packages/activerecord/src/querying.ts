@@ -246,9 +246,9 @@ export function _loadFromSql<T extends typeof Base>(
 
   return messageBus.instrument("instantiation.active_record", payload, () => {
     if (resultSet.includesColumn(this.inheritanceColumn)) {
-      return resultSet.toArray().map((record) => this.instantiate(record, columnTypes, block));
+      return resultSet.indexedRows.map((record) => this.instantiate(record, columnTypes, block));
     } else {
-      return resultSet.toArray().map((record) => this._instantiate(record, block, columnTypes));
+      return resultSet.indexedRows.map((record) => this._instantiate(record, block, columnTypes));
     }
   });
 }

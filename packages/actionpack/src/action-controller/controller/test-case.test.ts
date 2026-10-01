@@ -11,8 +11,12 @@ import {
   assertNotEqual,
   assertPredicate,
   assertRaise,
+  assertRaises,
   assertRespondTo,
+  ActiveSupportJSON,
   isBlank,
+  isPlainObject,
+  toParam,
   toQuery,
 } from "@blazetrails/activesupport";
 import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/reporting";
@@ -32,6 +36,7 @@ import { Base } from "../base.js";
 import { Metal } from "../metal.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
+import { InvalidType } from "../../action-dispatch/http/mime-negotiation.js";
 import { Response } from "../../action-dispatch/http/response.js";
 import { TestResponse } from "../../action-dispatch/testing/test-response.js";
 import type {
@@ -485,6 +490,10 @@ class TestController extends Base {
     await this.render({ plain: JSON.stringify(this.request.queryParameters) });
   }
 
+  async testRequestParameters() {
+    await this.render({ plain: JSON.stringify(this.request.requestParameters) });
+  }
+
   async testQueryString() {
     await this.render({ plain: this.request.queryString });
   }
@@ -499,6 +508,16 @@ class TestController extends Base {
 
   async testProtocol() {
     await this.render({ plain: this.request.protocol });
+  }
+
+  async testHeaders() {
+    await this.render({
+      plain: JSON.stringify(this.request.headers.env, (_key, value) =>
+        value === null || typeof value !== "object" || Array.isArray(value) || isPlainObject(value)
+          ? value
+          : String(value),
+      ),
+    });
   }
 
   async testOnlyOneParam() {
@@ -607,6 +626,10 @@ describe("TestCaseTest", () => {
   const FILES_DIR = `${FIXTURE_LOAD_PATH}/multipart`;
   const controllerInfo = { controller: "test_case_test/test", action: "testParams" };
   let tc: TestCaseTest;
+  const assertGenerates = (...args: Parameters<TestCaseTest["assertGenerates"]>) =>
+    tc.assertGenerates(...args);
+  const assertRouting = (...args: Parameters<TestCaseTest["assertRouting"]>) =>
+    tc.assertRouting(...args);
 
   beforeEach(async () => {
     tc = new TestCaseTest(TestController);
@@ -806,6 +829,295 @@ describe("TestCaseTest", () => {
     assertEqual("OK", tc.response.body);
   });
 
+  // BLOCKED: action-controller-test-case-has-no-assert-select
+  it.skip("should impose childless html tags in html", () => {});
+
+  // BLOCKED: action-controller-test-case-has-no-assert-select
+  it.skip("should not impose childless html tags in xml", () => {});
+
+  it("assert generates", () => {
+    assertGenerates("controller/action/5", {
+      controller: "controller",
+      action: "action",
+      id: "5",
+    });
+    assertGenerates(
+      "controller/action/7",
+      { id: "7" },
+      { controller: "controller", action: "action" },
+    );
+    assertGenerates(
+      "controller/action/5",
+      { controller: "controller", action: "action", id: "5", name: "bob" },
+      {},
+      { name: "bob" },
+    );
+    assertGenerates(
+      "controller/action/7",
+      { id: "7", name: "bob" },
+      { controller: "controller", action: "action" },
+      { name: "bob" },
+    );
+    assertGenerates(
+      "controller/action/7",
+      { id: "7" },
+      { controller: "controller", action: "action", name: "bob" },
+      {},
+    );
+  });
+
+  it("assert routing", () => {
+    assertRouting("content", { controller: "content", action: "index" });
+  });
+
+  it("assert routing with method", () => {
+    tc.withRouting((set: RouteSet) => {
+      set.draw(function () {
+        this.resources("content");
+      });
+      assertRouting(
+        { method: "post", path: "content" },
+        { controller: "content", action: "create" },
+      );
+    });
+  });
+
+  it("assert routing in module", () => {
+    tc.withRouting((set: RouteSet) => {
+      set.draw(function () {
+        this.namespace("admin", () => {
+          this.get("user", { to: "user#index" });
+        });
+      });
+
+      assertRouting("admin/user", { controller: "admin/user", action: "index" });
+    });
+  });
+
+  it("assert routing with glob", () => {
+    tc.withRouting((set: RouteSet) => {
+      set.draw(function () {
+        this.get("*path", { to: "pages#show" });
+      });
+      assertRouting("/company/about", {
+        controller: "pages",
+        action: "show",
+        path: "company/about",
+      });
+    });
+  });
+
+  it("params passing", async () => {
+    await tc.get("testParams", {
+      params: { page: { name: "Page name", month: "4", year: "2004", day: "6" } },
+    });
+    const parsedParams = JSON.parse(tc.response.body);
+    assertEqual(
+      { ...controllerInfo, page: { name: "Page name", month: "4", year: "2004", day: "6" } },
+      parsedParams,
+    );
+  });
+
+  it("nil params", async () => {
+    await tc.get("testParams", { params: null });
+    const parsedParams = JSON.parse(tc.response.body);
+    assertEqual({ action: "testParams", controller: "test_case_test/test" }, parsedParams);
+  });
+
+  it("query param named action", async () => {
+    await tc.get("testQueryParameters", { params: { action: "foobar" } });
+    const parsedParams = JSON.parse(tc.response.body);
+    assertEqual({ action: "foobar" }, parsedParams);
+  });
+
+  it("request param named action", async () => {
+    await tc.post("testRequestParameters", { params: { action: "foobar" } });
+    const parsedParams = JSON.parse(tc.response.body);
+    assertEqual({ action: "foobar" }, parsedParams);
+  });
+
+  it("kwarg params passing with session and flash", async () => {
+    await tc.get("testParams", {
+      params: { page: { name: "Page name", month: "4", year: "2004", day: "6" } },
+      session: { foo: "bar" },
+      flash: { notice: "created" },
+    });
+
+    const parsedParams = JSON.parse(tc.response.body);
+    assertEqual(
+      { ...controllerInfo, page: { name: "Page name", month: "4", year: "2004", day: "6" } },
+      parsedParams,
+    );
+
+    assertEqual("bar", tc.session.get("foo"));
+    assertEqual("created", tc.flash.get("notice"));
+  });
+
+  it("params passing with integer", async () => {
+    await tc.get("testParams", {
+      params: { page: { name: "Page name", month: 4, year: 2004, day: 6 } },
+    });
+    const parsedParams = JSON.parse(tc.response.body);
+    assertEqual(
+      { ...controllerInfo, page: { name: "Page name", month: "4", year: "2004", day: "6" } },
+      parsedParams,
+    );
+  });
+
+  it("params passing with integers when not html request", async () => {
+    await tc.get("testParams", { params: { format: "json", count: 999 } });
+    const parsedParams = JSON.parse(tc.response.body);
+    assertEqual({ ...controllerInfo, format: "json", count: "999" }, parsedParams);
+  });
+
+  it("params passing path parameter is string when not html request", async () => {
+    await tc.get("testParams", { params: { format: "json", id: 1 } });
+    const parsedParams = JSON.parse(tc.response.body);
+    assertEqual({ ...controllerInfo, format: "json", id: "1" }, parsedParams);
+  });
+
+  it("params passing with frozen values", async () => {
+    await assertNothingRaised(async () => {
+      await tc.get("testParams", {
+        params: {
+          frozen: "icy",
+          frozens: Object.freeze(["icy"]),
+          deepfreeze: Object.freeze({ frozen: "icy" }),
+        },
+      });
+    });
+    const parsedParams = JSON.parse(tc.response.body);
+    assertEqual(
+      { ...controllerInfo, frozen: "icy", frozens: ["icy"], deepfreeze: { frozen: "icy" } },
+      parsedParams,
+    );
+  });
+
+  it("params passing doesnt modify in place", async () => {
+    const page = { name: "Page name", month: 4, year: 2004, day: 6 };
+    await tc.get("testParams", { params: { page } });
+    assertEqual(2004, page.year);
+  });
+
+  it("set additional HTTP headers", async () => {
+    tc.request.headers.set("Referer", "http://nohost.com/home");
+    tc.request.headers.set("Content-Type", "application/rss+xml");
+    await tc.get("testHeaders");
+    const parsedEnv = ActiveSupportJSON.decode(tc.response.body) as Record<string, unknown>;
+    assertEqual("http://nohost.com/home", parsedEnv["HTTP_REFERER"]);
+    assertEqual("application/rss+xml", parsedEnv["CONTENT_TYPE"]);
+  });
+
+  it("set additional env variables", async () => {
+    tc.request.headers.set("HTTP_REFERER", "http://example.com/about");
+    tc.request.headers.set("CONTENT_TYPE", "application/json");
+    await tc.get("testHeaders");
+    const parsedEnv = ActiveSupportJSON.decode(tc.response.body) as Record<string, unknown>;
+    assertEqual("http://example.com/about", parsedEnv["HTTP_REFERER"]);
+    assertEqual("application/json", parsedEnv["CONTENT_TYPE"]);
+  });
+
+  // BLOCKED: mime-type-initialize-validates-mime-regexp
+  it.skip("blank Content-Type header", async () => {
+    tc.request.headers.set("Content-Type", "");
+    await assertRaises([InvalidType], {}, async () => {
+      await tc.get("testHeaders");
+    });
+  });
+
+  it("nil Content-Type header with post request", async () => {
+    tc.request.headers.set("Content-Type", null);
+    await assertRaises([Error], { match: /Unknown Content-Type/ }, async () => {
+      await tc.post("renderBody");
+    });
+  });
+
+  it("using as json sets request content type to json", async () => {
+    await tc.post("renderBody", {
+      params: { bool_value: true, str_value: "string", num_value: 2 },
+      as: "json",
+    });
+
+    assertEqual("application/json", tc.request.headers.get("CONTENT_TYPE"));
+    assertEqual(true, tc.request.requestParameters["bool_value"]);
+    assertEqual("string", tc.request.requestParameters["str_value"]);
+    assertEqual(2, tc.request.requestParameters["num_value"]);
+  });
+
+  it("using as json sets format json", async () => {
+    await tc.post("renderBody", {
+      params: { bool_value: true, str_value: "string", num_value: 2 },
+      as: "json",
+    });
+    assertEqual("json", tc.request.format);
+  });
+
+  it("using as json with empty params", async () => {
+    await tc.post("testParams", { params: { foo: { bar: [] } }, as: "json" });
+
+    assertEqual({ bar: [] }, JSON.parse(tc.response.body)["foo"]);
+  });
+
+  it("using as json with path parameters", async () => {
+    await tc.post("testParams", { params: { id: "12345" }, as: "json" });
+
+    assertEqual("12345", tc.request.pathParameters["id"]);
+  });
+
+  it("mutating content type headers for plain text files sets the header", async () => {
+    tc.request.headers.set("Content-Type", "text/plain");
+    await tc.post("renderBody", { params: { name: "foo.txt" } });
+
+    assertEqual("text/plain", tc.request.headers.get("Content-type"));
+    assertEqual("foo.txt", tc.request.requestParameters["name"]);
+    assertEqual("renderBody", tc.request.pathParameters["action"]);
+  });
+
+  it("mutating content type headers for html files sets the header", async () => {
+    tc.request.headers.set("Content-Type", "text/html");
+    await tc.post("renderBody", { params: { name: "foo.html" } });
+
+    assertEqual("text/html", tc.request.headers.get("Content-type"));
+    assertEqual("foo.html", tc.request.requestParameters["name"]);
+    assertEqual("renderBody", tc.request.pathParameters["action"]);
+  });
+
+  it("mutating content type headers for non registered mime type raises an error", async () => {
+    await assertRaises([Error], {}, async () => {
+      tc.request.headers.set("Content-Type", "type/fake");
+      await tc.post("renderBody", { params: { name: "foo.fake" } });
+    });
+  });
+
+  it("id converted to string", async () => {
+    await tc.get("testParams", { params: { id: 20, foo: new Object() } });
+    assertEqual("string", typeof tc.request.pathParameters["id"]);
+  });
+
+  it("array path parameter handled properly", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.get("file/*path", { to: "test_case_test/test#testParams" });
+
+        deprecator().silence(() => {
+          this.get(":controller/:action");
+        });
+      });
+
+      await tc.get("testParams", { params: { path: ["hello", "world"] } });
+      assertEqual(["hello", "world"], tc.request.pathParameters["path"]);
+      assertEqual("hello/world", toParam(tc.request.pathParameters["path"]));
+    });
+  });
+
+  it("assert realistic path parameters", async () => {
+    await tc.get("testParams", { params: { id: 20, foo: new Object() } });
+
+    for (const key of Object.keys(tc.request.pathParameters)) {
+      assertEqual("string", typeof key);
+    }
+  });
+
   it("with routing places routes back", () => {
     assert(tc.routes);
     const routesId = rbObjId(tc.routes!);
@@ -825,17 +1137,17 @@ describe("TestCaseTest", () => {
 
   it("remote addr", async () => {
     await tc.get("testRemoteAddr");
-    expect(tc.responseBody).toBe("0.0.0.0");
+    assertEqual("0.0.0.0", tc.response.body);
 
     tc.request.remoteAddr = "192.0.0.1";
     await tc.get("testRemoteAddr");
-    expect(tc.responseBody).toBe("192.0.0.1");
+    assertEqual("192.0.0.1", tc.response.body);
   });
 
   it("header properly reset after remote http request", async () => {
     await tc.get("testParams", { xhr: true });
-    expect(tc.request.env["HTTP_X_REQUESTED_WITH"]).toBeUndefined();
-    expect(tc.request.env["HTTP_ACCEPT"]).toBeUndefined();
+    assertNil(tc.request.env["HTTP_X_REQUESTED_WITH"]);
+    assertNil(tc.request.env["HTTP_ACCEPT"]);
   });
 
   it("xhr with params", async () => {
@@ -966,24 +1278,6 @@ describe("TestCaseTest", () => {
     await assertNothingRaised(async () => {
       await tc.get("testFormat", { format: "json", params });
     });
-  });
-
-  it("using as json sets request content type to json", async () => {
-    await tc.post("renderBody", {
-      params: { bool_value: true, str_value: "string", num_value: 2 },
-      as: "json",
-    });
-    expect(tc.request.getHeader("CONTENT_TYPE")).toContain("application/json");
-  });
-
-  it("using as json sets format json", async () => {
-    await tc.post("renderBody", { params: { bool_value: true }, as: "json" });
-    expect(String(tc.request.format)).toBe("application/json");
-  });
-
-  it.skip("using as json with path parameters", async () => {
-    await tc.post("testParams", { params: { id: "12345" }, as: "json" });
-    expect(tc.request.pathParameters["id"]).toBe("12345");
   });
 
   it("should have knowledge of client side cookie state even if they are not set", async () => {

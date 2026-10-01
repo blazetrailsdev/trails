@@ -240,4 +240,25 @@ describe("_loadFromSql — STI detection (Story J gap 2)", () => {
   it("returns empty array for empty result set", () => {
     expect(_loadFromSql.call(Topic as typeof Base, resultFromRowHashes([]))).toEqual([]);
   });
+
+  it("instantiates STI rows from indexedRows without materializing a hash per row", () => {
+    const resultSet = new Result(["id", "type", "title"], [[1, Reply.name, "Rex"]]);
+    const toArray = vi.spyOn(resultSet, "toArray");
+    const records = _loadFromSql.call(Topic as typeof Base, resultSet);
+    expect(toArray).not.toHaveBeenCalled();
+    expect(records[0]).toBeInstanceOf(Reply);
+    expect(records[0].readAttribute("title")).toBe("Rex");
+    expect(records[0].hasAttribute("author_name")).toBe(false);
+    expect(Object.keys(records[0].attributes)).toEqual(["id", "type", "title"]);
+  });
+
+  it("instantiates non-STI rows from indexedRows without materializing a hash per row", () => {
+    const resultSet = new Result(["id", "title"], [[1, "Rex"]]);
+    const toArray = vi.spyOn(resultSet, "toArray");
+    const records = _loadFromSql.call(Topic as typeof Base, resultSet);
+    expect(toArray).not.toHaveBeenCalled();
+    expect(records[0]).toBeInstanceOf(Topic);
+    expect(records[0].readAttribute("title")).toBe("Rex");
+    expect(records[0].isPersisted()).toBe(true);
+  });
 });

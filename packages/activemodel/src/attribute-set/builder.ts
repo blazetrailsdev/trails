@@ -16,6 +16,19 @@ import {
 import { ValueType } from "../type/value.js";
 import { AttributeSet } from "../attribute-set.js";
 
+interface IndexedRow {
+  isKey(column: string): boolean;
+  keys(): string[];
+  eachKey(block: (key: string) => void): void;
+  fetch(column: string, block?: () => unknown): unknown;
+}
+
+type Values = Record<string, unknown> | IndexedRow;
+
+function isIndexedRow(values: Values): values is IndexedRow {
+  return typeof values.fetch === "function";
+}
+
 export class Builder {
   readonly types: Record<string, ValueType>;
   readonly defaultAttributes: Record<string, Attribute>;
@@ -26,7 +39,7 @@ export class Builder {
   }
 
   buildFromDatabase(
-    values: Record<string, unknown> = {},
+    values: Values = {},
     additionalTypes: Record<string, ValueType> = {},
   ): AttributeSet {
     return new LazyAttributeSet(values, this.types, additionalTypes, this.defaultAttributes);
@@ -35,7 +48,7 @@ export class Builder {
 
 export class LazyAttributeSet extends AttributeSet {
   declare protected _attributes: Record<string, Attribute>;
-  private values: Record<string, unknown>;
+  private values: Values;
   private types: Record<string, ValueType>;
   private additionalTypes: Record<string, ValueType>;
   private defaultAttributes: Record<string, Attribute>;
@@ -43,7 +56,7 @@ export class LazyAttributeSet extends AttributeSet {
   private materialized: boolean;
 
   constructor(
-    values: Record<string, unknown>,
+    values: Values,
     types: Record<string, ValueType>,
     additionalTypes: Record<string, ValueType>,
     defaultAttributes: Record<string, Attribute>,
@@ -60,7 +73,7 @@ export class LazyAttributeSet extends AttributeSet {
 
   override isKey(name: string): boolean {
     return (
-      (Object.hasOwn(this.values, name) ||
+      ((isIndexedRow(this.values) ? this.values.isKey(name) : Object.hasOwn(this.values, name)) ||
         hasKey(this.types, name) ||
         hasKey(this._attributes, name)) &&
       this.getAttribute(name).isInitialized()
@@ -69,11 +82,15 @@ export class LazyAttributeSet extends AttributeSet {
 
   /** @missingRailsName attributes — PERMANENT */
   override keys(): string[] {
-    const keys = new Set([
-      ...Object.keys(this.values),
-      ...Object.keys(this.types),
-      ...Object.keys(this._attributes),
-    ]);
+    const keys = new Set(
+      isIndexedRow(this.values)
+        ? [...this.values.keys(), ...Object.keys(this.types), ...Object.keys(this._attributes)]
+        : [
+            ...Object.keys(this.values),
+            ...Object.keys(this.types),
+            ...Object.keys(this._attributes),
+          ],
+    );
     return [...keys].filter((name) => this.getAttribute(name).isInitialized());
   }
 
@@ -85,9 +102,13 @@ export class LazyAttributeSet extends AttributeSet {
 
     if (hasKey(this.castedValues, name)) return this.castedValues[name];
 
-    let valuePresent = true;
+    let valuePresent = true as boolean;
     let value: unknown;
-    if (Object.hasOwn(this.values, name)) {
+    if (isIndexedRow(this.values)) {
+      value = this.values.fetch(name, () => {
+        valuePresent = false;
+      });
+    } else if (Object.hasOwn(this.values, name)) {
       value = this.values[name];
     } else {
       valuePresent = false;
@@ -106,7 +127,11 @@ export class LazyAttributeSet extends AttributeSet {
 
   protected override attributes(): Record<string, Attribute> {
     if (!this.materialized) {
-      eachKey(this.values, (key) => this.getAttribute(key));
+      if (isIndexedRow(this.values)) {
+        this.values.eachKey((key) => this.getAttribute(key));
+      } else {
+        eachKey(this.values, (key) => this.getAttribute(key));
+      }
       eachKey(this.types, (key) => this.getAttribute(key));
       this.materialized = true;
     }
@@ -119,8 +144,15 @@ export class LazyAttributeSet extends AttributeSet {
     value?: unknown,
   ): Attribute {
     if (valuePresent === undefined) {
-      valuePresent = Object.hasOwn(this.values, name);
-      value = valuePresent ? this.values[name] : undefined;
+      if (isIndexedRow(this.values)) {
+        valuePresent = true;
+        value = this.values.fetch(name, () => {
+          valuePresent = false;
+        });
+      } else {
+        valuePresent = Object.hasOwn(this.values, name);
+        value = valuePresent ? this.values[name] : undefined;
+      }
     }
 
     const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
