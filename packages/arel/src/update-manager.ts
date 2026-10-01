@@ -10,8 +10,7 @@ import { BoundSqlLiteral } from "./nodes/bound-sql-literal.js";
 import { Table } from "./table.js";
 import type { UpdateValues } from "./crud.js";
 
-export class UpdateManager extends TreeManager {
-  readonly ast: UpdateStatement;
+export class UpdateManager extends TreeManager<UpdateStatement> {
   declare key: unknown;
   declare wheres: Node[];
   declare where: (expr: Node) => this;

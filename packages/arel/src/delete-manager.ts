@@ -6,8 +6,7 @@ import { Group } from "./nodes/unary.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
 
-export class DeleteManager extends TreeManager {
-  readonly ast: DeleteStatement;
+export class DeleteManager extends TreeManager<DeleteStatement> {
   declare key: unknown;
   declare wheres: Node[];
   declare where: (expr: Node) => this;

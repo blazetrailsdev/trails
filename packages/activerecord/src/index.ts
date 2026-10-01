@@ -1,4 +1,4 @@
-/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: ConnectionAdapters, pp, RuntimeRegistry, Type. */
+/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: pp. */
 
 export { Base } from "./base.js";
 export type { PrimaryKeyScalar, PrimaryKeyValue } from "./base.js";

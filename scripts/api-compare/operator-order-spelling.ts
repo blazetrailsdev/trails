@@ -189,6 +189,13 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // statement_cache.rb:72 `def <<(str)` →
   // statement-cache.ts `PartialQueryCollector#append`.
   "ActiveRecord::StatementCache::PartialQueryCollector": { "<<": ["append"] },
+  // arel/collectors: `def <<(str)` at plain_string.rb:14, bind.rb:12,
+  // composite.rb:20 and substitute_binds.rb:13 → `append` on each collector
+  // class (`SQLString` inherits PlainString's).
+  "Arel::Collectors::PlainString": { "<<": ["append"] },
+  "Arel::Collectors::Bind": { "<<": ["append"] },
+  "Arel::Collectors::Composite": { "<<": ["append"] },
+  "Arel::Collectors::SubstituteBinds": { "<<": ["append"] },
   // connection_adapters/statement_pool.rb:23 `def [](key)` / :31 `def []=(sql, stmt)`
   // → connection-adapters/statement-pool.ts `get` / `set`.
   "ActiveRecord::ConnectionAdapters::StatementPool": { "[]": ["get"], "[]=": ["set"] },

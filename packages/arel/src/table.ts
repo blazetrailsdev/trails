@@ -30,7 +30,7 @@ export class Table {
 
   name: string | Node;
   readonly tableAlias: string | null;
-  readonly klass?: TableKlass;
+  private readonly klass?: TableKlass;
 
   constructor(
     name: string | Node,

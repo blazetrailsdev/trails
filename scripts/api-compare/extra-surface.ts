@@ -460,6 +460,20 @@ function rubyMethodCandidates(rubyName: string): string[] | null {
 }
 
 /**
+ * A TS namespace binding that declares nothing of its own: a namespace
+ * re-export or a `declare namespace` holding only types.
+ */
+function isBareNamespaceBinding(m: ClassInfo): boolean {
+  return (
+    m.declaredAsNamespace === true &&
+    m.isInterface !== true &&
+    m.reExportedFrom === undefined &&
+    m.instanceMethods.length === 0 &&
+    m.classMethods.length === 0
+  );
+}
+
+/**
  * TS-candidate names for a Ruby file-level constant. Constants aren't
  * case-transformed on the way over — `ER_DUP_ENTRY` ports verbatim — so the
  * name itself is always a candidate. The camelized form is the second
@@ -959,6 +973,11 @@ exemption would hide.
 A class whose name appears nowhere in Rails cannot hold a misplaced port, so a
 member it overrides from the class it \`extends\` is not counted as moved and
 needs no tag. An override on a class Rails does name stays scored.
+
+A namespace binding with no members of its own (\`export * as Collectors from\`,
+a types-only \`declare namespace\`) named after a Rails module of the package is
+not counted as moved: Rails reopens the module in every file under it, so it
+has no defining \`.rb\`. A binding that declares members stays scored.
 
 Reasoned exceptions: an extra is allowed by tagging its TS declaration
 \`@noRailsEquivalent <reason>\` in JSDoc. Allowed extras are subtracted from the
@@ -2274,6 +2293,12 @@ function buildPackageReport(
   const rubyFileByTsFile = new Map<string, string>();
   for (const rf of rubyFileNames) rubyFileByTsFile.set(rubyFileToTs(rf, pkg), rf);
 
+  const rubyModuleConstants = new Set<string>();
+  for (const fqn of Object.keys(rubyPkg.modules)) {
+    const short = fqn.split("::").pop();
+    if (short) for (const c of rubyConstantCandidates(short)) rubyModuleConstants.add(c);
+  }
+
   const tsDeclFileByName = new Map<string, string>();
   for (const c of [...Object.values(tsPkg.classes), ...Object.values(tsPkg.modules)]) {
     if (!c.file || c.reExportedFrom || tsDeclFileByName.has(c.name)) continue;
@@ -2438,6 +2463,22 @@ function buildPackageReport(
     // surface such a file has is its functions, and those stay scored.
     for (const c of [...classes, ...modules]) {
       if (c.file === expectedTs && c.synthesizedFileModule === true) allowed.add(c.name);
+    }
+
+    // A namespace BINDING with no members of its own — `export * as Collectors
+    // from "./collectors/index.js"`, or the type-only `declare namespace Nodes`
+    // merged onto the `Arel::Nodes` Autoload object — spells a Ruby namespace
+    // module. Rails reopens that module in every file under it (`module
+    // Collectors` at collectors/bind.rb:4, plain_string.rb:4, composite.rb:4),
+    // so it has no defining `.rb` to relocate the binding to: the extractor
+    // stamps it with whichever reopening it read first, and the binding scored
+    // `moved` against that one arbitrary file. Deliberately narrow: the name
+    // must be a module of this package, and a binding that declares members,
+    // or merges with a class or interface of the same name, stays scored.
+    for (const m of modules) {
+      if (m.file !== expectedTs || !isBareNamespaceBinding(m)) continue;
+      if (classes.some((c) => c.name === m.name)) continue;
+      if (rubyModuleConstants.has(m.name)) allowed.add(m.name);
     }
 
     const scored: ExtraName[] = [];

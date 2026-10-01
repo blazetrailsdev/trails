@@ -57,9 +57,7 @@ export class StatementMethods {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export abstract class TreeManager {
-  abstract ast: Node;
-
+export abstract class TreeManager<T extends Node = Node> {
   toDot(): string {
     const collector = new PlainString();
     const dot = new Visitors.Dot();
@@ -71,11 +69,11 @@ export abstract class TreeManager {
     return this.ast.toSql(engine);
   }
 
-  initializeCopy(_other: TreeManager): void {
+  initializeCopy(_other: TreeManager<T>): void {
     this.ast = rbObjClone(this.ast);
   }
 }
 
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
-   @typescript-eslint/no-unsafe-declaration-merging */
-export interface TreeManager extends FactoryMethodsModule {}
+export interface TreeManager<T extends Node = Node> extends FactoryMethodsModule {
+  ast: T;
+}

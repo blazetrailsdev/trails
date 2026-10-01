@@ -2531,6 +2531,82 @@ describe("buildReport — declaration names", () => {
   });
 });
 
+describe("buildReport — bare namespace bindings", () => {
+  const run = (ruby: ApiManifest, ts: ApiManifest) =>
+    buildReport(ruby, ts, { filterPkg: null, excludeGlobs: [], novelOnly: false, topN: 50 });
+
+  // `module Collectors` is reopened by every file under it and stamped with
+  // the first one read — collectors/bind.rb — so no TS file "mirrors" it.
+  const ruby: ApiManifest = {
+    source: "ruby",
+    generatedAt: "",
+    packages: {
+      arel: {
+        classes: {
+          "Arel::Collectors::Bind": rubyClass({ name: "Bind", file: "collectors/bind.rb" }),
+          "Arel::Table": rubyClass({ name: "Table", file: "table.rb" }),
+        },
+        modules: {
+          "Arel::Collectors": rubyClass({ name: "Collectors", file: "collectors/bind.rb" }),
+        },
+      },
+    },
+  };
+
+  const tsWith = (name: string, extra: Partial<ClassInfo> = {}): ApiManifest => ({
+    source: "typescript",
+    generatedAt: "",
+    packages: {
+      arel: {
+        classes: {},
+        modules: {
+          [`index.ts:${name}`]: {
+            name,
+            file: "index.ts",
+            includes: [],
+            extends: [],
+            instanceMethods: [],
+            classMethods: [],
+            declaredAsNamespace: true,
+            ...extra,
+          },
+        },
+      },
+    },
+  });
+
+  it("does not count a member-less namespace binding of a Rails module as moved", () => {
+    expect(run(ruby, tsWith("Collectors")).packages[0].extraFiles).toEqual([]);
+  });
+
+  it("still scores a namespace binding that declares members", () => {
+    const report = run(ruby, tsWith("Collectors", { instanceMethods: [method("build")] }));
+    expect(report.packages[0].extraFiles[0].extras).toMatchObject([
+      { name: "build", kind: "novel" },
+      { name: "Collectors", kind: "moved" },
+    ]);
+  });
+
+  it("still scores a namespace binding named after a Rails CLASS declared elsewhere", () => {
+    const report = run(ruby, tsWith("Table"));
+    expect(report.packages[0].extraFiles[0].extras).toMatchObject([
+      { name: "Table", kind: "moved" },
+    ]);
+  });
+
+  it("still scores a namespace merged onto an interface of the same name", () => {
+    const report = run(ruby, tsWith("Collectors", { isInterface: true }));
+    expect(report.packages[0].extraFiles[0].extras).toMatchObject([
+      { name: "Collectors", kind: "moved" },
+    ]);
+  });
+
+  it("still scores a namespace binding no Rails module is named after", () => {
+    const report = run(ruby, tsWith("Helpers"));
+    expect(report.packages[0].extraFiles[0].extras).toEqual([{ name: "Helpers", kind: "novel" }]);
+  });
+});
+
 describe("buildReport — interface declaration names", () => {
   const run = (ruby: ApiManifest, ts: ApiManifest) =>
     buildReport(ruby, ts, {
@@ -4164,9 +4240,9 @@ describe("buildReport — Ruby operator methods", () => {
       packages: {
         arel: {
           classes: {
-            "Arel::Collectors::PlainString": rubyClass({
-              name: "PlainString",
-              file: "collectors/plain_string.rb",
+            "Arel::Collectors::Unpinned": rubyClass({
+              name: "Unpinned",
+              file: "collectors/unpinned.rb",
               instance: [method("<<")],
             }),
           },
@@ -4194,9 +4270,9 @@ describe("buildReport — Ruby operator methods", () => {
               instanceMethods: [method("multiply"), method("bitwiseShiftLeft")],
               classMethods: [],
             },
-            PlainString: {
-              name: "PlainString",
-              file: "collectors/plain-string.ts",
+            Unpinned: {
+              name: "Unpinned",
+              file: "collectors/unpinned.ts",
               includes: [],
               extends: [],
               instanceMethods: [method("append")],
@@ -4230,7 +4306,7 @@ describe("buildReport — Ruby operator methods", () => {
       novelOnly: false,
       topN: 50,
     });
-    const f = report.packages[0].extraFiles.find((f) => f.tsFile === "collectors/plain-string.ts");
+    const f = report.packages[0].extraFiles.find((f) => f.tsFile === "collectors/unpinned.ts");
     expect(f?.extras.map((e) => e.name)).toEqual(["append"]);
   });
 });
