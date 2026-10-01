@@ -82,8 +82,6 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
     return 1;
   }
 
-  // Scoped, only the scope's mark is held against the measurement: every other
-  // package measured zero rows because it was never compared.
   const marks = scope === null ? committed : committed[scope] ? { [scope]: committed[scope] } : {};
   const current = measure(artifact.skeletons.flatMap((s) => compareArms(s) ?? []));
   const grew = exceedances(marks, current);

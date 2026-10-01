@@ -56,11 +56,8 @@ describe("scopedMarks", () => {
   });
 });
 
-// scripts/ci/thor-comparison.sh skips these gates because thor is outside the
-// population each one judges. Enrolling thor in one makes its skip a hole:
-// give that gate a `--package` arm and move it to the driver's SCOPED list.
-describe("the gates the thor comparison skips", () => {
-  it("do not cover thor", () => {
+describe("the gates scripts/ci/thor-comparison.sh skips", () => {
+  it("judge populations thor is outside of", () => {
     expect(EXTRA_SURFACE_GATED).not.toContain("thor");
     expect(PARAM_NAME_GATED).not.toContain("thor");
     expect([...GATE_ENFORCED_PACKAGES]).not.toContain("thor");

@@ -155,12 +155,6 @@ const hasRailsApi = railsApiAvailable({
   argv: process.argv.slice(2),
 });
 
-// `--package <name>` (CI's thor-only comparison): rails-api.json holds that one
-// package, so only the private-methods manifest — a per-file projection of it
-// — is emitted. The other outputs describe the whole surface: the two
-// vendored-Ruby scans below, and the committed runtime module, which a partial
-// manifest would rewrite under packages/ and so stale the build the extractor
-// is measuring.
 const scope = scopeOf(process.argv.slice(2));
 
 // This script emits three manifests per run. Collect their writes and format

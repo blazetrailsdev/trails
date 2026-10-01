@@ -1,22 +1,11 @@
-/**
- * Per-package mode for the gates that read a whole-surface artifact.
- *
- * A gate fed an artifact covering one package must not read every other
- * package's committed rows as converged: an absent row is exactly what STALE
- * looks like. So a scoped gate does two things, and both live here — it holds
- * only the scope's committed rows against the artifact ({@link inScope}), and
- * it refuses an artifact whose population is anything but that one package
- * ({@link scopeMismatch}), the scoped twin of each gate's `missingScope`.
- *
- * CI takes this arm for a diff that touches one package only
- * (scripts/ci/thor-comparison.sh); every other run stays whole-surface.
- *
- * Hard rules: no node:* imports, no process.*, no third-party runtime deps.
- */
-
 import { PACKAGES } from "./config.js";
 
-/** The package `--package <name>` scopes a gate to, or null for the whole surface. */
+/**
+ * The package `--package <name>` scopes a gate to, or null for the whole
+ * surface. CI takes the scoped arm for a diff confined to one package
+ * (scripts/ci/thor-comparison.sh); a scoped run only gates, so a flag that
+ * rewrites the committed marks is refused alongside it.
+ */
 export function scopeOf(argv: readonly string[]): string | null {
   const at = argv.indexOf("--package");
   if (at === -1) return null;
@@ -31,7 +20,11 @@ export function scopeOf(argv: readonly string[]): string | null {
   return pkg;
 }
 
-/** The rows a scoped gate judges: the scope's own, or all of them unscoped. */
+/**
+ * The committed rows a scoped gate holds against its artifact: the scope's
+ * own, since a package the artifact never compared has no rows in it and would
+ * read as STALE. Unscoped, all of them.
+ */
 export function inScope<T extends { package?: string }>(
   rows: readonly T[],
   scope: string | null,

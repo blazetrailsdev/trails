@@ -458,11 +458,13 @@ function gateRegex(yml: string, name: string): RegExp {
  *    non-transactional-row-writes are not kept: they read only
  *    packages/activerecord/.
  *  - rails-comparison skips and rails-comparison-thor runs in its place:
- *    scripts/ci/thor-comparison.sh extracts and compares the `thor` package
- *    alone, and its header lists every whole-surface gate as scoped
- *    (`--package thor`, scripts/api-compare/scope.ts), unscoped or skipped,
- *    with the reason. The ci aggregate accepts each job's skip only on the
- *    other's side of thor_only.
+ *    scripts/ci/thor-comparison.sh fetches, extracts and compares the
+ *    `thor` package alone. Each gate it runs is scoped (`--package thor`,
+ *    scripts/api-compare/scope.ts) unless it reads no artifact; each
+ *    whole-surface script it does not run is in THOR_COMPARISON_SKIPS below,
+ *    with the reason. The vendor cache is restore-only there, so a thor-only
+ *    fetch is never saved under the key rails-comparison shares. The ci
+ *    aggregate accepts each job's skip only on the other's side of thor_only.
  *
  *  case "${{ github.event_name }}" in
  *  Website label opt-in. The Website job otherwise gates only on
@@ -490,6 +492,28 @@ type GateOpts = { cwd?: string; base?: string; head?: string };
 
 /** The filter step's last gate line; ci.yml names the script repo-relative. */
 const THOR_ONLY_CALL = "bash scripts/ci/thor-only.sh";
+
+/**
+ * The whole-surface comparison scripts scripts/ci/thor-comparison.sh does not
+ * run, each with why a thor-only diff cannot move its answer. The first four
+ * premises are asserted by scripts/api-compare/scope.test.ts.
+ */
+const THOR_COMPARISON_SKIPS: Record<string, string> = {
+  "scripts/api-compare/lint-extra-surface-ratchet.ts": "thor is not in its GATED_PACKAGES",
+  "scripts/api-compare/lint-param-names.ts": "thor is not in its GATED_PACKAGES",
+  "scripts/api-compare/lint-block-params.ts": "thor is not in its GATED_PACKAGES",
+  "scripts/api-compare/lint-deps.ts": "no dependency rule names thor",
+  "scripts/api-compare/receipt-audit.ts": "runs for --package activerecord only",
+  "scripts/build-rails-file-structure-manifest.ts": "method order: arel and activemodel only",
+  "scripts/build-rails-test-names-manifest.ts": "test names: no thor path is enrolled",
+  "scripts/parity/conventions-doc.ts": "generated from conventions.ts",
+  "scripts/generate-standalone-associations-exclude.ts": "reads packages/activerecord only",
+  "scripts/test-deps/rails-test-deps.ts": "reads packages/activerecord only",
+  "scripts/test-deps/build-fixture-baseline.ts": "reads packages/activerecord only",
+  "scripts/test-compare/closure-cli.ts": "reads vendored activesupport tests only",
+  "scripts/fixtures-compare/compare.ts": "reads activerecord fixtures and models only",
+  "scripts/schema-compare/compare.ts": "reads the activerecord test schema only",
+};
 
 async function gateRunner(
   yml: string,
@@ -1344,13 +1368,17 @@ describe("CI runs every tooling test suite", () => {
     expect(flat(wf.jobs["rails-comparison-thor"].if).trim()).toBe(`${gated} == 'true'`);
     expect(wf.jobs.ci.needs).toContain("rails-comparison-thor");
     expect(aggregate).toContain(
-      "# A thor-only diff runs rails-comparison-thor instead. " +
-        'if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; then continue',
+      'if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; then continue',
     );
     expect(aggregate).toContain(
       'rails-comparison-thor) if [ "$COMPARISON_AFFECTED" = "false" ] || ' +
         '[ "$THOR_ONLY" != "true" ]; then continue',
     );
+
+    const steps = wf.jobs["rails-comparison-thor"].steps as { uses?: string; run?: string }[];
+    expect(steps.map((step) => step.uses)).toContain("actions/cache/restore@v4");
+    expect(steps.map((step) => step.uses)).not.toContain("actions/cache@v4");
+    expect(steps.map((step) => step.run)).toContain("pnpm vendor:fetch --source thor");
   });
 
   it("accounts for every whole-surface comparison script in the thor driver", async () => {
@@ -1363,8 +1391,12 @@ describe("CI runs every tooling test suite", () => {
       .replaceAll("$api/", "scripts/api-compare/")
       .replaceAll("$tests/", "scripts/test-compare/");
 
+    const run = [...scripts].filter((script) => driver.includes(script));
+    const skipped = Object.keys(THOR_COMPARISON_SKIPS);
+
     expect(scripts.size).toBeGreaterThan(30);
-    expect([...scripts].filter((script) => !driver.includes(script))).toEqual([]);
+    expect([...scripts].filter((s) => !run.includes(s) && !skipped.includes(s))).toEqual([]);
+    expect(skipped.filter((s) => !scripts.has(s) || run.includes(s))).toEqual([]);
   });
 
   it("keeps comparison_affected off for website-only changes", async () => {

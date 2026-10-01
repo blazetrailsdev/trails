@@ -102,8 +102,6 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
   const artifact = path.join(OUTPUT_DIR, "ambiguous-parents.json");
   const current = JSON.parse(await fs.readFile(artifact, "utf-8")) as AmbiguousParentCounts;
   if (scope !== null) {
-    // The artifact names only the packages with a count, so the scope itself
-    // may be absent from it; any OTHER package there means a wider run.
     const measured = [scope, ...Object.keys(current)];
     const mismatch = scopeMismatch("ambiguous-parent gate", measured, scope);
     if (mismatch !== null) {

@@ -175,8 +175,6 @@ export async function main(
 
   const current = countsFromArtifact(await loadArtifact(paths.artifact));
   const committed = await loadMark(paths.mark);
-  // Scoped, the artifact must hold exactly that package, and only its mark is
-  // held against it: every other marked package is absent, not converged.
   if (scope !== null) {
     const mismatch = scopeMismatch("assertion-mismatch ratchet", Object.keys(current), scope);
     if (mismatch !== null) {
