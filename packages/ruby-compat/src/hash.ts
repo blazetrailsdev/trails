@@ -66,6 +66,12 @@ export function fetch<T>(hash: Record<string, unknown>, key: string, defaultValu
  */
 export function fetch<K, V, T>(hash: Map<K, V>, key: K, defaultValue: T): V | T;
 /**
+ * The Map arm with the arguments forwarded as received, which is how a
+ * subclass's `fetch(key, *args)` reaches `super(key, *args)`.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`).
+ */
+export function fetch<K, V>(hash: Map<K, V>, key: K, ...rest: unknown[]): unknown;
+/**
  * `rb_hash_fetch_m` dispatches on `argc` and `rb_block_given_p`, so the arms
  * share one body over a rest parameter: an absent second argument is the
  * raising arm, and an explicitly-passed `undefined` is a default, exactly as
@@ -179,13 +185,34 @@ export function merge<T>(
 export function update<T>(
   hash: Record<string, T>,
   ...others: (Record<string, T> | Map<string, T> | ConflictBlock<T>)[]
-): Record<string, T> {
+): Record<string, T>;
+/**
+ * The Map arm: a `Hash` receiver is written through its own `[]=`, as
+ * `rb_hash_update_i` does through `rb_hash_aset` (`vendor/ruby/v3.3.11/hash.c:3945`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#update` (`vendor/ruby/v3.3.11/hash.c:4028`).
+ */
+export function update<T, H extends Map<string, T>>(
+  hash: H,
+  ...others: (Record<string, T> | Map<string, T> | ConflictBlock<T>)[]
+): H;
+/** @noRailsEquivalent PERMANENT — Ruby core `Hash#update` (`vendor/ruby/v3.3.11/hash.c:4028`). */
+export function update<T>(
+  hash: Record<string, T> | Map<string, T>,
+  ...others: (Record<string, T> | Map<string, T> | ConflictBlock<T>)[]
+): Record<string, T> | Map<string, T> {
   const block = rbBlockGivenP(others[others.length - 1])
     ? (others.pop() as ConflictBlock<T>)
     : undefined;
   for (const other of others as (Record<string, T> | Map<string, T>)[]) {
     for (const [key, value] of other instanceof Map ? other : Object.entries(other)) {
-      hash[key] = block !== undefined && hasKey(hash, key) ? block(key, hash[key], value) : value;
+      if (hash instanceof Map) {
+        hash.set(
+          key,
+          block !== undefined && hash.has(key) ? block(key, hash.get(key)!, value) : value,
+        );
+      } else {
+        hash[key] = block !== undefined && hasKey(hash, key) ? block(key, hash[key], value) : value;
+      }
     }
   }
   return hash;
@@ -397,9 +424,27 @@ export function transformValues<T, U>(
  * of just the given keys, in ARGUMENT order, keys that are absent ignored.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#slice` (`vendor/ruby/v3.3.11/hash.c:2651`).
  */
-export function slice<T>(hash: Record<string, T>, ...keys: string[]): Record<string, T> {
-  const result: Record<string, T> = Object.create(null) as Record<string, T>;
-  for (const key of keys) {
+export function slice<T>(hash: Record<string, T>, ...keys: string[]): Record<string, T>;
+/**
+ * The Map arm: `rb_hash_slice` answers a bare `Hash` (`rb_hash_new_with_size`)
+ * whatever the receiver's class.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#slice` (`vendor/ruby/v3.3.11/hash.c:2651`).
+ */
+export function slice<K, V>(hash: Map<K, V>, ...keys: K[]): Hash<K, V>;
+/** @noRailsEquivalent PERMANENT — Ruby core `Hash#slice` (`vendor/ruby/v3.3.11/hash.c:2651`). */
+export function slice(
+  hash: Record<string, unknown> | Map<unknown, unknown>,
+  ...keys: unknown[]
+): Record<string, unknown> | Hash<unknown, unknown> {
+  if (hash instanceof Map) {
+    const result = new Hash<unknown, unknown>();
+    for (const key of keys) {
+      if (hash.has(key)) result.set(key, hash.get(key));
+    }
+    return result;
+  }
+  const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+  for (const key of keys as string[]) {
     if (hasKey(hash, key)) result[key] = hash[key];
   }
   return result;
@@ -852,6 +897,29 @@ export class Hash<K, V> extends Map<K, V> {
     thisArg?: unknown,
   ): void {
     for (const [key, value] of this) callbackfn.call(thisArg, value, key, this);
+  }
+
+  /**
+   * `Hash#replace` (`vendor/ruby/v3.3.11/hash.c:2967` `rb_hash_replace`): the
+   * receiver takes `hash2`'s `default` / `default_proc` (`COPY_DEFAULT`) and a
+   * `hash_copy` of its table, which is not written through a subclass's `[]=`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#replace` (`vendor/ruby/v3.3.11/hash.c:2967`).
+   */
+  replace(hash2: Iterable<[K, V]> | Record<string, unknown>): this {
+    this.modifyCheck();
+    if (this === hash2) return this;
+    if (this.hashIteratingP()) {
+      throw new RuntimeError("can't replace hash during iteration");
+    }
+    const pairs = (Symbol.iterator in hash2 ? [...hash2] : Object.entries(hash2)) as [K, V][];
+    if (hash2 instanceof Hash) {
+      this.#default = hash2.#default;
+      this.#defaultProc = hash2.#defaultProc;
+    }
+    Hash.prototype.clear.call(this);
+    for (const [key, value] of pairs) Hash.prototype.set.call(this, key, value);
+    return this;
   }
 
   /** `hash_iterating_p` (`vendor/ruby/v3.3.11/hash.c:1339`). */

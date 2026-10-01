@@ -4,8 +4,10 @@ import {
   eachPair,
   fetch,
   isSymbol,
+  mergeBang,
   rbEqual,
   rtest,
+  slice,
   symbolToS,
 } from "@blazetrails/ruby-compat";
 
@@ -67,19 +69,11 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   }
 
   fetch(key: string, ...args: unknown[]): unknown {
-    return (fetch as (hash: Map<string, V>, key: string, ...rest: unknown[]) => unknown)(
-      this,
-      this.convertKey(key),
-      ...args,
-    );
+    return fetch(this, this.convertKey(key), ...args);
   }
 
   slice(...keys: string[]): Hash<string, V> {
-    const result = new Hash<string, V>();
-    for (const key of keys.map((key) => this.convertKey(key))) {
-      if (super.has(key)) result.set(key, super.get(key)!);
-    }
-    return result;
+    return slice(this, ...keys.map((key) => this.convertKey(key)));
   }
 
   key(key: string): boolean {
@@ -109,17 +103,12 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return this.replace(this.reverseMerge(otherHash));
   }
 
-  replace(otherHash: AnyHash<V>): this {
-    const pairs = otherHash instanceof Map ? [...otherHash] : Object.entries(otherHash);
-    super.clear();
-    for (const [key, value] of pairs) super.set(key, value);
-    return this;
+  override replace(otherHash: Map<string, V>): this {
+    return super.replace(otherHash);
   }
 
   toHash(): Hash<string, V> {
-    const hash = new Hash<string, V>(this.default());
-    for (const [key, value] of this) hash.set(key, value);
-    return hash;
+    return mergeBang(new Hash<string, V>(this.default()), this);
   }
 
   /** @internal */

@@ -95,7 +95,7 @@ export class OrderedHash<K, V> extends Hash<K, V> {
     return this.mergeInPlace(other);
   }
 
-  replace(other: OrderedHash<K, V>): this {
+  override replace(other: OrderedHash<K, V>): this {
     this.clear();
     for (const [k, v] of other) {
       this.set(k, v);

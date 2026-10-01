@@ -238,7 +238,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return this.reverseMergeBang(otherHash);
   }
 
-  replace(otherHash: AnyObject | HashWithIndifferentAccess<V>): this {
+  override replace(otherHash: AnyObject | HashWithIndifferentAccess<V>): this {
     super.clear();
     return this.update(new HashWithIndifferentAccess<V>(otherHash));
   }
