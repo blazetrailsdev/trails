@@ -1,11 +1,10 @@
+import type { UnportedFile } from "./types.js";
+
 /**
  * `version.rb`, one entry per package that has not ported it. activemodel
  * has (`packages/activemodel/src/version.ts`), so it carries no entry. Each
  * remaining package leaves by deleting its name here. Schema: ./types.ts.
  */
-
-import type { UnportedFile } from "./types.js";
-
 export const VERSION_UNPORTED_FILES: UnportedFile[] = [
   "activerecord",
   "activesupport",

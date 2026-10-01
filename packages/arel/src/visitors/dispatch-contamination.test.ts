@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { Nodes, Visitors } from "../index.js";
 
 describe("DispatchContaminationTest", () => {
@@ -7,12 +8,10 @@ describe("DispatchContaminationTest", () => {
     expect(node.toSql()).toBe("( TRUE UNION FALSE )");
 
     class ContaminatingVisitor extends Visitors.Visitor {
-      protected visitArelNodesUnion(_node: unknown): void {}
+      protected visitArelNodesUnion(_o: unknown): void {}
+      protected visitArelNodesTrue = this.visitArelNodesUnion;
+      protected visitArelNodesFalse = this.visitArelNodesUnion;
     }
-    const cache = ContaminatingVisitor.dispatchCache();
-    cache.set(Nodes.Binary, "visitArelNodesUnion");
-    cache.set(Nodes.True, "visitArelNodesUnion");
-    cache.set(Nodes.False, "visitArelNodesUnion");
 
     new ContaminatingVisitor().accept(node);
 
@@ -22,13 +21,14 @@ describe("DispatchContaminationTest", () => {
   it("is threadsafe when implementing superclass fallback", () => {
     class DummySuperNode {}
     class DummySubNode extends DummySuperNode {}
+    rbSetClassPathString(DummySuperNode, Visitors, "DummySuperNode");
+    rbSetClassPathString(DummySubNode, Visitors, "DummySubNode");
 
     class DummyVisitor extends Visitors.Visitor {
       protected visitArelVisitorsDummySuperNode(_node: unknown): number {
         return 42;
       }
     }
-    DummyVisitor.dispatchCache().set(DummySuperNode, "visitArelVisitorsDummySuperNode");
 
     const visitor = new DummyVisitor();
     const racingVisitor = new DummyVisitor();

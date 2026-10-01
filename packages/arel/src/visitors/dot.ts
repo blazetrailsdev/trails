@@ -27,10 +27,6 @@ export class Dot extends Visitor {
   private static readonly NIL_SENTINEL = Symbol("Dot.NIL_SENTINEL");
 
   override accept(object: Nodes.Node, collector?: unknown): { value: string } {
-    if (!this.dispatch.has(Table)) {
-      this.dispatch.set(Table, "visitArelTable");
-    }
-
     this.nodes = [];
     this.edges = [];
     this.nodeStack = [];

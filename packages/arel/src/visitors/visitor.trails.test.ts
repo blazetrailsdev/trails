@@ -15,9 +15,6 @@ class TestVisitor extends Visitor {
     this.visited.push({ node: node.constructor.name, collector });
     return "A";
   }
-  static {
-    this.dispatchCache().set(A, "visitA");
-  }
 }
 
 describe("Visitor dispatch", () => {
@@ -43,9 +40,6 @@ describe("Visitor dispatch", () => {
     class FreshVisitor extends Visitor {
       visitA(_n: A): string {
         return "A";
-      }
-      static {
-        this.dispatchCache().set(A, "visitA");
       }
     }
     expect(FreshVisitor.dispatchCache().has(B)).toBe(false);
@@ -73,7 +67,6 @@ describe("Visitor dispatch", () => {
         return "A";
       }
       static {
-        this.dispatchCache().set(A, "visitA");
         this.dispatchCache().set(B, "visitTypoed");
       }
     }
@@ -132,9 +125,6 @@ describe("Visitor dispatch", () => {
       visitC(_n: C): string {
         return "C";
       }
-      static {
-        this.dispatchCache().set(C, "visitC");
-      }
     }
     const sub = new Sub();
     expect(sub.accept(new A())).toBe("A");
@@ -174,9 +164,6 @@ describe("Visitor dispatch", () => {
       }
       visitTime(): string {
         return "Time";
-      }
-      static {
-        this.dispatchCache().set(Registered, "visitRegistered");
       }
     }
 
