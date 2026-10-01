@@ -14,6 +14,7 @@ import {
   initialize,
   initializeIncludedModules,
   isModuleIncluded,
+  rbModAncestors,
   defineModule,
   moduleVisibility,
   publicInstanceMethods,
@@ -782,6 +783,20 @@ describe("isModuleIncluded", () => {
     class User {}
     include(User, Trackable);
     expect(isModuleIncluded(User, Trackable)).toBe(true);
+  });
+});
+
+describe("Module#ancestors", () => {
+  it("lists the class, its mixed-in modules most recent first, then each superclass", () => {
+    const first = { a() {} };
+    const second = { b() {} };
+    const inherited = { c() {} };
+    class Base {}
+    class User extends Base {}
+    include(Base, inherited);
+    include(User, first);
+    include(User, second);
+    expect(rbModAncestors(User)).toEqual([User, second, first, Base, inherited, Object]);
   });
 });
 

@@ -13,15 +13,16 @@ import { CpkBook } from "./test-helpers/models/cpk.js";
 describe("CoreTest", () => {
   const { topics } = fixtures(["topics"]);
 
-  async function withAttributesForInspect<T>(value: unknown, fn: () => T | Promise<T>): Promise<T> {
-    const had = Object.prototype.hasOwnProperty.call(Topic, "attributesForInspect");
-    const prev = (Topic as any).attributesForInspect;
-    (Topic as any).attributesForInspect = value;
+  async function withAttributesForInspect<T>(
+    value: typeof Topic.attributesForInspect,
+    fn: () => T | Promise<T>,
+  ): Promise<T> {
+    const prev = Topic.attributesForInspect;
+    Topic.attributesForInspect = value;
     try {
       return await fn();
     } finally {
-      if (had) (Topic as any).attributesForInspect = prev;
-      else delete (Topic as any).attributesForInspect;
+      Topic.attributesForInspect = prev;
     }
   }
 
@@ -95,7 +96,7 @@ describe("CoreTest", () => {
   });
 
   it("inspect with attributes for inspect all lists all attributes", async () => {
-    await withAttributesForInspect("all", () => {
+    await withAttributesForInspect(":all", () => {
       const topic = topics("first") as any;
       expect(topic.inspect()).toBe(fullInspectString(topic));
     });
@@ -185,7 +186,7 @@ describe("CoreTest", () => {
   });
 
   it("pretty print full", async () => {
-    await withAttributesForInspect("all", async () => {
+    await withAttributesForInspect(":all", async () => {
       const topic = topics("first") as any;
       const actual = await ppString(topic);
       const expected = `#<Topic:0x\\w+
@@ -239,7 +240,7 @@ describe("CoreTest", () => {
       attrName === "title"
         ? JSON.stringify(topic.readAttribute("title").toUpperCase())
         : superAttributeForInspect(attrName);
-    await withAttributesForInspect("all", async () => {
+    await withAttributesForInspect(":all", async () => {
       expect(await ppString(topic)).toMatch(/title: "THE FIRST TOPIC"/);
     });
   });

@@ -74,6 +74,7 @@ export const Core = {
     classAttribute.call(base, "defaultConnectionHandler", { instanceWriter: false });
     classAttribute.call(base, "defaultRole", { instanceWriter: false });
     classAttribute.call(base, "defaultShard", { instanceWriter: false });
+    classAttribute.call(base, "attributesForInspect", { instanceAccessor: false, default: ":all" });
 
     (base as { defaultConnectionHandler: ConnectionHandler }).defaultConnectionHandler =
       new ConnectionHandler();
@@ -785,10 +786,10 @@ export function inspectWithAttributes(
 }
 
 export function attributesForInspect(this: CoreRecord): string[] {
-  const klass = this.constructor as any;
-  const forInspect = klass.attributesForInspect;
-  if (forInspect === "all" || forInspect == null) return allAttributesForInspect.call(this);
-  return Array.isArray(forInspect) ? forInspect : allAttributesForInspect.call(this);
+  const klass = this.constructor as unknown as { attributesForInspect: ":all" | string[] };
+  return klass.attributesForInspect === ":all"
+    ? allAttributesForInspect.call(this)
+    : klass.attributesForInspect;
 }
 
 /** @internal */

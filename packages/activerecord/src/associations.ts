@@ -609,6 +609,12 @@ export function _buildAssociationInstance(
   }
 }
 
+export async function eagerLoadBang(this: typeof AssociationsNamespace): Promise<void> {
+  await Autoload.eagerLoadBang.call(this);
+  await this.Preloader.eagerLoadBang();
+  await this.JoinDependency.eagerLoadBang();
+}
+
 export function association(this: Base, name: string): AssociationInstance {
   const existing = associationInstanceGet.call(this, name) as AssociationInstance | null;
   if (existing) return existing;
@@ -648,11 +654,7 @@ export function associationInstanceSet(this: Base, name: string, association: un
 }
 
 Object.defineProperty(AssociationsNamespace, "eagerLoadBang", {
-  value: async function eagerLoadBang(this: typeof AssociationsNamespace): Promise<void> {
-    await Autoload.eagerLoadBang.call(this);
-    await this.Preloader.eagerLoadBang();
-    await this.JoinDependency.eagerLoadBang();
-  },
+  value: eagerLoadBang,
   writable: true,
   configurable: true,
 });

@@ -39,6 +39,7 @@ export {
   rbObjInstanceVariables,
   rbObjIvarGet,
   rbObjIvarSet,
+  classpaths,
   rbClassSuperclass,
   rbModName,
   rbModSingletonP,
@@ -163,6 +164,7 @@ export {
   includedModules,
   initializeIncludedModules,
   isModuleIncluded,
+  rbModAncestors,
   moduleVisibility,
   publicInstanceMethods,
 } from "./include.js";

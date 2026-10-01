@@ -1,5 +1,4 @@
 import { Deprecation } from "@blazetrails/activesupport";
-import { gemVersion } from "./gem-version.js";
 
 export { Deprecation as Deprecator };
 
@@ -11,8 +10,4 @@ export function deprecator(): Deprecation {
 
 export interface ActiveModel {
   deprecator(): Deprecation;
-}
-
-export function version(): string {
-  return gemVersion();
 }

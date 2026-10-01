@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { NoMethodError, TypeError, rbFSend } from "@blazetrails/ruby-compat";
 import { Node } from "../nodes/node.js";
 import { Visitor } from "./visitor.js";
 import { UnsupportedVisitError } from "./to-sql.js";
@@ -93,6 +94,32 @@ describe("Visitor dispatch", () => {
     expect(() => v.accept(new A())).not.toThrow(UnsupportedVisitError);
   });
 
+  it("re-raises a NoMethodError raised inside a visit method it responds to", () => {
+    class RaisingVisitor extends Visitor {
+      visitA(o: A): unknown {
+        return rbFSend(o, "mumbo");
+      }
+      visitC(o: C): unknown {
+        return (o as unknown as { mumbo(): unknown }).mumbo();
+      }
+    }
+    const v = new RaisingVisitor();
+    expect(() => v.accept(new A())).toThrow(NoMethodError);
+    expect(() => v.accept(new B())).toThrow(NoMethodError);
+    expect(() => v.accept(new C())).toThrow(globalThis.TypeError);
+    expect(() => v.accept(new C())).not.toThrow(/Cannot visit/);
+  });
+
+  it("keys the dispatch cache by identity and names a method after the class path", () => {
+    class NamingVisitor extends Visitor {}
+    const cache = NamingVisitor.dispatchCache();
+    expect(cache.isCompareByIdentity()).toBe(true);
+    expect(cache.get(Node)).toBe("visitArelNodesNode");
+    expect(cache.get(class {})).toBe("visit_");
+    expect(cache.get("Integer")).toBe("visitInteger");
+    expect(NamingVisitor.dispatchCache()).toBe(cache);
+  });
+
   it("propagates the collector argument from accept through to the visit method", () => {
     const v = new TestVisitor();
     const collector = { sentinel: true };
@@ -100,7 +127,7 @@ describe("Visitor dispatch", () => {
     expect(v.visited[0]?.collector).toBe(collector);
   });
 
-  it("each subclass has its own cache seeded from the parent", () => {
+  it("each subclass has its own cache", () => {
     class Sub extends TestVisitor {
       visitC(_n: C): string {
         return "C";
@@ -112,7 +139,9 @@ describe("Visitor dispatch", () => {
     const sub = new Sub();
     expect(sub.accept(new A())).toBe("A");
     expect(sub.accept(new C())).toBe("C");
-    expect(TestVisitor.dispatchCache().has(C)).toBe(false);
+    expect(Sub.dispatchCache()).not.toBe(TestVisitor.dispatchCache());
+    expect(TestVisitor.dispatchCache().get(C)).toBe("visitC");
+    expect(() => new TestVisitor().accept(new C())).toThrow(TypeError);
   });
 
   describe("raw values dispatch on their Ruby class", () => {

@@ -768,6 +768,31 @@ export function includedModules(mod: { prototype: object }): unknown[] {
 }
 
 /**
+ * Ruby's `Module#ancestors` for a class: the class, the modules mixed into
+ * it most recently first, and then the same for each superclass up to
+ * `Object`. `rb_mod_ancestors` reads the iclass of an included module off the
+ * superclass chain; the registry `include()` keeps on each prototype is that
+ * record here.
+ *
+ * Mirrors: Ruby's Module#ancestors — vendor/ruby/v3.3.11/class.c:1570
+ * `rb_mod_ancestors`.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+ */
+export function rbModAncestors(mod: { prototype: object }): unknown[] {
+  const ary: unknown[] = [];
+  for (let p: object | null = mod.prototype; p; p = Object.getPrototypeOf(p) as object | null) {
+    if (Object.prototype.hasOwnProperty.call(p, "constructor")) {
+      ary.push((p as { constructor: unknown }).constructor);
+    }
+    if (!Object.prototype.hasOwnProperty.call(p, includedModulesKey)) continue;
+    const mods = [...((p as Record<symbol, unknown>)[includedModulesKey] as Set<unknown>)];
+    for (const m of mods.reverse()) if (!ary.includes(m)) ary.push(m);
+  }
+  return ary;
+}
+
+/**
  * Symbol key for the per-section visibility record `defineModule` stamps onto
  * the flat module object it returns. Symbol-keyed so it never collides with a
  * real method name, and so `Object.keys()` consumers see the module unchanged.

@@ -1154,14 +1154,4 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "loadable. Ruby-only wire format, same as test_date_marshal.rb above; the " +
       "rest of the file stays counted.",
   },
-  {
-    pattern: "/version.rb",
-    reason:
-      "`Module.version` / `VERSION` returns the gem version as a Gem::Version " +
-      "(e.g. active_record/version.rb:8). Every trails package carries its " +
-      "version in package.json, which is the JS ecosystem's registry for it, so " +
-      "there is nothing to port. Anchored (leading `/`) so it cannot also " +
-      "exclude `gem_version.rb`, which IS ported and owns real surface " +
-      "(`ActionPack.gem_version`).",
-  },
 ];
