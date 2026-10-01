@@ -243,7 +243,8 @@ const arithmetic = (expr: string, vars: readonly string[]): boolean =>
  * outside the arithmetic grammar (integers, `+ - * ( ) [ ]` and the loop
  * variables; no `/`, which truncates in Ruby and not in JS) becomes
  * ERB_SKIP_SENTINEL, and any other control tag is left as Ruby for `stripErb`
- * to report.
+ * to report. A loop variable is in scope until its loop's `end`, and an `end`
+ * with no loop open is left as Ruby too.
  */
 function erbToTse(text: string): string {
   const vars: string[] = [];
@@ -256,7 +257,7 @@ function erbToTse(text: string): string {
       if (!str || !parts.every((m) => arithmetic(m[1], vars))) return ERB_SKIP_SENTINEL;
       return `<%= \`${str[1].replace(/#\{/g, "${")}\` %>`;
     }
-    if (code === "end") return "<% } %>";
+    if (code === "end") return vars.pop() === undefined ? tag : "<% } %>";
     let m: RegExpExecArray | null;
     if ((m = /^(\d+)\.times\s+do\s*\|\s*(\w+)\s*\|$/.exec(code))) {
       vars.push(m[2]);
@@ -325,6 +326,12 @@ export function stripErb(text: string): { rendered: string; unsupported: boolean
 // fidelity (merge keys, `_fixture.ignore`, list-form auto-labels, `$LABEL`)
 // without going through `main()`. Internal callers still use `loadRailsYaml`.
 export { loadRailsYaml as loadRailsYamlForTest };
+/**
+ * Parses a Rails fixture file into its rows. `uniqueKeys: false` is Psych's own
+ * rule, under which a repeated key keeps its last value rather than raising
+ * (`YAML.load("a: 1\na: 2")` is `{"a"=>2}`), and it spares the library's
+ * duplicate check, which is quadratic in a map's size.
+ */
 // prettier-ignore
 function loadRailsYaml(file: string, basename: string): { ok: true; data: FixtureMap } | { ok: false; reason: Status } {
   const raw = readFileSync(file, "utf8");
@@ -665,7 +672,7 @@ function parentOf(
   const namespace = klass.qualifiedName.split("::").slice(0, -1);
   for (let i = namespace.length; i >= 0; i--) {
     const candidate = classes.get([...namespace.slice(0, i), klass.parent].join("::"));
-    if (candidate) return candidate;
+    if (candidate && candidate !== klass) return candidate;
   }
   return undefined;
 }
@@ -674,7 +681,7 @@ function parentOf(
  * The set a fixture file belongs to: its path below the fixtures directory the
  * test names, or the directory itself when a sibling `<dir>.yml` makes it part
  * of that set (`read_fixture_files` globs `#{path}{.yml,/{**,*}/*.yml}`,
- * `fixtures.rb:784`).
+ * `fixtures.rb:782`).
  */
 export function fixtureSetName(snake: string, files: ReadonlySet<string>): string {
   const root = FIXTURE_PATHS.find((dir) => snake.startsWith(`${dir}/`));
@@ -683,22 +690,53 @@ export function fixtureSetName(snake: string, files: ReadonlySet<string>): strin
   return name.includes("/") && files.has(root ? `${root}/${dir}` : dir) ? dir : name;
 }
 
-/** `ModelSchema#compute_table_name` (`model_schema.rb:627-643`) over the models manifest. */
-function computeTableName(classes: ReadonlyMap<string, RubyClass>, klass: RubyClass): string {
+/** `ModelSchema#reset_table_name` (`model_schema.rb:290-300`) over the models manifest. */
+function tableName(classes: ReadonlyMap<string, RubyClass>, klass: RubyClass): string | null {
   if (klass.tableName) return klass.tableName;
-  const parent = parentOf(classes, klass);
-  if (parent && parent !== klass && !parent.abstractClass) return computeTableName(classes, parent);
-  const name = underscore(klass.name.split("::").pop()!);
-  return `${klass.tableNamePrefix ?? ""}${klass.pluralizeTableNames === false ? name : pluralize(name)}`;
+  const superclass = parentOf(classes, klass);
+  if (klass.abstractClass) return superclass ? tableName(classes, superclass) : null;
+  if (superclass?.abstractClass)
+    return tableName(classes, superclass) ?? computeTableName(classes, klass);
+  return computeTableName(classes, klass);
 }
 
 /**
- * `FixtureSet#initialize` (`fixtures.rb:713-722`): the class passed in, else the
- * default model name when it constantizes (`fixtures.rb:544-548`), else the
- * file's `_fixture.model_class` (`fixtures.rb:792`); then that class's table
- * name, or `default_fixture_table_name` (`fixtures.rb:550-554`) with no class.
- * The manifest names a class nested in a class (`Post::CategoryPost`) by its
- * last segment, so a file's `model_class` is also looked up that way.
+ * `ModelSchema#compute_table_name` (`model_schema.rb:606-620`) over the models
+ * manifest. `full_table_name_prefix` (`:302-304`) is the enclosing module's
+ * `table_name_prefix`; `Base.table_name_prefix` and `full_table_name_suffix`
+ * (`:306-308`) are `""` throughout Rails' test models, so the manifest carries
+ * neither.
+ */
+function computeTableName(classes: ReadonlyMap<string, RubyClass>, klass: RubyClass): string {
+  const superclass = parentOf(classes, klass);
+  if (!superclass || superclass.abstractClass) {
+    const moduleParent = classes.get(klass.qualifiedName.split("::").slice(0, -1).join("::"));
+    let contained = "";
+    if (moduleParent && !moduleParent.abstractClass) {
+      contained = tableName(classes, moduleParent)!;
+      if (moduleParent.pluralizeTableNames !== false) contained = singularize(contained);
+      contained += "_";
+    }
+    const undecorated = underscore(klass.name.split("::").pop()!);
+    return `${klass.tableNamePrefix ?? ""}${contained}${klass.pluralizeTableNames === false ? undecorated : pluralize(undecorated)}`;
+  }
+  let baseClass = superclass;
+  for (let up = parentOf(classes, baseClass); up && !up.abstractClass; up = parentOf(classes, up))
+    baseClass = up;
+  return tableName(classes, baseClass)!;
+}
+
+/**
+ * `FixtureSet#initialize` (`fixtures.rb:713-722`): the class passed in
+ * (`read_and_insert`, `fixtures.rb:650-656`), else the file's
+ * `_fixture.model_class` when it constantizes (`fixtures.rb:790`), else the
+ * default model name (`fixtures.rb:791`, `:544-548`, `:800-803`); then that
+ * class's table name, or `default_fixture_table_name` (`fixtures.rb:550-554`)
+ * with no class, whose `config.table_name_prefix` / `table_name_suffix` are
+ * `""` in Rails' test suite. A passed class the manifest lacks is one the test
+ * file defines, with no `table_name` of its own. The manifest qualifies a class
+ * by its enclosing modules only, so a file's `model_class` nested in a class
+ * body (`Post::CategoryPost`) is found under its last segment.
  */
 export function fixtureTable(
   name: string,
@@ -711,13 +749,13 @@ export function fixtureTable(
     .map((segment, i, all) => camelize(i === all.length - 1 ? singularize(segment) : segment))
     .join("::");
   const passed = FIXTURE_CLASS_NAMES[name];
-  const klass =
-    classes.get(passed ?? defaultName) ??
-    (passed || !fileModelClass
-      ? undefined
-      : (classes.get(fileModelClass) ?? classes.get(fileModelClass.split("::").pop()!)));
+  const klass = passed
+    ? classes.get(passed)
+    : ((fileModelClass
+        ? (classes.get(fileModelClass) ?? classes.get(fileModelClass.split("::").pop()!))
+        : undefined) ?? classes.get(defaultName));
   const table = klass
-    ? computeTableName(classes, klass)
+    ? tableName(classes, klass)!
     : passed
       ? pluralize(underscore(passed))
       : name.replace(/\//g, "_");
@@ -726,6 +764,37 @@ export function fixtureTable(
     modelClass: klass?.qualifiedName ?? passed ?? null,
     declared: railsTables.has(table),
   };
+}
+
+/**
+ * Rails' rows keyed by the table their set loads into, for the id index. Sets
+ * sharing a table merge. A label two of them share (`all/developers.yml` and
+ * `developers.yml`) only arises between sets Rails never loads together, since
+ * a label is the row's primary key (`fixtures.rb:616-622`); FIXTURES_ROOT's own
+ * file wins it, being the one other fixtures' foreign keys refer to.
+ */
+export function rowsByTable(
+  yamlByTable: ReadonlyMap<string, FixtureMap>,
+  tables: ReadonlyMap<string, FixtureTable>,
+): Map<string, FixtureMap> {
+  const out = new Map<string, FixtureMap>();
+  const subdirsFirst = [...yamlByTable].sort(
+    ([a], [b]) => Number(b.includes("/")) - Number(a.includes("/")),
+  );
+  for (const [snake, rows] of subdirsFirst) {
+    const table = tables.get(snake)!.table;
+    out.set(table, { ...out.get(table), ...rows });
+  }
+  return out;
+}
+
+/** Entries of the hand-kept fixture tables that name no file under Rails' fixtures directory. */
+export function staleFixtureEntries(files: ReadonlySet<string>): string[] {
+  const names = new Set([...files].map((snake) => fixtureSetName(snake, files)));
+  return [
+    ...FIXTURE_PATHS.filter((dir) => ![...files].some((snake) => snake.startsWith(`${dir}/`))),
+    ...Object.keys(FIXTURE_CLASS_NAMES).filter((name) => !names.has(name)),
+  ];
 }
 
 export function belongsToAssociationsByClass(manifest: RubyFileEntry[]): Map<string, Set<string>> {
@@ -1018,6 +1087,11 @@ async function main(): Promise<void> {
       .flatMap((f) => [...parseSchemaRb(readFileSync(path.join(SCHEMA_DIR, f), "utf8")).keys()]),
   );
   const files = new Set(allYamls.map((f) => f.replace(/\.yml$/, "")));
+  const stale = staleFixtureEntries(files);
+  if (stale.length > 0) {
+    console.error(`parity:fixtures: FIXTURE_PATHS / FIXTURE_CLASS_NAMES name no fixture file: ${stale.join(", ")}`); // prettier-ignore
+    process.exit(1);
+  }
   const tables = new Map<string, FixtureTable>();
   for (const snake of files) {
     const fileModelClass = /^_fixture:\s*\n\s+model_class:\s*(\S+)/m.exec(
@@ -1028,13 +1102,7 @@ async function main(): Promise<void> {
       fixtureTable(fixtureSetName(snake, files), fileModelClass, classes, railsTables),
     );
   }
-  const yamlByTableName = new Map<string, FixtureMap>();
-  const subdirsFirst = [...yamlByTable].sort(([a], [b]) => Number(b.includes("/")) - Number(a.includes("/"))); // prettier-ignore
-  for (const [snake, rows] of subdirsFirst) {
-    const table = tables.get(snake)!.table;
-    yamlByTableName.set(table, { ...yamlByTableName.get(table), ...rows });
-  }
-  const idIndex = buildIdIndex(yamlByTableName);
+  const idIndex = buildIdIndex(rowsByTable(yamlByTable, tables));
   const associations = belongsToAssociationsByClass(manifest);
 
   const results: FileResult[] = [];

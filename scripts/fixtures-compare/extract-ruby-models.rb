@@ -120,10 +120,17 @@ def parse_file(path)
     modules.pop while modules.last && depth < modules.last[:depth]
     singletons.pop while singletons.last && depth < singletons.last
 
-    if prefix_module && (m = line.match(/^["']([^"']*)["']$/))
+    if prefix_module
+      m = line.match(/^["']([^"']*)["']$/) or abort "extract-ruby-models: #{path}: unrecognized table_name_prefix body: #{line}"
       TABLE_NAME_PREFIXES[prefix_module] = m[1]
+      prefix_module = nil
+    elsif line.match?(/^def self\.table_name_prefix\b/)
+      prefix_module = modules.map { |mod| mod[:name] }.join("::")
+      if (m = line.match(/^def self\.table_name_prefix\s*(?:=|;)\s*["']([^"']*)["']/))
+        TABLE_NAME_PREFIXES[prefix_module] = m[1]
+        prefix_module = nil
+      end
     end
-    prefix_module = line.match?(/^def self\.table_name_prefix\b/) ? modules.map { |mod| mod[:name] }.join("::") : nil
 
     next if stack.empty?
     cls = stack.last[:cls]

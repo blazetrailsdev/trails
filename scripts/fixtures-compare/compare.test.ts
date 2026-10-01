@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from "vitest";
 // prettier-ignore
-import { belongsToAssociationsByClass, stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, modelDeclarationDrift, buildIdIndexForTest, loadRailsYamlForTest, withoutIgnoredFixtures, COMPOSITE_FK_LABEL_ATTRS, fixtureSetName, fixtureTable } from "./compare.js";
+import { belongsToAssociationsByClass, stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, modelDeclarationDrift, buildIdIndexForTest, loadRailsYamlForTest, withoutIgnoredFixtures, COMPOSITE_FK_LABEL_ATTRS, fixtureSetName, fixtureTable, rowsByTable, staleFixtureEntries } from "./compare.js";
 import type { RubyClass } from "./compare.js";
 import type { Schema } from "../../packages/activerecord/src/support/schema-types.js";
 
@@ -54,6 +54,11 @@ describe("stripErb ERB expanders", () => {
     const { rendered, unsupported } = stripErb("<%\n[[4001, 0],\n  [4002, 4001]].each do |set| %>t_<%= set[0] %>: <%= set[1]%>;<% end %>"); // prettier-ignore
     expect(unsupported).toBe(false);
     expect(rendered).toBe("t_4001: 0;t_4002: 4001;");
+  });
+  it("scopes a loop variable to its loop and leaves an unmatched `end` as Ruby", () => {
+    const out = stripErb("<% 2.times do |i| %>a<%= i %>;<% end %>b: <%= i %>");
+    expect(out).toEqual({ rendered: `a0;a1;b: ${ERB_SKIP_SENTINEL}`, unsupported: false });
+    expect(stripErb("<% 1.times do |i| %>x<% end %><% end %>").unsupported).toBe(true);
   });
   it("renders citations.yml's 65536-row loop with Rails' row count", () => {
     const out = stripErb("<% 65536.times do |i| %>\nr_<%= i %>:\n  id: <%= i*i %>\n<% end %>");
@@ -391,6 +396,11 @@ describe("loadRailsYaml (parsing fidelity)", () => {
     expect(r).toEqual({ ok: true, data: { DEFAULTS: { color: "red" }, row1: { color: "red", name: "x" } } }); // prettier-ignore
   });
 
+  it("keeps the last of a repeated label, as Psych does", () => {
+    const r = loadRailsYamlForTest(write("dup", "row:\n  x: 1\nrow:\n  x: 2\n"), "dup");
+    expect(r).toEqual({ ok: true, data: { row: { x: 2 } } });
+  });
+
   it("strips `_fixture` metadata and honors `_fixture.ignore`", () => {
     const r = loadRailsYamlForTest(
       write("ig", "_fixture:\n  ignore: SKIP_ME\nSKIP_ME:\n  x: 1\nkeep:\n  y: 2\n"),
@@ -505,6 +515,29 @@ describe("fixtureSetName", () => {
   });
 });
 
+describe("rowsByTable", () => {
+  it("merges sets sharing a table, FIXTURES_ROOT's file winning a shared label", () => {
+    const entry = (table: string) => ({ table, modelClass: null, declared: true });
+    const tables = new Map([["developers", entry("developers")], ["all/developers", entry("developers")], ["categories/special", entry("categories")]]); // prettier-ignore
+    const rows = new Map<string, Record<string, Record<string, unknown>>>([["developers", { david: { id: 1 } }], ["all/developers", { david: { id: 9 }, extra: { id: 2 } }], ["categories/special", { sub: { id: 3 } }]]); // prettier-ignore
+    expect(Object.fromEntries(rowsByTable(rows, tables))).toEqual({
+      developers: { david: { id: 1 }, extra: { id: 2 } },
+      categories: { sub: { id: 3 } },
+    });
+  });
+});
+
+describe("staleFixtureEntries", () => {
+  const files = ["all/people", "naked/yml/trees", "primary_key_error/primary_key_error", "reserved_words/select", "bad_posts", "categories_ordered", "fk_object_to_point_to", "randomly_named_a9", "admin/randomly_named_a9", "admin/randomly_named_b0"]; // prettier-ignore
+  it("is empty while every hand-kept entry names a fixture file", () => {
+    expect(staleFixtureEntries(new Set(files))).toEqual([]);
+  });
+  it("names a fixtures directory or set Rails no longer has", () => {
+    const gone = files.filter((f) => f !== "bad_posts" && !f.startsWith("reserved_words/"));
+    expect(staleFixtureEntries(new Set(gone))).toEqual(["reserved_words", "bad_posts"]);
+  });
+});
+
 describe("fixtureTable", () => {
   const klass = (qualifiedName: string, rest: Partial<RubyClass> = {}): [string, RubyClass] => [
     qualifiedName,
@@ -534,12 +567,22 @@ describe("fixtureTable", () => {
     expect(table("aircrafts").table).toBe("aircraft");
     expect(table("admin/accounts").table).toBe("admin_accounts");
   });
-  it("prefers the passed class, then the default name, then the file's model_class", () => {
+  it("prefers the passed class, then the file's model_class, then the default name", () => {
     expect(table("bad_posts", "BadPostModel").table).toBe("posts");
-    expect(table("posts", "Parrot").table).toBe("posts");
+    expect(table("posts", "Parrot").table).toBe("parrots");
+    expect(table("posts", "NoSuchModel").table).toBe("posts");
     expect(table("other_posts", "Post").table).toBe("posts");
     expect(table("categories_posts", "Post::CategoryPost").table).toBe("categories_posts");
     expect(table("fk_object_to_point_to").table).toBe("fk_object_to_point_tos");
+  });
+  it("prefixes a class nested in a model with that model's singular table name", () => {
+    const nested = new Map([...classes, klass("Post::Draft"), klass("Aircraft::Wing")]);
+    expect(fixtureTable("post/drafts", undefined, nested, rails).table).toBe("post_drafts");
+    expect(fixtureTable("aircraft/wings", undefined, nested, rails).table).toBe("aircraft_wings");
+  });
+  it("gives an STI descendant its base class's table, past an intermediate table_name", () => {
+    const sti = new Map([...classes, klass("Renamed", { parent: "Parrot", tableName: "renamed" }), klass("Leaf", { parent: "Renamed" })]); // prettier-ignore
+    expect(fixtureTable("leafs", undefined, sti, rails).table).toBe("parrots");
   });
   it("falls back to default_fixture_table_name when no class resolves", () => {
     expect(table("namespaced/accounts")).toEqual({ table: "namespaced_accounts", modelClass: null, declared: false }); // prettier-ignore
