@@ -855,10 +855,6 @@ interface PackageTotals {
    * measurable: it is the one allowance with no per-declaration tag to count.
    */
   totalInterfaceExempt: number;
-  /**
-   * Moved names dropped as a trails-only class's override of an inherited
-   * member (`collectOverrideOnlyNames`). Reported for the same reason.
-   */
   totalOverrideExempt: number;
   /**
    * The `rubyFile === null` slice of the totals above — files no Rails file
@@ -1348,6 +1344,13 @@ export function collectInterfaceMemberOnlyNames(
  * declares, an interface member, a top-level function, any declaration name —
  * is excluded, on the same reasoning as `collectInterfaceOnlyNames`: the extra
  * set is a flat Set of bare names, so one name carries one verdict.
+ *
+ * The scorer applies it AFTER the tag check, like the interface exemption:
+ * ruby-compat's package contract puts a receipt on every member, an override's
+ * `constructor` included, and that receipt must keep matching. `inherits` walks
+ * the `extends` chain across package boundaries; a dep's `superclassFile` is
+ * relative to its own src dir, so only that package's entities are candidates
+ * for it.
  */
 export function collectOverrideOnlyNames(
   file: string,
@@ -2207,17 +2210,12 @@ function buildPackageReport(
     }
   }
 
-  // The `extends` walk `collectOverrideOnlyNames` asks about. Dep packages are
-  // indexed too, so the chain crosses a package boundary the way compare.ts's
-  // inheritance propagation does (`DeferredIdsIn extends Nodes.In` is arel's).
   const foreignEntities = new Set<ClassInfo>();
   const entityPackages = new Map<ClassInfo, string>();
   const entitiesByName = buildEntitiesByName(pkg, ts, foreignEntities, entityPackages);
   const superclassOf = (klass: ClassInfo): ClassInfo | null => {
     const short = klass.superclass?.split(/::|\./).pop();
     if (!short) return null;
-    // A dep's `superclassFile` is relative to ITS src dir, so only that
-    // package's entities are candidates for it.
     const ownerPkg = entityPackages.get(klass);
     const candidates = (entitiesByName.get(short) ?? []).filter(
       (c) => !foreignEntities.has(klass) || entityPackages.get(c) === ownerPkg,
@@ -2434,11 +2432,6 @@ function buildPackageReport(
       }
       const owners = globalRubyCandidates.get(name);
       const kind: ExtraKind = owners ? "moved" : "novel";
-      // Exempt by the overriding class's verdict — see
-      // `collectOverrideOnlyNames`. AFTER the tag check, like the interface
-      // exemption below: ruby-compat's package contract puts a receipt on
-      // every member, an override's `constructor` included, and that receipt
-      // must keep matching.
       if (kind === "moved" && overrideOnly.get(name)?.every(trailsOnly) === true) {
         overrideExemptCount++;
         continue;

@@ -2778,8 +2778,6 @@ describe("buildReport — overrides on a class with no Rails counterpart", () =>
   });
 
   it("still scores an override on a class Rails names elsewhere", () => {
-    // The `postgresql/schema-statements-class.ts` shape: the class is a port
-    // sitting in the wrong file, so its overrides are the misplaced surface.
     const report = run(ruby, tsWith(tsClass("Quoting", "deferred.ts", ["invert"], "Binary")));
     expect(report.packages[0].extraFiles[0].extras).toMatchObject([
       { name: "invert", kind: "moved" },
