@@ -1,4 +1,5 @@
 import { Autoload, extend, runLoadHooks } from "@blazetrails/activesupport";
+import { included } from "@blazetrails/ruby-compat";
 import { ActiveRecord, Encryption } from "./namespaces.js";
 import { type SchemeOptions } from "./encryption/scheme.js";
 import { Cipher } from "./encryption/cipher.js";
@@ -10,6 +11,7 @@ export type EncryptsOptions = SchemeOptions;
 
 extend(Encryption, Configurable);
 extend(Encryption, Contexts);
+Contexts[included](Encryption);
 
 Object.defineProperty(Encryption, "eagerLoadBang", {
   value: async function eagerLoadBang(this: typeof Encryption): Promise<void> {

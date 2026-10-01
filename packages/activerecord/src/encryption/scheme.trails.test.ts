@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Scheme } from "./scheme.js";
 import { Encryptor } from "./encryptor.js";
-import { Contexts } from "./contexts.js";
+import { Encryption } from "../encryption.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 
 describe("ActiveRecord::Encryption::SchemeTest (trails)", () => {
@@ -31,9 +31,9 @@ describe("ActiveRecord::Encryption::SchemeTest (trails)", () => {
 
   it("leaves the surrounding context's encryptor in place on the default path", () => {
     const outer = new Encryptor();
-    Contexts.withEncryptionContext({ encryptor: outer }, () => {
+    Encryption.withEncryptionContext({ encryptor: outer }, () => {
       new Scheme().withContext(() => {
-        expect(Contexts.context.encryptor).toBe(outer);
+        expect(Encryption.context.encryptor).toBe(outer);
       });
     });
   });

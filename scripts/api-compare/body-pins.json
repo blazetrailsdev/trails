@@ -18475,6 +18475,13 @@
   {
     "package": "activemodel",
     "rubyFile": "type/registry.rb",
+    "rubyName": "initialize_copy",
+    "digest": "c8102ee9b2f26126",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "activemodel",
+    "rubyFile": "type/registry.rb",
     "rubyName": "lookup",
     "digest": "51b70e058099623a",
     "ref": "v8.0.2"
@@ -61392,8 +61399,29 @@
   {
     "package": "arel",
     "rubyFile": "nodes/bound_sql_literal.rb",
+    "rubyName": "eql?",
+    "digest": "673eca2170631ffa",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/bound_sql_literal.rb",
+    "rubyName": "hash",
+    "digest": "2ff7511f9cd8927c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/bound_sql_literal.rb",
     "rubyName": "initialize",
     "digest": "340cdd852de5808d",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/bound_sql_literal.rb",
+    "rubyName": "inspect",
+    "digest": "bd3664ced08ac89e",
     "ref": "v8.0.2"
   },
   {

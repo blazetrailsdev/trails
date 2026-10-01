@@ -82,7 +82,6 @@ import {
   cantModifyEncryptedAttributesWhenFrozen as _cantModifyEncryptedAttributesWhenFrozen,
   sourceAttributeFromPreservedAttribute as _sourceAttributeFromPreservedAttribute,
 } from "./encryption/encryptable-record.js";
-import { Contexts as _Contexts } from "./encryption/contexts.js";
 import type { EncryptsOptions } from "./encryption.js";
 import * as CounterCache from "./counter-cache.js";
 import * as ReadonlyAttributes from "./readonly-attributes.js";
@@ -2586,7 +2585,8 @@ classAttribute.call(Base, "defaultScopeOverride", {
 classAttribute.call(Base, "nestedAttributesOptions", { instanceWriter: false, default: {} });
 classAttribute.call(Base, "encryptedAttributes");
 Base.validate(":cantModifyEncryptedAttributesWhenFrozen", {
-  if: (record: any) => _hasEncryptedAttributes.call(record) && _Contexts.context.frozenEncryption,
+  if: (record: any) =>
+    _hasEncryptedAttributes.call(record) && ActiveRecord.Encryption.context.frozenEncryption,
 });
 extend(Base, {
   encrypts: _encrypts,

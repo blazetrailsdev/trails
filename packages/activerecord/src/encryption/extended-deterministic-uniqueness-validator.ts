@@ -1,6 +1,5 @@
 import { Encryption } from "../namespaces.js";
 import { prepend } from "@blazetrails/activesupport";
-import { Contexts } from "./contexts.js";
 
 export class ExtendedDeterministicUniquenessValidator {
   private static _installed = false;
@@ -43,7 +42,7 @@ export const EncryptedUniquenessValidator = {
       const encryptedType = klass.typeForAttribute(attribute);
       for (const type of encryptedType.previousTypes) {
         const encryptedValue = type.serialize(value);
-        await Contexts.withoutEncryption(() => super_(record, attribute, encryptedValue));
+        await Encryption.withoutEncryption(() => super_(record, attribute, encryptedValue));
       }
     }
   },

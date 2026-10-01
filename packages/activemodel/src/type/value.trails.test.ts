@@ -7,6 +7,29 @@ describe("ValueType", () => {
     expect(new ValueType().type()).toBeUndefined();
   });
 
+  describe("precision / scale / limit", () => {
+    it("are nil unless initialize is given them", () => {
+      const type = new ValueType();
+      expect([type.precision, type.scale, type.limit]).toEqual([null, null, null]);
+    });
+
+    it("read what initialize was given", () => {
+      const type = new ValueType({ precision: 8, limit: 4, scale: 2 });
+      expect([type.precision, type.scale, type.limit]).toEqual([8, 2, 4]);
+    });
+
+    it("are readers on the class, so a subclass override is not shadowed by the instance", () => {
+      class Wrapping extends ValueType {
+        override get limit(): number | null {
+          return 16;
+        }
+      }
+      const type = new Wrapping({ limit: 4 });
+      expect(type.limit).toBe(16);
+      expect(Object.keys(type)).not.toContain("limit");
+    });
+  });
+
   describe("equals", () => {
     it("same class, no metadata: equal", () => {
       expect(new ValueType().equals(new ValueType())).toBe(true);

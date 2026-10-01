@@ -1,59 +1,58 @@
+import { mattrAccessor, threadMattrAccessor } from "@blazetrails/activesupport";
+import { included, rbObjDup } from "@blazetrails/ruby-compat";
 import { Encryption } from "../namespaces.js";
 import { Context } from "./context.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import { EncryptingOnlyEncryptor } from "./encrypting-only-encryptor.js";
 
-const customContexts: Context[] = [];
-
-let _defaultContext: Context | undefined;
-
 export class Contexts {
-  static get defaultContext(): Context {
-    return (_defaultContext ??= new Context());
+  declare static defaultContext: Context;
+  declare static customContexts: Context[] | null;
+  declare customContexts: Context[] | null;
+
+  static [included](base: object): void {
+    mattrAccessor.call(base, "defaultContext", { default: new Context() });
+    threadMattrAccessor.call(base, "customContexts");
   }
 
-  static set defaultContext(value: Context) {
-    _defaultContext = value;
-  }
+  static withEncryptionContext<T>(properties: Partial<Context>, block: () => T): T {
+    this.customContexts ||= [];
+    this.customContexts.push(rbObjDup(this.defaultContext));
+    for (const [key, value] of Object.entries(properties)) {
+      (this.currentCustomContext as unknown as Record<string, unknown>)[key] = value;
+    }
 
-  static withEncryptionContext<T>(properties: Partial<Context>, fn: () => T): T {
-    const frame: Context = Object.assign(
-      Object.create(Object.getPrototypeOf(this.defaultContext)),
-      this.defaultContext,
-    );
-    Object.assign(frame, properties);
-    customContexts.push(frame);
     let result: T;
     try {
-      result = fn();
+      result = block();
     } catch (e) {
-      customContexts.pop();
+      this.customContexts.pop();
       throw e;
     }
     if (result && typeof (result as { then?: unknown }).then === "function") {
       return (result as unknown as Promise<unknown>).then(
         (val) => {
-          customContexts.pop();
+          this.customContexts!.pop();
           return val;
         },
         (err) => {
-          customContexts.pop();
+          this.customContexts!.pop();
           throw err;
         },
       ) as unknown as T;
     }
-    customContexts.pop();
+    this.customContexts.pop();
     return result;
   }
 
-  static withoutEncryption<T>(fn: () => T): T {
-    return this.withEncryptionContext({ encryptor: new NullEncryptor() }, fn);
+  static withoutEncryption<T>(block: () => T): T {
+    return this.withEncryptionContext({ encryptor: new NullEncryptor() }, block);
   }
 
-  static protectingEncryptedData<T>(fn: () => T): T {
+  static protectingEncryptedData<T>(block: () => T): T {
     return this.withEncryptionContext(
       { encryptor: new EncryptingOnlyEncryptor(), frozenEncryption: true },
-      fn,
+      block,
     );
   }
 
@@ -63,11 +62,11 @@ export class Contexts {
 
   /** @missingRailsCall last — PERMANENT */
   static get currentCustomContext(): Context | null {
-    return customContexts.length > 0 ? customContexts[customContexts.length - 1] : null;
+    return this.customContexts?.at(-1) ?? null;
   }
 
   static resetDefaultContext(): void {
-    _defaultContext = new Context();
+    this.defaultContext = new Context();
   }
 }
 

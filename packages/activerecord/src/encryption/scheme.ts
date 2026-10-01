@@ -6,7 +6,6 @@ import type { MessageSerializerLike } from "./message-serializer.js";
 import type { Context } from "./context.js";
 import { isPresent, wrap } from "@blazetrails/activesupport";
 
-import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
 
@@ -99,7 +98,7 @@ export class Scheme {
 
   withContext<T>(fn: () => T): T {
     if (isPresent(this._contextProperties)) {
-      return Contexts.withEncryptionContext(this._contextProperties, fn);
+      return Encryption.withEncryptionContext(this._contextProperties, fn);
     }
     return fn();
   }

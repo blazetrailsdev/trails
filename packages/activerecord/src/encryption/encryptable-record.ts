@@ -1,5 +1,4 @@
 import { Scheme, type SchemeOptions } from "./scheme.js";
-import { Contexts } from "./contexts.js";
 import { Configuration } from "./errors.js";
 import { type ValueType } from "@blazetrails/activemodel";
 import { Module, include } from "@blazetrails/ruby-compat";
@@ -224,12 +223,12 @@ export async function decryptAttributes(this: any): Promise<void> {
   validateEncryptionAllowed.call(this);
 
   const decryptAttributeAssignments = buildDecryptAttributeAssignments.call(this);
-  await Contexts.withoutEncryption(() => this.updateColumns(decryptAttributeAssignments));
+  await Encryption.withoutEncryption(() => this.updateColumns(decryptAttributeAssignments));
 }
 
 /** @internal */
 export function validateEncryptionAllowed(this: any): void {
-  if (Contexts.context.frozenEncryption) {
+  if (Encryption.context.frozenEncryption) {
     throw new Configuration("can't be modified because it is encrypted");
   }
 }

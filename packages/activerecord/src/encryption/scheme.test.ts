@@ -6,7 +6,7 @@ import { Scheme } from "./scheme.js";
 import { Encryptor } from "./encryptor.js";
 import { Configuration } from "./errors.js";
 import { Configurable } from "./configurable.js";
-import { Contexts } from "./contexts.js";
+import { Encryption } from "../encryption.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
 
@@ -108,7 +108,7 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
     c.primaryKey = undefined;
     c.deterministicKey = undefined;
     c.keyDerivationSalt = undefined;
-    Contexts.resetDefaultContext();
+    Encryption.resetDefaultContext();
     try {
       expect(() => new Scheme().keyProvider).toThrow(
         "Missing Active Record encryption credential: active_record_encryption.primary_key",
@@ -117,7 +117,7 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
       c.primaryKey = saved.primaryKey;
       c.deterministicKey = saved.deterministicKey;
       c.keyDerivationSalt = saved.keyDerivationSalt;
-      Contexts.resetDefaultContext();
+      Encryption.resetDefaultContext();
     }
   });
 
@@ -195,7 +195,7 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
     let ran = false;
     scheme.withContext(() => {
       ran = true;
-      expect(Contexts.context.encryptor).toBeInstanceOf(Encryptor);
+      expect(Encryption.context.encryptor).toBeInstanceOf(Encryptor);
     });
     expect(ran).toBe(true);
   });
@@ -210,10 +210,10 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
     const scheme = new Scheme({ encryptor: customEncryptor });
     let encryptorInContext: unknown;
     scheme.withContext(() => {
-      encryptorInContext = Contexts.context.encryptor;
+      encryptorInContext = Encryption.context.encryptor;
     });
     expect(encryptorInContext).toBe(customEncryptor);
-    expect(Contexts.context.encryptor).toBeInstanceOf(Encryptor);
+    expect(Encryption.context.encryptor).toBeInstanceOf(Encryptor);
   });
 
   it("isCompatibleWith returns true when deterministic flags match", () => {
