@@ -329,6 +329,7 @@ const alias = {
   ),
   "@blazetrails/globalid": path.resolve(__dirname, "packages/globalid/src/index.ts"),
   "@blazetrails/trails-tsc": path.resolve(__dirname, "packages/trails-tsc/src/index.ts"),
+  "@blazetrails/trailties/engine": path.resolve(__dirname, "packages/trailties/src/engine.ts"),
   "@blazetrails/ruby-compat/": path.resolve(__dirname, "packages/ruby-compat/src") + "/",
   "@blazetrails/ruby-compat": path.resolve(__dirname, "packages/ruby-compat/src/index.ts"),
   "@blazetrails/date": path.resolve(__dirname, "packages/date/src/index.ts"),

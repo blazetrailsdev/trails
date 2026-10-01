@@ -16,7 +16,7 @@ const ABSTRACT_RAILTIES = ["Rails::Railtie", "Rails::Engine", "Rails::Applicatio
 let loadCounter = 0;
 
 /** @internal */
-function generateRailtieName(string: string): string {
+export function generateRailtieName(string: string): string {
   return underscore(string).replace(/\//g, "_");
 }
 

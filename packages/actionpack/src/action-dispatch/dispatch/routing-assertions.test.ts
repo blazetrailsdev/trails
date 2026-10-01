@@ -8,6 +8,8 @@ import {
   include,
   TopLevel,
 } from "@blazetrails/activesupport";
+import { File } from "@blazetrails/ruby-compat";
+import { Engine } from "@blazetrails/trailties/engine";
 import { Base } from "../../action-controller/base.js";
 import { TestCase } from "../../action-controller/test-case.js";
 import { controllerConstants } from "../http/request.js";
@@ -17,7 +19,7 @@ import type { Request } from "../http/request.js";
 import type { MountableApp, RouteOptions } from "../routing/mapper.js";
 import { RouteSet } from "../routing/route-set.js";
 import { IntegrationTest } from "../testing/integration.js";
-import "../../test-helpers/abstract-unit.js";
+import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
 
 class ArticlesController extends Base {}
 class BooksController extends Base {}
@@ -49,8 +51,6 @@ beforeAll(() => {
   }
 });
 
-class Engine {}
-
 let trails: typeof TopLevel.Trails;
 beforeAll(() => {
   trails = TopLevel.Trails;
@@ -61,16 +61,9 @@ afterAll(() => {
 });
 
 function engineClass(name: string): MountableApp & { routes(): RouteSet } {
-  const klass = class extends Engine {
-    static _routes = new RouteSet();
-
-    static routes(): RouteSet {
-      return this._routes;
-    }
-
-    static call(_env: Record<string, unknown>): void {}
-  };
+  const klass = class extends Engine {};
   Object.defineProperty(klass, "name", { value: name });
+  Engine.register(klass, File.dirname(FIXTURE_LOAD_PATH));
   return klass as unknown as MountableApp & { routes(): RouteSet };
 }
 

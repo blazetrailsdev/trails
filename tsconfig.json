@@ -34,6 +34,7 @@
     { "path": "packages/actionpack" },
     { "path": "packages/actionview/tsconfig.test.json" },
     { "path": "packages/trailties" },
+    { "path": "packages/actionpack/tsconfig.test.json" },
     { "path": "packages/globalid" },
     { "path": "packages/did-you-mean" },
     { "path": "packages/i18n" },

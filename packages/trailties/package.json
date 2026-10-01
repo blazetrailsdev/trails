@@ -9,6 +9,10 @@
     ".": "./dist/cli.js",
     "./all": "./dist/all.js",
     "./generators": "./dist/generators/index.js",
+    "./engine": {
+      "types": "./dist/engine.d.ts",
+      "default": "./dist/engine.js"
+    },
     "./test-help": {
       "types": "./dist/test-help.d.ts",
       "default": "./dist/test-help.js"
