@@ -2,15 +2,25 @@ import { it, expect, beforeEach, afterEach } from "vitest";
 import { assertPredicate } from "@blazetrails/activesupport";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { describeIfSupports } from "../../support/supports.js";
+import { fixtures } from "../../test-fixtures.js";
+import { Base } from "../../base.js";
+import type { Column as MySQLColumn } from "../../connection-adapters/mysql/column.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
+class VirtualColumn extends Base {}
+
 describeIfMysqlAdapter("Mysql2Adapter", () => {
+  fixtures([], { useTransactionalTests: false });
+
   let adapter: Mysql2Adapter;
+
+  async function take(): Promise<Record<string, unknown>> {
+    return (await VirtualColumn.take()) as unknown as Record<string, unknown>;
+  }
 
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
-    await adapter.dropTable("virtual_columns", { ifExists: true }).catch(() => {});
-    await adapter.createTable("virtual_columns", { force: "cascade" }, (t: any) => {
+    await adapter.createTable("virtual_columns", { force: true }, (t) => {
       t.string("name");
       t.virtual("upper_name", { type: "string", as: "UPPER(`name`)" });
       t.virtual("name_length", { type: "integer", as: "LENGTH(`name`)", stored: true });
@@ -24,37 +34,39 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       t.datetime("time");
       t.virtual("time_mirror", { type: "datetime", as: "`time`" });
     });
-    await adapter.execute("INSERT INTO virtual_columns (name) VALUES ('Rails')");
+    await VirtualColumn.create({ name: "Rails" });
   });
 
   afterEach(async () => {
-    await adapter.dropTable("virtual_columns", { ifExists: true }).catch(() => {});
+    await adapter.dropTable("virtual_columns", { ifExists: true });
+    void VirtualColumn.resetColumnInformation();
   });
 
   describeIfSupports("virtual_columns", "VirtualColumnTest", () => {
-    const findColumn = async (name: string) => {
-      const cols = (await adapter.columns("virtual_columns")) as unknown as Array<{
-        name: string;
-        extra: string;
-        isVirtual(): boolean;
-      }>;
-      return cols.find((c) => c.name === name);
-    };
-
     it("virtual column", async () => {
-      const column = await findColumn("upper_name");
-      assertPredicate(column!, (c) => c.isVirtual());
-      expect(column!.extra).toMatch(/\bVIRTUAL\b/);
-      const value = await adapter.selectValue("SELECT upper_name FROM virtual_columns LIMIT 1");
-      expect(value).toBe("RAILS");
+      const column = VirtualColumn.columnsHash()["upper_name"] as unknown as MySQLColumn;
+      assertPredicate(column, (c) => c.isVirtual());
+      expect(column.extra).toMatch(/\bVIRTUAL\b/);
+      expect((await take()).upper_name).toBe("RAILS");
     });
 
     it("stored column", async () => {
-      const column = await findColumn("name_length");
-      assertPredicate(column!, (c) => c.isVirtual());
-      expect(column!.extra).toMatch(/\b(?:STORED|PERSISTENT)\b/);
-      const value = await adapter.selectValue("SELECT name_length FROM virtual_columns LIMIT 1");
-      expect(value).toBe(5);
+      const column = VirtualColumn.columnsHash()["name_length"] as unknown as MySQLColumn;
+      assertPredicate(column, (c) => c.isVirtual());
+      expect(column.extra).toMatch(/\b(?:STORED|PERSISTENT)\b/);
+      expect((await take()).name_length).toBe(5);
+    });
+
+    it("change table", async () => {
+      await adapter.changeTable("virtual_columns", async (t) => {
+        await t.virtual("lower_name", { type: "string", as: "LOWER(name)" });
+      });
+      void VirtualColumn.resetColumnInformation();
+      await VirtualColumn.loadSchema();
+      const column = VirtualColumn.columnsHash()["lower_name"] as unknown as MySQLColumn;
+      assertPredicate(column, (c) => c.isVirtual());
+      expect(column.extra).toMatch(/\bVIRTUAL\b/);
+      expect((await take()).lower_name).toBe("rails");
     });
 
     it("schema dumping", async () => {

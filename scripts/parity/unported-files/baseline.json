@@ -457,11 +457,6 @@
     "reason": "Encrypts/decrypts records across concurrent Ruby Threads to assert the encryption context is thread-local. The entire file is a Thread.new concurrency test with no single-threaded JS equivalent."
   },
   {
-    "testFile": "adapters/abstract_mysql_adapter/transaction_test.rb",
-    "tests": ["raises Deadlocked when a deadlock is encountered"],
-    "reason": "Provokes a MySQL deadlock across two Ruby Threads (transaction_test.rb:38-60). A deadlock requires genuine concurrency; single-threaded JS cannot reproduce it."
-  },
-  {
     "testFile": "adapters/sqlite3/statement_pool_test.rb",
     "tests": ["cache is per pid"],
     "reason": "Forks a child process and asserts the statement cache is keyed per pid (statement_pool_test.rb:6-18, guarded by Process.respond_to?(:fork)). Process forking has no Node.js equivalent."
