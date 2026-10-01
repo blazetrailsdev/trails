@@ -112,7 +112,6 @@ export interface FsAdapter {
   symlink?(target: string, path: string): Promise<void>;
   link?(existingPath: string, newPath: string): Promise<void>;
   chmod?(path: string, mode: number): Promise<void>;
-  rm?(path: string, options?: { recursive?: boolean; force?: boolean }): Promise<void>;
 }
 
 export interface PathAdapter {
@@ -263,7 +262,6 @@ function tryAutoRegisterNode(): boolean {
       symlink(target: string, path: string): Promise<void>;
       link(existingPath: string, newPath: string): Promise<void>;
       chmod(path: string, mode: number): Promise<void>;
-      rm(path: string, opts?: { recursive?: boolean; force?: boolean }): Promise<void>;
     };
     const withExecutable = (stat: FsStatResult): FsStatResult =>
       Object.assign(stat, { isExecutable: () => (stat.mode & 0o111) !== 0 });
@@ -296,7 +294,6 @@ function tryAutoRegisterNode(): boolean {
       symlink: (target: string, p: string) => fsPromises.symlink(target, p),
       link: (existingPath: string, newPath: string) => fsPromises.link(existingPath, newPath),
       chmod: (p: string, mode: number) => fsPromises.chmod(p, mode),
-      rm: (p: string, opts?: { recursive?: boolean; force?: boolean }) => fsPromises.rm(p, opts),
       ...withFlock(nodeFs as unknown as FlockableFs),
     }) as FsAdapter;
     const nodePath = req("node:path") as Required<Omit<PathAdapter, "pathToFileURL">>;

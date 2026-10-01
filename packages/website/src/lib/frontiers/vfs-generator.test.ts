@@ -70,26 +70,19 @@ describe("the VFS FsAdapter's async verbs", () => {
     "/README.md": "readme",
   });
 
-  test("Dir.globAsync walks the directories the stored paths imply", async () => {
+  test("Dir.globAsync walks the directories the stored paths imply, dot entries under FNM_DOTMATCH", async () => {
     vfsFs(tree());
+    const glob = async (pattern: string, flags = 0): Promise<string> =>
+      (await Dir.globAsync(pattern, flags)).join(" ");
 
-    expect(await Dir.globAsync("/app/**/*.ts")).toEqual(["/app/models/post.ts"]);
-    expect(await Dir.globAsync("/app/models/*")).toEqual(["/app/models/post.ts"]);
-    expect(await Dir.globAsync("/nope/*")).toEqual([]);
-  });
-
-  test("Dir.globAsync with FNM_DOTMATCH includes dotfiles and dot directories", async () => {
-    vfsFs(tree());
-
-    expect(await Dir.globAsync("/app/models/*", File.FNM_DOTMATCH)).toEqual([
-      "/app/models/.",
-      "/app/models/.keep",
-      "/app/models/post.ts",
-    ]);
-    expect(await Dir.globAsync("/app/**/*.ts", File.FNM_DOTMATCH)).toEqual([
-      "/app/.hidden/secret.ts",
-      "/app/models/post.ts",
-    ]);
+    expect(await glob("/app/**/*.ts")).toBe("/app/models/post.ts");
+    expect(await glob("/nope/*")).toBe("");
+    expect(await glob("/app/models/*", File.FNM_DOTMATCH)).toBe(
+      "/app/models/. /app/models/.keep /app/models/post.ts",
+    );
+    expect(await glob("/app/**/*.ts", File.FNM_DOTMATCH)).toBe(
+      "/app/.hidden/secret.ts /app/models/post.ts",
+    );
   });
 
   test("FileUtils.rmRfAsync removes everything beneath a directory and ignores a missing path", async () => {
@@ -98,55 +91,64 @@ describe("the VFS FsAdapter's async verbs", () => {
 
     await FileUtils.rmRfAsync(["/app/models", "/missing"]);
 
-    expect(Object.keys(files).sort()).toEqual([
-      "/README.md",
-      "/app/.hidden/secret.ts",
-      "/app/views/posts/index.html.tse",
-    ]);
-  });
-
-  test("FileUtils.rmRAsync rejects for a missing path, and rm for a directory unless recursive", async () => {
-    const fs = vfsFs(tree());
-
+    expect(Object.keys(files).sort().join(" ")).toBe(
+      "/README.md /app/.hidden/secret.ts /app/views/posts/index.html.tse",
+    );
     await expect(FileUtils.rmRAsync("/missing")).rejects.toThrow(/ENOENT/);
-    await expect(fs.rm!("/app/models")).rejects.toThrow(/EISDIR/);
   });
 
-  test("lstat tells a file from a directory and rejects for neither", async () => {
+  test("a made directory exists while empty, to the sync and the async verbs alike", async () => {
     const fs = vfsFs(tree());
 
-    expect((await fs.lstat!("/app/models")).isDirectory()).toBe(true);
-    expect((await fs.lstat!("/README.md")).isFile()).toBe(true);
-    await expect(fs.lstat!("/missing")).rejects.toThrow(/ENOENT/);
-    expect(await File.isSymlinkAsync("/README.md")).toBe(false);
+    await fs.mkdir!("/tmp/cache", { recursive: true });
+
+    expect(await fs.exists("/tmp/cache")).toBe(true);
+    expect(fs.existsSync("/tmp")).toBe(true);
+    expect((await fs.lstat!("/tmp/cache")).isDirectory()).toBe(true);
+    expect(fs.statSync("/tmp").isDirectory()).toBe(true);
+    expect(await fs.readdir!("/tmp")).toEqual(["cache"]);
+    expect(fs.readdirSync("/tmp/cache")).toEqual([]);
+    expect(await Dir.globAsync("/tmp/*")).toEqual(["/tmp/cache"]);
+    await expect(fs.rmdir!("/tmp")).rejects.toThrow(/ENOTEMPTY/);
+
+    await FileUtils.rmRfAsync("/tmp");
+    expect(fs.existsSync("/tmp")).toBe(false);
+    expect(() => fs.readdirSync("/tmp")).toThrow(/ENOENT/);
   });
 
-  test("FileUtils.chmodRAsync is a no-op, the VFS having no permission bits", async () => {
+  test("the sync and the async readdir, stat and exists agree", async () => {
+    const fs = vfsFs(tree());
+
+    expect(fs.readdirSync("/app")).toEqual(await fs.readdir!("/app"));
+    expect(fs.readdirSync("/app").sort()).toEqual([".hidden", "models", "views"]);
+    expect(fs.statSync("/app/models").isDirectory()).toBe(true);
+    expect((await fs.lstat!("/README.md")).isFile()).toBe(true);
+    expect(fs.existsSync("/app/models")).toBe(await fs.exists("/app/models"));
+    expect(() => fs.statSync("/missing")).toThrow(/ENOENT/);
+    await expect(fs.lstat!("/missing")).rejects.toThrow(/ENOENT/);
+  });
+
+  test("the VFS holds no links and no permission bits", async () => {
     vfsFs(tree());
 
     expect(await FileUtils.chmodRAsync(0o755, "/app")).toEqual(["/app"]);
-  });
-
-  test("File.symlinkAsync and File.linkAsync raise NotImplementedError, the VFS holding no links", async () => {
-    vfsFs(tree());
-
     await expect(File.symlinkAsync("/README.md", "/link")).rejects.toThrow(
       "symlink() function is unimplemented on this machine",
     );
     await expect(File.linkAsync("/README.md", "/link")).rejects.toThrow(
       "link() function is unimplemented on this machine",
     );
+    expect(await File.isSymlinkAsync("/README.md")).toBe(false);
     expect(await File.isIdenticalAsync("/README.md", "/README.md")).toBe(false);
   });
 
-  test("writeFile stores the content and unlink removes it", async () => {
+  test("writeFile stores UTF-8 content, rejects bytes that are not, and unlink removes it", async () => {
     const files = tree();
     const fs = vfsFs(files);
 
-    await fs.writeFile!("/bin/trails", new TextEncoder().encode("#!/usr/bin/env node"), {
-      mode: 0o755,
-    });
+    await fs.writeFile!("/bin/trails", new TextEncoder().encode("#!/usr/bin/env node"));
     expect(files["/bin/trails"]).toBe("#!/usr/bin/env node");
+    await expect(fs.writeFile!("/bin/blob", new Uint8Array([0xff, 0xfe]))).rejects.toThrow();
     await fs.unlink!("/bin/trails");
     expect(files["/bin/trails"]).toBeUndefined();
     await expect(fs.unlink!("/bin/trails")).rejects.toThrow(/ENOENT/);

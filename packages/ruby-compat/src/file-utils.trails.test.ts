@@ -523,86 +523,88 @@ describe("FileUtils", () => {
     );
   });
 
-  it("rm_rf awaited removes a tree and ignores a missing path", async () => {
+  function useFs(name: string, overrides: object): void {
+    const fs = getFs();
+    registerFsAdapter(name, Object.assign(Object.create(fs) as typeof fs, overrides), getPath());
+    fsAdapterConfig.adapter = name;
+  }
+
+  function makeTree(): { tree: string; file: string } {
     const tree = nodePath.join(root, "tree");
+    const file = nodePath.join(tree, "sub", "f");
     nodeFs.mkdirSync(nodePath.join(tree, "sub"), { recursive: true });
-    nodeFs.writeFileSync(nodePath.join(tree, "sub", "f"), "x");
-    const missing = nodePath.join(root, "missing");
+    nodeFs.writeFileSync(file, "x");
+    return { tree, file };
+  }
 
-    expect(await FileUtils.rmRfAsync([tree, missing])).toEqual([tree, missing]);
-    expect(nodeFs.existsSync(tree)).toBe(false);
-  });
+  const modeOf = (path: string): number => nodeFs.statSync(path).mode & 0o777;
+  const failing = (code: string) => () => Promise.reject(Object.assign(new Error(code), { code }));
 
-  it("rm_r awaited raises ENOENT for a missing path unless forced, and prints rm -r", async () => {
+  it("rm_r awaited removes a tree, raises ENOENT for a missing path unless forced, and prints rm -r", async () => {
     const lines: string[] = [];
     FileUtils.fileutilsOutput = { puts: (msg) => lines.push(msg) };
+    const { tree } = makeTree();
     const missing = nodePath.join(root, "missing");
-    const file = nodePath.join(root, "f");
-    nodeFs.writeFileSync(file, "x");
 
     await expect(FileUtils.rmRAsync(missing)).rejects.toThrow(/ENOENT/);
-    expect(await FileUtils.rmRAsync(file, { noop: true, verbose: true })).toBeUndefined();
-    expect(nodeFs.existsSync(file)).toBe(true);
-    expect(await FileUtils.rmRAsync(file, { verbose: true })).toEqual([file]);
-    expect(await FileUtils.rmRfAsync(missing, { verbose: true })).toEqual([missing]);
-    expect(nodeFs.existsSync(file)).toBe(false);
-    expect(lines).toEqual([`rm -r ${file}`, `rm -r ${file}`, `rm -rf ${missing}`]);
+    expect(await FileUtils.rmRAsync(tree, { noop: true, verbose: true })).toBeUndefined();
+    expect(nodeFs.existsSync(tree)).toBe(true);
+    expect(await FileUtils.rmRfAsync([tree, missing], { verbose: true })).toEqual([tree, missing]);
+    expect(nodeFs.existsSync(tree)).toBe(false);
+    expect(lines).toEqual([`rm -r ${tree}`, `rm -rf ${tree} ${missing}`]);
+  });
+
+  it("rm_rf awaited removes what it can beneath an entry it cannot", async () => {
+    const { tree, file } = makeTree();
+    nodeFs.writeFileSync(nodePath.join(tree, "gone"), "x");
+    const unlink = getFs().unlink!;
+    useFs("eperm", {
+      unlink: (path: string) => (path === file ? failing("EPERM")() : unlink(path)),
+    });
+
+    await expect(FileUtils.rmRAsync(tree)).rejects.toThrow("EPERM");
+    expect(await FileUtils.rmRfAsync(tree)).toEqual([tree]);
+    expect(nodeFs.readdirSync(tree)).toEqual(["sub"]);
   });
 
   it("chmod_R sets the mode on every entry beneath the root and leaves a symlink alone", async () => {
     const lines: string[] = [];
     FileUtils.fileutilsOutput = { puts: (msg) => lines.push(msg) };
-    const tree = nodePath.join(root, "tree");
-    const file = nodePath.join(tree, "sub", "f");
+    const { tree, file } = makeTree();
     const outside = nodePath.join(root, "outside");
-    nodeFs.mkdirSync(nodePath.join(tree, "sub"), { recursive: true });
-    nodeFs.writeFileSync(file, "x");
+    const missing = nodePath.join(root, "missing");
     nodeFs.writeFileSync(outside, "x");
     nodeFs.chmodSync(outside, 0o600);
     nodeFs.symlinkSync(outside, nodePath.join(tree, "link"));
 
+    expect(await FileUtils.chmodRAsync(0o700, tree, { noop: true })).toBeUndefined();
+    expect(modeOf(file)).not.toBe(0o700);
     expect(await FileUtils.chmodRAsync(0o755, tree, { verbose: true })).toEqual([tree]);
-
-    for (const path of [tree, nodePath.join(tree, "sub"), file])
-      expect(nodeFs.statSync(path).mode & 0o777).toBe(0o755);
-    expect(nodeFs.statSync(outside).mode & 0o777).toBe(0o600);
+    expect([tree, nodePath.join(tree, "sub"), file].map(modeOf)).toEqual([0o755, 0o755, 0o755]);
+    expect(modeOf(outside)).toBe(0o600);
     expect(lines).toEqual([`chmod -R 755 ${tree}`]);
+    await expect(FileUtils.chmodRAsync(0o755, missing)).rejects.toThrow(/ENOENT/);
+    expect(await FileUtils.chmodRAsync(0o755, missing, { force: true })).toEqual([missing]);
   });
 
-  it("chmod_R raises for a missing root and does nothing under noop", async () => {
-    const file = nodePath.join(root, "f");
-    nodeFs.writeFileSync(file, "x");
-    nodeFs.chmodSync(file, 0o600);
+  it("chmod_R swallows EOPNOTSUPP without force, and any failure under it", async () => {
+    const { file } = makeTree();
 
-    await expect(FileUtils.chmodRAsync(0o755, nodePath.join(root, "missing"))).rejects.toThrow(
-      /ENOENT/,
-    );
-    const missing = nodePath.join(root, "missing");
-    expect(await FileUtils.chmodRAsync(0o755, missing, { force: true })).toEqual([missing]);
-    expect(await FileUtils.chmodRAsync(0o755, file, { noop: true })).toBeUndefined();
-    expect(nodeFs.statSync(file).mode & 0o777).toBe(0o600);
+    useFs("eopnotsupp", { chmod: failing("EOPNOTSUPP") });
+    expect(await FileUtils.chmodRAsync(0o755, file)).toEqual([file]);
+
+    useFs("eperm", { chmod: failing("EPERM") });
+    await expect(FileUtils.chmodRAsync(0o755, file)).rejects.toThrow("EPERM");
+    expect(await FileUtils.chmodRAsync(0o755, file, { force: true })).toEqual([file]);
   });
 
   it("rm_rf and chmod_R awaited read a backend's sync verbs where it has no async ones", async () => {
-    const fs = getFs();
-    registerFsAdapter(
-      "sync-only",
-      Object.assign(Object.create(fs) as typeof fs, {
-        lstat: undefined,
-        readdir: undefined,
-        chmod: undefined,
-        rm: undefined,
-      }),
-      getPath(),
-    );
-    fsAdapterConfig.adapter = "sync-only";
-    const tree = nodePath.join(root, "tree");
-    const file = nodePath.join(tree, "sub", "f");
-    nodeFs.mkdirSync(nodePath.join(tree, "sub"), { recursive: true });
-    nodeFs.writeFileSync(file, "x");
+    const { tree, file } = makeTree();
+    const none = undefined;
+    useFs("sync-only", { lstat: none, readdir: none, chmod: none, unlink: none, rmdir: none });
 
     expect(await FileUtils.chmodRAsync(0o700, tree)).toEqual([tree]);
-    expect(nodeFs.statSync(file).mode & 0o777).toBe(0o700);
+    expect(modeOf(file)).toBe(0o700);
     expect(await Dir.globAsync(`${tree}/**/*`)).toEqual([`${tree}/sub`, file]);
     expect(await FileUtils.rmRfAsync(tree)).toEqual([tree]);
     expect(nodeFs.existsSync(tree)).toBe(false);

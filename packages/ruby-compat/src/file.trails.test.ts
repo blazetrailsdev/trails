@@ -218,16 +218,13 @@ describe("File", () => {
     expect(await File.isIdenticalAsync(path, join(root, "missing.txt"))).toBe(false);
   });
 
-  it("symlink? awaited lstats, so a broken symlink is true and a missing path false", async () => {
-    const root = fixture();
-    expect(await File.isSymlinkAsync(join(root, "broken"))).toBe(true);
-    expect(await File.isSymlinkAsync(join(root, "a.rb"))).toBe(false);
-    expect(await File.isSymlinkAsync(join(root, "missing"))).toBe(false);
-  });
-
   it("symlink and link answer 0 and make the two names identical", async () => {
     const root = fixture();
     const source = join(root, "a.rb");
+    expect(await File.isSymlinkAsync(join(root, "broken"))).toBe(true);
+    expect(await File.isSymlinkAsync(join(root, "missing"))).toBe(false);
+    expect(await File.chmodAsync(0o600, source)).toBe(1);
+    expect(statSync(source).mode & 0o777).toBe(0o600);
 
     expect(await File.symlinkAsync(source, join(root, "soft"))).toBe(0);
     expect(await File.isSymlinkAsync(join(root, "soft"))).toBe(true);
@@ -256,14 +253,6 @@ describe("File", () => {
     } finally {
       fsAdapterConfig.adapter = previous;
     }
-  });
-
-  it("chmod awaited answers the number of files whose mode was set", async () => {
-    const root = fixture();
-    const path = join(root, "a.rb");
-
-    expect(await File.chmodAsync(0o600, path)).toBe(1);
-    expect(statSync(path).mode & 0o777).toBe(0o600);
   });
 });
 

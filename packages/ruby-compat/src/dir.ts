@@ -133,10 +133,9 @@ function globHelper(base: string, segments: string[], found: string[], enumerate
 }
 
 async function childrenAsync(dirname: string, skipdot: boolean): Promise<string[]> {
-  const fs = getFs();
   let names: string[];
   try {
-    names = (fs.readdir ? await fs.readdir(dirname) : fs.readdirSync(dirname)).sort();
+    names = (await Dir.childrenAsync(dirname)).sort();
   } catch {
     return [];
   }
@@ -401,6 +400,14 @@ export class Dir {
    */
   static children(dirname: string): string[] {
     return getFs().readdirSync(dirname);
+  }
+
+  /** {@link Dir.children} over the backend's async `readdir`, or its `readdirSync`.
+   * @noRailsEquivalent PERMANENT — Ruby core `Dir.children` (`vendor/ruby/v3.3.11/dir.c:3421`).
+   */
+  static async childrenAsync(dirname: string): Promise<string[]> {
+    const fs = getFs();
+    return fs.readdir ? await fs.readdir(dirname) : fs.readdirSync(dirname);
   }
 
   /**

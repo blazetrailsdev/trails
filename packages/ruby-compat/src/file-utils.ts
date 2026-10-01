@@ -66,26 +66,6 @@ function fuList(arg: string | string[]): string[] {
   return Array.isArray(arg) ? [...arg] : [arg];
 }
 
-async function entryChmodTraverseAsync(path: string, mode: number, force: boolean): Promise<void> {
-  const fs = getFs();
-  let st: FsStatResult | null;
-  try {
-    st = fs.lstat ? await fs.lstat(path) : fs.lstatSync(path);
-  } catch (error) {
-    if (!isSystemCallError(error)) throw error;
-    st = null;
-  }
-  try {
-    if (st?.isSymbolicLink?.() !== true) await File.chmodAsync(mode, path);
-  } catch (error) {
-    if (force !== true) throw error;
-  }
-  if (st == null || !st.isDirectory()) return;
-  for (const n of fs.readdir ? await fs.readdir(path) : fs.readdirSync(path)) {
-    await entryChmodTraverseAsync(File.join(path, n), mode, force);
-  }
-}
-
 /**
  * `fu_mkdir` (`vendor/ruby/v3.3.11/lib/fileutils.rb:396-404`). Ruby's `Dir.mkdir path,
  * mode` takes the mode in the create call; the backend contract's `mkdirSync`
@@ -464,6 +444,102 @@ class Entry_ {
       }
     }
     yieldFn(this);
+  }
+
+  async isDirectoryAsync(): Promise<boolean> {
+    const s = await this.lstatBangAsync();
+    return s != null && s.isDirectory();
+  }
+
+  async isSymlinkAsync(): Promise<boolean> {
+    const s = await this.lstatBangAsync();
+    return s != null && s.isSymbolicLink?.() === true;
+  }
+
+  async entriesAsync(): Promise<Entry_[]> {
+    const files = await Dir.childrenAsync(this.path);
+
+    return files.map((n) => new Entry_(this.prefix as string, this.join(this.rel, n)));
+  }
+
+  async lstatAsync(): Promise<FsStatResult> {
+    const fs = getFs();
+    if (this.isDereference) {
+      return (this._lstat ??= fs.stat ? await fs.stat(this.path) : fs.statSync(this.path));
+    } else {
+      return (this._lstat ??= fs.lstat ? await fs.lstat(this.path) : fs.lstatSync(this.path));
+    }
+  }
+
+  async lstatBangAsync(): Promise<FsStatResult | null> {
+    try {
+      return await this.lstatAsync();
+    } catch (error) {
+      if (!isSystemCallError(error)) throw error;
+      return null;
+    }
+  }
+
+  async chmodAsync(mode: number): Promise<void> {
+    try {
+      if (await this.isSymlinkAsync()) {
+        if (getFs().lchmodSync != null) fileLchmod(mode, this.path);
+      } else {
+        await File.chmodAsync(mode, this.path);
+      }
+    } catch (error) {
+      if ((error as { code?: string }).code !== "EOPNOTSUPP") throw error;
+    }
+  }
+
+  async removeAsync(): Promise<void> {
+    if (await this.isDirectoryAsync()) {
+      await this.removeDir1Async();
+    } else {
+      await this.removeFileAsync();
+    }
+  }
+
+  async removeDir1Async(): Promise<void> {
+    const fs = getFs();
+    const path = removeTrailingSlash(this.path);
+    if (fs.rmdir) await fs.rmdir(path);
+    else fs.rmdirSync(path);
+  }
+
+  async removeFileAsync(): Promise<void> {
+    const fs = getFs();
+    if (fs.unlink) await fs.unlink(this.path);
+    else fs.unlinkSync(this.path);
+  }
+
+  async preorderTraverseAsync(yieldFn: (ent: Entry_) => Promise<void>): Promise<void> {
+    const stack: Entry_[] = [this];
+    let ent: Entry_ | undefined;
+    while ((ent = stack.pop()) != null) {
+      await yieldFn(ent);
+      if (await ent.isDirectoryAsync()) stack.push(...(await ent.entriesAsync()).reverse());
+    }
+  }
+
+  async postorderTraverseAsync(yieldFn: (ent: Entry_) => Promise<void>): Promise<void> {
+    if (await this.isDirectoryAsync()) {
+      let children: Entry_[];
+      try {
+        children = await this.entriesAsync();
+      } catch (error) {
+        if ((error as { code?: string }).code !== "EACCES") throw error;
+        await yieldFn(this);
+        return;
+      }
+
+      for (const ent of children) {
+        await ent.postorderTraverseAsync(async (e) => {
+          await yieldFn(e);
+        });
+      }
+    }
+    await yieldFn(this);
   }
 
   /** `Entry_#wrap_traverse` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2386-2393`). */
@@ -845,30 +921,29 @@ export class FileUtils {
   }
 
   /** {@link FileUtils.removeEntry} (`vendor/ruby/v3.3.11/lib/fileutils.rb:1449-1456`)
-   * over the backend's async recursive `rm`, which is the whole
-   * `Entry_#postorder_traverse` / `Entry_#remove` walk in one verb. Under
-   * `force` a missing path is not an error and every other failure is
-   * swallowed, as Ruby's two `rescue`s do.
+   * over `Entry_`'s async walk: `Entry_#postorder_traverse`
+   * (`fileutils.rb:2364-2382`) yielding to `Entry_#remove` (`fileutils.rb:2314-2332`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static async removeEntryAsync(path: string, force = false): Promise<void> {
     try {
-      const fs = getFs();
-      if (fs.rm) await fs.rm(path, { recursive: true, force });
-      else fs.rmSync(path, { recursive: true, force });
+      await new Entry_(path).postorderTraverseAsync(async (ent) => {
+        try {
+          await ent.removeAsync();
+        } catch (error) {
+          if (force !== true) throw error;
+        }
+      });
     } catch (error) {
       if (force !== true) throw error;
     }
   }
 
   /** `FileUtils.chmod_R` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1815-1830`) over
-   * the backend's async verbs. Its block is `Entry_#traverse` yielding to
-   * `Entry_#chmod` (`fileutils.rb:2354-2362,2206-2213`): each entry before its
-   * children, a symlink left alone where there is no `lchmod`, a failed
-   * `lstat` read as `Entry_#lstat!` reads it (`fileutils.rb:2200-2204`), and a
-   * failed `chmod` swallowed under `force`. `mode` is the Integer arm of
-   * `fu_mode` (`fileutils.rb:1721-1723`); the symbolic String arm (`"u+x"`) is
-   * unported.
+   * `Entry_`'s async walk: `Entry_#traverse` (`fileutils.rb:2354-2362`)
+   * yielding to `Entry_#chmod` (`fileutils.rb:2206-2213`). `mode` is the
+   * Integer arm of `fu_mode` (`fileutils.rb:1721-1723`); the symbolic String
+   * arm (`"u+x"`) is unported.
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static async chmodRAsync(
@@ -881,7 +956,13 @@ export class FileUtils {
       fuOutputMessage(`chmod -R${force === true ? "f" : ""} ${mode.toString(8)} ${list.join(" ")}`);
     if (noop === true) return;
     for (const root of list) {
-      await entryChmodTraverseAsync(root, mode, force === true);
+      await new Entry_(root).preorderTraverseAsync(async (ent) => {
+        try {
+          await ent.chmodAsync(mode);
+        } catch (error) {
+          if (force !== true) throw error;
+        }
+      });
     }
     return list;
   }
