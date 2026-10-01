@@ -25,7 +25,11 @@ describe("watchViews", () => {
     const cwd = mkScratch();
     fs.mkdirSync(path.join(cwd, "app/views"), { recursive: true });
     const events: string[] = [];
-    const handle = watchViews({ cwd, debounceMs: 5, onRebuild: ({ kind }) => events.push(kind) });
+    const handle = await watchViews({
+      cwd,
+      debounceMs: 5,
+      onRebuild: ({ kind }) => events.push(kind),
+    });
     try {
       await waitFor(() => events.includes("initial"));
       fs.writeFileSync(path.join(cwd, "app/views/home.html.tse"), "<%= name %>");
@@ -40,7 +44,7 @@ describe("watchViews", () => {
     const cwd = mkScratch();
     fs.symlinkSync(mkScratch(), path.join(cwd, ".trails"));
     const errors: Error[] = [];
-    const handle = watchViews({ cwd, debounceMs: 5, onError: (e) => errors.push(e) });
+    const handle = await watchViews({ cwd, debounceMs: 5, onError: (e) => errors.push(e) });
     try {
       await waitFor(() => errors.length > 0);
       expect(errors[0].message).toMatch(/symlink escape/);

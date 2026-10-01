@@ -42,13 +42,13 @@ function write(root: string, rel: string, body: string): void {
 }
 
 describe("buildViews", () => {
-  it("mirrors .tse files to .trails/views/ as typecheck shims", () => {
+  it("mirrors .tse files to .trails/views/ as typecheck shims", async () => {
     const cwd = mkScratch();
     write(cwd, "app/views/users/show.html.tse", "<h1><%= name %></h1>");
     write(cwd, "app/views/users/edit.html.tse", "<%# locals: (name:) %>edit");
     write(cwd, "app/views/posts/index.html.tse", "list");
 
-    const { count, files } = buildViews({ cwd });
+    const { count, files } = await buildViews({ cwd });
 
     expect(count).toBe(3);
     expect(files).toEqual(["posts/index.html.tse", "users/edit.html.tse", "users/show.html.tse"]);
@@ -58,65 +58,65 @@ describe("buildViews", () => {
     expect(shim).toContain("_ob.append(name)");
   });
 
-  it("emits no runtime module — templates render from .tse source at request time", () => {
+  it("emits no runtime module — templates render from .tse source at request time", async () => {
     const cwd = mkScratch();
     write(cwd, "app/views/users/show.html.tse", "ok");
 
-    buildViews({ cwd });
+    await buildViews({ cwd });
 
     expect(fs.existsSync(path.join(cwd, ".trails/views/users/show.html.tse.js"))).toBe(false);
     expect(fs.existsSync(path.join(cwd, ".trails/views/users/show.html.tse.js.map"))).toBe(false);
     expect(fs.existsSync(path.join(cwd, ".trails/views-manifest.ts"))).toBe(false);
   });
 
-  it("is a no-op when the views dir is absent", () => {
+  it("is a no-op when the views dir is absent", async () => {
     const cwd = mkScratch();
-    const { count } = buildViews({ cwd });
+    const { count } = await buildViews({ cwd });
     expect(count).toBe(0);
   });
 
-  it("clears stale outputs from a prior build", () => {
+  it("clears stale outputs from a prior build", async () => {
     const cwd = mkScratch();
     write(cwd, "app/views/users/show.html.tse", "first");
     write(cwd, "app/views/users/gone.html.tse", "doomed");
-    buildViews({ cwd });
+    await buildViews({ cwd });
     expect(fs.existsSync(path.join(cwd, ".trails/views/users/gone.html.tse.ts"))).toBe(true);
 
     fs.rmSync(path.join(cwd, "app/views/users/gone.html.tse"));
-    const { count } = buildViews({ cwd });
+    const { count } = await buildViews({ cwd });
     expect(count).toBe(1);
     expect(fs.existsSync(path.join(cwd, ".trails/views/users/gone.html.tse.ts"))).toBe(false);
   });
 
-  it("deletes a views-manifest.ts left behind by an older build", () => {
+  it("deletes a views-manifest.ts left behind by an older build", async () => {
     const cwd = mkScratch();
     write(cwd, "app/views/users/show.html.tse", "first");
-    buildViews({ cwd });
+    await buildViews({ cwd });
     const manifest = path.join(cwd, ".trails/views-manifest.ts");
     fs.writeFileSync(manifest, "export const views = {} as const;\n");
 
-    buildViews({ cwd });
+    await buildViews({ cwd });
 
     expect(fs.existsSync(manifest)).toBe(false);
   });
 
-  it("refuses to build when outDir is a symlink escaping cwd", () => {
+  it("refuses to build when outDir is a symlink escaping cwd", async () => {
     const cwd = mkScratch();
     const elsewhere = mkScratch();
     fs.symlinkSync(elsewhere, path.join(cwd, ".trails"));
     write(cwd, "app/views/home.html.tse", "x");
-    expect(() => buildViews({ cwd })).toThrow(/symlink escape/);
+    await expect(buildViews({ cwd })).rejects.toThrow(/symlink escape/);
     expect(fs.existsSync(elsewhere)).toBe(true);
   });
 
-  it("honors custom viewsDir / outDir", () => {
+  it("honors custom viewsDir / outDir", async () => {
     const cwd = mkScratch();
     write(cwd, "src/templates/home.html.tse", "hi");
-    buildViews({ cwd, viewsDir: "src/templates", outDir: "build/.gen" });
+    await buildViews({ cwd, viewsDir: "src/templates", outDir: "build/.gen" });
     expect(fs.existsSync(path.join(cwd, "build/.gen/views/home.html.tse.ts"))).toBe(true);
   });
 
-  it("emits template-registry-augmentation.d.ts keyed by Rails partial name", () => {
+  it("emits template-registry-augmentation.d.ts keyed by Rails partial name", async () => {
     const cwd = mkScratch();
     write(
       cwd,
@@ -126,7 +126,7 @@ describe("buildViews", () => {
     write(cwd, "app/views/posts/index.html.tse", "<%# locals: (page:) %>list");
     write(cwd, "app/views/shared/_nav.html.tse", "nav");
 
-    buildViews({ cwd });
+    await buildViews({ cwd });
 
     const aug = fs.readFileSync(
       path.join(cwd, ".trails/template-registry-augmentation.d.ts"),
@@ -144,7 +144,7 @@ describe("buildViews", () => {
     expect(aug).toContain("AUTO-GENERATED");
   });
 
-  it("intersects locals types when a partial exists as multiple formats", () => {
+  it("intersects locals types when a partial exists as multiple formats", async () => {
     const cwd = mkScratch();
     write(
       cwd,
@@ -153,7 +153,7 @@ describe("buildViews", () => {
     );
     write(cwd, "app/views/users/_user.json.tse", "<%# locals: (name:, email:) %><%= name %>");
 
-    buildViews({ cwd });
+    await buildViews({ cwd });
 
     const aug = fs.readFileSync(
       path.join(cwd, ".trails/template-registry-augmentation.d.ts"),
@@ -163,7 +163,7 @@ describe("buildViews", () => {
     expect(aug).toMatch(/\(NoExtraKeys<\{[^}]+\}>\)\s*&\s*\(NoExtraKeys<\{[^}]+\}>\)/);
   });
 
-  it("multi-format intersection augmentation satisfies tsc semantic check", () => {
+  it("multi-format intersection augmentation satisfies tsc semantic check", async () => {
     const cwd = mkScratch();
     write(
       cwd,
@@ -172,7 +172,7 @@ describe("buildViews", () => {
     );
     write(cwd, "app/views/users/_user.json.tse", "<%# locals: (name:, email:) %><%= name %>");
 
-    buildViews({ cwd });
+    await buildViews({ cwd });
 
     const aug = fs.readFileSync(
       path.join(cwd, ".trails/template-registry-augmentation.d.ts"),
@@ -202,12 +202,12 @@ describe("buildViews", () => {
     ).toBeGreaterThan(0);
   }, 30_000);
 
-  it("emits an empty augmentation when no partials have a locals directive", () => {
+  it("emits an empty augmentation when no partials have a locals directive", async () => {
     const cwd = mkScratch();
     write(cwd, "app/views/home.html.tse", "plain template");
     write(cwd, "app/views/shared/_nav.html.tse", "nav without locals");
 
-    buildViews({ cwd });
+    await buildViews({ cwd });
 
     const aug = fs.readFileSync(
       path.join(cwd, ".trails/template-registry-augmentation.d.ts"),
@@ -219,11 +219,11 @@ describe("buildViews", () => {
     expect(aug).toContain("AUTO-GENERATED");
   });
 
-  it("emits all 4 artifacts with correct source map references", () => {
+  it("emits all 4 artifacts with correct source map references", async () => {
     const cwd = mkScratch();
     const src = "<h1><%= name %></h1>";
     write(cwd, "app/views/users/show.html.tse", src);
-    buildViews({ cwd });
+    await buildViews({ cwd });
     const base = path.join(cwd, ".trails/views/users/show.html.tse");
     const mapDir = path.dirname(base);
     const srcPath = path.join(cwd, "app/views/users/show.html.tse");
@@ -239,11 +239,11 @@ describe("buildViews", () => {
     expect(shim).toContain("//# sourceMappingURL=show.html.tse.ts.map");
   });
 
-  it("tse virtual shim includes TemplateRegistry import and render overloads", () => {
+  it("tse virtual shim includes TemplateRegistry import and render overloads", async () => {
     const cwd = mkScratch();
     write(cwd, "app/views/users/_user.html.tse", "<%= name %>");
 
-    buildViews({ cwd });
+    await buildViews({ cwd });
 
     const shim = fs.readFileSync(path.join(cwd, ".trails/views/users/_user.html.tse.ts"), "utf8");
     expect(shim).toContain(
@@ -256,7 +256,7 @@ describe("buildViews", () => {
     expect(shim).toContain("{ locals: TemplateLocals<TemplateRegistry[P]> }");
   });
 
-  it("makes an unresolved name an error once every render site of the template is resolved", () => {
+  it("makes an unresolved name an error once every render site of the template is resolved", async () => {
     const cwd = mkScratch();
     write(
       cwd,
@@ -290,7 +290,7 @@ describe("buildViews", () => {
     write(cwd, "app/views/posts/new.html.tse", '<%= render("form", { post: this.post }) %>');
     write(cwd, "app/views/posts/_post.html.tse", "<%= post.title %><%= psot.title %>");
     write(cwd, "app/views/posts/_form.html.tse", "<%= post.title %><%= psot.title %>");
-    buildViews({ cwd });
+    await buildViews({ cwd });
     const diagnostics = viewDiagnostics(cwd);
     expect(diagnostics).toEqual(
       ["posts/_form", "posts/_post", "posts/index"].map(
@@ -299,7 +299,7 @@ describe("buildViews", () => {
     );
   }, 30_000);
 
-  it("keeps the any fallback for a partial some unresolved render site may reach", () => {
+  it("keeps the any fallback for a partial some unresolved render site may reach", async () => {
     const cwd = mkScratch();
     write(cwd, "app/models/post.ts", "export class Post {}");
     write(cwd, "app/views/posts/_post.html.tse", "<%= psot %>");
@@ -308,7 +308,7 @@ describe("buildViews", () => {
     write(cwd, "app/views/posts/new.html.tse", '<%= render("form") %><%= render("row") %>');
     const shim = (rel: string): string =>
       fs.readFileSync(path.join(cwd, ".trails/views/posts", `${rel}.html.tse.ts`), "utf8");
-    buildViews({ cwd });
+    await buildViews({ cwd });
     expect(shim("_form")).toContain("      : never;");
     expect(shim("_row")).toContain("      : never;");
     expect(shim("new")).toContain("      : never;");
@@ -317,7 +317,7 @@ describe("buildViews", () => {
       "app/views/posts/edit.html.tse",
       '<%= render({ partial: "row", collection: [1] }) %>',
     );
-    buildViews({ cwd });
+    await buildViews({ cwd });
     expect(shim("_form")).toContain("      : never;");
     expect(shim("_row")).toContain("      : any;");
     write(
@@ -325,13 +325,13 @@ describe("buildViews", () => {
       "app/views/posts/show.html.tse",
       '<% const someVariable: string = "form"; %><%= render(someVariable) %>',
     );
-    buildViews({ cwd });
+    await buildViews({ cwd });
     for (const partial of ["_post", "_form", "_row"])
       expect(shim(partial)).toContain("      : any;");
     expect(shim("show")).toContain("      : never;");
   }, 30_000);
 
-  it("reads a hash render's second argument as a block only when it is a function", () => {
+  it("reads a hash render's second argument as a block only when it is a function", async () => {
     const cwd = mkScratch();
     write(cwd, "app/views/posts/_row.html.tse", "<%= psot %>");
     write(cwd, "app/views/posts/_boxed.html.tse", "<%= psot %>");
@@ -340,7 +340,7 @@ describe("buildViews", () => {
       "app/views/posts/show.html.tse",
       '<%= render({ partial: "row" }, { post: 1 }) %><%= render({ layout: "boxed", locals: { post: 1 } }, () => "") %>',
     );
-    buildViews({ cwd });
+    await buildViews({ cwd });
     const shim = (rel: string): string =>
       fs.readFileSync(path.join(cwd, ".trails/views/posts", `${rel}.html.tse.ts`), "utf8");
     expect(shim("_row")).toContain("type ObjectLocals = {};");
@@ -348,7 +348,7 @@ describe("buildViews", () => {
     expect(shim("_boxed")).toContain("type ObjectLocals = { post: number };");
   }, 30_000);
 
-  it("keeps the any fallback for a template a controller render passes locals to", () => {
+  it("keeps the any fallback for a template a controller render passes locals to", async () => {
     const cwd = mkScratch();
     write(
       cwd,
@@ -365,7 +365,7 @@ describe("buildViews", () => {
     for (const rel of ["show", "edit", "_row", "_form"]) {
       write(cwd, `app/views/posts/${rel}.html.tse`, "<%= foo %>");
     }
-    buildViews({ cwd });
+    await buildViews({ cwd });
     const shim = (rel: string): string =>
       fs.readFileSync(path.join(cwd, ".trails/views/posts", `${rel}.html.tse.ts`), "utf8");
     expect(shim("show")).toContain("      : any;");
@@ -376,44 +376,44 @@ describe("buildViews", () => {
 });
 
 describe("runCli", () => {
-  it("dispatches `build` to buildViews with --cwd", () => {
+  it("dispatches `build` to buildViews with --cwd", async () => {
     const cwd = mkScratch();
     write(cwd, "app/views/home.html.tse", "x");
-    const rc = runCli(["build", "--cwd", cwd]);
+    const rc = await runCli(["build", "--cwd", cwd]);
     expect(rc).toBe(0);
     expect(fs.existsSync(path.join(cwd, ".trails/views/home.html.tse.ts"))).toBe(true);
   });
 
-  it("rejects unknown commands with a non-zero exit", () => {
-    expect(runCli(["bogus"])).toBe(1);
+  it("rejects unknown commands with a non-zero exit", async () => {
+    expect(await runCli(["bogus"])).toBe(1);
   });
 
-  it("rejects a value-flag without a value", () => {
-    expect(runCli(["build", "--cwd"])).toBe(1);
+  it("rejects a value-flag without a value", async () => {
+    expect(await runCli(["build", "--cwd"])).toBe(1);
   });
 
-  it("catches buildViews errors and returns 1 instead of throwing", () => {
+  it("catches buildViews errors and returns 1 instead of throwing", async () => {
     const cwd = mkScratch();
-    expect(runCli(["build", "--cwd", cwd, "--out", "/tmp/elsewhere"])).toBe(1);
+    expect(await runCli(["build", "--cwd", cwd, "--out", "/tmp/elsewhere"])).toBe(1);
   });
 
-  it("prints usage for --help and exits 0", () => {
-    expect(runCli(["--help"])).toBe(0);
+  it("prints usage for --help and exits 0", async () => {
+    expect(await runCli(["--help"])).toBe(0);
   });
 
   afterEach(() => vi.restoreAllMocks());
 
-  it("`dev` starts the watcher synchronously and runs an initial build", () => {
+  it("`dev` starts the watcher synchronously and runs an initial build", async () => {
     vi.spyOn(process, "exit").mockImplementation(((_c?: number) => undefined) as never);
     const cwd = mkScratch();
     write(cwd, "app/views/home.html.tse", "hi");
-    const rc = runCli(["dev", "--cwd", cwd]);
+    const rc = await runCli(["dev", "--cwd", cwd]);
     expect(rc).toBe(0);
     expect(fs.existsSync(path.join(cwd, ".trails/views/home.html.tse.ts"))).toBe(true);
     process.emit("SIGINT");
   });
 
-  it("scopes a view to app/helpers, the controller's declared ivars and the partial's model", () => {
+  it("scopes a view to app/helpers, the controller's declared ivars and the partial's model", async () => {
     const cwd = mkScratch();
     write(cwd, "app/helpers/posts-helper.ts", "export const PostsHelper = {};");
     write(cwd, "app/helpers/admin/users-helper.ts", "export const AdminUsersHelper = {};");
@@ -453,7 +453,7 @@ describe("runCli", () => {
     write(cwd, "app/views/posts/_post.html.tse", "<%= post %>");
     write(cwd, "app/views/layouts/application.html.tse", "<%= yield %>");
     write(cwd, "app/views/comments/_post.html.tse", "<%= post %>");
-    buildViews({ cwd });
+    await buildViews({ cwd });
     const shim = fs.readFileSync(path.join(cwd, ".trails/views/posts/_post.html.tse.ts"), "utf8");
     expect(shim).toContain(
       '(typeof import("../../../app/helpers/posts-helper.js"))["PostsHelper"]',
@@ -483,7 +483,7 @@ describe("runCli", () => {
         "}",
       ].join("\n"),
     );
-    buildViews({ cwd });
+    await buildViews({ cwd });
     const applicationLayout = fs.readFileSync(
       path.join(cwd, ".trails/views/layouts/application.html.tse.ts"),
       "utf8",
@@ -498,7 +498,7 @@ describe("runCli", () => {
     expect(notCollection).toContain("type ObjectLocals = {};");
   }, 30_000);
 
-  it("exposes helperMethod names only from class-level macro positions", () => {
+  it("exposes helperMethod names only from class-level macro positions", async () => {
     const cwd = mkScratch();
     write(
       cwd,
@@ -560,7 +560,7 @@ describe("runCli", () => {
       ].join("\n"),
     );
     write(cwd, "app/views/posts/index.html.tse", "hi");
-    buildViews({ cwd });
+    await buildViews({ cwd });
     const shim = fs.readFileSync(path.join(cwd, ".trails/views/posts/index.html.tse.ts"), "utf8");
     expect(shim).toContain('"late": () => number');
     expect(shim).toContain('"field": () => boolean');
@@ -572,10 +572,10 @@ describe("runCli", () => {
     expect(shim).not.toContain('"foreign"');
   }, 30_000);
 
-  it("writes a source map pointing each shim line at its .tse line", () => {
+  it("writes a source map pointing each shim line at its .tse line", async () => {
     const cwd = mkScratch();
     write(cwd, "app/views/posts/show.html.tse", "<div>\n  <p>\n    <%= readingTime(1) %>\n</div>");
-    buildViews({ cwd });
+    await buildViews({ cwd });
     const base = path.join(cwd, ".trails/views/posts/show.html.tse.ts");
     const lines = fs.readFileSync(base, "utf8").split("\n");
     const map = JSON.parse(fs.readFileSync(base + ".map", "utf8"));
@@ -585,7 +585,7 @@ describe("runCli", () => {
     );
   });
 
-  it("types a partial's passed locals from every render call that passes them", () => {
+  it("types a partial's passed locals from every render call that passes them", async () => {
     const cwd = mkScratch();
     write(cwd, "app/views/posts/new.html.tse", '<%= render("form", { post: 1, title: "x" }) %>');
     write(
@@ -602,7 +602,7 @@ describe("runCli", () => {
     write(cwd, "app/views/posts/_form.html.tse", "<%= post %><%= title %>");
     write(cwd, "app/views/posts/_strict.html.tse", "<%# locals: (post:) %><%= post %>");
     write(cwd, "app/views/posts/show.html.tse", '<%= render("strict", { post: 1 }) %>');
-    buildViews({ cwd });
+    await buildViews({ cwd });
     const form = fs.readFileSync(path.join(cwd, ".trails/views/posts/_form.html.tse.ts"), "utf8");
     expect(form).toContain(
       "type ObjectLocals = { post: string | boolean | number | undefined; title: string | undefined };",
@@ -614,17 +614,17 @@ describe("runCli", () => {
     expect(strict).toContain("type ObjectLocals = {};");
   }, 30_000);
 
-  it("types a local a partial forwards to another partial", () => {
+  it("types a local a partial forwards to another partial", async () => {
     const cwd = mkScratch();
     write(cwd, "app/views/posts/show.html.tse", '<%= render("card", { post: 1 }) %>');
     write(cwd, "app/views/posts/_card.html.tse", '<%= render("line", { post }) %>');
     write(cwd, "app/views/posts/_line.html.tse", "<%= post %>");
-    buildViews({ cwd });
+    await buildViews({ cwd });
     const line = fs.readFileSync(path.join(cwd, ".trails/views/posts/_line.html.tse.ts"), "utf8");
     expect(line).toContain("type ObjectLocals = { post: number };");
   }, 30_000);
 
-  it("types a shared layout from every controller that falls back to it", () => {
+  it("types a shared layout from every controller that falls back to it", async () => {
     const cwd = mkScratch();
     write(
       cwd,
@@ -648,7 +648,7 @@ describe("runCli", () => {
     write(cwd, "app/views/layouts/application.html.tse", "<%= this.items %>");
     write(cwd, "app/views/layouts/posts.html.tse", "<%= this.items %>");
     write(cwd, "app/views/layouts/admin/posts.html.tse", "<%= this.items %>");
-    buildViews({ cwd });
+    await buildViews({ cwd });
     const read = (rel: string): string =>
       fs.readFileSync(path.join(cwd, ".trails/views", `${rel}.ts`), "utf8");
     expect(read("layouts/application.html.tse")).toContain('{ "items": string[] | undefined }');
@@ -657,7 +657,7 @@ describe("runCli", () => {
     expect(fs.existsSync(path.join(cwd, "app/controllers/posts-controller.d.ts"))).toBe(false);
   }, 30_000);
 
-  it("types a layout from explicit layout() and render layout: choices before the implied name", () => {
+  it("types a layout from explicit layout() and render layout: choices before the implied name", async () => {
     const cwd = mkScratch();
     write(
       cwd,
@@ -700,7 +700,7 @@ describe("runCli", () => {
     for (const layout of ["application", "posts", "comments", "plain", "drafts", "admin"]) {
       write(cwd, `app/views/layouts/${layout}.html.tse`, "hi");
     }
-    buildViews({ cwd });
+    await buildViews({ cwd });
     const fields = (layout: string): string[] =>
       [
         ...fs
@@ -715,7 +715,7 @@ describe("runCli", () => {
     expect(fields("plain")).toEqual(["picked"]);
   }, 30_000);
 
-  it("types addFlashTypes readers in a controller's views and layout", () => {
+  it("types addFlashTypes readers in a controller's views and layout", async () => {
     const cwd = mkScratch();
     write(
       cwd,
@@ -729,14 +729,14 @@ describe("runCli", () => {
     );
     write(cwd, "app/views/posts/index.html.tse", "<%= this.warning %>");
     write(cwd, "app/views/layouts/posts.html.tse", "<%= this.info %><%= yield %>");
-    buildViews({ cwd });
+    await buildViews({ cwd });
     const read = (rel: string): string =>
       fs.readFileSync(path.join(cwd, ".trails/views", `${rel}.ts`), "utf8");
     expect(read("posts/index.html.tse")).toContain('{ "warning": unknown; "info": unknown }');
     expect(read("layouts/posts.html.tse")).toContain('{ "warning": unknown; "info": unknown }');
   }, 30_000);
 
-  it("types a partial's locals from each hash of a conditional render", () => {
+  it("types a partial's locals from each hash of a conditional render", async () => {
     const cwd = mkScratch();
     write(
       cwd,
@@ -744,7 +744,7 @@ describe("runCli", () => {
       '<%= render({ partial: "choice", locals: Math.random() > 0.5 ? { post: 1 } : { title: "t" } }) %>',
     );
     write(cwd, "app/views/posts/_choice.html.tse", "<%= post %><%= title %>");
-    buildViews({ cwd });
+    await buildViews({ cwd });
     const choice = fs.readFileSync(
       path.join(cwd, ".trails/views/posts/_choice.html.tse.ts"),
       "utf8",

@@ -1,4 +1,5 @@
-import * as fs from "node:fs";
+import type { Dirent } from "node:fs";
+import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import ts from "typescript-5";
 import { camelize, dasherize, pluralize, underscore } from "@blazetrails/activesupport";
@@ -21,36 +22,36 @@ export interface BuildViewsResult {
   files: readonly string[];
 }
 
-export function buildViews(opts: BuildViewsOptions = {}): BuildViewsResult {
+export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildViewsResult> {
   const cwd = opts.cwd ?? process.cwd();
   const viewsDir = path.resolve(cwd, opts.viewsDir ?? "app/views");
   const outDir = path.resolve(cwd, opts.outDir ?? ".trails");
   const outViews = path.join(outDir, "views");
-  const files = walkTse(viewsDir);
+  const files = await walkTse(viewsDir);
   const lexicalRel = path.relative(cwd, outViews);
   if (lexicalRel === "" || lexicalRel.startsWith("..") || path.isAbsolute(lexicalRel)) {
     throw new Error(
       `refusing to build into ${JSON.stringify(outViews)} — outDir must resolve under cwd ${JSON.stringify(cwd)}`,
     );
   }
-  const realCwd = fs.realpathSync(cwd);
-  const realOutAncestor = fs.realpathSync(deepestExisting(outViews));
+  const realCwd = await fs.realpath(cwd);
+  const realOutAncestor = await fs.realpath(await deepestExisting(outViews));
   const realRel = path.relative(realCwd, realOutAncestor);
   if (realRel !== "" && (realRel.startsWith("..") || path.isAbsolute(realRel))) {
     throw new Error(
       `refusing to build into ${JSON.stringify(outViews)} — resolved path ${JSON.stringify(realOutAncestor)} is outside cwd ${JSON.stringify(realCwd)} (symlink escape)`,
     );
   }
-  fs.rmSync(outViews, { recursive: true, force: true });
-  fs.rmSync(path.join(outDir, "views-manifest.ts"), { force: true });
-  fs.mkdirSync(outViews, { recursive: true });
+  await fs.rm(outViews, { recursive: true, force: true });
+  await fs.rm(path.join(outDir, "views-manifest.ts"), { force: true });
+  await fs.mkdir(outViews, { recursive: true });
   const registryMap = new Map<string, string[]>();
   const appDir = path.dirname(viewsDir);
-  const helpers = allHelpersFromPath(path.join(appDir, "helpers"));
-  const controllers = allControllers(path.join(appDir, "controllers"));
+  const helpers = await allHelpersFromPath(path.join(appDir, "helpers"));
+  const controllers = await allControllers(path.join(appDir, "controllers"));
   const views: ViewShim[] = [];
   for (const rel of files) {
-    const src = fs.readFileSync(path.join(viewsDir, rel), "utf8");
+    const src = await fs.readFile(path.join(viewsDir, rel), "utf8");
     const outBase = path.join(outViews, rel);
     const ast = parse(src);
     views.push({
@@ -59,10 +60,10 @@ export function buildViews(opts: BuildViewsOptions = {}): BuildViewsResult {
       outBase,
       strictLocals: ast.localsSignature !== null,
       resolved: false,
-      ...templateScope(appDir, rel, path.dirname(outBase), helpers, controllers),
+      ...(await templateScope(appDir, rel, path.dirname(outBase), helpers, controllers)),
     });
-    fs.mkdirSync(path.dirname(outBase), { recursive: true });
-    writeShim(views[views.length - 1], viewsDir);
+    await fs.mkdir(path.dirname(outBase), { recursive: true });
+    await writeShim(views[views.length - 1], viewsDir);
     const registryKey = partialRegistryKey(rel);
     if (registryKey !== null && ast.localsSignature !== null) {
       const locals = parseLocalsSignature(ast.localsSignature);
@@ -80,7 +81,7 @@ export function buildViews(opts: BuildViewsOptions = {}): BuildViewsResult {
       pass <= views.length && bindCheckedTypes(views, controllers, program);
       pass++
     ) {
-      for (const view of views) writeShim(view, viewsDir);
+      for (const view of views) await writeShim(view, viewsDir);
       program = ts.createProgram(roots, EMIT_OPTIONS, host, program);
     }
     emitDeclarations(program, host, outViews);
@@ -89,17 +90,24 @@ export function buildViews(opts: BuildViewsOptions = {}): BuildViewsResult {
     key,
     localsType: types.length === 1 ? types[0] : types.map((t) => `(${t})`).join(" & "),
   }));
-  fs.mkdirSync(outDir, { recursive: true });
-  fs.writeFileSync(
+  await fs.mkdir(outDir, { recursive: true });
+  await fs.writeFile(
     path.join(outDir, "template-registry-augmentation.d.ts"),
     emitRegistryAugmentation(registryEntries),
   );
   return { count: files.length, files };
 }
 
-function deepestExisting(p: string): string {
+function exists(p: string): Promise<boolean> {
+  return fs.access(p).then(
+    () => true,
+    () => false,
+  );
+}
+
+async function deepestExisting(p: string): Promise<string> {
   let cur = path.resolve(p);
-  while (!fs.existsSync(cur)) {
+  while (!(await exists(cur))) {
     const parent = path.dirname(cur);
     if (parent === cur) return cur;
     cur = parent;
@@ -107,15 +115,15 @@ function deepestExisting(p: string): string {
   return cur;
 }
 
-function walkTse(dir: string): string[] {
-  if (!fs.existsSync(dir)) return [];
+async function walkTse(dir: string): Promise<string[]> {
+  if (!(await exists(dir))) return [];
   const out: string[] = [];
-  const entries = fs.readdirSync(dir, { recursive: true, withFileTypes: true });
+  const entries = await fs.readdir(dir, { recursive: true, withFileTypes: true });
   for (const e of entries) {
     if (!e.isFile() || !e.name.endsWith(".tse")) continue;
     const parent =
-      (e as fs.Dirent & { parentPath?: string }).parentPath ??
-      (e as fs.Dirent & { path?: string }).path ??
+      (e as Dirent & { parentPath?: string }).parentPath ??
+      (e as Dirent & { path?: string }).path ??
       dir;
     const full = path.join(parent, e.name);
     out.push(path.relative(dir, full).split(path.sep).join("/"));
@@ -123,10 +131,9 @@ function walkTse(dir: string): string[] {
   return out.sort();
 }
 
-function allHelpersFromPath(helpersDir: string): string[] {
-  if (!fs.existsSync(helpersDir)) return [];
-  const names = fs
-    .readdirSync(helpersDir, { recursive: true, encoding: "utf8" })
+async function allHelpersFromPath(helpersDir: string): Promise<string[]> {
+  if (!(await exists(helpersDir))) return [];
+  const names = (await fs.readdir(helpersDir, { recursive: true, encoding: "utf8" }))
     .map((file) => file.split(path.sep).join("/"))
     .filter((file) => /[-_]helper\.ts$/u.test(file));
   return names.sort();
@@ -138,10 +145,9 @@ interface Controller {
   path: string;
 }
 
-function allControllers(controllersDir: string): Controller[] {
-  if (!fs.existsSync(controllersDir)) return [];
-  return fs
-    .readdirSync(controllersDir, { recursive: true, encoding: "utf8" })
+async function allControllers(controllersDir: string): Promise<Controller[]> {
+  if (!(await exists(controllersDir))) return [];
+  return (await fs.readdir(controllersDir, { recursive: true, encoding: "utf8" }))
     .map((file) => file.split(path.sep).join("/"))
     .filter((file) => file.endsWith("-controller.ts"))
     .sort()
@@ -178,7 +184,7 @@ interface ViewShim {
   layout?: string;
 }
 
-function writeShim(shim: ViewShim, viewsDir: string): void {
+async function writeShim(shim: ViewShim, viewsDir: string): Promise<void> {
   const shimDir = path.dirname(shim.outBase);
   const locals = [...shim.locals].map(([name, types]) => `${name}: ${[...types].join(" | ")}`);
   const scope: TseScope = {
@@ -188,13 +194,13 @@ function writeShim(shim: ViewShim, viewsDir: string): void {
   };
   const { ts: code, mappings } = virtualizeTseWithDeltas(shim.src, scope);
   const base = path.basename(shim.rel);
-  fs.writeFileSync(shim.outBase + ".ts", code + `//# sourceMappingURL=${base}.ts.map\n`);
+  await fs.writeFile(shim.outBase + ".ts", code + `//# sourceMappingURL=${base}.ts.map\n`);
   const sourceFileName = path
     .relative(shimDir, path.join(viewsDir, shim.rel))
     .split(path.sep)
     .join("/");
   const map = generateSourceMap(`${base}.ts`, sourceFileName, shim.src, mappings);
-  fs.writeFileSync(shim.outBase + ".ts.map", JSON.stringify(map));
+  await fs.writeFile(shim.outBase + ".ts.map", JSON.stringify(map));
 }
 
 function relocateImports(typeText: string, shimDir: string): string {
@@ -637,13 +643,13 @@ function isFunction(node: ts.Expression): boolean {
   return ts.isArrowFunction(node) || ts.isFunctionExpression(node);
 }
 
-function templateScope(
+async function templateScope(
   appDir: string,
   rel: string,
   shimDir: string,
   helpers: readonly string[],
   controllers: readonly Controller[],
-): Pick<ViewShim, "view" | "locals" | "model" | "base" | "controller" | "layout"> {
+): Promise<Pick<ViewShim, "view" | "locals" | "model" | "base" | "controller" | "layout">> {
   const view = ['import("@blazetrails/actionview").Base'];
   for (const file of helpers) {
     const name = constantName(file.replace(/[-_]helper\.ts$/u, ""));
@@ -670,7 +676,7 @@ function templateScope(
       ...namespace.map(dasherize),
       `${dasherize(element)}.ts`,
     );
-    if (fs.existsSync(model)) {
+    if (await exists(model)) {
       const klass = constantName([...namespace, element].join("/"));
       locals.set(element, new Set([`import(${JSON.stringify(model)}).${klass}`]));
       modelClass = { file: model, klass };

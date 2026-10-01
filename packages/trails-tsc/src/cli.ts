@@ -7,7 +7,7 @@ const USAGE = "usage: trails-tsc-views <build|dev> [--cwd <dir>] [--views <dir>]
 
 const VALUE_FLAGS = new Set(["--cwd", "--views", "--out"]);
 
-export function runCli(argv: readonly string[]): number {
+export async function runCli(argv: readonly string[]): Promise<number> {
   const cmd = argv[0];
   if (cmd === undefined || cmd === "--help" || cmd === "-h") {
     process.stdout.write(USAGE);
@@ -37,7 +37,7 @@ export function runCli(argv: readonly string[]): number {
   }
   if (cmd === "build") {
     try {
-      const { count } = buildViews(opts);
+      const { count } = await buildViews(opts);
       process.stdout.write(`trails-tsc-views: built ${count} view${count === 1 ? "" : "s"}\n`);
       return 0;
     } catch (err) {
@@ -50,7 +50,7 @@ export function runCli(argv: readonly string[]): number {
   let started = false;
   let handle: WatchHandle;
   try {
-    handle = watchViews({
+    handle = await watchViews({
       ...opts,
       onRebuild: ({ kind, trigger, result }) =>
         process.stdout.write(
@@ -80,9 +80,9 @@ export function runCli(argv: readonly string[]): number {
   return 0;
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
   const argv = process.argv.slice(2);
-  const rc = runCli(argv);
+  const rc = await runCli(argv);
   if (argv[0] !== "dev") process.exit(rc);
   else if (rc !== 0) process.exit(rc);
 }
