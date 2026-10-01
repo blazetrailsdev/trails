@@ -8,19 +8,25 @@ import {
   demodulize,
   extractOptionsBang,
   humanize,
+  isBlank,
+  isExtractableOptions,
   isPlainObject,
   onLoad,
+  presence,
+  reverseMergeBang,
   underscore,
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
-  block,
+  block as rbBlock,
+  compact,
   Hash,
   except,
   fetch,
   hashDelete,
   merge,
   mergeBang,
+  rbFPublicSend,
   rbInspect,
   rbObjRespondTo,
   slice,
@@ -28,10 +34,12 @@ import {
 
 import { convertToModel, modelNameFromRecordOrClass } from "../model-naming.js";
 export { convertToModel, modelNameFromRecordOrClass } from "../model-naming.js";
+import { domClass, domId } from "../record-identifier.js";
 export { domClass, domId } from "../record-identifier.js";
 import { ActionView } from "../namespaces.js";
 import { capture, type CaptureHelperHost } from "./capture-helper.js";
 import {
+  embedAuthenticityTokenInRemoteForms,
   formTagHtml,
   formTagWithBody,
   htmlOptionsForForm,
@@ -59,8 +67,10 @@ const __FILE__ = import.meta.url;
 const __LINE__ = 0;
 
 export interface FormHelperHost extends FormTagHelperHost, CaptureHelperHost {
+  fieldsFor: typeof fieldsFor;
   hiddenField: typeof hiddenField;
   label: typeof label;
+  _objectForFormBuilder: typeof _objectForFormBuilder;
   defaultFormBuilder: unknown;
   polymorphicPath?(record: unknown, options: Record<string, unknown>): string;
 }
@@ -89,6 +99,78 @@ export function setFormWithGeneratesIds(value: boolean): void {
 
 export function setMultipleFileFieldIncludeHidden(value: boolean): void {
   multipleFileFieldIncludeHidden = value;
+}
+
+export function formFor(
+  this: FormHelperHost,
+  record: unknown,
+  options: Record<string, unknown> = {},
+  block?: (builder: FormBuilder) => unknown,
+): SafeBuffer {
+  if (block === undefined) throw new ArgumentError("Missing block");
+
+  let model: unknown;
+  let objectName: unknown;
+  if (typeof record === "string") {
+    model = false;
+    objectName = record;
+  } else {
+    model = record;
+    const object = _objectForFormBuilder(record);
+    if (object == null || object === false) {
+      throw new ArgumentError("First argument in form cannot contain nil or be empty");
+    }
+    objectName =
+      options["as"] != null && options["as"] !== false
+        ? options["as"]
+        : modelNameFromRecordOrClass(object).paramKey;
+    applyFormForOptionsBang.call(this, object, options);
+  }
+
+  const remote = hashDelete(options, "remote");
+
+  if (
+    remote != null &&
+    remote !== false &&
+    (embedAuthenticityTokenInRemoteForms == null ||
+      embedAuthenticityTokenInRemoteForms === false) &&
+    isBlank(options["authenticityToken"])
+  ) {
+    options["authenticityToken"] = false;
+  }
+
+  options["model"] = model;
+  options["scope"] = objectName;
+  options["local"] = !(remote != null && remote !== false);
+  options["skipDefaultIds"] = false;
+  options["allowMethodNamesOutsideObject"] = fetch(options, "allowMethodNamesOutsideObject", false);
+
+  return formWith.call(this, options, block);
+}
+
+/** @internal */
+export function applyFormForOptionsBang(
+  this: FormHelperHost,
+  object: unknown,
+  options: Record<string, unknown>,
+): void {
+  object = convertToModel(object);
+
+  const as = options["as"];
+  const namespace = options["namespace"];
+  const persisted =
+    rbObjRespondTo(object, "isPersisted") && (object as { isPersisted(): unknown }).isPersisted();
+  const action = persisted != null && persisted !== false ? "edit" : "new";
+  if (options["html"] == null || options["html"] === false) options["html"] = {};
+  reverseMergeBang(options["html"] as Record<string, unknown>, {
+    class: as != null && as !== false ? `${action}_${as}` : domClass(object, action),
+    id:
+      presence(
+        compact(
+          as != null && as !== false ? [namespace, action, as] : [namespace, domId(object, action)],
+        ).join("_"),
+      ) ?? null,
+  });
 }
 
 export function formWith(
@@ -134,6 +216,41 @@ export function formWith(
     const htmlOptions = htmlOptionsForFormWith.call(this, url, model, options);
     return formTagHtml.call(this, htmlOptions);
   }
+}
+
+export function fieldsFor(
+  this: FormHelperHost,
+  recordName: unknown,
+  recordObject: unknown = null,
+  options: Record<string, unknown> = {},
+  block?: (builder: FormBuilder) => unknown,
+): SafeBuffer | null {
+  options = mergeBang(
+    { model: recordObject, allowMethodNamesOutsideObject: false, skipDefaultIds: false },
+    options,
+  );
+
+  return fields.call(this, recordName, options, block);
+}
+
+export function fields(
+  this: FormHelperHost,
+  scope: unknown = null,
+  { model = null, ...rest }: { model?: unknown; [key: string]: unknown } = {},
+  block?: (builder: FormBuilder) => unknown,
+): SafeBuffer | null {
+  const options: Record<string, unknown> = mergeBang(
+    { allowMethodNamesOutsideObject: true, skipDefaultIds: !formWithGeneratesIds },
+    rest,
+  );
+
+  if (model != null && model !== false) {
+    model = _objectForFormBuilder(model);
+    if (scope == null || scope === false) scope = modelNameFromRecordOrClass(model).paramKey;
+  }
+
+  const builder = instantiateBuilder.call(this, scope, model, options);
+  return capture.call(this, block as (...args: unknown[]) => unknown, builder);
 }
 
 export function label(
@@ -534,12 +651,12 @@ export class FormBuilder {
     const namespace = fetch(
       kwargs,
       "namespace",
-      block(() => this.options["namespace"]),
+      rbBlock(() => this.options["namespace"]),
     );
     const index = fetch(
       kwargs,
       "index",
-      block(() => this.options["index"]),
+      rbBlock(() => this.options["index"]),
     );
     return this._template.fieldId(this.objectName, method, ...suffixes, {
       namespace: namespace,
@@ -553,12 +670,12 @@ export class FormBuilder {
     const index = fetch(
       kwargs,
       "index",
-      block(() => this.options["index"]),
+      rbBlock(() => this.options["index"]),
     );
     const objectName = fetch(
       this.options,
       "as",
-      block(() => this.objectName),
+      rbBlock(() => this.objectName),
     );
 
     return this._template.fieldName(objectName, method, ...methods, {
@@ -595,6 +712,69 @@ export class FormBuilder {
       }
     });
     this.prototype.textArea = this.prototype.textarea;
+  }
+
+  fieldsFor(
+    recordName: unknown,
+    recordObject: unknown = null,
+    fieldsOptions: Record<string, unknown> | null = null,
+    block?: (builder: FormBuilder) => unknown,
+  ): unknown {
+    if (
+      fieldsOptions == null &&
+      (isPlainObject(recordObject) || recordObject instanceof Hash) &&
+      isExtractableOptions(recordObject)
+    ) {
+      [fieldsOptions, recordObject] = [recordObject as Record<string, unknown>, null];
+    }
+    fieldsOptions ||= {};
+    if (fieldsOptions["builder"] == null || fieldsOptions["builder"] === false) {
+      fieldsOptions["builder"] = this.options["builder"];
+    }
+    fieldsOptions["namespace"] = this.options["namespace"];
+    fieldsOptions["parentBuilder"] = this;
+
+    if (typeof recordName === "string") {
+      if (this.isNestedAttributesAssociation(recordName)) {
+        return this.fieldsForWithNestedAttributes(recordName, recordObject, fieldsOptions, block);
+      }
+    } else {
+      recordObject = this._template._objectForFormBuilder(recordName);
+      recordName = modelNameFromRecordOrClass(recordObject).paramKey;
+    }
+
+    let objectName = this.objectName;
+    let index: unknown;
+    if (Object.hasOwn(this.options, "index")) {
+      index = this.options["index"];
+    } else if (this._autoIndex !== undefined) {
+      objectName = String(objectName ?? "").replace(/\[\]$/, "");
+      index = this._autoIndex;
+    }
+
+    if (index != null && index !== false) {
+      recordName = `${objectName}[${index}][${recordName}]`;
+    } else if ((recordName as string).endsWith("[]")) {
+      recordName = `${objectName}[${(recordName as string).slice(0, -2)}][${(recordObject as { id: unknown }).id}]`;
+    } else {
+      recordName = `${objectName}[${recordName}]`;
+    }
+    fieldsOptions["childIndex"] = index;
+
+    return this._template.fieldsFor(recordName, recordObject, fieldsOptions, block);
+  }
+
+  fields(
+    scope: unknown = null,
+    { model = null, ...options }: { model?: unknown; [key: string]: unknown } = {},
+    block?: (builder: FormBuilder) => unknown,
+  ): unknown {
+    options["allowMethodNamesOutsideObject"] = true;
+    options["skipDefaultIds"] = !formWithGeneratesIds;
+
+    this.convertToLegacyOptions(options);
+
+    return this.fieldsFor(scope != null && scope !== false ? scope : model, model, options, block);
   }
 
   label(
@@ -657,6 +837,81 @@ export class FormBuilder {
     defaults.push(`${humanize(key)} ${model}`);
 
     return I18n.t(defaults.shift(), { model: model, default: defaults }) as string;
+  }
+
+  private isNestedAttributesAssociation(associationName: string): boolean {
+    return rbObjRespondTo(this.object, `${associationName}_attributes=`);
+  }
+
+  private fieldsForWithNestedAttributes(
+    associationName: string,
+    association: unknown,
+    options: Record<string, unknown>,
+    block?: (builder: FormBuilder) => unknown,
+  ): unknown {
+    const name = `${this.objectName}[${associationName}_attributes]`;
+    association = convertToModel(association);
+
+    if (rbObjRespondTo(association, "isPersisted")) {
+      const records = rbFPublicSend(this.object, associationName);
+      if (Array.isArray(records) || rbObjRespondTo(records, "toAry")) association = [association];
+    } else if (!(Array.isArray(association) || rbObjRespondTo(association, "toAry"))) {
+      association = rbFPublicSend(this.object, associationName);
+    }
+
+    if (Array.isArray(association) || rbObjRespondTo(association, "toAry")) {
+      const explicitChildIndex = options["childIndex"];
+      const output = new SafeBuffer();
+      for (const child of association as Iterable<unknown>) {
+        if (explicitChildIndex != null && explicitChildIndex !== false) {
+          if (rbObjRespondTo(explicitChildIndex, "call")) {
+            options["childIndex"] = (explicitChildIndex as () => unknown)();
+          }
+        } else {
+          options["childIndex"] = this.nestedChildIndex(name);
+        }
+        const content = this.fieldsForNestedModel(
+          `${name}[${options["childIndex"]}]`,
+          child,
+          options,
+          block,
+        );
+        if (content != null) output.concat(content);
+      }
+      return output;
+    } else if (association != null && association !== false) {
+      return this.fieldsForNestedModel(name, association, options, block);
+    }
+    return null;
+  }
+
+  private fieldsForNestedModel(
+    name: string,
+    object: unknown,
+    fieldsOptions: Record<string, unknown>,
+    block?: (builder: FormBuilder) => unknown,
+  ): SafeBuffer | null {
+    object = convertToModel(object);
+    const persisted = (object as { isPersisted(): unknown }).isPersisted();
+    const emitHiddenId =
+      persisted != null && persisted !== false
+        ? fetch(
+            fieldsOptions,
+            "includeId",
+            rbBlock(() => fetch(this.options, "includeId", true)),
+          )
+        : persisted;
+
+    return this._template.fieldsFor(name, object, fieldsOptions, (f) => {
+      const output = this._template.capture(block as (...args: unknown[]) => unknown, f);
+      if (output != null && emitHiddenId != null && emitHiddenId !== false) {
+        const emittedHiddenId = f.isEmittedHiddenId();
+        if (emittedHiddenId == null || emittedHiddenId === false) {
+          output.concat(f.hiddenField("id"));
+        }
+      }
+      return output;
+    });
   }
 
   private nestedChildIndex(name: string): number {

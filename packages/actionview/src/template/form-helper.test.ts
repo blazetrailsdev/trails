@@ -1,15 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { RouteSet, UrlFor } from "@blazetrails/actionpack";
 import { Conversion, ModelName, Naming, Translation } from "@blazetrails/activemodel";
-import { I18n, extend } from "@blazetrails/activesupport";
+import { I18n, extend, isPresent } from "@blazetrails/activesupport";
 import { Date as RubyDate, DateTime } from "@blazetrails/date";
-import { Range, include } from "@blazetrails/ruby-compat";
+import { Range, Struct, include } from "@blazetrails/ruby-compat";
 
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
 import { TemplateHandlers } from "./handlers.js";
 import { Tse } from "./handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
+import type { FormBuilder } from "../helpers/form-helper.js";
 import type { LabelBuilder } from "../helpers/tags/label.js";
+import { RoutingUrlFor } from "../routing-url-for.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
 
 class Post {
@@ -21,14 +24,25 @@ class Post {
   declare static humanAttributeName: (attribute: string) => string;
 
   title: unknown = null;
+  author_name: unknown = null;
   body: unknown = null;
   secret: unknown = null;
-  author_name: unknown = null;
+  persisted: unknown = false;
   written_on: unknown = null;
   cost: unknown = null;
+  comments: unknown = null;
+  tags: unknown = null;
   errors = { get: (field: string) => (field === "author_name" ? ["can't be empty"] : []) };
   get ["secret?"](): unknown {
     return this.secret;
+  }
+  isPersisted(): unknown {
+    return this.persisted;
+  }
+  set comments_attributes(attributes: unknown) {}
+  set tags_attributes(attributes: unknown) {}
+  toKey(): unknown[] {
+    return [123];
   }
   toParam(): string {
     return "123";
@@ -51,9 +65,67 @@ class PostDelegate extends Post {
   }
 }
 
+class Comment {
+  static {
+    extend(this, Naming);
+    include(this, Conversion);
+  }
+
+  body: unknown = null;
+
+  constructor(
+    public id: unknown = null,
+    public post_id: unknown = null,
+  ) {}
+
+  toKey(): unknown[] | null {
+    return this.id != null && this.id !== false ? [this.id] : null;
+  }
+  isPersisted(): boolean {
+    return isPresent(this.id);
+  }
+  toParam(): unknown {
+    return this.id != null && this.id !== false ? String(this.id) : this.id;
+  }
+}
+
+class Tag {
+  static {
+    extend(this, Naming);
+    include(this, Conversion);
+  }
+
+  constructor(
+    public id: unknown = null,
+    public post_id: unknown = null,
+  ) {}
+
+  toKey(): unknown[] | null {
+    return this.id != null && this.id !== false ? [this.id] : null;
+  }
+  isPersisted(): boolean {
+    return isPresent(this.id);
+  }
+  toParam(): unknown {
+    return this.id != null && this.id !== false ? String(this.id) : this.id;
+  }
+  get value(): string {
+    return this.id == null ? "new tag" : `tag #${String(this.id)}`;
+  }
+}
+
 class Car {
   constructor(public color: string) {}
 }
+
+include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
+
+const Routes = new RouteSet();
+Routes.draw(function () {
+  this.resources("posts", () => {
+    this.resources("comments");
+  });
+});
 
 type View = Base &
   Record<string, (...args: unknown[]) => unknown> & {
@@ -65,6 +137,66 @@ type View = Base &
 describe("FormHelperTest", () => {
   let view: View;
   let post: Post;
+  let rendered: unknown;
+
+  function formFor(...args: Parameters<Base["formFor"]>): unknown {
+    return (rendered = view.formFor(...args));
+  }
+
+  function concat(string: unknown): unknown {
+    return (view as unknown as { concat(string: unknown): unknown }).concat(string);
+  }
+
+  function hiddenFields(options: { method?: string; enforceUtf8?: boolean } = {}): string {
+    const method = options.method;
+
+    let txt = "";
+    if (options.enforceUtf8 ?? true) {
+      txt += `<input name="utf8" type="hidden" value="&#x2713;" autocomplete="off" />`;
+    }
+
+    if (method && !["get", "post"].includes(method)) {
+      txt += `<input name="_method" type="hidden" value="${method}" autocomplete="off" />`;
+    }
+
+    return txt;
+  }
+
+  function formText(
+    action: string | null = "/",
+    id: string | null = null,
+    htmlClass: string | null = null,
+    remote: unknown = null,
+    multipart: unknown = null,
+    method: string | null = null,
+  ): string {
+    let txt = `<form accept-charset="UTF-8"` + (action ? ` action="${action}"` : "");
+    if (multipart) txt += ` enctype="multipart/form-data"`;
+    if (remote) txt += ` data-remote="true"`;
+    if (htmlClass) txt += ` class="${htmlClass}"`;
+    if (id) txt += ` id="${id}"`;
+    method = method === "get" ? "get" : "post";
+    return txt + ` method="${method}">`;
+  }
+
+  function wholeForm(
+    action: string | null = "/",
+    id: string | null = null,
+    htmlClass: string | null = null,
+    options: { method?: string; remote?: unknown; multipart?: unknown; enforceUtf8?: boolean } = {},
+    block?: () => string,
+  ): string {
+    const contents = block ? block() : "";
+
+    const { method, remote, multipart } = options;
+
+    return (
+      formText(action, id, htmlClass, remote, multipart, method) +
+      hiddenFields({ method: options.method, enforceUtf8: options.enforceUtf8 }) +
+      contents +
+      "</form>"
+    );
+  }
 
   beforeEach(() => {
     I18n.backend().storeTranslations("label", {
@@ -90,12 +222,16 @@ describe("FormHelperTest", () => {
       helpers: { placeholder: { post: { title: "What is this about?" } } },
     });
     view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, null) as View;
+    include(view.constructor as new (...args: never[]) => unknown, Routes.urlHelpers());
     post = new Post();
+    post.persisted = true;
     post.title = "Hello World";
     post.author_name = "";
     post.body = "Back to the hill and over it again!";
     post.secret = 1;
     post.written_on = RubyDate.civil(2004, 6, 15);
+    post.comments = [new Comment()];
+    post.tags = [new Tag()];
     view.post = post;
     view.car = new Car("#000FFF");
     const postDelegator = new PostDelegator();
@@ -176,11 +312,64 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it.skip("label with locales and nested attributes", () => {});
+  it("label with locales and nested attributes", () => {
+    I18n.withLocale("label", () => {
+      formFor(post, { html: { id: "create-post" } }, (f: FormBuilder) =>
+        f.fieldsFor("comments", null, null, (cf) => concat(cf.label("body"))),
+      );
 
-  it.skip("label with locales fallback and nested attributes", () => {});
+      const expected = wholeForm(
+        "/posts/123",
+        "create-post",
+        "edit_post",
+        { method: "patch" },
+        () => '<label for="post_comments_attributes_0_body">Write body here</label>',
+      );
 
-  it.skip("label with non active record object", () => {});
+      assertDomEqual(expected, rendered);
+    });
+  });
+
+  it("label with locales fallback and nested attributes", () => {
+    I18n.withLocale("label", () => {
+      formFor(post, { html: { id: "create-post" } }, (f: FormBuilder) =>
+        f.fieldsFor("tags", null, null, (cf) => concat(cf.label("value"))),
+      );
+
+      const expected = wholeForm(
+        "/posts/123",
+        "create-post",
+        "edit_post",
+        { method: "patch" },
+        () => '<label for="post_tags_attributes_0_value">Tag</label>',
+      );
+
+      assertDomEqual(expected, rendered);
+    });
+  });
+
+  it("label with non active record object", () => {
+    class Person {
+      constructor(public name: unknown) {}
+    }
+    include(Person, Struct.new("name"));
+
+    formFor(
+      new Person("ok"),
+      { as: "person", url: "/an", html: { id: "create-person" } },
+      (f: FormBuilder) => f.label("name"),
+    );
+
+    const expected = wholeForm(
+      "/an",
+      "create-person",
+      "new_person",
+      { method: "post" },
+      () => '<label for="person_name">Name</label>',
+    );
+
+    assertDomEqual(expected, rendered);
+  });
 
   it("label with for attribute as symbol", () => {
     assertDomEqual(

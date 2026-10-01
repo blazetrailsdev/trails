@@ -17,6 +17,7 @@ import { OutputBuffer } from "./buffers.js";
 import { Context } from "./context.js";
 import { Helpers } from "./helpers.js";
 import type * as HelperExports from "./helpers/index.js";
+import type { _objectForFormBuilder } from "./helpers/form-helper.js";
 import {
   ClassMethods as UrlHelperClassMethods,
   type _backUrl,
@@ -388,6 +389,7 @@ export interface Base extends Context, HelperMethods, TseUtilMethods {
   request: unknown;
   _backUrl: typeof _backUrl;
   _filteredReferrer: typeof _filteredReferrer;
+  _objectForFormBuilder: typeof _objectForFormBuilder;
   /** @noRailsEquivalent PERMANENT */
   readonly yield: SafeBuffer;
 }
