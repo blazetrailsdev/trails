@@ -44362,20 +44362,6 @@
   {
     "package": "activerecord",
     "rubyFile": "relation.rb",
-    "rubyName": "find_by_token_for",
-    "digest": "7ac4f2be7aa1b1af",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "relation.rb",
-    "rubyName": "find_by_token_for!",
-    "digest": "7e402fd38b91c6cb",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "relation.rb",
     "rubyName": "find_or_create_by",
     "digest": "5966680a583335ac",
     "ref": "v8.0.2"
