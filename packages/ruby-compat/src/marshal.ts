@@ -530,6 +530,10 @@ export const Marshal = {
    *  (`rbObjClass`), so a Float `1.0` dumps as a Float only when boxed
    *  (`rbDbl2num`). A JS string is UTF-16, and `TextEncoder` writes a lone
    *  surrogate as U+FFFD where a Ruby String's bytes are written as they are.
+   *  `T_OBJECT` is a value `Object.prototype.toString` answers
+   *  `[object Object]` for that is not a plain hash, so a JS built-in with
+   *  internal slots, a Temporal value, or an instance of a class carrying
+   *  `Symbol.toStringTag` is `T_DATA` and takes its `TypeError`.
    *
    * Not ported: the `anIO` argument; `w_extended` (`marshal.c:550`) and the
    * `marshal_dump` arm (`marshal.c:910`), which are

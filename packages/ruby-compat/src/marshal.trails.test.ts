@@ -106,6 +106,12 @@ describe("Marshal.dump", () => {
     expect(() => Marshal.dump([new Set()])).toThrow(
       new TypeError("no _dump_data is defined for class Set"),
     );
+    class Tagged {
+      [Symbol.toStringTag] = "Tagged";
+    }
+    expect(() => Marshal.dump(new Tagged())).toThrow(
+      new TypeError("no _dump_data is defined for class Tagged"),
+    );
   });
 
   it("raises TypeError for a Hash with a default proc", () => {
