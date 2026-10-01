@@ -11,12 +11,55 @@ is a Rails gem that _uses_ Ruby, not the place Ruby lives. This package is where
 they belong instead.
 
 Its upstream is [ruby/ruby](https://github.com/ruby/ruby), vendored at
-`vendor/ruby/` (RFC 0129). Read the C or the Ruby there before writing anything
-here, the same way every other package reads `vendor/rails/` first.
+`vendor/ruby/v3.3.11/` (RFC 0129). Read the C or the Ruby there before writing
+anything here, the same way every other package reads `vendor/rails/` first.
+
+Every other package depends on this one, and it depends on nothing in the
+workspace (rule 4). It is not a general Ruby runtime: a member exists only
+because some other package calls it (rule 1).
+
+## Using it
+
+Most users never import it directly; the framework packages do. What a trails
+application does touch is the host-adapter layer and a few Ruby values that
+cross the API boundary:
+
+```ts
+import { Range, env, setEnv } from "@blazetrails/ruby-compat";
+
+new Range(1, 10).isInclude(5); // true: Ruby's Range#include?
+setEnv("TRAILS_ENV", "test"); // ENV["TRAILS_ENV"] = "test", through the process adapter
+env.TRAILS_ENV; // "test"
+```
+
+The subpath exports `./include`, `./method-missing-proxy`, `./name-error` and
+`./range` exist for the packages that need those modules without loading the
+barrel.
 
 ## What is here
 
-Every export, with the call site that justifies it (rule 1).
+About 90 modules, grouped by the MRI area they port:
+
+| area                        | modules                                                                                                                                                                                                                                                                                 |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Object model                | `include` / `extend` / `prepend` (`Module#include` and friends, `included` / `extended` hooks), `Method`, `rbObjRespondTo` / `basicObjRespondTo`, `rbFSend` / `rbFPublicSend`, `rbModPrivate` / `rbModProtected` visibility, `rbObjSingletonClass`, `methodMissingProxy`, `ObjectSpace` |
+| Equality, hashing, ordering | `rbEqual` / `rbEql` / `rbEqq`, `rbHash`, `Comparable` (`cmp`, `isBetween`, …), `Enumerable`, `Enumerator` / `toEnum`                                                                                                                                                                    |
+| Core values                 | `Range`, `Rational`, `BigDecimal`, `NilClass`, numeric helpers (`round`, `toI`, `anybits`), `Kernel#Integer` / `Float` / `format` / `rand` / `catch`                                                                                                                                    |
+| String, Symbol, Regexp      | `succ`, `chomp`, `scrub`, `byteslice`, `split`, `inspect`, `force_encoding`, `Encoding`, `StringScanner`, `StringIO`, `MatchData`, `regexpEscape`, Symbol helpers                                                                                                                       |
+| Array, Hash                 | Ruby `Array` methods (`pack`, `unpack1`, `slice`, `uniq`, …) and `Hash` methods with Ruby semantics (`fetch`, `merge`, `except`, default procs, …)                                                                                                                                      |
+| Exceptions                  | `Exception`, `StandardError`, `ArgumentError`, `NameError`, `NoMethodError`, `TypeError`, `KeyError`, `FrozenError`, `ZeroDivisionError`, …, and `Location` / `excBacktraceLocations` for backtraces                                                                                    |
+| Concurrency                 | `Monitor` / `synchronize` / `MonitorMixin`, `Mutex`, `Thread`, `Fiber`, `ThreadPoolExecutor`                                                                                                                                                                                            |
+| Stdlib                      | `File`, `Dir`, `FileUtils`, `IO`, `Tempfile`, `JSON`, `Base64`, `Digest`, `OpenSSL` (`Cipher`, `HMAC`), `SecureRandom`, `Zlib`, `URI`, `IPAddr`, `Gem`, `RbConfig`, `Process`                                                                                                           |
+| Host adapters               | Pluggable backends for the host runtime: `registerFsAdapter`, `registerCryptoAdapter`, `registerProcessAdapter`, `registerZlibAdapter`, `registerHttpAdapter`, `registerOsAdapter`, `registerChildProcessAdapter`, `registerAsyncContextAdapter`. Node implementations are the default. |
+
+`src/index.ts` is the complete list.
+
+### Call sites for the first exports
+
+The table below predates most of the package. It covers the exports that moved
+here first, with the call site that justifies each (rule 1). Extending it to
+every export is part of `ruby-compat-rule-1-call-site-gate` (RFC 0154), which
+also puts rule 1 under a gate.
 
 | export                   | MRI anchor                                       | call sites                                                                                                                                                                                                                                                                                 |
 | ------------------------ | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

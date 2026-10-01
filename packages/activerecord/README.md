@@ -1,338 +1,232 @@
 # @blazetrails/activerecord
 
-The ORM layer of [trails](../../README.md) — a TypeScript port of Ruby on
-Rails' [ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html):
-persistence, querying, associations, validations, enums, and migrations. It is
-the leading package of the monorepo. If you can read the Rails API docs, you
-already know how to use this.
+The ORM layer of [trails](../../README.md), a TypeScript port of Rails'
+[ActiveRecord](https://api.rubyonrails.org/classes/ActiveRecord.html):
+persistence, querying, associations, validations, callbacks, enums,
+migrations, schema dump and load, transactions, encryption and fixtures. It is
+the most complete package in the repo. Class names, method signatures and
+behavior follow Rails, and the Rails ActiveRecord test suite, ported test for
+test, is the specification.
 
-The goal has two halves:
+It is built on `@blazetrails/arel` (the SQL AST) and `@blazetrails/activemodel`
+(attributes, validations, callbacks, dirty tracking).
 
-- **Rails parity wherever the languages allow it.** Class names, method
-  signatures, and behavior are designed to match Rails. Progress isn't measured
-  by feel — we port the Rails test suite **test for test** (`parity:test`) and
-  match the public API surface method for method (`parity:api`), so behavior is
-  pinned to Rails' own tests rather than to our interpretation of them.
-- **Rails-quality developer experience where the languages diverge.** Some Ruby
-  idioms have no TypeScript equivalent — synchronous DB access, `!`/`?` in
-  method names, the `inherited` hook, metaprogrammed attribute readers. Rather
-  than drop those features, trails picks the most Rails-faithful, type-safe
-  TypeScript shape (e.g. `save!` → `saveBang()`, lazy readers → awaited loaders)
-  and documents each divergence. See
-  [Behavioral deviations](#behavioral-deviations-from-rails) and the
-  [deviations guide](../website/docs/guides/activerecord-rails-deviations.md).
+**The one big difference: JavaScript has no synchronous database access.**
+Every method that touches the database is `async` and must be `await`ed.
+Relations stay lazy, as in Rails, and you await the terminal call. Most of the
+other differences below follow from that.
 
-Built on `@blazetrails/arel` (SQL AST) and `@blazetrails/activemodel`
-(attributes, validations, callbacks, dirty tracking). This README is the
-focused entry point for ActiveRecord; for the project-wide overview, package
-list, and design principles see the [root README](../../README.md).
+## Status
 
-> The single biggest divergence: **JavaScript has no synchronous DB access**, so
-> nearly every method that touches the database is `async` and must be
-> `await`ed. The deviations below — the `Bang` suffix, async
-> singular-association loading, and the awaited (async) validation chain —
-> mostly follow from that one fact.
+As of 2026-09-27 (`main` at `91245b796a`; not regenerated since):
+
+| measure                                      | result              |
+| -------------------------------------------- | ------------------- |
+| Rails public methods with a TS counterpart   | 4748 / 4888 (97.1%) |
+| Rails methods, including private / protected | 6685 / 6721 (99.5%) |
+| Rails ActiveRecord test cases ported         | 8501 / 8630 (98.5%) |
+
+Regenerate with `pnpm parity:api --package activerecord --public-only`,
+`pnpm parity:api --package activerecord`, and `pnpm parity:test`. CI runs the
+suite against SQLite, PostgreSQL and MySQL/MariaDB.
 
 ## Install
 
-The runtime package carries no CLI and no driver dependency — you add a driver
-and (optionally) the CLI tooling yourself:
+The packages are not on npm yet. Build them from a checkout and link them into
+your project, as the [root README's quickstart](../../README.md#quickstart)
+shows. The runtime has no CLI and bundles no driver. You add a driver yourself:
 
-```sh
-pnpm add @blazetrails/activerecord            # runtime — prod dep
-pnpm add -D @blazetrails/activerecord-cli     # the `ar` CLI + trails-tsc — dev dep
-pnpm add <driver>                             # one of: better-sqlite3 | pg | mysql2
-```
+| optional peer    | for                                                |
+| ---------------- | -------------------------------------------------- |
+| `better-sqlite3` | the `sqlite3` adapter                              |
+| `pg`             | `postgresql`                                       |
+| `mysql2`         | `mysql2`                                           |
+| `libsql`         | `libsql`, `libsql-remote`, `libsql-replica`        |
+| `expo-sqlite`    | `expo-sqlite` (React Native)                       |
+| none             | `node-sqlite` (Node's built-in `node:sqlite`)      |
+| `typescript`     | only the `./type-virtualization/*` subpath (below) |
 
-The drivers are optional peer dependencies (`better-sqlite3`, `pg`, `mysql2`,
-`expo-sqlite`); install only the one your target needs. `node:sqlite` needs no
-package.
-
-`typescript` is an optional peer too, at `^5.0.0`. Nothing in the runtime
-imports the compiler — the range exists for the `./type-virtualization/*`
-subpath (the engine behind `trails-tsc`), which builds a `ts.SourceFile` from
-source text via `ts.createSourceFile` and so cannot run on the TypeScript 7 API.
-The range stays on 5.x until that port lands; widening it to admit 7.x would
-invite in a user the subpath cannot serve. See RFC
-`0125-typescript-7-ground-floor` in the tasks repo.
+`typescript` is pinned to `7.1.0-dev.20260920.1`, the build the
+type-virtualization engine behind `trails-tsc` was verified against. Nothing in
+the runtime imports the compiler.
 
 ## Quickstart
 
-The fastest path is the [`ar` CLI](#the-ar-cli) (the trails counterpart to
-Rails' `bin/rails`), which scaffolds a project, generates migrations and
-models, and runs migrations:
-
-```sh
-ar new myapp --driver better-sqlite3
-cd myapp && pnpm install
-ar db:create
-ar generate:model Post title:string published:boolean
-ar db:migrate
-ar console            # REPL with Base + every model pre-loaded
-```
-
-Prefer wiring it up by hand? Establish a connection, define a model, and go:
+With no trailties and no CLI: connect, migrate, define a model, query. This
+script ran as shown, on Node 24 with `better-sqlite3`:
 
 ```ts
-import { Base } from "@blazetrails/activerecord";
+import { Base, Migration } from "@blazetrails/activerecord";
 
-// Adapter is selected by name; the adapter subclass bundles its own driver.
-await Base.establishConnection({ adapter: "sqlite3", database: "db/dev.sqlite3" });
+await Base.establishConnection({ adapter: "sqlite3", database: "tmp/standalone.sqlite3" });
 
-class Post extends Base {
+class CreateArticles extends Migration {
+  async change(): Promise<void> {
+    await this.createTable("articles", { force: true }, (t) => {
+      t.string("title");
+      t.boolean("published", { default: false });
+      t.timestamps();
+    });
+  }
+}
+await new CreateArticles().migrate("up");
+
+class Article extends Base {
   static {
-    this.attribute("title", "string");
-    this.attribute("published", "boolean", { default: false });
-    this.belongsTo("author");
-    this.hasMany("comments", { dependent: "destroy" });
     this.validates("title", { presence: true });
-    this.scope("published", (rel) => rel.where({ published: true }));
+    this.scope("published", function () {
+      return this.where({ published: true });
+    });
   }
 }
 
-const post = await Post.createBang({ title: "Hello" }); // save! → createBang
-const recent = await Post.published().order("created_at", "desc").limit(10);
+const a = await Article.createBang({ title: "Hello", published: true });
+console.log(a.id, a.published); //                                          1 true
+console.log(await Article.published().count()); //                          1
+console.log((await Article.create({ title: "" })).errors.fullMessages); // [ "Title can't be blank" ]
 ```
 
-### Zero-declare models — `trails-tsc`
-
-Hand-writing `this.attribute(...)` for every column is optional. `trails-tsc`
-(shipped by `@blazetrails/activerecord-cli`) is a drop-in `tsc` replacement that
-reads your dumped schema and each model's class body, then virtualizes the file
-at type-check time to inject attribute fields, association proxies, scope
-signatures, and enum surfaces — so you never hand-write a `declare`. Dump the
-schema once and point your typecheck script at it:
-
-```sh
-ar db:schema:dump   # writes db/schema.ts (re-run after each migration, like Rails' schema.rb)
+```text
+==  CreateArticles: migrating =================================================
+-- createTable("articles", {:force=>true})
+   -> 0.0330s
+==  CreateArticles: migrated (0.0340s) ========================================
 ```
 
-```json
-{ "scripts": { "typecheck": "trails-tsc --schema db/schema.ts --noEmit" } }
-```
+`Article` declares no attributes. Its columns are reflected from the table the
+first time the class queries or creates.
 
-See the [root README](../../README.md#zero-declare-models--trails-tsc) for the
-full zero-declare story and the `declare`-pattern reference at
-[`dx-tests/declare-patterns.test-d.ts`](dx-tests/declare-patterns.test-d.ts).
-
-### Adopting against an existing database
-
-Already have a database (and maybe an existing TypeScript app)? You don't need
-`ar new`. Introspect the schema, generate models, and wire `trails-tsc` into
-your current build:
-
-1. **Dump the schema.** Point ActiveRecord at your DB (see
-   [connection config](#database-adapters) below), then introspect it into a
-   committed `db/schema.ts` — re-run after each migration, like Rails'
-   `schema.rb`:
-
-   ```sh
-   ar db:schema:dump
-   ```
-
-2. **Generate models from the schema.** `ar models:dump` emits one
-   `class X extends Base` module per table, with `belongsTo` / `hasMany`
-   inferred from foreign keys. You own the files afterward (no round-trip
-   merge); re-running regenerates.
-
-   ```sh
-   ar models:dump --out app/models          # or omit --out to print to stdout
-   ar models:dump --only users,posts        # subset; --ignore is the inverse
-   ar models:dump --strip-prefix wp_         # drop a table-name prefix/suffix
-   ```
-
-3. **Wire `trails-tsc` into your existing tsconfig.** The simplest path is to
-   run `ar init` in the project root — it merges the required settings into your
-   existing `tsconfig.json` (JSONC-aware, non-destructive; it won't overwrite
-   without `--force`). To add them by hand, you need:
-
-   ```jsonc
-   {
-     "compilerOptions": {
-       "target": "ES2022",
-       "module": "Node16",
-       "moduleResolution": "Node16",
-       "strict": true,
-       "plugins": [{ "name": "@blazetrails/trails-tsc/ts-plugin" }],
-     },
-     "include": ["app/models/**/*.ts", "db/migrate/**/*.ts"],
-   }
-   ```
-
-   Then type-check through `trails-tsc` (the schema-aware `tsc` replacement):
-
-   ```sh
-   trails-tsc --schema db/schema.ts --noEmit -p tsconfig.json
-   ```
-
-   The `plugins` entry is for editor support (autocomplete/hover via tsserver),
-   which is still in flight; the command-line `trails-tsc` check works today.
-
-See the [activerecord-cli README](../activerecord-cli/README.md) for the full
-flag set and project layout.
-
-## Examples
-
-- **[Twitter clone](../../examples/twitter-clone/)** — a minimal Twitter/X clone
-  on Express + better-sqlite3. It exercises the parts of ActiveRecord you reach
-  for first: timestamped migrations, models with `belongsTo` / `hasMany` /
-  `hasMany … through` (self-referential follows), scopes, validations, eager
-  loading with `includes`, association proxies, and error mapping
-  (`RecordNotFound` → 404, `RecordInvalid` → 422). Its
-  [README](../../examples/twitter-clone/README.md) walks through setup, and
-  `pnpm smoke` runs the whole flow end-to-end (in-memory DB, no HTTP).
-
-A Vite example (front-end / SPA integration) is planned.
+For a project layout with migrations on disk, use
+[`ar`](../activerecord-cli/README.md) (standalone) or `trails new` (the full
+stack). Both are walked through, with their current gaps, in their READMEs and
+the [root quickstart](../../README.md#quickstart).
 
 ## Rails patterns translate directly
 
 ```ruby
-# Ruby / Rails
 class Post < ApplicationRecord
-  belongs_to :author
+  belongs_to :author, optional: true
   has_many :comments, dependent: :destroy
   validates :title, presence: true
   scope :published, -> { where(published: true) }
-  enum status: { draft: 0, published: 1, archived: 2 }
+  enum :status, { draft: 0, published: 1, archived: 2 }, prefix: true
 end
 
 Post.published.where("created_at > ?", 1.week.ago).order(created_at: :desc).limit(20)
-
 post = Post.create!(title: "Hello", author: current_user)
-post.update!(status: :published)
+post.update!(status: :archived)
 ```
 
 ```ts
-// TypeScript / trails
 import { Base } from "@blazetrails/activerecord";
+import { Temporal } from "@blazetrails/date";
 
 class Post extends Base {
   static {
-    this.belongsTo("author");
+    this.belongsTo("author", { optional: true });
     this.hasMany("comments", { dependent: "destroy" });
     this.validates("title", { presence: true });
-    this.scope("published", (rel) => rel.where({ published: true }));
-    this.enum("status", { draft: 0, published: 1, archived: 2 });
+    this.scope("published", function () {
+      return this.where({ published: true });
+    });
+    this.enum("status", { draft: 0, published: 1, archived: 2 }, { prefix: true });
   }
 }
 
-await Post.published().where("created_at > ?", oneWeekAgo).order("created_at", "desc").limit(20); // lazy — await the terminal op
-
-const post = await Post.createBang({ title: "Hello", author: currentUser }); // create!
-await post.update({ status: "published" });
+const weekAgo = Temporal.Now.instant().subtract({ hours: 24 * 7 });
+await Post.published().where("created_at > ?", weekAgo).order({ created_at: "desc" }).limit(20);
+const post = await Post.createBang({ title: "Hello", author: currentUser });
+await post.updateBang({ status: "archived" });
 ```
+
+Three things in that translation are easy to get wrong:
+
+- **A scope body is a `function`, not an arrow.** The relation is `this`, as
+  Rails `instance_exec`s the lambda, and the parameters are the scope's own
+  arguments. `(rel) => rel.where(...)` receives no relation and throws
+  `Cannot read properties of undefined (reading 'where')`.
+- **Time values are `Temporal`, not `Date`.** A JS `Date` bind raises
+  `TypeError: quote: JS Date is not accepted — use a Temporal type`.
+  `@blazetrails/date` re-exports `Temporal`.
+- **An enum value and a scope with the same name collide.** The enum's scope
+  replaces the earlier one, as in Rails. Hence `prefix: true` above.
+
+The generated [Ruby → TypeScript conventions](../../docs/ruby-ts-conventions.md)
+table is the authoritative naming reference (`save!` → `saveBang`, `valid?` →
+`isValid`, and the rest).
 
 ### Association proxies
 
-`post.comments` (a collection) is an `AssociationProxy<Comment>` — chainable
-like a relation, awaitable to the loaded array, and array-shaped once hydrated:
+`post.comments` is an `AssociationProxy<Comment>`. It is chainable like a
+relation, awaitable to its records, and iterable once loaded:
 
 ```ts
 const post = await Post.find(1);
-const recent = await post.comments.where({ flagged: false }).order("created_at").limit(10);
-const all = await post.comments; // awaitable → Comment[]
-for (const c of post.comments) c.body; // array-shaped once loaded
-post.comments.length;
+await post.comments.where({ flagged: false }).order("created_at"); // a query
+const all = await post.comments; //                                   loads the target
+for (const c of post.comments) c.body; //                             sync, once loaded
+post.comments.map((c) => c.id);
+await post.comments.size();
 ```
 
-Singular associations (`belongsTo` / `hasOne`) behave differently — see
-[Async singular-association loading](#2-async-singular-association-loading-belongsto--hasone).
+`length` is Ruby's `length` method, not the JS array property, so use
+`await post.comments.size()` for a count.
+
+`post.comments.createBang({...})` reflects `Comment`'s columns first if nothing
+has loaded them yet. Before #8197 it raised `UnknownAttributeError` in that
+case.
 
 ## Behavioral deviations from Rails
 
-ActiveRecord is where JavaScript's single-threaded async model has the biggest
-impact: almost every DB-touching method in Rails is synchronous, but in trails
-it returns a `Promise`. The deviations below are the ones that most often trip
-up someone coming from Rails. The full catalog (transactions as functions,
-`AsyncLocalStorage` for per-flow state, Proxy-based scope dispatch, enums,
-ranges, numeric types, adapters) lives in the
-[ActiveRecord deviations guide](../website/docs/guides/activerecord-rails-deviations.md).
+The full catalog (transactions as functions, `AsyncLocalStorage` for per-flow
+state, Proxy-based scope dispatch, enums, ranges, numeric types, adapters) is
+the [ActiveRecord deviations guide](../website/docs/guides/activerecord-rails-deviations.md).
+These are the ones people coming from Rails hit first.
 
-### 1. The `Bang` suffix: `save!` → `saveBang`
+### 1. Bang and predicate spellings
 
-`!` is not a legal identifier character in JS/TS, so every Ruby **bang** method
-becomes a `Bang` **suffix** in trails. This is one rule in the authoritative,
-CI-checked [Ruby → TypeScript naming conventions](../../docs/ruby-ts-conventions.md)
-(generated from `scripts/api-compare/conventions.ts`; never hand-edit it).
+`!` and `?` are not legal in JS identifiers. A bang method takes a `Bang`
+suffix, and a predicate takes an `is` prefix (or `has`, where the conventions
+table says so):
 
-| Ruby         | trails            | Note                                 |
-| ------------ | ----------------- | ------------------------------------ |
-| `save!`      | `saveBang()`      | Bang (`!`) → `*Bang` suffix.         |
-| `create!`    | `createBang()`    |                                      |
-| `update!`    | `updateBang()`    |                                      |
-| `destroy!`   | `destroyBang()`   |                                      |
-| `valid?`     | `isValid()`       | Predicate (`?`) → `is*` prefix.      |
-| `published!` | `publishedBang()` | enum bang setter (async — persists). |
+| Ruby         | trails            | Note                                                                |
+| ------------ | ----------------- | ------------------------------------------------------------------- |
+| `save!`      | `saveBang()`      | raises `RecordInvalid` on validation failure                        |
+| `create!`    | `createBang()`    |                                                                     |
+| `update!`    | `updateBang()`    |                                                                     |
+| `destroy!`   | `destroyBang()`   |                                                                     |
+| `valid?`     | `isValid()`       | async, see below                                                    |
+| `changed?`   | `isChanged`       | a zero-argument predicate can be a getter                           |
+| `published!` | `publishedBang()` | enum bang writer; persists (with a prefix, `statusPublishedBang()`) |
 
-```ts
-await post.saveBang(); // Rails: post.save!  — throws on validation failure
-await Post.createBang({ title: "x" });
-```
+### 2. Singular associations load asynchronously
 
-Related families that follow the same suffix: `toggleBang`, `incrementBang`,
-`decrementBang`, the `validatesUniqueness`/`validatesPresenceOf` declarations,
-and the enum bang setters from `Base.enum`.
-
-### 2. Async singular-association loading (`belongsTo` / `hasOne`)
-
-In Rails, reading an unloaded `belongs_to`/`has_one` lazily fires a query
-**synchronously**. JavaScript can't do a synchronous DB read, so trails splits
-the behavior:
-
-- **The reader `post.author` returns the loaded or preloaded record
-  synchronously.** When the association isn't loaded yet, it returns a
-  `Promise` that runs the query — so `await post.author` always works:
+In Rails, reading an unloaded `belongs_to` / `has_one` fires a query
+synchronously. trails cannot, so the reader returns the loaded or preloaded
+record synchronously, and a `Promise` that runs the query when it is not
+loaded. `await post.author` therefore always works:
 
 ```ts
 const post = await Post.find(1);
+const author = await post.author; // queries, or returns the loaded record
+post.author; //                     now the loaded Author
 
-const author = await post.author; // queries (or returns cached/preloaded)
-post.author; // now the loaded Author
-
-// or preload, so the sync read is safe:
 const p = await Post.includes("author").find(1);
-p.author; // Author (preloaded)
+p.author; //                        Author, preloaded
 ```
 
-- **Under strict loading, reading an unloaded association throws**
-  `StrictLoadingViolationError` (Rails parity). Strict loading is **off by
-  default**. See
-  [`src/strict-loading-sync-reader.trails.test.ts`](src/strict-loading-sync-reader.trails.test.ts).
+Under strict loading (off by default), reading an unloaded association raises
+`StrictLoadingViolationError`, as in Rails.
 
 ### 3. `isValid()` is async
 
-`record.isValid()` (Rails' `valid?`) returns a `Promise<boolean>`. It runs the
-full validator chain inline — including the DB-backed `UniquenessValidator` and
-`validates_associated`, which issue their `SELECT`s and populate `errors` before
-the promise resolves. So `await record.isValid()` returns `false` on a
-uniqueness collision before any save, matching Rails' `valid?`.
+`record.isValid()` returns `Promise<boolean>`. It runs the whole validator
+chain, including the database-backed `UniquenessValidator` and
+`validates_associated`, before it resolves. So `await record.isValid()` is
+`false` on a uniqueness collision before any save, matching Rails' `valid?`.
+`save()` and `saveBang()` run the same chain.
 
-```ts
-if (await record.isValid()) { ... }   // full chain, including uniqueness
-```
-
-`save()` / `saveBang()` run the same chain, so the simplest correct pattern is
-to let `save` do the validating:
-
-```ts
-if (await record.save()) {
-  // runs the validation chain, then persists
-  // saved
-} else {
-  record.errors; // fully populated, including uniqueness
-}
-```
-
-See [`src/validations.ts`](src/validations.ts) (`isValid`) and
-[`src/validations/uniqueness.ts`](src/validations/uniqueness.ts).
-
-### 4. Async everywhere else the DB is touched
-
-Finders (`find`, `findBy`, `first`, `count`, `pluck`, `exists`, `findEach`…),
-relation materialization (`toArray()` for Rails' `to_a`), persistence (`save`,
-`update`, `destroy`, `touch`, `updateColumn`…), and every adapter call are all
-`async`. Relations stay lazy as in Rails — you just `await` the terminal
-operation. Transactions are a module-level **function**, not a block:
+### 4. Transactions are functions
 
 ```ts
 import { transaction } from "@blazetrails/activerecord";
@@ -343,88 +237,110 @@ await transaction(Post, async () => {
 });
 ```
 
-Full list and rationale: the
-[ActiveRecord deviations guide](../website/docs/guides/activerecord-rails-deviations.md).
+## Typed models: `trails-tsc`
+
+`trails-tsc` (shipped by `@blazetrails/activerecord-cli`) is a `tsc`
+replacement. It reads `db/schema.ts` and each model's `static {}` block, and
+rewrites the model in memory at type-check time, so a model needs no
+hand-written `declare` lines:
+
+```sh
+ar db:schema:dump                               # writes db/schema.ts from the live database
+trails-tsc --schema db/schema.ts --noEmit
+```
+
+Verified on 2026-09-28 (`main` at `c19bfc0aee`): attributes are typed from
+their columns (`post.title` is `string | null`), and an enum attribute is typed
+as its value names (`"archived" | "draft" | "published" | null`). `hasMany`
+members are `AssociationProxy<T>`. Scopes and enum predicates, bang writers and
+scopes are typed on the class and on `Relation<T>`, so a chain that mixes
+enum scopes and named scopes type-checks.
+
+Editor support (a tsserver plugin for model virtualization) is not built yet.
+See [docs/infrastructure/virtual-source-files-plan.md](../../docs/infrastructure/virtual-source-files-plan.md).
+The `declare`-pattern reference for hand-typed models is
+[`dx-tests/declare-patterns.test-d.ts`](dx-tests/declare-patterns.test-d.ts).
+
+### Adopting an existing database
+
+Point a connection at the database, then:
+
+```sh
+ar db:schema:dump                        # introspect into db/schema.ts
+ar models:dump --out app/models          # one class per table, belongsTo / hasMany from foreign keys
+```
+
+`ar models:dump` also takes `--only`, `--ignore`, `--strip-prefix` and
+`--strip-suffix`. A table with no primary key is skipped with a comment.
+Against the root quickstart's app it printed (excerpt):
+
+```ts
+// 4 models, 2 associations from 1 foreign key.
+// SKIPPED posts_tags: no primary key (likely a view)
+
+export class Comment extends Base {
+  static {
+    this.belongsTo("post");
+  }
+}
+
+export class Post extends Base {
+  static {
+    this.hasMany("comments");
+  }
+}
+```
 
 ## Database adapters
 
-Adapters are selected by **name** in your connection config; the adapter
-subclass bundles its own driver, so the config alone picks the backend. Each
-adapter is also available as an explicit subpath import from this package's
-`exports` map:
+The adapter is picked by name in the connection config. Each adapter loads its
+own driver:
 
-| Config name (`adapter:`) | Driver / runtime              | Subpath export                                                            |
-| ------------------------ | ----------------------------- | ------------------------------------------------------------------------- |
-| `sqlite3` (canonical)    | `better-sqlite3`              | `@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js` |
-| `node-sqlite`            | Node's built-in `node:sqlite` | `.../connection-adapters/node-sqlite-adapter.js`                          |
-| `expo-sqlite`            | `expo-sqlite` (React Native)  | `.../connection-adapters/expo-sqlite-adapter.js`                          |
-| `postgresql`             | `pg`                          | `.../connection-adapters/postgresql-adapter.js`                           |
-| `mysql2`                 | `mysql2`                      | `.../connection-adapters/mysql2-adapter.js`                               |
+| `adapter:`                                  | Driver                        | Subpath export                                                            |
+| ------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------- |
+| `sqlite3`                                   | `better-sqlite3`              | `@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js` |
+| `node-sqlite`                               | Node's built-in `node:sqlite` | `.../connection-adapters/node-sqlite-adapter.js`                          |
+| `expo-sqlite`                               | `expo-sqlite` (React Native)  | `.../connection-adapters/expo-sqlite-adapter.js`                          |
+| `libsql`, `libsql-remote`, `libsql-replica` | `libsql`                      | `.../connection-adapters/libsql-adapter.js`                               |
+| `postgresql`                                | `pg`                          | `.../connection-adapters/postgresql-adapter.js`                           |
+| `mysql2`                                    | `mysql2`                      | `.../connection-adapters/mysql2-adapter.js`                               |
 
-Aliases are also registered: `sqlite` → `sqlite3`, `postgres` → `postgresql`,
-`mysql` → `mysql2`. There is a dedicated raw `sqlite3-adapter.js` export too;
-`better-sqlite3` backs the canonical `sqlite3` name. Register your own with
-`ConnectionAdapters.register(name, loader)` (see
+A URL config maps the `sqlite:`, `postgres:` and `mysql:` schemes onto those
+names (`ActiveRecord.protocolAdapters`). There is also a raw
+`sqlite3-adapter.js` subpath. Register your own adapter with
+`ConnectionAdapters.register(name, className, path, loader)` (see
 [`src/connection-adapters.ts`](src/connection-adapters.ts)).
-
-Choose at connection time:
 
 ```ts
 await Base.establishConnection({ adapter: "postgresql", url: process.env.DATABASE_URL });
-// or, via config/database.ts keyed on TRAILS_ENV when using the `ar` CLI.
 ```
 
-## The `ar` CLI
+## Examples
 
-`@blazetrails/activerecord-cli` provides the `ar` binary — the trails
-counterpart to Rails' `bin/rails` for ActiveRecord workflows. Run
-`ar --help`, or `ar <command> --help` for any command's options. The full
-command set (with project-layout details and the programmatic API) is in the
-[activerecord-cli README](../activerecord-cli/README.md). The highlights:
+[examples/twitter-clone](../../examples/twitter-clone/) is a small Express app
+with migrations, `belongsTo` / `hasMany` / `hasMany … through`
+(self-referential follows), scopes typed on `Relation<T>`, validations, eager
+loading and error mapping. `pnpm smoke` runs the whole flow against an
+in-memory database (`TRAILS_ENV=test`), and ends with `Smoke test passed ✅`.
 
-| Area        | Commands                                                                                                                                                                                                                     |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Scaffolding | `ar new <app>`, `ar init`, `ar generate:model`, `ar generate:migration`, `ar generate:manifest`, `ar destroy:model`, `ar destroy:migration`                                                                                  |
-| Database    | `ar db:create` / `db:drop` / `db:migrate` / `db:rollback` / `db:migrate:status` / `db:version` / `db:seed` / `db:schema:dump` / `db:schema:load` / `db:setup` / `db:reset` / `db:prepare` / `db:abort_if_pending_migrations` |
-| Runtime     | `ar console` (REPL with models pre-loaded), `ar runner <script>`                                                                                                                                                             |
-| Tooling     | `ar typecheck` (via `trails-tsc`), `ar models:dump`                                                                                                                                                                          |
+## Contributing and measuring parity
 
-> ActiveRecord registers models via Ruby's `inherited` hook + Zeitwerk; ES
-> modules have no equivalent, so the CLI maintains a generated barrel
-> (`app/models/index.ts`). Run `ar generate:manifest` after adding/removing a
-> model, or `--check` in CI to catch drift.
-
-## Contributing & measuring parity
-
-ActiveRecord is built **Rails-port-first**: read the Rails source, implement the
-behavior, then unskip the tests that prove it. Tests live next to their source
-as `*.test.ts`, named to match the corresponding Rails test so `parity:test`
-can match them — **never rename a test to make it pass**.
+Read the Rails source under `vendor/rails/v8.0.2/activerecord/` first, port the
+behavior, then port or unskip the Rails tests that prove it. Tests live next to
+their source as `*.test.ts`, named after the Rails test so `parity:test` can
+match them. Never rename a test to make it pass.
 
 ```sh
-pnpm vitest run path/to/file.test.ts   # run an individual file (don't run the whole suite locally)
-pnpm parity:api --package activerecord # method-level coverage vs Rails source
-pnpm parity:test                       # test-name coverage vs the Rails test suite
-pnpm test:types                         # DX typecheck suites (dx-tests/, virtualized-dx-tests/)
-pnpm parity:api:conventions                    # regenerate docs/ruby-ts-conventions.md
+pnpm vitest run path/to/file.test.ts          # one file; do not run the whole suite locally
+pnpm parity:api --package activerecord        # method-level coverage vs the Rails source
+pnpm parity:test                              # test-name coverage vs the Rails suite
+pnpm test:types                               # the DX type-test suites (dx-tests/)
 ```
 
-The methodology — implementation-first principles, the `@internal` JSDoc
-convention for Rails-private helpers, the module-mixin pattern, and how progress
-is measured — is in [CONTRIBUTING.md](../../CONTRIBUTING.md). The canonical
-naming rules are in [docs/ruby-ts-conventions.md](../../docs/ruby-ts-conventions.md).
-The intentional divergences (and why) are catalogued in the
-[ActiveRecord deviations guide](../website/docs/guides/activerecord-rails-deviations.md).
-
-## Further reading
-
-- [Root README](../../README.md) — project overview, package list, design principles.
-- [Twitter clone example](../../examples/twitter-clone/) — a runnable Express + ActiveRecord app.
-- [CONTRIBUTING.md](../../CONTRIBUTING.md) — Rails-port methodology and conventions.
-- [Ruby → TypeScript conventions](../../docs/ruby-ts-conventions.md) — the authoritative naming rules.
-- [activerecord-cli README](../activerecord-cli/README.md) — the `ar` CLI in depth.
-- [ActiveRecord deviations](../website/docs/guides/activerecord-rails-deviations.md) · [ActiveModel](../website/docs/guides/activemodel-rails-deviations.md) · [Arel](../website/docs/guides/arel-rails-deviations.md).
-- [Rails ActiveRecord API docs](https://api.rubyonrails.org/classes/ActiveRecord.html) — names and signatures are designed to match.
+The methodology is in [CONTRIBUTING.md](../../CONTRIBUTING.md) and the rules in
+[CLAUDE.md](../../CLAUDE.md). ActiveRecord is "rowless" in the extra-surface
+gate: every public name without a Rails counterpart needs a receipt at its
+declaration.
 
 ## License
 
