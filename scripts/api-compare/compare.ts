@@ -4999,9 +4999,6 @@ export function main() {
           for (const blockOwner of rubyBlockOwners.get(`${level}|${rubyName}`) ?? []) {
             blockParamsCompared++;
             const short = blockOwner.split("::").at(-1) ?? blockOwner;
-            // An owner that declares the name on the OTHER seat is a homonym, not
-            // the counterpart: `Validations#validate` is the instance alias of
-            // `valid?` (validations.rb:370), not `ClassMethods#validate` (:160).
             const seat = tsOwnerSeat(
               short,
               tsStaticOwnersByFileName.get(tsFile)?.get(tsName),
