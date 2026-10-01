@@ -7,7 +7,6 @@ import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 class XmlDataType extends Base {
   static {
     this.tableName = "xml_data_type";
-    this.attribute("id", "integer");
   }
 }
 

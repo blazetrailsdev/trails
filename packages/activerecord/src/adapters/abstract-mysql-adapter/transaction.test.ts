@@ -1,13 +1,7 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { assertDifference, assertNoDifference, assertRaises } from "@blazetrails/activesupport";
 import { Thread } from "@blazetrails/ruby-compat";
-import {
-  describeIfMysqlAdapter,
-  isMariaDb,
-  leaseMysqlAdapter,
-  Mysql2Adapter,
-  MYSQL_TEST_URL,
-} from "./test-helper.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../base.js";
 import {
   StatementTimeout,
@@ -16,7 +10,6 @@ import {
   LockWaitTimeout,
   QueryCanceled,
 } from "../../errors.js";
-import type { Mysql2RawResult } from "../../connection-adapters/mysql2/database-statements.js";
 
 class Sample extends Base {
   declare id: number;
@@ -85,48 +78,33 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       });
     });
 
-    it.skipIf(isMariaDb)("raises StatementTimeout when statement timeout exceeded", async () => {
-      await adapter.execute("INSERT INTO `samples` (value) VALUES (1)");
-      const result = (await adapter.execute("SELECT id FROM `samples` LIMIT 1")) as Mysql2RawResult;
-      const id = Number(result.rows![0][0]);
+    it("raises StatementTimeout when statement timeout exceeded", async (ctx) => {
+      ctx.skip((await adapter.showVariable("max_execution_time")) == null);
+      const error = await assertRaises([StatementTimeout], {}, async () => {
+        const s = await Sample.createBang({ value: 1 });
+        const latch1 = countDownLatch();
+        const latch2 = countDownLatch();
 
-      const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
-      let error: unknown;
-      try {
-        let latch1Resolve!: () => void;
-        let latch2Resolve!: () => void;
-        const latch1 = new Promise<void>((r) => {
-          latch1Resolve = r;
-        });
-        const latch2 = new Promise<void>((r) => {
-          latch2Resolve = r;
-        });
-
-        const thread = (async () => {
-          await adapter2.transaction(async () => {
-            await adapter2.execute(`SELECT * FROM \`samples\` WHERE id = ${id} FOR UPDATE`);
-            latch1Resolve();
-            await latch2;
-          });
-        })();
+        const thread = new Thread(() =>
+          Sample.transaction(async () => {
+            await Sample.lock().find(s.id);
+            latch1.countDown();
+            await latch2.wait();
+          }),
+        );
 
         try {
-          error = await assertRaises([StatementTimeout], {}, () =>
-            adapter.transaction(async () => {
-              await latch1;
-              await adapter.execute("SET max_execution_time = 1");
-              await adapter.execute(`SELECT * FROM \`samples\` WHERE id = ${id} FOR UPDATE`);
-            }),
-          );
+          await Sample.transaction(async () => {
+            await latch1.wait();
+            await (await Sample.leaseConnection()).execute("SET max_execution_time = 1");
+            await Sample.lock().find(s.id);
+          });
         } finally {
-          await adapter.execute("SET max_execution_time = DEFAULT").catch(() => {});
-          latch2Resolve();
-          await thread.catch(() => {});
+          await (await Sample.leaseConnection()).execute("SET max_execution_time = DEFAULT");
+          latch2.countDown();
+          await thread.join();
         }
-      } finally {
-        await adapter2.disconnectBang();
-      }
-
+      });
       expect(error).toBeInstanceOf(QueryAborted);
     });
 
@@ -161,55 +139,64 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("reconnect preserves isolation level", async () => {
-      const sampleCount = async (): Promise<number> => {
-        const result = (await adapter.execute(
-          "SELECT COUNT(*) AS n FROM `samples`",
-        )) as Mysql2RawResult;
-        return Number(result.rows![0][0]);
-      };
-
-      const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
+      const pool = Sample.connectionPool();
+      const connection = await Sample.leaseConnection();
       try {
-        await adapter.transaction(async () => {
-          await adapter.materializeTransactions();
-          await assertNoDifference(sampleCount, null, () =>
-            adapter2.execute("INSERT INTO `samples` (value) VALUES (1)"),
+        await Sample.transaction(async () => {
+          await connection.materializeTransactions();
+          await assertNoDifference(
+            () => Sample.count(),
+            null,
+            async () => void (await new Thread(() => Sample.createBang({ value: 1 })).join()),
           );
         });
 
-        await adapter.transaction({ isolation: ":read_committed" }, async () => {
-          await adapter.materializeTransactions();
-          await assertDifference(sampleCount, +1, null, () =>
-            adapter2.execute("INSERT INTO `samples` (value) VALUES (1)"),
-          );
-        });
+        await Sample.transaction(
+          async () => {
+            await connection.materializeTransactions();
+            await assertDifference(
+              () => Sample.count(),
+              +1,
+              null,
+              async () => void (await new Thread(() => Sample.createBang({ value: 1 })).join()),
+            );
+          },
+          { isolation: ":read_committed" },
+        );
 
         let firstBeginFailed = false;
-        const origPerformQuery = (adapter as any).performQuery.bind(adapter);
-        (adapter as any).performQuery = async (
+        const performQuery = (connection as any).performQuery;
+        (connection as any).performQuery = async function (
+          this: unknown,
           rawConnection: unknown,
           sql: string,
-          ...args: any[]
-        ) => {
+          ...args: unknown[]
+        ) {
           if (sql.includes("BEGIN") && !firstBeginFailed) {
             firstBeginFailed = true;
             throw new ConnectionFailed("Simulated failure");
           }
-          return origPerformQuery(rawConnection, sql, ...args);
+          return performQuery.call(this, rawConnection, sql, ...args);
         };
-        try {
-          await adapter.transaction({ isolation: ":read_committed" }, async () => {
-            await adapter.materializeTransactions();
-            await assertDifference(sampleCount, +1, null, () =>
-              adapter2.execute("INSERT INTO `samples` (value) VALUES (1)"),
+
+        await Sample.transaction(
+          async () => {
+            await connection.materializeTransactions();
+            await assertDifference(
+              () => Sample.count(),
+              +1,
+              null,
+              async () => void (await new Thread(() => Sample.createBang({ value: 1 })).join()),
             );
-          });
-        } finally {
-          delete (adapter as any).performQuery;
-        }
+          },
+          { isolation: ":read_committed" },
+        );
+
         expect(firstBeginFailed).toBeTruthy();
       } finally {
-        await adapter2.disconnectBang();
+        pool.remove(connection);
+        await connection.disconnectBang();
+        Sample.releaseConnection();
       }
     });
   });
