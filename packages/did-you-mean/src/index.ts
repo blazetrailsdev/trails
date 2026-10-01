@@ -7,17 +7,16 @@ export type { SpellCheckerOptions } from "./spell-checker.js";
 
 export { Formatter, PlainFormatter };
 
-interface FormatterClass {
-  new (): { messageFor(corrections: string[]): string };
+interface FormatterLike {
   messageFor(corrections: string[]): string;
 }
 
-let ractorFormatter: FormatterClass | null = null;
+let ractorFormatter: FormatterLike | null = null;
 
-export function formatter(): FormatterClass {
+export function formatter(): typeof Formatter | FormatterLike {
   return ractorFormatter || Formatter;
 }
 
-export function setFormatter<T extends FormatterClass | null>(formatter: T): T {
+export function setFormatter<T extends FormatterLike | null>(formatter: T): T {
   return (ractorFormatter = formatter) as T;
 }
