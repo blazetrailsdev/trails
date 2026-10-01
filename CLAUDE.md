@@ -1140,6 +1140,11 @@ As a consequence:
 - Code whose Rails body branches on visibility (Thor's `public_method?` /
   `private_method?` deciding what is a command) needs an explicit mechanism
   decided per class, not a general visibility table.
+- `defineModule`'s section record (`ruby-compat/src/include.ts`), read by
+  `publicInstanceMethods`, is such a mechanism and stays. It is read once at
+  load, where a Rails body enumerates `public_instance_methods`
+  (`relation/delegation.rb:19`, `associations/collection_proxy.rb:1132-1133`),
+  and never at dispatch.
 
 This is a genuine language shortcoming, ratified repo-wide here. There is no
 story to add a runtime visibility carrier, and a new instance is not a new
