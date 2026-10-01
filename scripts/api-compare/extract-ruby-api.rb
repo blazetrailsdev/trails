@@ -631,7 +631,6 @@ class ApiExtractor
       elsif lhs.is_a?(Array) && lhs[0] == :var_field &&
             lhs[1].is_a?(Array) && lhs[1][0] == :@const &&
             (body = class_new_body(rhs))
-        # `ENCODER = Class.new do … end.new` (action_controller/test_case.rb:151-176).
         @namespace_stack.push(lhs[1][1])
         @visibility_stack.push(:public)
         fqn = current_fqn
@@ -711,8 +710,6 @@ class ApiExtractor
     const_name(call[1]) == "Struct" ? call : nil
   end
 
-  # The block body of a `CONST = Class.new do … end` RHS, with or without a
-  # superclass argument and a trailing `.new`; nil otherwise.
   def class_new_body(rhs)
     rhs = rhs[1] if rhs.is_a?(Array) && rhs[0] == :call && rhs[3].is_a?(Array) && rhs[3][1] == "new"
     return nil unless rhs.is_a?(Array) && rhs[0] == :method_add_block

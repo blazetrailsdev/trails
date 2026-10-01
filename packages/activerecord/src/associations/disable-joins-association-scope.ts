@@ -60,7 +60,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       const records = addConstraints.call(this, reflection, key, joinIds, owner, ordered);
       const foreignKey = nextReflection.joinForeignKey;
       const recordIds = new DeferredPluck(records, [foreignKey].flat());
-      const recordsOrdered = any(records.orderValues);
+      const recordsOrdered = records != null && any(records.orderValues);
 
       return [nextReflection, recordsOrdered, recordIds];
     }, firstScope);
@@ -76,7 +76,7 @@ export function addConstraints(
   owner: Base,
   ordered: boolean,
 ): Relation<Base> | DisableJoinsAssociationRelation<Base> {
-  const scope: Relation<Base> = reflection
+  let scope: Relation<Base> = reflection
     .buildScope(reflection.aliasedTable)
     .where(new Map([[key, joinIds]]));
 
@@ -93,12 +93,13 @@ export function addConstraints(
     ),
   );
 
-  for (const scopeChainItem of reflection.constraints()) {
+  scope = reflection.constraints().reduce((_memo, scopeChainItem) => {
     const item = (this as unknown as EvalScope).evalScope(reflection, scopeChainItem, owner);
     scope.unscopeBang(...item.unscopeValues);
     scope.whereClause = scope.whereClause.plus(item.whereClause);
     scope.orderValues = union(item.orderValues, scope.orderValues);
-  }
+    return scope;
+  }, scope);
 
   if (isEmpty(scope.orderValues) && ordered) {
     const splitScope = DisableJoinsAssociationRelation.create(scope.model, key, joinIds);
