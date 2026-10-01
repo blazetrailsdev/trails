@@ -16,7 +16,7 @@ import { COMPARED_TS_FILES, walkTsFilesSync } from "./ts-file-walk.js";
 import { fileURLToPath } from "url";
 import * as ts from "typescript-5";
 import type { ApiManifest, ClassInfo } from "@blazetrails/parity/types";
-import { OUTPUT_DIR, packageSrcDir } from "./config.js";
+import { OUTPUT_DIR, PACKAGE_DIR_OVERRIDES, ROOT_DIR, packageSrcDir } from "./config.js";
 import { rubyFileToTs, rubyMethodToTs } from "@blazetrails/parity/conventions";
 import { isNotImplementedStub } from "./extract-ts-api.js";
 
@@ -318,7 +318,7 @@ function analyzeTsDepUsage(
 
   const checker = program.getTypeChecker();
   const knownIds = new Set(tsIdentifiers);
-  const depRoot = path.dirname(packageSrcDir(dep)) + path.sep;
+  const depRoot = path.join(ROOT_DIR, "packages", PACKAGE_DIR_OVERRIDES[dep] ?? dep) + path.sep;
   const { tainted: taintedSymbols, taintedRefs } = collectTaintedSymbols(
     program,
     pkgSrcDir,
