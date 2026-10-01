@@ -164,7 +164,7 @@ describe("sameFileHelperSkeletons", () => {
     ).toEqual(["loop", "if"]);
   });
 
-  it("spends the counterpart's loop on the iteration callee before an idiom can claim it", () => {
+  it("spends the counterpart's loop on JS_ITERATION_CALLEE (`forEach`) before an idiom can claim it", () => {
     expect(
       foldSkeletonTokens(["ref:forEach", "ref:save", "ref:filter_map"], "ruby", ["loop", "if"]),
     ).toEqual(["loop", "ref:save"]);

@@ -1,6 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { wrap } from "@blazetrails/activesupport";
-import { NoMethodError, rbObjClass, symbolToS, toSym, uniq } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbObjClass, rtest, symbolToS, toSym, uniq } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import type { AbstractReflection } from "../../reflection.js";
 import { Association } from "./association.js";
@@ -26,7 +26,7 @@ export class Branch {
   private _polymorphic: boolean | undefined;
 
   constructor({ association, children, parent, associateByDefault, scope }: BranchOptions) {
-    if (association != null) {
+    if (rtest(association)) {
       try {
         this.association = symbolToS(toSym(association));
       } catch (error) {

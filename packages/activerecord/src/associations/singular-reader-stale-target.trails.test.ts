@@ -45,6 +45,20 @@ describe("BelongsToAssociationsTest", () => {
     expect(await targetId(client.firmWithCondition)).toBe(anotherFirmId);
   });
 
+  it("loadTarget keeps a nil target loaded under a nil stale state, as load_target does (association.rb:190); the reader reloads it (singular_association.rb:10)", async () => {
+    const client = new Client() as unknown as Client & Rec;
+    const firstFirmId = (companies("first_firm") as unknown as Rec).id;
+    const firmProxy = client.association("firm");
+
+    expect(await firmProxy.loadTarget()).toBeNull();
+
+    client.client_of = firstFirmId as bigint;
+
+    expect(firmProxy.isStaleTarget()).toBe(true);
+    expect(await firmProxy.loadTarget()).toBeNull();
+    expect(await targetId(client.firm)).toBe(firstFirmId);
+  });
+
   it("loadTarget re-queries a stale target instead of returning the cache", async () => {
     const client = companies("second_client") as unknown as Client & Rec;
     const firstFirmId = (companies("first_firm") as unknown as Rec).id;
