@@ -4,7 +4,7 @@ import { Nodes, Table, fetchAttribute } from "@blazetrails/arel";
 import type { AbstractReflection } from "../../reflection.js";
 import { JoinPart } from "./join-part.js";
 import { aliasedArelTableForReflection, type AliasTracker } from "../alias-tracker.js";
-import { union } from "@blazetrails/ruby-compat";
+import { first, isEmpty, union } from "@blazetrails/ruby-compat";
 
 type JoinType = typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
 type TableResolver = (
@@ -45,10 +45,6 @@ export class JoinAssociation extends JoinPart {
     return this.isMatch(other);
   }
 
-  /**
-   * @missingRailsCall empty? — PERMANENT
-   * @missingRailsCall first — PERMANENT
-   */
   joinConstraints(
     foreignTable: Table | Nodes.TableAlias,
     foreignKlass: typeof Base,
@@ -97,16 +93,16 @@ export class JoinAssociation extends JoinPart {
 
       const scope = refl.joinScope(table, foreignTable, foreignKlass);
 
-      if (scope && scope.referencesValues.length > 0) {
+      if (!isEmpty(scope.referencesValues)) {
         const associations = union(scope.eagerLoadValues, scope.includesValues);
 
-        if (associations.length > 0) {
+        if (!isEmpty(associations)) {
           scope.joinsBang(scope.constructJoinDependency(associations, Nodes.OuterJoin));
         }
       }
 
       const arel = scope.arel(aliasTracker);
-      let nodes: Nodes.Node = arel.constraints[0];
+      let nodes: Nodes.Node = first(arel.constraints)!;
 
       const others: Nodes.Node[] = [];
       if (nodes instanceof Nodes.And) {

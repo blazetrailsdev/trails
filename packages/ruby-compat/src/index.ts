@@ -125,6 +125,7 @@ export {
 } from "./zlib-adapter.js";
 export type { ZlibAdapter, GzipWriterIO, GzipWriterHandle } from "./zlib-adapter.js";
 export {
+  aryCount,
   aryDelete,
   aryPop,
   arySlice,
@@ -132,6 +133,7 @@ export {
   drop,
   first,
   pack,
+  partition,
   sort,
   toA,
   union,

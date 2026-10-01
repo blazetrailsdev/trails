@@ -1,4 +1,4 @@
-import { type Hash, hasKey, type Module } from "@blazetrails/ruby-compat";
+import { first, type Hash, hashDelete, hasKey, type Module } from "@blazetrails/ruby-compat";
 import { underscore, pluralize, isBlank, safeConstantize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
@@ -114,7 +114,6 @@ export class BelongsTo extends SingularAssociation {
     return { [pk]: fkValue };
   }
 
-  /** @missingRailsCall first — PERMANENT */
   static async touchRecord(
     o: any,
     changes: Hash<string, unknown>,
@@ -126,7 +125,7 @@ export class BelongsTo extends SingularAssociation {
 
     const oldFkValues = fkColumns.map((col) => {
       const change = changes.get(col) as [unknown, unknown] | undefined;
-      if (change) return change[0];
+      if (change) return first(change);
       return typeof o._readAttribute === "function" ? o._readAttribute(col) : o[col];
     });
     const foreignTypeCol = `${underscore(name)}_type`;
@@ -147,7 +146,7 @@ export class BelongsTo extends SingularAssociation {
             reflection?.options?.foreignType ??
             `${underscore(name)}_type`;
           klass =
-            (changes.get(foreignType) as [unknown, unknown] | undefined)?.[0] ??
+            (changes.get(foreignType) && first(changes.get(foreignType) as unknown[])) ??
             (typeof o._readAttribute === "function"
               ? o._readAttribute(foreignType)
               : o[foreignType]);
@@ -250,13 +249,11 @@ export class BelongsTo extends SingularAssociation {
     });
   }
 
-  /** @missingRailsCall delete — PERMANENT */
   static override defineValidations(model: any, reflection: any): void {
     const options = reflection.options ?? {};
 
     if (hasKey(options, "required")) {
-      options.optional = !options.required;
-      delete options.required;
+      options.optional = !hashDelete(options, "required");
     }
 
     let required: boolean;

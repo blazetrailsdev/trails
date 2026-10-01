@@ -419,6 +419,40 @@ export function first<T>(ary: readonly T[]): T | undefined {
 }
 
 /**
+ * Ruby `Array#count` (`vendor/ruby/v3.3.11/array.c:6275` `rb_ary_count`): the number
+ * of elements the block answers truthily for (`RTEST`), or the length with no
+ * block. The `count(obj)` arm is not ported: nothing calls it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function aryCount<T>(ary: readonly T[], block?: (item: T) => unknown): number {
+  if (!block) return ary.length;
+  let n = 0;
+  for (const v of ary) {
+    const result = block(v);
+    if (result != null && result !== false) n++;
+  }
+  return n;
+}
+
+/**
+ * Ruby `Enumerable#partition` (`vendor/ruby/v3.3.11/enum.c:1102` `enum_partition`):
+ * two arrays, the elements the block answers truthily for (`RTEST`,
+ * `partition_i`, `:1057`) and all the others.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function partition<T>(ary: readonly T[], block: (item: T) => unknown): [T[], T[]] {
+  const v1: T[] = [];
+  const v2: T[] = [];
+  for (const i of ary) {
+    const result = block(i);
+    (result != null && result !== false ? v1 : v2).push(i);
+  }
+  return [v1, v2];
+}
+
+/**
  * Ruby `Array#to_a` (`vendor/ruby/v3.3.11/array.c:2952` `rb_ary_to_a`): the receiver
  * itself, or a plain-Array copy of an instance of an Array subclass.
  *

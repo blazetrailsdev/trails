@@ -290,7 +290,7 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
     return null;
   }
 
-  /** @missingRailsCall map — PERMANENT */
+  /** @missingRailsCall map — CONVERGEABLE association-marshal-dump-maps-its-instance-variables */
   marshalDump(): [string, Record<string, unknown>] {
     return [
       this.reflection.name,
@@ -512,7 +512,7 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
 
   /**
    * @internal
-   * @missingRailsCall create — PERMANENT
+   * @missingRailsCall create — CONVERGEABLE association-target-scope-calls-association-relation-create
    */
   protected targetScope(): any {
     const klass = this.klass as typeof Base | undefined;

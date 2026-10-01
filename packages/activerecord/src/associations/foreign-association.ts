@@ -17,7 +17,7 @@ export function foreignKeyPresent(this: ForeignAssociationHost): boolean {
 export class ForeignAssociation {
   foreignKeyPresent: boolean = false;
 
-  /** @missingRailsCall new — PERMANENT */
+  /** @missingRailsCall new — CONVERGEABLE call-gate-credits-argumentless-hash-new-as-a-literal */
   static nullifiedOwnerAttributes(
     reflection: Pick<AssociationReflection, "foreignKey" | "type">,
   ): Record<string, null> {

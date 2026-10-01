@@ -1,4 +1,4 @@
-import { rbEqual } from "@blazetrails/ruby-compat";
+import { fetch, rbEqual } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { underscore } from "@blazetrails/activesupport";
@@ -10,7 +10,6 @@ import { MissingAttributeError } from "@blazetrails/activemodel";
 export class BelongsToAssociation extends SingularAssociation {
   private _updated = false;
 
-  /** @missingRailsCall fetch — PERMANENT */
   async handleDependency(): Promise<void> {
     const target = await this.loadTarget();
     if (!target) return;
@@ -50,10 +49,7 @@ export class BelongsToAssociation extends SingularAssociation {
           ),
           associationIds: [id],
           associationPrimaryKeyColumn: primaryKeyColumn,
-          ensuringOwnerWasMethod:
-            "ensuringOwnerWas" in this.reflection.options
-              ? (this.reflection.options as any).ensuringOwnerWas
-              : null,
+          ensuringOwnerWasMethod: fetch(this.reflection.options, "ensuringOwnerWas", null),
         });
         break;
       }

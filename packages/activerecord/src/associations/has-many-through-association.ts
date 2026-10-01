@@ -3,7 +3,7 @@ import type { Base } from "../base.js";
 import type { AssociationReflection } from "../reflection.js";
 import type { AssociationDefinition } from "../associations.js";
 import { HasManyAssociation } from "./has-many-association.js";
-import { Hash, include, NotImplementedError, rbEqual } from "@blazetrails/ruby-compat";
+import { aryCount, Hash, include, NotImplementedError, rbEqual } from "@blazetrails/ruby-compat";
 import { underscore, singularize, isBlank } from "@blazetrails/activesupport";
 import { collectionProxyFor as collectionProxyFor } from "../associations.js";
 import { ThroughAssociation, sourceReflection } from "./through-association.js";
@@ -123,7 +123,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
 
   /**
    * @internal
-   * @missingRailsCall map — PERMANENT
+   * @missingRailsCall map — CONVERGEABLE call-gate-credits-a-module-include-edge-to-its-includer
    * @missingRailsName class — PERMANENT
    */
   override buildRecord(
@@ -181,10 +181,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     return isThenable(deleted) ? deleted.then(() => true) : true;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall count — PERMANENT
-   */
+  /** @internal */
   protected override async deleteRecords(records: Base[], method: string): Promise<number> {
     this.ensureNotNested();
     const throughName = this.reflection.options.through;
@@ -207,8 +204,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     let count = 0;
     if (method === "destroy") {
       if ((scope.model as typeof Base | undefined)?.primaryKey) {
-        const destroyed = (await scope.destroyAll()) as Base[];
-        count = destroyed.filter((r) => (r as any).isDestroyed?.()).length;
+        count = aryCount((await scope.destroyAll()) as Base[], (r) => r.isDestroyed());
       } else {
         const recs = (await scope.toArray()) as Base[];
         for (const r of recs) {

@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
 import { TypeError } from "./type-error.js";
 import {
+  aryCount,
   aryDelete,
   aryPop,
   arySlice,
   compact,
   pack,
+  partition,
   sort,
   toA,
   union,
@@ -191,6 +193,33 @@ describe("Array#to_a", () => {
     expect(result).not.toBe(ary);
     expect(result.constructor).toBe(Array);
     expect(result).toEqual([1, 2]);
+  });
+});
+
+describe("Array#count", () => {
+  it("counts the elements the block answers truthily for", () => {
+    expect(aryCount([1, 2, 3, 4], (i) => i % 2 === 0)).toBe(2);
+    expect(aryCount([0, "", null, false], (i) => i)).toBe(2);
+  });
+
+  it("answers the length with no block", () => {
+    expect(aryCount([1, null, 3])).toBe(3);
+  });
+});
+
+describe("Enumerable#partition", () => {
+  it("splits on the block's truthiness, keeping order", () => {
+    expect(partition([1, 2, 3, 4], (i) => i % 2 === 0)).toEqual([
+      [2, 4],
+      [1, 3],
+    ]);
+  });
+
+  it("counts 0 and the empty string as truthy, nil and false as not", () => {
+    expect(partition([0, "", null, false, undefined], (i) => i)).toEqual([
+      [0, ""],
+      [null, false, undefined],
+    ]);
   });
 });
 

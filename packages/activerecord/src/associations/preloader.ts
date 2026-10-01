@@ -30,7 +30,7 @@ export class Preloader {
   private _availableRecords: (Base | Base[])[];
   private _materialized: boolean;
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE preloader-new-stub-seam-onto-a-ruby-compat-class-new */
   static new(options: PreloaderOptions): Preloader {
     return new this(options);
   }

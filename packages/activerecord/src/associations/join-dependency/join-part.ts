@@ -39,7 +39,7 @@ export abstract class JoinPart {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE association-symbol-iterators-come-from-ruby-compat-enumerable */
   *[Symbol.iterator](): IterableIterator<JoinPart> {
     yield this;
     for (const child of this.children) {

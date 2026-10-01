@@ -1,4 +1,4 @@
-import { kernelThrow, rbEqual, toI } from "@blazetrails/ruby-compat";
+import { fetch, first, isEmpty, kernelThrow, rbEqual, toI } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { NoMethodError } from "@blazetrails/activemodel";
@@ -47,10 +47,6 @@ export class HasManyAssociation extends CollectionAssociation {
     return result;
   }
 
-  /**
-   * @missingRailsCall fetch — PERMANENT
-   * @missingRailsCall first — PERMANENT
-   */
   async handleDependency(): Promise<void> {
     const dependent = this.reflection.options.dependent;
     if (!dependent) return;
@@ -93,8 +89,8 @@ export class HasManyAssociation extends CollectionAssociation {
           (t as any).destroyedByAssociation = this.reflection;
         }
 
-        if (this.target.length > 0) {
-          const associationClass = this.target[0].constructor as typeof Base;
+        if (!isEmpty(this.target)) {
+          const associationClass = first(this.target)!.constructor as typeof Base;
           let primaryKeyColumn: string | string[];
           let ids: unknown[];
           if (queryConstraintsList.call(associationClass as any)) {
@@ -118,10 +114,7 @@ export class HasManyAssociation extends CollectionAssociation {
               associationClass: String(this.reflection.klass.name),
               associationIds: idsBatch,
               associationPrimaryKeyColumn: primaryKeyColumn,
-              ensuringOwnerWasMethod:
-                "ensuringOwnerWas" in this.reflection.options
-                  ? (this.reflection.options as any).ensuringOwnerWas
-                  : null,
+              ensuringOwnerWasMethod: fetch(this.reflection.options, "ensuringOwnerWas", null),
             });
           }
         }

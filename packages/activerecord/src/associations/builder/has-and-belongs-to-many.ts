@@ -22,7 +22,6 @@ export class HasAndBelongsToMany {
     this.options = options;
   }
 
-  /** @missingRailsCall call — PERMANENT */
   throughModel(): any {
     const builder = this;
     const lhsModel = this.lhsModel;
@@ -43,7 +42,7 @@ export class HasAndBelongsToMany {
 
       /** @internal */
       static get tableName(): string {
-        return (tableName ??= this.tableNameResolver());
+        return (tableName ??= this.tableNameResolver.call(null));
       }
 
       /** @internal */
