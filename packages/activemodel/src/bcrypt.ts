@@ -2,14 +2,15 @@ import bcryptjs from "bcryptjs";
 import { ArgumentError, StandardError, rbObjAsString, warn } from "@blazetrails/ruby-compat";
 
 /** @noRailsEquivalent CONVERGEABLE activemodel-bcrypt-engine-into-a-bcrypt-gem-package */
-export class Error extends StandardError {}
+class BCryptError extends StandardError {}
+export { BCryptError as Error };
 
 /** @noRailsEquivalent CONVERGEABLE activemodel-bcrypt-engine-into-a-bcrypt-gem-package */
 export const Errors = {
-  InvalidSalt: class InvalidSalt extends Error {},
-  InvalidHash: class InvalidHash extends Error {},
-  InvalidCost: class InvalidCost extends Error {},
-  InvalidSecret: class InvalidSecret extends Error {},
+  InvalidSalt: class InvalidSalt extends BCryptError {},
+  InvalidHash: class InvalidHash extends BCryptError {},
+  InvalidCost: class InvalidCost extends BCryptError {},
+  InvalidSecret: class InvalidSecret extends BCryptError {},
 };
 
 /** @noRailsEquivalent CONVERGEABLE activemodel-bcrypt-engine-into-a-bcrypt-gem-package */
