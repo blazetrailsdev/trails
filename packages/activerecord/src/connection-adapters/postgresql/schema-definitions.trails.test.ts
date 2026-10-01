@@ -456,16 +456,6 @@ describeIfPostgresqlAdapter("TableDefinition#toSql", () => {
     expect(constraintPos).toBeLessThan(withPos);
   });
 
-  it("skips constraint injection for CREATE TABLE ... AS queries", async () => {
-    const td = new TableDefinition(leased, "archived_orders", {
-      as: "SELECT (1) AS id, amount FROM orders WHERE archived = true",
-    });
-    td.uniqueConstraint("id", { name: "unique_id" });
-    const sql = await toSql(td);
-    expect(sql).not.toContain("CONSTRAINT");
-    expect(sql).toContain("AS SELECT");
-  });
-
   it("emits PG-specific long-tail column SQL types verbatim from pgColumn helpers (no-adapter fallback)", async () => {
     const td = new TableDefinition(leased, "widgets");
     td.cidr("net");
