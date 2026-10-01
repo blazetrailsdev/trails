@@ -24,8 +24,8 @@ export class Engine {
   static cost: number = 12;
 
   /**
-   * @noRailsEquivalent CONVERGEABLE activemodel-bcrypt-engine-into-a-bcrypt-gem-package
    * @missingRailsCall byteslice — PERMANENT
+   * @noRailsEquivalent CONVERGEABLE activemodel-bcrypt-engine-into-a-bcrypt-gem-package
    */
   static hashSecret(secret: unknown, salt: string, _: unknown = null): string {
     if (_ != null) {
