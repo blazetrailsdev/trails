@@ -207,6 +207,7 @@ describe("DisableJoinsAssociationScope", () => {
     }) as DisableJoinsAssociationRelation<Base>;
 
     await expect(built.limit(-1)).rejects.toThrow("attempt to take negative size");
+    await expect(built.limit(NaN)).rejects.toThrow("float NaN out of range of integer");
     await expect(built.first(1)).rejects.toThrow(
       "undefined method 'limit' for an instance of Array",
     );

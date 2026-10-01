@@ -4,6 +4,7 @@ import { ArgumentError } from "./argument-error.js";
 import { cmp, rbCmpint } from "./comparable.js";
 import { rbBuiltinClassName } from "./object.js";
 import { Range } from "./range.js";
+import { num2long } from "./string/support.js";
 import { TypeError } from "./type-error.js";
 
 /** `toofew` (`vendor/ruby/v3.3.11/pack.c:120`). */
@@ -497,9 +498,9 @@ export function toA<T>(ary: T[]): T[] {
  * @noRailsEquivalent PERMANENT
  */
 export function take<T>(ary: readonly T[], n: number): T[] {
-  if (n == null) throw new TypeError("no implicit conversion from nil to integer");
-  if (n < 0) throw new ArgumentError("attempt to take negative size");
-  return ary.slice(0, n);
+  const len = num2long(n);
+  if (len < 0) throw new ArgumentError("attempt to take negative size");
+  return ary.slice(0, len);
 }
 
 /**
