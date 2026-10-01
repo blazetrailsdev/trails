@@ -33,6 +33,16 @@ describe("frozen / isFrozen", () => {
   });
 });
 
+describe("DatabaseConfigurations.new given a DatabaseConfigurations", () => {
+  it("takes the other instance's configurations (database_configurations.rb:201)", () => {
+    const configs = new DatabaseConfigurations({
+      test: { adapter: "sqlite3", database: ":memory:" },
+    });
+
+    expect(new DatabaseConfigurations(configs).configurations).toEqual(configs.configurations);
+  });
+});
+
 describe("eql (core.rb:637 alias :eql? :==)", () => {
   fixtures(["topics"]);
 

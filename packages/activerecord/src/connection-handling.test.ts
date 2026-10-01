@@ -477,7 +477,7 @@ describe("ConnectionHandlingTest", () => {
 
   it("#isPrimaryClass returns false for a normal model subclass", async () => {
     class Post extends Base {}
-    expect(Post.isPrimaryClass()).toBe(false);
+    expect(Post.isPrimaryClass()).toBeFalsy();
   });
 
   it.skipIf(adapterType !== "sqlite")(

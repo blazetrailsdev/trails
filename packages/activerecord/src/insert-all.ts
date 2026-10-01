@@ -10,7 +10,7 @@ import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import { Result } from "./result.js";
 import { isEmpty, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
-import { isPresent, many, reverseMerge } from "@blazetrails/activesupport";
+import { filterMap, isPresent, many, reverseMerge } from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
 import { first } from "@blazetrails/ruby-compat";
 import { withConnection } from "./connection-handling.js";
@@ -546,22 +546,20 @@ export class Builder implements InsertBuilder {
     return this.quoteColumns(this._insertAll.updatableColumns());
   }
 
+  /** @missingRailsArgs filter_map — PERMANENT */
   touchModelTimestampsUnless(block: (col: string) => string): string {
     if (!this._insertAll.updateDuplicates() || !this._insertAll.recordTimestamps()) {
       return "";
     }
-    return this.model
-      .timestampAttributesForUpdateInModel()
-      .filter((columnName) => this.touchTimestampAttribute(columnName))
-      .map(
-        (columnName) =>
-          `${columnName}=(CASE WHEN (${this.updatableColumns()
-            .map(block)
-            .join(" AND ")}) THEN ${this.model.quotedTableName()}.${columnName} ELSE ${String(
-            this._connection.highPrecisionCurrentTimestamp(),
-          )} END),`,
-      )
-      .join("");
+    return filterMap(this.model.timestampAttributesForUpdateInModel(), (columnName) => {
+      if (this.touchTimestampAttribute(columnName)) {
+        return `${columnName}=(CASE WHEN (${this.updatableColumns()
+          .map(block)
+          .join(" AND ")}) THEN ${this.model.quotedTableName()}.${columnName} ELSE ${String(
+          this._connection.highPrecisionCurrentTimestamp(),
+        )} END),`;
+      }
+    }).join("");
   }
 
   /** @internal */

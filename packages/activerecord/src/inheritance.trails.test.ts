@@ -14,6 +14,20 @@ describe("_instantiate STI dispatch", () => {
   });
 });
 
+describe("compute_type candidates cache", () => {
+  fixtures(["authors"]);
+
+  it("remembers the candidate that resolved, per class", () => {
+    expect(Client.computeType("Author")).toBe(Author);
+
+    const cache = (Client as unknown as { _typeCandidatesCache: Map<string, string> })
+      ._typeCandidatesCache;
+    expect(Object.prototype.hasOwnProperty.call(Client, "_typeCandidatesCache")).toBe(true);
+    expect(cache.get("Author")).toBe("Author");
+    expect(Client.computeType("Author")).toBe(Author);
+  });
+});
+
 describe("descends_from_active_record? column test", () => {
   fixtures(["authors"]);
 

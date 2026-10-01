@@ -158,7 +158,7 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("reject if method without arguments", async () => {
-    Pirate.acceptsNestedAttributesFor("ship", { rejectIf: (_a, rec) => rec.isNewRecord() });
+    Pirate.acceptsNestedAttributesFor("ship", { rejectIf: "isNewRecord" });
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
     await (pirate as any).setShipAttributes({ name: "Black Pearl" });
     await assertNoDifference(
@@ -170,13 +170,7 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("reject if method with arguments", async () => {
-    Pirate.acceptsNestedAttributesFor("ship", {
-      rejectIf: (attrs, rec) => {
-        const v = attrs["_reject_me_if_new"];
-        delete attrs["_reject_me_if_new"];
-        return v != null && v !== "" && v !== false && !rec.isPersisted();
-      },
-    });
+    Pirate.acceptsNestedAttributesFor("ship", { rejectIf: "rejectEmptyShipsOnCreate" });
 
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
     await (pirate as any).setShipAttributes({ name: "Red Pearl", _reject_me_if_new: true });

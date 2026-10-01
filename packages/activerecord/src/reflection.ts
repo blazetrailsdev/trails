@@ -122,6 +122,8 @@ export class AbstractReflection {
   /** @internal */
   private _counterCacheColumn?: string | null;
   private _counterCacheColumnKlass?: typeof Base;
+  private _inverseWhichUpdatesCounterCacheDefined?: boolean;
+  private _inverseWhichUpdatesCounterCache?: AbstractReflection;
 
   /** @internal */
   protected _concrete(): ConcreteReflection {
@@ -331,22 +333,20 @@ export class AbstractReflection {
   }
 
   inverseWhichUpdatesCounterCache(): AbstractReflection | null {
-    const col = this.counterCacheColumn();
-    if (!col) return null;
-    const inv = this.inverseOf();
-    const candidates: any[] = inv ? [inv] : this.klass.reflectOnAllAssociations("belongsTo");
-    return (
-      candidates.find((c: any) => {
-        try {
-          return (
-            c.counterCacheColumn?.() === col &&
-            (c.isPolymorphic?.() || c.klass === this._concrete().activeRecord)
-          );
-        } catch {
-          return false;
-        }
-      }) ?? null
-    );
+    if (!this._inverseWhichUpdatesCounterCacheDefined) {
+      if (this.counterCacheColumn()) {
+        const inverseCandidates: any[] = this.inverseOf()
+          ? [this.inverseOf()]
+          : this.klass.reflectOnAllAssociations("belongsTo");
+        this._inverseWhichUpdatesCounterCache = inverseCandidates.find(
+          (inverse: any) =>
+            inverse.counterCacheColumn() === this.counterCacheColumn() &&
+            (inverse.isPolymorphic() || inverse.klass === this._concrete().activeRecord),
+        );
+      }
+      this._inverseWhichUpdatesCounterCacheDefined = true;
+    }
+    return this._inverseWhichUpdatesCounterCache ?? null;
   }
 
   isInverseUpdatesCounterCache(): AbstractReflection | null {

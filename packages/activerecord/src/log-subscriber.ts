@@ -7,6 +7,7 @@ import {
   NotificationEvent as Event,
   type Logger,
 } from "@blazetrails/activesupport";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { verboseQueryLogs } from "./active-record.js";
 import { ActiveRecord } from "./namespaces.js";
 
@@ -85,9 +86,15 @@ export class LogSubscriber extends BaseLogSubscriber {
       );
       const bindPairs: [string | null, unknown][] = [];
 
-      for (let i = 0; i < payload.binds.length; i++) {
-        const attr = payload.binds[i];
-        const filteredParams = this.filter(this.extractAttributeName(attr, i), castedParams?.[i]);
+      for (const [i, attr] of payload.binds.entries()) {
+        const attributeName: string | null = rbObjRespondTo(attr, "name")
+          ? attr.name
+          : attr != null && rbObjRespondTo(attr[i], "name")
+            ? attr[i].name
+            : null;
+
+        const filteredParams = this.filter(attributeName, castedParams?.[i]);
+
         bindPairs.push(this.renderBind(attr, filteredParams));
       }
 
@@ -139,12 +146,6 @@ export class LogSubscriber extends BaseLogSubscriber {
   private typeCastedBinds(castedBinds: unknown): any[] {
     if (typeof castedBinds === "function") return castedBinds();
     return (castedBinds as any[]) ?? [];
-  }
-
-  private extractAttributeName(attr: any, _i: number): string | null {
-    if (attr && typeof attr.name === "string") return attr.name;
-    if (Array.isArray(attr) && attr[0] && typeof attr[0].name === "string") return attr[0].name;
-    return null;
   }
 
   private resolveBindAttribute(attr: unknown): {

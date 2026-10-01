@@ -619,11 +619,12 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   });
 
   const updateConstraints = this._queryConstraintsHash();
-  attributes = Object.entries(attributes).reduce<Record<string, unknown>>((h, [k, v]) => {
+  const h: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(attributes)) {
     h[k] = this._attributes.writeCastValue(k, v);
     this.clearAttributeChange(k);
-    return h;
-  }, {});
+  }
+  attributes = h;
 
   const affectedRows = await this.constructor._updateRecord(attributes, updateConstraints);
 

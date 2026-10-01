@@ -11,9 +11,11 @@ import {
   hashDelete,
   include,
   isEmpty,
+  isSymbol,
   merge,
   rbEql,
   rbObjClass,
+  symbolToS,
 } from "@blazetrails/ruby-compat";
 import {
   Concern,
@@ -525,7 +527,8 @@ function accessFixture(this: TestFixtures, fsName: string, ...fixtureNames: unkn
   this._fixtureCache[fsName] ??= {};
 
   const instances = fixtureNames.map((name) => {
-    const fName = String(name);
+    let fName = name as string;
+    if (isSymbol(fName)) fName = symbolToS(fName);
     if (forceReload) hashDelete(this._fixtureCache[fsName], fName);
 
     const loaded = this._loadedFixtures[fsName].fixtures[fName];

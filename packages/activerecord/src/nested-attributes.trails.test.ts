@@ -156,6 +156,19 @@ describe("nested attributes save wrapper argument forwarding (trails-only)", () 
     Pirate.acceptsNestedAttributesFor("ship");
   });
 
+  it("converts a permitted? collection and its members with to_h", async () => {
+    Pirate.acceptsNestedAttributesFor("parrots");
+    const params = <T>(hash: T) =>
+      Object.assign(Object.create({ toH: () => hash }), { permitted: true });
+
+    const pirate = await Pirate.createBang({ catchphrase: "Arr" });
+    await (
+      pirate as unknown as { setParrotsAttributes(v: unknown): Promise<void> }
+    ).setParrotsAttributes(params([params({ name: "Polly" })]));
+
+    expect(pirate.parrots.target.map((parrot) => cols(parrot).name)).toEqual(["Polly"]);
+  });
+
   it("assigns constructor nested attributes without the property setter", async () => {
     Pirate.acceptsNestedAttributesFor("ship");
     expect(Object.getOwnPropertyDescriptor(Pirate.prototype, "shipAttributes")).toBeUndefined();

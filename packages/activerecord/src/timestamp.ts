@@ -184,14 +184,14 @@ export async function recordUpdateTimestamps<T>(
 ): Promise<T | undefined> {
   if (this._touchRecord && shouldRecordTimestamps.call(this)) {
     const currentTime = this.currentTimeFromProperTimezone();
+
     for (const column of this.timestampAttributesForUpdateInModel()) {
-      if (!this.isWillSaveChangeToAttribute?.(column)) {
-        this._writeAttribute?.(column, currentTime);
-      }
+      if (this.isWillSaveChangeToAttribute?.(column)) continue;
+      this._writeAttribute?.(column, currentTime);
     }
   }
 
-  return block?.();
+  if (block) return block();
 }
 
 /** @internal */

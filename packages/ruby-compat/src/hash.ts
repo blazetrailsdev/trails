@@ -319,7 +319,22 @@ export function inspect(hash: Record<string, unknown> | Map<unknown, unknown>): 
 export function eachValue<T>(
   hash: Record<string, T>,
   block: (value: T) => unknown,
-): Record<string, T> {
+): Record<string, T>;
+/**
+ * The blockless arm, `RETURN_SIZED_ENUMERATOR` (`hash.c:3061`): the values an
+ * Enumerable call chained onto the Enumerator iterates.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_value` (`vendor/ruby/v3.3.11/hash.c:3060`).
+ */
+export function eachValue<T>(hash: Record<string, T>): T[];
+/**
+ * The arms share one body.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_value` (`vendor/ruby/v3.3.11/hash.c:3060`).
+ */
+export function eachValue<T>(
+  hash: Record<string, T>,
+  block?: (value: T) => unknown,
+): Record<string, T> | T[] {
+  if (!block) return Object.values(hash);
   for (const key of Object.keys(hash)) {
     block(hash[key]);
   }

@@ -9,7 +9,7 @@ import {
   isBlank,
   singularize,
 } from "@blazetrails/activesupport";
-import { except } from "@blazetrails/ruby-compat";
+import { except, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { defineAutosaveValidationCallbacks } from "./autosave-association.js";
 import { ArgumentError, BooleanType } from "@blazetrails/activemodel";
 
@@ -30,7 +30,7 @@ export const REJECT_ALL_BLANK_PROC = (attributes: Record<string, unknown>): bool
 
 export interface NestedAttributeOptions {
   allowDestroy?: boolean;
-  rejectIf?: ((attrs: Record<string, unknown>, record: Base) => boolean) | "all_blank";
+  rejectIf?: ((attrs: Record<string, unknown>, record: Base) => boolean) | string;
   limit?: number | string | ((...args: unknown[]) => number);
   updateOnly?: boolean;
 }
@@ -100,11 +100,20 @@ export function callRejectIf(
   this: Base,
   associationName: string,
   attributes: Record<string, unknown>,
-): boolean {
+): boolean | undefined {
   if (isWillBeDestroyed.call(this, associationName, attributes)) return false;
-  const ctor = this.constructor as typeof Base;
-  const rejectIf = ctor.nestedAttributesOptions[associationName]?.rejectIf;
-  return typeof rejectIf === "function" ? rejectIf(attributes, this) : false;
+
+  const callback = (this.constructor as typeof Base).nestedAttributesOptions[associationName]
+    .rejectIf;
+  if (typeof callback === "string") {
+    return (
+      (this as unknown as Record<string, (...args: unknown[]) => unknown>)[callback].length === 0
+        ? rbFSend(this, callback)
+        : rbFSend(this, callback, attributes)
+    ) as boolean;
+  } else if (typeof callback === "function") {
+    return callback(attributes, this);
+  }
 }
 
 /** @internal */
@@ -112,7 +121,7 @@ export function isRejectNewRecord(
   this: Base,
   associationName: string,
   attributes: Record<string, unknown>,
-): boolean {
+): boolean | undefined {
   return (
     isWillBeDestroyed.call(this, associationName, attributes) ||
     callRejectIf.call(this, associationName, attributes)
@@ -164,30 +173,26 @@ export function raiseNestedAttributesRecordNotFoundBang(
 }
 
 /** @internal */
-function resolveNestedLimit(
-  limit: number | string | ((...args: unknown[]) => number) | undefined,
-  record: Base,
-): number | undefined {
-  if (limit === undefined) return undefined;
-  if (typeof limit === "function") return limit();
-  if (typeof limit === "string") {
-    const value = (record as unknown as Record<string, unknown>)[limit];
-    return typeof value === "function" ? (value as () => number).call(record) : Number(value);
-  }
-  return limit;
-}
-
-/** @internal */
 export function checkRecordLimitBang(
-  limit: number | ((...args: unknown[]) => number) | undefined,
-  attributesCollection: unknown[],
+  this: Base,
+  limit: number | string | (() => number) | null | undefined,
+  attributesCollection: unknown[] | Record<string, unknown>,
 ): void {
-  if (limit === undefined) return;
-  const resolved = typeof limit === "function" ? limit() : limit;
-  if (resolved !== undefined && attributesCollection.length > resolved) {
-    throw new TooManyRecords(
-      `Maximum ${resolved} records are allowed. Got ${attributesCollection.length} records instead.`,
-    );
+  if (limit != null) {
+    if (typeof limit === "string") {
+      limit = rbFSend(this, limit) as number | null | undefined;
+    } else if (typeof limit === "function") {
+      limit = limit();
+    }
+
+    const size = Array.isArray(attributesCollection)
+      ? attributesCollection.length
+      : Object.keys(attributesCollection).length;
+    if (limit != null && size > limit) {
+      throw new TooManyRecords(
+        `Maximum ${limit} records are allowed. Got ${size} records instead.`,
+      );
+    }
   }
 }
 
@@ -360,13 +365,18 @@ export function assignNestedAttributesForCollectionAssociation(
   associationName: string,
   attributesCollection: Record<string, unknown>[] | Record<string, Record<string, unknown>>,
 ): Promise<void> | void {
+  const options = (record.constructor as typeof Base).nestedAttributesOptions[associationName];
+  if (rbObjRespondTo(attributesCollection, "permitted")) {
+    attributesCollection = (attributesCollection as unknown as { toH(): never }).toH();
+  }
+
   if (typeof attributesCollection !== "object" || attributesCollection === null) {
     throw new ArgumentError(
       `Hash or Array expected for \`${associationName}\` attributes, got ${nestedTypeName(attributesCollection)}`,
     );
   }
-  const ctor = record.constructor as typeof Base;
-  const config = ctor.nestedAttributesOptions[associationName];
+
+  checkRecordLimitBang.call(record, options.limit, attributesCollection);
 
   let attrs: Record<string, unknown>[];
   if (Array.isArray(attributesCollection)) {
@@ -380,15 +390,17 @@ export function assignNestedAttributesForCollectionAssociation(
     }
   }
 
-  checkRecordLimitBang(resolveNestedLimit(config?.limit, record), attrs);
-
   const collectionTargetModel = resolveCollectionTargetModel(record, associationName);
   const association = record.association(associationName) as CollectionAssociation;
 
   const assignRecords = (existingRecords: Base[]): Promise<void> | void => {
     const nestedTarget: (Base | null)[] = [];
     let pending: Promise<void> | undefined;
-    for (const a of attrs) {
+    for (let a of attrs) {
+      if (rbObjRespondTo(a, "permitted")) {
+        a = (a as unknown as { toH(): Record<string, unknown> }).toH();
+      }
+
       if (!hasNestedId(a)) {
         if (!isRejectNewRecord.call(record, associationName, a)) {
           nestedTarget.push(

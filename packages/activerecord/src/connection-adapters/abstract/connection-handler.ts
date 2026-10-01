@@ -14,7 +14,7 @@ import { isPreventingWrites } from "../../core.js";
 
 export interface ConnectionOwner {
   name: string;
-  isPrimaryClass(): boolean;
+  isPrimaryClass(): boolean | undefined;
 }
 
 export class ConnectionDescriptor {
