@@ -1,5 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { defineModule, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 
 import { Relation } from "../relation.js";
@@ -42,7 +42,7 @@ export function scope<T extends typeof Base>(
     );
   }
 
-  const extension = block;
+  const extension = block != null ? defineModule(block) : undefined;
 
   let method: (this: any, ...args: any[]) => any;
   if (typeof body === "function") {
@@ -96,8 +96,12 @@ export function defaultScoped(
 }
 
 export function defaultExtensions(this: NamedHost): any[] {
-  const scope = scopeForAssociation.call(this) ?? defaultScoped.call(this);
-  return scope?.extensions ?? [];
+  const scope = scopeForAssociation.call(this) || Default.buildDefaultScope.call(this);
+  if (scope != null && scope !== false) {
+    return scope.extensions;
+  } else {
+    return [];
+  }
 }
 
 export const ClassMethods = {

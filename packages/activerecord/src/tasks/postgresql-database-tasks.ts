@@ -1,9 +1,10 @@
-import { isBlank, Tempfile } from "@blazetrails/activesupport";
+import { isBlank, kernelArray, Tempfile } from "@blazetrails/activesupport";
 import {
   File,
   FileUtils,
   getChildProcessAsync,
   getOsAsync,
+  rbEqq,
   type SpawnSyncResult,
 } from "@blazetrails/ruby-compat";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
@@ -72,23 +73,22 @@ export class PostgreSQLDatabaseTasks {
   async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
     let searchPath: string | undefined;
     if (dumpSchemas() === "schema_search_path") {
-      const raw = this.configurationHash.schemaSearchPath;
-      searchPath = typeof raw === "string" ? raw : undefined;
+      searchPath = this.configurationHash.schemaSearchPath as string | undefined;
     } else if (dumpSchemas() === "all") {
       searchPath = undefined;
     } else if (typeof dumpSchemas() === "string") {
       searchPath = dumpSchemas();
     }
 
-    const args = ["--schema-only", "--no-privileges", "--no-owner"];
+    let args = ["--schema-only", "--no-privileges", "--no-owner"];
     args.push("--file", filename);
 
-    if (extraFlags) {
-      args.push(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
-    }
+    if (extraFlags != null) args.push(...kernelArray(extraFlags));
 
     if (!isBlank(searchPath)) {
-      args.push(...(searchPath as string).split(",").map((part) => `--schema=${part.trim()}`));
+      args = args.concat(
+        (searchPath as string).split(",").map((part) => `--schema=${part.trim()}`),
+      );
     }
 
     const { SchemaDumper } = await import("../schema-dumper.js");
@@ -96,13 +96,9 @@ export class PostgreSQLDatabaseTasks {
     if (ignoreTables.length > 0) {
       const dataSources = await (await this.connection()).dataSources();
       ignoreTables = dataSources.filter((table) =>
-        ignoreTables.some((pattern) => {
-          if (!(pattern instanceof RegExp)) return pattern === table;
-          pattern.lastIndex = 0;
-          return pattern.test(table);
-        }),
+        ignoreTables.some((pattern) => rbEqq(pattern, table)),
       );
-      for (const table of ignoreTables) args.push("-T", table as string);
+      args = args.concat(ignoreTables.flatMap((table) => ["-T", table as string]));
     }
 
     args.push(this.dbConfig.database as string);

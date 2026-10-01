@@ -81,7 +81,9 @@ export class Scheme {
   }
 
   isSupportUnencryptedData(): boolean {
-    return this._supportUnencryptedData ?? Encryption.config.supportUnencryptedData;
+    return this._supportUnencryptedData == null
+      ? Encryption.config.supportUnencryptedData
+      : this._supportUnencryptedData;
   }
 
   isFixed(): boolean {

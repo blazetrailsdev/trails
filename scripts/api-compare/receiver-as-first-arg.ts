@@ -99,6 +99,11 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // active_support/core_ext/enumerable.rb:184-186 — `values.compact_blank`,
   // exported by @blazetrails/activesupport as `compactBlank(collection)`.
   "compact_blank",
+  // Ruby core `Enumerable#filter_map` — `schemes.filter_map { … }`
+  // (activerecord/lib/active_record/encryption/encryptable_record.rb:79). No
+  // JS method both filters and maps, so @blazetrails/activesupport exports it
+  // as `filterMap(collection, block)` and the receiver is TS argument 1.
+  "filter_map",
   // Ruby core `Array#empty?` / `Hash#empty?` / `String#empty?` — a language
   // built-in on the same receivers as `blank?` above, and the same shape: no
   // prototype to hang it on, so activerecord's `ruby-empty.ts` exports it as

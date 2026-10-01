@@ -182,8 +182,10 @@ export class AdapterSpecificRegistry {
     options?: { adapter?: string; override?: boolean },
     block?: (...args: unknown[]) => ValueType,
   ): void {
-    const factory = block ?? ((_symbol: unknown, ...args: unknown[]) => new klass!(...args));
-    this.registrations.push(new Registration(typeName, factory, options));
+    if (block == null) {
+      block = (_: unknown, ...args: unknown[]) => new klass!(...args);
+    }
+    this.registrations.push(new Registration(typeName, block, options));
   }
 
   lookup(symbol: string, ...args: unknown[]): ValueType {

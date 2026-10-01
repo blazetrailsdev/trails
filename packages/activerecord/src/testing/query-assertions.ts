@@ -60,7 +60,10 @@ export async function assertQueriesCount<T>(
         `${queries.length} instead of ${count} queries were executed. Queries: ${queries.join("\n\n")}`,
       );
     } else {
-      assert(queries.length >= 1, "1 or more queries expected, but none were executed.");
+      assert(
+        queries.length >= 1,
+        `1 or more queries expected, but none were executed.${queries.length === 0 ? "" : `\nQueries:\n${queries.join("\n")}`}`,
+      );
     }
     return result;
   });

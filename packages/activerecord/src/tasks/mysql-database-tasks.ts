@@ -1,4 +1,5 @@
-import { getChildProcessAsync, type SpawnSyncResult } from "@blazetrails/ruby-compat";
+import { getChildProcessAsync, rbEqq, type SpawnSyncResult } from "@blazetrails/ruby-compat";
+import { kernelArray } from "@blazetrails/activesupport";
 import type { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
@@ -49,29 +50,27 @@ export class MySQLDatabaseTasks {
   }
 
   async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
-    const args = this.prepareCommandOptions();
-    args.push("--result-file", filename, "--no-data", "--routines", "--skip-comments");
+    let args = this.prepareCommandOptions();
+    args.push("--result-file", `${filename}`);
+    args.push("--no-data");
+    args.push("--routines");
+    args.push("--skip-comments");
 
     const { SchemaDumper } = await import("../schema-dumper.js");
     let ignoreTables: (string | RegExp)[] = SchemaDumper.ignoreTables;
     if (ignoreTables.length > 0) {
       const dataSources = await (await this.connection()).dataSources();
       ignoreTables = dataSources.filter((table) =>
-        ignoreTables.some((pattern) => {
-          if (!(pattern instanceof RegExp)) return pattern === table;
-          pattern.lastIndex = 0;
-          return pattern.test(table);
-        }),
+        ignoreTables.some((pattern) => rbEqq(pattern, table)),
       );
-      for (const table of ignoreTables) {
-        args.push(`--ignore-table=${this.dbConfig.database as string}.${table as string}`);
-      }
+      args = args.concat(
+        ignoreTables.map((table) => `--ignore-table=${this.dbConfig.database}.${table}`),
+      );
     }
 
-    args.push(this.dbConfig.database as string);
-    if (extraFlags) {
-      args.unshift(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
-    }
+    args.push(String(this.dbConfig.database));
+    if (extraFlags != null) args.unshift(...kernelArray(extraFlags));
+
     await this.runCmd("mysqldump", args, "dumping");
   }
 
