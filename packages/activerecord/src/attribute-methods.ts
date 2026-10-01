@@ -123,6 +123,7 @@ export function accessedFields(this: AttributeRecord): string[] {
 export class GeneratedAttributeMethods extends Module {}
 
 export interface AttributeMethodsHost {
+  new (...args: never[]): unknown;
   name: string;
   _attributeMethodsGenerated?: boolean;
   _aliasAttributesMassGenerated?: boolean;
@@ -226,13 +227,13 @@ export function initializeGeneratedModules(this: AttributeMethodsHost): void {
     previous.removeMethod(...previous.instanceMethods());
   }
   this._generatedAttributeMethods = rbModConstSet(
-    this as unknown as new (...args: unknown[]) => unknown,
+    this,
     "GeneratedAttributeMethods",
     new GeneratedAttributeMethods(),
   );
   this._attributeMethodsGenerated = false;
   this._aliasAttributesMassGenerated = false;
-  include(this as unknown as new (...args: unknown[]) => unknown, this._generatedAttributeMethods);
+  include(this, this._generatedAttributeMethods);
   _coreInitializeGeneratedModules.call(
     this as unknown as ThisParameterType<typeof _coreInitializeGeneratedModules>,
   );
