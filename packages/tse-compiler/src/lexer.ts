@@ -117,6 +117,5 @@ export function tokenize(source: string, trim = true): Token[] {
   buf += source.slice(last);
   flush();
 
-  if (/<%(?!%)/.test(source.replace(TAG_RE, ""))) throw new TseSyntaxError("unterminated TSE tag");
   return tokens;
 }

@@ -165,6 +165,8 @@ const RSPEC_MAP: Record<string, CanonicalKind> = {
   expect_not_to_be_nil: "notNil",
   expect_to_be_falsey: "falsy",
   expect_to_be_empty: "empty",
+  expect_to_be_entered: "truthy",
+  expect_not_to_be_entered: "falsy",
   expect_to_include: "includes",
   expect_not_to_include: "excludes",
   expect_to_match: "match",

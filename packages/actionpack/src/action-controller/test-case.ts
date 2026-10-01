@@ -552,6 +552,7 @@ proto.createRoutes = routingAssertions.createRoutes;
 proto.resetRoutes = routingAssertions.resetRoutes;
 proto.recognizedRequestFor = routingAssertions.recognizedRequestFor;
 proto.failOn = routingAssertions.failOn;
+routingAssertions.spliceMethodMissing(proto);
 
 SetupAndTeardown.prepended(TestCase.prototype);
 

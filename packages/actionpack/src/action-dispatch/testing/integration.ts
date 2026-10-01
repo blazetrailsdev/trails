@@ -654,6 +654,7 @@ proto.saveAndOpenPage = pageDumpHelper.saveAndOpenPage;
 proto.savePage = pageDumpHelper.savePage;
 proto.openFile = pageDumpHelper.openFile;
 proto.htmlDumpDefaultPath = pageDumpHelper.htmlDumpDefaultPath;
+routingAssertions.spliceMethodMissing(proto);
 include(IntegrationTest, urlForMod.UrlFor);
 
 SetupAndTeardown.prepended(IntegrationTest.prototype);

@@ -25,3 +25,19 @@ describe("Integration::Session delegated readers (allow_nil: true)", () => {
     expect(session.request.host).toBe("rubyonrails.com");
   });
 });
+
+describe("RoutingAssertions#method_missing", () => {
+  it("forwards a named route helper to the controller, and nothing else", () => {
+    const test = new IntegrationTest() as IntegrationTest & {
+      itemsPath?(): string;
+      nope?: unknown;
+    };
+    test.routes.draw(function () {
+      this.get("/items", { to: "items#index", as: "items" });
+    });
+    expect(test.itemsPath).toBeUndefined();
+    test.controller = { itemsPath: () => "/items" } as unknown as IntegrationTest["controller"];
+    expect(test.itemsPath!()).toBe("/items");
+    expect(test.nope).toBeUndefined();
+  });
+});

@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import ts from "typescript-5";
+import { buildViews } from "./build-views.js";
 import { init } from "./lsp-plugin.js";
 
 function makeHost(files: Record<string, string>): ts.LanguageServiceHost {
@@ -76,4 +77,65 @@ describe("lspPluginInit", () => {
       path.join(root, "src/templates/x.html.tse"),
     ]);
   });
+
+  it("virtualizes a view with the scope pnpm build gave its shim", () => {
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-lsp-scope-"));
+    const write = (rel: string, body: string): void => {
+      fs.mkdirSync(path.dirname(path.join(cwd, rel)), { recursive: true });
+      fs.writeFileSync(path.join(cwd, rel), body);
+    };
+    write(
+      "node_modules/@blazetrails/actionview/package.json",
+      '{ "name": "@blazetrails/actionview", "types": "index.d.ts" }',
+    );
+    write(
+      "node_modules/@blazetrails/actionview/index.d.ts",
+      "export interface TemplateRegistry {}\nexport type TemplateLocals<T> = T;\nexport declare class Base {}",
+    );
+    write("app/models/post.ts", "export class Post { title = 0; }");
+    write(
+      "app/helpers/posts-helper.ts",
+      "export const PostsHelper = { readingTime(text: string): number { return text.length; } };",
+    );
+    const view = path.join(cwd, "app/views/posts/_post.html.tse");
+    write("app/views/posts/_post.html.tse", "<div>\n  <%= readingTime(post.title) %>\n</div>");
+    const options: ts.CompilerOptions = {
+      strict: true,
+      noEmit: true,
+      skipLibCheck: true,
+      allowNonTsExtensions: true,
+      moduleResolution: ts.ModuleResolutionKind.Bundler,
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ESNext,
+    };
+    const host: ts.LanguageServiceHost = {
+      getScriptFileNames: () => [view],
+      getScriptVersion: () => "1",
+      getScriptSnapshot: (f) =>
+        fs.existsSync(f) ? ts.ScriptSnapshot.fromString(fs.readFileSync(f, "utf8")) : undefined,
+      getCurrentDirectory: () => cwd,
+      getCompilationSettings: () => options,
+      getDefaultLibFileName: (o) => ts.getDefaultLibFilePath(o),
+      fileExists: (f) => fs.existsSync(f),
+      readFile: (f) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8") : undefined),
+    };
+    const position = (d: ts.Diagnostic) => [
+      d.code,
+      d.file!.getLineAndCharacterOfPosition(d.start!),
+    ];
+    init({ typescript: ts }).create({ ...baseInfo(host), project: host });
+    const service = ts.createLanguageService(host);
+    expect(service.getSemanticDiagnostics(view).map((d) => d.code)).toEqual([2304, 2304]);
+
+    buildViews({ cwd });
+    const shim = path.join(cwd, ".trails/views/posts/_post.html.tse.ts");
+    const built = ts.createProgram([shim], options);
+    const expected = built.getSemanticDiagnostics(built.getSourceFile(shim)).map(position);
+    expect(expected.map(([code]) => code)).toEqual([2345]);
+    host.getScriptVersion = () => "2";
+    expect(service.getSemanticDiagnostics(view).map(position)).toEqual(expected);
+    const text = host.readFile(view)!;
+    const completions = service.getCompletionsAtPosition(view, text.indexOf("post.title"), {});
+    expect(completions!.entries.map((e) => e.name)).toContain("readingTime");
+  }, 30_000);
 });

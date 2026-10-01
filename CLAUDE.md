@@ -1402,6 +1402,7 @@ the capability, in a different place. Each is decided here, and each but
 | `rails/railtie/configuration.rb`                      | Proxy                 |
 | `action_controller/metal/mime_responds.rb`            | Proxy                 |
 | `action_dispatch/http/mime_type.rb`                   | Proxy (`is…` names)   |
+| `action_dispatch/testing/assertions/routing.rb`       | Proxy (proto chain)   |
 
 A Proxy row whose Ruby class also defines `respond_to_missing?` forwards a
 name only when that predicate answers it (`broadcast_logger.rb:235-251`): a

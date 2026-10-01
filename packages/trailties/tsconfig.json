@@ -18,6 +18,7 @@
     { "path": "../globalid" },
     { "path": "../tse-compiler" },
     { "path": "../html-sanitizer" },
-    { "path": "../nokogiri" }
+    { "path": "../nokogiri" },
+    { "path": "../did-you-mean" }
   ]
 }

@@ -130,11 +130,13 @@ Object.defineProperty(InnerModuleController, "name", { value: "Admin::InnerModul
 const Admin = { InnerModuleController };
 
 describe("ActionPackAssertionsControllerTest", () => {
-  let tc: TestCase;
+  let tc: TestCase &
+    Pick<ActionPackAssertionsController, "routeTwoUrl"> &
+    Pick<InnerModuleController, "adminInnerModulePath" | "topLevelPath">;
   const assertRedirectedTo = (...args: Parameters<TestCase["assertRedirectedTo"]>): true =>
     tc.assertRedirectedTo(...args);
   beforeEach(async () => {
-    tc = new TestCase(ActionPackAssertionsController);
+    tc = new TestCase(ActionPackAssertionsController) as typeof tc;
     await tc.beforeSetup();
   });
 
@@ -202,7 +204,7 @@ describe("ActionPackAssertionsControllerTest", () => {
         assertRedirectedTo({ controller: "action_pack_assertions", action: "nothing", id: "two" });
       });
       await assertRaise([Assertion], {}, () => {
-        assertRedirectedTo((tc.controller as ActionPackAssertionsController).routeTwoUrl());
+        assertRedirectedTo(tc.routeTwoUrl());
       });
     });
   });
@@ -222,7 +224,7 @@ describe("ActionPackAssertionsControllerTest", () => {
         });
       });
       await tc.process("redirectToIndex");
-      assertRedirectedTo((tc.controller as InnerModuleController).adminInnerModulePath());
+      assertRedirectedTo(tc.adminInnerModulePath());
     });
   });
 
@@ -258,7 +260,7 @@ describe("ActionPackAssertionsControllerTest", () => {
         });
       });
       await tc.process("redirectToTopLevelNamedRoute");
-      assertRedirectedTo((tc.controller as InnerModuleController).topLevelPath("foo"));
+      assertRedirectedTo(tc.topLevelPath("foo"));
     });
   });
   it("assert redirect failure message with protocol relative url", async () => {

@@ -48,6 +48,7 @@
     "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/did-you-mean": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
     "@blazetrails/html-sanitizer": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
