@@ -100,6 +100,13 @@ export function hasKey(hash: object, key: PropertyKey): boolean {
   return Object.hasOwn(hash, key);
 }
 
+/**
+ * Ruby `Hash#include?` (`vendor/ruby/v3.3.11/hash.c:7255`), which MRI defines onto the
+ * same `rb_hash_has_key` body as `key?` and `has_key?`.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#include?` (`vendor/ruby/v3.3.11/hash.c:7255`).
+ */
+export const isInclude = hasKey;
+
 const ELLIPSIS = "...";
 
 /**

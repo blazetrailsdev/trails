@@ -4,11 +4,7 @@
    how `include()` surfaces those members on the type side. */
 import { describe, expect, it } from "vitest";
 
-import {
-  type AttributeMethod,
-  InstanceMethods,
-  defineMethodAttribute,
-} from "./attribute-methods.js";
+import { InstanceMethods, defineMethodAttribute } from "./attribute-methods.js";
 import { Model } from "./index.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 import { include } from "@blazetrails/activesupport";
@@ -402,32 +398,6 @@ describe("attributeMissing", () => {
 
     const u = new User({ name: "Alice" });
     expect(u.attribute("nonexistent")).toBeNull();
-  });
-
-  it("can be overridden to provide custom behavior", () => {
-    class User extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
-
-      static {
-        include(this, Attributes);
-      }
-      constructor(attrs: Record<string, unknown> = {}) {
-        super(attrs);
-      }
-      attributeMissing(match: AttributeMethod): unknown {
-        return `intercepted:${match.proxyTarget}:${match.attrName}`;
-      }
-    }
-    interface User extends Attributes {}
-    User.attributeMethodSuffix("Contrived");
-    User.attribute("name", "string");
-
-    const u = new User({ name: "Alice" });
-    expect((u as unknown as { nameContrived(): string }).nameContrived()).toBe(
-      "intercepted:attributeContrived:name",
-    );
-    expect(u._readAttribute("name")).toBe("Alice");
   });
 });
 

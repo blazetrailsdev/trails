@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { temporalTypeCast } from "./temporal-type-cast.js";
 
 function field(type: string, value: string | null) {
@@ -95,6 +96,41 @@ describe("temporalTypeCast", () => {
 
     it("delegates to next() for LONG", () => {
       expect(temporalTypeCast(field("LONG", "42"), next)).toBe("next-called");
+    });
+  });
+
+  describe("DECIMAL", () => {
+    it("casts a scaled NEWDECIMAL to BigDecimal", () => {
+      const result = temporalTypeCast(field("NEWDECIMAL", "1.10"), () => "1.10");
+      expect(result).toBeInstanceOf(BigDecimal);
+      expect((result as BigDecimal).toString()).toBe(new BigDecimal("1.10").toString());
+    });
+
+    it("casts a scale-0 NEWDECIMAL to an integer", () => {
+      expect(temporalTypeCast(field("NEWDECIMAL", "42"), () => "42")).toBe(42);
+      expect(temporalTypeCast(field("DECIMAL", "-7"), () => "-7")).toBe(-7);
+    });
+
+    it("keeps a scale-0 NEWDECIMAL beyond the safe range exact", () => {
+      expect(
+        temporalTypeCast(field("NEWDECIMAL", "9007199254740993"), () => "9007199254740993"),
+      ).toBe(9007199254740993n);
+    });
+
+    it("returns null for NULL", () => {
+      expect(temporalTypeCast(field("NEWDECIMAL", null), () => null)).toBeNull();
+    });
+  });
+
+  describe("LONGLONG", () => {
+    it("passes a safe-range value through as a number", () => {
+      expect(temporalTypeCast(field("LONGLONG", "42"), () => 42)).toBe(42);
+    });
+
+    it("casts the big-number string the driver returns to a bigint", () => {
+      expect(
+        temporalTypeCast(field("LONGLONG", "9007199254740993"), () => "9007199254740993"),
+      ).toBe(9007199254740993n);
     });
   });
 });

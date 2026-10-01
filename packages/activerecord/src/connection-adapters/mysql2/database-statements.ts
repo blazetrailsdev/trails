@@ -1,4 +1,3 @@
-import type { ValueType } from "@blazetrails/activemodel";
 import type mysql from "mysql2/promise";
 import { Result } from "../../result.js";
 import { combineMultiStatements, type MaxAllowedPacketHost } from "../mysql/database-statements.js";
@@ -16,35 +15,14 @@ export interface DatabaseStatementsHost {
 }
 
 /** @internal */
-export interface Mysql2FieldDescriptor {
-  name: string;
-  type?: number;
-  columnType?: number;
-  decimals?: number;
-}
-
-/** @internal */
 export interface Mysql2RawResult {
   rows: unknown[][] | null;
-  fields: Mysql2FieldDescriptor[];
+  fields: string[];
+  toA(): unknown[][];
   affectedRows: number;
   insertId?: number;
   _arStmtToClose?: { close(): void };
 }
-
-/** @internal */
-const MYSQL_NUMERIC_FIELD_SQL_TYPE: Readonly<Record<number, string>> = {
-  0: "decimal",
-  246: "decimal",
-  4: "float",
-  5: "double",
-  1: "tinyint",
-  2: "smallint",
-  9: "mediumint",
-  3: "int",
-  8: "bigint",
-  13: "year",
-};
 
 /** @internal */
 interface PerformQueryHost {
@@ -230,12 +208,12 @@ export async function performQuery(
     result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
   }
   let rows: unknown[][] | null = null;
-  let fieldList: Mysql2FieldDescriptor[] = [];
+  let fieldList: string[] = [];
   let affectedRows = 0;
   let insertId: number | undefined;
   if (Array.isArray(result)) {
     rows = result as unknown[][];
-    fieldList = (fields ?? []) as unknown as Mysql2FieldDescriptor[];
+    fieldList = (fields ?? []).map((field) => field.name);
     affectedRows = rows.length;
   } else {
     affectedRows = result.affectedRows ?? 0;
@@ -253,14 +231,18 @@ export async function performQuery(
   this.verified?.();
   await this.handleWarnings?.(sql);
 
-  return { rows, fields: fieldList, affectedRows, insertId, _arStmtToClose: stmtToClose };
+  return {
+    rows,
+    fields: fieldList,
+    toA: () => rows ?? [],
+    affectedRows,
+    insertId,
+    _arStmtToClose: stmtToClose,
+  };
 }
 
 /** @internal */
-export function castResult(
-  this: { lookupCastType(sqlType: string): ValueType },
-  rawResult: Mysql2RawResult,
-): Result {
+export function castResult(rawResult: Mysql2RawResult): Result {
   if (rawResult.rows == null) return Result.empty();
 
   const fields = rawResult.fields;
@@ -269,26 +251,7 @@ export function castResult(
   if (fields.length === 0) {
     result = Result.empty();
   } else {
-    let columnTypes: Record<string | number, ValueType> | null = null;
-    for (let i = 0; i < fields.length; i++) {
-      const f = fields[i];
-      const code = f.columnType ?? f.type;
-      if (code == null) continue;
-      let sqlType = MYSQL_NUMERIC_FIELD_SQL_TYPE[code];
-      if (sqlType == null) continue;
-      if (sqlType === "decimal" && typeof f.decimals === "number" && f.decimals > 0) {
-        sqlType = `decimal(65,${f.decimals})`;
-      }
-      const type = this.lookupCastType(sqlType);
-      columnTypes ??= {};
-      columnTypes[i] = type;
-      if (!/^\d+$/.test(f.name)) columnTypes[f.name] = type;
-    }
-    result = new Result(
-      fields.map((f) => f.name),
-      rawResult.rows,
-      columnTypes,
-    );
+    result = new Result(fields, rawResult.toA());
   }
 
   freeRawResult(rawResult);

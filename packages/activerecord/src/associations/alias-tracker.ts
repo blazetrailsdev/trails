@@ -1,4 +1,5 @@
 import { ArgumentError } from "@blazetrails/activesupport";
+import { Hash } from "@blazetrails/ruby-compat";
 import { Table, Nodes } from "@blazetrails/arel";
 import { maxIdentifierLength } from "../connection-adapters/abstract/database-limits.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting.js";
@@ -34,28 +35,12 @@ export function aliasedArelTableForReflection(
   return aliasedArelTableFor(klass, tableName, effectiveName);
 }
 
-/** @noRailsEquivalent PERMANENT */
-export class AliasCounts extends Map<string, number> {
-  /** @noRailsEquivalent PERMANENT */
-  defaultProc: (h: AliasCounts, k: string) => number;
-
-  constructor(defaultProc: (h: AliasCounts, k: string) => number) {
-    super();
-    this.defaultProc = defaultProc;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  override get(key: string): number {
-    return super.has(key) ? super.get(key)! : this.defaultProc(this, key);
-  }
-}
-
 export class AliasTracker {
-  readonly aliases: AliasCounts;
+  readonly aliases: Hash<string, number>;
   private _tableAliasLength: number;
 
-  constructor(tableAliasLength?: number, aliases?: AliasCounts) {
-    this.aliases = aliases ?? new AliasCounts(() => 0);
+  constructor(tableAliasLength?: number, aliases?: Hash<string, number>) {
+    this.aliases = aliases ?? new Hash<string, number>(0);
     this._tableAliasLength = tableAliasLength ?? DEFAULT_TABLE_ALIAS_LENGTH;
   }
 
@@ -63,20 +48,20 @@ export class AliasTracker {
     pool: any,
     initialTable: string,
     joins: any[],
-    aliases?: AliasCounts,
+    aliases?: Hash<string, number>,
   ): AliasTracker {
     const block = (connection: any): AliasTracker => {
       if (joins.length === 0) {
-        aliases ??= new AliasCounts(() => 0);
+        aliases ??= new Hash<string, number>(0);
       } else if (aliases) {
-        const defaultProc = aliases.defaultProc;
-        aliases.defaultProc = (h, k) => {
+        const defaultProc = aliases.defaultProc() ?? (() => 0);
+        aliases.setDefaultProc((h, k) => {
           const count = AliasTracker.initialCountFor(connection, k, joins) + defaultProc(h, k);
           h.set(k, count);
           return count;
-        };
+        });
       } else {
-        aliases = new AliasCounts((h, k) => {
+        aliases = new Hash<string, number>((h, k) => {
           const count = AliasTracker.initialCountFor(connection, k, joins);
           h.set(k, count);
           return count;
@@ -135,7 +120,7 @@ export class AliasTracker {
     } else {
       let aliasedName = this.tableAliasFor(block());
 
-      const count = this.aliases.get(aliasedName) + 1;
+      const count = this.aliases.get(aliasedName)! + 1;
       this.aliases.set(aliasedName, count);
 
       if (count > 1) aliasedName = `${this.truncate(aliasedName)}_${count}`;

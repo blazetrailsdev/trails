@@ -79,7 +79,8 @@ import {
   DeferredIdsIn,
   DeferredIdsNotIn,
 } from "./relation/predicate-builder/deferred-distinct-pk-in.js";
-import { AliasCounts, AliasTracker } from "./associations/alias-tracker.js";
+import { AliasTracker } from "./associations/alias-tracker.js";
+import type { Hash } from "@blazetrails/ruby-compat";
 
 export type LoadedRelation<R> = Omit<R, "then">;
 
@@ -1536,7 +1537,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this.limitValue !== null || this.offsetValue !== null;
   }
 
-  aliasTracker(joins: Nodes.Node[] = [], aliases?: AliasCounts): AliasTracker {
+  aliasTracker(joins: Nodes.Node[] = [], aliases?: Hash<string, number>): AliasTracker {
     return AliasTracker.create(
       this.model.connectionPool(),
       String(this.table.name),
