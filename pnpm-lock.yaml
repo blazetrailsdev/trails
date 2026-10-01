@@ -177,10 +177,6 @@ importers:
       ua-parser-js:
         specifier: ^2.0.9
         version: 2.0.9
-    devDependencies:
-      '@blazetrails/trailties':
-        specifier: workspace:*
-        version: link:../trailties
 
   packages/actionview:
     dependencies:

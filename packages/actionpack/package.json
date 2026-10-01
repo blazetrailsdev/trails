@@ -20,9 +20,6 @@
       "optional": true
     }
   },
-  "devDependencies": {
-    "@blazetrails/trailties": "workspace:*"
-  },
   "dependencies": {
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
