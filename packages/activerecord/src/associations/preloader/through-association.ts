@@ -61,14 +61,7 @@ export class ThroughAssociation extends Association {
         const preloadIndex = await this.preloadIndex();
         records.sort((a, b) => (preloadIndex.get(a) ?? 0) - (preloadIndex.get(b) ?? 0));
       }
-      if (this.scope?.distinctValue) {
-        const seen = new Set<Base>();
-        records = records.filter((rhs) => {
-          if (seen.has(rhs)) return false;
-          seen.add(rhs);
-          return true;
-        });
-      }
+      if (this.scope.distinctValue) records = uniq(records);
       result.set(owner, records);
     }
 
@@ -106,12 +99,7 @@ export class ThroughAssociation extends Association {
       for (const loader of await this.sourcePreloaders()) {
         sourceClasses.push(...(await loader.futureClasses()));
       }
-      const seen = new Set<typeof Base>();
-      return sourceClasses.filter((k) => {
-        if (seen.has(k)) return false;
-        seen.add(k);
-        return true;
-      });
+      return uniq(sourceClasses);
     }
 
     const throughClasses: (typeof Base)[] = [];

@@ -200,13 +200,55 @@ import { isStdlibMixinGap, stdlibMixinRows } from "./stdlib-mixin-surface.js";
  * an Enumerator and iterates nothing itself; the chained iterator carries the loop.
  */
 function isEnumeratorReceiver(name: string, next: string | undefined): boolean {
-  const isPlainLoop = (n: string) =>
-    SKELETON_IDIOM_LOWERINGS.get(n)
-      ?.map((l) => l.join(" "))
-      .join() === "loop";
   if (!isPlainLoop(name) || next?.startsWith("ref:") !== true) return false;
   const chained = next.slice("ref:".length);
+  if (name === "each_with_index" && INDEXED_ENUMERATOR_CONSUMERS.has(chained)) return true;
   return SKELETON_IDIOM_LOWERINGS.has(chained) && !isPlainLoop(chained);
+}
+
+function isPlainLoop(name: string): boolean {
+  return (
+    SKELETON_IDIOM_LOWERINGS.get(name)
+      ?.map((l) => l.join(" "))
+      .join() === "loop"
+  );
+}
+
+/**
+ * The call-keeping iterators a blockless `each_with_index` is chained into:
+ * `join_root.each_with_index.map { |join_part, i| … }`
+ * (activerecord/lib/active_record/associations/join_dependency.rb:169) is
+ * `[...joinRoot].map((joinPart, i) => …)`, whose callback already receives the
+ * index, so the Enumerator stands for no loop of its own.
+ */
+const INDEXED_ENUMERATOR_CONSUMERS = new Set(["map", "flat_map", "select", "reject", "to_a"]);
+
+/**
+ * The control tokens `counterpart` shows BEYOND the ones the Ruby stream
+ * already accounts for by itself: its literal arms and the reaches with a
+ * single lowering. Only this surplus can be the port's spelling of an idiom
+ * with alternative lowerings, so `ids.compact.uniq` beside two Ruby `if`s
+ * (activerecord/lib/active_record/associations/collection_association.rb:521-531)
+ * is credited nothing against a port showing exactly those two `if`s.
+ */
+function idiomSurplus(skeleton: readonly string[], counterpart: readonly string[]): string[] {
+  const surplus = [...counterpart];
+  const spend = (token: string) => {
+    const at = surplus.indexOf(token);
+    if (at !== -1) surplus.splice(at, 1);
+  };
+  for (const [index, token] of skeleton.entries()) {
+    if (!token.startsWith("ref:")) {
+      spend(token);
+      continue;
+    }
+    const name = token.slice("ref:".length);
+    if (isEnumeratorReceiver(name, skeleton[index + 1])) continue;
+    if (name === JS_ITERATION_CALLEE) spend("loop");
+    const alternatives = SKELETON_IDIOM_LOWERINGS.get(name);
+    if (alternatives?.length === 1) alternatives[0].forEach(spend);
+  }
+  return surplus;
 }
 
 // The significant set (RFC 0047): admits EVERY ported Ruby call name as
@@ -459,6 +501,8 @@ export function foldSkeletonTokens(
   counterpart?: readonly string[],
 ): string[] {
   const folded: string[] = [];
+  const surplus =
+    side === "ruby" && counterpart !== undefined ? idiomSurplus(skeleton, counterpart) : undefined;
   for (const [index, token] of skeleton.entries()) {
     if (!token.startsWith("ref:")) {
       folded.push(token);
@@ -470,9 +514,13 @@ export function foldSkeletonTokens(
       folded.push("loop");
       continue;
     }
-    const lowering = side === "ruby" ? skeletonIdiomLowering(name, counterpart) : undefined;
+    const lowering = side === "ruby" ? skeletonIdiomLowering(name, surplus) : undefined;
     if (lowering !== undefined) {
       folded.push(...lowering);
+      for (const spent of lowering) {
+        const at = surplus?.indexOf(spent) ?? -1;
+        if (at !== -1) surplus!.splice(at, 1);
+      }
       continue;
     }
     const tsConstruct = side === "ts" ? TS_CONSTRUCT_SKELETON_NAMES.get(name) : undefined;

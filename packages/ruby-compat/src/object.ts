@@ -1,5 +1,5 @@
 import { stringInspect } from "./string/inspect.js";
-import { isSymbol } from "./symbol.js";
+import { isSymbol, stringToSym } from "./symbol.js";
 import { rubyClass, type Comparable } from "./comparable.js";
 import { TypeError } from "./type-error.js";
 import { NameError } from "./name-error.js";
@@ -319,6 +319,28 @@ export function rbModPublicMethodDefined(mod: { prototype: object }, mid: string
  */
 export function rbFPublicSend(recv: unknown, mid: string, ...args: unknown[]): unknown {
   return sendInternal(args.length, [mid, ...args], recv);
+}
+
+/**
+ * Ruby's `obj.to_sym` send: `String#to_sym` (`rb_str_intern`,
+ * `vendor/ruby/v3.3.11/symbol.c:862`, bound at `vendor/ruby/v3.3.11/string.c:12212`)
+ * and `Symbol#to_sym` (`vendor/ruby/v3.3.11/symbol.rb:8`). A JS string spells
+ * both receivers and answers the Symbol's colon spelling (`":name"`); no other
+ * core receiver defines `to_sym`, so the send raises `NoMethodError`.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby method send, which JS has no receiver
+ * for on a primitive.
+ */
+export function toSym(obj: unknown): string {
+  if (typeof obj === "string") return stringToSym(obj);
+  if (obj == null) throw new NoMethodError("undefined method 'to_sym' for nil", "to_sym");
+  throw new NoMethodError(
+    `undefined method 'to_sym' for an instance of ${rbObjClass(obj)}`,
+    "to_sym",
+    [],
+    false,
+    { receiver: obj },
+  );
 }
 
 /**

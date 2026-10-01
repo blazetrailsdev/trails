@@ -9,6 +9,7 @@ import {
   rbObjRespondTo,
   rbFPublicSend,
   rbFSend,
+  toSym,
   rbModPublicMethodDefined,
   rbDeclareIvar,
   rbObjInstanceVariables,
@@ -384,5 +385,18 @@ describe("rb_obj_class over trails' date and hash seats", () => {
     expect(rbObjClass(Object.create(Object.create(null)))).toBe("Hash");
     expect(rbObjClass(Object.create({ constructor: Klass }))).toBe("Hash");
     expect(rbObjClass(new Klass())).toBe("Klass");
+  });
+});
+
+describe("toSym", () => {
+  it("answers the Symbol spelling of a JS string, which spells both a String and a Symbol", () => {
+    expect(toSym("posts")).toBe(":posts");
+    expect(toSym(":posts")).toBe(":posts");
+  });
+
+  it("raises NoMethodError for a receiver that defines no to_sym", () => {
+    expect(() => toSym(1)).toThrow(NoMethodError);
+    expect(() => toSym(1)).toThrow("undefined method 'to_sym' for an instance of Integer");
+    expect(() => toSym(null)).toThrow("undefined method 'to_sym' for nil");
   });
 });

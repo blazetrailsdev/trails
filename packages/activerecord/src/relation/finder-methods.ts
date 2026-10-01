@@ -491,7 +491,6 @@ export function usingLimitableReflections(
 /**
  * @internal
  * @missingRailsCall first — PERMANENT
- * @missingRailsArgs uniq — PERMANENT
  */
 export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Promise<any> {
   if (this.primaryKey == null) throw new UnknownPrimaryKey(this.model as any);

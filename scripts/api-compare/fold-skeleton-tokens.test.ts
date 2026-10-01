@@ -136,14 +136,43 @@ describe("sameFileHelperSkeletons", () => {
     expect(foldSkeletonTokens(["ref:concat"], "ruby", ["loop", "ref:push"])).toEqual(["loop"]);
   });
 
-  it("cannot hide an if the TS side dropped: the folded Ruby stream still runs one over", () => {
+  it("cannot hide an if the TS side dropped: the two folded streams still disagree", () => {
     const ruby = foldSkeletonTokens(["ref:filter_map", "if", "ref:save"], "ruby", [
       "loop",
       "if",
       "ref:save",
     ]);
     const ts = foldSkeletonTokens(["loop", "if", "ref:save"], "ts");
-    expect(ruby.filter((t) => t === "if")).toHaveLength(2);
-    expect(ts.filter((t) => t === "if")).toHaveLength(1);
+    expect(ruby).not.toEqual(ts);
+  });
+
+  it("credits an idiom only the control tokens the Ruby stream does not already claim", () => {
+    const ts = ["ref:isArray", "ref:filter", "if", "ref:find", "if", "ref:filter"];
+    expect(
+      foldSkeletonTokens(["ref:compact", "ref:uniq", "if", "ref:detect", "if"], "ruby", ts),
+    ).toEqual(["if", "ref:detect", "if"]);
+    expect(foldSkeletonTokens(["ref:uniq", "ref:uniq"], "ruby", ["if"])).toEqual(["if"]);
+    expect(
+      foldSkeletonTokens(["ref:each", "ref:save", "ref:delete_if"], "ruby", ["loop", "if"]),
+    ).toEqual(["loop", "ref:save"]);
+  });
+
+  it("folds a TS `each` call onto the loop Ruby's `each` folds onto", () => {
+    expect(foldSkeletonTokens(["ref:join_root", "ref:each"])).toEqual(["ref:join_root", "loop"]);
+    expect(foldSkeletonTokens(["ref:joinRoot", "ref:each"], "ts")).toEqual([
+      "ref:joinRoot",
+      "loop",
+    ]);
+  });
+
+  it("reads a blockless each_with_index chained into map as no loop of its own", () => {
+    expect(foldSkeletonTokens(["ref:each_with_index", "ref:map", "new:Column"], "ruby")).toEqual([
+      "ref:map",
+      "new:Column",
+    ]);
+    expect(foldSkeletonTokens(["ref:each_with_index", "ref:save"], "ruby")).toEqual([
+      "loop",
+      "ref:save",
+    ]);
   });
 });
