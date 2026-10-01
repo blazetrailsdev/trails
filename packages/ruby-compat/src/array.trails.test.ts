@@ -153,6 +153,12 @@ describe("String#unpack1", () => {
     expect(unpack1("\x00\x00\x00\x80", "l<")).toBe(-2147483648);
   });
 
+  it("reads h as hex digits, low nibble first", () => {
+    expect(unpack1("a", "h*")).toBe("16");
+    expect(unpack1("\xc3\xa9(", "h*")).toBe("3c9a82");
+    expect(unpack1("ab", "h3")).toBe("162");
+  });
+
   it("answers nil when the string is short of an item's bytes", () => {
     expect(unpack1("ab", "@2l<")).toBeNull();
     expect(unpack1("", "E")).toBeNull();

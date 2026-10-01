@@ -1,10 +1,12 @@
 import {
+  b,
   basicObjRespondTo,
   block,
   fetch,
   hasKey,
   isInclude,
   rbFSend,
+  unpack1,
 } from "@blazetrails/ruby-compat";
 import {
   camelize,
@@ -51,9 +53,7 @@ export namespace AttrNames {
     if (/^[\x00-\x7f]*$/.test(attrName) && DEF_SAFE_NAME.test(attrName)) {
       block(methodName, `'${attrName}'`);
     } else {
-      const safeName = Array.from(attrName)
-        .map((c) => c.charCodeAt(0).toString(16).padStart(2, "0"))
-        .join("");
+      const safeName = unpack1(b(attrName), "h*");
       const constName = `ATTR_${safeName}`;
       const tempMethodName = `__temp__${safeName}${writer ? "=" : ""}`;
       const attrNameExpr = `::ActiveModel::AttributeMethods::AttrNames::${constName}`;
@@ -424,10 +424,7 @@ export const ClassMethods = {
   /** @internal */
   buildMangledName(name: string): string {
     if (NAME_COMPILABLE_REGEXP.test(name)) return name;
-    const hex = Array.from(name)
-      .map((c) => c.charCodeAt(0).toString(16).padStart(2, "0"))
-      .join("");
-    return `__temp__${hex}`;
+    return `__temp__${unpack1(b(name), "h*")}`;
   },
 
   /** @internal */

@@ -441,10 +441,29 @@ describe("AttrNames.defineAttributeAccessorMethod (attribute_methods.rb:577-589)
 
   it("yields a __temp__ name and a constant reference for any other name", () => {
     const [reader, expr] = yielded("my_column(omg)", false);
-    expect(reader).toMatch(/^__temp__[0-9a-f]+$/);
+    expect(reader).toBe("__temp__d697f536f6c657d6e682f6d67692");
     expect(expr).toBe(
       `::ActiveModel::AttributeMethods::AttrNames::ATTR_${reader.slice("__temp__".length)}`,
     );
     expect(yielded("my_column(omg)", true)[0]).toBe(`${reader}=`);
+  });
+
+  it("generates a working reader and writer for a name that is not def-safe", () => {
+    class Odd extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        this.attribute("foo-bar", "string");
+        this.attribute("\u00e9", "integer");
+      }
+    }
+    const odd = new Odd({ "foo-bar": "a" }) as unknown as Record<string, unknown>;
+
+    expect(odd["foo-bar"]).toBe("a");
+    odd["foo-bar"] = "b";
+    odd["\u00e9"] = "7";
+    expect(odd["foo-bar"]).toBe("b");
+    expect(odd["\u00e9"]).toBe(7);
   });
 });
