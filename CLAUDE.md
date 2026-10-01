@@ -1139,7 +1139,11 @@ As a consequence:
   `PERMANENT-SKIP:` line citing this section.
 - Code whose Rails body branches on visibility (Thor's `public_method?` /
   `private_method?` deciding what is a command) needs an explicit mechanism
-  decided per class, not a general visibility table.
+  decided per class, not a general visibility table. Until one is decided the
+  branch reads "defined": `Mapping#build_conditions`' `public_method_defined?`
+  (`action_dispatch/routing/mapper.rb:198-204`) keeps a constraint named after a
+  private `Request` method, filed as
+  `mapper-build-conditions-keeps-request-private-method-constraints`.
 - `defineModule`'s section record (`ruby-compat/src/include.ts`), read by
   `publicInstanceMethods`, is such a mechanism and stays. It is read once at
   load, where a Rails body enumerates `public_instance_methods`

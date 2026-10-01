@@ -309,4 +309,14 @@ describe("Mapper::Mapping#build_conditions", () => {
     expect(Object.keys(route.conditions)).toContain("ip");
     expect(Object.keys(route.conditions)).not.toContain("hasOwnProperty");
   });
+
+  it("keeps a constraint naming a Rails-private Request method", () => {
+    const set = new RouteSet();
+    new Mapper(set).get("/foo", {
+      to: "posts#index",
+      constraints: { checkMethod: "GET" },
+    });
+    const [route] = set.routes.routes;
+    expect(Object.keys(route.conditions)).toContain("checkMethod");
+  });
 });
