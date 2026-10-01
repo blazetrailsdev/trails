@@ -318,6 +318,7 @@ function analyzeTsDepUsage(
 
   const checker = program.getTypeChecker();
   const knownIds = new Set(tsIdentifiers);
+  const depRoot = path.dirname(packageSrcDir(dep)) + path.sep;
   const { tainted: taintedSymbols, taintedRefs } = collectTaintedSymbols(
     program,
     pkgSrcDir,
@@ -347,7 +348,7 @@ function analyzeTsDepUsage(
         dep,
         sourceFile,
         anchor,
-        { checker, taintedSymbols, taintedRefs },
+        { checker, taintedSymbols, taintedRefs, depRoot },
         refs,
         aliasMap,
       );
@@ -454,6 +455,8 @@ export interface TransitiveContext {
   checker: ts.TypeChecker;
   taintedSymbols: Set<ts.Symbol>;
   taintedRefs?: Map<ts.Symbol, Set<string>>;
+  /** The dep package's directory; a module function declared outside it earns no module ref. */
+  depRoot?: string;
   // Suppresses lint-deps-ignore detection. Used during taint
   // computation so an opt-out helper doesn't spuriously taint callers.
   skipIgnoreAnnotation?: boolean;
@@ -506,7 +509,7 @@ export function methodUsesDepImport(
               found = true;
               recordRef(n.text);
               if (collectRefs && transitive && importedNames.has(n.text)) {
-                const owner = moduleFunctionOwner(n, transitive.checker);
+                const owner = moduleFunctionOwner(n, transitive.checker, transitive.depRoot);
                 if (owner) collectRefs.add(owner);
               }
               if (!collectRefs) return;
@@ -551,9 +554,14 @@ export function methodUsesDepImport(
  * (activerecord/lib/arel/nodes/homogeneous_in.rb:51) extracts the dep ref
  * `Type`. The port is a top-level function of the file mirroring that module
  * (activemodel/src/type.ts's `defaultValue`), imported by its bare name, so
- * its module is the declaring file's basename.
+ * its module is the declaring file's basename. With `depRoot`, a function
+ * declared outside that package directory has no module there and answers null.
  */
-export function moduleFunctionOwner(id: ts.Identifier, checker: ts.TypeChecker): string | null {
+export function moduleFunctionOwner(
+  id: ts.Identifier,
+  checker: ts.TypeChecker,
+  depRoot?: string,
+): string | null {
   const sym = checker.getSymbolAtLocation(id);
   if (!sym) return null;
   const resolved = sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym;
@@ -565,6 +573,7 @@ export function moduleFunctionOwner(id: ts.Identifier, checker: ts.TypeChecker):
       ts.isSourceFile(decl.parent.parent.parent)
     : ts.isFunctionDeclaration(decl) && ts.isSourceFile(decl.parent);
   if (!isFunction) return null;
+  if (depRoot !== undefined && !decl.getSourceFile().fileName.startsWith(depRoot)) return null;
   return path
     .basename(decl.getSourceFile().fileName)
     .replace(/(\.d)?\.ts$/, "")

@@ -427,7 +427,11 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
       ts.forEachChild(n, find);
     };
     find(consumerSf);
-    const collect = (transitive?: { checker: ts.TypeChecker; taintedSymbols: Set<ts.Symbol> }) => {
+    const collect = (transitive?: {
+      checker: ts.TypeChecker;
+      taintedSymbols: Set<ts.Symbol>;
+      depRoot?: string;
+    }) => {
       const refs = new Set<string>();
       methodUsesDepImport(
         method!,
@@ -448,6 +452,17 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
       "fromHash",
     ]);
     expect(collect()).toEqual(["Builder", "aliased", "fromHash"]);
+    const checker = program.getTypeChecker();
+    expect(collect({ checker, taintedSymbols: new Set(), depRoot: dir + path.sep })).toContain(
+      "attributeset",
+    );
+    expect(
+      collect({
+        checker,
+        taintedSymbols: new Set(),
+        depRoot: path.join(dir, "elsewhere") + path.sep,
+      }),
+    ).toEqual(["Builder", "aliased", "fromHash"]);
   });
 
   it("credits a method that calls a same-package wrapper of the dep", () => {
