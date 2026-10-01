@@ -337,6 +337,17 @@ describe("virtualizeTse", () => {
       expect(diagnose(virtualizeTse("<%= readingTime(this.posts.length) %>", scope))).toEqual([]);
     });
 
+    it("keeps every overload of a this-typed helper callable bare", () => {
+      const overloaded = {
+        view: "{ tag(this: { x: 1 }, name: string): string; tag(this: { x: 1 }, count: number, sep: boolean): number }",
+      };
+      const out = virtualizeTse('<%= tag("p").length %><%= tag(2, true).toFixed() %>', overloaded);
+      expect(diagnose(out)).toEqual([]);
+      expect(diagnose(virtualizeTse("<%= tag(2) %>", overloaded))).not.toEqual([]);
+      const single = diagnose(virtualizeTse("<%= readingTime(post.title) %>", scope)).join("\n");
+      expect(single).not.toMatch(/No overload matches this call/);
+    });
+
     it("leaves an unknown name `any` without strict locals and `never` with them", () => {
       expect(diagnose(virtualizeTse("<%= mystery.anything() %>", scope))).toEqual([]);
       const strict = virtualizeTse("<%# locals: () %><%= mystery.anything() %>", scope);

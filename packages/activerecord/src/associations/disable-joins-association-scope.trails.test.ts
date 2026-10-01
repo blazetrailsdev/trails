@@ -4,6 +4,7 @@ import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
+import { Relation } from "../relation.js";
 import { fixtures } from "../test-fixtures.js";
 
 describe("DisableJoinsAssociationScope", () => {
@@ -110,8 +111,9 @@ describe("DisableJoinsAssociationScope", () => {
       owner: author,
       reflection,
       klass: reflection.klass,
-    }) as DisableJoinsAssociationRelation<Base>;
-    expect(built).toBeInstanceOf(DisableJoinsAssociationRelation);
+    }) as Relation<Base>;
+    expect(built).toBeInstanceOf(Relation);
+    expect(built).not.toBeInstanceOf(DisableJoinsAssociationRelation);
 
     const records = await built;
     expect(records.map((r: any) => r.body).sort()).toEqual(["c1", "c2"]);
@@ -248,15 +250,8 @@ describe("DisableJoinsAssociationScope", () => {
     expect(viaToArray.isLoaded).toBe(true);
   });
   it("a malformed composite join id raises the predicate builder's Array expectation", () => {
-    const reflection = { klass: DjsPost, buildScope: () => DjsPost.all(), constraints: () => [] };
-    expect(() =>
-      (DisableJoinsAssociationScope.create() as any)._addConstraintsDj(
-        reflection,
-        ["djs_author_id", "title"],
-        [1],
-        null,
-        false,
-      ),
-    ).toThrow('Expected corresponding value for ["djs_author_id", "title"] to be an Array');
+    expect(() => DjsPost.where(new Map([[["djs_author_id", "title"], [1]]]))).toThrow(
+      'Expected corresponding value for ["djs_author_id", "title"] to be an Array',
+    );
   });
 });

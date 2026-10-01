@@ -43,7 +43,8 @@ describe("RateLimitingTest", () => {
   beforeEach(async () => {
     vi.useFakeTimers();
     (RateLimitedController as unknown as CacheStoreHost).cacheStore.clear();
-    tc = new TestCase(RateLimitedController);
+    tc = new TestCase();
+    tc.controller = new RateLimitedController();
     await tc.beforeSetup();
   });
 

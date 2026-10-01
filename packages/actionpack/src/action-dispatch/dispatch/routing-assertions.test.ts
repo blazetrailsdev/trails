@@ -461,8 +461,8 @@ function WithRoutingSharedTests(klass: HostClass, t: () => Host): void {
 
 describe("RoutingAssertionsControllerTest", () => {
   class RoutingAssertionsControllerTest extends TestCase {
-    constructor() {
-      super(ArticlesController);
+    static {
+      this.tests(ArticlesController);
     }
   }
   RoutingAssertionsSharedTests(
@@ -472,8 +472,8 @@ describe("RoutingAssertionsControllerTest", () => {
 
   describe("WithRoutingTest", () => {
     class WithRoutingTest extends TestCase {
-      constructor() {
-        super(SecureArticlesController);
+      static {
+        this.tests(SecureArticlesController);
       }
     }
     const t = runTest(WithRoutingTest);

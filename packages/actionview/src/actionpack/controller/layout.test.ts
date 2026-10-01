@@ -87,7 +87,9 @@ describe("LayoutAutoDiscoveryTest", () => {
 
   test("third party template library auto discovers layout", async () => {
     await withTemplateHandler("mab", mab, async () => {
-      testCase = new ActionController.TestCase(ThirdPartyTemplateLibraryController);
+      testCase = new ActionController.TestCase();
+      testCase.controller = new ThirdPartyTemplateLibraryController();
+      await testCase.beforeSetup();
       testCase.routes = SharedTestRoutes;
       await testCase.get("hello");
       assertResponse("success");
@@ -254,7 +256,9 @@ class LayoutStatusIsRendered extends LayoutTest {
 
 describe("LayoutStatusIsRenderedTest", () => {
   test("layout status is rendered", async () => {
-    testCase = new ActionController.TestCase(LayoutStatusIsRendered);
+    testCase = new ActionController.TestCase();
+    testCase.controller = new LayoutStatusIsRendered();
+    await testCase.beforeSetup();
     testCase.routes = SharedTestRoutes;
     await testCase.get("hello");
     assertResponse(401);
@@ -269,7 +273,9 @@ class LayoutSymlinkedTest extends LayoutTest {
 
 describe("LayoutSymlinkedIsRenderedTest", () => {
   test("symlinked layout is rendered", async () => {
-    testCase = new ActionController.TestCase(LayoutSymlinkedTest);
+    testCase = new ActionController.TestCase();
+    testCase.controller = new LayoutSymlinkedTest();
+    await testCase.beforeSetup();
     testCase.routes = SharedTestRoutes;
     await testCase.get("hello");
     assertResponse(200);

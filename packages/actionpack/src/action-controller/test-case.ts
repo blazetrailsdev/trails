@@ -95,10 +95,10 @@ export interface RequestOptions {
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Test::Utils` (`actionpack/lib/action_controller/test_case.rb:152`); the class/interface merge is how a mixin surfaces on the type side. */
-interface Encoder extends Included<typeof RackTestUtils> {}
+export interface Encoder extends Included<typeof RackTestUtils> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
-class Encoder {
+export class Encoder {
   shouldMultipart(params: Record<string, unknown>): boolean {
     let multipart = false;
     const query = (value: unknown): void => {
@@ -232,8 +232,6 @@ export class TestCase extends ActiveSupportTestCase {
     return isAnonymous(klass) ? "anonymous" : klass.controllerPath();
   }
 
-  private _controllerClass: ControllerClass | undefined;
-
   controller!: Metal;
 
   request!: TestRequest;
@@ -254,23 +252,23 @@ export class TestCase extends ActiveSupportTestCase {
     return JSON.parse(this.responseBody);
   }
 
-  constructor(controllerClass?: ControllerClass) {
-    super("");
-    this._controllerClass = controllerClass;
-    this.setupControllerRequestAndResponse();
+  constructor(name?: string) {
+    super(name!);
   }
 
   setupControllerRequestAndResponse(): void {
+    if (this.controller === undefined) this.controller = null!;
+
     this._responseKlass = TestResponse;
 
-    const klass = this._controllerClass ?? (this.constructor as typeof TestCase).controllerClass;
+    const klass = (this.constructor as typeof TestCase).controllerClass;
     if (klass) {
       if (isModuleIncluded(klass, Live)) this._responseKlass = LiveTestResponse;
       if (!this.controller) {
         try {
           this.controller = new klass();
         } catch {
-          this.controller = undefined!;
+          this.controller = null!;
         }
       }
     }
@@ -555,6 +553,7 @@ proto.failOn = routingAssertions.failOn;
 routingAssertions.spliceMethodMissing(proto);
 
 SetupAndTeardown.prepended(TestCase.prototype);
+TestCase.setup(":setupControllerRequestAndResponse");
 
 runLoadHooks("action_controller_test_case", TestCase);
 

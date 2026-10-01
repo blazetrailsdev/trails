@@ -14,7 +14,8 @@ describe("WelcomeController", () => {
   it("index raises MissingExactTemplate when no template resolver is configured", async () => {
     class WelcomeControllerTest extends ActionController.TestCase {}
     WelcomeControllerTest.tests(WelcomeController);
-    const t = new WelcomeControllerTest(WelcomeController);
+    const t = new WelcomeControllerTest();
+    await t.beforeSetup();
     t.routes = new RouteSet();
     t.routes.draw(function () {
       this.root({ to: "rails/welcome#index" });

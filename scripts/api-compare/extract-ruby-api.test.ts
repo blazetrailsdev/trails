@@ -1925,6 +1925,23 @@ describe(
       expect(urlHelpers.params.map((p) => p.kind)).toEqual(["optional"]);
     });
 
+    it("hosts a `CONST = Class.new do … end` body on the anonymous class", () => {
+      const m = metaMethods(`
+      class TestRequest
+        ENCODER = Class.new do
+          def should_multipart?(params); end
+        end.new
+        PASS_NOT_FOUND = Class.new(Object) {
+          def self.action(_); self; end
+        }
+        def assign_parameters; end
+      end
+    `);
+      expect(m["TestRequest"].map((x) => x.name)).toEqual(["assign_parameters"]);
+      expect(m["TestRequest::ENCODER"].map((x) => x.name)).toEqual(["should_multipart?"]);
+      expect(m["TestRequest::PASS_NOT_FOUND.self"].map((x) => x.name)).toEqual(["action"]);
+    });
+
     it("synthesizes the accessors and initialize a Struct.new superclass generates", () => {
       const m = metaMethods(`
       module Arel

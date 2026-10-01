@@ -162,7 +162,8 @@ describe("ActionController::Base#verify_authenticity_token", () => {
   PostsController.protectFromForgery({ with: "exception" });
 
   it("accepts a valid X-CSRF-Token even when the form token is wrong", async () => {
-    const tc = new TestCase(PostsController);
+    const tc = new TestCase();
+    tc.controller = new PostsController();
     await tc.beforeSetup();
     await tc.post("create", {
       session: { _csrf_token: token },
@@ -175,7 +176,8 @@ describe("ActionController::Base#verify_authenticity_token", () => {
   it("rejects a mismatched Origin when forgeryProtectionOriginCheck is on", async () => {
     PostsController.forgeryProtectionOriginCheck = true;
     try {
-      const tc = new TestCase(PostsController);
+      const tc = new TestCase();
+      tc.controller = new PostsController();
       await tc.beforeSetup();
       await expect(
         tc.post("create", {
@@ -214,7 +216,8 @@ describe("ActionController::Base#verify_authenticity_token", () => {
       }
     }
     ResetController.protectFromForgery({ with: "reset_session" });
-    const tc = new TestCase(ResetController);
+    const tc = new TestCase();
+    tc.controller = new ResetController();
     await tc.beforeSetup();
     await tc.post("create", { session: { _csrf_token: token, user_id: 1 } });
     expect(tc.session().get("user_id")).toBeUndefined();

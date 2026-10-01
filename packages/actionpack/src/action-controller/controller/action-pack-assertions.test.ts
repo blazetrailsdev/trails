@@ -136,7 +136,8 @@ describe("ActionPackAssertionsControllerTest", () => {
   const assertRedirectedTo = (...args: Parameters<TestCase["assertRedirectedTo"]>): true =>
     tc.assertRedirectedTo(...args);
   beforeEach(async () => {
-    tc = new TestCase(ActionPackAssertionsController) as typeof tc;
+    tc = new TestCase() as typeof tc;
+    tc.controller = new ActionPackAssertionsController();
     await tc.beforeSetup();
   });
 
@@ -437,13 +438,15 @@ describe("ActionPackAssertionsControllerTest", () => {
   });
 
   it("assert response uses exception message", async () => {
-    const tc2 = new TestCase(AssertResponseWithUnexpectedErrorController);
+    const tc2 = new TestCase();
+    tc2.controller = new AssertResponseWithUnexpectedErrorController();
     await tc2.beforeSetup();
     await expect(tc2.get("index")).rejects.toThrow("FAIL");
   });
 
   it("assert response failure response with no exception", async () => {
-    const tc2 = new TestCase(AssertResponseWithUnexpectedErrorController);
+    const tc2 = new TestCase();
+    tc2.controller = new AssertResponseWithUnexpectedErrorController();
     await tc2.beforeSetup();
     await tc2.get("show");
     tc2.assertResponse(500);
@@ -454,7 +457,8 @@ describe("ActionPackAssertionsControllerTest", () => {
 describe("ActionPackHeaderTest", () => {
   let tc: TestCase;
   beforeEach(async () => {
-    tc = new TestCase(ActionPackAssertionsController);
+    tc = new TestCase();
+    tc.controller = new ActionPackAssertionsController();
     await tc.beforeSetup();
   });
 

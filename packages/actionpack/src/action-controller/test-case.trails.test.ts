@@ -106,16 +106,21 @@ describe("ActionController::Live under test_case.rb", () => {
     expect(order).toEqual(["inside", "after-call"]);
   });
 
-  it("builds a LiveTestResponse for a controller that includes Live", () => {
+  it("builds a LiveTestResponse for a controller that includes Live", async () => {
     class LiveController extends Base {}
     include(LiveController, Live);
-    expect(new TestCase(LiveController).response).toBeInstanceOf(LiveTestResponse);
+    class LiveControllerTest extends TestCase {}
+    LiveControllerTest.tests(LiveController);
+    const tc = new LiveControllerTest();
+    expect(tc.response).toBeUndefined();
+    await tc.beforeSetup();
+    expect(tc.response).toBeInstanceOf(LiveTestResponse);
   });
 });
 
 describe("TestCase#check_required_ivars", () => {
   it("names the unset ivar when a request is made with no routes", async () => {
-    await expect(new TestCase(Base).get("index")).rejects.toThrow(
+    await expect(new TestCase().get("index")).rejects.toThrow(
       "@routes is nil: make sure you set it in your test's setup method.",
     );
   });
@@ -129,7 +134,8 @@ describe("TestCase#document_root_element", () => {
   }
 
   it("parses the response as XML and resets it on the next request", async () => {
-    const tc = new TestCase(XmlController);
+    const tc = new TestCase();
+    tc.controller = new XmlController();
     await tc.beforeSetup();
     await tc.get("index");
     const first = tc.htmlDocument;

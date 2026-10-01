@@ -628,6 +628,17 @@ class ApiExtractor
         walk_body(body) if body
         @visibility_stack.pop
         @namespace_stack.pop
+      elsif lhs.is_a?(Array) && lhs[0] == :var_field &&
+            lhs[1].is_a?(Array) && lhs[1][0] == :@const &&
+            (body = class_new_body(rhs))
+        # `ENCODER = Class.new do … end.new` (action_controller/test_case.rb:151-176).
+        @namespace_stack.push(lhs[1][1])
+        @visibility_stack.push(:public)
+        fqn = current_fqn
+        @classes[fqn] ||= new_class_info(lhs[1][1], fqn)
+        walk_body(body)
+        @visibility_stack.pop
+        @namespace_stack.pop
       else
         node.each { |child| walk(child) if child.is_a?(Array) }
       end
@@ -698,6 +709,18 @@ class ApiExtractor
     return nil unless call.is_a?(Array) &&
                       (call[0] == :method_add_arg || call[0] == :command_call)
     const_name(call[1]) == "Struct" ? call : nil
+  end
+
+  # The block body of a `CONST = Class.new do … end` RHS, with or without a
+  # superclass argument and a trailing `.new`; nil otherwise.
+  def class_new_body(rhs)
+    rhs = rhs[1] if rhs.is_a?(Array) && rhs[0] == :call && rhs[3].is_a?(Array) && rhs[3][1] == "new"
+    return nil unless rhs.is_a?(Array) && rhs[0] == :method_add_block
+    call = rhs[1][0] == :method_add_arg ? rhs[1][1] : rhs[1]
+    return nil unless call.is_a?(Array) && call[0] == :call &&
+                      const_name(call[1]) == "Class" && call[3][1] == "new"
+    block = rhs[2]
+    block.is_a?(Array) && (block[0] == :do_block || block[0] == :brace_block) ? block[2] : nil
   end
 
   # `class Attribute < Struct.new :relation, :name` (arel/attributes/attribute.rb:5)

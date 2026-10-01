@@ -190,8 +190,8 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     });
   });
 
+  // PERMANENT-SKIP: the through-id pluck is awaited on the way to SQL, not run at scope build (CLAUDE.md, "`Relation` is evaluated by an async query").
   it.skip("empty on disable joins through", async () => {
-    // BLOCKED: the through-id pluck runs at load, not at scope build (disable_joins_association_scope.rb:25) — converge-djar-deferred-chain-walk-mode
     const emptyAuthor = await Author.find(authors("bob").id);
     let comments: unknown;
     await assertQueriesCount(0, false, () => {
@@ -204,8 +204,8 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     expect(await comments).toEqual([]);
   });
 
+  // PERMANENT-SKIP: the through-id pluck is awaited on the way to SQL, not run at scope build (CLAUDE.md, "`Relation` is evaluated by an async query").
   it.skip("empty on disable joins through using custom foreign key", async () => {
-    // BLOCKED: the through-id pluck runs at load, not at scope build (disable_joins_association_scope.rb:25) — converge-djar-deferred-chain-walk-mode
     const emptyAuthor = await Author.find(authors("bob").id);
     let comments: unknown;
     await assertQueriesCount(0, false, () => {
@@ -366,9 +366,9 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     expect(await q(1, () => association(author, "members").unnamed().limit(1).toArray())).toEqual([
       member2,
     ]);
-    expect(
-      await q(3, () => association(author, "noJoinsMembers").unnamed().limit(1).toArray()),
-    ).toEqual([member2]);
+    expect(await q(3, () => association(author, "noJoinsMembers").unnamed().limit(1))).toEqual([
+      member2,
+    ]);
   });
 
   it("limit and scope in double join applies limit in memory", async () => {

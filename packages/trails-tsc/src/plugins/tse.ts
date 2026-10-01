@@ -230,14 +230,22 @@ export function virtualizeTseWithDeltas(source: string, scope?: TseScope): Virtu
   return { ts, deltas, mappings };
 }
 
+const OVERLOADS = [0, 1, 2, 3];
+
 function scopeTypes(scope: TseScope, localsKnown: boolean): string[] {
   return [
     `type View = ${scope.view};`,
     `type ObjectLocals = ${scope.locals ?? "{}"};`,
+    "type Sig<A extends unknown[], R> = (...args: A) => R;",
+    "type Bare<F> = unknown extends ThisParameterType<F>",
+    "  ? F",
+    `  : F extends { ${OVERLOADS.map((i) => `(this: any, ...args: infer A${i}): infer R${i}`).join("; ")} }`,
+    `    ? ${OVERLOADS.map((i) => `Sig<A${i}, R${i}>`).join(" & ")}`,
+    "    : F;",
     "type Scope<K extends string> = K extends keyof ObjectLocals",
     "  ? ObjectLocals[K]",
     "  : K extends keyof View",
-    "    ? OmitThisParameter<View[K]>",
+    "    ? Bare<View[K]>",
     "    : K extends keyof typeof globalThis",
     "      ? (typeof globalThis)[K]",
     `      : ${localsKnown ? "never" : "any"};`,

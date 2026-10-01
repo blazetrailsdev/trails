@@ -8,6 +8,7 @@ import { ArrayHandler } from "./predicate-builder/array-handler.js";
 import { RangeHandler } from "./predicate-builder/range-handler.js";
 import { BasicObjectHandler } from "./predicate-builder/basic-object-handler.js";
 import { RelationHandler } from "./predicate-builder/relation-handler.js";
+import { DeferredPluck } from "./predicate-builder/deferred-distinct-pk-in.js";
 import { AssociationQueryValue } from "./predicate-builder/association-query-value.js";
 import { Substitute } from "../statement-cache.js";
 import { PolymorphicArrayValue } from "./predicate-builder/polymorphic-array-value.js";
@@ -52,6 +53,18 @@ export class PredicateBuilder {
     }
     const nodes: Nodes.Node[] = [];
     for (let [key, value] of entriesOf(attributes)) {
+      if (value instanceof DeferredPluck) {
+        const arelTable = this.table.arelTable;
+        nodes.push(
+          value.in(
+            Array.isArray(key)
+              ? new Nodes.Grouping(key.map((col) => arelTable.get(col)))
+              : arelTable.get(key),
+          ),
+        );
+        continue;
+      }
+
       if (Array.isArray(key) && key.length === 1) {
         key = key[0];
         value = (value as unknown[]).flat(Infinity);
