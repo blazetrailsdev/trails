@@ -17,6 +17,7 @@ import {
   rbModName,
   rbObjDup,
   stringToSym,
+  symbolToS,
   transformValues,
 } from "@blazetrails/ruby-compat";
 import { Error as ActiveModelError } from "./error.js";
@@ -93,8 +94,8 @@ export class Errors<TBase extends object = object> {
   ): void {
     for (const key of ["attribute", "type"] as const) {
       if (hasKey(overrideOptions, key)) {
-        const value = overrideOptions[key] as string;
-        overrideOptions[key] = key === "type" ? stringToSym(value) : value;
+        const sym = stringToSym(overrideOptions[key] as string);
+        overrideOptions[key] = key === "type" ? sym : symbolToS(sym);
       }
     }
     this._errors.push(new NestedError(this._base, error, overrideOptions));
