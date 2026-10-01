@@ -30,6 +30,7 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
   });
 
   afterEach(async () => {
+    // eslint-disable-next-line blazetrails/require-canonical-rebuild -- exclusion_constraint_test.rb:23-25 drops it; the fixtures() transaction rolls the DDL back
     await connection.dropTable("invoices", { ifExists: true });
   });
 

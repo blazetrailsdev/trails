@@ -21,11 +21,11 @@
  * second failure, in `abstract-mysql-adapter/warnings.test.ts`, only reproduced
  * on MariaDB) and so may not surface on the lane the author runs locally.
  *
- * The population is large and most of it is legitimate — files that clean up in
- * `afterEach`, or write to a table nothing else reads — so this is a ratchet
- * seeded from the tree, not a suite-reddening gate: the count may not grow.
+ * The population was large when this landed, so it started as a ratchet seeded
+ * from the tree. That seed has been burnt to zero and deleted: every offender
+ * is now a failure.
  *
- * ## What the ratchet holds a file to
+ * ## What the gate holds a file to
  *
  * A row only outlives its test if it was written over a connection some other
  * file also uses — the canonical per-worker connection. So the population is
@@ -67,8 +67,6 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 export const TEST_ROOT = path.join("packages", "activerecord", "src");
-
-export const RATCHET_PATH = path.join("scripts", "non-transactional-row-writes.json");
 
 const SKIP_DIRS = new Set(["node_modules", "dist", "__snapshots__", "__fixtures__"]);
 
@@ -397,22 +395,4 @@ export async function findOffenders(root: string = TEST_ROOT): Promise<string[]>
     if (isOffender(await readFile(file, "utf8"))) offenders.push(file);
   }
   return offenders;
-}
-
-export async function loadRatchet(ratchetPath: string = RATCHET_PATH): Promise<string[]> {
-  return JSON.parse(await readFile(ratchetPath, "utf8")) as string[];
-}
-
-export interface RatchetDiff {
-  added: string[];
-  stale: string[];
-}
-
-export function diffRatchet(offenders: string[], ratchet: string[]): RatchetDiff {
-  const seeded = new Set(ratchet);
-  const found = new Set(offenders);
-  return {
-    added: offenders.filter((file) => !seeded.has(file)),
-    stale: ratchet.filter((file) => !found.has(file)),
-  };
 }

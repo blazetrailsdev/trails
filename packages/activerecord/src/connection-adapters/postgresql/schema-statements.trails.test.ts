@@ -959,36 +959,36 @@ describe("SchemaStatements#dropTable", () => {
   it("emits a single DROP TABLE statement with all table names joined", async () => {
     const { adapter, executed } = makeFakeAdapter();
     const ss = withSchemaStatements(adapter);
-    await ss.dropTable("posts", "comments");
-    expect(executed).toEqual([`DROP TABLE "posts", "comments"`]);
+    await ss.dropTable("widgets", "gadgets");
+    expect(executed).toEqual([`DROP TABLE "widgets", "gadgets"`]);
   });
 
   it("appends CASCADE when force: 'cascade'", async () => {
     const { adapter, executed } = makeFakeAdapter();
     const ss = withSchemaStatements(adapter);
-    await ss.dropTable("posts", { force: "cascade" });
-    expect(executed).toEqual([`DROP TABLE "posts" CASCADE`]);
+    await ss.dropTable("widgets", { force: "cascade" });
+    expect(executed).toEqual([`DROP TABLE "widgets" CASCADE`]);
   });
 
   it("appends IF EXISTS when ifExists: true", async () => {
     const { adapter, executed } = makeFakeAdapter();
     const ss = withSchemaStatements(adapter);
-    await ss.dropTable("posts", { ifExists: true });
-    expect(executed).toEqual([`DROP TABLE IF EXISTS "posts"`]);
+    await ss.dropTable("widgets", { ifExists: true });
+    expect(executed).toEqual([`DROP TABLE IF EXISTS "widgets"`]);
   });
 
   it("combines IF EXISTS, multiple tables, and CASCADE", async () => {
     const { adapter, executed } = makeFakeAdapter();
     const ss = withSchemaStatements(adapter);
-    await ss.dropTable("posts", "comments", { ifExists: true, force: "cascade" });
-    expect(executed).toEqual([`DROP TABLE IF EXISTS "posts", "comments" CASCADE`]);
+    await ss.dropTable("widgets", "gadgets", { ifExists: true, force: "cascade" });
+    expect(executed).toEqual([`DROP TABLE IF EXISTS "widgets", "gadgets" CASCADE`]);
   });
 
   it("clears the schema cache for each table", async () => {
     const { adapter, clearedTables } = makeFakeAdapter();
     const ss = withSchemaStatements(adapter);
-    await ss.dropTable("posts", "comments");
-    expect(clearedTables).toEqual(["posts", "comments"]);
+    await ss.dropTable("widgets", "gadgets");
+    expect(clearedTables).toEqual(["widgets", "gadgets"]);
   });
 
   it("issues no statement when called with no table names", async () => {

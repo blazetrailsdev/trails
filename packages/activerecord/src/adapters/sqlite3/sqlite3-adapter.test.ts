@@ -26,6 +26,7 @@ import {
   capture,
 } from "@blazetrails/activesupport";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
+import { withExampleTable } from "../../support/ddl-helper.js";
 import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
 import { StatementInvalid, StatementTimeout } from "../../errors.js";
 import { BusyException } from "../../sqlite/errors.js";
@@ -88,7 +89,6 @@ async function createExampleTable(): Promise<void> {
 }
 
 afterEach(async () => {
-  await adapter.execute(`DROP TABLE IF EXISTS items`);
   await adapter.execute(`DROP TABLE IF EXISTS typed`);
   await adapter.execute(`DROP TABLE IF EXISTS no_pk`);
   await adapter.execute(`DROP TABLE IF EXISTS bin_esc`);
@@ -111,7 +111,6 @@ afterEach(async () => {
   await adapter.execute(`DROP TABLE IF EXISTS auto_inc`);
   await adapter.execute(`DROP TABLE IF EXISTS cpk`);
   await adapter.execute(`DROP TABLE IF EXISTS cpk_table`);
-  await adapter.execute(`DROP TABLE IF EXISTS people`);
   await adapter.execute(`DROP TABLE IF EXISTS foos`);
   await adapter.execute(`DROP TABLE IF EXISTS ex`);
   await adapter.execute(`DROP TABLE IF EXISTS json_defs`);
@@ -144,12 +143,6 @@ class BarcodeCpk extends Base {
 
 describeIfSqlite("SQLite3AdapterTest", () => {
   fixtures(["owners"], { useTransactionalTests: false });
-
-  beforeEach(async () => {
-    await adapter.execute(
-      `CREATE TABLE "items" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "name" TEXT, "price" INTEGER, "active" INTEGER DEFAULT 1)`,
-    );
-  });
 
   it("database should get created when missing parent directories for database path", async () => {
     const fs = await import("fs");
@@ -770,13 +763,16 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("tables", async () => {
-    await adapter.execute(`DROP TABLE IF EXISTS items`);
     await createExampleTable();
     expect(await adapter.tables()).toEqual(["ex"]);
-    await adapter.execute(
-      `CREATE TABLE "people" ("id" integer PRIMARY KEY AUTOINCREMENT, "number" integer)`,
+    await withExampleTable(
+      adapter,
+      "people",
+      "id integer PRIMARY KEY AUTOINCREMENT, number integer",
+      async () => {
+        expect((await adapter.tables()).sort()).toEqual(["ex", "people"].sort());
+      },
     );
-    expect((await adapter.tables()).sort()).toEqual(["ex", "people"].sort());
   });
 
   it("columns", async () => {
@@ -836,25 +832,25 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("non unique index", async () => {
-    await adapter.execute(`CREATE INDEX "fun" ON "items" ("id")`);
-    const indexes = (await adapter.indexes("items")) as any[];
-    const index = indexes.find((idx) => idx.name === "fun");
+    await createExampleTable();
+    await adapter.addIndex("ex", "id", { name: "fun" });
+    const index = (await adapter.indexes("ex")).find((idx) => idx.name === "fun")!;
     expect(index.unique).toBeFalsy();
   });
 
   it("compound index", async () => {
-    await adapter.execute(`CREATE INDEX "fun" ON "items" ("id", "price")`);
-    const indexes = (await adapter.indexes("items")) as any[];
-    const index = indexes.find((idx) => idx.name === "fun");
-    expect([...index.columns].sort()).toEqual(["id", "price"].sort());
+    await createExampleTable();
+    await adapter.addIndex("ex", ["id", "number"], { name: "fun" });
+    const index = (await adapter.indexes("ex")).find((idx) => idx.name === "fun")!;
+    expect([...index.columns].sort()).toEqual(["id", "number"].sort());
   });
 
   it("partial index with comment", async () => {
-    await adapter.execute(`CREATE INDEX "fun" ON "items" ("id") WHERE price > 0 /*tag:test*/`);
-    const indexes = (await adapter.indexes("items")) as any[];
-    const index = indexes.find((idx) => idx.name === "fun");
+    await createExampleTable();
+    await adapter.addIndex("ex", "id", { name: "fun", where: "number > 0 /*tag:test*/" });
+    const index = (await adapter.indexes("ex")).find((idx) => idx.name === "fun")!;
     expect(index.columns).toEqual(["id"]);
-    expect(index.where).toBe("price > 0");
+    expect(index.where).toBe("number > 0");
   });
 
   itIfSupports("expression_index", "expression index", async () => {
@@ -1284,6 +1280,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   it("tables logs name", async () => {
     const sql =
       "SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND type IN ('table')";
+    await adapter.connectBang();
     await assertLogged([[sql, "SCHEMA", []]], () => adapter.tables());
   });
 

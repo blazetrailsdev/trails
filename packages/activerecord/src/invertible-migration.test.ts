@@ -7,6 +7,7 @@ import { itIfSupports } from "./support/supports.js";
 import { adapterType } from "./test-adapter.js";
 import { registerModel } from "./associations.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
+import { fixtures } from "./test-fixtures.js";
 
 class Horse extends Base {
   static {
@@ -269,6 +270,8 @@ async function resetHorse(): Promise<void> {
 }
 
 describe("InvertibleMigrationTest", () => {
+  fixtures({}, { useTransactionalTests: false });
+
   afterEach(async () => {
     const connection = await Base.leaseConnection();
     for (const table of ["horses", "new_horses"]) {

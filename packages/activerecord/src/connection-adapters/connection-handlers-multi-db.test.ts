@@ -8,6 +8,7 @@ import { type RawConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
 import { currentRole } from "../core.js";
 import { restoreWorkerConnection } from "../support/connection.js";
+import { fixtures } from "../test-fixtures.js";
 import { readingRole, setReadingRole, setWritingRole, writingRole } from "../active-record.js";
 
 describe("ConnectionHandlersMultiDbTest", () => {
@@ -21,6 +22,8 @@ describe("ConnectionHandlersMultiDbTest", () => {
 
   let dbDir: string;
   let dbPaths: Record<DbName, string>;
+
+  fixtures(["people"], { useTransactionalTests: false });
 
   const sqliteDb = (name: DbName, extra: { replica?: boolean } = {}) => ({
     adapter: "sqlite3",

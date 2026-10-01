@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as os from "node:os";
 import * as path from "node:path";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -8,6 +8,11 @@ import { type RawConfigurations } from "../database-configurations.js";
 import { currentRole, connectedToStack } from "../core.js";
 import { ConnectionNotDefined } from "../errors.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
+import { fixtures } from "../test-fixtures.js";
+import { restoreWorkerConnection } from "../support/connection.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
+import { Person } from "../test-helpers/models/person.js";
+import { assertNothingRaised } from "@blazetrails/activesupport";
 
 async function withBaseConfigs(
   raw: RawConfigurations,
@@ -35,9 +40,7 @@ const dbPath = (basename: string) => path.join(dbDir, basename);
 describe("ConnectionHandlersShardingDbTest", () => {
   let baselinePools: Set<unknown>;
 
-  afterAll(async () => {
-    await Base.connectionHandler.removeConnectionPool("ActiveRecord::Base");
-  });
+  fixtures(["people"], { useTransactionalTests: false });
 
   beforeEach(async () => {
     dbDir = await mkdtemp(path.join(os.tmpdir(), "trails-sharding-db-"));
@@ -60,35 +63,25 @@ describe("ConnectionHandlersShardingDbTest", () => {
     await rm(dbDir, { recursive: true, force: true });
     Base.defaultShard = "default";
     (Base as any).connectionClass = undefined;
+    await restoreWorkerConnection();
   });
 
-  it("establishing a connection in connected to block uses current role and shard", async () => {
-    const primary = dbPath("primary.sqlite3");
-    await withBaseConfigs(
-      {
-        default_env: { primary: { adapter: "sqlite3", database: primary } },
-      },
-      async () => {
-        await Base.connectsTo({
-          shards: { default: { writing: ":primary" } },
-        });
+  it.skipIf(inMemoryDb())(
+    "establishing a connection in connected to block uses current role and shard",
+    async () => {
+      await Base.connectedTo({ role: "writing", shard: "shard_one" }, async () => {
+        const dbConfig = Base.configurations().configsFor({ envName: "arunit", name: "primary" });
+        await Base.establishConnection(dbConfig);
+        await assertNothingRaised(() => Person.first());
 
-        await Base.connectedTo({ role: "writing", shard: "shard_one" }, async () => {
-          await Base.establishConnection({ adapter: "sqlite3", database: primary });
-          const conn = await Base.leaseConnection();
-          await conn.execute(
-            `CREATE TABLE IF NOT EXISTS "people" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "name" TEXT)`,
-          );
-          await expect(conn.execute(`SELECT * FROM "people" LIMIT 1`)).resolves.not.toThrow();
-          await conn.execute(`DROP TABLE IF EXISTS "people"`);
-
-          const pm = (Base.connectionHandler as any).getPoolManager("ActiveRecord::Base");
-          expect([...pm.shardNames].sort()).toEqual(["default", "shard_one"]);
-        });
-      },
-      { defaultEnv: "default_env" },
-    );
-  });
+        expect(
+          [
+            ...(Base.connectionHandler as any).getPoolManager("ActiveRecord::Base").shardNames,
+          ].sort(),
+        ).toEqual(["default", "shard_one"]);
+      });
+    },
+  );
   it("establish connection using 3 levels config", async () => {
     const primary = dbPath("primary.sqlite3");
     const primaryShardOne = dbPath("primary_shard_one.sqlite3");

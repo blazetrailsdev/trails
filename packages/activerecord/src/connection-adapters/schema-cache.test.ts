@@ -651,8 +651,8 @@ function makeMockAdapter(cache: SchemaCache): MockAdapter & SchemaStatements {
 describe("DDL cache-invalidation safety-net", () => {
   it("dropTable clears schema cache entry before DROP SQL", async () => {
     const cache = new SchemaCache();
-    cache.setColumns("posts", [makeColumn("id", "integer")]);
-    expect(cache.isCached("posts")).toBe(true);
+    cache.setColumns("widgets", [makeColumn("id", "integer")]);
+    expect(cache.isCached("widgets")).toBe(true);
 
     const order: string[] = [];
     const adapter = makeMockAdapter(cache);
@@ -667,10 +667,10 @@ describe("DDL cache-invalidation safety-net", () => {
     });
 
     // eslint-disable-next-line blazetrails/require-table-teardown
-    await adapter.dropTable("posts");
+    await adapter.dropTable("widgets");
 
-    expect(cache.isCached("posts")).toBe(false);
-    expect(order).toEqual(["clear:posts", "sql"]);
+    expect(cache.isCached("widgets")).toBe(false);
+    expect(order).toEqual(["clear:widgets", "sql"]);
   });
 
   it("dropJoinTable clears schema cache entry before DROP SQL (via dropTable)", async () => {
@@ -698,10 +698,10 @@ describe("DDL cache-invalidation safety-net", () => {
 
   it("createTable clears schema cache entry (non-force branch)", async () => {
     const cache = new SchemaCache();
-    cache.setColumns("posts", [makeColumn("id", "integer")]);
+    cache.setColumns("widgets", [makeColumn("id", "integer")]);
 
     const adapter = makeMockAdapter(cache);
-    await adapter.createTable("posts");
+    await adapter.createTable("widgets");
 
     expect(cache.isCached("posts")).toBe(false);
   });

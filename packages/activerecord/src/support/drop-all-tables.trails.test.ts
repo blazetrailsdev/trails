@@ -5,8 +5,11 @@ import { provisionSecondDatabase } from "./setup-second-pool.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { typeRegistryKeyFor } from "./type-registry-key.js";
+import { fixtures } from "../test-fixtures.js";
 
 let adapter: DatabaseAdapter;
+
+fixtures({}, { useTransactionalTests: false });
 
 async function listTables(a: DatabaseAdapter): Promise<string[]> {
   if (typeRegistryKeyFor(a) === "sqlite3") {

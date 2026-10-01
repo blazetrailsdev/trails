@@ -99,19 +99,6 @@ const requireTableTeardownRawSqlExclude = JSON.parse(
     "utf8",
   ),
 );
-// AR test files exempt from require-canonical-rebuild, in two permanent groups.
-// `privateAdapter` files own an adapter of their own — a `:memory:` database or
-// a throwaway file under a per-test tmpdir — so a canonical table they drop
-// cannot drift the shared per-worker database. `nonExecuting` files name a
-// canonical table in a drop that never reaches a database at all: SQL captured
-// for assertion, or a hand-rolled fake adapter. Neither group is backlog; a
-// file that really does leave a canonical table dropped belongs in neither and
-// must be fixed. See eslint/require-canonical-rebuild.mjs.
-/** @type {{ privateAdapter: string[], nonExecuting: string[] }} */
-const requireCanonicalRebuildExclude = JSON.parse(
-  readFileSync(new URL("./eslint/require-canonical-rebuild-exclude.json", import.meta.url), "utf8"),
-);
-
 /**
  * The canonical table names — the top-level keys of `TEST_SCHEMA` in
  * test-helpers/test-schema.ts, which the lint rule needs but cannot import
@@ -683,11 +670,7 @@ export default defineConfig(
   //    test. See eslint/require-canonical-rebuild.mjs. ──
   {
     files: ["packages/activerecord/src/**/*.test.ts"],
-    ignores: [
-      ...testInfraExemptIgnores,
-      ...requireCanonicalRebuildExclude.privateAdapter,
-      ...requireCanonicalRebuildExclude.nonExecuting,
-    ],
+    ignores: testInfraExemptIgnores,
     rules: {
       "blazetrails/require-canonical-rebuild": ["error", { canonicalTables }],
     },

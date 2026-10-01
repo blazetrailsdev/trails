@@ -2,12 +2,15 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./base.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import { ConnectionNotDefined } from "./errors.js";
+import { fixtures } from "./test-fixtures.js";
 
 class TestRecord extends Base {}
 
 describe("TestUnconnectedAdapter", () => {
   let underlying: { active(): Promise<boolean> };
   let connectionName: DatabaseConfig | undefined;
+
+  fixtures({}, { useTransactionalTests: false });
 
   beforeEach(async () => {
     underlying = (await Base.leaseConnection()) as unknown as { active(): Promise<boolean> };

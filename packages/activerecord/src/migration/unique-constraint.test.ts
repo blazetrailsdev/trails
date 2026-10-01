@@ -32,6 +32,7 @@ describeIfSupports("unique_constraints", "Migration", () => {
   });
 
   afterEach(async () => {
+    // eslint-disable-next-line blazetrails/require-canonical-rebuild -- unique_constraint_test.rb:22-24 drops it; the fixtures() transaction rolls the DDL back
     await connection.dropTable("sections", { ifExists: true });
   });
 
