@@ -410,4 +410,15 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
       "(see CLAUDE.md, 'Method visibility is compile-time only'), so a defined delegate " +
       "answers `respond_to?` at both arities. The file's other delegate cases stay counted.",
   },
+  {
+    testFile: "configurable_test.rb",
+    className: "ConfigurableActiveSupport",
+    tests: ["the config_accessor method should not be publicly callable"],
+    reason:
+      "Asserts `assert_raises NoMethodError` on calling the private class method " +
+      "`config_accessor` from outside the class body (configurable_test.rb:125-131, " +
+      "`private :config_accessor`, configurable.rb:129). trails carries no method " +
+      "visibility at run time (see CLAUDE.md, 'Method visibility is compile-time only'). " +
+      "The file's other nine cases stay counted.",
+  },
 ];
