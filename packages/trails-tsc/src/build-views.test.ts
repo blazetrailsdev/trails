@@ -715,6 +715,63 @@ describe("runCli", () => {
     expect(fields("plain")).toEqual(["picked"]);
   }, 30_000);
 
+  it("reads a per-render layout from non-literal render options and layout.call(this, ...)", async () => {
+    const cwd = mkScratch();
+    write(
+      cwd,
+      "app/controllers/application-controller.ts",
+      [
+        "export function layout(this: unknown, _layout: unknown): void {}",
+        "export class ApplicationController { render(..._args: unknown[]): void {} }",
+      ].join("\n"),
+    );
+    for (const [file, name, body] of [
+      [
+        "comments",
+        "CommentsController",
+        'declare comments: number[]; show(): void { const options = { layout: "admin" } as const; this.render("show", options); }',
+      ],
+      [
+        "drafts",
+        "DraftsController",
+        'declare drafts: bigint; show(options: { layout: "admin" | false }): void { this.render({ ...options, action: "show" }); }',
+      ],
+      [
+        "wide",
+        "WideController",
+        'declare wide: symbol; show(options: Record<string, unknown>): void { this.render("show", options); }',
+      ],
+      [
+        "posts",
+        "PostsController",
+        'declare posts: string[]; static { layout.call(this, "application"); }',
+      ],
+    ]) {
+      write(
+        cwd,
+        `app/controllers/${file}-controller.ts`,
+        [
+          'import { ApplicationController, layout } from "./application-controller.js";',
+          `export class ${name} extends ApplicationController { ${body} }`,
+          "void layout;",
+        ].join("\n"),
+      );
+    }
+    for (const name of ["application", "admin", "posts"]) {
+      write(cwd, `app/views/layouts/${name}.html.tse`, "hi");
+    }
+    await buildViews({ cwd });
+    const fields = (name: string): string[] =>
+      [
+        ...fs
+          .readFileSync(path.join(cwd, `.trails/views/layouts/${name}.html.tse.ts`), "utf8")
+          .matchAll(/"(posts|comments|drafts|wide)":/gu),
+      ].map((m) => m[1]);
+    expect(fields("admin")).toEqual(["comments", "drafts", "wide"]);
+    expect(fields("application")).toEqual(["comments", "drafts", "posts", "wide"]);
+    expect(fields("posts")).toEqual(["wide"]);
+  }, 30_000);
+
   it("types addFlashTypes readers in a controller's views and layout", async () => {
     const cwd = mkScratch();
     write(

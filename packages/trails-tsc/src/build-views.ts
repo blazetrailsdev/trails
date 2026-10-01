@@ -399,8 +399,8 @@ function controllerMembers(
     if (type.getCallSignatures().length > 0) continue;
     members.set(prop.name, typeText(type));
   }
-  for (const { name, call } of classMacros(checker, klass)) {
-    for (const arg of call.arguments.flatMap(stringLiterals)) {
+  for (const { name, args } of classMacros(checker, klass)) {
+    for (const arg of args.flatMap(stringLiterals)) {
       const member = name === "helperMethod" && instance.getProperty(arg);
       if (member) members.set(arg, typeText(checker.getTypeOfSymbolAtLocation(member, klass)));
       if (name === "addFlashTypes") members.set(arg, "unknown");
@@ -431,10 +431,10 @@ function layoutsOf(
   klass: ts.ClassDeclaration,
 ): Set<string> | "every" {
   const layouts = new Set<string>();
-  const add = (value: ts.Expression): boolean => {
-    if (ts.isStringLiteral(value) && !value.text.startsWith(":")) {
-      layouts.add(value.text.replace(/^layouts\//u, ""));
-    } else if (value.kind !== ts.SyntaxKind.FalseKeyword) {
+  const add = (type: ts.Type): boolean => {
+    if (type.isStringLiteral() && !type.value.startsWith(":")) {
+      layouts.add(type.value.replace(/^layouts\//u, ""));
+    } else if (checker.typeToString(type) !== "false") {
       return false;
     }
     return true;
@@ -448,11 +448,30 @@ function layoutsOf(
   };
   const declared = classMacros(checker, klass).filter((m) => m.name === "layout");
   const nearest = declared.filter((m) => m.depth === declared[0].depth).at(-1);
-  const [value, conditions] = nearest?.call.arguments ?? [];
+  const [value, conditions] = nearest?.args ?? [];
   if (value === undefined || value.kind === ts.SyntaxKind.NullKeyword) implied(klass);
-  else if (!add(value)) return "every";
+  else if (!add(checker.getTypeAtLocation(value))) return "every";
   else if (conditions !== undefined) implied(klass);
   let every = false;
+  const perRender = (options: ts.Expression): void => {
+    const written = ts.isObjectLiteralExpression(options) && option(options, "layout");
+    if (ts.isObjectLiteralExpression(options) && !written) {
+      for (const p of options.properties) if (ts.isSpreadAssignment(p)) perRender(p.expression);
+      return;
+    }
+    const type = checker.getTypeAtLocation(written || options);
+    const property = written ? undefined : type.getProperty("layout");
+    const anything = type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown);
+    if (!written && (anything || (!property && type.getStringIndexType()))) every = true;
+    const layout = written
+      ? type
+      : property && checker.getTypeOfSymbolAtLocation(property, options);
+    for (const each of layout?.isUnion() ? layout.types : layout ? [layout] : []) {
+      if (each.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined)) continue;
+      if (checker.typeToString(each) === "true") implied(klass);
+      else if (!add(each)) every = true;
+    }
+  };
   const visit = (node: ts.Node): void => {
     const callee = ts.isCallExpression(node) ? node.expression : undefined;
     if (
@@ -461,12 +480,7 @@ function layoutsOf(
       callee.expression.kind === ts.SyntaxKind.ThisKeyword &&
       callee.name.text === "render"
     ) {
-      for (const options of (node as ts.CallExpression).arguments.slice(0, 2)) {
-        const layout = ts.isObjectLiteralExpression(options) && option(options, "layout");
-        if (!layout || layout.kind === ts.SyntaxKind.NullKeyword) continue;
-        if (layout.kind === ts.SyntaxKind.TrueKeyword) implied(klass);
-        else if (!add(layout)) every = true;
-      }
+      (node as ts.CallExpression).arguments.slice(0, 2).forEach(perRender);
     }
     ts.forEachChild(node, visit);
   };
@@ -481,7 +495,7 @@ const CLASS_MACROS = ["helperMethod", "layout", "addFlashTypes"];
 
 interface ClassMacro {
   name: string;
-  call: ts.CallExpression;
+  args: readonly ts.Expression[];
   depth: number;
 }
 
@@ -496,8 +510,12 @@ function classMacros(checker: ts.TypeChecker, klass: ts.ClassDeclaration): Class
       const [receiver, name] = ts.isPropertyAccessExpression(callee)
         ? [callee.expression, callee.name.text]
         : [undefined, ts.isIdentifier(callee) ? callee.text : ""];
-      if (CLASS_MACROS.includes(name) && isSelf(receiver)) {
-        macros.push({ name, call: node, depth });
+      const viaCall = name === "call" && receiver !== undefined && ts.isIdentifier(receiver);
+      const self = viaCall ? node.arguments[0] : receiver;
+      const args = viaCall ? node.arguments.slice(1) : node.arguments;
+      const macroName = viaCall ? receiver.text : name;
+      if (CLASS_MACROS.includes(macroName) && isSelf(self)) {
+        macros.push({ name: macroName, args, depth });
       } else if (name === "include" && isSelf(node.arguments[0])) {
         for (const arg of node.arguments.slice(1)) {
           const included = sourceDeclaration(checker, arg);
