@@ -99,6 +99,7 @@ export class Password extends String {
     );
   }
 
+  /** @noRailsEquivalent CONVERGEABLE activemodel-bcrypt-engine-into-a-bcrypt-gem-package */
   constructor(rawHash: string | Password) {
     super(rawHash);
     if (this.isValidHash(rawHash)) {
