@@ -858,6 +858,48 @@ describe("InflectorTest", () => {
     });
   });
 
+  for (const [name, scope] of [
+    ["all", ["all"]],
+    ["no arguments", []],
+  ] as const) {
+    it(`clear inflections with ${name}`, () => {
+      withInflections((inflect) => {
+        const [singulars, plurals, uncountables] = [
+          inflect.singulars,
+          inflect.plurals,
+          [...inflect.uncountables],
+        ];
+
+        inflect.clear(...scope);
+
+        expect(inflect.singulars).toEqual([]);
+        expect(inflect.plurals).toEqual([]);
+        expect([...inflect.uncountables]).toEqual([]);
+
+        for (const singular of [...singulars].reverse()) {
+          inflect.singular(singular.rule, singular.replacement);
+        }
+        for (const plural of [...plurals].reverse()) {
+          inflect.plural(plural.rule, plural.replacement);
+        }
+        inflect.uncountable(uncountables);
+
+        expect(inflect.singulars).toEqual(singulars);
+        expect(inflect.plurals).toEqual(plurals);
+        expect([...inflect.uncountables]).toEqual(uncountables);
+      });
+    });
+  }
+
+  for (const scope of ["plurals", "singulars", "uncountables", "humans"] as const) {
+    it(`clear inflections with ${scope}`, () => {
+      withInflections((inflect) => {
+        inflect.clear(scope);
+        expect([...inflect[scope]]).toEqual([]);
+      });
+    });
+  }
+
   it("clear inflections with acronyms", () => {
     withInflections((inflect) => {
       inflect.clear("acronyms");

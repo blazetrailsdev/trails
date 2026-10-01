@@ -657,6 +657,85 @@ describe("runCli", () => {
     expect(fs.existsSync(path.join(cwd, "app/controllers/posts-controller.d.ts"))).toBe(false);
   }, 30_000);
 
+  it("types a layout from explicit layout() and render layout: choices before the implied name", () => {
+    const cwd = mkScratch();
+    write(
+      cwd,
+      "app/controllers/application-controller.ts",
+      [
+        "export class ApplicationController {",
+        "  static layout(_layout: unknown, _conditions?: object): void {}",
+        "  render(..._args: unknown[]): void {}",
+        "}",
+      ].join("\n"),
+    );
+    for (const [file, name, body] of [
+      [
+        "posts",
+        "PostsController",
+        'declare posts: string[]; static { this.layout("application"); }',
+      ],
+      [
+        "comments",
+        "CommentsController",
+        'declare comments: number[]; show(): void { this.render("show", { layout: "admin" }); }',
+      ],
+      ["plain", "PlainController", "declare plain: boolean; static { this.layout(false); }"],
+      [
+        "drafts",
+        "DraftsController",
+        'declare drafts: bigint; static { this.layout("admin", { only: "index" }); }',
+      ],
+      ["picked", "PickedController", 'declare picked: symbol; static { this.layout(":pick"); }'],
+    ]) {
+      write(
+        cwd,
+        `app/controllers/${file}-controller.ts`,
+        [
+          'import { ApplicationController } from "./application-controller.js";',
+          `export class ${name} extends ApplicationController { ${body} }`,
+        ].join("\n"),
+      );
+    }
+    for (const layout of ["application", "posts", "comments", "plain", "drafts", "admin"]) {
+      write(cwd, `app/views/layouts/${layout}.html.tse`, "hi");
+    }
+    buildViews({ cwd });
+    const fields = (layout: string): string[] =>
+      [
+        ...fs
+          .readFileSync(path.join(cwd, `.trails/views/layouts/${layout}.html.tse.ts`), "utf8")
+          .matchAll(/"(posts|comments|plain|drafts|picked)":/gu),
+      ].map((m) => m[1]);
+    expect(fields("application")).toEqual(["picked", "posts"]);
+    expect(fields("posts")).toEqual(["picked"]);
+    expect(fields("comments")).toEqual(["comments", "picked"]);
+    expect(fields("admin")).toEqual(["comments", "drafts", "picked"]);
+    expect(fields("drafts")).toEqual(["drafts", "picked"]);
+    expect(fields("plain")).toEqual(["picked"]);
+  }, 30_000);
+
+  it("types addFlashTypes readers in a controller's views and layout", () => {
+    const cwd = mkScratch();
+    write(
+      cwd,
+      "app/controllers/posts-controller.ts",
+      [
+        "export class PostsController {",
+        '  static { this.addFlashTypes("warning", "info"); }',
+        "  static addFlashTypes(..._types: string[]): void {}",
+        "}",
+      ].join("\n"),
+    );
+    write(cwd, "app/views/posts/index.html.tse", "<%= this.warning %>");
+    write(cwd, "app/views/layouts/posts.html.tse", "<%= this.info %><%= yield %>");
+    buildViews({ cwd });
+    const read = (rel: string): string =>
+      fs.readFileSync(path.join(cwd, ".trails/views", `${rel}.ts`), "utf8");
+    expect(read("posts/index.html.tse")).toContain('{ "warning": unknown; "info": unknown }');
+    expect(read("layouts/posts.html.tse")).toContain('{ "warning": unknown; "info": unknown }');
+  }, 30_000);
+
   it("types a partial's locals from each hash of a conditional render", () => {
     const cwd = mkScratch();
     write(

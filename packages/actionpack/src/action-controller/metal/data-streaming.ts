@@ -1,6 +1,7 @@
 import { File } from "@blazetrails/ruby-compat";
 import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
 import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
+import type { RenderOptions } from "../base.js";
 
 export const DEFAULT_SEND_FILE_TYPE = "application/octet-stream";
 export const DEFAULT_SEND_FILE_DISPOSITION = "attachment";
@@ -13,7 +14,7 @@ export interface SendFileHeadersHost {
 }
 
 export interface SendDataOptions extends SendFileHeadersOptions {
-  status?: number | string;
+  status?: RenderOptions["status"];
   contentType?: string;
 }
 

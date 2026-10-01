@@ -315,6 +315,34 @@ describe("Ruby extractor define_method loop expansion", () => {
     expect(unexpandedLoops).toEqual(["cases/foo_test.rb:11"]);
   });
 
+  it("expands a name that picks between a literal and the element on kind_of?", () => {
+    const { cases, unexpandedLoops } = extract(`
+  [ :all, [] ].each do |scope|
+    ActiveSupport::Inflector.inflections do |inflect|
+      define_method("test_clear_inflections_with_#{scope.kind_of?(Array) ? "no_arguments" : scope}") do
+        inflect.clear(*scope)
+      end
+    end
+  end
+`);
+    expect(cases.map((c) => c.description)).toEqual([
+      "clear inflections with all",
+      "clear inflections with no arguments",
+    ]);
+    expect(unexpandedLoops).toEqual([]);
+  });
+
+  it("reports a ternary name whose condition is not a kind_of? test on the element", () => {
+    const { cases, unexpandedLoops } = extract(`
+  [ :all, [] ].each do |scope|
+    define_method("test_clear_#{scope.empty? ? "no_arguments" : scope}") do
+    end
+  end
+`);
+    expect(cases).toEqual([]);
+    expect(unexpandedLoops).toHaveLength(1);
+  });
+
   it("neither expands nor reports a loop that generates ordinary helpers", () => {
     const { cases, unexpandedLoops } = extract(`
   (1..3).each do |i|

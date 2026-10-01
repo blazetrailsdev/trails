@@ -38,4 +38,16 @@ describe("decodeLineMappings", () => {
     const map = generateSourceMap("out.js", "src.tse", null, mappings);
     expect(decodeLineMappings(map.mappings)).toEqual(mappings);
   });
+
+  it("returns every segment of a generated line", () => {
+    const mappings = [
+      { genLine: 1, srcLine: 0, genCol: 13, srcCol: 4 },
+      { genLine: 1, srcLine: 0, genCol: 23, srcCol: 14 },
+      { genLine: 2, srcLine: 1, genCol: 0, srcCol: 0 },
+      { genLine: 2, srcLine: 1, genCol: 7, srcCol: 7 },
+    ];
+    const map = generateSourceMap("out.js", "src.tse", null, [...mappings].reverse());
+    expect(map.mappings.split(";").map((line) => line.split(",").length)).toEqual([1, 2, 2]);
+    expect(decodeLineMappings(map.mappings)).toEqual(mappings);
+  });
 });

@@ -9,6 +9,9 @@ import {
   runLoadHooks,
 } from "@blazetrails/activesupport";
 import { File, getCrypto } from "@blazetrails/ruby-compat";
+import type { StatusSymbol } from "@blazetrails/rack";
+import type { TemplateLocals, TemplateRegistry } from "@blazetrails/actionview";
+import type { ToModel } from "../action-dispatch/routing/polymorphic-routes.js";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Metal } from "./metal.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
@@ -182,25 +185,52 @@ import {
 
 export { type ActionCallback, type AroundCallback, type CallbackOptions };
 
-export type RenderOptions = {
+export interface RenderOptions {
   json?: unknown;
-  plain?: string;
+  js?: unknown;
+  xml?: unknown;
+  plain?: string | number | boolean | null;
   html?: string | SafeBuffer;
   body?: string;
   action?: string;
   template?: string;
+  file?: string;
   inline?: string;
+  type?: string;
+  renderable?: { renderIn(...args: never[]): unknown };
   partial?: string;
   locals?: Record<string, unknown>;
-  collection?: unknown[];
+  object?: unknown;
+  collection?: readonly unknown[];
   as?: string;
+  spacerTemplate?: string;
+  cached?: boolean | ((...args: never[]) => unknown);
   callback?: string;
-  status?: number | string;
+  status?: number | StatusSymbol | `:${StatusSymbol}` | `${number}` | `${number} ${string}`;
   contentType?: string;
-  layout?: boolean | string;
-  formats?: string;
+  location?: UrlForOptions;
+  layout?: boolean | string | null | ((...args: never[]) => unknown);
+  prefixes?: string[];
+  formats?: string | string[];
+  variants?: string | string[];
+  handlers?: string | string[];
+  locale?: string | string[];
   stream?: boolean;
-};
+}
+
+type RenderOptionsFor<P extends string> = Omit<RenderOptions, "partial" | "locals"> & {
+  partial?: P;
+} & (P extends keyof TemplateRegistry
+    ? // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+      {} extends TemplateLocals<TemplateRegistry[P]>
+      ? { locals?: TemplateLocals<TemplateRegistry[P]> }
+      : { locals: TemplateLocals<TemplateRegistry[P]> }
+    : { locals?: Record<string, unknown> });
+
+type RenderArgs<P extends string> =
+  | []
+  | [RenderOptionsFor<P> | StrongParameters]
+  | [string | ToModel | NonNullable<RenderOptions["renderable"]>, RenderOptionsFor<P>?];
 
 type StreamingBody = { each(block: (chunk: string) => void): Promise<unknown> };
 
@@ -374,7 +404,7 @@ export class Base extends Metal {
 
   viewRuntime: number | null = null;
 
-  render(...args: unknown[]): void | Promise<void> {
+  render<P extends string = string>(...args: RenderArgs<P>): void | Promise<void> {
     let renderOutput: void | Promise<void>;
     const viewRuntime = this.cleanupViewRuntime(() =>
       Benchmark.realtime(":float_millisecond", () => {
