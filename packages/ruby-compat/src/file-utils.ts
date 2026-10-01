@@ -446,6 +446,102 @@ class Entry_ {
     yieldFn(this);
   }
 
+  async isDirectoryAsync(): Promise<boolean> {
+    const s = await this.lstatBangAsync();
+    return s != null && s.isDirectory();
+  }
+
+  async isSymlinkAsync(): Promise<boolean> {
+    const s = await this.lstatBangAsync();
+    return s != null && s.isSymbolicLink?.() === true;
+  }
+
+  async entriesAsync(): Promise<Entry_[]> {
+    const files = await Dir.childrenAsync(this.path);
+
+    return files.map((n) => new Entry_(this.prefix as string, this.join(this.rel, n)));
+  }
+
+  async lstatAsync(): Promise<FsStatResult> {
+    const fs = getFs();
+    if (this.isDereference) {
+      return (this._lstat ??= fs.stat ? await fs.stat(this.path) : fs.statSync(this.path));
+    } else {
+      return (this._lstat ??= fs.lstat ? await fs.lstat(this.path) : fs.lstatSync(this.path));
+    }
+  }
+
+  async lstatBangAsync(): Promise<FsStatResult | null> {
+    try {
+      return await this.lstatAsync();
+    } catch (error) {
+      if (!isSystemCallError(error)) throw error;
+      return null;
+    }
+  }
+
+  async chmodAsync(mode: number): Promise<void> {
+    try {
+      if (await this.isSymlinkAsync()) {
+        if (getFs().lchmodSync != null) fileLchmod(mode, this.path);
+      } else {
+        await File.chmodAsync(mode, this.path);
+      }
+    } catch (error) {
+      if ((error as { code?: string }).code !== "EOPNOTSUPP") throw error;
+    }
+  }
+
+  async removeAsync(): Promise<void> {
+    if (await this.isDirectoryAsync()) {
+      await this.removeDir1Async();
+    } else {
+      await this.removeFileAsync();
+    }
+  }
+
+  async removeDir1Async(): Promise<void> {
+    const fs = getFs();
+    const path = removeTrailingSlash(this.path);
+    if (fs.rmdir) await fs.rmdir(path);
+    else fs.rmdirSync(path);
+  }
+
+  async removeFileAsync(): Promise<void> {
+    const fs = getFs();
+    if (fs.unlink) await fs.unlink(this.path);
+    else fs.unlinkSync(this.path);
+  }
+
+  async preorderTraverseAsync(yieldFn: (ent: Entry_) => Promise<void>): Promise<void> {
+    const stack: Entry_[] = [this];
+    let ent: Entry_ | undefined;
+    while ((ent = stack.pop()) != null) {
+      await yieldFn(ent);
+      if (await ent.isDirectoryAsync()) stack.push(...(await ent.entriesAsync()).reverse());
+    }
+  }
+
+  async postorderTraverseAsync(yieldFn: (ent: Entry_) => Promise<void>): Promise<void> {
+    if (await this.isDirectoryAsync()) {
+      let children: Entry_[];
+      try {
+        children = await this.entriesAsync();
+      } catch (error) {
+        if ((error as { code?: string }).code !== "EACCES") throw error;
+        await yieldFn(this);
+        return;
+      }
+
+      for (const ent of children) {
+        await ent.postorderTraverseAsync(async (e) => {
+          await yieldFn(e);
+        });
+      }
+    }
+    await yieldFn(this);
+  }
+
   /** `Entry_#wrap_traverse` (`vendor/ruby/v3.3.11/lib/fileutils.rb:2386-2393`). */
   wrapTraverse(pre: (ent: Entry_) => void, post: (ent: Entry_) => void): void {
     pre(this);
@@ -794,6 +890,81 @@ export class FileUtils {
     } catch (error) {
       if (force !== true) throw error;
     }
+  }
+
+  /** {@link FileUtils.rmR} over the backend's async verbs
+   * (`vendor/ruby/v3.3.11/lib/fileutils.rb:1299-1310`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async rmRAsync(
+    list: string | string[],
+    { force, noop, verbose }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
+  ): Promise<string[] | undefined> {
+    list = fuList(list);
+    if (verbose === true) fuOutputMessage(`rm -r${force === true ? "f" : ""} ${list.join(" ")}`);
+    if (noop === true) return;
+    for (const path of list) {
+      await FileUtils.removeEntryAsync(path, force);
+    }
+    return list;
+  }
+
+  /** {@link FileUtils.rmRf} over the backend's async verbs
+   * (`vendor/ruby/v3.3.11/lib/fileutils.rb:1328-1330`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async rmRfAsync(
+    list: string | string[],
+    { noop, verbose }: { noop?: boolean; verbose?: boolean } = {},
+  ): Promise<string[] | undefined> {
+    return FileUtils.rmRAsync(list, { force: true, noop, verbose });
+  }
+
+  /** {@link FileUtils.removeEntry} (`vendor/ruby/v3.3.11/lib/fileutils.rb:1449-1456`)
+   * over `Entry_`'s async walk: `Entry_#postorder_traverse`
+   * (`fileutils.rb:2364-2382`) yielding to `Entry_#remove` (`fileutils.rb:2314-2332`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async removeEntryAsync(path: string, force = false): Promise<void> {
+    try {
+      await new Entry_(path).postorderTraverseAsync(async (ent) => {
+        try {
+          await ent.removeAsync();
+        } catch (error) {
+          if (force !== true) throw error;
+        }
+      });
+    } catch (error) {
+      if (force !== true) throw error;
+    }
+  }
+
+  /** `FileUtils.chmod_R` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1815-1830`) over
+   * `Entry_`'s async walk: `Entry_#traverse` (`fileutils.rb:2354-2362`)
+   * yielding to `Entry_#chmod` (`fileutils.rb:2206-2213`). `mode` is the
+   * Integer arm of `fu_mode` (`fileutils.rb:1721-1723`); the symbolic String
+   * arm (`"u+x"`) is unported.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async chmodRAsync(
+    mode: number,
+    list: string | string[],
+    { noop, verbose, force }: { noop?: boolean; verbose?: boolean; force?: boolean } = {},
+  ): Promise<string[] | undefined> {
+    list = fuList(list);
+    if (verbose === true)
+      fuOutputMessage(`chmod -R${force === true ? "f" : ""} ${mode.toString(8)} ${list.join(" ")}`);
+    if (noop === true) return;
+    for (const root of list) {
+      await new Entry_(root).preorderTraverseAsync(async (ent) => {
+        try {
+          await ent.chmodAsync(mode);
+        } catch (error) {
+          if (force !== true) throw error;
+        }
+      });
+    }
+    return list;
   }
 
   /** `FileUtils.remove_file` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1473-1477`).

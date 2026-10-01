@@ -9,6 +9,7 @@ import {
   registerFsAdapter,
   type Bytes,
   type FsAdapter,
+  type FsStatResult,
   type PathAdapter,
 } from "@blazetrails/ruby-compat";
 import type { VirtualFS } from "./virtual-fs.js";
@@ -64,6 +65,8 @@ function toBytes(content: string): Bytes {
   });
 }
 
+const directories = new WeakMap<VirtualFS, Set<string>>();
+
 function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
   // Required on FsAdapter, like its sync twin. Both overloads are carried: an
   // encoding yields the string, its absence the bytes, and a missing path
@@ -83,62 +86,120 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
     return Promise.resolve(encoding === undefined ? toBytes(entry.content) : entry.content);
   }
 
+  function errno(code: string, syscall: string, path: string): Error {
+    return Object.assign(new Error(`${code}: ${syscall} '${path}'`), { code });
+  }
+
+  const made = directories.get(vfs) ?? new Set<string>();
+  directories.set(vfs, made);
+
+  function trim(path: string): string {
+    return path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
+  }
+
+  function beneath(path: string): string[] {
+    const prefix = path.endsWith("/") ? path : `${path}/`;
+    const files = vfs.list().map((file) => file.path);
+    return [...files, ...Object.keys(TEMPLATES), ...made].filter((e) => e.startsWith(prefix));
+  }
+
+  function isDirectory(path: string): boolean {
+    return made.has(trim(path)) || beneath(path).length > 0;
+  }
+
+  function content(path: string): string | null {
+    return TEMPLATES[path] ?? vfs.read(path)?.content ?? null;
+  }
+
+  function existsSync(path: string): boolean {
+    return content(path) !== null || isDirectory(path);
+  }
+
+  function statSync(path: string, syscall = "stat"): FsStatResult {
+    const file = content(path);
+    const directory = file === null && isDirectory(path);
+    if (file === null && !directory) throw errno("ENOENT", syscall, path);
+    return {
+      isDirectory: () => directory,
+      isFile: () => !directory,
+      isSymbolicLink: () => false,
+      isExecutable: () => directory,
+      size: file?.length ?? 0,
+      // boundary: epoch-zero placeholder for in-memory VFS file times.
+      atime: new Date(0),
+      mtime: new Date(0),
+      mode: directory ? 0o040755 : 0o100644,
+      uid: 0,
+      gid: 0,
+    };
+  }
+
+  function readdirSync(path: string): string[] {
+    if (!isDirectory(path)) throw errno("ENOENT", "scandir", path);
+    const prefix = path.endsWith("/") ? path : `${path}/`;
+    return [...new Set(beneath(path).map((entry) => entry.slice(prefix.length).split("/")[0]))];
+  }
+
+  function mkdirSync(path: string): void {
+    for (let dir = trim(path); dir !== "/"; dir = posixPath.dirname(dir)) made.add(dir);
+  }
+
+  function rmdirSync(path: string): void {
+    if (!isDirectory(path)) throw errno("ENOENT", "rmdir", path);
+    if (beneath(path).length > 0) throw errno("ENOTEMPTY", "rmdir", path);
+    made.delete(trim(path));
+  }
+
+  function unlinkSync(path: string): void {
+    if (!vfs.delete(path)) throw errno("ENOENT", "unlink", path);
+    mkdirSync(posixPath.dirname(path));
+  }
+
+  function writeFileSync(path: string, data: string | Uint8Array): void {
+    vfs.write(
+      path,
+      typeof data === "string" ? data : new TextDecoder("utf-8", { fatal: true }).decode(data),
+    );
+  }
+
+  function settle<T>(block: () => T): Promise<T> {
+    try {
+      return Promise.resolve(block());
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
+
   return {
     readFileSync(path: string): string {
       return vfs.read(path)?.content ?? "";
     },
     readFile,
-    writeFileSync(path: string, content: string): void {
-      vfs.write(path, content);
-    },
-    existsSync(path: string): boolean {
-      return vfs.exists(path);
-    },
-    mkdirSync(): void {
-      // VFS directories are virtual — no-op
-    },
-    appendFileSync(path: string, content: string): void {
+    writeFileSync,
+    writeFile: (path: string, data: string | Uint8Array) => settle(() => writeFileSync(path, data)),
+    existsSync,
+    exists: (path: string) => settle(() => existsSync(path)),
+    mkdirSync,
+    mkdir: (path: string) => settle(() => mkdirSync(path)),
+    appendFileSync(path: string, data: string): void {
       const existing = vfs.read(path);
-      vfs.write(path, (existing?.content ?? "") + content);
+      vfs.write(path, (existing?.content ?? "") + data);
     },
-    unlinkSync(path: string): void {
-      vfs.delete(path);
-    },
-    rm(list: string | string[]): void {
-      for (const entry of Array.isArray(list) ? list : [list]) vfs.delete(entry);
-    },
-    rmF(list: string | string[]): void {
-      for (const entry of Array.isArray(list) ? list : [list]) vfs.delete(entry);
-    },
-    readdirSync(): string[] {
-      return [];
-    },
+    unlinkSync,
+    unlink: (path: string) => settle(() => unlinkSync(path)),
+    readdirSync,
+    readdir: (path: string) => settle(() => readdirSync(path)),
+    rmdirSync,
+    rmdir: (path: string) => settle(() => rmdirSync(path)),
     rmSync(): void {
       // no-op
     },
-    statSync(path: string) {
-      const entry = vfs.read(path);
-      const content = entry?.content ?? "";
-      return {
-        isDirectory: () => false,
-        isFile: () => entry !== undefined,
-        size: content.length,
-        // boundary: epoch-zero placeholder for in-memory VFS file mtime.
-        atime: new Date(0),
-        mtime: new Date(0),
-        mode: 0o100644,
-        uid: 0,
-        gid: 0,
-      };
-    },
-    lstatSync(path: string) {
-      return this.statSync(path);
-    },
+    statSync: (path: string) => statSync(path),
+    stat: (path: string) => settle(() => statSync(path)),
+    lstatSync: (path: string) => statSync(path, "lstat"),
+    lstat: (path: string) => settle(() => statSync(path, "lstat")),
     cwd(): string {
       return "/";
-    },
-    exists(path: string): Promise<boolean> {
-      return Promise.resolve(TEMPLATES[path] !== undefined || vfs.exists(path));
     },
   };
 }

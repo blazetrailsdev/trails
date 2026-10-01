@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Dir, createTmpname } from "./dir.js";
+import { File } from "./file.js";
 
 function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), "trails-dir-"));
@@ -62,6 +63,35 @@ describe("Dir", () => {
       `${root}/sub`,
       `${root}/z.rb`,
     ]);
+  });
+
+  it("globAsync matches what glob does when no flag is given", async () => {
+    const root = fixture();
+
+    for (const pattern of [`${root}/**/*.rb`, `${root}/*`, `${root}/{a,b}/*.rb`, `${root}/nope/*`])
+      expect(await Dir.globAsync(pattern)).toEqual(Dir.glob(pattern));
+    expect(await Dir.globAsync(`${root}/a.rb`)).toEqual([`${root}/a.rb`]);
+    expect(await Dir.globAsync(`${root}/missing.rb`)).toEqual([]);
+  });
+
+  it("globAsync with FNM_DOTMATCH matches dotfiles and the first directory's own dot, never dot-dot", async () => {
+    const g = mkdtempSync(join(tmpdir(), "trails-dir-"));
+    for (const dir of ["a", "a/.h", ".d"]) mkdirSync(join(g, dir));
+    for (const file of ["B.rb", ".dot", "a/x.rb", "a/.y", "a/.h/z", ".d/w", "a.rb"])
+      writeFileSync(join(g, file), "");
+    symlinkSync(join(g, "a"), join(g, "lnk"));
+    const glob = async (pattern: string, flags = File.FNM_DOTMATCH): Promise<string> =>
+      (await Dir.globAsync(`${g}/${pattern}`, flags)).map((e) => e.slice(g.length + 1)).join(" ");
+
+    expect(await glob("*")).toBe(". .d .dot B.rb a a.rb lnk");
+    expect(await glob("a/?y")).toBe("a/.y");
+    expect(await glob("{.d,a}/*")).toBe(".d/. .d/w a/. a/.h a/.y a/x.rb");
+    expect(await glob("*/*")).toBe(
+      "./.d ./.dot ./B.rb ./a ./a.rb ./lnk .d/w a/.h a/.y a/x.rb lnk/.h lnk/.y lnk/x.rb",
+    );
+    expect(await glob("**/*")).toBe(". .d .d/w .dot B.rb a a/.h a/.h/z a/.y a/x.rb a.rb lnk");
+    expect(await glob("**/z")).toBe("a/.h/z");
+    expect(await glob("**/*.rb", 0)).toBe("B.rb a/x.rb a.rb");
   });
 
   it("glob answers an empty array for a pattern that matches nothing", () => {

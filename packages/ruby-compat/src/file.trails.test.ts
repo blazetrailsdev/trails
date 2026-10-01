@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -205,6 +206,53 @@ describe("File", () => {
     expect(File.isIdentical(path, root)).toBe(false);
     file.close();
     expect(File.isIdentical(path, join(root, "missing.txt"))).toBe(false);
+  });
+
+  it("identical? awaited compares device and inode, and reads them off an open stream", async () => {
+    const root = fixture();
+    const path = join(root, "ident.txt");
+    const file = File.open(path, "w+");
+    expect(await File.isIdenticalAsync(file, path)).toBe(true);
+    expect(await File.isIdenticalAsync(path, root)).toBe(false);
+    file.close();
+    expect(await File.isIdenticalAsync(path, join(root, "missing.txt"))).toBe(false);
+  });
+
+  it("symlink and link answer 0 and make the two names identical", async () => {
+    const root = fixture();
+    const source = join(root, "a.rb");
+    expect(await File.isSymlinkAsync(join(root, "broken"))).toBe(true);
+    expect(await File.isSymlinkAsync(join(root, "missing"))).toBe(false);
+    expect(await File.chmodAsync(0o600, source)).toBe(1);
+    expect(statSync(source).mode & 0o777).toBe(0o600);
+
+    expect(await File.symlinkAsync(source, join(root, "soft"))).toBe(0);
+    expect(await File.isSymlinkAsync(join(root, "soft"))).toBe(true);
+    expect(await File.isIdenticalAsync(source, join(root, "soft"))).toBe(true);
+
+    expect(await File.linkAsync(source, join(root, "hard"))).toBe(0);
+    expect(await File.isSymlinkAsync(join(root, "hard"))).toBe(false);
+    expect(await File.isIdenticalAsync(source, join(root, "hard"))).toBe(true);
+
+    await expect(File.symlinkAsync(source, join(root, "soft"))).rejects.toThrow(/EEXIST/);
+  });
+
+  it("symlink and link raise NotImplementedError on a backend with neither", async () => {
+    const previous = fsAdapterConfig.adapter;
+    registerFsAdapter("linkless", {} as unknown as FsAdapter, posixPath);
+    fsAdapterConfig.adapter = "linkless";
+    try {
+      await expect(File.symlinkAsync("a", "b")).rejects.toThrow(
+        "symlink() function is unimplemented on this machine",
+      );
+      await expect(File.linkAsync("a", "b")).rejects.toThrow(
+        "link() function is unimplemented on this machine",
+      );
+      expect(await File.chmodAsync(0o644, "a", "b")).toBe(2);
+      expect(await File.isSymlinkAsync("a")).toBe(false);
+    } finally {
+      fsAdapterConfig.adapter = previous;
+    }
   });
 });
 

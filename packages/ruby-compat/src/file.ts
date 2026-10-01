@@ -3,6 +3,7 @@ import { Encoding } from "./encoding.js";
 import { getFs, getPath } from "./fs-adapter.js";
 import type { FsStatResult } from "./fs-adapter.js";
 import { IO } from "./io.js";
+import { NotImplementedError } from "./not-implemented-error.js";
 
 /** `FMODE_SETENC_BY_BOM` (`vendor/ruby/v3.3.11/include/ruby/io.h:368`). */
 const FMODE_SETENC_BY_BOM = 0x00100000;
@@ -14,6 +15,16 @@ const FMODE_SETENC_BY_BOM = 0x00100000;
 function rbStat(file: IO | string): FsStatResult | null {
   try {
     return typeof file === "string" ? getFs().statSync(file) : file.stat();
+  } catch {
+    return null;
+  }
+}
+
+async function rbStatAsync(file: IO | string): Promise<FsStatResult | null> {
+  try {
+    if (typeof file !== "string") return file.stat();
+    const fs = getFs();
+    return fs.stat ? await fs.stat(file) : fs.statSync(file);
   } catch {
     return null;
   }
@@ -266,6 +277,43 @@ export class File extends IO {
   }
 
   /**
+   * {@link File.isIdentical} over the backend's async `stat`, which is the
+   * form a caller on the async fs path awaits; a backend with no async `stat`
+   * is read through its sync one. A stream argument is still `fstat`ed, as
+   * `rb_stat` (`vendor/ruby/v3.3.11/file.c:1296`) does.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.identical?`
+   * (`vendor/ruby/v3.3.11/file.c:2196`).
+   */
+  static async isIdenticalAsync(fileName1: IO | string, fileName2: IO | string): Promise<boolean> {
+    const st1 = await rbStatAsync(fileName1);
+    const st2 = await rbStatAsync(fileName2);
+    if (!st1 || !st2) return false;
+    if (st1.dev == null || st1.ino == null) return false;
+    if (st1.dev !== st2.dev) return false;
+    if (st1.ino !== st2.ino) return false;
+    return true;
+  }
+
+  /**
+   * {@link File.isSymlink} over the backend's async `lstat`, `false` on a
+   * failed `lstat`; a backend with no async `lstat` is read through its sync
+   * one.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.symlink?`
+   * (`vendor/ruby/v3.3.11/file.c:1670`).
+   */
+  static async isSymlinkAsync(fileName: string): Promise<boolean> {
+    try {
+      const fs = getFs();
+      const st = fs.lstat ? await fs.lstat(fileName) : fs.lstatSync(fileName);
+      return st.isSymbolicLink?.() === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:2009` `rb_file_file_p`, `false` on a failed stat.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.file?`
@@ -511,6 +559,54 @@ export class File extends IO {
   static chmod(mode: number, ...files: string[]): number {
     for (const file of files) getFs().chmodSync?.(file, mode);
     return files.length;
+  }
+
+  /**
+   * {@link File.chmod} over the backend's async `chmod`, falling back to its
+   * `chmodSync`; a backend with no permission bits has neither, and there the
+   * call is a no-op too.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.chmod`
+   * (`vendor/ruby/v3.3.11/file.c:2575`).
+   */
+  static async chmodAsync(mode: number, ...files: string[]): Promise<number> {
+    const fs = getFs();
+    for (const file of files) {
+      if (fs.chmod) await fs.chmod(file, mode);
+      else fs.chmodSync?.(file, mode);
+    }
+    return files.length;
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/file.c:3056` `rb_file_s_link`, which answers `0`
+   * (`file.c:3066`) and raises `NotImplementedError` on a platform with no
+   * `link(2)` — spelled here as a backend with no `link`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.link`
+   * (`vendor/ruby/v3.3.11/file.c:3056`).
+   */
+  static async linkAsync(oldName: string, newName: string): Promise<number> {
+    const fs = getFs();
+    if (!fs.link) throw new NotImplementedError("link() function is unimplemented on this machine");
+    await fs.link(oldName, newName);
+    return 0;
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/file.c:3086` `rb_file_s_symlink`, which answers `0`
+   * (`file.c:3096`) and raises `NotImplementedError` on a platform with no
+   * `symlink(2)` — spelled here as a backend with no `symlink`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.symlink`
+   * (`vendor/ruby/v3.3.11/file.c:3086`).
+   */
+  static async symlinkAsync(oldName: string, newName: string): Promise<number> {
+    const fs = getFs();
+    if (!fs.symlink)
+      throw new NotImplementedError("symlink() function is unimplemented on this machine");
+    await fs.symlink(oldName, newName);
+    return 0;
   }
 
   /**

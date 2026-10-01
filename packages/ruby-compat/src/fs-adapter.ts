@@ -109,6 +109,9 @@ export interface FsAdapter {
   rmdir?(path: string): Promise<void>;
   readdir?(path: string): Promise<string[]>;
   mkdir?(path: string, options?: { recursive?: boolean }): Promise<void>;
+  symlink?(target: string, path: string): Promise<void>;
+  link?(existingPath: string, newPath: string): Promise<void>;
+  chmod?(path: string, mode: number): Promise<void>;
 }
 
 export interface PathAdapter {
@@ -256,6 +259,9 @@ function tryAutoRegisterNode(): boolean {
       rmdir(path: string): Promise<void>;
       readdir(path: string): Promise<string[]>;
       mkdir(path: string, opts?: { recursive?: boolean }): Promise<string | undefined>;
+      symlink(target: string, path: string): Promise<void>;
+      link(existingPath: string, newPath: string): Promise<void>;
+      chmod(path: string, mode: number): Promise<void>;
     };
     const withExecutable = (stat: FsStatResult): FsStatResult =>
       Object.assign(stat, { isExecutable: () => (stat.mode & 0o111) !== 0 });
@@ -285,6 +291,9 @@ function tryAutoRegisterNode(): boolean {
       readdir: (p: string) => fsPromises.readdir(p),
       mkdir: (p: string, opts?: { recursive?: boolean }) =>
         fsPromises.mkdir(p, opts).then(() => undefined),
+      symlink: (target: string, p: string) => fsPromises.symlink(target, p),
+      link: (existingPath: string, newPath: string) => fsPromises.link(existingPath, newPath),
+      chmod: (p: string, mode: number) => fsPromises.chmod(p, mode),
       ...withFlock(nodeFs as unknown as FlockableFs),
     }) as FsAdapter;
     const nodePath = req("node:path") as Required<Omit<PathAdapter, "pathToFileURL">>;
