@@ -67,6 +67,53 @@ describe("LazyAttributeSet", () => {
     const lazy = new LazyAttributeSet({}, {}, {}, {});
     expect(lazy.fetchValue("nope")).toBe(null);
   });
+
+  describe("over an indexed row", () => {
+    function indexedRow(columnIndexes: Record<string, number>, row: unknown[]) {
+      return {
+        isKey: (column: string) => Object.hasOwn(columnIndexes, column),
+        keys: () => Object.keys(columnIndexes),
+        eachKey: (block: (key: string) => void) => Object.keys(columnIndexes).forEach(block),
+        fetch: (column: string, block?: () => unknown) =>
+          Object.hasOwn(columnIndexes, column) ? row[columnIndexes[column]] : block?.(),
+      };
+    }
+
+    it("reads present values through fetch and casts them", () => {
+      const types = { name: strType, age: intType };
+      const lazy = new LazyAttributeSet(
+        indexedRow({ name: 0, age: 1 }, ["Alice", "30"]),
+        types,
+        {},
+        {},
+      );
+      expect(lazy.fetchValue("age")).toBe(30);
+      expect(lazy.getAttribute("name").valueBeforeTypeCast).toBe("Alice");
+      expect(lazy.isKey("name")).toBe(true);
+    });
+
+    it("keeps a stored null distinct from an absent column", () => {
+      const types = { name: strType, status: strType };
+      const defaults = { status: Attribute.fromDatabase("status", "draft", strType) };
+      const lazy = new LazyAttributeSet(indexedRow({ name: 0 }, [null]), types, {}, defaults);
+      expect(lazy.getAttribute("name").isInitialized()).toBe(true);
+      expect(lazy.fetchValue("name")).toBe(null);
+      expect(lazy.fetchValue("status")).toBe("draft");
+    });
+
+    it("unions the row's keys with the typed ones and materializes both", () => {
+      const types = { name: strType, missing: strType };
+      const lazy = new LazyAttributeSet(
+        indexedRow({ extra: 0, name: 1 }, [1, "Alice"]),
+        types,
+        { extra: intType },
+        {},
+      );
+      expect(lazy.keys()).toEqual(["extra", "name"]);
+      expect(lazy.isKey("missing")).toBe(false);
+      expect(lazy.toHash()).toEqual({ extra: 1, name: "Alice" });
+    });
+  });
 });
 
 describe("LazyAttributeHash", () => {

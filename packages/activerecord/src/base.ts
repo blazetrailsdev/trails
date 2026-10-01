@@ -103,6 +103,7 @@ import {
 
 import * as ConnectionHandling from "./connection-handling.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
+import type { IndexedRow } from "./result.js";
 import * as ModelSchema from "./model-schema.js";
 import {
   createOrUpdate as callbacksCreateOrUpdate,
@@ -1508,7 +1509,7 @@ export class Base extends Model {
 
   static instantiate<T extends typeof Base>(
     this: T,
-    attributes: Record<string, unknown>,
+    attributes: Record<string, unknown> | IndexedRow,
     columnTypes?: Record<string, unknown>,
     block?: (record: InstanceType<T>) => void,
   ): InstanceType<T> {
@@ -1672,7 +1673,7 @@ export class Base extends Model {
 
   static _instantiate<T extends typeof Base>(
     this: T,
-    row: Record<string, unknown>,
+    row: Record<string, unknown> | IndexedRow,
     block?: (record: InstanceType<T>) => void,
     columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
   ): InstanceType<T> {
