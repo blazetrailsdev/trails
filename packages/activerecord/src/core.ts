@@ -121,7 +121,7 @@ export const ClassMethods = {
 
 interface CoreRecord {
   id: unknown;
-  _attributes: Iterable<[string, unknown]>;
+  _attributes: AttributeSet;
   _newRecord: boolean;
   readAttribute(name: string): unknown;
   isPersisted(): boolean;
@@ -145,10 +145,9 @@ export async function prettyPrint(
       pp.text("not initialized");
       return;
     }
-    const knownKeys = new Set<string>(
-      Array.from(this._attributes as Iterable<[string, unknown]>).map(([k]) => k),
-    );
-    const attrNames = attributesForInspect.call(this).filter((name) => knownKeys.has(name));
+    const attrNames = attributesForInspect
+      .call(this)
+      .filter((name) => this._attributes.isKey(name));
     await pp.seplist(
       attrNames,
       () => pp.text(","),
@@ -763,11 +762,8 @@ export function inspectWithAttributes(
 ): string {
   const ctor = this.constructor as { name: string };
   if (!this._attributes) return `#<${ctor.name} not initialized>`;
-  const knownKeys = new Set<string>(
-    Array.from(this._attributes as Iterable<[string, unknown]>).map(([k]) => k),
-  );
   const parts = attributesToList
-    .filter((name) => knownKeys.has(name))
+    .filter((name) => this._attributes.isKey(name))
     .map(
       (name) =>
         `${name}: ${(this as unknown as { attributeForInspect(attr: string): string }).attributeForInspect(name)}`,
@@ -785,7 +781,7 @@ export function attributesForInspect(this: CoreRecord): string[] {
 /** @internal */
 export function allAttributesForInspect(this: CoreRecord): string[] {
   if (!this._attributes) return [];
-  return Array.from(this._attributes).map(([k]) => k);
+  return this._attributes.keys();
 }
 
 /** @internal */

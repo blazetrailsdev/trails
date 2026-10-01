@@ -71,7 +71,7 @@ export function defineModelCallbacks(this: object, ...args: unknown[]): void {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE callbacks-define-model-callback-send-and-macro-options */
 const _defineModelCallbackByType: Record<string, (klass: CallbackHost, callback: string) => void> =
   {
     _define_before_model_callback: _defineBeforeModelCallback,
@@ -163,7 +163,7 @@ export function _defineAfterModelCallback(klass: CallbackHost, callback: string)
   });
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE callbacks-define-model-callback-send-and-macro-options */
 function extractMacroOptions(
   args: FilterListEntry[],
 ): [FilterListEntry[], CallbackOptions & CallbackConditions] {

@@ -1,13 +1,7 @@
+import { Assertion } from "@blazetrails/activesupport";
+
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Lint {}
-
-/** @noRailsEquivalent PERMANENT */
-export class MinitestAssertion extends globalThis.Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "MinitestAssertion";
-  }
-}
 
 /** @internal */
 export function model<T>(m: T | { toModel(): T }): T {
@@ -20,7 +14,7 @@ export function model<T>(m: T | { toModel(): T }): T {
 /** @internal */
 export function assertBoolean(result: unknown, name: string): void {
   if (result !== true && result !== false) {
-    throw new MinitestAssertion(`${name} should be a boolean`);
+    throw new Assertion(`${name} should be a boolean`);
   }
 }
 
@@ -30,11 +24,11 @@ export namespace Tests {
   export function testToKey(input: ToKeyHost | { toModel(): ToKeyHost }): void {
     const m = model(input);
     if (typeof m.toKey !== "function") {
-      throw new MinitestAssertion("model must respond to toKey");
+      throw new Assertion("model must respond to toKey");
     }
     m.isPersisted = () => false;
     if (m.toKey() !== null) {
-      throw new MinitestAssertion("toKey should return null when `isPersisted` returns false");
+      throw new Assertion("toKey should return null when `isPersisted` returns false");
     }
   }
 
@@ -46,12 +40,12 @@ export namespace Tests {
   export function testToParam(input: ToParamHost | { toModel(): ToParamHost }): void {
     const m = model(input);
     if (typeof m.toParam !== "function") {
-      throw new MinitestAssertion("model must respond to toParam");
+      throw new Assertion("model must respond to toParam");
     }
     m.toKey = () => [1];
     m.isPersisted = () => false;
     if (m.toParam() !== null) {
-      throw new MinitestAssertion("toParam should return null when `isPersisted` returns false");
+      throw new Assertion("toParam should return null when `isPersisted` returns false");
     }
   }
 
@@ -61,10 +55,10 @@ export namespace Tests {
   ): void {
     const m = model(input);
     if (typeof m.toPartialPath !== "function") {
-      throw new MinitestAssertion("model must respond to toPartialPath");
+      throw new Assertion("model must respond to toPartialPath");
     }
     if (typeof m.toPartialPath() !== "string") {
-      throw new MinitestAssertion("toPartialPath must return a string");
+      throw new Assertion("toPartialPath must return a string");
     }
   }
 
@@ -72,7 +66,7 @@ export namespace Tests {
   export function testPersisted(input: PersistedHost | { toModel(): PersistedHost }): void {
     const m = model(input);
     if (typeof m.isPersisted !== "function") {
-      throw new MinitestAssertion("model must respond to isPersisted");
+      throw new Assertion("model must respond to isPersisted");
     }
     assertBoolean(m.isPersisted(), "isPersisted");
   }
@@ -84,19 +78,19 @@ export namespace Tests {
   export function testModelNaming(model: ModelNamingHost): void {
     const modelName = model.constructor.modelName;
     if (!modelName) {
-      throw new MinitestAssertion("model.constructor.modelName must be defined");
+      throw new Assertion("model.constructor.modelName must be defined");
     }
     if (typeof modelName.human() !== "string") {
-      throw new MinitestAssertion("modelName.human must return a string");
+      throw new Assertion("modelName.human must return a string");
     }
     if (typeof modelName.singular !== "string") {
-      throw new MinitestAssertion("modelName.singular must return a string");
+      throw new Assertion("modelName.singular must return a string");
     }
     if (typeof modelName.plural !== "string") {
-      throw new MinitestAssertion("modelName.plural must return a string");
+      throw new Assertion("modelName.plural must return a string");
     }
     if (model.modelName !== modelName) {
-      throw new MinitestAssertion("model.modelName must equal model.constructor.modelName");
+      throw new Assertion("model.modelName must equal model.constructor.modelName");
     }
   }
 
@@ -105,7 +99,7 @@ export namespace Tests {
   }): void {
     const result = model.errors.messagesFor("hello");
     if (!Array.isArray(result) || result.length !== 0) {
-      throw new MinitestAssertion("errors#[] should return an empty Array");
+      throw new Assertion("errors#[] should return an empty Array");
     }
   }
 }

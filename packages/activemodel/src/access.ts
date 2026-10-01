@@ -6,7 +6,7 @@ import {
 import { NoMethodError } from "./attribute-assignment.js";
 
 export class Access {
-  /** @missingRailsArgs index_with — PERMANENT */
+  /** @missingRailsArgs index_with — CONVERGEABLE access-slice-index-with-receiver-shape-and-public-send */
   slice(...methods: (string | string[])[]): HashWithIndifferentAccess<unknown> {
     return withIndifferentAccess(
       Object.fromEntries(indexWith(methods.flat(), (method) => publicSend(this, method))),

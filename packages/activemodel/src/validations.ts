@@ -416,7 +416,6 @@ export function raiseOnMissingTranslations(value?: boolean): boolean {
 
 export type ConditionFn = ((record: ValidatableRecord) => boolean) | string;
 
-/** @noRailsEquivalent PERMANENT */
 export interface ConditionalOptions {
   if?: ConditionFn | ConditionFn[];
   unless?: ConditionFn | ConditionFn[];

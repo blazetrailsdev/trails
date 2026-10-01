@@ -1,7 +1,7 @@
 import { ValueType } from "./type/value.js";
 import { defaultValue } from "./type.js";
 import { MissingAttributeError } from "./attribute-methods.js";
-import { rbEqual } from "@blazetrails/ruby-compat";
+import { hasKey, rbEqual } from "@blazetrails/ruby-compat";
 import { isDuplicable, registerConstant } from "@blazetrails/activesupport";
 import { ActiveModel } from "./namespaces.js";
 import type { UserProvidedDefault } from "./attribute/user-provided-default.js";
@@ -25,7 +25,7 @@ export const UNINITIALIZED_ORIGINAL_VALUE: unique symbol = Symbol.for(
 const rubyNamespace: unique symbol = Symbol.for("@blazetrails:rubyNamespace");
 
 export abstract class Attribute {
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE activemodel-ruby-classpath-carriers-onto-rb-mod-name */
   static readonly [rubyNamespace]: string = "ActiveModel";
 
   declare static UserProvidedDefault: typeof UserProvidedDefault;
@@ -121,7 +121,7 @@ export abstract class Attribute {
     return this.typeCast(this.valueBeforeTypeCast);
   }
 
-  /** @missingRailsArgs changed_in_place? — PERMANENT */
+  /** @missingRailsArgs changed_in_place? — CONVERGEABLE attribute-value-for-database-memo-ivar-collides-with-private-method */
   get valueForDatabase(): unknown {
     if (
       !this._hasValueForDatabase ||
@@ -238,14 +238,13 @@ export abstract class Attribute {
     return this.value;
   }
 
-  /** @missingRailsCall key? — PERMANENT */
   initWith(coder: Coder): void {
     const self = this as { -readonly [K in "name" | "type"]: Attribute[K] };
     self.name = (coder["name"] ?? null) as string | null;
     this._valueBeforeTypeCast = coder["value_before_type_cast"] ?? null;
     self.type = (coder["type"] ?? null) as ValueType | null;
     this.originalAttribute = (coder["original_attribute"] ?? null) as Attribute | null;
-    this._hasValue = Object.hasOwn(coder, "value");
+    this._hasValue = hasKey(coder, "value");
     if (this._hasValue) this._value = coder["value"];
   }
 
@@ -280,7 +279,7 @@ export abstract class Attribute {
 }
 
 export class FromDatabase extends Attribute {
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE activemodel-ruby-classpath-carriers-onto-rb-mod-name */
   static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   typeCast(value: unknown): unknown {
     return this.type!.deserialize(value);
@@ -301,7 +300,7 @@ export class FromDatabase extends Attribute {
 }
 
 export class FromUser extends Attribute {
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE activemodel-ruby-classpath-carriers-onto-rb-mod-name */
   static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   typeCast(value: unknown): unknown {
     return this.type!.cast(value);
@@ -322,7 +321,7 @@ export class FromUser extends Attribute {
 }
 
 export class WithCastValue extends Attribute {
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE activemodel-ruby-classpath-carriers-onto-rb-mod-name */
   static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   typeCast(value: unknown): unknown {
     return value;
@@ -334,7 +333,7 @@ export class WithCastValue extends Attribute {
 }
 
 export class Null extends Attribute {
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE activemodel-ruby-classpath-carriers-onto-rb-mod-name */
   static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   constructor(name: string | null) {
     super(name, null, defaultValue());
@@ -362,7 +361,7 @@ export class Null extends Attribute {
 }
 
 export class Uninitialized extends Attribute {
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE activemodel-ruby-classpath-carriers-onto-rb-mod-name */
   static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   constructor(name: string | null, type: ValueType | null) {
     super(name, null, type);
