@@ -223,32 +223,34 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should allow post with token in header", async () => {
     initializeCsrfToken();
-    await assertNotBlocked(() => tc.post("index", { env: { HTTP_X_CSRF_TOKEN: TOKEN } }));
+    tc.request.env["HTTP_X_CSRF_TOKEN"] = TOKEN;
+    await assertNotBlocked(() => tc.post("index"));
   });
 
   it("should allow delete with token in header", async () => {
     initializeCsrfToken();
-    await assertNotBlocked(() => tc.delete("index", { env: { HTTP_X_CSRF_TOKEN: TOKEN } }));
+    tc.request.env["HTTP_X_CSRF_TOKEN"] = TOKEN;
+    await assertNotBlocked(() => tc.delete("index"));
   });
 
   it("should allow patch with token in header", async () => {
     initializeCsrfToken();
-    await assertNotBlocked(() => tc.patch("index", { env: { HTTP_X_CSRF_TOKEN: TOKEN } }));
+    tc.request.env["HTTP_X_CSRF_TOKEN"] = TOKEN;
+    await assertNotBlocked(() => tc.patch("index"));
   });
 
   it("should allow put with token in header", async () => {
     initializeCsrfToken();
-    await assertNotBlocked(() => tc.put("index", { env: { HTTP_X_CSRF_TOKEN: TOKEN } }));
+    tc.request.env["HTTP_X_CSRF_TOKEN"] = TOKEN;
+    await assertNotBlocked(() => tc.put("index"));
   });
 
   it("should allow post with origin checking and correct origin", async () => {
     await forgeryProtectionOriginCheck(async () => {
       initializeCsrfToken();
+      tc.request.setHeader("HTTP_ORIGIN", "http://test.host");
       await assertNotBlocked(() =>
-        tc.post("index", {
-          env: { HTTP_ORIGIN: "http://test.host" },
-          params: { custom_authenticity_token: TOKEN },
-        }),
+        tc.post("index", { params: { custom_authenticity_token: TOKEN } }),
       );
     });
   });
@@ -265,11 +267,9 @@ describe("ActionController::RequestForgeryProtection", () => {
   it("should raise for post with null origin", async () => {
     await forgeryProtectionOriginCheck(async () => {
       initializeCsrfToken();
+      tc.request.setHeader("HTTP_ORIGIN", "null");
       const exception = await assertRaises([InvalidAuthenticityToken], {}, () =>
-        tc.post("index", {
-          env: { HTTP_ORIGIN: "null" },
-          params: { custom_authenticity_token: TOKEN },
-        }),
+        tc.post("index", { params: { custom_authenticity_token: TOKEN } }),
       );
       expect(exception.message).toMatch("The browser returned a 'null' origin for a request");
     });
@@ -282,11 +282,9 @@ describe("ActionController::RequestForgeryProtection", () => {
     try {
       await forgeryProtectionOriginCheck(async () => {
         initializeCsrfToken();
+        tc.request.setHeader("HTTP_ORIGIN", "http://bad.host");
         await assertBlocked(() =>
-          tc.post("index", {
-            env: { HTTP_ORIGIN: "http://bad.host" },
-            params: { custom_authenticity_token: TOKEN },
-          }),
+          tc.post("index", { params: { custom_authenticity_token: TOKEN } }),
         );
       });
 
@@ -356,11 +354,9 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
     Base.forgeryProtectionOriginCheck = true;
     try {
       tc.session().set("_csrf_token", TOKEN);
+      tc.request.setHeader("HTTP_ORIGIN", "http://bad.host");
       const exception = await assertRaises([InvalidAuthenticityToken], {}, () =>
-        tc.post("index", {
-          env: { HTTP_ORIGIN: "http://bad.host" },
-          params: { custom_authenticity_token: TOKEN },
-        }),
+        tc.post("index", { params: { custom_authenticity_token: TOKEN } }),
       );
       expect(exception.message).toMatch(
         "HTTP Origin header (http://bad.host) didn't match request.base_url (http://test.host)",
@@ -414,24 +410,25 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
       tc.assertResponse("success");
     }
 
-    const accept = (value: string) => ({ headers: { Accept: value } });
-
     it("should only allow same origin js get with xhr header", async () => {
       await assertCrossOriginBlocked(() => tc.get("sameOriginJs"));
       await assertCrossOriginBlocked(() => tc.get("sameOriginJs", { format: "js" }));
-      await assertCrossOriginBlocked(() =>
-        tc.get("negotiateSameOrigin", accept("text/javascript")),
-      );
+      await assertCrossOriginBlocked(() => {
+        tc.request.accept = "text/javascript";
+        return tc.get("negotiateSameOrigin");
+      });
 
-      await assertCrossOriginBlocked(() =>
-        tc.get("negotiateSameOrigin", accept("application/javascript")),
-      );
+      await assertCrossOriginBlocked(() => {
+        tc.request.accept = "application/javascript";
+        return tc.get("negotiateSameOrigin");
+      });
 
       await assertCrossOriginNotBlocked(() => tc.get("sameOriginJs", { xhr: true }));
       await assertCrossOriginNotBlocked(() => tc.get("sameOriginJs", { xhr: true, format: "js" }));
-      await assertCrossOriginNotBlocked(() =>
-        tc.get("negotiateSameOrigin", { ...accept("text/javascript"), xhr: true }),
-      );
+      await assertCrossOriginNotBlocked(() => {
+        tc.request.accept = "text/javascript";
+        return tc.get("negotiateSameOrigin", { xhr: true });
+      });
     });
 
     it("should warn on not same origin js", async () => {
@@ -475,26 +472,26 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
       await assertCrossOriginNotBlocked(() =>
         tc.post("sameOriginJs", { params: { format: "js", custom_authenticity_token: TOKEN } }),
       );
-      await assertCrossOriginNotBlocked(() =>
-        tc.post("negotiateSameOrigin", {
-          ...accept("text/javascript"),
-          params: { custom_authenticity_token: TOKEN },
-        }),
-      );
+      await assertCrossOriginNotBlocked(() => {
+        tc.request.accept = "text/javascript";
+        return tc.post("negotiateSameOrigin", { params: { custom_authenticity_token: TOKEN } });
+      });
     });
 
     it("should only allow cross origin js get without xhr header if protection disabled", async () => {
       await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs"));
       await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs", { format: "js" }));
-      await assertCrossOriginNotBlocked(() =>
-        tc.get("negotiateCrossOrigin", accept("text/javascript")),
-      );
+      await assertCrossOriginNotBlocked(() => {
+        tc.request.accept = "text/javascript";
+        return tc.get("negotiateCrossOrigin");
+      });
 
       await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs", { xhr: true }));
       await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs", { xhr: true, format: "js" }));
-      await assertCrossOriginNotBlocked(() =>
-        tc.get("negotiateCrossOrigin", { ...accept("text/javascript"), xhr: true }),
-      );
+      await assertCrossOriginNotBlocked(() => {
+        tc.request.accept = "text/javascript";
+        return tc.get("negotiateCrossOrigin", { xhr: true });
+      });
     });
   });
 });

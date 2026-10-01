@@ -132,23 +132,23 @@ describe("TestCaseTest", () => {
     it("GET dispatches to action", async () => {
       await tc.get("index");
       expect(tc.controller).toBeDefined();
-      expect(tc.responseBody).toContain("Hello");
+      expect(tc.response.body).toContain("Hello");
     });
 
     it("POST dispatches to action", async () => {
       await tc.post("create", { params: { title: "New Post" } });
       expect(tc.controller.status).toBe(201);
-      expect(JSON.parse(tc.responseBody).title).toBe("New Post");
+      expect(JSON.parse(tc.response.body).title).toBe("New Post");
     });
 
     it("PUT dispatches to action", async () => {
       await tc.put("update", { params: { id: "42" } });
-      expect(JSON.parse(tc.responseBody).id).toBe("42");
+      expect(JSON.parse(tc.response.body).id).toBe("42");
     });
 
     it("PATCH dispatches to action", async () => {
       await tc.patch("update", { params: { id: "7" } });
-      expect(JSON.parse(tc.responseBody).id).toBe("7");
+      expect(JSON.parse(tc.response.body).id).toBe("7");
     });
 
     it("DELETE dispatches to action", async () => {
@@ -165,36 +165,21 @@ describe("TestCaseTest", () => {
   describe("request options", () => {
     it("passes params to controller", async () => {
       await tc.get("show", { params: { id: "99" } });
-      expect(JSON.parse(tc.responseBody).id).toBe("99");
-    });
-
-    it("sets custom headers", async () => {
-      await tc.get("index", { headers: { "X-Custom": "test" } });
-      expect(tc.request.getHeader("X-Custom")).toBe("test");
+      expect(JSON.parse(tc.response.body).id).toBe("99");
     });
 
     it("sets XHR flag", async () => {
       await tc.get("xhrFlag", { xhr: true });
-      expect(JSON.parse(tc.responseBody).xhr).toBe(true);
+      expect(JSON.parse(tc.response.body).xhr).toBe(true);
     });
 
     it("passes session data", async () => {
       await tc.get("useSession", { session: { count: 5 } });
-      expect(JSON.parse(tc.responseBody).count).toBe(6);
+      expect(JSON.parse(tc.response.body).count).toBe(6);
     });
   });
 
   describe("response inspection", () => {
-    it("responseBody returns response body", async () => {
-      await tc.get("renderPlain");
-      expect(tc.responseBody).toBe("hello world");
-    });
-
-    it("parsedBody returns parsed JSON", async () => {
-      await tc.get("index");
-      expect(tc.parsedBody).toEqual([{ id: 1, title: "Hello" }]);
-    });
-
     it("controller is accessible", async () => {
       await tc.get("index");
       expect(tc.controller).toBeInstanceOf(Base);
@@ -358,36 +343,18 @@ describe("TestCaseTest", () => {
   describe("session persistence", () => {
     it("session persists across requests", async () => {
       await tc.get("useSession");
-      expect(JSON.parse(tc.responseBody).count).toBe(1);
+      expect(JSON.parse(tc.response.body).count).toBe(1);
 
       await tc.get("useSession");
-      expect(JSON.parse(tc.responseBody).count).toBe(2);
+      expect(JSON.parse(tc.response.body).count).toBe(2);
 
       await tc.get("useSession");
-      expect(JSON.parse(tc.responseBody).count).toBe(3);
+      expect(JSON.parse(tc.response.body).count).toBe(3);
     });
 
     it("session set by controller is available", async () => {
       await tc.post("create", { params: { title: "My Post" } });
       expect(tc.session().get("lastCreated")).toBe("My Post");
-    });
-
-    it("reset clears session", async () => {
-      await tc.get("useSession");
-      tc.reset();
-      await tc.get("useSession");
-      expect(JSON.parse(tc.responseBody).count).toBe(1);
-    });
-  });
-
-  describe("reset", () => {
-    it("clears controller, request, response", async () => {
-      await tc.get("index");
-      const { controller, request, response } = tc;
-      tc.reset();
-      expect(tc.controller).not.toBe(controller);
-      expect(tc.request).not.toBe(request);
-      expect(tc.response).not.toBe(response);
     });
   });
 
@@ -405,7 +372,7 @@ describe("TestCaseTest", () => {
       mtc.controller = new SimpleMetal();
       await mtc.beforeSetup();
       await mtc.get("index");
-      expect(mtc.responseBody).toBe("metal response");
+      expect(mtc.response.body).toBe("metal response");
     });
   });
 

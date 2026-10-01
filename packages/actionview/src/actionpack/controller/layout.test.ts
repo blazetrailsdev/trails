@@ -93,7 +93,7 @@ describe("LayoutAutoDiscoveryTest", () => {
       testCase.routes = SharedTestRoutes;
       await testCase.get("hello");
       assertResponse("success");
-      expect(testCase.responseBody).toBe("layouts/third_party_template_library.mab");
+      expect(testCase.response.body).toBe("layouts/third_party_template_library.mab");
     });
   });
 
@@ -279,6 +279,6 @@ describe("LayoutSymlinkedIsRenderedTest", () => {
     testCase.routes = SharedTestRoutes;
     await testCase.get("hello");
     assertResponse(200);
-    expect(testCase.responseBody).toContain("This is my layout");
+    expect(testCase.response.body).toContain("This is my layout");
   });
 });

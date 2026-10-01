@@ -83,14 +83,12 @@ type ControllerClass = new () => Metal;
 
 export interface RequestOptions {
   params?: Record<string, unknown> | null;
-  headers?: Record<string, string>;
   session?: Record<string, unknown>;
   flash?: Record<string, string>;
   body?: string | Record<string, unknown>;
   format?: string;
   xhr?: boolean;
   as?: string;
-  env?: Record<string, unknown>;
   method?: string;
 }
 
@@ -244,14 +242,6 @@ export class TestCase extends ActiveSupportTestCase {
   /** @internal */
   _responseKlass!: typeof TestResponse | typeof LiveTestResponse;
 
-  get responseBody(): string {
-    return this.response?.body ?? this.controller?.responseBody ?? "";
-  }
-
-  get parsedBody(): unknown {
-    return JSON.parse(this.responseBody);
-  }
-
   constructor(name?: string) {
     super(name!);
   }
@@ -315,24 +305,8 @@ export class TestCase extends ActiveSupportTestCase {
     );
   }
 
-  reset(): void {
-    this.controller = undefined!;
-    this._cookieJar = undefined;
-    this.setupControllerRequestAndResponse();
-  }
-
   async process(action: string, options: RequestOptions = {}): Promise<void> {
-    const {
-      method = "GET",
-      params,
-      session,
-      body,
-      flash,
-      xhr = false,
-      as,
-      env: extraEnv = {},
-      headers,
-    } = options;
+    const { method = "GET", params, session, body, flash = {}, xhr = false, as } = options;
     let { format } = options;
 
     this.checkRequiredIvars();
@@ -372,16 +346,6 @@ export class TestCase extends ActiveSupportTestCase {
 
     if (format) {
       parameters["format"] = format;
-    }
-
-    for (const [key, value] of Object.entries(extraEnv)) this.request.setHeader(key, value);
-    if (headers) {
-      for (const [name, value] of Object.entries(headers)) {
-        const envKey = name.startsWith("HTTP_")
-          ? name
-          : "HTTP_" + name.toUpperCase().replace(/-/g, "_");
-        this.request.setHeader(envKey, value);
-      }
     }
 
     this.setupRequest(this.controllerClassName(), action, parameters, session, flash, xhr);

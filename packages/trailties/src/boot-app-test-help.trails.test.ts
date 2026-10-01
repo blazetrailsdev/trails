@@ -114,7 +114,7 @@ describe("test_help wires a booted app into the test case classes", () => {
     await controllerTest.beforeSetup();
     await controllerTest.get("show");
     expect(controllerTest.response.status).toBe(200);
-    expect(controllerTest.responseBody).toContain("<p>Hello from TSE</p>");
+    expect(controllerTest.response.body).toContain("<p>Hello from TSE</p>");
   });
 
   it("rolls a model test's writes back after the test", async () => {
