@@ -374,7 +374,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("dependence", async () => {
-    const numAccounts = (await Account.count()) as number;
+    const numAccounts = await Account.count();
     const firm = (await Firm.find(1)) as any;
     expect(await readHasOne(firm, "account")).not.toBeNull();
     const accountId = (await readHasOne(firm, "account")).id;
@@ -403,7 +403,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("exclusive dependence", async () => {
-    const numAccounts = (await Account.count()) as number;
+    const numAccounts = await Account.count();
     const firm = (await ExclusivelyDependentFirm.find(9)) as any;
     expect(await readHasOne(firm, "account")).not.toBeNull();
     expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([]);
@@ -1243,10 +1243,7 @@ describe("HasOneAssociationsTest", () => {
     const author = await DestroyableAuthor.create({ name: "Test" });
     await (UndestroyableBook as any).create({ author });
     await assertNoDifference(
-      [
-        () => DestroyableAuthor.count() as Promise<number>,
-        () => UndestroyableBook.count() as Promise<number>,
-      ],
+      [() => DestroyableAuthor.count(), () => UndestroyableBook.count()],
       null,
       async () => {
         assertNot(await author.destroy());

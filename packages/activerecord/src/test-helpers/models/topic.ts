@@ -190,7 +190,7 @@ export class Topic extends Base {
   }
 
   static async klassStats(this: typeof Topic, stats: { count?: number }): Promise<typeof Topic> {
-    stats.count = (await this.count()) as number;
+    stats.count = await this.count();
     return this;
   }
 

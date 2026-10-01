@@ -236,7 +236,7 @@ describe("PersistenceTest", () => {
   it("delete all", async () => {
     await Topic.create({ title: "a" });
     await Topic.create({ title: "b" });
-    expect(((await Topic.count()) as number) > 0).toBeTruthy();
+    expect((await Topic.count()) > 0).toBeTruthy();
 
     const count = await Topic.count();
     expect(await Topic.deleteAll()).toBe(count);
@@ -631,7 +631,7 @@ describe("PersistenceTest", () => {
   });
 
   it("delete many", async () => {
-    const originalCount = (await Topic.count()) as number;
+    const originalCount = await Topic.count();
     await Topic.delete([1, 2]);
     expect(await Topic.count()).toBe(originalCount - 2);
   });
@@ -958,7 +958,7 @@ describe("PersistenceTest", () => {
   it("delete isnt affected by scoping", async () => {
     const topic = await Topic.find(1);
     await assertDifference(
-      () => Topic.count() as Promise<number>,
+      () => Topic.count(),
       -1,
       null,
       async () => {
@@ -1193,7 +1193,7 @@ describe("PersistenceTest", () => {
     const clients = (await Client.find([2, 3])) as Client[];
 
     await assertDifference(
-      () => Client.count() as Promise<number>,
+      () => Client.count(),
       -2,
       null,
       async () => {
@@ -1388,7 +1388,7 @@ describe("PersistenceTest", () => {
     });
 
     await assertDifference(
-      () => Topic.count() as Promise<number>,
+      () => Topic.count(),
       -1,
       null,
       async () => {
@@ -1531,7 +1531,7 @@ describe("PersistenceTest", () => {
   it("destroy with single composite primary key", async () => {
     const book = cpkBooks("cpk_great_author_first_book");
     await assertDifference(
-      () => CpkBook.count() as Promise<number>,
+      () => CpkBook.count(),
       -1,
       null,
       async () => {
@@ -1547,7 +1547,7 @@ describe("PersistenceTest", () => {
       cpkBooks("cpk_great_author_second_book"),
     ];
     await assertDifference(
-      () => CpkBook.count() as Promise<number>,
+      () => CpkBook.count(),
       -2,
       null,
       async () => {
@@ -2098,7 +2098,7 @@ describe("PersistenceTest", () => {
     registerModel(MinimalisticAircraft);
 
     await assertDifference(
-      () => Aircraft.count() as Promise<number>,
+      () => Aircraft.count(),
       1,
       null,
       async () => {

@@ -1305,17 +1305,13 @@ describe("BasicsTest", async () => {
   it("switching between table name", async () => {
     const k = class extends Joke {};
 
-    await assertDifference(
-      new Map([[() => GoodJoke.count() as Promise<number>, 1]]),
-      null,
-      async () => {
-        k.tableName = "cold_jokes";
-        await k.create();
+    await assertDifference(new Map([[() => GoodJoke.count(), 1]]), null, async () => {
+      k.tableName = "cold_jokes";
+      await k.create();
 
-        k.tableName = "funny_jokes";
-        await k.create();
-      },
-    );
+      k.tableName = "funny_jokes";
+      await k.create();
+    });
   });
 
   it("clear cache when setting table name", async () => {

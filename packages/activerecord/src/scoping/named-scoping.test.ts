@@ -77,7 +77,7 @@ describe("NamedScopingTest", () => {
 
     expect(ids(await Topic.base())).toEqual(ids(await Topic.all()));
     expect((await Topic.base().first())!.id).toBe((await Topic.first())!.id);
-    expect((await Topic.count()) as number).toBe(await Topic.base().count());
+    expect(await Topic.count()).toBe(await Topic.base().count());
     expect(await Topic.average("replies_count")).toEqual(
       await Topic.base().average("replies_count"),
     );

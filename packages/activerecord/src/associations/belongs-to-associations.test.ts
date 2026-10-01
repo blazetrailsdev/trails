@@ -1600,7 +1600,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(AuthorAddress.destroyedAuthorAddressIds).toEqual([]);
 
     await assertDifference(
-      () => AuthorAddress.count() as Promise<number>,
+      () => AuthorAddress.count(),
       -2,
       null,
       async () => {
@@ -1637,10 +1637,7 @@ describe("BelongsToAssociationsTest", () => {
 
     const authorCount = await UndestroyableAuthor.count();
     await assertNoDifference(
-      [
-        () => UndestroyableAuthor.count() as Promise<number>,
-        () => DestroyableBook.count() as Promise<number>,
-      ],
+      [() => UndestroyableAuthor.count(), () => DestroyableBook.count()],
       null,
       async () => {
         assertNot(await book.destroy());
@@ -1655,9 +1652,9 @@ describe("BelongsToAssociationsTest", () => {
 
     await assertNoDifference(
       [
-        () => UndestroyableAuthor.count() as Promise<number>,
-        () => DestroyableBook.count() as Promise<number>,
-        () => EssayDestroy.count() as Promise<number>,
+        () => UndestroyableAuthor.count(),
+        () => DestroyableBook.count(),
+        () => EssayDestroy.count(),
       ],
       null,
       async () => {
@@ -1740,7 +1737,7 @@ describe("BelongsToAssociationsTest", () => {
       const citation = await (book as any).citations.create({});
 
       await assertDifference(
-        () => Citation.count() as Promise<number>,
+        () => Citation.count(),
         -1,
         null,
         async () => {
@@ -2020,7 +2017,7 @@ describe("BelongsToAssociationsTest", () => {
         const sponsor = await (toy as any).sponsors.create({});
 
         await assertDifference(
-          () => Sponsor.count() as Promise<number>,
+          () => Sponsor.count(),
           -1,
           null,
           async () => {

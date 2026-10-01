@@ -273,7 +273,7 @@ describe("FixturesTest", () => {
       };
 
       await assertNoDifference(
-        async () => (await Aircraft.count()) as number,
+        async () => await Aircraft.count(),
         null,
         async () => {
           await expect((await Base.leaseConnection()).insertFixturesSet(fixtures)).rejects.toThrow(
@@ -292,7 +292,7 @@ describe("FixturesTest", () => {
       };
 
       await assertDifference(
-        async () => (await TrafficLight.count()) as number,
+        async () => await TrafficLight.count(),
         1,
         null,
         async () => {
@@ -348,7 +348,7 @@ describe("FixturesTest", () => {
       const stub = stubMaxAllowedPacket(conn, packetSize);
       try {
         await assertDifference(
-          async () => (await TrafficLight.count()) as number,
+          async () => await TrafficLight.count(),
           1,
           null,
           async () => {
@@ -406,10 +406,7 @@ describe("FixturesTest", () => {
       const stub = stubMaxAllowedPacket(conn, packetSize);
       try {
         await assertDifference(
-          [
-            async () => (await TrafficLight.count()) as number,
-            async () => (await Comment.count()) as number,
-          ],
+          [async () => await TrafficLight.count(), async () => await Comment.count()],
           +1,
           null,
           async () => {

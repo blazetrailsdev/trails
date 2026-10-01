@@ -129,7 +129,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const created = await Professor.create({ name: "Nicola" });
       const prof = await ForeignProfessorWithPk.find(created.readAttribute("id"));
       await assertDifference(
-        () => ForeignProfessor.count() as Promise<number>,
+        () => ForeignProfessor.count(),
         -1,
         null,
         async () => {

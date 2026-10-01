@@ -2659,7 +2659,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("dependence on account", async () => {
-    const numAccounts = (await Account.all().count()) as number;
+    const numAccounts = await Account.all().count();
     await (companies("first_firm") as any).destroy();
     expect(await Account.all().count()).toBe(numAccounts - 1);
   });

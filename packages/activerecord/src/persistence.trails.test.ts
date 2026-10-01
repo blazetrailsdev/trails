@@ -188,7 +188,7 @@ describe("PersistenceTest (trails)", () => {
 
     void Aircraft.resetColumnInformation();
 
-    const before = (await Aircraft.count()) as number;
+    const before = await Aircraft.count();
     const aircraft = (await MinimalisticAircraft.create({ name: "Wright Flyer" })) as unknown as {
       name: string | null;
       wingspan: unknown;

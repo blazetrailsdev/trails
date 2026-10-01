@@ -94,10 +94,10 @@ describe("RelationTest", () => {
   });
 
   it("count", async () => {
-    const before = (await CanonPost.all().count()) as number;
+    const before = await CanonPost.all().count();
     await CanonPost.create({ title: "reltest-count-a", body: "b" });
     await CanonPost.create({ title: "reltest-count-b", body: "b" });
-    const count = (await CanonPost.all().count()) as number;
+    const count = await CanonPost.all().count();
     expect(count).toBe(before + 2);
   });
 

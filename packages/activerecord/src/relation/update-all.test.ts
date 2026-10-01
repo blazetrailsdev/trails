@@ -276,7 +276,7 @@ describe("UpdateAllTest", () => {
           if (!(this as any).author_name) (this as any).author_name = "David";
         });
         this.afterUpdate(async function () {
-          TopicWithCallbacks.topicCount = (await TopicWithCallbacks.count()) as number;
+          TopicWithCallbacks.topicCount = await TopicWithCallbacks.count();
         });
       }
     }
@@ -309,7 +309,7 @@ describe("UpdateAllTest", () => {
           if (!(this as any).author_name) (this as any).author_name = "David";
         });
         this.afterUpdate(async function () {
-          TopicWithCallbacks.topicCount = (await TopicWithCallbacks.count()) as number;
+          TopicWithCallbacks.topicCount = await TopicWithCallbacks.count();
         });
       }
     }
@@ -351,7 +351,7 @@ describe("UpdateAllTest", () => {
           if (!(this as any).author_name) (this as any).author_name = "David";
         });
         this.afterUpdate(async function () {
-          TopicWithCallbacks.topicCount = (await TopicWithCallbacks.count()) as number;
+          TopicWithCallbacks.topicCount = await TopicWithCallbacks.count();
         });
       }
     }

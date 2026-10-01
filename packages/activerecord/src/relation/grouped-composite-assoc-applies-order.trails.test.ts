@@ -40,10 +40,7 @@ describe("CpkBook grouped calculation over a composite-key belongs_to applies or
     await seedOrders();
     let result: Map<unknown, number> = new Map();
     const sqls = await captureSql(async () => {
-      result = (await CpkBook.group("order")
-        .order(arelSql("COUNT(*) DESC"))
-        .limit(2)
-        .count()) as Map<unknown, number>;
+      result = await CpkBook.group("order").order(arelSql("COUNT(*) DESC")).limit(2).count();
     });
 
     const counts = [...result.entries()].map(([order, count]) => [
@@ -62,10 +59,7 @@ describe("CpkBook grouped calculation over a composite-key belongs_to applies or
 
   it("group by a composite-key belongs_to with order and offset skips the ordered groups", async () => {
     await seedOrders();
-    const result = (await CpkBook.group("order")
-      .order(arelSql("COUNT(*) DESC"))
-      .offset(2)
-      .count()) as Map<unknown, number>;
+    const result = await CpkBook.group("order").order(arelSql("COUNT(*) DESC")).offset(2).count();
 
     const counts = [...result.entries()].map(([order, count]) => [
       (order as CpkOrder | null)?.id,
@@ -76,10 +70,7 @@ describe("CpkBook grouped calculation over a composite-key belongs_to applies or
 
   it("group by a composite-key belongs_to with a group-key column order and limit returns the ordered groups", async () => {
     await seedOrders();
-    const result = (await CpkBook.group("order").order("order_id DESC").limit(2).count()) as Map<
-      unknown,
-      number
-    >;
+    const result = await CpkBook.group("order").order("order_id DESC").limit(2).count();
 
     const counts = [...result.entries()].map(([order, count]) => [
       (order as CpkOrder | null)?.id,

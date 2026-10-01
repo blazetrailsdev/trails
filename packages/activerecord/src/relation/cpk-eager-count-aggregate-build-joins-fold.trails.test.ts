@@ -26,7 +26,7 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     await seedBooksWithChapters();
     let count = 0;
     const sqls = await captureSql(async () => {
-      count = (await CpkBook.eagerLoad(":chapters").count()) as number;
+      count = await CpkBook.eagerLoad(":chapters").count();
     });
     expect(count).toBe(2);
     const countSql = sqls.find((s) => /count/i.test(s)) ?? "";
@@ -57,10 +57,10 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     await seedBooksDuplicateRevisions();
     let count = 0;
     const sqls = await captureSql(async () => {
-      count = (await CpkBook.eagerLoad(":chapters")
+      count = await CpkBook.eagerLoad(":chapters")
         .order("cpk_books.author_id", "cpk_books.id")
         .limit(2)
-        .count("cpk_books.revision")) as number;
+        .count("cpk_books.revision");
     });
     expect(count).toBe(2 - 1);
     const idSql = sqls.find((s) => /DISTINCT.*cpk_books.*author_id/i.test(s) && /LIMIT/i.test(s));
@@ -75,10 +75,10 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     await seedBooksDuplicateRevisions();
     let count = 0;
     const sqls = await captureSql(async () => {
-      count = (await CpkBook.eagerLoad(":chapters")
+      count = await CpkBook.eagerLoad(":chapters")
         .order("cpk_books.title")
         .limit(2)
-        .count("cpk_books.revision")) as number;
+        .count("cpk_books.revision");
     });
     expect(count).toBe(1);
     const idSql = sqls.find((s) => /DISTINCT.*cpk_books.*author_id/i.test(s) && /LIMIT/i.test(s));

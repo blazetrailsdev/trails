@@ -289,11 +289,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgreSQLTimestampFixtureTest", () => {
     it("group by date", async () => {
-      const keys = [
-        ...(
-          (await Topic.group("date_trunc('month', created_at)").count()) as Map<unknown, number>
-        ).keys(),
-      ];
+      const keys = [...(await Topic.group("date_trunc('month', created_at)").count()).keys()];
       expect(keys.length).toBeGreaterThan(0);
       for (const k of keys) expect(k).toBeInstanceOf(RubyTime);
     });

@@ -99,7 +99,7 @@ describe("InsertAllTest", () => {
   itIfSupports("insert_on_duplicate_skip", "insert", async () => {
     const id = 1_000_000;
     await assertDifference(
-      () => Book.count() as Promise<number>,
+      () => Book.count(),
       +1,
       null,
       async () => {
@@ -113,7 +113,7 @@ describe("InsertAllTest", () => {
 
   it("insert!", async () => {
     await assertDifference(
-      () => Book.count() as Promise<number>,
+      () => Book.count(),
       1,
       null,
       async () => {
@@ -138,7 +138,7 @@ describe("InsertAllTest", () => {
 
   it("insert all", async () => {
     await assertDifference(
-      () => Book.count() as Promise<number>,
+      () => Book.count(),
       10,
       null,
       async () => {
@@ -219,7 +219,7 @@ describe("InsertAllTest", () => {
 
   itIfSupports("insert_on_duplicate_skip", "insert all can skip duplicate records", async () => {
     await assertNoDifference(
-      () => Book.count() as Promise<number>,
+      () => Book.count(),
       null,
       async () => {
         await Book.insertAll([{ id: 1, name: "Agile Web Development with Rails" }]);
@@ -250,7 +250,7 @@ describe("InsertAllTest", () => {
     "insert all with skip duplicates and autonumber id not given",
     async () => {
       await assertDifference(
-        () => Book.count() as Promise<number>,
+        () => Book.count(),
         1,
         null,
         async () => {
@@ -268,7 +268,7 @@ describe("InsertAllTest", () => {
     "insert all with skip duplicates and autonumber id given",
     async () => {
       await assertDifference(
-        () => Book.count() as Promise<number>,
+        () => Book.count(),
         1,
         null,
         async () => {
@@ -287,7 +287,7 @@ describe("InsertAllTest", () => {
     async () => {
       const book = await Book.create({ format: "EXPECTED", author_id: 8, name: "Refactoring" });
       await assertNoDifference(
-        () => Book.count() as Promise<number>,
+        () => Book.count(),
         null,
         async () => {
           await Book.insertAll([{ format: "UNEXPECTED", author_id: 8, name: "Refactoring" }]);
@@ -316,7 +316,7 @@ describe("InsertAllTest", () => {
     "insert all and upsert all with index finding options",
     async () => {
       await assertDifference(
-        () => Book.count() as Promise<number>,
+        () => Book.count(),
         +4,
         null,
         async () => {
@@ -343,7 +343,7 @@ describe("InsertAllTest", () => {
     async () => {
       const book = await Book.create({ external_id: "abc" });
       await assertNoDifference(
-        () => Book.count() as Promise<number>,
+        () => Book.count(),
         null,
         async () => {
           await Book.insertAll([{ external_id: "ABC" }], {
@@ -390,7 +390,7 @@ describe("InsertAllTest", () => {
       expect(await (await Base.leaseConnection()).indexExists("books", columns)).toBeTruthy();
 
       await assertDifference(
-        () => Book.count() as Promise<number>,
+        () => Book.count(),
         +2,
         null,
         async () => {
@@ -410,7 +410,7 @@ describe("InsertAllTest", () => {
     "insert all and upsert all works with composite primary keys when unique by is provided",
     async () => {
       await assertDifference(
-        () => Cart.count() as Promise<number>,
+        () => Cart.count(),
         2,
         null,
         async () => {
@@ -436,7 +436,7 @@ describe("InsertAllTest", () => {
     "insert all and upsert all works with composite primary keys when unique by is not provided",
     async () => {
       await assertDifference(
-        () => Cart.count() as Promise<number>,
+        () => Cart.count(),
         3,
         null,
         async () => {
@@ -475,7 +475,7 @@ describe("InsertAllTest", () => {
     async () => {
       if (supportsInsertReturning) {
         await assertDifference(
-          () => Book.count() as Promise<number>,
+          () => Book.count(),
           1,
           null,
           async () => {
@@ -501,7 +501,7 @@ describe("InsertAllTest", () => {
 
   itIfSupports("insert_on_duplicate_update", "insert all and upsert all with sti", async () => {
     await assertDifference(
-      () => Category.count() as Promise<number>,
+      () => Category.count(),
       2,
       null,
       async () => {
@@ -1134,7 +1134,7 @@ describe("InsertAllTest", () => {
 
   it("insert all create with", async () => {
     await assertDifference(
-      () => Book.where({ format: "X" }).count() as Promise<number>,
+      () => Book.where({ format: "X" }).count(),
       2,
       null,
       async () => {
@@ -1179,7 +1179,7 @@ describe("InsertAllTest", () => {
 
   itIfSupports("insert_on_duplicate_update", "upsert all create with", async () => {
     await assertDifference(
-      () => Book.where({ format: "X" }).count() as Promise<number>,
+      () => Book.where({ format: "X" }).count(),
       2,
       null,
       async () => {
