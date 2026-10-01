@@ -42,6 +42,7 @@ export class MissingAttributeError extends globalThis.Error {
 export namespace AttrNames {
   const DEF_SAFE_NAME = /^[a-zA-Z_]\w*$/;
 
+  /** @missingRailsCall const_set — CONVERGEABLE attr-names-and-build-mangled-name-open-code-unpack1-h */
   export function defineAttributeAccessorMethod(
     owner: unknown,
     attrName: string,
