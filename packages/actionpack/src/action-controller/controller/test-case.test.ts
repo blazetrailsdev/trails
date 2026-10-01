@@ -23,6 +23,7 @@ import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/repo
 import {
   Encoding,
   File,
+  rbInspect,
   rbObjClass,
   rbObjId,
   rbObjIvarGet,
@@ -622,6 +623,13 @@ class TestCaseTest extends TestCase {
   }
 }
 
+function assertKindOf(klass: StringConstructor, actual: unknown): void {
+  assert(
+    klass === String && typeof actual === "string",
+    `Expected ${rbInspect(actual)} to be a kind of String, not ${rbObjClass(actual)}`,
+  );
+}
+
 describe("TestCaseTest", () => {
   const FILES_DIR = `${FIXTURE_LOAD_PATH}/multipart`;
   const controllerInfo = { controller: "test_case_test/test", action: "testParams" };
@@ -1091,7 +1099,7 @@ describe("TestCaseTest", () => {
 
   it("id converted to string", async () => {
     await tc.get("testParams", { params: { id: 20, foo: new Object() } });
-    assertEqual("string", typeof tc.request.pathParameters["id"]);
+    assertKindOf(String, tc.request.pathParameters["id"]);
   });
 
   it("array path parameter handled properly", async () => {
@@ -1114,7 +1122,7 @@ describe("TestCaseTest", () => {
     await tc.get("testParams", { params: { id: 20, foo: new Object() } });
 
     for (const key of Object.keys(tc.request.pathParameters)) {
-      assertEqual("string", typeof key);
+      assertKindOf(String, key);
     }
   });
 

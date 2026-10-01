@@ -2,6 +2,7 @@ import { registerConstant } from "@blazetrails/activesupport";
 import { Attribute } from "../attribute.js";
 import type { Block } from "@blazetrails/ruby-compat";
 import {
+  block as rbBlock,
   dup,
   eachKey,
   eachValue,
@@ -73,24 +74,20 @@ export class LazyAttributeSet extends AttributeSet {
 
   override isKey(name: string): boolean {
     return (
-      ((isIndexedRow(this.values) ? this.values.isKey(name) : Object.hasOwn(this.values, name)) ||
+      ((isIndexedRow(this.values) ? this.values.isKey(name) : hasKey(this.values, name)) ||
         hasKey(this.types, name) ||
         hasKey(this._attributes, name)) &&
       this.getAttribute(name).isInitialized()
     );
   }
 
-  /** @missingRailsName attributes — PERMANENT */
+  /** @missingRailsArgs keys — PERMANENT */
   override keys(): string[] {
-    const keys = new Set(
-      isIndexedRow(this.values)
-        ? [...this.values.keys(), ...Object.keys(this.types), ...Object.keys(this._attributes)]
-        : [
-            ...Object.keys(this.values),
-            ...Object.keys(this.types),
-            ...Object.keys(this._attributes),
-          ],
-    );
+    const keys = new Set([
+      ...(isIndexedRow(this.values) ? this.values.keys() : Object.keys(this.values)),
+      ...Object.keys(this.types),
+      ...Object.keys(this._attributes),
+    ]);
     return [...keys].filter((name) => this.getAttribute(name).isInitialized());
   }
 
@@ -102,17 +99,18 @@ export class LazyAttributeSet extends AttributeSet {
 
     if (hasKey(this.castedValues, name)) return this.castedValues[name];
 
-    let valuePresent = true as boolean;
-    let value: unknown;
-    if (isIndexedRow(this.values)) {
-      value = this.values.fetch(name, () => {
-        valuePresent = false;
-      });
-    } else if (Object.hasOwn(this.values, name)) {
-      value = this.values[name];
-    } else {
-      valuePresent = false;
-    }
+    let valuePresent: boolean = true;
+    const value = isIndexedRow(this.values)
+      ? this.values.fetch(name, () => {
+          valuePresent = false;
+        })
+      : fetch<unknown>(
+          this.values,
+          name,
+          rbBlock(() => {
+            valuePresent = false;
+          }),
+        );
 
     if (valuePresent) {
       const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
@@ -144,15 +142,18 @@ export class LazyAttributeSet extends AttributeSet {
     value?: unknown,
   ): Attribute {
     if (valuePresent === undefined) {
-      if (isIndexedRow(this.values)) {
-        valuePresent = true;
-        value = this.values.fetch(name, () => {
-          valuePresent = false;
-        });
-      } else {
-        valuePresent = Object.hasOwn(this.values, name);
-        value = valuePresent ? this.values[name] : undefined;
-      }
+      valuePresent = true;
+      value = isIndexedRow(this.values)
+        ? this.values.fetch(name, () => {
+            valuePresent = false;
+          })
+        : fetch<unknown>(
+            this.values,
+            name,
+            rbBlock(() => {
+              valuePresent = false;
+            }),
+          );
     }
 
     const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
