@@ -855,6 +855,11 @@ interface PackageTotals {
    * measurable: it is the one allowance with no per-declaration tag to count.
    */
   totalInterfaceExempt: number;
+  /**
+   * Moved names dropped as an override on a class with no Rails counterpart
+   * (`collectOverrideOnlyNames`). Reported for the same reason as the
+   * interface count: the allowance has no per-declaration tag to count.
+   */
   totalOverrideExempt: number;
   /**
    * The `rubyFile === null` slice of the totals above — files no Rails file
@@ -1339,6 +1344,11 @@ export function collectInterfaceMemberOnlyNames(
  * named after something Rails declares may be a real port sitting in the wrong
  * file (`postgresql/schema-statements-class.ts`, ~80 names of
  * `PostgreSQL::SchemaStatements`), so its members stay scored.
+ *
+ * `inherits` answers for an ancestor only where Rails agrees: the ancestor
+ * declares the member in the TS file mirroring a `.rb` that declares it too.
+ * An ancestor that itself carries the name as extra surface — a relocated port,
+ * a short-name coincidence — lends nothing, so an override of it stays scored.
  *
  * A name anything else in the file also contributes — a member no ancestor
  * declares, an interface member, a top-level function, any declaration name —
@@ -2229,12 +2239,33 @@ function buildPackageReport(
       (c) => entityPackages.get(c),
     );
   };
+  const railsDeclarationSites = new Map<string, Set<string>>();
+  const railsDeclaresIn = (ownerPkg: string, tsFile: string, name: string): boolean => {
+    let sites = railsDeclarationSites.get(ownerPkg);
+    if (sites === undefined) {
+      sites = new Set<string>();
+      const rp = ruby.packages[ownerPkg] ?? emptyRubyPackage();
+      for (const e of [...Object.values(rp.classes), ...Object.values(rp.modules)]) {
+        for (const m of [...e.instanceMethods, ...e.classMethods]) {
+          const file = m.file ?? e.file;
+          if (!file) continue;
+          const mirror = rubyFileToTs(file, ownerPkg);
+          for (const c of rubyMethodCandidates(m.name) ?? []) sites.add(`${mirror}\0${c}`);
+        }
+      }
+      railsDeclarationSites.set(ownerPkg, sites);
+    }
+    return sites.has(`${tsFile}\0${name}`);
+  };
   const inheritsMember = (klass: ClassInfo, name: string): boolean => {
     const visited = new Set<ClassInfo>([klass]);
     for (let cursor = superclassOf(klass); cursor !== null; cursor = superclassOf(cursor)) {
       if (visited.has(cursor)) return false;
       visited.add(cursor);
-      if ([...cursor.instanceMethods, ...cursor.classMethods].some((m) => m.name === name))
+      if (
+        [...cursor.instanceMethods, ...cursor.classMethods].some((m) => m.name === name) &&
+        railsDeclaresIn(entityPackages.get(cursor) ?? pkg, cursor.file ?? "", name)
+      )
         return true;
     }
     return false;

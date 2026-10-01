@@ -2798,6 +2798,21 @@ describe("buildReport — overrides on a class with no Rails counterpart", () =>
     expect(report.packages[0].totalOverrideExempt).toBe(0);
   });
 
+  it("still scores an override of a member the ancestor carries but Rails declares elsewhere", () => {
+    const ts = tsWith(tsClass("DeferredIn", "deferred.ts", ["quotedTableName"], "Binary"));
+    ts.packages.activemodel.classes["binary.ts:Binary"].instanceMethods.push(
+      method("quotedTableName"),
+    );
+    const report = run(ruby, ts);
+    expect(
+      report.packages[0].extraFiles.find((f) => f.tsFile === "deferred.ts")?.extras,
+    ).toMatchObject([
+      { name: "DeferredIn", kind: "novel" },
+      { name: "quotedTableName", kind: "moved" },
+    ]);
+    expect(report.packages[0].totalOverrideExempt).toBe(0);
+  });
+
   it("still scores an override name a class with no superclass also declares", () => {
     const report = run(
       ruby,
