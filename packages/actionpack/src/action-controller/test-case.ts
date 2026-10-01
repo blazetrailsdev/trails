@@ -237,13 +237,13 @@ export class TestCase extends ActiveSupportTestCase {
 
   request!: TestRequest;
 
-  response!: TestResponse;
+  response!: TestResponse | LiveTestResponse;
 
   /** @internal */
   _cookieJar?: CookieJar;
 
   /** @internal */
-  _responseKlass!: typeof TestResponse;
+  _responseKlass!: typeof TestResponse | typeof LiveTestResponse;
 
   get responseBody(): string {
     return this.response?.body ?? this.controller?.responseBody ?? "";
@@ -399,7 +399,9 @@ export class TestCase extends ActiveSupportTestCase {
   }
 
   /** @internal */
-  buildResponse(klass: typeof TestResponse): TestResponse {
+  buildResponse(
+    klass: typeof TestResponse | typeof LiveTestResponse,
+  ): TestResponse | LiveTestResponse {
     return klass.create();
   }
 
@@ -467,7 +469,7 @@ export class TestCase extends ActiveSupportTestCase {
       );
     } finally {
       this.request = this.controller.request as TestRequest;
-      this.response = this.controller.response as TestResponse;
+      this.response = this.controller.response as TestResponse | LiveTestResponse;
 
       if (this.request.isHaveCookieJar()) {
         if (!this.request.cookieJar().isCommitted()) {

@@ -454,19 +454,30 @@ function layoutsOf(
   else if (conditions !== undefined) implied(klass);
   let every = false;
   const perRender = (options: ts.Expression): void => {
-    const written = ts.isObjectLiteralExpression(options) && option(options, "layout");
-    if (ts.isObjectLiteralExpression(options) && !written) {
-      for (const p of options.properties) if (ts.isSpreadAssignment(p)) perRender(p.expression);
-      return;
+    let found: ts.Type[] = [];
+    let wide = false;
+    const read = (source: ts.Expression): void => {
+      const type = checker.getTypeAtLocation(source);
+      const property = type.getProperty("layout");
+      const anything = type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown);
+      if (anything || (!property && type.getStringIndexType())) wide = true;
+      if (!property) return;
+      const optional = property.flags & ts.SymbolFlags.Optional;
+      found = [...(optional ? found : []), checker.getTypeOfSymbolAtLocation(property, source)];
+      wide &&= optional !== 0;
+    };
+    if (!ts.isObjectLiteralExpression(options)) read(options);
+    else {
+      for (const p of options.properties) {
+        if (ts.isSpreadAssignment(p)) read(p.expression);
+        else if (propertyName(p) === "layout") {
+          found = [checker.getTypeAtLocation(option(options, "layout")!)];
+          wide = false;
+        }
+      }
     }
-    const type = checker.getTypeAtLocation(written || options);
-    const property = written ? undefined : type.getProperty("layout");
-    const anything = type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown);
-    if (!written && (anything || (!property && type.getStringIndexType()))) every = true;
-    const layout = written
-      ? type
-      : property && checker.getTypeOfSymbolAtLocation(property, options);
-    for (const each of layout?.isUnion() ? layout.types : layout ? [layout] : []) {
+    if (wide) every = true;
+    for (const each of found.flatMap((type) => (type.isUnion() ? type.types : [type]))) {
       if (each.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined)) continue;
       if (checker.typeToString(each) === "true") implied(klass);
       else if (!add(each)) every = true;

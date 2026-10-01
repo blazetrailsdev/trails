@@ -734,7 +734,7 @@ describe("runCli", () => {
       [
         "drafts",
         "DraftsController",
-        'declare drafts: bigint; show(options: { layout: "admin" | false }): void { this.render({ ...options, action: "show" }); }',
+        'declare drafts: bigint; show(options: { layout: "admin" | false }): void { this.render({ layout: "posts", ...options, action: "show" }); }',
       ],
       [
         "wide",

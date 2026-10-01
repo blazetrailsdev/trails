@@ -596,6 +596,8 @@ Object.defineProperty(DefaultUrlOptionsCachingController, "name", {
 });
 
 class TestCaseTest extends TestCase {
+  declare response: TestResponse;
+
   static fixturePaths(): string[] {
     return [];
   }
