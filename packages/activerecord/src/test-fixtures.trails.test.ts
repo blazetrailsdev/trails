@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { include } from "@blazetrails/ruby-compat";
+import { NoMethodError, include } from "@blazetrails/ruby-compat";
 import { TestFixtures } from "./test-fixtures.js";
 import { File as FixtureFile } from "./fixture-set/file.js";
 
@@ -82,5 +82,73 @@ describe("TestFixtures::ClassMethods", () => {
     klass.usesTransaction("test_a", "test_b");
     expect(klass.isUsesTransaction("test_a")).toBe(true);
     expect(klass.isUsesTransaction("test_c")).toBe(false);
+  });
+});
+
+describe("TestFixtures#method_missing", () => {
+  type Instance = {
+    _loadedFixtures: Record<string, { fixtures: Record<string, unknown> }>;
+    _fixtureCache: Record<string, Record<string, unknown>>;
+    topics(...names: unknown[]): unknown;
+    developers?: unknown;
+  };
+  let instance: Instance;
+
+  beforeEach(() => {
+    const k = class {};
+    include(k, TestFixtures);
+    (k as unknown as Host).fixtures("topics");
+    instance = new k() as unknown as Instance;
+    instance._loadedFixtures = { topics: { fixtures: { first: { find: async () => "first" } } } };
+    instance._fixtureCache = {};
+  });
+
+  it("dispatches a fixture set name to active_record_fixture", async () => {
+    await expect(instance.topics("first")).resolves.toBe("first");
+    expect((instance as unknown as Record<string, unknown>).topics).toBeTypeOf("function");
+  });
+
+  it("raises for a fixture the set does not have", () => {
+    expect(() => instance.topics("missing")).toThrow(
+      "No fixture named 'missing' found for fixture set 'topics'",
+    );
+  });
+
+  it("leaves a name that is not a fixture set unanswered", () => {
+    expect(instance.developers).toBeUndefined();
+    const probes = instance as unknown as Record<string, unknown>;
+    expect(probes.then).toBeUndefined();
+    expect(probes.toJSON).toBeUndefined();
+    expect(JSON.stringify(instance)).toContain("_fixtureCache");
+  });
+
+  it("answers a missed read on the prototype itself, where fixture_sets is the class's", () => {
+    const proto = Object.getPrototypeOf(instance) as Record<string, unknown>;
+    expect(proto.developers).toBeUndefined();
+    expect(proto.topics).toBeTypeOf("function");
+  });
+
+  it("raises NoMethodError carrying the receiver, name and args, as the super arm does", () => {
+    const methodMissing = (instance as unknown as { methodMissing(...a: unknown[]): unknown })
+      .methodMissing;
+    let error: NoMethodError | undefined;
+    try {
+      methodMissing.call(instance, "developers", "david");
+    } catch (e) {
+      error = e as NoMethodError;
+    }
+    expect(error).toBeInstanceOf(NoMethodError);
+    expect(error!.message).toMatch(/^undefined method 'developers' for an instance of /);
+    expect(error!.constantName).toBe("developers");
+    expect(error!.args()).toEqual(["david"]);
+    expect(error!.receiver()).toBe(instance);
+  });
+
+  it("keeps answering when the module is included a second time", async () => {
+    const k = Object.getPrototypeOf(instance).constructor as new () => object;
+    include(k, TestFixtures);
+    (k as unknown as Host).fixtures("topics");
+    await expect(instance.topics("first")).resolves.toBe("first");
+    expect(instance.developers).toBeUndefined();
   });
 });

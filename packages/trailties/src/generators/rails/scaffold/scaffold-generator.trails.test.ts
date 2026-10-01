@@ -57,6 +57,10 @@ describe("ScaffoldGenerator (namespaced)", () => {
       expect(read(`app/views/admin/accounts/${view}.html.tse`)).toContain(
         'linkTo("Back to accounts", adminAccountsPath())',
       );
+    const functionalTest = read("test/controllers/admin/accounts-controller.test.ts");
+    expect(functionalTest).toContain("declare admin_accounts: FixtureSetAccessor<AdminAccount>;");
+    expect(functionalTest).toContain('this["@admin_account"] = await this.admin_accounts("one");');
+    expect(parseTs(functionalTest).diagnostics).toEqual([]);
     const rerun = ScaffoldGenerator.start(["admin/account"], { ...config, force: true });
     await expect(rerun).resolves.toEqual(expect.any(Array));
   });

@@ -1346,7 +1346,7 @@ the capability, in a different place. Each is decided here, and each but
 | `migration/default_strategy.rb`                       | typed forwarders      |
 | `active_record/migration.rb`                          | typed forwarders      |
 | `relation/delegation.rb`                              | Proxy                 |
-| `active_record/test_fixtures.rb`                      | nothing               |
+| `active_record/test_fixtures.rb`                      | Proxy (proto chain)   |
 | `active_support/array_inquirer.rb`                    | Proxy                 |
 | `active_support/broadcast_logger.rb`                  | Proxy                 |
 | `core_ext/module/delegation.rb`                       | nothing (no file)     |

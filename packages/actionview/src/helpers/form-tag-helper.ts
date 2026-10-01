@@ -14,12 +14,13 @@ import { Hash, Module, fetch, hashDelete, rbObjRespondTo, update } from "@blazet
 
 import { ActionView } from "../namespaces.js";
 import type { capture } from "./capture-helper.js";
-import * as ContentExfiltrationPreventionHelper from "./content-exfiltration-prevention-helper.js";
-import { preventContentExfiltration } from "./content-exfiltration-prevention-helper.js";
+import {
+  ContentExfiltrationPreventionHelper,
+  preventContentExfiltration,
+} from "./content-exfiltration-prevention-helper.js";
 import { contentTag, tag, type TagHelperHost } from "./tag-helper.js";
-import * as TextHelper from "./text-helper.js";
-import * as UrlHelper from "./url-helper.js";
-import { methodTag, tokenTag, type UrlHelperHost } from "./url-helper.js";
+import { TextHelper } from "./text-helper.js";
+import { UrlHelper, methodTag, tokenTag, type UrlHelperHost } from "./url-helper.js";
 
 export interface FormTagHelperHost extends UrlHelperHost, TagHelperHost {
   urlFor(options: unknown): string;

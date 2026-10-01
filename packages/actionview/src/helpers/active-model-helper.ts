@@ -3,6 +3,8 @@ import { Module, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { ActionView } from "../namespaces.js";
 
+export const ActiveModelHelper = new Module();
+
 export interface ActiveModelInstanceTag {
   object: unknown;
   contentTag(type: string, options: unknown, ...args: unknown[]): unknown;

@@ -4,6 +4,7 @@ import {
   Dir,
   Hash,
   File as RubyFile,
+  NoMethodError,
   RuntimeError,
   StandardError,
   hashDelete,
@@ -12,6 +13,7 @@ import {
   isEmpty,
   merge,
   rbEql,
+  rbObjClass,
 } from "@blazetrails/ruby-compat";
 import {
   Notifications,
@@ -130,6 +132,11 @@ type FixtureAttrs = Record<string, unknown>;
 
 export type FixtureMap = Record<string, [BaseClass, Record<string, FixtureAttrs>]>;
 
+export type FixtureSetAccessor<T> = {
+  (fixtureName: string, forceReload?: true | ":reload"): T | Promise<T>;
+  (...fixtureNames: unknown[]): Array<T | Promise<T>>;
+};
+
 type ResolvedFixtureSet = {
   table: string;
   model: BaseClass | null;
@@ -217,6 +224,23 @@ export class TestFixtures {
     classAttribute.call(base, "fixtureSets", { default: {} });
 
     runLoadHooks("active_record_fixtures", base);
+
+    const proto = (base as { prototype: object }).prototype;
+    Object.setPrototypeOf(
+      proto,
+      new Proxy(Object.getPrototypeOf(proto) as object, {
+        get(target, prop, receiver: TestFixtures) {
+          const value = Reflect.get(target, prop, receiver);
+          if (value !== undefined || typeof prop === "symbol" || Reflect.has(target, prop)) {
+            return value;
+          }
+          if (receiver.respondToMissing(prop, true)) {
+            return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
+          }
+          return value;
+        },
+      }),
+    );
   }
 
   declare protected name: string;
@@ -450,6 +474,28 @@ export class TestFixtures {
   /** @internal */
   isLoadInstances(): boolean {
     return this.useInstantiatedFixtures !== ":no_instances";
+  }
+
+  methodMissing(method: string, ...args: unknown[]): unknown {
+    if (Object.prototype.hasOwnProperty.call(this.fixtureSets, method)) {
+      return this.activeRecordFixture(method, ...args);
+    } else {
+      throw new NoMethodError(
+        `undefined method '${method}' for an instance of ${rbObjClass(this)}`,
+        method,
+        args,
+        false,
+        { receiver: this },
+      );
+    }
+  }
+
+  respondToMissing(method: string, includePrivate: boolean = false): boolean {
+    if (includePrivate && Object.prototype.hasOwnProperty.call(this.fixtureSets, method)) {
+      return true;
+    } else {
+      return false;
+    }
   }
 
   /** @internal */

@@ -7,10 +7,10 @@ import {
   truncate as stringTruncate,
 } from "@blazetrails/activesupport";
 import { OutputBuffer } from "../buffers.js";
-import { chomp, regexpEscape } from "@blazetrails/ruby-compat";
-import { contentTag, type TagHelperHost } from "./tag-helper.js";
-import { sanitize } from "./sanitize-helper.js";
-import { raw } from "./output-safety-helper.js";
+import { Module, chomp, regexpEscape } from "@blazetrails/ruby-compat";
+import { TagHelper, contentTag, type TagHelperHost } from "./tag-helper.js";
+import { SanitizeHelper, sanitize } from "./sanitize-helper.js";
+import { OutputSafetyHelper, raw } from "./output-safety-helper.js";
 
 export interface TextHelperHost {
   outputBuffer: OutputBuffer;
@@ -374,3 +374,14 @@ function splitParagraphs(text: string): string[] {
     .split(/\n\n+/)
     .map((t) => t.replace(/([^\n]\n)(?=[^\n])/g, "$1<br />"));
 }
+
+export const TextHelper = new Module((mod) => {
+  mod.include(SanitizeHelper);
+  mod.include(TagHelper);
+  mod.include(OutputSafetyHelper);
+
+  mod.moduleEval((m) => {
+    Object.assign(m, { concat, safeConcat, truncate, highlight, excerpt, pluralize, wordWrap });
+    Object.assign(m, { simpleFormat, cycle, currentCycle, resetCycle });
+  });
+});

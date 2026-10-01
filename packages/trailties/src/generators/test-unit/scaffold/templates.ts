@@ -6,20 +6,23 @@ function header(this: ScaffoldGenerator) {
   const testClassName = `${this.controllerClassName().split("::").join("")}ControllerTest`;
   const modelClassName = this.className().split("::").join("");
   const singular = this.singularTableName();
+  const fixtureName = this.fixtureName();
   const root = "../".repeat(this.controllerClassPath().length + 1);
   const preamble = `import { describe, it } from "vitest";
 import { IntegrationTest } from "@blazetrails/actionpack";
+import type { FixtureSetAccessor } from "@blazetrails/activerecord/test-fixtures";
 import { assertDifference, registerConstant } from "@blazetrails/activesupport";
 import { ${modelClassName} } from "../${root}app/models/${this.filePath()}.js";
 import "${root}test-helper.js";
 
 class ${testClassName} extends IntegrationTest {
   declare "@${singular}": ${modelClassName};
+  declare ${fixtureName}: FixtureSetAccessor<${modelClassName}>;
 
   static {
     registerConstant("${testClassName}", this);
     this.setup(async function (this: ${testClassName}) {
-      this["@${singular}"] = (await this.fixture("${this.fixtureName()}", "one")) as ${modelClassName};
+      this["@${singular}"] = await this.${fixtureName}("one");
     });
   }
 }
