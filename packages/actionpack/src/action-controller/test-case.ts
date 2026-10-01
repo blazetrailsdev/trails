@@ -338,6 +338,7 @@ export class TestCase extends ActiveSupportTestCase {
     } = options;
     let { format } = options;
 
+    this.checkRequiredIvars();
     this.controller.clearInstanceVariablesBetweenRequests();
 
     const httpMethod = String(method).toUpperCase();
@@ -523,6 +524,15 @@ export class TestCase extends ActiveSupportTestCase {
   /** @internal */
   private get documentRootElement() {
     return this.htmlDocument.root;
+  }
+
+  /** @internal */
+  private checkRequiredIvars(): void {
+    for (const ivName of ["routes", "controller", "request", "response"] as const) {
+      if (this[ivName] == null) {
+        throw new Error(`@${ivName} is nil: make sure you set it in your test's setup method.`);
+      }
+    }
   }
 }
 

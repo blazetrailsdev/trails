@@ -106,6 +106,14 @@ describe("ActionController::Live under test_case.rb", () => {
   });
 });
 
+describe("TestCase#check_required_ivars", () => {
+  it("names the unset ivar when a request is made with no routes", async () => {
+    await expect(new TestCase(Base).get("index")).rejects.toThrow(
+      "@routes is nil: make sure you set it in your test's setup method.",
+    );
+  });
+});
+
 describe("TestCase#document_root_element", () => {
   class XmlController extends Base {
     async index() {
