@@ -195,11 +195,7 @@ describe("trails-tsc .tse diagnostic remap", () => {
 });
 
 describe("trails-tsc .tse diagnostic span end", () => {
-  async function remapSpan(
-    source: string,
-    from: string,
-    to: string,
-  ): Promise<[string, Diagnostic]> {
+  async function remapSpan(source: string, from: string, to: string) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-span-"));
     fs.mkdirSync(path.join(root, "app/views/posts"), { recursive: true });
     fs.writeFileSync(path.join(root, "app/views/posts/show.html.tse"), source);
@@ -233,7 +229,7 @@ describe("trails-tsc .tse diagnostic span end", () => {
       getOriginalText: () => undefined,
       getTseSourceMap: () => ({ source: "show.html.tse", sourceContent: source, lines }),
     });
-    return [source.slice(remapped.pos, remapped.end), remapped];
+    return [source.slice(remapped.pos, remapped.end), remapped] as const;
   }
 
   it("maps a span crossing two lines of a multi-line tag through each line's own mapping", async () => {
@@ -246,9 +242,8 @@ describe("trails-tsc .tse diagnostic span end", () => {
   });
 
   it("clamps a span around a yield's re-emitted call to the argument the template wrote", async () => {
-    expect((await remapSpan("<main><%= yield(123) %></main>\n", "context.yield(", "123)"))[0]).toBe(
-      "123",
-    );
+    const [span] = await remapSpan("<main><%= yield(123) %></main>\n", "context.yield(", "123)");
+    expect(span).toBe("123");
     expect((await remapSpan("<main><%= yield(123) %></main>\n", "123", "123"))[0]).toBe("123");
   });
 });

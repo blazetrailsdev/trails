@@ -597,7 +597,6 @@ Object.defineProperty(DefaultUrlOptionsCachingController, "name", {
 
 class TestCaseTest extends TestCase {
   declare response: TestResponse;
-
   static fixturePaths(): string[] {
     return [];
   }
@@ -953,8 +952,8 @@ describe("TestCaseTest", () => {
       parsedParams,
     );
 
-    assertEqual("bar", tc.session.get("foo"));
-    assertEqual("created", tc.flash.get("notice"));
+    assertEqual("bar", tc.session().get("foo"));
+    assertEqual("created", tc.flash().get("notice"));
   });
 
   it("params passing with integer", async () => {
