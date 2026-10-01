@@ -96,9 +96,7 @@ describe("CalculationsTest", () => {
     "posts",
     "comments",
     "cpkBooks",
-    "cpkAuthors",
-    "oneNeedQuoting",
-  ] as const);
+  ]);
 
   it("should sum field", async () => {
     expect(await Account.sum("credit_limit")).toEqual(318);
