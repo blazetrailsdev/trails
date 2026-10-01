@@ -1,7 +1,13 @@
-import { ArgumentError, rbObjAsString as toS, Range } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  rbFPublicSend,
+  rbObjAsString as toS,
+  rbObjRespondTo,
+  Range,
+} from "@blazetrails/ruby-compat";
 import type * as Arel from "@blazetrails/arel";
 import { Nodes, sql } from "@blazetrails/arel";
-import { kernelArray, wrap } from "@blazetrails/activesupport";
+import { kernelArray, Tryable, wrap } from "@blazetrails/activesupport";
 
 import { QueryAttribute } from "./query-attribute.js";
 import { ArrayHandler } from "./predicate-builder/array-handler.js";
@@ -13,7 +19,6 @@ import { AssociationQueryValue } from "./predicate-builder/association-query-val
 import { Substitute } from "../statement-cache.js";
 import { PolymorphicArrayValue } from "./predicate-builder/polymorphic-array-value.js";
 import type { TableMetadata } from "../table-metadata.js";
-import type { Base } from "../base.js";
 
 export class PredicateBuilder {
   private _table: TableMetadata;
@@ -48,21 +53,16 @@ export class PredicateBuilder {
     attributes: Attributes,
     block?: (tableName: string) => unknown,
   ): Nodes.Node[] {
-    if (entriesOf(attributes).length === 0) {
-      return [sql("1=0")];
-    }
-    const nodes: Nodes.Node[] = [];
-    for (let [key, value] of entriesOf(attributes)) {
+    if (entriesOf(attributes).length === 0) return [sql("1=0")];
+
+    return entriesOf(attributes).flatMap(([key, value]) => {
       if (value instanceof DeferredPluck) {
         const arelTable = this.table.arelTable;
-        nodes.push(
-          value.in(
-            Array.isArray(key)
-              ? new Nodes.Grouping(key.map((col) => arelTable.get(col)))
-              : arelTable.get(key),
-          ),
+        return value.in(
+          Array.isArray(key)
+            ? new Nodes.Grouping(key.map((col) => arelTable.get(col)))
+            : arelTable.get(key),
         );
-        continue;
       }
 
       if (Array.isArray(key) && key.length === 1) {
@@ -76,122 +76,55 @@ export class PredicateBuilder {
           if (!Array.isArray(idsSet)) {
             throw new ArgumentError(`Expected corresponding value for ${toS(cols)} to be an Array`);
           }
-          return this.expandFromHash(
-            new Map(cols.map((col, index) => [col, idsSet[index]])),
-            block,
-          );
+          return this.expandFromHash(new Map(cols.map((col, index) => [col, idsSet[index]])));
         });
-        nodes.push(...this.groupingQueries(queries));
+        return this.groupingQueries(queries);
       } else if (isPlainObject(value) && !this.table.hasColumn(key)) {
-        const assocPb: PredicateBuilder = this.table.associatedTable(
-          key,
-          block as (name: string) => never,
-        ).predicateBuilder;
-        nodes.push(...assocPb.expandFromHash(value));
+        return this.table
+          .associatedTable(key, block as (name: string) => never)
+          .predicateBuilder.expandFromHash(value);
       } else if (this.table.isAssociatedWith(key)) {
-        const assocNodes = this.buildFromHashAssociation(
-          this.table.associatedTable(key),
-          key,
-          value,
-          attributes,
-        );
-        nodes.push(...assocNodes);
-      } else if (this.table.aggregatedWith(key)) {
-        nodes.push(...this.buildFromHashAggregate(key, value));
-      } else {
-        nodes.push(this.build(this.table.arelTable.get(key), value));
-      }
-    }
-    return nodes;
-  }
-
-  /** @internal */
-  private buildFromHashAggregate(key: string, value: unknown): Nodes.Node[] {
-    const reflection = this.table.reflectOnAggregation(key);
-    const mapping: [string, string][] = reflection.mapping();
-    const values = value === null || value === undefined ? [null] : wrap(value);
-    if (mapping.length === 1 || values.length === 0) {
-      const [columnName, aggregateAttr] = mapping[0];
-      const mapped = values.map((object) => extractAggregateAttr(object, aggregateAttr, false));
-      return [this.build(this.table.arelTable.get(columnName), mapped)];
-    }
-    const queryGroups: Nodes.Node[][] = values.map((object) =>
-      mapping.map(([fieldAttr, aggregateAttr]) =>
-        this.build(
-          this.table.arelTable.get(fieldAttr),
-          extractAggregateAttr(object, aggregateAttr, true),
-        ),
-      ),
-    );
-    return this.groupingQueries(queryGroups);
-  }
-
-  /** @internal */
-  private buildFromHashAssociation(
-    associatedTable: any,
-    key: string,
-    value: unknown,
-    attributes: Attributes,
-  ): Nodes.Node[] {
-    if (associatedTable.isPolymorphicAssociation?.()) {
-      const fk = associatedTable.joinForeignKey as string | string[];
-      const ft = associatedTable.joinForeignType as string;
-      const refl = associatedTable.reflection;
-      const pkFor = (klass?: unknown): string | string[] => {
-        const pk = associatedTable.joinPrimaryKey(klass as typeof Base | undefined) ?? "id";
-        return Array.isArray(pk) ? pk : String(pk);
-      };
-      const values = Array.isArray(value) ? value : [value];
-      const queries = new PolymorphicArrayValue(
-        { joinForeignKey: fk, joinForeignType: ft, joinPrimaryKey: pkFor },
-        values,
-      ).queries();
-      const queryGroups: Nodes.Node[][] = [];
-      for (const query of queries) {
-        const inner = this.expandFromHash(query);
-        if (inner.length === 0) continue;
-        queryGroups.push(inner);
-      }
-      return this.groupingQueries(queryGroups);
-    }
-    if (associatedTable.isThroughAssociation?.()) {
-      const rawPk = associatedTable.primaryKey;
-      const assocPb: PredicateBuilder = associatedTable.predicateBuilder;
-      if (Array.isArray(rawPk)) {
-        if (rawPk.length === 1) {
-          const flat = Array.isArray(value) ? value.flat(Infinity) : value;
-          return assocPb.expandFromHash({ [rawPk[0]]: flat });
+        const associatedTable = this.table.associatedTable(key);
+        let klass: typeof PolymorphicArrayValue | typeof AssociationQueryValue | undefined;
+        if (associatedTable.isPolymorphicAssociation()) {
+          if (!Array.isArray(value)) value = [value];
+          klass = PolymorphicArrayValue;
+        } else if (associatedTable.isThroughAssociation()) {
+          return associatedTable.predicateBuilder.expandFromHash(
+            new Map([[associatedTable.primaryKey, value]]),
+          );
         }
-        const values =
-          value === null || value === undefined ? [] : Array.isArray(value) ? value : [value];
-        const queryGroups: Nodes.Node[][] = values.map((idsSet) => {
-          if (!Array.isArray(idsSet)) {
-            throw new ArgumentError(
-              `Expected corresponding value for [${rawPk.map((c) => `"${c}"`).join(", ")}] to be an Array`,
-            );
-          }
-          const zipped: Record<string, unknown> = {};
-          rawPk.forEach((col, i) => {
-            zipped[col] = idsSet[i];
-          });
-          return assocPb.expandFromHash(zipped);
-        });
-        return assocPb.groupingQueries(queryGroups);
-      }
-      return assocPb.expandFromHash({ [rawPk as string]: value });
-    }
-    const queries = new AssociationQueryValue(associatedTable, value).queries();
-    const queryGroups: Nodes.Node[][] = [];
-    for (const query of queries) {
-      if (isSameHash(query, attributes)) {
-        queryGroups.push([this.build(this.table.arelTable.get(key), value)]);
+
+        klass ||= AssociationQueryValue;
+        const queries = new klass(associatedTable as never, value as never)
+          .queries()
+          .map((query) =>
+            isSameHash(query, attributes) ? [this.get(key, value)] : this.expandFromHash(query),
+          );
+
+        return this.groupingQueries(queries);
+      } else if (this.table.aggregatedWith(key)) {
+        const mapping: [string, string][] = this.table.reflectOnAggregation(key).mapping();
+        let values: unknown[] = value === null || value === undefined ? [null] : wrap(value);
+        if (mapping.length === 1 || values.length === 0) {
+          const [columnName, aggrAttr] = mapping[0];
+          values = values.map((object) =>
+            rbObjRespondTo(object, aggrAttr) ? rbFPublicSend(object, aggrAttr) : object,
+          );
+          return this.get(columnName, values);
+        } else {
+          const queries = values.map((object) =>
+            mapping.map(([fieldAttr, aggregateAttr]) =>
+              this.get(fieldAttr, Tryable.tryBang(object, aggregateAttr)),
+            ),
+          );
+
+          return this.groupingQueries(queries);
+        }
       } else {
-        const inner = this.expandFromHash(query);
-        if (inner.length === 0) continue;
-        queryGroups.push(inner);
+        return this.get(key, value);
       }
-    }
-    return this.groupingQueries(queryGroups);
+    });
   }
 
   /** @internal */
@@ -375,25 +308,6 @@ function entriesOf(attributes: Attributes): [string | string[], unknown][] {
 
 function respondsToId(value: unknown): value is { id: unknown } {
   return value != null && typeof value === "object" && "id" in value && !isPlainObject(value);
-}
-
-function extractAggregateAttr(object: unknown, attr: string, tryBang: boolean): unknown {
-  if (object === null || object === undefined) return tryBang ? null : object;
-  if (typeof object === "object" && attr in object) {
-    const v = (object as Record<string, unknown>)[attr];
-    return typeof v === "function" ? (v as (...a: unknown[]) => unknown).call(object) : v;
-  }
-  if (tryBang) {
-    throw new TypeError(
-      `composed_of value ${describeAggregateValue(object)} does not respond to mapped attribute '${attr}'`,
-    );
-  }
-  return object;
-}
-
-function describeAggregateValue(object: unknown): string {
-  const ctor = (object as { constructor?: { name?: string } } | null)?.constructor?.name;
-  return ctor ? `(${ctor})` : String(object);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

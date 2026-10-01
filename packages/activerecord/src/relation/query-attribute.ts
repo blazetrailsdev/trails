@@ -53,11 +53,11 @@ export class QueryAttribute extends Attribute {
   }
 
   override get valueForDatabase(): unknown {
-    return super.valueForDatabase;
-  }
-
-  protected override _valueForDatabase(): unknown {
-    return this.type!.serialize(this.value());
+    if (!this._hasValueForDatabase) {
+      this._cachedValueForDatabase = this._valueForDatabase();
+      this._hasValueForDatabase = true;
+    }
+    return this._cachedValueForDatabase;
   }
 
   isNil(): boolean {

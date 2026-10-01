@@ -722,13 +722,12 @@ describe("EachTest", () => {
   it("in batches executes range queries when unconstrained", async () => {
     const quoted = regexpEscape(quoteTableName("posts.id"));
     await assertQueriesMatch(
-      new RegExp(`WHERE ${quoted} >=? .+ AND ${quoted} <= .+`, "i"),
+      new RegExp(`WHERE ${quoted} > .+ AND ${quoted} <= .+`, "i"),
       undefined,
       false,
       async () => {
         for await (const relation of Post.inBatches({ of: 2 })) {
           expect(await relation.first()).toBeInstanceOf(Post);
-          break;
         }
       },
     );
@@ -767,7 +766,7 @@ describe("EachTest", () => {
   it("in batches executes range queries when constrained and opted in into ranges", async () => {
     const quoted = regexpEscape(quoteTableName("posts.id"));
     await assertQueriesMatch(
-      new RegExp(`${quoted} >=? .+ AND ${quoted} <= .+`, "i"),
+      new RegExp(`${quoted} > .+ AND ${quoted} <= .+`, "i"),
       undefined,
       false,
       async () => {
@@ -776,7 +775,6 @@ describe("EachTest", () => {
           useRanges: true,
         })) {
           expect(await relation.first()).toBeInstanceOf(Post);
-          break;
         }
       },
     );

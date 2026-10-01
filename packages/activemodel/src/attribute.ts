@@ -37,7 +37,7 @@ export abstract class Attribute {
   originalAttribute: Attribute | null;
   protected _value: unknown;
   protected _hasValue: boolean;
-  private _cachedValueForDatabase: unknown;
+  protected _cachedValueForDatabase: unknown;
   protected _hasValueForDatabase: boolean;
 
   static fromDatabase(

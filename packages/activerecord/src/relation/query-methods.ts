@@ -2062,12 +2062,11 @@ export function lookupTableKlassFromJoinDependencies(
 /** @internal */
 export function eachJoinDependencies(
   this: QueryMethodsHost,
-  joinDependencies: JoinDependency[] | undefined,
+  joinDependencies: JoinDependency[] = buildJoinDependencies.call(this),
   block: (join: any) => void,
 ): void {
-  const deps = joinDependencies ?? buildJoinDependencies.call(this);
-  for (const jd of deps) {
-    jd.each(block);
+  for (const joinDependency of joinDependencies) {
+    joinDependency.each(block);
   }
 }
 
@@ -2195,54 +2194,50 @@ export function buildJoinBuckets(
     },
   });
 
-  const joinsValues = this.joinsValues;
-
-  const leftOuterJoinsValues = this.leftOuterJoinsValues;
-  const stashedLeft: JoinDependency[] = [];
-  if (leftOuterJoinsValues.length > 0) {
-    const namedLeft = selectNamedJoins.call(this, leftOuterJoinsValues, stashedLeft, (left) => {
-      if (left instanceof CTEJoin) {
-        buckets.join_node.push(buildWithJoinNode.call(this, left.name, Nodes.OuterJoin));
-      } else {
-        throw new ArgumentError("only Hash, Symbol and Array are allowed");
-      }
-    });
-
-    if (joinsValues.length === 0) {
-      buckets.named_join.push(...namedLeft);
-      buckets.stashed_join.push(...stashedLeft);
-      return [buckets, Nodes.OuterJoin];
-    }
-
-    const leftJd = constructJoinDependency.call(
+  let stashedLeftJoins: JoinDependency[] | undefined;
+  if (this.leftOuterJoinsValues.length > 0) {
+    stashedLeftJoins = [];
+    const leftJoins = selectNamedJoins.call(
       this,
-      namedLeft as AssociationSpec[],
-      Nodes.OuterJoin,
+      this.leftOuterJoinsValues,
+      stashedLeftJoins,
+      (leftJoin) => {
+        if (leftJoin instanceof CTEJoin) {
+          buckets.join_node.push(buildWithJoinNode.call(this, leftJoin.name, Nodes.OuterJoin));
+        } else {
+          throw new ArgumentError("only Hash, Symbol and Array are allowed");
+        }
+      },
     );
-    stashedLeft.unshift(leftJd);
-  }
 
-  const joins = [...joinsValues];
-  const lastJoinValue = joins[joins.length - 1];
-  let stashedEagerLoad: JoinDependency | undefined;
-  if (lastJoinValue instanceof ActiveRecord.Associations.JoinDependency) {
-    if (lastJoinValue.baseKlass === this.model) {
-      joins.pop();
-      stashedEagerLoad = lastJoinValue;
+    if (this.joinsValues.length === 0) {
+      buckets.named_join = leftJoins;
+      buckets.stashed_join = stashedLeftJoins;
+      return [buckets, Nodes.OuterJoin];
+    } else {
+      stashedLeftJoins.unshift(
+        constructJoinDependency.call(this, leftJoins as AssociationSpec[], Nodes.OuterJoin),
+      );
     }
   }
 
-  const hasStashed = Boolean(stashedEagerLoad) || stashedLeft.length > 0;
+  const joins = [...this.joinsValues];
+  let stashedEagerLoad: JoinDependency | undefined;
+  if (joins[joins.length - 1] instanceof ActiveRecord.Associations.JoinDependency) {
+    if ((joins[joins.length - 1] as JoinDependency).baseKlass === this.model) {
+      stashedEagerLoad = joins.pop() as JoinDependency;
+    }
+  }
 
-  for (const [i, v] of joins.entries()) {
-    if (typeof v === "string" && !v.startsWith(":")) {
-      joins[i] = new Nodes.StringJoin(Arel.sql(v.trim()) as any) as Nodes.Join;
+  for (const [i, join] of joins.entries()) {
+    if (typeof join === "string" && !join.startsWith(":")) {
+      joins[i] = new Nodes.StringJoin(Arel.sql(join.trim()) as any) as Nodes.Join;
     }
   }
 
   while (joins[0] instanceof Nodes.Join) {
     const joinNode = joins.shift() as Nodes.Join;
-    if (!(joinNode instanceof Nodes.LeadingJoin) && hasStashed) {
+    if (!(joinNode instanceof Nodes.LeadingJoin) && (stashedEagerLoad || stashedLeftJoins)) {
       buckets.join_node.push(joinNode);
     } else {
       buckets.leading_join.push(joinNode);
@@ -2259,7 +2254,7 @@ export function buildJoinBuckets(
     }
   });
 
-  buckets.stashed_join.push(...stashedLeft);
+  if (stashedLeftJoins) buckets.stashed_join.push(...stashedLeftJoins);
   if (stashedEagerLoad) buckets.stashed_join.push(stashedEagerLoad);
 
   return [buckets, Nodes.InnerJoin];

@@ -1,7 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { kernelArray as Array } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/ruby-compat";
-import { WhereClause } from "./where-clause.js";
 import { stripThenable } from "./thenable.js";
 import { BatchEnumerator } from "./batches/batch-enumerator.js";
 import type { Base } from "../base.js";
@@ -199,51 +198,17 @@ export class Batches {
     } else {
       generator = async function* () {
         await ensureValidOptions();
-        for await (const { rows: batchRows, useRanges: batchUseRanges } of batchOnUnloadedRelation({
+        yield* batchOnUnloadedRelation.call(self, {
           relation: self,
           start,
           finish,
+          load,
           cursor,
           order: (order ?? "asc") as any,
-          batchLimit,
-          load,
-          remaining,
           useRanges,
-        })) {
-          const batchRel = self.clone();
-          batchRel.orderValues = batchOrders.map(([col, dir]) =>
-            dir === "desc" ? self.table.get(col).desc() : self.table.get(col).asc(),
-          );
-          const tuples = batchRows.map((r) => cursor.map((c) => r.readAttribute(c)));
-          if (batchUseRanges && !load && cursor.length === 1 && tuples.length > 0) {
-            const col = cursor[0];
-            const dir = batchOrders[0][1];
-            const first = tuples[0][0];
-            const last = tuples[tuples.length - 1][0];
-            const attr = self.table.get(col);
-            const lo = dir === "desc" ? last : first;
-            const hi = dir === "desc" ? first : last;
-            batchRel.whereClause = batchRel.whereClause.plus(
-              new WhereClause([attr.gteq(lo).and(attr.lteq(hi))]),
-            );
-          } else if (cursor.length === 1) {
-            const ids = tuples.map((t: unknown[]) => t[0]);
-            batchRel.whereClause = batchRel.whereClause.plus(
-              new WhereClause([...self.predicateBuilder.buildFromHash({ [cursor[0]]: ids })]),
-            );
-          } else {
-            batchRel.whereClause = batchRel.whereClause.plus(
-              new WhereClause([
-                ...self.predicateBuilder.buildFromHash(new Map([[cursor, tuples]])),
-              ]),
-            );
-          }
-          if (load) {
-            batchRel._records = batchRows;
-            batchRel._loaded = true;
-          }
-          yield stripThenable(batchRel);
-        }
+          remaining,
+          batchLimit,
+        });
       } as () => AsyncGenerator<LoadedRelation<Relation<T>>>;
     }
 
@@ -452,55 +417,84 @@ export function compareValuesForOrder(
 }
 
 /** @internal */
-export async function* batchOnUnloadedRelation(opts: {
-  relation: any;
-  start: unknown;
-  finish: unknown;
-  cursor: string[];
-  order: "asc" | "desc" | ("asc" | "desc")[];
-  batchLimit: number;
-  load?: boolean;
-  remaining?: number | null;
-  useRanges?: boolean | null;
-}): AsyncGenerator<{ rows: any[]; useRanges: boolean }> {
-  const { cursor } = opts;
-  let { batchLimit } = opts;
-  let remaining: number | null | undefined = opts.remaining;
-  const batchOrders = buildBatchOrders(cursor, opts.order as any);
-  let relation = opts.relation.reorder(Object.fromEntries(batchOrders)).limit(batchLimit);
-  relation = applyLimits(relation, cursor, opts.start, opts.finish, batchOrders);
-  const emptyScope = opts.relation.toSql() === opts.relation.model.unscoped().all().toSql();
-  const useRanges = (emptyScope && opts.useRanges !== false) || opts.useRanges === true;
+export async function* batchOnUnloadedRelation(
+  this: any,
+  opts: {
+    relation: any;
+    start: unknown;
+    finish: unknown;
+    load: boolean;
+    cursor: string[];
+    order: "asc" | "desc" | ("asc" | "desc")[];
+    useRanges: boolean | null | undefined;
+    remaining: number | null;
+    batchLimit: number;
+  },
+): AsyncGenerator<any> {
+  const { start, load, cursor, order, useRanges, batchLimit } = opts;
+  let { relation, finish, remaining } = opts;
+  const batchOrders = buildBatchOrders(cursor, order);
+  relation = relation.reorder(Object.fromEntries(batchOrders)).limit(batchLimit);
+  relation = applyLimits(relation, cursor, start, finish, batchOrders);
+  relation.skipQueryCacheBang();
   let batchRelation = relation;
-  while (true) {
-    const rows = await (opts.load ? batchRelation : batchRelation.select(...cursor)).toArray();
-    if (rows.length === 0) break;
+  const emptyScope = this.toSql() === this.model.unscoped().all().toSql();
 
-    if (rows.some((record: any) => cursor.some((column) => record.attributes[column] == null))) {
+  while (true) {
+    let values: unknown[];
+    let yieldedRelation: any;
+    if (load) {
+      const records = await batchRelation.records();
+      values = records.map((record: any) =>
+        cursor.length > 1 ? cursor.map((key) => record.get(key)) : record.get(cursor[0]),
+      );
+      yieldedRelation = this.where(new Map([[cursor, values]]));
+      yieldedRelation.loadRecords(records);
+    } else if ((emptyScope && useRanges !== false) || useRanges) {
+      values = await batchRelation.pluck(...cursor);
+
+      finish = values[values.length - 1];
+      if (finish != null && finish !== false) {
+        yieldedRelation = applyFinishLimit(batchRelation, cursor, finish, batchOrders);
+        yieldedRelation = yieldedRelation.except("limit", "order");
+        yieldedRelation.skipQueryCacheBang(false);
+      }
+    } else {
+      values = await batchRelation.pluck(...cursor);
+      yieldedRelation = this.where(new Map([[cursor, values]]));
+    }
+
+    if (values.length === 0) break;
+
+    if (values.flat(Infinity).some((value) => value == null)) {
       throw new ArgumentError(
         "Not all of the batch cursor columns were included in the custom select clause " +
           "or some columns contain nil.",
       );
     }
 
-    yield { rows, useRanges };
-    if (rows.length < batchLimit) break;
-    if (remaining != null) {
-      remaining -= rows.length;
-      if (remaining === 0) break;
-      if (remaining < batchLimit) {
-        batchLimit = remaining;
-        relation = relation.limit(batchLimit);
+    yield stripThenable(yieldedRelation);
+
+    if (values.length < batchLimit) break;
+
+    if (this.limitValue != null) {
+      remaining! -= values.length;
+
+      if (remaining === 0) {
+        break;
+      } else if (remaining! < batchLimit) {
+        relation = relation.limit(remaining);
       }
     }
+
     const batchOrdersCopy = [...batchOrders];
-    const [, lastOrder] = batchOrdersCopy.pop() as [string, "asc" | "desc"];
+    const [, lastOrder] = batchOrdersCopy.pop()!;
     const operators: string[] = batchOrdersCopy.map(([, order]) =>
       order === "desc" ? "lteq" : "gteq",
     );
     operators.push(lastOrder === "desc" ? "lt" : "gt");
 
-    const cursorValue = recordCursorValues(rows[rows.length - 1], cursor);
+    const cursorValue = values[values.length - 1];
     batchRelation = batchCondition(relation, cursor, cursorValue, operators);
   }
 }
