@@ -1,11 +1,8 @@
 import { type Included } from "@blazetrails/activesupport";
 import { ValueType } from "../value.js";
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export const MutableModule = {
+/** @internal */
+export const Mutable = {
   cast(this: ValueType, value: unknown): unknown {
     return this.deserialize(this.serialize(value));
   },
@@ -19,4 +16,4 @@ export const MutableModule = {
   },
 };
 
-export type Mutable = Included<typeof MutableModule>;
+export type Mutable = Included<typeof Mutable>;

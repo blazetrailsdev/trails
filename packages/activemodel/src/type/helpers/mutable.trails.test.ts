@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { include } from "@blazetrails/activesupport";
-import { MutableModule } from "./mutable.js";
+import { Mutable } from "./mutable.js";
 import { ValueType } from "../value.js";
 
 class FakeJsonType extends ValueType<unknown> {
@@ -18,9 +18,9 @@ class FakeJsonType extends ValueType<unknown> {
   }
 }
 
-include(FakeJsonType, MutableModule);
+include(FakeJsonType, Mutable);
 
-describe("MutableModule", () => {
+describe("Mutable", () => {
   it("included class instances satisfy instanceof the base class", () => {
     const instance = new FakeJsonType();
     expect(instance).toBeInstanceOf(FakeJsonType);

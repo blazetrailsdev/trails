@@ -1,6 +1,6 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { humanize, mergeBang } from "@blazetrails/activesupport";
+import { mergeBang } from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
 import { inspectAccessor } from "./_accessor.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
@@ -16,23 +16,19 @@ export class ConfirmationValidator extends EachValidator {
     this.setupBang(options.class);
   }
 
-  /** @missingRailsArgs merge! — PERMANENT */
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     const confirmationAttr = `${attribute}Confirmation`;
     const rec = record as unknown as Record<string, unknown>;
     const confirmed = rec[confirmationAttr];
     if (confirmed == null) return;
     if (!this.isConfirmationValueEqual(record, attribute, value, confirmed)) {
-      const modelClass = rec.constructor as
-        | { humanAttributeName?: (a: string) => string }
-        | undefined;
-      const humanAttr = modelClass?.humanAttributeName
-        ? modelClass.humanAttributeName(attribute)
-        : humanize(attribute);
+      const humanAttributeName = (
+        rec.constructor as unknown as { humanAttributeName(attribute: string): string }
+      ).humanAttributeName(attribute);
       record.errors.add(
         confirmationAttr,
         ":confirmation",
-        mergeBang(except(this.options, "caseSensitive"), { attribute: humanAttr }),
+        mergeBang(except(this.options, "caseSensitive"), { attribute: humanAttributeName }),
       );
     }
   }

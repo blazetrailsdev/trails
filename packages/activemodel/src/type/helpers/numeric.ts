@@ -42,7 +42,7 @@ export interface NumericMixinMethods {
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE type-helpers-numeric-is-a-class-factory-not-an-included-module
  */
 export function applyNumericMixin<TBase extends AbstractValueTypeCtor>(
   Base: TBase,

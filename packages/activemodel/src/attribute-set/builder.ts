@@ -81,7 +81,7 @@ export class LazyAttributeSet extends AttributeSet {
     );
   }
 
-  /** @missingRailsArgs keys — PERMANENT */
+  /** @missingRailsArgs keys — CONVERGEABLE lazy-attribute-set-keys-drops-args-receipt-after-pairing-tiebreak */
   override keys(): string[] {
     const keys = new Set([
       ...(isIndexedRow(this.values) ? this.values.keys() : Object.keys(this.values)),

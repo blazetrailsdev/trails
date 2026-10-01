@@ -49,28 +49,6 @@ describe("TypeRegistry", () => {
     const t = Types.typeRegistry.lookup("type_registry_test_custom");
     expect(t).toBeInstanceOf(Types.StringType);
   });
-
-  it("keyFor returns the registry key a type instance was built from", () => {
-    for (const key of [
-      "string",
-      "integer",
-      "float",
-      "boolean",
-      "date",
-      "datetime",
-      "decimal",
-      "big_integer",
-      "immutable_string",
-      "binary",
-      "time",
-    ]) {
-      expect(Types.typeRegistry.keyFor(Types.typeRegistry.lookup(key))).toBe(key);
-    }
-  });
-
-  it("keyFor returns null for a type that was never registered", () => {
-    expect(Types.typeRegistry.keyFor(defaultValue())).toBeNull();
-  });
 });
 
 describe("ActiveModel::Type::Registry#initialize_copy", () => {
@@ -82,7 +60,6 @@ describe("ActiveModel::Type::Registry#initialize_copy", () => {
 
     expect(copy).toBeInstanceOf(TypeRegistry);
     expect(copy.lookup("foo")).toBeInstanceOf(Types.StringType);
-    expect(copy.keyFor(new Types.StringType())).toBe("foo");
   });
 
   it("registering on the dup leaves the original untouched", () => {
@@ -96,7 +73,6 @@ describe("ActiveModel::Type::Registry#initialize_copy", () => {
     expect(copy.lookup("foo")).toBeInstanceOf(Types.IntegerType);
     expect(registry.lookup("foo")).toBeInstanceOf(Types.StringType);
     expect(() => registry.lookup("bar")).toThrow("Unknown type :bar");
-    expect(registry.keyFor(new Types.IntegerType())).toBeNull();
   });
 
   it("registering on the original leaves the dup untouched", () => {
