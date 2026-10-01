@@ -86,11 +86,24 @@ function lineMappings(genLine: number, code: string, node: TseAst["nodes"][numbe
   const emitted = /^\s*(?:_ob\.\w+\()?/u.exec(pieces[0])?.[0].length ?? 0;
   const at = node.kind === "text" ? 0 : pieces[0].indexOf(anchor, emitted);
   const srcCol = valueCol + (yielded !== null && arg !== "" ? value.indexOf(arg) : 0);
-  return pieces.map((_, i) =>
-    i === 0
-      ? { genLine, srcLine, genCol: at === -1 ? pieces[0].length : at, srcCol }
-      : { genLine: genLine + i, srcLine: srcLine + i, genCol: 0, srcCol: 0 },
-  );
+  const valueLines = value.split("\n");
+  const srcEnd =
+    yielded !== null && arg === "" ? valueCol + valueLines[0].length : srcCol + anchor.length;
+  return pieces.flatMap((piece, i) => {
+    if (i > 0) {
+      const end = (valueLines[i] ?? piece).length;
+      return [
+        { genLine: genLine + i, srcLine: srcLine + i, genCol: 0, srcCol: 0 },
+        { genLine: genLine + i, srcLine: srcLine + i, genCol: end, srcCol: end },
+      ];
+    }
+    if (at === -1) return [{ genLine, srcLine, genCol: piece.length, srcCol }];
+    if (node.kind === "text") return [{ genLine, srcLine, genCol: at, srcCol }];
+    return [
+      { genLine, srcLine, genCol: at, srcCol },
+      { genLine, srcLine, genCol: at + anchor.length, srcCol: srcEnd },
+    ];
+  });
 }
 
 function contextYield(value: string): string {

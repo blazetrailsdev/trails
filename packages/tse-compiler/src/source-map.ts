@@ -34,26 +34,29 @@ export function generateSourceMap(
   sourceContent: string | null,
   mappings: readonly LineMapping[],
 ): RawSourceMap {
-  const sorted = [...mappings].sort((a, b) => a.genLine - b.genLine);
-  const segs: string[] = [];
-  let prevGen = 0;
+  const sorted = [...mappings].sort(
+    (a, b) => a.genLine - b.genLine || (a.genCol ?? 0) - (b.genCol ?? 0),
+  );
+  const lines: string[][] = [];
+  let prevGenCol = 0;
   let prevSrc = 0;
   let prevSrcCol = 0;
   for (const m of sorted) {
-    while (prevGen < m.genLine) {
-      segs.push("");
-      prevGen++;
+    while (lines.length <= m.genLine) {
+      lines.push([]);
+      prevGenCol = 0;
     }
+    const genCol = m.genCol ?? 0;
     const srcCol = m.srcCol ?? 0;
-    segs.push(
-      encodeVlq(m.genCol ?? 0) +
+    lines[m.genLine].push(
+      encodeVlq(genCol - prevGenCol) +
         encodeVlq(0) +
         encodeVlq(m.srcLine - prevSrc) +
         encodeVlq(srcCol - prevSrcCol),
     );
+    prevGenCol = genCol;
     prevSrc = m.srcLine;
     prevSrcCol = srcCol;
-    prevGen++;
   }
   return {
     version: 3,
@@ -61,7 +64,7 @@ export function generateSourceMap(
     sourceRoot: "",
     sources: [sourceFile],
     sourcesContent: [sourceContent],
-    mappings: segs.join(";"),
+    mappings: lines.map((segments) => segments.join(",")).join(";"),
   };
 }
 
@@ -88,7 +91,6 @@ export function decodeLineMappings(mappings: string): LineMapping[] {
   let srcLine = 0;
   let srcCol = 0;
   mappings.split(";").forEach((line, genLine) => {
-    let first = true;
     let genCol = 0;
     for (const segment of line.split(",")) {
       const fields = decodeVlqSegment(segment);
@@ -96,8 +98,7 @@ export function decodeLineMappings(mappings: string): LineMapping[] {
       genCol += fields[0];
       srcLine += fields[2];
       srcCol += fields[3];
-      if (first) out.push({ genLine, srcLine, genCol, srcCol });
-      first = false;
+      out.push({ genLine, srcLine, genCol, srcCol });
     }
   });
   return out;

@@ -24,7 +24,7 @@ export interface ArRemapHost {
 export interface TseSourceMap {
   source: string;
   sourceContent: string;
-  lines: ReadonlyMap<number, { line: number; genCol: number; srcCol: number }>;
+  lines: ReadonlyMap<number, readonly { line: number; genCol: number; srcCol: number }[]>;
 }
 
 export interface ArTrailsProgram {
@@ -179,14 +179,33 @@ function remapOneDiagnostic(
   };
 }
 
+function tsePosition(
+  tse: TseSourceMap,
+  position: { line: number; character: number },
+): { line: number; character: number } | undefined {
+  const segments = tse.lines.get(position.line);
+  if (segments === undefined || segments.length === 0) return undefined;
+  let i = 0;
+  while (i + 1 < segments.length && segments[i + 1].genCol <= position.character) i++;
+  const { line, genCol, srcCol } = segments[i];
+  const next = segments[i + 1];
+  const character = srcCol + Math.max(0, position.character - genCol);
+  if (next?.line === line) return { line, character: Math.min(character, next.srcCol) };
+  return { line, character: i > 0 ? srcCol : character };
+}
+
 function remapTseDiagnostic(d: Diagnostic, unmoved: Diagnostic, tse: TseSourceMap): Diagnostic {
-  const mapped = tse.lines.get(d.startPosition!.line);
-  if (mapped === undefined) return unmoved;
-  const { line } = mapped;
+  const startPosition = tsePosition(tse, d.startPosition!);
+  if (startPosition === undefined) return unmoved;
+  const { line, character } = startPosition;
   const lineStarts = computeLineStarts(tse.sourceContent);
   const text = tse.sourceContent.slice(lineStarts[line], lineStarts[line + 1]);
-  const character = mapped.srcCol + Math.max(0, d.startPosition!.character - mapped.genCol);
   const pos = lineStarts[line] + character;
+  const mappedEnd = d.endPosition && tsePosition(tse, d.endPosition);
+  const endPosition =
+    mappedEnd && lineStarts[mappedEnd.line] + mappedEnd.character >= pos
+      ? mappedEnd
+      : startPosition;
   const open = text.lastIndexOf("<%", character);
   const close = text.indexOf("%>", character);
   const tag = open === -1 || close === -1 ? undefined : text.slice(open, close + 2);
@@ -200,10 +219,13 @@ function remapTseDiagnostic(d: Diagnostic, unmoved: Diagnostic, tse: TseSourceMa
       : unmoved.messageChain,
     fileName: tse.source,
     pos,
-    end: pos + (d.end - d.pos),
-    startPosition: { line, character },
-    endPosition: { line, character: character + (d.end - d.pos) },
-    sourceLines: [{ line, text }],
+    end: lineStarts[endPosition.line] + endPosition.character,
+    startPosition,
+    endPosition,
+    sourceLines: lineStarts.slice(line, endPosition.line + 1).map((start, i) => ({
+      line: line + i,
+      text: tse.sourceContent.slice(start, lineStarts[line + i + 1]),
+    })),
   };
 }
 

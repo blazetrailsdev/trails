@@ -5,6 +5,7 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import { fileURLToPath } from "node:url";
+import { buildViews, decodeLineMappings } from "@blazetrails/trails-tsc";
 import {
   createArSolutionBuilder,
   createArTrailsProgram,
@@ -180,7 +181,7 @@ describe("trails-tsc .tse diagnostic remap", () => {
       getTseSourceMap: () => ({
         source: "/app/app/views/posts/_post.html.tse",
         sourceContent,
-        lines: new Map([[40, { line: 1, genCol: 13, srcCol: 27 }]]),
+        lines: new Map([[40, [{ line: 1, genCol: 13, srcCol: 27 }]]]),
       }),
     });
     expect(remapped.fileName).toBe("/app/app/views/posts/_post.html.tse");
@@ -190,6 +191,59 @@ describe("trails-tsc .tse diagnostic remap", () => {
     expect(remapped.sourceLines).toEqual([
       { line: 1, text: "  <p><%= post.title %> <%= readingTime(post.title) %></p>\n" },
     ]);
+  });
+});
+
+describe("trails-tsc .tse diagnostic span end", () => {
+  function remapSpan(source: string, from: string, to: string): [string, Diagnostic] {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-span-"));
+    fs.mkdirSync(path.join(root, "app/views/posts"), { recursive: true });
+    fs.writeFileSync(path.join(root, "app/views/posts/show.html.tse"), source);
+    buildViews({ cwd: root });
+    const shim = path.join(root, ".trails/views/posts/show.html.tse.ts");
+    const text = fs.readFileSync(shim, "utf8");
+    const map = JSON.parse(fs.readFileSync(shim + ".map", "utf8"));
+    const lines = new Map<number, { line: number; genCol: number; srcCol: number }[]>();
+    for (const m of decodeLineMappings(map.mappings)) {
+      if (!lines.has(m.genLine)) lines.set(m.genLine, []);
+      lines.get(m.genLine)!.push({ line: m.srcLine, genCol: m.genCol!, srcCol: m.srcCol! });
+    }
+    const position = (offset: number): { line: number; character: number } => {
+      const before = text.slice(0, offset).split("\n");
+      return { line: before.length - 1, character: before[before.length - 1].length };
+    };
+    const pos = text.indexOf(from);
+    const end = text.indexOf(to, pos) + to.length;
+    const diagnostic = {
+      fileName: shim,
+      pos,
+      end,
+      code: 2345,
+      category: 1,
+      text: "x",
+      startPosition: position(pos),
+      endPosition: position(end),
+    } as unknown as Diagnostic;
+    const [remapped] = remapDiagnostics([diagnostic], {
+      getDeltasForFile: () => undefined,
+      getOriginalText: () => undefined,
+      getTseSourceMap: () => ({ source: "show.html.tse", sourceContent: source, lines }),
+    });
+    return [source.slice(remapped.pos, remapped.end), remapped];
+  }
+
+  it("maps a span crossing two lines of a multi-line tag through each line's own mapping", () => {
+    const source = "<p>\n  <% const total = sum(\n       1, 2); %>\n</p>\n";
+    const [span, remapped] = remapSpan(source, "sum(", "2)");
+    expect(span).toBe("sum(\n       1, 2)");
+    expect(remapped.startPosition).toEqual({ line: 1, character: 19 });
+    expect(remapped.endPosition).toEqual({ line: 2, character: 12 });
+    expect(remapped.sourceLines?.map((l) => l.line)).toEqual([1, 2]);
+  });
+
+  it("clamps a span around a yield's re-emitted call to the argument the template wrote", () => {
+    expect(remapSpan("<main><%= yield(123) %></main>\n", "context.yield(", "123)")[0]).toBe("123");
+    expect(remapSpan("<main><%= yield(123) %></main>\n", "123", "123")[0]).toBe("123");
   });
 });
 

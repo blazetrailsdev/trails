@@ -335,15 +335,17 @@ async function loadTseSourceMaps(
       }
       const sourceContent = raw.sourcesContent[0];
       if (sourceContent == null) return;
+      const lines = new Map<number, { line: number; genCol: number; srcCol: number }[]>();
+      for (const m of decodeLineMappings(raw.mappings)) {
+        if (!lines.has(m.genLine)) lines.set(m.genLine, []);
+        lines
+          .get(m.genLine)!
+          .push({ line: m.srcLine, genCol: m.genCol ?? 0, srcCol: m.srcCol ?? 0 });
+      }
       maps.set(fileName, {
         source: path.resolve(path.dirname(mapPath), raw.sources[0]),
         sourceContent,
-        lines: new Map(
-          decodeLineMappings(raw.mappings).map((m) => [
-            m.genLine,
-            { line: m.srcLine, genCol: m.genCol ?? 0, srcCol: m.srcCol ?? 0 },
-          ]),
-        ),
+        lines,
       });
     }),
   );
