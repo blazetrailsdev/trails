@@ -70,36 +70,18 @@ export class TokenDefinition {
   }
 }
 
-export class RelationMethods {
+export class RelationMethods<T extends Base = Base> {
   /** @missingRailsArgs fetch — PERMANENT */
-  async findByTokenFor<T extends Base>(
-    this: Relation<T>,
-    purpose: string,
-    token: string,
-  ): Promise<T | null> {
-    const primaryKey = this.model.primaryKey as string | string[] | null;
-    if (!primaryKey || primaryKey.length === 0) throw new UnknownPrimaryKey(this);
-    const record = await fetch<TokenDefinition>(this.model.tokenDefinitions, purpose).resolveToken(
+  async findByTokenFor(this: Relation<T>, purpose: string, token: string): Promise<T | null> {
+    if (this.model.primaryKey == null) throw new UnknownPrimaryKey(this);
+    return (await fetch<TokenDefinition>(this.model.tokenDefinitions, purpose).resolveToken(
       token,
-      (id) => {
-        if (Array.isArray(primaryKey)) {
-          if (!Array.isArray(id) || id.length !== primaryKey.length) return Promise.resolve(null);
-          return this.findBy(
-            Object.fromEntries(primaryKey.map((key, i) => [key, id[i]])),
-          ) as Promise<Base | null>;
-        }
-        return this.findBy({ [primaryKey]: [id] }) as Promise<Base | null>;
-      },
-    );
-    return record as T | null;
+      (id) => this.findBy(new Map([[this.model.primaryKey, [id]]])),
+    )) as T | null;
   }
 
   /** @missingRailsArgs fetch — PERMANENT */
-  async findByTokenForBang<T extends Base>(
-    this: Relation<T>,
-    purpose: string,
-    token: string,
-  ): Promise<T> {
+  async findByTokenForBang(this: Relation<T>, purpose: string, token: string): Promise<T> {
     const record = await fetch<TokenDefinition>(this.model.tokenDefinitions, purpose).resolveToken(
       token,
       (id) => this.find(id) as Promise<Base>,

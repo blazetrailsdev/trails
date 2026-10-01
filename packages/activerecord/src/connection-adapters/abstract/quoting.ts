@@ -58,15 +58,14 @@ export type TemporalDateLike =
   | Temporal.PlainDate;
 
 export function quote(this: QuotingDispatchHost, value: unknown): string {
-  if (typeof value === "string") {
-    return `'${this.quoteString(value)}'`;
+  if (typeof value === "string" || value instanceof Chars) {
+    return `'${this.quoteString(value instanceof Chars ? value.toS() : value)}'`;
   }
   if (typeof value === "symbol") {
     const desc = value.description;
     if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");
     return `'${this.quoteString(desc)}'`;
   }
-  if (value instanceof Chars) return `'${this.quoteString(value.toS())}'`;
   if (typeof value === "boolean") return value ? this.quotedTrue() : this.quotedFalse();
   if (value === null || value === undefined) return "NULL";
   if (value instanceof BigDecimal) return value.toString("F");
@@ -100,8 +99,9 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
-  if (typeof value === "symbol") return value.description ?? String(value);
-  if (value instanceof Chars) return value.toS();
+  if (typeof value === "symbol" || value instanceof Chars) {
+    return value instanceof Chars ? value.toS() : (value.description ?? String(value));
+  }
   if (value instanceof BinaryData) return value.bytes;
   if (typeof value === "boolean") return value ? this.unquotedTrue() : this.unquotedFalse();
   if (value === null || value === undefined) return value;

@@ -859,7 +859,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   async migrate(direction: "up" | "down"): Promise<void> {
-    if (typeof this[direction] !== "function") return;
+    if (!rbObjRespondTo(this, direction)) return;
+
     switch (direction) {
       case "up":
         this.announce("migrating");

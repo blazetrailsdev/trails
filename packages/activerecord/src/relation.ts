@@ -1902,12 +1902,17 @@ export interface Relation<T extends Base, G extends boolean = false> {
 }
 
 export interface Relation<T extends Base, G extends boolean = false>
-  extends Included<typeof QueryMethods>, Included<typeof Explain>, CalculationMethods<G> {
+  extends
+    Included<typeof QueryMethods>,
+    Included<typeof Explain>,
+    Included<TokenForRelationMethods<T>>,
+    CalculationMethods<G> {
   find(block: (record: T) => unknown): Promise<T | null>;
   find(ids: unknown[]): Promise<T[]>;
   find(id: unknown): Promise<T>;
   find(...ids: unknown[]): Promise<T | T[]>;
   findBy(arg: Record<string, unknown>): Promise<T | null>;
+  findBy(arg: Map<unknown, unknown>): Promise<T | null>;
   findByBang(arg: Record<string, unknown>): Promise<T>;
   findSoleBy(...conditions: unknown[]): Promise<T>;
   first(): Promise<T | null>;
@@ -2086,11 +2091,6 @@ export interface Relation<T extends Base, G extends boolean = false>
     block: (relation: LoadedRelation<Relation<T, G>>) => void | Promise<void>,
   ): Promise<null>;
   inBatches(opts?: InBatchesOptions): BatchEnumerator<LoadedRelation<Relation<T, G>>>;
-}
-
-export interface Relation<T extends Base, G extends boolean = false> {
-  findByTokenFor(purpose: string, token: string): Promise<T | null>;
-  findByTokenForBang(purpose: string, token: string): Promise<T>;
 }
 
 export interface Relation<T extends Base, G extends boolean = false> {
