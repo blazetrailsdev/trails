@@ -33,11 +33,9 @@ export abstract class JoinPart {
     return this.constructor === other.constructor;
   }
 
-  each(fn: (part: JoinPart) => void): void {
-    fn(this);
-    for (const child of this.children) {
-      child.each(fn);
-    }
+  each(block: (part: JoinPart) => void): void {
+    block(this);
+    for (const child of this.children) child.each(block);
   }
 
   /** @noRailsEquivalent CONVERGEABLE association-symbol-iterators-come-from-ruby-compat-enumerable */

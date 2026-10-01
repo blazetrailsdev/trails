@@ -49,6 +49,7 @@ export {
   rbSetClassPathString,
   rbFPublicSend,
   rbFSend,
+  toSym,
   rbModPublicMethodDefined,
   rtest,
 } from "./object.js";

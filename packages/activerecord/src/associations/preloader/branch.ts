@@ -1,5 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { wrap } from "@blazetrails/activesupport";
+import { NoMethodError, rbObjClass, rtest, symbolToS, toSym, uniq } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import type { AbstractReflection } from "../../reflection.js";
 import { Association } from "./association.js";
@@ -24,21 +25,26 @@ export class Branch {
   private _loaders: Association[] | null;
   private _polymorphic: boolean | undefined;
 
-  constructor(options: BranchOptions) {
-    const association = options.association;
-    if (association == null) {
-      this.association = null;
-    } else if (typeof association !== "string") {
-      throw new ArgumentError(
-        `Association names must be Symbol or String, got: ${rubyClassName(association)}`,
-      );
+  constructor({ association, children, parent, associateByDefault, scope }: BranchOptions) {
+    if (rtest(association)) {
+      try {
+        this.association = symbolToS(toSym(association));
+      } catch (error) {
+        if (error instanceof NoMethodError) {
+          throw new ArgumentError(
+            `Association names must be Symbol or String, got: ${rbObjClass(association)}`,
+          );
+        }
+        throw error;
+      }
     } else {
-      this.association = association.startsWith(":") ? association.slice(1) : association;
+      this.association = null;
     }
-    this.parent = options.parent;
-    this.scope = options.scope;
-    this.associateByDefault = options.associateByDefault;
-    this.children = this.buildChildren(options.children);
+    this.parent = parent;
+    this.scope = scope;
+    this.associateByDefault = associateByDefault;
+
+    this.children = this.buildChildren(children);
     this._loaders = null;
   }
 
@@ -74,32 +80,19 @@ export class Branch {
   }
 
   async immediateFutureClasses(): Promise<(typeof Base)[]> {
-    if (this.parent == null) {
-      return [];
-    }
-
-    if (this.parent.isDone()) {
-      const classes: (typeof Base)[] = [];
+    if (this.parent!.isDone()) {
+      const futureClasses: (typeof Base)[] = [];
       for (const loader of await this.loaders()) {
-        classes.push(...(await loader.futureClasses()));
+        futureClasses.push(...(await loader.futureClasses()));
       }
-      const seen = new Set<typeof Base>();
-      return classes.filter((k) => {
-        if (seen.has(k)) return false;
-        seen.add(k);
-        return true;
-      });
+      return uniq(futureClasses);
+    } else {
+      return uniq(
+        (await this.likelyReflections())
+          .filter((reflection) => !reflection.isPolymorphic())
+          .flatMap((reflection) => reflection.chain.map((r: AbstractReflection) => r.klass)),
+      );
     }
-
-    const seen = new Set<typeof Base>();
-    return (await this.likelyReflections())
-      .filter((r) => !r.isPolymorphic())
-      .flatMap((r) => r.chain.map((c: AbstractReflection) => c.klass))
-      .filter((k) => {
-        if (seen.has(k)) return false;
-        seen.add(k);
-        return true;
-      });
   }
 
   async targetClasses(): Promise<(typeof Base)[]> {
@@ -307,10 +300,4 @@ export class Branch {
     }
     return Association;
   }
-}
-
-/** @internal */
-function rubyClassName(value: unknown): string {
-  if (typeof value === "number") return Number.isInteger(value) ? "Integer" : "Float";
-  return (value as any)?.constructor?.name ?? typeof value;
 }

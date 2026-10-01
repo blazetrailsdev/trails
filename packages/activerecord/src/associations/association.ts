@@ -1,18 +1,24 @@
 import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
-import { associationInstanceGet } from "../associations.js";
 import { AssociationScope, type AssociationScopeable } from "./association-scope.js";
 import { ActiveRecord, Associations } from "../namespaces.js";
 import { relationClassFor } from "../relation/delegation.js";
 import { camelize, kernelArray, safeConstantize, singularize } from "@blazetrails/activesupport";
-import { except, hasKey, rbEqual } from "@blazetrails/ruby-compat";
-import { AssociationTypeMismatch } from "../errors.js";
+import {
+  except,
+  hasKey,
+  rbEqual,
+  rbObjInstanceVariables,
+  rbObjIvarGet,
+  rbObjIvarSet,
+} from "@blazetrails/ruby-compat";
+import { AssociationTypeMismatch, RecordNotFound } from "../errors.js";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
 
 export class Association<Target extends Base | Base[] = Base | Base[]> {
   owner: Base;
-  readonly reflection: AssociationDefinition;
+  reflection: AssociationDefinition;
   readonly disableJoins: boolean;
   /** @internal */
   _targetStore: Base | Base[] | null = null;
@@ -50,8 +56,6 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
   get _rawLoaded(): boolean {
     return this._loadedStore;
   }
-
-  _loadedViaAsync = false;
 
   /** @internal */
   protected _skipStrictLoading = false;
@@ -95,7 +99,6 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
     this.loaded = false;
     this._staleState = undefined;
     this._staleStateSnapshotted = false;
-    this._loadedViaAsync = false;
   }
 
   resetNegativeCache(): void {
@@ -255,26 +258,31 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
 
   loadTarget(): Promise<Base | Base[] | null> | Base | Base[] | null {
     const loaded = (): Base | Base[] | null => {
-      this.loadedBang();
+      if (!this.isLoaded()) this.loadedBang();
       return this.target;
     };
-    if (this.isStaleTarget() && (this._staleState != null || this.target == null)) {
-      return this._findTarget().then(loaded);
-    } else if (this.findTargetNeeded()) {
-      const cached = this.doFindTarget();
-      if (cached !== undefined) {
-        this._writeTargetStore(cached);
-      } else {
-        return this._findTarget().then(loaded);
-      }
+    if ((this._staleState != null && this.isStaleTarget()) || this.isFindTarget()) {
+      const target = this._findTarget({ async: false });
+      return (async () => {
+        try {
+          await target;
+          return loaded();
+        } catch (error) {
+          if (error instanceof RecordNotFound) {
+            this.reset();
+            return null;
+          }
+          throw error;
+        }
+      })();
     }
 
     return loaded();
   }
 
-  private _findTarget(): Promise<void> {
+  private _findTarget(options: { async: boolean }): Promise<void> {
     const staleStateBeforeLoad = this.staleState();
-    return this.findTarget().then((result) => {
+    return this.findTarget(options).then((result) => {
       if (result !== undefined) {
         if (result !== null) this.setStrictLoading(result as Base);
         if (this.loaded && (!this.isStaleTarget() || this.staleState() !== staleStateBeforeLoad))
@@ -285,29 +293,27 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
   }
 
   async asyncLoadTarget(): Promise<null> {
-    await this.loadTarget();
-    this._loadedViaAsync = true;
+    if ((this._staleState != null && this.isStaleTarget()) || this.isFindTarget()) {
+      await this._findTarget({ async: true });
+    }
+
+    if (!this.isLoaded()) this.loadedBang();
     return null;
   }
 
-  /** @missingRailsCall map — CONVERGEABLE association-marshal-dump-maps-its-instance-variables */
-  marshalDump(): [string, Record<string, unknown>] {
-    return [
-      this.reflection.name,
-      {
-        loaded: this.loaded,
-        target: this.target,
-      },
-    ];
+  marshalDump(): [string, [string, unknown][]] {
+    const ivars = rbObjInstanceVariables(this)
+      .filter((name) => !["@reflection", "@through_reflection"].includes(name))
+      .map((name): [string, unknown] => [name, rbObjIvarGet(this, name)]);
+    return [this.reflection.name, ivars];
   }
 
-  marshalLoad(data: [string, Record<string, unknown>]): void {
-    const [, ivars] = data;
-    this.loaded = ivars.loaded as boolean;
-    this._writeTargetStore(ivars.target as Base | Base[] | null);
-    if (this.loaded) {
-      this._staleState = this.staleState();
-    }
+  marshalLoad(data: [string, [string, unknown][]]): void {
+    const [reflectionName, ivars] = data;
+    for (const [name, val] of ivars) rbObjIvarSet(this, name, val);
+    this.reflection = (this.owner.constructor as typeof Base)._reflectOnAssociation(
+      reflectionName,
+    ) as AssociationDefinition;
   }
 
   initializeAttributes(record: Base, exceptFromScopeAttributes?: Record<string, unknown>): void {
@@ -355,24 +361,6 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
 
   protected staleState(): unknown {
     return undefined;
-  }
-
-  protected doFindTarget(): Base | Base[] | null | undefined {
-    const owner = this.owner;
-    const name = this.reflection.name;
-
-    const holder = associationInstanceGet.call(owner, name) as Association | null;
-    if (holder != null && holder !== this && holder.isLoaded()) return holder.target ?? null;
-    if (holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())) {
-      return holder.target ?? null;
-    }
-    return undefined;
-  }
-
-  protected findTargetNeeded(): boolean {
-    if (this.loaded) return false;
-    const isNew = this.owner.isNewRecord();
-    return (!isNew || this.foreignKeyPresent()) && !!this.klass;
   }
 
   protected foreignKeyPresent(): boolean {
@@ -472,7 +460,7 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
     void this.klass;
   }
 
-  protected async findTarget(): Promise<Base | Base[] | null> {
+  protected async findTarget(_options: { async?: boolean } = {}): Promise<Base | Base[] | null> {
     return null;
   }
 
@@ -527,8 +515,11 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
     return this.scope()?.scopeForCreate?.() ?? {};
   }
 
-  private isFindTarget(): boolean {
-    return this.findTargetNeeded();
+  /** @internal */
+  protected isFindTarget(): boolean {
+    return (
+      !this.isLoaded() && (!this.owner.isNewRecord() || this.foreignKeyPresent()) && !!this.klass
+    );
   }
 
   protected raiseOnTypeMismatchBang(record: Base): void {

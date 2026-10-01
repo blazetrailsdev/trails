@@ -225,7 +225,6 @@ export class Pattern {
     return this._requiredNames;
   }
 
-  /** @missingRailsArgs uniq — PERMANENT */
   get optionalNames(): readonly string[] {
     return (this._optionalNames ??= uniq(
       this.spec

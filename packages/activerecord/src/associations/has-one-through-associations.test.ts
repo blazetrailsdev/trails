@@ -55,7 +55,7 @@ import {
 } from "../test-helpers/models/cpk.js";
 
 async function readHasOne(owner: any, name: string): Promise<any> {
-  return await owner.association(name).loadTarget();
+  return await owner.association(name).reader;
 }
 
 function tgt(owner: any, name: string): any {
