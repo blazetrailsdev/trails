@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ActionController } from "@blazetrails/actionpack";
+import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { HealthController } from "./health-controller.js";
 
 describe("HealthController", () => {
@@ -11,6 +11,10 @@ describe("HealthController", () => {
     class HealthControllerTest extends ActionController.TestCase {}
     HealthControllerTest.tests(HealthController);
     const t = new HealthControllerTest(HealthController);
+    t.routes = new RouteSet();
+    t.routes.draw(function () {
+      this.get("/up", { to: "rails/health#show", as: "rails_health_check" });
+    });
     await t.get("show");
     expect(t.controller.status).toBe(200);
     expect(t.responseBody).toMatch(/background-color: green/);
@@ -25,6 +29,10 @@ describe("HealthController", () => {
     class HealthControllerTest extends ActionController.TestCase {}
     HealthControllerTest.tests(FailingController);
     const t = new HealthControllerTest(FailingController);
+    t.routes = new RouteSet();
+    t.routes.draw(function () {
+      this.get("/up", { to: "rails/health#show", as: "rails_health_check" });
+    });
     await t.get("show");
     expect(t.controller.status).toBe(500);
     expect(t.responseBody).toMatch(/background-color: red/);

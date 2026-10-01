@@ -389,7 +389,7 @@ include(IntegrationProcessTest, CookieAssertions);
 describe("IntegrationProcessTest", () => {
   let t: IntegrationProcessTest;
   const assertResponse = (type: number | string): void => t.assertResponse(type);
-  const assertRedirectedTo = (url: string): void => t.assertRedirectedTo(url);
+  const assertRedirectedTo = (url: string): true => t.assertRedirectedTo(url);
   const assertSetCookieHeader = (expected: string, header?: string): void =>
     t.assertSetCookieHeader(expected, header);
 

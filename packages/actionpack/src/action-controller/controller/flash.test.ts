@@ -73,7 +73,7 @@ describe("FlashTest", () => {
   it("flash after reset session", () => {
     const flash = new FlashHash({ notice: "old" });
     flash.clear();
-    expect(flash.empty).toBe(true);
+    expect(flash.isEmpty()).toBe(true);
   });
 
   it("does not set the session if the flash is empty", () => {
@@ -118,7 +118,7 @@ describe("FlashTest", () => {
 
   it("from session value nil returns empty", () => {
     const flash = FlashHash.fromSessionValue(null);
-    expect(flash.empty).toBe(true);
+    expect(flash.isEmpty()).toBe(true);
   });
 
   it.skip("sweep after halted action chain", () => {});

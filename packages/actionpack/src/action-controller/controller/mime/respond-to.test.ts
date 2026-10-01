@@ -254,8 +254,9 @@ describe("RespondToControllerTest", () => {
 
   let tc: TestCase;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tc = new TestCase(RespondToController);
+    await tc.beforeSetup();
     MimeType.register("text/x-mobile", ":mobile");
     MimeType.register("application/fancy-xml", ":fancy_xml");
     MimeType.register("text/html; fragment", ":html_fragment");
