@@ -59,6 +59,8 @@ describe("tokenize", () => {
   it("throws on unterminated tags", () => {
     expect(() => tokenize("<% never closed")).toThrow(TseSyntaxError);
     expect(() => tokenize("<%! never closed")).toThrow(TseSyntaxError);
+    expect(tokenize("a <%% never closed").map((t) => t.value)).toEqual(["a <%% never closed"]);
+    expect(() => tokenize("a <%% b <% never closed")).toThrow(TseSyntaxError);
   });
 
   it("classifies block-expr tags as blockExpr, not expr", () => {

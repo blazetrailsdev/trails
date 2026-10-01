@@ -17,6 +17,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { TestManifest, TestCaseInfo } from "./types.js";
+import { PKG_SRC_DIRS } from "./compare.js";
 
 const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
@@ -34,7 +35,7 @@ const PKG_DIRS: Record<string, string> = {
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",
   actionview: "packages/actionview/src/",
-  thor: "packages/trailties/src/thor/",
+  thor: PKG_SRC_DIRS.thor,
 };
 
 interface ConventionFile {

@@ -3,6 +3,8 @@ import * as fs from "fs";
 import { globSync } from "tinyglobby";
 import type { TestManifest, TestPackageInfo } from "./types.js";
 import { extractTestsFromSource } from "./extract-ts-core.js";
+import { PKG_SRC_DIRS } from "./compare.js";
+import { PACKAGE_DIR_OVERRIDES } from "../api-compare/config.js";
 
 export { extractTestsFromSource } from "./extract-ts-core.js";
 
@@ -10,9 +12,7 @@ const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
-const NESTED_PACKAGES: Record<string, { host: string; subdir: string }> = {
-  thor: { host: "trailties", subdir: "thor" },
-};
+const NESTED_PACKAGES = ["thor"];
 
 function getPackageTestFiles(): Record<string, string[]> {
   const packages = [
@@ -38,9 +38,9 @@ function getPackageTestFiles(): Record<string, string[]> {
     const pattern = `packages/${pkg}/src/**/*.test.ts`;
     // Twin of the Ruby side's `test/**/behaviors/*_behavior.rb` glob.
     const behaviorPattern = `packages/${pkg}/src/**/behaviors/*-behavior.ts`;
-    const ignore = Object.entries(NESTED_PACKAGES)
-      .filter(([, nested]) => nested.host === pkg)
-      .map(([, nested]) => `packages/${nested.host}/src/${nested.subdir}/**`);
+    const ignore = NESTED_PACKAGES.filter((nested) => PACKAGE_DIR_OVERRIDES[nested] === pkg).map(
+      (nested) => `${PKG_SRC_DIRS[nested]}**`,
+    );
     const files = [
       ...globSync(pattern, { cwd: ROOT_DIR, ignore }),
       ...globSync(behaviorPattern, { cwd: ROOT_DIR, ignore }),
@@ -67,10 +67,8 @@ function getPackageTestFiles(): Record<string, string[]> {
   result["actioncontroller"] = [...actionControllerFiles, ...actionDispatchFiles];
   result["abstractcontroller"] = abstractControllerFiles;
 
-  for (const [pkg, nested] of Object.entries(NESTED_PACKAGES)) {
-    result[pkg] = globSync(`packages/${nested.host}/src/${nested.subdir}/**/*.test.ts`, {
-      cwd: ROOT_DIR,
-    }).sort();
+  for (const pkg of NESTED_PACKAGES) {
+    result[pkg] = globSync(`${PKG_SRC_DIRS[pkg]}**/*.test.ts`, { cwd: ROOT_DIR }).sort();
   }
 
   // Aliased packages (trailties → cli)

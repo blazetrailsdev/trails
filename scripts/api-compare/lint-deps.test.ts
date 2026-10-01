@@ -404,6 +404,52 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
     expect(owners.get("ValueType")).toBe(null);
   });
 
+  it("records the module of an imported module function as a ref of the calling method", () => {
+    const dir = writePkg({
+      "attribute-set.ts": `
+        export class Builder {}
+        export const fromHash = () => new Builder();
+        const local = () => 1;
+        export const aliased = local;
+      `,
+      "consumer.ts": `
+        import { Builder, fromHash, aliased } from "./attribute-set.js";
+        export class Model {
+          attributes() { return [fromHash(), new Builder(), aliased()]; }
+        }
+      `,
+    });
+    const program = programFor(dir);
+    const consumerSf = program.getSourceFiles().find((sf) => sf.fileName.endsWith("consumer.ts"))!;
+    let method: ts.Node | undefined;
+    const find = (n: ts.Node) => {
+      if (ts.isMethodDeclaration(n)) method = n;
+      ts.forEachChild(n, find);
+    };
+    find(consumerSf);
+    const collect = (transitive?: { checker: ts.TypeChecker; taintedSymbols: Set<ts.Symbol> }) => {
+      const refs = new Set<string>();
+      methodUsesDepImport(
+        method!,
+        new Set(["Builder", "fromHash", "aliased"]),
+        new Set(),
+        "activemodel",
+        consumerSf,
+        method,
+        transitive,
+        refs,
+      );
+      return [...refs].sort();
+    };
+    expect(collect({ checker: program.getTypeChecker(), taintedSymbols: new Set() })).toEqual([
+      "Builder",
+      "aliased",
+      "attributeset",
+      "fromHash",
+    ]);
+    expect(collect()).toEqual(["Builder", "aliased", "fromHash"]);
+  });
+
   it("credits a method that calls a same-package wrapper of the dep", () => {
     const pkg = "@blazetrails/activesupport";
     const dir = writePkg({

@@ -45,12 +45,52 @@ describe("normalizeRailsKind", () => {
   });
 
   it("maps RSpec expectation chains by matcher", () => {
-    expect(normalizeRailsKind("expect_to_eq")).toBe("equal");
-    expect(normalizeRailsKind("expect_to_be")).toBe("equal");
-    expect(normalizeRailsKind("expect_not_to_include")).toBe("excludes");
-    expect(normalizeRailsKind("expect_to_raise_error")).toBe("raises");
-    expect(normalizeRailsKind("expect_not_to_raise_error")).toBe("nothingRaised");
+    const mapped = Object.fromEntries(
+      [
+        "expect_to_eq",
+        "expect_not_to_eq",
+        "expect_to_eql",
+        "expect_to_be",
+        "expect_not_to_be",
+        "expect_to_be_nil",
+        "expect_not_to_be_nil",
+        "expect_to_be_falsey",
+        "expect_to_be_empty",
+        "expect_to_include",
+        "expect_not_to_include",
+        "expect_to_match",
+        "expect_not_to_match",
+        "expect_to_raise_error",
+        "expect_not_to_raise_error",
+        "expect_to_be_a",
+        "expect_to_be_kind_of",
+        "expect_to_respond_to",
+        "expect_not_to_respond_to",
+      ].map((token) => [token, normalizeRailsKind(token)]),
+    );
+    expect(mapped).toEqual({
+      expect_to_eq: "equal",
+      expect_not_to_eq: "notEqual",
+      expect_to_eql: "equal",
+      expect_to_be: "equal",
+      expect_not_to_be: "notEqual",
+      expect_to_be_nil: "nil",
+      expect_not_to_be_nil: "notNil",
+      expect_to_be_falsey: "falsy",
+      expect_to_be_empty: "empty",
+      expect_to_include: "includes",
+      expect_not_to_include: "excludes",
+      expect_to_match: "match",
+      expect_not_to_match: "noMatch",
+      expect_to_raise_error: "raises",
+      expect_not_to_raise_error: "nothingRaised",
+      expect_to_be_a: "instanceOf",
+      expect_to_be_kind_of: "instanceOf",
+      expect_to_respond_to: "respondTo",
+      expect_not_to_respond_to: "notRespondTo",
+    });
     expect(normalizeRailsKind("expect_to_receive")).toBeNull();
+    expect(normalizeRailsKind("expect_to_output")).toBeNull();
     expect(normalizeRailsKind("expect")).toBeNull();
   });
 

@@ -558,7 +558,13 @@ export function moduleFunctionOwner(id: ts.Identifier, checker: ts.TypeChecker):
   if (!sym) return null;
   const resolved = sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym;
   const decl = resolved.declarations?.[0];
-  if (!decl || !ts.isFunctionDeclaration(decl) || !ts.isSourceFile(decl.parent)) return null;
+  if (!decl) return null;
+  const isFunction = ts.isVariableDeclaration(decl)
+    ? decl.initializer !== undefined &&
+      (ts.isArrowFunction(decl.initializer) || ts.isFunctionExpression(decl.initializer)) &&
+      ts.isSourceFile(decl.parent.parent.parent)
+    : ts.isFunctionDeclaration(decl) && ts.isSourceFile(decl.parent);
+  if (!isFunction) return null;
   return path
     .basename(decl.getSourceFile().fileName)
     .replace(/(\.d)?\.ts$/, "")

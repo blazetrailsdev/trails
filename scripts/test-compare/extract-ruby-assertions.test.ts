@@ -698,6 +698,7 @@ describe("Ruby extractor mocha expectation collection", () => {
             expect(paths).to_not match(/doc/)
             expect(File.exist?(file)).to be true
             expect(paths).to be_empty
+            expect(runner.shell.base).to be nil
           end
 
           it "blocks" do
@@ -721,6 +722,7 @@ describe("Ruby extractor mocha expectation collection", () => {
       "expect_not_to_match",
       "expect_to_be",
       "expect_to_be_empty",
+      "expect_to_be_nil",
     ]);
     expect(k["blocks"]).toEqual(["expect_to_raise_error", "expect_not_to_raise_error"]);
     expect(k["stays a bare expect"]).toEqual(["expect", "expect", "expect"]);

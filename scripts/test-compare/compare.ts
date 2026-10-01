@@ -81,6 +81,7 @@ import {
 import { PATH_SEGMENT_ALIASES } from "@blazetrails/parity/conventions";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 import { testPathsManifest } from "../../vendor/sources.js";
+import { ROOT_DIR as API_ROOT_DIR, packageSrcDir } from "../api-compare/config.js";
 import { classifyTestFile, closureFiles } from "./closure-manifest.js";
 
 const SCRIPT_DIR = __dirname;
@@ -1546,7 +1547,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   i18n: "packages/i18n/src/",
   date: "packages/date/src/",
   "ruby-compat": "packages/ruby-compat/src/",
-  thor: "packages/trailties/src/thor/",
+  thor: `${path.relative(API_ROOT_DIR, packageSrcDir("thor")).split(path.sep).join("/")}/`,
 };
 
 function extractRelativeTsPath(fullPath: string, pkg: string): string {
