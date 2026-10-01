@@ -7,6 +7,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Thread, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
+import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../base.js";
 import {
   StatementTimeout,
@@ -54,6 +55,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   });
 
   describe("TransactionTest", () => {
+    fixtures([], { useTransactionalTests: false });
+
     beforeEach(async () => {
       await adapter.clearCacheBang();
 

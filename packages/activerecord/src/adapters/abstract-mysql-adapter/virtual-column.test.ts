@@ -2,6 +2,7 @@ import { it, expect, beforeEach, afterEach } from "vitest";
 import { assertPredicate } from "@blazetrails/activesupport";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { describeIfSupports } from "../../support/supports.js";
+import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../base.js";
 import type { Column as MySQLColumn } from "../../connection-adapters/mysql/column.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
@@ -9,6 +10,8 @@ import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 class VirtualColumn extends Base {}
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
+  fixtures([], { useTransactionalTests: false });
+
   let adapter: Mysql2Adapter;
 
   async function take(): Promise<Record<string, unknown>> {
