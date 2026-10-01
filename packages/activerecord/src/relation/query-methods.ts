@@ -2301,18 +2301,16 @@ export function buildJoins(
  * @internal
  * @missingRailsCall empty? — PERMANENT
  */
-export function buildWith(this: QueryMethodsHost, arel: any): void {
+export function buildWith(this: QueryMethodsHost, arel: any): unknown {
   if (this.withValues.length === 0) return;
 
   const withStatements = this.withValues.map((withValue) =>
     buildWithValueFromHash.call(this, withValue),
   );
 
-  if (this._withIsRecursive) {
-    arel.with(":recursive", withStatements);
-  } else {
-    arel.with(withStatements);
-  }
+  return this._withIsRecursive
+    ? arel.with(":recursive", withStatements)
+    : arel.with(withStatements);
 }
 
 /**
