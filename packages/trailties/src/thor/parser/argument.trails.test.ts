@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ArgumentError, Range } from "@blazetrails/ruby-compat";
+import { ArgumentError, NoMethodError, Range } from "@blazetrails/ruby-compat";
 import { Argument } from "./argument.js";
 
 describe("Thor::Argument", () => {
@@ -40,8 +40,10 @@ describe("Thor::Argument", () => {
     expect(showDefault(null)).toBe(null);
   });
 
-  it("prints an Array enum joined and a Range enum as first..last", () => {
+  it("prints an Array or Set enum joined and a Range enum as first..last", () => {
     expect(new Argument("foo", { enum: ["a", "b"] }).enumToS()).toBe("a, b");
+    expect(new Argument("foo", { enum: new Set(["a", "b"]) }).enumToS()).toBe("a, b");
+    expect(() => new Argument("foo", { enum: { a: 1 } }).enumToS()).toThrow(NoMethodError);
     expect(new Argument("foo", { type: "numeric", enum: new Range(1, 3) }).enumToS()).toBe("1..3");
   });
 });

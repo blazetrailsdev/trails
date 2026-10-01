@@ -3,6 +3,7 @@ import {
   hasKey,
   isEmpty,
   Range,
+  rbFSend,
   rbModName,
   rbObjAsString,
   rbObjClass,
@@ -89,11 +90,10 @@ export class Argument {
   }
 
   enumToS(): string {
-    if (rbObjRespondTo(this.enum, "join")) {
-      return (this.enum as unknown[]).join(", ");
+    if (rbObjRespondTo(this.enum, "join") || this.enum instanceof Set) {
+      return [...(this.enum as Iterable<unknown>)].flat(Infinity).join(", ");
     } else {
-      const range = this.enum as Range<unknown>;
-      return `${range.first()}..${range.last()}`;
+      return `${rbFSend(this.enum, "first")}..${rbFSend(this.enum, "last")}`;
     }
   }
 

@@ -3,6 +3,7 @@ import {
   arySlice,
   first,
   format,
+  Hash,
   isEmpty,
   isInclude,
   Range,
@@ -50,7 +51,7 @@ export class Arguments {
   }
 
   constructor(arguments_: Argument[] = []) {
-    this.assigns = {};
+    this.assigns = Object.create(null) as Record<string, unknown>;
     this.nonAssignedRequired = [];
     this.switches = arguments_;
 
@@ -121,7 +122,7 @@ export class Arguments {
 
   /**
    * @internal
-   * @missingRailsCall split — PERMANENT
+   * @missingRailsCall split — CONVERGEABLE call-gate-reads-string-split-as-thor-arguments-split
    */
   protected parseHash(name: string): unknown {
     if (rbObjClass(this.peek()) === "Hash") return this.shift();
@@ -165,7 +166,8 @@ export class Arguments {
   protected parseNumeric(name: string): unknown {
     if (typeof this.peek() === "number" || typeof this.peek() === "bigint") return this.shift();
 
-    const match = Arguments.NUMERIC.exec(this.peek() as string);
+    const match =
+      typeof this.peek() === "string" ? Arguments.NUMERIC.exec(this.peek() as string) : null;
     if (!(match && match[0] === this.peek())) {
       throw new MalformattedArgumentError(
         `Expected numeric value for '${name}'; got ${rbInspect(this.peek())}`,
@@ -205,7 +207,11 @@ export class Arguments {
       rtest(switch_.enum) &&
       !(Array.isArray(switch_.enum)
         ? switch_.enum.includes(value)
-        : (switch_.enum as Range<unknown>).isInclude(value))
+        : switch_.enum instanceof Set || switch_.enum instanceof Hash
+          ? switch_.enum.has(value)
+          : switch_.enum instanceof Range
+            ? switch_.enum.isInclude(value)
+            : isInclude(switch_.enum as object, value as PropertyKey))
     ) {
       throw new MalformattedArgumentError(format(message, name, switch_.enumToS(), value));
     }

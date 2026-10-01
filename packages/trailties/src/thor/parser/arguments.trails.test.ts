@@ -28,6 +28,12 @@ describe("Thor::Arguments", () => {
     expect(hash.default).toEqual({ a: "b" });
   });
 
+  it("assigns an argument named __proto__", () => {
+    const proto = new Argument("__proto__", { required: false, default: "a" });
+    expect(Object.keys(new Arguments([proto]).parse([]))).toEqual(["__proto__"]);
+    expect(Object.keys(new Arguments([proto]).parse(["b"]))).toEqual(["__proto__"]);
+  });
+
   it("assigns a false or zero default", () => {
     const flag = new Argument("flag", { required: false, default: false });
     const count = new Argument("count", { type: "numeric", required: false, default: 0 });
@@ -37,6 +43,9 @@ describe("Thor::Arguments", () => {
   it("reads a leading-dot numeric as a float and rejects a partial match", () => {
     const numeric = new Argument("numeric", { type: "numeric" });
     expect(new Arguments([numeric]).parse([".5"])).toEqual({ numeric: 0.5 });
+    expect(() => new Arguments([numeric]).parse([["13"]])).toThrow(
+      new MalformattedArgumentError(`Expected numeric value for 'numeric'; got ["13"]`),
+    );
     expect(() => new Arguments([numeric]).parse(["13a"])).toThrow(
       new MalformattedArgumentError(`Expected numeric value for 'numeric'; got "13a"`),
     );
@@ -86,6 +95,14 @@ describe("Thor::Arguments", () => {
     const string = new Argument("string", { enum: ["a", "b"] });
     const numeric = new Argument("numeric", { type: "numeric", enum: new Range(1, 3) });
     expect(new Keyed([string, numeric]).parse(["a", "2"])).toEqual({ string: "a", numeric: 2 });
+    const set = new Argument("string", { enum: new Set(["a", "b"]) });
+    const hash = new Argument("string", { enum: { a: 1, b: 2 } });
+    expect(new Keyed([set, numeric]).parse(["b", "2"]).string).toBe("b");
+    expect(new Keyed([hash, numeric]).parse(["b", "2"]).string).toBe("b");
+    expect(() => new Keyed([hash, numeric]).parse(["c", "2"])).toThrow(NoMethodError);
+    expect(() => new Keyed([set, numeric]).parse(["c", "2"])).toThrow(
+      new MalformattedArgumentError("Expected 'string' to be one of a, b; got c"),
+    );
     expect(() => new Keyed([string, numeric]).parse(["c", "2"])).toThrow(
       new MalformattedArgumentError("Expected 'string' to be one of a, b; got c"),
     );
