@@ -5,6 +5,9 @@ import { Time as RubyTime } from "@blazetrails/date";
 import { Base, Migration, Migrator, NotNullViolation } from "../index.js";
 import type { MigrationProxy } from "../migration.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
+import type { AbstractMysqlAdapter } from "../connection-adapters/abstract-mysql-adapter.js";
+import type { Column as MysqlColumn } from "../connection-adapters/mysql/column.js";
+import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import type { Column } from "../connection-adapters/column.js";
 import { ambientConnection } from "../support/rocket-tables.js";
 import {
@@ -506,11 +509,7 @@ describe("Migration", () => {
 
       await migrate(migration);
 
-      expect(
-        await (
-          connection as unknown as { tableComment(tableName: string): Promise<string | null> }
-        ).tableComment("testings"),
-      ).toBe("comment");
+      expect(await connection.tableComment("testings")).toBe("comment");
     });
 
     it("datetime doesnt set precision on add column 5 0", async () => {
@@ -577,7 +576,7 @@ describe("Migration", () => {
       try {
         if (currentAdapter("Mysql2Adapter", "TrilogyAdapter")) {
           const error = await assertRaises([StandardError], {}, () => migrate(migration));
-          if (await (connection as unknown as { isMariadb(): Promise<boolean> }).isMariadb()) {
+          if (await (connection as AbstractMysqlAdapter).isMariadb()) {
             expect(error.message).toMatch(
               new RegExp(`Incorrect table name '${longTableName}'`, "i"),
             );
@@ -612,7 +611,7 @@ describe("Migration", () => {
       try {
         if (currentAdapter("Mysql2Adapter", "TrilogyAdapter")) {
           const error = await assertRaises([StandardError], {}, () => migrate(migration));
-          if (await (connection as unknown as { isMariadb(): Promise<boolean> }).isMariadb()) {
+          if (await (connection as AbstractMysqlAdapter).isMariadb()) {
             expect(error.message).toMatch(
               new RegExp(`Incorrect table name '${longTableName}'`, "i"),
             );
@@ -697,7 +696,7 @@ describe("Migration", () => {
     );
 
     it.skipIf(!currentAdapter("PostgreSQLAdapter"))("disable extension on 7 0", async () => {
-      await enableExtensionBang("hstore", connection as never);
+      await enableExtensionBang("hstore", connection as PostgreSQLAdapter);
       const migration = class extends Migration.get(7.0) {
         async up(): Promise<void> {
           await this.addColumn("testings", "settings", "hstore");
@@ -707,9 +706,9 @@ describe("Migration", () => {
 
       try {
         await migrate(migration as unknown as Migration);
-        expect(await (connection as never as PgConnection).extensionEnabled("hstore")).toBeFalsy();
+        expect(await (connection as PostgreSQLAdapter).extensionEnabled("hstore")).toBeFalsy();
       } finally {
-        await disableExtensionBang("hstore", connection as never);
+        await disableExtensionBang("hstore", connection as PostgreSQLAdapter);
       }
     });
 
@@ -741,8 +740,6 @@ describe("Migration", () => {
     );
   });
 });
-
-type PgConnection = { extensionEnabled(name: string): Promise<boolean> };
 
 class LegacyPrimaryKey extends Base {}
 
@@ -908,9 +905,7 @@ function legacyPrimaryKeyTestCases(migrationClass: () => ReturnType<typeof Migra
       await LegacyPrimaryKey.loadSchema();
       const legacyPk = columnsHash()["id"];
       expect(legacyPk.isBigint()).toBeTruthy();
-      expect(
-        (legacyPk as unknown as { isAutoIncrement(): boolean }).isAutoIncrement(),
-      ).toBeTruthy();
+      expect((legacyPk as MysqlColumn).isAutoIncrement()).toBeTruthy();
 
       expect(await dump("legacy_primary_keys")).toMatch(
         /createTable\("legacy_primary_keys", (?!\{ id: "bigint", default: null)/,

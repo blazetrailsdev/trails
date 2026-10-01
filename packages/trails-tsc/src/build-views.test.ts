@@ -702,12 +702,18 @@ describe("runCli", () => {
     );
     write(cwd, "app/views/posts/_post.html.tse", "<%= post.title %><%= compact %>");
     write(cwd, "app/views/posts/_badge.html.tse", "<%= label %>");
+    write(cwd, "app/views/comments/_badge.html.tse", "<%= label %>");
     await buildViews({ cwd });
     const shim = (rel: string): string =>
       fs.readFileSync(path.join(cwd, ".trails/views/posts", `${rel}.html.tse.ts`), "utf8");
     expect(shim("_post")).toContain("compact: boolean | undefined }");
     expect(shim("_post")).toContain("      : never;");
     expect(shim("_badge")).toContain("type ObjectLocals = { label: string };");
+    const comments = fs.readFileSync(
+      path.join(cwd, ".trails/views/comments/_badge.html.tse.ts"),
+      "utf8",
+    );
+    expect(comments).toContain("type ObjectLocals = { label: string };");
   }, 30_000);
 
   it("types a local a partial forwards to another partial", async () => {
