@@ -6,7 +6,7 @@ import {
 } from "@blazetrails/activesupport/core-ext/date-and-time/zones";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { classAttribute, included } from "@blazetrails/activesupport";
-import { DelegateClass, rbEqual, registerConstant } from "@blazetrails/ruby-compat";
+import { ArgumentError, DelegateClass, rbEqual, registerConstant } from "@blazetrails/ruby-compat";
 import { AttributeMethods } from "../namespaces.js";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
 
@@ -57,9 +57,14 @@ export class TimeZoneConverter extends DelegateClass(ValueType) {
     if (isPlainObject(value)) {
       return setTimeZoneWithoutConversion(super.cast(value));
     }
-    if (value instanceof TimeWithZone || value instanceof RubyTime) {
-      const casted = super.cast(subtype.userInputInTimeZone(value));
-      return casted != null && casted !== false ? casted : super.cast(value);
+    if (value instanceof TimeWithZone || value instanceof RubyTime || typeof value === "string") {
+      try {
+        const casted = super.cast(subtype.userInputInTimeZone(value));
+        return casted != null && casted !== false ? casted : super.cast(value);
+      } catch (e) {
+        if (e instanceof ArgumentError) return null;
+        throw e;
+      }
     }
     if (value instanceof Temporal.ZonedDateTime) {
       return this.convertTimeToTimeZone(value.toInstant());
@@ -69,10 +74,6 @@ export class TimeZoneConverter extends DelegateClass(ValueType) {
     }
     if (value instanceof Temporal.PlainDateTime) {
       return setTimeZoneWithoutConversion(value.toZonedDateTime("UTC").toInstant());
-    }
-    if (typeof value === "string") {
-      const casted = super.cast(subtype.userInputInTimeZone(value));
-      return casted != null && casted !== false ? casted : super.cast(value);
     }
     if (isInfinite(value)) {
       return value;

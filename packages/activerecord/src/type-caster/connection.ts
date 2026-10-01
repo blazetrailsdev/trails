@@ -18,15 +18,17 @@ export class Connection {
 
   typeForAttribute(attrName: unknown): ValueType {
     const schemaCache = this._klass?.connectionPool?.()?.poolConfig?.schemaReflection.loadedCache;
-    const columnsHash = schemaCache?.getCachedColumnsHash?.(tableName(this));
-    const column = columnsHash?.[toS(attrName)];
-    const type = column
-      ? (this._klass
+
+    let type: ValueType | undefined;
+    if (schemaCache?.getCachedDataSourceExists?.(tableName(this))) {
+      const column = schemaCache.getCachedColumnsHash?.(tableName(this))?.[toS(attrName)];
+      if (column) {
+        type = this._klass
           .connectionPool()
-          .withConnectionSync((connection: any) => connection.lookupCastTypeFromColumn(column)) as
-          | ValueType
-          | undefined)
-      : undefined;
+          .withConnectionSync((connection: any) => connection.lookupCastTypeFromColumn(column));
+      }
+    }
+
     return type ?? defaultValue();
   }
 }

@@ -1,12 +1,13 @@
 import type { Base } from "../base.js";
 import type { Fixture } from "../fixtures.js";
 import { Time as RubyTime } from "@blazetrails/date";
+import { Hash } from "@blazetrails/ruby-compat";
 import { defaultTimezone } from "../active-record.js";
 import { TableRow } from "./table-row.js";
 import { ModelMetadata } from "./model-metadata.js";
 
 export class TableRows {
-  readonly tables: Map<string, (TableRow | Record<string, unknown>)[] | null>;
+  readonly tables: Hash<string, (TableRow | Record<string, unknown>)[] | null>;
   readonly modelClass: typeof Base | null;
   private _modelMetadata?: ModelMetadata;
 
@@ -16,7 +17,11 @@ export class TableRows {
   ) {
     this.modelClass = modelClass;
 
-    this.tables = new Map();
+    this.tables = new Hash((h, table) => {
+      const rows: (TableRow | Record<string, unknown>)[] = [];
+      h.set(table, rows);
+      return rows;
+    });
 
     this.tables.set(tableName, null);
 

@@ -7,7 +7,7 @@ import { DEFAULT_ENV } from "../connection-handling.js";
 import { _setDatabaseTasks } from "./database-tasks-slot.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import type { BoundSchemaReflection } from "../connection-adapters/schema-cache.js";
-import { getEnv, isBlank, TopLevel, trailsRoot } from "@blazetrails/activesupport";
+import { getEnv, isBlank, TopLevel, toSentence, trailsRoot } from "@blazetrails/activesupport";
 import {
   getCryptoAsync,
   getOs,
@@ -548,6 +548,8 @@ export class DatabaseTasks {
     dbConfig: HashConfig,
     format: SchemaFormat = schemaFormat(),
   ): Promise<void> {
+    if (dbConfig.schemaDump() == null) return;
+
     const filename = this.schemaDumpPath(dbConfig, format);
     if (filename == null) return;
 
@@ -868,12 +870,18 @@ export class DatabaseTasks {
 
   static raiseForMultiDb(environment: string | undefined, opts: { command: string }): void {
     environment ??= DatabaseTasks.env;
-    const configs = this.configsFor({ envName: environment });
-    if (configs.length > 1) {
-      const list = configs.map((c) => `${opts.command}:${c.name}`).join(", ");
+    const dbConfigs = this.configsFor({ envName: environment });
+
+    if (dbConfigs.length > 1) {
+      const dbsList: string[] = [];
+
+      for (const db of dbConfigs) {
+        dbsList.push(`${opts.command}:${db.name}`);
+      }
+
       throw new Error(
         `You're using a multiple database application. To use \`${opts.command}\` you must ` +
-          `run the namespaced task with a VERSION. Available tasks are ${list}.`,
+          `run the namespaced task with a VERSION. Available tasks are ${toSentence(dbsList)}.`,
       );
     }
   }

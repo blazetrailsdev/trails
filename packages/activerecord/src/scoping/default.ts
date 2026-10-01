@@ -22,7 +22,7 @@ export class Default {
   /** @internal */
   static buildDefaultScope(
     this: any,
-    relation: any,
+    relation: any = this.relation(),
     { allQueries }: { allQueries?: boolean | null } = {},
   ): any {
     if (this.abstractClass) return undefined;

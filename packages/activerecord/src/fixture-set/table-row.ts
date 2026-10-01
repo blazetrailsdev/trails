@@ -255,9 +255,7 @@ export class TableRow {
         }
         return join;
       });
-      const tables = this._tableRows.tables;
-      if (!tables.get(tableName)) tables.set(tableName, []);
-      tables.get(tableName)!.push(...joins);
+      this._tableRows.tables.get(tableName)!.push(...joins);
     }
   }
 }

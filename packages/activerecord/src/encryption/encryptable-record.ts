@@ -16,9 +16,9 @@ import { Encryption } from "../encryption.js";
  * @internal
  */
 export function globalPreviousSchemesFor(scheme: Scheme): Scheme[] {
-  return Encryption.config.previousSchemes
-    .filter((previousScheme) => scheme.isCompatibleWith(previousScheme))
-    .map((previousScheme) => scheme.merge(previousScheme));
+  return Encryption.config.previousSchemes.flatMap((previousScheme) =>
+    scheme.isCompatibleWith(previousScheme) ? [scheme.merge(previousScheme)] : [],
+  );
 }
 
 /** @internal */

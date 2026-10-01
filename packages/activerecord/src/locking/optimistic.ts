@@ -174,16 +174,16 @@ export async function _updateRow(
   const ctor = this.constructor;
   if (!ctor.lockingEnabled) return superFn(attributeNames, attemptedAction);
 
-  const col = ctor.lockingColumn;
-  const lockAttributeWas = this._attributes.getAttribute(col);
-
-  const updateConstraints = (this as any)._queryConstraintsHash();
-
-  attributeNames = [...attributeNames, col];
-
-  this.writeAttribute(col, (Number(this.readAttribute(col)) || 0) + 1);
-
+  const lockingColumn = ctor.lockingColumn;
+  const lockAttributeWas = this._attributes.getAttribute(lockingColumn);
   try {
+    const updateConstraints = (this as any)._queryConstraintsHash();
+
+    if (Object.isFrozen(attributeNames)) attributeNames = [...attributeNames];
+    attributeNames.push(lockingColumn);
+
+    this.writeAttribute(lockingColumn, (Number(this.readAttribute(lockingColumn)) || 0) + 1);
+
     const affectedRows = await (ctor as any)._updateRecord(
       attributesWithValues.call(this as any, attributeNames),
       updateConstraints,
@@ -193,7 +193,7 @@ export async function _updateRow(
 
     return affectedRows;
   } catch (e) {
-    this._attributes.set(col, lockAttributeWas);
+    this._attributes.set(lockingColumn, lockAttributeWas);
     throw e;
   }
 }

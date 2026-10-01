@@ -3,6 +3,7 @@ import { protocolAdapters } from "../active-record.js";
 
 export class ConnectionUrlResolver {
   private readonly _adapter: string | null;
+  private readonly _scheme: string | null;
   private readonly _parsed: URL | null;
   private readonly _opaque: string | null;
   private readonly _query: string | null;
@@ -19,7 +20,8 @@ export class ConnectionUrlResolver {
       if (/^[^/?#]*:/.test(url)) {
         throw new Error(`Invalid database URL: ${redactUrl(url)}`);
       }
-      this._adapter = null;
+      this._scheme = null;
+      this._adapter = this.resolvedAdapter();
       this._opaque = null;
       this._emptyAuthority = true;
       this._parsed = new URL(`http://placeholder/${url.replace(/^\//, "")}`);
@@ -27,15 +29,11 @@ export class ConnectionUrlResolver {
       return;
     }
 
-    const scheme = schemeMatch[1].toLowerCase().replace(/-/g, "_");
+    this._scheme = schemeMatch[1].toLowerCase();
     const hasAuthority = !!schemeMatch[2];
     const rest = schemeMatch[3];
 
-    let adapter = scheme;
-    if (protocolAdapters().get(adapter) != null) {
-      adapter = protocolAdapters().get(adapter) as string;
-    }
-    this._adapter = adapter;
+    this._adapter = this.resolvedAdapter();
 
     if (hasAuthority) {
       const emptyAuthority = rest.startsWith("/");
@@ -100,8 +98,12 @@ export class ConnectionUrlResolver {
   }
 
   /** @internal */
-  private get resolvedAdapter(): string | null {
-    return this._adapter;
+  private resolvedAdapter(): string | null {
+    let adapter = this._scheme && this._scheme.replace(/-/g, "_");
+    if (adapter != null && protocolAdapters().get(adapter) != null) {
+      adapter = protocolAdapters().get(adapter) as string;
+    }
+    return adapter;
   }
 
   /** @internal */

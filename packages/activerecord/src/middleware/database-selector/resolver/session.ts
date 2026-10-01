@@ -18,7 +18,9 @@ export class Session {
 
   /** @missingRailsCall at — PERMANENT */
   static convertTimestampToTime(timestamp: number | undefined): Temporal.Instant {
-    return Temporal.Instant.fromEpochMilliseconds(timestamp ?? 0);
+    return timestamp != null
+      ? Temporal.Instant.fromEpochMilliseconds(timestamp)
+      : Temporal.Instant.fromEpochMilliseconds(0);
   }
 
   lastWriteTimestamp(): Temporal.Instant {
