@@ -350,6 +350,8 @@ describe("Module#name", () => {
   it("is what rb_obj_class reports for an instance", () => {
     expect(rbObjClass(new Base())).toBe("Outer::Space::Base");
     expect(rbObjClass(new Derived())).toBe("Derived");
+    expect(rbObjClass(Derived)).toBe("Class");
+    expect(rbObjClass(() => {})).toBe("Proc");
     expect(rbObjClass(new (class extends Base {})())).toMatch(/^#<Class:0x[0-9a-f]+>$/);
   });
 });
