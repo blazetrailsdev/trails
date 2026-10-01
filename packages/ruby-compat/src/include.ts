@@ -22,14 +22,7 @@
 
 import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
-import {
-  FL_SINGLETON,
-  T_ICLASS,
-  classpaths,
-  rbAnyToS,
-  rbModName,
-  rbModToS,
-} from "./object.js";
+import { FL_SINGLETON, T_ICLASS, classpaths, rbAnyToS, rbModName, rbModToS } from "./object.js";
 
 type AnyClass = new (...args: never[]) => unknown;
 type ModuleObject = object;
