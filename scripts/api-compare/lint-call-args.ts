@@ -49,6 +49,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { type ArClosure, DATA_LAYER_PACKAGES } from "./ar-closure.js";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
+import { inScope, scopeMismatch, scopeOf } from "./scope.js";
 import { TAG as ARGS_TAG } from "./missing-rails-args-tags.js";
 import { TAG as NAME_TAG } from "./missing-rails-name-tags.js";
 import { NAMING_CLASSES, classifyPair, refName } from "./naming-taxonomy.js";
@@ -229,14 +230,22 @@ export function renderKey(k: CallArgKey): string {
   return `${k.package}  ${k.tsFile}  ${k.rubyName}  ${k.call}(${k.rubyArgs.join(", ")})`;
 }
 
-export async function main(write: boolean): Promise<number> {
+export async function main(write: boolean, scope: string | null = null): Promise<number> {
   const artifact = await loadArtifact();
   const current: CallArgKey[] = gatedRows(artifact);
   const namingRows = artifact.mismatches.length - current.length;
 
   // Determinism guard (RFC 0044): an artifact covering fewer packages than CI
   // must neither seed nor pass a gate. Shared with the call-set ratchet.
-  const absent = missingScope({ packages: artifact.packages, mismatches: [] });
+  if (scope !== null) {
+    const mismatch = scopeMismatch("call-args ratchet", artifact.packages, scope);
+    if (mismatch !== null) {
+      console.error(mismatch);
+      return 1;
+    }
+  }
+  const absent =
+    scope === null ? missingScope({ packages: artifact.packages, mismatches: [] }) : [];
   if (absent.length > 0) {
     console.error(
       `\ncall-args ratchet: artifact compared a PARTIAL scope — missing ` +
@@ -275,7 +284,7 @@ export async function main(write: boolean): Promise<number> {
   if (await reportNonCanonicalBaselines(files, "call-args ratchet")) return 1;
   if (await reportEmptyBaselines(files, "call-args ratchet")) return 1;
 
-  const { added, stale } = diffAgainstBaseline(current, baseline);
+  const { added, stale } = diffAgainstBaseline(current, inScope(baseline, scope));
   const staleTags = artifact.staleTags ?? [];
   if (staleTags.length > 0) console.error(renderStaleTags(staleTags));
   const api = await readJson<TsApi>(TS_API_PATH);
@@ -365,7 +374,7 @@ async function runAsScript(): Promise<void> {
     console.error(staleArtifactMessage("call-args ratchet", ARTIFACT_PATH));
     process.exit(2);
   }
-  process.exit(await main(argv.includes("--write")));
+  process.exit(await main(argv.includes("--write"), scopeOf(argv)));
 }
 
 void runAsScript();

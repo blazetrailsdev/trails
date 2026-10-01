@@ -5,6 +5,7 @@ import type { TestManifest, TestPackageInfo } from "./types.js";
 import { extractTestsFromSource } from "./extract-ts-core.js";
 import { PKG_SRC_DIRS } from "./compare.js";
 import { PACKAGE_DIR_OVERRIDES } from "../api-compare/config.js";
+import { scopeOf } from "../api-compare/scope.js";
 
 export { extractTestsFromSource } from "./extract-ts-core.js";
 
@@ -80,7 +81,8 @@ function getPackageTestFiles(): Record<string, string[]> {
   return result;
 }
 
-export function main() {
+/** `only` narrows the extraction to one package (CI's thor-only comparison). */
+export function main(only: string | null = null) {
   const manifest: TestManifest = {
     source: "typescript",
     generatedAt: new Date().toISOString(),
@@ -90,6 +92,7 @@ export function main() {
   const packageTestFiles = getPackageTestFiles();
 
   for (const [pkg, files] of Object.entries(packageTestFiles)) {
+    if (only !== null && pkg !== only) continue;
     const absoluteFiles = files.map((f) => path.join(ROOT_DIR, f));
     manifest.packages[pkg] = extractPackageTests(absoluteFiles);
   }
@@ -126,4 +129,4 @@ function extractPackageTests(files: string[]): TestPackageInfo {
   return pkgInfo;
 }
 
-if (require.main === module) main();
+if (require.main === module) main(scopeOf(process.argv.slice(2)));

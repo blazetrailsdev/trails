@@ -456,7 +456,15 @@ function gateRegex(yml: string, name: string): RegExp {
  *    package test trees; lint-call-mismatches and baseline-json read the
  *    committed call-mismatch shards. mixin-declaration-drift and
  *    non-transactional-row-writes are not kept: they read only
- *    packages/activerecord/. rails-comparison is not narrowed.
+ *    packages/activerecord/.
+ *  - rails-comparison skips and rails-comparison-thor runs in its place:
+ *    scripts/ci/thor-comparison.sh fetches, extracts and compares the
+ *    `thor` package alone. Each gate it runs is scoped (`--package thor`,
+ *    scripts/api-compare/scope.ts) unless it reads no artifact; each
+ *    whole-surface script it does not run is in THOR_COMPARISON_SKIPS below,
+ *    with the reason. The vendor cache is restore-only there, so a thor-only
+ *    fetch is never saved under the key rails-comparison shares. The ci
+ *    aggregate accepts each job's skip only on the other's side of thor_only.
  *
  *  case "${{ github.event_name }}" in
  *  Website label opt-in. The Website job otherwise gates only on
@@ -484,6 +492,32 @@ type GateOpts = { cwd?: string; base?: string; head?: string };
 
 /** The filter step's last gate line; ci.yml names the script repo-relative. */
 const THOR_ONLY_CALL = "bash scripts/ci/thor-only.sh";
+
+/**
+ * The whole-surface comparison scripts scripts/ci/thor-comparison.sh does not
+ * run, each with why a thor-only diff cannot move its answer. The population
+ * premises are asserted by scripts/api-compare/scope.test.ts: extra-surface's
+ * GATED_PACKAGES, param-name-mark's (which the block-param ratchet gates by
+ * too), and the dependency rules. The receipt-audit package and the
+ * method-order and test-name lint paths, which ci.yml states, are asserted by
+ * the test that reads this table.
+ */
+const THOR_COMPARISON_SKIPS: Record<string, string> = {
+  "scripts/api-compare/lint-extra-surface-ratchet.ts": "thor is not in its GATED_PACKAGES",
+  "scripts/api-compare/lint-param-names.ts": "thor is not in its GATED_PACKAGES",
+  "scripts/api-compare/lint-block-params.ts": "thor is not in its GATED_PACKAGES",
+  "scripts/api-compare/lint-deps.ts": "no dependency rule names thor",
+  "scripts/api-compare/receipt-audit.ts": "runs for --package activerecord only",
+  "scripts/build-rails-file-structure-manifest.ts": "method order: arel and activemodel only",
+  "scripts/build-rails-test-names-manifest.ts": "test names: no thor path is enrolled",
+  "scripts/parity/conventions-doc.ts": "generated from conventions.ts",
+  "scripts/generate-standalone-associations-exclude.ts": "reads packages/activerecord only",
+  "scripts/test-deps/rails-test-deps.ts": "reads packages/activerecord only",
+  "scripts/test-deps/build-fixture-baseline.ts": "reads packages/activerecord only",
+  "scripts/test-compare/closure-cli.ts": "reads vendored activesupport tests only",
+  "scripts/fixtures-compare/compare.ts": "reads activerecord fixtures and models only",
+  "scripts/schema-compare/compare.ts": "reads the activerecord test schema only",
+};
 
 async function gateRunner(
   yml: string,
@@ -1323,6 +1357,60 @@ describe("CI runs every tooling test suite", () => {
     expect(aggregate).toContain(
       '[ "$AR_AFFECTED" = "false" ] && { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; }',
     );
+  });
+
+  it("runs exactly one comparison job on either side of thor_only", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8"));
+    const flat = (x: string): string => x.replace(/\s+/g, " ");
+    const aggregate = flat(wf.jobs.ci.steps[0].run);
+    const gated =
+      "needs.changes.outputs.docs_only != 'true' && " +
+      "needs.changes.outputs.comparison_affected == 'true' && " +
+      "needs.changes.outputs.thor_only";
+
+    expect(flat(wf.jobs["rails-comparison"].if).trim()).toBe(`${gated} != 'true'`);
+    expect(flat(wf.jobs["rails-comparison-thor"].if).trim()).toBe(`${gated} == 'true'`);
+    expect(wf.jobs.ci.needs).toContain("rails-comparison-thor");
+    expect(aggregate).toContain(
+      'if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; then continue',
+    );
+    expect(aggregate).toContain(
+      'rails-comparison-thor) if [ "$COMPARISON_AFFECTED" = "false" ] || ' +
+        '[ "$THOR_ONLY" != "true" ]; then continue',
+    );
+
+    const steps = wf.jobs["rails-comparison-thor"].steps as { uses?: string; run?: string }[];
+    expect(steps.map((step) => step.uses)).toContain("actions/cache/restore@v4");
+    expect(steps.map((step) => step.uses)).not.toContain("actions/cache@v4");
+    expect(steps.map((step) => step.run)).toContain("pnpm vendor:fetch --source thor");
+  });
+
+  it("accounts for every whole-surface comparison script in the thor driver", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8"));
+    const steps = wf.jobs["rails-comparison"].steps as { run?: string }[];
+    const scripts = new Set(
+      steps.flatMap((step) => (step.run ?? "").match(/scripts\/[\w/-]+\.ts/g) ?? []),
+    );
+    const driver = (await readFile(path.join(REPO_ROOT, "scripts/ci/thor-comparison.sh"), "utf8"))
+      .replaceAll("$api/", "scripts/api-compare/")
+      .replaceAll("$tests/", "scripts/test-compare/");
+
+    const run = [...scripts].filter((script) => driver.includes(script));
+    const skipped = Object.keys(THOR_COMPARISON_SKIPS);
+
+    expect(scripts.size).toBeGreaterThan(30);
+    expect([...scripts].filter((s) => !run.includes(s) && !skipped.includes(s))).toEqual([]);
+    expect(skipped.filter((s) => !scripts.has(s) || run.includes(s))).toEqual([]);
+
+    const lines = steps.flatMap((step) => (step.run ?? "").split("\n").map((l) => l.trim()));
+    expect(lines.some((l) => l.includes("receipt-audit.ts --package activerecord --gate"))).toBe(
+      true,
+    );
+    for (const id of ["method-order", "test-names"]) {
+      const lint = lines.filter((l) => l.startsWith(`${id} after `));
+      expect(lint).toHaveLength(1);
+      expect(lint[0]).not.toContain("packages/trailties");
+    }
   });
 
   it("keeps comparison_affected off for website-only changes", async () => {

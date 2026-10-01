@@ -31,6 +31,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
+import { inScope, scopeMismatch, scopeOf } from "./scope.js";
 import {
   type Artifact,
   type ExcludeEntry,
@@ -124,10 +125,18 @@ export async function loadBaseline(dir: string = BASELINE_DIR): Promise<ExcludeE
  * The scope check is the RFC 0044 determinism guard the other two gates carry:
  * an artifact covering fewer packages than CI must not pass a gate.
  */
-export async function main(): Promise<number> {
+export async function main(scope: string | null = null): Promise<number> {
   const artifact = JSON.parse(await fs.readFile(ARTIFACT_PATH, "utf-8")) as Artifact;
 
-  const absent = missingScope({ packages: artifact.packages, mismatches: [] });
+  if (scope !== null) {
+    const mismatch = scopeMismatch("ruby-compat call ratchet", artifact.packages, scope);
+    if (mismatch !== null) {
+      console.error(mismatch);
+      return 1;
+    }
+  }
+  const absent =
+    scope === null ? missingScope({ packages: artifact.packages, mismatches: [] }) : [];
   if (absent.length > 0) {
     console.error(
       `\nruby-compat call ratchet: artifact compared a PARTIAL scope — missing ` +
@@ -138,7 +147,7 @@ export async function main(): Promise<number> {
   }
 
   const current = enrolled(reverseRows(artifact));
-  const baseline = await loadBaseline();
+  const baseline = inScope(await loadBaseline(), scope);
   const { added, stale } = diffAgainstBaseline(current, baseline);
 
   if (added.length === 0 && stale.length === 0) {
@@ -190,7 +199,7 @@ async function runAsScript(): Promise<void> {
     console.error(staleArtifactMessage("ruby-compat call ratchet", ARTIFACT_PATH));
     process.exit(2);
   }
-  process.exit(await main());
+  process.exit(await main(scopeOf(argv)));
 }
 
 void runAsScript();

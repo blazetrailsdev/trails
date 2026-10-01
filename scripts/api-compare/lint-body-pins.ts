@@ -28,6 +28,7 @@
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { ROOT_DIR } from "./config.js";
+import { inScope, scopeMismatch, scopeOf } from "./scope.js";
 import {
   MANIFEST_PATH,
   diffPins,
@@ -38,9 +39,9 @@ import {
   missingScope,
 } from "./body-pins.js";
 
-async function main(): Promise<number> {
+async function main(scope: string | null): Promise<number> {
   const artifact = await loadArtifact();
-  const pins = await loadManifest();
+  const pins = inScope(await loadManifest(), scope);
 
   const dups = findDuplicateKeys(pins);
   if (dups.length > 0) {
@@ -51,7 +52,14 @@ async function main(): Promise<number> {
     return 1;
   }
 
-  const absent = missingScope(artifact);
+  if (scope !== null) {
+    const mismatch = scopeMismatch("body-pins gate", artifact.packages, scope);
+    if (mismatch !== null) {
+      console.error(mismatch);
+      return 1;
+    }
+  }
+  const absent = scope === null ? missingScope(artifact) : [];
   if (absent.length > 0) {
     console.error(
       `\nbody-pins gate: artifact compared a PARTIAL scope — missing ${absent.length} ` +
@@ -105,7 +113,7 @@ async function runAsScript(): Promise<void> {
   const self = fileURLToPath(import.meta.url);
   const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
   if (path.resolve(self) !== invoked) return;
-  const code = await main();
+  const code = await main(scopeOf(process.argv.slice(2)));
   process.exit(code);
 }
 

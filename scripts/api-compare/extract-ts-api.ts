@@ -54,6 +54,7 @@ import {
   overlappingSubDirs,
   apiComparePackageRoots,
 } from "./config.js";
+import { scopeOf } from "./scope.js";
 import {
   sharedCacheDir,
   contentFingerprint,
@@ -364,7 +365,12 @@ async function runWithConcurrency<T>(tasks: (() => Promise<T>)[], limit: number)
   return results;
 }
 
-export async function main() {
+/**
+ * `packages` narrows the walk to a per-package run (CI's thor-only comparison):
+ * each package is extracted from its own program, so a narrowed manifest holds
+ * the same entry for a package that the whole-surface one does.
+ */
+export async function main(packages: readonly string[] = TS_EXTRACT_PACKAGES) {
   const manifest: ApiManifest = {
     source: "typescript",
     generatedAt: new Date().toISOString(),
@@ -416,7 +422,7 @@ export async function main() {
   }
   const pending: PendingExtract[] = [];
 
-  for (const pkg of TS_EXTRACT_PACKAGES) {
+  for (const pkg of packages) {
     const pkgDir = packageSrcDir(pkg);
     const files = walkTsFilesSync(pkgDir, COMPARED_TS_FILES, overlappingSubDirs(pkg));
     const dirName = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
@@ -539,7 +545,7 @@ export async function main() {
   }
 
   // Print summary in TS_EXTRACT_PACKAGES order (not extraction order).
-  for (const pkg of TS_EXTRACT_PACKAGES) {
+  for (const pkg of packages) {
     const data = manifest.packages[pkg];
     const classCount = Object.keys(data.classes).length;
     const moduleCount = Object.keys(data.modules).length;
@@ -556,7 +562,7 @@ export async function main() {
     const sharedNote =
       sharedHits.size > 0 ? ` (${sharedHits.size} from the shared cross-worktree cache)` : "";
     console.log(
-      `\n  ${cacheHits.size}/${TS_EXTRACT_PACKAGES.length} packages served from cache${sharedNote} (set API_COMPARE_FORCE=1 to rebuild).`,
+      `\n  ${cacheHits.size}/${packages.length} packages served from cache${sharedNote} (set API_COMPARE_FORCE=1 to rebuild).`,
     );
   }
 
@@ -5682,5 +5688,6 @@ if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  void main();
+  const scope = scopeOf(process.argv.slice(2));
+  void main(scope === null ? TS_EXTRACT_PACKAGES : [scope]);
 }

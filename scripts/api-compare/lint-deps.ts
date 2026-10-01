@@ -32,7 +32,7 @@ interface DepRule {
   blocking: boolean;
 }
 
-const RULES: DepRule[] = [
+export const RULES: DepRule[] = [
   {
     package: "activerecord",
     dependency: "arel",

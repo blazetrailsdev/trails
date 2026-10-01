@@ -126,6 +126,7 @@ import * as path from "path";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
+import { inScope, scopeMismatch, scopeOf } from "./scope.js";
 import {
   type Artifact,
   type CallMismatchKey,
@@ -730,6 +731,7 @@ async function main(
   write: boolean,
   showSeededKeys: boolean,
   autoTighten: boolean,
+  scope: string | null = null,
 ): Promise<number> {
   const baseline = await loadBaseline();
   const artifact = await loadArtifact();
@@ -746,7 +748,14 @@ async function main(
 
   // Determinism guard (RFC 0044): same partial-scope coverage check as the
   // shared machinery (see call-mismatch-baseline.ts header).
-  const absent = missingScope(artifact);
+  if (scope !== null) {
+    const mismatch = scopeMismatch("call-mismatches ratchet", artifact.packages, scope);
+    if (mismatch !== null) {
+      console.error(mismatch);
+      return 1;
+    }
+  }
+  const absent = scope === null ? missingScope(artifact) : [];
   if (absent.length > 0) {
     console.error(
       `\ncall-mismatches ratchet: artifact compared a PARTIAL scope — missing ` +
@@ -791,7 +800,7 @@ async function main(
   if (await reportNonCanonicalBaselines(files, "call-mismatches ratchet")) return 1;
   if (await reportEmptyBaselines(files, "call-mismatches ratchet")) return 1;
 
-  const { added, stale } = diffAgainstBaseline(current, baseline);
+  const { added, stale } = diffAgainstBaseline(current, inScope(baseline, scope));
   const staleTags = artifact.staleTags ?? [];
   const staleTagReport = renderStaleTags(staleTags);
   if (staleTagReport) console.error(staleTagReport);
@@ -1040,7 +1049,12 @@ async function runAsScript(): Promise<void> {
       process.exit(2);
     }
     process.exit(
-      await main(argv.includes("--write"), argv.includes(DROPPED_SEEDED_KEYS_ARG), !process.env.CI),
+      await main(
+        argv.includes("--write"),
+        argv.includes(DROPPED_SEEDED_KEYS_ARG),
+        !process.env.CI,
+        scopeOf(argv),
+      ),
     );
   }
   let top: number;

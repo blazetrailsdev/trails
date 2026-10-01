@@ -32,6 +32,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
+import { scopeMismatch, scopeOf, scopedMarks } from "./scope.js";
 import { compareArms, type SkeletonArtifact } from "./report-arms.js";
 import {
   MARK_PATH,
@@ -50,10 +51,17 @@ async function readArtifact(): Promise<SkeletonArtifact> {
   return JSON.parse(await fs.readFile(file, "utf-8")) as SkeletonArtifact;
 }
 
-async function main(tighten: boolean): Promise<number> {
+async function main(tighten: boolean, scope: string | null): Promise<number> {
   const artifact = await readArtifact();
 
-  const absent = unmeasuredPackages(artifact.packages);
+  if (scope !== null) {
+    const mismatch = scopeMismatch("arm-throw gate", artifact.packages, scope);
+    if (mismatch !== null) {
+      console.error(mismatch);
+      return 1;
+    }
+  }
+  const absent = scope === null ? unmeasuredPackages(artifact.packages) : [];
   if (absent.length > 0) {
     console.error(
       `\narm-throw gate: gated package(s) not measured: ${absent.join(", ")}.\n` +
@@ -63,8 +71,8 @@ async function main(tighten: boolean): Promise<number> {
     return 1;
   }
 
-  const marks = await loadMarks();
-  const unmarked = unmarkedPackages(marks);
+  const committed = await loadMarks();
+  const unmarked = unmarkedPackages(committed);
   if (unmarked.length > 0) {
     console.error(
       `\narm-throw gate: gated package(s) carry no committed mark: ${unmarked.join(", ")}.\n` +
@@ -74,6 +82,7 @@ async function main(tighten: boolean): Promise<number> {
     return 1;
   }
 
+  const marks = scopedMarks(committed, scope);
   const current = measure(artifact.skeletons.flatMap((s) => compareArms(s) ?? []));
   const grew = exceedances(marks, current);
   const stale = staleMarks(marks, current);
@@ -125,7 +134,8 @@ async function runAsScript(): Promise<void> {
   const self = fileURLToPath(import.meta.url);
   const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
   if (path.resolve(self) !== invoked) return;
-  const code = await main(process.argv.slice(2).includes("--tighten"));
+  const argv = process.argv.slice(2);
+  const code = await main(argv.includes("--tighten"), scopeOf(argv));
   process.exit(code);
 }
 

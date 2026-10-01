@@ -55,7 +55,8 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import * as ts from "typescript-5";
-import { ROOT_DIR } from "./config.js";
+import { ROOT_DIR, packageSrcDir } from "./config.js";
+import { scopeOf } from "./scope.js";
 import { isLineLeadingJsDocTag } from "./extract-ts-api.js";
 import { listSourceFiles } from "./lint-missing-rails-call-reasons.js";
 import { COMMITTED_TS_FILES, walkTsFiles } from "./ts-file-walk.js";
@@ -189,8 +190,14 @@ export function lintFileText(fileName: string, text: string): Detachment[] {
   return found.sort((a, b) => a.line - b.line);
 }
 
-export async function main(): Promise<number> {
-  const files = await listLintedFiles(PACKAGES_DIR, SCRIPTS_DIR);
+/** `scope` narrows the pass to one package's src tree: a detachment is a
+ *  property of the file it sits in, so the scoped answer is the whole answer
+ *  for that package. */
+export async function main(scope: string | null = null): Promise<number> {
+  const files =
+    scope === null
+      ? await listLintedFiles(PACKAGES_DIR, SCRIPTS_DIR)
+      : (await walkTsFiles(packageSrcDir(scope), COMMITTED_TS_FILES)).sort();
   const found: Detachment[] = [];
   for (const abs of files) {
     found.push(...lintFileText(path.relative(ROOT_DIR, abs), await fs.readFile(abs, "utf-8")));
@@ -215,7 +222,7 @@ async function runAsScript(): Promise<void> {
   const self = fileURLToPath(import.meta.url);
   const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
   if (path.resolve(self) !== invoked) return;
-  process.exit(await main());
+  process.exit(await main(scopeOf(process.argv.slice(2))));
 }
 
 void runAsScript();
