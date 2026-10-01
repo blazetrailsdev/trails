@@ -339,10 +339,17 @@ describe("virtualizeTse", () => {
 
     it("keeps every overload of a this-typed helper callable bare", () => {
       const overloaded = {
-        view: "{ tag(this: { x: 1 }, name: string): string; tag(this: { x: 1 }, count: number, sep: boolean): number }",
+        view: `{ ${["a: string", "a: number, b: boolean", "a: 1, b: 2, c: 3", "a: [], b: [], c: [], d: []", "a: null"].map((params, i) => `tag(this: { x: 1 }, ${params}): ${i}`).join("; ")}; posts: string[] }`,
       };
-      const out = virtualizeTse('<%= tag("p").length %><%= tag(2, true).toFixed() %>', overloaded);
-      expect(diagnose(out)).toEqual([]);
+      const calls = [
+        'tag("p")',
+        "tag(2, true)",
+        "tag(1, 2, 3)",
+        "tag([], [], [], [])",
+        "tag(null)",
+      ];
+      const body = calls.map((call, i) => `<% const r${i}: ${i} = ${call} %>`).join("");
+      expect(diagnose(virtualizeTse(body + "<%= posts.length %>", overloaded))).toEqual([]);
       expect(diagnose(virtualizeTse("<%= tag(2) %>", overloaded))).not.toEqual([]);
       const single = diagnose(virtualizeTse("<%= readingTime(post.title) %>", scope)).join("\n");
       expect(single).not.toMatch(/No overload matches this call/);

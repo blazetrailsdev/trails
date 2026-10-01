@@ -117,6 +117,7 @@ describe("DJAS — composite key support", () => {
       const reflection = (CkShop as any)._reflectOnAssociation("ckLineItemsThroughOrders");
       const items = (await shop.association("ckLineItemsThroughOrders").loadTarget()) as Base[];
       expect(items.map((i: any) => i.sku).sort()).toEqual(["sku-1", "sku-2"]);
+      expect(await shop.association("ckLineItemsThroughOrders").scope().invertWhere()).toEqual([]);
     } finally {
       Notifications.unsubscribe(sub);
     }

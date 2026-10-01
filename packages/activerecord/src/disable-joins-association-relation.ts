@@ -40,16 +40,15 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T,
   // @ts-expect-error — Rails' override returns an Array, not a Relation (activerecord/lib/active_record/disable_joins_association_relation.rb:13-15)
   override async limit(value: number | null): Promise<T[]> {
     const records = await this.toArray();
-    return value === null ? records : records.slice(0, value);
+    return records.slice(0, value as number);
   }
 
   override first(): Promise<T | null>;
   override first(n: number): Promise<T[]>;
-  /** @missingRailsCall limit — PERMANENT */
   override async first(limit?: number): Promise<T | T[] | null> {
     const records = await this.toArray();
     if (limit != null) {
-      return records.slice(0, limit);
+      return (records as unknown as Relation<T>).limit(limit).first();
     } else {
       return records[0] ?? null;
     }

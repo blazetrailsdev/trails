@@ -93,7 +93,7 @@ export function addConstraints(
     ),
   );
 
-  scope = reflection.constraints().reduce((_memo, scopeChainItem) => {
+  scope = reflection.constraints().reduce((memo, scopeChainItem) => {
     const item = (this as unknown as EvalScope).evalScope(reflection, scopeChainItem, owner);
     scope.unscopeBang(...item.unscopeValues);
     scope.whereClause = scope.whereClause.plus(item.whereClause);

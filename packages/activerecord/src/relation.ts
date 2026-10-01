@@ -1083,7 +1083,10 @@ export class Relation<T extends Base, G extends boolean = false> {
           }
           if (node.left instanceof Nodes.Grouping) {
             const key = (node.left.expr as Arel.Attribute[]).map((attribute) => attribute.name);
-            const built = this.predicateBuilder.buildFromHash(new Map([[key, ids]]));
+            const clause = new WhereClause(
+              this.predicateBuilder.buildFromHash(new Map([[key, ids]])),
+            );
+            const built = (node instanceof DeferredIdsNotIn ? clause.invert() : clause).predicates;
             const at = predicates.indexOf(node);
             if (at !== -1) predicates.splice(at, 1, ...built);
             i = at + built.length - 1;

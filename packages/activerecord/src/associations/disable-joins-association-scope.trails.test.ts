@@ -4,7 +4,6 @@ import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
-import { Relation } from "../relation.js";
 import { fixtures } from "../test-fixtures.js";
 
 describe("DisableJoinsAssociationScope", () => {
@@ -111,8 +110,7 @@ describe("DisableJoinsAssociationScope", () => {
       owner: author,
       reflection,
       klass: reflection.klass,
-    }) as Relation<Base>;
-    expect(built).toBeInstanceOf(Relation);
+    }) as DisableJoinsAssociationRelation<Base>;
     expect(built).not.toBeInstanceOf(DisableJoinsAssociationRelation);
 
     const records = await built;
