@@ -9,7 +9,7 @@ import {
   isBlank,
   singularize,
 } from "@blazetrails/activesupport";
-import { except, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { except, rbFSend, rbObjMethod, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { defineAutosaveValidationCallbacks } from "./autosave-association.js";
 import { ArgumentError, BooleanType } from "@blazetrails/activemodel";
 
@@ -107,7 +107,7 @@ export function callRejectIf(
     .rejectIf;
   if (typeof callback === "string") {
     return (
-      (this as unknown as Record<string, (...args: unknown[]) => unknown>)[callback].length === 0
+      rbObjMethod(this, callback).arity() === 0
         ? rbFSend(this, callback)
         : rbFSend(this, callback, attributes)
     ) as boolean;
