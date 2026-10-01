@@ -306,7 +306,7 @@ export class TestCase extends ActiveSupportTestCase {
   }
 
   async process(action: string, options: RequestOptions = {}): Promise<void> {
-    const { method = "GET", params, session, body, flash, xhr = false, as } = options;
+    const { method = "GET", params, session, body, flash = {}, xhr = false, as } = options;
     let { format } = options;
 
     this.checkRequiredIvars();
