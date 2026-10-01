@@ -1,13 +1,7 @@
 import { Request } from "../http/request.js";
 import { Headers } from "../http/headers.js";
 import { Mime } from "../http/mime-type.js";
-import {
-  isPresent,
-  reverseMergeBang,
-  runLoadHooks,
-  SetupAndTeardown,
-  type FilterListEntry,
-} from "@blazetrails/activesupport";
+import { isPresent, reverseMergeBang, runLoadHooks } from "@blazetrails/activesupport";
 import {
   HTTPS,
   URI,
@@ -472,26 +466,9 @@ export class IntegrationTest extends TestCase {
   copySessionVariablesBang(): void {}
 
   /** @internal */
-  beforeSetup(): unknown {
+  override beforeSetup(): unknown {
     this._app = undefined;
-    const result = super.beforeSetup?.();
-    return result instanceof Promise
-      ? result.then(() => SetupAndTeardown.beforeSetup.call(this))
-      : SetupAndTeardown.beforeSetup.call(this);
-  }
-
-  /** @internal */
-  afterTeardown(test: Parameters<typeof SetupAndTeardown.afterTeardown>[0]): unknown {
-    SetupAndTeardown.afterTeardown.call(this, test);
-    return super.afterTeardown?.(test as never);
-  }
-
-  static override setup(this: object, ...args: FilterListEntry<object>[]): void {
-    SetupAndTeardown.setup.call((this as { prototype: object }).prototype, ...args);
-  }
-
-  static override teardown(this: object, ...args: FilterListEntry<object>[]): void {
-    SetupAndTeardown.teardown.call((this as { prototype: object }).prototype, ...args);
+    return super.beforeSetup();
   }
 
   static withRouting = routingAssertions.WithIntegrationRouting.ClassMethods.withRouting;
@@ -656,7 +633,5 @@ proto.openFile = pageDumpHelper.openFile;
 proto.htmlDumpDefaultPath = pageDumpHelper.htmlDumpDefaultPath;
 routingAssertions.spliceMethodMissing(proto);
 include(IntegrationTest, urlForMod.UrlFor);
-
-SetupAndTeardown.prepended(IntegrationTest.prototype);
 
 runLoadHooks("action_dispatch_integration_test", IntegrationTest);

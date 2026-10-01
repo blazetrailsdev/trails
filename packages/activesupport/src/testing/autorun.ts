@@ -22,17 +22,12 @@ beforeEach(async (context: TestContext) => {
     }
   }
   const testCase = (context.testCase = new klass(context.task.name));
-  await testCase.beforeSetup?.();
-  TestCase.beforeSetup();
+  await testCase.beforeSetup();
 });
 
 afterEach(async (context: TestContext) => {
   const test = _runningTest(context);
-  try {
-    TestCase.afterTeardown(test);
-  } finally {
-    await context.testCase?.afterTeardown?.(test);
-  }
+  await context.testCase?.afterTeardown(test);
   if (test.failures.length > 0) throw test.failures[0];
 });
 

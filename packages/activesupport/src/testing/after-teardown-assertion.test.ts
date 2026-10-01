@@ -6,7 +6,7 @@ import { afterTeardown, prepended, teardown } from "./setup-and-teardown.js";
 import type { RunningTest } from "./tests-without-assertions.js";
 
 describe("AfterTeardownAssertionTest", () => {
-  const klass = {};
+  const klass = class {};
   const test: Pick<RunningTest, "failures"> = { failures: [] };
   let witness = false;
   let flunked: Assertion;
@@ -30,7 +30,7 @@ describe("AfterTeardownAssertionTest", () => {
         null,
         { from: 0, to: 1 },
         () => {
-          afterTeardown.call(klass, test);
+          afterTeardown.call(new klass(), test);
           witness = true;
         },
       );
@@ -39,7 +39,7 @@ describe("AfterTeardownAssertionTest", () => {
       expect(witness).toBe(true);
       test.failures.length = 0;
     } finally {
-      resetCallbacks(klass, "teardown");
+      resetCallbacks(klass.prototype, "teardown");
     }
   });
 

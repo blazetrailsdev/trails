@@ -842,11 +842,13 @@ describe("SetupAndTeardownTest", () => {
     instance.foo();
 
     expect(
-      peekCallbackChain(SetupAndTeardownTestCase, "setup")?.entries.map((c) => c.filter),
+      peekCallbackChain(SetupAndTeardownTestCase.prototype, "setup")?.entries.map((c) => c.filter),
     ).toEqual([":resetCallbackRecord", ":foo"]);
     expect(instance.calledBack).toEqual([":foo"]);
     expect(
-      peekCallbackChain(SetupAndTeardownTestCase, "teardown")?.entries.map((c) => c.filter),
+      peekCallbackChain(SetupAndTeardownTestCase.prototype, "teardown")?.entries.map(
+        (c) => c.filter,
+      ),
     ).toEqual([":foo", ":sentinel"]);
   });
 });
@@ -859,11 +861,15 @@ describe("SubclassSetupAndTeardownTest", () => {
     instance.bar();
 
     expect(
-      peekCallbackChain(SubclassSetupAndTeardownTestCase, "setup")?.entries.map((c) => c.filter),
+      peekCallbackChain(SubclassSetupAndTeardownTestCase.prototype, "setup")?.entries.map(
+        (c) => c.filter,
+      ),
     ).toEqual([":resetCallbackRecord", ":foo", ":bar"]);
     expect(instance.calledBack).toEqual([":foo", ":bar"]);
     expect(
-      peekCallbackChain(SubclassSetupAndTeardownTestCase, "teardown")?.entries.map((c) => c.filter),
+      peekCallbackChain(SubclassSetupAndTeardownTestCase.prototype, "teardown")?.entries.map(
+        (c) => c.filter,
+      ),
     ).toEqual([":foo", ":sentinel", ":bar"]);
   });
 });
@@ -874,7 +880,7 @@ describe("TestCaseTaggedLoggingTest", () => {
   beforeEach(() => {
     out = [];
     TestCase.setTaggedLogger(new Logger({ write: (s: string) => out.push(s) }) as never);
-    TestCase.beforeSetup();
+    new TestCase("logs tagged with current test case").beforeSetup();
   });
 
   it("logs tagged with current test case", () => {
