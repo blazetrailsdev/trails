@@ -742,7 +742,6 @@ describe("runCli", () => {
         [
           'import { ApplicationController, layout } from "./application-controller.js";',
           `export class ${name} extends ApplicationController { ${body} }`,
-          "void layout;",
         ].join("\n"),
       );
     }

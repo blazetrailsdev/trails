@@ -467,14 +467,13 @@ function layoutsOf(
       found = definite ? layouts : [...found, ...layouts];
       if (definite) wide = false;
     };
-    if (!ts.isObjectLiteralExpression(options)) read(options);
-    else {
-      for (const p of options.properties) {
-        if (ts.isSpreadAssignment(p)) read(p.expression);
-        else if (propertyName(p) === "layout") {
-          found = [checker.getTypeAtLocation(option(options, "layout")!)];
-          wide = false;
-        }
+    const literal = ts.isObjectLiteralExpression(options) ? options : undefined;
+    if (!literal) read(options);
+    for (const p of literal?.properties ?? []) {
+      if (ts.isSpreadAssignment(p)) read(p.expression);
+      else if (propertyName(p) === "layout") {
+        found = [checker.getTypeAtLocation(option(literal!, "layout")!)];
+        wide = false;
       }
     }
     if (wide) every = true;

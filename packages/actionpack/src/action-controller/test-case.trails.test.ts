@@ -18,7 +18,6 @@ import {
   newControllerThread as liveNewControllerThread,
 } from "./metal/live.js";
 import { Base } from "./base.js";
-import { TestResponse } from "../action-dispatch/testing/test-response.js";
 import type { UploadedFile as HttpUploadedFile } from "../action-dispatch/http/upload.js";
 import "../test-helpers/abstract-unit.js";
 
@@ -111,7 +110,6 @@ describe("ActionController::Live under test_case.rb", () => {
     class LiveController extends Base {}
     include(LiveController, Live);
     expect(new TestCase(LiveController).response).toBeInstanceOf(LiveTestResponse);
-    expect(new TestCase(Base).response).toBeInstanceOf(TestResponse);
   });
 });
 

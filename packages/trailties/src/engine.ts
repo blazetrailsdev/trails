@@ -90,7 +90,6 @@ export class Engine extends Trailtie {
 
     if (!rbObjRespondTo(mod, "trailtieNamespace")) {
       const [name, railtie] = [this.engineName(), this] as const;
-
       mod.trailtieNamespace = () => railtie;
 
       if (!rbObjRespondTo(mod, "tableNamePrefix")) {
