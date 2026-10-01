@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 # Emits a JSON manifest of Rails test model classes.
-# Output: [{ package, file, classes: [{ name, parent, tableName, associations, validations, scopes, callbacks, attributes, attrs }] }]
+# Output: [{ package, file, classes: [{ name, parent, tableName, tableNamePrefix, abstractClass, pluralizeTableNames, associations, validations, scopes, callbacks, attributes, attrs }] }]
 require "json"
 
 MODELS_PATHS_JSON = ENV.fetch("MODELS_PATHS_JSON") do
@@ -62,8 +62,12 @@ def attr_names(line)
   line.sub(/^attr_\w+\s*\(?/, "").scan(/\A\s*:(\w+)|,\s*:(\w+)/).flatten.compact
 end
 
+# Module name => the string its `def self.table_name_prefix` returns.
+TABLE_NAME_PREFIXES = {}
+
 def parse_file(path)
   lines = File.readlines(path, chomp: true)
+  prefix_module = nil
   classes = []
   stack = []   # [{cls:, depth:}]
   modules = [] # [{name:, depth:}]
@@ -116,11 +120,27 @@ def parse_file(path)
     modules.pop while modules.last && depth < modules.last[:depth]
     singletons.pop while singletons.last && depth < singletons.last
 
+    if prefix_module
+      m = line.match(/^["']([^"']*)["']$/) or abort "extract-ruby-models: #{path}: unrecognized table_name_prefix body: #{line}"
+      TABLE_NAME_PREFIXES[prefix_module] = m[1]
+      prefix_module = nil
+    elsif line.match?(/^def self\.table_name_prefix\b/)
+      prefix_module = modules.map { |mod| mod[:name] }.join("::")
+      if (m = line.match(/^def self\.table_name_prefix\s*(?:=|;)\s*["']([^"']*)["']/))
+        TABLE_NAME_PREFIXES[prefix_module] = m[1]
+        prefix_module = nil
+      end
+    end
+
     next if stack.empty?
     cls = stack.last[:cls]
 
-    if (m = line.match(/^self\.table_name\s*=\s*["']([^"']+)["']/))
-      cls[:tableName] = m[1]
+    if (m = line.match(/^self\.table_name\s*=\s*(?:["']([^"']+)["']|:(\w+))/))
+      cls[:tableName] = m[1] || m[2]
+    elsif line.match?(/^self\.abstract_class\s*=\s*true\b/)
+      cls[:abstractClass] = true
+    elsif line.match?(/^self\.pluralize_table_names\s*=\s*false\b/)
+      cls[:pluralizeTableNames] = false
     elsif (kind = ASSOC_KINDS.find { |k| line =~ /^#{Regexp.escape(k)}\b/ })
       name = first_symbol(line)
       cls[:associations] << { kind: kind, name: name, options: extract_options(line), hasScope: scope_lambda?(line) } if name
@@ -153,6 +173,12 @@ MODELS_DIRS.each do |package, models_dir|
     rel = f.delete_prefix(File.expand_path("../..", models_dir) + "/")
     classes = parse_file(f)
     result << { package: package, file: rel, classes: classes } unless classes.empty?
+  end
+end
+result.each do |entry|
+  entry[:classes].each do |cls|
+    mod = TABLE_NAME_PREFIXES.keys.select { |name| cls[:qualifiedName].start_with?("#{name}::") }.max_by(&:size)
+    cls[:tableNamePrefix] = TABLE_NAME_PREFIXES[mod] if mod
   end
 end
 puts JSON.generate(result)

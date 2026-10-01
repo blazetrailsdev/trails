@@ -1,6 +1,7 @@
 export const deadParrotFixtureData = {
   deadbird: {
     name: "Dusty DeadBird",
+    treasures: ["ruby", "sapphire"],
     parrot_sti_class: "DeadParrot",
     killer: "blackbeard",
   },
