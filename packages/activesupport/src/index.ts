@@ -287,7 +287,6 @@ export { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 
 export { BigDecimal, toD } from "./core-ext/big-decimal/conversions.js";
 export { toF, toI } from "./core-ext/string/conversions.js";
-export { enableWarnings, silenceWarnings, withWarnings } from "./core-ext/kernel/reporting.js";
 export { endsWith, startsWith } from "./core-ext/string/starts-ends-with.js";
 export { threadMattrAccessor } from "./core-ext/module/attribute-accessors-per-thread.js";
 

@@ -13,9 +13,9 @@ import {
   assertRaise,
   assertRespondTo,
   isBlank,
-  silenceWarnings,
   toQuery,
 } from "@blazetrails/activesupport";
+import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/reporting";
 import {
   Encoding,
   File,
