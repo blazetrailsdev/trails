@@ -343,14 +343,6 @@ export class Headers extends Hash<string, string> {
     return fn ? arr.sort(fn) : arr.sort((a, b) => a[0].localeCompare(b[0]));
   }
 
-  shift(): [string, string] | undefined {
-    for (const first of this) {
-      this.delete(first[0]);
-      return first;
-    }
-    return undefined;
-  }
-
   dup(): Headers {
     const h = new Headers();
     if (this.defaultProc()) h.setDefaultProc(this.defaultProc());

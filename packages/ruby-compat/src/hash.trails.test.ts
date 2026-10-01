@@ -532,6 +532,40 @@ describe("Hash keyed on an object answering hash / eql?", () => {
   });
 });
 
+describe("Hash#shift", () => {
+  it("removes the first entry and returns it, nil once the hash is empty", () => {
+    const first = [1];
+    const h = new Hash<unknown, string>("default");
+    h.set(first, "a");
+    h.set("b", "b");
+    expect(h.shift()).toEqual([first, "a"]);
+    expect(h.has([1])).toBe(false);
+    h.set([1], "again");
+    expect(h.size).toBe(2);
+    expect(h.shift()).toEqual(["b", "b"]);
+    expect(h.shift()).toEqual([[1], "again"]);
+    expect(h.shift()).toBeUndefined();
+  });
+
+  it("shifts while the hash is being iterated", () => {
+    const h = new Hash<string, number>();
+    h.set("a", 1);
+    h.set("b", 2);
+    const yielded: string[] = [];
+    for (const [key] of h) {
+      yielded.push(key);
+      expect(h.shift()).toEqual(["a", 1]);
+      break;
+    }
+    expect(yielded).toEqual(["a"]);
+    expect(h.keys()).toEqual(["b"]);
+  });
+
+  it("raises FrozenError on a frozen hash, even an empty one", () => {
+    expect(() => new Hash().freeze().shift()).toThrow(FrozenError);
+  });
+});
+
 describe("Hash#compare_by_identity", () => {
   it("returns the receiver and answers compare_by_identity?", () => {
     const h = new Hash<unknown, number>();

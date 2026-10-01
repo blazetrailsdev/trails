@@ -6,6 +6,7 @@ import { rbHash } from "./rb-hash.js";
 import { RuntimeError } from "./runtime-error.js";
 
 const BLOCK = Symbol.for("@blazetrails/ruby-compat:block");
+const UNDEF = Symbol("Qundef");
 
 /** @noRailsEquivalent PERMANENT — Ruby's `&block`, read back by `rb_block_given_p` (`vendor/ruby/v3.3.11/eval.c:866`); TypeScript has no such syntax, and a stored default may itself be callable, so the block carries a mark instead. */
 export type Block<T> = ((key: string) => T) & { readonly [BLOCK]: true };
@@ -687,19 +688,47 @@ export class Hash<K, V> extends Map<K, V> {
    */
   override delete(key: K, block?: (key: K) => V): MapBoundaryReturn {
     this.modifyCheck();
-    const stored = this.hashStlikeLookup(key);
-    if (super.has(stored)) {
-      const val = super.get(stored);
-      super.delete(stored);
-      if (!this.#identhash && isObjectKey(stored)) {
-        const h = rbHash(stored);
-        const bucket = this.#eqlKeys.get(h)!;
-        bucket.splice(bucket.indexOf(stored), 1);
-        if (bucket.length === 0) this.#eqlKeys.delete(h);
-      }
-      return val;
-    }
+    const val = this.deleteEntry(key);
+
+    if (val !== UNDEF) return val;
     if (block) return block(key);
+    return undefined;
+  }
+
+  /**
+   * `rb_hash_delete_entry` (`vendor/ruby/v3.3.11/hash.c:2383`): the stored
+   * value, or `Qundef` for a key that was not there.
+   */
+  private deleteEntry(key: K): V | undefined | typeof UNDEF {
+    const stored = this.hashStlikeLookup(key);
+    if (!super.has(stored)) return UNDEF;
+    const val = super.get(stored);
+    super.delete(stored);
+    if (!this.#identhash && isObjectKey(stored)) {
+      const h = rbHash(stored);
+      const bucket = this.#eqlKeys.get(h)!;
+      bucket.splice(bucket.indexOf(stored), 1);
+      if (bucket.length === 0) this.#eqlKeys.delete(h);
+    }
+    return val;
+  }
+
+  /**
+   * `Hash#shift` (`vendor/ruby/v3.3.11/hash.c:2492` `rb_hash_shift`): removes
+   * the first entry and returns it as a `[key, value]` pair, `nil` for an
+   * empty hash, after `rb_hash_modify_check`. MRI takes the entry through
+   * `rb_hash_foreach` only while the hash is being iterated, because
+   * `st_shift` may not run then; a `Map` drops its first entry either way.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#shift` (`vendor/ruby/v3.3.11/hash.c:2492`).
+   */
+  shift(): [K, V] | undefined {
+    this.modifyCheck();
+    const first = super.entries().next();
+    if (!first.done) {
+      this.deleteEntry(first.value[0]);
+      return first.value;
+    }
     return undefined;
   }
 
