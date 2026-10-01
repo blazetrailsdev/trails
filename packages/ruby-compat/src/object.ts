@@ -235,16 +235,16 @@ function setMethodVisibility(
   mids: string[],
   visi: MethodVisibility,
 ): void {
-  const owner = M_TBL in module ? module[M_TBL] : module.prototype;
+  const owner = "prototype" in module ? module.prototype : module[M_TBL];
   for (const mid of mids) {
     const defined =
       mid in owner ||
       (mid.endsWith("=") && typeof lookupSetter(owner, mid.slice(0, -1)) === "function");
     if (!defined) {
       throw new NameError(
-        M_TBL in module
-          ? `undefined method '${mid}' for module '${moduleInspect(module)}'`
-          : `undefined method '${mid}' for class '${module.name}'`,
+        "prototype" in module
+          ? `undefined method '${mid}' for class '${module.name}'`
+          : `undefined method '${mid}' for module '${moduleInspect(module)}'`,
         mid,
       );
     }

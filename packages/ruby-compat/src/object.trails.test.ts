@@ -18,7 +18,7 @@ import {
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { NoMethodError } from "./no-method-error.js";
-import { Module, include } from "./include.js";
+import { Module, extend, include } from "./include.js";
 
 describe("Object#inspect", () => {
   it("renders nested arrays, hashes, nil, strings and numbers as MRI does", () => {
@@ -246,6 +246,17 @@ describe("rbModPrivate on a Module", () => {
     expect(rbFPublicSend(obj, "shown")).toBe("shown");
     expect(() => rbFPublicSend(obj, "hidden")).toThrow(NoMethodError);
     expect(rbFSend(obj, "hidden")).toBe("hidden");
+  });
+
+  it("records on a class's own prototype when the class is extended with a Module", () => {
+    class Extended {
+      secret(): string {
+        return "s";
+      }
+    }
+    extend(Extended, Helper);
+    rbModPrivate(Extended, "secret");
+    expect(() => rbFPublicSend(new Extended(), "secret")).toThrow(NoMethodError);
   });
 
   it("raises NameError for a name the module does not define", () => {
