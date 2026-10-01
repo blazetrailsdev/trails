@@ -237,13 +237,16 @@ export class LazyAttributeHash {
     this._delegateHash = dup(this.delegateHash());
   }
 
-  eachKey(fn: (key: string) => void): void {
-    const keys = new Set([
-      ...Object.keys(this.types),
-      ...Object.keys(this.values),
-      ...Object.keys(this.delegateHash()),
-    ]);
-    for (const key of keys) fn(key);
+  eachKey(block?: (key: string) => void): string[] {
+    const keys = [
+      ...new Set([
+        ...Object.keys(this.types),
+        ...Object.keys(this.values),
+        ...Object.keys(this.delegateHash()),
+      ]),
+    ];
+    if (block) keys.forEach(block);
+    return keys;
   }
 
   equals(other: unknown): boolean {

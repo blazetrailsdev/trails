@@ -4544,11 +4544,18 @@ function skeletonLogicalOpToken(kind: ts.SyntaxKind): string | undefined {
   }
 }
 
+/**
+ * An `instanceof` test, or an `||` of them — the lowering of a Ruby `rescue`
+ * naming a class LIST (`rescue TypeError, NoMethodError`,
+ * `activemodel/lib/active_model/attribute_mutation_tracker.rb:147`), which is
+ * one clause and so one arm.
+ */
 function isInstanceOfTest(expression: ts.Expression): boolean {
-  return (
-    ts.isBinaryExpression(expression) &&
-    expression.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword
-  );
+  if (!ts.isBinaryExpression(expression)) return false;
+  if (expression.operatorToken.kind === ts.SyntaxKind.BarBarToken) {
+    return isInstanceOfTest(expression.left) && isInstanceOfTest(expression.right);
+  }
+  return expression.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword;
 }
 
 /**

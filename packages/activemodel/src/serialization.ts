@@ -295,15 +295,11 @@ async function resolveIncludeAsync(record: SerializationRecord, name: string): P
 /** @noRailsEquivalent PERMANENT */
 export function asJsonThenable(
   serialize: () => Record<string, unknown>,
-  root: boolean | string | null | undefined,
-  element: () => string,
+  block: (hash: Record<string, unknown>) => Record<string, unknown>,
   options: SerializeOptions,
 ): Record<string, unknown> {
-  const finalize = (raw: unknown): Record<string, unknown> => {
-    const hash = asJson(raw) as Record<string, unknown>;
-    if (root === false || root == null) return hash;
-    return { [root === true ? element() : root]: hash };
-  };
+  const finalize = (raw: unknown): Record<string, unknown> =>
+    block(asJson(raw) as Record<string, unknown>);
   if (options.include == null || (options.include as unknown) === false)
     return finalize(serialize());
   return thenableHash(

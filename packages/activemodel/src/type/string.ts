@@ -18,10 +18,15 @@ export class StringType extends ImmutableStringType {
     });
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall new — PERMANENT
+   */
   protected castValue(value: unknown): string | null {
-    if (typeof value === "boolean") return super.castValue(value);
-    return String(value);
+    if (typeof value === "string") return String(value);
+    else if (value === true) return this.true;
+    else if (value === false) return this.false;
+    else return String(value);
   }
 }
 

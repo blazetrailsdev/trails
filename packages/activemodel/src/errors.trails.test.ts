@@ -292,6 +292,23 @@ describe("Errors — trails-only coverage", () => {
       expect(target.added("name", ":too_short")).toBe(true);
     });
 
+    it("import keeps an :attribute override bare, as an attribute name's Symbol is spelled", () => {
+      const source = new Errors({});
+      source.add("name", ":invalid");
+      const target = new Errors({});
+      target.import(source.objects[0], { attribute: "title" });
+      expect(target.objects[0].attribute).toBe("title");
+      expect(target.added("title", ":invalid")).toBe(true);
+    });
+
+    it("import raises for a nil :attribute or :type override, which has no to_sym", () => {
+      const source = new Errors({});
+      source.add("name", ":invalid");
+      const target = new Errors({});
+      expect(() => target.import(source.objects[0], { attribute: undefined })).toThrow(TypeError);
+      expect(() => target.import(source.objects[0], { type: undefined })).toThrow(TypeError);
+    });
+
     it("import accepts :attribute and :type override (rawType stays on inner)", () => {
       const source = new Errors({});
       source.add("name", ":invalid");

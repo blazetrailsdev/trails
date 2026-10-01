@@ -748,6 +748,23 @@ describe("body call capture", () => {
     ]);
   });
 
+  it("emits one rescue for an `||` of instanceof tests, as Ruby's `rescue A, B` is one clause", () => {
+    const cls = extractFromSource(
+      `export class Foo {
+        cloneValue() {
+          try {
+            return this.clone();
+          } catch (e) {
+            if (e instanceof TypeError || e instanceof NoMethodError) return this.value();
+            throw e;
+          }
+        }
+      }`,
+    );
+    const cloneValue = cls.instanceMethods.find((m) => m.name === "cloneValue")!;
+    expect(cloneValue.skeleton).toEqual(["try", "ref:clone", "rescue", "ref:value", "throw"]);
+  });
+
   it("carries the thrown class on the throw token", () => {
     const cls = extractFromSource(
       `class Foo {

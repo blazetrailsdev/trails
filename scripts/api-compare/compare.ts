@@ -392,6 +392,20 @@ export const NO_JS_CALL_FORM = new Set([
 const JS_ITERATION_CALLEE = "forEach";
 
 /**
+ * The camelCased spelling of every Ruby block iterator whose lowering is a
+ * plain `loop` (`each_key` is `eachKey`). A port that keeps the call form —
+ * ruby-compat's `eachKey` / `eachValue` / `eachPair` (hash.ts), or a ported
+ * method of that name (`LazyAttributeHash#eachKey`) — iterates exactly as the
+ * Ruby reach does, so the TS side folds it onto the same `loop` the Ruby side
+ * gets, whatever its receiver.
+ */
+const TS_ITERATION_CALLEES = new Set(
+  [...SKELETON_IDIOM_LOWERINGS]
+    .filter(([, alternatives]) => alternatives.map((l) => l.join(" ")).join() === "loop")
+    .map(([name]) => name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())),
+);
+
+/**
  * Fold a skeleton stream's Ruby stdlib reaches onto the control constructs their
  * faithful port is forced to spell, so Ruby's `xs.each { |x| save(x) }`
  * (`ref:each ref:save`) and its `for (const x of xs) this.save(x)` port
@@ -452,7 +466,7 @@ export function foldSkeletonTokens(
     }
     const name = token.slice("ref:".length);
     if (side === "ruby" && isEnumeratorReceiver(name, skeleton[index + 1])) continue;
-    if (name === JS_ITERATION_CALLEE) {
+    if (name === JS_ITERATION_CALLEE || (side === "ts" && TS_ITERATION_CALLEES.has(name))) {
       folded.push("loop");
       continue;
     }

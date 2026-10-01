@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Builder, LazyAttributeHash } from "./builder.js";
 import { Attribute } from "../attribute.js";
+import { AttributeSet } from "../attribute-set.js";
 import { typeRegistry } from "../type/registry.js";
 import { ValueType } from "../type/value.js";
 
@@ -23,6 +24,19 @@ describe("LazyAttributeHash defaultAttributes", () => {
     const hash = new LazyAttributeHash(types, { status: "archived" }, {}, defaults);
 
     expect(hash.getAttribute("status").value()).toBe("archived");
+  });
+
+  it("each_key without a block enumerates the keys AttributeSet#keys and #accessed select from", () => {
+    const types = { status: strType, age: intType };
+    const hash = new LazyAttributeHash(types, { status: "archived", extra: 1 });
+
+    expect(hash.eachKey()).toEqual(["status", "age", "extra"]);
+
+    const set = new AttributeSet(hash);
+    expect(set.keys()).toEqual(["status", "extra"]);
+    expect(set.accessed()).toEqual([]);
+    set.fetchValue("status");
+    expect(set.accessed()).toEqual(["status"]);
   });
 
   it("materializing a mutable schema default twice does not share the value", () => {

@@ -1,6 +1,6 @@
 import { Temporal } from "@blazetrails/date";
-import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
-import { Hash } from "@blazetrails/ruby-compat";
+import { HashWithIndifferentAccess, isDuplicable } from "@blazetrails/activesupport";
+import { Hash, NoMethodError, TypeError } from "@blazetrails/ruby-compat";
 import { AttributeSet } from "./attribute-set.js";
 
 /** @internal */
@@ -191,8 +191,14 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
   }
 
   private cloneValue(attrName: string): unknown {
-    const value = this.fetchValue(attrName);
-    return dupValue(value);
+    let value: unknown;
+    try {
+      value = this.fetchValue(attrName);
+      return isDuplicable(value) ? dupValue(value) : value;
+    } catch (e) {
+      if (e instanceof TypeError || e instanceof NoMethodError) return value;
+      throw e;
+    }
   }
 
   /** @internal */

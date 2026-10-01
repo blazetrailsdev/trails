@@ -122,6 +122,15 @@ describe("sameFileHelperSkeletons", () => {
     expect(foldSkeletonTokens(["ref:dig"], "ruby", ["ref:get"])).toEqual([]);
   });
 
+  it("folds the each-family call form a port keeps, so `eachKey(hash, block)` reads as each_key's loop", () => {
+    const ruby = foldSkeletonTokens(["ref:values", "ref:each_key", "ref:get"]);
+    const ts = foldSkeletonTokens(["ref:eachKey", "ref:values", "ref:getAttribute"], "ts");
+
+    expect(ruby.filter((t) => t === "loop")).toEqual(ts.filter((t) => t === "loop"));
+    expect(foldSkeletonTokens(["ref:eachValue", "ref:eachPair"], "ts")).toEqual(["loop", "loop"]);
+    expect(foldSkeletonTokens(["ref:eachKey"], "ruby")).toEqual(["ref:eachKey"]);
+  });
+
   it("reads the idiom table on the Ruby side only, so a TS `concat` is not a loop", () => {
     expect(foldSkeletonTokens(["ref:concat"], "ts")).toEqual(["ref:concat"]);
     expect(foldSkeletonTokens(["ref:concat"], "ruby", ["loop", "ref:push"])).toEqual(["loop"]);

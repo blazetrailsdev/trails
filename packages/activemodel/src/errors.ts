@@ -9,12 +9,15 @@ import {
   Enumerable,
   FrozenError,
   Hash,
+  hasKey,
   isEmpty,
   rbEqual,
   rbInspect,
   rbModConstSet,
   rbModName,
   rbObjDup,
+  stringToSym,
+  symbolToS,
   transformValues,
 } from "@blazetrails/ruby-compat";
 import { Error as ActiveModelError } from "./error.js";
@@ -89,9 +92,11 @@ export class Errors<TBase extends object = object> {
     error: ActiveModelError,
     overrideOptions: { attribute?: string; type?: string } = {},
   ): void {
-    const type = overrideOptions.type;
-    if (type !== undefined) {
-      overrideOptions.type = type.startsWith(":") ? type : `:${type}`;
+    for (const key of ["attribute", "type"] as const) {
+      if (hasKey(overrideOptions, key)) {
+        const sym = stringToSym(overrideOptions[key] as string);
+        overrideOptions[key] = key === "type" ? sym : symbolToS(sym);
+      }
     }
     this._errors.push(new NestedError(this._base, error, overrideOptions));
   }

@@ -43,7 +43,7 @@ export function symbolToS(sym: string): string {
 
 /** @noRailsEquivalent PERMANENT */
 export function stringToSym(value: string): string {
-  return isSymbol(value) ? value : `:${value}`;
+  return value.startsWith(":") ? value : `:${value}`;
 }
 
 const OPERATOR_METHOD_NAMES: Record<string, string> = {
