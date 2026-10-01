@@ -11,6 +11,7 @@ import {
   rbModToS,
   rbObjHash,
   basicObjRespondTo,
+  rbFPublicSend,
   rbObjSingletonClass,
 } from "@blazetrails/ruby-compat";
 import {
@@ -865,13 +866,13 @@ export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {
             if (attribute === "id") {
               return (value as any).id_value;
             } else {
-              return (value as any)[attribute];
+              return rbFPublicSend(value, attribute);
             }
           });
           compositePrimaryKey = true;
         }
       } else {
-        if (respondsTo(value, pkey)) value = (value as any)[pkey];
+        if (respondsTo(value, pkey)) value = rbFPublicSend(value, pkey);
       }
     }
 

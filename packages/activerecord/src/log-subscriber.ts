@@ -89,7 +89,7 @@ export class LogSubscriber extends BaseLogSubscriber {
       for (const [i, attr] of payload.binds.entries()) {
         const attributeName: string | null = rbObjRespondTo(attr, "name")
           ? attr.name
-          : attr != null && rbObjRespondTo(attr[i], "name")
+          : rbObjRespondTo(attr, "get") && rbObjRespondTo(attr[i], "name")
             ? attr[i].name
             : null;
 

@@ -30,7 +30,7 @@ export const REJECT_ALL_BLANK_PROC = (attributes: Record<string, unknown>): bool
 
 export interface NestedAttributeOptions {
   allowDestroy?: boolean;
-  rejectIf?: ((attrs: Record<string, unknown>, record: Base) => boolean) | string;
+  rejectIf?: ((attributes: Record<string, unknown>) => boolean) | string;
   limit?: number | string | ((...args: unknown[]) => number);
   updateOnly?: boolean;
 }
@@ -112,7 +112,7 @@ export function callRejectIf(
         : rbFSend(this, callback, attributes)
     ) as boolean;
   } else if (typeof callback === "function") {
-    return callback(attributes, this);
+    return callback(attributes);
   }
 }
 
