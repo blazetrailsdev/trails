@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { tokenize, TseSyntaxError } from "./lexer.js";
+import { tokenize } from "./lexer.js";
 
 describe("tokenize", () => {
   it("splits text and recognizes every tag indicator", () => {
@@ -56,11 +56,25 @@ describe("tokenize", () => {
     expect(tokenize("<%-= x %>")[0]).toMatchObject({ kind: "code", value: "= x " });
   });
 
-  it("throws on unterminated tags", () => {
-    expect(() => tokenize("<% never closed")).toThrow(TseSyntaxError);
-    expect(() => tokenize("<%! never closed")).toThrow(TseSyntaxError);
+  it("emits an unterminated tag as text", () => {
+    for (const indicator of ["", "=", "==", "-", "#"]) {
+      const source = `a <%${indicator} never closed`;
+      expect(tokenize(source)).toEqual([{ kind: "text", value: source, srcLine: 0 }]);
+    }
     expect(tokenize("a <%% never closed").map((t) => t.value)).toEqual(["a <%% never closed"]);
-    expect(() => tokenize("a <%% b <% never closed")).toThrow(TseSyntaxError);
+    expect(tokenize("a <%% b <% never closed").map((t) => t.value)).toEqual([
+      "a <%% b <% never closed",
+    ]);
+    expect(tokenize("<% x %> b <%= never").map((t) => [t.kind, t.value])).toEqual([
+      ["code", " x "],
+      ["text", " b <%= never"],
+    ]);
+  });
+
+  it("emits an unterminated <%! as text too, as Erubi reads it as <% followed by !", () => {
+    expect(tokenize("a <%! never closed")).toEqual([
+      { kind: "text", value: "a <%! never closed", srcLine: 0 },
+    ]);
   });
 
   it("classifies block-expr tags as blockExpr, not expr", () => {

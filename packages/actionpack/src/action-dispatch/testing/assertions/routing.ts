@@ -5,6 +5,9 @@ import {
   include,
   InvalidURIError,
   Module,
+  NoMethodError,
+  rbFPublicSend,
+  rbObjClass,
   rbObjClone,
   rbObjMethod,
   rbObjRespondTo,
@@ -251,6 +254,47 @@ export function assertRouting(
   const generateOptions = deleteIf({ ...options }, (k) => hasKey(defaults, k));
   const pathStr = typeof path === "string" ? path : path.path;
   assertGenerates.call(this, pathStr, generateOptions, defaults, extras, message);
+}
+
+export function methodMissing(
+  this: RoutingAssertionsHost,
+  selector: string,
+  ...args: unknown[]
+): unknown {
+  if (this.controller != null && this.routes?.namedRoutes?.isRouteDefined(selector)) {
+    return rbFPublicSend(this.controller, selector, ...args);
+  } else {
+    throw new NoMethodError(
+      `undefined method '${selector}' for an instance of ${rbObjClass(this)}`,
+      selector,
+      args,
+      false,
+      { receiver: this },
+    );
+  }
+}
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function spliceMethodMissing(proto: object): void {
+  Object.setPrototypeOf(
+    proto,
+    new Proxy(Object.create(Object.getPrototypeOf(proto) as object) as object, {
+      get(target, prop, receiver: RoutingAssertionsHost) {
+        const value = Reflect.get(target, prop, receiver);
+        if (value !== undefined || typeof prop === "symbol" || Reflect.has(target, prop)) {
+          return value;
+        }
+        if (prop === "controller" || prop === "routes") return value;
+        if (receiver.controller != null && receiver.routes?.namedRoutes?.isRouteDefined(prop)) {
+          return (...args: unknown[]) => methodMissing.call(receiver, prop, ...args);
+        }
+        return value;
+      },
+    }),
+  );
 }
 
 /** @internal */

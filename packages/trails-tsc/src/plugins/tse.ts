@@ -244,6 +244,16 @@ function scopeTypes(scope: TseScope, localsKnown: boolean): string[] {
   ];
 }
 
+export function shimScope(shim: string): TseScope | undefined {
+  const view = /^type View = (.*);$/mu.exec(shim)?.[1];
+  if (view === undefined) return undefined;
+  return {
+    view,
+    locals: /^type ObjectLocals = (.*);$/mu.exec(shim)?.[1],
+    resolved: /^ {6}: never;$/mu.test(shim),
+  };
+}
+
 const UNDECLARABLE = new Set([
   "undefined",
   "NaN",
