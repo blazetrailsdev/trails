@@ -730,6 +730,8 @@ describe("runCli", () => {
         'declare comments: number[]; show(): void { const options = { layout: "admin" } as const; this.render("show", options); }',
       drafts:
         'declare drafts: bigint; show(options: { layout: "admin" | false }): void { this.render({ layout: "posts", ...options, action: "show" }); }',
+      either:
+        'declare either: null; show(options: { layout: "admin" } | { foo: number }): void { this.render("show", options); }',
       wide: 'declare wide: symbol; show(options: Record<string, unknown>): void { this.render("show", options); }',
       posts: 'declare posts: string[]; static { layout.call(this, "application"); }',
     })) {
@@ -752,10 +754,10 @@ describe("runCli", () => {
       [
         ...fs
           .readFileSync(path.join(cwd, `.trails/views/layouts/${name}.html.tse.ts`), "utf8")
-          .matchAll(/"(posts|comments|drafts|wide)":/gu),
+          .matchAll(/"(posts|comments|drafts|either|wide)":/gu),
       ].map((m) => m[1]);
-    expect(fields("admin")).toEqual(["comments", "drafts", "wide"]);
-    expect(fields("application")).toEqual(["comments", "drafts", "posts", "wide"]);
+    expect(fields("admin")).toEqual(["comments", "drafts", "either", "wide"]);
+    expect(fields("application")).toEqual(["comments", "drafts", "either", "posts", "wide"]);
     expect(fields("posts")).toEqual(["wide"]);
   }, 30_000);
 

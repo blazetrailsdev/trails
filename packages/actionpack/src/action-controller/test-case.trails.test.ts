@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { BigDecimal } from "@blazetrails/activesupport";
+import { BigDecimal, include } from "@blazetrails/activesupport";
 import { b, StringIO } from "@blazetrails/ruby-compat";
 import { UploadedFile } from "@blazetrails/rack-test";
 import {
+  LiveTestResponse,
   TestCase,
   TestRequest,
   TestSession,
@@ -17,6 +18,7 @@ import {
   newControllerThread as liveNewControllerThread,
 } from "./metal/live.js";
 import { Base } from "./base.js";
+import { TestResponse } from "../action-dispatch/testing/test-response.js";
 import type { UploadedFile as HttpUploadedFile } from "../action-dispatch/http/upload.js";
 import "../test-helpers/abstract-unit.js";
 
@@ -103,6 +105,13 @@ describe("ActionController::Live under test_case.rb", () => {
     order.push("after-call");
     await p;
     expect(order).toEqual(["inside", "after-call"]);
+  });
+
+  it("builds a LiveTestResponse for a controller that includes Live", () => {
+    class LiveController extends Base {}
+    include(LiveController, Live);
+    expect(new TestCase(LiveController).response).toBeInstanceOf(LiveTestResponse);
+    expect(new TestCase(Base).response).toBeInstanceOf(TestResponse);
   });
 });
 

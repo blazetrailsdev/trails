@@ -16,16 +16,8 @@
   "references": [
     { "path": "./tsconfig.json" },
     { "path": "../ruby-compat" },
-    { "path": "../actionview" },
-    { "path": "../activemodel" },
     { "path": "../activesupport" },
-    { "path": "../date" },
-    { "path": "../did-you-mean" },
-    { "path": "../i18n" },
-    { "path": "../rack" },
-    { "path": "../rack-session" },
     { "path": "../rack-test" },
-    { "path": "../nokogiri" },
     { "path": "../trailties" }
   ]
 }

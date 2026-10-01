@@ -455,13 +455,17 @@ function layoutsOf(
     let wide = false;
     const read = (source: ts.Expression): void => {
       const type = checker.getTypeAtLocation(source);
-      const property = type.getProperty("layout");
-      const anything = type.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown);
-      if (anything || (!property && type.getStringIndexType())) wide = true;
-      if (!property) return;
-      const optional = property.flags & ts.SymbolFlags.Optional;
-      found = [...(optional ? found : []), checker.getTypeOfSymbolAtLocation(property, source)];
-      wide &&= optional !== 0;
+      const layouts: ts.Type[] = [];
+      let definite = true;
+      for (const part of type.isUnion() ? type.types : [type]) {
+        const property = part.getProperty("layout");
+        const anything = part.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown);
+        if (anything || (!property && part.getStringIndexType())) wide = true;
+        if (property) layouts.push(checker.getTypeOfSymbolAtLocation(property, source));
+        if (!property || property.flags & ts.SymbolFlags.Optional) definite = false;
+      }
+      found = definite ? layouts : [...found, ...layouts];
+      if (definite) wide = false;
     };
     if (!ts.isObjectLiteralExpression(options)) read(options);
     else {

@@ -7,6 +7,7 @@ import {
   include,
   isAnonymous,
   isBlank,
+  isModuleIncluded,
   isPlainObject,
   runLoadHooks,
   SetupAndTeardown,
@@ -264,6 +265,9 @@ export class TestCase extends ActiveSupportTestCase {
 
     const klass = this._controllerClass ?? (this.constructor as typeof TestCase).controllerClass;
     if (klass) {
+      if (isModuleIncluded(klass, Live)) {
+        this._responseKlass = LiveTestResponse;
+      }
       if (!this.controller) {
         try {
           this.controller = new klass();
