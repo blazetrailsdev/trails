@@ -8,7 +8,7 @@ import { PoolManager } from "../pool-manager.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import { AdapterNotSpecified, ConnectionNotDefined } from "../../errors.js";
 import type { QueryCachePool } from "./query-cache.js";
-import { Notifications } from "@blazetrails/activesupport";
+import { IsolatedExecutionState, Notifications } from "@blazetrails/activesupport";
 import "../../connection-adapters.js";
 import { isPreventingWrites } from "../../core.js";
 
@@ -54,20 +54,17 @@ export function _registerBase(base: BaseLike): void {
 
 export class ConnectionHandler {
   private _connectionNameToPoolManager: Map<string, PoolManager>;
-  private _preventWrites: boolean;
-
   /** @missingRailsArgs new — PERMANENT */
   constructor() {
     this._connectionNameToPoolManager = new Map();
-    this._preventWrites = false;
   }
 
-  get preventWrites(): boolean {
-    return this._preventWrites;
+  get preventWrites(): boolean | null {
+    return IsolatedExecutionState.get<boolean>("active_record_prevent_writes") ?? null;
   }
 
-  set preventWrites(value: boolean) {
-    this._preventWrites = value;
+  set preventWrites(preventWrites: boolean | null) {
+    IsolatedExecutionState.set("active_record_prevent_writes", preventWrites);
   }
 
   connectionPoolNames(): string[] {

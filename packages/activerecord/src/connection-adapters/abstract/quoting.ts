@@ -20,7 +20,7 @@
  */
 
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
+import { BigDecimal, Chars, TimeWithZone } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type ValueType } from "@blazetrails/activemodel";
 import { rbObjAsString, rbObjClass } from "@blazetrails/ruby-compat";
 import type { TypeMap } from "../../type/type-map.js";
@@ -58,8 +58,8 @@ export type TemporalDateLike =
   | Temporal.PlainDate;
 
 export function quote(this: QuotingDispatchHost, value: unknown): string {
-  if (typeof value === "string") {
-    return `'${this.quoteString(value)}'`;
+  if (typeof value === "string" || value instanceof Chars) {
+    return `'${this.quoteString(value instanceof Chars ? value.toS() : value)}'`;
   }
   if (typeof value === "symbol") {
     const desc = value.description;
@@ -99,7 +99,9 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
-  if (typeof value === "symbol") return value.description ?? String(value);
+  if (typeof value === "symbol" || value instanceof Chars) {
+    return value instanceof Chars ? value.toS() : (value.description ?? String(value));
+  }
   if (value instanceof BinaryData) return value.bytes;
   if (typeof value === "boolean") return value ? this.unquotedTrue() : this.unquotedFalse();
   if (value === null || value === undefined) return value;

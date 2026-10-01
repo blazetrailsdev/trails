@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
@@ -45,5 +46,17 @@ describe("ConnectionHandler selector defaults (trails)", () => {
     });
 
     handler.retrieveConnectionPool("primary", { role: "reading" })!.releaseConnection();
+  });
+
+  it("prevent_writes is read from the execution state, not from the handler", () => {
+    const other = new ConnectionHandler();
+    handler.preventWrites = true;
+    try {
+      expect(other.preventWrites).toBe(true);
+      expect(IsolatedExecutionState.get("active_record_prevent_writes")).toBe(true);
+    } finally {
+      handler.preventWrites = null;
+    }
+    expect(other.preventWrites).toBeNull();
   });
 });

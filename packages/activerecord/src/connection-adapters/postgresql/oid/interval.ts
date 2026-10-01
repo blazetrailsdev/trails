@@ -12,8 +12,9 @@ export class Interval extends ValueType<Duration> {
     if (typeof value === "string") {
       try {
         return Duration.parse(value);
-      } catch {
-        return null;
+      } catch (error) {
+        if (error instanceof Duration.ISO8601Parser.ParsingError) return null;
+        throw error;
       }
     }
     if (typeof value === "number") {

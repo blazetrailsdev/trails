@@ -2,6 +2,8 @@ import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/me
 import { fetch, merge } from "@blazetrails/ruby-compat";
 import { asJson, getEnv, onLoad } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
+import type { Relation } from "./relation.js";
+import { UnknownPrimaryKey } from "./errors.js";
 
 export { InvalidSignature };
 
@@ -65,6 +67,27 @@ export class TokenDefinition {
     return model && JSON.stringify(this.payloadFor(model)) === JSON.stringify(payload)
       ? model
       : null;
+  }
+}
+
+export class RelationMethods<T extends Base = Base> {
+  /** @missingRailsArgs fetch — PERMANENT */
+  async findByTokenFor(this: Relation<T>, purpose: string, token: string): Promise<T | null> {
+    if (this.model.primaryKey == null) throw new UnknownPrimaryKey(this);
+    return (await fetch<TokenDefinition>(this.model.tokenDefinitions, purpose).resolveToken(
+      token,
+      (id) => this.findBy(new Map([[this.model.primaryKey, [id]]])),
+    )) as T | null;
+  }
+
+  /** @missingRailsArgs fetch — PERMANENT */
+  async findByTokenForBang(this: Relation<T>, purpose: string, token: string): Promise<T> {
+    const record = await fetch<TokenDefinition>(this.model.tokenDefinitions, purpose).resolveToken(
+      token,
+      (id) => this.find(id) as Promise<Base>,
+    );
+    if (!record) throw new InvalidSignature();
+    return record as T;
   }
 }
 

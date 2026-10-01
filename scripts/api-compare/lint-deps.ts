@@ -487,11 +487,19 @@ export function methodUsesDepImport(
     if (found && !collectRefs) return;
 
     // Resolve namespace property accesses: Nodes.OuterJoin → "OuterJoin"
-    if (ts.isPropertyAccessExpression(n) && ts.isIdentifier(n.expression)) {
-      if (importedNames.has(n.expression.text)) {
+    if (ts.isPropertyAccessExpression(n)) {
+      let root: ts.Expression = n.expression;
+      while (ts.isPropertyAccessExpression(root)) root = root.expression;
+      if (ts.isIdentifier(root) && importedNames.has(root.text)) {
         found = true;
         recordRef(n.name.text);
-        if (aliasMap?.has(n.expression.text)) recordRef(n.expression.text);
+        if (root === n.expression) {
+          if (aliasMap?.has(root.text)) recordRef(root.text);
+          if (collectRefs && transitive) {
+            const constant = declaredConstantName(root, transitive.checker);
+            if (constant) collectRefs.add(constant);
+          }
+        }
         if (!collectRefs) return;
       }
     }
@@ -511,6 +519,8 @@ export function methodUsesDepImport(
               if (collectRefs && transitive && importedNames.has(n.text)) {
                 const owner = moduleFunctionOwner(n, transitive.checker, transitive.depRoot);
                 if (owner) collectRefs.add(owner);
+                const constant = declaredConstantName(n, transitive.checker);
+                if (constant) collectRefs.add(constant);
               }
               if (!collectRefs) return;
             }
@@ -578,6 +588,30 @@ export function moduleFunctionOwner(
     .basename(decl.getSourceFile().fileName)
     .replace(/(\.d)?\.ts$/, "")
     .replace(/-/g, "");
+}
+
+/**
+ * The name an imported constant is declared under, or null for an identifier
+ * that is not one. Ruby names a constant where it is defined:
+ * `ActiveModel::Type::Binary::Data.new(value)`
+ * (activerecord/lib/active_record/encryption/encrypted_attribute_type.rb:168)
+ * extracts the dep ref `Data`, and
+ * `ActiveModel::Type::SerializeCastValue.serialize(...)`
+ * (activerecord/lib/active_record/insert_all.rb:243) extracts
+ * `SerializeCastValue`. The port reaches the first through a re-export alias
+ * (`Data as BinaryData`) and the second as the receiver of a module method, so
+ * neither spelling is the identifier or the member the walk records. A Ruby
+ * constant is capitalised, and so is the class, namespace or module object
+ * porting it. The walk also records every member of a chain rooted at an
+ * import, so `Duration.ISO8601Parser.ParsingError` answers
+ * `ActiveSupport::Duration::ISO8601Parser::ParsingError`
+ * (activerecord/lib/active_record/connection_adapters/postgresql/oid/interval.rb:21).
+ */
+export function declaredConstantName(id: ts.Identifier, checker: ts.TypeChecker): string | null {
+  const sym = checker.getSymbolAtLocation(id);
+  if (!sym) return null;
+  const resolved = sym.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym) : sym;
+  return /^[A-Z]/.test(resolved.name) ? resolved.name : null;
 }
 
 function isDeclarationName(id: ts.Identifier): boolean {
@@ -656,6 +690,33 @@ const RUBY_METHOD_REFS = new Set([
 // the mixed-in methods but never references the module name itself.
 const RUBY_MIXIN_REFS = new Set(["Predications", "Expressions"]);
 
+const RUBY_UNPORTED_REFS = new Set(["Dependencies"]);
+
+/**
+ * Whether a Ruby dep ref names a constant with no trails counterpart.
+ * `ActiveSupport::Dependencies` is the Zeitwerk load interlock
+ * (`Dependencies.interlock.permit_concurrent_loads`,
+ * activerecord/lib/active_record/connection_adapters/abstract/connection_pool/queue.rb:117),
+ * which SKIP_GROUPS in scripts/parity/conventions.ts already leaves unmirrored
+ * for dependencies.rb and dependencies/interlock.rb.
+ */
+export function isUnportedRubyRef(ref: string): boolean {
+  return ref.split("::").some((part) => RUBY_UNPORTED_REFS.has(part));
+}
+
+/**
+ * The spellings a TS ref may answer a Ruby dep ref by: its leaf constant, or
+ * the whole path joined, which is how a constant whose leaf is a JS global is
+ * exported (`ActiveSupport::JSON` is `ActiveSupportJSON`,
+ * activesupport/src/json.ts).
+ */
+export function rubyRefSpellings(ref: string): string[] {
+  const leaf = normalizeRubyRef(ref);
+  if (leaf === null) return [];
+  const camel = snakeToCamel(leaf);
+  return [leaf, camel, "_" + camel, ref.split("::").join("")].map((r) => r.toLowerCase());
+}
+
 function normalizeRubyRef(ref: string): string | null {
   const parts = ref.split("::");
   const leaf = parts.pop() ?? ref;
@@ -679,6 +740,8 @@ function crossReference(rubyMethods: RubyDepMethod[], tsDepMap: TsDepMap): Cross
   for (const rm of rubyMethods) {
     const tsCandidates = rubyMethodToTs(rm.rubyName);
     if (!tsCandidates) continue;
+    const depRefs = rm.depRefs.filter((ref) => !isUnportedRubyRef(ref));
+    if (rm.depRefs.length > 0 && depRefs.length === 0) continue;
 
     const tsFile = rubyFileToTs(rm.rubyFile);
     // Key by Ruby method name — two Ruby methods can map to the same TS candidate
@@ -728,24 +791,23 @@ function crossReference(rubyMethods: RubyDepMethod[], tsDepMap: TsDepMap): Cross
     // that protocol (e.g., serializeCastValue → ActiveModel::Type::SerializeCastValue).
     const implementsProtocol =
       !info.uses &&
-      rm.depRefs.some((ref) => {
+      depRefs.some((ref) => {
         const simpleName = ref.split("::").pop() ?? "";
         return simpleName.toLowerCase() === matchedTsName.toLowerCase();
       });
     if (info.uses || implementsProtocol) {
       compliant.push(entry);
 
-      if (rm.depRefs.length > 0 && info.refs.size > 0) {
-        const rubyNormalized = rm.depRefs
-          .map(normalizeRubyRef)
-          .filter((r): r is string => r !== null);
+      if (depRefs.length > 0 && info.refs.size > 0) {
+        const rubyNormalized = depRefs.map(normalizeRubyRef).filter((r): r is string => r !== null);
         const tsRefNames = [...info.refs];
         const tsSet = new Set(tsRefNames.map((r) => r.toLowerCase()));
-        const missingInTs = rubyNormalized.filter((r) => {
-          const lower = r.toLowerCase();
-          const camel = snakeToCamel(r).toLowerCase();
-          return !tsSet.has(lower) && !tsSet.has(camel) && !tsSet.has("_" + camel);
-        });
+        const missingInTs = depRefs
+          .filter((ref) => {
+            const spellings = rubyRefSpellings(ref);
+            return spellings.length > 0 && !spellings.some((spelling) => tsSet.has(spelling));
+          })
+          .map((ref) => normalizeRubyRef(ref)!);
         if (missingInTs.length > 0) {
           refMismatches.push({
             ...entry,
@@ -756,7 +818,7 @@ function crossReference(rubyMethods: RubyDepMethod[], tsDepMap: TsDepMap): Cross
         }
       }
     } else {
-      violations.push({ ...entry, depRefs: rm.depRefs });
+      violations.push({ ...entry, depRefs });
     }
   }
 

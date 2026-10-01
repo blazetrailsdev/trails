@@ -1,5 +1,6 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { eachCons, hexdigest, isBlank, isPresent, toFs } from "@blazetrails/activesupport";
+import { eachCons, isBlank, isPresent, toFs } from "@blazetrails/activesupport";
+import { Digest } from "@blazetrails/activesupport/digest";
 import {
   except,
   extend,
@@ -8,14 +9,13 @@ import {
   Range,
   uniq,
 } from "@blazetrails/ruby-compat";
-import { fetch, isEmpty } from "@blazetrails/ruby-compat";
-import type { TokenDefinition } from "./token-for.js";
+import { isEmpty } from "@blazetrails/ruby-compat";
+import { RelationMethods as TokenForRelationMethods } from "./token-for.js";
 import { first } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
 import { Table, SelectManager, Nodes, sql, star } from "@blazetrails/arel";
 import type { Base } from "./base.js";
-import { ActiveRecordError, RecordNotUnique, UnknownPrimaryKey } from "./errors.js";
-import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
+import { ActiveRecordError, RecordNotUnique } from "./errors.js";
 import { compact, max, min } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { SerializeOptions } from "@blazetrails/activemodel";
@@ -1598,35 +1598,6 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this.scoping(() => (this.model as any).findSignedBang(token, options)) as Promise<T>;
   }
 
-  /** @missingRailsArgs fetch — PERMANENT */
-  async findByTokenFor(purpose: string, token: string): Promise<T | null> {
-    const primaryKey = this.model.primaryKey as string | string[] | null;
-    if (!primaryKey || primaryKey.length === 0) throw new UnknownPrimaryKey(this);
-    const record = await fetch<TokenDefinition>(this.model.tokenDefinitions, purpose).resolveToken(
-      token,
-      (id) => {
-        if (Array.isArray(primaryKey)) {
-          if (!Array.isArray(id) || id.length !== primaryKey.length) return Promise.resolve(null);
-          return this.findBy(
-            Object.fromEntries(primaryKey.map((key, i) => [key, id[i]])),
-          ) as Promise<Base | null>;
-        }
-        return this.findBy({ [primaryKey]: [id] }) as Promise<Base | null>;
-      },
-    );
-    return record as T | null;
-  }
-
-  /** @missingRailsArgs fetch — PERMANENT */
-  async findByTokenForBang(purpose: string, token: string): Promise<T> {
-    const record = await fetch<TokenDefinition>(this.model.tokenDefinitions, purpose).resolveToken(
-      token,
-      (id) => this.find(id) as Promise<Base>,
-    );
-    if (!record) throw new InvalidSignature();
-    return record as T;
-  }
-
   private _shouldEagerLoad: boolean | undefined;
 
   private _cacheKeys: Map<string, Promise<string>> | undefined;
@@ -1642,7 +1613,9 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   /** @internal */
   async computeCacheKey(timestampColumn = "updated_at"): Promise<string> {
-    const key = `${this.model.modelName.cacheKey}/query-${hexdigest(this.toSql())}`;
+    const querySignature = Digest.hexdigest(this.toSql());
+    const key = `${this.model.modelName.cacheKey}/query-${querySignature}`;
+
     if (this.model.collectionCacheVersioning) {
       return key;
     }
@@ -1929,12 +1902,17 @@ export interface Relation<T extends Base, G extends boolean = false> {
 }
 
 export interface Relation<T extends Base, G extends boolean = false>
-  extends Included<typeof QueryMethods>, Included<typeof Explain>, CalculationMethods<G> {
+  extends
+    Included<typeof QueryMethods>,
+    Included<typeof Explain>,
+    Included<TokenForRelationMethods<T>>,
+    CalculationMethods<G> {
   find(block: (record: T) => unknown): Promise<T | null>;
   find(ids: unknown[]): Promise<T[]>;
   find(id: unknown): Promise<T>;
   find(...ids: unknown[]): Promise<T | T[]>;
   findBy(arg: Record<string, unknown>): Promise<T | null>;
+  findBy(arg: Map<unknown, unknown>): Promise<T | null>;
   findByBang(arg: Record<string, unknown>): Promise<T>;
   findSoleBy(...conditions: unknown[]): Promise<T>;
   first(): Promise<T | null>;
@@ -2201,6 +2179,7 @@ include(Relation, QueryMethods);
 include(Relation, SpawnMethods);
 include(Relation, Calculations);
 include(Relation, FinderMethods);
+include(Relation, TokenForRelationMethods);
 
 for (const name of ["updateAll", "deleteAll"] as const) {
   const body = Relation.prototype[name] as (this: Relation<any>, ...args: any[]) => Promise<number>;

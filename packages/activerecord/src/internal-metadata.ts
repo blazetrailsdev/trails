@@ -158,10 +158,10 @@ export class InternalMetadata {
     key: string,
   ): Promise<Record<string, unknown> | null> {
     const sm = new SelectManager(this.arelTable);
-    sm.project(star());
+    sm.project(new Nodes.SqlLiteral("*", { retryable: true }));
     sm.where(this.arelTable.get(this.primaryKey).eq(new Nodes.BindParam(key)));
     sm.order(this.arelTable.get(this.primaryKey).asc());
-    sm.take(1);
+    sm.limit = 1;
     const result = await connection.selectAll(sm, `${this.constructor.name} Load`);
     return result.first() ?? null;
   }

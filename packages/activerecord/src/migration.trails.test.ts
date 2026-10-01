@@ -556,4 +556,22 @@ describe("Migration#formatArguments", () => {
     );
     expect(m.formatArguments(["posts", { _skipValidateOptions: true }])).toBe('"posts"');
   });
+
+  it("say_with_time reports rows for an Integer result only", async () => {
+    class Recording extends Migration {
+      lines: string[] = [];
+      override write(text = ""): void {
+        this.lines.push(text);
+      }
+    }
+    const integer = new Recording();
+    expect(await integer.sayWithTime("work", async () => 3)).toBe(3);
+    expect(integer.lines[0]).toBe("-- work");
+    expect(integer.lines[1]).toMatch(/^ {3}-> \d+\.\d{4}s$/);
+    expect(integer.lines[2]).toBe("   -> 3 rows");
+
+    const float = new Recording();
+    expect(await float.sayWithTime("work", async () => 1.5)).toBe(1.5);
+    expect(float.lines).toHaveLength(2);
+  });
 });

@@ -81,6 +81,8 @@ function mergeParts(
 }
 
 export class Duration {
+  static ISO8601Parser = ISO8601Parser;
+
   readonly parts: DurationParts;
 
   readonly [rubyClass] = "ActiveSupport::Duration";

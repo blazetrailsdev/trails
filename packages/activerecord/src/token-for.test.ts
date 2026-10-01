@@ -1,6 +1,7 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { RecordNotFound, registerModel } from "./index.js";
+import { UnknownPrimaryKey } from "./errors.js";
 import { User } from "./test-helpers/models/user.js";
 import { Matey } from "./test-helpers/models/matey.js";
 import { Room } from "./test-helpers/models/room.js";
@@ -190,6 +191,8 @@ describe("TokenForTest", () => {
       }
     }
 
-    await expect(NoPk.findByTokenFor("parley", "this token will not be checked")).rejects.toThrow();
+    await expect(NoPk.findByTokenFor("parley", "this token will not be checked")).rejects.toThrow(
+      UnknownPrimaryKey,
+    );
   });
 });

@@ -60,6 +60,8 @@ const DATE_COMPONENTS: (keyof DurationParts)[] = ["years", "months", "days"];
 const TIME_COMPONENTS: (keyof DurationParts)[] = ["hours", "minutes", "seconds"];
 
 export class ISO8601Parser {
+  static ParsingError = ParsingError;
+
   readonly parts: Partial<DurationParts> = {};
   readonly scanner: StringScanner;
   mode: string;

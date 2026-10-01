@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { User } from "./test-helpers/models/user.js";
 import { Base } from "./base.js";
+import { Relation } from "./relation.js";
+import { RelationMethods } from "./token-for.js";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { fixtures } from "./test-fixtures.js";
 
@@ -44,6 +46,13 @@ describe("token-for relation finders", () => {
     );
     await expect(TokenUser.where("1=1").findByTokenForBang("bad", "token")).rejects.toThrow(
       /key not found: "bad"/,
+    );
+  });
+
+  it("Relation includes TokenFor::RelationMethods", () => {
+    expect(Relation.prototype.findByTokenFor).toBe(RelationMethods.prototype.findByTokenFor);
+    expect(Relation.prototype.findByTokenForBang).toBe(
+      RelationMethods.prototype.findByTokenForBang,
     );
   });
 });

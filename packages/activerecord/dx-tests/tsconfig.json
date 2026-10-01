@@ -15,6 +15,7 @@
         "../../activesupport/src/message-verifier.ts"
       ],
       "@blazetrails/activesupport/key-generator": ["../../activesupport/src/key-generator.ts"],
+      "@blazetrails/activesupport/digest": ["../../activesupport/src/digest.ts"],
       "@blazetrails/activesupport/temporal": ["../../activesupport/src/temporal.ts"],
       "@blazetrails/activesupport/core-ext/date/conversions": [
         "../../activesupport/src/core-ext/date/conversions.ts"

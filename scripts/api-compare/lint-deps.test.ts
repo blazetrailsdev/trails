@@ -7,9 +7,12 @@ import {
   collectDirectImports,
   collectImportAliases,
   collectTaintedSymbols,
+  declaredConstantName,
   isImportFromPackage,
+  isUnportedRubyRef,
   methodUsesDepImport,
   moduleFunctionOwner,
+  rubyRefSpellings,
 } from "./lint-deps.js";
 
 function makeSourceFile(source: string): ts.SourceFile {
@@ -339,6 +342,30 @@ describe("isImportFromPackage", () => {
   });
 });
 
+describe("rubyRefSpellings", () => {
+  it("answers a Ruby dep ref by its leaf or by its whole path joined", () => {
+    expect(rubyRefSpellings("ActiveSupport::JSON")).toEqual([
+      "json",
+      "json",
+      "_json",
+      "activesupportjson",
+    ]);
+    expect(rubyRefSpellings("ActiveModel::Type::Binary::Data")).toContain("data");
+  });
+
+  it("answers nothing for a namespace root or a method ref", () => {
+    expect(rubyRefSpellings("ActiveSupport")).toEqual([]);
+    expect(rubyRefSpellings("arel_table")).toEqual([]);
+  });
+});
+
+describe("isUnportedRubyRef", () => {
+  it("is true for the Zeitwerk load interlock and nothing else", () => {
+    expect(isUnportedRubyRef("ActiveSupport::Dependencies")).toBe(true);
+    expect(isUnportedRubyRef("ActiveSupport::Benchmark")).toBe(false);
+  });
+});
+
 describe("collectTaintedSymbols — transitive dep usage", () => {
   const tmpDirs: string[] = [];
   afterEach(() => {
@@ -463,6 +490,70 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
         depRoot: path.join(dir, "elsewhere") + path.sep,
       }),
     ).toEqual(["Builder", "aliased", "fromHash"]);
+  });
+
+  it("records an imported constant under the name it is declared by", () => {
+    const dir = writePkg({
+      "dep/binary.ts": `
+        export class Data {}
+      `,
+      "dep/duration.ts": `
+        export class ParsingError extends Error {}
+        export class ISO8601Parser { static ParsingError = ParsingError; }
+        export class Duration { static ISO8601Parser = ISO8601Parser; }
+      `,
+      "dep/index.ts": `
+        export { Data as BinaryData } from "./binary.js";
+        export { Duration } from "./duration.js";
+        export namespace SerializeCastValue {
+          export function serialize(value: unknown) { return value; }
+        }
+        export const Nodes = { Not: class {} };
+      `,
+      "consumer.ts": `
+        import { BinaryData, Duration, Nodes, SerializeCastValue } from "./dep/index.js";
+        export function textToDatabaseType(value: unknown) { return new BinaryData(); }
+        export function valuesList(value: unknown) { return SerializeCastValue.serialize(value); }
+        export function castValue(error: unknown) {
+          return error instanceof Duration.ISO8601Parser.ParsingError;
+        }
+        export function invert() { return new Nodes.Not(); }
+      `,
+    });
+    const program = programFor(dir);
+    const checker = program.getTypeChecker();
+    const consumerSf = program.getSourceFiles().find((sf) => sf.fileName.endsWith("consumer.ts"))!;
+    const imported = new Set(["BinaryData", "Duration", "Nodes", "SerializeCastValue"]);
+    const refsOf = (name: string, transitive?: { checker: ts.TypeChecker }) => {
+      const fn = consumerSf.statements.find(
+        (stmt): stmt is ts.FunctionDeclaration =>
+          ts.isFunctionDeclaration(stmt) && stmt.name?.text === name,
+      )!;
+      const refs = new Set<string>();
+      methodUsesDepImport(
+        fn,
+        imported,
+        new Set(),
+        "activemodel",
+        consumerSf,
+        fn,
+        transitive && { ...transitive, taintedSymbols: new Set() },
+        refs,
+      );
+      return [...refs].sort();
+    };
+    expect(refsOf("textToDatabaseType", { checker })).toEqual(["BinaryData", "Data"]);
+    expect(refsOf("textToDatabaseType")).toEqual(["BinaryData"]);
+    expect(refsOf("valuesList", { checker })).toEqual(["SerializeCastValue", "serialize"]);
+    expect(refsOf("valuesList")).toEqual(["serialize"]);
+    expect(refsOf("castValue", { checker })).toEqual(["Duration", "ISO8601Parser", "ParsingError"]);
+    expect(refsOf("invert", { checker })).toEqual(["Nodes", "Not"]);
+
+    const bare = consumerSf.statements
+      .filter(ts.isFunctionDeclaration)
+      .map((fn) => fn.name!)
+      .map((id) => declaredConstantName(id, checker));
+    expect(bare).toEqual([null, null, null, null]);
   });
 
   it("credits a method that calls a same-package wrapper of the dep", () => {
