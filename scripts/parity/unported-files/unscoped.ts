@@ -1078,14 +1078,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "encryption context is thread-local. The entire file is a Thread.new " +
       "concurrency test with no single-threaded JS equivalent.",
   },
-  {
-    testFile: "adapters/abstract_mysql_adapter/transaction_test.rb",
-    tests: ["raises Deadlocked when a deadlock is encountered"],
-    reason:
-      "Provokes a MySQL deadlock across two Ruby Threads " +
-      "(transaction_test.rb:38-60). A deadlock requires genuine concurrency; " +
-      "single-threaded JS cannot reproduce it.",
-  },
   // --- fork() / pid ---
   // Both the SQLite and PostgreSQL statement_pool files define this fork test;
   // exclude both so neither surviving sibling is mis-flagged as "misplaced".

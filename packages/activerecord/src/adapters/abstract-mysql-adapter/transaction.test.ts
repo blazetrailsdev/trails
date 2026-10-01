@@ -1,12 +1,18 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { assertDifference, assertNoDifference, assertRaises } from "@blazetrails/activesupport";
-import { Thread } from "@blazetrails/ruby-compat";
+import {
+  assertDifference,
+  assertNoDifference,
+  assertPredicate,
+  assertRaises,
+} from "@blazetrails/activesupport";
+import { Thread, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../base.js";
 import {
   StatementTimeout,
   QueryAborted,
   ConnectionFailed,
+  Deadlocked,
   LockWaitTimeout,
   QueryCanceled,
 } from "../../errors.js";
@@ -25,6 +31,20 @@ function countDownLatch(): { countDown: () => void; wait: () => Promise<void> } 
     countDown = r;
   });
   return { countDown, wait: () => latch };
+}
+
+function cyclicBarrier(parties: number): { wait: () => Promise<void> } {
+  let count = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  return {
+    wait: () => {
+      if (++count >= parties) release();
+      return gate;
+    },
+  };
 }
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
@@ -48,6 +68,35 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
     afterEach(async () => {
       await (await Base.leaseConnection()).dropTable("samples", { ifExists: true });
+    });
+
+    it("raises Deadlocked when a deadlock is encountered", async () => {
+      const connection = await Sample.leaseConnection();
+      await assertRaises([Deadlocked], {}, async () => {
+        const barrier = cyclicBarrier(2);
+
+        const s1 = await Sample.create({ value: 1 });
+        const s2 = await Sample.create({ value: 2 });
+
+        const thread = new Thread(() =>
+          Sample.transaction(async () => {
+            await s1.lockBang();
+            await barrier.wait();
+            await s2.update({ value: 1 });
+          }),
+        );
+
+        try {
+          await Sample.transaction(async () => {
+            await s2.lockBang();
+            await barrier.wait();
+            await s1.update({ value: 2 });
+          });
+        } finally {
+          await thread.join();
+        }
+      });
+      assertPredicate(connection, (c) => c.active());
     });
 
     it("raises LockWaitTimeout when lock wait timeout exceeded", async () => {
@@ -165,18 +214,14 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         );
 
         let firstBeginFailed = false;
-        const performQuery = (connection as any).performQuery;
-        (connection as any).performQuery = async function (
-          this: unknown,
-          rawConnection: unknown,
-          sql: string,
-          ...args: unknown[]
-        ) {
+        const singletonClass = rbObjSingletonClass(connection) as typeof Mysql2Adapter;
+        const superclass = Object.getPrototypeOf(singletonClass.prototype) as Mysql2Adapter;
+        singletonClass.prototype.performQuery = async function (rawConnection, sql, ...args) {
           if (sql.includes("BEGIN") && !firstBeginFailed) {
             firstBeginFailed = true;
             throw new ConnectionFailed("Simulated failure");
           }
-          return performQuery.call(this, rawConnection, sql, ...args);
+          return superclass.performQuery.call(this, rawConnection, sql, ...args);
         };
 
         await Sample.transaction(

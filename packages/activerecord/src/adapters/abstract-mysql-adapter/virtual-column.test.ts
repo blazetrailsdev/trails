@@ -15,16 +15,9 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     return (await VirtualColumn.take()) as unknown as Record<string, unknown>;
   }
 
-  async function reloadColumnInformation(): Promise<void> {
-    adapter.schemaCache.clearBang();
-    void VirtualColumn.resetColumnInformation();
-    await VirtualColumn.loadSchema();
-  }
-
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
-    await adapter.dropTable("virtual_columns", { ifExists: true }).catch(() => {});
-    await adapter.createTable("virtual_columns", { force: "cascade" }, (t: any) => {
+    await adapter.createTable("virtual_columns", { force: true }, (t) => {
       t.string("name");
       t.virtual("upper_name", { type: "string", as: "UPPER(`name`)" });
       t.virtual("name_length", { type: "integer", as: "LENGTH(`name`)", stored: true });
@@ -38,12 +31,11 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       t.datetime("time");
       t.virtual("time_mirror", { type: "datetime", as: "`time`" });
     });
-    await reloadColumnInformation();
     await VirtualColumn.create({ name: "Rails" });
   });
 
   afterEach(async () => {
-    await adapter.dropTable("virtual_columns", { ifExists: true }).catch(() => {});
+    await adapter.dropTable("virtual_columns", { ifExists: true });
     void VirtualColumn.resetColumnInformation();
   });
 
@@ -66,7 +58,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await adapter.changeTable("virtual_columns", async (t) => {
         await t.virtual("lower_name", { type: "string", as: "LOWER(name)" });
       });
-      await reloadColumnInformation();
+      void VirtualColumn.resetColumnInformation();
+      await VirtualColumn.loadSchema();
       const column = VirtualColumn.columnsHash()["lower_name"] as unknown as MySQLColumn;
       assertPredicate(column, (c) => c.isVirtual());
       expect(column.extra).toMatch(/\bVIRTUAL\b/);
