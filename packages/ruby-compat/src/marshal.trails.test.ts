@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { ArgumentError } from "./argument-error.js";
 import { Hash } from "./hash.js";
+import { Module, rbModConstSet } from "./include.js";
 import { Marshal } from "./marshal.js";
 import { rbSetClassPathString } from "./object.js";
+import { RuntimeError } from "./runtime-error.js";
 import { TypeError } from "./type-error.js";
 
 const fixtures = JSON.parse(
@@ -11,11 +13,12 @@ const fixtures = JSON.parse(
 ) as Record<string, string>;
 
 class Ary extends Array<unknown> {}
+class Hsh extends Hash<unknown, unknown> {}
 
-class Pt {
+class Column {
   constructor(
-    public x: number,
     public name: string,
+    public type: string,
   ) {}
 }
 
@@ -24,28 +27,9 @@ class Shape {
 }
 const Geo = { name: "Geo", Shape };
 rbSetClassPathString(Shape, Geo, "Shape");
+const Kind = rbModConstSet(Geo, "Kind", new Module());
 
-class SqlTypeMetadata {
-  sqlType: string;
-  type = ":integer";
-  constructor(sqlType: string) {
-    this.sqlType = sqlType;
-  }
-}
-
-class Column {
-  name: string;
-  sqlTypeMetadata: SqlTypeMetadata;
-  null: boolean;
-  constructor(name: string, sqlType: string, isNull: boolean) {
-    this.name = name;
-    this.sqlTypeMetadata = new SqlTypeMetadata(sqlType);
-    this.null = isNull;
-  }
-}
-
-function hash(pairs: [unknown, unknown][], ifnone?: unknown): Hash<unknown, unknown> {
-  const h = new Hash<unknown, unknown>(ifnone);
+function hash<H extends Hash<unknown, unknown>>(pairs: [unknown, unknown][], h: H): H {
   for (const [key, value] of pairs) h.set(key, value);
   return h;
 }
@@ -54,57 +38,51 @@ function hex(str: string): string {
   return Array.from(str, (c) => c.charCodeAt(0).toString(16).padStart(2, "0")).join("");
 }
 
-const shared = new Pt(1, "a");
+const shared = new Column("a", ":string");
 const cycle: unknown[] = [];
 cycle.push(cycle);
 
 const VALUES: Record<string, unknown> = {
   nil: null,
-  "fixnum 0": 0,
-  "fixnum 122": 122,
-  "fixnum 123": 123,
-  "fixnum 65536": 65536,
-  "fixnum 2**30 - 1": 2 ** 30 - 1,
-  "fixnum -1": -1,
-  "fixnum -123": -123,
-  "fixnum -124": -124,
-  "fixnum -257": -257,
-  "fixnum -2**30": -(2 ** 30),
-  "bigfixnum 2**30": 2 ** 30,
-  "bigfixnum -2**30 - 1": -(2 ** 30) - 1,
-  "bigfixnum 2**62 - 1": 2n ** 62n - 1n,
-  "bigfixnum then link": [2 ** 40, "a", "a"],
-  "bignum 2**62": 2n ** 62n,
-  "bignum -2**70": -(2n ** 70n),
-  "bignum then link": [2n ** 70n, "a", "a"],
-  "float 1.0": new Number(1),
-  "float 0.0 and -0.0": [new Number(0), new Number(-0)],
-  "float 100.0": new Number(100),
-  "float 1e-5": 1e-5,
-  "float 0.00015": 0.00015,
-  "float -123456789.125": -123456789.125,
+  fixnums: [0, 122, 123, 65536, 2 ** 30 - 1, -1, -123, -124, -257, -(2 ** 30)],
+  "bigfixnums then link": [2 ** 30, -(2 ** 30) - 1, 2n ** 62n - 1n, "a", "a"],
+  "bignums then link": [2n ** 62n, -(2n ** 70n), "a", "a"],
+  floats: [
+    new Number(1),
+    new Number(100),
+    1e-5,
+    0.00015,
+    -123456789.125,
+    new Number(0),
+    new Number(-0),
+    1.5,
+    new Number(1.5),
+  ],
   "float inf, -inf, nan": [Infinity, -Infinity, NaN],
-  "float link": [1.5, new Number(1.5)],
   "string utf-8": "héllo ☃",
-  "symbol utf-8": ":é",
-  symlink: [":a", ":b", ":a"],
-  array: [1, "a", undefined, [true, false], []],
+  "symbols and strings": [":a", "a", ":a", "a", ":é", ":é", true, false],
+  array: [1, "a", undefined, [], {}],
   "array cycle": cycle,
   "array subclass": Ary.of(1),
-  hash: hash([
-    ["a", 1],
-    [":b", [2]],
-    [3, {}],
-  ]),
-  "hash default": hash([["a", 1]], 5),
-  "hash compare_by_identity": hash([]).compareByIdentity().set(1, 2),
+  hash: hash(
+    [
+      ["a", 1],
+      [":b", [2]],
+      [3, new Map()],
+    ],
+    new Hash(),
+  ),
+  "hash string keys": { a: 1, b: null },
+  "hash default": hash([["a", 1]], new Hash(5)),
+  "hash default false": new Hash(false),
+  "hash subclass": hash([["a", 1]], new Hsh()),
+  "hash compare_by_identity": hash([[1, 2]], new Hash().compareByIdentity()),
+  "class and module": [Column, Shape, Kind],
   "object nested path": new Shape(":circle"),
   "object link": [shared, shared],
   "schema cache": [
     20240101000000,
-    new Map([
-      ["posts", [new Column("id", "integer", false), new Column("title", "varchar", true)]],
-    ]),
+    new Map([["posts", [new Column("id", ":integer")]]]),
     new Map(),
     new Map([["posts", "id"]]),
     new Map([["posts", true]]),
@@ -136,15 +114,30 @@ describe("Marshal.dump", () => {
     );
   });
 
-  it("raises TypeError for an instance of an anonymous class", () => {
+  it("raises TypeError for an anonymous class and for an instance of one", () => {
     const klass = class {};
     Object.defineProperty(klass, "name", { value: "" });
-    expect(() => Marshal.dump(new klass())).toThrow(TypeError);
-    expect(() => Marshal.dump(new klass())).toThrow(/^can't dump anonymous class #<Class:0x/);
+    for (const obj of [klass, new klass()]) {
+      expect(() => Marshal.dump(obj)).toThrow(TypeError);
+      expect(() => Marshal.dump(obj)).toThrow(/^can't dump anonymous class #<Class:0x/);
+    }
   });
 
   it("raises ArgumentError past the depth limit", () => {
     expect(Marshal.dump([[1]], 3)).toBe(Marshal.dump([[1]]));
     expect(() => Marshal.dump([[1]], 2)).toThrow(new ArgumentError("exceed depth limit"));
+  });
+
+  it("raises RuntimeError for an Array modified during the dump", () => {
+    const ary: unknown[] = [];
+    ary.push(
+      Object.defineProperty(new Column("id", ":integer"), "name", { get: () => ary.push(1) }),
+    );
+    expect(() => Marshal.dump(ary)).toThrow(new RuntimeError("array modified during dump"));
+  });
+
+  it("raises TypeError for a length past 32 bits", () => {
+    const ary = new Proxy([], { get: (t, k) => (k === "length" ? 2 ** 32 : Reflect.get(t, k)) });
+    expect(() => Marshal.dump(ary)).toThrow(new TypeError("long too big to dump"));
   });
 });

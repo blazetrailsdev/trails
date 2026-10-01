@@ -1,7 +1,15 @@
 import { ArgumentError } from "./argument-error.js";
 import { Hash } from "./hash.js";
+import { Module } from "./include.js";
 import { rbFloatTypeP, rbIntegerTypeP } from "./numeric.js";
-import { rbModName, rbModToS, rbObjClass, rbObjInstanceVariables, rbObjIvarGet } from "./object.js";
+import {
+  rbModName,
+  rbModSingletonP,
+  rbModToS,
+  rbObjClass,
+  rbObjInstanceVariables,
+  rbObjIvarGet,
+} from "./object.js";
 import { RuntimeError } from "./runtime-error.js";
 import { isSymbol, symbolToS } from "./symbol.js";
 import { TypeError } from "./type-error.js";
@@ -22,6 +30,8 @@ const TYPE_STRING = 0x22;
 const TYPE_ARRAY = 0x5b;
 const TYPE_HASH = 0x7b;
 const TYPE_HASH_DEF = 0x7d;
+const TYPE_CLASS = 0x63;
+const TYPE_MODULE = 0x6d;
 
 const TYPE_SYMBOL = 0x3a;
 const TYPE_SYMLINK = 0x3b;
@@ -32,9 +42,11 @@ const TYPE_LINK = 0x40;
 const FIXNUM_MAX = 2n ** 62n - 1n;
 const FIXNUM_MIN = -(2n ** 62n);
 
+/** The `arg->data` key of `-0.0`, a heap Float apart from the flonum `0.0` (`vendor/ruby/v3.3.11/marshal.c:896`). */
 const NEGATIVE_ZERO = Symbol("-0.0");
 
 type AnyClass = abstract new (...args: never) => unknown;
+type Encname = boolean | string | null;
 
 /** `struct dump_arg` (`vendor/ruby/v3.3.11/marshal.c:171`). */
 interface DumpArg {
@@ -58,8 +70,8 @@ function mustNotBeAnonymous(type: string, path: string): string {
 }
 
 /** `class2path` (`vendor/ruby/v3.3.11/marshal.c:273`). */
-function class2path(klass: AnyClass): string {
-  const path = rbModName(klass) ?? rbModToS(klass);
+function class2path(klass: AnyClass | Module): string {
+  const path = rbModName(klass as AnyClass) ?? rbModToS(klass as AnyClass);
 
   mustNotBeAnonymous(typeof klass === "function" ? "class" : "module", path);
   return path;
@@ -178,10 +190,18 @@ function wFloat(d: number, arg: DumpArg): void {
   }
 }
 
+/** `is_ascii_string` (`vendor/ruby/v3.3.11/marshal.c:484`, `rb_enc_str_asciionly_p`). */
+function isAsciiString(str: string): boolean {
+  for (let i = 0; i < str.length; i++) {
+    if (str.charCodeAt(i) > 0x7f) return false;
+  }
+  return true;
+}
+
 /** `w_encivar` (`vendor/ruby/v3.3.11/marshal.c:480`). */
-function wEncivar(str: string, arg: DumpArg): boolean | string | null {
+function wEncivar(str: string, arg: DumpArg): Encname {
   const encname = encodingName(str);
-  if (encname === null || /^[\0-\x7f]*$/.test(str)) {
+  if (encname === null || isAsciiString(str)) {
     return null;
   }
   wByte(TYPE_IVAR, arg);
@@ -189,7 +209,7 @@ function wEncivar(str: string, arg: DumpArg): boolean | string | null {
 }
 
 /** `w_encname` (`vendor/ruby/v3.3.11/marshal.c:492`). */
-function wEncname(encname: boolean | string | null, arg: DumpArg): void {
+function wEncname(encname: Encname, arg: DumpArg): void {
   if (encname !== null) {
     wLong(1, arg);
     wEncoding(encname, arg, 1);
@@ -220,6 +240,12 @@ function wUnique(s: string, arg: DumpArg): void {
   wSymbol(`:${s}`, arg);
 }
 
+/** `hash_each` (`vendor/ruby/v3.3.11/marshal.c:537`). */
+function hashEach(key: unknown, value: unknown, arg: DumpArg, limit: number): void {
+  wObject(key, arg, limit);
+  wObject(value, arg, limit);
+}
+
 /** `w_class` (`vendor/ruby/v3.3.11/marshal.c:572`). */
 function wClass(type: number, obj: object, arg: DumpArg): void {
   const klass = obj.constructor as AnyClass;
@@ -239,7 +265,7 @@ function wUclass(obj: object, sup: AnyClass, arg: DumpArg): void {
 }
 
 /** `encoding_name` (`vendor/ruby/v3.3.11/marshal.c:661`). */
-function encodingName(obj: unknown): boolean | string | null {
+function encodingName(obj: unknown): Encname {
   if (typeof obj === "string") {
     return true;
   } else {
@@ -248,7 +274,7 @@ function encodingName(obj: unknown): boolean | string | null {
 }
 
 /** `w_encoding` (`vendor/ruby/v3.3.11/marshal.c:694`). */
-function wEncoding(encname: boolean | string | null, arg: DumpArg, limit: number): number {
+function wEncoding(encname: Encname, arg: DumpArg, limit: number): number {
   if (limit >= 0) ++limit;
   switch (encname) {
     case false:
@@ -265,7 +291,7 @@ function wEncoding(encname: boolean | string | null, arg: DumpArg, limit: number
 }
 
 /** `has_ivars` (`vendor/ruby/v3.3.11/marshal.c:713`). */
-function hasIvars(encname: boolean | string | null): number {
+function hasIvars(encname: Encname): number {
   return encname !== null ? 1 : 0;
 }
 
@@ -279,7 +305,7 @@ function wIvarEach(obj: object, num: number, arg: DumpArg, limit: number): void 
 }
 
 /** `w_ivar` (`vendor/ruby/v3.3.11/marshal.c:763`). */
-function wIvar(num: number, encname: boolean | string | null, arg: DumpArg, limit: number): void {
+function wIvar(num: number, encname: Encname, arg: DumpArg, limit: number): void {
   wLong(num, arg);
   wEncoding(encname, arg, limit);
 }
@@ -330,7 +356,7 @@ function wRemember(obj: unknown, arg: DumpArg): void {
 /** `w_object` (`vendor/ruby/v3.3.11/marshal.c:846`). */
 function wObject(obj: unknown, arg: DumpArg, limit: number): void {
   let hasiv = 0;
-  let encname: boolean | string | null = null;
+  let encname: Encname = null;
 
   if (limit === 0) {
     throw new ArgumentError("exceed depth limit");
@@ -377,7 +403,24 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
     hasiv = hasIvars((encname = encodingName(obj)));
     if (hasiv) wByte(TYPE_IVAR, arg);
 
-    if (typeof obj === "bigint") {
+    if (typeof obj === "function" && rbObjClass(obj) === "Class") {
+      if (rbModSingletonP(obj)) {
+        throw new TypeError("singleton class can't be dumped");
+      }
+      {
+        const path = class2path(obj as AnyClass);
+        const encname = wEncivar(path, arg);
+        wByte(TYPE_CLASS, arg);
+        wCstr(path, arg);
+        wEncname(encname, arg);
+      }
+    } else if (obj instanceof Module) {
+      const path = class2path(obj);
+      const encname = wEncivar(path, arg);
+      wByte(TYPE_MODULE, arg);
+      wCstr(path, arg);
+      wEncname(encname, arg);
+    } else if (typeof obj === "bigint") {
       wByte(TYPE_BIGNUM, arg);
       {
         const sign = obj >= 0n ? 0x2b : 0x2d;
@@ -416,22 +459,18 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
         wByte(TYPE_UCLASS, arg);
         wSymbol(":Hash", arg);
       }
-      const ifnone = obj instanceof Hash ? (obj.default() ?? null) : null;
-      const procDefault = obj instanceof Hash && obj.defaultProc() !== undefined;
-      if (ifnone === null && !procDefault) {
+      const ifnone = obj instanceof Hash ? (obj.defaultProc() ?? obj.default()) : undefined;
+      if (ifnone == null) {
         wByte(TYPE_HASH, arg);
-      } else if (procDefault) {
+      } else if (obj instanceof Hash && obj.defaultProc() !== undefined) {
         throw new TypeError("can't dump hash with default proc");
       } else {
         wByte(TYPE_HASH_DEF, arg);
       }
       const pairs = obj instanceof Map ? [...obj] : Object.entries(obj as object);
       wLong(pairs.length, arg);
-      for (const [key, value] of pairs) {
-        wObject(key, arg, limit);
-        wObject(value, arg, limit);
-      }
-      if (ifnone !== null) {
+      for (const [key, value] of pairs) hashEach(key, value, arg, limit);
+      if (ifnone != null) {
         wObject(ifnone, arg, limit);
       }
     } else if (tObjectP(obj)) {
@@ -446,6 +485,22 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
   }
 }
 
+/** `rb_marshal_dump_limited` (`vendor/ruby/v3.3.11/marshal.c:1228`). */
+function rbMarshalDumpLimited(obj: unknown, limit: number): string {
+  const arg: DumpArg = { str: [], symbols: new Map(), data: new Map(), numEntries: 0 };
+
+  wByte(MARSHAL_MAJOR, arg);
+  wByte(MARSHAL_MINOR, arg);
+
+  wObject(obj, arg, limit);
+
+  let port = "";
+  for (let i = 0; i < arg.str.length; i += 0x8000) {
+    port += String.fromCharCode(...arg.str.slice(i, i + 0x8000));
+  }
+  return port;
+}
+
 /**
  * Ruby's `Marshal` (`vendor/ruby/v3.3.11/marshal.c:2555`), format 4.8. The
  * marshalled data is an ASCII-8BIT String, one character per byte.
@@ -456,12 +511,12 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
 export const Marshal = {
   /**
    * `Marshal.dump(obj, limit = -1)` (`marshal_dump`,
-   * `vendor/ruby/v3.3.11/marshal.c:1207`, over `rb_marshal_dump_limited`,
-   * `marshal.c:1228`, and `w_object`, `marshal.c:846`), for the types a
+   * `vendor/ruby/v3.3.11/marshal.c:1207`, over `w_object`, `marshal.c:846`), for the types a
    * schema-cache dump holds
    * (`vendor/rails/v8.0.2/activerecord/lib/active_record/connection_adapters/schema_cache.rb:416-418`):
    * `nil`, `true`, `false`, Integer, Float, String, Symbol, Array, Hash and a
-   * plain ivar object. Any other value takes the `T_DATA` arm's `TypeError`.
+   * plain ivar object, plus Class and Module. Any other value takes the
+   * `T_DATA` arm's `TypeError`.
    *
    * @boundary: a JS string carries no encoding tag, so `encoding_name`
    *  (`marshal.c:661`) answers UTF-8 for every String and `has_ivars`
@@ -471,29 +526,21 @@ export const Marshal = {
    *  `TYPE_LINK`, as a deduplicated Ruby String's is; `-0.0` is keyed apart
    *  from `0.0`, which a `Map` reads as one key. `ruby_dtoa(d, 0, …)`
    *  (`marshal.c:444`) is the shortest round-tripping digit string, which
-   *  `toExponential()` also answers.
+   *  `toExponential()` also answers. A whole-valued `number` is an Integer
+   *  (`rbObjClass`), so a Float `1.0` dumps as a Float only when boxed
+   *  (`rbDbl2num`). A JS string is UTF-16, and `TextEncoder` writes a lone
+   *  surrogate as U+FFFD where a Ruby String's bytes are written as they are.
    *
    * Not ported: the `anIO` argument; `w_extended` (`marshal.c:550`) and the
    * `marshal_dump` arm (`marshal.c:910`), which are
    * `ruby-compat-has-no-marshal-for-schema-cache-and-debug`; `class2path`'s
    * `rb_path_to_class` check (`marshal.c:279`), which is
-   * `ruby-compat-marshal-load-core-types`; and the `_dump`, Class, Module,
-   * Regexp and Struct arms, which nothing calls.
+   * `ruby-compat-marshal-load-core-types`; and the `_dump`, Regexp and Struct
+   * arms, which nothing calls.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Marshal.dump` (`vendor/ruby/v3.3.11/marshal.c:1207`).
    */
   dump(obj: unknown, limit: number = -1): string {
-    const arg: DumpArg = { str: [], symbols: new Map(), data: new Map(), numEntries: 0 };
-
-    wByte(MARSHAL_MAJOR, arg);
-    wByte(MARSHAL_MINOR, arg);
-
-    wObject(obj, arg, limit);
-
-    let port = "";
-    for (let i = 0; i < arg.str.length; i += 0x8000) {
-      port += String.fromCharCode(...arg.str.slice(i, i + 0x8000));
-    }
-    return port;
+    return rbMarshalDumpLimited(obj, limit);
   },
 };
