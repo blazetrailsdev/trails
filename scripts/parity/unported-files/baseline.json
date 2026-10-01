@@ -300,11 +300,6 @@
   },
   {
     "package": "did-you-mean",
-    "pattern": "/formatter.rb",
-    "reason": "Formats `Did you mean? …` suffix for Ruby's Exception#detailed_message integration. JS error stringification is per-error, not via a stdlib hook."
-  },
-  {
-    "package": "did-you-mean",
     "pattern": "spell_checkers/key_error_checker.rb",
     "testFile": "spell_checking/test_key_name_check.rb",
     "reason": "Suggests Hash/ENV keys on Ruby KeyError. JS Map/object access doesn't raise."

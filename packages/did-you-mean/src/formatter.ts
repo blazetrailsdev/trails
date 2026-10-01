@@ -14,3 +14,5 @@ export class Formatter {
     return (this.constructor as typeof Formatter).messageFor(corrections);
   }
 }
+
+export const PlainFormatter = Formatter;

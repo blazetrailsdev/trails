@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { Formatter, setFormatter } from "@blazetrails/did-you-mean";
 import {
   AmbiguousCommandError,
+  Error as ThorError,
   AmbiguousTaskError,
   UndefinedCommandError,
   UndefinedTaskError,
@@ -24,6 +26,23 @@ describe("Thor::Error", () => {
     expect(error.message).toBe(
       'Unknown switches "--forc", "--quie"\nDid you mean?  "--force"\n               "--quiet"',
     );
+  });
+
+  it("formats the corrections with the formatter DidYouMean currently holds", () => {
+    setFormatter({ messageFor: (corrections) => ` (${corrections.join(", ")}?)` });
+    try {
+      expect(new UndefinedCommandError("instal", ["install"], null).message).toBe(
+        'Could not find command "instal". ("install"?)',
+      );
+    } finally {
+      setFormatter(null);
+    }
+    expect(Formatter.messageFor([])).toBe("");
+  });
+
+  it("keeps an empty message for an error built without one", () => {
+    expect(new ThorError().message).toBe("");
+    expect(new ThorError("boom").message).toBe("boom");
   });
 
   it("aliases the task errors to the command errors", () => {

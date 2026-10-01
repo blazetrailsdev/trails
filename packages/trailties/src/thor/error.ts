@@ -22,10 +22,9 @@ export const Correctable = {
 export class Error extends StandardError {
   #mesg: string;
 
-  /** @noRailsEquivalent CONVERGEABLE ruby-compat-exception-message-dispatches-to-to-s */
   constructor(message?: string) {
     super(message);
-    this.#mesg = this.message;
+    this.#mesg = message ?? "";
     delete (this as { message?: string }).message;
   }
 
@@ -34,7 +33,6 @@ export class Error extends StandardError {
     return this.toString();
   }
 
-  /** @noRailsEquivalent CONVERGEABLE ruby-compat-exception-message-dispatches-to-to-s */
   override toString(): string {
     return this.#mesg;
   }
