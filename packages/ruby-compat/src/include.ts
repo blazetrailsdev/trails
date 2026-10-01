@@ -47,9 +47,13 @@ type ModuleHooks = {
  * letter (`rb_sym_constant_char_p`, vendor/ruby/v3.3.11/symbol.c:218-250), then
  * identifier characters (`is_identchar`, symbol.c:54). It then calls `const_set`
  * (vendor/ruby/v3.3.11/variable.c:3607). Binding a module names it after the
- * owner (variable.c:3648-3668), as it does a class: permanently under a named owner, and under an
- * anonymous one with the owner's temporary path, until a named owner re-paths
- * it. `Module#name` and `Module#inspect` read that path.
+ * owner (variable.c:3648-3668), as it does a class: permanently under a named
+ * owner, and under an anonymous one with the owner's temporary path, until a
+ * named owner re-paths it. `Module#name` and `Module#inspect` read that path.
+ * `rb_namespace_p` (variable.c:83) admits a class or a module: a class here is a function
+ * whose `prototype` is non-writable, which holds for `class` syntax and the
+ * built-in constructors and for no arrow, bound or `function` function — the
+ * test `rbInspect` applies before rendering a value through `rbModToS`.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
  */
