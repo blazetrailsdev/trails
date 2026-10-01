@@ -153,6 +153,7 @@ describe("the VFS FsAdapter's async verbs", () => {
     await expect(fs.writeFile!("/bin/blob", new Uint8Array([0xff, 0xfe]))).rejects.toThrow();
     await fs.unlink!("/bin/trails");
     expect(files["/bin/trails"]).toBeUndefined();
-    await expect(fs.unlink!("/bin/trails")).rejects.toThrow(/ENOENT/);
+    await expect(fs.unlink!("/nope/trails")).rejects.toThrow(/ENOENT/);
+    expect(fs.existsSync("/nope")).toBe(false);
   });
 });

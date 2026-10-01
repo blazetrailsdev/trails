@@ -151,8 +151,8 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
   }
 
   function unlinkSync(path: string): void {
-    mkdirSync(posixPath.dirname(path));
     if (!vfs.delete(path)) throw errno("ENOENT", "unlink", path);
+    mkdirSync(posixPath.dirname(path));
   }
 
   function writeFileSync(path: string, data: string | Uint8Array): void {
