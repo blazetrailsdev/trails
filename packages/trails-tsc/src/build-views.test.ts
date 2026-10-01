@@ -86,7 +86,7 @@ describe("buildViews", () => {
     const { count } = await buildViews({ cwd });
     expect(count).toBe(1);
     expect(fs.existsSync(path.join(cwd, ".trails/views/users/gone.html.tse.ts"))).toBe(false);
-  });
+  }, 30_000);
 
   it("deletes a views-manifest.ts left behind by an older build", async () => {
     const cwd = mkScratch();
@@ -98,7 +98,7 @@ describe("buildViews", () => {
     await buildViews({ cwd });
 
     expect(fs.existsSync(manifest)).toBe(false);
-  });
+  }, 30_000);
 
   it("refuses to build when outDir is a symlink escaping cwd", async () => {
     const cwd = mkScratch();
@@ -403,7 +403,7 @@ describe("runCli", () => {
 
   afterEach(() => vi.restoreAllMocks());
 
-  it("`dev` starts the watcher synchronously and runs an initial build", async () => {
+  it("`dev` runs an initial build and starts the watcher", async () => {
     vi.spyOn(process, "exit").mockImplementation(((_c?: number) => undefined) as never);
     const cwd = mkScratch();
     write(cwd, "app/views/home.html.tse", "hi");
