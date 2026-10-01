@@ -12,6 +12,11 @@ export class SubstituteBinds {
     this.delegate = delegateCollector;
   }
 
+  append(str: string): this {
+    this.delegate.append(str);
+    return this;
+  }
+
   addBind(bind: unknown, _block: (index: number) => string): this {
     if (bind != null && typeof bind === "object" && "valueForDatabase" in bind) {
       const valueForDatabase = (bind as Record<string, unknown>).valueForDatabase;
@@ -34,10 +39,5 @@ export class SubstituteBinds {
 
   get value(): string {
     return this.delegate.value;
-  }
-
-  append(str: string): this {
-    this.delegate.append(str);
-    return this;
   }
 }

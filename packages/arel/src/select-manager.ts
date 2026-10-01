@@ -11,14 +11,14 @@ import { OuterJoin } from "./nodes/outer-join.js";
 import { StringJoin } from "./nodes/string-join.js";
 import { EmptyJoinError } from "./errors.js";
 import { Union, UnionAll, Intersect, Except } from "./nodes/binary.js";
-import { With, WithRecursive } from "./nodes/with.js";
+import { With } from "./nodes/with.js";
 import { TableAlias } from "./nodes/table-alias.js";
 import { Exists } from "./nodes/function.js";
 import { NamedWindow } from "./nodes/window.js";
 import { Table } from "./table.js";
 import { sql } from "./arel.js";
-import { Arel } from "./namespaces.js";
-import { rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { Arel, Nodes } from "./namespaces.js";
+import { isSymbol, rbConstGet, rbSetClassPathString, symbolToS } from "@blazetrails/ruby-compat";
 import { Comment } from "./nodes/comment.js";
 import { Lateral } from "./nodes/unary.js";
 import { And } from "./nodes/nary.js";
@@ -32,9 +32,7 @@ const UNION_NODE_CLASSES: Record<
 > = { UnionAll };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class SelectManager extends TreeManager {
-  ast: SelectStatement;
-
+export class SelectManager extends TreeManager<SelectStatement> {
   constructor(table?: Table | Node | null) {
     super();
     this.ast = new SelectStatement(table ?? null);
@@ -251,8 +249,17 @@ export class SelectManager extends TreeManager {
     return new Lateral(base);
   }
 
-  with(...subqueries: Node[]): this {
-    this.ast.with = new With(subqueries);
+  with(...subqueries: (string | Node | Node[])[]): this {
+    let nodeClass: typeof With;
+    if (isSymbol(subqueries[0])) {
+      const name = symbolToS(subqueries.shift() as string);
+      const capitalized = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+      nodeClass = rbConstGet(Nodes, `With${capitalized}`) as typeof With;
+    } else {
+      nodeClass = With;
+    }
+    this.ast.with = new nodeClass(subqueries.flat(Infinity) as Node[]);
+
     return this;
   }
 
@@ -284,11 +291,6 @@ export class SelectManager extends TreeManager {
 
   private get core(): SelectCore {
     return this.ast.cores[this.ast.cores.length - 1];
-  }
-
-  withRecursive(...ctes: Node[]): this {
-    this.ast.with = new WithRecursive(ctes);
-    return this;
   }
 }
 

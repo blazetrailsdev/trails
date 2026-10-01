@@ -396,10 +396,6 @@ export class Dot extends Visitor {
     return [header, ...nodeLines, ...edgeLines, "}"].join("\n");
   }
 
-  compile(node: Nodes.Node): string {
-    return this.accept(node).value;
-  }
-
   protected visitArelNodesExists(o: Nodes.Exists): void {
     this.visitEdge(o, "expressions");
     this.visitEdge(o, "alias");

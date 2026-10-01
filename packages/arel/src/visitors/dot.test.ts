@@ -32,7 +32,7 @@ describe("TestDot", () => {
 
   it("named function", () => {
     const func = new Nodes.NamedFunction("omg", "omg" as never);
-    dot.compile(func);
+    dot.accept(func, new Collectors.PlainString());
   });
 
   it("Arel Nodes Not", () => acceptUnary(Nodes.Not));
@@ -67,24 +67,30 @@ describe("TestDot", () => {
 
   it("Arel Nodes BindParam", () => {
     const node = new Nodes.BindParam(1);
-    expect(dot.compile(node)).toMatch('[label="<f0>Arel::Nodes::BindParam"]');
+    expect(dot.accept(node, new Collectors.PlainString()).value).toMatch(
+      '[label="<f0>Arel::Nodes::BindParam"]',
+    );
   });
 
   it("ActiveModel Attribute", () => {
     const node = ModelAttribute.withCastValue("LIMIT", 1, null as never);
-    expect(dot.compile(node as never)).toMatch(
+    expect(dot.accept(node as never, new Collectors.PlainString()).value).toMatch(
       '[label="<f0>ActiveModel::Attribute::WithCastValue"]',
     );
   });
 
   it("Arel Nodes CurrentRow", () => {
     const node = new Nodes.CurrentRow();
-    expect(dot.compile(node)).toMatch('[label="<f0>Arel::Nodes::CurrentRow"]');
+    expect(dot.accept(node, new Collectors.PlainString()).value).toMatch(
+      '[label="<f0>Arel::Nodes::CurrentRow"]',
+    );
   });
 
   it("Arel Nodes Distinct", () => {
     const node = new Nodes.Distinct();
-    expect(dot.compile(node)).toMatch('[label="<f0>Arel::Nodes::Distinct"]');
+    expect(dot.accept(node, new Collectors.PlainString()).value).toMatch(
+      '[label="<f0>Arel::Nodes::Distinct"]',
+    );
   });
 
   it("Arel Nodes Case and friends", () => {
@@ -93,7 +99,7 @@ describe("TestDot", () => {
     node.conditions = [new Nodes.When(foo, buildQuoted(1))];
     node.default = new Nodes.Else(buildQuoted(0));
 
-    const out = dot.compile(node);
+    const out = dot.accept(node, new Collectors.PlainString()).value;
 
     expect(out).toMatch('[label="<f0>Arel::Nodes::Case"]');
     expect(out).toMatch(/->.*label="case"/);
@@ -107,7 +113,7 @@ describe("TestDot", () => {
   it("Arel Nodes InfixOperation", () => {
     const node = new Nodes.InfixOperation("&&", buildQuoted(1), buildQuoted(2));
 
-    const out = dot.compile(node);
+    const out = dot.accept(node, new Collectors.PlainString()).value;
 
     expect(out).toMatch('[label="<f0>Arel::Nodes::InfixOperation"]');
     expect(out).toMatch(/->.*label="operator"/);
@@ -119,7 +125,7 @@ describe("TestDot", () => {
     const table = new Table("users");
     const node = new Nodes.Regexp(table.get("name"), buildQuoted("foo%"));
 
-    const out = dot.compile(node);
+    const out = dot.accept(node, new Collectors.PlainString()).value;
 
     expect(out).toMatch('[label="<f0>Arel::Nodes::Regexp"]');
     expect(out).toMatch(/->.*label="left"/);
@@ -131,7 +137,7 @@ describe("TestDot", () => {
     const table = new Table("users");
     const node = new Nodes.NotRegexp(table.get("name"), buildQuoted("foo%"));
 
-    const out = dot.compile(node);
+    const out = dot.accept(node, new Collectors.PlainString()).value;
 
     expect(out).toMatch('[label="<f0>Arel::Nodes::NotRegexp"]');
     expect(out).toMatch(/->.*label="left"/);
@@ -142,7 +148,7 @@ describe("TestDot", () => {
   it("Arel Nodes UnaryOperation", () => {
     const node = new Nodes.UnaryOperation("-", 1 as never);
 
-    const out = dot.compile(node);
+    const out = dot.accept(node, new Collectors.PlainString()).value;
 
     expect(out).toMatch('[label="<f0>Arel::Nodes::UnaryOperation"]');
     expect(out).toMatch(/->.*label="operator"/);
@@ -152,7 +158,7 @@ describe("TestDot", () => {
   it("Arel Nodes With", () => {
     const node = new Nodes.With(["query1", "query2", "query3"] as never);
 
-    const out = dot.compile(node);
+    const out = dot.accept(node, new Collectors.PlainString()).value;
 
     expect(out).toMatch('[label="<f0>Arel::Nodes::With"]');
     expect(out).toMatch(/->.*label="0"/);
@@ -163,7 +169,7 @@ describe("TestDot", () => {
   it("Arel Nodes SelectCore", () => {
     const node = new Nodes.SelectCore();
 
-    const out = dot.compile(node);
+    const out = dot.accept(node, new Collectors.PlainString()).value;
 
     expect(out).toMatch('[label="<f0>Arel::Nodes::SelectCore"]');
     expect(out).toMatch(/->.*label="source"/);
@@ -180,7 +186,7 @@ describe("TestDot", () => {
   it("Arel Nodes SelectStatement", () => {
     const node = new Nodes.SelectStatement();
 
-    const out = dot.compile(node);
+    const out = dot.accept(node, new Collectors.PlainString()).value;
 
     expect(out).toMatch('[label="<f0>Arel::Nodes::SelectStatement"]');
     expect(out).toMatch(/->.*label="cores"/);
@@ -194,7 +200,7 @@ describe("TestDot", () => {
   it("Arel Nodes InsertStatement", () => {
     const node = new Nodes.InsertStatement();
 
-    const out = dot.compile(node);
+    const out = dot.accept(node, new Collectors.PlainString()).value;
 
     expect(out).toMatch('[label="<f0>Arel::Nodes::InsertStatement"]');
     expect(out).toMatch(/->.*label="relation"/);
@@ -206,7 +212,7 @@ describe("TestDot", () => {
   it("Arel Nodes UpdateStatement", () => {
     const node = new Nodes.UpdateStatement();
 
-    const out = dot.compile(node);
+    const out = dot.accept(node, new Collectors.PlainString()).value;
 
     expect(out).toMatch('[label="<f0>Arel::Nodes::UpdateStatement"]');
     expect(out).toMatch(/->.*label="relation"/);
@@ -221,7 +227,7 @@ describe("TestDot", () => {
   it("Arel Nodes DeleteStatement", () => {
     const node = new Nodes.DeleteStatement();
 
-    const out = dot.compile(node);
+    const out = dot.accept(node, new Collectors.PlainString()).value;
 
     expect(out).toMatch('[label="<f0>Arel::Nodes::DeleteStatement"]');
     expect(out).toMatch(/->.*label="relation"/);

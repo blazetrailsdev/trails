@@ -29,6 +29,12 @@ export class Composite {
     this.right = right;
   }
 
+  append(str: string): this {
+    this.left.append(str);
+    this.right.append(str);
+    return this;
+  }
+
   addBind(bind: unknown, block: (index: number) => string): this {
     this.left.addBind(bind, block);
     this.right.addBind(bind, block);
@@ -47,12 +53,6 @@ export class Composite {
 
   get value(): [unknown, unknown] {
     return [this.left.value, this.right.value];
-  }
-
-  append(str: string): this {
-    this.left.append(str);
-    this.right.append(str);
-    return this;
   }
 
   private left: CollectorLike;

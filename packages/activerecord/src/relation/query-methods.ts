@@ -2304,14 +2304,14 @@ export function buildJoins(
 export function buildWith(this: QueryMethodsHost, arel: any): void {
   if (this.withValues.length === 0) return;
 
-  const withStatements = this.withValues.flatMap((withValue) =>
+  const withStatements = this.withValues.map((withValue) =>
     buildWithValueFromHash.call(this, withValue),
   );
 
   if (this._withIsRecursive) {
-    arel.withRecursive?.(...withStatements);
+    arel.with(":recursive", withStatements);
   } else {
-    arel.with?.(...withStatements);
+    arel.with(withStatements);
   }
 }
 

@@ -339,7 +339,7 @@ describe("the to_sql visitor", () => {
     it("handles table aliases", () => {
       const manager = new Table("foo").project(star()).from(new Nodes.SqlLiteral("expr1"));
       const expr1 = new Table("bar").project(star()).as("expr1");
-      manager.withRecursive(expr1);
+      manager.with(":recursive", expr1);
       const sql = new Visitors.ToSql(fakeRecordConnection).compile(manager.ast);
       expect(sql).toBe('WITH RECURSIVE expr1 AS (SELECT * FROM "bar") SELECT * FROM expr1');
     });

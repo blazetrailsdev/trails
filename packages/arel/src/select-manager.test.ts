@@ -333,7 +333,7 @@ describe("SelectManagerTest", () => {
       const asStatement = new Nodes.As(replies, union);
 
       const manager = new SelectManager();
-      manager.withRecursive(asStatement).from(replies).project(star());
+      manager.with(":recursive", asStatement).from(replies).project(star());
 
       expect(mustBeLike(visitor.compile(manager.ast))).toBe(
         mustBeLike(`

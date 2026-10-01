@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Attribute as ModelAttribute, ValueType } from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/date";
 import {
+  Collectors,
   Table,
   star,
   SelectManager,
@@ -15,7 +16,7 @@ import { Node as DotNode } from "./dot.js";
 
 function visitStandalone(value: unknown): string {
   const v = new Visitors.Dot();
-  v.compile(new Nodes.SqlLiteral(""));
+  v.accept(new Nodes.SqlLiteral(""), new Collectors.PlainString());
   (v as unknown as { visit(o: unknown): void }).visit(value);
   return (v as unknown as { toDot(): string }).toDot();
 }
@@ -26,40 +27,45 @@ describe("Dot (trails-only)", () => {
 
   it("labels a NamedFunction node", () => {
     const node = new Nodes.NamedFunction("COUNT", [users.get("id")]);
-    expect(dot.compile(node)).toMatch('[label="<f0>Arel::Nodes::NamedFunction"]');
+    expect(dot.accept(node, new Collectors.PlainString()).value).toMatch(
+      '[label="<f0>Arel::Nodes::NamedFunction"]',
+    );
   });
 
   it("walks a With node's Cte children", () => {
     const cte = new Nodes.Cte("t", users.project(users.get("id")).ast);
-    const out = dot.compile(new SelectManager().with(cte).project("1").ast);
+    const out = dot.accept(
+      new SelectManager().with(cte).project("1").ast,
+      new Collectors.PlainString(),
+    ).value;
     expect(out).toMatch('[label="<f0>Arel::Nodes::With"]');
     expect(out).toMatch('[label="<f0>Arel::Nodes::Cte"]');
   });
 
   it("walks a projected SelectCore", () => {
     const stmt = users.project(star()).ast;
-    const out = dot.compile(stmt.cores[0]);
+    const out = dot.accept(stmt.cores[0], new Collectors.PlainString()).value;
     expect(out).toMatch('[label="<f0>Arel::Nodes::SelectCore"]');
     expect(out).toMatch(/->.*label="projections"/);
   });
 
   it("walks a manager-built InsertStatement's values", () => {
     const stmt = new InsertManager(users).insert([[users.get("name"), "dean"]]).ast;
-    const out = dot.compile(stmt);
+    const out = dot.accept(stmt, new Collectors.PlainString()).value;
     expect(out).toMatch('[label="<f0>Arel::Nodes::InsertStatement"]');
     expect(out).toMatch('[label="<f0>Arel::Nodes::ValuesList"]');
   });
 
   it("walks a manager-built UpdateStatement's assignments", () => {
     const stmt = new UpdateManager().table(users).set([[users.get("name"), "sam"]]).ast;
-    const out = dot.compile(stmt);
+    const out = dot.accept(stmt, new Collectors.PlainString()).value;
     expect(out).toMatch('[label="<f0>Arel::Nodes::UpdateStatement"]');
     expect(out).toMatch('[label="<f0>Arel::Nodes::Assignment"]');
   });
 
   it("walks a manager-built DeleteStatement's relation", () => {
     const stmt = new DeleteManager().from(users).ast;
-    const out = dot.compile(stmt);
+    const out = dot.accept(stmt, new Collectors.PlainString()).value;
     expect(out).toMatch('[label="<f0>Arel::Nodes::DeleteStatement"]');
     expect(out).toMatch('[label="<f0>Arel::Table"]');
   });
@@ -70,7 +76,7 @@ describe("TestDot", () => {
   const dot = new Visitors.Dot();
   it("Arel Nodes And", () => {
     const node = new Nodes.And([users.get("id"), users.get("name")]);
-    const out = dot.compile(node);
+    const out = dot.accept(node, new Collectors.PlainString()).value;
     expect(out).toContain("And");
     expect(out).toContain('[label="0"]');
     expect(out).toContain('[label="1"]');
@@ -78,20 +84,20 @@ describe("TestDot", () => {
 
   it("Arel Nodes Or", () => {
     const node = new Nodes.Or([users.get("id"), users.get("name")]);
-    const out = dot.compile(node);
+    const out = dot.accept(node, new Collectors.PlainString()).value;
     expect(out).toContain("Or");
     expect(out).toContain('[label="0"]');
   });
 
   it("Arel Nodes SqlLiteral", () => {
     const node = new Nodes.SqlLiteral("RAW SQL");
-    const out = dot.compile(node);
+    const out = dot.accept(node, new Collectors.PlainString()).value;
     expect(out).toContain("RAW SQL");
   });
 
   describe("output structure (Rails parity)", () => {
     it("emits the Rails dot.rb header and shape", () => {
-      const out = dot.compile(new Nodes.Distinct());
+      const out = dot.accept(new Nodes.Distinct(), new Collectors.PlainString()).value;
       expect(out).toMatch(/^digraph "Arel" \{\n/);
       expect(out).toContain("node [width=0.375,height=0.25,shape=record];");
       expect(out).toMatch(/\n\}$/);
@@ -100,14 +106,14 @@ describe("TestDot", () => {
 
     it("emits one edge per visit_edge declaration with the field name as label", () => {
       const node = new Nodes.Equality(users.get("id"), new Nodes.SqlLiteral("1"));
-      const out = dot.compile(node);
+      const out = dot.accept(node, new Collectors.PlainString()).value;
       expect(out).toMatch(/-> \d+ \[label="left"\];/);
       expect(out).toMatch(/-> \d+ \[label="right"\];/);
     });
 
     it("emits an InfixOperation's three edges in Rails order: operator, left, right", () => {
       const node = new Nodes.InfixOperation("+", users.get("age"), new Nodes.Quoted(1));
-      const out = dot.compile(node);
+      const out = dot.accept(node, new Collectors.PlainString()).value;
       const operatorPos = out.indexOf('[label="operator"]');
       const leftPos = out.indexOf('[label="left"]');
       const rightPos = out.indexOf('[label="right"]');
@@ -117,14 +123,14 @@ describe("TestDot", () => {
     });
 
     it("collapses to a leaf for visit_NoEdges nodes (CurrentRow, Distinct)", () => {
-      const out = dot.compile(new Nodes.CurrentRow());
+      const out = dot.accept(new Nodes.CurrentRow(), new Collectors.PlainString()).value;
       const edges = (out.match(/->/g) ?? []).length;
       expect(edges).toBe(0);
     });
 
     it("escapes embedded double-quotes in side-field labels (quote helper)", () => {
       const node = new Nodes.SqlLiteral('say "hi"');
-      const out = dot.compile(node);
+      const out = dot.accept(node, new Collectors.PlainString()).value;
       expect(out).toContain('say \\"hi\\"');
     });
 
@@ -134,7 +140,7 @@ describe("TestDot", () => {
         visit(o: unknown): void;
         toDot(): string;
       };
-      v.compile(new Nodes.SqlLiteral("seed"));
+      v.accept(new Nodes.SqlLiteral("seed"), new Collectors.PlainString());
       (v as unknown as Internals).visit(null);
       const out = (v as unknown as Internals).toDot();
       expect(out).toMatch(/<f0>NilClass\|<f1>"/);
@@ -156,7 +162,7 @@ describe("TestDot", () => {
         visitSymbol(o: unknown): void;
       };
       const iv = v as unknown as WithBigDecimal;
-      v.compile(new Nodes.SqlLiteral("seed"));
+      v.accept(new Nodes.SqlLiteral("seed"), new Collectors.PlainString());
       const node = new DotNode("Integer", 0);
       (v as unknown as { nodes: DotNode[] }).nodes.push(node);
       iv.withNode(node, () => {
@@ -178,7 +184,7 @@ describe("TestDot", () => {
         toDot(): string;
       };
       const iv = v as unknown as Internals;
-      v.compile(new Nodes.SqlLiteral("seed"));
+      v.accept(new Nodes.SqlLiteral("seed"), new Collectors.PlainString());
       const node = new DotNode("Set", 0);
       (v as unknown as { nodes: DotNode[] }).nodes.push(node);
       iv.withNode(node, () => {
@@ -197,7 +203,7 @@ describe("TestDot", () => {
       }
       const v = new Visitors.Dot();
       type Internals = { visit(o: unknown): void };
-      v.compile(new Nodes.SqlLiteral("seed"));
+      v.accept(new Nodes.SqlLiteral("seed"), new Collectors.PlainString());
       expect(() => (v as unknown as Internals).visit(new Money())).toThrow(
         new TypeError("Cannot visit Money"),
       );
@@ -208,7 +214,7 @@ describe("TestDot", () => {
       const v = new Visitors.Dot();
       (v as unknown as { dispatch: Map<unknown, string> }).dispatch.set(Weird, "visitTypoed");
       type Internals = { visit(o: unknown): void };
-      v.compile(new Nodes.SqlLiteral("seed"));
+      v.accept(new Nodes.SqlLiteral("seed"), new Collectors.PlainString());
       expect(() => (v as unknown as Internals).visit(new Weird(null))).not.toThrow();
     });
 
@@ -216,7 +222,7 @@ describe("TestDot", () => {
       const v = new Visitors.Dot();
       type Internals = { visit(o: unknown): void; toDot(): string };
       const iv = v as unknown as Internals;
-      v.compile(new Nodes.SqlLiteral("seed"));
+      v.accept(new Nodes.SqlLiteral("seed"), new Collectors.PlainString());
       iv.visit(Temporal.PlainDate.from("2024-01-02"));
       iv.visit(Temporal.PlainDateTime.from("2024-01-02T03:04:05"));
       iv.visit(Temporal.Instant.from("2024-01-02T03:04:05Z"));
@@ -230,7 +236,7 @@ describe("TestDot", () => {
       const v = new Visitors.Dot();
       type Internals = { visit(o: unknown): void };
       const iv = v as unknown as Internals;
-      v.compile(new Nodes.SqlLiteral("seed"));
+      v.accept(new Nodes.SqlLiteral("seed"), new Collectors.PlainString());
       expect(() => iv.visit(Temporal.Duration.from({ hours: 1 }))).toThrow(TypeError);
       expect(() => iv.visit(Temporal.PlainYearMonth.from("2024-01"))).toThrow(TypeError);
       expect(() => iv.visit(Temporal.PlainMonthDay.from("01-02"))).toThrow(TypeError);
@@ -238,7 +244,7 @@ describe("TestDot", () => {
 
     it("visitEdge throws on a typo'd field (Rails NoMethodError parity)", () => {
       const v = new Visitors.Dot();
-      v.compile(new Nodes.SqlLiteral("seed"));
+      v.accept(new Nodes.SqlLiteral("seed"), new Collectors.PlainString());
       type Internals = { visitEdge(o: object, method: string): void };
       const tbl = new Table("users");
       expect(() => (v as unknown as Internals).visitEdge(tbl, "definitelyNotAField")).toThrow(
@@ -248,7 +254,7 @@ describe("TestDot", () => {
 
     it("visitEdge names the receiver's Ruby constant, as NoMethodError does", () => {
       const v = new Visitors.Dot();
-      v.compile(new Nodes.SqlLiteral("seed"));
+      v.accept(new Nodes.SqlLiteral("seed"), new Collectors.PlainString());
       type Internals = { visitEdge(o: object, method: string): void };
       const grouping = new Nodes.Grouping(new Nodes.SqlLiteral("1"));
       expect(() => (v as unknown as Internals).visitEdge(grouping, "definitelyNotAField")).toThrow(
@@ -262,7 +268,7 @@ describe("TestDot", () => {
         .set([[users.get("name"), "x"]])
         .group([users.get("dept")])
         .having(users.get("active").eq(true)).ast;
-      const out = dot.compile(stmt);
+      const out = dot.accept(stmt, new Collectors.PlainString()).value;
       expect(out).toContain("UpdateStatement");
       expect(out).not.toMatch(/-> \d+ \[label="groups"\];/);
       expect(out).not.toMatch(/-> \d+ \[label="havings"\];/);
@@ -275,7 +281,7 @@ describe("TestDot", () => {
         .from(users)
         .group([users.get("dept")])
         .having(users.get("active").eq(true)).ast;
-      const out = dot.compile(stmt);
+      const out = dot.accept(stmt, new Collectors.PlainString()).value;
       expect(out).toContain("DeleteStatement");
       expect(out).not.toMatch(/-> \d+ \[label="groups"\];/);
       expect(out).not.toMatch(/-> \d+ \[label="havings"\];/);
@@ -286,7 +292,7 @@ describe("TestDot", () => {
     it("repeated equal scalar primitives dedupe onto one DotNode (Rails singleton parity)", () => {
       const v = new Visitors.Dot();
       type Internals = { visit(o: unknown): void; toDot(): string };
-      v.compile(new Nodes.SqlLiteral("seed"));
+      v.accept(new Nodes.SqlLiteral("seed"), new Collectors.PlainString());
       (v as unknown as Internals).visit(true);
       (v as unknown as Internals).visit(true);
       (v as unknown as Internals).visit(42);
@@ -303,7 +309,7 @@ describe("TestDot", () => {
       const b = new Table("users");
       const v = new Visitors.Dot();
       type Internals = { visit(o: unknown): void; toDot(): string };
-      v.compile(new Nodes.SqlLiteral("seed"));
+      v.accept(new Nodes.SqlLiteral("seed"), new Collectors.PlainString());
       (v as unknown as Internals).visit(a);
       (v as unknown as Internals).visit(b);
       const out = (v as unknown as Internals).toDot();
@@ -315,7 +321,7 @@ describe("TestDot", () => {
 
     it("Extract walks expressions + alias, as Rails does", () => {
       const node = new Nodes.Extract(users.get("created_at"), "year");
-      expect(() => dot.compile(node)).toThrow(
+      expect(() => dot.accept(node, new Collectors.PlainString()).value).toThrow(
         /undefined method 'expressions' for Arel::Nodes::Extract/,
       );
     });
@@ -323,7 +329,7 @@ describe("TestDot", () => {
     it("Exists walks expressions + alias (no spurious distinct edge)", () => {
       const inner = new SelectManager(users).project(users.get("id")).ast;
       const node = new Nodes.Exists(inner);
-      const out = dot.compile(node);
+      const out = dot.accept(node, new Collectors.PlainString()).value;
       expect(out).toContain("Exists");
       expect(out).toMatch(/-> \d+ \[label="expressions"\];/);
       expect(out).toMatch(/-> \d+ \[label="alias"\];/);
@@ -332,7 +338,7 @@ describe("TestDot", () => {
 
     it("OptimizerHints renders its hints field (not Unary's null expr)", () => {
       const node = new Nodes.OptimizerHints(["IDX(t1)", "MAX_EXEC_TIME(1000)"]);
-      const out = dot.compile(node);
+      const out = dot.accept(node, new Collectors.PlainString()).value;
       expect(out).toContain("OptimizerHints");
       expect(out).toMatch(/-> \d+ \[label="expr"\];/);
       expect(out).toContain("IDX(t1)");
@@ -342,14 +348,17 @@ describe("TestDot", () => {
     it("non-Node bind values (ActiveModel::Attribute shape) don't crash", () => {
       const attribute = ModelAttribute.fromDatabase("x", 42, new ValueType());
       const bind = new Nodes.BindParam(attribute);
-      const out = dot.compile(bind);
+      const out = dot.accept(bind, new Collectors.PlainString()).value;
       expect(out).toContain("BindParam");
       expect(out).toMatch(/-> \d+ \[label="value_before_type_cast"\];/);
       expect(out).toContain("42");
     });
 
     it("a non-Attribute object with valueBeforeTypeCast is not visited as an Attribute", () => {
-      const out = dot.compile(new Nodes.BindParam({ valueBeforeTypeCast: 42 }));
+      const out = dot.accept(
+        new Nodes.BindParam({ valueBeforeTypeCast: 42 }),
+        new Collectors.PlainString(),
+      ).value;
       expect(out).not.toMatch(/-> \d+ \[label="value_before_type_cast"\];/);
       expect(out).toContain('[label="pair_0"]');
       expect(out).toContain("42");

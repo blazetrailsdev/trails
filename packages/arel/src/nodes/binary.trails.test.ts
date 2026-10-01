@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Table, Nodes, SelectManager, Visitors } from "../index.js";
+import { Collectors, Table, Nodes, SelectManager, Visitors } from "../index.js";
 
 describe("NodesTest", () => {
   const users = new Table("users");
@@ -64,7 +64,7 @@ describe("NodesTest", () => {
       const sm = new SelectManager(users);
       const union = sm.union(new SelectManager(users));
       const dot = new Visitors.Dot();
-      const out = dot.compile(union);
+      const out = dot.accept(union, new Collectors.PlainString()).value;
       expect(out).toMatch(/-> \d+ \[label="left"\]/);
       expect(out).toMatch(/-> \d+ \[label="right"\]/);
     });

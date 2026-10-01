@@ -57,8 +57,8 @@ export class StatementMethods {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export abstract class TreeManager {
-  abstract ast: Node;
+export abstract class TreeManager<T extends Node = Node> {
+  ast!: T;
 
   toDot(): string {
     const collector = new PlainString();
@@ -76,6 +76,5 @@ export abstract class TreeManager {
   }
 }
 
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
-   @typescript-eslint/no-unsafe-declaration-merging */
-export interface TreeManager extends FactoryMethodsModule {}
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, unused-imports/no-unused-vars */
+export interface TreeManager<T extends Node = Node> extends FactoryMethodsModule {}

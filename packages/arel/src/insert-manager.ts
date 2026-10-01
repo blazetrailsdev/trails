@@ -6,9 +6,7 @@ import { ValuesList } from "./nodes/values-list.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
 
-export class InsertManager extends TreeManager {
-  readonly ast: InsertStatement;
-
+export class InsertManager extends TreeManager<InsertStatement> {
   constructor(table?: Table | null) {
     super();
     this.ast = new InsertStatement(table ?? null);
