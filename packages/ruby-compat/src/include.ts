@@ -391,6 +391,7 @@ export class Module {
     links.members.add(link);
     links.refs.add(ref);
     singletonReaper.register(link, { mod: this, ref });
+    singletonLinks.add(link);
     Object.setPrototypeOf(obj, link);
   }
 
@@ -493,6 +494,25 @@ function isUndefEntry(carrier: Record<string, unknown>, name: string): boolean {
 }
 
 const includerCarriers = new WeakMap<Module, object[]>();
+
+const singletonLinks = new WeakSet<object>();
+
+/**
+ * Mirrors: Ruby's Class#superclass — vendor/ruby/v3.3.11/object.c:2191
+ * `rb_class_superclass`, which answers the next `T_CLASS` in the ancestry and
+ * so skips the iclass an `extend` put above the class. `Object.getPrototypeOf`
+ * answers that link, which {@link Module.extendObject} splices in as a
+ * subclass of the real parent.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+ */
+export function rbClassSuperclass<T extends object>(klass: T): T | null {
+  let superclass = Object.getPrototypeOf(klass) as object | null;
+  while (superclass && singletonLinks.has(superclass)) {
+    superclass = Object.getPrototypeOf(superclass) as object | null;
+  }
+  return superclass === Function.prototype ? null : (superclass as T | null);
+}
 
 const singletonCarriers = new WeakMap<
   Module,

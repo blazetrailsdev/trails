@@ -12,6 +12,7 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { rbClassSuperclass } from "@blazetrails/ruby-compat";
 import { DescendantsTracker, demodulize } from "@blazetrails/activesupport";
 import { applicationRecordClass, setApplicationRecordClass } from "./active-record.js";
 
@@ -68,7 +69,7 @@ function computeTypeCandidates(baseClass: typeof Base, typeName: string): string
 export function isDescendsFromActiveRecord(this: typeof Base): boolean {
   const modelClass = this;
   if (Object.prototype.hasOwnProperty.call(modelClass, "_isActiveRecordBase")) return false;
-  const superclass = Object.getPrototypeOf(modelClass) as typeof Base | null;
+  const superclass = rbClassSuperclass(modelClass);
   if (!superclass || superclass === Function.prototype || typeof superclass.name !== "string")
     return true;
   if (superclass.abstractClass) return isDescendsFromActiveRecord.call(superclass);
@@ -94,7 +95,7 @@ export function setBaseClass(modelClass: typeof Base): void {
       );
     }
 
-    const superclass = Object.getPrototypeOf(modelClass) as typeof Base;
+    const superclass = rbClassSuperclass(modelClass)!;
     if (superclass === ActiveRecord.Base || superclass.abstractClass) {
       klass._computedBaseClass = modelClass;
     } else {

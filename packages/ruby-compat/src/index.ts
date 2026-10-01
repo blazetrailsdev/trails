@@ -143,6 +143,7 @@ export { fsAdapterConfig, getFs, getPath, registerFsAdapter } from "./fs-adapter
 export type { Bytes, FsAdapter, FsDirent, FsStatResult, PathAdapter } from "./fs-adapter.js";
 export {
   Module,
+  rbClassSuperclass,
   rbModConstSet,
   defineModule,
   extend,

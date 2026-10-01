@@ -6,16 +6,15 @@ import { fixtures } from "./test-fixtures.js";
 
 type SchemaLoadCounted = typeof Base & { loadSchemaCalls?: number };
 
-const SchemaLoadCounter = Object.assign(new Module(), {
-  ClassMethods: {
-    loadSchemaBang(this: SchemaLoadCounted): void {
-      this.loadSchemaCalls ??= 0;
-      this.loadSchemaCalls += 1;
-      return (Object.getPrototypeOf(this) as typeof Base).loadSchemaBang.call(this);
-    },
-  },
-});
+const SchemaLoadCounter = new Module() as Module & { ClassMethods: Module };
 extend(SchemaLoadCounter, Concern);
+SchemaLoadCounter.ClassMethods = new Module((mod) => {
+  mod.defineMethod("loadSchemaBang", function (this: SchemaLoadCounted) {
+    this.loadSchemaCalls ??= 0;
+    this.loadSchemaCalls += 1;
+    return mod.superMethod(this, "loadSchemaBang")!();
+  });
+});
 
 describe("SchemaLoadingTest", () => {
   fixtures([]);
