@@ -412,6 +412,7 @@ export interface AbstractAdapter {
   dataSourceSql(options: { type?: string }): string;
   columns(tableName: string): Promise<Column[]>;
   primaryKey(tableName: string): Promise<string | string[] | null>;
+  tableComment(tableName: string): Promise<string | null>;
   indexes(tableName: string): Promise<IndexDefinition[]>;
   foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]>;
   foreignKeyExists(

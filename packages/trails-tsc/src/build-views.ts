@@ -74,11 +74,12 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
   const shimPaths = views.map((v) => v.outBase + ".ts");
   if (shimPaths.length > 0) {
     const host = cachingHost();
-    const roots = [...shimPaths, ...controllers.map((c) => c.file)];
+    const helperFiles = helpers.map((file) => path.join(appDir, "helpers", file));
+    const roots = [...shimPaths, ...controllers.map((c) => c.file), ...helperFiles];
     let program = ts.createProgram(roots, EMIT_OPTIONS, host);
     for (
       let pass = 0;
-      pass <= views.length && bindCheckedTypes(views, controllers, program);
+      pass <= views.length && bindCheckedTypes(views, controllers, helperFiles, program);
       pass++
     ) {
       for (const view of views) await writeShim(view, viewsDir);
@@ -234,6 +235,7 @@ function cachingHost(): ts.CompilerHost {
 function bindCheckedTypes(
   views: ViewShim[],
   controllers: readonly Controller[],
+  helperFiles: readonly string[],
   program: ts.Program,
 ): boolean {
   const checker = program.getTypeChecker();
@@ -243,6 +245,7 @@ function bindCheckedTypes(
       undefined,
       ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.UseFullyQualifiedType,
     );
+  const baseText = (type: ts.Type): string => typeText(checker.getBaseTypeOfLiteralType(type));
   const before = views.map(scopeSignature);
   const partials = new Map<string, ViewShim>();
   const renders = new Map<ViewShim, { calls: number; keys: Map<string, number> }>();
@@ -272,41 +275,67 @@ function bindCheckedTypes(
     }
     return [nonNull];
   };
-  const sources = [
+  const sources: { file: string; prefix?: string; inController: boolean }[] = [
     ...views.map((v) => ({
       file: v.outBase + ".ts",
       prefix: path.posix.dirname(v.rel),
       inController: false,
     })),
     ...controllers.map((c) => ({ file: c.file, prefix: c.path, inController: true })),
+    ...helperFiles.map((file) => ({ file, inController: false })),
   ];
   for (const { file, prefix, inController } of sources) {
     const sf = program.getSourceFile(file);
     if (sf === undefined) continue;
+    const named = (key: string | null, name: string): boolean =>
+      name.includes("/") || prefix === undefined
+        ? key === name || (prefix === undefined && key?.endsWith(`/${name}`) === true)
+        : key === `${prefix}/${name}`;
     const visit = (node: ts.Node): void => {
       const site = ts.isCallExpression(node) ? renderSite(node, inController) : undefined;
+      const targets: ViewShim[] = [];
+      const bound = new Map<string, string>();
+      let untyped = false;
       if (site === "unknown") unknownTarget = true;
       else if (site !== undefined && "template" in site) {
-        const key = site.template?.includes("/") ? site.template : `${prefix}/${site.template}`;
-        if (site.template === undefined) unknownTemplate = true;
-        for (const view of views)
-          if (view.rel.replace(/\.[^/]*$/u, "") === key) unresolved.add(view);
+        const { template } = site;
+        if (template === undefined) unknownTemplate = true;
+        else targets.push(...views.filter((v) => named(v.rel.replace(/\.[^/]*$/u, ""), template)));
+        untyped = site.untyped === true;
       } else if (site !== undefined && "object" in site) {
         for (const type of objectTypes(checker.getTypeAtLocation(site.object))) {
           const reached = modelPartial(type);
           if (reached === undefined) unknownTarget = true;
-          else if (site.locals !== undefined) unresolved.add(reached);
+          else targets.push(reached);
         }
+      } else if (site !== undefined) {
+        targets.push(...[...partials].flatMap(([key, p]) => (named(key, site.name) ? [p] : [])));
+        const { options } = site;
+        const as = options && option(options, "as");
+        const variable = as ? (ts.isStringLiteral(as) ? as.text : undefined) : localVariable(site);
+        const object = options && option(options, "object");
+        const collection = options && option(options, "collection");
+        const each =
+          collection &&
+          checker.getIndexTypeOfType(
+            checker.getNonNullableType(checker.getTypeAtLocation(collection)),
+            ts.IndexKind.Number,
+          );
+        if (options && (variable === undefined || (collection && each === undefined))) {
+          untyped = true;
+        } else if (collection) {
+          bound.set(variable!, baseText(each!));
+          bound.set(`${variable}_counter`, "number");
+          bound.set(`${variable}_iteration`, 'import("@blazetrails/actionview").PartialIteration');
+        } else if (object) bound.set(variable!, baseText(checker.getTypeAtLocation(object)));
       }
-      const passed = site !== undefined && site !== "unknown" && "name" in site ? site : undefined;
-      const target =
-        passed &&
-        partials.get(passed.name.includes("/") ? passed.name : `${prefix}/${passed.name}`);
-      if (passed && target) {
-        if (passed.implicitLocals) unresolved.add(target);
+      const locals = site === undefined || site === "unknown" ? undefined : site.locals;
+      for (const target of targets) {
+        if (target.strictLocals) continue;
+        if (untyped) unresolved.add(target);
         const seen = renders.get(target) ?? { calls: 0, keys: new Map<string, number>() };
         renders.set(target, seen);
-        const hash = passed.locals && checker.getTypeAtLocation(passed.locals);
+        const hash = locals && checker.getTypeAtLocation(locals);
         if (hash && hash.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown)) unresolved.add(target);
         for (const each of hash === undefined
           ? [undefined]
@@ -314,13 +343,19 @@ function bindCheckedTypes(
             ? hash.types
             : [hash]) {
           seen.calls++;
+          const passed = new Map(
+            [...bound].map(([name, type]) => [name, { type, optional: false }]),
+          );
           for (const prop of each ? checker.getPropertiesOfType(each) : []) {
-            const type = checker.getTypeOfSymbolAtLocation(prop, passed.locals!);
-            const types = target.locals.get(prop.name) ?? new Set<string>();
-            types.add(typeText(checker.getBaseTypeOfLiteralType(type)));
-            target.locals.set(prop.name, types);
-            if (prop.flags & ts.SymbolFlags.Optional) continue;
-            seen.keys.set(prop.name, (seen.keys.get(prop.name) ?? 0) + 1);
+            const type = checker.getTypeOfSymbolAtLocation(prop, locals!);
+            passed.set(prop.name, {
+              type: typeText(checker.getBaseTypeOfLiteralType(type)),
+              optional: (prop.flags & ts.SymbolFlags.Optional) !== 0,
+            });
+          }
+          for (const [name, { type, optional }] of passed) {
+            target.locals.set(name, (target.locals.get(name) ?? new Set<string>()).add(type));
+            if (!optional) seen.keys.set(name, (seen.keys.get(name) ?? 0) + 1);
           }
         }
       }
@@ -606,15 +641,15 @@ function sourceDeclaration(
   return declaration && !declaration.getSourceFile().isDeclarationFile ? declaration : undefined;
 }
 
+type RenderSite =
+  | { name: string; locals?: ts.Expression; options?: ts.ObjectLiteralExpression }
+  | { object: ts.Expression; locals?: ts.Expression }
+  | { template: string | undefined; locals?: ts.Expression; untyped?: boolean };
+
 function renderSite(
   call: ts.CallExpression,
   inController: boolean,
-):
-  | { name: string; locals?: ts.Expression; implicitLocals: boolean }
-  | { object: ts.Expression; locals?: ts.Expression }
-  | { template: string | undefined }
-  | "unknown"
-  | undefined {
+): RenderSite | "unknown" | undefined {
   const callee = call.expression;
   const isRender = ts.isIdentifier(callee)
     ? callee.text === "render"
@@ -625,8 +660,16 @@ function renderSite(
   const [first, second] = call.arguments;
   if (!first) return undefined;
   if (ts.isStringLiteral(first)) {
-    if (!inController) return { name: first.text, locals: second, implicitLocals: false };
-    return second === undefined || !passesLocals(second) ? undefined : { template: first.text };
+    if (!inController) return { name: first.text, locals: second };
+    if (second === undefined || !passesLocals(second)) return undefined;
+    const typeable =
+      ts.isObjectLiteralExpression(second) &&
+      !second.properties.map(propertyName).includes(undefined);
+    return {
+      template: first.text,
+      locals: typeable ? option(second, "locals") : undefined,
+      untyped: !typeable,
+    };
   }
   if (!ts.isObjectLiteralExpression(first)) return { object: first, locals: second };
   const keys = first.properties.map(propertyName);
@@ -636,14 +679,26 @@ function renderSite(
   if (!keys.includes(partialKey)) {
     if (!keys.includes("locals")) return undefined;
     const named = option(first, "template") ?? option(first, "action");
-    return { template: named && ts.isStringLiteral(named) ? named.text : undefined };
+    return {
+      template: named && ts.isStringLiteral(named) ? named.text : undefined,
+      locals: option(first, "locals"),
+    };
   }
   const partial = option(first, partialKey);
   if (partial && ts.isStringLiteral(partial)) {
     const implicitLocals = keys.some((k) => k === "collection" || k === "object" || k === "as");
-    return { name: partial.text, locals: option(first, "locals"), implicitLocals };
+    return {
+      name: partial.text,
+      locals: option(first, "locals"),
+      options: implicitLocals ? first : undefined,
+    };
   }
   return "unknown";
+}
+
+function localVariable({ name }: { name: string }): string | undefined {
+  const base = name.endsWith("/") ? "" : path.posix.basename(name);
+  return /^_?(.*?)(?:\.\w+)*$/u.exec(base)?.[1] || undefined;
 }
 
 function propertyName(p: ts.ObjectLiteralElementLike): string | undefined {

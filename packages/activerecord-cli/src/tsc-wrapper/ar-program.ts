@@ -199,16 +199,18 @@ function remapTseDiagnostic(d: Diagnostic, unmoved: Diagnostic, tse: TseSourceMa
   if (startPosition === undefined) return unmoved;
   const { line, character } = startPosition;
   const lineStarts = computeLineStarts(tse.sourceContent);
-  const text = tse.sourceContent.slice(lineStarts[line], lineStarts[line + 1]);
   const pos = lineStarts[line] + character;
   const mappedEnd = d.endPosition && tsePosition(tse, d.endPosition);
   const endPosition =
     mappedEnd && lineStarts[mappedEnd.line] + mappedEnd.character >= pos
       ? mappedEnd
       : startPosition;
-  const open = text.lastIndexOf("<%", character);
-  const close = text.indexOf("%>", character);
-  const tag = open === -1 || close === -1 ? undefined : text.slice(open, close + 2);
+  const open = tse.sourceContent.lastIndexOf("<%", pos);
+  const close = tse.sourceContent.indexOf("%>", pos);
+  const enclosed =
+    open !== -1 && close !== -1 && tse.sourceContent.slice(open, pos).indexOf("%>") === -1;
+  const [first, ...rest] = enclosed ? tse.sourceContent.slice(open, close + 2).split("\n") : [];
+  const tag = rest.length > 0 ? `${first.trimEnd()} … %>` : first;
   return {
     ...unmoved,
     messageChain: tag

@@ -315,7 +315,7 @@ describe("buildViews", () => {
     write(
       cwd,
       "app/views/posts/edit.html.tse",
-      '<%= render({ partial: "row", collection: [1] }) %>',
+      '<% const name: string = "row"; %><%= render({ partial: "row", collection: [1], as: name }) %>',
     );
     await buildViews({ cwd });
     expect(shim("_form")).toContain("      : never;");
@@ -356,9 +356,9 @@ describe("buildViews", () => {
       [
         "export class PostsController {",
         "  render(..._args: unknown[]): void {}",
-        '  show(): void { this.render("show", { locals: { foo: 1 } }); }',
+        '  show(options: object): void { this.render("show", options); }',
         '  edit(): void { this.render("edit", { status: "unprocessable_entity" }); }',
-        '  rows(): void { this.render({ partial: "row", collection: [1] }); }',
+        '  rows(as: string): void { this.render({ partial: "row", collection: [1], as }); }',
         "}",
       ].join("\n"),
     );
@@ -612,6 +612,108 @@ describe("runCli", () => {
       "utf8",
     );
     expect(strict).toContain("type ObjectLocals = {};");
+  }, 30_000);
+
+  it("types a template's locals from view and controller renders that pass a hash", async () => {
+    const cwd = mkScratch();
+    write(
+      cwd,
+      "app/controllers/posts-controller.ts",
+      [
+        "export class PostsController {",
+        "  render(..._args: unknown[]): void {}",
+        '  show(): void { this.render("show", { locals: { foo: 1 } }); }',
+        '  edit(): void { this.render({ action: "show", locals: { foo: "x", bar: true } }); }',
+        "}",
+      ].join("\n"),
+    );
+    write(cwd, "app/views/posts/show.html.tse", "<%= foo %><%= bar %><%= baz %>");
+    write(
+      cwd,
+      "app/views/posts/index.html.tse",
+      '<%= render({ template: "posts/show", locals: { foo: 2 } }) %>',
+    );
+    await buildViews({ cwd });
+    const show = fs.readFileSync(path.join(cwd, ".trails/views/posts/show.html.tse.ts"), "utf8");
+    expect(show).toContain(
+      "type ObjectLocals = { foo: number | string; bar: boolean | undefined };",
+    );
+    expect(show).toContain("      : never;");
+  }, 30_000);
+
+  it("declares the object, counter and iteration locals of collection:, object: and as: renders", async () => {
+    const cwd = mkScratch();
+    write(
+      cwd,
+      "app/views/posts/index.html.tse",
+      [
+        '<%= render({ partial: "row", collection: ["a"], locals: { wide: true } }) %>',
+        '<%= render({ partial: "cell", object: 1, as: "value" }) %>',
+      ].join(""),
+    );
+    write(cwd, "app/views/posts/_row.html.tse", "<%= row %><%= row_counter %><%= psot %>");
+    write(cwd, "app/views/posts/_cell.html.tse", "<%= value %>");
+    await buildViews({ cwd });
+    const shim = (rel: string): string =>
+      fs.readFileSync(path.join(cwd, ".trails/views/posts", `${rel}.html.tse.ts`), "utf8");
+    expect(shim("_row")).toContain(
+      'type ObjectLocals = { row: string; row_counter: number; row_iteration: import("@blazetrails/actionview").PartialIteration; wide: boolean };',
+    );
+    expect(shim("_row")).toContain("      : never;");
+    expect(shim("_cell")).toContain("type ObjectLocals = { value: number };");
+  }, 30_000);
+
+  it("types the locals an object render and a helper module pass", async () => {
+    const cwd = mkScratch();
+    write(
+      cwd,
+      "node_modules/@blazetrails/actionview/package.json",
+      '{ "name": "@blazetrails/actionview", "types": "index.d.ts" }',
+    );
+    write(
+      cwd,
+      "node_modules/@blazetrails/actionview/index.d.ts",
+      "export declare class Base { render(...args: unknown[]): string; }",
+    );
+    write(cwd, "app/models/post.ts", 'export class Post { title = ""; }');
+    write(
+      cwd,
+      "app/controllers/posts-controller.ts",
+      [
+        'import type { Post } from "../models/post.js";',
+        "export class PostsController { declare post: Post; }",
+      ].join("\n"),
+    );
+    write(
+      cwd,
+      "app/helpers/posts-helper.ts",
+      [
+        "export const PostsHelper = {",
+        "  badge(this: { render(...args: unknown[]): string }): string {",
+        '    return this.render("badge", { label: "new" });',
+        "  },",
+        "};",
+      ].join("\n"),
+    );
+    write(
+      cwd,
+      "app/views/posts/show.html.tse",
+      "<%= render(this.post, { compact: true }) %><%= render(this.post) %>",
+    );
+    write(cwd, "app/views/posts/_post.html.tse", "<%= post.title %><%= compact %>");
+    write(cwd, "app/views/posts/_badge.html.tse", "<%= label %>");
+    write(cwd, "app/views/comments/_badge.html.tse", "<%= label %>");
+    await buildViews({ cwd });
+    const shim = (rel: string): string =>
+      fs.readFileSync(path.join(cwd, ".trails/views/posts", `${rel}.html.tse.ts`), "utf8");
+    expect(shim("_post")).toContain("compact: boolean | undefined }");
+    expect(shim("_post")).toContain("      : never;");
+    expect(shim("_badge")).toContain("type ObjectLocals = { label: string };");
+    const comments = fs.readFileSync(
+      path.join(cwd, ".trails/views/comments/_badge.html.tse.ts"),
+      "utf8",
+    );
+    expect(comments).toContain("type ObjectLocals = { label: string };");
   }, 30_000);
 
   it("types a local a partial forwards to another partial", async () => {

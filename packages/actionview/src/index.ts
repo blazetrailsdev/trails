@@ -65,6 +65,7 @@ export * from "./layouts.js";
 
 export { Renderer, RenderedTemplate } from "./renderer.js";
 export type { ViewContext, RenderOptions as RendererOptions } from "./renderer.js";
+export { PartialIteration } from "./renderer/collection-renderer.js";
 
 export { OutputBuffer, RawOutputBuffer, StreamingBuffer, RawStreamingBuffer } from "./buffers.js";
 

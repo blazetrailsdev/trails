@@ -78,7 +78,7 @@ describe("lspPluginInit", () => {
     ]);
   });
 
-  it("virtualizes a view with the scope pnpm build gave its shim", () => {
+  it("virtualizes a view with the scope pnpm build gave its shim", async () => {
     const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-lsp-scope-"));
     const write = (rel: string, body: string): void => {
       fs.mkdirSync(path.dirname(path.join(cwd, rel)), { recursive: true });
@@ -127,7 +127,7 @@ describe("lspPluginInit", () => {
     const service = ts.createLanguageService(host);
     expect(service.getSemanticDiagnostics(view).map((d) => d.code)).toEqual([2304, 2304]);
 
-    buildViews({ cwd });
+    await buildViews({ cwd });
     const shim = path.join(cwd, ".trails/views/posts/_post.html.tse.ts");
     const built = ts.createProgram([shim], options);
     const expected = built.getSemanticDiagnostics(built.getSourceFile(shim)).map(position);

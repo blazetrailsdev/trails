@@ -30263,13 +30263,6 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "table_comment",
-    "digest": "71b865a56b13812a",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
     "rubyName": "table_options",
     "digest": "71b865a56b13812a",
     "ref": "v8.0.2"

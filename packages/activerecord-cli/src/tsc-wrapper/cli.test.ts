@@ -241,6 +241,12 @@ describe("trails-tsc .tse diagnostic span end", () => {
     expect(remapped.sourceLines?.map((l) => l.line)).toEqual([1, 2]);
   });
 
+  it("names the enclosing tag for a diagnostic on a later line of a multi-line tag", async () => {
+    const source = "<p>\n  <% const total = sum(\n       1, 2); %>\n</p>\n<%= total %>\n";
+    const [, remapped] = await remapSpan(source, "2)", "2)");
+    expect(remapped.messageChain?.at(-1)?.text).toBe("in <% const total = sum( … %>");
+  });
+
   it("clamps a span around a yield's re-emitted call to the argument the template wrote", async () => {
     const [span] = await remapSpan("<main><%= yield(123) %></main>\n", "context.yield(", "123)");
     expect(span).toBe("123");
