@@ -216,10 +216,15 @@ describe("TestFixtures#before_setup / #after_teardown", () => {
   });
 
   it("an includer's own before_setup outranks the module's and reaches it through super", async () => {
-    const k = class {
+    class Parent {
+      async beforeSetup(): Promise<void> {
+        calls.push("super before_setup");
+      }
+    }
+    const k = class extends Parent {
       async beforeSetup(): Promise<void> {
         calls.push("own before_setup");
-        await (Object.getPrototypeOf(k.prototype) as Lifecycle).beforeSetup.call(this);
+        await super.beforeSetup();
       }
       async setupFixtures() {
         calls.push("setup_fixtures");
@@ -227,6 +232,51 @@ describe("TestFixtures#before_setup / #after_teardown", () => {
     };
     include(k, TestFixtures);
     await new k().beforeSetup();
-    expect(calls).toEqual(["own before_setup", "setup_fixtures"]);
+    expect(calls).toEqual(["own before_setup", "setup_fixtures", "super before_setup"]);
+  });
+
+  it("a subclass's before_setup reaches the module through the includer", async () => {
+    const includer = build(
+      class {
+        beforeSetup() {
+          calls.push("super before_setup");
+        }
+      },
+    );
+    const sub = class extends includer {
+      async beforeSetup(): Promise<void> {
+        calls.push("sub before_setup");
+        await super.beforeSetup();
+      }
+    };
+    await new sub().beforeSetup();
+    expect(calls).toEqual(["sub before_setup", "setup_fixtures", "super before_setup"]);
+  });
+
+  it("keeps an instance an instance of the includer's superclass", () => {
+    class Parent {}
+    const k = class extends Parent {};
+    include(k, TestFixtures);
+    expect(new k()).toBeInstanceOf(Parent);
+    expect(k.prototype).toBeInstanceOf(Parent);
+  });
+
+  it("including the module again into a subclass splices nothing and keeps the chain", async () => {
+    const includer = build(
+      class {
+        beforeSetup() {
+          calls.push("super before_setup");
+        }
+      },
+    );
+    const sub = class extends includer {};
+    include(sub, TestFixtures);
+    expect(Object.getPrototypeOf(sub.prototype)).toBe(includer.prototype);
+    (sub as unknown as Host).fixtures("topics");
+    const instance = new sub() as unknown as Lifecycle & { topics: unknown; developers: unknown };
+    await instance.beforeSetup();
+    expect(calls).toEqual(["setup_fixtures", "super before_setup"]);
+    expect(instance.topics).toBeTypeOf("function");
+    expect(instance.developers).toBeUndefined();
   });
 });
