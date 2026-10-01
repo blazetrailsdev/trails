@@ -18,6 +18,7 @@ import {
 } from "./metal/live.js";
 import { Base } from "./base.js";
 import type { UploadedFile as HttpUploadedFile } from "../action-dispatch/http/upload.js";
+import "../test-helpers/abstract-unit.js";
 
 describe("TestRequest#assignParameters Content-Type case", () => {
   it("raises on a Content-Type no Mime::Type is registered for", () => {
@@ -114,6 +115,7 @@ describe("TestCase#document_root_element", () => {
 
   it("parses the response as XML and resets it on the next request", async () => {
     const tc = new TestCase(XmlController);
+    await tc.beforeSetup();
     await tc.get("index");
     const first = tc.htmlDocument;
     expect(tc["documentRootElement"].name).toBe("root");

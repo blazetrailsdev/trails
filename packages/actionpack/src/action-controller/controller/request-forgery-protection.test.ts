@@ -7,6 +7,7 @@ import {
   InvalidAuthenticityToken,
   InvalidCrossOriginRequest,
 } from "../metal/request-forgery-protection.js";
+import "../../test-helpers/abstract-unit.js";
 
 interface ActionsHost {
   sameOriginJs(): Promise<void>;
@@ -106,8 +107,9 @@ describe("ActionController::RequestForgeryProtection", () => {
   let tc: TestCase;
   let oldRequestForgeryProtectionToken: string | null;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tc = new TestCase(RequestForgeryProtectionControllerUsingResetSession);
+    await tc.beforeSetup();
     oldRequestForgeryProtectionToken = Base.requestForgeryProtectionToken;
     Base.requestForgeryProtectionToken = "custom_authenticity_token";
   });
@@ -345,6 +347,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
   it("raised exception message explains why it occurred", async () => {
     const tc = new TestCase(RequestForgeryProtectionControllerUsingException);
+    await tc.beforeSetup();
     const oldRequestForgeryProtectionToken = Base.requestForgeryProtectionToken;
     const oldSetting = Base.forgeryProtectionOriginCheck;
     Base.requestForgeryProtectionToken = "custom_authenticity_token";
@@ -386,8 +389,9 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
     let tc: TestCase;
     let oldRequestForgeryProtectionToken: string | null;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       tc = new TestCase(RequestForgeryProtectionControllerUsingException);
+      await tc.beforeSetup();
       oldRequestForgeryProtectionToken = Base.requestForgeryProtectionToken;
       Base.requestForgeryProtectionToken = "custom_authenticity_token";
     });
@@ -503,6 +507,7 @@ describe("RequestForgeryProtectionControllerUsingNullSessionTest", () => {
 
   it("should allow reset_session", async () => {
     const tc = new TestCase(RequestForgeryProtectionControllerUsingNullSession);
+    await tc.beforeSetup();
     await tc.post("tryToResetSession");
     tc.assertResponse("ok");
   });
@@ -514,8 +519,9 @@ describe("CustomAuthenticityParamControllerTest", () => {
   let logger: MockLogger;
   let oldRequestForgeryProtectionToken: string | null;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tc = new TestCase(CustomAuthenticityParamController);
+    await tc.beforeSetup();
     oldLogger = Base.logger;
     logger = new MockLogger();
     oldRequestForgeryProtectionToken = Base.requestForgeryProtectionToken;
@@ -608,6 +614,7 @@ describe("PrependProtectForgeryBaseControllerTest", () => {
 describe("FreeCookieControllerTest", () => {
   it("should allow all methods without token", async () => {
     const tc = new TestCase(FreeCookieController);
+    await tc.beforeSetup();
     for (const method of ["post", "patch", "put", "delete"] as const) {
       await tc[method]("index");
     }

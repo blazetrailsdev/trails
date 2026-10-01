@@ -34,11 +34,11 @@ export function combineEtags(
 
 export function flashEtagger(request: {
   flash?: {
-    empty?: boolean;
+    isEmpty(): boolean;
     toHash?(): unknown;
   };
 }): unknown | undefined {
   const flash = request.flash;
-  if (!flash || flash.empty) return undefined;
+  if (!flash || flash.isEmpty()) return undefined;
   return flash.toHash ? flash.toHash() : flash;
 }

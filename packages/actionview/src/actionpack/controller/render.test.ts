@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "vitest";
-import { ActionController } from "@blazetrails/actionpack";
+import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { FixtureResolver } from "../../testing/resolvers.js";
 
 class TestController extends ActionController.Base {
@@ -40,11 +40,17 @@ TestController.viewPaths(
   }),
 );
 
+const SharedTestRoutes = new RouteSet();
+SharedTestRoutes.draw(function () {
+  this.get(":controller(/:action)");
+});
+
 describe("RenderTest", () => {
   let testCase: InstanceType<typeof ActionController.TestCase>;
 
   beforeEach(() => {
     testCase = new ActionController.TestCase(TestController);
+    testCase.routes = SharedTestRoutes;
   });
 
   test("rendered format without format", async () => {

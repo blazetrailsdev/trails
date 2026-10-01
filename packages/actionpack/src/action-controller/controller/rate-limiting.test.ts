@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, it, vi } from "vitest";
 import { Duration, MemoryStore } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
+import "../../test-helpers/abstract-unit.js";
 
 type CacheStoreHost = { cacheStore: MemoryStore };
 
@@ -39,10 +40,11 @@ describe("RateLimitingTest", () => {
   let tc: TestCase;
   const assertResponse = (type: number | string): void => tc.assertResponse(type);
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers();
     (RateLimitedController as unknown as CacheStoreHost).cacheStore.clear();
     tc = new TestCase(RateLimitedController);
+    await tc.beforeSetup();
   });
 
   afterEach(() => {

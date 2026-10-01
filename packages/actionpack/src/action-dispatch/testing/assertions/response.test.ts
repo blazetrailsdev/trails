@@ -6,6 +6,7 @@ function host(status: number, headers: Record<string, string> = {}): AssertionRe
     response: {
       status,
       body: "",
+      location: headers["location"],
       getHeader: (k) => headers[k.toLowerCase()],
     },
     request: { protocol: "http://", hostWithPort: () => "www.example.com" },

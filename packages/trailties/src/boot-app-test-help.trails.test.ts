@@ -111,6 +111,7 @@ describe("test_help wires a booted app into the test case classes", () => {
     const { PostsController } =
       await import("./__fixtures__/boot-app/app/controllers/posts-controller.js");
     const controllerTest = new ActionController.TestCase(PostsController);
+    await controllerTest.beforeSetup();
     await controllerTest.get("show");
     expect(controllerTest.response.status).toBe(200);
     expect(controllerTest.responseBody).toContain("<p>Hello from TSE</p>");

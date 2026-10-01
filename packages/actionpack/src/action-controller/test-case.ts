@@ -1,13 +1,14 @@
 import {
   ActiveSupportJSON,
-  Assertion,
   camelize,
   classAttribute,
   include,
+  isAnonymous,
   isBlank,
   isPlainObject,
   runLoadHooks,
   SetupAndTeardown,
+  toQuery,
   toXml,
   type FilterListEntry,
   type Included,
@@ -21,7 +22,6 @@ import {
   SessionId,
   type PersistedRequest,
 } from "@blazetrails/rack-session";
-import { buildNestedQuery, statusCode } from "@blazetrails/rack";
 import {
   MULTIPART_BOUNDARY,
   UploadedFile as RackTestUploadedFile,
@@ -38,11 +38,11 @@ import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import { CookieJar, type CookieResponse } from "../action-dispatch/middleware/cookies.js";
 import { cookies, type TestProcessHost } from "../action-dispatch/testing/test-process.js";
 import type { RouteSet } from "../action-dispatch/routing/route-set.js";
+import * as responseAssertions from "../action-dispatch/testing/assertions/response.js";
 import * as routingAssertions from "../action-dispatch/testing/assertions/routing.js";
 import { Metal } from "./metal.js";
 import { Functional } from "./metal/testing.js";
 import { Buffer as LiveBuffer, Live, type LiveControllerHost } from "./metal/live.js";
-import { _computeRedirectToLocation } from "./metal/redirecting.js";
 
 include(Metal, Functional);
 
@@ -72,9 +72,9 @@ LiveBuffer.queueSize = null;
 type ControllerClass = new () => Metal;
 
 export interface RequestOptions {
-  params?: Record<string, unknown>;
+  params?: Record<string, unknown> | null;
   headers?: Record<string, string>;
-  session?: Record<string, unknown>;
+  session?: Record<string, unknown> | null;
   flash?: Record<string, string>;
   body?: string;
   format?: string;
@@ -83,13 +83,6 @@ export interface RequestOptions {
   env?: Record<string, unknown>;
   method?: string;
 }
-
-const STATUS_RANGES: Record<string, [number, number]> = {
-  success: [200, 299],
-  redirect: [300, 399],
-  missing: [400, 499],
-  error: [500, 599],
-};
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Test::Utils` (`actionpack/lib/action_controller/test_case.rb:152`); the class/interface merge is how a mixin surfaces on the type side. */
 interface Encoder extends Included<typeof RackTestUtils> {}
@@ -205,6 +198,12 @@ export class TestCase extends ActiveSupportTestCase {
 
   routes?: RouteSet;
 
+  declare assertResponse: typeof responseAssertions.assertResponse;
+  declare assertRedirectedTo: typeof responseAssertions.assertRedirectedTo;
+  /** @internal */
+  declare parameterize: typeof responseAssertions.parameterize;
+  /** @internal */
+  declare normalizeArgumentToRedirection: typeof responseAssertions.normalizeArgumentToRedirection;
   declare assertRecognizes: typeof routingAssertions.assertRecognizes;
   declare assertGenerates: typeof routingAssertions.assertGenerates;
   declare assertRouting: typeof routingAssertions.assertRouting;
@@ -219,7 +218,8 @@ export class TestCase extends ActiveSupportTestCase {
   declare failOn: typeof routingAssertions.failOn;
 
   controllerClassName(): string {
-    return (this.constructor as typeof TestCase).controllerClass?.name ?? "";
+    const klass = this.controller.constructor as typeof Metal;
+    return isAnonymous(klass) ? "anonymous" : klass.controllerPath();
   }
 
   private _controllerClass: ControllerClass;
@@ -310,50 +310,6 @@ export class TestCase extends ActiveSupportTestCase {
     await this.process(action, { method: "HEAD", ...options });
   }
 
-  assertResponse(expected: number | string): void {
-    const actual = this.response?.statusCode ?? this.controller?.status;
-    if (typeof expected === "number") {
-      if (actual !== expected) {
-        throw new Error(`Expected response status ${expected}, got ${actual}`);
-      }
-      return;
-    }
-
-    const range = STATUS_RANGES[expected];
-    if (range) {
-      if (actual < range[0] || actual > range[1]) {
-        throw new Error(
-          `Expected response to be "${expected}" (${range[0]}-${range[1]}), got ${actual}`,
-        );
-      }
-      return;
-    }
-
-    const code = statusCode(expected);
-    if (actual !== code) {
-      throw new Error(`Expected response status :${expected} (${code}), got ${actual}`);
-    }
-  }
-
-  assertRedirectedTo(expected: string | RegExp): void {
-    const location =
-      this.response?.getHeader("location") ?? this.controller?.headers.get("location");
-    if (!location) {
-      throw new Assertion("Expected a redirect but no Location header was set");
-    }
-    if (typeof expected === "string") {
-      const redirectIs = _computeRedirectToLocation(this.request, location);
-      const redirectExpected = _computeRedirectToLocation(this.request, expected);
-      if (redirectIs !== redirectExpected) {
-        throw new Assertion(`Expected redirect to "${expected}", got "${location}"`);
-      }
-    } else {
-      if (!expected.test(location)) {
-        throw new Assertion(`Expected redirect matching ${expected}, got "${location}"`);
-      }
-    }
-  }
-
   /** @internal */
   assertTemplate(_options: unknown = {}, _message?: string): never {
     throw new Error(
@@ -410,7 +366,7 @@ export class TestCase extends ActiveSupportTestCase {
     this.request.setHeader("REQUEST_METHOD", httpMethod);
 
     if (as) {
-      this.request.contentType = formatToMime(as);
+      this.request.contentType = Mime.get(as)!.toString();
       format ??= as;
     }
 
@@ -430,14 +386,7 @@ export class TestCase extends ActiveSupportTestCase {
       }
     }
 
-    this.setupRequest(
-      (this._controllerClass as unknown as typeof import("./metal.js").Metal).controllerPath(),
-      action,
-      parameters,
-      session,
-      flash,
-      xhr,
-    );
+    this.setupRequest(this.controllerClassName(), action, parameters, session, flash, xhr);
     await this.processControllerResponse(action, this.cookies, xhr);
   }
 
@@ -465,18 +414,26 @@ export class TestCase extends ActiveSupportTestCase {
     controllerClassName: string,
     action: string,
     parameters: Record<string, unknown>,
-    session: Record<string, unknown> | undefined,
+    session: Record<string, unknown> | null | undefined,
     flash: Record<string, string> | undefined,
     xhr: boolean,
   ): void {
-    this.request.setHeader("PATH_INFO", parameters["path"] ?? `/${action}`);
-    if (Object.keys(parameters).length > 0) (this.request as any).parameters = parameters;
-    this.request.setHeader("action_dispatch.request.path_parameters", {
-      controller: controllerClassName,
-      action,
-    });
+    const generatedExtras = this.routes!.generateExtras(
+      merge(parameters, { controller: controllerClassName, action }),
+    );
+    const generatedPath = this.generatedPath(generatedExtras);
+    const queryStringKeys = this.queryParameterNames(generatedExtras);
 
-    if (session) this.request.session.update(session);
+    this.request.assignParameters(
+      this.routes,
+      controllerClassName,
+      action,
+      parameters,
+      generatedPath,
+      queryStringKeys,
+    );
+
+    if (session != null) this.request.session.update(session);
     this.request.flash!.update(flash ?? {});
 
     if (xhr) {
@@ -570,6 +527,10 @@ export class TestCase extends ActiveSupportTestCase {
 }
 
 const proto = TestCase.prototype as unknown as Record<string, unknown>;
+proto.assertResponse = responseAssertions.assertResponse;
+proto.assertRedirectedTo = responseAssertions.assertRedirectedTo;
+proto.parameterize = responseAssertions.parameterize;
+proto.normalizeArgumentToRedirection = responseAssertions.normalizeArgumentToRedirection;
 proto.assertRecognizes = routingAssertions.assertRecognizes;
 proto.assertGenerates = routingAssertions.assertGenerates;
 proto.assertRouting = routingAssertions.assertRouting;
@@ -664,7 +625,7 @@ export class TestRequest extends AbstractTestRequest {
 
     if (this.isGet()) {
       if (isBlank(this.queryString)) {
-        this.queryString = buildNestedQuery(nonPathParameters);
+        this.queryString = toQuery(nonPathParameters);
       }
     } else {
       let data: string;
@@ -687,11 +648,11 @@ export class TestRequest extends AbstractTestRequest {
             data = toXml(nonPathParameters);
             break;
           case ":url_encoded_form":
-            data = buildNestedQuery(nonPathParameters);
+            data = toQuery(nonPathParameters);
             break;
           default:
             this._customParamParsers[contentMimeType!.symbol!] = () => nonPathParameters;
-            data = buildNestedQuery(nonPathParameters);
+            data = toQuery(nonPathParameters);
         }
         data = b(data);
       }
@@ -809,17 +770,3 @@ export class TestSession extends SecureSessionHash {
 }
 
 Object.defineProperty(TestSession, "name", { value: "ActionController::TestSession" });
-
-function formatToMime(format: string): string {
-  const MIMES: Record<string, string> = {
-    json: "application/json",
-    xml: "application/xml",
-    html: "text/html",
-    text: "text/plain",
-    js: "text/javascript",
-    css: "text/css",
-    csv: "text/csv",
-    any: "*/*",
-  };
-  return MIMES[format] ?? format;
-}

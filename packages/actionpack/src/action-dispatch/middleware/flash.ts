@@ -41,7 +41,7 @@ export function commitFlash(this: FlashRequestHost): void {
   if (session.isEnabled && !session.isEnabled()) return;
 
   const hash = flashHash.call(this);
-  if (hash && (!hash.empty || session.isKey("flash"))) {
+  if (hash && (!hash.isEmpty() || session.isKey("flash"))) {
     session.set("flash", hash.toSessionValue());
     this.env[KEY] = hash.dup();
   }
@@ -94,7 +94,7 @@ export class FlashHash {
     return [...new Set([...this._flashes.keys(), ...this._now.keys()])];
   }
 
-  get empty(): boolean {
+  isEmpty(): boolean {
     return this._flashes.size === 0 && this._now.size === 0;
   }
 

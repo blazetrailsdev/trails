@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ActionController } from "@blazetrails/actionpack";
+import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { WelcomeController } from "./welcome-controller.js";
 
 describe("WelcomeController", () => {
@@ -15,6 +15,10 @@ describe("WelcomeController", () => {
     class WelcomeControllerTest extends ActionController.TestCase {}
     WelcomeControllerTest.tests(WelcomeController);
     const t = new WelcomeControllerTest(WelcomeController);
+    t.routes = new RouteSet();
+    t.routes.draw(function () {
+      this.root({ to: "rails/welcome#index" });
+    });
     await expect(t.get("index")).rejects.toBeInstanceOf(ActionController.MissingExactTemplate);
   });
 });

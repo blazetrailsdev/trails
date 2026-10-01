@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { extractOptionsBang, underscore } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { ActionController, Request, Response } from "@blazetrails/actionpack";
+import { ActionController, Request, Response, RouteSet } from "@blazetrails/actionpack";
 import { FixtureResolver } from "../../testing/resolvers.js";
 import { MissingTemplate } from "../../template/error.js";
 import { TemplateHandlers, type TemplateHandler } from "../../template/handlers.js";
@@ -63,6 +63,10 @@ Object.defineProperty(NestedController, "name", { value: "ControllerNameSpace::N
 
 class MultipleExtensions extends LayoutTest {}
 
+const SharedTestRoutes = new RouteSet();
+SharedTestRoutes.draw(function () {
+  this.get(":controller(/:action)");
+});
 let testCase: InstanceType<typeof ActionController.TestCase>;
 const assertResponse = (type: number | string): void => testCase.assertResponse(type);
 
@@ -84,6 +88,7 @@ describe("LayoutAutoDiscoveryTest", () => {
   test("third party template library auto discovers layout", async () => {
     await withTemplateHandler("mab", mab, async () => {
       testCase = new ActionController.TestCase(ThirdPartyTemplateLibraryController);
+      testCase.routes = SharedTestRoutes;
       await testCase.get("hello");
       assertResponse("success");
       expect(testCase.responseBody).toBe("layouts/third_party_template_library.mab");
@@ -250,6 +255,7 @@ class LayoutStatusIsRendered extends LayoutTest {
 describe("LayoutStatusIsRenderedTest", () => {
   test("layout status is rendered", async () => {
     testCase = new ActionController.TestCase(LayoutStatusIsRendered);
+    testCase.routes = SharedTestRoutes;
     await testCase.get("hello");
     assertResponse(401);
   });
@@ -264,6 +270,7 @@ class LayoutSymlinkedTest extends LayoutTest {
 describe("LayoutSymlinkedIsRenderedTest", () => {
   test("symlinked layout is rendered", async () => {
     testCase = new ActionController.TestCase(LayoutSymlinkedTest);
+    testCase.routes = SharedTestRoutes;
     await testCase.get("hello");
     assertResponse(200);
     expect(testCase.responseBody).toContain("This is my layout");

@@ -8,6 +8,8 @@
  * resolve from `this` at call time, per the CLAUDE.md mixin pattern.
  */
 
+import { assert, assertEqual, isPlainObject } from "@blazetrails/activesupport";
+import { rbEqq } from "@blazetrails/ruby-compat";
 import { AssertionResponse } from "../assertion-response.js";
 import { _computeRedirectToLocation } from "../../../action-controller/metal/redirecting.js";
 
@@ -20,6 +22,7 @@ export interface AssertionResponseHost {
 export interface AssertionResponseLike {
   status: number;
   body?: string;
+  location?: string;
   getHeader?: (key: string) => string | undefined;
 }
 
@@ -33,62 +36,34 @@ const RESPONSE_PREDICATES: Record<string, (status: number) => boolean> = {
 export function assertResponse(
   this: AssertionResponseHost,
   type: number | string,
-  message?: string,
+  message?: string | (() => string),
 ): void {
-  const status = this.response.status;
-  const predicate =
-    typeof type === "string" && Object.hasOwn(RESPONSE_PREDICATES, type)
-      ? RESPONSE_PREDICATES[type]
-      : undefined;
+  message ??= () => generateResponseMessage(this, type, this.response.status);
 
-  if (predicate) {
-    if (!predicate(status)) {
-      throw new Error(message ?? generateResponseMessage(this, type, status));
-    }
-    return;
-  }
-
-  const expectedCode = parseInt(new AssertionResponse(type).code, 10);
-  if (status !== expectedCode) {
-    throw new Error(message ?? generateResponseMessage(this, type, status));
+  if (Object.hasOwn(RESPONSE_PREDICATES, type)) {
+    assert(RESPONSE_PREDICATES[type](this.response.status), message);
+  } else {
+    assertEqual(parseInt(new AssertionResponse(type).code, 10), this.response.status, message);
   }
 }
 
 export function assertRedirectedTo(
   this: AssertionResponseHost,
-  urlOptions: string | RegExp,
+  urlOptions: unknown = {},
   options: { status?: number | string } | string = {},
   message?: string,
 ): void {
-  let opts: { status?: number | string } = {};
-  if (typeof options === "string") {
-    if (!message) message = options;
-  } else {
-    opts = options;
-  }
+  if (!isPlainObject(options)) [options, message] = [{}, options];
 
-  const status = opts.status ?? "redirect";
+  const status = (options as { status?: number | string }).status ?? "redirect";
   assertResponse.call(this, status, message);
+  if (rbEqq(urlOptions, this.response.location)) return;
 
-  const redirectIs = normalizeArgumentToRedirection.call(
-    this,
-    this.response.getHeader?.("location"),
-  );
+  const redirectIs = normalizeArgumentToRedirection.call(this, this.response.location);
   const redirectExpected = normalizeArgumentToRedirection.call(this, urlOptions);
 
-  if (redirectExpected instanceof RegExp) {
-    const probe = new RegExp(redirectExpected.source, redirectExpected.flags);
-    if (probe.test(String(redirectIs))) return;
-  } else if (redirectExpected === redirectIs) {
-    return;
-  }
-
-  const expectedStr =
-    redirectExpected instanceof RegExp ? redirectExpected.toString() : String(redirectExpected);
-  throw new Error(
-    message ??
-      `Expected response to be a redirect to <${expectedStr}> but was a redirect to <${redirectIs}>`,
-  );
+  message ??= `Expected response to be a redirect to <${redirectExpected}> but was a redirect to <${redirectIs}>`;
+  assert(rbEqq(redirectExpected, redirectIs), message);
 }
 
 /** @internal */

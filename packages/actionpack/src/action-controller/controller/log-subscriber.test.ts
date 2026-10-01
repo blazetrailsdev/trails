@@ -9,6 +9,7 @@ import { LogSubscriber } from "../log-subscriber.js";
 import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
 import type { CachingClassMethods } from "../../abstract-controller/caching.js";
+import "../../test-helpers/abstract-unit.js";
 
 class LogSubscribersController extends Base {
   async withFragmentCache() {
@@ -70,7 +71,7 @@ describe("ACLogSubscriberTest", () => {
   let oldEnableFragmentCacheLogging: boolean;
   let cachePath: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     subscriber = new LogSubscriber();
     logger = new CaptureLogger();
     logs = logger.messages;
@@ -81,6 +82,8 @@ describe("ACLogSubscriberTest", () => {
     caching.enableFragmentCacheLogging = true;
 
     controller = new TestCase(LogSubscribersController);
+
+    await controller.beforeSetup();
     const controllerClass = LogSubscribersController as unknown as CachingClassMethods;
     cachePath = Dir.mktmpdir(["tmp", "cache"]);
     controllerClass.cacheStore = [":file_store", cachePath];
