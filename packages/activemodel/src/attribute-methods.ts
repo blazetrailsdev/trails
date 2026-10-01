@@ -439,10 +439,10 @@ export const ClassMethods = {
     codeGenerator.defineCachedMethod(mangledName, { namespace, as }, (batch) => {
       let body: (self: ReadWriteHost, args: unknown[]) => unknown;
       if (CALL_COMPILABLE_REGEXP.test(targetName)) {
-        body = (self, args) => sendProxyTarget(self, targetName, [...callArgs, ...args]);
+        body = (self, args) => rbFSend(self, targetName, ...callArgs, ...args);
       } else {
         callArgs.unshift(targetName);
-        body = (self, args) => rbFSend(self, callArgs[0], ...callArgs.slice(1), ...args);
+        body = (self, args) => rbFSend(self, ...(callArgs as [string, ...string[]]), ...args);
       }
 
       batch.push((mod) => {
@@ -569,19 +569,6 @@ function generateMethodFor(pattern: AttributeMethodPattern): string {
   return pattern.proxyTarget.endsWith("=")
     ? camelize(`set_define_method_${pattern.proxyTarget.slice(0, -1)}`, false)
     : camelize(`define_method_${pattern.proxyTarget}`, false);
-}
-
-function sendProxyTarget(record: ReadWriteHost, targetName: string, args: unknown[]): unknown {
-  const target = record[targetName] as ((...a: unknown[]) => unknown) | undefined;
-  if (typeof target !== "function") {
-    if (targetName in record) return target;
-    const [attrName, ...rest] = args as [string, ...unknown[]];
-    return (record as unknown as AttributeMethods).attributeMissing(
-      { proxyTarget: targetName, attrName },
-      ...rest,
-    );
-  }
-  return target.call(record, ...args);
 }
 
 /** @noRailsEquivalent CONVERGEABLE attribute-methods-inline-generate-method-and-affix-parameters */
