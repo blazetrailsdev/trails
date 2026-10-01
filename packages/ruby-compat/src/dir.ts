@@ -10,7 +10,6 @@ import { Process } from "./process.js";
 import type { TempfileBasename } from "./tempfile.js";
 import { warn } from "./kernel-warn.js";
 import { FileUtils } from "./file-utils.js";
-import { NotImplementedError } from "./not-implemented-error.js";
 
 /** `W_OK` (`vendor/ruby/v3.3.11/file.c:1898` `rb_file_writable_p`). */
 const W_OK = 2;
@@ -133,32 +132,26 @@ function globHelper(base: string, segments: string[], found: string[], enumerate
   }
 }
 
-/**
- * A directory's entries as `glob_helper` reads them
- * (`vendor/ruby/v3.3.11/dir.c:2695-2718`): sorted, with `.` among them unless
- * `FNM_GLOB_SKIPDOT` is set — which it is for every directory below the first
- * one read (`dir.c:2692-2693`) — and never `..`.
- */
 async function childrenAsync(dirname: string, skipdot: boolean): Promise<string[]> {
   const fs = getFs();
-  if (!fs.readdir)
-    throw new NotImplementedError("readdir() function is unimplemented on this machine");
   let names: string[];
   try {
-    names = (await fs.readdir(dirname)).sort();
+    names = (fs.readdir ? await fs.readdir(dirname) : fs.readdirSync(dirname)).sort();
   } catch {
     return [];
   }
   return skipdot ? names : [".", ...names];
 }
 
-/**
- * `glob_helper` (`vendor/ruby/v3.3.11/dir.c:2528`) over the backend's async
- * verbs — {@link globHelper} with the `flags` it does not take. Under
- * `FNM_DOTMATCH` a wildcard matches a leading dot (`dir.c:325`) and `**`
- * descends into dot directories (`dir.c:2762`); `**` never descends a
- * symlink (`dir.c:2759`), nor `.` itself.
- */
+async function isDirectoryAsync(path: string): Promise<boolean> {
+  const fs = getFs();
+  try {
+    return (fs.lstat ? await fs.lstat(path) : fs.lstatSync(path)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 async function globHelperAsync(
   base: string,
   segments: string[],
@@ -181,10 +174,7 @@ async function globHelperAsync(
       if (segmentMatches(rest[0], name, flags))
         await globHelperAsync(join(name), rest.slice(1), found, true, flags, true);
       if (name === ".") continue;
-      const stat = await getFs()
-        .lstat?.(join(name))
-        .catch(() => null);
-      if (stat?.isDirectory() === true)
+      if (await isDirectoryAsync(join(name)))
         await globHelperAsync(join(name), segments, found, true, flags, true);
     }
     return;
@@ -489,11 +479,15 @@ export class Dir {
   }
 
   /**
-   * {@link Dir.glob} over the backend's async `readdir` / `lstat` / `exists`,
-   * taking the `flags` `dir_s_glob` does. `File::FNM_DOTMATCH` is the one flag
-   * read: a wildcard then matches dotfiles, and `.` in the first directory read
-   * — `Dir.glob("g/*", File::FNM_DOTMATCH)` answers `g/.` — but never `..`
-   * (`vendor/ruby/v3.3.11/dir.c:2713`).
+   * {@link Dir.glob} over the backend's async `readdir` / `lstat` / `exists`
+   * (its sync `readdirSync` / `lstatSync` where it has no async one), taking
+   * the `flags` `dir_s_glob` does. `File::FNM_DOTMATCH` is the one flag read,
+   * as `glob_helper` (`vendor/ruby/v3.3.11/dir.c:2528`) reads it: a wildcard
+   * then matches a leading dot (`dir.c:325`), `**` descends dot directories
+   * (`dir.c:2762`) though never a symlink (`dir.c:2759`), and `.` is among the
+   * entries of the first directory read — `Dir.glob("g/*", File::FNM_DOTMATCH)`
+   * answers `g/.` — until `FNM_GLOB_SKIPDOT` is set for the ones beneath it
+   * (`dir.c:2692-2693`). `..` never is (`dir.c:2713`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Dir.glob`
    * (`vendor/ruby/v3.3.11/dir.c:3227`).

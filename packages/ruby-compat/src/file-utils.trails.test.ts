@@ -583,6 +583,31 @@ describe("FileUtils", () => {
     expect(nodeFs.statSync(file).mode & 0o777).toBe(0o600);
   });
 
+  it("rm_rf and chmod_R awaited read a backend's sync verbs where it has no async ones", async () => {
+    const fs = getFs();
+    registerFsAdapter(
+      "sync-only",
+      Object.assign(Object.create(fs) as typeof fs, {
+        lstat: undefined,
+        readdir: undefined,
+        chmod: undefined,
+        rm: undefined,
+      }),
+      getPath(),
+    );
+    fsAdapterConfig.adapter = "sync-only";
+    const tree = nodePath.join(root, "tree");
+    const file = nodePath.join(tree, "sub", "f");
+    nodeFs.mkdirSync(nodePath.join(tree, "sub"), { recursive: true });
+    nodeFs.writeFileSync(file, "x");
+
+    expect(await FileUtils.chmodRAsync(0o700, tree)).toEqual([tree]);
+    expect(nodeFs.statSync(file).mode & 0o777).toBe(0o700);
+    expect(await Dir.globAsync(`${tree}/**/*`)).toEqual([`${tree}/sub`, file]);
+    expect(await FileUtils.rmRfAsync(tree)).toEqual([tree]);
+    expect(nodeFs.existsSync(tree)).toBe(false);
+  });
+
   it("chdir is an alias for cd", () => {
     expect(FileUtils.chdir).toBe(FileUtils.cd);
   });

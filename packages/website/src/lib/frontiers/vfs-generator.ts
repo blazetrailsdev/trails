@@ -90,8 +90,6 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
     });
   }
 
-  // The VFS holds files only: a directory exists exactly while a file sits
-  // beneath it, so these are derived from the stored paths.
   function under(path: string): string[] {
     const prefix = path.endsWith("/") ? path : `${path}/`;
     return vfs

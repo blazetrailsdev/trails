@@ -20,10 +20,11 @@ function rbStat(file: IO | string): FsStatResult | null {
   }
 }
 
-/** `rb_stat` (`vendor/ruby/v3.3.11/file.c:1296`) over the backend's async `stat`. */
 async function rbStatAsync(file: IO | string): Promise<FsStatResult | null> {
   try {
-    return typeof file === "string" ? ((await getFs().stat?.(file)) ?? null) : file.stat();
+    if (typeof file !== "string") return file.stat();
+    const fs = getFs();
+    return fs.stat ? await fs.stat(file) : fs.statSync(file);
   } catch {
     return null;
   }
@@ -277,8 +278,9 @@ export class File extends IO {
 
   /**
    * {@link File.isIdentical} over the backend's async `stat`, which is the
-   * form a caller on the async fs path awaits. A stream argument is still
-   * `fstat`ed, as `rb_stat` (`vendor/ruby/v3.3.11/file.c:1296`) does.
+   * form a caller on the async fs path awaits; a backend with no async `stat`
+   * is read through its sync one. A stream argument is still `fstat`ed, as
+   * `rb_stat` (`vendor/ruby/v3.3.11/file.c:1296`) does.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.identical?`
    * (`vendor/ruby/v3.3.11/file.c:2196`).
@@ -295,14 +297,17 @@ export class File extends IO {
 
   /**
    * {@link File.isSymlink} over the backend's async `lstat`, `false` on a
-   * failed `lstat` and on a backend with none.
+   * failed `lstat`; a backend with no async `lstat` is read through its sync
+   * one.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.symlink?`
    * (`vendor/ruby/v3.3.11/file.c:1670`).
    */
   static async isSymlinkAsync(fileName: string): Promise<boolean> {
     try {
-      return (await getFs().lstat?.(fileName))?.isSymbolicLink?.() === true;
+      const fs = getFs();
+      const st = fs.lstat ? await fs.lstat(fileName) : fs.lstatSync(fileName);
+      return st.isSymbolicLink?.() === true;
     } catch {
       return false;
     }
@@ -557,14 +562,19 @@ export class File extends IO {
   }
 
   /**
-   * {@link File.chmod} over the backend's async `chmod`; a backend with no
-   * permission bits has none, and there the call is a no-op too.
+   * {@link File.chmod} over the backend's async `chmod`, falling back to its
+   * `chmodSync`; a backend with no permission bits has neither, and there the
+   * call is a no-op too.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.chmod`
    * (`vendor/ruby/v3.3.11/file.c:2575`).
    */
   static async chmodAsync(mode: number, ...files: string[]): Promise<number> {
-    for (const file of files) await getFs().chmod?.(file, mode);
+    const fs = getFs();
+    for (const file of files) {
+      if (fs.chmod) await fs.chmod(file, mode);
+      else fs.chmodSync?.(file, mode);
+    }
     return files.length;
   }
 

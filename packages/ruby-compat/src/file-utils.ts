@@ -66,31 +66,22 @@ function fuList(arg: string | string[]): string[] {
   return Array.isArray(arg) ? [...arg] : [arg];
 }
 
-/**
- * `Entry_#traverse` yielding to `Entry_#chmod`
- * (`vendor/ruby/v3.3.11/lib/fileutils.rb:2354-2362,2206-2213`) over the
- * backend's async verbs, as `chmod_R`'s block calls them
- * (`fileutils.rb:1822-1828`): each entry before its children, a symlink left
- * alone where there is no `lchmod`, a failed `lstat` read as `Entry_#lstat!`
- * reads it (`fileutils.rb:2200-2204`), and a failed `chmod` swallowed under
- * `force`.
- */
 async function entryChmodTraverseAsync(path: string, mode: number, force: boolean): Promise<void> {
   const fs = getFs();
-  if (!fs.lstat) throw new NotImplementedError("lstat() function is unimplemented on this machine");
-  const st = await fs.lstat(path).catch((error: unknown) => {
+  let st: FsStatResult | null;
+  try {
+    st = fs.lstat ? await fs.lstat(path) : fs.lstatSync(path);
+  } catch (error) {
     if (!isSystemCallError(error)) throw error;
-    return null;
-  });
+    st = null;
+  }
   try {
     if (st?.isSymbolicLink?.() !== true) await File.chmodAsync(mode, path);
   } catch (error) {
     if (force !== true) throw error;
   }
   if (st == null || !st.isDirectory()) return;
-  if (!fs.readdir)
-    throw new NotImplementedError("readdir() function is unimplemented on this machine");
-  for (const n of await fs.readdir(path)) {
+  for (const n of fs.readdir ? await fs.readdir(path) : fs.readdirSync(path)) {
     await entryChmodTraverseAsync(File.join(path, n), mode, force);
   }
 }
@@ -863,16 +854,21 @@ export class FileUtils {
   static async removeEntryAsync(path: string, force = false): Promise<void> {
     try {
       const fs = getFs();
-      if (!fs.rm) throw new NotImplementedError("rm() function is unimplemented on this machine");
-      await fs.rm(path, { recursive: true, force });
+      if (fs.rm) await fs.rm(path, { recursive: true, force });
+      else fs.rmSync(path, { recursive: true, force });
     } catch (error) {
       if (force !== true) throw error;
     }
   }
 
-  /** `FileUtils.chmod_R` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1815-1830`). `mode`
-   * is the Integer arm of `fu_mode` (`fileutils.rb:1721-1723`); the symbolic
-   * String arm (`"u+x"`) is unported.
+  /** `FileUtils.chmod_R` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1815-1830`) over
+   * the backend's async verbs. Its block is `Entry_#traverse` yielding to
+   * `Entry_#chmod` (`fileutils.rb:2354-2362,2206-2213`): each entry before its
+   * children, a symlink left alone where there is no `lchmod`, a failed
+   * `lstat` read as `Entry_#lstat!` reads it (`fileutils.rb:2200-2204`), and a
+   * failed `chmod` swallowed under `force`. `mode` is the Integer arm of
+   * `fu_mode` (`fileutils.rb:1721-1723`); the symbolic String arm (`"u+x"`) is
+   * unported.
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static async chmodRAsync(
