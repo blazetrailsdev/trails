@@ -63,9 +63,8 @@ function isKey(attributes: Attributes, name: string): boolean {
   return isHash(attributes) ? hasKey(attributes, name) : attributes.isKey(name);
 }
 
-function eachKey(attributes: Attributes, block: (name: string) => void): void {
-  if (isHash(attributes)) hashEachKey(attributes, block);
-  else attributes.eachKey(block);
+function eachKey(attributes: Attributes): string[] {
+  return isHash(attributes) ? hashEachKey(attributes) : attributes.eachKey();
 }
 
 function fetch(
@@ -153,11 +152,7 @@ export class AttributeSet {
   }
 
   keys(): string[] {
-    const keys: string[] = [];
-    eachKey(this.attributes(), (name) => {
-      if (this.getAttribute(name).isInitialized()) keys.push(name);
-    });
-    return keys;
+    return eachKey(this.attributes()).filter((name) => this.getAttribute(name).isInitialized());
   }
 
   fetchValue(name: string, block?: (name: string) => unknown): unknown {
@@ -205,11 +200,7 @@ export class AttributeSet {
   }
 
   accessed(): string[] {
-    const accessed: string[] = [];
-    eachKey(this.attributes(), (name) => {
-      if (this.getAttribute(name).hasBeenRead()) accessed.push(name);
-    });
-    return accessed;
+    return eachKey(this.attributes()).filter((name) => this.getAttribute(name).hasBeenRead());
   }
 
   map(fn: (attr: Attribute) => Attribute): AttributeSet {

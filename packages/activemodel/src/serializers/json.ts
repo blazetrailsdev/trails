@@ -35,14 +35,21 @@ export class JSON {
 
   asJson(options?: SerializeOptions & { root?: boolean | string }): Record<string, unknown> {
     const ctor = this.constructor as typeof JSON;
-    const rootOpt =
+    let root =
       options && Object.prototype.hasOwnProperty.call(options, "root")
         ? options.root
         : ctor.includeRootInJson;
+
     return asJsonThenable(
       () => this.serializableHash(options),
-      rootOpt,
-      () => ctor.modelName.element,
+      (hash) => {
+        if (root != null && root !== false) {
+          if (root === true) root = ctor.modelName.element;
+          return { [root]: hash };
+        } else {
+          return hash;
+        }
+      },
       options ?? {},
     );
   }

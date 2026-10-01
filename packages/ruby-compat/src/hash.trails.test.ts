@@ -291,6 +291,11 @@ describe("Hash#each_key", () => {
     expect(eachKey(hash, (k) => seen.push(k))).toBe(hash);
     expect(seen).toEqual(["foo", "bar"]);
   });
+
+  it("enumerates the keys when no block is given", () => {
+    const hash = { foo: 0, bar: 1 };
+    expect(eachKey(hash).filter((k) => hash[k as keyof typeof hash] > 0)).toEqual(["bar"]);
+  });
 });
 
 describe("Hash#transform_values", () => {

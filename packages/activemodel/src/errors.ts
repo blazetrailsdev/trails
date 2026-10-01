@@ -9,6 +9,7 @@ import {
   Enumerable,
   FrozenError,
   Hash,
+  hasKey,
   isEmpty,
   rbEqual,
   rbInspect,
@@ -89,9 +90,11 @@ export class Errors<TBase extends object = object> {
     error: ActiveModelError,
     overrideOptions: { attribute?: string; type?: string } = {},
   ): void {
-    const type = overrideOptions.type;
-    if (type !== undefined) {
-      overrideOptions.type = type.startsWith(":") ? type : `:${type}`;
+    for (const key of ["attribute", "type"] as const) {
+      if (hasKey(overrideOptions, key)) {
+        const name = overrideOptions[key]!;
+        overrideOptions[key] = key === "type" && !name.startsWith(":") ? `:${name}` : name;
+      }
     }
     this._errors.push(new NestedError(this._base, error, overrideOptions));
   }

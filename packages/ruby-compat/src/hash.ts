@@ -334,7 +334,22 @@ export function eachValue<T>(
 export function eachKey<T>(
   hash: Record<string, T>,
   block: (key: string) => unknown,
-): Record<string, T> {
+): Record<string, T>;
+/**
+ * The blockless arm, `RETURN_SIZED_ENUMERATOR` (`hash.c:3100`): the keys an
+ * Enumerable call chained onto the Enumerator iterates.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_key` (`vendor/ruby/v3.3.11/hash.c:3098`).
+ */
+export function eachKey<T>(hash: Record<string, T>): string[];
+/**
+ * The arms share one body.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_key` (`vendor/ruby/v3.3.11/hash.c:3098`).
+ */
+export function eachKey<T>(
+  hash: Record<string, T>,
+  block?: (key: string) => unknown,
+): Record<string, T> | string[] {
+  if (!block) return Object.keys(hash);
   for (const key of Object.keys(hash)) {
     block(key);
   }
