@@ -14,11 +14,11 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /** @internal */
   _throughScope?: unknown;
   /** @internal */
-  _throughRecords: Map<Base, Base>;
+  _throughRecords: Hash<Base, Base>;
 
   constructor(owner: Base, reflection: AssociationDefinition) {
     super(owner, reflection);
-    this._throughRecords = new Map<Base, Base>();
+    this._throughRecords = new Hash<Base, Base>().compareByIdentity();
   }
 
   /** @internal */

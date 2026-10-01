@@ -481,6 +481,135 @@ describe("Hash keys by eql?", () => {
   });
 });
 
+class EqlKey {
+  constructor(readonly id: number) {}
+  hash(): number {
+    return this.id;
+  }
+  eql(other: unknown): boolean {
+    return other instanceof EqlKey && other.id === this.id;
+  }
+}
+
+describe("Hash keyed on an object answering hash / eql?", () => {
+  it("finds the entry through a different but eql? key", () => {
+    const h = new Hash<EqlKey, string>();
+    h.set(new EqlKey(1), "one");
+    expect(h.get(new EqlKey(1))).toBe("one");
+    expect(h.has(new EqlKey(2))).toBe(false);
+  });
+
+  it("separates keys that share a hash but are not eql?", () => {
+    const h = new Hash<unknown, string>();
+    h.set(new EqlKey(1), "key");
+    h.set({ hash: () => 1, eql: () => false }, "other");
+    expect(h.size).toBe(2);
+    expect(h.get(new EqlKey(1))).toBe("key");
+  });
+
+  it("counts eql? keys together under Hash.new(0)", () => {
+    const h = new Hash<EqlKey, number>(0);
+    for (const key of [new EqlKey(1), new EqlKey(1), new EqlKey(2)]) {
+      h.set(key, h.get(key)! + 1);
+    }
+    expect(h.get(new EqlKey(1))).toBe(2);
+    expect(h.get(new EqlKey(2))).toBe(1);
+    expect(h.get(new EqlKey(3))).toBe(0);
+    expect(h.size).toBe(2);
+  });
+
+  it("populates one entry per eql? key from a default_proc", () => {
+    const h = new Hash<EqlKey, number[]>((hash, key) => {
+      const made: number[] = [];
+      hash.set(key, made);
+      return made;
+    });
+    h.get(new EqlKey(1))!.push(1);
+    h.get(new EqlKey(1))!.push(2);
+    expect(h.size).toBe(1);
+    expect(h.get(new EqlKey(1))).toEqual([1, 2]);
+  });
+});
+
+describe("Hash#compare_by_identity", () => {
+  it("returns the receiver and answers compare_by_identity?", () => {
+    const h = new Hash<unknown, number>();
+    expect(h.isCompareByIdentity()).toBe(false);
+    expect(h.compareByIdentity()).toBe(h);
+    expect(h.isCompareByIdentity()).toBe(true);
+  });
+
+  it("keeps eql? keys as separate entries", () => {
+    const first = [1];
+    const h = new Hash<unknown, number>().compareByIdentity();
+    h.set(first, 1);
+    h.set([1], 2);
+    expect(h.size).toBe(2);
+    expect(h.get(first)).toBe(1);
+    expect(h.get([1])).toBeUndefined();
+    expect(h.has([1])).toBe(false);
+    expect(h.delete([1])).toBeUndefined();
+    expect(h.delete(first)).toBe(1);
+    expect(h.size).toBe(1);
+  });
+
+  it("rehashes the stored keys, so an eql? key no longer finds them", () => {
+    const stored = new EqlKey(1);
+    const h = new Hash<EqlKey, number>(0);
+    h.set(stored, 5);
+    h.compareByIdentity();
+    expect(h.get(new EqlKey(1))).toBe(0);
+    expect(h.get(stored)).toBe(5);
+    expect(h.delete(stored)).toBe(5);
+    expect(h.size).toBe(0);
+  });
+
+  it("returns the default value for an eql? but not identical key", () => {
+    const stored = new EqlKey(1);
+    const h = new Hash<EqlKey, number>(0).compareByIdentity();
+    h.set(stored, h.get(stored)! + 1);
+    h.set(stored, h.get(stored)! + 1);
+    expect(h.get(stored)).toBe(2);
+    expect(h.get(new EqlKey(1))).toBe(0);
+  });
+
+  it("runs the default_proc once per identity", () => {
+    const h = new Hash<EqlKey, number[]>((hash, key) => {
+      const made: number[] = [];
+      hash.set(key, made);
+      return made;
+    }).compareByIdentity();
+    const stored = new EqlKey(1);
+    h.get(stored)!.push(1);
+    h.get(new EqlKey(1))!.push(2);
+    expect(h.size).toBe(2);
+    expect(h.get(stored)).toEqual([1]);
+  });
+
+  it("raises FrozenError on a frozen hash, and returns an identity hash as it is", () => {
+    expect(() => new Hash().freeze().compareByIdentity()).toThrow(FrozenError);
+    const h = new Hash().compareByIdentity().freeze();
+    expect(h.compareByIdentity()).toBe(h);
+  });
+
+  it("carries over a dup, as hash_copy copies the table's type", () => {
+    const h = new Hash<unknown, number>().compareByIdentity();
+    const copy = dup(h);
+    expect(copy.isCompareByIdentity()).toBe(true);
+    copy.set([1], 1);
+    copy.set([1], 2);
+    expect(copy.size).toBe(2);
+  });
+
+  it("stays an identity hash across clear", () => {
+    const h = new Hash<unknown, number>().compareByIdentity();
+    h.clear();
+    h.set([1], 1);
+    h.set([1], 2);
+    expect(h.size).toBe(2);
+  });
+});
+
 describe("block (a marked `&block`)", () => {
   it("keeps the block's arity and passes the receiver an instance_exec gives it", () => {
     const receiver = { name: "david" };

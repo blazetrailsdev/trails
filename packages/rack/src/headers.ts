@@ -386,12 +386,8 @@ export class Headers extends Hash<string, string> {
     return (key: string) => this.get(key);
   }
 
-  compareByIdentity(): never {
-    throw new TypeError("Headers cannot compare by identity");
-  }
-
-  get isCompareByIdentity(): boolean {
-    return false;
+  override compareByIdentity(): never {
+    throw new TypeError("Rack::Headers cannot compare by identity, use regular Hash");
   }
 
   deconstructKeys(): Headers {

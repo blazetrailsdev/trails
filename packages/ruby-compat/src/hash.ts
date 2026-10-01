@@ -422,7 +422,8 @@ export function valuesAt(
  * `RHASH_PROC_DEFAULT` flag through to the allocation, which a plain object
  * spread has nowhere to put. The flag is what decides which of the two seats
  * the value lands in, so the port reads the receiver's seat rather than
- * testing the value's type.
+ * testing the value's type. `hash_copy` (`vendor/ruby/v3.3.11/hash.c:1530`)
+ * copies the table with its type, so an identity hash dups into one.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#dup` (`vendor/ruby/v3.3.11/object.c:591`).
  */
 export function dup<K, V>(hash: Hash<K, V>): Hash<K, V>;
@@ -447,6 +448,7 @@ export function dup(
   const defaultProc = hash.defaultProc();
   if (defaultProc) ret.setDefaultProc(defaultProc);
   else ret.setDefault(hash.default());
+  if (hash.isCompareByIdentity()) ret.compareByIdentity();
   for (const [key, value] of hash) {
     ret.set(key, value);
   }
@@ -476,6 +478,7 @@ export class Hash<K, V> extends Map<K, V> {
   #defaultProc?: DefaultProc<K, V>;
   #frozen = false;
   #eqlKeys = new Map<number, K[]>();
+  #identhash = false;
 
   /**
    * `Hash.new` (`vendor/ruby/v3.3.11/hash.c:1782` `rb_hash_initialize`): a block is
@@ -546,7 +549,7 @@ export class Hash<K, V> extends Map<K, V> {
   override set(key: K, value: V): this {
     this.modifyCheck();
     const stored = this.hashStlikeLookup(key);
-    if (stored === key && isObjectKey(key) && !super.has(key)) {
+    if (stored === key && !this.#identhash && isObjectKey(key) && !super.has(key)) {
       const h = rbHash(key);
       const bucket = this.#eqlKeys.get(h);
       if (bucket) bucket.push(key);
@@ -570,10 +573,12 @@ export class Hash<K, V> extends Map<K, V> {
    * (`vendor/ruby/v3.3.11/hash.c:2084`) through the `hash` / `eql?` pair
    * (`rb_any_hash`, `hash.c:241`; `rb_any_cmp`, `hash.c:126`). A JS
    * `Map` keys an object by identity, so two equal Arrays would otherwise be
-   * two entries. A primitive's identity is already its `eql?`.
+   * two entries. A primitive's identity is already its `eql?`. An identity
+   * hash's table type is `identhash` (`vendor/ruby/v3.3.11/hash.c:375`), whose
+   * `rb_ident_cmp` is the `Map`'s own comparison.
    */
   private hashStlikeLookup(key: K): K {
-    if (!isObjectKey(key)) return key;
+    if (this.#identhash || !isObjectKey(key)) return key;
     return this.#eqlKeys.get(rbHash(key))?.find((stored) => rbEql(stored, key)) ?? key;
   }
 
@@ -684,7 +689,7 @@ export class Hash<K, V> extends Map<K, V> {
     if (super.has(stored)) {
       const val = super.get(stored);
       super.delete(stored);
-      if (isObjectKey(stored)) {
+      if (!this.#identhash && isObjectKey(stored)) {
         const h = rbHash(stored);
         const bucket = this.#eqlKeys.get(h)!;
         bucket.splice(bucket.indexOf(stored), 1);
@@ -694,6 +699,36 @@ export class Hash<K, V> extends Map<K, V> {
     }
     if (block) return block(key);
     return undefined;
+  }
+
+  /**
+   * `Hash#compare_by_identity` (`vendor/ruby/v3.3.11/hash.c:4427`
+   * `rb_hash_compare_by_id`): keys are compared by identity from here on, and
+   * the receiver is returned. The rehash into an `identhash` table keeps every
+   * entry, since two stored keys were never `eql?`, so only the `eql?` index
+   * goes. A JS string is a primitive with no identity apart from its value, so
+   * two equal Strings stay one key where Ruby makes them two.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#compare_by_identity` (`vendor/ruby/v3.3.11/hash.c:4427`).
+   */
+  compareByIdentity(): this {
+    if (this.isCompareByIdentity()) return this;
+
+    this.modifyCheck();
+    this.#identhash = true;
+    this.#eqlKeys.clear();
+
+    return this;
+  }
+
+  /**
+   * `Hash#compare_by_identity?` (`vendor/ruby/v3.3.11/hash.c:4474`
+   * `rb_hash_compare_by_id_p`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#compare_by_identity?` (`vendor/ruby/v3.3.11/hash.c:4474`).
+   */
+  isCompareByIdentity(): boolean {
+    return this.#identhash;
   }
 
   /**
