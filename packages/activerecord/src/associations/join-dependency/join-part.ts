@@ -1,11 +1,12 @@
 import type { Base } from "../../base.js";
 import type { Table, Nodes } from "@blazetrails/arel";
+import type { JoinAssociation } from "./join-association.js";
 
 export abstract class JoinPart {
   readonly baseKlass: typeof Base;
-  readonly children: JoinPart[] = [];
+  readonly children: JoinAssociation[] = [];
 
-  constructor(baseKlass: typeof Base, children?: JoinPart[]) {
+  constructor(baseKlass: typeof Base, children?: JoinAssociation[]) {
     this.baseKlass = baseKlass;
     if (children) this.children.push(...children);
   }

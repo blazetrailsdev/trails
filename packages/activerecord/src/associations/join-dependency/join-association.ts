@@ -19,7 +19,7 @@ export class JoinAssociation extends JoinPart {
   private _readonly?: boolean;
   private _strictLoading?: boolean;
 
-  constructor(reflection: AbstractReflection, children?: JoinPart[]) {
+  constructor(reflection: AbstractReflection, children?: JoinAssociation[]) {
     super(reflection.klass, children);
     this.reflection = reflection;
   }

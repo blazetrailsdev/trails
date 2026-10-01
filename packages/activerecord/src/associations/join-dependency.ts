@@ -144,7 +144,7 @@ export class JoinDependency {
   }
 
   /** @internal */
-  private addAssociation(reflection: any): JoinPart {
+  private addAssociation(reflection: any): JoinAssociation {
     const targetModel: typeof Base = reflection.klass;
     const targetTable: string = (targetModel as any).tableName;
 
@@ -156,7 +156,7 @@ export class JoinDependency {
   }
 
   /** @internal */
-  private build(associations: Record<string, any>, baseKlass: typeof Base): JoinPart[] {
+  private build(associations: Record<string, any>, baseKlass: typeof Base): JoinAssociation[] {
     return Object.keys(associations).flatMap((name) => {
       const right = associations[name];
       const reflection = this.findReflection(baseKlass, name);
@@ -232,7 +232,7 @@ export class JoinDependency {
     joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
   ): Nodes.Join[] {
     const [intersection, missing] = partition(
-      right.children.map((node1): [JoinPart | undefined, JoinPart] => [
+      right.children.map((node1): [JoinAssociation | undefined, JoinAssociation] => [
         left.children.find((node2) => node1.isMatch(node2)),
         node1,
       ]),
@@ -240,7 +240,7 @@ export class JoinDependency {
     );
 
     const joins = intersection.flatMap(([l, r]) => {
-      (r as JoinAssociation).table = l!.table;
+      r.table = l!.table;
       return this.walk(l!, r, joinType);
     });
     return joins.concat(missing.flatMap(([, n]) => this.makeConstraints(left, n, joinType)));

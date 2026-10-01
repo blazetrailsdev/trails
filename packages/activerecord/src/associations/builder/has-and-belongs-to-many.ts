@@ -22,6 +22,7 @@ export class HasAndBelongsToMany {
     this.options = options;
   }
 
+  /** @missingRailsCall call — CONVERGEABLE call-gate-credits-invoking-a-proc-valued-member-as-proc-call */
   throughModel(): any {
     const builder = this;
     const lhsModel = this.lhsModel;
@@ -42,7 +43,7 @@ export class HasAndBelongsToMany {
 
       /** @internal */
       static get tableName(): string {
-        return (tableName ??= this.tableNameResolver.call(null));
+        return (tableName ??= this.tableNameResolver());
       }
 
       /** @internal */

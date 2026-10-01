@@ -1,4 +1,4 @@
-import { first, type Hash, hashDelete, hasKey, type Module } from "@blazetrails/ruby-compat";
+import { first, type Hash, hashDelete, hasKey, type Module, rtest } from "@blazetrails/ruby-compat";
 import { underscore, pluralize, isBlank, safeConstantize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
@@ -145,11 +145,13 @@ export class BelongsTo extends SingularAssociation {
             reflection?.foreignType ??
             reflection?.options?.foreignType ??
             `${underscore(name)}_type`;
-          klass =
-            (changes.get(foreignType) && first(changes.get(foreignType) as unknown[])) ??
-            (typeof o._readAttribute === "function"
-              ? o._readAttribute(foreignType)
-              : o[foreignType]);
+          klass = changes.get(foreignType) && first(changes.get(foreignType) as unknown[]);
+          if (!rtest(klass)) {
+            klass =
+              typeof o._readAttribute === "function"
+                ? o._readAttribute(foreignType)
+                : o[foreignType];
+          }
           try {
             klass = klass
               ? (o.constructor as { polymorphicClassFor(name: string): any }).polymorphicClassFor(
