@@ -10,6 +10,14 @@ const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
+// A gem ported inside another package's source tree (thor lives at
+// `packages/trailties/src/thor/`, the test-side twin of api-compare's
+// `PACKAGE_DIR_OVERRIDES` / `PACKAGE_SRC_SUBDIR`). Its files belong to the
+// nested package alone, so the host's glob excludes the subdir.
+const NESTED_PACKAGES: Record<string, { host: string; subdir: string }> = {
+  thor: { host: "trailties", subdir: "thor" },
+};
+
 function getPackageTestFiles(): Record<string, string[]> {
   const packages = [
     "arel",
@@ -34,9 +42,12 @@ function getPackageTestFiles(): Record<string, string[]> {
     const pattern = `packages/${pkg}/src/**/*.test.ts`;
     // Twin of the Ruby side's `test/**/behaviors/*_behavior.rb` glob.
     const behaviorPattern = `packages/${pkg}/src/**/behaviors/*-behavior.ts`;
+    const ignore = Object.entries(NESTED_PACKAGES)
+      .filter(([, nested]) => nested.host === pkg)
+      .map(([, nested]) => `packages/${nested.host}/src/${nested.subdir}/**`);
     const files = [
-      ...globSync(pattern, { cwd: ROOT_DIR }),
-      ...globSync(behaviorPattern, { cwd: ROOT_DIR }),
+      ...globSync(pattern, { cwd: ROOT_DIR, ignore }),
+      ...globSync(behaviorPattern, { cwd: ROOT_DIR, ignore }),
     ].sort();
 
     result[pkg] = files;
@@ -59,6 +70,12 @@ function getPackageTestFiles(): Record<string, string[]> {
   // Shared test files also relevant to controller/ Ruby tests
   result["actioncontroller"] = [...actionControllerFiles, ...actionDispatchFiles];
   result["abstractcontroller"] = abstractControllerFiles;
+
+  for (const [pkg, nested] of Object.entries(NESTED_PACKAGES)) {
+    result[pkg] = globSync(`packages/${nested.host}/src/${nested.subdir}/**/*.test.ts`, {
+      cwd: ROOT_DIR,
+    }).sort();
+  }
 
   // Aliased packages (trailties → cli)
   for (const [alias, dir] of Object.entries(packageAliases)) {

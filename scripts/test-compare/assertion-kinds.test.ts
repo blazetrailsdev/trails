@@ -44,6 +44,16 @@ describe("normalizeRailsKind", () => {
     expect(normalizeRailsKind("assert_edge")).toBe("match");
   });
 
+  it("maps RSpec expectation chains by matcher", () => {
+    expect(normalizeRailsKind("expect_to_eq")).toBe("equal");
+    expect(normalizeRailsKind("expect_to_be")).toBe("equal");
+    expect(normalizeRailsKind("expect_not_to_include")).toBe("excludes");
+    expect(normalizeRailsKind("expect_to_raise_error")).toBe("raises");
+    expect(normalizeRailsKind("expect_not_to_raise_error")).toBe("nothingRaised");
+    expect(normalizeRailsKind("expect_to_receive")).toBeNull();
+    expect(normalizeRailsKind("expect")).toBeNull();
+  });
+
   it("returns null for an unmapped assertion helper", () => {
     expect(normalizeRailsKind("assert_cycle")).toBeNull();
     expect(normalizeRailsKind("must_be_frobnicated")).toBeNull();

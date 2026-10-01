@@ -34,6 +34,7 @@ const PKG_DIRS: Record<string, string> = {
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",
   actionview: "packages/actionview/src/",
+  thor: "packages/trailties/src/thor/",
 };
 
 interface ConventionFile {

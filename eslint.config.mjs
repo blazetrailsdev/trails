@@ -47,6 +47,7 @@ import {
 import rubyCompatNeedsMriCitation from "./eslint/ruby-compat-needs-mri-citation.mjs";
 import noInternalCanonicalLoaders from "./eslint/no-internal-canonical-loaders.mjs";
 import noLoadSchemaWithStubbedDdl from "./eslint/no-load-schema-with-stubbed-ddl.mjs";
+import thorImportBoundary from "./eslint/thor-import-boundary.mjs";
 import noExplicitAnyDisable from "./eslint/no-explicit-any-disable.mjs";
 import noRawControlBytes from "./eslint/no-raw-control-bytes.mjs";
 import noJsRenderingInRailsMessages from "./eslint/no-js-rendering-in-rails-messages.mjs";
@@ -318,6 +319,7 @@ export default defineConfig(
           "ruby-compat-needs-mri-citation": rubyCompatNeedsMriCitation,
           "no-internal-canonical-loaders": noInternalCanonicalLoaders,
           "no-load-schema-with-stubbed-ddl": noLoadSchemaWithStubbedDdl,
+          "thor-import-boundary": thorImportBoundary,
           "no-explicit-any-disable": noExplicitAnyDisable,
           "no-raw-control-bytes": noRawControlBytes,
           "no-js-rendering-in-rails-messages": noJsRenderingInRailsMessages,
@@ -781,6 +783,19 @@ export default defineConfig(
     files: canonicalLoaderEnforcedGlobs,
     rules: {
       "blazetrails/no-internal-canonical-loaders": "error",
+    },
+  },
+
+  // ── thor-import-boundary: the thor port nested in trailties imports nothing
+  //    outside thor/ but ruby-compat and did-you-mean (thor.gemspec declares no
+  //    runtime dependency). Specs are held out: until `Thor::Group` is ported,
+  //    actions.test.ts hosts `Thor::Actions` on the railties generator base.
+  //    See eslint/thor-import-boundary.mjs. ──
+  {
+    files: ["packages/trailties/src/thor/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "blazetrails/thor-import-boundary": "error",
     },
   },
 

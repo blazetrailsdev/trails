@@ -136,14 +136,20 @@ const RUBY_COMPAT_SPEC_TS_FILES: Record<string, string> = {
  * `-behavior.test.ts`.
  */
 export function rubyToConventionTs(rubyFile: string, pkg: string): string {
-  if (pkg === "rack-test") {
-    // Specs are reported relative to `spec`, so each repeats the gem's
-    // `lib/rack/test` root as a leading `rack/` (plus a further `test/` below
-    // `rack/test_spec.rb`). Drop both, the same redundant-leading-segment case
-    // as rack-session above, so both sides land on `packages/rack-test/src/<x>`.
-    let rest = rubyFile.startsWith("rack/") ? rubyFile.slice("rack/".length) : rubyFile;
-    if (rest.startsWith("test/")) rest = rest.slice("test/".length);
-    const dir = path.dirname(rest);
+  if (pkg === "rack-test" || pkg === "thor") {
+    // Specs are reported relative to `spec`, so each rack-test one repeats the
+    // gem's `lib/rack/test` root as a leading `rack/` (plus a further `test/`
+    // below `rack/test_spec.rb`). Drop both, the same redundant-leading-segment
+    // case as rack-session above, so both sides land on
+    // `packages/rack-test/src/<x>`. Thor's specs already sit at the lib-relative
+    // path (`spec/actions/create_file_spec.rb` mirrors
+    // `lib/thor/actions/create_file.rb`).
+    let rest = rubyFile;
+    if (pkg === "rack-test") {
+      if (rest.startsWith("rack/")) rest = rest.slice("rack/".length);
+      if (rest.startsWith("test/")) rest = rest.slice("test/".length);
+    }
+    const dir = path.dirname(rest).replace(/_/g, "-");
     const base = path.basename(rest, ".rb").replace(/_spec$/, "");
     const tsFile = base.replace(/_/g, "-") + ".test.ts";
     return dir === "." ? tsFile : path.join(dir, tsFile);
@@ -1543,6 +1549,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   i18n: "packages/i18n/src/",
   date: "packages/date/src/",
   "ruby-compat": "packages/ruby-compat/src/",
+  thor: "packages/trailties/src/thor/",
 };
 
 function extractRelativeTsPath(fullPath: string, pkg: string): string {

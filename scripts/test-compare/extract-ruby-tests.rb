@@ -1879,6 +1879,34 @@ class TestExtractor
     end
   end
 
+  RSPEC_TO = { "to" => "to", "not_to" => "not_to", "to_not" => "not_to" }.freeze
+
+  # RSpec's expectation chain, `expect(x).to eq(y)` / `expect { … }.not_to
+  # raise_error`, as `[kind, expect_node, matcher_args]`: the kind token
+  # (`expect_to_eq`, `expect_not_to_raise_error`) that stands in for the bare
+  # `expect`, the `expect` call it replaces, and the matcher's own argument list.
+  # nil for anything else, including a matcher that is not a plain call
+  # (`to be > 3`), which stays a bare `expect`.
+  def rspec_expectation(node)
+    return nil unless node[0] == :command_call && (to = RSPEC_TO[ident_name(node[3])])
+    recv = node[1]
+    recv = recv[1] if recv.is_a?(Array) && recv[0] == :method_add_block
+    recv = recv[1] if recv.is_a?(Array) && recv[0] == :method_add_arg
+    return nil unless recv.is_a?(Array) && recv[0] == :fcall && ident_name(recv[1]) == "expect"
+    matcher = (positional_args(node[4]) || node[4])&.first
+    matcher = matcher[1] if matcher.is_a?(Array) && matcher[0] == :method_add_block
+    args = nil
+    if matcher.is_a?(Array) && matcher[0] == :method_add_arg
+      args = matcher[2]
+      matcher = matcher[1]
+    elsif matcher.is_a?(Array) && matcher[0] == :command
+      args = matcher[2]
+    end
+    return nil unless matcher.is_a?(Array) && %i[fcall vcall command].include?(matcher[0])
+    name = ident_name(matcher[1])
+    name ? ["expect_#{to}_#{name}", recv, args] : nil
+  end
+
   # Collect every same-file `def name` → { scope:, body: } (node[3] is the
   # bodystmt), where `scope` is the enclosing class/module name path. Includes
   # `test_*` methods too: a test method is itself a valid helper when another
@@ -2053,9 +2081,18 @@ class TestExtractor
   def collect_assertion_kinds_expanded(node, results, values, visiting, depth, pending_args, scope, pending_never = false)
     return unless node.is_a?(Array)
 
+    if (rspec = rspec_expectation(node))
+      kind, expect_node, matcher_args = rspec
+      (@rspec_expects ||= {}.compare_by_identity)[expect_node] = true
+      results << kind
+      values << literal_token(positional_args(matcher_args)&.first)
+    end
+
     name = self_call_name(node)
     if name
-      if assertion_method?(name)
+      if @rspec_expects&.key?(node)
+        # Recorded above, under its matcher's kind.
+      elsif assertion_method?(name)
         # A parenthesized call `assert_equal(a, b)` is `[:method_add_arg,
         # [:fcall, ...], ...]`; self_call_name matches the inner :fcall, and the
         # recursion below descends into it — so the wrapper is not double-counted.

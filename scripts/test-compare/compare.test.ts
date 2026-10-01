@@ -178,6 +178,17 @@ describe("rubyToConventionTs", () => {
     expect(rubyToConventionTs("rack/test/utils_spec.rb", "rack-test")).toBe("utils.test.ts");
   });
 
+  it("strips thor's _spec suffix and keeps its lib-relative spec path", () => {
+    expect(rubyToConventionTs("actions/create_file_spec.rb", "thor")).toBe(
+      "actions/create-file.test.ts",
+    );
+    expect(rubyToConventionTs("parser/options_spec.rb", "thor")).toBe("parser/options.test.ts");
+    expect(rubyToConventionTs("thor_spec.rb", "thor")).toBe("thor.test.ts");
+    expect(rubyToConventionTs("line_editor/basic_spec.rb", "thor")).toBe(
+      "line-editor/basic.test.ts",
+    );
+  });
+
   it("strips rack-session's leading session_ segment, which mirrors its lib/rack/session root", () => {
     expect(rubyToConventionTs("spec_session_pool.rb", "rack-session")).toBe("pool.test.ts");
     expect(rubyToConventionTs("spec_session_cookie.rb", "rack-session")).toBe("cookie.test.ts");
