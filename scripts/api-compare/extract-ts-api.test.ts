@@ -3655,7 +3655,6 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
   });
 
   it("reads option keys off an options hash carried as a keyword", () => {
-    // delegated_type.rb:237 `def define_delegated_type_methods(role, types:, options:)`.
     const info = extractFromFiles("/p", {
       "delegated-type.ts": `
         export function defineDelegatedTypeMethods(

@@ -81,10 +81,6 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // Ruby core `Hash#except` — `hash.except(*keys)`, exported by ruby-compat
   // as `except(hash, ...keys)`.
   "except",
-  // Ruby core `Hash#merge!` (`vendor/ruby/v3.3.11/hash.c:4028`) —
-  // `options.except(...).merge!(count:, value:)` (validations/comparability.rb:10).
-  // The same shape as `except` above: @blazetrails/ruby-compat exports it as
-  // `mergeBang(hash, other)` and the Ruby receiver is TS argument 1.
   "merge!",
   // active_support/core_ext/hash/indifferent_access.rb — `hash.with_indifferent_access`,
   // exported by @blazetrails/activesupport as `withIndifferentAccess(obj)`.

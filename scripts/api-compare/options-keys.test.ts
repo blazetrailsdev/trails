@@ -105,8 +105,6 @@ describe("matchOptionKeysAgainst", () => {
   });
 
   it("empties extraInTs when the Ruby body forwards its options hash to a callee", () => {
-    // serializers/json.rb:96-103 `as_json` reads only `:root` and hands
-    // `options` to `serializable_hash`, which reads the rest.
     const ts = [["except", "include", "methods", "only", "root"]];
     expect(matchOptionKeysAgainst(["root"], ts, [], true)).toEqual({
       comparable: true,

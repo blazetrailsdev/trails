@@ -5528,7 +5528,10 @@ function typeAdmitsBoolean(type: ts.Type): boolean {
  * options-shaped trailing param), null (uncheckable — `any`/`unknown` or a
  * string-index bag like `Record<string, unknown>`, distinct from `[]`), or the
  * sorted/deduped property names. Only interface/type-literal/intersection
- * trailing params are inspected.
+ * trailing params are inspected. A trailing kwargs bag that carries the options
+ * hash as its `options` / `opts` property (Ruby `def m(role, types:, options:)`,
+ * delegated_type.rb:237) is read through to that property, since those are the
+ * names extract-ruby-api.rb `option_var_names` reads keys off.
  */
 export function extractOptionKeys(
   parameters: ts.NodeArray<ts.ParameterDeclaration>,
@@ -5551,11 +5554,6 @@ export function extractOptionKeys(
     .getIndexInfosOfType(type)
     .some((i) => (i.keyType.flags & (ts.TypeFlags.String | ts.TypeFlags.Number)) !== 0);
   if (hasStringIndex) return null;
-  // Ruby `def m(role, types:, options:)` (delegated_type.rb:237) carries its
-  // options hash as a KEYWORD, which ports as a property of the trailing kwargs
-  // bag. The Ruby side reads keys off that `options` var, so the keys to diff
-  // against are the property's, not the bag's. The two names are the ones
-  // extract-ruby-api.rb `option_var_names` reads an options hash off.
   const nested = type.getProperty("options") ?? type.getProperty("opts");
   if (nested) {
     const nestedType = checker.getNonNullableType(checker.getTypeOfSymbolAtLocation(nested, last));

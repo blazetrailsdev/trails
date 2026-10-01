@@ -7,6 +7,7 @@ import {
   prepend,
   runCallbacks,
 } from "@blazetrails/activesupport";
+import { hasKey } from "@blazetrails/ruby-compat";
 import type { CallbackConditions, CallbackObject } from "../callbacks.js";
 
 export const ClassMethods = {
@@ -101,18 +102,23 @@ export async function runValidationsBang(
 
 /** @internal */
 export function setOptionsForCallback(options: CallbackOptions): void {
-  if (!Object.prototype.hasOwnProperty.call(options, "on")) return;
-  const onArr = Array.isArray(options.on) ? options.on : options.on == null ? [] : [options.on];
-  options.on = onArr;
-  const contextGuard = (o: unknown) => {
-    const ctx = (o as CallbackHostRecord).validationContext;
-    const ctxArr = Array.isArray(ctx) ? ctx : ctx == null ? [] : [ctx];
-    return onArr.some((on) => ctxArr.includes(on));
-  };
-  const existingIf = options.if;
-  const existingArr =
-    existingIf == null ? [] : Array.isArray(existingIf) ? existingIf : [existingIf];
-  options.if = [contextGuard, ...existingArr];
+  if (hasKey(options, "on")) {
+    const on = Array.isArray(options.on) ? options.on : options.on == null ? [] : [options.on];
+    options.on = on;
+    const ifs = options.if == null ? [] : Array.isArray(options.if) ? options.if : [options.if];
+    options.if = [
+      (o: unknown) => {
+        const validationContext = (o as CallbackHostRecord).validationContext;
+        const contexts = Array.isArray(validationContext)
+          ? validationContext
+          : validationContext == null
+            ? []
+            : [validationContext];
+        return on.some((context) => contexts.includes(context));
+      },
+      ...ifs,
+    ];
+  }
 }
 
 /** @internal */

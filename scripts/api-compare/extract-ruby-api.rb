@@ -3371,10 +3371,6 @@ class ApiExtractor
     names
   end
 
-  # The options var handed WHOLE to a callee — `serializable_hash(options)`,
-  # `super(name, **options)`, a bare `super`. The keys the callee reads are then
-  # invisible to collect_option_keys, so the port's options type naming them is
-  # not an extra key (see options-keys.ts `forwarded`).
   def forwards_option_var?(node, vars)
     return false unless node.is_a?(Array)
     case node[0]
