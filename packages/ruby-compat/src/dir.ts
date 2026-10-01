@@ -10,6 +10,7 @@ import { Process } from "./process.js";
 import type { TempfileBasename } from "./tempfile.js";
 import { warn } from "./kernel-warn.js";
 import { FileUtils } from "./file-utils.js";
+import { NotImplementedError } from "./not-implemented-error.js";
 
 /** `W_OK` (`vendor/ruby/v3.3.11/file.c:1898` `rb_file_writable_p`). */
 const W_OK = 2;
@@ -66,7 +67,7 @@ function braceExpand(pattern: string): string[] {
   return alternatives.flatMap((alternative) => braceExpand(`${prefix}${alternative}${suffix}`));
 }
 
-function fnmatch(segment: string, name: string): boolean {
+function fnmatch(segment: string, name: string, flags = 0): boolean {
   let source = "";
   for (let i = 0; i < segment.length; i++) {
     const char = segment[i];
@@ -86,6 +87,7 @@ function fnmatch(segment: string, name: string): boolean {
     } else source += char.replace(/[.*+?^${}()|[\]\\]/, "\\$&");
   }
   if (!new RegExp(`^${source}$`).test(name)) return false;
+  if ((flags & File.FNM_DOTMATCH) !== 0) return true;
   return !name.startsWith(".") || segment.startsWith(".");
 }
 
@@ -101,8 +103,8 @@ function unescape(segment: string): string {
   return segment.replace(/\\(.)/g, "$1");
 }
 
-function segmentMatches(segment: string, name: string): boolean {
-  return MAGIC.test(segment) ? fnmatch(segment, name) : unescape(segment) === name;
+function segmentMatches(segment: string, name: string, flags = 0): boolean {
+  return MAGIC.test(segment) ? fnmatch(segment, name, flags) : unescape(segment) === name;
 }
 
 function globHelper(base: string, segments: string[], found: string[], enumerated: boolean): void {
@@ -128,6 +130,72 @@ function globHelper(base: string, segments: string[], found: string[], enumerate
   for (const name of children(base)) {
     if (!fnmatch(segment === "**" ? "*" : segment, name)) continue;
     globHelper(join(name), rest, found, true);
+  }
+}
+
+/**
+ * A directory's entries as `glob_helper` reads them
+ * (`vendor/ruby/v3.3.11/dir.c:2695-2718`): sorted, with `.` among them unless
+ * `FNM_GLOB_SKIPDOT` is set — which it is for every directory below the first
+ * one read (`dir.c:2692-2693`) — and never `..`.
+ */
+async function childrenAsync(dirname: string, skipdot: boolean): Promise<string[]> {
+  const fs = getFs();
+  if (!fs.readdir)
+    throw new NotImplementedError("readdir() function is unimplemented on this machine");
+  let names: string[];
+  try {
+    names = (await fs.readdir(dirname)).sort();
+  } catch {
+    return [];
+  }
+  return skipdot ? names : [".", ...names];
+}
+
+/**
+ * `glob_helper` (`vendor/ruby/v3.3.11/dir.c:2528`) over the backend's async
+ * verbs — {@link globHelper} with the `flags` it does not take. Under
+ * `FNM_DOTMATCH` a wildcard matches a leading dot (`dir.c:325`) and `**`
+ * descends into dot directories (`dir.c:2762`); `**` never descends a
+ * symlink (`dir.c:2759`), nor `.` itself.
+ */
+async function globHelperAsync(
+  base: string,
+  segments: string[],
+  found: string[],
+  enumerated: boolean,
+  flags: number,
+  skipdot: boolean,
+): Promise<void> {
+  const [segment, ...rest] = segments;
+  if (segment === undefined) {
+    if (enumerated || (await getFs().exists(base))) found.push(base);
+    return;
+  }
+  const join = (name: string): string =>
+    base.endsWith(File.SEPARATOR) ? `${base}${name}` : `${base}${File.SEPARATOR}${name}`;
+  const dotmatch = (flags & File.FNM_DOTMATCH) !== 0;
+  if (segment === "**" && rest.length > 0) {
+    for (const name of await childrenAsync(base, skipdot || !dotmatch)) {
+      if (name.startsWith(".") && !dotmatch) continue;
+      if (segmentMatches(rest[0], name, flags))
+        await globHelperAsync(join(name), rest.slice(1), found, true, flags, true);
+      if (name === ".") continue;
+      const stat = await getFs()
+        .lstat?.(join(name))
+        .catch(() => null);
+      if (stat?.isDirectory() === true)
+        await globHelperAsync(join(name), segments, found, true, flags, true);
+    }
+    return;
+  }
+  if (!MAGIC.test(segment)) {
+    await globHelperAsync(join(unescape(segment)), rest, found, false, flags, skipdot);
+    return;
+  }
+  for (const name of await childrenAsync(base, skipdot)) {
+    if (!fnmatch(segment === "**" ? "*" : segment, name, flags)) continue;
+    await globHelperAsync(join(name), rest, found, true, flags, true);
   }
 }
 
@@ -415,6 +483,28 @@ export class Dir {
       const segments = expanded.split(File.SEPARATOR);
       if (absolute) segments.shift();
       globHelper(absolute ? File.SEPARATOR : ".", segments, found, false);
+    }
+    if (pattern.startsWith(".")) return found;
+    return found.map((entry) => (entry.startsWith("./") ? entry.slice(2) : entry));
+  }
+
+  /**
+   * {@link Dir.glob} over the backend's async `readdir` / `lstat` / `exists`,
+   * taking the `flags` `dir_s_glob` does. `File::FNM_DOTMATCH` is the one flag
+   * read: a wildcard then matches dotfiles, and `.` in the first directory read
+   * — `Dir.glob("g/*", File::FNM_DOTMATCH)` answers `g/.` — but never `..`
+   * (`vendor/ruby/v3.3.11/dir.c:2713`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Dir.glob`
+   * (`vendor/ruby/v3.3.11/dir.c:3227`).
+   */
+  static async globAsync(pattern: string, flags: number = 0): Promise<string[]> {
+    const found: string[] = [];
+    for (const expanded of braceExpand(pattern)) {
+      const absolute = expanded.startsWith(File.SEPARATOR);
+      const segments = expanded.split(File.SEPARATOR);
+      if (absolute) segments.shift();
+      await globHelperAsync(absolute ? File.SEPARATOR : ".", segments, found, false, flags, false);
     }
     if (pattern.startsWith(".")) return found;
     return found.map((entry) => (entry.startsWith("./") ? entry.slice(2) : entry));

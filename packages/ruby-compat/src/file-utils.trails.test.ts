@@ -523,6 +523,66 @@ describe("FileUtils", () => {
     );
   });
 
+  it("rm_rf awaited removes a tree and ignores a missing path", async () => {
+    const tree = nodePath.join(root, "tree");
+    nodeFs.mkdirSync(nodePath.join(tree, "sub"), { recursive: true });
+    nodeFs.writeFileSync(nodePath.join(tree, "sub", "f"), "x");
+    const missing = nodePath.join(root, "missing");
+
+    expect(await FileUtils.rmRfAsync([tree, missing])).toEqual([tree, missing]);
+    expect(nodeFs.existsSync(tree)).toBe(false);
+  });
+
+  it("rm_r awaited raises ENOENT for a missing path unless forced, and prints rm -r", async () => {
+    const lines: string[] = [];
+    FileUtils.fileutilsOutput = { puts: (msg) => lines.push(msg) };
+    const missing = nodePath.join(root, "missing");
+    const file = nodePath.join(root, "f");
+    nodeFs.writeFileSync(file, "x");
+
+    await expect(FileUtils.rmRAsync(missing)).rejects.toThrow(/ENOENT/);
+    expect(await FileUtils.rmRAsync(file, { noop: true, verbose: true })).toBeUndefined();
+    expect(nodeFs.existsSync(file)).toBe(true);
+    expect(await FileUtils.rmRAsync(file, { verbose: true })).toEqual([file]);
+    expect(await FileUtils.rmRfAsync(missing, { verbose: true })).toEqual([missing]);
+    expect(nodeFs.existsSync(file)).toBe(false);
+    expect(lines).toEqual([`rm -r ${file}`, `rm -r ${file}`, `rm -rf ${missing}`]);
+  });
+
+  it("chmod_R sets the mode on every entry beneath the root and leaves a symlink alone", async () => {
+    const lines: string[] = [];
+    FileUtils.fileutilsOutput = { puts: (msg) => lines.push(msg) };
+    const tree = nodePath.join(root, "tree");
+    const file = nodePath.join(tree, "sub", "f");
+    const outside = nodePath.join(root, "outside");
+    nodeFs.mkdirSync(nodePath.join(tree, "sub"), { recursive: true });
+    nodeFs.writeFileSync(file, "x");
+    nodeFs.writeFileSync(outside, "x");
+    nodeFs.chmodSync(outside, 0o600);
+    nodeFs.symlinkSync(outside, nodePath.join(tree, "link"));
+
+    expect(await FileUtils.chmodRAsync(0o755, tree, { verbose: true })).toEqual([tree]);
+
+    for (const path of [tree, nodePath.join(tree, "sub"), file])
+      expect(nodeFs.statSync(path).mode & 0o777).toBe(0o755);
+    expect(nodeFs.statSync(outside).mode & 0o777).toBe(0o600);
+    expect(lines).toEqual([`chmod -R 755 ${tree}`]);
+  });
+
+  it("chmod_R raises for a missing root and does nothing under noop", async () => {
+    const file = nodePath.join(root, "f");
+    nodeFs.writeFileSync(file, "x");
+    nodeFs.chmodSync(file, 0o600);
+
+    await expect(FileUtils.chmodRAsync(0o755, nodePath.join(root, "missing"))).rejects.toThrow(
+      /ENOENT/,
+    );
+    const missing = nodePath.join(root, "missing");
+    expect(await FileUtils.chmodRAsync(0o755, missing, { force: true })).toEqual([missing]);
+    expect(await FileUtils.chmodRAsync(0o755, file, { noop: true })).toBeUndefined();
+    expect(nodeFs.statSync(file).mode & 0o777).toBe(0o600);
+  });
+
   it("chdir is an alias for cd", () => {
     expect(FileUtils.chdir).toBe(FileUtils.cd);
   });

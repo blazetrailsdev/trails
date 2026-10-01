@@ -67,6 +67,35 @@ function fuList(arg: string | string[]): string[] {
 }
 
 /**
+ * `Entry_#traverse` yielding to `Entry_#chmod`
+ * (`vendor/ruby/v3.3.11/lib/fileutils.rb:2354-2362,2206-2213`) over the
+ * backend's async verbs, as `chmod_R`'s block calls them
+ * (`fileutils.rb:1822-1828`): each entry before its children, a symlink left
+ * alone where there is no `lchmod`, a failed `lstat` read as `Entry_#lstat!`
+ * reads it (`fileutils.rb:2200-2204`), and a failed `chmod` swallowed under
+ * `force`.
+ */
+async function entryChmodTraverseAsync(path: string, mode: number, force: boolean): Promise<void> {
+  const fs = getFs();
+  if (!fs.lstat) throw new NotImplementedError("lstat() function is unimplemented on this machine");
+  const st = await fs.lstat(path).catch((error: unknown) => {
+    if (!isSystemCallError(error)) throw error;
+    return null;
+  });
+  try {
+    if (st?.isSymbolicLink?.() !== true) await File.chmodAsync(mode, path);
+  } catch (error) {
+    if (force !== true) throw error;
+  }
+  if (st == null || !st.isDirectory()) return;
+  if (!fs.readdir)
+    throw new NotImplementedError("readdir() function is unimplemented on this machine");
+  for (const n of await fs.readdir(path)) {
+    await entryChmodTraverseAsync(File.join(path, n), mode, force);
+  }
+}
+
+/**
  * `fu_mkdir` (`vendor/ruby/v3.3.11/lib/fileutils.rb:396-404`). Ruby's `Dir.mkdir path,
  * mode` takes the mode in the create call; the backend contract's `mkdirSync`
  * does not, so the mode arrives through the `File.chmod` half alone.
@@ -794,6 +823,71 @@ export class FileUtils {
     } catch (error) {
       if (force !== true) throw error;
     }
+  }
+
+  /** {@link FileUtils.rmR} over the backend's async verbs
+   * (`vendor/ruby/v3.3.11/lib/fileutils.rb:1299-1310`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async rmRAsync(
+    list: string | string[],
+    { force, noop, verbose }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
+  ): Promise<string[] | undefined> {
+    list = fuList(list);
+    if (verbose === true) fuOutputMessage(`rm -r${force === true ? "f" : ""} ${list.join(" ")}`);
+    if (noop === true) return;
+    for (const path of list) {
+      await FileUtils.removeEntryAsync(path, force);
+    }
+    return list;
+  }
+
+  /** {@link FileUtils.rmRf} over the backend's async verbs
+   * (`vendor/ruby/v3.3.11/lib/fileutils.rb:1328-1330`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async rmRfAsync(
+    list: string | string[],
+    { noop, verbose }: { noop?: boolean; verbose?: boolean } = {},
+  ): Promise<string[] | undefined> {
+    return FileUtils.rmRAsync(list, { force: true, noop, verbose });
+  }
+
+  /** {@link FileUtils.removeEntry} (`vendor/ruby/v3.3.11/lib/fileutils.rb:1449-1456`)
+   * over the backend's async recursive `rm`, which is the whole
+   * `Entry_#postorder_traverse` / `Entry_#remove` walk in one verb. Under
+   * `force` a missing path is not an error and every other failure is
+   * swallowed, as Ruby's two `rescue`s do.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async removeEntryAsync(path: string, force = false): Promise<void> {
+    try {
+      const fs = getFs();
+      if (!fs.rm) throw new NotImplementedError("rm() function is unimplemented on this machine");
+      await fs.rm(path, { recursive: true, force });
+    } catch (error) {
+      if (force !== true) throw error;
+    }
+  }
+
+  /** `FileUtils.chmod_R` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1815-1830`). `mode`
+   * is the Integer arm of `fu_mode` (`fileutils.rb:1721-1723`); the symbolic
+   * String arm (`"u+x"`) is unported.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async chmodRAsync(
+    mode: number,
+    list: string | string[],
+    { noop, verbose, force }: { noop?: boolean; verbose?: boolean; force?: boolean } = {},
+  ): Promise<string[] | undefined> {
+    list = fuList(list);
+    if (verbose === true)
+      fuOutputMessage(`chmod -R${force === true ? "f" : ""} ${mode.toString(8)} ${list.join(" ")}`);
+    if (noop === true) return;
+    for (const root of list) {
+      await entryChmodTraverseAsync(root, mode, force === true);
+    }
+    return list;
   }
 
   /** `FileUtils.remove_file` (`vendor/ruby/v3.3.11/lib/fileutils.rb:1473-1477`).

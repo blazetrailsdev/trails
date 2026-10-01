@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Dir, createTmpname } from "./dir.js";
+import { File } from "./file.js";
 
 function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), "trails-dir-"));
@@ -62,6 +63,76 @@ describe("Dir", () => {
       `${root}/sub`,
       `${root}/z.rb`,
     ]);
+  });
+
+  function dotFixture(): string {
+    const g = mkdtempSync(join(tmpdir(), "trails-dir-"));
+    for (const dir of ["a", "a/.h", ".d"]) mkdirSync(join(g, dir));
+    for (const file of ["B.rb", ".dot", "a/x.rb", "a/.y", "a/.h/z", ".d/w", "a.rb"])
+      writeFileSync(join(g, file), "");
+    symlinkSync(join(g, "a"), join(g, "lnk"));
+    return g;
+  }
+
+  it("globAsync matches what glob does when no flag is given", async () => {
+    const root = fixture();
+
+    for (const pattern of [`${root}/**/*.rb`, `${root}/*`, `${root}/{a,b}/*.rb`, `${root}/nope/*`])
+      expect(await Dir.globAsync(pattern)).toEqual(Dir.glob(pattern));
+    expect(await Dir.globAsync(`${root}/a.rb`)).toEqual([`${root}/a.rb`]);
+    expect(await Dir.globAsync(`${root}/missing.rb`)).toEqual([]);
+  });
+
+  it("globAsync with FNM_DOTMATCH matches dotfiles and the directory's own dot, never dot-dot", async () => {
+    const g = dotFixture();
+    const glob = async (pattern: string): Promise<string[]> =>
+      (await Dir.globAsync(`${g}/${pattern}`, File.FNM_DOTMATCH)).map((entry) =>
+        entry.slice(g.length + 1),
+      );
+
+    expect(await glob("*")).toEqual([".", ".d", ".dot", "B.rb", "a", "a.rb", "lnk"]);
+    expect(await glob("a/?y")).toEqual(["a/.y"]);
+    expect(await glob("{.d,a}/*")).toEqual([".d/.", ".d/w", "a/.", "a/.h", "a/.y", "a/x.rb"]);
+    expect(await glob("*/*")).toEqual([
+      "./.d",
+      "./.dot",
+      "./B.rb",
+      "./a",
+      "./a.rb",
+      "./lnk",
+      ".d/w",
+      "a/.h",
+      "a/.y",
+      "a/x.rb",
+      "lnk/.h",
+      "lnk/.y",
+      "lnk/x.rb",
+    ]);
+  });
+
+  it("globAsync with FNM_DOTMATCH descends dot directories under ** but not a symlink", async () => {
+    const g = dotFixture();
+
+    expect(
+      (await Dir.globAsync(`${g}/**/*`, File.FNM_DOTMATCH)).map((entry) =>
+        entry.slice(g.length + 1),
+      ),
+    ).toEqual([
+      ".",
+      ".d",
+      ".d/w",
+      ".dot",
+      "B.rb",
+      "a",
+      "a/.h",
+      "a/.h/z",
+      "a/.y",
+      "a/x.rb",
+      "a.rb",
+      "lnk",
+    ]);
+    expect(await Dir.globAsync(`${g}/**/z`, File.FNM_DOTMATCH)).toEqual([`${g}/a/.h/z`]);
+    expect(await Dir.globAsync(`${g}/**/*.rb`)).toEqual([`${g}/B.rb`, `${g}/a/x.rb`, `${g}/a.rb`]);
   });
 
   it("glob answers an empty array for a pattern that matches nothing", () => {

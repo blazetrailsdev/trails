@@ -9,6 +9,7 @@ import {
   registerFsAdapter,
   type Bytes,
   type FsAdapter,
+  type FsStatResult,
   type PathAdapter,
 } from "@blazetrails/ruby-compat";
 import type { VirtualFS } from "./virtual-fs.js";
@@ -83,7 +84,73 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
     return Promise.resolve(encoding === undefined ? toBytes(entry.content) : entry.content);
   }
 
+  function enoent(syscall: string, path: string): Error {
+    return Object.assign(new Error(`ENOENT: no such file or directory, ${syscall} '${path}'`), {
+      code: "ENOENT",
+    });
+  }
+
+  // The VFS holds files only: a directory exists exactly while a file sits
+  // beneath it, so these are derived from the stored paths.
+  function under(path: string): string[] {
+    const prefix = path.endsWith("/") ? path : `${path}/`;
+    return vfs
+      .list()
+      .map((file) => file.path)
+      .filter((file) => file.startsWith(prefix));
+  }
+
+  function lstat(path: string): Promise<FsStatResult> {
+    const entry = vfs.read(path);
+    const isDirectory = entry === null && under(path).length > 0;
+    if (entry === null && !isDirectory) return Promise.reject(enoent("lstat", path));
+    return Promise.resolve({
+      isDirectory: () => isDirectory,
+      isFile: () => !isDirectory,
+      isSymbolicLink: () => false,
+      isExecutable: () => isDirectory,
+      size: entry?.content.length ?? 0,
+      // boundary: epoch-zero placeholder for in-memory VFS file times.
+      atime: new Date(0),
+      mtime: new Date(0),
+      mode: isDirectory ? 0o040755 : 0o100644,
+      uid: 0,
+      gid: 0,
+    });
+  }
+
   return {
+    stat: lstat,
+    lstat,
+    readdir(path: string): Promise<string[]> {
+      const prefix = path.endsWith("/") ? path : `${path}/`;
+      const names = under(path).map((file) => file.slice(prefix.length).split("/")[0]);
+      if (names.length === 0) return Promise.reject(enoent("scandir", path));
+      return Promise.resolve([...new Set(names)]);
+    },
+    writeFile(path: string, content: string | Uint8Array): Promise<void> {
+      vfs.write(path, typeof content === "string" ? content : new TextDecoder().decode(content));
+      return Promise.resolve();
+    },
+    unlink(path: string): Promise<void> {
+      return vfs.delete(path) ? Promise.resolve() : Promise.reject(enoent("unlink", path));
+    },
+    mkdir(): Promise<void> {
+      return Promise.resolve();
+    },
+    rm(path: string, options: { recursive?: boolean; force?: boolean } = {}): Promise<void> {
+      const beneath = under(path);
+      if (beneath.length > 0 && options.recursive !== true) {
+        return Promise.reject(
+          Object.assign(new Error(`EISDIR: illegal operation on a directory, rm '${path}'`), {
+            code: "EISDIR",
+          }),
+        );
+      }
+      const removed = [path, ...beneath].filter((file) => vfs.delete(file));
+      if (removed.length === 0 && options.force !== true) return Promise.reject(enoent("rm", path));
+      return Promise.resolve();
+    },
     readFileSync(path: string): string {
       return vfs.read(path)?.content ?? "";
     },
@@ -103,12 +170,6 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
     },
     unlinkSync(path: string): void {
       vfs.delete(path);
-    },
-    rm(list: string | string[]): void {
-      for (const entry of Array.isArray(list) ? list : [list]) vfs.delete(entry);
-    },
-    rmF(list: string | string[]): void {
-      for (const entry of Array.isArray(list) ? list : [list]) vfs.delete(entry);
     },
     readdirSync(): string[] {
       return [];
