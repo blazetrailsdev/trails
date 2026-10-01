@@ -27,10 +27,7 @@ describe("Post single-PK eager count limit id subquery applies order", () => {
     await seedPosts();
     let count = 0;
     const sqls = await captureSql(async () => {
-      count = (await Post.eagerLoad(":comments")
-        .order("title")
-        .limit(2)
-        .count("posts.tags_count")) as number;
+      count = await Post.eagerLoad(":comments").order("title").limit(2).count("posts.tags_count");
     });
     expect(count).toBe(1);
     const idSql = sqls.find((s) => /DISTINCT/i.test(s) && /ORDER BY/i.test(s) && /LIMIT/i.test(s));

@@ -27,7 +27,7 @@ describe("CollectionAssociation#size arms", () => {
   it("counts the target when the association is loaded", async () => {
     const author = await Author.find(authors("david").id);
     const assoc = association(author, "posts");
-    const persisted = (await Post.where({ author_id: author.id }).count()) as number;
+    const persisted = await Post.where({ author_id: author.id }).count();
 
     assoc.target.length = 0;
     assoc.loadedBang();
@@ -39,7 +39,7 @@ describe("CollectionAssociation#size arms", () => {
   it("counts records with a COUNT(*) when the association is not loaded", async () => {
     const author = await Author.find(authors("david").id);
     const assoc = association(author, "posts");
-    const persisted = (await Post.where({ author_id: author.id }).count()) as number;
+    const persisted = await Post.where({ author_id: author.id }).count();
 
     expect(assoc.isLoaded()).toBe(false);
     expect(await assoc.size()).toBe(persisted);
@@ -48,7 +48,7 @@ describe("CollectionAssociation#size arms", () => {
   it("adds buffered new records to the counted records", async () => {
     const author = await Author.find(authors("david").id);
     const assoc = association(author, "posts");
-    const persisted = (await Post.where({ author_id: author.id }).count()) as number;
+    const persisted = await Post.where({ author_id: author.id }).count();
 
     assoc.addToTarget(Post.new({ title: "unsaved", body: "unsaved" }));
 

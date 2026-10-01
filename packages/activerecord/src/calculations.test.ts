@@ -630,7 +630,7 @@ describe("CalculationsTest", () => {
   it("group by count for a composite primary key model", async () => {
     const book = cpkBooks("cpk_great_author_first_book");
     const expected = new Map([
-      [book.author_id, (await CpkBook.where({ author_id: book.author_id }).count()) as number],
+      [book.author_id, await CpkBook.where({ author_id: book.author_id }).count()],
     ]);
     expect(await CpkBook.where({ author_id: book.author_id }).group("author_id").count()).toEqual(
       expected,

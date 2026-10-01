@@ -490,7 +490,7 @@ describe("Migration", () => {
       void TestModel.resetColumnInformation();
 
       await assertDifference(
-        new Map([[async () => (await TestModel.count()) as number, 1]]),
+        new Map([[async () => await TestModel.count(), 1]]),
         null,
         async () => {
           await TestModel.create({ first_name: null });

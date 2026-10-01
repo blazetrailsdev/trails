@@ -40,7 +40,7 @@ describe("CpkBook grouped calculation over a composite-key belongs_to aliases th
     await seedOrders();
     let result: Map<unknown, number> = new Map();
     const sqls = await captureSql(async () => {
-      result = (await CpkBook.group("order").count()) as Map<unknown, number>;
+      result = await CpkBook.group("order").count();
     });
 
     const groupedSql = sqls.find((s) => /GROUP BY/i.test(s));
@@ -62,10 +62,7 @@ describe("CpkBook grouped calculation over a composite-key belongs_to aliases th
 
   it("group by a composite-key belongs_to can order by the aggregate alias", async () => {
     await seedOrders();
-    const result = (await CpkBook.group("order")
-      .order(arelSql("count_all DESC"))
-      .limit(2)
-      .count()) as Map<unknown, number>;
+    const result = await CpkBook.group("order").order(arelSql("count_all DESC")).limit(2).count();
 
     const counts = [...result.entries()].map(([order, count]) => [
       (order as CpkOrder | null)?.id,

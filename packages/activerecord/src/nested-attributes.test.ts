@@ -162,7 +162,7 @@ describe("TestNestedAttributesInGeneral", () => {
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
     await (pirate as any).setShipAttributes({ name: "Black Pearl" });
     await assertNoDifference(
-      () => Ship.count() as Promise<number>,
+      () => Ship.count(),
       null,
       () => pirate.saveBang(),
     );
@@ -181,14 +181,14 @@ describe("TestNestedAttributesInGeneral", () => {
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
     await (pirate as any).setShipAttributes({ name: "Red Pearl", _reject_me_if_new: true });
     await assertNoDifference(
-      () => Ship.count() as Promise<number>,
+      () => Ship.count(),
       null,
       () => pirate.saveBang(),
     );
 
     await (pirate as any).setShipAttributes({ name: "Red Pearl", _reject_me_if_new: true });
     await assertDifference(
-      () => Ship.count() as Promise<number>,
+      () => Ship.count(),
       1,
       null,
       () => pirate.saveBang(),
@@ -232,7 +232,7 @@ describe("TestNestedAttributesInGeneral", () => {
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
     await (pirate as any).setShipAttributes({ name: "Hello Pearl" });
     await assertDifference(
-      () => Ship.count() as Promise<number>,
+      () => Ship.count(),
       1,
       null,
       () => pirate.saveBang(),
@@ -343,7 +343,7 @@ describe("TestNestedAttributesInGeneral", () => {
   it("should not create duplicates with create with", async () => {
     Human.acceptsNestedAttributesFor("interests");
     await assertDifference(
-      () => Interest.count() as Promise<number>,
+      () => Interest.count(),
       1,
       null,
       async () => {
@@ -1205,12 +1205,12 @@ describe("TestNestedAttributesOnAHasManyAssociation", () => {
     await repairValidations(Interest, async () => {
       (Interest as any).validates("human", { presence: true });
       await assertDifference(
-        () => Human.count() as Promise<number>,
+        () => Human.count(),
         1,
         null,
         async () => {
           await assertDifference(
-            () => Interest.count() as Promise<number>,
+            () => Interest.count(),
             2,
             null,
             async () => {
@@ -1259,7 +1259,7 @@ function limitTests(makePirate: () => Promise<Pirate>): void {
     const pirate = await makePirate();
     await (pirate as any).setAttributes({ parrotsAttributes: { foo: { name: "Big Big Love" } } });
     await assertDifference(
-      () => Parrot.count() as Promise<number>,
+      () => Parrot.count(),
       1,
       null,
       () => pirate.saveBang(),
@@ -1275,7 +1275,7 @@ function limitTests(makePirate: () => Promise<Pirate>): void {
       },
     });
     await assertDifference(
-      () => Parrot.count() as Promise<number>,
+      () => Parrot.count(),
       2,
       null,
       () => pirate.saveBang(),

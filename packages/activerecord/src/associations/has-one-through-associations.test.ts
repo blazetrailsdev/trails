@@ -400,18 +400,18 @@ describe("HasOneThroughAssociationsTest", () => {
   it("re-assigning the same target record on a persisted owner is a no-op", async () => {
     const member = members("groucho");
     const club = await readHasOne(member, "club");
-    const before = (await Membership.count()) as number;
+    const before = await Membership.count();
     await (member.association("club") as SingularAssociation).writer(club);
     await member.save();
     await member.reload();
     expect((await readHasOne(member, "club"))?.id).toBe(clubs("boring_club").id);
-    expect((await Membership.count()) as number).toBe(before);
+    expect(await Membership.count()).toBe(before);
   });
 
   it("replacing target record deletes old association", async () => {
     const member = members("groucho");
     await assertNoDifference(
-      () => Membership.count() as Promise<number>,
+      () => Membership.count(),
       null,
       async () => {
         const newClub = await Club.create({ name: "Bananarama" });
@@ -573,7 +573,7 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   const memberDetailCount = async (member: any): Promise<number> =>
-    (await MemberDetail.where({ member_id: member.id }).count()) as number;
+    await MemberDetail.where({ member_id: member.id }).count();
 
   it("assigning to has one through preserves decorated join record", async () => {
     const member = members("groucho");

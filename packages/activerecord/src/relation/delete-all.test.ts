@@ -37,7 +37,7 @@ describe("DeleteAllTest", () => {
     expect(davids.isLoaded).toBeTruthy();
 
     await assertDifference(
-      () => Author.count() as Promise<number>,
+      () => Author.count(),
       -1,
       null,
       async () => {
@@ -55,7 +55,7 @@ describe("DeleteAllTest", () => {
     const davids = Author.where({ name: "David" });
 
     await assertDifference(
-      () => Author.count() as Promise<number>,
+      () => Author.count(),
       -1,
       null,
       () => davids.deleteAll(),
@@ -69,7 +69,7 @@ describe("DeleteAllTest", () => {
     );
 
     await assertDifference(
-      () => Author.count() as Promise<number>,
+      () => Author.count(),
       -1,
       null,
       () => davids.deleteAll(),
@@ -84,7 +84,7 @@ describe("DeleteAllTest", () => {
     expect(davids.isLoaded).toBeTruthy();
 
     await assertDifference(
-      () => Author.count() as Promise<number>,
+      () => Author.count(),
       -1,
       null,
       () => davids.deleteAll(),
@@ -100,7 +100,7 @@ describe("DeleteAllTest", () => {
     expect(postsToBeDeleted.length).toBeGreaterThan(0);
 
     await assertDifference(
-      () => Post.count() as Promise<number>,
+      () => Post.count(),
       -postsToBeDeleted.length,
       null,
       () => Post.mostCommented(minimumCommentsCount).deleteAll(),

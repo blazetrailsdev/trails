@@ -683,7 +683,7 @@ describe("RelationTest", () => {
 
     let count = 0;
     const countQueries = await captureSql(async () => {
-      count = (await CanonPost.where({ author_id: subquery() }).count()) as number;
+      count = await CanonPost.where({ author_id: subquery() }).count();
     });
     expect(count).toBe(expectedPostIds.length);
     expect(countQueries.every((sql) => !/IN\s*\(\s*SELECT/i.test(sql))).toBe(true);

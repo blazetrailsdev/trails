@@ -9,8 +9,8 @@ import { User, UserWithNotification } from "./test-helpers/models/user.js";
 fixtures([]);
 
 describe("SuppressorTest", () => {
-  const notificationCount = () => Notification.count() as Promise<number>;
-  const userCount = () => User.count() as Promise<number>;
+  const notificationCount = () => Notification.count();
+  const userCount = () => User.count();
 
   it("suppresses create", async () => {
     await assertNoDifference(notificationCount, null, async () => {

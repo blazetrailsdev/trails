@@ -1625,7 +1625,7 @@ describe("TransactionTest", () => {
         }
       }
       await assertNoDifference(
-        () => K.count() as Promise<number>,
+        () => K.count(),
         null,
         async () => {
           await K.transaction(async () => {

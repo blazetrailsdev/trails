@@ -552,7 +552,7 @@ describe("AdapterTestWithoutTransaction", () => {
     connection.enableQueryCacheBang();
     try {
       posts("welcome");
-      const count = (await Post.count()) as number;
+      const count = await Post.count();
 
       await connection.create("INSERT INTO posts(title, body) VALUES ('', '')");
 
@@ -937,7 +937,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
   it.skipIf(!remoteSupported)(
     "active transaction is restored after remote disconnection",
     async () => {
-      expect((await Post.count()) as number).toBeGreaterThan(0);
+      expect(await Post.count()).toBeGreaterThan(0);
       await Post.transaction(async () => {
         await connection.materializeTransactions();
         await remoteDisconnect(connection);
@@ -950,7 +950,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
         throw new Rollback();
       });
 
-      expect((await Post.count()) as number).toBeGreaterThan(0);
+      expect(await Post.count()).toBeGreaterThan(0);
     },
   );
 
@@ -970,7 +970,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
       expect(invocations).toBe(1);
 
       expect(await activePredicate(connection)).toBeFalsy();
-      expect((await Post.count()) as number).toBeGreaterThan(0);
+      expect(await Post.count()).toBeGreaterThan(0);
     },
   );
 

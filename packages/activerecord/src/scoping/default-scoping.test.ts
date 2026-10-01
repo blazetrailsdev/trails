@@ -524,7 +524,7 @@ describe("DefaultScopingTest", () => {
   });
 
   it("default scope find last", async () => {
-    expect(((await DeveloperOrderedBySalary.count()) as number) > 1).toBeTruthy();
+    expect((await DeveloperOrderedBySalary.count()) > 1).toBeTruthy();
     const lowest = (await DeveloperOrderedBySalary.find(developers("poor_jamis").id)) as any;
     expect(((await DeveloperOrderedBySalary.last()) as any).id).toBe(lowest.id);
   });
@@ -700,7 +700,7 @@ describe("DefaultScopingTest", () => {
 
   it("create with nested attributes", async () => {
     await assertDifference(
-      () => Project.count() as Promise<number>,
+      () => Project.count(),
       1,
       null,
       async () => {

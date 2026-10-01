@@ -63,7 +63,7 @@ describe("collection association and CollectionProxy share one target", () => {
     assoc.addToTarget(built);
 
     expect(proxy.target).toContain(built);
-    const persisted = (await Post.where({ author_id: author.id }).count()) as number;
+    const persisted = await Post.where({ author_id: author.id }).count();
     expect(await proxy.size()).toBe(persisted + 1);
   });
 
