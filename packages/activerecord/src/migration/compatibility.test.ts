@@ -7,12 +7,19 @@ import type { MigrationProxy } from "../migration.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { Column } from "../connection-adapters/column.js";
 import { ambientConnection } from "../support/rocket-tables.js";
-import { currentAdapter } from "../support/adapter-helper.js";
+import {
+  currentAdapter,
+  disableExtensionBang,
+  enableExtensionBang,
+} from "../support/adapter-helper.js";
 import { itIfSupports } from "../support/supports.js";
 import { fixtures } from "../test-fixtures.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 
 class TestModel extends Base {}
+class Testing extends Base {
+  declare foo: string | null;
+}
 TestModel.tableName = "testings";
 
 describe("Migration", () => {
@@ -665,14 +672,86 @@ describe("Migration", () => {
         await TestModel.createBang({ name: null });
       });
     });
+
+    it.skipIf(!currentAdapter("PostgreSQLAdapter"))(
+      "legacy change column with null executes update",
+      async () => {
+        const migration = new (class extends Migration.get(5.1) {
+          override async migrate(_x: unknown): Promise<void> {
+            await this.changeColumn("testings", "foo", "string", {
+              limit: 10,
+              null: false,
+              default: "foobar",
+            });
+          }
+        })();
+
+        try {
+          await Testing.createBang();
+          await migrate(migration);
+          expect((await Testing.all()).map((testing) => testing.foo)).toEqual(["foobar"]);
+        } finally {
+          Base.clearCacheBang();
+        }
+      },
+    );
+
+    it.skipIf(!currentAdapter("PostgreSQLAdapter"))("disable extension on 7 0", async () => {
+      await enableExtensionBang("hstore", connection as never);
+      const migration = class extends Migration.get(7.0) {
+        async up(): Promise<void> {
+          await this.addColumn("testings", "settings", "hstore");
+          await this.disableExtension("hstore");
+        }
+      };
+
+      try {
+        await migrate(migration as unknown as Migration);
+        expect(await (connection as never as PgConnection).extensionEnabled("hstore")).toBeFalsy();
+      } finally {
+        await disableExtensionBang("hstore", connection as never);
+      }
+    });
+
+    it.skipIf(!currentAdapter("PostgreSQLAdapter"))(
+      "legacy add foreign key with deferrable true",
+      async () => {
+        const migration = new (class extends Migration.get(7.0) {
+          override async migrate(_x: unknown): Promise<void> {
+            await this.createTable("sub_testings", (t) => {
+              t.bigint("testing_id");
+            });
+            await this.addForeignKey("sub_testings", "testings", {
+              name: "deferrable_foreign_key",
+              deferrable: true as never,
+            });
+          }
+        })();
+
+        try {
+          await migrate(migration);
+          const foreignKeys = await (await Testing.leaseConnection()).foreignKeys("sub_testings");
+          expect(foreignKeys.length).toBe(1);
+          expect(foreignKeys[0].deferrable).toBe("immediate");
+        } finally {
+          await connection.dropTable("sub_testings", { ifExists: true });
+          Base.clearCacheBang();
+        }
+      },
+    );
   });
 });
+
+type PgConnection = { extensionEnabled(name: string): Promise<boolean> };
 
 class LegacyPrimaryKey extends Base {}
 
 function legacyPrimaryKeyTestCases(migrationClass: () => ReturnType<typeof Migration.get>): void {
+  fixtures({}, { useTransactionalTests: false });
   let migration: Migration | null;
   let verboseWas: boolean;
+  const columnsHash = () => LegacyPrimaryKey.columnsHash() as unknown as Record<string, Column>;
+  const dump = async (table: string) => dumpTableSchema(await ambientConnection(), table);
 
   beforeEach(() => {
     migration = null;
@@ -682,7 +761,8 @@ function legacyPrimaryKeyTestCases(migrationClass: () => ReturnType<typeof Migra
 
   afterEach(async () => {
     if (migration) await migration.migrate("down");
-    await (await ambientConnection()).dropTable("legacy_primary_keys", { ifExists: true });
+    const connection = await ambientConnection();
+    await connection.dropTable("legacy_primary_keys", "apples_bananas", { ifExists: true });
     Migration.verbose = verboseWas;
     await Base.connectionPool()
       .schemaMigration.deleteAllVersions()
@@ -694,18 +774,56 @@ function legacyPrimaryKeyTestCases(migrationClass: () => ReturnType<typeof Migra
     await LegacyPrimaryKey.loadSchema();
     expect(LegacyPrimaryKey.primaryKey).toBe("id");
 
-    const legacyPk = (LegacyPrimaryKey.columnsHash() as unknown as Record<string, Column>)["id"];
+    const legacyPk = columnsHash()["id"];
     expect(legacyPk.type).toBe("integer");
     expect(legacyPk.isBigint()).toBeFalsy();
     expect(legacyPk.null).toBeFalsy();
 
     if (currentAdapter("Mysql2Adapter", "TrilogyAdapter", "PostgreSQLAdapter")) {
-      const schema = await dumpTableSchema(await ambientConnection(), "legacy_primary_keys");
-      expect(schema).toMatch(
+      expect(await dump("legacy_primary_keys")).toMatch(
         /createTable\("legacy_primary_keys", \{ id: "(?:integer|serial)", (?!default: null)/,
       );
     }
   };
+
+  it("legacy primary key should be auto incremented", async () => {
+    migration = new (class extends migrationClass() {
+      async change(): Promise<void> {
+        await this.createTable("legacy_primary_keys", (t) => {
+          t.references("legacy_ref");
+        });
+      }
+    })();
+
+    await migration.migrate("up");
+    await assertLegacyPrimaryKey();
+    expect(columnsHash()["legacy_ref_id"].isBigint()).toBeFalsy();
+
+    const record1 = await LegacyPrimaryKey.createBang();
+    expect(record1.id).not.toBeNull();
+    await record1.destroy();
+    const record2 = await LegacyPrimaryKey.createBang();
+    expect(record2.id).not.toBeNull();
+    expect(record2.id).toBeGreaterThan(record1.id as number);
+  });
+
+  it.skipIf(currentAdapter("SQLite3Adapter"))(
+    "legacy integer primary key should not be auto incremented",
+    async () => {
+      migration = new (class extends migrationClass() {
+        async change(): Promise<void> {
+          await this.createTable("legacy_primary_keys", { id: "integer" }, () => {});
+        }
+      })();
+
+      await migration.migrate("up");
+      await assertRaises([NotNullViolation], {}, () => LegacyPrimaryKey.createBang());
+
+      expect(await dump("legacy_primary_keys")).toMatch(
+        /createTable\("legacy_primary_keys", \{ id: "integer", default: null/,
+      );
+    },
+  );
 
   it("legacy primary key in create table should be integer", async () => {
     migration = new (class extends migrationClass() {
@@ -719,6 +837,104 @@ function legacyPrimaryKeyTestCases(migrationClass: () => ReturnType<typeof Migra
     await migration.migrate("up");
     await assertLegacyPrimaryKey();
   });
+
+  it("legacy primary key in change table should be integer", async () => {
+    migration = new (class extends migrationClass() {
+      async change(): Promise<void> {
+        await this.createTable("legacy_primary_keys", { id: false }, (t) => {
+          t.integer("dummy");
+        });
+        await this.changeTable("legacy_primary_keys", async (t) => {
+          await t.primaryKey("id");
+        });
+      }
+    })();
+
+    await migration.migrate("up");
+    await assertLegacyPrimaryKey();
+  });
+
+  it("add column with legacy primary key should be integer", async () => {
+    migration = new (class extends migrationClass() {
+      async change(): Promise<void> {
+        await this.createTable("legacy_primary_keys", { id: false }, (t) => {
+          t.integer("dummy");
+        });
+        await this.addColumn("legacy_primary_keys", "id", "primary_key");
+      }
+    })();
+
+    await migration.migrate("up");
+    await assertLegacyPrimaryKey();
+  });
+
+  it("legacy join table foreign keys should be integer", async () => {
+    migration = new (class extends migrationClass() {
+      async change(): Promise<void> {
+        await this.createJoinTable("apples", "bananas", () => {});
+      }
+    })();
+
+    await migration.migrate("up");
+    const schema = await dump("apples_bananas");
+    expect(schema).toMatch(/integer\("apple_id", \{ null: false \}/);
+    expect(schema).toMatch(/integer\("banana_id", \{ null: false \}/);
+  });
+
+  it("legacy join table column options should be overwritten", async () => {
+    migration = new (class extends migrationClass() {
+      async change(): Promise<void> {
+        await this.createJoinTable("apples", "bananas", { columnOptions: { type: "bigint" } });
+      }
+    })();
+
+    await migration.migrate("up");
+    const schema = await dump("apples_bananas");
+    expect(schema).toMatch(/bigint\("apple_id", \{ null: false \}/);
+    expect(schema).toMatch(/bigint\("banana_id", \{ null: false \}/);
+  });
+
+  it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter"))(
+    "legacy bigint primary key should be auto incremented",
+    async () => {
+      migration = new (class extends migrationClass() {
+        async change(): Promise<void> {
+          await this.createTable("legacy_primary_keys", { id: "bigint" });
+        }
+      })();
+
+      await migration.migrate("up");
+
+      await LegacyPrimaryKey.loadSchema();
+      const legacyPk = columnsHash()["id"];
+      expect(legacyPk.isBigint()).toBeTruthy();
+      expect(
+        (legacyPk as unknown as { isAutoIncrement(): boolean }).isAutoIncrement(),
+      ).toBeTruthy();
+
+      expect(await dump("legacy_primary_keys")).toMatch(
+        /createTable\("legacy_primary_keys", (?!\{ id: "bigint", default: null)/,
+      );
+    },
+  );
+
+  it.skipIf(currentAdapter("Mysql2Adapter", "TrilogyAdapter"))(
+    "legacy bigint primary key should not be auto incremented",
+    async () => {
+      migration = new (class extends migrationClass() {
+        async change(): Promise<void> {
+          await this.createTable("legacy_primary_keys", { id: "bigint" }, () => {});
+        }
+      })();
+
+      await migration.migrate("up");
+      await assertRaises([NotNullViolation], {}, () => LegacyPrimaryKey.createBang());
+
+      expect(await dump("legacy_primary_keys")).toMatch(
+        /createTable\("legacy_primary_keys", \{ id: "bigint", default: null/,
+      );
+    },
+  );
 }
 
 describe("LegacyPrimaryKeyTest", () => {
