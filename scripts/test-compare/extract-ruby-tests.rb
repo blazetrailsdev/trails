@@ -353,6 +353,7 @@ class TestExtractor
           description: desc, line: extract_line(node), assertions: assertion_kinds.uniq,
           assertion_count: assertion_kinds.length, assertion_kinds: assertion_kinds,
           assertion_values: assertion_values,
+          gates: @gate_stack.drop(@module_gate_base),
           body_gate: body_skip_gate(node)
         }
         return
@@ -398,12 +399,15 @@ class TestExtractor
   def process_module(node)
     name = const_name(node[1])
     prev = @module_collect
+    prev_base = @module_gate_base
     @module_collect = []
+    @module_gate_base = @gate_stack.length
     @class_stack.push(name) if name
     walk_body(node[2])
     @class_stack.pop if name
     collected = @module_collect
     @module_collect = prev
+    @module_gate_base = prev_base
     if name && !collected.empty?
       @modules[name] = (@modules[name] || []) + collected
       # Remember the gate in force at the definition site, used as a fallback for
@@ -435,8 +439,10 @@ class TestExtractor
     @modules.each do |name, tests|
       gate_stack = @module_includes[name] || @module_def_gates[name] || []
       saved = @gate_stack
-      @gate_stack = gate_stack
-      tests.each { |t| @test_cases << materialize_module_test(t) }
+      tests.each do |t|
+        @gate_stack = gate_stack + t[:gates]
+        @test_cases << materialize_module_test(t)
+      end
       @gate_stack = saved
     end
   end
@@ -716,6 +722,7 @@ class TestExtractor
         description: desc, line: line, assertions: assertion_kinds.uniq,
         assertion_count: assertion_kinds.length, assertion_kinds: assertion_kinds,
         assertion_values: assertion_values,
+        gates: @gate_stack.drop(@module_gate_base),
         body_gate: body_skip_gate(node)
       }
       return
@@ -983,6 +990,7 @@ class TestExtractor
         description: desc, line: line, assertions: assertion_kinds.uniq,
         assertion_count: assertion_kinds.length, assertion_kinds: assertion_kinds,
         assertion_values: assertion_values,
+        gates: @gate_stack.drop(@module_gate_base),
         body_gate: body_skip_gate(node)
       }
       return
@@ -1343,6 +1351,7 @@ class TestExtractor
         description: desc, line: line, assertions: assertion_kinds.uniq,
         assertion_count: assertion_kinds.length, assertion_kinds: assertion_kinds,
         assertion_values: assertion_values,
+        gates: @gate_stack.drop(@module_gate_base),
         body_gate: body_skip_gate(define_node)
       }
       return
