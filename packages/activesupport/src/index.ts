@@ -287,6 +287,7 @@ export { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 
 export { BigDecimal, toD } from "./core-ext/big-decimal/conversions.js";
 export { toF, toI } from "./core-ext/string/conversions.js";
+export { enableWarnings, silenceWarnings, withWarnings } from "./core-ext/kernel/reporting.js";
 export { endsWith, startsWith } from "./core-ext/string/starts-ends-with.js";
 export { threadMattrAccessor } from "./core-ext/module/attribute-accessors-per-thread.js";
 
@@ -626,6 +627,7 @@ export {
   BacktraceFilter,
   Minitest,
 } from "./testing/assertions.js";
+export { ConstantLookup } from "./testing/constant-lookup.js";
 export { beforeSetup, setTaggedLogger } from "./testing/tagged-logging.js";
 export { silenceStream, quietly, capture } from "./testing/stream.js";
 export * as SetupAndTeardown from "./testing/setup-and-teardown.js";

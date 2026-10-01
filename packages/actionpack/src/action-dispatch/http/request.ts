@@ -1,5 +1,5 @@
 import { camelize, NameError, presence, toSentence, underscore } from "@blazetrails/activesupport";
-import { rbStrDump } from "@blazetrails/ruby-compat";
+import { rbStrDump, toI } from "@blazetrails/ruby-compat";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
   parseNestedQuery,
@@ -342,12 +342,9 @@ export class Request {
     return this.contentMimeType?.toString();
   }
 
-  get contentLength(): number | undefined {
+  get contentLength(): number {
     if (this.hasHeader(TRANSFER_ENCODING)) return new TextEncoder().encode(this.rawPost).length;
-    const cl = this.getHeader("CONTENT_LENGTH") as string | undefined;
-    if (!cl) return undefined;
-    const n = parseInt(cl, 10);
-    return isNaN(n) ? undefined : n;
+    return Number(toI(this.rackRequest.contentLength));
   }
 
   declare readonly ifModifiedSince: Date | undefined;
@@ -446,7 +443,7 @@ export class Request {
     if (!this.hasHeader("RAW_POST_DATA")) {
       this.setHeader("RAW_POST_DATA", this.readBodyStream());
     }
-    return String(this.getHeader("RAW_POST_DATA"));
+    return this.getHeader("RAW_POST_DATA") as string;
   }
 
   get params(): Record<string, unknown> {

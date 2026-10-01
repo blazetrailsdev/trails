@@ -421,7 +421,7 @@ export function toParam(value: unknown): string | boolean | null {
       .join("/");
   }
   if (typeof value === "object") {
-    if (typeof (value as any).toParam === "function") {
+    if (rbObjRespondTo(value, "toParam")) {
       return (value as any).toParam();
     }
     if (value instanceof Map) return toQuery(value);
