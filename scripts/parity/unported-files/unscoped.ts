@@ -90,18 +90,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "test cases stay Ruby-only.",
   },
   {
-    pattern: "/fixtures.rb",
-    reason:
-      "Rails-specific YAML fixtures (test/fixtures/*.yml loaded once into the DB " +
-      "with named-row references and ERB preprocessing). The JS/TS ecosystem uses " +
-      "factories or ad-hoc Model.create instead; Trails users won't ship YAML fixtures. " +
-      "Anchored: unanchored, this pattern also swallowed test_fixtures.rb, " +
-      "encryption/encrypted_fixtures.rb and activesupport's testing/file_fixtures.rb, " +
-      "which carry (or need) their own rows. Source-only since story " +
-      "port-fixtures-test-cases-first-half: fixtures_test.rb is enrolled per case " +
-      "by the rows below.",
-  },
-  {
     testFile: "fixtures_test.rb",
     className: "FixturesTest",
     tests: [

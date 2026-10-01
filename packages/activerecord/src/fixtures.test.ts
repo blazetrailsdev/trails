@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFile } from "fs/promises";
-import { include, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { include, rbObjRespondTo, RuntimeError } from "@blazetrails/ruby-compat";
 import { FixtureSet, FixtureError } from "./fixtures.js";
 import { File as FixtureFile } from "./fixture-set/file.js";
 import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "./test-helpers/fixtures-registry.js";
@@ -155,7 +155,7 @@ describe("FixturesWithForeignKeyViolationsTest", () => {
         const error = await load().catch((e: Error) => e);
         expect(() => {
           throw error;
-        }).toThrow();
+        }).toThrow(RuntimeError);
         expect((error as Error).message).toContain(
           "Foreign key violations found in your fixture data. Ensure you aren't referring to labels that don't exist on associations.",
         );
