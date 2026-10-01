@@ -89,8 +89,9 @@ export class Engine extends Trailtie {
     this.isolated(true);
 
     if (!rbObjRespondTo(mod, "trailtieNamespace")) {
-      const name = this.engineName();
-      mod.trailtieNamespace = () => this;
+      const [name, railtie] = [this.engineName(), this] as const;
+
+      mod.trailtieNamespace = () => railtie;
 
       if (!rbObjRespondTo(mod, "tableNamePrefix")) {
         Object.defineProperty(mod, "tableNamePrefix", {
@@ -111,12 +112,12 @@ export class Engine extends Trailtie {
       }
 
       if (!rbObjRespondTo(mod, "trailtieHelpersPaths")) {
-        mod.trailtieHelpersPaths = () => this.instance().helpersPaths();
+        mod.trailtieHelpersPaths = () => railtie.instance().helpersPaths();
       }
 
       if (!rbObjRespondTo(mod, "trailtieRoutesUrlHelpers")) {
         mod.trailtieRoutesUrlHelpers = (includePathHelpers = true) =>
-          this.instance().routes().urlHelpers(includePathHelpers);
+          railtie.instance().routes().urlHelpers(includePathHelpers);
       }
     }
   }
