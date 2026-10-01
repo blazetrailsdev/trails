@@ -248,7 +248,7 @@ describe("JoinDependency Arel node construction", () => {
 
     const child = jd.joinRoot.children[0];
     expect(child).toBeInstanceOf(JoinAssociation);
-    expect((child as JoinAssociation).reflection).toBeDefined();
+    expect(child.reflection).toBeDefined();
     expect(child).toBe(nodeAt(jd, "assets"));
   });
 });
