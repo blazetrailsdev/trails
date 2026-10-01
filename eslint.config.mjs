@@ -786,11 +786,6 @@ export default defineConfig(
     },
   },
 
-  // ── thor-import-boundary: the thor port nested in trailties imports nothing
-  //    outside thor/ but ruby-compat and did-you-mean (thor.gemspec declares no
-  //    runtime dependency). Specs are held out: until `Thor::Group` is ported,
-  //    actions.test.ts hosts `Thor::Actions` on the railties generator base.
-  //    See eslint/thor-import-boundary.mjs. ──
   {
     files: ["packages/trailties/src/thor/**/*.ts"],
     ignores: ["**/*.test.ts"],

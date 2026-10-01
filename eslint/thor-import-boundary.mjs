@@ -1,14 +1,3 @@
-/**
- * ESLint rule: thor-import-boundary
- *
- * `packages/trailties/src/thor/` is the port of the thor gem, nested inside
- * trailties (api-compare's `PACKAGE_DIR_OVERRIDES.thor`). Thor depends on
- * nothing but Ruby's standard library (`vendor/thor/v1.3.2/thor.gemspec`), so
- * its port may reach only what stands in for that: `@blazetrails/ruby-compat`
- * and `@blazetrails/did-you-mean`. A relative import that leaves `thor/` would
- * make Thor depend on railties, the reverse of the gems' real edge.
- */
-
 import path from "path";
 
 const THOR_ROOT = "packages/trailties/src/thor/";
@@ -33,7 +22,18 @@ export function violation(rel, source) {
     : "package";
 }
 
-/** @type {import("eslint").Rule.RuleModule} */
+/**
+ * ESLint rule: thor-import-boundary
+ *
+ * `packages/trailties/src/thor/` is the port of the thor gem, nested inside
+ * trailties (api-compare's `PACKAGE_DIR_OVERRIDES.thor`). Thor depends on
+ * nothing but Ruby's standard library (`vendor/thor/v1.3.2/thor.gemspec`), so
+ * its port may reach only what stands in for that: `@blazetrails/ruby-compat`
+ * and `@blazetrails/did-you-mean`. A relative import that leaves `thor/` would
+ * make Thor depend on railties, the reverse of the gems' real edge.
+ *
+ * @type {import("eslint").Rule.RuleModule}
+ */
 export default {
   meta: {
     type: "problem",

@@ -137,13 +137,10 @@ const RUBY_COMPAT_SPEC_TS_FILES: Record<string, string> = {
  */
 export function rubyToConventionTs(rubyFile: string, pkg: string): string {
   if (pkg === "rack-test" || pkg === "thor") {
-    // Specs are reported relative to `spec`, so each rack-test one repeats the
-    // gem's `lib/rack/test` root as a leading `rack/` (plus a further `test/`
-    // below `rack/test_spec.rb`). Drop both, the same redundant-leading-segment
-    // case as rack-session above, so both sides land on
-    // `packages/rack-test/src/<x>`. Thor's specs already sit at the lib-relative
-    // path (`spec/actions/create_file_spec.rb` mirrors
-    // `lib/thor/actions/create_file.rb`).
+    // Specs are reported relative to `spec`, so each repeats the gem's
+    // `lib/rack/test` root as a leading `rack/` (plus a further `test/` below
+    // `rack/test_spec.rb`). Drop both, the same redundant-leading-segment case
+    // as rack-session above, so both sides land on `packages/rack-test/src/<x>`.
     let rest = rubyFile;
     if (pkg === "rack-test") {
       if (rest.startsWith("rack/")) rest = rest.slice("rack/".length);

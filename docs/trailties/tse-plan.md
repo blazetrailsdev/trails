@@ -725,7 +725,7 @@ Concretely (matching upstream erubi's lexer):
   detection. A `-%>` followed by `\r\n` on Windows still strips
   correctly (we normalize line endings to `\n` before lex, matching
   Rails' `source.b` + encoding handling).
-- `<%% … %>` emits a literal `<% … %>` tag (Erubi's `%` indicator, `erubi.rb:53,186`); `%%>` is plain text.
+- `<%% … %>` emits a literal `<% … %>` tag (Erubi's `%` indicator, `erubi.rb:53,190-191`); `%%>` is plain text.
 - `<%#` opens a comment that runs to the matching `%>`. Comment bodies
   may contain anything except `%>` — same restriction as `<% %>`. The
   comment AND its trailing newline are dropped from output (Erubi

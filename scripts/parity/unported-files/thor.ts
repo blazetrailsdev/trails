@@ -1,8 +1,3 @@
-/**
- * Entries scoped to `package: "thor"`. The `package` field, not this file's
- * name, is what scopes the match. Schema: ./types.ts.
- */
-
 import type { UnportedFile } from "./types.js";
 
 const RUNNER_REASON =
@@ -81,17 +76,14 @@ export const THOR_UNPORTED_FILES: UnportedFile[] = [
   {
     testFile: "util_spec.rb",
     tests: [
-      // #namespaces_in_content
       "returns an array of names of constants defined in the string",
       "doesn't put the newly-defined constants in the enclosing namespace",
-      // #user_home
       "returns the user path if no variable is set on the environment",
       "returns the *nix system path if file cannot be expanded and separator does not exist",
       "returns the windows system path if file cannot be expanded and a separator exists",
       "returns HOME/.thor if set",
       "returns path with HOMEDRIVE and HOMEPATH if set",
       "returns APPDATA/.thor if set",
-      // #thor_root_glob and #globs_for
       "escapes globs in path",
     ],
     reason: RUNNER_REASON,

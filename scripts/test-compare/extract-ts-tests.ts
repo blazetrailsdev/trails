@@ -10,10 +10,6 @@ const SCRIPT_DIR = __dirname;
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
-// A gem ported inside another package's source tree (thor lives at
-// `packages/trailties/src/thor/`, the test-side twin of api-compare's
-// `PACKAGE_DIR_OVERRIDES` / `PACKAGE_SRC_SUBDIR`). Its files belong to the
-// nested package alone, so the host's glob excludes the subdir.
 const NESTED_PACKAGES: Record<string, { host: string; subdir: string }> = {
   thor: { host: "trailties", subdir: "thor" },
 };

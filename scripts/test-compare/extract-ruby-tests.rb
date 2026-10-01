@@ -1881,12 +1881,6 @@ class TestExtractor
 
   RSPEC_TO = { "to" => "to", "not_to" => "not_to", "to_not" => "not_to" }.freeze
 
-  # RSpec's expectation chain, `expect(x).to eq(y)` / `expect { … }.not_to
-  # raise_error`, as `[kind, expect_node, matcher_args]`: the kind token
-  # (`expect_to_eq`, `expect_not_to_raise_error`) that stands in for the bare
-  # `expect`, the `expect` call it replaces, and the matcher's own argument list.
-  # nil for anything else, including a matcher that is not a plain call
-  # (`to be > 3`), which stays a bare `expect`.
   def rspec_expectation(node)
     return nil unless node[0] == :command_call && (to = RSPEC_TO[ident_name(node[3])])
     recv = node[1]
@@ -2090,15 +2084,15 @@ class TestExtractor
 
     name = self_call_name(node)
     if name
-      if @rspec_expects&.key?(node)
-        # Recorded above, under its matcher's kind.
-      elsif assertion_method?(name)
+      if assertion_method?(name)
         # A parenthesized call `assert_equal(a, b)` is `[:method_add_arg,
         # [:fcall, ...], ...]`; self_call_name matches the inner :fcall, and the
         # recursion below descends into it — so the wrapper is not double-counted.
-        results << (pending_never ? "#{name}_never" : name)
-        args = node[0] == :command ? node[2] : pending_args
-        values << literal_token(expected_arg(args, name))
+        unless @rspec_expects&.key?(node)
+          results << (pending_never ? "#{name}_never" : name)
+          args = node[0] == :command ? node[2] : pending_args
+          values << literal_token(expected_arg(args, name))
+        end
       elsif depth < MAX_HELPER_DEPTH && !visiting.include?(name)
         resolved = resolve_helper(name, scope)
         if resolved

@@ -155,12 +155,6 @@ const MSPEC_MAP: Record<string, CanonicalKind> = {
   should_be_kind_of: "instanceOf",
 };
 
-// RSpec expectation chains, as extract-ruby-tests.rb's `rspec_expectation`
-// spells them: `expect(x).to eq(y)` is `expect_to_eq`, `expect { }.not_to
-// raise_error` is `expect_not_to_raise_error`. Thor's suite is RSpec
-// throughout (vendor/thor/v1.3.2/spec/helper.rb:45). `be` is `equal?`
-// identity, which lands on `equal` for the reason `toBe` does below. Mock
-// expectations (`receive`, `have_been_made`) and `output` stay unmapped.
 const RSPEC_MAP: Record<string, CanonicalKind> = {
   expect_to_eq: "equal",
   expect_not_to_eq: "notEqual",

@@ -544,11 +544,15 @@ export function methodUsesDepImport(
   return found;
 }
 
-// Ruby names a module function through its module: `ActiveModel::Type.default_value`
-// (activerecord/lib/arel/nodes/homogeneous_in.rb:51) extracts the dep ref `Type`.
-// The port is a top-level function of the file mirroring that module
-// (activemodel/src/type.ts's `defaultValue`), imported by its bare name, so the
-// module it belongs to is the declaring file's basename.
+/**
+ * The module an imported top-level function belongs to, or null for any other
+ * identifier. Ruby names a module function through its module:
+ * `ActiveModel::Type.default_value`
+ * (activerecord/lib/arel/nodes/homogeneous_in.rb:51) extracts the dep ref
+ * `Type`. The port is a top-level function of the file mirroring that module
+ * (activemodel/src/type.ts's `defaultValue`), imported by its bare name, so
+ * its module is the declaring file's basename.
+ */
 export function moduleFunctionOwner(id: ts.Identifier, checker: ts.TypeChecker): string | null {
   const sym = checker.getSymbolAtLocation(id);
   if (!sym) return null;
