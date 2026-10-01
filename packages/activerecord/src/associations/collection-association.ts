@@ -53,7 +53,7 @@ export abstract class CollectionAssociation extends Association {
     for (const val of records) (this as any).raiseOnTypeMismatchBang(val);
     if (
       (this.owner as { isPersisted?: () => boolean }).isPersisted?.() ||
-      this.findTargetNeeded() ||
+      this.isFindTarget() ||
       this.difference(this.target, records).some((r) => !r.isNewRecord())
     ) {
       throw new CollectionPersistedAssignmentError(this.reflection.name);
@@ -370,7 +370,7 @@ export abstract class CollectionAssociation extends Association {
   }
 
   size(): Promise<number> | number {
-    if (!this.findTargetNeeded() || this.isLoaded()) {
+    if (!this.isFindTarget() || this.isLoaded()) {
       return this.target.length;
     } else if (this._associationIds) {
       return this._associationIds.length;
@@ -464,7 +464,7 @@ export abstract class CollectionAssociation extends Association {
       return this.target;
     };
     if (this.#loadingTarget) return this.#loadingTarget;
-    if (this.findTargetNeeded()) {
+    if (this.isFindTarget()) {
       const loading = Promise.resolve(this.findTarget())
         .then((findTarget) => {
           if (!this.isLoaded()) {

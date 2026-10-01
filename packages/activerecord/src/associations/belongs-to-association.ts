@@ -176,7 +176,7 @@ export class BelongsToAssociation extends SingularAssociation {
       : (this.owner as any)[fks[0]];
   }
 
-  protected override findTargetNeeded(): boolean {
+  protected override isFindTarget(): boolean {
     return !this.isLoaded() && this.foreignKeyPresent() && !!this.klass;
   }
 

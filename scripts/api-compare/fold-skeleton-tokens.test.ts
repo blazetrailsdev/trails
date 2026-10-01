@@ -157,6 +157,19 @@ describe("sameFileHelperSkeletons", () => {
     ).toEqual(["loop", "ref:save"]);
   });
 
+  it("credits one of two identical idioms when the counterpart shows one surplus arm", () => {
+    expect(foldSkeletonTokens(["ref:compact", "ref:compact"], "ruby", ["if"])).toEqual(["if"]);
+    expect(
+      foldSkeletonTokens(["ref:filter_map", "ref:filter_map"], "ruby", ["loop", "if"]),
+    ).toEqual(["loop", "if"]);
+  });
+
+  it("spends the counterpart's loop on the iteration callee before an idiom can claim it", () => {
+    expect(
+      foldSkeletonTokens(["ref:forEach", "ref:save", "ref:filter_map"], "ruby", ["loop", "if"]),
+    ).toEqual(["loop", "ref:save"]);
+  });
+
   it("folds a TS `each` call onto the loop Ruby's `each` folds onto", () => {
     expect(foldSkeletonTokens(["ref:join_root", "ref:each"])).toEqual(["ref:join_root", "loop"]);
     expect(foldSkeletonTokens(["ref:joinRoot", "ref:each"], "ts")).toEqual([

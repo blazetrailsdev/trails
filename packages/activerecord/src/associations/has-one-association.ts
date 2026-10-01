@@ -105,7 +105,7 @@ export class HasOneAssociation extends SingularAssociation {
 
   /** @internal */
   protected override loadDisplacedForBuild(): Promise<unknown> | null {
-    if (!this.findTargetNeeded()) return null;
+    if (!this.isFindTarget()) return null;
     return this.loadTargetForBuild();
   }
 
@@ -201,7 +201,7 @@ export class HasOneAssociation extends SingularAssociation {
 
   /** @internal */
   private async loadDisplacedTargetForCreate(): Promise<unknown> {
-    if (!this.findTargetNeeded()) return null;
+    if (!this.isFindTarget()) return null;
     try {
       await this.loadTargetForBuild();
       return null;
@@ -219,7 +219,7 @@ export class HasOneAssociation extends SingularAssociation {
 
   /** @internal */
   protected displacementNeedsAwait(): boolean {
-    if (!this.loaded) return this.findTargetNeeded();
+    if (!this.loaded) return this.isFindTarget();
     const displaced = this.target;
     if (!displaced) return false;
     return (displaced as { isDestroyed?: () => boolean }).isDestroyed?.() !== true;

@@ -326,10 +326,11 @@ export function rbFPublicSend(recv: unknown, mid: string, ...args: unknown[]): u
  * `vendor/ruby/v3.3.11/symbol.c:862`, bound at `vendor/ruby/v3.3.11/string.c:12212`)
  * and `Symbol#to_sym` (`vendor/ruby/v3.3.11/symbol.rb:8`). A JS string spells
  * both receivers and answers the Symbol's colon spelling (`":name"`); no other
- * core receiver defines `to_sym`, so the send raises `NoMethodError`.
+ * core receiver defines `to_sym`, so the send raises `NoMethodError`. It is
+ * the send, where {@link stringToSym} is `rb_str_intern` on a known String,
+ * as `toI` is to `rbStrToI`.
  *
- * @noRailsEquivalent PERMANENT — a Ruby method send, which JS has no receiver
- * for on a primitive.
+ * @noRailsEquivalent PERMANENT
  */
 export function toSym(obj: unknown): string {
   if (typeof obj === "string") return stringToSym(obj);

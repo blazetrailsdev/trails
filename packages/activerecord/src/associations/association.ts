@@ -363,12 +363,6 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
     return undefined;
   }
 
-  protected findTargetNeeded(): boolean {
-    if (this.loaded) return false;
-    const isNew = this.owner.isNewRecord();
-    return (!isNew || this.foreignKeyPresent()) && !!this.klass;
-  }
-
   protected foreignKeyPresent(): boolean {
     return false;
   }
@@ -521,8 +515,11 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
     return this.scope()?.scopeForCreate?.() ?? {};
   }
 
-  private isFindTarget(): boolean {
-    return this.findTargetNeeded();
+  /** @internal */
+  protected isFindTarget(): boolean {
+    return (
+      !this.isLoaded() && (!this.owner.isNewRecord() || this.foreignKeyPresent()) && !!this.klass
+    );
   }
 
   protected raiseOnTypeMismatchBang(record: Base): void {
