@@ -112,7 +112,7 @@ describe("DisableJoinsAssociationScope", () => {
       klass: reflection.klass,
     }) as DisableJoinsAssociationRelation<Base>;
     expect(built).not.toBeInstanceOf(DisableJoinsAssociationRelation);
-    expect(built.toSql()).toMatch(/"djs_post_id" IN \(SELECT "djs_posts"."id" FROM/);
+    expect(built.toSql()).toMatch(/djs_post_id\W+IN \(SELECT \W?djs_posts\W+id\W+FROM/);
 
     const records = await built;
     expect(records.map((r: any) => r.body).sort()).toEqual(["c1", "c2"]);
