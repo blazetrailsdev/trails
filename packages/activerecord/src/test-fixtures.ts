@@ -13,6 +13,7 @@ import {
   isEmpty,
   merge,
   rbEql,
+  rbObjClass,
 } from "@blazetrails/ruby-compat";
 import {
   Notifications,
@@ -480,8 +481,11 @@ export class TestFixtures {
       return this.activeRecordFixture(method, ...args);
     } else {
       throw new NoMethodError(
-        `undefined method '${method}' for an instance of ${this.constructor.name}`,
+        `undefined method '${method}' for an instance of ${rbObjClass(this)}`,
         method,
+        args,
+        false,
+        { receiver: this },
       );
     }
   }
