@@ -1,5 +1,5 @@
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
-import { Fiber, kernelThrow, Thread } from "@blazetrails/ruby-compat";
+import { Fiber, kernelThrow } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach, afterAll, vi } from "vitest";
 import {
   IsolatedExecutionState,
@@ -478,7 +478,7 @@ describe("aborting before_validation halts before the validators run", () => {
 });
 
 describe("a pinned connection's Thread monitor (lock_thread=, abstract_adapter.rb:181-191)", () => {
-  it("serializes sibling promises started inside the pinned connection's transaction", async () => {
+  it("selects the Thread arm, which serializes sibling promises inside a transaction", async () => {
     const { adapter } = await makeSQLiteTopic();
     adapter.setLockThread(IsolatedExecutionState.context());
     const tm = adapter.transactionManager;
@@ -493,11 +493,6 @@ describe("a pinned connection's Thread monitor (lock_thread=, abstract_adapter.r
     await tm.withinNewTransaction({}, () => Promise.all([sibling("a"), sibling("b")]));
 
     expect(log).toEqual(["a:enter", "a:exit", "b:enter", "b:exit"]);
-  });
-
-  it("selects Rails' three arms", () => {
-    const adapter = new AbstractAdapter({});
-    adapter.setLockThread(Thread.current());
     expect(adapter.lock).toBeInstanceOf(ThreadLoadInterlockAwareMonitor);
     adapter.setLockThread(Fiber.current());
     expect(adapter.lock).toBeInstanceOf(LoadInterlockAwareMonitor);

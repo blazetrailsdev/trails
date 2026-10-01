@@ -1,6 +1,8 @@
 import {
   chomp,
   isSymbol,
+  print,
+  puts,
   rbConstGet,
   rbObjAsString as toS,
   rtest,
@@ -81,7 +83,7 @@ export class Basic {
     );
     if (rtest(forceNewLine) && !toS(message).endsWith("\n")) buffer += "\n";
 
-    this.stdout().write(buffer);
+    print.call(this.stdout(), buffer);
   }
 
   sayError(message: unknown = "", color: unknown = null, forceNewLine?: unknown): void {
@@ -94,7 +96,7 @@ export class Basic {
     );
     if (rtest(forceNewLine) && !toS(message).endsWith("\n")) buffer += "\n";
 
-    this.stderr().write(buffer);
+    print.call(this.stderr(), buffer);
   }
 
   /** @missingRailsArgs chomp — PERMANENT */
@@ -110,12 +112,11 @@ export class Basic {
     message = chomp(toS(message)).replace(/(?<=\n)(?!$)/g, margin);
     const buffer = `${status}${spaces}${message}\n`;
 
-    this.stdout().write(buffer);
+    print.call(this.stdout(), buffer);
   }
 
   error(statement: unknown): void {
-    const line = toS(statement);
-    this.stderr().write(line.endsWith("\n") ? line : `${line}\n`);
+    puts.call(this.stderr(), statement);
   }
 
   setColor(string: string, ..._: unknown[]): string {

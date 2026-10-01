@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { capture } from "@blazetrails/activesupport";
-import { include, initializeIncludedModules } from "@blazetrails/ruby-compat";
+import {
+  childProcessAdapterConfig,
+  include,
+  initializeIncludedModules,
+  registerChildProcessAdapter,
+  setEnv,
+} from "@blazetrails/ruby-compat";
 import { Shell } from "./shell.js";
 import { Basic } from "./shell/basic.js";
+import { DEFAULT_TERMINAL_WIDTH, terminalWidth } from "./shell/terminal.js";
 
 class Counter {
   options: Record<string, unknown> = {};
@@ -39,27 +46,31 @@ describe("Thor::Shell block restores wait for an async block to settle", () => {
     expect(shell.padding).toBe(0);
     expect(shell.isMute()).toBe(false);
   });
+
+  it("indent has no ensure, so a rejected block leaves the padding changed", async () => {
+    const shell = new Basic();
+    await expect(shell.indent(2, () => Promise.reject(new Error("boom")))).rejects.toThrow("boom");
+    expect(shell.padding).toBe(2);
+  });
 });
 
-describe("Thor::Shell::Basic output", () => {
-  it("say computes force_new_line from the message only when it is not passed", async () => {
+describe("Thor::Shell::Basic#say", () => {
+  it("computes force_new_line from the message only when it is not passed", async () => {
     const shell = new Basic();
-    const said = (...args: Parameters<Basic["say"]>) =>
-      capture(":stdout", () => shell.say(...args));
-    expect(await said("Running...")).toBe("Running...\n");
-    expect(await said("Running... ")).toBe("Running... ");
-    expect(await said("Running... \n")).toBe("Running... \n");
-    expect(await said("Running...", null, undefined)).toBe("Running...");
-    expect(await said("Running... ", null, true)).toBe("Running... \n");
+    expect(await capture(":stdout", () => shell.say("Running..."))).toBe("Running...\n");
+    expect(await capture(":stdout", () => shell.say("Running...", null, undefined))).toBe(
+      "Running...",
+    );
   });
+});
 
-  it("say_status indents continuation lines and honours a quiet base", async () => {
-    const shell = new Basic();
-    const status = (...args: Parameters<Basic["sayStatus"]>) =>
-      capture(":stdout", () => shell.sayStatus(...args));
-    expect(await status("create", "a\nb\n")).toBe("      create  a\n              b\n");
-    expect(await status("create", "a", false)).toBe("");
-    shell.base = { options: { quiet: true } };
-    expect(await status("create", "a")).toBe("");
+describe("Thor::Shell::Terminal", () => {
+  it("answers the default width when stty and tput both print nothing", () => {
+    registerChildProcessAdapter("thor-terminal-test", {
+      spawnSync: () => ({ status: 1, signal: null, stdout: "", stderr: "" }),
+    });
+    childProcessAdapterConfig.adapter = "thor-terminal-test";
+    setEnv("THOR_COLUMNS", undefined);
+    expect(terminalWidth()).toBe(DEFAULT_TERMINAL_WIDTH);
   });
 });

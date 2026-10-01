@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Thread, ThreadError } from "@blazetrails/ruby-compat";
+import { Fiber, Thread } from "@blazetrails/ruby-compat";
 import { ThreadLoadInterlockAwareMonitor } from "./load-interlock-aware-monitor.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
@@ -33,25 +33,21 @@ describe("ThreadLoadInterlockAwareMonitor", () => {
         }),
       ).value();
       await tick();
-      await monitor.synchronize(() => {
-        log.push("owner:nested");
-      });
-      log.push("owner:exit");
+      await monitor.synchronize(() => log.push("owner:nested"));
     });
     await other;
 
-    expect(log).toEqual(["owner:nested", "owner:exit", "other"]);
+    expect(log).toEqual(["owner:nested", "other"]);
   });
 
-  it("raises when a thread that is not the owner exits", async () => {
+  it("raises as MRI does when the last exit runs in another fiber of the owner", async () => {
     const monitor = new ThreadLoadInterlockAwareMonitor();
-    const exit = () => (monitor as unknown as { monExit(): void }).monExit();
+    const fiber = new Fiber(() => monitor.synchronize(() => Fiber.yield()));
 
-    await monitor.synchronize(async () => {
-      await new Thread(async () => {
-        expect(exit).toThrow(ThreadError);
-        expect(exit).toThrow("current thread not owner");
-      }).value();
-    });
+    await monitor.synchronize(() => fiber.resume());
+
+    await expect(fiber.resume()).rejects.toThrow(
+      "Attempt to unlock a mutex which is locked by another thread/fiber",
+    );
   });
 });

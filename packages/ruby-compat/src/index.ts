@@ -8,7 +8,7 @@ export { EOFError } from "./eof-error.js";
 export { Errno, SystemCallError } from "./errno.js";
 export { File } from "./file.js";
 export { Base64 } from "./base64.js";
-export { IO, STDOUT } from "./io.js";
+export { IO, STDOUT, print, puts } from "./io.js";
 export { IOError } from "./io-error.js";
 export {
   cmp,

@@ -13,7 +13,7 @@ const putsAryInFlight = new Set<unknown[]>();
 
 /** The receiver `rb_io_puts` sends to (`vendor/ruby/v3.3.11/io.c:8947`). */
 export interface GenericWritable {
-  write(string: string): number;
+  write(string: string): unknown;
 }
 
 /**

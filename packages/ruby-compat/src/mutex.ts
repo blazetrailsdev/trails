@@ -72,9 +72,8 @@ export class Mutex {
   /**
    * `vendor/ruby/v3.3.11/thread_sync.c:475` `rb_mutex_lock`.
    *
-   * A lock taken with no block has no async context to tell a recursive lock
-   * (`thread_sync.c:350-352`, `ThreadError`) from a sibling promise on the same
-   * fiber, so a second `lock` waits for the first `unlock` either way.
+   * Sibling promises share a fiber, so a second `lock` waits where
+   * `thread_sync.c:350-352` raises "deadlock; recursive locking".
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Mutex#lock`
    * (`vendor/ruby/v3.3.11/thread_sync.c:475`).

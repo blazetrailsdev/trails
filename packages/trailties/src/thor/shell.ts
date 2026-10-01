@@ -25,7 +25,7 @@ export const Base = {
       } else if (/mswin|mingw/.test(RbConfig.CONFIG["host_os"]) && env["ANSICON"] == null) {
         this._shell = Shell.Basic;
       } else {
-        this._shell = Shell.Color;
+        this._shell = Shell.Color!;
       }
     }
     return this._shell;
@@ -192,6 +192,6 @@ export const Shell = new Module((mod) => {
 }) as Module & {
   SHELL_DELEGATED_METHODS: string[];
   Basic: typeof Basic;
-  Color: typeof Basic;
-  HTML: typeof Basic;
+  Color?: typeof Basic;
+  HTML?: typeof Basic;
 };
