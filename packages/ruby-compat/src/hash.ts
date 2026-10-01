@@ -707,7 +707,9 @@ export class Hash<K, V> extends Map<K, V> {
    * the receiver is returned. The rehash into an `identhash` table keeps every
    * entry, since two stored keys were never `eql?`, so only the `eql?` index
    * goes. A JS string is a primitive with no identity apart from its value, so
-   * two equal Strings stay one key where Ruby makes them two.
+   * two equal Strings stay one key where Ruby makes them two. The
+   * `hash_iterating_p` raise (`hash.c:4435`) has no port: a `Map` iterator that
+   * is abandoned never reports its end, so there is no `iter_lev` to read.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Hash#compare_by_identity` (`vendor/ruby/v3.3.11/hash.c:4427`).
    */
