@@ -533,7 +533,7 @@ export const SKIP_GROUPS: SkipGroup[] = [
   {
     reason:
       "Ruby core object methods outside `PROTOCOL_DEFINITION_NAMES`: identity " +
-      "(`object_id`, `equal?`, `nil?`, `class`), reflection (`instance_of?`, " +
+      "(`object_id`, `equal?`, `class`), reflection (`instance_of?`, " +
       "`instance_variable_get` / `instance_variable_set` / `instance_variables`), " +
       "dispatch (`send`, `public_send`, `tap`, " +
       "`yield_self`), numeric coercion (`to_i`, `to_f`, `to_r`, `to_c`), " +
@@ -550,7 +550,6 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "then",
       "yield_self",
       "instance_of?",
-      "nil?",
       "equal?",
       "instance_variable_get",
       "instance_variable_set",
@@ -1222,6 +1221,18 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
     names: ["key?"],
     rubyFiles: ["headers.rb"],
     tsMirrorName: "hasKey",
+  },
+  {
+    reason:
+      "`Arel::Nodes::Case#then` (nodes/case.rb:19-22) sets the last `when`'s " +
+      "result and is ported at its Rails name. `then` stays on the global " +
+      "skip because everywhere else Ruby's `then` is `Kernel#then` or a " +
+      "promise's continuation, which JS answers with the thenable `await` " +
+      'calls (CLAUDE.md § "`Relation` is evaluated by an async query"). ' +
+      "Scoped to nodes/case.rb so this one definition is scored.",
+    names: ["then"],
+    rubyFiles: ["nodes/case.rb"],
+    tsMirrorName: "then",
   },
 ];
 

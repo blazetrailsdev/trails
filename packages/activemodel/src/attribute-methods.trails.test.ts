@@ -138,6 +138,41 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(Employee.attributeMethodPatterns.length).toBe(Person.attributeMethodPatterns.length + 1);
   });
 
+  it("inherited leaves a subclass without its parent's method caches and generated module", () => {
+    class Person extends Model {
+      declare name: string;
+      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
+      declare static aliasesByAttributeName: AttributesClassHalf["aliasesByAttributeName"];
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static attributeMethodPatternsCache: AttributesClassHalf["attributeMethodPatternsCache"];
+      declare static attributeMethodPatternsMatching: AttributesClassHalf["attributeMethodPatternsMatching"];
+      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
+      declare static generatedAttributeMethods: AttributesClassHalf["generatedAttributeMethods"];
+
+      static {
+        include(this, Attributes);
+        this.attribute("name", "string");
+        this.attributeMethodSuffix("Short");
+      }
+    }
+    interface Person extends Attributes {}
+
+    Person.aliasesByAttributeName().set("name", ["nickname"]);
+    Person.attributeMethodPatternsMatching("nameShort");
+    expect(Person.attributeMethodPatternsCache().size).toBeGreaterThan(0);
+    const generated = Person.generatedAttributeMethods();
+
+    class Employee extends Person {}
+
+    expect(Employee.attributeMethodPatternsCache()).not.toBe(Person.attributeMethodPatternsCache());
+    expect(Employee.attributeMethodPatternsCache().size).toBe(0);
+    expect(Employee.aliasesByAttributeName()).not.toBe(Person.aliasesByAttributeName());
+    expect(Employee.aliasesByAttributeName().size).toBe(0);
+    expect(Employee.generatedAttributeMethods()).not.toBe(generated);
+    expect(Person.generatedAttributeMethods()).toBe(generated);
+    expect(Person.aliasesByAttributeName().get("name")).toEqual(["nickname"]);
+  });
+
   it("_read_attribute raises for a name with no reader, as __send__ does", () => {
     class Person extends Model {
       declare name: string;

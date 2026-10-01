@@ -198,6 +198,10 @@ describe("rubyMethodToTsIgnoringSkip", () => {
     expect(bareCandidatesIgnoringSkip("pretty_print")).toEqual(["prettyPrint"]);
   });
 
+  it("maps nil? as a predicate, with no SKIP gate", () => {
+    expect(bareCandidates("nil?")).toEqual(["isNil", "nil"]);
+  });
+
   it("still refuses operators", () => {
     expect(rubyMethodToTsIgnoringSkip("==")).toBeNull();
   });
@@ -660,7 +664,9 @@ describe("SCOPED_SKIP_GROUPS", () => {
   });
 
   it("never overlaps the global SKIP set (scoped names stay file-local)", () => {
-    for (const g of SCOPED_SKIP_GROUPS) {
+    // A group naming its `tsMirrorName` is the exception: there the scoped
+    // entry SCORES a globally skipped name in its files (`Case#then`).
+    for (const g of SCOPED_SKIP_GROUPS.filter((g) => g.tsMirrorName === undefined)) {
       for (const name of g.names) expect(SKIP.has(name)).toBe(false);
     }
   });
@@ -698,6 +704,12 @@ describe("SCOPED_SKIP_GROUPS", () => {
     expect(
       scopedSkipMirrorName("lookup_cast_type", "connection_adapters/postgresql/quoting.rb"),
     ).toBeNull();
+  });
+
+  it("scores Arel::Nodes::Case#then through its scoped mirror while then stays skipped", () => {
+    expect(rubyMethodToTs("then")).toBeNull();
+    expect(scopedSkipMirrorName("then", "nodes/case.rb")).toEqual(["then"]);
+    expect(scopedSkipMirrorName("then", "relation.rb")).toBeNull();
   });
 
   it("names every spelling of a port spread over several TS declarations", () => {

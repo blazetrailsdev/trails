@@ -350,6 +350,7 @@ export const NO_JS_CALL_FORM = new Set([
   "synchronize", // the block runs bare — JS has no mutex to acquire
   "symbolize_keys", // a bare-keyed JS object is already normalized (RFC 0149)
   "symbolize_keys!", // same, in place
+  "nil?", // `x == null` — a null check on a plain value has no callee
 ]);
 
 // `synchronize` is the strongest member of that set rather than a marginal one.
@@ -382,6 +383,14 @@ export const NO_JS_CALL_FORM = new Set([
 // and the one that takes arguments lives in activesupport's hash-utils.ts, so
 // outside activesupport the call was never significant and a
 // `@missingRailsCall` receipt for it read STALE.
+
+// `nil?` is `NilClass#nil?` / `Object#nil?` on nearly every Ruby receiver, and
+// its port there is `x == null`, which has no callee. The classes that DEFINE
+// it (`Arel::Nodes::BindParam`, `Casted`, `Quoted`, `QueryAttribute`,
+// `Mime::NullType`) are scored by definition and pinned, and a port still calls
+// `isNil()` on a receiver that can be one of them (`visitors/to_sql.rb`'s
+// `o.right.nil?`). Before `nil?` left `SKIP_GROUPS` the call mapped to no TS
+// candidate at all, so no call-set row moves.
 
 /**
  * The JS iteration callee an Enumerable iterator's faithful port would name if
@@ -3121,9 +3130,11 @@ export function dedupeRubyMethodInto(
   klass = false,
   pkg?: string,
 ): void {
-  if (rubyMethodToTsForFqn(itemFqn, rm.name, undefined, pkg) === null) return;
-  if (isRubyOnlyClass(itemFqn)) return;
   const tsMirrorNames = rubyFile === undefined ? null : scopedSkipMirrorName(rm.name, rubyFile);
+  if (tsMirrorNames === null && rubyMethodToTsForFqn(itemFqn, rm.name, undefined, pkg) === null) {
+    return;
+  }
+  if (isRubyOnlyClass(itemFqn)) return;
   if (rubyFile !== undefined && tsMirrorNames === null && isScopedSkip(rm.name, rubyFile)) return;
   const level = rubyOwnerSeat(itemFqn, klass);
   const key = rubyLevelKey(level, rm.name);
@@ -3224,11 +3235,12 @@ function rubyDefinitionBucket(
   seen: Set<string>,
   pkg: string,
 ): DenominatorBucket {
-  if (rubyMethodToTsForFqn(fqn, name, undefined, pkg) === null) {
+  const tsMirrorNames = scopedSkipMirrorName(name, file);
+  if (tsMirrorNames === null && rubyMethodToTsForFqn(fqn, name, undefined, pkg) === null) {
     return OPERATORS.has(name) ? "operator" : "globalSkip";
   }
   if (isRubyOnlyClass(fqn)) return "rowlessFile";
-  if (scopedSkipMirrorName(name, file) === null && isScopedSkip(name, file)) return "scopedSkip";
+  if (tsMirrorNames === null && isScopedSkip(name, file)) return "scopedSkip";
   const key = rubyLevelKey(rubyOwnerSeat(fqn, klass), name);
   if (seen.has(key)) return "sameNameCollapse";
   seen.add(key);

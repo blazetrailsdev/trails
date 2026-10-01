@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 import { ModelName, Naming } from "./naming.js";
 import { TypeError } from "./attribute-assignment.js";
-import { Inflections, include } from "@blazetrails/activesupport";
+import { Inflections, extend, include } from "@blazetrails/activesupport";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 
 describe("naming (trails-only)", () => {
@@ -25,6 +25,27 @@ describe("naming (trails-only)", () => {
   it("instance delegates to class", () => {
     const p = new Post();
     expect(p.modelName.name).toBe("Post");
+  });
+
+  it("extended delegates an instance's model_name to its class", () => {
+    class Plain {}
+    extend(Plain, Naming);
+
+    const klass = Plain as unknown as { modelName: ModelName };
+    const record = new Plain() as unknown as { modelName: ModelName };
+    expect(klass.modelName.name).toBe("Plain");
+    expect(record.modelName).toBe(klass.modelName);
+  });
+
+  it("inherited leaves a subclass without its parent's memoized model_name", () => {
+    class Animal extends Model {}
+    const parentName = Animal.modelName;
+    class Dog extends Animal {}
+
+    expect(Dog.modelName).not.toBe(parentName);
+    expect(Dog.modelName.name).toBe("Dog");
+    expect(Dog.modelName).toBe(Dog.modelName);
+    expect(Animal.modelName).toBe(parentName);
   });
 
   it("to_partial_path default implementation returns a string giving a relative path", () => {

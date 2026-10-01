@@ -4692,6 +4692,14 @@
   {
     "package": "actiondispatch",
     "rubyFile": "http/mime_type.rb",
+    "rubyName": "nil?",
+    "digest": "357b923f2251ef17",
+    "ref": "v8.0.2",
+    "reason": "arel-score-core-object-names-nil-and-case-then"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/mime_type.rb",
     "rubyName": "parse",
     "digest": "2e64d53a9ab34f3c",
     "ref": "v8.0.2"
@@ -45908,6 +45916,14 @@
   {
     "package": "activerecord",
     "rubyFile": "relation/query_attribute.rb",
+    "rubyName": "nil?",
+    "digest": "79dcf03586eee2c5",
+    "ref": "v8.0.2",
+    "reason": "arel-score-core-object-names-nil-and-case-then"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "relation/query_attribute.rb",
     "rubyName": "type_cast",
     "digest": "b3901e296ee71013",
     "ref": "v8.0.2"
@@ -61378,6 +61394,14 @@
   {
     "package": "arel",
     "rubyFile": "nodes/bind_param.rb",
+    "rubyName": "nil?",
+    "digest": "7103a37a63d7bf09",
+    "ref": "v8.0.2",
+    "reason": "arel-score-core-object-names-nil-and-case-then"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/bind_param.rb",
     "rubyName": "unboundable?",
     "digest": "c0390ac8c1dd9a89",
     "ref": "v8.0.2"
@@ -61420,6 +61444,14 @@
   {
     "package": "arel",
     "rubyFile": "nodes/case.rb",
+    "rubyName": "then",
+    "digest": "59318c2265ce034f",
+    "ref": "v8.0.2",
+    "reason": "arel-score-core-object-names-nil-and-case-then"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/case.rb",
     "rubyName": "when",
     "digest": "e8ca25013f76c145",
     "ref": "v8.0.2"
@@ -61444,6 +61476,14 @@
     "rubyName": "initialize",
     "digest": "11e0660706d0e51e",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/casted.rb",
+    "rubyName": "nil?",
+    "digest": "7103a37a63d7bf09",
+    "ref": "v8.0.2",
+    "reason": "arel-score-core-object-names-nil-and-case-then"
   },
   {
     "package": "arel",
@@ -66239,6 +66279,14 @@
     "rubyName": "lookup",
     "digest": "3941b446dcd8f775",
     "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/key_value.rb",
+    "rubyName": "nil?",
+    "digest": "0e2742bec37bff23",
+    "ref": "v1.14.8",
+    "reason": "arel-score-core-object-names-nil-and-case-then"
   },
   {
     "package": "i18n",

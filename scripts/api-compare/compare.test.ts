@@ -1867,6 +1867,15 @@ describe("dedupeRubyMethodInto", () => {
     expect(skipped.size).toBe(0);
   });
 
+  it("expects a globally skipped name where a scoped skip names its TS mirror", () => {
+    const scored = new Map<string, SeenRubyMethod>();
+    dedupeRubyMethodInto(scored, rm("then"), "Arel::Nodes::Case", "nodes/case.rb");
+    expect(scored.get("then")!.tsMirrorNames).toEqual(["then"]);
+    const skipped = new Map<string, SeenRubyMethod>();
+    dedupeRubyMethodInto(skipped, rm("then"), "ActiveRecord::Relation", "relation.rb");
+    expect(skipped.size).toBe(0);
+  });
+
   it("keeps a class method and an instance method of one name as two rows", () => {
     const seen = new Map<string, SeenRubyMethod>();
     dedupeRubyMethodInto(seen, rm("attribute_method?"), "ActiveRecord::AttributeMethods");
@@ -3864,6 +3873,16 @@ describe("rubyDefinitionBreakdown", () => {
       sameNameCollapse: 1,
       ownRow: 4,
     });
+  });
+
+  it("gives a globally skipped name its own row where a scoped skip names its TS mirror", () => {
+    const breakdown = rubyDefinitionBreakdown(
+      [entity("Arel::Nodes::Case", "nodes/case.rb", ["then"]), entity("Foo", "foo.rb", ["then"])],
+      "arel",
+      () => true,
+    );
+    expect(breakdown.ownRow).toBe(1);
+    expect(breakdown.rowlessFile).toBe(1);
   });
 
   it("counts only the definitions the mode admits", () => {
