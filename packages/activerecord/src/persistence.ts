@@ -24,7 +24,6 @@ import {
   attributesForUpdate,
   attributesWithValues,
 } from "./attribute-methods.js";
-import * as Inheritance from "./inheritance.js";
 import { getStiBase, isStiSubclass } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
 import { registry } from "./suppressor.js";
@@ -48,6 +47,8 @@ interface PersistenceHost {
   _hasQueryConstraints?: boolean;
   _isBaseClass?: boolean;
   ensureSchemaLoaded(): Promise<void>;
+  /** @internal */
+  discriminateClassForRecord(record: Record<string, unknown>): any;
 }
 
 export async function create(
@@ -123,7 +124,7 @@ export function instantiate(
   columnTypes: Record<string, unknown> = {},
   block?: (record: any) => void,
 ): any {
-  const klass = Inheritance.discriminateClassForRecord(this as never, attributes);
+  const klass = this.discriminateClassForRecord(attributes);
   return instantiateInstanceOf(klass, attributes, columnTypes, block);
 }
 

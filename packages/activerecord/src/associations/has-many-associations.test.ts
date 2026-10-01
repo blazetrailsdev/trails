@@ -296,6 +296,7 @@ describe("HasManyAssociationsTest", () => {
     class DefaultScopeCounterComment extends Base {
       static {
         this.tableName = "comments";
+        this.inheritanceColumn = "not_there";
         this.belongsTo("post", { className: "DefaultScopeCounterPost", foreignKey: "post_id" });
         this.defaultScope(function (this: any) {
           counter += 1;
@@ -308,6 +309,7 @@ describe("HasManyAssociationsTest", () => {
 
       static {
         this.tableName = "posts";
+        this.inheritanceColumn = "not_there";
         this.hasMany("comments", {
           className: "DefaultScopeCounterComment",
           foreignKey: "post_id",

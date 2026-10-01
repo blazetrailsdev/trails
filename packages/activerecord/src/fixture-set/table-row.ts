@@ -1,7 +1,6 @@
 import { hasKey, hashDelete } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { FixtureSet, type Fixture } from "../fixtures.js";
-import { findStiClass } from "../inheritance.js";
 import type { TableRows } from "./table-rows.js";
 import type { ModelMetadata } from "./model-metadata.js";
 
@@ -123,7 +122,7 @@ export class TableRow {
       const inheritanceColumnName = this.modelMetadata.inheritanceColumnName;
       if (inheritanceColumnName != null && hasKey(this._row, inheritanceColumnName)) {
         try {
-          return findStiClass(this.modelClass!, String(this._row[inheritanceColumnName]));
+          return this.modelClass!.findStiClass(String(this._row[inheritanceColumnName]));
         } catch {
           return this.modelClass!;
         }

@@ -1,7 +1,6 @@
-import bcrypt from "bcryptjs";
 import { camelize, include, isBlank, Module } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { Engine } from "./bcrypt.js";
+import { Engine, Password } from "./bcrypt.js";
 import { Validations } from "./validations.js";
 import { Model } from "./model.js";
 
@@ -51,7 +50,7 @@ export function hasSecurePassword(
         const digestWas = rbObjRespondTo(record, `${digestAttr}Was`)
           ? (publicSend(record, `${digestAttr}Was`) as string | null | undefined)
           : undefined;
-        if (isBlank(digestWas) || !bcrypt.compareSync(String(challenge), digestWas as string)) {
+        if (!(!isBlank(digestWas) && new Password(digestWas as string).isPassword(challenge))) {
           record.errors.add(challengeAttr);
         }
       }
@@ -130,7 +129,7 @@ export class InstanceMethodsOnActivation extends Module {
             (this as unknown as Record<string, unknown>)[passwordIvar] =
               String(unencryptedPassword);
             const cost = SecurePassword.minCost ? Engine.MIN_COST : Engine.cost;
-            publicSendWriter(this, digestAttr, bcrypt.hashSync(String(unencryptedPassword), cost));
+            publicSendWriter(this, digestAttr, Password.create(unencryptedPassword, { cost }));
           }
         },
         configurable: true,
@@ -158,10 +157,9 @@ export class InstanceMethodsOnActivation extends Module {
     });
 
     const authenticateAttribute = function (this: Model, unencryptedPassword: unknown) {
-      if (typeof unencryptedPassword !== "string" || !unencryptedPassword) return false;
       const attributeDigest = publicSend(this, digestAttr) as string | null;
       return !isBlank(attributeDigest) &&
-        bcrypt.compareSync(unencryptedPassword, attributeDigest as string)
+        new Password(attributeDigest as string).isPassword(unencryptedPassword)
         ? this
         : false;
     };
@@ -171,7 +169,7 @@ export class InstanceMethodsOnActivation extends Module {
       Object.defineProperty(mod, `${attribute}Salt`, {
         get(this: Model) {
           const attributeDigest = publicSend(this, digestAttr) as string | null;
-          return isBlank(attributeDigest) ? null : bcrypt.getSalt(attributeDigest as string);
+          return !isBlank(attributeDigest) ? new Password(attributeDigest as string).salt : null;
         },
         configurable: true,
       });
@@ -194,6 +192,6 @@ export class InstanceMethodsOnActivation extends Module {
   }
 }
 
-function publicSendWriter(record: Model, name: string, value: string | null): void {
+function publicSendWriter(record: Model, name: string, value: Password | null): void {
   (record as unknown as Record<string, unknown>)[name] = value;
 }

@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Model } from "./index.js";
 import { hasSecurePassword, SecurePassword } from "./secure-password.js";
+import { InvalidHash } from "./bcrypt.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 import { include } from "@blazetrails/activesupport";
 import { User } from "./test-helpers/models/user.js";
@@ -183,6 +184,12 @@ describe("SecurePasswordTrailsTest", () => {
     u._writeAttribute("password_digest", "   ");
     expect(await u.isValid()).toBe(false);
     expect(u.errors.messagesFor("password")).toContain("can't be blank");
+  });
+
+  it("authenticate raises BCrypt::Errors::InvalidHash for a digest that is not a bcrypt hash", () => {
+    const user = new User();
+    user.password_digest = "not-a-bcrypt-hash";
+    expect(() => user.authenticate("secret")).toThrow(InvalidHash);
   });
 
   it("password_salt returns the bcrypt salt from the digest", () => {
