@@ -16,10 +16,15 @@ export class ExplainPrettyPrinter {
 
   /** @internal */
   protected computeColumnWidths(result: ExplainResult): number[] {
-    return result.columns.map((col, i) => {
-      const cells = [col, ...result.rows.map((r) => (r[i] == null ? "NULL" : String(r[i])))];
-      return Math.max(...cells.map((s) => s.length));
-    });
+    const widths: number[] = [];
+    for (const [i, column] of result.columns.entries()) {
+      const cellsInColumn = [
+        column,
+        ...result.rows.map((r) => (r[i] == null ? "NULL" : String(r[i]))),
+      ];
+      widths.push(Math.max(...cellsInColumn.map((cell) => cell.length)));
+    }
+    return widths;
   }
 
   /** @internal */
@@ -29,10 +34,13 @@ export class ExplainPrettyPrinter {
 
   /** @internal */
   protected buildCells(items: Array<unknown>, widths: number[]): string {
-    const cells = items.map((item, i) => {
-      const s = item == null ? "NULL" : String(item);
-      return typeof item === "number" ? s.padStart(widths[i]) : s.padEnd(widths[i]);
-    });
+    const cells: string[] = [];
+    for (let i = 0; i < items.length; i++) {
+      let item = items[i];
+      if (item == null) item = "NULL";
+      const justifier = typeof item === "number" ? "padStart" : "padEnd";
+      cells.push(String(item)[justifier](widths[i]));
+    }
     return "| " + cells.join(" | ") + " |";
   }
 

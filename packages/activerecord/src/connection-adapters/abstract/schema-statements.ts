@@ -1,4 +1,12 @@
-import { block, fetch, KeyError, OpenSSL, slice, rbInspect } from "@blazetrails/ruby-compat";
+import {
+  block,
+  fetch,
+  KeyError,
+  OpenSSL,
+  partition,
+  slice,
+  rbInspect,
+} from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "../../errors.js";
 import { findJoinTableName, joinTableName } from "../../migration/join-table.js";
 import { CommandRecorder } from "../../migration/command-recorder.js";
@@ -438,17 +446,25 @@ export class SchemaStatements {
       comment?: unknown;
     } = {},
   ): Promise<boolean> {
-    const cols = await this.columns(tableName);
-    const optionKeys = this.columnOptionsKeys() as Array<keyof typeof options>;
-    return cols.some((c) => {
-      if (c.name !== columnName) return false;
-      if (type != null && (c as { type?: unknown }).type !== type) return false;
-      for (const key of optionKeys) {
-        if (key in options && (c as unknown as Record<string, unknown>)[key] !== options[key])
-          return false;
+    columnName = String(columnName);
+    const checks: Array<(c: Column) => unknown> = [];
+    checks.push((c) => c.name === columnName);
+    if (type != null) {
+      checks.push((c) => {
+        try {
+          return c.type === type;
+        } catch {
+          return null;
+        }
+      });
+    }
+    for (const attr of this.columnOptionsKeys() as Array<keyof typeof options>) {
+      if (attr in options) {
+        checks.push((c) => (c as unknown as Record<string, unknown>)[attr] === options[attr]);
       }
-      return true;
-    });
+    }
+
+    return (await this.columns(tableName)).some((c) => checks.every((check) => check(c)));
   }
 
   async changeColumnDefault(
@@ -1018,17 +1034,17 @@ export class SchemaStatements {
     type: ColumnType,
     options: ColumnOptions & { ifNotExists?: boolean } = {},
   ): Promise<AlterTable | null> {
-    if (options.ifNotExists && (await this.columnExists(tableName, columnName))) {
+    if (options.ifNotExists === true && (await this.columnExists(tableName, columnName))) {
       return null;
     }
     const { ifNotExists: _, ...colOpts } = options;
-    if (
-      this.supportsDatetimeWithPrecision?.() &&
-      type === "datetime" &&
-      !("precision" in colOpts)
-    ) {
-      colOpts.precision = 6;
+
+    if (this.supportsDatetimeWithPrecision?.()) {
+      if (type === "datetime" && !("precision" in colOpts)) {
+        colOpts.precision = 6;
+      }
     }
+
     const at = this.createAlterTable(tableName);
     at.addColumn(columnName, type, colOpts);
     return at;
@@ -1287,7 +1303,10 @@ export class SchemaStatements {
     columnNames: string[],
     options: Record<string, unknown> = {},
   ): Promise<string> {
-    const quotedColumns = new Map(columnNames.map((name) => [name, this.quoteColumnName(name)]));
+    const quotedColumns = new Map<string, string>();
+    for (const name of columnNames) {
+      quotedColumns.set(name, this.quoteColumnName(name));
+    }
     return Array.from(
       (
         await this.addOptionsForIndexColumns(
@@ -1340,16 +1359,12 @@ export class SchemaStatements {
       const method = `${command}ForAlter`;
 
       if (typeof (this as any)[method] === "function") {
-        const result = await (this as any)[method](table, ...arguments_);
-        const values = wrap(result);
-        const sqls: string[] = [];
-        const procs: Array<() => Promise<void>> = [];
-        for (const v of values) {
-          if (typeof v === "string") sqls.push(v);
-          else procs.push(v as () => Promise<void>);
-        }
-        sqlFragments = sqlFragments.concat(sqls);
-        nonCombinableOperations = nonCombinableOperations.concat(procs);
+        const [sqls, procs] = partition(
+          wrap(await (this as any)[method](table, ...arguments_)),
+          (v) => typeof v === "string",
+        ) as [string[], Array<() => Promise<void>>];
+        for (const sql of sqls) sqlFragments.push(sql);
+        for (const proc of procs) nonCombinableOperations.push(proc);
       } else {
         if (sqlFragments.length > 0) {
           await this.execute(

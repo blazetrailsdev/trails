@@ -547,8 +547,10 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     tableName: string,
     columnName: string,
     defaultOrChanges: unknown,
-  ): Promise<ChangeColumnDefaultDefinition> {
+  ): Promise<ChangeColumnDefaultDefinition | undefined> {
     const column = await this.columnFor(tableName, columnName);
+    if (!column) return;
+
     const default_ = this.extractNewDefaultValue(defaultOrChanges);
     return new ChangeColumnDefaultDefinition(column, default_);
   }
@@ -751,12 +753,38 @@ WHERE fk.referenced_column_name IS NOT NULL
     return checkConstraints;
   }
 
-  async tableOptions(tableName: string): Promise<Record<string, string>> {
-    const createInfo = await this.createTableInfo(tableName);
-    if (!createInfo) return {};
-    const tail = createInfo.replace(/[\s\S]*\n\) ?/, "");
-    const comment = /COMMENT='/.test(tail) ? await this.tableComment(tableName) : null;
-    return parseTableOptions(createInfo, comment);
+  async tableOptions(tableName: string): Promise<Record<string, string | null> | null> {
+    const createTableInfo = (await this.createTableInfo(tableName))!;
+
+    let rawTableOptions = createTableInfo
+      .replace(/^.*\n\) ?/s, "")
+      .replace(/\n\/\*!.*\*\/\n$/s, "")
+      .trim();
+
+    if (rawTableOptions === "") return null;
+
+    const tableOptions: Record<string, string | null> = {};
+
+    const match = / DEFAULT CHARSET=(?<charset>\w+)(?: COLLATE=(?<collation>\w+))?/.exec(
+      rawTableOptions,
+    );
+    if (match) {
+      rawTableOptions =
+        rawTableOptions.slice(0, match.index) +
+        rawTableOptions.slice(match.index + match[0].length);
+      tableOptions.charset = match.groups!.charset;
+      if (match.groups!.collation) tableOptions.collation = match.groups!.collation;
+    }
+
+    rawTableOptions = rawTableOptions.replace(/(ENGINE=\w+)(?: AUTO_INCREMENT=\d+)/, "$1");
+
+    if (/ COMMENT='.+'/.test(rawTableOptions)) {
+      rawTableOptions = rawTableOptions.replace(/ COMMENT='.+'/, "");
+      tableOptions.comment = await this.tableComment(tableName);
+    }
+
+    if (rawTableOptions !== "ENGINE=InnoDB") tableOptions.options = rawTableOptions;
+    return tableOptions;
   }
 
   async showVariable(name: string): Promise<unknown> {
@@ -1272,7 +1300,8 @@ WHERE fk.referenced_column_name IS NOT NULL
     message: string;
     sql: string;
   }): Promise<Partial<MismatchedForeignKeyOptions>> {
-    const foreignKeyPat = /Referencing column '(\w+)' and referenced/i.exec(message)?.[1] ?? "\\w+";
+    const referencing = /Referencing column '(\w+)' and referenced/i.exec(message);
+    const foreignKeyPat = referencing ? referencing[1] : "\\w+";
 
     const match = new RegExp(
       String.raw`(?:CREATE|ALTER)\s+TABLE\s*(?:\`?\w+\`?\.)?\`?(?<table>\w+)\`?.+?` +
@@ -1468,45 +1497,6 @@ WHERE fk.referenced_column_name IS NOT NULL
     const value = Object.values(row)[0];
     return typeof value === "number" ? value : Number(value) || 0;
   }
-}
-
-/**
- * Parse the trailing table-options string from `SHOW CREATE TABLE` output.
- * Exported for unit testing. Mirrors Rails AbstractMysqlAdapter#table_options.
- *
- * @param createInfo - Raw output of `SHOW CREATE TABLE`
- * @param tableComment - Pre-fetched table comment (pass null if no COMMENT= in createInfo)
- * @internal
- * @noRailsEquivalent CONVERGEABLE the SHOW CREATE TABLE parsing of AbstractMysqlAdapter#table_options (abstract_mysql_adapter.rb:549), extracted for unit testing.
- */
-export function parseTableOptions(
-  createInfo: string,
-  tableComment: string | null,
-): Record<string, string> {
-  let raw = createInfo
-    .replace(/[\s\S]*\n\) ?/, "")
-    .replace(/\n\/\*![\s\S]*\*\/\n$/, "")
-    .trim();
-  if (!raw) return {};
-
-  const opts: Record<string, string> = {};
-
-  const charsetMatch = / DEFAULT CHARSET=(?<charset>\w+)(?: COLLATE=(?<collation>\w+))?/.exec(raw);
-  if (charsetMatch) {
-    raw = raw.slice(0, charsetMatch.index) + raw.slice(charsetMatch.index + charsetMatch[0].length);
-    opts["charset"] = charsetMatch.groups!["charset"]!;
-    if (charsetMatch.groups!["collation"]) opts["collation"] = charsetMatch.groups!["collation"]!;
-  }
-
-  raw = raw.replace(/(ENGINE=\w+)(?: AUTO_INCREMENT=\d+)/, "$1");
-
-  if (/ COMMENT='/.test(raw)) {
-    raw = raw.replace(/ COMMENT='.+'/, "");
-    if (tableComment != null) opts["comment"] = tableComment;
-  }
-
-  if (raw !== "ENGINE=InnoDB") opts["options"] = raw;
-  return opts;
 }
 
 export interface MysqlPreparedStatement {

@@ -139,4 +139,10 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // values as ARGUMENTS and is numbers-only, so @blazetrails/activesupport
   // exports `min(collection)` and the Ruby receiver is TS argument 1.
   "min",
+  // Ruby core `Enumerable#partition` (`vendor/ruby/v3.3.11/enum.c:1102`) —
+  // `Array(send(method, table, *arguments)).partition { … }`
+  // (connection_adapters/abstract/schema_statements.rb:1564). JS has no
+  // `Array.prototype` analogue, so @blazetrails/ruby-compat exports it as
+  // `partition(ary, block)` and the Ruby receiver is TS argument 1.
+  "partition",
 ]);

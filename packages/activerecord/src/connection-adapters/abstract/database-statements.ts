@@ -1213,7 +1213,8 @@ export async function buildFixtureStatements(
   const statements: string[] = [];
   for (const [tableName, fixtures] of Object.entries(fixtureSet)) {
     if (fixtures.length === 0) continue;
-    statements.push(await buildFixtureSql.call(this, fixtures, tableName));
+    const sql = await buildFixtureSql.call(this, fixtures, tableName);
+    if (sql != null) statements.push(sql);
   }
   return statements;
 }

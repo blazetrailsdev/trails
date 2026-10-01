@@ -10,17 +10,11 @@ import {
   type ForeignKeyDefinition,
   type ColumnOptions,
   type AddColumnOptions,
-  type TableDefinition as AbstractTableDefinition,
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
   CheckConstraintDefinition,
 } from "../abstract/schema-definitions.js";
 import { ExclusionConstraintDefinition, UniqueConstraintDefinition } from "./schema-definitions.js";
-
-type PgTableDef = AbstractTableDefinition & {
-  exclusionConstraints: ExclusionConstraintDefinition[];
-  uniqueConstraints: UniqueConstraintDefinition[];
-};
 
 /** @internal */
 export interface PgSchemaCreationHost extends SchemaCreationConn {
@@ -209,21 +203,5 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (o.temporary) return " TEMPORARY";
     if (o.unlogged) return " UNLOGGED";
     return "";
-  }
-
-  /** @internal */
-  protected override async tableConstraintStatements(
-    o: AbstractTableDefinition,
-  ): Promise<string[]> {
-    if ((o as { as?: unknown }).as) return [];
-    const pg = o as PgTableDef;
-    const result: string[] = [];
-    for (const exc of pg.exclusionConstraints ?? []) {
-      result.push(this.visitExclusionConstraintDefinition(exc));
-    }
-    for (const uc of pg.uniqueConstraints ?? []) {
-      result.push(await this.visitUniqueConstraintDefinition(uc));
-    }
-    return result;
   }
 }

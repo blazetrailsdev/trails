@@ -208,7 +208,19 @@ export class SchemaCreation {
       }
     }
 
-    statements.push(...(await this.tableConstraintStatements(o)));
+    if (this.supportsExclusionConstraints()) {
+      for (const exc of (o as TableDefinition & { exclusionConstraints: object[] })
+        .exclusionConstraints) {
+        statements.push(await this.accept(exc));
+      }
+    }
+
+    if (this.supportsUniqueConstraints()) {
+      for (const exc of (o as TableDefinition & { uniqueConstraints: object[] })
+        .uniqueConstraints) {
+        statements.push(await this.accept(exc));
+      }
+    }
 
     if (statements.length > 0) createSql += ` (${statements.join(", ")})`;
     createSql = this.addTableOptionsBang(createSql, o);
@@ -362,10 +374,5 @@ export class SchemaCreation {
             `Supported values are: :nullify, :cascade, :restrict\n`,
         );
     }
-  }
-
-  /** @internal */
-  protected async tableConstraintStatements(_o: TableDefinition): Promise<string[]> {
-    return [];
   }
 }

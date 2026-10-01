@@ -12,6 +12,7 @@ import {
   type MonitorMixin,
   type NotificationHandle,
 } from "@blazetrails/activesupport";
+import { Thread } from "@blazetrails/ruby-compat";
 import { beforeCommittedOnAllRecords } from "../../active-record.js";
 
 /** @internal */
@@ -839,11 +840,51 @@ export class TransactionManager {
   /**
    * @missingRailsCall empty? — PERMANENT
    * @missingRailsCall size — PERMANENT
+   * @missingRailsName connection — PERMANENT
    */
   async beginTransaction(
     options: { isolation?: string | null; joinable?: boolean; _lazy?: boolean } = {},
   ): Promise<Transaction> {
-    return await this._connection.lock.synchronize(() => this._beginTransactionInner(options));
+    const { isolation = null, joinable = true, _lazy = true } = options;
+    return await this._connection.lock.synchronize(async () => {
+      const runCommitCallbacks = !this.currentTransaction.joinable;
+      let transaction: Transaction;
+      if (this._stack.length === 0) {
+        transaction = new RealTransaction(this._connection, {
+          isolation,
+          joinable,
+          runCommitCallbacks,
+        });
+      } else if (this.currentTransaction.isRestartable()) {
+        transaction = new RestartParentTransaction(
+          this._connection,
+          this.currentTransaction as Transaction,
+          { isolation, joinable, runCommitCallbacks },
+        );
+      } else {
+        transaction = new SavepointTransaction(
+          this._connection,
+          `active_record_${this._stack.length}`,
+          this.currentTransaction as Transaction,
+          { isolation, joinable, runCommitCallbacks },
+        );
+      }
+
+      if (!transaction.isMaterialized()) {
+        if (
+          this._connection.supportsLazyTransactions?.() &&
+          this.isLazyTransactionsEnabled() &&
+          _lazy &&
+          !isolation
+        ) {
+          this._hasUnmaterializedTransactions = true;
+        } else {
+          await transaction.materializeBang();
+        }
+      }
+      this._stack.push(transaction);
+      return transaction;
+    });
   }
 
   async disableLazyTransactionsBang(): Promise<void> {
@@ -903,12 +944,33 @@ export class TransactionManager {
 
   /** @missingRailsCall last — PERMANENT */
   async commitTransaction(): Promise<void> {
-    await this._connection.lock.synchronize(() => this._commitTransactionInner());
+    await this._connection.lock.synchronize(async () => {
+      const transaction = this._stack[this._stack.length - 1] as Transaction;
+
+      try {
+        await transaction.beforeCommitRecords();
+      } finally {
+        this._stack.pop();
+      }
+
+      if (transaction.isDirty()) this.dirtyCurrentTransaction();
+
+      await transaction.commit();
+      await transaction.commitRecords();
+    });
   }
 
   /** @missingRailsCall last — PERMANENT */
-  async rollbackTransaction(transaction?: Transaction): Promise<void> {
-    await this._connection.lock.synchronize(() => this._rollbackTransactionInner(transaction));
+  async rollbackTransaction(transaction?: Transaction | null): Promise<void> {
+    await this._connection.lock.synchronize(async () => {
+      transaction ||= this._stack[this._stack.length - 1] as Transaction;
+      try {
+        await transaction.rollback();
+      } finally {
+        if (this._stack[this._stack.length - 1] === transaction) this._stack.pop();
+      }
+      await transaction.rollbackRecords();
+    });
   }
 
   async withinNewTransaction<T>(
@@ -922,31 +984,38 @@ export class TransactionManager {
           isolation: options.isolation,
           joinable: options.joinable,
         });
-        let result: T;
+        let error: unknown;
         try {
-          result = await fn(transaction.userTransaction);
-        } catch (error) {
+          return await fn(transaction.userTransaction);
+        } catch (e) {
+          error = e;
           await this.rollbackTransaction();
           await this.afterFailureActions(transaction, error);
+
           throw error;
-        }
-
-        try {
-          await this.commitTransaction();
-        } catch (commitError) {
-          if (commitError instanceof ConnectionFailed) {
-            if (!transaction.state.isCompleted()) {
-              transaction.invalidateBang();
+        } finally {
+          if (!error) {
+            if ((Thread.current().status as string) === "aborting") {
+              await this.rollbackTransaction();
+            } else {
+              try {
+                await this.commitTransaction();
+              } catch (e) {
+                if (e instanceof ConnectionFailed) {
+                  if (!transaction.state.isCompleted()) transaction.invalidateBang();
+                  // eslint-disable-next-line no-unsafe-finally -- Ruby's `ensure` re-raises the commit failure over the block's return.
+                  throw e;
+                } else {
+                  if (!transaction.state.isCompleted()) {
+                    await this.rollbackTransaction(transaction);
+                  }
+                  // eslint-disable-next-line no-unsafe-finally -- Ruby's `ensure` re-raises the commit failure over the block's return.
+                  throw e;
+                }
+              }
             }
-            throw commitError;
           }
-          if (!transaction.state.isCompleted()) {
-            await this.rollbackTransaction(transaction);
-          }
-          throw commitError;
         }
-
-        return result;
       } finally {
         if (!transaction || !transaction.state.isCompleted()) {
           await this._connection.throwAwayBang?.();
@@ -973,92 +1042,6 @@ export class TransactionManager {
     if (!(transaction instanceof RealTransaction)) return;
     if (!(error instanceof PreparedStatementCacheExpired)) return;
     return this._connection.clearCacheBang?.();
-  }
-
-  /** @internal */
-  private async _beginTransactionInner(options: {
-    isolation?: string | null;
-    joinable?: boolean;
-    _lazy?: boolean;
-  }): Promise<Transaction> {
-    const { isolation = null, joinable = true, _lazy = true } = options;
-    const current = this.currentTransaction;
-    const runCommitCallbacks = current instanceof Transaction ? !current.joinable : true;
-
-    let transaction: Transaction;
-
-    if (this._stack.length === 0) {
-      transaction = new RealTransaction(this._connection, {
-        isolation,
-        joinable,
-        runCommitCallbacks,
-      });
-    } else if (current instanceof Transaction && current.isRestartable()) {
-      transaction = new RestartParentTransaction(this._connection, current, {
-        isolation,
-        joinable,
-        runCommitCallbacks,
-      });
-    } else {
-      const parentTransaction = current as Transaction;
-      transaction = new SavepointTransaction(
-        this._connection,
-        `active_record_${this._stack.length}`,
-        parentTransaction,
-        { isolation, joinable, runCommitCallbacks },
-      );
-    }
-
-    if (!transaction.isMaterialized()) {
-      if (
-        this._connection.supportsLazyTransactions?.() &&
-        this.isLazyTransactionsEnabled() &&
-        _lazy &&
-        !isolation
-      ) {
-        this._hasUnmaterializedTransactions = true;
-      } else {
-        await transaction.materializeBang();
-      }
-    }
-
-    this._stack.push(transaction);
-    return transaction;
-  }
-
-  /** @internal */
-  private async _commitTransactionInner(): Promise<void> {
-    const transaction = this._stack[this._stack.length - 1];
-    if (!(transaction instanceof Transaction)) return;
-
-    try {
-      await transaction.beforeCommitRecords();
-    } finally {
-      this._stack.pop();
-    }
-
-    if (transaction.isDirty()) {
-      this.dirtyCurrentTransaction();
-    }
-
-    await transaction.commit();
-    await transaction.commitRecords();
-  }
-
-  /** @internal */
-  private async _rollbackTransactionInner(transaction?: Transaction): Promise<void> {
-    const txn = transaction || this._stack[this._stack.length - 1];
-
-    if (!(txn instanceof Transaction)) return;
-
-    try {
-      await txn.rollback();
-    } finally {
-      if (this._stack[this._stack.length - 1] === txn) {
-        this._stack.pop();
-      }
-    }
-    await txn.rollbackRecords();
   }
 }
 

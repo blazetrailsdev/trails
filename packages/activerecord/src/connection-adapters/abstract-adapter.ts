@@ -1079,7 +1079,7 @@ export class AbstractAdapter implements Quoting {
   stealBang(): void {
     if (this.isInUse()) {
       if (this._owner !== IsolatedExecutionState.context()) {
-        removeConnectionFromThreadCache(this.pool as ConnectionPool, this, this._owner!);
+        removeConnectionFromThreadCache(this.pool as ConnectionPool, this, this._owner);
 
         this._owner = IsolatedExecutionState.context();
       }
@@ -1683,13 +1683,23 @@ export class AbstractAdapter implements Quoting {
 
       let retriesAvailable = allowRetry ? this.connectionRetries : 0;
       const deadline =
-        this.retryDeadline !== null
-          ? Process.clockGettime(Process.CLOCK_MONOTONIC) + this.retryDeadline
-          : null;
+        this.retryDeadline != null &&
+        Process.clockGettime(Process.CLOCK_MONOTONIC) + this.retryDeadline;
       let reconnectable = this.isReconnectCanRestoreState();
-      const last = this.secondsSinceLastActivity;
-      const recent = last !== null && last < this.verifyTimeout;
-      if (!this._verified && !recent && reconnectable && !allowRetry) await this.verifyBang();
+
+      let lastActivity: number | null;
+      if (this._verified) {
+      } else if (
+        (lastActivity = this.secondsSinceLastActivity) != null &&
+        lastActivity < this.verifyTimeout
+      ) {
+      } else if (reconnectable) {
+        if (allowRetry) {
+        } else {
+          await this.verifyBang();
+        }
+      } else {
+      }
 
       for (;;) {
         try {
@@ -1702,7 +1712,7 @@ export class AbstractAdapter implements Quoting {
           ) as Error;
           this.invalidateTransaction(translatedException);
           const retryDeadlineExceeded =
-            deadline !== null && deadline < Process.clockGettime(Process.CLOCK_MONOTONIC);
+            deadline !== false && deadline < Process.clockGettime(Process.CLOCK_MONOTONIC);
           if (!retryDeadlineExceeded && retriesAvailable > 0) {
             retriesAvailable -= 1;
             if (this.isRetryableQueryError(translatedException)) {
