@@ -82,6 +82,7 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // as `except(hash, ...keys)`.
   "except",
   "merge!",
+  "intersect?",
   // active_support/core_ext/hash/indifferent_access.rb — `hash.with_indifferent_access`,
   // exported by @blazetrails/activesupport as `withIndifferentAccess(obj)`.
   "with_indifferent_access",

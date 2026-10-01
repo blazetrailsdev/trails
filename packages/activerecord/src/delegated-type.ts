@@ -28,7 +28,7 @@ export function delegatedType(
     hashDelete(options as Record<string, unknown>, "scope") as DelegatedTypeOptions["scope"] | null,
     merge(options, { polymorphic: true }),
   );
-  this.defineDelegatedTypeMethods(role, { types: types, options: options });
+  this.defineDelegatedTypeMethods(role, { types, options });
 }
 
 function defineMethod(mixin: any, methodName: string, body: (...args: any[]) => any): void {

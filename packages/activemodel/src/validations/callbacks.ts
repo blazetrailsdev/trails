@@ -4,10 +4,11 @@ import {
   extend,
   include,
   included,
+  kernelArray as array,
   prepend,
   runCallbacks,
 } from "@blazetrails/activesupport";
-import { hasKey } from "@blazetrails/ruby-compat";
+import { hasKey, isIntersect } from "@blazetrails/ruby-compat";
 import type { CallbackConditions, CallbackObject } from "../callbacks.js";
 
 export const ClassMethods = {
@@ -103,20 +104,11 @@ export async function runValidationsBang(
 /** @internal */
 export function setOptionsForCallback(options: CallbackOptions): void {
   if (hasKey(options, "on")) {
-    const on = Array.isArray(options.on) ? options.on : options.on == null ? [] : [options.on];
-    options.on = on;
-    const ifs = options.if == null ? [] : Array.isArray(options.if) ? options.if : [options.if];
+    options.on = array(options.on);
     options.if = [
-      (o: unknown) => {
-        const validationContext = (o as CallbackHostRecord).validationContext;
-        const contexts = Array.isArray(validationContext)
-          ? validationContext
-          : validationContext == null
-            ? []
-            : [validationContext];
-        return on.some((context) => contexts.includes(context));
-      },
-      ...ifs,
+      (o: unknown) =>
+        isIntersect(options.on as string[], array((o as CallbackHostRecord).validationContext)),
+      ...array(options.if),
     ];
   }
 }
