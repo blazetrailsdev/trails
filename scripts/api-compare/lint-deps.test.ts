@@ -9,6 +9,7 @@ import {
   collectTaintedSymbols,
   declaredConstantName,
   isImportFromPackage,
+  isUnportedRubyRef,
   methodUsesDepImport,
   moduleFunctionOwner,
   rubyRefSpellings,
@@ -355,6 +356,13 @@ describe("rubyRefSpellings", () => {
   it("answers nothing for a namespace root or a method ref", () => {
     expect(rubyRefSpellings("ActiveSupport")).toEqual([]);
     expect(rubyRefSpellings("arel_table")).toEqual([]);
+  });
+});
+
+describe("isUnportedRubyRef", () => {
+  it("is true for the Zeitwerk load interlock and nothing else", () => {
+    expect(isUnportedRubyRef("ActiveSupport::Dependencies")).toBe(true);
+    expect(isUnportedRubyRef("ActiveSupport::Benchmark")).toBe(false);
   });
 });
 

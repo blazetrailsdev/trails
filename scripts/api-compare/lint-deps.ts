@@ -486,8 +486,7 @@ export function methodUsesDepImport(
   const check = (n: ts.Node, inSignatureType: boolean) => {
     if (found && !collectRefs) return;
 
-    // Resolve namespace property accesses: Nodes.OuterJoin → "OuterJoin", and
-    // every further member of the chain: Duration.ISO8601Parser.ParsingError.
+    // Resolve namespace property accesses: Nodes.OuterJoin → "OuterJoin"
     if (ts.isPropertyAccessExpression(n)) {
       let root: ts.Expression = n.expression;
       while (ts.isPropertyAccessExpression(root)) root = root.expression;
@@ -603,7 +602,10 @@ export function moduleFunctionOwner(
  * (`Data as BinaryData`) and the second as the receiver of a module method, so
  * neither spelling is the identifier or the member the walk records. A Ruby
  * constant is capitalised, and so is the class, namespace or module object
- * porting it.
+ * porting it. The walk also records every member of a chain rooted at an
+ * import, so `Duration.ISO8601Parser.ParsingError` answers
+ * `ActiveSupport::Duration::ISO8601Parser::ParsingError`
+ * (activerecord/lib/active_record/connection_adapters/postgresql/oid/interval.rb:21).
  */
 export function declaredConstantName(id: ts.Identifier, checker: ts.TypeChecker): string | null {
   const sym = checker.getSymbolAtLocation(id);
@@ -688,13 +690,17 @@ const RUBY_METHOD_REFS = new Set([
 // the mixed-in methods but never references the module name itself.
 const RUBY_MIXIN_REFS = new Set(["Predications", "Expressions"]);
 
-// Ruby constants with no trails counterpart. `ActiveSupport::Dependencies` is
-// the Zeitwerk load interlock (`Dependencies.interlock.permit_concurrent_loads`,
-// connection_pool/queue.rb:117), which SKIP_GROUPS in scripts/parity/conventions.ts
-// already leaves unmirrored for dependencies.rb and dependencies/interlock.rb.
 const RUBY_UNPORTED_REFS = new Set(["Dependencies"]);
 
-function isUnportedRubyRef(ref: string): boolean {
+/**
+ * Whether a Ruby dep ref names a constant with no trails counterpart.
+ * `ActiveSupport::Dependencies` is the Zeitwerk load interlock
+ * (`Dependencies.interlock.permit_concurrent_loads`,
+ * activerecord/lib/active_record/connection_adapters/abstract/connection_pool/queue.rb:117),
+ * which SKIP_GROUPS in scripts/parity/conventions.ts already leaves unmirrored
+ * for dependencies.rb and dependencies/interlock.rb.
+ */
+export function isUnportedRubyRef(ref: string): boolean {
   return ref.split("::").some((part) => RUBY_UNPORTED_REFS.has(part));
 }
 
