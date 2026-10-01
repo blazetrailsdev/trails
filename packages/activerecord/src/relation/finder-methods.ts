@@ -358,10 +358,12 @@ export function raiseRecordNotFoundExceptionBang(
   const conditions = this.whereClause.isEmpty()
     ? ""
     : ` [${
-        this.arel().whereSql({
-          withConnection: <T>(block: (connection: DatabaseAdapter) => T): T =>
-            (model as any).connectionPool().withConnectionSync(block),
-        })?.value ?? ""
+        this.arel()
+          .whereSql({
+            withConnection: <T>(block: (connection: DatabaseAdapter) => T): T =>
+              (model as any).connectionPool().withConnectionSync(block),
+          })
+          ?.toString() ?? ""
       }]`;
 
   const name = this.model.name;

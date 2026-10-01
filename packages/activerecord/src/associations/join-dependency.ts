@@ -202,7 +202,7 @@ export class JoinDependency {
     if (references) {
       for (const tableName of references) {
         if (tableName instanceof Nodes.SqlLiteral)
-          this._references.set(tableName.value, tableName.value);
+          this._references.set(tableName.toString(), tableName.toString());
       }
     }
     const joins = this.makeJoinConstraints(this.joinRoot, this.joinType);

@@ -1128,7 +1128,7 @@ describe("SelectManagerTest", () => {
       const mgr = new SelectManager();
       mgr.from(users);
       mgr.where(users.get("id").eq(10));
-      expect(mgr.whereSql()?.value).toBe('WHERE "users"."id" = 10');
+      expect(mgr.whereSql()?.toString()).toBe('WHERE "users"."id" = 10');
     });
 
     it("joins wheres with AND", () => {
@@ -1136,7 +1136,7 @@ describe("SelectManagerTest", () => {
       mgr.from(users);
       mgr.where(users.get("id").eq(10));
       mgr.where(users.get("id").eq(11));
-      expect(mgr.whereSql()?.value).toBe('WHERE "users"."id" = 10 AND "users"."id" = 11');
+      expect(mgr.whereSql()?.toString()).toBe('WHERE "users"."id" = 10 AND "users"."id" = 11');
     });
 
     it("handles database-specific statements", () => {
@@ -1148,7 +1148,7 @@ describe("SelectManagerTest", () => {
       mgr.from(users);
       mgr.where(users.get("id").eq(10));
       mgr.where(users.get("name").matches("foo%"));
-      expect(mgr.whereSql(pgEngine)?.value).toBe(
+      expect(mgr.whereSql(pgEngine)?.toString()).toBe(
         `WHERE "users"."id" = 10 AND "users"."name" ILIKE 'foo%'`,
       );
     });

@@ -229,7 +229,7 @@ export class Dot extends Visitor {
   protected visitString(o: unknown): void {
     const top = this.nodeStack[this.nodeStack.length - 1];
     if (!top) return;
-    const value = o instanceof Nodes.SqlLiteral ? o.value : o;
+    const value = o instanceof Nodes.SqlLiteral ? o.toString() : o;
     top.fields.push(value == null ? "" : String(value));
   }
 

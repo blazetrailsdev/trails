@@ -23,7 +23,7 @@ describe("InsertManagerTest (trails)", () => {
       const mgr = new InsertManager(users);
       mgr.insert("foo");
       expect(mgr.ast.values).toBeInstanceOf(Nodes.SqlLiteral);
-      expect((mgr.ast.values as Nodes.SqlLiteral).value).toBe("foo");
+      expect((mgr.ast.values as Nodes.SqlLiteral).toString()).toBe("foo");
     });
 
     it("infers ast.relation from the first column when not yet set", () => {

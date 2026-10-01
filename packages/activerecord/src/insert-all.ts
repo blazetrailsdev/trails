@@ -485,7 +485,7 @@ export class Builder implements InsertBuilder {
   returning(): string | undefined {
     const ret = this._insertAll.returning;
     if (!ret) return undefined;
-    if (ret instanceof Nodes.SqlLiteral) return ret.value;
+    if (ret instanceof Nodes.SqlLiteral) return ret.toString();
     const cols = Array.isArray(ret) ? ret : [ret];
     const aliases = (this.model as any).attributeAliases as Record<string, string> | undefined;
     return cols

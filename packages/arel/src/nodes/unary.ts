@@ -5,14 +5,12 @@ import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class Unary extends NodeExpression {
-  expr: unknown;
-
-  get value(): unknown {
+export class Unary<E = unknown> extends NodeExpression {
+  get value(): E {
     return this.expr;
   }
 
-  constructor(expr: unknown) {
+  constructor(expr: E) {
     super();
     this.expr = expr;
   }
@@ -65,8 +63,9 @@ rbSetClassPathString(Not, Nodes, "Not");
 Nodes.Not = Not;
 
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-export interface Unary extends _AliasPredication {}
+export interface Unary<E = unknown> extends _AliasPredication {
+  expr: E;
+}
 
 rbSetClassPathString(Unary, Nodes, "Unary");
 Nodes.Unary = Unary;

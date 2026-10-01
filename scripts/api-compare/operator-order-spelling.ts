@@ -69,6 +69,8 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   "ActionDispatch::Journey::GTG::TransitionTable": { "[]=": ["set"] },
   // arel/table.rb:82 `def [](name, table = self)` → table.ts `get`.
   "Arel::Table": { "[]": ["get"] },
+  // arel/nodes/table_alias.rb:10 `def [](name)` → nodes/table-alias.ts `get`.
+  "Arel::Nodes::TableAlias": { "[]": ["get"] },
   // active_model/errors.rb:229 `def [](attribute)` → errors.ts `get`.
   "ActiveModel::Errors": { "[]": ["get"] },
   // attribute_set/builder.rb:110 `def [](key)` → builder.ts

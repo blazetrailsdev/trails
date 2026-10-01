@@ -2,6 +2,9 @@ import { Nodes } from "../namespaces.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { rbSetClassPathString } from "@blazetrails/ruby-compat";
 import type { FactoryMethodsModule } from "../factory-methods.js";
+import type { And } from "./nary.js";
+import type { Not } from "./unary.js";
+import type { Grouping } from "./grouping.js";
 
 export interface ArelEngine {
   withConnection<T>(
@@ -13,15 +16,15 @@ export const _engine: { current: ArelEngine | null } = { current: null };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Node {
-  not(): Node {
+  not(): Not {
     return new Nodes.Not(this);
   }
 
-  or(right: Node): Node {
+  or(right: Node): Grouping {
     return new Nodes.Grouping(new Nodes.Or([this, right]));
   }
 
-  and(right: Node): Node {
+  and(right: Node): And {
     return new Nodes.And([this, right]);
   }
 

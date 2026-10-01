@@ -91,8 +91,7 @@ export class AliasTracker {
     for (const join of tableJoins) {
       if (join instanceof Nodes.StringJoin) {
         const left = join.left;
-        const sql =
-          typeof left === "string" ? left : ((left as any)?.value ?? left?.toString?.() ?? "");
+        const sql = typeof left === "string" ? left : (left?.toString?.() ?? "");
         const matches = sql.match(pattern);
         count += matches ? matches.length : 0;
       } else if (join instanceof Nodes.Join) {

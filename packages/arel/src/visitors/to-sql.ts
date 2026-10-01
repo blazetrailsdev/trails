@@ -94,7 +94,7 @@ export class ToSql extends Visitor {
     if (o.columns.length > 0) {
       collector.append(" (");
       const colNames = o.columns.map((c) => {
-        if (c instanceof Nodes.SqlLiteral) return c.value;
+        if (c instanceof Nodes.SqlLiteral) return c.toString();
         const name =
           c instanceof Attributes.Attribute ? c.name : String((c as { name?: string }).name ?? c);
         return this.quoteColumnName(name);
@@ -897,7 +897,7 @@ export class ToSql extends Visitor {
       collector.retryable = false;
     }
     collector.preparable = false;
-    collector.append(o.value);
+    collector.append(o.toString());
     return collector;
   }
 
@@ -1019,24 +1019,24 @@ export class ToSql extends Visitor {
   }
 
   protected quote(value: unknown): string {
-    if (value instanceof Nodes.SqlLiteral) return value.value;
+    if (value instanceof Nodes.SqlLiteral) return value.toString();
     return this.connection.quote(value);
   }
 
   /** @internal */
   protected quoteTableName(name: string | Node | null): string {
-    if (name instanceof Nodes.SqlLiteral) return name.value;
+    if (name instanceof Nodes.SqlLiteral) return name.toString();
     return this.connection.quoteTableName(name);
   }
 
   /** @internal */
   protected quoteColumnName(name: string | Node | null): string {
-    if (name instanceof Nodes.SqlLiteral) return name.value;
+    if (name instanceof Nodes.SqlLiteral) return name.toString();
     return this.connection.quoteColumnName(name);
   }
 
   protected sanitizeAsSqlComment(value: string | Nodes.SqlLiteral): string {
-    if (value instanceof Nodes.SqlLiteral) return value.value;
+    if (value instanceof Nodes.SqlLiteral) return value.toString();
     return this.connection.sanitizeAsSqlComment(String(value));
   }
 

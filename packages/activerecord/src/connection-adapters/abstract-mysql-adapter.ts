@@ -875,7 +875,7 @@ WHERE fk.referenced_column_name IS NOT NULL
       } else if (insert.updateDuplicates()) {
         const raw = insert.rawUpdateSql();
         if (raw) {
-          sql = `INSERT ${insert.into()} ${await insert.valuesList()} ON DUPLICATE KEY UPDATE ${raw.value}`;
+          sql = `INSERT ${insert.into()} ${await insert.valuesList()} ON DUPLICATE KEY UPDATE ${raw.toString()}`;
         } else {
           sql += " ON DUPLICATE KEY UPDATE ";
           sql += insert.touchModelTimestampsUnless(
@@ -898,7 +898,7 @@ WHERE fk.referenced_column_name IS NOT NULL
         sql += " ON DUPLICATE KEY UPDATE ";
         const raw = insert.rawUpdateSql();
         if (raw) {
-          sql += raw.value;
+          sql += raw.toString();
         } else {
           sql += insert.touchModelTimestampsUnless((column) => `${column}<=>VALUES(${column})`);
           sql += insert

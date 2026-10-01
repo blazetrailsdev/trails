@@ -10,14 +10,10 @@ import type { ExpressionsModule } from "../expressions.js";
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class InfixOperation extends Binary {
   readonly operator: string;
-  left: NodeOrValue;
-  right: NodeOrValue;
 
   constructor(operator: string, left: NodeOrValue, right: NodeOrValue) {
     super(left, right);
     this.operator = operator;
-    this.left = left;
-    this.right = right;
   }
 }
 

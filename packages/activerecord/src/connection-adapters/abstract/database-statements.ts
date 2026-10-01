@@ -123,7 +123,7 @@ export function toSqlAndBinds(
   }
 
   if (arelOrSqlString instanceof Nodes.SqlLiteral) {
-    return [arelOrSqlString.value, binds, preparable, allowRetry];
+    return [arelOrSqlString.toString(), binds, preparable, allowRetry];
   }
 
   return [arelOrSqlString as string, binds, preparable, allowRetry];

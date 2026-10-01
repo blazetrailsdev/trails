@@ -112,7 +112,7 @@ export function sanitizeSqlForOrder(
   if (condition instanceof Nodes.Node) return condition;
   if (Array.isArray(condition)) {
     const first: unknown = condition[0];
-    const firstText = first instanceof Nodes.SqlLiteral ? first.value : String(first);
+    const firstText = first instanceof Nodes.SqlLiteral ? first.toString() : String(first);
     if (firstText.includes("?")) {
       const adapterClass = this.adapterClass() as {
         columnNameWithOrderMatcher(): RegExp;

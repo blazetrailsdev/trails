@@ -10,6 +10,7 @@ import { OPERATORS } from "@blazetrails/parity/conventions";
 describe("operatorSpelling", () => {
   it("resolves `[]` to the class-specific spelling per fqn", () => {
     expect(operatorSpelling("Arel::Table", "[]")).toEqual(["get"]);
+    expect(operatorSpelling("Arel::Nodes::TableAlias", "[]")).toEqual(["get"]);
     expect(operatorSpelling("ActiveModel::AttributeSet", "[]")).toEqual(["getAttribute"]);
     expect(operatorSpelling("ActiveModel::Errors", "[]")).toEqual(["get"]);
     expect(operatorSpelling("ActiveModel::LazyAttributeHash", "[]")).toEqual(["getAttribute"]);

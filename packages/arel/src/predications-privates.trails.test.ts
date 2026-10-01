@@ -28,7 +28,7 @@ describe("Predications.groupingAny / groupingAll", () => {
     const attr = users.get("id");
     const any = Predications.groupingAny.call(attr, "eq", []);
     expect(any.expr).toBeInstanceOf(Nodes.SqlLiteral);
-    expect((any.expr as Nodes.SqlLiteral).value).toBe("NULL");
+    expect((any.expr as Nodes.SqlLiteral).toString()).toBe("NULL");
     expect(attr.eqAny([])).toEqual(any);
 
     const all = Predications.groupingAll.call(attr, "eq", []);
@@ -205,7 +205,7 @@ describe("SelectManager#collapse (Rails-fidelity helper)", () => {
   it("wraps a bare string as SqlLiteral", () => {
     const out = mgr.callCollapse(["LOWER(name) = 'x'"]);
     expect(out).toBeInstanceOf(Nodes.SqlLiteral);
-    expect((out as Nodes.SqlLiteral).value).toBe("LOWER(name) = 'x'");
+    expect((out as Nodes.SqlLiteral).toString()).toBe("LOWER(name) = 'x'");
   });
 
   it("folds multiple exprs into an And via createAnd", () => {
