@@ -547,6 +547,18 @@ describe("Hash#shift", () => {
     expect(h.shift()).toBeUndefined();
   });
 
+  it("removes the first entry without looking its key up, so a key mutated since is shifted", () => {
+    const key = [1];
+    const h = new Hash<unknown[], string>();
+    h.set(key, "a");
+    key.push(2);
+    expect(h.shift()).toEqual([[1, 2], "a"]);
+    expect(h.size).toBe(0);
+    h.set([1], "b");
+    h.set([1], "c");
+    expect(h.size).toBe(1);
+  });
+
   it("shifts while the hash is being iterated", () => {
     const h = new Hash<string, number>();
     h.set("a", 1);

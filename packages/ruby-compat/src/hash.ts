@@ -480,6 +480,7 @@ export class Hash<K, V> extends Map<K, V> {
   #defaultProc?: DefaultProc<K, V>;
   #frozen = false;
   #eqlKeys = new Map<number, K[]>();
+  #stHash = new WeakMap<object, number>();
   #identhash = false;
   #iterLev = 0;
 
@@ -554,6 +555,7 @@ export class Hash<K, V> extends Map<K, V> {
     const stored = this.hashStlikeLookup(key);
     if (stored === key && !this.#identhash && isObjectKey(key) && !super.has(key)) {
       const h = rbHash(key);
+      this.#stHash.set(key, h);
       const bucket = this.#eqlKeys.get(h);
       if (bucket) bucket.push(key);
       else this.#eqlKeys.set(h, [key]);
@@ -703,22 +705,33 @@ export class Hash<K, V> extends Map<K, V> {
     const stored = this.hashStlikeLookup(key);
     if (!super.has(stored)) return UNDEF;
     const val = super.get(stored);
+    this.stDeleteEntry(stored);
+    return val;
+  }
+
+  /**
+   * Removes a stored entry from its bin by the hash the entry was stored
+   * under, as `st_table_entry.hash` holds it (`vendor/ruby/v3.3.11/st.c:134`),
+   * so a key whose `hash` has changed since is still found.
+   */
+  private stDeleteEntry(stored: K): void {
     super.delete(stored);
     if (!this.#identhash && isObjectKey(stored)) {
-      const h = rbHash(stored);
+      const h = this.#stHash.get(stored)!;
       const bucket = this.#eqlKeys.get(h)!;
       bucket.splice(bucket.indexOf(stored), 1);
       if (bucket.length === 0) this.#eqlKeys.delete(h);
     }
-    return val;
   }
 
   /**
    * `Hash#shift` (`vendor/ruby/v3.3.11/hash.c:2492` `rb_hash_shift`): removes
    * the first entry and returns it as a `[key, value]` pair, `nil` for an
-   * empty hash, after `rb_hash_modify_check`. MRI takes the entry through
-   * `rb_hash_foreach` only while the hash is being iterated, because
-   * `st_shift` may not run then; a `Map` drops its first entry either way.
+   * empty hash, after `rb_hash_modify_check`. The entry is removed directly,
+   * with no lookup of its key, as `st_shift` does (`hash.c:2515`). MRI takes
+   * it through `rb_hash_foreach` only while the hash is being iterated,
+   * because `st_shift` may not run then; a `Map` drops its first entry
+   * either way.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Hash#shift` (`vendor/ruby/v3.3.11/hash.c:2492`).
    */
@@ -726,7 +739,7 @@ export class Hash<K, V> extends Map<K, V> {
     this.modifyCheck();
     const first = super.entries().next();
     if (!first.done) {
-      this.deleteEntry(first.value[0]);
+      this.stDeleteEntry(first.value[0]);
       return first.value;
     }
     return undefined;
