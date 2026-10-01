@@ -48,7 +48,7 @@ interface PersistenceHost {
   _isBaseClass?: boolean;
   ensureSchemaLoaded(): Promise<void>;
   /** @internal */
-  discriminateClassForRecord(record: Record<string, unknown>): any;
+  discriminateClassForRecord(record: Record<string, unknown>): typeof Base;
 }
 
 export async function create(

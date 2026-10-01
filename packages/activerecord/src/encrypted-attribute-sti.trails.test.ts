@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Company } from "./test-helpers/models/company.js";
 import { fixtures } from "./test-fixtures.js";
+import { registerModel } from "./associations.js";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import {
   configureEncryption,
@@ -11,6 +12,7 @@ import {
 class EncryptedCompany extends Company {}
 class OtherEncryptedCompany extends Company {}
 class ReflectedEncryptedCompany extends Company {}
+registerModel([EncryptedCompany, OtherEncryptedCompany, ReflectedEncryptedCompany]);
 
 const defTypeFor = (klass: typeof Company, name: string) => klass.typeForAttribute(name);
 

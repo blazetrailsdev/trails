@@ -1,4 +1,4 @@
-import { camelize, include, isBlank, Module } from "@blazetrails/activesupport";
+import { camelize, include, isPresent, Module } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Engine, Password } from "./bcrypt.js";
 import { Validations } from "./validations.js";
@@ -41,7 +41,7 @@ export function hasSecurePassword(
     const klass = this as unknown as typeof Model;
 
     klass.validate((record: Model) => {
-      if (isBlank(publicSend(record, digestAttr))) record.errors.add(attribute, ":blank");
+      if (!isPresent(publicSend(record, digestAttr))) record.errors.add(attribute, ":blank");
     });
 
     klass.validate((record: Model) => {
@@ -50,7 +50,7 @@ export function hasSecurePassword(
         const digestWas = rbObjRespondTo(record, `${digestAttr}Was`)
           ? (publicSend(record, `${digestAttr}Was`) as string | null | undefined)
           : undefined;
-        if (!(!isBlank(digestWas) && new Password(digestWas as string).isPassword(challenge))) {
+        if (!(isPresent(digestWas) && new Password(digestWas as string).isPassword(challenge))) {
           record.errors.add(challengeAttr);
         }
       }
@@ -59,7 +59,7 @@ export function hasSecurePassword(
     klass.validate((record: Model) => {
       const passwordValue = publicSend(record, attribute) as string | null;
       if (
-        !isBlank(passwordValue) &&
+        isPresent(passwordValue) &&
         textEncoder.encode(passwordValue as string).length > MAX_PASSWORD_LENGTH_ALLOWED
       ) {
         record.errors.add(attribute, ":password_too_long");
@@ -158,7 +158,7 @@ export class InstanceMethodsOnActivation extends Module {
 
     const authenticateAttribute = function (this: Model, unencryptedPassword: unknown) {
       const attributeDigest = publicSend(this, digestAttr) as string | null;
-      return !isBlank(attributeDigest) &&
+      return isPresent(attributeDigest) &&
         new Password(attributeDigest as string).isPassword(unencryptedPassword)
         ? this
         : false;
@@ -169,7 +169,7 @@ export class InstanceMethodsOnActivation extends Module {
       Object.defineProperty(mod, `${attribute}Salt`, {
         get(this: Model) {
           const attributeDigest = publicSend(this, digestAttr) as string | null;
-          return !isBlank(attributeDigest) ? new Password(attributeDigest as string).salt : null;
+          return isPresent(attributeDigest) ? new Password(attributeDigest as string).salt : null;
         },
         configurable: true,
       });

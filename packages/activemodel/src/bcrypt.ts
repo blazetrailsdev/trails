@@ -1,20 +1,16 @@
 import bcryptjs from "bcryptjs";
-import { ArgumentError, StandardError, rbObjAsString } from "@blazetrails/ruby-compat";
+import { ArgumentError, StandardError, rbObjAsString, warn } from "@blazetrails/ruby-compat";
 
 /** @noRailsEquivalent CONVERGEABLE activemodel-bcrypt-engine-into-a-bcrypt-gem-package */
 export class Error extends StandardError {}
 
 /** @noRailsEquivalent CONVERGEABLE activemodel-bcrypt-engine-into-a-bcrypt-gem-package */
-export class InvalidSalt extends Error {}
-
-/** @noRailsEquivalent CONVERGEABLE activemodel-bcrypt-engine-into-a-bcrypt-gem-package */
-export class InvalidHash extends Error {}
-
-/** @noRailsEquivalent CONVERGEABLE activemodel-bcrypt-engine-into-a-bcrypt-gem-package */
-export class InvalidCost extends Error {}
-
-/** @noRailsEquivalent CONVERGEABLE activemodel-bcrypt-engine-into-a-bcrypt-gem-package */
-export const Errors = { InvalidSalt, InvalidHash, InvalidCost };
+export const Errors = {
+  InvalidSalt: class InvalidSalt extends Error {},
+  InvalidHash: class InvalidHash extends Error {},
+  InvalidCost: class InvalidCost extends Error {},
+  InvalidSecret: class InvalidSecret extends Error {},
+};
 
 /** @noRailsEquivalent CONVERGEABLE activemodel-bcrypt-engine-into-a-bcrypt-gem-package */
 export class Engine {
@@ -27,12 +23,28 @@ export class Engine {
   /** @noRailsEquivalent CONVERGEABLE activemodel-bcrypt-engine-into-a-bcrypt-gem-package */
   static cost: number = 12;
 
-  /** @noRailsEquivalent CONVERGEABLE activemodel-bcrypt-engine-into-a-bcrypt-gem-package */
-  static hashSecret(secret: unknown, salt: string): string {
-    if (this.isValidSalt(salt)) {
-      return bcryptjs.hashSync(rbObjAsString(secret), salt);
+  /**
+   * @noRailsEquivalent CONVERGEABLE activemodel-bcrypt-engine-into-a-bcrypt-gem-package
+   * @missingRailsCall byteslice — PERMANENT
+   */
+  static hashSecret(secret: unknown, salt: string, _: unknown = null): string {
+    if (_ != null) {
+      warn(
+        "[DEPRECATION] Passing the third argument to " +
+          "`BCrypt::Engine.hash_secret` is deprecated. " +
+          "Please do not pass the third argument which " +
+          "is currently not used.",
+      );
+    }
+
+    if (this.isValidSecret(secret)) {
+      if (this.isValidSalt(salt)) {
+        return bcryptjs.hashSync(rbObjAsString(secret), salt);
+      } else {
+        throw new Errors.InvalidSalt("invalid salt");
+      }
     } else {
-      throw new Errors.InvalidSalt("invalid salt");
+      throw new Errors.InvalidSecret("invalid secret");
     }
   }
 
@@ -43,7 +55,7 @@ export class Engine {
       if (cost < this.MIN_COST) {
         cost = this.MIN_COST;
       }
-      return bcryptjs.genSaltSync(cost);
+      return `$2a$${bcryptjs.genSaltSync(cost).slice(4)}`;
     } else {
       throw new Errors.InvalidCost("cost must be numeric and > 0");
     }
@@ -52,6 +64,11 @@ export class Engine {
   /** @noRailsEquivalent CONVERGEABLE activemodel-bcrypt-engine-into-a-bcrypt-gem-package */
   static isValidSalt(salt: string): boolean {
     return /^\$[0-9a-z]{2,}\$[0-9]{2,}\$[A-Za-z0-9./]{22,}$/.test(salt);
+  }
+
+  /** @noRailsEquivalent CONVERGEABLE activemodel-bcrypt-engine-into-a-bcrypt-gem-package */
+  static isValidSecret(secret: unknown): boolean {
+    return secret == null || typeof (secret as { toString?: unknown }).toString === "function";
   }
 }
 
@@ -67,8 +84,8 @@ export class Password extends String {
   readonly cost: number;
 
   /** @noRailsEquivalent CONVERGEABLE activemodel-bcrypt-engine-into-a-bcrypt-gem-package */
-  static create(secret: unknown, options: { cost?: number } = {}): Password {
-    const cost = options.cost ?? Engine.cost;
+  static create(secret: unknown, options: { cost?: number | false | null } = {}): Password {
+    const cost = options.cost != null && options.cost !== false ? options.cost : Engine.cost;
     if (cost > Engine.MAX_COST) throw new ArgumentError();
     return new Password(Engine.hashSecret(secret, Engine.generateSalt(cost)));
   }
