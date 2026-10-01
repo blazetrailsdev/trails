@@ -604,12 +604,29 @@ describe("Hash#compare_by_identity", () => {
       h.forEach(() => {});
       expect(() => h.compareByIdentity()).toThrow(RuntimeError);
     });
+    for (const _pair of h) {
+      expect(() => h.compareByIdentity()).toThrow(RuntimeError);
+    }
     expect(h.isCompareByIdentity()).toBe(false);
     expect(() =>
       eachPair(h, () => {
         throw new IndexError("stop");
       }),
     ).toThrow(IndexError);
+    expect(h.compareByIdentity().isCompareByIdentity()).toBe(true);
+  });
+
+  it("lowers the level when a for…of breaks, and keeps it for a suspended iterator", () => {
+    const h = new Hash<string, number>();
+    h.set("a", 1);
+    h.set("b", 2);
+    for (const _pair of h) break;
+    const [first] = h;
+    expect(first).toEqual(["a", 1]);
+    const enumerator = h[Symbol.iterator]();
+    enumerator.next();
+    expect(() => h.compareByIdentity()).toThrow("compare_by_identity during iteration");
+    enumerator.return(undefined);
     expect(h.compareByIdentity().isCompareByIdentity()).toBe(true);
   });
 

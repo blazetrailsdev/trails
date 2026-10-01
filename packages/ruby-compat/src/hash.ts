@@ -290,7 +290,7 @@ export function eachPair<T>(
   block: PairBlock<T>,
 ): Record<string, T> | Map<string, T> {
   if (hash instanceof Map) {
-    hash.forEach((value, key) => block(key, value));
+    for (const [key, value] of hash) block(key, value);
     return hash;
   }
   for (const key of Object.keys(hash)) {
@@ -730,27 +730,37 @@ export class Hash<K, V> extends Map<K, V> {
   /**
    * `rb_hash_foreach` (`vendor/ruby/v3.3.11/hash.c:1438`), the walk every
    * yielding Hash method goes through: it raises the receiver's `iter_lev`
-   * for the length of the walk and lowers it in an `ensure`. A `for…of` over
-   * the hash is not counted: an iterator that is abandoned never reports its
-   * end, so nothing could lower the level again.
+   * for the length of the walk and lowers it in an `ensure`. A `for…of` that
+   * ends, breaks or throws closes the iterator and lowers the level. One left
+   * part-way keeps it raised, as a suspended `hash.each` Enumerator does.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `rb_hash_foreach` (`vendor/ruby/v3.3.11/hash.c:1438`).
+   */
+  override *[Symbol.iterator](): Generator<[K, V], undefined, unknown> {
+    if (this.size === 0) return;
+    if (this.#frozen) {
+      yield* super[Symbol.iterator]();
+    } else {
+      this.#iterLev++;
+      try {
+        yield* super[Symbol.iterator]();
+      } finally {
+        this.#iterLev--;
+      }
+    }
+  }
+
+  /**
+   * `Map#forEach`, walked through `rb_hash_foreach`
+   * (`vendor/ruby/v3.3.11/hash.c:1438`) as `Hash#each_pair` is (`hash.c:3149`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_pair` (`vendor/ruby/v3.3.11/hash.c:3149`).
    */
   override forEach(
     callbackfn: (value: V, key: K, map: Map<K, V>) => void,
     thisArg?: unknown,
   ): void {
-    if (this.size === 0) return;
-    if (this.#frozen) {
-      super.forEach(callbackfn, thisArg);
-    } else {
-      this.#iterLev++;
-      try {
-        super.forEach(callbackfn, thisArg);
-      } finally {
-        this.#iterLev--;
-      }
-    }
+    for (const [key, value] of this) callbackfn.call(thisArg, value, key, this);
   }
 
   /** `hash_iterating_p` (`vendor/ruby/v3.3.11/hash.c:1339`). */
