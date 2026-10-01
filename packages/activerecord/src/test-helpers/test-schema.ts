@@ -1709,6 +1709,15 @@ export const TEST_SCHEMA: Schema = {
     toooooooo_long_b_id: { type: "big_integer", null: false },
   },
 
+  to_be_linked_accounts: {
+    name: "string",
+  },
+  to_be_linked_users: {
+    name: "string",
+    account_id: "integer",
+    settings: "text",
+  },
+
   catalog_categories: { name: "string" },
   catalog_products: { name: "string" },
   clients: { name: "string" },

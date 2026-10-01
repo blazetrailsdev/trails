@@ -10,7 +10,9 @@
     "orgs",
     "orphans",
     "targets",
-    "teams"
+    "teams",
+    "to_be_linked_accounts",
+    "to_be_linked_users"
   ],
   "columns": ["admin_users.region_id"]
 }
