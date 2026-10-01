@@ -744,11 +744,12 @@ export class FormBuilder {
     }
 
     let objectName = this.objectName;
-    let index: unknown;
+    let index: unknown = null;
     if (Object.hasOwn(this.options, "index")) {
       index = this.options["index"];
     } else if (this._autoIndex !== undefined) {
-      objectName = String(objectName ?? "").replace(/\[\]$/, "");
+      objectName = String(objectName ?? "");
+      if (objectName.endsWith("[]")) objectName = objectName.slice(0, -2);
       index = this._autoIndex;
     }
 
