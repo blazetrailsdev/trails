@@ -178,7 +178,8 @@ export function rbModName(klass: abstract new (...args: never) => unknown): stri
  * `Set`, which define `include?` (`array.c:8679`, `hash.c:7255`,
  * `string.c:12215`, `lib/set.rb:393`), and `toSym` for every JS string
  * (`string.c:12212`), which spells both a Ruby String and a Ruby Symbol
- * (`":name"`); Symbol answers `to_sym` too (`symbol.rb:8`).
+ * (`":name"`); Symbol answers `to_sym` too (`symbol.rb:8`). `toAry` is bound for a JS array
+ * (`array.c:8619`), whose prototype carries no such member.
  *
  * A class receiver (a non-writable `prototype`, which a plain function, the
  * JS spelling of a `Proc`, does not have) answers `Module#respond_to?`: its static data fields hold
@@ -200,6 +201,7 @@ export function rbModName(klass: abstract new (...args: never) => unknown): stri
  */
 export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true): boolean {
   if (typeof obj === "string" && (mid === "toStr" || mid === "toSym")) return true;
+  if (Array.isArray(obj) && mid === "toAry") return true;
   if (
     (mid === "isEmpty" || mid === "isInclude") &&
     (typeof obj === "string" ||
