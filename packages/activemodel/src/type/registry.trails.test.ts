@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Types, defaultValue } from "../index.js";
+import { rbObjDup } from "@blazetrails/ruby-compat";
 import { TypeRegistry } from "./registry.js";
 
 describe("TypeRegistry", () => {
@@ -69,5 +70,40 @@ describe("TypeRegistry", () => {
 
   it("keyFor returns null for a type that was never registered", () => {
     expect(Types.typeRegistry.keyFor(defaultValue())).toBeNull();
+  });
+});
+
+describe("ActiveModel::Type::Registry#initialize_copy", () => {
+  it("a dup'd registry keeps the registrations it was copied with", () => {
+    const registry = new TypeRegistry();
+    registry.register("foo", Types.StringType);
+
+    const copy = rbObjDup(registry);
+
+    expect(copy).toBeInstanceOf(TypeRegistry);
+    expect(copy.lookup("foo")).toBeInstanceOf(Types.StringType);
+    expect(copy.keyFor(new Types.StringType())).toBe("foo");
+  });
+
+  it("registering on the dup leaves the original untouched", () => {
+    const registry = new TypeRegistry();
+    registry.register("foo", Types.StringType);
+
+    const copy = rbObjDup(registry);
+    copy.register("foo", Types.IntegerType);
+    copy.register("bar", Types.IntegerType);
+
+    expect(copy.lookup("foo")).toBeInstanceOf(Types.IntegerType);
+    expect(registry.lookup("foo")).toBeInstanceOf(Types.StringType);
+    expect(() => registry.lookup("bar")).toThrow("Unknown type :bar");
+    expect(registry.keyFor(new Types.IntegerType())).toBeNull();
+  });
+
+  it("registering on the original leaves the dup untouched", () => {
+    const registry = new TypeRegistry();
+    const copy = rbObjDup(registry);
+    registry.register("foo", Types.StringType);
+
+    expect(() => copy.lookup("foo")).toThrow("Unknown type :foo");
   });
 });

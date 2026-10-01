@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Configurable } from "./configurable.js";
-import { Contexts } from "./contexts.js";
+import { Encryption } from "../encryption.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { encrypts } from "./encryptable-record.js";
@@ -37,11 +37,11 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     c.previousSchemes = savedConfig.previousSchemes;
     c.addToFilterParameters = savedConfig.addToFilterParameters;
     c.excludedFromFilterParameters = savedConfig.excludedFromFilterParameters;
-    Contexts.resetDefaultContext();
+    Encryption.resetDefaultContext();
   });
 
   it("can access context properties with top level getters", () => {
-    expect(Configurable.keyProvider).toBe(Contexts.context.keyProvider);
+    expect(Configurable.keyProvider).toBe(Encryption.context.keyProvider);
   });
 
   it(".configure configures initial config properties", () => {
@@ -147,15 +147,15 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
   });
 
   it("configure resets the default context so config-derived properties are rebuilt", () => {
-    const before = Contexts.defaultContext;
+    const before = Encryption.defaultContext;
     Configurable.configure({ primaryKey: "test-key", keyDerivationSalt: "the salt" });
-    expect(Contexts.defaultContext).not.toBe(before);
+    expect(Encryption.defaultContext).not.toBe(before);
   });
 
   it("configure applies Context-only properties to the reset default context", () => {
     const encryptor = new NullEncryptor();
     Configurable.configure({ primaryKey: "test-key", keyDerivationSalt: "the salt", encryptor });
-    expect(Contexts.context.encryptor).toBe(encryptor);
+    expect(Encryption.context.encryptor).toBe(encryptor);
   });
 
   it("excludeFromFilterParameters excludes specific attributes while others are still filtered", () => {

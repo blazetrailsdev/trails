@@ -9,7 +9,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 export { Base };
 import { Configurable } from "./configurable.js";
 import { type Compressor } from "./config.js";
-import { Contexts } from "./contexts.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { Encryptor as EncryptorImpl } from "./encryptor.js";
 import type { KeyProviderLike } from "./encryptor.js";
@@ -65,7 +64,7 @@ export function restoreEncryptionConfig(snapshot: ConfigSnapshot): void {
   c.encryptFixtures = snapshot.encryptFixtures;
   c.previousSchemes = snapshot.previousSchemes;
   c.forcedEncodingForDeterministicEncryption = snapshot.forcedEncodingForDeterministicEncryption;
-  Contexts.resetDefaultContext();
+  Encryption.resetDefaultContext();
 }
 
 export function configureEncryption(
@@ -199,7 +198,7 @@ export async function createUnencryptedBookIgnoringCase(
   encryptedBookThatIgnoresCase: any,
   { name }: { name: string },
 ): Promise<any> {
-  const book = await Contexts.withoutEncryption(() =>
+  const book = await Encryption.withoutEncryption(() =>
     encryptedBookThatIgnoresCase.createBang({ name }),
   );
 

@@ -1,10 +1,40 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
+import { rbObjInstanceVariables, rbObjIvarGet } from "@blazetrails/ruby-compat";
 import { ValueType, IntegerType, FloatType, DecimalType, BigIntegerType } from "../index.js";
 
 describe("ValueType", () => {
   it("type is nil for the unmapped default", () => {
     expect(new ValueType().type()).toBeUndefined();
+  });
+
+  describe("precision / scale / limit", () => {
+    it("are nil unless initialize is given them", () => {
+      const type = new ValueType();
+      expect([type.precision, type.scale, type.limit]).toEqual([null, null, null]);
+    });
+
+    it("read what initialize was given", () => {
+      const type = new ValueType({ precision: 8, limit: 4, scale: 2 });
+      expect([type.precision, type.scale, type.limit]).toEqual([8, 2, 4]);
+    });
+
+    it("are readers on the class, so a subclass override is not shadowed by the instance", () => {
+      class Wrapping extends ValueType {
+        override get limit(): number | null {
+          return 16;
+        }
+      }
+      const type = new Wrapping({ limit: 4 });
+      expect(type.limit).toBe(16);
+      expect(Object.keys(type)).not.toContain("limit");
+    });
+
+    it("are held in the ivars initialize sets, in its order", () => {
+      const type = new ValueType({ precision: 8, limit: 4, scale: 2 });
+      expect(rbObjInstanceVariables(type)).toEqual(["@precision", "@scale", "@limit"]);
+      expect(rbObjIvarGet(type, "@limit")).toBe(4);
+    });
   });
 
   describe("equals", () => {

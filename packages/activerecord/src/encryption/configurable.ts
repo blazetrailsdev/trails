@@ -2,7 +2,6 @@ import { mattrAccessor, mattrReader } from "@blazetrails/activesupport";
 import { Config } from "./config.js";
 import { Encryption } from "../namespaces.js";
 import { Context } from "./context.js";
-import { Contexts } from "./contexts.js";
 import { Cipher } from "./cipher.js";
 import type { EncryptorLike } from "./encryptor.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
@@ -22,27 +21,27 @@ export class Configurable {
   }
 
   static get keyProvider(): unknown {
-    return Contexts.context.keyProvider;
+    return Encryption.context.keyProvider;
   }
 
   static get keyGenerator(): unknown {
-    return Contexts.context.keyGenerator;
+    return Encryption.context.keyGenerator;
   }
 
   static get cipher(): Cipher {
-    return Contexts.context.cipher as Cipher;
+    return Encryption.context.cipher as Cipher;
   }
 
   static get messageSerializer(): MessageSerializerLike | undefined {
-    return Contexts.context.messageSerializer;
+    return Encryption.context.messageSerializer;
   }
 
   static get encryptor(): EncryptorLike | undefined {
-    return Contexts.context.encryptor as EncryptorLike | undefined;
+    return Encryption.context.encryptor as EncryptorLike | undefined;
   }
 
   static get frozenEncryption(): boolean {
-    return Contexts.context.frozenEncryption;
+    return Encryption.context.frozenEncryption;
   }
 
   static configure(options: {
@@ -75,7 +74,7 @@ export class Configurable {
       }
     }
 
-    Contexts.resetDefaultContext();
+    Encryption.resetDefaultContext();
 
     for (const [key, value] of Object.entries(properties)) {
       if (key === "primaryKey" || key === "deterministicKey" || key === "keyDerivationSalt") {
@@ -83,7 +82,7 @@ export class Configurable {
       }
       if (value === undefined) continue;
       if (!(Context.PROPERTIES as readonly string[]).includes(key)) continue;
-      (Contexts.context as unknown as Record<string, unknown>)[key] = value;
+      (Encryption.context as unknown as Record<string, unknown>)[key] = value;
     }
   }
 

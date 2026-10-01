@@ -3,7 +3,6 @@ import { ValueType, StringType, BinaryData } from "@blazetrails/activemodel";
 import { Serialized } from "../type/serialized.js";
 import { Scheme } from "./scheme.js";
 import type { EncryptorLike } from "./encryptor.js";
-import { Contexts } from "./contexts.js";
 import { Encryption } from "../encryption.js";
 import { Encoding, Decryption, Base } from "./errors.js";
 import { rtest } from "@blazetrails/ruby-compat";
@@ -238,7 +237,7 @@ export class EncryptedAttributeType extends ValueType {
 
   /** @internal */
   private get encryptor(): EncryptorLike {
-    return Contexts.context.encryptor as EncryptorLike;
+    return Encryption.context.encryptor as EncryptorLike;
   }
 
   /** @internal */

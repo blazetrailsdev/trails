@@ -1,11 +1,12 @@
 import { Nodes } from "../namespaces.js";
-import { ArgumentError, rbEqual, rbHash } from "@blazetrails/activesupport";
+import { ArgumentError, rbEqual, rbHash, symbolizeKeys } from "@blazetrails/activesupport";
 import { rbInspect } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { BindError } from "../errors.js";
 import { Fragments } from "./fragments.js";
+import { rubyConstantName } from "../visitors/ruby-class.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class BoundSqlLiteral extends NodeExpression {
@@ -85,6 +86,11 @@ export class BoundSqlLiteral extends NodeExpression {
       throw new ArgumentError("Expected Arel node");
     }
     return new Fragments([this, other as Node]);
+  }
+
+  inspect(): string {
+    const namedBinds = this.namedBinds && symbolizeKeys(this.namedBinds);
+    return `#<${rubyConstantName(this.constructor)} ${rbInspect(this.sqlWithPlaceholders)} ${rbInspect(namedBinds || this.positionalBinds)}>`;
   }
 }
 

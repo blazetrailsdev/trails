@@ -15,7 +15,7 @@ interface ThreadMattrWriterOptions {
 
 interface ThreadMattrAccessorOptions extends ThreadMattrReaderOptions, ThreadMattrWriterOptions {}
 
-type Module = { prototype: object } & Record<string, any>;
+type Module = { prototype?: object } & Record<string, any>;
 
 let lastObjectId = 0;
 const objectIds = new WeakMap<object, number>();
@@ -98,7 +98,7 @@ export function threadMattrReader(
       });
     }
 
-    if (instanceReader && instanceAccessor) {
+    if (instanceReader && instanceAccessor && this.prototype) {
       defineHalf(this.prototype, sym, {
         get(this: { constructor: Module }) {
           return this.constructor[sym];
@@ -127,7 +127,7 @@ export function threadMattrWriter(
       },
     });
 
-    if (instanceWriter && instanceAccessor) {
+    if (instanceWriter && instanceAccessor && this.prototype) {
       defineHalf(this.prototype, sym, {
         set(this: { constructor: Module }, obj: unknown) {
           this.constructor[sym] = obj;

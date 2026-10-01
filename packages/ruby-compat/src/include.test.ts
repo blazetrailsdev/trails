@@ -418,6 +418,22 @@ describe("include", () => {
     expect(order).toEqual(["included"]);
   });
 
+  it("fires the included callback for a module object, which has no instances to copy onto", () => {
+    const namespace = {};
+    const bases: unknown[] = [];
+    const mod = {
+      greet() {
+        return "hello";
+      },
+      [included](base: unknown) {
+        bases.push(base);
+      },
+    };
+    include(namespace, mod);
+    expect(bases).toEqual([namespace]);
+    expect("greet" in namespace).toBe(false);
+  });
+
   it("does not copy the included symbol onto the prototype", () => {
     class User {}
     const mod = {

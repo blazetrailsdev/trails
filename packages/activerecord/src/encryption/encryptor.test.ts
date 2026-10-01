@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Cipher } from "./cipher.js";
 import { Encryptor } from "./encryptor.js";
 import { Configurable } from "./configurable.js";
-import { Contexts } from "./contexts.js";
+import { Encryption as ActiveRecordEncryption } from "../encryption.js";
 import { Decryption, ForbiddenClass, Encryption } from "./errors.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { MessageSerializer } from "./message-serializer.js";
@@ -199,7 +199,7 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     afterEach(() => {
       Configurable.config.primaryKey = savedPrimaryKey;
       Configurable.config.keyDerivationSalt = savedSalt;
-      Contexts.resetDefaultContext();
+      ActiveRecordEncryption.resetDefaultContext();
     });
 
     it("encrypts and decrypts using global primaryKey when no key/keyProvider is passed", () => {
@@ -220,7 +220,7 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
 
   it("cipher reads from the current encryption context", () => {
     const customCipher = new Cipher();
-    Contexts.withEncryptionContext({ cipher: customCipher }, () => {
+    ActiveRecordEncryption.withEncryptionContext({ cipher: customCipher }, () => {
       expect((new Encryptor() as any).cipher()).toBe(customCipher);
     });
   });
@@ -231,7 +231,7 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     try {
       Configurable.config.primaryKey = "a".repeat(32);
       Configurable.config.keyDerivationSalt = "testsalt";
-      Contexts.resetDefaultContext();
+      ActiveRecordEncryption.resetDefaultContext();
       const enc = new Encryptor({ compress: false });
       const cipherSpy = vi.spyOn(enc as any, "cipher");
       const encrypted = enc.encrypt("secret text");
@@ -242,7 +242,7 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     } finally {
       Configurable.config.primaryKey = savedKey;
       Configurable.config.keyDerivationSalt = savedSalt;
-      Contexts.resetDefaultContext();
+      ActiveRecordEncryption.resetDefaultContext();
     }
   });
 });
