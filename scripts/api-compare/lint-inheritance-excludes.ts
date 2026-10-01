@@ -28,6 +28,7 @@ import {
   type InheritanceExcludeEntry,
 } from "./inheritance-exclude.js";
 import { OUTPUT_DIR, PACKAGES, ROOT_DIR } from "./config.js";
+import { inScope, scopeMismatch, scopeOf } from "./scope.js";
 
 // Full-surface artifact only; compare.ts also writes --public-only /
 // --privates-only variants, but excludes are written against the default run.
@@ -74,11 +75,19 @@ export function reportStale(stale: readonly InheritanceExcludeEntry[]): string {
   );
 }
 
-async function main(): Promise<number> {
-  const entries = await loadInheritanceExcludes();
+async function main(scope: string | null): Promise<number> {
+  const entries = inScope(await loadInheritanceExcludes(), scope);
   const artifact = await loadArtifact();
 
-  const absent = missingScope(artifact);
+  if (scope !== null) {
+    const measured = (artifact.results ?? []).map((r) => r.package);
+    const mismatch = scopeMismatch("inheritance excludes", measured, scope);
+    if (mismatch !== null) {
+      console.error(mismatch);
+      return 1;
+    }
+  }
+  const absent = scope === null ? missingScope(artifact) : [];
   if (absent.length > 0) {
     console.error(
       `\ninheritance excludes: artifact compared a PARTIAL scope — missing ` +
@@ -105,7 +114,7 @@ async function runAsScript(): Promise<void> {
   if (path.resolve(self) !== invoked) return;
   let code: number;
   try {
-    code = await main();
+    code = await main(scopeOf(process.argv.slice(2)));
   } catch (e) {
     console.error(`\ninheritance excludes: ${(e as Error).message}\n`);
     code = 1;

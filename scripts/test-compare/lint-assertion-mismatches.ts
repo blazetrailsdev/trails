@@ -44,6 +44,7 @@ import {
   violations,
   writeMark,
 } from "./assertion-ratchet.js";
+import { scopeMismatch, scopeOf } from "../api-compare/scope.js";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
@@ -157,7 +158,11 @@ export const DEFAULT_PATHS: Paths = {
  * partial-scope artifact has no honest slack to report for the packages it
  * omits.
  */
-export async function main(write: boolean, paths: Paths = DEFAULT_PATHS): Promise<number> {
+export async function main(
+  write: boolean,
+  paths: Paths = DEFAULT_PATHS,
+  scope: string | null = null,
+): Promise<number> {
   const markRel = path.relative(ROOT_DIR, paths.mark);
 
   if (write) {
@@ -169,7 +174,18 @@ export async function main(write: boolean, paths: Paths = DEFAULT_PATHS): Promis
   }
 
   const current = countsFromArtifact(await loadArtifact(paths.artifact));
-  const mark = await loadMark(paths.mark);
+  const committed = await loadMark(paths.mark);
+  // Scoped, the artifact must hold exactly that package, and only its mark is
+  // held against it: every other marked package is absent, not converged.
+  if (scope !== null) {
+    const mismatch = scopeMismatch("assertion-mismatch ratchet", Object.keys(current), scope);
+    if (mismatch !== null) {
+      console.error(mismatch);
+      return 1;
+    }
+  }
+  const mark =
+    scope === null ? committed : { ...committed, packages: { [scope]: committed.packages[scope] } };
 
   const missing = missingFromArtifact(current, mark);
   if (missing.length > 0) {
@@ -219,7 +235,7 @@ async function runAsScript(): Promise<void> {
         process.exit(2);
       }
     }
-    process.exit(await main(write));
+    process.exit(await main(write, DEFAULT_PATHS, scopeOf(argv)));
   } catch (e) {
     console.error(`\nassertion-mismatch ratchet: ${(e as Error).message}\n`);
     process.exit(2);

@@ -1641,7 +1641,8 @@ jobs:
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.comparison_affected == 'true'
+      needs.changes.outputs.comparison_affected == 'true' &&
+      needs.changes.outputs.thor_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -2052,6 +2053,42 @@ jobs:
         if: always()
         run: node scripts/ci/bg-gates.mjs summary
 
+  # The comparison above, for a thor-only diff: scripts/ci/thor-comparison.sh
+  # extracts and compares the `thor` package alone and lists every gate as
+  # scoped, unscoped or skipped, with its reason. Exactly one of the two jobs
+  # runs for a comparison-affected diff; the `ci` aggregate accepts each one's
+  # skip only on the other's side of `thor_only`.
+  rails-comparison-thor:
+    name: Rails API/Test Comparison (thor)
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.comparison_affected == 'true' &&
+      needs.changes.outputs.thor_only == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
+      - run: pnpm build
+      - name: Cache vendored upstream Ruby sources
+        # The same cache and the same whole fetch as rails-comparison: a hit
+        # makes the fetch a ~1s no-op, and on a miss this job saves a complete
+        # cache under the shared key rather than one holding thor alone.
+        uses: actions/cache@v4
+        with:
+          path: vendor/*/*/
+          key: vendor-sources-${{ hashFiles('vendor/sources.ts', 'vendor/sources.lock.json', 'vendor/fetch.ts') }}
+      - name: Fetch upstream Ruby sources
+        run: pnpm vendor:fetch
+      - name: Thor comparison
+        run: bash scripts/ci/thor-comparison.sh
+
   schema-parity-rails:
     name: Schema Parity (Rails side)
     needs: changes
@@ -2274,6 +2311,7 @@ jobs:
       - maria-tests
       - website
       - rails-comparison
+      - rails-comparison-thor
       - schema-parity-rails
       - schema-parity-trails
       - schema-parity-diff
@@ -2415,7 +2453,13 @@ jobs:
                   # (no packages/**, scripts/{api,test,fixtures,schema}-compare/**,
                   # comparison-consumed manifest builders, vendor/**, or
                   # cross-cutting infra — see COMPARISON_RE).
-                  if [ "$COMPARISON_AFFECTED" = "false" ]; then
+                  # A thor-only diff runs rails-comparison-thor instead.
+                  if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; then
+                    continue
+                  fi
+                  ;;
+                rails-comparison-thor)
+                  if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" != "true" ]; then
                     continue
                   fi
                   ;;

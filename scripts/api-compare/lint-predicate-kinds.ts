@@ -24,8 +24,10 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { serializeBaseline } from "./baseline-json.js";
 import { OUTPUT_DIR, ROOT_DIR, SCRIPT_DIR } from "./config.js";
+import { scopeMismatch, scopeOf } from "./scope.js";
 import {
   exceedances,
+  scopedMarks,
   staleMarks,
   tightened,
   type AmbiguousParentCounts as PackageCounts,
@@ -40,12 +42,21 @@ interface ApiComparison {
   }[];
 }
 
-async function main(tighten: boolean): Promise<number> {
+async function main(tighten: boolean, scope: string | null): Promise<number> {
   const file = path.join(OUTPUT_DIR, "api-comparison.json");
   const { results } = JSON.parse(await fs.readFile(file, "utf-8")) as ApiComparison;
+  if (scope !== null) {
+    const measured = results.map((r) => r.package);
+    const mismatch = scopeMismatch("predicate-kind gate", measured, scope);
+    if (mismatch !== null) {
+      console.error(mismatch);
+      return 1;
+    }
+  }
   const current: PackageCounts = {};
   for (const r of results) current[r.package] = r.predicateKindMismatches.length;
-  const marks = JSON.parse(await fs.readFile(PREDICATE_MARK_PATH, "utf-8")) as PackageCounts;
+  const committed = JSON.parse(await fs.readFile(PREDICATE_MARK_PATH, "utf-8")) as PackageCounts;
+  const marks = scopedMarks(committed, scope);
   const grew = exceedances(marks, current);
   const stale = staleMarks(marks, current);
 
@@ -89,7 +100,8 @@ async function runAsScript(): Promise<void> {
   const self = fileURLToPath(import.meta.url);
   const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
   if (path.resolve(self) !== invoked) return;
-  process.exit(await main(process.argv.slice(2).includes("--tighten")));
+  const argv = process.argv.slice(2);
+  process.exit(await main(argv.includes("--tighten"), scopeOf(argv)));
 }
 
 void runAsScript();

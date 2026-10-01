@@ -456,7 +456,13 @@ function gateRegex(yml: string, name: string): RegExp {
  *    package test trees; lint-call-mismatches and baseline-json read the
  *    committed call-mismatch shards. mixin-declaration-drift and
  *    non-transactional-row-writes are not kept: they read only
- *    packages/activerecord/. rails-comparison is not narrowed.
+ *    packages/activerecord/.
+ *  - rails-comparison skips and rails-comparison-thor runs in its place:
+ *    scripts/ci/thor-comparison.sh extracts and compares the `thor` package
+ *    alone, and its header lists every whole-surface gate as scoped
+ *    (`--package thor`, scripts/api-compare/scope.ts), unscoped or skipped,
+ *    with the reason. The ci aggregate accepts each job's skip only on the
+ *    other's side of thor_only.
  *
  *  case "${{ github.event_name }}" in
  *  Website label opt-in. The Website job otherwise gates only on
@@ -1323,6 +1329,42 @@ describe("CI runs every tooling test suite", () => {
     expect(aggregate).toContain(
       '[ "$AR_AFFECTED" = "false" ] && { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; }',
     );
+  });
+
+  it("runs exactly one comparison job on either side of thor_only", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8"));
+    const flat = (x: string): string => x.replace(/\s+/g, " ");
+    const aggregate = flat(wf.jobs.ci.steps[0].run);
+    const gated =
+      "needs.changes.outputs.docs_only != 'true' && " +
+      "needs.changes.outputs.comparison_affected == 'true' && " +
+      "needs.changes.outputs.thor_only";
+
+    expect(flat(wf.jobs["rails-comparison"].if).trim()).toBe(`${gated} != 'true'`);
+    expect(flat(wf.jobs["rails-comparison-thor"].if).trim()).toBe(`${gated} == 'true'`);
+    expect(wf.jobs.ci.needs).toContain("rails-comparison-thor");
+    expect(aggregate).toContain(
+      "# A thor-only diff runs rails-comparison-thor instead. " +
+        'if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; then continue',
+    );
+    expect(aggregate).toContain(
+      'rails-comparison-thor) if [ "$COMPARISON_AFFECTED" = "false" ] || ' +
+        '[ "$THOR_ONLY" != "true" ]; then continue',
+    );
+  });
+
+  it("accounts for every whole-surface comparison script in the thor driver", async () => {
+    const wf = parseYaml(await readFile(CI_YML, "utf8"));
+    const steps = wf.jobs["rails-comparison"].steps as { run?: string }[];
+    const scripts = new Set(
+      steps.flatMap((step) => (step.run ?? "").match(/scripts\/[\w/-]+\.ts/g) ?? []),
+    );
+    const driver = (await readFile(path.join(REPO_ROOT, "scripts/ci/thor-comparison.sh"), "utf8"))
+      .replaceAll("$api/", "scripts/api-compare/")
+      .replaceAll("$tests/", "scripts/test-compare/");
+
+    expect(scripts.size).toBeGreaterThan(30);
+    expect([...scripts].filter((script) => !driver.includes(script))).toEqual([]);
   });
 
   it("keeps comparison_affected off for website-only changes", async () => {

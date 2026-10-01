@@ -80,7 +80,8 @@ function getPackageTestFiles(): Record<string, string[]> {
   return result;
 }
 
-export function main() {
+/** `only` narrows the extraction to one package (CI's thor-only comparison). */
+export function main(only: string | null = null) {
   const manifest: TestManifest = {
     source: "typescript",
     generatedAt: new Date().toISOString(),
@@ -90,6 +91,7 @@ export function main() {
   const packageTestFiles = getPackageTestFiles();
 
   for (const [pkg, files] of Object.entries(packageTestFiles)) {
+    if (only !== null && pkg !== only) continue;
     const absoluteFiles = files.map((f) => path.join(ROOT_DIR, f));
     manifest.packages[pkg] = extractPackageTests(absoluteFiles);
   }
@@ -126,4 +128,7 @@ function extractPackageTests(files: string[]): TestPackageInfo {
   return pkgInfo;
 }
 
-if (require.main === module) main();
+if (require.main === module) {
+  const at = process.argv.indexOf("--package");
+  main(at === -1 ? null : process.argv[at + 1]);
+}

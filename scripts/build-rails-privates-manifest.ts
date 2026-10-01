@@ -82,6 +82,7 @@ import {
 } from "@blazetrails/parity/write-json-manifest";
 import { PACKAGE_DIRS } from "./api-compare/config.js";
 import { railsApiAvailable } from "./api-compare/require-rails-api.js";
+import { scopeOf } from "./api-compare/scope.js";
 import { entitiesByTsFile } from "./api-compare/privates-entities.js";
 import { projectPrivateNames } from "./api-compare/privates-projection.js";
 import { diffDeprecatedManifest } from "./deprecated-manifest-diff.js";
@@ -154,6 +155,14 @@ const hasRailsApi = railsApiAvailable({
   argv: process.argv.slice(2),
 });
 
+// `--package <name>` (CI's thor-only comparison): rails-api.json holds that one
+// package, so only the private-methods manifest — a per-file projection of it
+// — is emitted. The other outputs describe the whole surface: the two
+// vendored-Ruby scans below, and the committed runtime module, which a partial
+// manifest would rewrite under packages/ and so stale the build the extractor
+// is measuring.
+const scope = scopeOf(process.argv.slice(2));
+
 // This script emits three manifests per run. Collect their writes and format
 // them all in one prettier spawn (~330ms of startup, once instead of thrice).
 beginManifestBatch();
@@ -161,12 +170,12 @@ beginManifestBatch();
 // The deprecation-parity manifest scans the vendored Ruby source directly and
 // does NOT depend on rails-api.json, so emit it up front — before the early
 // exit below that fires when rails-api.json is missing.
-emitDeprecatedManifest();
+if (scope === null) emitDeprecatedManifest();
 
 // The callback-invocation manifest likewise scans the vendored Ruby source
 // directly (the run_callbacks event symbol is not carried in MethodInfo.calls),
 // so emit it here too — before the rails-api.json early exit.
-emitCallbackInvocationsManifest();
+if (scope === null) emitCallbackInvocationsManifest();
 
 if (!hasRailsApi) {
   writeJsonManifest(OUT, { files: {}, entities: {}, instanceFiles: {}, entityInstanceFiles: {} });
@@ -424,7 +433,7 @@ const final: Manifest = {
 
 writeJsonManifest(OUT, final);
 flushManifestBatch();
-emitRuntimePrivateMethods(final.files);
+if (scope === null) emitRuntimePrivateMethods(final.files);
 const fileCount = Object.keys(final.files).length;
 const fileNames = Object.values(final.files).reduce((n, a) => n + a.length, 0);
 console.log(`Wrote ${OUT} — ${fileCount} files (${fileNames} names)`);
