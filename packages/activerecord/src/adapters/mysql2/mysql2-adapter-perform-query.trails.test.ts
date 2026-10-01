@@ -44,9 +44,8 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
   });
 
   it("the driver casts numerics, so castResult reports no column types", async () => {
-    await adapter.execute(`INSERT INTO pq (nick) VALUES ('a'), ('b')`);
     const result = await adapter.selectAll(
-      `SELECT 1.10 AS scaled, SUM(id) AS summed, 9007199254740993 AS big FROM pq`,
+      `SELECT 1.10 AS scaled, CAST(3 AS DECIMAL(10,0)) AS summed, 9007199254740993 AS big`,
     );
     expect(result.columnTypes).toEqual({});
     const [scaled, summed, big] = result.rows[0];
