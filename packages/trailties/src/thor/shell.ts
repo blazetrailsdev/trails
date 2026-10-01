@@ -55,19 +55,19 @@ export interface Shell {
 }
 
 const SHELL_DELEGATED_METHODS = [
-  ":ask",
-  ":error",
-  ":set_color",
-  ":yes?",
-  ":no?",
-  ":say",
-  ":say_error",
-  ":say_status",
-  ":print_in_columns",
-  ":print_table",
-  ":print_wrapped",
-  ":file_collision",
-  ":terminal_width",
+  "ask",
+  "error",
+  "setColor",
+  "isYes",
+  "isNo",
+  "say",
+  "sayError",
+  "sayStatus",
+  "printInColumns",
+  "printTable",
+  "printWrapped",
+  "fileCollision",
+  "terminalWidth",
 ];
 
 function setShell(this: Shell, shell: Basic | null | undefined): void {
@@ -161,8 +161,8 @@ export const Shell = new Module((mod) => {
 
   (mod as unknown as Record<symbol, unknown>)[initialize] = function (
     this: Shell,
-    _args: unknown[] = [],
-    _options: unknown = {},
+    args: unknown[] = [],
+    options: unknown = {},
     config: { shell?: Basic | null } = {},
   ) {
     this.shell = config.shell as Basic;

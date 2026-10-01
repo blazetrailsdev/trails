@@ -14,7 +14,7 @@ export const LoadInterlockAwareMonitorMixin = {
 
   async synchronize<T>(
     this: LoadInterlockAwareMonitorHost,
-    _super: () => unknown,
+    super_: () => unknown,
     block: () => T | Promise<T>,
   ): Promise<T> {
     await this.monEnter();

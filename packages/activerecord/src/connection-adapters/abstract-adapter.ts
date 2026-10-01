@@ -955,13 +955,12 @@ export class AbstractAdapter implements Quoting {
   }
 
   setLockThread(lockThread: unknown): void {
-    if (lockThread instanceof Thread) {
-      this.lock = new ThreadLoadInterlockAwareMonitor();
-    } else if (lockThread instanceof Fiber) {
-      this.lock = new LoadInterlockAwareMonitor();
-    } else {
-      this.lock = NullLock;
-    }
+    this.lock =
+      lockThread instanceof Thread
+        ? new ThreadLoadInterlockAwareMonitor()
+        : lockThread instanceof Fiber
+          ? new LoadInterlockAwareMonitor()
+          : NullLock;
   }
 
   checkIfWriteQuery(sql: string | null): void {
