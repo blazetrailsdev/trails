@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { BigIntegerType, IntegerType } from "@blazetrails/activemodel";
+import { BigIntegerType, IntegerType, ValueType } from "@blazetrails/activemodel";
 import { QueryAttribute } from "./query-attribute.js";
 
 class StringType {
@@ -24,6 +24,29 @@ const stringType = new StringType();
 const intType = new IntType();
 
 describe("QueryAttribute", () => {
+  it("value for database is computed once even when the type reports an in-place change", () => {
+    let callCount = 0;
+    class MutableType extends ValueType<unknown> {
+      readonly name = "mutable";
+      cast(v: unknown) {
+        return v;
+      }
+      override serialize(v: unknown) {
+        callCount++;
+        return JSON.stringify(v);
+      }
+      override isChangedInPlace() {
+        return true;
+      }
+    }
+    const value = { a: 1 };
+    const attr = new QueryAttribute("n", value, new MutableType());
+    expect(attr.valueForDatabase).toBe('{"a":1}');
+    value.a = 2;
+    expect(attr.valueForDatabase).toBe('{"a":1}');
+    expect(callCount).toBe(1);
+  });
+
   it("does not cast value via type", () => {
     const attr = new QueryAttribute("age", "25", intType);
     expect(attr.value()).toBe("25");

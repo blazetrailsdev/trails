@@ -3,7 +3,7 @@ import type * as Arel from "@blazetrails/arel";
 import { Nodes, Table, SelectManager, sql, star } from "@blazetrails/arel";
 import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
 import { any, BigDecimal, isPresent, many, tryCall } from "@blazetrails/activesupport";
-import { block, fetch, isEmpty } from "@blazetrails/ruby-compat";
+import { block, fetch, isEmpty, uniq } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { Result, type ColumnType, type ColumnTypes } from "../result.js";
@@ -837,7 +837,7 @@ export async function executeGroupedCalculation(
   const fn = operation.toLowerCase() as AggFn;
   columnName = aggregateTarget(columnName);
   let groupFields: unknown[] = rel.groupValues;
-  if (groupFields.length > 1) groupFields = groupFields.filter((f, i, all) => all.indexOf(f) === i);
+  if (groupFields.length > 1) groupFields = uniq(groupFields);
   let association: any = null;
   let associated = false;
   if (groupFields.length === 1 && typeof groupFields[0] === "string") {
@@ -893,7 +893,6 @@ export async function executeGroupedCalculation(
     ).skipQueryCacheIfNecessary(() =>
       connection.selectAll(relation.arel(), `${rel.model.name} ${opName}`),
     );
-    const rows = calculatedData.toArray();
 
     const keyOf = (vals: unknown[]): string => vals.map((v) => String(v)).join("\u0000");
     let keyRecords: Map<string, unknown> | null = null;
@@ -902,7 +901,8 @@ export async function executeGroupedCalculation(
       const primaryKey = (
         Array.isArray(klass.primaryKey) ? klass.primaryKey : [klass.primaryKey]
       ) as string[];
-      const keyIds = rows
+      const keyIds = calculatedData
+        .toArray()
         .map((row) => groupAliases.map((aliaz) => row[aliaz]))
         .filter((vals) => vals.every((v) => v != null));
       const records: any[] = await klass.where(new Map([[primaryKey, keyIds]])).toArray();
@@ -911,13 +911,21 @@ export async function executeGroupedCalculation(
       );
     }
 
-    const keyTypes = groupColumns.map(
-      ([aliaz, colName]) =>
-        (typeCasterFor(colName) ??
-          typeFor(rel, colName, () =>
-            fetch(calculatedData.columnTypes, aliaz, defaultValue()),
-          )) as { deserialize?(v: unknown): unknown } | null,
-    );
+    const keyTypes: ColumnTypes = {};
+    for (const [aliaz, colName] of groupColumns) {
+      keyTypes[aliaz] = (typeCasterFor(colName) ??
+        typeFor(rel, colName, () =>
+          fetch(calculatedData.columnTypes, aliaz, defaultValue()),
+        )) as ColumnType;
+    }
+
+    const hashRows = (calculatedData.castValues(keyTypes) as unknown[][]).map((row) => {
+      const hash: Record<string, unknown> = {};
+      for (const [i, colName] of calculatedData.columns.entries()) {
+        hash[colName] = row[i];
+      }
+      return hash;
+    });
 
     let type: unknown;
     if (fn !== "count") {
@@ -929,21 +937,12 @@ export async function executeGroupedCalculation(
     }
 
     const result = new Map<unknown, unknown>();
-    for (const row of rows) {
-      const key = groupAliases.map((aliaz, i) => {
-        const raw = row[aliaz];
-        const keyType = keyTypes[i];
-        return raw == null
-          ? null
-          : typeof keyType?.deserialize === "function"
-            ? keyType.deserialize(raw)
-            : raw;
-      });
-      let resultKey: unknown = key.length === 1 ? key[0] : key;
-      if (associated) {
-        resultKey = key.every((v) => v != null) ? (keyRecords?.get(keyOf(key)) ?? null) : null;
-      }
-      result.set(resultKey, typeCastCalculatedValue(row[columnAlias] ?? null, fn, type));
+    for (const row of hashRows) {
+      let key: unknown = groupAliases.map((aliaz) => row[aliaz]);
+      if ((key as unknown[]).length === 1) key = (key as unknown[])[0];
+      if (associated) key = keyRecords!.get(keyOf([key].flat())) ?? null;
+
+      result.set(key, typeCastCalculatedValue(row[columnAlias], fn, type));
     }
     return result;
   });
@@ -975,7 +974,7 @@ export function typeFor(
 export function lookupCastTypeFromJoinDependencies(
   rel: CalculationRelation,
   name: string,
-  joinDependencies?: JoinDependency[],
+  joinDependencies: JoinDependency[] = buildJoinDependencies.call(rel as any),
 ): unknown {
   let found: unknown = null;
   eachJoinDependencies.call(rel as any, joinDependencies, (join: any) => {

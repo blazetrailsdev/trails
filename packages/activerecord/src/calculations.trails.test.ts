@@ -111,6 +111,19 @@ describe("multi-field grouped calculation key shape", () => {
   });
 });
 
+describe("grouped calculation over a group whose aggregate is NULL", () => {
+  fixtures(["companies", "accounts"]);
+
+  it("keys the group and answers null for minimum and maximum", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    await new Account({ firm_id: 9999, credit_limit: null }).save({ validate: false });
+    const scope = Account.where({ firm_id: 9999 }).group("firm_id");
+    expect([...(await scope.maximum("credit_limit")).entries()]).toEqual([[9999, null]]);
+    expect([...(await scope.minimum("credit_limit")).entries()]).toEqual([[9999, null]]);
+    expect([...(await scope.sum("credit_limit")).entries()]).toEqual([[9999, 0]]);
+  });
+});
+
 describe("multi-field grouped bigint sum", () => {
   fixtures([]);
 
