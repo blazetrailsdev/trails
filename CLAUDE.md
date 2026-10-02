@@ -1419,6 +1419,7 @@ the capability, in a different place. Each is decided here, and each but
 | `action_controller/metal/mime_responds.rb`            | Proxy                 |
 | `action_dispatch/http/mime_type.rb`                   | Proxy (`is…` names)   |
 | `action_dispatch/testing/assertions/routing.rb`       | Proxy (proto chain)   |
+| `thor/core_ext/hash_with_indifferent_access.rb`       | Proxy (proto chain)   |
 
 A Proxy row whose Ruby class also defines `respond_to_missing?` forwards a
 name only when that predicate answers it (`broadcast_logger.rb:235-251`): a
@@ -1436,6 +1437,15 @@ missed the class as the Ruby name `foo?` (`isUrlEncodedForm` is
 `url_encoded_form?`), skipping `KERNEL_METHODS` / `PROTOCOL_PROBES`, which Ruby
 finds on the receiver first. A defined predicate (`isHtml`, `isAll`, `isNil`) is
 found before the trap, as Ruby finds `html?` before `method_missing`.
+
+`thor/core_ext/hash_with_indifferent_access.rb`'s `method_missing`
+(`hash_with_indifferent_access.rb:93-104`) answers every undefined name, so its
+Proxy is spliced beneath the class's prototype and an instance stays a real
+`Hash`. A read that missed the class is `self[method]`, and an `is…` name is the
+Ruby name `foo?`, read as a property: `options.isSkipGit` is `options.skip_git?`,
+with Ruby truthiness. A property cannot take an argument, so the one-argument
+compare arm (`options.database?("sqlite3")`) is reached only by `rbFSend`. An
+assignment that missed the class is `[]=`, so a frozen hash raises `FrozenError`.
 
 A "named method, no trap" row answers only an explicit `methodMissing` call.
 These rows are decided per class, not ratified: a "nothing" row with a

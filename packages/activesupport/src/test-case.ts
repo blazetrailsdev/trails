@@ -51,13 +51,11 @@ import { include } from "@blazetrails/ruby-compat/include";
 
 export class TestCase {
   name: string;
-  beforeSetup?(): unknown;
   declare static fileFixturePath: string | null;
   declare readonly fileFixturePath: string | null;
   declare static isFileFixturePath: () => boolean;
   declare isFileFixturePath: () => boolean;
   declare fileFixture: typeof FileFixtures.fileFixture;
-  afterTeardown?(test: RunningTest): unknown;
 
   constructor(name: string) {
     this.name = name;
@@ -83,19 +81,43 @@ export class TestCase {
   static setup = setup;
   static teardown = teardown;
 
-  static beforeSetup(): void {
-    taggedLoggingBeforeSetup();
-    setupAndTeardownBeforeSetup.call(TestCase);
+  beforeSetup(): unknown {
+    const runSetup = (): unknown => {
+      taggedLoggingBeforeSetup();
+      return setupAndTeardownBeforeSetup.call(this);
+    };
+    const result = (
+      Object.getPrototypeOf(TestCase.prototype) as Partial<TestCase>
+    ).beforeSetup?.call(this);
+    return result instanceof Promise ? result.then(runSetup) : runSetup();
   }
 
-  static afterTeardown(test: RunningTest): void {
-    setupAndTeardownAfterTeardown.call(TestCase, test);
-    timeHelpersAfterTeardown();
-    testsWithoutAssertionsAfterTeardown({
-      ...test,
-      error: test.error || test.failures.some((f) => f instanceof UnexpectedError),
-    });
-    if (test.failures.length > 0) throw test.failures[0];
+  afterTeardown(test: RunningTest): unknown {
+    const withoutAssertions = (): void => {
+      testsWithoutAssertionsAfterTeardown({
+        ...test,
+        error: test.error || test.failures.some((f) => f instanceof UnexpectedError),
+      });
+      if (test.failures.length > 0) throw test.failures[0];
+    };
+    const callSuper = (): unknown => {
+      let raised: [unknown] | undefined;
+      try {
+        timeHelpersAfterTeardown();
+      } catch (e) {
+        raised = [e];
+      }
+      const afterSuper = (): void => {
+        if (raised) throw raised[0];
+        withoutAssertions();
+      };
+      const result = (
+        Object.getPrototypeOf(TestCase.prototype) as Partial<TestCase>
+      ).afterTeardown?.call(this, test);
+      return result instanceof Promise ? result.then(afterSuper) : afterSuper();
+    };
+    const result = setupAndTeardownAfterTeardown.call(this, test);
+    return result instanceof Promise ? result.then(callSuper) : callSuper();
   }
 
   static assertNot = assertNot;

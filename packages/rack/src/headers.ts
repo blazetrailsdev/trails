@@ -192,9 +192,9 @@ export class Headers extends Hash<string, string> {
     return this.mergeInPlace(hash, fn);
   }
 
-  replace(hash: Record<string, string> | Headers): Headers {
+  override replace(hash: Record<string, string> | Headers): this {
     this.clear();
-    return this.update(hash);
+    return this.update(hash) as this;
   }
 
   select(fn: (key: string, value: string) => boolean): Headers {

@@ -8,7 +8,7 @@ import type { RunningTest } from "./tests-without-assertions.js";
 class MyError extends Error {}
 
 describe("AfterTeardownTest", () => {
-  const klass = {};
+  const klass = class {};
   const test: Pick<RunningTest, "failures"> = { failures: [] };
   let witness = false;
 
@@ -28,7 +28,7 @@ describe("AfterTeardownTest", () => {
         null,
         { from: 0, to: 1 },
         () => {
-          afterTeardown.call(klass, test);
+          afterTeardown.call(new klass(), test);
           witness = true;
         },
       );
@@ -38,7 +38,7 @@ describe("AfterTeardownTest", () => {
       expect(witness).toBe(true);
       test.failures.length = 0;
     } finally {
-      resetCallbacks(klass, "teardown");
+      resetCallbacks(klass.prototype, "teardown");
     }
   });
 

@@ -10,10 +10,8 @@ import {
   isModuleIncluded,
   isPlainObject,
   runLoadHooks,
-  SetupAndTeardown,
   toQuery,
   toXml,
-  type FilterListEntry,
   type Included,
 } from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
@@ -165,39 +163,11 @@ export class TestCase extends ActiveSupportTestCase {
     ) ?? null) as ControllerClass | null;
   }
 
-  static override setup(this: object, ...args: FilterListEntry<object>[]): void {
-    SetupAndTeardown.setup.call((this as { prototype: object }).prototype, ...args);
-  }
-
-  static override teardown(this: object, ...args: FilterListEntry<object>[]): void {
-    SetupAndTeardown.teardown.call((this as { prototype: object }).prototype, ...args);
-  }
-
   static withRouting(
     this: ThisParameterType<typeof routingAssertions.ClassMethods.withRouting>,
     block: (routes: RouteSet) => unknown,
   ): void {
     routingAssertions.ClassMethods.withRouting.call(this, block);
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE active-support-test-case-carries-setup-and-teardown-instance-side
-   */
-  beforeSetup(): unknown {
-    const result = super.beforeSetup?.();
-    return result instanceof Promise
-      ? result.then(() => SetupAndTeardown.beforeSetup.call(this))
-      : SetupAndTeardown.beforeSetup.call(this);
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE active-support-test-case-carries-setup-and-teardown-instance-side
-   */
-  afterTeardown(test: Parameters<typeof SetupAndTeardown.afterTeardown>[0]): unknown {
-    SetupAndTeardown.afterTeardown.call(this, test);
-    return super.afterTeardown?.(test as never);
   }
 
   setup(): void {
@@ -516,7 +486,6 @@ proto.recognizedRequestFor = routingAssertions.recognizedRequestFor;
 proto.failOn = routingAssertions.failOn;
 routingAssertions.spliceMethodMissing(proto);
 
-SetupAndTeardown.prepended(TestCase.prototype);
 TestCase.setup(":setupControllerRequestAndResponse");
 
 runLoadHooks("action_controller_test_case", TestCase);
