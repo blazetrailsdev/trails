@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   aliasKey,
   arClosureResult,
+  CROSS_PACKAGE_TEST_FILES,
   assertionKindMismatch,
   compareFileResults,
   isAssertionCountMismatch,
@@ -448,5 +449,69 @@ describe("main erb description credit", () => {
     const tracker = results[0].files.find((f) => f.rubyFile === rubyFile)!;
     expect([tracker.matched, tracker.missing, tracker.extra]).toEqual([1, 0, 0]);
     await fs.rm(dir, { recursive: true });
+  });
+});
+
+describe("main cross-package and parked-stub credit", () => {
+  const tc = (ancestors: string[], description: string, pending = false) => ({
+    ancestors,
+    description,
+    pending,
+  });
+  async function compare(rubyFile: string, tsPackages: Record<string, unknown>, rubyCases: object) {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "compare-"));
+    const ruby = {
+      packages: { activemodel: { files: [{ file: rubyFile, testCases: rubyCases }] } },
+    };
+    await fs.writeFile(path.join(dir, "rails-tests.json"), JSON.stringify(ruby));
+    await fs.writeFile(path.join(dir, "ts-tests.json"), JSON.stringify({ packages: tsPackages }));
+    main(["--package", "activemodel", "--json"], dir);
+    const { results } = JSON.parse(
+      await fs.readFile(path.join(dir, "convention-comparison.json"), "utf-8"),
+    ) as { results: { files: ConventionFileResult[] }[] };
+    await fs.rm(dir, { recursive: true });
+    return results[0].files[0];
+  }
+
+  it("credits a railtie test against the trailties file CROSS_PACKAGE_TEST_FILES names", async () => {
+    const name = "i18n customize full message defaults to false";
+    const hosted = CROSS_PACKAGE_TEST_FILES["activemodel:railtie_test.rb"];
+    const result = await compare(
+      "railtie_test.rb",
+      {
+        activemodel: { files: [] },
+        [hosted.package]: {
+          files: [
+            {
+              file: `${PKG_SRC_DIRS[hosted.package]}${hosted.tsFile}`,
+              testCases: [tc(["RailtieTest"], name), tc(["RailtieTest"], "a trails-only case")],
+            },
+          ],
+        },
+      },
+      [tc(["RailtieTest"], name)],
+    );
+    expect(result.conventionTsPackage).toBe("trailties");
+    expect([result.tsFileExists, result.matched, result.missing, result.extra]).toEqual([
+      true,
+      1,
+      0,
+      1,
+    ]);
+  });
+
+  it("does not count a pending stub for an unported case as extra", async () => {
+    const name = "errors are marshalable";
+    const stubs = [tc(["ErrorsTest"], name, true), tc(["ErrorsTest"], "inspect", true)];
+    const result = await compare(
+      "errors_test.rb",
+      {
+        activemodel: {
+          files: [{ file: `${PKG_SRC_DIRS.activemodel}errors.test.ts`, testCases: stubs }],
+        },
+      },
+      [tc(["ErrorsTest"], name)],
+    );
+    expect([result.rubyTestCount, result.matched, result.extra]).toEqual([0, 0, 1]);
   });
 });

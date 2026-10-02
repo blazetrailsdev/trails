@@ -126,6 +126,21 @@ const RUBY_COMPAT_SPEC_TS_FILES: Record<string, string> = {
 };
 
 /**
+ * A Rails test file whose port lives in another compare package, keyed
+ * `<package>:<ruby test file>`. `tsFile` is relative to the hosting package's
+ * source root, as a convention path is.
+ *
+ * A gem's `railtie_test.rb` boots a `Rails::Application`, and trails ports each
+ * gem's railtie in trailties (`packages/trailties/src/trailties/<gem>.ts`,
+ * with its test beside it) because the gem's own package cannot depend on
+ * trailties. Without a row the file can only score against a convention path
+ * in a package that cannot host it.
+ */
+export const CROSS_PACKAGE_TEST_FILES: Record<string, { package: string; tsFile: string }> = {
+  "activemodel:railtie_test.rb": { package: "trailties", tsFile: "trailties/active-model.test.ts" },
+};
+
+/**
  * Maps a Ruby test path to the TS test path our conventions put it at. The
  * i18n gem's lib root is `lib/i18n` while its test root is `test`, so a test
  * mirroring `lib/i18n/<x>.rb` sits at `test/i18n/<x>_test.rb`; that leading
@@ -407,6 +422,8 @@ interface ValueMismatch {
 export interface ConventionFileResult {
   rubyFile: string;
   conventionTsFile: string;
+  /** Set when `conventionTsFile` is rooted in another package (`CROSS_PACKAGE_TEST_FILES`). */
+  conventionTsPackage?: string;
   tsFileExists: boolean;
   rubyTestCount: number;
   matched: number;
@@ -802,17 +819,21 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
       file.testCases = file.testCases.map((tc) =>
         applyAssertionReceipts(pkg, file.file, tc, ASSERTION_RECEIPTS, consumedReceipts),
       );
-      const conventionTs = rubyToConventionTs(file.file, pkg);
-      const exists = lookup.allFiles.has(conventionTs);
+      const crossPackage = Object.hasOwn(CROSS_PACKAGE_TEST_FILES, `${pkg}:${file.file}`)
+        ? CROSS_PACKAGE_TEST_FILES[`${pkg}:${file.file}`]
+        : undefined;
+      const conventionTs = crossPackage?.tsFile ?? rubyToConventionTs(file.file, pkg);
+      const host = crossPackage ? tsLookup.get(crossPackage.package) : lookup;
+      const exists = host?.allFiles.has(conventionTs) ?? false;
 
       if (exists) tsMapped++;
       else tsUnmapped++;
 
-      const tsTests = lookup.fileTests.get(conventionTs) || [];
-      const pathIndex = lookup.filePathIndex.get(conventionTs) || new Map();
-      const descIndex = lookup.fileDescIndex.get(conventionTs) || new Map();
-      const pathAliasIndex = lookup.filePathAliasIndex.get(conventionTs) || new Map();
-      const descAliasIndex = lookup.fileDescAliasIndex.get(conventionTs) || new Map();
+      const tsTests = host?.fileTests.get(conventionTs) || [];
+      const pathIndex = host?.filePathIndex.get(conventionTs) || new Map();
+      const descIndex = host?.fileDescIndex.get(conventionTs) || new Map();
+      const pathAliasIndex = host?.filePathAliasIndex.get(conventionTs) || new Map();
+      const descAliasIndex = host?.fileDescAliasIndex.get(conventionTs) || new Map();
       const descCandidates = (nd: string, consumed: Set<number>): number[] | undefined => {
         const exact = descIndex.get(nd) as number[] | undefined;
         return exact !== undefined && exact.some((i) => !consumed.has(i))
@@ -1095,6 +1116,16 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
         }
       }
 
+      // A pending stub named after a case the unported register excludes is
+      // that case's parked port, not a TS-only test.
+      for (const tc of file.testCases) {
+        if (!isTestCaseUnported(file.file, tc.description, tc.ancestors[0])) continue;
+        const stub = descIndex
+          .get(normalizeErb(tc.description))
+          ?.find((i: number) => !consumedTs.has(i) && tsTests[i].pending);
+        if (stub !== undefined) consumedTs.add(stub);
+      }
+
       // TS tests in the convention file that no Rails test consumed.
       const extra = tsTests.length - consumedTs.size;
       totalExtra += extra;
@@ -1102,6 +1133,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
       fileResults.push({
         rubyFile: file.file,
         conventionTsFile: conventionTs,
+        ...(crossPackage ? { conventionTsPackage: crossPackage.package } : {}),
         tsFileExists: exists,
         rubyTestCount: file.testCases.length - excludedCount,
         matched,
@@ -1466,8 +1498,11 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
       if (showIncomplete && isComplete && f.tsFileExists) continue;
       if (f.extra < minExtra) continue;
       const marker = !f.tsFileExists ? " ✗" : isComplete ? " ✓" : "";
+      const conventionTs = f.conventionTsPackage
+        ? `${f.conventionTsPackage}:${f.conventionTsFile}`
+        : f.conventionTsFile;
       console.log(
-        `  ${f.rubyFile.padEnd(45)} ${f.conventionTsFile.padEnd(45)} ${String(fileImplemented).padStart(4)} ${String(f.matchedSkipped).padStart(4)} ${String(f.wrongDescribe).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.extra).padStart(5)} ${String(f.rubyTestCount).padStart(4)}${marker}`,
+        `  ${f.rubyFile.padEnd(45)} ${conventionTs.padEnd(45)} ${String(fileImplemented).padStart(4)} ${String(f.matchedSkipped).padStart(4)} ${String(f.wrongDescribe).padStart(4)} ${String(f.misplaced).padStart(4)} ${String(f.missing).padStart(4)} ${String(f.extra).padStart(5)} ${String(f.rubyTestCount).padStart(4)}${marker}`,
       );
 
       if (showMissing && f.missingTests && f.missingTests.length > 0) {

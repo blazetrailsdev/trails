@@ -41,6 +41,7 @@ const PKG_DIRS: Record<string, string> = {
 interface ConventionFile {
   rubyFile: string;
   conventionTsFile: string;
+  conventionTsPackage?: string;
   tsFileExists: boolean;
   missing: number;
   missingTests?: string[];
@@ -193,7 +194,11 @@ function main() {
 
       const rubyFile = convFile.rubyFile;
       const conventionTsFile = convFile.conventionTsFile;
-      const tsFullPath = path.join(ROOT_DIR, pkgDir, conventionTsFile);
+      const tsFullPath = path.join(
+        ROOT_DIR,
+        convFile.conventionTsPackage ? PKG_SRC_DIRS[convFile.conventionTsPackage] : pkgDir,
+        conventionTsFile,
+      );
 
       // Find the Ruby file in the manifest
       const rubyFileInfo = pkgInfo.files.find((f) => f.file === rubyFile);
