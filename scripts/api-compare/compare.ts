@@ -497,13 +497,6 @@ const TS_CONSTRUCT_SKELETON_NAMES = new Map([
 ]);
 
 const NIL_GUARD_TOKEN = "if:nil-guard";
-/**
- * `isSymbol(x) ? symbolToS(x) : x`, the port of `x.to_s` on a Symbol-or-String
- * receiver (extract-ts-api.ts#isSymbolToSConditional). Ruby's send emits no
- * arm, so the token is dropped — unless the Ruby stream still shows an `if` no
- * TS arm claims, which is the same shape porting a real Ruby ternary
- * (`key.is_a?(Symbol) ? key.name : key`).
- */
 const SYMBOL_TO_S_TOKEN = "if:to-s";
 const RETRY_LOOP_TOKEN = "loop:retry";
 
