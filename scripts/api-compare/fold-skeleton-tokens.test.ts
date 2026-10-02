@@ -212,21 +212,6 @@ describe("sameFileHelperSkeletons", () => {
     expect(foldSkeletonTokens(ts, "ts")).toEqual(["ref:super", "if", "new:SqlLiteral"]);
   });
 
-  it("drops a Symbol-or-String `to_s` conditional unless the Ruby stream still shows an unclaimed `if`", () => {
-    const ts = ["if:to-s", "ref:isSymbol", "ref:symbolToS"];
-    expect(foldSkeletonTokens(ts, "ts", ["ref:to_s"])).toEqual(["ref:isSymbol", "ref:symbolToS"]);
-    expect(foldSkeletonTokens(ts, "ts", ["if", "ref:is_a?", "ref:name"])).toEqual([
-      "if",
-      "ref:isSymbol",
-      "ref:symbolToS",
-    ]);
-    expect(foldSkeletonTokens(["if:to-s", "if", "if:to-s"], "ts", ["if", "if"])).toEqual([
-      "if",
-      "if",
-    ]);
-    expect(foldSkeletonTokens(ts, "ts")).toEqual(["if", "ref:isSymbol", "ref:symbolToS"]);
-  });
-
   it("drops a retry loop unless the Ruby stream still shows an unclaimed `loop`", () => {
     const ts = ["loop:retry", "try", "ref:send", "rescue"];
     expect(foldSkeletonTokens(ts, "ts", ["try", "ref:send", "rescue"])).toEqual([

@@ -16,6 +16,7 @@ import {
   RuntimeError,
   symbolToS,
   toI,
+  toS,
   transformValues,
   union,
   uniq,
@@ -1382,7 +1383,7 @@ export function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): 
 
 /** @internal */
 export function extractTableNameFrom(string: string): string | null {
-  const match = (isSymbol(string) ? symbolToS(string) : string).match(/^\W?(\w+)\W?\./);
+  const match = toS(string).match(/^\W?(\w+)\W?\./);
   return match && match[1];
 }
 
@@ -1407,7 +1408,7 @@ export function columnReferences(orderArgs: unknown[]): Nodes.SqlLiteral[] {
       } else if (isHash(arg)) {
         return (toA(arg) as [unknown, unknown][]).map(([key, value]) => {
           if (isHash(value)) {
-            return isSymbol(key) ? symbolToS(key) : rbObjAsString(key);
+            return toS(key);
           } else {
             return typeof key === "string" ? extractTableNameFrom(key) : null;
           }
@@ -1461,13 +1462,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
             if (isHash(value)) {
               return (toA(value) as [unknown, unknown][]).map(([field, dir]) =>
                 rbFPublicSend(
-                  orderColumn.call(
-                    this,
-                    [
-                      isSymbol(key) ? symbolToS(key) : rbObjAsString(key),
-                      isSymbol(field) ? symbolToS(field) : rbObjAsString(field),
-                    ].join("."),
-                  ),
+                  orderColumn.call(this, [toS(key), toS(field)].join(".")),
                   rbFSend(dir, "downcase"),
                 ),
               );
@@ -1479,10 +1474,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
               ) {
                 return rbFPublicSend(key, rbFSend(value, "downcase"));
               } else {
-                return rbFPublicSend(
-                  orderColumn.call(this, isSymbol(key) ? symbolToS(key) : rbObjAsString(key)),
-                  rbFSend(value, "downcase"),
-                );
+                return rbFPublicSend(orderColumn.call(this, toS(key)), rbFSend(value, "downcase"));
               }
             }
           });
@@ -1858,21 +1850,13 @@ export function arelColumnAliasesFromHash(
       return Object.entries(columnsAliases).map(([column, columnAlias]) =>
         arelColumnWithTable
           .call(this, tableName, column)
-          .as(
-            this.model
-              .adapterClass()
-              .quoteColumnName(
-                isSymbol(columnAlias) ? symbolToS(columnAlias) : rbObjAsString(columnAlias),
-              ),
-          ),
+          .as(this.model.adapterClass().quoteColumnName(toS(columnAlias))),
       );
     } else if (Array.isArray(columnsAliases)) {
       return columnsAliases.map((column) => arelColumnWithTable.call(this, tableName, column));
     } else if (typeof columnsAliases === "string") {
       return (arelColumn.call(this, key) as Arel.Attribute | Nodes.SqlLiteral).as(
-        this.model
-          .adapterClass()
-          .quoteColumnName(isSymbol(columnsAliases) ? symbolToS(columnsAliases) : columnsAliases),
+        this.model.adapterClass().quoteColumnName(toS(columnsAliases)),
       );
     } else {
       return null;

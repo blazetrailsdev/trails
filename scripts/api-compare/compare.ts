@@ -497,7 +497,6 @@ const TS_CONSTRUCT_SKELETON_NAMES = new Map([
 ]);
 
 const NIL_GUARD_TOKEN = "if:nil-guard";
-const SYMBOL_TO_S_TOKEN = "if:to-s";
 const RETRY_LOOP_TOKEN = "loop:retry";
 
 export function foldSkeletonTokens(
@@ -518,10 +517,6 @@ export function foldSkeletonTokens(
   for (const [index, token] of skeleton.entries()) {
     if (token === NIL_GUARD_TOKEN) {
       folded.push(unclaimedIfs-- > 0 ? "if" : "and");
-      continue;
-    }
-    if (token === SYMBOL_TO_S_TOKEN) {
-      if (unclaimedIfs-- > 0) folded.push("if");
       continue;
     }
     if (token === RETRY_LOOP_TOKEN) {

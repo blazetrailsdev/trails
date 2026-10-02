@@ -541,6 +541,22 @@ export function toSym(obj: unknown): string {
 }
 
 /**
+ * Ruby's `obj.to_s` send for a receiver that may be a Symbol: `Symbol#to_s`
+ * (`rb_sym_to_s`, `vendor/ruby/v3.3.11/string.c:11734`) answers the name of a
+ * colon-spelled Symbol (`":name"`), and every other receiver answers as
+ * {@link rbObjAsString} does (`String#to_s` is `rb_str_to_s`,
+ * `vendor/ruby/v3.3.11/string.c:6648`). It is the send, where
+ * {@link symbolToS} is `rb_sym_to_s` on a known Symbol, as `toSym` is to
+ * `stringToSym`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function toS(obj: unknown): string {
+  if (isSymbol(obj)) return symbolToS(obj);
+  return rbObjAsString(obj);
+}
+
+/**
  * `Kernel#send` (`rb_f_send`, `vendor/ruby/v3.3.11/vm_eval.c:1330`): calls the nearest
  * entry for `mid` whatever its visibility. A zero-argument reader ported as a
  * JS accessor or a field answers through its getter or its value, as the Ruby

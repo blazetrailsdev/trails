@@ -14,6 +14,7 @@ import {
   rbModAttrWriter,
   rbModMethodDefined,
   rbFSend,
+  toS as toSSend,
   toSym,
   isNil,
   rbModPublicMethodDefined,
@@ -689,6 +690,15 @@ describe("isNil", () => {
   it("answers through the receiver's own nil?", () => {
     expect(isNil({ isNil: () => true })).toBe(true);
     expect(isNil({ isNil: () => false })).toBe(false);
+  });
+});
+
+describe("toS", () => {
+  it("answers a Symbol's name and any other receiver's to_s", () => {
+    expect(toSSend(":name")).toBe("name");
+    expect(toSSend("name")).toBe("name");
+    expect(toSSend(1)).toBe("1");
+    expect(toSSend(null)).toBe("");
   });
 });
 

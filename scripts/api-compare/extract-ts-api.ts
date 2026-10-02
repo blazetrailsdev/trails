@@ -4741,24 +4741,6 @@ function isNilGuardConditional(node: ts.ConditionalExpression): boolean {
   }
 }
 
-function isSymbolToSConditional(node: ts.ConditionalExpression): boolean {
-  const receiver = soleArgumentOf(node.condition, "isSymbol");
-  if (receiver === undefined || soleArgumentOf(node.whenTrue, "symbolToS") !== receiver) {
-    return false;
-  }
-  return (
-    node.whenFalse.getText() === receiver ||
-    soleArgumentOf(node.whenFalse, "String") === receiver ||
-    soleArgumentOf(node.whenFalse, "rbObjAsString") === receiver
-  );
-}
-
-function soleArgumentOf(node: ts.Expression, callee: string): string | undefined {
-  if (!ts.isCallExpression(node) || !ts.isIdentifier(node.expression)) return undefined;
-  if (node.expression.text !== callee || node.arguments.length !== 1) return undefined;
-  return node.arguments[0].getText();
-}
-
 function isRetryLoop(statement: ts.ForStatement | ts.WhileStatement): boolean {
   const unconditional = ts.isForStatement(statement)
     ? !statement.initializer && !statement.condition && !statement.incrementor
@@ -4960,10 +4942,6 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
           tokens.push("or");
           visit(fallback);
           return;
-        }
-        if (isSymbolToSConditional(n as ts.ConditionalExpression)) {
-          tokens.push("if:to-s");
-          break;
         }
         tokens.push(isNilGuardConditional(n as ts.ConditionalExpression) ? "if:nil-guard" : "if");
         break;
