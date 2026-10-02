@@ -2,21 +2,54 @@ import { BigDecimal, presence } from "@blazetrails/activesupport";
 import {
   cmp,
   isNan,
+  Module,
   Rational,
+  rbClassOf,
   rbFloatTypeP,
   rbObjAsString as toS,
-  rbObjClass,
 } from "@blazetrails/ruby-compat";
-import { ValueType } from "../value.js";
+import type { ValueType } from "../value.js";
 
 const NUMERIC_REGEX = /^\s*[+-]?\d/;
+
+export function serialize(this: ValueType, value: unknown): unknown {
+  return this.cast(value);
+}
+
+export function serializeCastValue(value: unknown): unknown {
+  return value;
+}
+
+export function cast(this: ValueType, value: unknown): unknown {
+  value =
+    cmp(value, 0) != null ? value : value === true ? 1 : value === false ? 0 : presence(value);
+
+  return Numeric.superMethod(this, "cast")!(value);
+}
+
+export function isChanged(
+  this: ValueType,
+  oldValue: unknown,
+  _newValue: unknown,
+  newValueBeforeTypeCast: unknown,
+): boolean {
+  return (
+    ((Numeric.superMethod(this, "isChanged")!(
+      oldValue,
+      _newValue,
+      newValueBeforeTypeCast,
+    ) as boolean) ||
+      isNumberToNonNumber(oldValue, newValueBeforeTypeCast)) &&
+    !isEqualNan(oldValue, newValueBeforeTypeCast)
+  );
+}
 
 /** @internal */
 export function isEqualNan(oldValue: unknown, newValue: unknown): boolean {
   return (
     (rbFloatTypeP(oldValue) || oldValue instanceof BigDecimal) &&
     isNan(oldValue) &&
-    rbObjClass(oldValue) === rbObjClass(newValue) &&
+    rbClassOf(oldValue) === rbClassOf(newValue) &&
     isNan(newValue)
   );
 }
@@ -41,50 +74,12 @@ export function isNonNumericString(value: string): boolean {
   return !NUMERIC_REGEX.test(value);
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AbstractValueTypeCtor<T = unknown> = abstract new (...args: any[]) => ValueType<T>;
-
-export interface NumericMixinMethods {
-  cast(value: unknown): unknown;
-  serialize(value: unknown): unknown;
-  serializeCastValue(value: unknown): unknown;
-  isChanged(oldValue: unknown, newValue: unknown, newValueBeforeTypeCast?: unknown): boolean;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE type-helpers-numeric-is-a-class-factory-not-an-included-module
- */
-export function applyNumericMixin<TBase extends AbstractValueTypeCtor>(
-  Base: TBase,
-): TBase & { prototype: NumericMixinMethods } {
-  class NumericType extends (Base as AbstractValueTypeCtor) {
-    override cast(value: unknown) {
-      value =
-        cmp(value, 0) != null ? value : value === true ? 1 : value === false ? 0 : presence(value);
-
-      return super.cast(value);
-    }
-
-    override serialize(value: unknown): unknown {
-      return this.cast(value);
-    }
-
-    override serializeCastValue(value: unknown): unknown {
-      return value;
-    }
-
-    override isChanged(
-      oldValue: unknown,
-      newValue: unknown,
-      newValueBeforeTypeCast?: unknown,
-    ): boolean {
-      return (
-        (super.isChanged(oldValue, newValue, newValueBeforeTypeCast) ||
-          isNumberToNonNumber(oldValue, newValueBeforeTypeCast)) &&
-        !isEqualNan(oldValue, newValueBeforeTypeCast)
-      );
-    }
-  }
-  return NumericType as unknown as TBase & { prototype: NumericMixinMethods };
-}
+export const Numeric = new Module((mod) => {
+  mod.defineMethod("serialize", serialize);
+  mod.defineMethod("serializeCastValue", serializeCastValue);
+  mod.defineMethod("cast", cast);
+  mod.defineMethod("isChanged", isChanged);
+  mod.defineMethod("isEqualNan", isEqualNan);
+  mod.defineMethod("isNumberToNonNumber", isNumberToNonNumber);
+  mod.defineMethod("isNonNumericString", isNonNumericString);
+});

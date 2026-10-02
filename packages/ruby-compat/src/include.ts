@@ -23,7 +23,22 @@
 import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
 import { temporalTag } from "./temporal-tag.js";
-import { FL_SINGLETON, T_ICLASS, classpaths, rbAnyToS, rbModName, rbModToS } from "./object.js";
+import { Enumerable } from "./enumerable.js";
+import { Hash } from "./hash.js";
+import {
+  FL_SINGLETON,
+  T_ICLASS,
+  classpaths,
+  rbAnyToS,
+  rbCBasicObject,
+  rbCClass,
+  rbCDate,
+  rbCNumeric,
+  rbCString,
+  rbCTime,
+  rbModName,
+  rbModToS,
+} from "./object.js";
 
 type AnyClass = new (...args: never[]) => unknown;
 type ModuleObject = object;
@@ -791,18 +806,6 @@ export function includedModules(mod: { prototype: object }): unknown[] {
   return result;
 }
 
-const CORE_ANCESTORS: Record<string, string[]> = {
-  Integer: ["Numeric", "Comparable"],
-  Float: ["Numeric", "Comparable"],
-  String: ["Comparable"],
-  Symbol: ["Comparable"],
-  Class: ["Module"],
-  Time: ["Comparable"],
-  Date: ["Comparable"],
-  DateTime: ["Date", "Comparable"],
-  Hash: ["Enumerable"],
-};
-
 /**
  * Ruby's `Module#ancestors`: the class, the modules mixed into it most
  * recently first, and then the same for each superclass up to `Object`.
@@ -810,30 +813,25 @@ const CORE_ANCESTORS: Record<string, string[]> = {
  * superclass chain; the registry `include()` keeps on each prototype is that
  * record here.
  *
- * A core class with no JS class object is the name `rbObjClass` answers for
- * its instances, and its ancestors are the names MRI lists for it. `Kernel`
- * and `BasicObject`, which every ancestry ends with after `Object`, are
- * names for the same reason.
+ * `Object.prototype` is the seat of `Object`, whose own ancestry
+ * (`Kernel`, `BasicObject`) no JS prototype carries.
  *
  * Mirrors: Ruby's Module#ancestors — vendor/ruby/v3.3.11/class.c:1570
  * `rb_mod_ancestors`.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
  */
-export function rbModAncestors(mod: { prototype: object } | string): unknown[] {
-  if (typeof mod === "string") {
-    return [mod, ...(CORE_ANCESTORS[mod] ?? []), Object, "Kernel", "BasicObject"];
-  }
-  const ary: unknown[] = [];
+export function rbModAncestors(mod: { prototype: object }): object[] {
+  const ary: object[] = [];
   for (let p: object | null = mod.prototype; p; p = Object.getPrototypeOf(p) as object | null) {
     if (Object.prototype.hasOwnProperty.call(p, "constructor")) {
-      ary.push((p as { constructor: unknown }).constructor);
+      ary.push((p as { constructor: object }).constructor);
     }
     if (Object.prototype.hasOwnProperty.call(p, includedModulesKey)) {
-      const mods = [...((p as Record<symbol, unknown>)[includedModulesKey] as Set<unknown>)];
+      const mods = [...((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>)];
       for (const m of mods.reverse()) if (!ary.includes(m)) ary.push(m);
     }
-    if (p === Object.prototype) ary.push("Kernel", "BasicObject");
+    if (p === Object.prototype) ary.push(Kernel, rbCBasicObject);
   }
   return ary;
 }
@@ -850,7 +848,7 @@ export function rbModAncestors(mod: { prototype: object } | string): unknown[] {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbModInstanceMethod(mod: { prototype: object }, mid: string): { owner: unknown } {
+export function rbModInstanceMethod(mod: { prototype: object }, mid: string): { owner: object } {
   for (
     let link: object | null = mod.prototype;
     link && link !== Object.prototype;
@@ -858,9 +856,9 @@ export function rbModInstanceMethod(mod: { prototype: object }, mid: string): { 
   ) {
     if (!Object.hasOwn(link, mid)) continue;
     const table = link as Record<symbol, unknown>;
-    if (Object.hasOwn(link, T_ICLASS)) return { owner: table[T_ICLASS] };
+    if (Object.hasOwn(link, T_ICLASS)) return { owner: table[T_ICLASS] as object };
     if (Object.hasOwn(link, includedKeys) && (table[includedKeys] as Set<string>).has(mid)) {
-      const mods = [...(table[includedModulesKey] as Set<unknown>)].reverse();
+      const mods = [...(table[includedModulesKey] as Set<object>)].reverse();
       const owner = mods.find((m) => {
         if (m instanceof Module) return false;
         if (typeof m === "function") return Object.hasOwn(m.prototype as object, mid);
@@ -1403,3 +1401,19 @@ export const Kernel = new Module((mod) => {
     return Object.freeze(this);
   });
 });
+
+classpaths.set(Kernel, { path: "Kernel", permanent: true });
+classpaths.set(Enumerable, { path: "Enumerable", permanent: true });
+
+// `rb_mComparable` (`vendor/ruby/v3.3.11/compar.c:315`).
+const rbMComparable = new Module();
+classpaths.set(rbMComparable, { path: "Comparable", permanent: true });
+
+Object.setPrototypeOf(rbCClass, Module);
+Object.setPrototypeOf(rbCClass.prototype, Module.prototype);
+
+include(rbCNumeric, rbMComparable);
+include(rbCString, rbMComparable);
+include(rbCTime, rbMComparable);
+include(rbCDate, rbMComparable);
+trackIncludedModule(Hash.prototype, Enumerable);

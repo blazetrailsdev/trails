@@ -1,11 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
-import {
-  isNonNumericString,
-  isNumberToNonNumber,
-  isEqualNan,
-  applyNumericMixin,
-} from "./numeric.js";
+import { isNonNumericString, isNumberToNonNumber, isEqualNan, Numeric } from "./numeric.js";
+import { include, rbModAncestors } from "@blazetrails/ruby-compat";
 import { ValueType } from "../value.js";
 
 describe("Helpers::Numeric private predicates", () => {
@@ -80,8 +76,8 @@ describe("Helpers::Numeric private predicates", () => {
   });
 });
 
-describe("applyNumericMixin", () => {
-  class ConcreteNumeric extends applyNumericMixin(ValueType<number>) {
+describe("Numeric", () => {
+  class ConcreteNumeric extends ValueType<number> {
     readonly name = "test_numeric";
     type() {
       return this.name;
@@ -93,7 +89,17 @@ describe("applyNumericMixin", () => {
     }
   }
 
+  include(ConcreteNumeric, Numeric);
+
   const type = new ConcreteNumeric();
+
+  it("is an included module, not a superclass", () => {
+    expect(rbModAncestors(ConcreteNumeric).slice(0, 3)).toEqual([
+      ConcreteNumeric,
+      Numeric,
+      ValueType,
+    ]);
+  });
 
   it("cast returns null for blank strings", () => {
     expect(type.cast("")).toBeNull();

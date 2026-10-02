@@ -10,44 +10,61 @@ import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { temporalTag } from "./temporal-tag.js";
 import { NoMethodError } from "./no-method-error.js";
+import { Hash } from "./hash.js";
+
+type Klass = abstract new (...args: never) => unknown;
 
 /**
- * `rb_obj_class` (`vendor/ruby/v3.3.11/object.c:296`) over the values trails carries:
- * the immediates Ruby answers a class for without a heap object, the
- * {@link rubyClass} brand, and otherwise the constructor's own name.
+ * `rb_class_of` (`vendor/ruby/v3.3.11/include/ruby/internal/globals.h:172`) read
+ * through `rb_class_real`, which is `rb_obj_class`
+ * (`vendor/ruby/v3.3.11/object.c:265`): the class object `Object#class` answers,
+ * for the immediates Ruby answers a class for without a heap object and
+ * otherwise the constructor.
  *
  * @boundary: a JS `number` is the seat for both `Integer` and `Float`, so
  *  which one it is is read off the value; a Temporal value carrying an instant
  *  is a Ruby `Time`, by the same reading `cmp` orders it with, and so are a JS
  *  `Date` and a `Temporal.PlainTime`. A function is a `Class` when its
  *  `prototype` is non-writable and a `Proc` otherwise. `Temporal.PlainDate` and
- *  `Temporal.PlainDateTime` are the seats of `Date` and `DateTime`. Any other
- *  object answers its class's {@link rbModToS}, which is how Ruby interpolates
- *  the class `rb_obj_class` returns.
+ *  `Temporal.PlainDateTime` are the seats of `Date` and `DateTime`, and a
+ *  record whose prototype chain holds no class is a `Hash`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbClassOf(obj: unknown): Klass {
+  if (obj === null || obj === undefined) return rbCNilClass;
+  if (typeof obj === "boolean") return obj ? rbCTrueClass : rbCFalseClass;
+  if (typeof obj === "bigint") return rbCInteger;
+  if (typeof obj === "number") return Number.isInteger(obj) ? rbCInteger : rbCFloat;
+  if (obj instanceof Number) return rbCFloat;
+  if (typeof obj === "string") return rbCString;
+  if (typeof obj === "function") {
+    return Object.getOwnPropertyDescriptor(obj, "prototype")?.writable === false
+      ? rbCClass
+      : rbCProc;
+  }
+  if (hasEpochNanoseconds(obj)) return rbCTime;
+  const tag = temporalTag(obj);
+  if (tag === "Temporal.PlainDate") return rbCDate;
+  if (tag === "Temporal.PlainDateTime") return rbCDateTime;
+  if (tag === "Temporal.PlainTime") return rbCTime;
+  if (isPlainHash(obj)) return Hash;
+  const klass = (obj as object).constructor as Klass | undefined;
+  if (klass === Date) return rbCTime;
+  return typeof klass === "function" ? klass : Object;
+}
+
+/**
+ * `rb_obj_classname` (`vendor/ruby/v3.3.11/variable.c:498`): the
+ * {@link rbModToS} of the class {@link rbClassOf} answers, which is how Ruby
+ * interpolates `obj.class`, or the {@link rubyClass} brand.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_class` (`vendor/ruby/v3.3.11/object.c:296`).
  */
 export function rbObjClass(x: unknown): string {
-  if (x === null || x === undefined) return "NilClass";
-  if (typeof x === "boolean") return x ? "TrueClass" : "FalseClass";
-  if (typeof x === "bigint") return "Integer";
-  if (typeof x === "number") return Number.isInteger(x) ? "Integer" : "Float";
-  if (x instanceof Number) return "Float";
-  if (typeof x === "string") return "String";
-  const branded = (x as Comparable)[rubyClass];
+  const branded = typeof x === "object" && x !== null ? (x as Comparable)[rubyClass] : null;
   if (branded != null) return branded;
-  if (typeof x === "function") {
-    return Object.getOwnPropertyDescriptor(x, "prototype")?.writable === false ? "Class" : "Proc";
-  }
-  if (hasEpochNanoseconds(x)) return "Time";
-  const tag = temporalTag(x);
-  if (tag === "Temporal.PlainDate") return "Date";
-  if (tag === "Temporal.PlainDateTime") return "DateTime";
-  if (tag === "Temporal.PlainTime") return "Time";
-  if (isPlainHash(x)) return "Hash";
-  const klass = (x as object).constructor as (abstract new (...args: never) => unknown) | undefined;
-  if (klass === Date) return "Time";
-  return typeof klass === "function" ? rbModToS(klass) : typeof x;
+  return rbModToS(rbClassOf(x));
 }
 
 /**
@@ -157,6 +174,70 @@ export function rbClassSuperclass<T extends object>(klass: T): T | null {
 export const classpaths = new WeakMap<object, { path: string; permanent: boolean }>();
 
 /**
+ * `rb_define_class` (`vendor/ruby/v3.3.11/class.c:972`) for a core class no JS
+ * constructor seats: a class under `super`, pathed by its top-level name.
+ */
+function rbDefineClass(name: string, superclass: Klass = Object): Klass {
+  const klass = class extends (superclass as new () => object) {};
+  classpaths.set(klass, { path: name, permanent: true });
+  return klass;
+}
+
+/**
+ * `rb_cBasicObject` (`vendor/ruby/v3.3.11/object.c:4200`), the class every
+ * ancestry ends on. `Object.prototype` is the seat of `Object`, so this
+ * prototype has no parent.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCBasicObject = rbDefineClass("BasicObject");
+Object.setPrototypeOf(rbCBasicObject.prototype, null);
+
+/**
+ * `rb_cClass` (`vendor/ruby/v3.3.11/object.c:4203`). include.ts seats its
+ * superclass, `Module`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCClass = rbDefineClass("Class");
+
+/**
+ * `rb_cNumeric` (`vendor/ruby/v3.3.11/numeric.c:6156`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCNumeric = rbDefineClass("Numeric");
+
+/**
+ * `rb_cString` (`vendor/ruby/v3.3.11/string.c:12121`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCString = rbDefineClass("String");
+
+/**
+ * `rb_cTime` (`vendor/ruby/v3.3.11/time.c:5832`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCTime = rbDefineClass("Time");
+
+/**
+ * `cDate` (`vendor/ruby/v3.3.11/ext/date/date_core.c:9604`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCDate = rbDefineClass("Date");
+
+const rbCNilClass = rbDefineClass("NilClass");
+const rbCTrueClass = rbDefineClass("TrueClass");
+const rbCFalseClass = rbDefineClass("FalseClass");
+const rbCInteger = rbDefineClass("Integer", rbCNumeric);
+const rbCFloat = rbDefineClass("Float", rbCNumeric);
+const rbCProc = rbDefineClass("Proc");
+const rbCDateTime = rbDefineClass("DateTime", rbCDate);
+
+/**
  * `rb_mod_singleton_p` (`vendor/ruby/v3.3.11/object.c:3050`), `Module#singleton_class?`.
  *
  * @noRailsEquivalent PERMANENT
@@ -200,8 +281,8 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbModName(klass: abstract new (...args: never) => unknown): string | null {
-  return classpaths.get(klass)?.path ?? (klass.name || null);
+export function rbModName(klass: object): string | null {
+  return classpaths.get(klass)?.path ?? ((klass as { name?: string | null }).name || null);
 }
 
 /**

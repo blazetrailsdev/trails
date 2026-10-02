@@ -1,14 +1,19 @@
 import { isBlank } from "@blazetrails/activesupport";
-import { Range, rbDeclareIvar, rbModToS, toI, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  include,
+  Range,
+  rbDeclareIvar,
+  rbModToS,
+  toI,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 import { RangeError } from "../errors.js";
-import { applyNumericMixin, isNonNumericString } from "./helpers/numeric.js";
+import { Numeric, isNonNumericString } from "./helpers/numeric.js";
 
 const DEFAULT_LIMIT = 4;
 
-const NumericValueType = applyNumericMixin(ValueType<number | bigint>);
-
-export class IntegerType extends NumericValueType {
+export class IntegerType extends ValueType<number | bigint> {
   protected _range: Range<number | bigint>;
 
   constructor(options?: { precision?: number; scale?: number; limit?: number }) {
@@ -94,5 +99,7 @@ export class IntegerType extends NumericValueType {
 }
 
 rbDeclareIvar(IntegerType, "@range", "_range");
+
+include(IntegerType, Numeric);
 
 registerConstant("ActiveModel::Type::Integer", IntegerType);

@@ -43,6 +43,7 @@ export {
   rbObjIvarSet,
   classpaths,
   rbClassSuperclass,
+  rbClassOf,
   rbModName,
   rbModSingletonP,
   rbModToS,

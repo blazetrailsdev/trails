@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  rbCBasicObject,
   rbClassSuperclass,
   basicObjRespondTo,
   objRespondToMissing,
@@ -25,7 +26,7 @@ import {
   rbObjClass,
   rbSetClassPathString,
 } from "./object.js";
-import { Module, include, rbModAncestors, rbModInstanceMethod } from "./include.js";
+import { Kernel, Module, include, rbModAncestors, rbModInstanceMethod } from "./include.js";
 import { cmp } from "./comparable.js";
 import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
@@ -464,7 +465,7 @@ describe("rbModAncestors / rbModInstanceMethod", () => {
     const mod = new Module();
     mod.defineMethod("cast", () => {});
     mod.appendFeatures(Sub);
-    expect(rbModAncestors(Sub)).toEqual([Sub, mod, Base, Object, "Kernel", "BasicObject"]);
+    expect(rbModAncestors(Sub)).toEqual([Sub, mod, Base, Object, Kernel, rbCBasicObject]);
     expect(rbModInstanceMethod(Sub, "cast").owner).toBe(mod);
     expect(rbModInstanceMethod(Sub, "serialize").owner).toBe(Base);
     expect(() => rbModInstanceMethod(Sub, "nope")).toThrow(NameError);
