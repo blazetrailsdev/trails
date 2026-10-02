@@ -1,5 +1,5 @@
 import type * as Arel from "@blazetrails/arel";
-import { Nodes } from "@blazetrails/arel";
+import { Nodes, type ArelNode } from "@blazetrails/arel";
 import type { Relation } from "../../relation.js";
 import type { Base } from "../../base.js";
 
@@ -41,7 +41,7 @@ export class DeferredPluck implements PromiseLike<unknown[]> {
 export class DeferredIdsIn extends Nodes.In {
   constructor(
     attribute: Arel.Attribute | Nodes.Grouping,
-    inlineSubquery: Nodes.Node,
+    inlineSubquery: ArelNode,
     /** @noRailsEquivalent PERMANENT */
     readonly innerRelations: DeferredIds[],
   ) {
@@ -51,7 +51,7 @@ export class DeferredIdsIn extends Nodes.In {
   invert(): DeferredIdsNotIn {
     return new DeferredIdsNotIn(
       this.left as Arel.Attribute,
-      this.right as Nodes.Node,
+      this.right as ArelNode,
       this.innerRelations,
     );
   }
@@ -61,7 +61,7 @@ export class DeferredIdsIn extends Nodes.In {
 export class DeferredIdsNotIn extends Nodes.NotIn {
   constructor(
     attribute: Arel.Attribute,
-    inlineSubquery: Nodes.Node,
+    inlineSubquery: ArelNode,
     /** @noRailsEquivalent PERMANENT */
     readonly innerRelations: DeferredIds[],
   ) {
@@ -71,7 +71,7 @@ export class DeferredIdsNotIn extends Nodes.NotIn {
   invert(): DeferredIdsIn {
     return new DeferredIdsIn(
       this.left as Arel.Attribute,
-      this.right as Nodes.Node,
+      this.right as ArelNode,
       this.innerRelations,
     );
   }

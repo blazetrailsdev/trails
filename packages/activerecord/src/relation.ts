@@ -13,7 +13,7 @@ import { isEmpty } from "@blazetrails/ruby-compat";
 import { RelationMethods as TokenForRelationMethods } from "./token-for.js";
 import { first } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
-import { Table, SelectManager, Nodes, sql, star } from "@blazetrails/arel";
+import { Table, SelectManager, Nodes, sql, star, type ArelNode } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { ActiveRecordError, RecordNotUnique } from "./errors.js";
 import { compact, max, min } from "@blazetrails/ruby-compat";
@@ -147,9 +147,9 @@ export type ValuesHash = {
   includes?: AssociationSpec[];
   eagerLoad?: AssociationSpec[];
   preload?: AssociationSpec[];
-  select?: (string | Nodes.Node)[];
+  select?: (string | ArelNode)[];
   group?: string[];
-  order?: Array<string | Nodes.Node>;
+  order?: Array<string | ArelNode>;
   joins?: (AssociationSpec | string | Nodes.Join)[];
   leftOuterJoins?: AssociationSpec[];
   references?: string[];
@@ -194,11 +194,11 @@ export class ExplainProxy<T extends Base> {
     );
   }
 
-  average(columnName: string | Nodes.Node): Promise<string> {
+  average(columnName: string | ArelNode): Promise<string> {
     return this.execExplain(() => this._relation.average(columnName as never));
   }
 
-  count(columnName?: string | Nodes.Node): Promise<string> {
+  count(columnName?: string | ArelNode): Promise<string> {
     return this.execExplain(() => this._relation.count(columnName as never));
   }
 
@@ -210,19 +210,19 @@ export class ExplainProxy<T extends Base> {
     return this.execExplain(() => this._relation.last(limit as never));
   }
 
-  maximum(columnName: string | Nodes.Node): Promise<string> {
+  maximum(columnName: string | ArelNode): Promise<string> {
     return this.execExplain(() => this._relation.maximum(columnName as never));
   }
 
-  minimum(columnName: string | Nodes.Node): Promise<string> {
+  minimum(columnName: string | ArelNode): Promise<string> {
     return this.execExplain(() => this._relation.minimum(columnName as never));
   }
 
-  pluck(...columnNames: (string | Nodes.Node)[]): Promise<string> {
+  pluck(...columnNames: (string | ArelNode)[]): Promise<string> {
     return this.execExplain(() => this._relation.pluck(...(columnNames as never[])));
   }
 
-  sum(identityOrColumn?: string | Nodes.Node): Promise<string> {
+  sum(identityOrColumn?: string | ArelNode): Promise<string> {
     return this.execExplain(() => this._relation.sum(identityOrColumn as never));
   }
 
@@ -746,7 +746,9 @@ export class Relation<T extends Base, G extends boolean = false> {
     );
   }
 
-  private tablesInString(string: Nodes.Node | string | null | undefined): string[] {
+  private tablesInString(
+    string: Nodes.Node | Nodes.SqlLiteral | string | null | undefined,
+  ): string[] {
     if (string instanceof Nodes.SqlLiteral) string = string.toString();
     else if (string instanceof Nodes.Node) string = string.toSql();
     if (!string) return [];
@@ -1253,18 +1255,18 @@ export class Relation<T extends Base, G extends boolean = false> {
     const adapter = c as unknown as {
       columnsForDistinct?: (
         cols: string | string[],
-        orders: (string | Nodes.Node)[],
+        orders: (string | ArelNode)[],
       ) => string | string[];
     };
     const orders = this.orderValues.map((clause) => {
-      if (clause instanceof Nodes.Node) return clause;
+      if (Arel.arelNode(clause)) return clause;
       const raw = Array.isArray(clause) ? `${clause[0]} ${clause[1]}` : clause;
       const bare = raw
         .trim()
         .replace(/\s+(?:ASC|DESC)\b.*$/i, "")
         .trim();
       if (!/^[A-Za-z_$][\w$]*$/.test(bare)) return new Nodes.SqlLiteral(raw);
-      return this.arelColumn(bare, () => new Nodes.SqlLiteral(raw)) as Nodes.Node;
+      return this.arelColumn(bare, () => new Nodes.SqlLiteral(raw)) as ArelNode;
     });
     const values = adapter.columnsForDistinct ? adapter.columnsForDistinct(pkSql, orders) : pkSql;
     return Array.isArray(values) ? values.join(", ") : values;
@@ -1909,9 +1911,9 @@ export interface Relation<T extends Base, G extends boolean = false> {
   includesValues: AssociationSpec[];
   eagerLoadValues: AssociationSpec[];
   preloadValues: AssociationSpec[];
-  selectValues: (string | Nodes.Node)[];
-  groupValues: Array<string | Nodes.Node>;
-  orderValues: Array<string | Nodes.Node>;
+  selectValues: (string | ArelNode)[];
+  groupValues: Array<string | ArelNode>;
+  orderValues: Array<string | ArelNode>;
   joinsValues: (AssociationSpec | string | Nodes.Join | JoinDependency)[];
   leftOuterJoinsValues: AssociationSpec[];
   referencesValues: Array<string | Nodes.SqlLiteral>;
@@ -1992,7 +1994,7 @@ export interface Relation<T extends Base, G extends boolean = false>
   readonly(value?: boolean): Relation<T, G>;
   strictLoading(value?: boolean): Relation<T, G>;
   createWith(value: Record<string, unknown> | null): Relation<T, G>;
-  from(value: string | Relation<any, boolean> | Nodes.Node, subqueryName?: string): Relation<T, G>;
+  from(value: string | Relation<any, boolean> | ArelNode, subqueryName?: string): Relation<T, G>;
   extending<M extends Record<string, (...args: any[]) => any>>(mod: M): Relation<T, G> & M;
   extending<M extends Record<string, (...args: any[]) => any>>(
     mod: M | undefined,
@@ -2039,21 +2041,21 @@ export interface Relation<T extends Base, G extends boolean = false>
   /** @internal */
   arelColumnsFromHash(fields: Record<PropertyKey, unknown>): unknown[];
   select(fn: (record: T) => boolean): Promise<T[]>;
-  select(...fields: (string | Nodes.Node | Record<string, unknown>)[]): Relation<T, G>;
+  select(...fields: (string | ArelNode | Record<string, unknown>)[]): Relation<T, G>;
   reselect(
-    ...args: (string | Nodes.Node | Record<string, unknown> | readonly (string | Nodes.Node)[])[]
+    ...args: (string | ArelNode | Record<string, unknown> | readonly (string | ArelNode)[])[]
   ): Relation<T, G>;
-  group(...args: (string | Nodes.Node)[]): Relation<T, true>;
+  group(...args: (string | ArelNode)[]): Relation<T, true>;
   regroup(...args: string[]): Relation<T, true>;
   order(...args: OrderArg[]): Relation<T, G>;
-  inOrderOf(column: string | Nodes.Node, values: unknown[], filter?: boolean): Relation<T, G>;
+  inOrderOf(column: string | ArelNode, values: unknown[], filter?: boolean): Relation<T, G>;
   reorder(...args: OrderArg[]): Relation<T, G>;
   where(): WhereChain<Relation<T, G>>;
   where(args: undefined): WhereChain<Relation<T, G>>;
   where(args: Record<string, unknown> | null): Relation<T, G>;
   where(args: Map<unknown, unknown>): Relation<T, G>;
   where(sql: string, ...binds: unknown[]): Relation<T, G>;
-  where(args: Nodes.Node): Relation<T, G>;
+  where(args: Nodes.Node | Nodes.SqlLiteral): Relation<T, G>;
   where(args: unknown[]): Relation<T, G>;
   rewhere(conditions: Record<string, unknown> | null): Relation<T, G>;
   invertWhere(): Relation<T, G>;
@@ -2064,9 +2066,9 @@ export interface Relation<T extends Base, G extends boolean = false>
   without(...records: unknown[]): Relation<T, G>;
   having(condition: string, ...binds: unknown[]): Relation<T, G>;
   having(condition: Record<string, unknown>): Relation<T, G>;
-  having(condition: Nodes.Node): Relation<T, G>;
+  having(condition: Nodes.Node | Nodes.SqlLiteral): Relation<T, G>;
   having(
-    condition: string | Record<string, unknown> | Nodes.Node,
+    condition: string | Record<string, unknown> | Nodes.Node | Nodes.SqlLiteral,
     ...binds: unknown[]
   ): Relation<T, G>;
   limit(value: number | string | null): Relation<T, G>;

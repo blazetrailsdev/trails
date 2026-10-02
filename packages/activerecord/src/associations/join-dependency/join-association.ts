@@ -165,7 +165,7 @@ export class JoinAssociation extends JoinPart {
 
 function nodeReferencesTable(node: unknown, tableName: string): boolean {
   let found = false;
-  fetchAttribute(node, (attr: Nodes.Node): boolean => {
+  fetchAttribute(node, (attr: Arel.Attribute): boolean => {
     if (attr instanceof Arel.Attribute) {
       const rel = attr.relation;
       if (String(rel.tableAlias ?? rel.name) === tableName) {

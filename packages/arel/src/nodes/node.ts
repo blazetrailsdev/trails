@@ -7,6 +7,7 @@ import type { And } from "./nary.js";
 import type { Not } from "./unary.js";
 import type { Grouping } from "./grouping.js";
 import type { Attribute } from "../attributes/attribute.js";
+import type { ArelNode } from "../arel.js";
 
 export interface ArelEngine {
   withConnection<T>(
@@ -22,11 +23,11 @@ export class Node {
     return new Nodes.Not(this);
   }
 
-  or(right: Node): Grouping {
+  or(right: ArelNode): Grouping {
     return new Nodes.Grouping(new Nodes.Or([this, right]));
   }
 
-  and(right: Node): And {
+  and(right: ArelNode): And {
     return new Nodes.And([this, right]);
   }
 

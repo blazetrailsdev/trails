@@ -20,7 +20,7 @@ import {
   FinderMethods,
 } from "../relation/finder-methods.js";
 import type * as Arel from "@blazetrails/arel";
-import type { Nodes } from "@blazetrails/arel";
+import type { Nodes, ArelNode } from "@blazetrails/arel";
 import {
   singularize,
   camelize,
@@ -430,7 +430,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
   ): Promise<number | Map<unknown, number>>;
   override async calculate(
     operation: "sum",
-    column: string | Nodes.Node | number | null,
+    column: string | ArelNode | number | null,
   ): Promise<number | bigint | Map<unknown, number | bigint>>;
   override async calculate(
     operation: "average" | "minimum" | "maximum",
@@ -438,7 +438,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
   ): Promise<unknown | null | Map<unknown, unknown>>;
   override async calculate(
     operation: string,
-    columnName?: string | Nodes.Node | number | null,
+    columnName?: string | ArelNode | number | null,
   ): Promise<unknown> {
     if (this.isNullScope()) return this.scope().calculate(operation, columnName);
     if (this.reflection.options.disableJoins) {

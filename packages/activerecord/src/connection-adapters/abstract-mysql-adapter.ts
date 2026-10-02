@@ -46,7 +46,7 @@ import {
   ValueTooLong,
 } from "../errors.js";
 import type * as Arel from "@blazetrails/arel";
-import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
+import { sql as arelSql, Nodes, Visitors, type ArelNode } from "@blazetrails/arel";
 import { StatementPool as ConnectionStatementPool } from "./statement-pool.js";
 import type { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
 import {
@@ -838,7 +838,7 @@ WHERE fk.referenced_column_name IS NOT NULL
     return column.isCaseSensitive();
   }
 
-  columnsForDistinct(columns: string, orders?: (string | Nodes.Node)[]): string {
+  columnsForDistinct(columns: string, orders?: (string | ArelNode)[]): string {
     const visitor = this.arelVisitor();
     const orderColumns = compactBlank(
       compactBlank(orders ?? []).map((s) =>

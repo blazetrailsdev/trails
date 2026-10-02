@@ -21,6 +21,15 @@ describe("WhereClause String predicates (trails)", () => {
     expect(node.expr).toBeInstanceOf(Nodes.SqlLiteral);
   });
 
+  it("inverts a SqlLiteral predicate as a String, into NOT of a new SqlLiteral", () => {
+    const literal = new Nodes.SqlLiteral("id = 1", { retryable: true });
+    const node = new WhereClause([literal]).invert().predicates[0] as Nodes.Not;
+    expect(node).toBeInstanceOf(Nodes.Not);
+    expect(node.expr).toBeInstanceOf(Nodes.SqlLiteral);
+    expect(node.expr).not.toBe(literal);
+    expect((node.expr as Nodes.SqlLiteral).retryable).toBe(false);
+  });
+
   it("compares a String predicate equal to a SqlLiteral carrying the same SQL", () => {
     const asString = new WhereClause(["id = 1"]);
     const asLiteral = new WhereClause([new Nodes.SqlLiteral("id = 1")]);

@@ -4,7 +4,7 @@ import { rtest } from "@blazetrails/ruby-compat";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type * as Arel from "@blazetrails/arel";
-import { type Nodes, Visitors, Collectors } from "@blazetrails/arel";
+import { type Nodes, type ArelNode, Visitors, Collectors } from "@blazetrails/arel";
 import {
   ReadOnlyError,
   ActiveRecordError,
@@ -1913,8 +1913,8 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   async columnForAttribute(attribute: {
-    relation: { name: string | Nodes.Node };
-    name: string | Nodes.Node | null;
+    relation: { name: string | ArelNode };
+    name: string | ArelNode | null;
   }): Promise<import("./column.js").Column | undefined> {
     const tableName = String(attribute.relation.name);
     const hash = await this.schemaCache.columnsHash(tableName);

@@ -13,7 +13,7 @@ import {
   runLoadHooks,
   singularize,
 } from "@blazetrails/activesupport";
-import { Nodes, Visitors } from "@blazetrails/arel";
+import { Nodes, Visitors, type ArelNode } from "@blazetrails/arel";
 import { rtest } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
 import * as Type from "../type.js";
@@ -2146,7 +2146,7 @@ export interface PostgreSQLAdapter {
 
   currentSchema(): Promise<string>;
 
-  columnsForDistinct(columns: string | string[], orders?: (string | Nodes.Node)[]): string;
+  columnsForDistinct(columns: string | string[], orders?: (string | ArelNode)[]): string;
 
   indexes(tableName: string): Promise<IndexDefinition[]>;
 

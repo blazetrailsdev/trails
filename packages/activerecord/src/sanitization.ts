@@ -1,4 +1,4 @@
-import { Nodes, sql as arelSql } from "@blazetrails/arel";
+import { Nodes, sql as arelSql, type ArelNode } from "@blazetrails/arel";
 import { actsLike, isBlank } from "@blazetrails/activesupport";
 import { format, rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
@@ -13,7 +13,7 @@ export type Quoter = Pick<
 
 export function disallowRawSqlBang(
   this: { adapterClass(): unknown },
-  args: (string | symbol | Nodes.Node)[],
+  args: (string | symbol | ArelNode)[],
   { permit }: { permit?: RegExp } = {},
 ): void {
   const columnMatcher =
@@ -104,11 +104,11 @@ export function sanitizeSqlForAssignment(
 export function sanitizeSqlForOrder(
   this: QuoterHost & {
     adapterClass(): unknown;
-    disallowRawSqlBang(args: (string | symbol | Nodes.Node)[], options?: { permit?: RegExp }): void;
+    disallowRawSqlBang(args: (string | symbol | ArelNode)[], options?: { permit?: RegExp }): void;
     sanitizeSqlArray(ary: [string, ...unknown[]]): string;
   },
-  condition: string | [string | Nodes.Node, ...unknown[]] | Nodes.Node,
-): string | Nodes.Node | [string | Nodes.Node, ...unknown[]] {
+  condition: string | [string | ArelNode, ...unknown[]] | Nodes.Node,
+): string | ArelNode | [string | ArelNode, ...unknown[]] {
   if (condition instanceof Nodes.Node) return condition;
   if (Array.isArray(condition)) {
     const first: unknown = condition[0];
@@ -117,7 +117,7 @@ export function sanitizeSqlForOrder(
       const adapterClass = this.adapterClass() as {
         columnNameWithOrderMatcher(): RegExp;
       };
-      this.disallowRawSqlBang([first as string | symbol | Nodes.Node], {
+      this.disallowRawSqlBang([first as string | symbol | ArelNode], {
         permit: adapterClass.columnNameWithOrderMatcher(),
       });
       const sanitized = this.sanitizeSqlArray([firstText, ...condition.slice(1)]);

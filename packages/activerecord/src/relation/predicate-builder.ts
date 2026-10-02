@@ -46,7 +46,10 @@ export class PredicateBuilder {
     this.registerHandler(Set, new ArrayHandler(this));
   }
 
-  buildFromHash(attributes: Attributes, block?: (tableName: string) => unknown): Nodes.Node[] {
+  buildFromHash(
+    attributes: Attributes,
+    block?: (tableName: string) => unknown,
+  ): (Nodes.Node | Nodes.SqlLiteral)[] {
     attributes = this.convertDotNotationToHash(attributes);
     return this.expandFromHash(attributes, block);
   }
@@ -54,7 +57,7 @@ export class PredicateBuilder {
   protected expandFromHash(
     attributes: Attributes,
     block?: (tableName: string) => unknown,
-  ): Nodes.Node[] {
+  ): (Nodes.Node | Nodes.SqlLiteral)[] {
     if (entriesOf(attributes).length === 0) return [sql("1=0")];
 
     return entriesOf(attributes).flatMap(([key, value]) => {
@@ -130,11 +133,17 @@ export class PredicateBuilder {
   }
 
   /** @internal */
-  private groupingQueries(queries: Nodes.Node[][]): Nodes.Node[];
-  private groupingQueries(queries: Nodes.Node[][] | Nodes.Node[] | Nodes.Or): Nodes.Node[] {
-    queries = queries as Nodes.Node[][];
+  private groupingQueries(
+    queries: (Nodes.Node | Nodes.SqlLiteral)[][],
+  ): (Nodes.Node | Nodes.SqlLiteral)[];
+  private groupingQueries(
+    queries: (Nodes.Node | Nodes.SqlLiteral)[][] | (Nodes.Node | Nodes.SqlLiteral)[] | Nodes.Or,
+  ): (Nodes.Node | Nodes.SqlLiteral)[] {
+    queries = queries as (Nodes.Node | Nodes.SqlLiteral)[][];
     if (queries.length === 1) return queries[0];
-    queries = queries.map((query) => query.reduce((left, right) => left.and(right)));
+    queries = queries.map((query) =>
+      query.reduce((left, right) => (left as Nodes.Node).and(right)),
+    );
     queries = new Nodes.Or(queries);
     return [new Nodes.Grouping(queries)];
   }

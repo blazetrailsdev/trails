@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { sql as arelSql } from "@blazetrails/arel";
+import { sql as arelSql, Visitors } from "@blazetrails/arel";
+import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
 import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Rollback, StatementInvalid } from "../../errors.js";
@@ -607,7 +608,7 @@ describe("DatabaseStatements", () => {
 
     it("high precision current timestamp returns Arel SQL literal", () => {
       const result = highPrecisionCurrentTimestamp();
-      expect(result.toSql()).toBe("CURRENT_TIMESTAMP");
+      expect(new Visitors.ToSql(testConnection).compile(result)).toBe("CURRENT_TIMESTAMP");
     });
   });
 });
@@ -927,7 +928,7 @@ describe("extractTableRefFromInsertSql", () => {
 describe("defaultInsertValue", () => {
   it("returns DEFAULT SQL literal", () => {
     const result = defaultInsertValue(null);
-    expect(result.toSql()).toBe("DEFAULT");
+    expect(new Visitors.ToSql(testConnection).compile(result)).toBe("DEFAULT");
   });
 });
 

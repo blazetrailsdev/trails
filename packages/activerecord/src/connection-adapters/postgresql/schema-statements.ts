@@ -1,6 +1,6 @@
 import { isSymbol, symbolToS, rbInspect } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Nodes } from "@blazetrails/arel";
+import { type ArelNode } from "@blazetrails/arel";
 import { compactBlank, first, singularize, symbolizeKeys, wrap } from "@blazetrails/activesupport";
 import { OpenSSL, stringDelete, valuesAt } from "@blazetrails/ruby-compat";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
@@ -447,10 +447,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return valuesAt(map, ...columnNumbers).filter((name): name is string => name != null);
   }
 
-  override columnsForDistinct(
-    columns: string | string[],
-    orders?: (string | Nodes.Node)[],
-  ): string {
+  override columnsForDistinct(columns: string | string[], orders?: (string | ArelNode)[]): string {
     const visitor = this.visitor;
     const orderColumns = compactBlank(
       compactBlank(orders ?? []).map((s) => {

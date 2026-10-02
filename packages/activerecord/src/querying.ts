@@ -255,7 +255,7 @@ export function _loadFromSql<T extends typeof Base>(
 
 export function from<T extends typeof Base>(
   this: T,
-  source: string | Relation<any, boolean> | import("@blazetrails/arel").Nodes.Node,
+  source: string | Relation<any, boolean> | import("@blazetrails/arel").ArelNode,
   subqueryName?: string,
 ): Relation<InstanceType<T>> {
   return this.all().from(source, subqueryName);
@@ -263,7 +263,7 @@ export function from<T extends typeof Base>(
 
 export function select<T extends typeof Base>(
   this: T,
-  ...columns: (string | import("@blazetrails/arel").Nodes.Node | Record<string, unknown>)[]
+  ...columns: (string | import("@blazetrails/arel").ArelNode | Record<string, unknown>)[]
 ): Relation<InstanceType<T>> {
   return this.all().select(...columns);
 }
@@ -277,7 +277,7 @@ export function order<T extends typeof Base>(
 
 export function group<T extends typeof Base>(
   this: T,
-  ...columns: (string | import("@blazetrails/arel").Nodes.Node)[]
+  ...columns: (string | import("@blazetrails/arel").ArelNode)[]
 ): Relation<InstanceType<T>, true> {
   return this.all().group(...columns);
 }
@@ -548,11 +548,11 @@ export function sum<T extends typeof Base>(
 ): Promise<number | bigint>;
 export function sum<T extends typeof Base>(
   this: T,
-  column?: string | import("@blazetrails/arel").Nodes.Node | number,
+  column?: string | import("@blazetrails/arel").ArelNode | number,
 ): Promise<number | bigint | Map<unknown, number | bigint>>;
 export function sum<T extends typeof Base>(
   this: T,
-  column?: string | import("@blazetrails/arel").Nodes.Node | number | SumBlock,
+  column?: string | import("@blazetrails/arel").ArelNode | number | SumBlock,
   block?: SumBlock,
 ): Promise<number | bigint | Map<unknown, number | bigint>> {
   const rel = this.all() as ReturnType<T["all"]>;
@@ -863,11 +863,15 @@ export function having<T extends typeof Base>(
 ): Relation<InstanceType<T>>;
 export function having<T extends typeof Base>(
   this: T,
-  condition: import("@blazetrails/arel").Nodes.Node,
+  condition: import("@blazetrails/arel").Nodes.Node | import("@blazetrails/arel").Nodes.SqlLiteral,
 ): Relation<InstanceType<T>>;
 export function having<T extends typeof Base>(
   this: T,
-  condition: string | Record<string, unknown> | import("@blazetrails/arel").Nodes.Node,
+  condition:
+    | string
+    | Record<string, unknown>
+    | import("@blazetrails/arel").Nodes.Node
+    | import("@blazetrails/arel").Nodes.SqlLiteral,
   ...binds: unknown[]
 ): Relation<InstanceType<T>> {
   if (typeof condition === "string") return this.all().having(condition, ...binds);
@@ -932,7 +936,7 @@ export function and<T extends typeof Base>(
 
 export function inOrderOf<T extends typeof Base>(
   this: T,
-  column: string | import("@blazetrails/arel").Nodes.Node,
+  column: string | import("@blazetrails/arel").ArelNode,
   values: unknown[],
   filter?: boolean,
 ): Relation<InstanceType<T>> {
@@ -1012,21 +1016,21 @@ export function asyncCount<T extends typeof Base>(
 
 export function asyncAverage<T extends typeof Base>(
   this: T,
-  column: string | import("@blazetrails/arel").Nodes.Node,
+  column: string | import("@blazetrails/arel").ArelNode,
 ): ReturnType<Relation<InstanceType<T>>["asyncAverage"]> {
   return this.all().asyncAverage(column);
 }
 
 export function asyncMinimum<T extends typeof Base>(
   this: T,
-  column: string | import("@blazetrails/arel").Nodes.Node,
+  column: string | import("@blazetrails/arel").ArelNode,
 ): ReturnType<Relation<InstanceType<T>>["asyncMinimum"]> {
   return this.all().asyncMinimum(column);
 }
 
 export function asyncMaximum<T extends typeof Base>(
   this: T,
-  column: string | import("@blazetrails/arel").Nodes.Node,
+  column: string | import("@blazetrails/arel").ArelNode,
 ): ReturnType<Relation<InstanceType<T>>["asyncMaximum"]> {
   return this.all().asyncMaximum(column);
 }

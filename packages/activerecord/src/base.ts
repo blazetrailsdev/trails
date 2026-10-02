@@ -708,7 +708,7 @@ export class Base extends Model {
     return ModelSchema.buildPkWhere.call(this, idValue);
   }
 
-  static _buildPkWhereNode(idValue: unknown): InstanceType<typeof Nodes.Node> {
+  static _buildPkWhereNode(idValue: unknown): Nodes.Node | Nodes.SqlLiteral {
     return ModelSchema.buildPkWhereNode.call(this, idValue);
   }
 
@@ -1251,7 +1251,10 @@ export class Base extends Model {
     ...binds: unknown[]
   ): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(this: T, conditions: unknown[]): Relation<InstanceType<T>>;
-  static where<T extends typeof Base>(this: T, node: Nodes.Node): Relation<InstanceType<T>>;
+  static where<T extends typeof Base>(
+    this: T,
+    node: Nodes.Node | Nodes.SqlLiteral,
+  ): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(
     this: T,
     conditionsOrSql?:
@@ -1260,7 +1263,8 @@ export class Base extends Model {
       | string
       | string[]
       | unknown[]
-      | Nodes.Node,
+      | Nodes.Node
+      | Nodes.SqlLiteral,
     ...rest: unknown[]
   ): Relation<InstanceType<T>> | WhereChain<Relation<InstanceType<T>>> {
     if (conditionsOrSql === undefined) {
