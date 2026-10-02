@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Types, defaultValue } from "../index.js";
+import * as Types from "../index.js";
+import { defaultValue } from "../index.js";
 import { rbObjDup } from "@blazetrails/ruby-compat";
 import { TypeRegistry } from "./registry.js";
 

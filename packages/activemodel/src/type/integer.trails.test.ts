@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { dump, unsafeLoad } from "@blazetrails/activesupport/yaml";
-import { Types } from "../index.js";
+import * as Types from "../index.js";
 
 const type = new Types.IntegerType();
 

@@ -1,50 +1,83 @@
-export interface SerializeCastValue {
-  itselfIfSerializeCastValueCompatible(): unknown;
+import { extend, include, included, initialize, Module } from "@blazetrails/activesupport";
+import { NameError, rbModPublicMethodDefined, rbModToS } from "@blazetrails/ruby-compat";
+
+interface SerializeCastValueHost {
+  constructor: { serializeCastValueCompatible(): boolean };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
-export namespace SerializeCastValue {
-  export interface ClassMethods {
-    serializeCastValueCompatible(): boolean;
-  }
+export const ClassMethods = {
+  serializeCastValueCompatible(this: {
+    prototype: object;
+    _serializeCastValueCompatible?: boolean;
+  }): boolean {
+    if (Object.hasOwn(this, "_serializeCastValueCompatible")) {
+      return this._serializeCastValueCompatible as boolean;
+    }
+    const ancestors: object[] = [];
+    for (
+      let proto: object | null = this.prototype;
+      proto && proto !== Object.prototype;
+      proto = Object.getPrototypeOf(proto)
+    ) {
+      ancestors.push(proto);
+    }
+    const instanceMethod = (name: string): { owner: object } => {
+      const owner = ancestors.find((proto) => Object.prototype.hasOwnProperty.call(proto, name));
+      if (owner === undefined) {
+        throw new NameError(
+          `undefined method '${name}' for class '${rbModToS(this as unknown as new () => unknown)}'`,
+          name,
+        );
+      }
+      return { owner };
+    };
+    return (this._serializeCastValueCompatible =
+      ancestors.indexOf(instanceMethod("serializeCastValue").owner) <=
+      ancestors.indexOf(instanceMethod("serialize").owner));
+  },
+};
 
-  export interface DefaultImplementation {
-    serializeCastValue(value: unknown): unknown;
-  }
-
-  export function serializeCastValue(value: unknown): unknown {
+export const DefaultImplementation = {
+  serializeCastValue(value: unknown): unknown {
     return value;
+  },
+};
+
+const defaultImplementation = new Module().include(DefaultImplementation);
+
+export class SerializeCastValue {
+  static [included](klass: { prototype: object }): void {
+    extend(klass, ClassMethods);
+    if (!rbModPublicMethodDefined(klass, "serializeCastValue")) {
+      include(klass, defaultImplementation);
+    }
   }
 
-  export function serialize(
-    type: {
-      serializeCastValue(value: unknown): unknown;
-      serialize(value: unknown): unknown;
-    } & CompatibleType<unknown>,
+  static serialize(
+    type: { serializeCastValue(value: unknown): unknown; serialize(value: unknown): unknown },
     value: unknown,
   ): unknown {
-    return itselfIfSerializeCastValueCompatible(type) === type
-      ? type.serializeCastValue(value)
-      : type.serialize(value);
+    let compatible: unknown;
+    try {
+      compatible = (
+        type as unknown as { itselfIfSerializeCastValueCompatible(): unknown }
+      ).itselfIfSerializeCastValueCompatible();
+    } catch {
+      compatible = null;
+    }
+    if (type === compatible) {
+      return type.serializeCastValue(value);
+    } else {
+      return type.serialize(value);
+    }
   }
-}
 
-type CompatibleType<T> = {
-  itselfIfSerializeCastValueCompatible?: () => T | null;
-};
+  itselfIfSerializeCastValueCompatible<T extends SerializeCastValueHost>(this: T): T | null {
+    if (this.constructor.serializeCastValueCompatible()) return this;
+    return null;
+  }
 
-type CompatibleCtor = {
-  serializeCastValueCompatible?: () => boolean;
-};
-
-export function itselfIfSerializeCastValueCompatible<T>(type: CompatibleType<T>): T | null {
-  return typeof type.itselfIfSerializeCastValueCompatible === "function"
-    ? type.itselfIfSerializeCastValueCompatible()
-    : null;
-}
-
-export function serializeCastValueCompatible(typeCtor: CompatibleCtor): boolean {
-  return typeof typeCtor.serializeCastValueCompatible === "function"
-    ? typeCtor.serializeCastValueCompatible()
-    : false;
+  static [initialize](this: SerializeCastValueHost): void {
+    this.constructor.serializeCastValueCompatible();
+  }
 }

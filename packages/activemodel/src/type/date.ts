@@ -27,8 +27,7 @@ export type { DateInfinityType, DateNegativeInfinityType };
 export type DateCastResult = Temporal.PlainDate | DateInfinityType | DateNegativeInfinityType;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (date.rb:27-28); the class/interface merge is how `include()` surfaces on the type side.
-export interface DateType
-  extends Timezone, Omit<InstanceMethods<DateCastResult>, "valueFromMultiparameterAssignment"> {}
+export interface DateType extends Timezone, InstanceMethods<DateCastResult> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DateType extends ValueType<DateCastResult> {

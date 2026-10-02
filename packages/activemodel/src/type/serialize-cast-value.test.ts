@@ -1,17 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { ValueType } from "./value.js";
-import { SerializeCastValue } from "./serialize-cast-value.js";
+import { extend, include, Module } from "@blazetrails/activesupport";
+import { prepend } from "@blazetrails/ruby-compat/include";
+import { ClassMethods, SerializeCastValue } from "./serialize-cast-value.js";
 
-function includeSerializeCastValue(klass: { prototype: object }): void {
-  const proto = klass.prototype as Record<string, unknown>;
-  if (!("serializeCastValue" in proto)) {
-    proto.serializeCastValue = SerializeCastValue.serializeCastValue;
-  }
-  proto.itselfIfSerializeCastValueCompatible =
-    ValueType.prototype.itselfIfSerializeCastValueCompatible;
-  (klass as unknown as Record<string, unknown>).serializeCastValueCompatible =
-    ValueType.serializeCastValueCompatible;
-}
+type Serializer = (value: unknown) => string;
 
 function DelegateClass(protoToForward: object): {
   new (delegated: object): { __getobj__: object };
@@ -44,20 +36,27 @@ describe("SerializeCastValueTest", () => {
     }
   }
 
-  class IncludesModule extends DoesNotIncludeModule {
-    serializeCastValue(value: unknown): string {
-      return `serialize_cast_value(${SerializeCastValue.serializeCastValue(value)})`;
-    }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include SerializeCastValue`; the class/interface merge is how `include()` surfaces on the type side.
+  interface IncludesModule {
+    serializeCastValue(value: unknown): string;
+  }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+  class IncludesModule extends DoesNotIncludeModule {
     static {
-      includeSerializeCastValue(this);
+      include(this, SerializeCastValue);
+
+      const zuper = Object.getPrototypeOf(this.prototype) as { serializeCastValue: Serializer };
+      this.prototype.serializeCastValue = function (value) {
+        return `serialize_cast_value(${zuper.serializeCastValue.call(this, value)})`;
+      };
     }
   }
 
   it("provides a default #serialize_cast_value implementation", () => {
     class type extends DoesNotIncludeModule {
       static {
-        includeSerializeCastValue(this);
+        include(this, SerializeCastValue);
       }
     }
     const serializeCastValue = (new type() as unknown as Record<string, (v: unknown) => unknown>)
@@ -97,20 +96,26 @@ describe("SerializeCastValueTest", () => {
   });
 
   it("uses #serialize when a subclass defines a newer #serialize implementation via a module", () => {
-    const mod = { serialize: DoesNotIncludeModule.prototype.serialize };
+    const mod = new Module();
+    mod.defineMethod("serialize", function (this: object, value: unknown) {
+      return mod.superMethod(this, "serialize")!(value);
+    });
     class subclass extends IncludesModule {
       static {
-        Object.assign(this.prototype, mod);
+        include(this, mod);
       }
     }
     assertSerializesUsing("serialize", new subclass());
   });
 
   it("uses #serialize_cast_value when a subclass defines a newer #serialize_cast_value implementation via a module", () => {
-    const mod = { serializeCastValue: IncludesModule.prototype.serializeCastValue };
+    const mod = new Module();
+    mod.defineMethod("serializeCastValue", function (this: object, value: unknown) {
+      return mod.superMethod(this, "serializeCastValue")!(value);
+    });
     class subclass extends IncludesModule {
       static {
-        Object.assign(this.prototype, mod);
+        include(this, mod);
       }
     }
     assertSerializesUsing("serialize_cast_value", new subclass());
@@ -123,14 +128,15 @@ describe("SerializeCastValueTest", () => {
 
   it("uses #serialize_cast_value when a delegate class prepends SerializeCastValue", () => {
     const delegateClass = DelegateClass(IncludesModule.prototype);
-    includeSerializeCastValue(delegateClass);
+    prepend(delegateClass, SerializeCastValue);
+    extend(delegateClass, ClassMethods);
     assertSerializesUsing("serialize_cast_value", new delegateClass(new IncludesModule()));
   });
 
   it("uses #serialize_cast_value when a delegate class subclass includes SerializeCastValue", () => {
     class delegateSubclass extends DelegateClass(IncludesModule.prototype) {
       static {
-        includeSerializeCastValue(this);
+        include(this, SerializeCastValue);
       }
     }
     assertSerializesUsing("serialize_cast_value", new delegateSubclass(new IncludesModule()));

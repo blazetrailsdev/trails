@@ -3,7 +3,7 @@ import { Temporal, Time as RubyTime, strftime } from "@blazetrails/date";
 import { TimeZone, setZoneDefault, assertNil } from "@blazetrails/activesupport";
 import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { Types } from "../index.js";
+import * as Types from "../index.js";
 
 describe("DateTimeTest", () => {
   const type = new Types.DateTimeType();

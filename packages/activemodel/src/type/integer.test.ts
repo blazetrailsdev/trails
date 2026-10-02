@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { minutes, hours, assertNil } from "@blazetrails/activesupport";
-import { Types } from "../index.js";
+import * as Types from "../index.js";
 import { IntegerType as Integer } from "./integer.js";
 import { RangeError } from "../errors.js";
 import { Range } from "@blazetrails/ruby-compat";

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { typeRegistry, Types } from "@blazetrails/activemodel";
+import * as Types from "@blazetrails/activemodel";
+import { typeRegistry } from "@blazetrails/activemodel";
 import { BigDecimal, TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Base } from "../index.js";

@@ -208,6 +208,10 @@ const AMBIENT_RAILTIE_MIXINS: Record<string, { includes: string[] }> = {
  *     `extend`s it answers `run_callbacks` / `set_callback` / `skip_callback` /
  *     `reset_callbacks`. `ActiveModel::Validations`' `included` block extends it
  *     (validations.rb:42), which is how `ActiveModel::Model` gets them.
+ *   - `ActiveModel::Type::SerializeCastValue.included(klass)` runs
+ *     `klass.include DefaultImplementation` unless the class already defines
+ *     `serialize_cast_value` (type/serialize_cast_value.rb:21-23), which is how
+ *     `Type::Value` (type/value.rb:10) answers it.
  */
 /**
  * Mixins every Ruby object answers because Active Support includes them into
@@ -219,9 +223,23 @@ const AMBIENT_RAILTIE_MIXINS: Record<string, { includes: string[] }> = {
  */
 const OBJECT_AMBIENT_MIXINS: readonly string[] = ["ActiveSupport::ToJsonWithActiveSupportEncoder"];
 
+/**
+ * Methods every Ruby object answers because Active Support defines them on
+ * `Object` itself. `Object#deep_dup` (`core_ext/object/deep_dup.rb:15-17`) is
+ * `duplicable? ? dup : self`, so `attributes.transform_values(&:deep_dup)`
+ * (`active_model/attribute_set.rb:72-74`) and `other.errors.deep_dup`
+ * (`active_model/errors.rb:139`) reach it on a class that defines none. trails'
+ * `deepDup(obj)` dispatches to a `deepDup()` the class carries, so that member
+ * is the port of `Object#deep_dup` and not surface moved from another class.
+ */
+const OBJECT_AMBIENT_METHODS: readonly string[] = ["deep_dup"];
+
 const HOOK_INJECTED_MIXINS: Record<string, { includes: string[] }> = {
   "ActiveModel::Callbacks": {
     includes: ["ActiveSupport::Callbacks"],
+  },
+  "ActiveModel::Type::SerializeCastValue": {
+    includes: ["ActiveModel::Type::SerializeCastValue::DefaultImplementation"],
   },
 };
 
@@ -277,6 +295,10 @@ const HOOK_INJECTED_MIXINS: Record<string, { includes: string[] }> = {
  * `def` on each of them and already resolves through the normal module walk,
  * spelled `compare` by MIRROR_CANDIDATE_OVERRIDES.
  *
+ * `Singleton` (stdlib `singleton.rb`) supplies `instance` to the including
+ * class: `ActiveModel::NullMutationTracker` (`attribute_mutation_tracker.rb:157`)
+ * and `Mime::AllType` / `Mime::NullType` (`http/mime_type.rb:349,370`).
+ *
  * Values are `Enumerable.instance_methods(false)` / `Comparable
  * .instance_methods(false)` (Ruby 3.4). An ActiveSupport core_ext reopening of
  * the same module (`index_by`, `compact_blank` in `core_ext/enumerable.rb`) is
@@ -285,6 +307,7 @@ const HOOK_INJECTED_MIXINS: Record<string, { includes: string[] }> = {
  */
 const CORE_MIXIN_METHODS: Record<string, string[]> = {
   Comparable: ["<", "<=", "==", ">", ">=", "between?", "clamp"],
+  Singleton: ["instance"],
   Enumerable: [
     "all?",
     "any?",
@@ -1455,6 +1478,11 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
  * which is also how the symbol import resolves at every site in the repo,
  * since the binding is imported under that bare name.
  *
+ * `[initialize]` is the third: a MODULE's `def initialize`, which joins the
+ * includer's constructor chain through `super`
+ * (`initializeIncludedModules`, `packages/ruby-compat/src/include.ts`). It is
+ * credited off the manifest, to a file whose module defines `initialize`.
+ *
  * The string-named `included` / `extended` / `inherited` methods are a
  * different thing and stay drift: `SKIP_GROUPS` in `scripts/parity/conventions.ts`
  * marks them `tsMirrorIsDrift`, and a bracketed name never collides with a
@@ -1463,6 +1491,7 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
 export const CONCERN_HOOK_MEMBERS = {
   included: "[included]",
   extended: "[extended]",
+  initialize: "[initialize]",
 } as const;
 
 /** `included do ... end` — activemodel/lib/active_model/api.rb:65. */
@@ -1490,6 +1519,15 @@ export function concernHookNames(rubySource: string): Set<string> {
   }
   if (SELF_EXTENDED_RE.test(rubySource)) names.add(CONCERN_HOOK_MEMBERS.extended);
   return names;
+}
+
+/** The `.rb` files in which a MODULE defines `initialize` (type/serialize_cast_value.rb:41-44). */
+export function moduleInitializeFiles(pkg: PackageInfo): Set<string> {
+  const files = new Set<string>();
+  for (const mod of Object.values(pkg.modules)) {
+    if (mod.file && mod.instanceMethods.some((m) => m.name === "initialize")) files.add(mod.file);
+  }
+  return files;
 }
 
 /** Key into the `concernHooks` map: one entry per (package, Ruby file). */
@@ -1523,6 +1561,7 @@ export async function loadConcernHooks(
     if (filterPkg !== null && pkg !== filterPkg) continue;
     const libDir = libPaths[pkg];
     if (libDir === undefined) continue;
+    const initializeFiles = moduleInitializeFiles(rubyPkg);
     for (const rubyFile of rubyFilesOf(rubyPkg)) {
       let source: string;
       try {
@@ -1531,6 +1570,7 @@ export async function loadConcernHooks(
         continue;
       }
       const names = concernHookNames(source);
+      if (initializeFiles.has(rubyFile)) names.add(CONCERN_HOOK_MEMBERS.initialize);
       if (names.size > 0) hooks.set(concernHookKey(pkg, rubyFile), names);
     }
   }
@@ -1777,6 +1817,7 @@ function collectAllowedNames(
       walkMixin(inc, fqn, target, methodFile);
 
     for (const inc of OBJECT_AMBIENT_MIXINS) walkMixin(inc, fqn, target);
+    for (const name of OBJECT_AMBIENT_METHODS) addRubyName(name, target);
 
     for (const name of PORTED_METHODS_FROM_UNPORTED_MIXINS[fqn] ?? []) addRubyName(name, target);
 
@@ -2043,6 +2084,7 @@ export function inlinedModuleMembers(
         if (m.file !== undefined && m.file !== mod.file) continue;
         const candidates = operatorSpelling(fqn, m.name) ?? rubyMethodCandidates(m.name);
         if (!candidates) continue;
+        if (m.name === "initialize" && moduleBodies?.has(CONCERN_HOOK_MEMBERS.initialize)) continue;
         const tsName = candidates.find((c) => hostBodies.has(c) && moduleBodies?.has(c) !== true);
         if (tsName === undefined) continue;
         const key = `${hostTs}#${tsName}`;

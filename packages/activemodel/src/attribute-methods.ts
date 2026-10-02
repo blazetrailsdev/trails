@@ -143,7 +143,7 @@ export interface InstanceHost {
   constructor: AttributeMethodHost;
 }
 
-export interface InstanceMethodsHost extends InstanceHost, Included<typeof InstanceMethods> {
+export interface InstanceMethodsHost extends InstanceHost, Included<typeof AttributeMethods> {
   constructor: ClassMethodsHost;
 }
 
@@ -469,7 +469,20 @@ export const ClassMethods = {
   },
 };
 
-export const InstanceMethods = {
+export const AttributeMethods = {
+  ClassMethods,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
+  [included](base: (new (...args: any[]) => any) & { prototype: object }): void {
+    extend(base, ClassMethods);
+
+    classAttribute.call(base, "attributeAliases", { instanceWriter: false, default: {} });
+    classAttribute.call(base, "attributeMethodPatterns", {
+      instanceWriter: false,
+      default: [new AttributeMethodPattern()],
+    });
+    prepend(base.prototype, { initInternals });
+  },
+
   methodMissing(this: InstanceMethodsHost, method: string, ...args: unknown[]): unknown {
     if (this.isRespondToWithoutAttributes(method, true)) {
       throw new NoMethodError(
@@ -546,23 +559,6 @@ export const InstanceMethods = {
       return this.methodMissing(attr);
     }
     return (this as unknown as Record<string, unknown>)[attr];
-  },
-};
-
-export const AttributeMethods = {
-  ClassMethods,
-  InstanceMethods,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
-  [included](base: (new (...args: any[]) => any) & { prototype: object }): void {
-    include(base, InstanceMethods);
-    extend(base, ClassMethods);
-
-    classAttribute.call(base, "attributeAliases", { instanceWriter: false, default: {} });
-    classAttribute.call(base, "attributeMethodPatterns", {
-      instanceWriter: false,
-      default: [new AttributeMethodPattern()],
-    });
-    prepend(base.prototype, { initInternals });
   },
 };
 

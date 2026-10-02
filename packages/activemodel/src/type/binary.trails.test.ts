@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Types, BinaryData } from "../index.js";
+import * as Types from "../index.js";
+import { BinaryData } from "../index.js";
 
 describe("BinaryTypeTrails", () => {
   it("serialize returns null for nil rather than wrapping it", () => {

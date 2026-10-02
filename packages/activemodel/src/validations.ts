@@ -18,7 +18,7 @@ import type { ValidatableRecord } from "./validator.js";
 import { I18n } from "./i18n.js";
 
 import { Naming } from "./naming.js";
-import { Translation, raiseOnMissingTranslations as translationRaise } from "./translation.js";
+import { Translation } from "./translation.js";
 import { HelperMethods } from "./validations/helper-methods.js";
 import {
   ClassMethods as WithClassMethods,
@@ -57,8 +57,6 @@ type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
 
 export class Validations {
   static [included](base: IncludingClass): void {
-    include(base, InstanceMethods);
-
     include(base, { validatesWith: withValidatesWith });
 
     extend(base, ClassMethods);
@@ -82,15 +80,12 @@ export class Validations {
   /** @internal */
   declare _errors?: Errors<this>;
 
+  /** @internal */
+  declare _contextForValidation?: ValidationContext;
+
   get errors(): Errors<this> {
     return (this._errors ??= new Errors(this));
   }
-
-  /** @internal */
-  declare contextForValidation: () => ValidationContext;
-  /** @internal */
-  declare runValidationsBang: () => Promise<boolean>;
-  declare raiseValidationError: () => never;
 
   async isValid(context?: string | string[] | ValidationContext | null): Promise<boolean> {
     const currentContext = this.validationContext;
@@ -107,6 +102,13 @@ export class Validations {
 
   declare validate: (context?: string | string[] | ValidationContext | null) => Promise<boolean>;
 
+  freeze(): this {
+    void this.errors;
+    void this.contextForValidation();
+    Object.freeze(this);
+    return this;
+  }
+
   async isInvalid(context?: string | string[] | ValidationContext | null): Promise<boolean> {
     return !(await this.isValid(context));
   }
@@ -116,6 +118,15 @@ export class Validations {
       this.raiseValidationError();
     }
     return true;
+  }
+
+  readAttributeForValidation(this: ReadAttributeForValidationHost, attribute: string): unknown {
+    if (!(attribute in this)) {
+      const klass = (this.constructor as { name?: string } | undefined)?.name ?? "object";
+      throw new NoMethodError(`undefined method '${attribute}' for an instance of ${klass}`);
+    }
+    const reader = this[attribute];
+    return typeof reader === "function" ? (reader as () => unknown).call(this) : reader;
   }
 
   get validationContext(): string | string[] | null {
@@ -135,6 +146,21 @@ export class Validations {
   /** @internal */
   async _runValidateCallbacks(): Promise<void> {
     await runCallbacks(this, "validate");
+  }
+
+  /** @internal */
+  contextForValidation(): ValidationContext {
+    return (this._contextForValidation ??= new ValidationContext());
+  }
+
+  /** @internal */
+  async runValidationsBang(): Promise<boolean> {
+    await this._runValidateCallbacks();
+    return this.errors.isEmpty();
+  }
+
+  raiseValidationError(): never {
+    throw new ValidationError(this);
   }
 }
 
@@ -313,28 +339,7 @@ export class ValidationError<TModel extends ModelWithErrors = ModelWithErrors>
 }
 
 export class ValidationContext {
-  private _context: string | string[] | null;
-
-  constructor(context: string | string[] | null = null) {
-    this._context = context;
-  }
-
-  get context(): string | string[] | null {
-    return this._context;
-  }
-
-  set context(value: string | string[] | null) {
-    this._context = value;
-  }
-
-  get name(): string {
-    const c = this._context;
-    return Array.isArray(c) ? (c[0] ?? "") : (c ?? "");
-  }
-
-  toString(): string {
-    return this.name;
-  }
+  context: string | string[] | null = null;
 }
 
 /** @internal */
@@ -352,62 +357,10 @@ export function initializeDup<TBase extends object>(
   super_(other);
 }
 
-interface ValidationsFreezeHost {
-  readonly errors: unknown;
-  /** @internal */
-  contextForValidation(): unknown;
-}
-
 export const VALID_OPTIONS_FOR_VALIDATE = ["on", "if", "unless", "prepend", "exceptOn"] as const;
 
 export interface ValidationsContextHost {
   readonly validationContext: string | string[] | null;
-}
-
-export const InstanceMethods = {
-  freeze<T extends ValidationsFreezeHost>(this: T): T {
-    void this.errors;
-    void this.contextForValidation();
-    Object.freeze(this);
-    return this;
-  },
-
-  readAttributeForValidation(this: ReadAttributeForValidationHost, attribute: string): unknown {
-    if (!(attribute in this)) {
-      const klass = (this.constructor as { name?: string } | undefined)?.name ?? "object";
-      throw new NoMethodError(`undefined method '${attribute}' for an instance of ${klass}`);
-    }
-    const reader = this[attribute];
-    return typeof reader === "function" ? (reader as () => unknown).call(this) : reader;
-  },
-
-  /** @internal */
-  contextForValidation(this: ContextForValidationHost): ValidationContext {
-    if (this._contextForValidation) return this._contextForValidation;
-    const vc = new ValidationContext();
-    this._contextForValidation = vc;
-    return vc;
-  },
-
-  /** @internal */
-  async runValidationsBang(this: RunValidationsHost): Promise<boolean> {
-    await this._runValidateCallbacks();
-    return this.errors.isEmpty();
-  },
-
-  raiseValidationError<TBase extends object = object>(this: { errors: Errors<TBase> }): never {
-    throw new ValidationError(this);
-  },
-};
-
-export interface ContextForValidationHost {
-  _validationContext: string | string[] | null;
-  _contextForValidation?: ValidationContext;
-}
-
-export interface RunValidationsHost<TBase extends object = object> {
-  errors: Errors<TBase>;
-  _runValidateCallbacks(): void | Promise<void>;
 }
 
 export interface ReadAttributeForValidationHost {
@@ -421,10 +374,6 @@ export function initInternals<TBase extends object>(
 ): void {
   super_();
   this._contextForValidation = undefined;
-}
-
-export function raiseOnMissingTranslations(value?: boolean): boolean {
-  return translationRaise(value);
 }
 
 export type ConditionFn = ((record: ValidatableRecord) => boolean) | string;

@@ -35,6 +35,7 @@ export class BinaryType extends ValueType<unknown> {
 }
 
 export class Data {
+  /** @noRailsEquivalent PERMANENT */
   readonly bytes: Uint8Array;
 
   constructor(value: unknown) {

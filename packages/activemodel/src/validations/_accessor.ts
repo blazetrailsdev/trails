@@ -6,6 +6,7 @@ export interface InheritedAccessor {
   setter?: (this: object, value: unknown) => void;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function inspectAccessor(prototype: object, name: string): InheritedAccessor {
   let proto: object | null = prototype;
   while (proto && proto !== Object.prototype) {

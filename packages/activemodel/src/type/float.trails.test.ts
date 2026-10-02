@@ -6,7 +6,8 @@ import { include } from "@blazetrails/activesupport";
 import { Dirty } from "../dirty.js";
 import { describe, it, expect } from "vitest";
 import { cmp, rbEql, rbEqual, rbObjAsString, rbObjClass } from "@blazetrails/ruby-compat";
-import { Model, Types } from "../index.js";
+import * as Types from "../index.js";
+import { Model } from "../index.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
 
 describe("FloatType (trails)", () => {

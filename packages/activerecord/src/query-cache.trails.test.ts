@@ -5,7 +5,8 @@ import { Base } from "./base.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Result } from "./result.js";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
-import { Attribute, Types } from "@blazetrails/activemodel";
+import * as Types from "@blazetrails/activemodel";
+import { Attribute } from "@blazetrails/activemodel";
 import { Store } from "./connection-adapters/abstract/query-cache.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 

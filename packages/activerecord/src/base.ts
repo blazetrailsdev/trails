@@ -117,7 +117,7 @@ import {
   type PermittedAttributes,
   assertAssignedSynchronously,
   type DirtyOptions,
-  dirtyInitAttributes,
+  initAttributes as dirtyInitAttributes,
 } from "@blazetrails/activemodel";
 import * as Inheritance from "./inheritance.js";
 import * as SignedId from "./signed-id.js";
@@ -1954,6 +1954,7 @@ export class Base extends Model {
   declare hasAttribute: (attrName: string) => boolean;
   declare attributePresent: (attrName: string) => boolean;
   declare readAttributeBeforeTypeCast: (attrName: string) => unknown;
+  declare attributes: Record<string, unknown>;
   declare attributesBeforeTypeCast: () => Record<string, unknown>;
   declare typeForAttribute: (name: string, block?: () => ValueType) => ValueType | null;
   declare columnForAttribute: (name: string) => any;
