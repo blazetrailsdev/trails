@@ -6,6 +6,7 @@ import {
   rbObjClone,
   rbModConstSet,
   rbObjRespondTo,
+  rtest,
 } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "../nodes/node.js";
@@ -720,7 +721,7 @@ export class ToSql extends Visitor {
   private visitArelNodesEquality(o: Nodes.Equality, collector: SQLString): SQLString {
     const right = o.right;
 
-    if (this.isUnboundable(right) !== false) return collector.append("1=0");
+    if (rtest(this.isUnboundable(right))) return collector.append("1=0");
 
     this.visit(o.left, collector);
 
@@ -761,7 +762,7 @@ export class ToSql extends Visitor {
   private visitArelNodesNotEqual(o: Nodes.NotEqual, collector: SQLString): SQLString {
     const right = o.right;
 
-    if (this.isUnboundable(right) !== false) return collector.append("1=1");
+    if (rtest(this.isUnboundable(right))) return collector.append("1=1");
 
     this.visit(o.left, collector);
 

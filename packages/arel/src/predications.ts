@@ -18,7 +18,7 @@ import type { Case } from "./nodes/case.js";
 import type { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
 import { Nodes } from "./namespaces.js";
 import { rbEqual } from "@blazetrails/activesupport";
-import { NoMethodError, rbObjClass, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbObjClass, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
 
 function isSelectManagerLike(value: unknown): value is { ast: Node } {
   return (
@@ -481,6 +481,6 @@ export const Predications: PredicationsModule = {
       value === undefined ||
       (typeof (value as { isNil?: () => boolean }).isNil === "function" &&
         (value as { isNil: () => boolean }).isNil());
-    return isNil || this.isInfinity(value) !== 0 || this.isUnboundable(value) !== false;
+    return isNil || this.isInfinity(value) !== 0 || rtest(this.isUnboundable(value));
   },
 };

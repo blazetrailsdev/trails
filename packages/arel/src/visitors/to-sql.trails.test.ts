@@ -1224,6 +1224,11 @@ describe("the to_sql visitor", () => {
         expect(compile(id.notEq(unbounded(1)))).toBe("1=1");
         expect(compile(id.notEq(unbounded(-1)))).toBe("1=1");
       });
+      it("Equality / NotEqual treat a nil unboundable? answer as bindable", () => {
+        const answersNil = new Nodes.BindParam({ isUnboundable: () => undefined });
+        expect(compile(id.eq(answersNil))).toBe('"users"."id" = ?');
+        expect(compile(id.notEq(answersNil))).toBe('"users"."id" != ?');
+      });
       it("GreaterThan +1 → 1=0; -1 → 1=1", () => {
         expect(compile(id.gt(unbounded(1)))).toBe("1=0");
         expect(compile(id.gt(unbounded(-1)))).toBe("1=1");

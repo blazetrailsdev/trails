@@ -117,6 +117,11 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
     expect(isOpenEnded("x")).toBe(false);
   });
 
+  it("isOpenEnded is false for a nil unboundable? answer", () => {
+    expect(isOpenEnded({ isUnboundable: () => undefined })).toBe(false);
+    expect(isOpenEnded({ isUnboundable: () => null })).toBe(false);
+  });
+
   it("isOpenEnded dispatches infinity?/unboundable? through `this` so host overrides win", () => {
     const overridden = { ...host, isInfinity: () => 1 as const };
     expect(Predications.isOpenEnded.call(overridden, 42)).toBe(true);
