@@ -1188,6 +1188,13 @@ export const SAME_FILE_CLOSURE_DEPTH = 3;
 const SYNTHETIC_CALL_NAMES: ReadonlySet<string> = new Set(["constructor"]);
 
 /**
+ * The extractor's name for `static [initialize]`: a computed member is recorded
+ * by its source text. `CONCERN_HOOK_MEMBERS.initialize` in extra-surface.ts is
+ * the same spelling.
+ */
+const MODULE_INITIALIZE_HOOK = "[initialize]";
+
+/**
  * {@link rubyCallToTs} for one body's call, given the receiver kinds its sites
  * had. In a file defining an instance `def new`, a `recv.new(...)` whose
  * receivers are never a constant may be that method — `@scope.new(...)`
@@ -5269,11 +5276,22 @@ export function main() {
       ] of seen) {
         // Null once the sibling set is known (`new` beside `initialize`), so it
         // is dropped the way `seen`'s own no-candidate gate drops one.
-        const tsCandidates =
+        const mirrorCandidates =
           tsMirrorNames === undefined
             ? rubyMethodToTsForFqn(rubyModule, rubyName, siblingRubyNames, pkg)
             : scopedSkipMirrorCandidates(tsMirrorNames, tsMethods);
-        if (tsCandidates === null) continue;
+        if (mirrorCandidates === null) continue;
+        // A MODULE's `def initialize` (`type/serialize_cast_value.rb:41`) has no
+        // constructor to be: it is ported as the symbol-keyed `[initialize]`
+        // hook `initializeIncludedModules` runs where the includer calls
+        // `super`. Without it the includer's own constructor answers for the
+        // module's, and reports as a method to move out of its Rails file.
+        const tsCandidates =
+          rubyName === "initialize" &&
+          Object.hasOwn(rubyPkg.modules, rubyModule) &&
+          tsMethods.has(MODULE_INITIALIZE_HOOK)
+            ? [MODULE_INITIALIZE_HOOK, ...mirrorCandidates]
+            : mirrorCandidates;
         const notePredicateKind = (tsFile: string, tsName: string) => {
           const admits = tsAdmitsBooleanByFileName.get(tsFile)?.get(tsName);
           if (predicateKindMismatch(rubyName, tsName, admits)) {
@@ -5441,12 +5459,46 @@ export function main() {
             false,
             level,
           );
+          // The includer's own declaration of the name (`declare static
+          // modelName` on `Model`, a signature on `interface API`) is the
+          // type-level cost of `include`, not the port: when a body sits in
+          // the file mirroring the `.rb` that defines the method
+          // (`naming.rb:270` in naming.ts), the member is where Rails put it.
+          // The credit above is unchanged; the move names the defining file so
+          // the relocation plan leaves it out.
+          const credited =
+            mixinMethodCreditedToOwnFile(
+              { rubyName, rubyModule, mixinFile },
+              rubyFile,
+              pkg,
+              (f) => byFile.has(f),
+              tsMethodsByFile,
+            ) ??
+            reopeningMethodCreditedToOwnFile(
+              { rubyName, rubyModule, definedInFile },
+              rubyFile,
+              pkg,
+              tsMethodsByFile,
+            );
+          const definedIn =
+            credited !== null &&
+            !declarationOnlyInFile(
+              credited.tsFile,
+              credited.tsName,
+              tsBodylessOwnersByFileName,
+              tsBodiedOwnersByFileName,
+              notes,
+              tsAliasNamesByFileName,
+            )
+              ? credited
+              : null;
           moves.push({
             tsName: matchedCandidate!,
             rubyName,
             rubyModule,
             expectedFile: expectedTs,
-            actualFile: foundViaInclude,
+            actualFile: definedIn?.tsFile ?? foundViaInclude,
+            ...(definedIn ? { inDefiningFile: true as const } : {}),
           });
           continue;
         }
@@ -5500,6 +5552,7 @@ export function main() {
             rubyModule,
             expectedFile: expectedTs,
             actualFile: creditedToReopening.tsFile,
+            inDefiningFile: true,
           });
           continue;
         }
