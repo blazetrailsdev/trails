@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { include } from "@blazetrails/ruby-compat";
 import { RouteSet, StaticDispatcher, type DrawCallback } from "./route-set.js";
+import type { RoutesProxyInstance } from "./routes-proxy.js";
+import { Parameters } from "../../action-controller/metal/strong-parameters.js";
 import { Constraints } from "./mapper.js";
 import { X_CASCADE } from "../constants.js";
 import type { Request } from "../http/request.js";
@@ -253,5 +255,48 @@ describe("ActionDispatch::Routing::RouteSet#generate_url_helpers", () => {
     }
     include(Host, new RouteSet().urlHelpers());
     expect(Host.defaultUrlOptions).toEqual({});
+  });
+});
+
+describe("ActionDispatch::Routing::RouteSet#define_mounted_helper", () => {
+  it("defines the helper under its camelCase name, once", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.get("/posts", { to: "posts#index", as: "posts" });
+    });
+    routes.defineMountedHelper("trails_test_app");
+    const mod = routes.mountedHelpers();
+    expect(mod.isMethodDefined("trailsTestApp")).toBe(true);
+    expect(mod.isMethodDefined("_trailsTestApp")).toBe(true);
+    expect(mod.isMethodDefined("trails_test_app")).toBe(false);
+
+    const other = new RouteSet();
+    other.defineMountedHelper("trailsTestApp");
+    class Host {}
+    include(Host, mod);
+    const host = new Host() as { trailsTestApp: RoutesProxyInstance };
+    expect(host.trailsTestApp.routes).toBe(routes);
+    expect(host.trailsTestApp.postsPath()).toBe("/posts");
+  });
+
+  it("reaches a class that included MountedHelpers before the helper was defined", () => {
+    const routes = new RouteSet();
+    class Host {}
+    include(Host, routes.mountedHelpers());
+    routes.defineMountedHelper("trails_late_app");
+    const host = new Host() as { trailsLateApp: RoutesProxyInstance };
+    expect(host.trailsLateApp.scope).toBe(host);
+  });
+});
+
+describe("ActionDispatch::Routing::RouteSet::NamedRouteCollection#define_url_helper", () => {
+  it("takes a trailing ActionController::Parameters as the options", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show", as: "post" });
+    });
+    const helpers = routes.urlHelpers() as unknown as { postPath(...args: unknown[]): string };
+    const params = new Parameters({ id: "7", page: "2" }).permit("id", "page");
+    expect(helpers.postPath(params)).toBe("/posts/7?page=2");
   });
 });

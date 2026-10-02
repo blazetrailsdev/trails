@@ -289,6 +289,19 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   return ret != null && ret !== false;
 }
 
+/**
+ * `Object#respond_to_missing?` (`obj_respond_to_missing`,
+ * `vendor/ruby/v3.3.11/vm_method.c:3009`), the default a class's own
+ * `respond_to_missing?` reaches through `super`: it answers false for every
+ * name.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `obj_respond_to_missing`
+ * (`vendor/ruby/v3.3.11/vm_method.c:3009`).
+ */
+export function objRespondToMissing(_obj: unknown, _mid: string, _priv: boolean): boolean {
+  return false;
+}
+
 function checkDefinitionVisibility(mod: { prototype: object }, mid: string): boolean {
   for (
     let o: object | null = mod.prototype;
