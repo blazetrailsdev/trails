@@ -1,32 +1,33 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
-import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import type { ArelNode } from "../arel.js";
 import type { Attribute } from "../attributes/attribute.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Nary extends NodeExpression {
-  readonly children: ArelNode[];
+  readonly children: ReturnType<typeof Nodes.buildQuoted>[];
 
-  constructor(children: ArelNode[]) {
+  constructor(children: ReturnType<typeof Nodes.buildQuoted>[]) {
     super();
     this.children = children;
   }
 
-  get left(): ArelNode | undefined {
+  get left(): ReturnType<typeof Nodes.buildQuoted> | undefined {
     return this.children[0];
   }
 
-  get right(): ArelNode | undefined {
+  get right(): ReturnType<typeof Nodes.buildQuoted> | undefined {
     return this.children[1];
   }
 
   fetchAttribute(block: (attr: Attribute) => boolean): boolean {
     return (
       this.children.length > 0 &&
-      this.children.every((child) => Boolean((child as Node).fetchAttribute(block)))
+      this.children.every((child) =>
+        Boolean((child as Exclude<ArelNode, Attribute>).fetchAttribute(block)),
+      )
     );
   }
 

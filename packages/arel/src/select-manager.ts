@@ -144,7 +144,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
 
     if (typeof relation === "string" || relation instanceof SqlLiteral) {
       if (isEmpty(relation)) throw new EmptyJoinError();
-      klass = StringJoin as unknown as new (left: ArelNode | Table, right: ArelNode | null) => Join;
+      klass = StringJoin;
     }
 
     this.ctx.source.right.push(this.createJoin(relation, null, klass));

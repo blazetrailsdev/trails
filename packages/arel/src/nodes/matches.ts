@@ -5,7 +5,7 @@ import { buildQuoted } from "./casted.js";
 import type { ArelNode } from "../arel.js";
 
 export class Matches extends Binary {
-  readonly escape: ArelNode | null;
+  readonly escape: ReturnType<typeof buildQuoted> | null;
   caseSensitive: boolean;
   constructor(
     left: NodeOrValue,

@@ -26,7 +26,7 @@ export type NodeOrValue =
   | Temporal.PlainDateTime
   | Temporal.PlainDate
   | Temporal.PlainTime
-  | ArelNode[]
+  | NodeOrValue[]
   | null;
 
 export const FetchAttribute = {

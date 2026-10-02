@@ -43,7 +43,7 @@ export class HomogeneousIn extends Node {
     return this.attribute;
   }
 
-  get right(): ArelNode[] {
+  get right(): ReturnType<Attribute["quotedArray"]> {
     return this.attribute.quotedArray(this.values);
   }
 

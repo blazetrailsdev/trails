@@ -7,8 +7,13 @@ import { Unary } from "./unary.js";
 import type { Attribute } from "../attributes/attribute.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import type { ArelNode } from "../arel.js";
+import type { SelectManager } from "../select-manager.js";
+import type { Table } from "../table.js";
 
-export function buildQuoted(other: unknown, attribute?: unknown): ArelNode {
+export function buildQuoted(
+  other: unknown,
+  attribute?: unknown,
+): ArelNode | Table | SelectManager | ModelAttribute {
   if (
     other instanceof Node ||
     other instanceof Attributes.Attribute ||
@@ -16,7 +21,7 @@ export function buildQuoted(other: unknown, attribute?: unknown): ArelNode {
     other instanceof Arel.SelectManager ||
     other instanceof ModelAttribute
   )
-    return other as ArelNode;
+    return other;
   if (attribute instanceof Attributes.Attribute) return new Casted(other, attribute);
   return new Quoted(other);
 }

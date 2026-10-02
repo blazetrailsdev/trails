@@ -19,7 +19,7 @@ import type { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
 import { Nodes } from "./namespaces.js";
 import { rbEqual } from "@blazetrails/activesupport";
 import { NoMethodError, rbObjClass, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
-import type { ArelNode } from "./arel.js";
+import type { NodeOrValue } from "./nodes/binary.js";
 
 function isSelectManagerLike(value: unknown): value is { ast: Node } {
   return (
@@ -36,9 +36,9 @@ function isEnumerable(value: unknown): value is Iterable<unknown> {
 
 export interface PredicationHost {
   /** @internal */
-  quotedNode(other: unknown): ArelNode;
+  quotedNode(other: unknown): ReturnType<typeof Nodes.buildQuoted>;
   /** @internal */
-  quotedArray(others: unknown[]): ArelNode[];
+  quotedArray(others: unknown[]): ReturnType<typeof Nodes.buildQuoted>[];
 }
 
 export interface GroupingFolders {
@@ -155,13 +155,13 @@ export interface PredicationsModule extends GroupingFolders {
   notInAny(others: unknown[]): Grouping;
   notInAll(others: unknown[]): Grouping;
   when(right: unknown): Case;
-  concat(other: ArelNode): Concat;
+  concat(other: NodeOrValue): Concat;
   contains(other: unknown): Contains;
   overlaps(other: unknown): Overlaps;
   /** @internal */
-  quotedArray(others: unknown[]): ArelNode[];
+  quotedArray(others: unknown[]): ReturnType<typeof Nodes.buildQuoted>[];
   /** @internal */
-  quotedNode(other: unknown): ArelNode;
+  quotedNode(other: unknown): ReturnType<typeof Nodes.buildQuoted>;
   isInfinity(value: unknown): 1 | -1 | 0;
   isUnboundable(value: unknown): 1 | -1 | false;
   isOpenEnded(value: unknown): boolean;
@@ -409,7 +409,7 @@ export const Predications: PredicationsModule = {
   when(this: Node & PredicationHost, right: unknown): Case {
     return new Nodes.Case(this).when(this.quotedNode(right));
   },
-  concat(this: Node, other: ArelNode): Concat {
+  concat(this: Node, other: NodeOrValue): Concat {
     return new Nodes.Concat(this, other);
   },
   contains(this: Node & PredicationHost, other: unknown): Contains {
@@ -418,7 +418,7 @@ export const Predications: PredicationsModule = {
   overlaps(this: Node & PredicationHost, other: unknown): Overlaps {
     return new Nodes.Overlaps(this, this.quotedNode(other));
   },
-  quotedArray(this: PredicationHost, others: unknown[]): ArelNode[] {
+  quotedArray(this: PredicationHost, others: unknown[]): ReturnType<typeof Nodes.buildQuoted>[] {
     return others.map((v) => this.quotedNode(v));
   },
 
@@ -444,7 +444,7 @@ export const Predications: PredicationsModule = {
     return new Nodes.Grouping(new Nodes.And(nodes));
   },
 
-  quotedNode(this: Node, other: unknown): ArelNode {
+  quotedNode(this: Node, other: unknown): ReturnType<typeof Nodes.buildQuoted> {
     return Nodes.buildQuoted(other, this);
   },
   isInfinity(this: PredicationHost, value: unknown): 1 | -1 | 0 {
