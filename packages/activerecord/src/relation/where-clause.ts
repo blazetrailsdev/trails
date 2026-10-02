@@ -1,5 +1,5 @@
 import { extractBang, rbEqual } from "@blazetrails/activesupport";
-import { first, isEmpty, isModuleIncluded, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Hash, first, isEmpty, isModuleIncluded, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import * as Arel from "@blazetrails/arel";
 import { Nodes, Predications, fetchAttribute, sql } from "@blazetrails/arel";
@@ -97,13 +97,7 @@ export class WhereClause {
   }
 
   equals(other: unknown): boolean {
-    return (
-      other instanceof WhereClause &&
-      this.predicates.length === other.predicates.length &&
-      this.predicates.every((predicate, i) =>
-        rbEqual(typeof predicate === "string" ? sql(predicate) : predicate, other.predicates[i]),
-      )
-    );
+    return other instanceof WhereClause && rbEqual(this.predicates, other.predicates);
   }
 
   isContradiction(): boolean {
@@ -124,14 +118,17 @@ export class WhereClause {
   }
 
   toH(tableName?: string | null, opts: { equalityOnly?: boolean } = {}): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const node of equalities(this.predicates, opts.equalityOnly ?? false)) {
-      const attr = extractAttribute(node);
-      if (attr === null) continue;
-      if (tableName != null && String(attr.relation.name) !== tableName) continue;
-      result[String(attr.name)] = extractNodeValue((node as any).right);
+    const hash: Record<string, unknown> = {};
+    for (const node of equalities(this.predicates, opts.equalityOnly ?? false) as (Nodes.Node & {
+      left: Arel.Attribute;
+      right: unknown;
+    })[]) {
+      if (tableName != null && tableName !== node.left.relation.name) continue;
+      const name = String(node.left.name);
+      const value = extractNodeValue(node.right);
+      hash[name] = value;
     }
-    return result;
+    return hash;
   }
 
   /** @internal */
@@ -176,28 +173,30 @@ export class WhereClause {
 
   /** @internal */
   private eachAttributes(
-    fn: (attr: Arel.Attribute | Nodes.Node, node: Nodes.Node | Nodes.SqlLiteral | string) => void,
+    block: (
+      attr: Arel.Attribute | Nodes.Node,
+      node: Nodes.Node | Nodes.SqlLiteral | string,
+    ) => void,
   ): void {
     for (const node of this.predicates) {
-      let attr: Arel.Attribute | Nodes.Node | null = extractAttribute(node);
-      if (!attr && isEqualityNode(node)) {
-        const left = (node as any).left;
-        if (left != null && isModuleIncluded(left.constructor, Predications)) attr = left;
-      }
-      if (attr) fn(attr, node);
+      const attr =
+        extractAttribute(node) ||
+        (isEqualityNode(node) &&
+        isModuleIncluded((node as Nodes.Node & { left: Nodes.Node }).left.constructor, Predications)
+          ? (node as Nodes.Node & { left: Nodes.Node }).left
+          : null);
+
+      if (attr) block(attr, node);
     }
   }
 
   /** @internal */
-  protected referencedColumns(): Record<string, Nodes.Node | Nodes.SqlLiteral | string> {
-    const hash: Record<string, Nodes.Node | Nodes.SqlLiteral | string> = {};
-    this.eachAttributes((attr, node) => {
-      const key =
-        attr instanceof Arel.Attribute
-          ? `${String(attr.relation.name)}.${attr.name}`
-          : String(attr);
-      hash[key] = node;
-    });
+  protected referencedColumns(): Hash<
+    Arel.Attribute | Nodes.Node,
+    Nodes.Node | Nodes.SqlLiteral | string
+  > {
+    const hash = new Hash<Arel.Attribute | Nodes.Node, Nodes.Node | Nodes.SqlLiteral | string>();
+    this.eachAttributes((attr, node) => hash.set(attr, node));
     return hash;
   }
 }

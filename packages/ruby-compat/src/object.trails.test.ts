@@ -357,6 +357,12 @@ describe("rbFSend", () => {
     expect(rbFSend(req, "field")).toBe("f");
   });
 
+  it("sends a String a method String is reopened with, and one JS String lacks", () => {
+    expect(rbFSend("abc", "upcase")).toBe("ABC");
+    expect(rbFSend("abc", "toUpperCase")).toBe("ABC");
+    expect(() => rbFSend("abc", "nope")).toThrow(NoMethodError);
+  });
+
   it("public_send dispatches a defined method as send does", () => {
     const req = new Req();
     expect(rbFPublicSend(req, "subdomain")).toBe(rbFSend(req, "subdomain"));

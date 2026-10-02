@@ -2,6 +2,7 @@ import { aryIncludes } from "./array.js";
 import { hasKey } from "./hash.js";
 import { stringInspect } from "./string/inspect.js";
 import { rbCheckStringType, stringValue } from "./string/support.js";
+import { STRING_METHOD_TABLE, rbStrSend } from "./string/method-table.js";
 import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
 import { cmp, rbCmpint, rubyClass, type Comparable } from "./comparable.js";
 import { rbEql, rbEqual } from "./rb-equal.js";
@@ -643,6 +644,9 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     if (desc && argc === 0) return desc.get ? desc.get.call(recv) : desc.value;
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
     if (setter) return setter.call(recv, args[0]);
+  }
+  if (typeof recv === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) {
+    return rbStrSend(recv, mid, ...args)[0];
   }
   if (mid === "isInclude") {
     if (typeof recv === "string") return recv.includes(stringValue(args[0]));

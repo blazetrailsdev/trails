@@ -1,4 +1,4 @@
-import { rbObjRespondTo, rtest } from "./object.js";
+import { rbCString, rbObjRespondTo, rtest } from "./object.js";
 import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 
 /**
@@ -56,7 +56,7 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
   /* `rb_str_equal` (`vendor/ruby/v3.3.11/string.c:3742`): a non-String answering
      `to_str` is asked `other == self` in turn. */
   if (typeof a === "string" && typeof b !== "string") {
-    if (!rbObjRespondTo(b, "toStr")) return false;
+    if (!(b instanceof rbCString) && !rbObjRespondTo(b, "toStr")) return false;
     return equalOrEql(b, a, eql);
   }
   /* `rb_int_equal` (`vendor/ruby/v3.3.11/numeric.c:4634`) compares by value, and Ruby

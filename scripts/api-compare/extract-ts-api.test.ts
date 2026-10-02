@@ -1052,6 +1052,35 @@ describe("body call capture", () => {
     expect(skeleton("plain")).toEqual(["if", "ref:build", "new:Lit"]);
   });
 
+  it("tokens the Symbol-or-String `to_s` conditional apart from an ordinary one", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        bare(key: string) {
+          return isSymbol(key) ? symbolToS(key) : key;
+        }
+        stringified(key: unknown) {
+          return isSymbol(key) ? symbolToS(key) : String(key);
+        }
+        otherReceiver(key: string, other: string) {
+          return isSymbol(key) ? symbolToS(other) : key;
+        }
+        otherFallback(key: string) {
+          return isSymbol(key) ? symbolToS(key) : this.build();
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("bare")).toEqual(["if:to-s", "ref:isSymbol", "ref:symbolToS"]);
+    expect(skeleton("stringified")).toEqual([
+      "if:to-s",
+      "ref:isSymbol",
+      "ref:symbolToS",
+      "ref:String",
+    ]);
+    expect(skeleton("otherReceiver")).toEqual(["if", "ref:isSymbol", "ref:symbolToS"]);
+    expect(skeleton("otherFallback")).toEqual(["if", "ref:isSymbol", "ref:symbolToS", "ref:build"]);
+  });
+
   it("tokens the unconditional loop a Ruby `retry` lowers to apart from a loop, and emits no arm for its rescue class guard", () => {
     const cls = extractFromSource(
       `class Foo {

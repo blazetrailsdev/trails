@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { rbEql, rbEqq, rbEqual } from "./rb-equal.js";
 import { Range } from "./range.js";
+import { stringSuperclass } from "./string/method-table.js";
 
 describe("rbEqual over the values a Ruby binary String stands in for", () => {
   it("compares Uint8Array byte strings by value", () => {
@@ -86,6 +87,19 @@ describe("rbEql is rb_equal without the `==` arm", () => {
     const key = new OnlyEquals();
     expect(rbEqual(new Map([[key, 1]]), new Map([[key, 1]]))).toBe(true);
     expect(rbEqual(new Map([[key, 1]]), new Map([[new OnlyEquals(), 1]]))).toBe(false);
+  });
+});
+
+describe("rbEqual between a String and a String subclass", () => {
+  class Literal extends stringSuperclass("eql", "hash") {}
+
+  it("compares contents in either order, as rb_str_equal does for two T_STRINGs", () => {
+    expect(rbEqual("a", new Literal("a"))).toBe(true);
+    expect(rbEqual(new Literal("a"), "a")).toBe(true);
+    expect(rbEql("a", new Literal("a"))).toBe(true);
+    expect(rbEqual("a", new Literal("b"))).toBe(false);
+    expect(rbEqual(["a"], [new Literal("a")])).toBe(true);
+    expect(rbEqual("a", { toString: () => "a" })).toBe(false);
   });
 });
 

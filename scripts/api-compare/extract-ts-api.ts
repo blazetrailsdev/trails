@@ -4741,6 +4741,32 @@ function isNilGuardConditional(node: ts.ConditionalExpression): boolean {
   }
 }
 
+/**
+ * `isSymbol(x) ? symbolToS(x) : x` (or `: String(x)`): Ruby's `x.to_s` on a
+ * receiver that is a Symbol or a String
+ * (`column_alias.to_s`, `activerecord/lib/active_record/relation/query_methods.rb:2240`).
+ * A Ruby Symbol is a colon-prefixed JS string, so the port of that one send has
+ * to test for the colon, and Ruby emits no arm for it. Tokened apart rather
+ * than dropped, because the same shape is also the port of a real Ruby ternary
+ * (`key.is_a?(Symbol) ? key.name : key`, `query_methods.rb:2236`);
+ * `compare.ts#foldSkeletonTokens` decides between the two readings.
+ */
+function isSymbolToSConditional(node: ts.ConditionalExpression): boolean {
+  const receiver = soleArgumentOf(node.condition, "isSymbol");
+  if (receiver === undefined || soleArgumentOf(node.whenTrue, "symbolToS") !== receiver) {
+    return false;
+  }
+  return (
+    node.whenFalse.getText() === receiver || soleArgumentOf(node.whenFalse, "String") === receiver
+  );
+}
+
+function soleArgumentOf(node: ts.Expression, callee: string): string | undefined {
+  if (!ts.isCallExpression(node) || !ts.isIdentifier(node.expression)) return undefined;
+  if (node.expression.text !== callee || node.arguments.length !== 1) return undefined;
+  return node.arguments[0].getText();
+}
+
 function isRetryLoop(statement: ts.ForStatement | ts.WhileStatement): boolean {
   const unconditional = ts.isForStatement(statement)
     ? !statement.initializer && !statement.condition && !statement.incrementor
@@ -4942,6 +4968,10 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
           tokens.push("or");
           visit(fallback);
           return;
+        }
+        if (isSymbolToSConditional(n as ts.ConditionalExpression)) {
+          tokens.push("if:to-s");
+          break;
         }
         tokens.push(isNilGuardConditional(n as ts.ConditionalExpression) ? "if:nil-guard" : "if");
         break;

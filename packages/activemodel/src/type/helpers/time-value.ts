@@ -1,12 +1,6 @@
 import { Temporal, Time } from "@blazetrails/date";
 import { ArgumentError, Rational, rbFSend } from "@blazetrails/ruby-compat";
-import {
-  actsLike,
-  TimeWithZone,
-  inTimeZone as stringInTimeZone,
-  toFs,
-  zone,
-} from "@blazetrails/activesupport";
+import { actsLike, TimeWithZone, toFs } from "@blazetrails/activesupport";
 
 export interface TimezoneAware {
   readonly isUtc: boolean;
@@ -67,18 +61,12 @@ export function typeCastForSchema(value: unknown): unknown {
 export function userInputInTimeZone(
   value: unknown,
 ): TimeWithZone | Temporal.ZonedDateTime | Temporal.Instant | Time | null {
-  if (value === null || value === undefined) return null;
-  if (value instanceof TimeWithZone) return value.inTimeZone();
-  if (value instanceof Time) {
-    const timeZone = zone();
-    return timeZone ? new TimeWithZone(value.toZonedDateTime().toInstant(), timeZone) : value;
-  }
-  if (value instanceof Temporal.ZonedDateTime) return value;
-  if (value instanceof Temporal.Instant) {
-    const timeZone = zone();
-    return timeZone ? new TimeWithZone(value, timeZone) : value;
-  }
-  return stringInTimeZone(String(value)) ?? null;
+  return rbFSend(value, "inTimeZone") as
+    | TimeWithZone
+    | Temporal.ZonedDateTime
+    | Temporal.Instant
+    | Time
+    | null;
 }
 
 /** @internal */

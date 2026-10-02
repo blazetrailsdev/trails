@@ -3,13 +3,17 @@ import {
   fetch,
   first,
   hasKey,
+  flatten,
   isEmpty,
   isModuleIncluded,
+  isSymbol,
+  rbFPublicSend,
   rbInspect,
   rbObjAsString,
   rbObjClassname,
   rbObjRespondTo,
   RuntimeError,
+  symbolToS,
   toI,
   transformValues,
   union,
@@ -50,6 +54,7 @@ import {
   actsLike,
   compactBlank,
   defineModule,
+  filterMap,
   foreignKey,
   included,
   isBlank,
@@ -1169,18 +1174,15 @@ export function checkIfMethodHasArgumentsBang(
   message?: string,
   block?: (args: unknown[]) => void,
 ): void {
-  if (!args || args.length === 0) {
+  if (isBlank(args)) {
     throw new ArgumentError(
       message ?? `The method .${methodName.slice(1)}() must contain arguments.`,
     );
   } else {
-    block?.(args);
+    if (block) block(args);
 
-    const flat = args.flat(Infinity);
-    args.length = 0;
-    for (const a of flat) {
-      if (!isBlank(a)) args.push(a);
-    }
+    args.splice(0, args.length, ...flatten(args));
+    args.splice(0, args.length, ...compactBlank(args));
   }
 }
 
@@ -1232,15 +1234,9 @@ export function processWithArgs(
 ): Record<string, unknown>[] {
   return args.flatMap((arg) => {
     if (!isPlainObject(arg)) {
-      const desc =
-        arg === null
-          ? "null"
-          : Array.isArray(arg)
-            ? "Array"
-            : typeof arg !== "object"
-              ? `${String(arg)} (${typeof arg})`
-              : ((arg as any).constructor?.name ?? "object");
-      throw new ArgumentError(`Unsupported argument type: ${desc}. Expected a plain object/hash.`);
+      throw new ArgumentError(
+        `Unsupported argument type: ${rbObjAsString(arg)} ${rbObjClassname(arg)}`,
+      );
     }
     return Object.entries(arg).map(([k, v]) => ({ [k]: v }));
   });
@@ -1386,7 +1382,7 @@ export function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): 
 /** @internal */
 export function extractTableNameFrom(string: string): string | null {
   const match = string.match(/^\W?(\w+)\W?\./);
-  return match ? match[1] : null;
+  return match && match[1];
 }
 
 function isRubySymbol(value: unknown): value is string {
@@ -1403,56 +1399,38 @@ function symbolToName(s: string): string {
 
 /** @internal */
 export function columnReferences(orderArgs: unknown[]): Nodes.SqlLiteral[] {
-  const refs: string[] = [];
-  for (const arg of orderArgs) {
-    if (Array.isArray(arg)) {
-      refs.push(...columnReferences(arg).map((ref) => ref.toString()));
-    } else if (typeof arg === "string") {
-      const term = isRubySymbol(arg) ? symbolToName(arg) : arg;
-      const t = extractTableNameFrom(term);
-      if (t) refs.push(t);
-    } else if (arg instanceof Arel.Attribute) {
-      refs.push(String(arg.relation.name));
-    } else if (arg instanceof Nodes.Ordering) {
-      const expr = (arg as any).expr;
-      if (expr instanceof Arel.Attribute) {
-        refs.push(String(expr.relation.name));
+  return filterMap(
+    orderArgs.flatMap((arg) => {
+      if (typeof arg === "string") {
+        return extractTableNameFrom(arg);
+      } else if (isHash(arg)) {
+        return (toA(arg) as [unknown, unknown][]).map(([key, value]) => {
+          if (isHash(value)) {
+            return isSymbol(key) ? symbolToS(key) : String(key);
+          } else {
+            return typeof key === "string" ? extractTableNameFrom(key) : null;
+          }
+        });
+      } else if (arg instanceof Arel.Attribute) {
+        return arg.relation.name;
+      } else if (arg instanceof Nodes.Ordering) {
+        return arg.expr instanceof Arel.Attribute ? arg.expr.relation.name : null;
+      } else {
+        return null;
       }
-    } else if (arg instanceof Map) {
-      for (const [key, value] of arg) {
-        if (isPlainObject(value)) {
-          refs.push(String(key));
-        } else if (typeof key === "string") {
-          const t = extractTableNameFrom(isRubySymbol(key) ? symbolToName(key) : key);
-          if (t) refs.push(t);
-        }
-      }
-    } else if (isPlainObject(arg)) {
-      for (const [key, value] of Object.entries(arg)) {
-        if (isPlainObject(value)) {
-          refs.push(key);
-        } else {
-          const t = extractTableNameFrom(String(key));
-          if (t) refs.push(t);
-        }
-      }
-    }
-  }
-  return refs.map((ref) => Arel.sql(ref, { retryable: true }));
+    }),
+    (ref) => (ref != null ? Arel.sql(ref as string, { retryable: true }) : null),
+  );
 }
 
 /** @internal */
 export function sanitizeOrderArguments(this: QueryMethodsHost, orderArgs: unknown[]): unknown[] {
-  for (let i = 0; i < orderArgs.length; i++) {
-    orderArgs[i] = (this.model as any)?.sanitizeSqlForOrder?.(orderArgs[i]) ?? orderArgs[i];
-  }
+  orderArgs.splice(
+    0,
+    orderArgs.length,
+    ...orderArgs.map((arg) => this.model.sanitizeSqlForOrder(arg as string | ArelNode)),
+  );
   return orderArgs;
-}
-
-function orderedNode(node: unknown, dir: unknown): unknown {
-  return String(dir).toLowerCase() === "desc"
-    ? new Nodes.Descending(node)
-    : new Nodes.Ascending(node);
 }
 
 /** @internal */
@@ -1462,43 +1440,57 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
       this.model.adapterClass() as unknown as { columnNameWithOrderMatcher(): RegExp }
     ).columnNameWithOrderMatcher(),
   });
+
   validateOrderArgs.call(this, orderArgs);
-  const refs = columnReferences(orderArgs);
-  if (refs.length > 0) {
-    (this as any).referencesValues = unionReferences((this as any).referencesValues ?? [], refs);
+
+  const references = columnReferences(orderArgs);
+  if (!isEmpty(references)) {
+    this.referencesValues = unionReferences(this.referencesValues, references);
   }
-  const mapped: unknown[] = [];
-  for (const arg of orderArgs) {
-    if (isRubySymbol(arg)) {
-      mapped.push(new Nodes.Ascending(orderColumn.call(this, symbolToName(arg))));
-    } else if (arg instanceof Map) {
-      for (const [key, value] of arg) {
-        mapped.push(
-          key instanceof Nodes.SqlLiteral ||
-            key instanceof Nodes.Node ||
-            key instanceof Arel.Attribute
-            ? orderedNode(key, value)
-            : orderedNode(orderColumn.call(this, String(key)), value),
-        );
-      }
-    } else if (isPlainObject(arg)) {
-      for (const rawKey of Object.keys(arg)) {
-        const key = isRubySymbol(rawKey) ? symbolToName(rawKey) : rawKey;
-        const value = (arg as Record<PropertyKey, unknown>)[rawKey];
-        if (isPlainObject(value)) {
-          for (const [field, dir] of Object.entries(value)) {
-            mapped.push(orderedNode(orderColumn.call(this, [key, field].join(".")), dir));
-          }
+
+  orderArgs.splice(
+    0,
+    orderArgs.length,
+    ...flatten(
+      orderArgs.map((arg) => {
+        if (isSymbol(arg)) {
+          return (orderColumn.call(this, symbolToS(arg)) as Nodes.SqlLiteral).asc();
+        } else if (isHash(arg)) {
+          return (toA(arg) as [unknown, unknown][]).map(([key, value]) => {
+            if (isHash(value)) {
+              return (toA(value) as [unknown, string][]).map(([field, dir]) =>
+                rbFPublicSend(
+                  orderColumn.call(
+                    this,
+                    [
+                      isSymbol(key) ? symbolToS(key) : String(key),
+                      isSymbol(field) ? symbolToS(field) : String(field),
+                    ].join("."),
+                  ),
+                  dir.toLowerCase(),
+                ),
+              );
+            } else {
+              if (
+                key instanceof Nodes.SqlLiteral ||
+                key instanceof Nodes.Node ||
+                key instanceof Arel.Attribute
+              ) {
+                return rbFPublicSend(key, (value as string).toLowerCase());
+              } else {
+                return rbFPublicSend(
+                  orderColumn.call(this, isSymbol(key) ? symbolToS(key) : String(key)),
+                  (value as string).toLowerCase(),
+                );
+              }
+            }
+          });
         } else {
-          mapped.push(orderedNode(orderColumn.call(this, key), value));
+          return arg;
         }
-      }
-    } else {
-      mapped.push(arg);
-    }
-  }
-  orderArgs.length = 0;
-  orderArgs.push(...mapped);
+      }),
+    ),
+  );
 }
 
 /** @internal */
@@ -1860,7 +1852,7 @@ export function arelColumnAliasesFromHash(
   fields: Record<string, unknown>,
 ): unknown[] {
   return Object.entries(fields).flatMap<unknown>(([key, columnsAliases]) => {
-    const tableName = isRubySymbol(key) ? symbolToName(key) : key;
+    const tableName = isSymbol(key) ? symbolToS(key) : key;
     if (isPlainObject(columnsAliases)) {
       return Object.entries(columnsAliases).map(([column, columnAlias]) =>
         arelColumnWithTable
@@ -1869,28 +1861,21 @@ export function arelColumnAliasesFromHash(
             this.model
               .adapterClass()
               .quoteColumnName(
-                isRubySymbol(columnAlias) ? symbolToName(columnAlias) : rbObjAsString(columnAlias),
+                isSymbol(columnAlias) ? symbolToS(columnAlias) : rbObjAsString(columnAlias),
               ),
           ),
       );
-    }
-    if (Array.isArray(columnsAliases)) {
-      return (columnsAliases as string[]).map((column) =>
-        arelColumnWithTable.call(this, tableName, column),
+    } else if (Array.isArray(columnsAliases)) {
+      return columnsAliases.map((column) => arelColumnWithTable.call(this, tableName, column));
+    } else if (typeof columnsAliases === "string") {
+      return (arelColumn.call(this, key) as Arel.Attribute | Nodes.SqlLiteral).as(
+        this.model
+          .adapterClass()
+          .quoteColumnName(isSymbol(columnsAliases) ? symbolToS(columnsAliases) : columnsAliases),
       );
+    } else {
+      return null;
     }
-    if (typeof columnsAliases === "string") {
-      return [
-        (arelColumn.call(this, key) as Arel.Attribute | Nodes.SqlLiteral).as(
-          this.model
-            .adapterClass()
-            .quoteColumnName(
-              isRubySymbol(columnsAliases) ? symbolToName(columnsAliases) : columnsAliases,
-            ),
-        ),
-      ];
-    }
-    return [];
   });
 }
 

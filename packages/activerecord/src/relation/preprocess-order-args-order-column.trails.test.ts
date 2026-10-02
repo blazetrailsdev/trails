@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { Nodes } from "@blazetrails/arel";
+import { Nodes, Table } from "@blazetrails/arel";
 import { fixtures } from "../test-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
-import { preprocessOrderArgs } from "./query-methods.js";
+import { columnReferences, preprocessOrderArgs, processWithArgs } from "./query-methods.js";
 
 describe("preprocessOrderArgs routes through orderColumn", () => {
   fixtures([]);
@@ -59,5 +59,55 @@ describe("preprocessOrderArgs routes through orderColumn", () => {
       quoteTableName.mockRestore();
       quoteColumnName.mockRestore();
     }
+  });
+});
+
+describe("columnReferences", () => {
+  it("reads a table from each arm Rails' case names, and nothing from an Array", () => {
+    const comments = new Table("comments");
+    const references = columnReferences([
+      "posts.id",
+      ":authors.name",
+      { tags: { name: "asc" } },
+      { "users.id": "desc", id: "asc" },
+      new Map([[comments.get("id"), "desc"]]),
+      comments.get("id"),
+      comments.get("id").desc(),
+      ["people.id"],
+      "id",
+    ]);
+    expect(references.map(String)).toEqual([
+      "posts",
+      "authors",
+      "tags",
+      "users",
+      "comments",
+      "comments",
+    ]);
+    expect(references.every((reference) => reference.retryable)).toBe(true);
+  });
+});
+
+describe("preprocessOrderArgs", () => {
+  fixtures([]);
+
+  it("sends the direction to a node key and flattens the nested Hash arm in place", () => {
+    const title = Topic.arelTable.get("title");
+    const args: unknown[] = [new Map([[title, "DESC"]]), { topics: { id: "asc", title: "desc" } }];
+    preprocessOrderArgs.call(Topic.all() as never, args);
+    expect(args).toHaveLength(3);
+    expect(args[0]).toBeInstanceOf(Nodes.Descending);
+    expect((args[0] as Nodes.Descending).expr).toBe(title);
+    expect(args[1]).toBeInstanceOf(Nodes.Ascending);
+    expect(args[2]).toBeInstanceOf(Nodes.Descending);
+  });
+});
+
+describe("processWithArgs", () => {
+  it("names the argument and its class, as Rails' message does", () => {
+    expect(() => processWithArgs.call({} as never, ["posts"])).toThrow(
+      /^Unsupported argument type: posts String$/,
+    );
+    expect(processWithArgs.call({} as never, [{ a: 1, b: 2 }])).toEqual([{ a: 1 }, { b: 2 }]);
   });
 });
