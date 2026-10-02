@@ -20,7 +20,7 @@ class InfoControllerTestApp extends Application {}
 describe("InfoControllerTest", () => {
   let tc: InstanceType<typeof TestCase>;
 
-  beforeEach(async () => {
+  beforeEach(async ({ task }) => {
     Trails.application = InfoControllerTestApp.instance();
     const routes = Trails.application.routes() as unknown as RouteSet;
     routes.clearBang();
@@ -40,7 +40,7 @@ describe("InfoControllerTest", () => {
 
     include(InfoController, routes.urlHelpers());
 
-    tc = new TestCase();
+    tc = new TestCase(task.name);
     tc.controller = new InfoController();
     await tc.beforeSetup();
     tc.routes = routes;

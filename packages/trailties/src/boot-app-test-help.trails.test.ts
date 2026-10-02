@@ -73,11 +73,12 @@ describe("test_help wires a booted app into the test case classes", () => {
   describe("BootAppIntegrationTest", () => {
     it("points IntegrationTest and ActionController::TestCase at the application's routes", async ({
       testCase,
+      task,
     }) => {
       const session = testCase as BootAppIntegrationTest;
       expect(session.routes).toBe(Trails.application!.routes());
 
-      const controllerTest = new ActionController.TestCase() as unknown as {
+      const controllerTest = new ActionController.TestCase(task.name) as unknown as {
         routes?: unknown;
         beforeSetup(): void;
       };
@@ -113,7 +114,9 @@ describe("test_help wires a booted app into the test case classes", () => {
     }
   });
 
-  it("reaches a module included onto ActionController::TestCase after test_help loads", async () => {
+  it("reaches a module included onto ActionController::TestCase after test_help loads", async ({
+    task,
+  }) => {
     const ran: string[] = [];
     const Included = new Module();
     Included.defineMethod("beforeSetup", function (this: object) {
@@ -124,7 +127,7 @@ describe("test_help wires a booted app into the test case classes", () => {
     const parent = Object.getPrototypeOf(proto);
     include(ActionController.TestCase, Included);
     try {
-      const controllerTest = new ActionController.TestCase();
+      const controllerTest = new ActionController.TestCase(task.name);
       await controllerTest.beforeSetup();
       expect(ran).toEqual(["included"]);
       expect(controllerTest.routes).toBe(Trails.application!.routes());
@@ -133,10 +136,10 @@ describe("test_help wires a booted app into the test case classes", () => {
     }
   });
 
-  it("renders a view through ActionController::TestCase", async () => {
+  it("renders a view through ActionController::TestCase", async ({ task }) => {
     const { PostsController } =
       await import("./__fixtures__/boot-app/app/controllers/posts-controller.js");
-    const controllerTest = new ActionController.TestCase();
+    const controllerTest = new ActionController.TestCase(task.name);
     controllerTest.controller = new PostsController();
     await controllerTest.beforeSetup();
     await controllerTest.get("show");

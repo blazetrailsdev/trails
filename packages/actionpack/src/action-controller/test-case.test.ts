@@ -76,10 +76,10 @@ describe("TestCase class helpers", () => {
     );
   });
 
-  it("controllerClassName returns the controller's path", () => {
+  it("controllerClassName returns the controller's path", ({ task }) => {
     class Sub extends TestCase {}
     Sub.tests(PostsController);
-    const tc = new Sub();
+    const tc = new Sub(task.name);
     tc.setupControllerRequestAndResponse();
     expect(tc.controllerClassName()).toBe("posts");
   });

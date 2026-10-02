@@ -35,7 +35,6 @@ import { Engine } from "@blazetrails/trailties/engine";
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { TestCase } from "../test-case.js";
 import { Base } from "../base.js";
-import { Metal } from "../metal.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { InvalidType } from "../../action-dispatch/http/mime-negotiation.js";
@@ -43,369 +42,6 @@ import { Response } from "../../action-dispatch/http/response.js";
 import { TestResponse } from "../../action-dispatch/testing/test-response.js";
 import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
 import { ContentController } from "../../test-helpers/lib/controller/fake-controllers.js";
-
-class PostsController extends Base {
-  async index() {
-    await this.render({ json: [{ id: 1, title: "Hello" }] });
-  }
-
-  async show() {
-    const id = this.params.get("id");
-    await this.render({ json: { id } });
-  }
-
-  async create() {
-    const title = this.params.get("title");
-    this.flash.set("notice", "Post created!");
-    this.session.set("lastCreated", title);
-    this.status = 201;
-    await this.render({ json: { title } });
-  }
-
-  async update() {
-    const id = this.params.get("id");
-    await this.render({ json: { id, updated: true } });
-  }
-
-  async destroy() {
-    const id = this.params.get("id");
-    this.head(204);
-  }
-
-  async redirectAction() {
-    this.redirectTo("/posts");
-  }
-
-  async renderPlain() {
-    await this.render({ plain: "hello world" });
-  }
-
-  async renderHtml() {
-    await this.render({ html: "<h1>Hello</h1>" });
-  }
-
-  async renderWithStatus() {
-    await this.render({ json: { error: "not found" }, status: 404 });
-  }
-
-  async setCustomHeader() {
-    this.headers.set("X-Custom", "test-value");
-    await this.render({ plain: "ok" });
-  }
-
-  async forbidden() {
-    this.head("forbidden");
-  }
-
-  async useSession() {
-    const count = ((this.session.get("count") as number) ?? 0) + 1;
-    this.session.set("count", count);
-    await this.render({ json: { count } });
-  }
-
-  async flashNotice() {
-    this.flash.set("notice", "Success!");
-    await this.render({ plain: "ok" });
-  }
-
-  async xhrFlag() {
-    await this.render({ json: { xhr: this.request.isXmlHttpRequest } });
-  }
-
-  async flashAlert() {
-    this.flash.set("alert", "Danger!");
-    await this.render({ plain: "ok" });
-  }
-}
-
-describe("TestCaseTest", () => {
-  class PostsControllerTest extends TestCase {}
-  PostsControllerTest.tests(PostsController);
-  let tc: TestCase;
-
-  beforeEach(async () => {
-    tc = new PostsControllerTest();
-    await tc.beforeSetup();
-  });
-
-  describe("HTTP verb methods", () => {
-    it("GET dispatches to action", async () => {
-      await tc.get("index");
-      expect(tc.controller).toBeDefined();
-      expect(tc.response.body).toContain("Hello");
-    });
-
-    it("POST dispatches to action", async () => {
-      await tc.post("create", { params: { title: "New Post" } });
-      expect(tc.controller.status).toBe(201);
-      expect(JSON.parse(tc.response.body).title).toBe("New Post");
-    });
-
-    it("PUT dispatches to action", async () => {
-      await tc.put("update", { params: { id: "42" } });
-      expect(JSON.parse(tc.response.body).id).toBe("42");
-    });
-
-    it("PATCH dispatches to action", async () => {
-      await tc.patch("update", { params: { id: "7" } });
-      expect(JSON.parse(tc.response.body).id).toBe("7");
-    });
-
-    it("DELETE dispatches to action", async () => {
-      await tc.delete("destroy", { params: { id: "1" } });
-      expect(tc.controller.status).toBe(204);
-    });
-
-    it("HEAD dispatches to action", async () => {
-      await tc.head("index");
-      expect(tc.controller).toBeDefined();
-    });
-  });
-
-  describe("request options", () => {
-    it("passes params to controller", async () => {
-      await tc.get("show", { params: { id: "99" } });
-      expect(JSON.parse(tc.response.body).id).toBe("99");
-    });
-
-    it("sets XHR flag", async () => {
-      await tc.get("xhrFlag", { xhr: true });
-      expect(JSON.parse(tc.response.body).xhr).toBe(true);
-    });
-
-    it("passes session data", async () => {
-      await tc.get("useSession", { session: { count: 5 } });
-      expect(JSON.parse(tc.response.body).count).toBe(6);
-    });
-  });
-
-  describe("response inspection", () => {
-    it("controller is accessible", async () => {
-      await tc.get("index");
-      expect(tc.controller).toBeInstanceOf(Base);
-    });
-
-    it("request is accessible", async () => {
-      await tc.get("index");
-      expect(tc.request).toBeDefined();
-      expect(tc.request.method).toBe("GET");
-    });
-
-    it("response is accessible", async () => {
-      await tc.get("index");
-      expect(tc.response).toBeDefined();
-    });
-  });
-
-  describe("assertResponse", () => {
-    it("accepts exact status code", async () => {
-      await tc.get("index");
-      tc.assertResponse(200);
-    });
-
-    it("throws on wrong status code", async () => {
-      await tc.get("index");
-      expect(() => tc.assertResponse(404)).toThrow(
-        /Expected response to be a <404: Not Found>, but was a <200: OK>/,
-      );
-    });
-
-    it("accepts 'success' for 2xx", async () => {
-      await tc.get("index");
-      tc.assertResponse("success");
-    });
-
-    it("accepts 'redirect' for 3xx", async () => {
-      await tc.get("redirectAction");
-      tc.assertResponse("redirect");
-    });
-
-    it("rejects 'success' for non-2xx", async () => {
-      await tc.get("renderWithStatus");
-      expect(() => tc.assertResponse("success")).toThrow(
-        /Expected response to be a <2XX: success>, but was a <404: Not Found>/,
-      );
-    });
-
-    it("accepts status symbols like 'ok'", async () => {
-      await tc.get("index");
-      tc.assertResponse("ok");
-    });
-
-    it("accepts status symbols like 'created'", async () => {
-      await tc.post("create", { params: { title: "x" } });
-      tc.assertResponse("created");
-    });
-
-    it("accepts status symbols like 'not_found'", async () => {
-      await tc.get("renderWithStatus");
-      tc.assertResponse("not_found");
-    });
-
-    it("accepts status symbols like 'no_content'", async () => {
-      await tc.delete("destroy", { params: { id: "1" } });
-      tc.assertResponse("no_content");
-    });
-
-    it("accepts status symbols like 'forbidden'", async () => {
-      await tc.get("forbidden");
-      tc.assertResponse("forbidden");
-    });
-
-    it("throws on unknown symbol", async () => {
-      await tc.get("index");
-      expect(() => tc.assertResponse("banana")).toThrow(/Invalid response name: banana/);
-    });
-
-    it("accepts 'missing' for 4xx", async () => {
-      await tc.get("renderWithStatus");
-      tc.assertResponse("missing");
-    });
-  });
-
-  describe("assertRedirectedTo", () => {
-    it("passes on correct redirect URL", async () => {
-      await tc.get("redirectAction");
-      tc.assertRedirectedTo("/posts");
-    });
-
-    it("throws on wrong redirect URL", async () => {
-      await tc.get("redirectAction");
-      expect(() => tc.assertRedirectedTo("/wrong")).toThrow(
-        /Expected response to be a redirect to <http:\/\/test.host\/wrong>/,
-      );
-    });
-
-    it("throws when no redirect", async () => {
-      await tc.get("index");
-      expect(() => tc.assertRedirectedTo("/posts")).toThrow(
-        /Expected response to be a <3XX: redirect>, but was a <200: OK>/,
-      );
-    });
-
-    it("accepts regex", async () => {
-      await tc.get("redirectAction");
-      tc.assertRedirectedTo(/\/posts/);
-    });
-  });
-
-  describe("assertContentType", () => {
-    it("matches JSON content type", async () => {
-      await tc.get("index");
-      expect(tc.response.mediaType).toBe("application/json");
-    });
-
-    it("matches plain text content type", async () => {
-      await tc.get("renderPlain");
-      expect(tc.response.mediaType).toBe("text/plain");
-    });
-
-    it("matches HTML content type", async () => {
-      await tc.get("renderHtml");
-      expect(tc.response.mediaType).toBe("text/html");
-    });
-  });
-
-  describe("assertHeader", () => {
-    it("checks header value", async () => {
-      await tc.get("setCustomHeader");
-      expect(tc.response.getHeader("x-custom")).toBe("test-value");
-    });
-
-    it("throws on missing header", async () => {
-      await tc.get("index");
-      expect(tc.response.getHeader("x-nonexistent")).toBeUndefined();
-    });
-  });
-
-  describe("flash", () => {
-    it("assertFlash passes when flash is set", async () => {
-      await tc.get("flashNotice");
-      expect(tc.flash().get("notice")).toBe("Success!");
-    });
-
-    it("assertFlash throws when flash is not set", async () => {
-      await tc.get("index");
-      expect(tc.flash().get("notice")).toBeUndefined();
-    });
-
-    it("assertNoFlash passes when flash is not set", async () => {
-      await tc.get("index");
-      expect(tc.flash().has("alert")).toBe(false);
-    });
-
-    it("flash accessor returns flash hash", async () => {
-      await tc.get("flashNotice");
-      expect(tc.flash().get("notice")).toBe("Success!");
-    });
-  });
-
-  describe("session persistence", () => {
-    it("session persists across requests", async () => {
-      await tc.get("useSession");
-      expect(JSON.parse(tc.response.body).count).toBe(1);
-
-      await tc.get("useSession");
-      expect(JSON.parse(tc.response.body).count).toBe(2);
-
-      await tc.get("useSession");
-      expect(JSON.parse(tc.response.body).count).toBe(3);
-    });
-
-    it("session set by controller is available", async () => {
-      await tc.post("create", { params: { title: "My Post" } });
-      expect(tc.session().get("lastCreated")).toBe("My Post");
-    });
-  });
-
-  describe("Metal controller support", () => {
-    it("works with Metal controllers", async () => {
-      class SimpleMetal extends Metal {
-        async index() {
-          this.responseBody = "metal response";
-          this.contentType = "text/plain";
-          this.markPerformed();
-        }
-      }
-
-      const mtc = new TestCase();
-      mtc.controller = new SimpleMetal();
-      await mtc.beforeSetup();
-      await mtc.get("index");
-      expect(mtc.response.body).toBe("metal response");
-    });
-  });
-
-  describe("process helpers", () => {
-    it("build_response returns a new Response", () => {
-      const resp = tc.buildResponse(TestResponse);
-      expect(resp).toBeDefined();
-    });
-
-    it("generatedPath returns the path component", () => {
-      expect(tc.generatedPath(["/posts/1", ["format"]])).toBe("/posts/1");
-    });
-
-    it("queryParameterNames returns extra keys plus controller and action", () => {
-      const names = tc.queryParameterNames(["/posts", ["format", "page"]]);
-      expect(names).toContain("controller");
-      expect(names).toContain("action");
-      expect(names).toContain("format");
-      expect(names).toContain("page");
-    });
-
-    it("executorAroundEachRequest class attribute defaults to false", () => {
-      expect(TestCase.executorAroundEachRequest).toBeFalsy();
-      TestCase.executorAroundEachRequest = true;
-      expect(TestCase.executorAroundEachRequest).toBe(true);
-      TestCase.executorAroundEachRequest = null;
-    });
-
-    it("assertTemplate raises (extracted to gem)", () => {
-      expect(() => tc.assertTemplate()).toThrow(/extracted to a gem/);
-    });
-  });
-});
 
 class TestController extends Base {
   declare counter: number | undefined;
@@ -604,8 +240,8 @@ describe("TestCaseTest", () => {
   const assertRouting = (...args: Parameters<TestCaseTest["assertRouting"]>) =>
     tc.assertRouting(...args);
 
-  beforeEach(async () => {
-    tc = new TestCaseTest();
+  beforeEach(async ({ task }) => {
+    tc = new TestCaseTest(task.name);
     await tc.beforeSetup();
     tc.setup();
   });
@@ -1536,8 +1172,8 @@ class ResponseDefaultHeadersTest extends TestCase {
 describe("ResponseDefaultHeadersTest", () => {
   let tc: ResponseDefaultHeadersTest;
 
-  beforeEach(async () => {
-    tc = new ResponseDefaultHeadersTest();
+  beforeEach(async ({ task }) => {
+    tc = new ResponseDefaultHeadersTest(task.name);
     await tc.beforeSetup();
     tc.setup();
   });
@@ -1599,8 +1235,8 @@ class BarControllerTest extends TestCase {
 describe("BarControllerTest", () => {
   let tc: BarControllerTest;
 
-  beforeEach(async () => {
-    tc = new BarControllerTest();
+  beforeEach(async ({ task }) => {
+    tc = new BarControllerTest(task.name);
     await tc.beforeSetup();
     tc.setup();
   });
@@ -1628,8 +1264,8 @@ class BarControllerTestWithExplicitRouteSet extends TestCase {
 describe("BarControllerTestWithExplicitRouteSet", () => {
   let tc: BarControllerTestWithExplicitRouteSet;
 
-  beforeEach(async () => {
-    tc = new BarControllerTestWithExplicitRouteSet();
+  beforeEach(async ({ task }) => {
+    tc = new BarControllerTestWithExplicitRouteSet(task.name);
     await tc.beforeSetup();
     tc.setup();
   });
@@ -1719,8 +1355,8 @@ class AnonymousControllerTest extends TestCase {
 }
 
 describe("AnonymousControllerTest", () => {
-  it("controller name", async () => {
-    const tc = new AnonymousControllerTest();
+  it("controller name", async ({ task }) => {
+    const tc = new AnonymousControllerTest(task.name);
     await tc.beforeSetup();
     tc.setup();
 
@@ -1752,8 +1388,8 @@ class RoutingDefaultsTest extends TestCase {
 describe("RoutingDefaultsTest", () => {
   let tc: RoutingDefaultsTest;
 
-  beforeEach(async () => {
-    tc = new RoutingDefaultsTest();
+  beforeEach(async ({ task }) => {
+    tc = new RoutingDefaultsTest(task.name);
     await tc.beforeSetup();
     tc.setup();
   });

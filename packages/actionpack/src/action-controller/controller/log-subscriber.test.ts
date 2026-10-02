@@ -71,7 +71,7 @@ describe("ACLogSubscriberTest", () => {
   let oldEnableFragmentCacheLogging: boolean;
   let cachePath: string;
 
-  beforeEach(async () => {
+  beforeEach(async ({ task }) => {
     subscriber = new LogSubscriber();
     logger = new CaptureLogger();
     logs = logger.messages;
@@ -81,7 +81,7 @@ describe("ACLogSubscriberTest", () => {
     oldEnableFragmentCacheLogging = caching.enableFragmentCacheLogging!;
     caching.enableFragmentCacheLogging = true;
 
-    controller = new TestCase();
+    controller = new TestCase(task.name);
     controller.controller = new LogSubscribersController();
 
     await controller.beforeSetup();

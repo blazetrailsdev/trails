@@ -15,8 +15,10 @@ describe("Rails::ApplicationController", () => {
     Trails.application = null;
   });
 
-  it("disables the nonce generator and allows inline script and style sources", async () => {
-    const tc = new ActionController.TestCase();
+  it("disables the nonce generator and allows inline script and style sources", async ({
+    task,
+  }) => {
+    const tc = new ActionController.TestCase(task.name);
     tc.controller = new InfoController();
     await tc.beforeSetup();
     tc.routes = new RouteSet();

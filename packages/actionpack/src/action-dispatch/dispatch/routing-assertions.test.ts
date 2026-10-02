@@ -80,12 +80,12 @@ interface Host {
   assertRouting: TestCase["assertRouting"];
   withRouting<T>(block: (routes: RouteSet) => T): T;
 }
-type HostClass = (typeof TestCase | typeof IntegrationTest) & (new () => Host);
+type HostClass = (typeof TestCase | typeof IntegrationTest) & (new (name: string) => Host);
 
-function runTest<T extends Host>(klass: new () => T): () => T {
+function runTest<T extends Host>(klass: new (name: string) => T): () => T {
   let t: T;
-  beforeEach(() => {
-    t = new klass();
+  beforeEach(({ task }) => {
+    t = new klass(task.name);
     t.beforeSetup();
     t.setup();
   });
