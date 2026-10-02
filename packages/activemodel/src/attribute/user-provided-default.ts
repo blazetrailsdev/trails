@@ -1,4 +1,4 @@
-import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { rbModConstSet, registerConstant, rtest } from "@blazetrails/ruby-compat";
 import { Attribute, FromUser } from "../attribute.js";
 import { ValueType } from "../type/value.js";
 
@@ -19,7 +19,9 @@ export class UserProvidedDefault extends FromUser {
 
   override get valueBeforeTypeCast(): unknown {
     if (typeof this.userProvidedValue === "function") {
-      return (this.memoizedValueBeforeTypeCast ??= this.userProvidedValue());
+      return rtest(this.memoizedValueBeforeTypeCast)
+        ? this.memoizedValueBeforeTypeCast
+        : (this.memoizedValueBeforeTypeCast = this.userProvidedValue());
     } else {
       return this.userProvidedValue;
     }

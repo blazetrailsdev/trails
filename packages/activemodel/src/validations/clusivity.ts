@@ -1,6 +1,6 @@
 import { resolveValue } from "./resolve-value.js";
 import { ArgumentError, NoMethodError } from "../attribute-assignment.js";
-import { Range, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Range, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
 
 export { resolveValue };
 
@@ -53,7 +53,9 @@ export function isInclude(this: ClusivityHost, record: unknown, value: unknown):
 
 /** @internal */
 export function delimiter(this: ClusivityHost): unknown {
-  return (this._delimiterCache ??= this.options.in ?? this.options.within);
+  return rtest(this._delimiterCache)
+    ? this._delimiterCache
+    : (this._delimiterCache = rtest(this.options.in) ? this.options.in : this.options.within);
 }
 
 /** @internal */

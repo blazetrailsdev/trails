@@ -1,4 +1,4 @@
-import { rbFPublicSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import {
   underscore,
   tableize,
@@ -34,7 +34,7 @@ export class Conversion {
   }
 
   toKey(): unknown[] | null {
-    const key = rbObjRespondTo(this, "id") && rbFPublicSend(this, "id");
+    const key = rbObjRespondTo(this, "id") && (this as unknown as { id: unknown }).id;
     return key != null && key !== false ? wrap(key) : null;
   }
 

@@ -1,6 +1,12 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { include, included, isModuleIncluded, Module } from "@blazetrails/activesupport";
+import {
+  include,
+  included,
+  isModuleIncluded,
+  kernelArray,
+  Module,
+} from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
 import { inspectAccessor } from "./_accessor.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
@@ -102,23 +108,7 @@ export function isAcceptableOption(
   this: { options: Record<string, unknown> },
   value: unknown,
 ): boolean {
-  const hasAccept = Object.hasOwn(this.options, "accept");
-  let accepted: unknown[];
-  if (!hasAccept) accepted = ["1", true];
-  else {
-    const rawAccept = this.options.accept;
-    if (rawAccept === null || rawAccept === undefined) accepted = [];
-    else if (Array.isArray(rawAccept)) accepted = rawAccept;
-    else if (isNonStringIterable(rawAccept)) accepted = Array.from(rawAccept);
-    else accepted = [rawAccept];
-  }
-  return accepted.includes(value);
-}
-
-function isNonStringIterable(value: unknown): value is Iterable<unknown> {
-  if (typeof value !== "object" || value === null) return false;
-  if (value instanceof String) return false;
-  return typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function";
+  return kernelArray(this.options.accept).includes(value);
 }
 
 AcceptanceValidator.prototype.isAcceptableOption = isAcceptableOption;

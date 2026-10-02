@@ -4674,6 +4674,23 @@ function isRescueClassGuard(statement: ts.Statement): boolean {
 }
 
 /**
+ * The `y` of `rtest(x) ? x : y`, or undefined for any other conditional. That
+ * shape is Ruby's `x || y` (`options[:in] || options[:within]`,
+ * `activemodel/lib/active_model/validations/clusivity.rb:31`) spelled exactly:
+ * JS `||` also falls through on `0`, `""` and `NaN`, and `??` does not fall
+ * through on `false`, so neither operator is the port. It is a short-circuit,
+ * and tokens as the `or` Ruby's operator emits rather than as an arm.
+ */
+function rtestFallback(conditional: ts.ConditionalExpression): ts.Expression | undefined {
+  const test = conditional.condition;
+  if (!ts.isCallExpression(test) || !ts.isIdentifier(test.expression)) return undefined;
+  if (test.expression.text !== "rtest" || test.arguments.length !== 1) return undefined;
+  return test.arguments[0].getText() === conditional.whenTrue.getText()
+    ? conditional.whenFalse
+    : undefined;
+}
+
+/**
  * `throw e`, alone or as a block's only statement, where `e` is the catch
  * binding: the exception leaving a typed `catch` it did not match. Ruby's
  * `rescue TypeError, NoMethodError`
@@ -4721,9 +4738,17 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   const tokens: string[] = [];
   const visit = (n: ts.Node): void => {
     switch (n.kind) {
-      case ts.SyntaxKind.ConditionalExpression:
+      case ts.SyntaxKind.ConditionalExpression: {
+        const fallback = rtestFallback(n as ts.ConditionalExpression);
+        if (fallback !== undefined) {
+          visit((n as ts.ConditionalExpression).condition);
+          tokens.push("or");
+          visit(fallback);
+          return;
+        }
         tokens.push(isNilGuardConditional(n as ts.ConditionalExpression) ? "if:nil-guard" : "if");
         break;
+      }
       case ts.SyntaxKind.IfStatement:
         tokens.push("if");
         break;

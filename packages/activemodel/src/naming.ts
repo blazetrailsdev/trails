@@ -257,7 +257,7 @@ export class ModelName {
 
   /** @internal */
   i18nKeys(): string[] {
-    return (this._cachedI18nKeys ??=
+    return (this._cachedI18nKeys ||=
       typeof this._klass?.lookupAncestors === "function"
         ? this._klass.lookupAncestors().map((klass) => klass.modelName.i18nKey)
         : []);

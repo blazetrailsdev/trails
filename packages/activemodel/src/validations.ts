@@ -9,7 +9,7 @@ import {
   runCallbacks,
 } from "@blazetrails/activesupport";
 
-import { block as rbBlock, rbBlockGivenP } from "@blazetrails/ruby-compat";
+import { block as rbBlock, rbBlockGivenP, rbFPublicSend } from "@blazetrails/ruby-compat";
 
 import { Errors } from "./errors.js";
 import { inspectAccessor } from "./validations/_accessor.js";
@@ -323,11 +323,13 @@ export class ValidationError<TModel extends ModelWithErrors = ModelWithErrors>
 
   constructor(model: TModel) {
     const errors = model.errors.fullMessages.join(", ");
-    const i18nScope = (model.constructor as unknown as { i18nScope: string }).i18nScope;
-    const message = I18n.t(`${i18nScope}.errors.messages.model_invalid`, {
-      errors,
-      default: ":errors.messages.model_invalid",
-    }) as string;
+    const message = I18n.t(
+      `${rbFPublicSend(model.constructor, "i18nScope")}.errors.messages.model_invalid`,
+      {
+        errors,
+        default: ":errors.messages.model_invalid",
+      },
+    ) as string;
     super(message);
     this.name = "ValidationError";
     this.model = model;

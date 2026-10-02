@@ -835,6 +835,22 @@ describe("body call capture", () => {
     expect(arms("catchAll")).toEqual(["try", "rescue", "throw"]);
   });
 
+  it("reads `rtest(x) ? x : y` as the `or` of Ruby's `x || y`, not as an arm", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        delimiter() {
+          return rtest(this.cache) ? this.cache : (this.cache = this.compute());
+        }
+        other() {
+          return rtest(this.cache) ? this.compute() : this.cache;
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("delimiter")).toEqual(["ref:rtest", "ref:cache", "or", "ref:compute"]);
+    expect(skeleton("other")!.filter((t) => t === "if" || t === "or")).toEqual(["if"]);
+  });
+
   it("carries the thrown class on the throw token", () => {
     const cls = extractFromSource(
       `class Foo {

@@ -2,7 +2,7 @@ import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { camelize } from "@blazetrails/activesupport";
-import { except, hashDelete, Range, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { except, hashDelete, Range, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
 import { resolveValue } from "./resolve-value.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
@@ -40,7 +40,8 @@ export class LengthValidator extends EachValidator {
   constructor(options: Record<string, unknown>) {
     options = { ...options };
 
-    const range = hashDelete(options, "in") ?? hashDelete(options, "within");
+    const inOption = hashDelete(options, "in");
+    const range = rtest(inOption) ? inOption : hashDelete(options, "within");
     if (range != null && range !== false) {
       if (!(range instanceof Range)) {
         throw new ArgumentError(":in and :within must be a Range");
