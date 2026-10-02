@@ -88,25 +88,21 @@ describe("compareLiteral", () => {
   });
 
   it("decodes a Ruby double-quoted escape before comparing", () => {
-    // sanitization.rb:132 — `escape_character = "\\"`
     expect(compareLiteral({ kind: "string", value: "\\\\" }, { kind: "string", value: "\\" })).toBe(
       "match",
     );
-    // journey/router/utils.rb:44 — `SUB_DELIMS = "!\\$&'\\(\\)\\*\\+,;="`
     expect(
       compareLiteral(
         { kind: "string", value: "!\\\\$&'\\\\(\\\\)\\\\*\\\\+,;=" },
         { kind: "string", value: "!\\$&'\\(\\)\\*\\+,;=" },
       ),
     ).toBe("match");
-    // i18n backend/flatten.rb — `SEPARATOR_ESCAPE_CHAR = "\001"`
     expect(
       compareLiteral({ kind: "string", value: "\\001" }, { kind: "string", value: "\u0001" }),
     ).toBe("match");
   });
 
   it("keeps the backslashes of a single-quoted Ruby literal", () => {
-    // action_view.rb:35 — `ENCODING_FLAG = '#.*coding[:=]\s*(\S+)[ \t]*'`
     expect(
       compareLiteral(
         { kind: "string", value: "#.*coding[:=]\\s*(\\S+)[ \\t]*", singleQuoted: true },

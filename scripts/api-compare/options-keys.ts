@@ -2,14 +2,6 @@
 // The matcher pairs Ruby↔TS methods by name and arity.ts checks positional
 // ranges; neither looks at the keys a method accepts inside an options hash.
 // These helpers diff the two key sets for a name-matched pair.
-//
-// Both sides are UNDER-approximations of the same thing — the keys a body
-// reads directly (dynamic access and keys consumed in callees are missed). The
-// TS options TYPE is the second TS source: it says what a caller may pass, so a
-// Ruby key absent from both is `missingInTs`. `extraInTs` is measured off the
-// body's reads alone, since a shared options type declares every key any method
-// on the surface accepts.
-
 import { snakeToCamel } from "@blazetrails/parity/conventions";
 
 /** Known Ruby-option-symbol → TS-property renames the camelization can't derive.
@@ -42,11 +34,8 @@ function isPublicKey(key: string): boolean {
  *  (`/(?<type>…)/`) or a `super`-inherited read can leak `:type` into the symbol
  *  set even though `type` is the second positional arg. Such keys never belong
  *  in a TS options interface, so flagging them `missingInTs` is a false
- *  positive. The leak cannot be told from a real `options[:type]` read
- *  (mysql/schema_definitions.rb:69), so the name is dropped from the TS reads
- *  too: unmeasured on both sides rather than extra on one. Param names are
- *  normalized through the same pipeline as the keys so `inverse_of`-style
- *  spellings line up. */
+ *  positive. Param names are normalized through the same pipeline as the keys
+ *  so `inverse_of`-style spellings line up. */
 function positionalSet(positionalParams: string[]): Set<string> {
   return new Set(positionalParams.map((p) => normalizeRubyKey(p)));
 }
@@ -63,7 +52,10 @@ export interface OptionKeyDiff {
  *  Ruby symbols to TS naming. `tsKeys` are the options type's property names,
  *  `tsReads` the keys the TS body reads (extract-ts-api.ts `extractOptionReads`).
  *  `positionalParams` (Ruby param names of the method) are dropped from the Ruby
- *  side — see `positionalSet`. `keywordParams` are the Ruby method's named
+ *  side — see `positionalSet` — and from the TS reads, since that leak cannot
+ *  be told from a real `options[:type]` read (mysql/schema_definitions.rb:69).
+ *  Both sides are under-approximations: dynamic access and keys consumed in
+ *  callees are missed. `keywordParams` are the Ruby method's named
  *  keywords (`def delegated_type(role, types:, **options)`, delegated_type.rb:231):
  *  the port takes them as members of the same trailing object, so a TS read of
  *  one is the keyword, not an extra key. Both result lists are sorted. */

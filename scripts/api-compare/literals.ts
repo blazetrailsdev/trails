@@ -49,13 +49,15 @@ const RUBY_ESCAPE =
  * decoded, so comparing the two spellings counts every Ruby backslash twice:
  * `"\\"` (sanitization.rb:132) and TS `"\\"` are the same one-backslash string.
  *
- * Mirrors MRI's `read_escape` (vendor/ruby/v3.3.11/parse.y:7989): octal `\nnn`, `\xHH`, `\uHHHH`, `\u{H…}`,
- * control `\cx` / `\C-x`, the named escapes, a backslash-newline continuation,
+ * Mirrors MRI's `read_escape` (vendor/ruby/v3.3.11/parse.y:7989): octal
+ * `\nnn`, `\xHH`, `\uHHHH`, `\u{H…}`, control `\cx` / `\C-x`, the named escapes, a backslash-newline continuation,
  * and any other `\X`, which is `X`. `\M-x` is not decoded: it yields a byte
  * that is not a character, and falls through the last arm.
  *
- * A single-quoted literal knows two escapes, `\\` and `\'`, and keeps every
- * other backslash: `'\s*'` (action_view.rb:35) is three characters.
+ * A single-quoted literal (`'…'` / `%q(…)`, which extract-ruby-api.rb reads
+ * back off the source line, since the sexp drops the delimiter) knows two
+ * escapes, `\\` and `\'`, and keeps every other backslash: `'\s*'`
+ * (action_view.rb:35) is three characters.
  */
 export function decodeRubyString(source: string, singleQuoted = false): string {
   if (singleQuoted) return source.replace(/\\([\\'])/g, "$1");

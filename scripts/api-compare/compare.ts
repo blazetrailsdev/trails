@@ -4464,8 +4464,6 @@ export function main() {
       // always describes the very params the arity check would compare.
       const rubyForwardingNames = new Set<string>();
       const rubyBlockOwners = new Map<string, string[]>();
-      // Ruby option keys per name, unioned over every same-named body in the
-      // file — the TS candidates are unioned the same way (matchOptionKeysAgainst).
       const rubyOptionKeysByName = new Map<string, string[]>();
       // First-sighting Ruby body call-set per name (advisory calls-parity check).
       const rubyCallsByName = new Map<string, string[]>();

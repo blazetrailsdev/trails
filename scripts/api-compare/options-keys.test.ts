@@ -26,8 +26,6 @@ describe("diffOptionKeys", () => {
   });
 
   it("does not report a key the options TYPE declares but the body never reads", () => {
-    // timestamps(**options) — schema_definitions.rb:537 hands the hash straight
-    // on; the shared ColumnOptions type declares every column key.
     const columnOptions = ["after", "array", "as", "limit", "null", "precision"];
     expect(diffOptionKeys(["null"], columnOptions, [], ["null"])).toEqual({
       missingInTs: [],
@@ -43,14 +41,12 @@ describe("diffOptionKeys", () => {
   });
 
   it("reads a Ruby keyword param as the keyword, not an extra key", () => {
-    // delegated_type(role, types:, **options) — delegated_type.rb:231
     expect(
       diffOptionKeys(["scope"], ["scope", "types"], [], ["scope", "types"], ["types"]),
     ).toEqual({ missingInTs: [], extraInTs: [] });
   });
 
   it("drops a positional-param name from the TS reads as well", () => {
-    // mysql/schema_definitions.rb:69 — `type = options[:type]`, `type` positional
     const diff = diffOptionKeys(["type"], ["type", "limit"], ["name", "type"], ["type"]);
     expect(diff).toEqual({ missingInTs: [], extraInTs: [] });
   });
@@ -140,7 +136,6 @@ describe("matchOptionKeysAgainst", () => {
   });
 
   it("is quiet for a pass-through on both sides, whatever the options type declares", () => {
-    // as_json(options) → serializable_hash(options), serializers/json.rb:103
     const ts = [["except", "include", "methods", "only", "root"]];
     expect(matchOptionKeysAgainst(["root"], ts, [], [["root"]])).toEqual({
       comparable: true,

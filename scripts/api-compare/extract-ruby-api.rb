@@ -321,10 +321,6 @@ def string_literal_value(node)
   str
 end
 
-# Is this string literal `'…'` or `%q(…)`? Ripper's `@tstring_content` is the
-# undecoded source either way and the sexp drops the delimiter, so it is read
-# back off the source line. literals.ts decodes the value by this: a
-# single-quoted literal knows only `\\` and `\'`.
 def single_quoted_literal?(node)
   part = node.dig(1, 1)
   return false unless part.is_a?(Array) && part[0] == :@tstring_content && $literal_source_lines
@@ -3414,8 +3410,6 @@ class ApiExtractor
       # options[:foo]
       traverse_for_symbols(node[2], keys) if option_var?(node[1], vars)
     when :opassign
-      # `options[:foo] ||= v` reads the key before it writes it; a plain
-      # `options[:foo] = v` (`:assign`) does not.
       target = node[1]
       if target.is_a?(Array) && target[0] == :aref_field && option_var?(target[1], vars)
         traverse_for_symbols(target[2], keys)

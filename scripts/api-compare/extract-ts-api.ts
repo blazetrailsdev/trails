@@ -85,8 +85,6 @@ import {
 } from "./missing-rails-args-tags.js";
 import { TAG as MISSING_RAILS_NAME_TAG, suppressedNamesIn } from "./missing-rails-name-tags.js";
 
-/** TS spellings of extract-ruby-api.rb `OPTION_READER_METHODS`: a call that
- *  reads the key named by the string literal following the options hash. */
 const OPTION_READER_FUNCTIONS = new Set([
   "fetch",
   "hasKey",
@@ -5883,8 +5881,11 @@ export function extractOptionKeys(
  * type (`ColumnOptions`) is every key any method on the surface accepts, so
  * {@link extractOptionKeys} cannot say which keys this body branches on. A rest
  * binding (`{ types, ...options }`) and a copy (`const opts = { ...options }`)
- * carry the hash on under a new name. `undefined` when there is no body or no
- * trailing options param.
+ * carry the hash on under a new name, and a kwargs bag carrying the hash as its
+ * `options` property is read through to it, as {@link extractOptionKeys} does.
+ * The reader calls are the TS spellings of extract-ruby-api.rb
+ * `OPTION_READER_METHODS`, plus `valuesAt`, which reads every key it names.
+ * `undefined` when there is no body or no trailing options param.
  */
 export function extractOptionReads(
   parameters: ts.NodeArray<ts.ParameterDeclaration>,
@@ -5919,7 +5920,6 @@ export function extractOptionReads(
   const isOptions = (expr: ts.Expression): boolean => {
     const e = unwrap(expr);
     if (ts.isIdentifier(e)) return vars.has(e.text);
-    // The kwargs bag carrying the hash as its `options` property — see extractOptionKeys.
     return (
       ts.isPropertyAccessExpression(e) &&
       isOptionsName(e.name.text) &&
@@ -5967,7 +5967,6 @@ export function extractOptionReads(
         ? callee.name.text
         : undefined;
     if (name === undefined) return [];
-    // `Object.prototype.hasOwnProperty.call(options, "k")`
     const viaCall =
       name === "call" &&
       ts.isPropertyAccessExpression(callee) &&
@@ -5976,7 +5975,6 @@ export function extractOptionReads(
     const at = call.arguments.findIndex((a) => isOptions(a));
     if (at === -1) return [];
     const after = call.arguments.slice(at + 1).filter(ts.isStringLiteralLike);
-    // `valuesAt(options, "before", "after")` reads every key it names.
     if (name === "valuesAt") return after.map((a) => a.text);
     if (!viaCall && !OPTION_READER_FUNCTIONS.has(name)) return [];
     const key = call.arguments[at + 1];
