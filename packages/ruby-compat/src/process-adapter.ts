@@ -8,6 +8,10 @@ export interface WriteStream {
   readonly rows?: number;
 }
 
+export interface StdStream extends WriteStream {
+  flush(): StdStream;
+}
+
 export interface ReadStream {
   readonly isTTY: boolean;
   read(): Promise<string | null>;
@@ -55,9 +59,15 @@ function requireAdapter(): ProcessAdapter {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export const stdout: WriteStream = {
+export const stdout: StdStream = {
   /** @noRailsEquivalent PERMANENT */
   write: (chunk) => requireAdapter().stdout.write(chunk),
+  /**
+   * `rb_io_flush` (`vendor/ruby/v3.3.11/io.c:2379`). The adapter stream holds no buffer.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  flush: () => stdout,
   /** @noRailsEquivalent PERMANENT */
   get isTTY() {
     return requireAdapter().stdout.isTTY;
@@ -73,9 +83,15 @@ export const stdout: WriteStream = {
 };
 
 /** @noRailsEquivalent PERMANENT */
-export const stderr: WriteStream = {
+export const stderr: StdStream = {
   /** @noRailsEquivalent PERMANENT */
   write: (chunk) => requireAdapter().stderr.write(chunk),
+  /**
+   * `rb_io_flush` (`vendor/ruby/v3.3.11/io.c:2379`). The adapter stream holds no buffer.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  flush: () => stderr,
   /** @noRailsEquivalent PERMANENT */
   get isTTY() {
     return requireAdapter().stderr.isTTY;

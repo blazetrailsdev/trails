@@ -4,6 +4,7 @@ import {
   Module,
   RbConfig,
   rbConstGet,
+  rbEnsure,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { Basic } from "./shell/basic.js";
@@ -12,20 +13,20 @@ type ShellClass = new () => Basic;
 
 export const Base = {
   /** @internal */
-  _shell: null as ShellClass | null,
+  _shell: null as ShellClass | null | undefined,
 
   set shell(shell: ShellClass | null) {
     this._shell = shell;
   },
 
-  get shell(): ShellClass {
+  get shell(): ShellClass | undefined {
     if (this._shell == null) {
       if (env["THOR_SHELL"] != null && env["THOR_SHELL"] !== "") {
         this._shell = rbConstGet(Shell, env["THOR_SHELL"]) as ShellClass;
       } else if (/mswin|mingw/.test(RbConfig.CONFIG["host_os"]) && env["ANSICON"] == null) {
         this._shell = Shell.Basic;
       } else {
-        this._shell = Shell.Color!;
+        this._shell = Shell.Color;
       }
     }
     return this._shell;
@@ -75,7 +76,7 @@ function setShell(this: Shell, shell: Basic | null | undefined): void {
 }
 
 function shell(this: Shell): Basic {
-  return (this._shell ??= new Base.shell());
+  return (this._shell ??= new Base.shell!());
 }
 
 function ask(this: Shell, ...args: unknown[]): unknown {
@@ -132,20 +133,9 @@ function terminalWidth(this: Shell, ...args: unknown[]): unknown {
 
 function withPadding<T>(this: Shell, block: () => T): T {
   this.shell.padding += 1;
-  let result: T;
-  try {
-    result = block();
-  } catch (error) {
+  return rbEnsure(block, () => {
     this.shell.padding -= 1;
-    throw error;
-  }
-  if (result instanceof Promise) {
-    return result.finally(() => {
-      this.shell.padding -= 1;
-    }) as T;
-  }
-  this.shell.padding -= 1;
-  return result;
+  });
 }
 
 /** @internal */

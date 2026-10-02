@@ -214,7 +214,13 @@ export {
   stdin,
   stdout,
 } from "./process-adapter.js";
-export type { ProcessAdapter, ReadStream, SignalName, WriteStream } from "./process-adapter.js";
+export type {
+  ProcessAdapter,
+  ReadStream,
+  SignalName,
+  StdStream,
+  WriteStream,
+} from "./process-adapter.js";
 export type { PrependMethod, PrependModule } from "./prepend.js";
 export { Method, rbCheckArity, rbObjMethod } from "./method.js";
 export { regexpEscape } from "./regexp.js";
@@ -275,6 +281,7 @@ export { succ } from "./string/succ.js";
 export { isSymbol, rbMethodName, stringToSym, symbolToS } from "./symbol.js";
 export { Monitor, isMonOwned, synchronize } from "./monitor.js";
 export { Mutex } from "./mutex.js";
+export { rbEnsure } from "./ensure.js";
 export { Queue, SizedQueue } from "./queue.js";
 export { Fiber } from "./fiber.js";
 export { FiberError } from "./fiber-error.js";

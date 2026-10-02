@@ -4,12 +4,13 @@ import {
   print,
   puts,
   rbConstGet,
+  rbEnsure,
   rbObjAsString as toS,
   rtest,
   stderr as $stderr,
   stdout as $stdout,
   symbolToS,
-  type WriteStream,
+  type StdStream,
 } from "@blazetrails/ruby-compat";
 import * as Terminal from "./terminal.js";
 
@@ -35,20 +36,9 @@ export class Basic {
 
   mute<T>(block: () => T): T {
     this._mute = true;
-    let result: T;
-    try {
-      result = block();
-    } catch (error) {
+    return rbEnsure(block, () => {
       this._mute = false;
-      throw error;
-    }
-    if (result instanceof Promise) {
-      return result.finally(() => {
-        this._mute = false;
-      }) as T;
-    }
-    this._mute = false;
-    return result;
+    });
   }
 
   isMute(): boolean {
@@ -84,6 +74,7 @@ export class Basic {
     if (rtest(forceNewLine) && !toS(message).endsWith("\n")) buffer += "\n";
 
     print.call(this.stdout(), buffer);
+    this.stdout().flush();
   }
 
   sayError(message: unknown = "", color: unknown = null, forceNewLine?: unknown): void {
@@ -97,6 +88,7 @@ export class Basic {
     if (rtest(forceNewLine) && !toS(message).endsWith("\n")) buffer += "\n";
 
     print.call(this.stderr(), buffer);
+    this.stderr().flush();
   }
 
   /** @missingRailsArgs chomp — PERMANENT */
@@ -113,6 +105,7 @@ export class Basic {
     const buffer = `${status}${spaces}${message}\n`;
 
     print.call(this.stdout(), buffer);
+    this.stdout().flush();
   }
 
   error(statement: unknown): void {
@@ -141,12 +134,12 @@ export class Basic {
   }
 
   /** @internal */
-  protected stdout(): WriteStream {
+  protected stdout(): StdStream {
     return $stdout;
   }
 
   /** @internal */
-  protected stderr(): WriteStream {
+  protected stderr(): StdStream {
     return $stderr;
   }
 

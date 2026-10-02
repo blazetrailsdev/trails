@@ -34,6 +34,18 @@ export class Thread<R = unknown> {
   });
 
   /**
+   * `rb_thread_s_handle_interrupt` (`vendor/ruby/v3.3.11/thread.c:2230`), which
+   * masks asynchronous interrupts (`Thread#raise`, `Thread#kill`) around the
+   * block. Nothing can interrupt a JS body from outside, so every mask is
+   * already in force and the block runs as it is.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread.handle_interrupt` (`vendor/ruby/v3.3.11/thread.c:2230`).
+   */
+  static handleInterrupt<T>(maskArg: Readonly<Record<string, string>>, block: () => T): T {
+    return block();
+  }
+
+  /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread.current` (`vendor/ruby/v3.3.11/thread.c:2943`).
    */
   static current(): Thread {

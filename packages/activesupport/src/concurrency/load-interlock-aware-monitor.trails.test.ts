@@ -5,6 +5,15 @@ import { ThreadLoadInterlockAwareMonitor } from "./load-interlock-aware-monitor.
 const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
 
 describe("ThreadLoadInterlockAwareMonitor", () => {
+  it("runs an uncontended block before synchronize returns", () => {
+    const monitor = new ThreadLoadInterlockAwareMonitor();
+    let ran = false;
+    void monitor.synchronize(() => {
+      ran = true;
+    });
+    expect(ran).toBe(true);
+  });
+
   it("serializes sibling promises of one thread", async () => {
     const monitor = new ThreadLoadInterlockAwareMonitor();
     const log: string[] = [];

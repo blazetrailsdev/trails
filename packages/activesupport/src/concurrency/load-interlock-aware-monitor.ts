@@ -7,23 +7,31 @@ interface LoadInterlockAwareMonitorHost {
   monExit(): void;
 }
 
+const EXCEPTION_NEVER = Object.freeze({ Exception: ":never" });
+const EXCEPTION_IMMEDIATE = Object.freeze({ Exception: ":immediate" });
+
 export const LoadInterlockAwareMonitorMixin = {
   monEnter(this: LoadInterlockAwareMonitorHost, super_: () => unknown): unknown {
     return this.monTryEnter() || super_();
   },
 
-  async synchronize<T>(
+  synchronize<T>(
     this: LoadInterlockAwareMonitorHost,
     super_: () => unknown,
     block: () => T | Promise<T>,
   ): Promise<T> {
-    await this.monEnter();
+    return Thread.handleInterrupt(EXCEPTION_NEVER, async () => {
+      const entered = this.monEnter();
+      if (entered instanceof Promise) await entered;
 
-    try {
-      return (await synchronize.call(this, block)) as T;
-    } finally {
-      this.monExit();
-    }
+      try {
+        return (await Thread.handleInterrupt(EXCEPTION_IMMEDIATE, () =>
+          synchronize.call(this, block),
+        )) as T;
+      } finally {
+        this.monExit();
+      }
+    });
   },
 };
 

@@ -21,7 +21,7 @@ const MyCounter = Counter as unknown as new (
 
 describe("Thor::Shell", () => {
   let _shell: Basic | undefined;
-  const shell = () => (_shell ??= new Base.shell());
+  const shell = () => (_shell ??= new Base.shell!());
   beforeEach(() => {
     _shell = undefined;
   });
@@ -40,7 +40,7 @@ describe("Thor::Shell", () => {
 
   describe("#shell", () => {
     it("returns the shell in use", () => {
-      expect(new MyCounter([1, 2]).shell).toBeInstanceOf(Base.shell);
+      expect(new MyCounter([1, 2]).shell).toBeInstanceOf(Base.shell!);
     });
 
     it("uses $THOR_SHELL", () => {
