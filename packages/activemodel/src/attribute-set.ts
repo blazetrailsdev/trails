@@ -175,6 +175,12 @@ export class AttributeSet {
     return aset(this._attributes, name, this.getAttribute(name).withCastValue(value));
   }
 
+  freeze(): this {
+    Object.freeze(this.attributes());
+    Object.freeze(this);
+    return this;
+  }
+
   deepDup(): AttributeSet {
     return new AttributeSet(transformValues(this.attributes(), (attr) => attr.deepDup()));
   }
@@ -235,12 +241,6 @@ export class AttributeSet {
 
   toH(): Record<string, unknown> {
     return this.toHash();
-  }
-
-  freeze(): this {
-    Object.freeze(this.attributes());
-    Object.freeze(this);
-    return this;
   }
 }
 
