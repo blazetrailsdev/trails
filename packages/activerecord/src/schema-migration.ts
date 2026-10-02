@@ -36,17 +36,17 @@ export class SchemaMigration {
     return `${base.tableNamePrefix}${base.schemaMigrationsTableName}${base.tableNameSuffix}`;
   }
 
-  async createTable(): Promise<void> {
-    await this._pool.withConnection(async (connection) => {
+  async createTable(): Promise<unknown> {
+    return await this._pool.withConnection(async (connection) => {
       if (await connection.tableExists(this.tableName)) return;
-      await connection.createTable(this.tableName, { id: false }, (t) => {
+      return await connection.createTable(this.tableName, { id: false }, (t) => {
         t.string(this.primaryKey, connection.internalStringOptionsForPrimaryKey());
       });
     });
   }
 
-  async dropTable(): Promise<void> {
-    await this._pool.withConnection((connection) =>
+  async dropTable(): Promise<unknown> {
+    return await this._pool.withConnection((connection) =>
       connection.dropTable(this.tableName, { ifExists: true }),
     );
   }

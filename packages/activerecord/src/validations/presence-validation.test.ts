@@ -14,7 +14,7 @@ class Boy extends Human {
   static name = "Boy";
 }
 
-function setAssoc(record: Base, name: string, value: Base | null): void | Promise<void> {
+function setAssoc(record: Base, name: string, value: Base | null): unknown {
   return (record.association(name) as SingularAssociation).writer(value);
 }
 

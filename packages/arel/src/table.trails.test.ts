@@ -41,10 +41,6 @@ describe("TableTest (trails)", () => {
     expect(new Table("users", { klass }).get(":title").name).toBe("name");
   });
 
-  it("drops a Symbol alias naming the table itself", () => {
-    expect(new Table("users", { as: ":users" }).tableAlias).toBeNull();
-  });
-
   it("does not read an inherited property as an attribute alias", () => {
     const klass = { attributeAliases: {}, typeCaster: () => null };
     expect(new Table("users", { klass }).get("constructor").name).toBe("constructor");

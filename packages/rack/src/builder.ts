@@ -21,7 +21,11 @@ export class Builder {
     }
   }
 
-  static parseFile(path: string): RackApp {
+  static parseFile(path: string, ...options: any[]): RackApp {
+    return Builder.loadFile(path, ...options);
+  }
+
+  static loadFile(path: string, ..._options: any[]): RackApp {
     let content = File.read(path);
 
     if (content.charCodeAt(0) === 0xfeff) {
@@ -31,7 +35,7 @@ export class Builder {
     const firstLine = content.split("\n")[0];
     if (firstLine.startsWith("#\\")) {
       throw new Error(
-        "Parsing options from the first comment line is no longer supported. Remove the '#\\ ...' line or configure server options elsewhere.",
+        `Parsing options from the first comment line is no longer supported: ${path}`,
       );
     }
 
@@ -97,10 +101,6 @@ export class Builder {
   freezeApp(): this {
     this._frozen = true;
     return this;
-  }
-
-  static loadFile(path: string, ..._options: any[]): RackApp {
-    return Builder.parseFile(path);
   }
 
   static app(defaultApp?: RackApp | null, block?: (b: Builder) => void): RackApp {

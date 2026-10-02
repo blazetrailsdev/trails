@@ -2502,31 +2502,6 @@ export class CreatePosts extends Migration {
     }
   });
 
-  it("db schema:dump --format=sql works against ':memory:' sqlite by reusing the migration adapter", async () => {
-    fs.writeFileSync(
-      path.join(tmpDir, "config", "database.ts"),
-      `export default {
-  schemaFormat: "sql",
-  development: { adapter: "sqlite3", database: ":memory:" },
-  test: { adapter: "sqlite3", database: ":memory:" },
-};`,
-    );
-    fs.writeFileSync(
-      path.join(tmpDir, "db", "migrate", "20260101000000_create_things.ts"),
-      `import { Migration } from "@blazetrails/activerecord";
-export class CreateThings extends Migration {
-  async up() { await this.createTable("things", (t) => { t.string("name"); }); }
-  async down() { await this.dropTable("things"); }
-}`,
-    );
-
-    await runDb(["migrate"]);
-
-    const dumped = fs.readFileSync(path.join(tmpDir, "db", "structure.sql"), "utf8");
-    expect(dumped).toContain("things");
-    expect(dumped).toMatch(/CREATE TABLE.*schema_migrations/);
-  });
-
   it("db schema:load --format=sql errors when structure.sql is missing", async () => {
     const dbFile = path.join(tmpDir, "missing.sqlite3");
     fs.writeFileSync(

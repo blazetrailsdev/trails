@@ -231,7 +231,7 @@ interface OneToOneAssociation {
   target: Base | null;
   build(attrs: Record<string, unknown>): Base | null | Promise<Base | null>;
   buildRecord(attrs: Record<string, unknown>): Base | null;
-  setNewRecord(record: Base): void | Promise<void>;
+  setNewRecord(record: Base): Base | null | Promise<Base | null>;
   initializeAttributes(record: Base): Promise<void> | void;
   isLoaded(): boolean;
   readonly reader?: Base | null | Promise<Base | null>;
@@ -349,7 +349,10 @@ export function assignNestedAttributesForOneToOneAssociation(
         if (assoc.displacementNeedsAwait?.() === true) {
           return detachDisplacedThenSetNewRecord(assoc, built);
         }
-        if (built) return assoc.setNewRecord(built);
+        if (built) {
+          const assigned = assoc.setNewRecord(built);
+          if (assigned instanceof Promise) return assigned.then(() => {});
+        }
       }
     }
   }

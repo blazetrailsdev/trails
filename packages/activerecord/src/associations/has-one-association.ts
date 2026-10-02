@@ -13,7 +13,11 @@ import { assertAssignedSynchronously } from "@blazetrails/activemodel";
 export class HasOneAssociation extends SingularAssociation {
   /** @internal */
   protected syncWrite(record: Base | null): void {
-    assertAssignedSynchronously(this.replace(record, false), `${this.reflection.name}=`);
+    const replaced = this.replace(record, false);
+    assertAssignedSynchronously(
+      replaced instanceof Promise ? replaced.then(() => {}) : undefined,
+      `${this.reflection.name}=`,
+    );
   }
 
   async handleDependency(): Promise<void> {
@@ -128,14 +132,17 @@ export class HasOneAssociation extends SingularAssociation {
     return Promise.resolve(this.loadTarget());
   }
 
-  protected override replace(record: Base | null, save: false): void | Promise<void>;
-  protected override replace(record: Base | null, save?: boolean): void | Promise<void>;
-  protected override replace(record: Base | null, save = true): void | Promise<void> {
+  protected override replace(record: Base | null, save: false): Base | null | Promise<Base | null>;
+  protected override replace(
+    record: Base | null,
+    save?: boolean,
+  ): Base | null | Promise<Base | null>;
+  protected override replace(record: Base | null, save = true): Base | null | Promise<Base | null> {
     if (save) {
       return (async () => {
         if (record) (this as any).raiseOnTypeMismatchBang(record);
         if (!this.loaded) await this.loadTarget();
-        if (!this.target && !record) return;
+        if (!this.target && !record) return this.target;
         const assigningAnotherRecord = !rbEqual(this.target, record);
         if (assigningAnotherRecord || record?.hasChangesToSave === true) {
           save = (this.owner as { isPersisted?: () => boolean }).isPersisted?.() === true;
@@ -157,7 +164,7 @@ export class HasOneAssociation extends SingularAssociation {
             }
           });
         }
-        this.target = record;
+        return (this.target = record);
       })();
     }
     {
@@ -180,8 +187,7 @@ export class HasOneAssociation extends SingularAssociation {
           this.setInverseInstance(record);
         }
       }
-      this.target = record;
-      return;
+      return (this.target = record);
     }
   }
 
@@ -278,7 +284,7 @@ export class HasOneAssociation extends SingularAssociation {
     }
   }
 
-  protected override setNewRecord(record: Base): void | Promise<void> {
+  protected override setNewRecord(record: Base): Base | null | Promise<Base | null> {
     return this.replace(record, false);
   }
 

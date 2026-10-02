@@ -442,7 +442,7 @@ describe("QueryCacheTest", () => {
     class ShouldNotHaveExceptionsLogger extends LogSubscriber {
       events: NotificationEvent[] = [];
       exception = false;
-      override sql(event: NotificationEvent): void {
+      override sql(event: NotificationEvent): undefined {
         this.events.push(event);
         try {
           super.sql(event);

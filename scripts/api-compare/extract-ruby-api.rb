@@ -445,6 +445,7 @@ class ApiExtractor
 
     @current_file = rel_path
     @current_line = 0
+    @defines_fail = source.match?(/^\s*def\s+(?:self\.)?fail\b/)
     @hash_ivars = hash_typed_ivars(sexp).select { |_name, hashy| hashy }.keys.to_set
     walk(sexp)
 
@@ -3127,10 +3128,14 @@ class ApiExtractor
     op.is_a?(Array) ? op[1] : op
   end
 
+  # `fail` is `raise` under its other name (`rb_define_global_function("fail",
+  # f_raise, -1)`, vendor/ruby/v3.3.11/eval.c:2072-2073), and its port is the same
+  # ThrowStatement, so it tokens the same way — except in a file that defines
+  # a `fail` of its own (`rack/files.rb:190`), where the name is that method.
   def skeleton_push_name(tokens, name, recv, args = nil)
     return unless name
 
-    if name == "raise"
+    if name == "raise" || (name == "fail" && recv.nil? && !@defines_fail)
       const = skeleton_raise_class(args)
       tokens << (const ? "throw:#{const}" : "throw")
     elsif name == "new"

@@ -1558,9 +1558,9 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
 }
 
 /** @internal */
-export function buildOrder(this: QueryMethodsHost, arel: any): void {
+export function buildOrder(this: QueryMethodsHost, arel: any): unknown {
   const orders = compactBlank(((this as any).orderValues ?? []) as unknown[]);
-  if (orders.length > 0) arel.order?.(...orders);
+  if (orders.length > 0) return arel.order?.(...orders);
 }
 
 /** @internal */

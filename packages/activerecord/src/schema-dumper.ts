@@ -665,7 +665,7 @@ export abstract class SchemaDumper {
   }
 
   /** @internal */
-  async foreignKeys(table: string, stream: IO | StringIO): Promise<void> {
+  async foreignKeys(table: string, stream: IO | StringIO): Promise<undefined> {
     const host = this._hookHost("foreignKeys") as
       | {
           foreignKeys(table: string): Promise<ForeignKeyDefinition[] | undefined>;

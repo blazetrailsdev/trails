@@ -58,11 +58,11 @@ export class InternalMetadata {
     return this._pool.dbConfig.useMetadataTable;
   }
 
-  async createTable(): Promise<void> {
+  async createTable(): Promise<unknown> {
     if (!this.enabled) return;
-    await this._pool.withConnection(async (connection) => {
+    return await this._pool.withConnection(async (connection) => {
       if (await connection.tableExists(this.tableName)) return;
-      await connection.createTable(this.tableName, { id: false }, (t) => {
+      return await connection.createTable(this.tableName, { id: false }, (t) => {
         t.string("key", connection.internalStringOptionsForPrimaryKey());
         t.string("value");
         t.timestamps();
@@ -81,9 +81,9 @@ export class InternalMetadata {
     });
   }
 
-  async dropTable(): Promise<void> {
+  async dropTable(): Promise<unknown> {
     if (!this.enabled) return;
-    await this._pool.withConnection((connection) =>
+    return await this._pool.withConnection((connection) =>
       connection.dropTable(this.tableName, { ifExists: true }),
     );
   }
