@@ -222,11 +222,11 @@ describe("DateTimeType cast and serialize coverage", () => {
     expect((result as RubyTime).getutc().usec).toBe(123456);
   });
 
-  it("Temporal.PlainDateTime is converted to Instant (treated as UTC)", () => {
+  it("a DateTime passes through cast and is truncated to the precision", () => {
     const pdt = plainDateTime("2026-04-26T14:23:55.123456");
-    const result = type.cast(pdt) as RubyTime;
-    expect(result).toBeInstanceOf(RubyTime);
-    expect(result.getutc().usec % 1000).toBe(456);
+    expect(type.cast(pdt)).toBe(pdt);
+    const result = new Types.DateTimeType({ precision: 3 }).cast(pdt) as unknown;
+    expect((result as Temporal.PlainDateTime).toString()).toBe("2026-04-26T14:23:55.123");
   });
 
   it("has name 'datetime'", () => {
@@ -252,11 +252,11 @@ describe("DateTimeType cast and serialize coverage", () => {
     );
   });
 
-  it("serialize returns the cast Instant for PlainDateTime (cast to Instant first)", () => {
+  it("serialize leaves a UTC DateTime as it is and converts one with an offset", () => {
     const pdt = plainDateTime("2026-04-26T14:23:55.123456");
-    expect((type.serialize(pdt) as RubyTime).getutc().xmlschema(6)).toBe(
-      "2026-04-26T14:23:55.123456Z",
-    );
+    expect(type.serialize(pdt)).toBe(pdt);
+    const zdt = Temporal.ZonedDateTime.from("2026-04-26T14:23:55.123456+02:00[+02:00]");
+    expect((type.serialize(zdt) as RubyTime).xmlschema(6)).toBe("2026-04-26T12:23:55.123456Z");
   });
 
   it("serialize null returns null", () => {
@@ -267,12 +267,6 @@ describe("DateTimeType cast and serialize coverage", () => {
     const t = new Types.DateTimeType({ precision: 3 });
     const i = RubyTime.utc(2026, 4, 26, 14, 23, 55, 123456);
     expect((t.serialize(i) as RubyTime).getutc().xmlschema(3)).toBe("2026-04-26T14:23:55.123Z");
-  });
-
-  it("PlainDateTime input is converted to Instant (multiparameter support)", () => {
-    const pdt = Temporal.PlainDateTime.from("2026-04-26T14:23:55");
-    const result = type.cast(pdt);
-    expect(result).toBeInstanceOf(RubyTime);
   });
 
   it("valueFromMultiparameterAssignment reconstructs an Instant from {1..6}", () => {

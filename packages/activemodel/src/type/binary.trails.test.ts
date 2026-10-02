@@ -14,7 +14,7 @@ describe("BinaryTypeTrails", () => {
     const bytes = new Uint8Array([0x80, 0xde, 0xad]);
     const result = type.serialize(bytes);
     expect(result).toBeInstanceOf(BinaryData);
-    expect(result!.bytes).toEqual(bytes);
+    expect(result!.toString()).toEqual(bytes);
   });
 
   it("Data#initialize takes another Data's bytes without decoding them", () => {

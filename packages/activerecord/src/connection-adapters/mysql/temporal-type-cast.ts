@@ -4,6 +4,7 @@ import {
   parseMysqlInstant,
   parseMysqlDatetimeAsInstant,
   parseMysqlDate,
+  timeFromInstant,
 } from "../abstract/temporal-wire.js";
 
 type Field = { type: string; string: () => string | null };
@@ -16,13 +17,13 @@ export function temporalTypeCast(field: Field, next: NextFn): unknown {
     case "TIMESTAMP2": {
       const raw = field.string();
       if (raw === null) return null;
-      return parseMysqlInstant(raw);
+      return timeFromInstant(parseMysqlInstant(raw));
     }
     case "DATETIME":
     case "DATETIME2": {
       const raw = field.string();
       if (raw === null) return null;
-      return parseMysqlDatetimeAsInstant(raw);
+      return timeFromInstant(parseMysqlDatetimeAsInstant(raw));
     }
     case "DATE":
     case "NEWDATE": {

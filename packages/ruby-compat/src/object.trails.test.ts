@@ -133,6 +133,15 @@ describe("Object#respond_to?", () => {
     expect(basicObjRespondTo(null, "id")).toBe(false);
   });
 
+  it("answers to_date for the Temporal seats of Date and DateTime", () => {
+    const tagged = (tag: string) => ({ [Symbol.toStringTag]: tag });
+    expect(basicObjRespondTo(tagged("Temporal.PlainDate"), "toDate")).toBe(true);
+    expect(basicObjRespondTo(tagged("Temporal.PlainDateTime"), "toDate")).toBe(true);
+    expect(basicObjRespondTo(tagged("Temporal.ZonedDateTime"), "toDate")).toBe(true);
+    expect(basicObjRespondTo(tagged("Temporal.Instant"), "toDate")).toBe(false);
+    expect(basicObjRespondTo("2026-01-01", "toDate")).toBe(false);
+  });
+
   it("sends an overridden respond_to? and otherwise falls back to the default", () => {
     // vendor/ruby/v3.3.11/vm_method.c:2882 vm_respond_to, :2945 the basic_obj_respond_to fallback.
     const overriding = { isRespondTo: (mid: string) => mid === "name" };

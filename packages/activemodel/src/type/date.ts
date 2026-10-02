@@ -44,10 +44,8 @@ export class DateType extends ValueType<DateCastResult> {
     if (typeof value === "string") {
       if (value === "") return null;
       return this.fastStringToDate(value) ?? this.fallbackStringToDate(value);
-    } else if (value instanceof Temporal.PlainDateTime) {
-      return value.toPlainDate();
     } else if (rbObjRespondTo(value, "toDate")) {
-      return (value as { toDate(): DateCastResult }).toDate();
+      return toDate(value);
     } else {
       return value as DateCastResult;
     }
@@ -106,6 +104,14 @@ export class DateType extends ValueType<DateCastResult> {
 }
 
 const ISO_DATE = /^(\d{4})-(\d\d)-(\d\d)$/;
+
+function toDate(value: unknown): DateCastResult {
+  if (value instanceof Temporal.PlainDate) return value;
+  if (value instanceof Temporal.PlainDateTime || value instanceof Temporal.ZonedDateTime) {
+    return value.toPlainDate();
+  }
+  return (value as { toDate(): DateCastResult }).toDate();
+}
 
 include(DateType, Timezone);
 

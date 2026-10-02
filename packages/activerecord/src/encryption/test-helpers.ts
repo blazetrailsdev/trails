@@ -471,18 +471,18 @@ function _assertEncryptedAttributeOnModel(
       rawSerialized == null
         ? null
         : rawSerialized instanceof BinaryData
-          ? new TextDecoder().decode(rawSerialized.bytes)
+          ? new TextDecoder().decode(rawSerialized.toString())
           : String(rawSerialized);
 
     const dbBytes =
       dbValue instanceof BinaryData
-        ? dbValue.bytes
+        ? dbValue.toString()
         : dbValue instanceof Uint8Array
           ? dbValue
           : null;
     const plaintextBytes =
       rawSerialized instanceof BinaryData
-        ? rawSerialized.bytes
+        ? rawSerialized.toString()
         : rawSerialized instanceof Uint8Array
           ? rawSerialized
           : null;

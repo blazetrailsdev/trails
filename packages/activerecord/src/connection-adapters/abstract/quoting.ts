@@ -102,7 +102,7 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (typeof value === "symbol" || value instanceof Chars) {
     return value instanceof Chars ? value.toS() : (value.description ?? String(value));
   }
-  if (value instanceof BinaryData) return value.bytes;
+  if (value instanceof BinaryData) return value.toString();
   if (typeof value === "boolean") return value ? this.unquotedTrue() : this.unquotedFalse();
   if (value === null || value === undefined) return value;
   if (value instanceof BigDecimal) return value.toString("F");
@@ -210,7 +210,7 @@ export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): s
 }
 
 export function quotedBinary(value: BinaryData): string {
-  return `'${quoteString(Buffer.from(value.bytes).toString("latin1"))}'`;
+  return `'${quoteString(Buffer.from(value.toString()).toString("latin1"))}'`;
 }
 
 export function sanitizeAsSqlComment(value: unknown): string {

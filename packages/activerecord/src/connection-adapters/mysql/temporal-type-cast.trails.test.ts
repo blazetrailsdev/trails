@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { temporalTypeCast } from "./temporal-type-cast.js";
 
@@ -12,16 +12,18 @@ describe("temporalTypeCast", () => {
   describe("TIMESTAMP", () => {
     it("parses a UTC timestamp to Temporal.Instant", () => {
       const result = temporalTypeCast(field("TIMESTAMP", "2026-04-27 14:23:55.123456"), next);
-      expect(result).toBeInstanceOf(Temporal.Instant);
-      expect((result as Temporal.Instant).epochMilliseconds).toBe(
+      expect(result).toBeInstanceOf(RubyTime);
+      expect((result as RubyTime).getutc().toZonedDateTime().toInstant().epochMilliseconds).toBe(
         Temporal.Instant.from("2026-04-27T14:23:55.123456Z").epochMilliseconds,
       );
     });
 
     it("preserves microsecond precision", () => {
       const result = temporalTypeCast(field("TIMESTAMP", "2026-01-01 00:00:00.000001"), next);
-      expect(result).toBeInstanceOf(Temporal.Instant);
-      expect((result as Temporal.Instant).epochNanoseconds % 1000000000n).toBe(1000n);
+      expect(result).toBeInstanceOf(RubyTime);
+      expect(
+        (result as RubyTime).getutc().toZonedDateTime().toInstant().epochNanoseconds % 1000000000n,
+      ).toBe(1000n);
     });
 
     it("returns null for NULL", () => {
@@ -34,15 +36,19 @@ describe("temporalTypeCast", () => {
 
     it("handles TIMESTAMP2 (binary protocol fractional variant)", () => {
       const result = temporalTypeCast(field("TIMESTAMP2", "2026-04-27 14:23:55.123456"), next);
-      expect(result).toBeInstanceOf(Temporal.Instant);
+      expect(result).toBeInstanceOf(RubyTime);
     });
   });
 
   describe("DATETIME", () => {
     it("parses DATETIME to Temporal.Instant (UTC)", () => {
       const result = temporalTypeCast(field("DATETIME", "2026-04-27 14:23:55.123456"), next);
-      expect(result).toBeInstanceOf(Temporal.Instant);
-      const zdt = (result as Temporal.Instant).toZonedDateTimeISO("UTC");
+      expect(result).toBeInstanceOf(RubyTime);
+      const zdt = (result as RubyTime)
+        .getutc()
+        .toZonedDateTime()
+        .toInstant()
+        .toZonedDateTimeISO("UTC");
       expect(zdt.millisecond).toBe(123);
       expect(zdt.microsecond).toBe(456);
     });
@@ -53,7 +59,7 @@ describe("temporalTypeCast", () => {
 
     it("handles DATETIME2 (binary protocol fractional variant)", () => {
       const result = temporalTypeCast(field("DATETIME2", "2026-04-27 00:00:00"), next);
-      expect(result).toBeInstanceOf(Temporal.Instant);
+      expect(result).toBeInstanceOf(RubyTime);
     });
 
     it("returns null for NULL", () => {

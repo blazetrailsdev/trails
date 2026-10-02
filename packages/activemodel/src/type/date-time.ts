@@ -1,17 +1,10 @@
 import {
   ArgumentError,
   Date as RubyDate,
-  Temporal,
   Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
-import {
-  numericMul,
-  Rational,
-  rbObjAsString as toS,
-  registerConstant,
-  toI,
-} from "@blazetrails/ruby-compat";
+import { numericMul, rbObjAsString as toS, registerConstant, toI } from "@blazetrails/ruby-compat";
 import {
   type DateInfinity as DateInfinityType,
   type DateNegativeInfinity as DateNegativeInfinityType,
@@ -44,17 +37,6 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
 
   /** @internal */
   protected castValue(value: unknown): DateTimeCastResult | null {
-    let seconds: Rational | null = null;
-    // boundary: the `Temporal.PlainDateTime` / `Temporal.ZonedDateTime` `DateTime.civil` returns stands for the Ruby ::DateTime `cast_value` receives.
-    if (value instanceof Temporal.PlainDateTime) {
-      seconds = new Rational(value.toZonedDateTime("UTC").epochNanoseconds, 1_000_000_000n);
-    } else if (value instanceof Temporal.ZonedDateTime) {
-      seconds = new Rational(value.epochNanoseconds, 1_000_000_000n);
-    }
-    if (seconds != null) {
-      const time = RubyTime.at(seconds);
-      value = this.isUtc ? time.getutc() : time.getlocal();
-    }
     if (typeof value !== "string")
       return this.applySecondsPrecision(value) as DateTimeCastResult | null;
     if (value === "") return null;

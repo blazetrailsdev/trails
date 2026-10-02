@@ -34,21 +34,20 @@ export class BinaryType extends ValueType<unknown> {
 }
 
 export class Data {
-  /** @noRailsEquivalent PERMANENT */
-  readonly bytes: Uint8Array;
+  private value: Uint8Array;
 
   constructor(value: unknown) {
     value = toS(value);
     if (typeof value === "string") value = textEncoder.encode(value);
-    this.bytes = value as Uint8Array;
+    this.value = value as Uint8Array;
   }
 
   toString(): Uint8Array {
-    return this.bytes;
+    return this.value;
   }
 
   hex(): string {
-    return Array.from(this.bytes)
+    return Array.from(this.value)
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
   }

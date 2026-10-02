@@ -204,6 +204,12 @@ export function rbModName(klass: abstract new (...args: never) => unknown): stri
   return classpaths.get(klass)?.path ?? (klass.name || null);
 }
 
+const DATE_SEATS: ReadonlySet<string> = new Set([
+  "Temporal.PlainDate",
+  "Temporal.PlainDateTime",
+  "Temporal.ZonedDateTime",
+]);
+
 /**
  * `basic_obj_respond_to` (`vendor/ruby/v3.3.11/vm_method.c:2864`) — the default
  * `Object#respond_to?`, which answers whether the receiver's class defines the
@@ -223,7 +229,8 @@ export function rbModName(klass: abstract new (...args: never) => unknown): stri
  * (`":name"`); Symbol answers `to_sym` too (`symbol.rb:8`). `toAry` is bound for a JS array
  * (`array.c:8619`), whose prototype carries no such member. `isInfinite` is
  * bound for a JS number and bigint, which spell Float (`numeric.c:6376`) and
- * Integer (`numeric.rb:48`).
+ * Integer (`numeric.rb:48`). `toDate` is bound for the Temporal seats of Date and
+ * DateTime, which define `to_date` (`ext/date/date_core.c:10054,10058`).
  *
  * A class receiver (a non-writable `prototype`, which a plain function, the
  * JS spelling of a `Proc`, does not have) answers `Module#respond_to?`: its static data fields hold
@@ -247,6 +254,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   if (typeof obj === "string" && (mid === "toStr" || mid === "toSym")) return true;
   if (Array.isArray(obj) && mid === "toAry") return true;
   if ((typeof obj === "number" || typeof obj === "bigint") && mid === "isInfinite") return true;
+  if (mid === "toDate" && obj != null && DATE_SEATS.has(temporalTag(obj) ?? "")) return true;
   if (
     mid === "get" &&
     (typeof obj === "string" || Array.isArray(obj) || obj instanceof Map || isPlainHash(obj))
