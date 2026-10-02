@@ -279,6 +279,26 @@ describe("rbFSend", () => {
   it("raises ArgumentError for an ordering operator <=> cannot place", () => {
     expect(() => rbFPublicSend(1, ">", "a")).toThrow(ArgumentError);
     expect(() => rbFPublicSend(1, ">", "a")).toThrow("comparison of Integer with String failed");
+    expect(() => rbFPublicSend("a", "<", 1)).toThrow(ArgumentError);
+  });
+
+  it("answers false for an ordering operator with a NaN operand, as Float does", () => {
+    for (const op of [">", ">=", "<", "<="]) {
+      expect(rbFPublicSend(NaN, op, 1)).toBe(false);
+      expect(rbFPublicSend(1, op, NaN)).toBe(false);
+    }
+  });
+
+  it("sends == to the receiver's own ==", () => {
+    const recv = { equals: (other: unknown) => other === "same" };
+    expect(rbFPublicSend(recv, "==", "same")).toBe(true);
+    expect(rbFPublicSend(recv, "!=", "same")).toBe(false);
+  });
+
+  it("raises NoMethodError for an ordering operator the receiver does not define", () => {
+    expect(() => rbFPublicSend(null, ">", 1)).toThrow(NoMethodError);
+    expect(() => rbFPublicSend([1], ">", [0])).toThrow(NoMethodError);
+    expect(() => rbFPublicSend(true, "<", false)).toThrow(NoMethodError);
   });
 
   it("answers infinite? for a Float and an Integer, whose JS values do not define it", () => {

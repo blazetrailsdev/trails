@@ -241,7 +241,7 @@ export const ClassMethods = {
   },
 
   /** @internal */
-  resolveAttributeName(this: AttributeHostInternals, name: string): string {
+  resolveAttributeName(name: string): string {
     return rbObjAsString(name);
   },
 

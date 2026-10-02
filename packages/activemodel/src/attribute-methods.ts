@@ -353,7 +353,7 @@ export const ClassMethods = {
   resolveAttributeName(this: ClassMethodsHost, name: string): string {
     return fetch(
       this.attributeAliases,
-      AttributeRegistration.ClassMethods.resolveAttributeName.call(this as never, name),
+      AttributeRegistration.ClassMethods.resolveAttributeName.call(this, name),
       block((key) => key),
     );
   },
