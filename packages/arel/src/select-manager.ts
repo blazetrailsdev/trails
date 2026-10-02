@@ -23,6 +23,7 @@ import {
   isSymbol,
   rbConstGet,
   rbModConstSet,
+  rbObjAsString,
   symbolToS,
 } from "@blazetrails/ruby-compat";
 import { Comment } from "./nodes/comment.js";
@@ -221,7 +222,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
     if (other != null) {
       nodeClass = rbConstGet(
         Nodes,
-        `Union${capitalize(symbolToS(operation as string), [])}`,
+        `Union${capitalize(isSymbol(operation) ? symbolToS(operation) : rbObjAsString(operation), [])}`,
       ) as typeof Union;
     } else {
       other = operation as SelectManager;

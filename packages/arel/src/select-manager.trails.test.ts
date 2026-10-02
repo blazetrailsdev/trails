@@ -65,6 +65,13 @@ describe("SelectManagerTest (trails)", () => {
   });
 
   describe("union", () => {
+    it("resolves a String operation as it does a Symbol", () => {
+      const m1 = new SelectManager(users).project(star());
+      const m2 = new SelectManager(users).project(star());
+      expect(m1.union("all", m2)).toBeInstanceOf(Nodes.UnionAll);
+      expect(m1.union(":all", m2)).toBeInstanceOf(Nodes.UnionAll);
+    });
+
     it("raises NameError for an operation naming no Union node", () => {
       const m1 = new SelectManager(users).project(star());
       const m2 = new SelectManager(users).project(star());
