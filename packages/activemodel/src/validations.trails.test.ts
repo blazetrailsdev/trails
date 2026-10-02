@@ -635,7 +635,7 @@ describe("ValidationsTest (trails)", () => {
 
       const b = new Scoped({});
       expect(await b.isValid(["create", "publish"])).toBe(false);
-      expect(b.errors.attributeNames.sort()).toEqual(["name", "title"]);
+      expect([...b.errors.attributeNames].sort()).toEqual(["name", "title"]);
 
       const c = new Scoped({});
       expect(await c.isValid(["publish"])).toBe(false);

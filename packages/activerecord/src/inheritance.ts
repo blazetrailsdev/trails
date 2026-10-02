@@ -209,10 +209,6 @@ export class ClassMethods {
   static set abstractClass(value: boolean) {
     (this as any)._abstractClass = value;
   }
-
-  static initializeClone(this: typeof Base, other: unknown): void {
-    setBaseClass(this);
-  }
 }
 
 /**
@@ -309,6 +305,15 @@ export function polymorphicClassFor(modelClass: typeof Base, name: string): type
     return constantize(name) as typeof Base;
   }
   return modelClass.computeType(name);
+}
+
+export function initializeClone(
+  this: typeof Base,
+  super_: (other: unknown) => void,
+  other: unknown,
+): void {
+  super_(other);
+  setBaseClass(this);
 }
 
 export function initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {

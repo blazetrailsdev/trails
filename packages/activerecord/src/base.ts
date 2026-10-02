@@ -2452,6 +2452,7 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
 
 extend(Base, ConnectionHandling.ConnectionHandling);
 extend(Base, Inheritance.ClassMethods);
+prepend(Base, { initializeClone: Inheritance.initializeClone as PrependMethod });
 extend(Base, LockingOptimistic.ClassMethods);
 extend(Base, SignedId.ClassMethods);
 include(Base, _Core.Core);
