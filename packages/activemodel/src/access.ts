@@ -6,13 +6,13 @@ import {
 import { rbFPublicSend } from "@blazetrails/ruby-compat";
 
 export class Access {
-  slice(...methods: (string | string[])[]): HashWithIndifferentAccess<unknown> {
+  slice(...methods: unknown[]): HashWithIndifferentAccess<unknown> {
     return withIndifferentAccess(
-      indexWith(methods.flat(), (method) => rbFPublicSend(this, method)),
+      indexWith(methods.flat(Infinity) as string[], (method) => rbFPublicSend(this, method)),
     );
   }
 
-  valuesAt(...methods: (string | string[])[]): unknown[] {
-    return methods.flat().map((method) => rbFPublicSend(this, method));
+  valuesAt(...methods: unknown[]): unknown[] {
+    return (methods.flat(Infinity) as string[]).map((method) => rbFPublicSend(this, method));
   }
 }

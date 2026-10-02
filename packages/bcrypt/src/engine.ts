@@ -1,6 +1,6 @@
 import bcryptjs from "bcryptjs";
 import { Time } from "@blazetrails/date";
-import { rbObjAsString, rbObjRespondTo, toI, warn } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbObjAsString, rbObjRespondTo, toI, warn } from "@blazetrails/ruby-compat";
 import { Errors } from "./error.js";
 import { Password } from "./password.js";
 
@@ -33,7 +33,8 @@ export class Engine {
 
     if (this.isValidSecret(secret)) {
       if (this.isValidSalt(salt)) {
-        return bcryptjs.hashSync(rbObjAsString(secret), salt);
+        secret = rbObjAsString(secret);
+        return this.__bcCrypt(secret as string, salt);
       } else {
         throw new Errors.InvalidSalt("invalid salt");
       }
@@ -60,6 +61,13 @@ export class Engine {
 
   static isValidSecret(secret: unknown): boolean {
     return rbObjRespondTo(secret, "toString");
+  }
+
+  private static __bcCrypt(key: string, setting: string): string {
+    if (key.includes("\0") || setting.includes("\0")) {
+      throw new ArgumentError("string contains null byte");
+    }
+    return bcryptjs.hashSync(key, setting);
   }
 
   static calibrate(upperTimeLimitInMs: number): number | undefined {

@@ -32,6 +32,10 @@ describe("Creating a hashed password", () => {
   it("should tolerate very long string secrets", () => {
     expect(() => Password.create("abcd".repeat(1024))).not.toThrow();
   });
+
+  it("blows up when null bytes are in the string", () => {
+    expect(() => Password.create("foo\0bar".slice(0, -1))).toThrow();
+  });
 });
 
 describe("Reading a hashed password", () => {

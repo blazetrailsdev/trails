@@ -310,7 +310,7 @@ class TestExtractor
           @describe_stack.pop
           return
         end
-      when "it"
+      when "it", "specify"
         # Pass outer node so assertion extraction can walk the block body
         process_it(inner[2], node)
         return
@@ -333,7 +333,7 @@ class TestExtractor
             @describe_stack.pop
             return
           end
-        when "it"
+        when "it", "specify"
           # Pass inner for desc extraction, outer node includes block for assertions
           process_it_paren(inner, node)
           return
@@ -546,7 +546,7 @@ class TestExtractor
       process_describe(args, node)
     when "it_behaves_like", "it_should_behave_like"
       materialize_shared_example(args, node)
-    when "it"
+    when "it", "specify"
       process_it(args, node)
     when "test"
       process_test_macro(args, node)
@@ -562,7 +562,7 @@ class TestExtractor
       case cmd_name
       when "describe"
         process_describe_paren(node)
-      when "it"
+      when "it", "specify"
         process_it_paren(node)
       when "test"
         process_test_macro_paren(node)
@@ -1921,6 +1921,13 @@ class TestExtractor
     return nil unless recv.is_a?(Array) && recv[0] == :fcall && ident_name(recv[1]) == "expect"
     matcher = (positional_args(node[4]) || node[4])&.first
     matcher = matcher[1] if matcher.is_a?(Array) && matcher[0] == :method_add_block
+    if matcher.is_a?(Array) && matcher[0] == :binary && matcher[1].is_a?(Array) &&
+       matcher[1][0] == :vcall && ident_name(matcher[1][1]) == "be"
+      rhs = matcher[3]
+      const = rhs.is_a?(Array) && (rhs[0] == :const_path_ref || (rhs[0] == :var_ref && rhs[1][0] == :@const))
+      name = const && %i[< <=].include?(matcher[2]) ? "be_kind_of" : "be_#{matcher[2]}"
+      return ["expect_#{to}_#{name}", recv, nil]
+    end
     args = nil
     if matcher.is_a?(Array) && matcher[0] == :method_add_arg
       args = matcher[2]

@@ -259,16 +259,9 @@ export const SOURCES: readonly UpstreamSource[] = [
     },
     packages: [
       {
-        // The gem `has_secure_password` reaches
-        // (`activemodel/lib/active_model/secure_password.rb:160-161`); its
-        // port is `packages/bcrypt/src`.
         name: "bcrypt",
         libPath: "lib/bcrypt",
         testPath: "spec/bcrypt",
-        // The gem's examples are `specify "..." do`, which
-        // scripts/test-compare/extract-ruby-tests.rb does not read (it reads
-        // `it`), so enrolling it today would compare against zero Ruby tests.
-        compareTests: false,
       },
     ],
   },

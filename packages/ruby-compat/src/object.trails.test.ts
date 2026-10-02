@@ -250,6 +250,7 @@ describe("rbFSend", () => {
   it("public_send dispatches a defined method as send does", () => {
     const req = new Req();
     expect(rbFPublicSend(req, "subdomain")).toBe(rbFSend(req, "subdomain"));
+    expect(rbFPublicSend(req, ":subdomain")).toBe("clients");
     expect(() => rbFPublicSend(req, "nope")).toThrow(NoMethodError);
   });
 

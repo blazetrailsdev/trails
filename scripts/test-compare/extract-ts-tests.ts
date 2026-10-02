@@ -24,6 +24,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "rack",
     "rack-session",
     "rack-test",
+    "bcrypt",
     "actionview",
     "trailties",
     "globalid",

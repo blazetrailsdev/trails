@@ -128,10 +128,9 @@ to **3.1.20** by `vendor/rails/v8.0.2/Gemfile.lock:145`. The port is
 `packages/bcrypt`, over the `bcryptjs` npm client where the gem calls its C
 extension (`__bc_crypt`, `__bc_salt`).
 
-`compareApi` is on. `compareTests` is off: the gem's examples are
-`specify "..." do`, which `scripts/test-compare/extract-ruby-tests.rb` does not
-read, so `packages/bcrypt/src/*.test.ts` carry the spec names unmeasured until
-the extractor learns `specify`.
+`compareApi` and `compareTests` are both on. The gem's examples are
+`specify "..." do`, which `scripts/test-compare/extract-ruby-tests.rb` reads as
+it reads `it`.
 
 ## Scoping a Rails bump (drift report)
 

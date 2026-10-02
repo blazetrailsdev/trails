@@ -4,10 +4,8 @@ import { Engine, Errors, Password } from "./index.js";
 
 describe("BCrypt::Engine", () => {
   describe(".calibrate(upper_time_limit_in_ms)", () => {
-    describe("a tiny upper time limit provided", () => {
-      it("returns a minimum cost supported by the algorithm", () => {
-        expect(Engine.calibrate(0.001)).toBe(4);
-      });
+    it("returns a minimum cost supported by the algorithm", () => {
+      expect(Engine.calibrate(0.001)).toBe(4);
     });
   });
 });
@@ -25,7 +23,7 @@ describe("The BCrypt engine", () => {
 
 describe("Generating BCrypt salts", () => {
   it("should produce strings", () => {
-    expect(typeof Engine.generateSalt()).toBe("string");
+    expect(Object(Engine.generateSalt())).toBeInstanceOf(String);
   });
 
   it("should produce random data", () => {
@@ -59,7 +57,7 @@ describe("Generating BCrypt hashes", () => {
   });
 
   it("should produce a string", () => {
-    expect(typeof Engine.hashSecret(password, salt)).toBe("string");
+    expect(Object(Engine.hashSecret(password, salt))).toBeInstanceOf(String);
   });
 
   it("should raise an InvalidSalt error if the salt is invalid", () => {
