@@ -206,7 +206,7 @@ describe("touchDeferredAttributes delegates to timestampTouch with deferred time
     const { touchDeferredAttributes } = await import("./touch-later.js");
     const inv = await Invoice.create();
 
-    const fixedTime = new Date(2_000_000);
+    const fixedTime = RubyTime.at(2_000);
     (inv as any)._deferTouchAttrs = ["updated_at"];
     (inv as any)._touchTime = fixedTime;
 

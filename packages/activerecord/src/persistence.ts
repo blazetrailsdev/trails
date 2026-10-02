@@ -1,10 +1,23 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import { type TouchArgs, type TouchOptions } from "./timestamp.js";
-import { merge, rbEqual, rbObjAsString, rtest, union, zip } from "@blazetrails/ruby-compat";
+import {
+  basicObjRespondTo,
+  merge,
+  rbEqual,
+  rbObjAsString,
+  rbObjSingletonClass,
+  rtest,
+  union,
+  zip,
+} from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
 import type { IndexedRow } from "./result.js";
-import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
+import {
+  ArgumentError,
+  AttributeMethods,
+  type PermittedAttributes,
+} from "@blazetrails/activemodel";
 import { extractOptionsBang, indexWith, transformKeys } from "@blazetrails/activesupport";
 import {
   InsertManager,
@@ -606,13 +619,14 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
 }
 
 interface ReloadRecord {
-  _attributes: unknown;
+  _attributes: { keys(): Iterable<string> };
   _newRecord: boolean;
   _previouslyNewRecord: boolean;
   _associationCache: Map<string, { owner: unknown }>;
   isApplyScoping(options: object | null): unknown;
   _findRecord(options: object | null): Promise<unknown>;
   constructor: {
+    prototype: object;
     connectionPool(): { clearQueryCache(): void };
     unscoped<R>(block: () => R | Promise<R>): Promise<R>;
   };
@@ -631,6 +645,14 @@ export async function reload<T extends ReloadRecord>(
   this._associationCache = freshObject._associationCache;
   for (const association of this._associationCache.values()) association.owner = this;
   this._attributes = freshObject._attributes;
+  if (Object.getPrototypeOf(this) !== this.constructor.prototype) {
+    AttributeMethods.ClassMethods.undefineAttributeMethods.call(rbObjSingletonClass(this) as never);
+  }
+  for (const name of this._attributes.keys()) {
+    if (!basicObjRespondTo(this, name, false)) {
+      (rbObjSingletonClass(this) as unknown as typeof Base).defineAttributeMethod(name);
+    }
+  }
   this._newRecord = false;
   this._previouslyNewRecord = false;
   return this;
