@@ -639,10 +639,10 @@ export class ConnectionPool implements ReapablePool {
   } {
     return {
       size: this.size,
-      connections: this._connections?.length ?? 0,
-      busy: aryCount(this._connections ?? [], (c) => c.isInUse() && c.owner!.isAlive()),
-      dead: aryCount(this._connections ?? [], (c) => c.isInUse() && !c.owner!.isAlive()),
-      idle: aryCount(this._connections ?? [], (c) => !c.isInUse()),
+      connections: this._connections!.length,
+      busy: aryCount(this._connections!, (c) => c.isInUse() && c.owner!.isAlive()),
+      dead: aryCount(this._connections!, (c) => c.isInUse() && !c.owner!.isAlive()),
+      idle: aryCount(this._connections!, (c) => !c.isInUse()),
       waiting: this.numWaitingInQueue(),
       checkoutTimeout: this.checkoutTimeout,
     };
