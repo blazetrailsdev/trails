@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bodyFromString } from "@blazetrails/rack";
+import { bodyFromString, type RackEnv } from "@blazetrails/rack";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { IntegrationTest } from "./integration.js";
 
@@ -31,7 +31,7 @@ describe("Integration::Session delegated readers (allow_nil: true)", () => {
 describe("Integration::RequestHelpers#follow_redirect!", () => {
   function redirecting(status: number): IntegrationTest {
     const session = new IntegrationTest();
-    session.app = async (env) =>
+    session.app = async (env: RackEnv) =>
       env.PATH_INFO === "/there"
         ? [200, {}, bodyFromString(`${env.REQUEST_METHOD} ${env.HTTP_REFERER}`)]
         : [status, { location: "http://www.example.com/there" }, bodyFromString("")];
