@@ -1,6 +1,6 @@
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE sql-datetime-formatters-fold-into-quoted-date-and-quoted-time
  */
 
 import { Temporal, cCivilToJd, strftime, type StrftimeSubject } from "@blazetrails/date";

@@ -1,4 +1,4 @@
-import { block, fetch, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { block, fetch, isSymbol, merge, slice, symbolToS } from "@blazetrails/ruby-compat";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import type { SchemaStatementsLike } from "./schema-statements-like.js";
 import type { Column } from "../column.js";
@@ -177,7 +177,7 @@ export class ForeignKeyDefinition {
     return this.isValidate;
   }
 
-  /** @missingRailsCall match? — PERMANENT */
+  /** @missingRailsCall match? — CONVERGEABLE export-name-on-schema-dump-matches-through-a-stateless-regexp-match-p */
   get isExportNameOnSchemaDump(): boolean {
     return this.name != null ? this.name.search(SchemaDumper.fkIgnorePattern) === -1 : false;
   }
@@ -598,30 +598,20 @@ export class ReferenceDefinition {
       : {};
   }
 
-  /**
-   * @internal
-   * @missingRailsCall slice — PERMANENT
-   */
+  /** @internal */
   private conditionalOptions(): Pick<ColumnOptions, "ifExists" | "ifNotExists"> {
-    const result: Pick<ColumnOptions, "ifExists" | "ifNotExists"> = {};
-    if (this.options.ifExists !== undefined) result.ifExists = this.options.ifExists;
-    if (this.options.ifNotExists !== undefined) result.ifNotExists = this.options.ifNotExists;
-    return result;
+    return slice(this.options as Record<string, unknown>, "ifExists", "ifNotExists");
   }
 
   /**
    * @internal
-   * @missingRailsCall merge — PERMANENT
-   * @missingRailsCall slice — PERMANENT
+   * @missingRailsArgs merge — CONVERGEABLE call-args-gate-aligns-the-receiver-of-a-function-form-hash-merge
    */
   private polymorphicOptions(): ColumnOptions {
-    return {
-      ...this.asOptions(this.polymorphic),
-      ...this.conditionalOptions(),
-      ...(this.options.null !== undefined ? { null: this.options.null } : {}),
-      ...(this.options.first !== undefined ? { first: this.options.first } : {}),
-      ...(this.options.after !== undefined ? { after: this.options.after } : {}),
-    };
+    return merge(
+      merge(this.asOptions(this.polymorphic), this.conditionalOptions()),
+      slice(this.options as Record<string, unknown>, "null", "first", "after"),
+    );
   }
 
   /** @internal */
@@ -631,32 +621,26 @@ export class ReferenceDefinition {
 
   /**
    * @internal
-   * @missingRailsCall merge — PERMANENT
+   * @missingRailsArgs merge — CONVERGEABLE call-args-gate-aligns-the-receiver-of-a-function-form-hash-merge
    */
   protected indexOptions(tableName: string): AddIndexOptions {
-    const opts: AddIndexOptions = {
-      ...this.asOptions(this.index),
-      ...this.conditionalOptions(),
-    };
+    const indexOptions: AddIndexOptions = merge(
+      this.asOptions(this.index),
+      this.conditionalOptions(),
+    );
 
-    if (this.options._usesLegacyReferenceIndexName) return opts;
+    if (this.options._usesLegacyReferenceIndexName) return indexOptions;
 
-    if (this.polymorphic && !opts.name) {
-      opts.name = this.polymorphicIndexName(tableName);
-    }
-    return opts;
+    if (this.polymorphic) indexOptions.name ||= this.polymorphicIndexName(tableName);
+    return indexOptions;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall merge — PERMANENT
-   */
+  /** @internal */
   private foreignKeyOptions(): ReferenceForeignKeyOptions {
-    return {
-      ...this.asOptions(this.foreignKey),
+    return merge(this.asOptions(this.foreignKey), {
       column: this.columnName(),
       ...this.conditionalOptions(),
-    } as ReferenceForeignKeyOptions;
+    }) as ReferenceForeignKeyOptions;
   }
 
   /** @internal */
@@ -680,14 +664,10 @@ export class ReferenceDefinition {
     return this.columns().map(([n]) => n);
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs fetch — PERMANENT
-   */
+  /** @internal */
   private foreignTableName(): string {
-    const fkOpts = this.foreignKeyOptions();
     return fetch<string>(
-      fkOpts as unknown as Record<string, unknown>,
+      this.foreignKeyOptions() as unknown as Record<string, unknown>,
       "toTable",
       block(() => (ActiveRecord.Base.pluralizeTableNames ? pluralize(this.name) : this.name)),
     );

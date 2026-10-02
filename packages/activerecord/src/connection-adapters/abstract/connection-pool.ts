@@ -1,4 +1,5 @@
 import {
+  aryCount,
   aryDelete,
   aryDeleteIf,
   Fiber,
@@ -168,7 +169,7 @@ export class WeakThreadKeyMap<V> {
     return this._map.get(key);
   }
 
-  /** @missingRailsCall select! — PERMANENT */
+  /** @missingRailsCall select! — CONVERGEABLE weak-thread-key-map-prunes-through-hash-select-bang */
   set(key: Thread | Fiber, value: V): void {
     for (const c of [...this._map.keys()]) {
       if (!c?.isAlive()) this._map.delete(c);
@@ -278,7 +279,7 @@ export class ConnectionPool implements ReapablePool {
     this._eagerWarmPromise = null;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE nodejs-inspect-custom-hooks-come-from-one-ruby-compat-seam */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return this.inspect();
   }
@@ -627,7 +628,6 @@ export class ConnectionPool implements ReapablePool {
     return this._available?.numWaiting() ?? 0;
   }
 
-  /** @missingRailsCall count — PERMANENT */
   stat(): {
     size: number;
     connections: number;
@@ -639,10 +639,10 @@ export class ConnectionPool implements ReapablePool {
   } {
     return {
       size: this.size,
-      connections: this._connections?.length ?? 0,
-      busy: this._connections?.filter((c) => c.isInUse() && c.owner!.isAlive()).length ?? 0,
-      dead: this._connections?.filter((c) => c.isInUse() && !c.owner!.isAlive()).length ?? 0,
-      idle: this._connections?.filter((c) => !c.isInUse()).length ?? 0,
+      connections: this._connections!.length,
+      busy: aryCount(this._connections!, (c) => c.isInUse() && c.owner!.isAlive()),
+      dead: aryCount(this._connections!, (c) => c.isInUse() && !c.owner!.isAlive()),
+      idle: aryCount(this._connections!, (c) => !c.isInUse()),
       waiting: this.numWaitingInQueue(),
       checkoutTimeout: this.checkoutTimeout,
     };

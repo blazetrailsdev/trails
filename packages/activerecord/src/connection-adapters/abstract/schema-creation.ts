@@ -16,6 +16,7 @@ import {
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { wrap } from "@blazetrails/activesupport";
+import { merge } from "@blazetrails/ruby-compat";
 
 export interface SchemaCreationConn extends SchemaQuoter {
   typeToSql(type: ColumnType, options?: ColumnOptions): string;
@@ -42,12 +43,11 @@ export class SchemaCreation {
 
   constructor(protected conn: SchemaCreationConn) {}
 
-  /** @missingRailsCall split — PERMANENT */
   async accept(o: object): Promise<string> {
     const klass = o.constructor as abstract new (...args: never[]) => object;
     let m = this.cache.get(klass);
     if (m === undefined) {
-      m = `visit${klass.name}`;
+      m = `visit${klass.name.split("::").at(-1)}`;
       this.cache.set(klass, m);
     }
     return (this as unknown as Record<string, (o: object) => Promise<string> | string>)[m](o);
@@ -133,7 +133,7 @@ export class SchemaCreation {
     return this.conn.supportsNullsNotDistinct();
   }
 
-  /** @missingRailsCall order:accept,map — PERMANENT */
+  /** @missingRailsCall order:accept,map — CONVERGEABLE schema-creation-visit-alter-table-maps-through-an-awaiting-map */
   protected async visitAlterTable(o: AlterTable): Promise<string> {
     let sql = `ALTER TABLE ${this.conn.quoteTableName(o.name)} `;
 
@@ -322,10 +322,10 @@ export class SchemaCreation {
 
   /**
    * @internal
-   * @missingRailsCall merge — PERMANENT
+   * @missingRailsArgs merge — CONVERGEABLE call-args-gate-aligns-the-receiver-of-a-function-form-hash-merge
    */
   protected columnOptions(o: ColumnDefinition): Record<string, unknown> {
-    return { ...o.options, column: o };
+    return merge(o.options, { column: o });
   }
 
   /** @internal */

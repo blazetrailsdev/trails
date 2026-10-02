@@ -1,4 +1,4 @@
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE temporal-wire-parsers-fold-into-the-oid-and-type-cast-bodies */
 
 import { Temporal } from "@blazetrails/date";
 import {
