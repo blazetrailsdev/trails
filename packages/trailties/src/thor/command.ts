@@ -262,7 +262,7 @@ export class Command extends Struct.new(
   protected isHandleNoMethodError(
     instance: Instance,
     error: NoMethodError,
-    _caller: string[],
+    caller: string[],
   ): boolean {
     return (
       this.isNotDebugging(instance) &&
