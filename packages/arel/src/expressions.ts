@@ -1,7 +1,7 @@
 import type { Count } from "./nodes/count.js";
 import type { Extract } from "./nodes/extract.js";
 import type { Sum, Max, Min, Avg } from "./nodes/function.js";
-import type { Node } from "./nodes/node.js";
+import type { ArelNode } from "./arel.js";
 import { Nodes } from "./namespaces.js";
 
 export interface ExpressionsModule {
@@ -14,22 +14,22 @@ export interface ExpressionsModule {
 }
 
 export const Expressions: ExpressionsModule = {
-  count(this: Node, distinct: boolean | null = false): Count {
+  count(this: ArelNode, distinct: boolean | null = false): Count {
     return new Nodes.Count([this], distinct);
   },
-  sum(this: Node): Sum {
+  sum(this: ArelNode): Sum {
     return new Nodes.Sum([this]);
   },
-  maximum(this: Node): Max {
+  maximum(this: ArelNode): Max {
     return new Nodes.Max([this]);
   },
-  minimum(this: Node): Min {
+  minimum(this: ArelNode): Min {
     return new Nodes.Min([this]);
   },
-  average(this: Node): Avg {
+  average(this: ArelNode): Avg {
     return new Nodes.Avg([this]);
   },
-  extract(this: Node, field: string): Extract {
+  extract(this: ArelNode, field: string): Extract {
     return new Nodes.Extract([this], field);
   },
 };

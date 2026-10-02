@@ -1,5 +1,5 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { rbFSend, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { isNil, rbFSend, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { Arel, Attributes, Nodes } from "../namespaces.js";
@@ -45,7 +45,7 @@ export class Casted extends NodeExpression {
   }
 
   isNil(): boolean {
-    return this.value === null || this.value === undefined;
+    return isNil(this.value);
   }
 
   valueForDatabase(): unknown {
@@ -83,7 +83,7 @@ export class Quoted extends Unary {
   }
 
   isNil(): boolean {
-    return this.value === null || this.value === undefined;
+    return isNil(this.value);
   }
 
   isInfinite(): 1 | -1 | null | false {

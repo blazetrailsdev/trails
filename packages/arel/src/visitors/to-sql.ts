@@ -2,6 +2,7 @@ import { Attributes, Nodes, Visitors } from "../namespaces.js";
 import {
   aryDeleteIf,
   isEmpty,
+  isNil,
   NotImplementedError,
   rbObjClone,
   rbModConstSet,
@@ -520,7 +521,9 @@ export class ToSql extends Visitor {
       case -1:
         return collector.append("1=1");
     }
-    return this.visitBinaryOp(o, ">=", collector);
+    collector = this.visit(o.left, collector);
+    collector.append(" >= ");
+    return this.visit(o.right, collector);
   }
 
   protected visitArelNodesGreaterThan(o: Nodes.GreaterThan, collector: SQLString): SQLString {
@@ -530,7 +533,9 @@ export class ToSql extends Visitor {
       case -1:
         return collector.append("1=1");
     }
-    return this.visitBinaryOp(o, ">", collector);
+    collector = this.visit(o.left, collector);
+    collector.append(" > ");
+    return this.visit(o.right, collector);
   }
 
   protected visitArelNodesLessThanOrEqual(
@@ -543,7 +548,9 @@ export class ToSql extends Visitor {
       case -1:
         return collector.append("1=0");
     }
-    return this.visitBinaryOp(o, "<=", collector);
+    collector = this.visit(o.left, collector);
+    collector.append(" <= ");
+    return this.visit(o.right, collector);
   }
 
   protected visitArelNodesLessThan(o: Nodes.LessThan, collector: SQLString): SQLString {
@@ -553,7 +560,9 @@ export class ToSql extends Visitor {
       case -1:
         return collector.append("1=0");
     }
-    return this.visitBinaryOp(o, "<", collector);
+    collector = this.visit(o.left, collector);
+    collector.append(" < ");
+    return this.visit(o.right, collector);
   }
 
   protected visitArelNodesMatches(o: Nodes.Matches, collector: SQLString): SQLString {
@@ -730,7 +739,7 @@ export class ToSql extends Visitor {
 
     this.visit(o.left, collector);
 
-    if (this.rightIsNull(right)) {
+    if (isNil(right)) {
       collector.append(" IS NULL");
     } else {
       collector.append(" = ");
@@ -743,7 +752,7 @@ export class ToSql extends Visitor {
     o: Nodes.IsNotDistinctFrom,
     collector: SQLString,
   ): SQLString {
-    if (this.rightIsNull(o.right)) {
+    if (isNil(o.right)) {
       this.visit(o.left, collector);
       collector.append(" IS NULL");
       return collector;
@@ -754,7 +763,7 @@ export class ToSql extends Visitor {
   }
 
   protected visitArelNodesIsDistinctFrom(o: Nodes.IsDistinctFrom, collector: SQLString): SQLString {
-    if (this.rightIsNull(o.right)) {
+    if (isNil(o.right)) {
       this.visit(o.left, collector);
       collector.append(" IS NOT NULL");
       return collector;
@@ -771,7 +780,7 @@ export class ToSql extends Visitor {
 
     this.visit(o.left, collector);
 
-    if (this.rightIsNull(right)) {
+    if (isNil(right)) {
       collector.append(" IS NOT NULL");
     } else {
       collector.append(" != ");
@@ -1228,13 +1237,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  protected visitBinaryOp(o: Nodes.Binary, op: string, collector: SQLString): SQLString {
-    this.visit(o.left, collector);
-    collector.append(` ${op} `);
-    this.visit(o.right, collector);
-    return collector;
-  }
-
   protected addDateBind(value: unknown, collector: SQLString): void {
     collector.addBind(value, this.bindBlock());
   }
@@ -1244,12 +1246,6 @@ export class ToSql extends Visitor {
     collector.append(" || ");
     this.visit(o.right, collector);
     return collector;
-  }
-
-  protected rightIsNull(right: unknown): boolean {
-    if (right === null || right === undefined) return true;
-    const maybe = right as { isNil?: () => boolean };
-    return typeof maybe?.isNil === "function" && maybe.isNil();
   }
 }
 

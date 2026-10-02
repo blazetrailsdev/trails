@@ -1,5 +1,5 @@
 import type { As } from "./nodes/binary.js";
-import type { Node } from "./nodes/node.js";
+import type { ArelNode } from "./arel.js";
 import type { SqlLiteral } from "./nodes/sql-literal.js";
 import { Nodes } from "./namespaces.js";
 
@@ -8,7 +8,7 @@ export interface AliasPredicationModule {
 }
 
 export const AliasPredication: AliasPredicationModule = {
-  as(this: Node, other: string | SqlLiteral): As {
+  as(this: ArelNode, other: string | SqlLiteral): As {
     return new Nodes.As(this, new Nodes.SqlLiteral(other, { retryable: true }));
   },
 };

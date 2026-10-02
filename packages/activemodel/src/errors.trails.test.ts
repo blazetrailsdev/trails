@@ -137,7 +137,7 @@ describe("Errors — trails-only coverage", () => {
   });
 
   it("delete removes errors for attribute", () => {
-    const errors = new Errors({});
+    const errors = new Errors(new Person());
     errors.add("name", ":blank");
     errors.add("name", ":invalid");
     errors.add("age", ":invalid");
@@ -166,7 +166,7 @@ describe("Errors — trails-only coverage", () => {
   });
 
   it("messages_for returns messages for an attribute", () => {
-    const errors = new Errors({});
+    const errors = new Errors(new Person());
     errors.add("name", ":blank");
     errors.add("name", ":invalid");
     expect(errors.messagesFor("name")).toEqual(["can't be blank", "is invalid"]);
@@ -179,18 +179,18 @@ describe("Errors — trails-only coverage", () => {
   });
 
   it("import imports an error from another Errors instance", () => {
-    const errors1 = new Errors({});
+    const errors1 = new Errors(new Person());
     errors1.add("name", ":blank");
-    const errors2 = new Errors({});
+    const errors2 = new Errors(new Person());
     errors2.import(errors1.objects[0]);
     expect(errors2.count).toBe(1);
     expect(errors2.messagesFor("name")).toEqual(["can't be blank"]);
   });
 
   it("import with attribute override", () => {
-    const errors1 = new Errors({});
+    const errors1 = new Errors(new Person());
     errors1.add("name", ":blank");
-    const errors2 = new Errors({});
+    const errors2 = new Errors(new Person());
     errors2.import(errors1.objects[0], { attribute: "title" });
     expect(errors2.messagesFor("title")).toEqual(["can't be blank"]);
   });
@@ -235,7 +235,7 @@ describe("Errors — trails-only coverage", () => {
     });
 
     it("delete filters by options subset match", () => {
-      const errors = new Errors({});
+      const errors = new Errors(new Person());
       errors.add("age", ":too_short", { count: 3 });
       errors.add("age", ":too_short", { count: 5 });
       const removed = errors.delete("age", ":too_short", { count: 3 });

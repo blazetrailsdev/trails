@@ -18,14 +18,15 @@ type ModelBase = object | null;
 
 interface ValidatableBase {
   readAttributeForValidation(attribute: string): unknown;
+  modelName: { human(): string };
+  constructor: ModelClass;
 }
 
 interface ModelClass {
-  name?: string;
   i18nScope?: string;
-  modelName?: { i18nKey?: string; human?: () => string };
-  humanAttributeName?: (attr: string, options?: { default?: string; base?: ModelBase }) => string;
-  lookupAncestors?: () => ModelClass[];
+  modelName: { i18nKey: string };
+  humanAttributeName(attr: string, options?: { default?: string; base?: ModelBase }): string;
+  lookupAncestors(): ModelClass[];
 }
 
 const CALLBACKS_OPTIONS: string[] = [
@@ -85,7 +86,7 @@ export class Error {
   static fullMessage(attribute: string, message: string | null, base: ModelBase): string | null {
     if (attribute === "base") return message;
 
-    const baseClass = base!.constructor as ModelClass;
+    const baseClass = (base as ValidatableBase).constructor;
 
     let defaults: unknown[];
     if (this.i18nCustomizeFullMessage && rbObjRespondTo(baseClass, "i18nScope")) {
@@ -96,15 +97,19 @@ export class Error {
       const attributesScope = `${baseClass.i18nScope}.errors.models`;
 
       if (namespace) {
-        defaults = baseClass.lookupAncestors!().map((klass) => [
-          `:${attributesScope}.${klass.modelName!.i18nKey}/${namespace}.attributes.${attributeName}.format`,
-          `:${attributesScope}.${klass.modelName!.i18nKey}/${namespace}.format`,
-        ]);
+        defaults = baseClass
+          .lookupAncestors()
+          .map((klass) => [
+            `:${attributesScope}.${klass.modelName.i18nKey}/${namespace}.attributes.${attributeName}.format`,
+            `:${attributesScope}.${klass.modelName.i18nKey}/${namespace}.format`,
+          ]);
       } else {
-        defaults = baseClass.lookupAncestors!().map((klass) => [
-          `:${attributesScope}.${klass.modelName!.i18nKey}.attributes.${attributeName}.format`,
-          `:${attributesScope}.${klass.modelName!.i18nKey}.format`,
-        ]);
+        defaults = baseClass
+          .lookupAncestors()
+          .map((klass) => [
+            `:${attributesScope}.${klass.modelName.i18nKey}.attributes.${attributeName}.format`,
+            `:${attributesScope}.${klass.modelName.i18nKey}.format`,
+          ]);
       }
 
       defaults = defaults.flat(Infinity);
@@ -116,7 +121,7 @@ export class Error {
     defaults.push("%{attribute} %{message}");
 
     let attrName: string = humanize(attribute.replace(/\.base$/, "").replace(/\./g, "_"));
-    attrName = baseClass.humanAttributeName!(attribute, {
+    attrName = baseClass.humanAttributeName(attribute, {
       default: attrName,
       base,
     });
@@ -142,19 +147,15 @@ export class Error {
     }
     const typeName = type.slice(1);
 
-    const baseClass = base!.constructor as ModelClass;
+    const baseClass = (base as ValidatableBase).constructor;
     const value =
-      attribute !== "base" && base != null
-        ? "readAttributeForValidation" in base
-          ? (base as ValidatableBase).readAttributeForValidation(attribute)
-          : (base as Record<string, unknown>)[attribute]
+      attribute !== "base"
+        ? (base as ValidatableBase).readAttributeForValidation(attribute)
         : undefined;
 
     options = {
-      model: baseClass?.modelName?.human?.(),
-      attribute: baseClass?.humanAttributeName
-        ? baseClass.humanAttributeName(attribute, { base })
-        : humanize(attribute),
+      model: (base as ValidatableBase).modelName.human(),
+      attribute: baseClass.humanAttributeName(attribute, { base }),
       value,
       object: base,
       ...options,
@@ -165,10 +166,12 @@ export class Error {
       const i18nScope = baseClass.i18nScope;
       attribute = attribute.replace(/\[\d+\]/g, "");
 
-      defaults = baseClass.lookupAncestors!().flatMap((klass) => [
-        `:${i18nScope}.errors.models.${klass.modelName!.i18nKey}.attributes.${attribute}.${typeName}`,
-        `:${i18nScope}.errors.models.${klass.modelName!.i18nKey}.${typeName}`,
-      ]);
+      defaults = baseClass
+        .lookupAncestors()
+        .flatMap((klass) => [
+          `:${i18nScope}.errors.models.${klass.modelName.i18nKey}.attributes.${attribute}.${typeName}`,
+          `:${i18nScope}.errors.models.${klass.modelName.i18nKey}.${typeName}`,
+        ]);
       defaults.push(`:${i18nScope}.errors.messages.${typeName}`);
 
       if (options.message == null || options.message === false) {

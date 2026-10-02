@@ -1343,6 +1343,14 @@ interface MoveResult {
   rubyModule: string;
   expectedFile: string;
   actualFile: string;
+  /**
+   * Set when `actualFile` mirrors the Ruby file that DEFINES the method — a
+   * mixin method flattened onto its host by `include` and ported once, in the
+   * mixin's own file (`mixinMethodCreditedToOwnFile`). The host file is
+   * credited through it, but nothing is misplaced: `parity:api:moves` leaves
+   * it out of the relocation plan.
+   */
+  inDefiningFile?: true;
 }
 
 interface FileResult {
@@ -5469,6 +5477,7 @@ export function main() {
             rubyModule,
             expectedFile: expectedTs,
             actualFile: creditedToMixin.tsFile,
+            inDefiningFile: true,
           });
           continue;
         }

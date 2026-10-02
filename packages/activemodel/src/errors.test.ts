@@ -14,14 +14,18 @@ import {
   assertSame,
   isBlank,
   assertNil,
+  extend,
 } from "@blazetrails/activesupport";
 import { FrozenError } from "@blazetrails/ruby-compat";
 import { Errors } from "./errors.js";
 import { Error as ModelError } from "./error.js";
 import { I18n } from "./i18n.js";
+import { Naming, type ModelName } from "./naming.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 
 class Person {
+  static moduleName = "ErrorsTest";
+  declare modelName: ModelName;
   errors: Errors<Person>;
   name: string | null = null;
   age: number | null = null;
@@ -48,6 +52,7 @@ class Person {
     return [this];
   }
 }
+extend(Person, Naming);
 
 describe("ErrorsTest", () => {
   beforeEach(() => {
