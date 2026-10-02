@@ -78,6 +78,28 @@ describe("autorun captures the body's exception (minitest/test.rb:190-198)", () 
     });
   });
 
+  it.fails("raises an array of exceptions", () => {
+    throw [raised, new RangeError("nope")];
+  });
+
+  it("seats a raised array once, though vitest records one error per element", () => {
+    const testCase = ran.get("raises an array of exceptions")!;
+    expect(testCase.failures.length).toBe(1);
+    expect((testCase.failures[0] as UnexpectedError).error).toEqual([
+      raised,
+      new RangeError("nope"),
+    ]);
+  });
+
+  it.fails("times out", { timeout: 10 }, () => new Promise<void>(() => {}));
+
+  it("seats a timeout once, as the error vitest rejected the body with", () => {
+    const testCase = ran.get("times out")!;
+    expect(testCase.failures.length).toBe(1);
+    expect((testCase.failures[0] as UnexpectedError).error).toBeInstanceOf(Error);
+    expect((testCase.failures[0] as UnexpectedError).error.message).toMatch(/timed out in 10ms/);
+  });
+
   let tries = 0;
   const outcomes = [
     (): void => {

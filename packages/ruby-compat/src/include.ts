@@ -90,7 +90,7 @@ export function rbModConstSet<T>(
  * constant name and otherwise answers `rb_const_defined`: the constant on the
  * module or one of its ancestors. Trails passes one name, never a `::` path.
  *
- * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+ * @noRailsEquivalent PERMANENT
  */
 export function rbModConstDefined(
   mod: Module | (abstract new (...args: never) => unknown) | { readonly name: string },
@@ -1346,7 +1346,7 @@ export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass | 
  * `rb_obj_freeze`), defined at vendor/ruby/v3.3.11/object.c:4382,4385. A gem that reopens
  * `Object` defines its method here, as ActiveSupport does for `as_json`.
  *
- * @noRailsEquivalent PERMANENT — a Ruby core module, not a Rails one.
+ * @noRailsEquivalent PERMANENT
  */
 export const Kernel = new Module((mod) => {
   mod.defineMethod("initializeDup", function (this: object, orig: unknown): object {
