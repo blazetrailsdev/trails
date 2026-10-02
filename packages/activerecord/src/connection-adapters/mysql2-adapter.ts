@@ -134,7 +134,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   constructor(config: string | (mysql.PoolOptions & MysqlAdapterOptions));
   /** @deprecated */
   constructor(rawConnection: mysql.Connection, deprecatedConfig?: Record<string, unknown> | null);
-  /** @missingRailsCall push — PERMANENT */
+  /** @missingRailsCall push — CONVERGEABLE mysql2-adapter-initialize-sets-found-rows-on-config-flags */
   constructor(
     config: string | (mysql.PoolOptions & MysqlAdapterOptions) | mysql.Connection,
     deprecatedConfig?: Record<string, unknown> | null,

@@ -357,7 +357,7 @@ export class SchemaCache {
   private _indexes = new Map<string, IndexDefinition[]>();
   private _version: string | number | null = null;
 
-  /** @missingRailsCall load — PERMANENT */
+  /** @missingRailsCall load — CONVERGEABLE schema-cache-load-from-ports-the-marshal-and-yaml-load-arms */
   static async _loadFrom(filename: string): Promise<SchemaCache | null> {
     try {
       if (!File.isFile(filename)) return null;
@@ -606,7 +606,7 @@ export class SchemaCache {
 
   /**
    * @internal
-   * @missingRailsArgs atomic_write — PERMANENT
+   * @missingRailsArgs atomic_write — CONVERGEABLE atomic-write-takes-its-block-without-a-temp-dir-placeholder
    */
   private async open(
     filename: string,

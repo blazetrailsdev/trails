@@ -1,5 +1,13 @@
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import { anybits, fetch, hasKey, merge, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  anybits,
+  fetch,
+  hasKey,
+  last,
+  merge,
+  rbStrPartition,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import type {
   SqliteConnection,
   SqliteDriver,
@@ -977,8 +985,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /**
    * @internal
-   * @missingRailsCall last — PERMANENT
-   * @missingRailsCall union — PERMANENT
+   * @missingRailsCall union — CONVERGEABLE regexp-union-comes-from-ruby-compat
    */
   private async tableStructureSql(tableName: string, columnNames?: string[]): Promise<string[]> {
     if (!columnNames) {
@@ -994,13 +1001,11 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
     if (!result) return [];
 
-    const openParens = SQLite3Adapter.UNQUOTED_OPEN_PARENS_REGEX.exec(result);
-    const partitioned = openParens ? result.slice(openParens.index + openParens[0].length) : "";
     const union =
       columnNames.length > 0
         ? columnNames.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")
         : "(?!)";
-    return partitioned
+    return last(rbStrPartition(result, SQLite3Adapter.UNQUOTED_OPEN_PARENS_REGEX))!
       .replace(SQLite3Adapter.FINAL_CLOSE_PARENS_REGEX, "")
       .split(new RegExp(`,(?=\\s(?:CONSTRAINT|"(?:${union})"))`, "i"))
       .map((columnString) => columnString.trim());

@@ -9,7 +9,7 @@ interface RawConnectionLike {
   connection?: { stream?: RawSocketLike };
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE adapter-discard-bang-abandons-the-socket-through-the-driver-port */
 export function abandonRawSocket(rawConnection: unknown): void {
   if (rawConnection === null || rawConnection === undefined) return;
   const candidate = rawConnection as RawConnectionLike;

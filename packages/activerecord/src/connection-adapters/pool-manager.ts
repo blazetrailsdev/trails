@@ -1,4 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
+import { hashDelete } from "@blazetrails/ruby-compat";
 import type { PoolConfig } from "./pool-config.js";
 
 export class PoolManager {
@@ -66,20 +67,12 @@ export class PoolManager {
     }
   }
 
-  /** @missingRailsCall delete — PERMANENT */
-  removeRole(role: string): Record<string, PoolConfig> | undefined {
-    if (!Object.hasOwn(this._roleToShardMapping, role)) return undefined;
-    const shardMap = this._roleToShardMapping[role];
-    delete this._roleToShardMapping[role];
-    return shardMap;
+  removeRole(role: string): Record<string, PoolConfig> | null {
+    return hashDelete(this._roleToShardMapping, role);
   }
 
-  /** @missingRailsCall delete — PERMANENT */
-  removePoolConfig(role: string, shard: string): PoolConfig | undefined {
-    const shardMap = this._roleToShardMapping[role];
-    const poolConfig = shardMap[shard];
-    delete shardMap[shard];
-    return poolConfig;
+  removePoolConfig(role: string, shard: string): PoolConfig | null {
+    return hashDelete(this._roleToShardMapping[role], shard);
   }
 
   getPoolConfig(role: string, shard: string): PoolConfig | undefined {

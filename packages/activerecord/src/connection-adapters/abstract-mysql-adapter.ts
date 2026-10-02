@@ -11,7 +11,14 @@ import {
   explain as mysqlExplain,
 } from "./mysql/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
-import { fetch, rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
+import {
+  fetch,
+  first,
+  isEmpty,
+  rbInspect,
+  rbObjAsString as toS,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
 import { rtest } from "@blazetrails/ruby-compat";
 import { transactionIsolationLevels } from "./abstract/database-statements.js";
@@ -164,7 +171,6 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     this._emulateBooleans = value;
   }
 
-  /** @missingRailsCall empty? — PERMANENT */
   static dbconsole(config: DatabaseConfig, options: Record<string, unknown> = {}): string[] {
     const mysqlConfig = (config as unknown as { configurationHash: DatabaseConfigOptions })
       .configurationHash;
@@ -187,7 +193,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
 
     if (rtest(mysqlConfig.password) && options.includePassword) {
       args.push(`--password=${String(mysqlConfig.password)}`);
-    } else if (rtest(mysqlConfig.password) && String(mysqlConfig.password) !== "") {
+    } else if (rtest(mysqlConfig.password) && !isEmpty(toS(mysqlConfig.password))) {
       args.push("-p");
     }
 
@@ -857,10 +863,9 @@ WHERE fk.referenced_column_name IS NOT NULL
     return index.using === "btree" || super.defaultIndexType(index);
   }
 
-  /** @missingRailsCall first — PERMANENT */
   override async buildInsertSql(insert: InsertBuilder): Promise<string> {
-    const [first] = insert.keys;
-    const noOpColumn = first !== undefined ? this.quoteColumnName(first) : undefined;
+    const noOpColumn =
+      first([...insert.keys]) != null ? this.quoteColumnName(first([...insert.keys])!) : undefined;
 
     let sql: string;
     if (await this.supportsInsertRawAliasSyntax()) {

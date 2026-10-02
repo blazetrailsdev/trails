@@ -479,16 +479,25 @@ export function valuesAt<T>(hash: Record<string, T>, ...keys: string[]): (T | un
  */
 export function valuesAt<K, T>(hash: Map<K, T>, ...keys: K[]): (T | undefined)[];
 /**
+ * Ruby `Array#values_at` with Integer indexes (`vendor/ruby/v3.3.11/array.c:3769`
+ * `rb_ary_values_at`): the element at each index, a negative one counting from
+ * the end (`rb_ary_entry`, `array.c:1687`), `nil` past either end. The Range
+ * arm of `rb_get_values_at` (`array.c:3672`) is not ported: nothing calls it.
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#values_at` (`vendor/ruby/v3.3.11/array.c:3769`).
+ */
+export function valuesAt<T>(ary: readonly T[], ...indexes: number[]): (T | undefined)[];
+/**
  * `rb_hash_values_at` pushes `rb_hash_aref(hash, argv[i])` for each key, so the
  * arms share one body over the rest parameter.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#values_at` (`vendor/ruby/v3.3.11/hash.c:2713`).
  */
 export function valuesAt(
-  hash: Record<string, unknown> | Map<unknown, unknown>,
+  hash: Record<string, unknown> | Map<unknown, unknown> | readonly unknown[],
   ...keys: unknown[]
 ) {
   if (hash instanceof Map) return keys.map((key) => hash.get(key));
-  return keys.map((key) => hash[key as string]);
+  if (Array.isArray(hash)) return keys.map((index) => hash.at(index as number));
+  return keys.map((key) => (hash as Record<string, unknown>)[key as string]);
 }
 
 /**

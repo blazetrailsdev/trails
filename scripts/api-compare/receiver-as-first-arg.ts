@@ -166,4 +166,10 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // @blazetrails/ruby-compat exports it as `uniq(ary)` and the Ruby receiver is
   // TS argument 1.
   "uniq",
+  // Ruby core `Array#values_at` (`vendor/ruby/v3.3.11/array.c:3769`) —
+  // `name.to_s.split(".").values_at(-2, -1)`
+  // (connection_adapters/postgresql_adapter.rb:474,487). JS's `at` takes one
+  // index, so @blazetrails/ruby-compat exports it as `valuesAt(ary, ...indexes)`
+  // and the Ruby receiver is TS argument 1.
+  "values_at",
 ]);
