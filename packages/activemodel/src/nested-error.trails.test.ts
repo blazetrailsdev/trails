@@ -33,6 +33,13 @@ describe("NestedErrorTest", () => {
     expect(baseNested.fullMessage).toBe("is invalid");
   });
 
+  it("NestedError seats a Symbol :attribute override by its bare name, as Error#attribute is held", () => {
+    const innerError = { attribute: "name", type: ":blank", message: "can't be blank" };
+    expect(new NestedError({}, innerError, { attribute: ":parent" }).attribute).toBe("parent");
+    expect(new NestedError({}, innerError, { attribute: "parent" }).attribute).toBe("parent");
+    expect(new NestedError({}, innerError).attribute).toBe("name");
+  });
+
   it("NestedError keeps an inner nil raw_type", () => {
     const base = {};
     const innerError = new ModelError(base, "name", null);
