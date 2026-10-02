@@ -764,6 +764,7 @@ interface PersistencePrivateHost {
   _previouslyNewRecord: boolean;
   _readonly?: boolean;
   attribute(attrName: string): unknown;
+  _inMemoryQueryConstraintsHash(): Record<string, unknown>;
   readAttribute(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
   isNewRecord(): boolean;
@@ -827,10 +828,7 @@ export function strictLoadedAssociations(this: PersistencePrivateHost): string[]
     .map(([name]) => name);
 }
 
-/**
- * @internal
- * @missingRailsName _inMemoryQueryConstraintsHash — PERMANENT
- */
+/** @internal */
 export function _findRecord(
   this: PersistencePrivateHost & { constructor: any },
   options?: { lock?: boolean | string; allQueries?: boolean | null },
@@ -840,7 +838,7 @@ export function _findRecord(
   let scope = ctor.all({ allQueries: options?.allQueries ?? null });
   if (preloads.length > 0) scope = scope.preload(...preloads);
   if (options?.lock) scope = scope.lock(options.lock);
-  return scope.findByBang(_inMemoryQueryConstraintsHash.call(this));
+  return scope.findByBang(this._inMemoryQueryConstraintsHash());
 }
 
 /** @internal */

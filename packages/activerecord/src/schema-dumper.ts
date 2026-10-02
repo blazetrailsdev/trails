@@ -669,7 +669,7 @@ export abstract class SchemaDumper {
     const host = this._hookHost("foreignKeys") as
       | {
           foreignKeys(table: string): Promise<ForeignKeyDefinition[] | undefined>;
-          foreignKeyColumnFor?(table: string, column: string): string;
+          foreignKeyColumnFor(table: string, column: string): string;
         }
       | undefined;
     if (!host) return;
@@ -680,32 +680,29 @@ export abstract class SchemaDumper {
           `await ctx.addForeignKey(${JSON.stringify(this.removePrefixAndSuffix(foreignKey.fromTable))}`,
           JSON.stringify(this.removePrefixAndSuffix(foreignKey.toTable)),
         ];
-        const opts: string[] = [];
 
-        if (
-          foreignKey.column &&
-          foreignKey.column !== host.foreignKeyColumnFor?.(foreignKey.toTable, "id")
-        ) {
-          opts.push(`column: ${JSON.stringify(foreignKey.column)}`);
+        if (foreignKey.column !== host.foreignKeyColumnFor(foreignKey.toTable, "id")) {
+          parts.push(`column: ${JSON.stringify(foreignKey.column)}`);
         }
 
         if (foreignKey.isCustomPrimaryKey) {
-          opts.push(`primaryKey: ${JSON.stringify(foreignKey.primaryKey)}`);
+          parts.push(`primaryKey: ${JSON.stringify(foreignKey.primaryKey)}`);
         }
 
         if (foreignKey.isExportNameOnSchemaDump) {
-          opts.push(`name: ${JSON.stringify(foreignKey.name)}`);
+          parts.push(`name: ${JSON.stringify(foreignKey.name)}`);
         }
 
-        if (foreignKey.onUpdate) opts.push(`onUpdate: ${JSON.stringify(foreignKey.onUpdate)}`);
-        if (foreignKey.onDelete) opts.push(`onDelete: ${JSON.stringify(foreignKey.onDelete)}`);
-        if (foreignKey.deferrable !== undefined && foreignKey.deferrable !== false)
-          opts.push(`deferrable: ${JSON.stringify(foreignKey.deferrable)}`);
+        if (foreignKey.onUpdate) parts.push(`onUpdate: ${JSON.stringify(foreignKey.onUpdate)}`);
+        if (foreignKey.onDelete) parts.push(`onDelete: ${JSON.stringify(foreignKey.onDelete)}`);
+        if (foreignKey.deferrable != null && foreignKey.deferrable !== false)
+          parts.push(`deferrable: ${JSON.stringify(foreignKey.deferrable)}`);
         if (foreignKey.isValidate == null || foreignKey.isValidate === false)
-          opts.push("validate: false");
-        if (opts.length > 0) parts.push(`{ ${opts.join(", ")} }`);
+          parts.push("validate: false");
 
-        return `  ${parts.join(", ")});`;
+        const [fromTable, toTable, ...opts] = parts;
+        const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
+        return `  ${fromTable}, ${toTable}${optStr});`;
       });
 
       stream.puts(addForeignKeyStatements.sort().join("\n"));

@@ -12,12 +12,13 @@ export class PresenceValidator extends BasePresenceValidator {
   }
 }
 
-interface HelperMethodHost {
-  validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
-  _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
-}
-
-export function validatesPresenceOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
+export function validatesPresenceOf(
+  this: {
+    validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
+    _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
+  },
+  ...attrNames: unknown[]
+): void {
   this.validatesWith(PresenceValidator, this._mergeAttributes(attrNames));
 }
 

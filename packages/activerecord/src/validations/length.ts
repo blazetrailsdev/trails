@@ -12,16 +12,23 @@ export class LengthValidator extends BaseLengthValidator {
   }
 }
 
-interface HelperMethodHost {
-  validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
-  _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
-}
-
-export function validatesLengthOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
+export function validatesLengthOf(
+  this: {
+    validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
+    _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
+  },
+  ...attrNames: unknown[]
+): void {
   this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
 }
 
-export function validatesSizeOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
+export function validatesSizeOf(
+  this: {
+    validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
+    _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
+  },
+  ...attrNames: unknown[]
+): void {
   this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
 }
 

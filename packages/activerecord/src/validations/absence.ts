@@ -12,12 +12,13 @@ export class AbsenceValidator extends BaseAbsenceValidator {
   }
 }
 
-interface HelperMethodHost {
-  validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
-  _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
-}
-
-export function validatesAbsenceOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
+export function validatesAbsenceOf(
+  this: {
+    validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
+    _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
+  },
+  ...attrNames: unknown[]
+): void {
   this.validatesWith(AbsenceValidator, this._mergeAttributes(attrNames));
 }
 
