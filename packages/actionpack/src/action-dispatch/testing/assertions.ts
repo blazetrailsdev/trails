@@ -1,3 +1,4 @@
+import { DomTestingAssertions } from "@blazetrails/actionview";
 import { Concern } from "@blazetrails/activesupport";
 import { XML, type XmlDocument } from "@blazetrails/nokogiri";
 import { extend, Module, rbModConstSet } from "@blazetrails/ruby-compat";
@@ -21,7 +22,8 @@ export function htmlDocument(this: HtmlDocumentHost): XmlDocument {
 }
 
 export type Assertions = ResponseAssertions &
-  RoutingAssertions & {
+  RoutingAssertions &
+  DomTestingAssertions & {
     /** @internal */
     _htmlDocument?: XmlDocument;
     readonly htmlDocument: XmlDocument;
@@ -32,6 +34,7 @@ export const Assertions = new Module((mod) => {
 
   mod.include(ResponseAssertions);
   mod.include(RoutingAssertions);
+  mod.include(DomTestingAssertions);
 
   mod.moduleEval((m) => {
     Object.defineProperty(m, "htmlDocument", { get: htmlDocument, configurable: true });

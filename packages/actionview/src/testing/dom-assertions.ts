@@ -1,4 +1,5 @@
 import { assert, assertNot } from "@blazetrails/activesupport";
+import { Module } from "@blazetrails/ruby-compat";
 
 type Node =
   | { type: "element"; name: string; attributeNodes: [string, string][]; children: Node[] }
@@ -159,3 +160,24 @@ function fragment(text: unknown): Fragment {
   }
   return root;
 }
+
+export type DomAssertions = {
+  assertDomEqual: typeof assertDomEqual;
+  assertDomNotEqual: typeof assertDomNotEqual;
+};
+
+export const DomAssertions = new Module((mod) => {
+  mod.moduleEval((m) => {
+    Object.assign(m, {
+      assertDomEqual,
+      assertDomNotEqual,
+      compareDoms,
+      extractChildren,
+      isEqualChildren,
+      isEqualChild,
+      isEqualAttributeNodes,
+      isEqualAttribute,
+      fragment,
+    });
+  });
+});
