@@ -160,10 +160,12 @@ export async function _insertRecord(
   const primaryKey = ctor.primaryKey;
   let primaryKeyValue: unknown = null;
   if (ctor.isPrefetchPrimaryKey() && primaryKey) {
-    values[primaryKey] ??= (() => {
-      primaryKeyValue = ctor.nextSequenceValue();
-      return ctor._defaultAttributes().getAttribute(primaryKey).withCastValue(primaryKeyValue);
-    })();
+    if (!rtest(values[primaryKey])) {
+      values[primaryKey] = (() => {
+        primaryKeyValue = ctor.nextSequenceValue();
+        return ctor._defaultAttributes().getAttribute(primaryKey).withCastValue(primaryKeyValue);
+      })();
+    }
   }
 
   const arelTable: ArelTable = ctor.arelTable;

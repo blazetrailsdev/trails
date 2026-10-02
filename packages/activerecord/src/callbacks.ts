@@ -45,12 +45,14 @@ export function touch(
 
 export function incrementBang<T>(
   this: any,
+  super_: (...args: unknown[]) => Promise<T>,
   attribute: string,
-  by: number | undefined,
-  options: { touch?: unknown } | undefined,
-  superFn: () => Promise<T>,
+  by: number = 1,
+  options: { touch?: unknown } = {},
 ): Promise<T> {
-  return rtest(options?.touch) ? (runCallbacks(this, "touch", superFn) as Promise<T>) : superFn();
+  return rtest(options.touch)
+    ? (runCallbacks(this, "touch", () => super_(attribute, by, options)) as Promise<T>)
+    : super_(attribute, by, options);
 }
 
 /** @internal */

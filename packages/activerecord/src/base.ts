@@ -2650,11 +2650,7 @@ include(Base, {
   updateBang: _Persistence.updateBang,
   delete: _Persistence.delete,
   _updateRow: _Persistence._updateRow,
-  reload(this: Base, options?: { lock?: boolean | string; unscoped?: boolean }) {
-    return _DirtyModule.reload.call(this as any, [options], () =>
-      _Persistence.reload.call(this as any, options),
-    );
-  },
+  reload: _Persistence.reload,
   slice: Access.prototype.slice,
   valuesAt: Access.prototype.valuesAt,
   updateAttribute: _Persistence.updateAttribute,
@@ -2717,12 +2713,14 @@ include(Base, _Dirty);
 include(Base, _AttrSerialization);
 include(Base, LockingPessimistic.Pessimistic);
 include(Base, LockingOptimistic.InstanceMethods);
+prepend(Base.prototype, { incrementBang: _Callbacks.incrementBang as PrependMethod });
 include(Base, Timestamp.InstanceMethods);
 include(Base, TouchLater.InstanceMethods);
 include(Base, _AttributeAssignment.AttributeAssignment);
 include(Base, AutosaveAssociation);
 prepend(Base, { loadSchemaBang: CounterCache.loadSchemaBang as PrependMethod });
 prepend(Base, { loadSchemaBang: _EncryptableRecord.loadSchemaBang as PrependMethod });
+prepend(Base.prototype, { reload: _DirtyModule.reload as PrependMethod });
 prepend(Base.prototype, { initInternals: _Core.initInternals as PrependMethod });
 prepend(Base.prototype, { initInternals: _Persistence.initInternals as PrependMethod });
 prepend(Base.prototype, {
@@ -2882,19 +2880,6 @@ for (const [name, fn] of [
             ),
           ),
         ),
-      );
-    },
-  ],
-  [
-    "incrementBang",
-    function (
-      this: Base,
-      attribute: string,
-      by?: number,
-      options?: { touch?: boolean | string | string[] },
-    ): Promise<unknown> {
-      return _Callbacks.incrementBang.call(this, attribute, by, options, () =>
-        LockingOptimistic.incrementBang.call(this as any, attribute, by, options),
       );
     },
   ],

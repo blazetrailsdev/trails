@@ -20,10 +20,10 @@ interface DirtyRecord {
 
 export async function reload<T>(
   this: { _mutationsBeforeLastSave: unknown; _mutationsFromDatabase: unknown },
-  args: unknown[],
-  superFn: () => Promise<T>,
+  super_: (...args: unknown[]) => Promise<T>,
+  ...args: unknown[]
 ): Promise<T> {
-  const result = await superFn();
+  const result = await super_(...args);
   this._mutationsBeforeLastSave = null;
   this._mutationsFromDatabase = null;
   return result;

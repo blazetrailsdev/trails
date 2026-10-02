@@ -155,22 +155,25 @@ export class UniquenessValidator extends EachValidator {
   /** @internal */
   protected async buildRelation(klass: any, attribute: string, value: unknown): Promise<any> {
     const relation = klass.unscoped();
-    return klass.withConnection((connection: any) =>
-      relation.bindAttribute(attribute, value, async (attr: any, bind: any) => {
-        if (bind.isUnboundable()) return stripThenable(relation.noneBang());
-
-        let comparison;
-        if (!hasKey(this.options, "caseSensitive") || bind.isNil()) {
-          comparison = connection.defaultUniquenessComparison(attr, bind);
-        } else if (this.options.caseSensitive) {
-          comparison = await connection.caseSensitiveComparison(attr, bind);
-        } else {
-          comparison = await connection.caseInsensitiveComparison(attr, bind);
+    let none = null;
+    const comparison = await klass.withConnection((connection: any) =>
+      relation.bindAttribute(attribute, value, (attr: any, bind: any) => {
+        if (bind.isUnboundable()) {
+          none = relation.noneBang();
+          return null;
         }
 
-        return stripThenable(relation.whereBang(comparison));
+        if (!hasKey(this.options, "caseSensitive") || bind.isNil()) {
+          return connection.defaultUniquenessComparison(attr, bind);
+        } else if (this.options.caseSensitive) {
+          return connection.caseSensitiveComparison(attr, bind);
+        } else {
+          return connection.caseInsensitiveComparison(attr, bind);
+        }
       }),
     );
+
+    return stripThenable(none ?? relation.whereBang(comparison));
   }
 
   /** @internal */

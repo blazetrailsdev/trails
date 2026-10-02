@@ -37,6 +37,19 @@ describe("PersistenceTest (trails)", () => {
     expect(all.every((t) => t.title === "same")).toBe(true);
   });
 
+  it("reload replaces the attributes of a record loaded with a selected alias", async () => {
+    const topic = (await Topic.select("id, title AS aliased_title").first()) as InstanceType<
+      typeof Topic
+    >;
+    expect(topic.readAttribute("aliased_title")).toBe("The First Topic");
+
+    await topic.reload();
+
+    expect(topic.hasAttribute("aliased_title")).toBe(false);
+    expect(topic.readAttribute("aliased_title")).toBeNull();
+    expect(topic.title).toBe("The First Topic");
+  });
+
   it("create awaits an async block before saving", async () => {
     const topic = await Topic.create({ title: "before" }, async (t: Base) => {
       await new Promise((resolve) => setTimeout(resolve, 20));
