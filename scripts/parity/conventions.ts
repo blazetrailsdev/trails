@@ -1684,8 +1684,7 @@ function rubyMethodToTsWithoutUnderscore(
   if (name === "to_json") return ["toJSON"];
   if (name === "to_sql") return ["toSql"];
   // Ruby unary minus (`-@`) ports to a named `negate` method (e.g.
-  // ActiveSupport::Duration#-@ → Duration#negate, and
-  // ConnectionAdapters::Deduplicable#-@ → `negate`).
+  // ActiveSupport::Duration#-@ → Duration#negate).
   if (name === "-@") return ["negate"];
   if (name === "to_a") return ["toA", "toArray"];
   if (COPY_HOOKS.has(name)) {

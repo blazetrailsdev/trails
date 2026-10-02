@@ -343,7 +343,7 @@ export function fetchTypeMetadata(
   sqlType: string,
   extra: string = "",
 ): TypeMetadata {
-  return new TypeMetadata(
+  return TypeMetadata.new(
     BaseSchemaStatements.prototype.fetchTypeMetadata.call(this, sqlType) as SqlTypeMetadata,
     {
       extra,

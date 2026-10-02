@@ -4490,8 +4490,6 @@ describe("inlinedModuleMembers", () => {
   });
 
   describe("a module `new` override beside the includer's constructor", () => {
-    // connection_adapters/deduplicable.rb:13-15 `def new(*, **)` in ClassMethods;
-    // column.rb:8 `include Deduplicable`, column.rb:20 `def initialize`.
     const dedupModules = {
       "ActiveRecord::ConnectionAdapters::Deduplicable": rubyClass({
         name: "Deduplicable",

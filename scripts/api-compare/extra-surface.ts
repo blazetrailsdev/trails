@@ -2058,9 +2058,6 @@ export function inlinedModuleMembers(
     const hostTs = rubyFileToTs(host.file, pkg);
     const hostBodies = bodiedByTsFile.get(hostTs);
     if (hostBodies === undefined) continue;
-    // A host with its own `initialize` owns its TS `constructor`; it is not the
-    // body of a `new` override the module adds (`Deduplicable::ClassMethods#new`,
-    // connection_adapters/deduplicable.rb:13-15, beside `Column#initialize`).
     const hostDefinesInitialize = host.instanceMethods.some((im) => im.name === "initialize");
     for (const incName of host.includes ?? []) {
       const fqn = resolveModuleName(incName, hostFqn, moduleFqnByShort);
