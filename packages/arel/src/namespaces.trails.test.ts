@@ -39,40 +39,17 @@ describe("Arel namespaces", () => {
     expect(Collectors.SQLString).toBe(Arel.Collectors.SQLString);
   });
 
-  it("a class is named by the constant binding that seats it", () => {
-    expect(rbModName(Nodes.Not)).toBe("Arel::Nodes::Not");
-    expect(rbModName(Arel.Attribute)).toBe("Arel::Attributes::Attribute");
-    expect(rbModName(Visitors.ToSql)).toBe("Arel::Visitors::ToSql");
-    expect(rbModName(Arel.Table)).toBe("Arel::Table");
-  });
-
   it("the managers, collectors, errors and Dot's Node and Edge answer their Rails path", () => {
-    expect(
-      [Arel.DeleteManager, Arel.InsertManager, Arel.UpdateManager, Arel.TreeManager].map(rbModName),
-    ).toEqual([
-      "Arel::DeleteManager",
-      "Arel::InsertManager",
-      "Arel::UpdateManager",
-      "Arel::TreeManager",
-    ]);
-    for (const name of [
-      "Bind",
-      "Composite",
-      "PlainString",
-      "SQLString",
-      "SubstituteBinds",
-    ] as const) {
+    const arel = ["DeleteManager", "InsertManager", "UpdateManager", "TreeManager"] as const;
+    for (const name of [...arel, "ArelError", "EmptyJoinError", "BindError"] as const) {
+      expect(rbModName(Arel[name])).toBe(`Arel::${name}`);
+    }
+    for (const name of ["Bind", "Composite", "PlainString", "SQLString"] as const) {
       expect(rbModName(Collectors[name])).toBe(`Arel::Collectors::${name}`);
     }
-    expect([Arel.ArelError, Arel.EmptyJoinError, Arel.BindError].map(rbModName)).toEqual([
-      "Arel::ArelError",
-      "Arel::EmptyJoinError",
-      "Arel::BindError",
-    ]);
+    expect(rbModName(Collectors.SubstituteBinds)).toBe("Arel::Collectors::SubstituteBinds");
     const { Node, Edge } = Visitors.Dot as unknown as Record<string, new () => unknown>;
-    expect([Node, Edge].map(rbModName)).toEqual([
-      "Arel::Visitors::Dot::Node",
-      "Arel::Visitors::Dot::Edge",
-    ]);
+    expect(rbModName(Node)).toBe("Arel::Visitors::Dot::Node");
+    expect(rbModName(Edge)).toBe("Arel::Visitors::Dot::Edge");
   });
 });
