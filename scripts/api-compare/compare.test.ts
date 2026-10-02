@@ -10,6 +10,7 @@ import {
   tsShouldIncludeInIndex,
   flattenIncludedMethodInfos,
   bodyInDefiningFile,
+  crossFileCredit,
   mixinMethodCreditedToOwnFile,
   moduleInitializeCandidates,
   reopeningMethodCreditedToOwnFile,
@@ -3193,6 +3194,162 @@ describe("bodyInDefiningFile", () => {
         bodied,
       ),
     ).toBeNull();
+  });
+});
+
+describe("crossFileCredit", () => {
+  const tsMethodsByFile = new Map([
+    ["naming.ts", new Set(["modelName"])],
+    ["validations/acceptance.ts", new Set(["validatesAcceptanceOf"])],
+    ["model.ts", new Set(["modelName", "validatesAcceptanceOf", "insert"])],
+  ]);
+  const hasBucket = (f: string) => f === "naming.rb" || f === "validations/absence.rb";
+  const bodied = new Map([
+    ["naming.ts", new Map([["modelName", new Set(["Naming"])]])],
+    ["validations/acceptance.ts", new Map([["validatesAcceptanceOf", new Set(["HelperMethods"])]])],
+  ]);
+  const none = new Map<string, Map<string, Set<string>>>();
+  const credit = (
+    rm: Parameters<typeof crossFileCredit>[0],
+    viaInclude: Parameters<typeof crossFileCredit>[8],
+    bodyless = none,
+    withBody = bodied,
+  ) =>
+    crossFileCredit(
+      rm,
+      "api.rb",
+      "activemodel",
+      hasBucket,
+      tsMethodsByFile,
+      bodyless,
+      withBody,
+      undefined,
+      viaInclude,
+    );
+
+  const includer = (tsName: string) => ({ tsName, tsFile: "model.ts" });
+
+  it("names the mixin's own member in the move and still compares the includer's", () => {
+    expect(
+      credit(
+        { rubyName: "model_name", rubyModule: "ActiveModel::API", mixinFile: "naming.rb" },
+        includer("modelName"),
+      ),
+    ).toEqual({
+      arm: "include",
+      move: { tsName: "modelName", tsFile: "naming.ts", inDefiningFile: true },
+      compared: includer("modelName"),
+    });
+  });
+
+  it("names a reopening's own member in the move when an includer declares the name", () => {
+    expect(
+      credit(
+        {
+          rubyName: "validates_acceptance_of",
+          rubyModule: "ActiveModel::API",
+          mixinFile: "validations/absence.rb",
+          definedInFile: "validations/acceptance.rb",
+        },
+        includer("validatesAcceptanceOf"),
+      ),
+    ).toEqual({
+      arm: "include",
+      move: {
+        tsName: "validatesAcceptanceOf",
+        tsFile: "validations/acceptance.ts",
+        inDefiningFile: true,
+      },
+      compared: includer("validatesAcceptanceOf"),
+    });
+  });
+
+  it("takes the move's name from the defining file, not from the includer's candidate", () => {
+    expect(
+      crossFileCredit(
+        {
+          rubyName: "initialize_dup",
+          rubyModule: "ActiveModel::Type::Value",
+          mixinFile: "type/serialize_cast_value.rb",
+        },
+        "type/value.rb",
+        "activemodel",
+        () => true,
+        new Map([["type/serialize-cast-value.ts", new Set(["_initializeDup"])]]),
+        none,
+        new Map([
+          [
+            "type/serialize-cast-value.ts",
+            new Map([["_initializeDup", new Set(["SerializeCastValue"])]]),
+          ],
+        ]),
+        undefined,
+        { tsName: "initializeDup", tsFile: "type/value.ts" },
+      )?.move,
+    ).toEqual({
+      tsName: "_initializeDup",
+      tsFile: "type/serialize-cast-value.ts",
+      inDefiningFile: true,
+    });
+  });
+
+  it("reports the includer as a relocation when no body sits in the defining file", () => {
+    expect(
+      credit(
+        { rubyName: "insert", rubyModule: "ActiveModel::API", mixinFile: "naming.rb" },
+        includer("insert"),
+      ),
+    ).toEqual({
+      arm: "include",
+      move: { ...includer("insert"), inDefiningFile: false },
+      compared: includer("insert"),
+    });
+
+    const bodyless = new Map([["naming.ts", new Map([["modelName", new Set(["Naming"])]])]]);
+    expect(
+      credit(
+        { rubyName: "model_name", rubyModule: "ActiveModel::API", mixinFile: "naming.rb" },
+        includer("modelName"),
+        bodyless,
+        none,
+      )?.move,
+    ).toEqual({ ...includer("modelName"), inDefiningFile: false });
+  });
+
+  it("flags the mixin arm and compares nothing", () => {
+    expect(
+      credit(
+        { rubyName: "model_name", rubyModule: "ActiveModel::API", mixinFile: "naming.rb" },
+        null,
+      ),
+    ).toEqual({
+      arm: "mixin",
+      move: { tsName: "modelName", tsFile: "naming.ts", inDefiningFile: true },
+      compared: null,
+    });
+  });
+
+  it("flags the reopening arm and compares the reopening's member", () => {
+    const reopening = { tsName: "validatesAcceptanceOf", tsFile: "validations/acceptance.ts" };
+    expect(
+      credit(
+        {
+          rubyName: "validates_acceptance_of",
+          rubyModule: "ActiveModel::API",
+          mixinFile: "validations/absence.rb",
+          definedInFile: "validations/acceptance.rb",
+        },
+        null,
+      ),
+    ).toEqual({
+      arm: "reopening",
+      move: { ...reopening, inDefiningFile: true },
+      compared: reopening,
+    });
+  });
+
+  it("is null when nothing ports it", () => {
+    expect(credit({ rubyName: "persisted?", rubyModule: "ActiveModel::API" }, null)).toBeNull();
   });
 });
 
