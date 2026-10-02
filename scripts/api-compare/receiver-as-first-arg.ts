@@ -123,6 +123,11 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // DescendantsTracker exports it as `subclasses(cls)` and the Ruby receiver is
   // TS argument 1.
   "subclasses",
+  // active_support/core_ext/module/anonymous.rb:27-29 — `klass.anonymous?`,
+  // a core-ext on Module, which TS cannot hang on a class any more than
+  // `subclasses` above. @blazetrails/activesupport exports it as
+  // `isAnonymous(mod)` and the Ruby receiver is TS argument 1.
+  "anonymous?",
   // active_support/core_ext/time/conversions.rb:55 and
   // core_ext/date/conversions.rb:49 — `timestamp.to_fs(format)`, defined on the
   // Ruby core classes Time/Date, which TS cannot monkey-patch any more than it

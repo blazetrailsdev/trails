@@ -395,14 +395,14 @@ describe("TestCaseTest", () => {
     });
 
     it("executorAroundEachRequest class attribute defaults to false", () => {
-      expect(TestCase.executorAroundEachRequest).toBe(false);
+      expect(TestCase.executorAroundEachRequest).toBeFalsy();
       TestCase.executorAroundEachRequest = true;
       expect(TestCase.executorAroundEachRequest).toBe(true);
-      TestCase.executorAroundEachRequest = false;
+      TestCase.executorAroundEachRequest = null;
     });
 
     it("assertTemplate raises (extracted to gem)", () => {
-      expect(() => tc.assertTemplate("posts/index")).toThrow(/extracted to a gem/);
+      expect(() => tc.assertTemplate()).toThrow(/extracted to a gem/);
     });
   });
 });

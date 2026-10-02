@@ -1,8 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { BigDecimal, include } from "@blazetrails/activesupport";
-import { b, StringIO } from "@blazetrails/ruby-compat";
+import { describe, it, expect, vi } from "vitest";
+import { BigDecimal, include, isModuleIncluded, TopLevel } from "@blazetrails/activesupport";
+import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
+import { b, setVerbose, stderr, StringIO, verbose } from "@blazetrails/ruby-compat";
 import { UploadedFile } from "@blazetrails/rack-test";
 import {
+  Behavior,
   LiveTestResponse,
   TestCase,
   TestRequest,
@@ -115,6 +117,95 @@ describe("ActionController::Live under test_case.rb", () => {
     expect(tc.response).toBeUndefined();
     await tc.beforeSetup();
     expect(tc.response).toBeInstanceOf(LiveTestResponse);
+  });
+});
+
+describe("TestCase::Behavior", () => {
+  it("is the module TestCase includes", () => {
+    expect(isModuleIncluded(TestCase, Behavior)).toBe(true);
+    expect(Object.hasOwn(TestCase.prototype, "process")).toBe(false);
+  });
+
+  it("is includable into a test class that is not an ActionController::TestCase", async () => {
+    class PlainController extends Base {}
+    class PlainTest extends ActiveSupportTestCase {}
+    include(PlainTest, Behavior);
+    const klass = PlainTest as unknown as typeof TestCase;
+    klass.tests(PlainController);
+    expect(klass.controllerClass).toBe(PlainController);
+    const tc = new klass("test_plain");
+    await tc.beforeSetup();
+    expect(tc.controller).toBeInstanceOf(PlainController);
+  });
+});
+
+describe("TestCase#wrap_execution", () => {
+  class HeadController extends Base {
+    async index() {
+      this.head("ok");
+    }
+  }
+
+  async function request(): Promise<TestCase> {
+    const tc = new TestCase();
+    tc.controller = new HeadController();
+    await tc.beforeSetup();
+    expect(await tc.get("index")).toBe(tc.response);
+    return tc;
+  }
+
+  it("wraps the dispatch in the application executor when executor_around_each_request is set", async () => {
+    const trails = TopLevel.Trails;
+    let wrapped = 0;
+    const executor = {
+      wrap<T>(block: () => T): T {
+        wrapped += 1;
+        return block();
+      },
+    };
+    TopLevel.Trails = { application: { executor } } as unknown as typeof trails;
+    try {
+      await request();
+      expect(wrapped).toBe(0);
+      TestCase.executorAroundEachRequest = true;
+      await request();
+      expect(wrapped).toBe(1);
+    } finally {
+      TestCase.executorAroundEachRequest = null;
+      TopLevel.Trails = trails;
+    }
+  });
+});
+
+describe("TestCase#setup_controller_request_and_response", () => {
+  class UnconstructibleController extends Base {
+    constructor() {
+      super();
+      throw new Error("boom");
+    }
+  }
+
+  it("warns under $VERBOSE when the controller cannot be constructed", async () => {
+    class UnconstructibleTest extends TestCase {}
+    UnconstructibleTest.tests(UnconstructibleController);
+    const written: string[] = [];
+    const write = vi.spyOn(stderr, "write").mockImplementation((s: string) => {
+      written.push(s);
+      return true;
+    });
+    const was = verbose();
+    try {
+      await new UnconstructibleTest().beforeSetup();
+      expect(written).toEqual([]);
+      setVerbose(true);
+      const tc = new UnconstructibleTest();
+      await tc.beforeSetup();
+      expect(tc.controller).toBeNull();
+      expect(written).toEqual(["could not construct controller UnconstructibleController\n"]);
+    } finally {
+      setVerbose(was);
+      write.mockRestore();
+    }
   });
 });
 
