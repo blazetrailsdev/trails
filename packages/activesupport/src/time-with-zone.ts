@@ -20,7 +20,13 @@ import { zone as timeZone, findZone, findZoneBang } from "./time-zone-config.js"
 import { DateTime, Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { Time } from "@blazetrails/date";
-import { Rational, rational, rbEqual, rbInspect, rbObjDup } from "@blazetrails/ruby-compat";
+import {
+  Rational,
+  rational,
+  rbDefineAllocFunc,
+  rbEqual,
+  rbInspect,
+} from "@blazetrails/ruby-compat";
 import { ArgumentError } from "./hash-utils.js";
 import { Encoding } from "./json/encoding.js";
 import { DATE_FORMATS, toFs } from "./core-ext/time/conversions.js";
@@ -864,11 +870,6 @@ export class TimeWithZone {
     return true;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE rb-obj-dup-has-no-allocator-for-private-state-classes */
-  dup(): this {
-    return new Proxy(rbObjDup(this), METHOD_MISSING_HANDLER) as this;
-  }
-
   freeze(): this {
     void this.period;
     this.utc();
@@ -915,3 +916,8 @@ export class TimeWithZone {
     return this._epochMs;
   }
 }
+
+rbDefineAllocFunc(
+  TimeWithZone,
+  (klass) => new Proxy(Object.create(klass.prototype) as TimeWithZone, METHOD_MISSING_HANDLER),
+);

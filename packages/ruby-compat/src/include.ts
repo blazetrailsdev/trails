@@ -1135,7 +1135,10 @@ export type Extended<M extends object> = CallableMethods<M>;
  * state in internal slots, so each is allocated from the receiver the way its
  * Ruby class's `initialize_copy` fills the allocation (`time_init_copy`,
  * `vendor/ruby/v3.3.11/time.c:4046`; `rb_hash_replace`, `hash.c:2967`;
- * `Set#initialize_dup`, `lib/set.rb:284`; `rb_reg_init_copy`, `re.c:4386`).
+ * `Set#initialize_dup`, `lib/set.rb:284`; `rb_reg_init_copy`, `re.c:4386`). A
+ * class with an allocator ({@link rbDefineAllocFunc}) is allocated through it.
+ * The copy hook is found as a method entry, never by a property read a
+ * `method_missing` Proxy would answer.
  *
  * Ruby's `Object#initialize_clone` / `#initialize_dup` default to
  * `initialize_copy` (`rb_obj_init_clone` / `rb_obj_init_dup_clone`, object.c:4382-4383), so a
@@ -1192,7 +1195,36 @@ export function rbObjDup<T>(obj: T): T {
   return dup as T;
 }
 
+const allocFuncs = new WeakMap<object, (klass: never) => object>();
+
+/**
+ * `rb_define_alloc_func` (`vendor/ruby/v3.3.11/vm_method.c:1270`): the allocator
+ * `rb_obj_alloc` calls for `klass` and its subclasses (`rb_get_alloc_func`,
+ * `:1286`). A class declares one when its instances hold state
+ * `Object.create` cannot make (`#private` fields, a Proxy), and copies that
+ * state in `initializeCopy`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbDefineAllocFunc<K extends abstract new (...args: never) => object>(
+  klass: K,
+  func: (klass: K) => InstanceType<K>,
+): void {
+  allocFuncs.set(klass, func);
+}
+
+function rbGetAllocFunc(klass: unknown): ((klass: never) => object) | undefined {
+  for (; typeof klass === "function"; klass = Object.getPrototypeOf(klass)) {
+    const allocator = allocFuncs.get(klass);
+    if (allocator) return allocator;
+  }
+  return undefined;
+}
+
 function rbObjAlloc(obj: object, proto: object | null): object {
+  const klass = (proto as { constructor?: unknown } | null)?.constructor;
+  const allocator = rbGetAllocFunc(klass);
+  if (allocator) return Object.setPrototypeOf(allocator(klass as never), proto);
   if (Array.isArray(obj)) return Object.setPrototypeOf([], proto);
   if (obj instanceof Date) return Object.setPrototypeOf(new Date(obj.getTime()), proto);
   if (obj instanceof Map) return Object.setPrototypeOf(new Map(obj), proto);
@@ -1227,9 +1259,15 @@ function initCopyHook(
   hook: "initializeClone" | "initializeDup",
   orig: unknown,
 ): void {
-  const host = copy as Record<string, unknown>;
-  const fn = typeof host[hook] === "function" ? host[hook] : host.initializeCopy;
-  if (typeof fn === "function") (fn as (orig: unknown) => unknown).call(copy, orig);
+  for (const mid of [hook, "initializeCopy"]) {
+    for (let o: object | null = copy; o; o = Object.getPrototypeOf(o) as object | null) {
+      const me = Object.getOwnPropertyDescriptor(o, mid);
+      if (!me) continue;
+      if (typeof me.value !== "function") break;
+      (me.value as (orig: unknown) => unknown).call(copy, orig);
+      return;
+    }
+  }
 }
 
 /**

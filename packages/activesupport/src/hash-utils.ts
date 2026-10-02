@@ -91,12 +91,10 @@ export function deepDup<T>(obj: T): T {
   if (rbObjRespondTo(obj, "deepDup")) {
     return (obj as unknown as { deepDup(): T }).deepDup();
   }
-  if (typeof obj !== "object") return obj;
-  return isDuplicable(obj)
-    ? rbObjRespondTo(obj, "dup")
-      ? (obj as unknown as { dup(): T }).dup()
-      : rbObjDup(obj)
-    : obj;
+  if (isDuplicable(obj)) {
+    return rbObjRespondTo(obj, "dup") ? (obj as unknown as { dup(): T }).dup() : rbObjDup(obj);
+  }
+  return obj;
 }
 
 export function slice<T extends AnyObject, K extends keyof T>(obj: T, ...keys: K[]): Pick<T, K> {

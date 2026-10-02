@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Time } from "@blazetrails/date";
-import { rbObjDup } from "@blazetrails/ruby-compat";
+import { rbDefineAllocFunc, rbObjDup } from "@blazetrails/ruby-compat";
 import { deepDup } from "../../hash-utils.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { TimeZone } from "../../values/time-zone.js";
@@ -66,6 +66,27 @@ describe("Object#deep_dup", () => {
     expect(setDup.size).toBe(2);
     expect([regexpDup.source, regexpDup.flags, regexpDup.lastIndex]).toEqual(["a", "g", 2]);
     expect(deepDup(date).getTime()).toBe(0);
+  });
+
+  it("allocates through the class allocator and copies in initialize_copy", () => {
+    class Sealed {
+      #secret: number;
+      constructor(secret: number) {
+        this.#secret = secret;
+      }
+      initializeCopy(orig: Sealed): void {
+        this.#secret = orig.#secret;
+      }
+      secret(): number {
+        return this.#secret;
+      }
+    }
+    class Subsealed extends Sealed {}
+    rbDefineAllocFunc(Sealed, (klass) => new klass(0));
+
+    const dup = deepDup(new Subsealed(7));
+    expect(dup).toBeInstanceOf(Subsealed);
+    expect(dup.secret()).toBe(7);
   });
 
   it("dups a Time and a TimeWithZone into working copies", () => {

@@ -261,6 +261,28 @@ describe("rbFPublicSend include?", () => {
     expect(rbFPublicSend({ a: 1 }, "isInclude", "toString")).toBe(false);
   });
 
+  it("looks a Set or Hash member up by eql?", () => {
+    class Point {
+      constructor(readonly x: number) {}
+      eql(other: unknown): boolean {
+        return other instanceof Point && other.x === this.x;
+      }
+      hash(): number {
+        return this.x;
+      }
+    }
+    expect(rbFPublicSend(new Set([new Point(1)]), "isInclude", new Point(1))).toBe(true);
+    expect(rbFPublicSend(new Set([new Point(1)]), "isInclude", new Point(2))).toBe(false);
+    expect(rbFPublicSend(new Map([[new Point(1), 1]]), "isInclude", new Point(1))).toBe(true);
+  });
+
+  it("raises NoMethodError for nil", () => {
+    expect(() => rbFPublicSend(null, "isInclude", 1)).toThrow(NoMethodError);
+    expect(() => rbFPublicSend(null, "isInclude", 1)).toThrow(
+      "undefined method 'include?' for nil",
+    );
+  });
+
   it("raises TypeError for String#include? with a non-String", () => {
     expect(() => rbFPublicSend("rubyist", "isInclude", 1)).toThrow(
       "no implicit conversion of Integer into String",

@@ -1,5 +1,6 @@
 import { aryIncludes } from "./array.js";
 import { hasKey } from "./hash.js";
+import { rbEql } from "./rb-equal.js";
 import { stringInspect } from "./string/inspect.js";
 import { rbCheckStringType, stringValue } from "./string/support.js";
 import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
@@ -466,7 +467,9 @@ export function toSym(obj: unknown): string {
  * for the core receivers {@link basicObjRespondTo} binds it for, when no entry
  * of their own answers: `String#include?` (`vendor/ruby/v3.3.11/string.c:12215`),
  * `Array#include?` (`array.c:8679`), `Hash#include?` (`hash.c:7255`) and
- * `Set#include?` (`lib/set.rb:393`).
+ * `Set#include?` (`lib/set.rb:393`). A Set or Hash looks its member up by
+ * `eql?`, so an object a JS `has` misses by identity is compared with
+ * `rb_eql` against each key.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#send` (`vendor/ruby/v3.3.11/vm_eval.c:1330`).
  */
@@ -546,8 +549,16 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (mid === "isInclude") {
     if (typeof recv === "string") return recv.includes(stringValue(args[0]));
     if (Array.isArray(recv)) return aryIncludes(recv, args[0]);
-    if (recv instanceof Set || recv instanceof Map) return recv.has(args[0]);
+    if (recv instanceof Set || recv instanceof Map) {
+      if (recv.has(args[0])) return true;
+      if (args[0] === null || typeof args[0] !== "object") return false;
+      for (const key of recv.keys()) {
+        if (rbEql(key, args[0])) return true;
+      }
+      return false;
+    }
     if (isPlainHash(recv)) return hasKey(recv, args[0] as PropertyKey);
+    if (recv == null) throw new NoMethodError("undefined method 'include?' for nil", "include?");
   }
   if (typeof obj.methodMissing === "function") {
     return (obj.methodMissing as AnyFunction).call(recv, mid, ...args);

@@ -1,6 +1,6 @@
 import { describe, it, afterEach, expect } from "vitest";
 import { assertNothingRaised, assertRaise } from "@blazetrails/activesupport";
-import { Range } from "@blazetrails/ruby-compat";
+import { NoMethodError, Range } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "../attribute-assignment.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { ERROR_MESSAGE } from "./clusivity.js";
@@ -49,6 +49,12 @@ describe("Clusivity#include?", () => {
     expect(await new Topic({ title: "ruby" }).isValid()).toBe(true);
     expect(await new Topic({ title: "java" }).isValid()).toBe(false);
     expect(asked).toEqual(["ruby", "java"]);
+  });
+
+  it("raises NoMethodError when the delimiter resolves to nil", async () => {
+    Topic.validatesInclusionOf("title", { in: () => null });
+
+    await expect(new Topic({ title: "ruby" }).isValid()).rejects.toThrow(NoMethodError);
   });
 
   it("asks a core String, Array, Set and Hash delimiter", async () => {
