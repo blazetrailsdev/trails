@@ -618,7 +618,7 @@ export class SchemaCache {
       if (File.extname(filename) === ".gz") {
         const zipper = new Zlib.GzipWriter(file);
         zipper.mtime = 0;
-        block(zipper);
+        await block(zipper);
         await zipper.flush();
         return zipper.close();
       } else {
