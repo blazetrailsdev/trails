@@ -70,6 +70,40 @@ export class Mutex {
   }
 
   /**
+   * `vendor/ruby/v3.3.11/thread_sync.c:475` `rb_mutex_lock`.
+   *
+   * Sibling promises share a fiber, so a second `lock` waits where
+   * `thread_sync.c:350-352` raises "deadlock; recursive locking".
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Mutex#lock`
+   * (`vendor/ruby/v3.3.11/thread_sync.c:475`).
+   */
+  async lock(): Promise<this> {
+    const data = mutexData(this);
+
+    const predecessor = data.chain;
+    let unlock!: () => void;
+    const mine = new Promise<void>((resolve) => {
+      unlock = resolve;
+    });
+    const tail = predecessor ? predecessor.then(() => mine) : mine;
+    data.chain = tail;
+
+    if (predecessor) await predecessor;
+
+    data.fiber = Symbol("mutex");
+    data.owner = Fiber.current();
+    data.release = () => {
+      data.fiber = null;
+      data.release = null;
+      data.owner = null;
+      if (data.chain === tail) data.chain = null;
+      unlock();
+    };
+    return this;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/thread_sync.c:548` `rb_mutex_unlock`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Mutex#unlock`

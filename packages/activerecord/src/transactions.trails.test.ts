@@ -1,7 +1,12 @@
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { Fiber, kernelThrow } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach, afterAll, vi } from "vitest";
-import { LoadInterlockAwareMonitor } from "@blazetrails/activesupport";
+import {
+  IsolatedExecutionState,
+  LoadInterlockAwareMonitor,
+  NullLock,
+  ThreadLoadInterlockAwareMonitor,
+} from "@blazetrails/activesupport";
 import { Base, transaction, registerModel } from "./index.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
 import { fixtures } from "./test-fixtures.js";
@@ -469,5 +474,29 @@ describe("aborting before_validation halts before the validators run", () => {
 
     expect(await reply.save()).toBeFalsy();
     expect(reply.errors.isAny()).toBe(false);
+  });
+});
+
+describe("a pinned connection's Thread monitor (lock_thread=, abstract_adapter.rb:181-191)", () => {
+  it("selects the Thread arm, which serializes sibling promises inside a transaction", async () => {
+    const { adapter } = await makeSQLiteTopic();
+    adapter.setLockThread(IsolatedExecutionState.context());
+    const tm = adapter.transactionManager;
+    const log: string[] = [];
+    const sibling = (name: string) =>
+      tm.withinNewTransaction({}, async () => {
+        log.push(`${name}:enter`);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        log.push(`${name}:exit`);
+      });
+
+    await tm.withinNewTransaction({}, () => Promise.all([sibling("a"), sibling("b")]));
+
+    expect(log).toEqual(["a:enter", "a:exit", "b:enter", "b:exit"]);
+    expect(adapter.lock).toBeInstanceOf(ThreadLoadInterlockAwareMonitor);
+    adapter.setLockThread(Fiber.current());
+    expect(adapter.lock).toBeInstanceOf(LoadInterlockAwareMonitor);
+    adapter.setLockThread(null);
+    expect(adapter.lock).toBe(NullLock);
   });
 });
