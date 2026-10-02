@@ -101,26 +101,24 @@ export class MySQL extends ToSql {
     return collector;
   }
 
-  protected override prepareUpdateStatement(o: Nodes.UpdateStatement): Nodes.UpdateStatement {
+  protected override prepareUpdateStatement<
+    T extends Nodes.UpdateStatement | Nodes.DeleteStatement,
+  >(o: T): T {
     if (
       o.offset ||
       this.hasGroupByAndHaving(o) ||
       (this.hasJoinSources(o) && this.hasLimitOrOffsetOrOrders(o))
     ) {
       return super.prepareUpdateStatement(o);
+    } else {
+      return o;
     }
-    return o;
   }
 
-  protected override prepareDeleteStatement(o: Nodes.DeleteStatement): Nodes.DeleteStatement {
-    if (
-      o.offset ||
-      this.hasGroupByAndHaving(o) ||
-      (this.hasJoinSources(o) && this.hasLimitOrOffsetOrOrders(o))
-    ) {
-      return super.prepareDeleteStatement(o);
-    }
-    return o;
+  protected override prepareDeleteStatement<
+    T extends Nodes.UpdateStatement | Nodes.DeleteStatement,
+  >(o: T): T {
+    return this.prepareUpdateStatement(o);
   }
 
   protected override buildSubselect(

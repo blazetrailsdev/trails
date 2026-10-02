@@ -8,7 +8,7 @@ import type { OptimizerHints } from "./unary.js";
 
 export class SelectCore extends Node {
   source: JoinSource;
-  projections: Node[];
+  projections: (Node | Node[])[];
   wheres: Node[];
   groups: Node[];
   havings: Node[];
@@ -42,7 +42,7 @@ export class SelectCore extends Node {
     return this.from;
   }
 
-  set froms(value: Node | null) {
+  set froms(value: Node | Table | null) {
     this.from = value;
   }
 

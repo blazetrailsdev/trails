@@ -111,12 +111,11 @@ export class SelectManager extends TreeManager<SelectStatement> {
   }
 
   group(...columns: (Node | string)[]): this {
-    for (const column of columns) {
-      if (typeof column === "string") {
-        this.core.groups.push(new Group(new SqlLiteral(column)));
-      } else {
-        this.core.groups.push(new Group(column));
-      }
+    for (let column of columns) {
+      if (typeof column === "string" && !isSymbol(column)) column = new SqlLiteral(column);
+      if (isSymbol(column)) column = new SqlLiteral(symbolToS(column));
+
+      this.core.groups.push(new Group(column));
     }
     return this;
   }
@@ -177,11 +176,11 @@ export class SelectManager extends TreeManager<SelectStatement> {
     return this;
   }
 
-  get projections(): Node[] {
+  get projections(): (Node | Node[])[] {
     return [...this.core.projections];
   }
 
-  set projections(value: Node[]) {
+  set projections(value: (Node | Node[])[]) {
     this.core.projections.length = 0;
     this.core.projections.push(...value);
   }

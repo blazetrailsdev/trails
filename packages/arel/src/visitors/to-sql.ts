@@ -1,4 +1,4 @@
-import { Attributes, Nodes, Visitors } from "../namespaces.js";
+import { Nodes, Visitors } from "../namespaces.js";
 import { NotImplementedError, rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "../nodes/node.js";
@@ -89,17 +89,14 @@ export class ToSql extends Visitor {
   ): SQLString {
     collector.retryable = false;
     collector.append("INSERT INTO ");
-    if (o.relation) this.visit(o.relation, collector);
+    collector = this.visit(o.relation, collector);
 
     if (o.columns.length > 0) {
       collector.append(" (");
-      const colNames = o.columns.map((c) => {
-        if (c instanceof Nodes.SqlLiteral) return c.toString();
-        const name =
-          c instanceof Attributes.Attribute ? c.name : String((c as { name?: string }).name ?? c);
-        return this.quoteColumnName(name);
+      o.columns.forEach((x, i) => {
+        if (i !== 0) collector.append(", ");
+        collector.append(this.quoteColumnName((x as Attribute).name));
       });
-      collector.append(colNames.join(", "));
       collector.append(")");
     }
 
@@ -237,7 +234,7 @@ export class ToSql extends Visitor {
   }
 
   protected collectNodesFor(
-    nodes: Node[],
+    nodes: (Node | Node[])[],
     collector: SQLString,
     spacer: string,
     connector = ", ",
@@ -903,24 +900,55 @@ export class ToSql extends Visitor {
 
   private visitArelNodesBoundSqlLiteral(o: Nodes.BoundSqlLiteral, collector: SQLString): SQLString {
     collector.retryable = false;
-    const sql = o.sqlWithPlaceholders;
+    let bindIndex = 0;
+
+    const newBind = (value: unknown): void => {
+      if (arelNode(value)) {
+        this.visit(value, collector);
+      } else if (Array.isArray(value)) {
+        if (value.length === 0) {
+          collector.append(this.connection.quote(null));
+        } else {
+          if (!value.some((v) => arelNode(v))) {
+            collector.addBinds(
+              value.map((v) => this.connection.castBoundValue(v)),
+              null,
+              this.bindBlock(),
+            );
+          } else {
+            value.forEach((v, i) => {
+              if (i !== 0) collector.append(", ");
+              if (arelNode(v)) {
+                this.visit(v, collector);
+              } else {
+                collector.addBind(this.connection.castBoundValue(v), this.bindBlock());
+              }
+            });
+          }
+        }
+      } else {
+        collector.addBind(this.connection.castBoundValue(value), this.bindBlock());
+      }
+    };
 
     if (o.positionalBinds) {
-      const positionalBinds = o.positionalBinds;
-      const segments = sql.split("?");
-      for (let i = 0; i < segments.length; i++) {
-        if (segments[i]) collector.append(segments[i]);
-        if (i < segments.length - 1) this.visitBindValue(positionalBinds[i] ?? null, collector);
+      for (const m of o.sqlWithPlaceholders.matchAll(/\?|([^?]+)/g)) {
+        if (m[1] != null) {
+          collector.append(m[1]);
+        } else {
+          const value = o.positionalBinds[bindIndex];
+          bindIndex += 1;
+
+          newBind(value);
+        }
       }
     } else {
-      const namedBinds = o.namedBinds ?? {};
-      const re = /:(?<!::)([a-zA-Z]\w*)|([^:]+|.)/gy;
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(sql)) !== null) {
-        if (m[2] !== undefined) {
+      for (const m of o.sqlWithPlaceholders.matchAll(/:(?<!::)([a-zA-Z]\w*)|([^:]+|.)/g)) {
+        if (m[2] != null) {
           collector.append(m[2]);
         } else {
-          this.visitBindValue(namedBinds[m[1]] ?? null, collector);
+          const value = o.namedBinds![m[1]];
+          newBind(value);
         }
       }
     }
@@ -1083,42 +1111,29 @@ export class ToSql extends Visitor {
     return o.groups.length > 0 && o.havings.length > 0;
   }
 
-  protected prepareUpdateStatement(o: Nodes.UpdateStatement): Nodes.UpdateStatement {
+  protected prepareUpdateStatement<T extends Nodes.UpdateStatement | Nodes.DeleteStatement>(
+    o: T,
+  ): T {
     if (o.key && (this.hasLimitOrOffsetOrOrders(o) || this.hasJoinSources(o))) {
       const stmt = rbObjClone(o);
       stmt.limit = null;
       stmt.offset = null;
       stmt.orders = [];
-      const key = Array.isArray(o.key)
-        ? o.key.map((k) => this.subselectKey(k))
-        : this.subselectKey(o.key);
-      const columns = new Nodes.Grouping(key);
-      stmt.wheres = [new Nodes.In(columns, [this.buildSubselect(key, o)])];
-      if (this.hasJoinSources(o)) {
-        stmt.relation = (o.relation as Nodes.JoinSource).left;
-      }
+      const columns = new Nodes.Grouping(o.key);
+      stmt.wheres = [new Nodes.In(columns, [this.buildSubselect(o.key, o)])];
+      if (this.hasJoinSources(o)) stmt.relation = (o.relation as Nodes.JoinSource).left;
+      if (!(o.groups.length === 0)) stmt.groups = o.groups;
+      if (!(o.havings.length === 0)) stmt.havings = o.havings;
       return stmt;
+    } else {
+      return o;
     }
-    return o;
   }
 
-  protected prepareDeleteStatement(o: Nodes.DeleteStatement): Nodes.DeleteStatement {
-    if (o.key && (this.hasLimitOrOffsetOrOrders(o) || this.hasJoinSources(o))) {
-      const stmt = rbObjClone(o);
-      stmt.limit = null;
-      stmt.offset = null;
-      stmt.orders = [];
-      const key = Array.isArray(o.key)
-        ? o.key.map((k) => this.subselectKey(k))
-        : this.subselectKey(o.key);
-      const columns = new Nodes.Grouping(key);
-      stmt.wheres = [new Nodes.In(columns, [this.buildSubselect(key, o)])];
-      if (this.hasJoinSources(o)) {
-        stmt.relation = (o.relation as Nodes.JoinSource).left;
-      }
-      return stmt;
-    }
-    return o;
+  protected prepareDeleteStatement<T extends Nodes.UpdateStatement | Nodes.DeleteStatement>(
+    o: T,
+  ): T {
+    return this.prepareUpdateStatement(o);
   }
 
   protected buildSubselect(
@@ -1135,14 +1150,14 @@ export class ToSql extends Visitor {
   ): Nodes.SelectStatement {
     const stmt = new Nodes.SelectStatement();
     const core = stmt.cores[0];
-    if (o.relation) core.source = new Nodes.JoinSource(o.relation);
-    core.wheres = [...o.wheres];
-    core.projections = Array.isArray(key) ? [...key] : [key];
-    core.groups = [...o.groups];
-    core.havings = [...o.havings];
+    core.froms = o.relation;
+    core.wheres = o.wheres;
+    core.projections = [key];
+    if (!(o.groups.length === 0)) core.groups = o.groups;
+    if (!(o.havings.length === 0)) core.havings = o.havings;
     stmt.limit = o.limit;
     stmt.offset = o.offset;
-    stmt.orders = [...o.orders];
+    stmt.orders = o.orders;
     return stmt;
   }
 
@@ -1242,13 +1257,6 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  private subselectKey(key: Node): Node {
-    if (key instanceof Nodes.Equality) {
-      return key.left as Node;
-    }
-    return key;
-  }
-
   protected visitBinaryOp(o: Nodes.Binary, op: string, collector: SQLString): SQLString {
     this.visit(o.left, collector);
     collector.append(` ${op} `);
@@ -1258,33 +1266,6 @@ export class ToSql extends Visitor {
 
   protected addDateBind(value: unknown, collector: SQLString): void {
     collector.addBind(value, this.bindBlock());
-  }
-
-  private visitBindValue(value: unknown, collector: SQLString): void {
-    if (arelNode(value)) {
-      this.visit(value as Node, collector);
-    } else if (Array.isArray(value)) {
-      if (value.length === 0) {
-        collector.append(this.quote(null));
-      } else if (!value.some((v) => arelNode(v))) {
-        collector.addBinds(
-          value.map((v) => this.connection.castBoundValue(v)),
-          null,
-          this.bindBlock(),
-        );
-      } else {
-        value.forEach((v, i) => {
-          if (i > 0) collector.append(", ");
-          if (arelNode(v)) {
-            this.visit(v as Node, collector);
-          } else {
-            collector.addBind(this.connection.castBoundValue(v), this.bindBlock());
-          }
-        });
-      }
-    } else {
-      collector.addBind(this.connection.castBoundValue(value), this.bindBlock());
-    }
   }
 
   protected visitArelNodesConcat(o: Nodes.Concat, collector: SQLString): SQLString {

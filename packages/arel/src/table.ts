@@ -10,12 +10,12 @@ import { SqlLiteral } from "./nodes/sql-literal.js";
 import { StringJoin } from "./nodes/string-join.js";
 import type { Join } from "./nodes/binary.js";
 import { TableAlias } from "./nodes/table-alias.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { isSymbol, rbModConstSet, symbolToS } from "@blazetrails/ruby-compat";
 
 export interface TableKlass {
-  readonly attributeAliases?: Record<string, string>;
+  readonly attributeAliases: Record<string, string>;
   /** @internal */
-  typeCaster?(): unknown;
+  typeCaster(): unknown;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -30,19 +30,26 @@ export class Table {
 
   name: string | Node;
   readonly tableAlias: string | null;
-  private readonly klass?: TableKlass;
+  private readonly klass: TableKlass | null;
 
   constructor(
     name: string | Node,
-    options?: { as?: string; klass?: TableKlass; typeCaster?: unknown },
+    {
+      as = null,
+      klass = null,
+      typeCaster = klass?.typeCaster() ?? null,
+    }: { as?: string | null; klass?: TableKlass | null; typeCaster?: unknown } = {},
   ) {
+    if (isSymbol(name)) name = symbolToS(name);
+
     this.name = name;
-    const as = options?.as ?? null;
-    this.tableAlias = as === name ? null : as;
-    this.klass = options?.klass;
-    this.typeCaster = (options?.typeCaster ??
-      options?.klass?.typeCaster?.() ??
-      null) as Table["typeCaster"];
+    this.klass = klass;
+    this.typeCaster = typeCaster as Table["typeCaster"];
+
+    if ((isSymbol(as) ? symbolToS(as) : as) === this.name) {
+      as = null;
+    }
+    this.tableAlias = as;
   }
 
   alias(name?: string): TableAlias {
@@ -100,10 +107,15 @@ export class Table {
     return this.from().having(expr);
   }
 
-  get(name: Node | string | null, table?: Attribute["relation"]): Attribute {
-    const resolved =
-      name === null || name instanceof Node ? name : (this.klass?.attributeAliases?.[name] ?? name);
-    return new Attribute(table ?? this, resolved);
+  get(name: Node | string | null, table: Attribute["relation"] = this): Attribute {
+    if (isSymbol(name)) name = symbolToS(name);
+    if (this.klass != null) {
+      name =
+        (typeof name === "string" && Object.hasOwn(this.klass.attributeAliases, name)
+          ? this.klass.attributeAliases[name]
+          : null) ?? name;
+    }
+    return new Attribute(table, name);
   }
 
   hash(): number {
