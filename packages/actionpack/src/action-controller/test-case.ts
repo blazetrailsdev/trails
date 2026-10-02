@@ -90,33 +90,6 @@ export interface RequestOptions {
   method?: string;
 }
 
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Test::Utils` (`actionpack/lib/action_controller/test_case.rb:152`); the class/interface merge is how a mixin surfaces on the type side. */
-export interface Encoder extends Included<typeof RackTestUtils> {}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
-export class Encoder {
-  shouldMultipart(params: Record<string, unknown>): boolean {
-    let multipart = false;
-    const query = (value: unknown): void => {
-      if (Array.isArray(value)) {
-        value.forEach(query);
-      } else if (isPlainObject(value)) {
-        Object.values(value).forEach(query);
-      } else if (value instanceof RackTestUploadedFile) {
-        multipart = true;
-      }
-    };
-    Object.values(params).forEach(query);
-    return multipart;
-  }
-
-  get contentType(): string {
-    return `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`;
-  }
-}
-
-include(Encoder, RackTestUtils);
-
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActionDispatch::TestProcess` (`actionpack/lib/action_controller/test_case.rb:373`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface TestCase extends Included<typeof TestProcess> {}
 
@@ -284,7 +257,6 @@ export class TestCase extends ActiveSupportTestCase {
 
     const httpMethod = String(method).toUpperCase();
 
-    this._htmlDocument?.dispose();
     this._htmlDocument = undefined;
 
     this.cookies().update(this.request.cookies);
@@ -620,7 +592,32 @@ export class TestRequest extends AbstractTestRequest {
     this.pathParameters = pathParameters;
   }
 
-  static readonly ENCODER = new Encoder();
+  static readonly ENCODER = new (class {
+    static {
+      include(this, RackTestUtils);
+    }
+
+    shouldMultipart(params: Record<string, unknown>): boolean {
+      let multipart = false;
+      const query = (value: unknown): void => {
+        if (Array.isArray(value)) {
+          value.forEach(query);
+        } else if (isPlainObject(value)) {
+          Object.values(value).forEach(query);
+        } else if (value instanceof RackTestUploadedFile) {
+          multipart = true;
+        }
+      };
+      Object.values(params).forEach(query);
+      return multipart;
+    }
+
+    declare buildMultipart: Included<typeof RackTestUtils>["buildMultipart"];
+
+    get contentType(): string {
+      return `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`;
+    }
+  })();
 
   /**
    * @internal

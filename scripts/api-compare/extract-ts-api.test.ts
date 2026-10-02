@@ -23,6 +23,7 @@ import {
   harvestObjectLiteralMethods,
   packageFingerprint,
   seatedClassExpression,
+  staticClassExpressions,
   tsLiteralValue,
 } from "./extract-ts-api.js";
 import { collectTsFileNames } from "./extra-surface.js";
@@ -5708,5 +5709,23 @@ describe("seatedClassExpression", () => {
     for (const stmt of statements("Ns.A = class { };\nNs.B = 1;\nfoo();")) {
       expect(seatedClassExpression(stmt)).toBeUndefined();
     }
+  });
+});
+
+describe("staticClassExpressions", () => {
+  it("hosts `static CONST = new (class { ... })()` on a class named after the constant", () => {
+    const [cls] = ts
+      .createSourceFile(
+        "virtual.ts",
+        "class TestRequest { static readonly ENCODER = new (class { shouldMultipart() {} })(); }",
+        ts.ScriptTarget.Latest,
+        true,
+      )
+      .statements.filter(ts.isClassDeclaration);
+    const [nested, ...rest] = staticClassExpressions(cls, "TestRequest");
+    expect(rest).toEqual([]);
+    expect(nested.seat).toBe("TestRequest.ENCODER");
+    expect(nested.name).toBe("ENCODER");
+    expect(nested.cls.members.map((member) => member.name?.getText())).toEqual(["shouldMultipart"]);
   });
 });

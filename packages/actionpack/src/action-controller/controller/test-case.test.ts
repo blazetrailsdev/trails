@@ -1503,17 +1503,6 @@ Object.defineProperty(ResponseDefaultHeadersTestController, "name", {
   value: "ResponseDefaultHeadersTest::TestController",
 });
 
-function runningTest(): Parameters<TestCase["afterTeardown"]>[0] {
-  return {
-    assertions: 1,
-    skipped: false,
-    error: false,
-    name: "",
-    sourceLocation: ["", 0],
-    failures: [],
-  };
-}
-
 class ResponseDefaultHeadersTest extends TestCase {
   original: typeof Response.defaultHeaders;
   defaults!: Record<string, string>;
@@ -1554,7 +1543,8 @@ describe("ResponseDefaultHeadersTest", () => {
   });
 
   afterEach(() => {
-    tc.afterTeardown(runningTest());
+    tc.assertions = 1;
+    tc.afterTeardown();
   });
 
   it("response contains default headers", async () => {
@@ -1614,7 +1604,10 @@ describe("BarControllerTest", () => {
     await tc.beforeSetup();
     tc.setup();
   });
-  afterEach(() => tc.afterTeardown(runningTest()));
+  afterEach(() => {
+    tc.assertions = 1;
+    tc.afterTeardown();
+  });
 
   it("engine controller route", async () => {
     await tc.get("index");
@@ -1640,7 +1633,10 @@ describe("BarControllerTestWithExplicitRouteSet", () => {
     await tc.beforeSetup();
     tc.setup();
   });
-  afterEach(() => tc.afterTeardown(runningTest()));
+  afterEach(() => {
+    tc.assertions = 1;
+    tc.afterTeardown();
+  });
 
   it("engine controller route", async () => {
     await tc.get("index");

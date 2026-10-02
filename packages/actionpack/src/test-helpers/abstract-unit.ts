@@ -98,7 +98,7 @@ SharedRoutes.defineMethod("beforeSetup", function (this: { routes?: RouteSet }):
       this.get(":controller(/:action)");
     });
   });
-  return SharedRoutes.superMethod(this, "beforeSetup")?.();
+  return SharedRoutes.superMethod(this, "beforeSetup")!();
 });
 
 Object.assign(ActionDispatch, { SharedRoutes });

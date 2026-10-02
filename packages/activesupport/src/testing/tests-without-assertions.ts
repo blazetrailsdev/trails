@@ -1,20 +1,14 @@
-import type { Assertion, UnexpectedError } from "./assertions.js";
+import type { Test } from "./assertions.js";
 
-/** @noRailsEquivalent PERMANENT */
-export interface RunningTest {
-  assertions: number;
-  skipped: boolean;
-  error: boolean;
-  name: string;
-  sourceLocation: [string, number];
-  failures: (Assertion | UnexpectedError)[];
-}
-
-export function afterTeardown(test: RunningTest): void {
-  if (test.assertions === 0 && !test.skipped && !test.error) {
-    const [file, line] = test.sourceLocation;
-    warn(`Test is missing assertions: \`${test.name}\` ${file}:${line}`);
-  }
+export function afterTeardown(this: Test, super_: () => unknown): unknown {
+  const warnWithoutAssertions = (): void => {
+    if (this.assertions === 0 && !this.isSkipped() && !this.isError()) {
+      const [file, line] = this.sourceLocation;
+      warn(`Test is missing assertions: \`${this.name}\` ${file}:${line}`);
+    }
+  };
+  const result = super_();
+  return result instanceof Promise ? result.then(warnWithoutAssertions) : warnWithoutAssertions();
 }
 
 /** @noRailsEquivalent PERMANENT */

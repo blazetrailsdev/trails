@@ -1,45 +1,45 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { resetCallbacks } from "../callbacks.js";
 import { UnexpectedError, assert, assertChanges } from "./assertions.js";
-import { afterTeardown, prepended, teardown } from "./setup-and-teardown.js";
-import type { RunningTest } from "./tests-without-assertions.js";
+import { TestCase } from "../test-case.js";
+import { Module, include } from "@blazetrails/ruby-compat";
 
 class MyError extends Error {}
 
+const OtherAfterTeardown = new Module();
+OtherAfterTeardown.defineMethod("afterTeardown", function (this: { witness: boolean }): unknown {
+  const result = OtherAfterTeardown.superMethod(this, "afterTeardown")!();
+  this.witness = true;
+  return result;
+});
+
 describe("AfterTeardownTest", () => {
-  const klass = class {};
-  const test: Pick<RunningTest, "failures"> = { failures: [] };
-  let witness = false;
+  let test: TestCase & { witness: boolean };
 
   beforeEach(() => {
-    prepended(klass);
-    witness = false;
-    test.failures.length = 0;
-    teardown.call(klass, () => {
+    const klass = class extends TestCase {
+      witness = false;
+    };
+    include(klass, OtherAfterTeardown);
+    klass.teardown(() => {
       throw new MyError("Test raises an error, all after_teardown should still get called");
     });
+    test = new klass("teardown raise but all after teardown method are called");
+    test.assertions = 1;
   });
 
   afterEach(async () => {
-    try {
-      await assertChanges(
-        () => test.failures.length,
-        null,
-        { from: 0, to: 1 },
-        () => {
-          afterTeardown.call(new klass(), test);
-          witness = true;
-        },
-      );
+    await assertChanges(
+      () => test.failures.length,
+      null,
+      { from: 0, to: 1 },
+      () => test.afterTeardown(),
+    );
 
-      expect(test.failures[0]).toBeInstanceOf(UnexpectedError);
-      expect((test.failures[0] as UnexpectedError).error).toBeInstanceOf(MyError);
-      expect(witness).toBe(true);
-      test.failures.length = 0;
-    } finally {
-      resetCallbacks(klass.prototype, "teardown");
-    }
+    expect(test.failures[0]).toBeInstanceOf(UnexpectedError);
+    expect((test.failures[0] as UnexpectedError).error).toBeInstanceOf(MyError);
+    expect(test.witness).toBe(true);
+    test.failures.length = 0;
   });
 
   it("teardown raise but all after teardown method are called", () => {

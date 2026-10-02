@@ -1,18 +1,13 @@
 import { afterEach, expect, it, vi } from "vitest";
 
-import { afterTeardown } from "./tests-without-assertions.js";
+import { TestCase } from "../test-case.js";
 
 afterEach(() => {
   const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   try {
-    afterTeardown({
-      assertions: 0,
-      skipped: false,
-      error: false,
-      name: "test_without_assertions",
-      sourceLocation: ["packages/activesupport/src/testing/test_without_assertions_test.ts", 9],
-      failures: [],
-    });
+    const test = new TestCase("test_without_assertions");
+    test.sourceLocation = ["packages/activesupport/src/testing/test_without_assertions_test.ts", 9];
+    test.afterTeardown();
 
     const err = warn.mock.calls.map((c) => String(c[0])).join("\n");
     expect(err).toMatch(

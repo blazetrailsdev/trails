@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { TypeError } from "@blazetrails/ruby-compat";
 import { Attribute as ModelAttribute, ValueType } from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/date";
@@ -24,7 +24,10 @@ function visitStandalone(value: unknown): string {
 
 describe("Dot (trails-only)", () => {
   const users = new Table("users");
-  const dot = new Visitors.Dot();
+  let dot: Visitors.Dot;
+  beforeEach(() => {
+    dot = new Visitors.Dot();
+  });
 
   it("labels a NamedFunction node", () => {
     const node = new Nodes.NamedFunction("COUNT", [users.get("id")]);
@@ -74,7 +77,10 @@ describe("Dot (trails-only)", () => {
 
 describe("TestDot", () => {
   const users = new Table("users");
-  const dot = new Visitors.Dot();
+  let dot: Visitors.Dot;
+  beforeEach(() => {
+    dot = new Visitors.Dot();
+  });
   it("Arel Nodes And", () => {
     const node = new Nodes.And([users.get("id"), users.get("name")]);
     const out = dot.accept(node, new Collectors.PlainString()).value;

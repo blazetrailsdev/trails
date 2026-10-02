@@ -28,18 +28,23 @@ function objectClass(object: unknown): Klass {
 }
 
 export abstract class Visitor {
-  protected dispatch: Hash<Klass, string>;
+  private _dispatch: Hash<Klass, string>;
 
   private static _dispatchCache?: Hash<Klass, string>;
 
   constructor() {
-    this.dispatch = this.getDispatchCache();
+    this._dispatch = this.getDispatchCache();
   }
 
   accept<C>(object: unknown, collector: C): C;
-  accept(object: unknown): unknown;
+  accept(object: unknown, collector?: null): unknown;
   accept(object: unknown, collector: unknown = null): unknown {
     return this.visit(object, collector);
+  }
+
+  /** @internal */
+  protected get dispatch(): Hash<Klass, string> {
+    return this._dispatch;
   }
 
   /** @internal */

@@ -680,7 +680,7 @@ export function extractFromProgram(
           info.classes[classKey] = classInfo;
           fileHasClassOrModule = true;
           for (const nested of staticClassExpressions(node, classInfo.name)) {
-            const nestedInfo = extractClass(nested.cls, checker, relPath, srcDir);
+            const nestedInfo = extractClass(nested.cls, checker, relPath, srcDir, nested.name);
             if (nestedInfo) info.classes[`${relPath}:${nested.seat}`] = nestedInfo;
           }
         }
@@ -899,7 +899,7 @@ export function extractFromProgram(
           info.classes[`${relPath}:${seat}`] = classInfo;
           fileHasClassOrModule = true;
           for (const nested of staticClassExpressions(cls, seat)) {
-            const nestedInfo = extractClass(nested.cls, checker, relPath, srcDir);
+            const nestedInfo = extractClass(nested.cls, checker, relPath, srcDir, nested.name);
             if (nestedInfo) info.classes[`${relPath}:${nested.seat}`] = nestedInfo;
           }
         }
@@ -3662,22 +3662,40 @@ export function seatedClassExpression(
  * (`class Scanner { static Scanner = class Scanner { ... } }`, the only way TS
  * lets `Journey::Scanner::Scanner` share its outer class's name). Keyed by the
  * dotted seat so it never overwrites the outer class; recurses for deeper
- * nesting.
+ * nesting. A `static CONST = new (class { ... })()` member is hosted the same
+ * way, on a class named after the constant.
  */
 export function staticClassExpressions(
   node: ts.ClassDeclaration | ts.ClassExpression,
   seat: string,
-): { seat: string; cls: ts.ClassExpression }[] {
-  const found: { seat: string; cls: ts.ClassExpression }[] = [];
+): { seat: string; cls: ts.ClassExpression; name?: string }[] {
+  const found: { seat: string; cls: ts.ClassExpression; name?: string }[] = [];
   for (const member of node.members) {
     if (!ts.isPropertyDeclaration(member) || !ts.isIdentifier(member.name)) continue;
     if (!member.modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword)) continue;
     const init = member.initializer;
-    if (!init || !ts.isClassExpression(init) || !init.name) continue;
     const nestedSeat = `${seat}.${member.name.text}`;
+    const instantiated = init && instantiatedClassExpression(init);
+    if (instantiated) {
+      found.push({ seat: nestedSeat, cls: instantiated, name: member.name.text });
+      continue;
+    }
+    if (!init || !ts.isClassExpression(init) || !init.name) continue;
     found.push({ seat: nestedSeat, cls: init }, ...staticClassExpressions(init, nestedSeat));
   }
   return found;
+}
+
+/**
+ * The class of a `new (class { ... })()` initializer: Ruby's
+ * `CONST = Class.new do ... end.new`, an instance of an anonymous class, which
+ * the Ruby extractor hosts on a class named after the constant.
+ */
+function instantiatedClassExpression(init: ts.Expression): ts.ClassExpression | undefined {
+  if (!ts.isNewExpression(init)) return undefined;
+  let cls: ts.Expression = init.expression;
+  while (ts.isParenthesizedExpression(cls)) cls = cls.expression;
+  return ts.isClassExpression(cls) ? cls : undefined;
 }
 
 /** The `export const Name = class Name { ... }` form of a class declaration. */
@@ -3697,8 +3715,8 @@ export function extractClass(
   checker: ts.TypeChecker,
   file: string,
   srcDir?: string,
+  name: string | undefined = node.name?.text,
 ): ClassInfo | null {
-  const name = node.name?.text;
   if (!name) return null;
 
   let superclass: string | undefined;

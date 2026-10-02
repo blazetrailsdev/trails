@@ -4,7 +4,7 @@ import "@blazetrails/activesupport/testing/autorun";
 import { TestDatabases } from "@blazetrails/activerecord/test-databases";
 import { TestFixtures, type ClassMethods } from "@blazetrails/activerecord/test-fixtures";
 import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
-import { abort } from "@blazetrails/ruby-compat";
+import { Module, abort } from "@blazetrails/ruby-compat";
 import { Trails } from "./rails.js";
 
 declare module "@blazetrails/activesupport/test-case" {
@@ -21,10 +21,6 @@ declare module "@blazetrails/activesupport/test-case" {
 interface FixtureHost {
   fixturePaths: string[];
   fileFixturePath?: string;
-}
-
-interface RoutesHost {
-  prototype: { routes?: unknown; beforeSetup?(): unknown };
 }
 
 if (Trails.env["production?"]()) {
@@ -48,19 +44,21 @@ onLoad("action_dispatch_integration_test", function (this: FixtureHost) {
   this.fixturePaths = [...this.fixturePaths, ...(TestCase as unknown as FixtureHost).fixturePaths];
 });
 
-onLoad("action_controller_test_case", function (this: RoutesHost) {
-  const superBeforeSetup = this.prototype.beforeSetup;
-  this.prototype.beforeSetup = function (this: { routes?: unknown }) {
+onLoad("action_controller_test_case", function (this: typeof TestCase) {
+  const reopening = new Module();
+  reopening.defineMethod("beforeSetup", function (this: { routes?: unknown }) {
     this.routes = Trails.application!.routes();
-    return superBeforeSetup?.call(this);
-  };
+    return reopening.superMethod(this, "beforeSetup")!();
+  });
+  include(this, reopening);
 });
 
-onLoad("action_dispatch_integration_test", function (this: RoutesHost) {
-  const superBeforeSetup = this.prototype.beforeSetup;
-  this.prototype.beforeSetup = async function (this: { routes?: unknown }) {
+onLoad("action_dispatch_integration_test", function (this: typeof TestCase) {
+  const reopening = new Module();
+  reopening.defineMethod("beforeSetup", async function (this: { routes?: unknown }) {
     this.routes = Trails.application!.routes();
     await Trails.application!.reloadRoutesUnlessLoaded();
-    return superBeforeSetup?.call(this);
-  };
+    return reopening.superMethod(this, "beforeSetup")!();
+  });
+  include(this, reopening);
 });

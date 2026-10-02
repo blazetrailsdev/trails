@@ -1,10 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { Collectors, Table, Nodes, Visitors } from "../index.js";
 import { buildQuoted } from "../nodes/casted.js";
 
 describe("TestDot", () => {
-  const dot = new Visitors.Dot();
+  let dot: Visitors.Dot;
+  beforeEach(() => {
+    dot = new Visitors.Dot();
+  });
 
   type Ctor = new (...args: never[]) => Nodes.Node;
   const acceptFunction = (klass: Ctor) => {
