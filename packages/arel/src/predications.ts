@@ -1,5 +1,5 @@
-import { Node } from "./nodes/node.js";
-import {
+import type { Node } from "./nodes/node.js";
+import type {
   NotEqual,
   GreaterThan,
   GreaterThanOrEqual,
@@ -8,17 +8,14 @@ import {
   NotIn,
   IsDistinctFrom,
   IsNotDistinctFrom,
-  Between,
 } from "./nodes/binary.js";
-import { Equality } from "./nodes/equality.js";
-import { Matches, DoesNotMatch } from "./nodes/matches.js";
-import { In } from "./nodes/in.js";
-import { Regexp as RegexpNode, NotRegexp } from "./nodes/regexp.js";
-import { SqlLiteral } from "./nodes/sql-literal.js";
-import { And, Or } from "./nodes/nary.js";
-import { Grouping } from "./nodes/grouping.js";
-import { Case } from "./nodes/case.js";
-import { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
+import type { Equality } from "./nodes/equality.js";
+import type { Matches, DoesNotMatch } from "./nodes/matches.js";
+import type { In } from "./nodes/in.js";
+import type { Regexp as RegexpNode, NotRegexp } from "./nodes/regexp.js";
+import type { Grouping } from "./nodes/grouping.js";
+import type { Case } from "./nodes/case.js";
+import type { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
 import { Nodes } from "./namespaces.js";
 import { rbEqual } from "@blazetrails/activesupport";
 import { NoMethodError, rbObjClass } from "@blazetrails/ruby-compat";
@@ -27,8 +24,8 @@ function isSelectManagerLike(value: unknown): value is { ast: Node } {
   return (
     typeof value === "object" &&
     value !== null &&
-    !(value instanceof Node) &&
-    (value as { ast?: unknown }).ast instanceof Node
+    !(value instanceof Nodes.Node) &&
+    (value as { ast?: unknown }).ast instanceof Nodes.Node
   );
 }
 
@@ -175,29 +172,29 @@ export interface PredicationsModule extends GroupingFolders {
 
 export const Predications: PredicationsModule = {
   eq(this: Node & PredicationHost, other: unknown): Equality {
-    return new Equality(this, this.quotedNode(other));
+    return new Nodes.Equality(this, this.quotedNode(other));
   },
   notEq(this: Node & PredicationHost, other: unknown): NotEqual {
-    return new NotEqual(this, this.quotedNode(other));
+    return new Nodes.NotEqual(this, this.quotedNode(other));
   },
   gt(this: Node & PredicationHost, right: unknown): GreaterThan {
-    return new GreaterThan(this, this.quotedNode(right));
+    return new Nodes.GreaterThan(this, this.quotedNode(right));
   },
   gteq(this: Node & PredicationHost, right: unknown): GreaterThanOrEqual {
-    return new GreaterThanOrEqual(this, this.quotedNode(right));
+    return new Nodes.GreaterThanOrEqual(this, this.quotedNode(right));
   },
   lt(this: Node & PredicationHost, right: unknown): LessThan {
-    return new LessThan(this, this.quotedNode(right));
+    return new Nodes.LessThan(this, this.quotedNode(right));
   },
   lteq(this: Node & PredicationHost, right: unknown): LessThanOrEqual {
-    return new LessThanOrEqual(this, this.quotedNode(right));
+    return new Nodes.LessThanOrEqual(this, this.quotedNode(right));
   },
 
   isDistinctFrom(this: Node & PredicationHost, other: unknown): IsDistinctFrom {
-    return new IsDistinctFrom(this, this.quotedNode(other));
+    return new Nodes.IsDistinctFrom(this, this.quotedNode(other));
   },
   isNotDistinctFrom(this: Node & PredicationHost, other: unknown): IsNotDistinctFrom {
-    return new IsNotDistinctFrom(this, this.quotedNode(other));
+    return new Nodes.IsNotDistinctFrom(this, this.quotedNode(other));
   },
 
   matches(
@@ -206,7 +203,7 @@ export const Predications: PredicationsModule = {
     escape: string | Node | null = null,
     caseSensitive = false,
   ): Matches {
-    return new Matches(this, this.quotedNode(other), escape, caseSensitive);
+    return new Nodes.Matches(this, this.quotedNode(other), escape, caseSensitive);
   },
   doesNotMatch(
     this: Node & PredicationHost,
@@ -214,24 +211,24 @@ export const Predications: PredicationsModule = {
     escape: string | Node | null = null,
     caseSensitive = false,
   ): DoesNotMatch {
-    return new DoesNotMatch(this, this.quotedNode(other), escape, caseSensitive);
+    return new Nodes.DoesNotMatch(this, this.quotedNode(other), escape, caseSensitive);
   },
   matchesRegexp(this: Node & PredicationHost, other: string, caseSensitive = true): RegexpNode {
-    return new RegexpNode(this, this.quotedNode(other), caseSensitive);
+    return new Nodes.Regexp(this, this.quotedNode(other), caseSensitive);
   },
   doesNotMatchRegexp(this: Node & PredicationHost, other: string, caseSensitive = true): NotRegexp {
-    return new NotRegexp(this, this.quotedNode(other), caseSensitive);
+    return new Nodes.NotRegexp(this, this.quotedNode(other), caseSensitive);
   },
 
   in(this: Node & PredicationHost, other: unknown): In {
-    if (isSelectManagerLike(other)) return new In(this, other.ast);
-    if (isEnumerable(other)) return new In(this, this.quotedArray([...other]));
-    return new In(this, this.quotedNode(other));
+    if (isSelectManagerLike(other)) return new Nodes.In(this, other.ast);
+    if (isEnumerable(other)) return new Nodes.In(this, this.quotedArray([...other]));
+    return new Nodes.In(this, this.quotedNode(other));
   },
   notIn(this: Node & PredicationHost, other: unknown): NotIn {
-    if (isSelectManagerLike(other)) return new NotIn(this, other.ast);
-    if (isEnumerable(other)) return new NotIn(this, this.quotedArray([...other]));
-    return new NotIn(this, this.quotedNode(other));
+    if (isSelectManagerLike(other)) return new Nodes.NotIn(this, other.ast);
+    if (isEnumerable(other)) return new Nodes.NotIn(this, this.quotedArray([...other]));
+    return new Nodes.NotIn(this, this.quotedNode(other));
   },
 
   between(this: BetweenHost, other: RangeLike): Node {
@@ -258,7 +255,7 @@ export const Predications: PredicationsModule = {
     } else {
       const left = this.quotedNode(other.begin);
       const right = this.quotedNode(other.end);
-      return new Between(this, new And([left, right]));
+      return new Nodes.Between(this, new Nodes.And([left, right]));
     }
   },
 
@@ -413,16 +410,16 @@ export const Predications: PredicationsModule = {
     return this.groupingAll("notIn", others);
   },
   when(this: Node & PredicationHost, right: unknown): Case {
-    return new Case(this).when(this.quotedNode(right));
+    return new Nodes.Case(this).when(this.quotedNode(right));
   },
   concat(this: Node, other: Node): Concat {
-    return new Concat(this, other);
+    return new Nodes.Concat(this, other);
   },
   contains(this: Node & PredicationHost, other: unknown): Contains {
-    return new Contains(this, this.quotedNode(other));
+    return new Nodes.Contains(this, this.quotedNode(other));
   },
   overlaps(this: Node & PredicationHost, other: unknown): Overlaps {
-    return new Overlaps(this, this.quotedNode(other));
+    return new Nodes.Overlaps(this, this.quotedNode(other));
   },
   quotedArray(this: PredicationHost, others: unknown[]): Node[] {
     return others.map((v) => this.quotedNode(v));
@@ -435,8 +432,9 @@ export const Predications: PredicationsModule = {
     ...extras: unknown[]
   ): Grouping {
     const nodes = others.map(predicationDispatch(this, methodId, extras));
-    if (nodes.length === 0) return new Grouping(new SqlLiteral("NULL", { retryable: true }));
-    return new Grouping(nodes.reduce((memo, node) => new Or([memo, node])));
+    if (nodes.length === 0)
+      return new Nodes.Grouping(new Nodes.SqlLiteral("NULL", { retryable: true }));
+    return new Nodes.Grouping(nodes.reduce((memo, node) => new Nodes.Or([memo, node])));
   },
 
   groupingAll<T extends PredicationHost>(
@@ -446,7 +444,7 @@ export const Predications: PredicationsModule = {
     ...extras: unknown[]
   ): Grouping {
     const nodes = others.map(predicationDispatch(this, methodId, extras));
-    return new Grouping(new And(nodes));
+    return new Nodes.Grouping(new Nodes.And(nodes));
   },
 
   quotedNode(this: Node, other: unknown): Node {

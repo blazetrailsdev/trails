@@ -1,7 +1,8 @@
 import { Nodes } from "../namespaces.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
-import type { FactoryMethodsModule } from "../factory-methods.js";
+import { include } from "@blazetrails/activesupport";
+import { FactoryMethods, type FactoryMethodsModule } from "../factory-methods.js";
 import type { And } from "./nary.js";
 import type { Not } from "./unary.js";
 import type { Grouping } from "./grouping.js";
@@ -49,4 +50,7 @@ export class Node {
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
    @typescript-eslint/no-unsafe-declaration-merging */
 export interface Node extends FactoryMethodsModule {}
+
+include(Node, FactoryMethods);
+
 rbModConstSet(Nodes, "Node", Node);

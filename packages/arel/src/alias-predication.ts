@@ -1,6 +1,7 @@
-import { As } from "./nodes/binary.js";
+import type { As } from "./nodes/binary.js";
 import type { Node } from "./nodes/node.js";
-import { SqlLiteral } from "./nodes/sql-literal.js";
+import type { SqlLiteral } from "./nodes/sql-literal.js";
+import { Nodes } from "./namespaces.js";
 
 export interface AliasPredicationModule {
   as(other: string | SqlLiteral): As;
@@ -8,6 +9,6 @@ export interface AliasPredicationModule {
 
 export const AliasPredication: AliasPredicationModule = {
   as(this: Node, other: string | SqlLiteral): As {
-    return new As(this, new SqlLiteral(other, { retryable: true }));
+    return new Nodes.As(this, new Nodes.SqlLiteral(other, { retryable: true }));
   },
 };
