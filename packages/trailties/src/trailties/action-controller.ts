@@ -21,6 +21,7 @@ import {
   RuntimeError,
 } from "@blazetrails/ruby-compat";
 import type { Root } from "../paths.js";
+import type { ActiveSupportConfig } from "./active-support.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 export interface ActionControllerConfig {
@@ -54,6 +55,7 @@ interface TrailtieApp {
   config: {
     helpersPaths: string[];
     paths(): Root;
+    activeSupport: ActiveSupportConfig;
     assetHost: string | null;
     relativeUrlRoot: string | null;
   };
@@ -149,6 +151,14 @@ export class Trailtie extends BaseTrailtie {
         if (options.defaultProtectFromForgery) {
           base.protectFromForgery({ with: "exception" });
         }
+      });
+    });
+
+    this.initializer("action_controller.test_case", (app) => {
+      onLoad("action_controller_test_case", () => {
+        ActionController.TestCase.executorAroundEachRequest = (
+          app as TrailtieApp
+        ).config.activeSupport.executorAroundTestCase;
       });
     });
   }

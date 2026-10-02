@@ -300,15 +300,18 @@ describe("TestDot", () => {
       const v = new Visitors.Dot();
       type Internals = { visit(o: unknown): void; toDot(): string };
       v.accept(new Nodes.SqlLiteral("seed"), new Collectors.PlainString());
-      (v as unknown as Internals).visit(true);
-      (v as unknown as Internals).visit(true);
-      (v as unknown as Internals).visit(42);
-      (v as unknown as Internals).visit(42);
+      (v as unknown as Internals).visit([true, true, 42, 42, null, null, 1.5, 1.5]);
       const out = (v as unknown as Internals).toDot();
       const trueMatches = out.match(/<f0>TrueClass\|<f1>true"\];/g) ?? [];
       expect(trueMatches.length).toBe(1);
       const fortyTwoMatches = out.match(/<f0>Integer\|<f1>42"\];/g) ?? [];
       expect(fortyTwoMatches.length).toBe(1);
+      expect((out.match(/<f0>NilClass\|<f1>"\];/g) ?? []).length).toBe(1);
+      expect((out.match(/<f0>Float\|<f1>1.5"\];/g) ?? []).length).toBe(1);
+      expect(out).toContain('20 [label="<f0>TrueClass|<f1>true"];');
+      expect(out).toContain('85 [label="<f0>Integer|<f1>42"];');
+      expect(out).toContain('4 [label="<f0>NilClass|<f1>"];');
+      expect(out).toContain('-18014398509481982 [label="<f0>Float|<f1>1.5"];');
     });
 
     it("two Tables sharing a name don't collapse into one node (primitive seen-map fix)", () => {

@@ -207,6 +207,25 @@ describe("rbObjId", () => {
     expect(rbObjId(a)).toBe(id);
     expect(rbObjId(b)).toBe(id + 20);
   });
+
+  it("answers a special constant's own VALUE", () => {
+    expect(rbObjId(null)).toBe(4);
+    expect(rbObjId(undefined)).toBe(4);
+    expect(rbObjId(true)).toBe(20);
+    expect(rbObjId(false)).toBe(0);
+    expect(rbObjId(1)).toBe(3);
+    expect(rbObjId(-3)).toBe(-5);
+    expect(rbObjId(21n)).toBe(43);
+    expect(rbObjId(1.5)).toBe(-18014398509481982n);
+    expect(rbObjId(2.0000000000000004)).toBe(10);
+  });
+
+  it("hands a string, a Bignum and a non-flonum Float a fresh heap id per send", () => {
+    expect(rbObjId("a")).not.toBe(rbObjId("a"));
+    expect(rbObjId(2n ** 70n)).not.toBe(rbObjId(2n ** 70n));
+    expect(rbObjId(1e-300)).not.toBe(rbObjId(1e-300));
+    expect(rbObjId(NaN)).not.toBe(rbObjId(NaN));
+  });
 });
 
 class Req {

@@ -501,23 +501,67 @@ function objAddress(obj: object): string {
 }
 
 /**
- * `rb_obj_id` (`vendor/ruby/v3.3.11/gc.c:4975`), `Kernel#object_id`: a stable integer
- * handed out on first use by `rb_find_object_id` (`gc.c:4883`), starting at
+ * `rb_obj_id` (`vendor/ruby/v3.3.11/gc.c:4975`), `Kernel#object_id`. A heap
+ * object answers a stable integer handed out on first use, starting at
  * `OBJ_ID_INITIAL` and `OBJ_ID_INCREMENT` apart (`gc.c:3826-3827`, a 40-byte
- * `RVALUE` on 64-bit).
+ * `RVALUE` on 64-bit). A special constant answers its own `VALUE`
+ * (`rb_find_object_id`, `gc.c:4883-4898`): `nil` is 4, `true` 20, `false` 0
+ * (`vendor/ruby/v3.3.11/include/ruby/internal/special_consts.h:98-100`), a
+ * Fixnum `n` is `2n + 1`, and a flonum is the rotated bits
+ * `rb_float_new_inline` packs it into
+ * (`vendor/ruby/v3.3.11/internal/numeric.h:243-262`).
+ *
+ * @boundary: a JS string has no identity, so each send hands out a fresh id,
+ *  as a fresh `String` would get; a Symbol's static id is not modelled. A
+ *  Bignum and a Float outside the flonum range are heap objects in MRI and get
+ *  a fresh id the same way. An id past `Number.MAX_SAFE_INTEGER` is a bigint.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbObjId(obj: object): number {
-  let id = objIds.get(obj);
-  if (id === undefined) {
-    id = nextObjectId;
-    nextObjectId += OBJ_ID_INCREMENT;
-    objIds.set(obj, id);
+export function rbObjId(obj: object): number;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_obj_id` (`vendor/ruby/v3.3.11/gc.c:4975`). */
+export function rbObjId(obj: unknown): number | bigint;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_obj_id` (`vendor/ruby/v3.3.11/gc.c:4975`). */
+export function rbObjId(obj: unknown): number | bigint {
+  if (typeof obj === "number" && !Number.isInteger(obj)) {
+    flonumBits.setFloat64(0, obj);
+    const v = flonumBits.getBigUint64(0);
+    const bits = Number((v >> 60n) & 0x7n);
+    if (v !== 0x3000000000000000n && ((bits - 3) & ~0x01) === 0) {
+      const rotated = BigInt.asUintN(64, (v << 3n) | (v >> 61n));
+      return fixId(BigInt.asIntN(64, (rotated & ~0x01n) | 0x02n));
+    }
+  } else if (typeof obj === "number" || typeof obj === "bigint") {
+    const n = BigInt(obj);
+    if (n >= FIXNUM_MIN && n <= FIXNUM_MAX) return fixId(2n * n + 1n);
+  } else if (obj === null || obj === undefined) {
+    return 4;
+  } else if (obj === true) {
+    return 20;
+  } else if (obj === false) {
+    return 0;
+  } else if (typeof obj === "object" || typeof obj === "function") {
+    let id = objIds.get(obj);
+    if (id === undefined) {
+      id = nextObjectId;
+      nextObjectId += OBJ_ID_INCREMENT;
+      objIds.set(obj, id);
+    }
+    return id;
   }
+  const id = nextObjectId;
+  nextObjectId += OBJ_ID_INCREMENT;
   return id;
 }
 
+function fixId(id: bigint): number | bigint {
+  const n = Number(id);
+  return Number.isSafeInteger(n) ? n : id;
+}
+
+const FIXNUM_MAX = (1n << 62n) - 1n;
+const FIXNUM_MIN = -(1n << 62n);
+const flonumBits = new DataView(new ArrayBuffer(8));
 const OBJ_ID_INCREMENT = 20;
 const OBJ_ID_INITIAL = OBJ_ID_INCREMENT * 2;
 const objIds = new WeakMap<object, number>();
