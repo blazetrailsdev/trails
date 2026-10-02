@@ -1170,14 +1170,14 @@ export class SchemaStatements extends AbstractSchemaStatements {
       serial = this.sequenceNameFromParts(tableName, columnName, suffix) === sequenceName;
     }
 
-    return new Column(columnName, defaultValue, typeMetadata, !notnull, {
+    return Column.new(columnName, defaultValue, typeMetadata, !notnull, {
       defaultFunction: defaultFunction ?? undefined,
       collation: collation ?? undefined,
       comment: comment || null,
       serial,
       identity: identity || null,
       generated: gen,
-    }).deduplicate();
+    });
   }
 
   /** @internal */

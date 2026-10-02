@@ -4488,6 +4488,58 @@ describe("inlinedModuleMembers", () => {
     const bodied = new Map([["select-manager.ts", new Set(["project"])]]);
     expect(inlinedModuleMembers("arel", rubyClasses, rubyModules, byShort, bodied)).toEqual([]);
   });
+
+  describe("a module `new` override beside the includer's constructor", () => {
+    // connection_adapters/deduplicable.rb:13-15 `def new(*, **)` in ClassMethods;
+    // column.rb:8 `include Deduplicable`, column.rb:20 `def initialize`.
+    const dedupModules = {
+      "ActiveRecord::ConnectionAdapters::Deduplicable": rubyClass({
+        name: "Deduplicable",
+        file: "connection_adapters/deduplicable.rb",
+        klass: [method("new")],
+      }),
+    };
+    const dedupShort = new Map([
+      ["Deduplicable", ["ActiveRecord::ConnectionAdapters::Deduplicable"]],
+    ]);
+    const bodied = new Map([
+      ["connection-adapters/column.ts", new Set(["constructor"])],
+      ["connection-adapters/deduplicable.ts", new Set(["new"])],
+    ]);
+    const column = (instance: MethodInfo[]) => ({
+      "ActiveRecord::ConnectionAdapters::Column": rubyClass({
+        name: "Column",
+        file: "connection_adapters/column.rb",
+        includes: ["Deduplicable"],
+        instance,
+      }),
+    });
+
+    it("leaves the constructor of an includer that defines `initialize` alone", () => {
+      expect(
+        inlinedModuleMembers(
+          "activerecord",
+          column([method("initialize")]),
+          dedupModules,
+          dedupShort,
+          bodied,
+        ),
+      ).toEqual([]);
+    });
+
+    it("still reports the constructor of an includer with no `initialize`", () => {
+      expect(
+        inlinedModuleMembers("activerecord", column([]), dedupModules, dedupShort, bodied),
+      ).toEqual([
+        {
+          tsFile: "connection-adapters/column.ts",
+          tsName: "constructor",
+          moduleRubyFile: "connection_adapters/deduplicable.rb",
+          rubyName: "new",
+        },
+      ]);
+    });
+  });
 });
 
 describe("buildReport — members Ruby supplies without a def in the mapped file", () => {

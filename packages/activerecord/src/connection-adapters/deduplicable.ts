@@ -1,9 +1,10 @@
-import { rbEqual } from "@blazetrails/ruby-compat";
+import { Concern } from "@blazetrails/activesupport";
+import { Module, extend, rbEqual } from "@blazetrails/ruby-compat";
 
-export interface Deduplicable {
-  /** @internal */
-  deduplicated(): this;
-}
+type DeduplicableClass = { registry(): Map<number, WeakRef<object>[]> };
+
+export const Deduplicable = new Module() as Module & { ClassMethods: typeof ClassMethods };
+extend(Deduplicable, Concern);
 
 const registries = new WeakMap<object, Map<number, WeakRef<object>[]>>();
 const _finalizer =
@@ -15,9 +16,9 @@ const _finalizer =
       })
     : null;
 
-export function deduplicate<T extends Deduplicable & { hash(): number }>(obj: T): T {
-  const own = registry.call(obj.constructor);
-  const hash = obj.hash();
+export function deduplicate<T extends { hash(): number; deduplicated(): T }>(this: T): T {
+  const own = (this.constructor as unknown as DeduplicableClass).registry();
+  const hash = this.hash();
   let bucket = own.get(hash);
   if (!bucket) {
     bucket = [];
@@ -25,12 +26,18 @@ export function deduplicate<T extends Deduplicable & { hash(): number }>(obj: T)
   }
   for (const ref of bucket) {
     const existing = ref.deref();
-    if (existing !== undefined && rbEqual(existing, obj)) return existing as T;
+    if (existing !== undefined && rbEqual(existing, this)) return existing as T;
   }
-  const deduped = obj.deduplicated();
+  const deduped = this.deduplicated();
   bucket.push(new WeakRef(deduped));
   _finalizer?.register(deduped, { bucket });
   return deduped;
+}
+export const negate = deduplicate;
+
+/** @internal */
+export function deduplicated<T extends object>(this: T): T {
+  return Object.freeze(this);
 }
 
 export function registry(this: object): Map<number, WeakRef<object>[]> {
@@ -41,3 +48,19 @@ export function registry(this: object): Map<number, WeakRef<object>[]> {
   }
   return own;
 }
+
+export const ClassMethods = {
+  registry,
+
+  new<C extends new (...args: never[]) => { deduplicate(): unknown }>(
+    this: C,
+    ...args: ConstructorParameters<C>
+  ): InstanceType<C> {
+    return new this(...(args as never[])).deduplicate() as InstanceType<C>;
+  },
+};
+Deduplicable.ClassMethods = ClassMethods;
+
+Deduplicable.defineMethod("deduplicate", deduplicate);
+Deduplicable.defineMethod("negate", negate);
+Deduplicable.defineMethod("deduplicated", deduplicated);

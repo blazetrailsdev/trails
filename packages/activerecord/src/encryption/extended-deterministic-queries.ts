@@ -184,11 +184,13 @@ export class RelationQueries {
 
 export const CoreQueries = new Module() as Module & { ClassMethods: Module };
 extend(CoreQueries, Concern);
-CoreQueries.ClassMethods = new Module((mod) => {
-  mod.defineMethod("findBy", function (this: any, ...args: unknown[]) {
-    return mod.superMethod(this, "findBy")!(...EncryptedQuery.processArguments(this, args, false));
-  });
-});
+
+export function findBy(this: any, ...args: unknown[]): unknown {
+  return CoreQueries.ClassMethods.superMethod(this, "findBy")!(
+    ...EncryptedQuery.processArguments(this, args, false),
+  );
+}
+CoreQueries.ClassMethods = new Module((mod) => mod.defineMethod("findBy", findBy));
 
 export class AdditionalValue {
   readonly value: unknown;

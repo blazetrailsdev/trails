@@ -308,7 +308,7 @@ export function newColumnFromField(
 
   const rowid = isColumnTheRowid(field, definitions);
 
-  return new Column(
+  return Column.new(
     String(field["name"]),
     defaultValue,
     typeMetadata,
@@ -320,7 +320,7 @@ export function newColumnFromField(
       rowid,
       generatedType,
     },
-  ).deduplicate();
+  );
 }
 
 const INTEGER_REGEX = /integer/i;

@@ -1,10 +1,15 @@
-import { deduplicate } from "./deduplicable.js";
-import type { Deduplicable } from "./deduplicable.js";
+import { Deduplicable, deduplicated } from "./deduplicable.js";
+import type { ClassMethods, deduplicate } from "./deduplicable.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { humanize } from "@blazetrails/activesupport";
-import { Encoding, rbHash } from "@blazetrails/ruby-compat";
+import { Encoding, include, rbHash } from "@blazetrails/ruby-compat";
 
-export class Column implements Deduplicable {
+export class Column {
+  declare static registry: typeof ClassMethods.registry;
+  declare static new: typeof ClassMethods.new;
+  declare deduplicate: typeof deduplicate;
+  declare negate: typeof deduplicate;
+
   name: string;
   sqlTypeMetadata: SqlTypeMetadata | null;
   null: boolean;
@@ -109,7 +114,7 @@ export class Column implements Deduplicable {
     if (this.sqlTypeMetadata) {
       this.sqlTypeMetadata = this.sqlTypeMetadata.deduplicate();
     }
-    return Object.freeze(this);
+    return deduplicated.call(this) as this;
   }
 
   initWith(coder: ColumnCoder): void {
@@ -131,11 +136,9 @@ export class Column implements Deduplicable {
     coder["collation"] = this.collation;
     coder["comment"] = this.comment;
   }
-
-  deduplicate(): this {
-    return deduplicate(this);
-  }
 }
+
+include(Column, Deduplicable);
 
 /** @internal */
 function metadataEquals(a: SqlTypeMetadata | null, b: SqlTypeMetadata | null): boolean {

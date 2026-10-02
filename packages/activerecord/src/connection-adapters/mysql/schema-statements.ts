@@ -330,11 +330,11 @@ export async function newColumnFromField(
     [def, defFn] = [null, def];
   }
 
-  return new Column(fieldName, def, meta, field["Null"] === "YES", {
+  return Column.new(fieldName, def, meta, field["Null"] === "YES", {
     defaultFunction: defFn ?? undefined,
     collation: field["Collation"] ?? null,
     comment: presence(field["Comment"] as string | undefined) ?? null,
-  }).deduplicate();
+  });
 }
 
 /** @internal */

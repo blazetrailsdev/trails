@@ -1,10 +1,9 @@
-import { File, FileUtils, Zlib, sort } from "@blazetrails/ruby-compat";
+import { File, FileUtils, Zlib, isModuleIncluded, sort } from "@blazetrails/ruby-compat";
 import { atomicWrite, camelize, underscore } from "@blazetrails/activesupport";
 import { parse as yamlParse, stringify as yamlStringify } from "@blazetrails/activesupport/yaml";
 import type { CollectionTag, YAMLMap } from "@blazetrails/activesupport/yaml";
 import { Column, NullColumn } from "./column.js";
-import { deduplicate } from "./deduplicable.js";
-import type { Deduplicable } from "./deduplicable.js";
+import { Deduplicable } from "./deduplicable.js";
 import type { ColumnCoder } from "./column.js";
 import { Column as MysqlColumn } from "./mysql/column.js";
 import { Column as PostgresqlColumn } from "./postgresql/column.js";
@@ -699,9 +698,9 @@ export function deepDeduplicate<T>(value: T): T {
   if (
     value !== null &&
     typeof value === "object" &&
-    typeof (value as unknown as Deduplicable).deduplicated === "function"
+    isModuleIncluded(value.constructor as { prototype: object }, Deduplicable)
   ) {
-    return deduplicate(value as unknown as Deduplicable & { hash(): number }) as unknown as T;
+    return (value as unknown as { negate(): T }).negate();
   }
   return value;
 }

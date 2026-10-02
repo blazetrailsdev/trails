@@ -68,7 +68,7 @@ export { ModelName, Naming } from "./naming.js";
 export { Conversion } from "./conversion.js";
 export { Translation } from "./translation.js";
 export type { ModelLike } from "./naming.js";
-export { Dirty, initAttributes } from "./dirty.js";
+export { Dirty } from "./dirty.js";
 export type { DirtyOptions } from "./dirty.js";
 export type {
   CallbackConditions,

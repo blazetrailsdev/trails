@@ -117,7 +117,6 @@ import {
   type PermittedAttributes,
   assertAssignedSynchronously,
   type DirtyOptions,
-  initAttributes as dirtyInitAttributes,
 } from "@blazetrails/activemodel";
 import * as Inheritance from "./inheritance.js";
 import * as SignedId from "./signed-id.js";
@@ -2738,6 +2737,7 @@ include(Base, _PrimaryKey);
 include(Base, _CompositePrimaryKey);
 include(Base, ModelSchema.ModelSchema);
 include(Base, _TimeZoneConversion);
+include(Base, new Module((mod) => mod.defineMethod("initAttributes", _Core.initAttributes)));
 include(Base, AMDirty);
 include(Base, _Dirty);
 include(Base, _AttrSerialization);
@@ -2795,7 +2795,6 @@ include(Base, {
   initWith: _Core.initWith,
   initWithAttributes: _Core.initWithAttributes,
   encodeWith: _Core.encodeWith,
-  initAttributes: _Core.initAttributes,
   fullInspect: _Core.fullInspect,
   destroyAssociationAsyncJob: _Core.destroyAssociationAsyncJob,
   initializeInternalsCallback: _Core.initializeInternalsCallback,
@@ -2869,8 +2868,6 @@ include(Base, {
   surreptitiouslyTouch: TouchLater.surreptitiouslyTouch,
   touchDeferredAttributes: TouchLater.touchDeferredAttributes,
 });
-
-prepend(Base.prototype, { initAttributes: dirtyInitAttributes as PrependMethod });
 
 for (const [name, fn] of [
   [
