@@ -1,7 +1,9 @@
 import {
   extend,
   fetch,
+  first,
   hasKey,
+  isEmpty,
   isModuleIncluded,
   rbInspect,
   rbObjClass,
@@ -24,7 +26,6 @@ import { DeferredIdsNotIn } from "./predicate-builder/deferred-distinct-pk-in.js
 import { ActiveRecord } from "../namespaces.js";
 import { defaultValue } from "../type.js";
 import {
-  ActiveRecordError,
   IrreversibleOrderError,
   NotImplementedError,
   PreparedStatementInvalid,
@@ -1363,31 +1364,22 @@ export function buildBoundSqlLiteral(
   }
 }
 
-/**
- * @internal
- * @missingRailsCall empty? — PERMANENT
- */
+/** @internal */
 export function buildSubquery(
   this: QueryMethodsHost,
   subqueryAlias: string | Nodes.SqlLiteral,
   selectValue: unknown,
 ): SelectManager {
-  const relation =
-    typeof (this as any).except === "function" ? (this as any).except("optimizerHints") : this;
-  if (typeof relation.arel !== "function") {
-    throw new ActiveRecordError("Cannot build subquery: relation does not support arel()");
-  }
-  const subquery = relation.arel().as(subqueryAlias);
-  const sm = new SelectManager(subquery);
-  sm.project(selectValue as any);
-  const hints: string[] = (this as any).optimizerHintsValues ?? [];
-  if (hints.length > 0) sm.optimizerHints(...hints);
-  return sm;
+  const subquery = (this as any).except("optimizerHints").arel().as(subqueryAlias);
+
+  const arel = new SelectManager(subquery).project(selectValue as any);
+  if (!isEmpty(this.optimizerHintsValues)) arel.optimizerHints(...this.optimizerHintsValues);
+  return arel;
 }
 
 /**
  * @internal
- * @missingRailsCall new — PERMANENT
+ * @missingRailsCall new — CONVERGEABLE call-gate-credits-string-conversion-as-string-new
  */
 export function isDoesNotSupportReverse(order: string | Nodes.SqlLiteral): boolean {
   const plain = String(order);
@@ -1888,19 +1880,16 @@ export function arelColumnsFromHash(
   });
 }
 
-/**
- * @internal
- * @missingRailsCall empty? — PERMANENT
- */
+/** @internal */
 export function orderColumn(this: QueryMethodsHost, field: string): unknown {
   return arelColumn.call(this, field, (attrName: string) => {
-    if (attrName === "count" && ((this as any).groupValues ?? []).length > 0) {
-      const table: any = this.table;
-      return table.get(attrName);
+    if (attrName === "count" && !isEmpty(this.groupValues)) {
+      return this.table.get(attrName);
+    } else {
+      return Arel.sql((this.model as any).adapterClass().quoteTableName(attrName), {
+        retryable: true,
+      });
     }
-    return Arel.sql((this.model as any).adapterClass().quoteTableName(attrName), {
-      retryable: true,
-    });
   });
 }
 
@@ -2070,14 +2059,11 @@ export function eachJoinDependencies(
   }
 }
 
-/**
- * @internal
- * @missingRailsCall empty? — PERMANENT
- */
+/** @internal */
 export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] {
   let joins = union(this.joinsValues as AssociationSpec[], this.leftOuterJoinsValues);
-  if (this.eagerLoadValues.length !== 0) joins = union(joins, this.eagerLoadValues);
-  if (this.includesValues.length !== 0) joins = union(joins, this.includesValues);
+  if (!isEmpty(this.eagerLoadValues)) joins = union(joins, this.eagerLoadValues);
+  if (!isEmpty(this.includesValues)) joins = union(joins, this.includesValues);
 
   const joinDependencies: JoinDependency[] = [];
   joinDependencies.unshift(
@@ -2181,7 +2167,6 @@ export function selectAssociationList(
 
 /**
  * @internal
- * @missingRailsCall empty? — PERMANENT
  * @missingRailsName strip — PERMANENT
  */
 export function buildJoinBuckets(
@@ -2195,7 +2180,7 @@ export function buildJoinBuckets(
   });
 
   let stashedLeftJoins: JoinDependency[] | undefined;
-  if (this.leftOuterJoinsValues.length > 0) {
+  if (!isEmpty(this.leftOuterJoinsValues)) {
     stashedLeftJoins = [];
     const leftJoins = selectNamedJoins.call(
       this,
@@ -2210,7 +2195,7 @@ export function buildJoinBuckets(
       },
     );
 
-    if (this.joinsValues.length === 0) {
+    if (isEmpty(this.joinsValues)) {
       buckets.named_join = leftJoins;
       buckets.stashed_join = stashedLeftJoins;
       return [buckets, Nodes.OuterJoin];
@@ -2260,16 +2245,13 @@ export function buildJoinBuckets(
   return [buckets, Nodes.InnerJoin];
 }
 
-/**
- * @internal
- * @missingRailsCall empty? — PERMANENT
- */
+/** @internal */
 export function buildJoins(
   this: QueryMethodsHost,
   joinSources: any[],
   aliases?: AliasTracker,
 ): any[] {
-  if (this.joinsValues.length === 0 && this.leftOuterJoinsValues.length === 0) return joinSources;
+  if (isEmpty(this.joinsValues) && isEmpty(this.leftOuterJoinsValues)) return joinSources;
 
   const [buckets, joinType] = buildJoinBuckets.call(this);
 
@@ -2278,9 +2260,9 @@ export function buildJoins(
   const leadingJoins = buckets.leading_join as Nodes.Join[];
   const joinNodes = buckets.join_node as Nodes.Join[];
 
-  if (leadingJoins.length > 0) joinSources.push(...leadingJoins);
+  if (!isEmpty(leadingJoins)) joinSources.push(...leadingJoins);
 
-  if (!(namedJoins.length === 0 && stashedJoins.length === 0)) {
+  if (!(isEmpty(namedJoins) && isEmpty(stashedJoins))) {
     const aliasTracker = this.aliasTracker([...leadingJoins, ...joinNodes], aliases?.aliases);
     const joinDependency = constructJoinDependency.call(this, namedJoins, joinType);
     joinSources.push(
@@ -2288,16 +2270,13 @@ export function buildJoins(
     );
   }
 
-  if (joinNodes.length > 0) joinSources.push(...joinNodes);
+  if (!isEmpty(joinNodes)) joinSources.push(...joinNodes);
   return joinSources;
 }
 
-/**
- * @internal
- * @missingRailsCall empty? — PERMANENT
- */
+/** @internal */
 export function buildWith(this: QueryMethodsHost, arel: SelectManager): SelectManager | undefined {
-  if (this.withValues.length === 0) return;
+  if (isEmpty(this.withValues)) return;
 
   const withStatements = this.withValues.map((withValue) =>
     buildWithValueFromHash.call(this, withValue),
@@ -2308,24 +2287,22 @@ export function buildWith(this: QueryMethodsHost, arel: SelectManager): SelectMa
     : arel.with(withStatements);
 }
 
-/**
- * @internal
- * @missingRailsCall first — PERMANENT
- */
+/** @internal */
 export function buildWithJoinNode(
   this: QueryMethodsHost,
   name: string,
   kind: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin = Nodes.InnerJoin,
 ): unknown {
   const withTable = new ArelTable(name);
-  const table: any = this.table;
-  const mc = this.model;
-  return table
-    .join(withTable, kind)
-    .on(
-      withTable
-        .get(foreignKey(String(mc?.modelName ?? mc?.name ?? "Model")))
-        .eq(table.get(mc?.primaryKey ?? "id")),
-    )
-    .joinSources()[0];
+
+  return first(
+    this.table
+      .join(withTable, kind)
+      .on(
+        withTable
+          .get(foreignKey(String(this.model.modelName)))
+          .eq(this.table.get(this.model.primaryKey as string)),
+      )
+      .joinSources(),
+  );
 }

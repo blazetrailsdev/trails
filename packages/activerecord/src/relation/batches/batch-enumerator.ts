@@ -1,3 +1,4 @@
+import { aryCount } from "@blazetrails/ruby-compat";
 import { applyThenable } from "../thenable.js";
 import type { TouchAllArgs } from "../../timestamp.js";
 
@@ -51,7 +52,7 @@ export class BatchEnumerator<T extends BatchRelation> {
     return this._of;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE batch-enumerator-enumerable-over-an-async-each */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {
     yield* this.each();
   }
@@ -81,7 +82,7 @@ export class BatchEnumerator<T extends BatchRelation> {
     })();
   }
 
-  /** @missingRailsCall sum — PERMANENT */
+  /** @missingRailsCall sum — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each */
   async deleteAll(): Promise<number> {
     let total = 0;
     for await (const batchRelation of this) {
@@ -90,7 +91,7 @@ export class BatchEnumerator<T extends BatchRelation> {
     return total;
   }
 
-  /** @missingRailsCall sum — PERMANENT */
+  /** @missingRailsCall sum — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each */
   async updateAll(updates: Record<string, unknown>): Promise<number> {
     let total = 0;
     for await (const batchRelation of this) {
@@ -99,7 +100,7 @@ export class BatchEnumerator<T extends BatchRelation> {
     return total;
   }
 
-  /** @missingRailsCall sum — PERMANENT */
+  /** @missingRailsCall sum — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each */
   async touchAll(...args: TouchAllArgs): Promise<number> {
     let total = 0;
     for await (const batchRelation of this) {
@@ -110,15 +111,11 @@ export class BatchEnumerator<T extends BatchRelation> {
     return total;
   }
 
-  /**
-   * @missingRailsCall count — PERMANENT
-   * @missingRailsCall sum — PERMANENT
-   */
+  /** @missingRailsCall sum — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each */
   async destroyAll(): Promise<number> {
     let total = 0;
     for await (const batchRelation of this) {
-      const records = await batchRelation.destroyAll();
-      total += records.filter((r) => r.isDestroyed?.()).length;
+      total += aryCount(await batchRelation.destroyAll(), (r) => r.isDestroyed());
     }
     return total;
   }
@@ -153,16 +150,16 @@ export class BatchEnumerator<T extends BatchRelation> {
 }
 
 export interface BatchEnumerator<T extends BatchRelation> {
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE batch-enumerator-enumerable-over-an-async-each */
   then<TResult1 = T[], TResult2 = never>(
     onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
   ): Promise<TResult1 | TResult2>;
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE batch-enumerator-enumerable-over-an-async-each */
   catch<TResult = never>(
     onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
   ): Promise<T[] | TResult>;
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE batch-enumerator-enumerable-over-an-async-each */
   finally(onfinally?: (() => void) | null): Promise<T[]>;
 }
 

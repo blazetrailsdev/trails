@@ -139,6 +139,11 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // call, so @blazetrails/ruby-compat exports it as `first(collection)`
   // and the Ruby receiver is TS argument 1.
   "first",
+  // Ruby core `Array#last` (`vendor/ruby/v3.3.11/array.c:1907`) — `first`'s
+  // twin: `pair[pair.length - 1]` is an index read, not a call, so
+  // @blazetrails/ruby-compat exports it as `last(collection)` and the Ruby
+  // receiver is TS argument 1.
+  "last",
   // Ruby core `Array#drop` — the same shape as `first` above: `chain.slice(1)`
   // names a JS method Ruby never calls, so @blazetrails/ruby-compat
   // exports it as `drop(collection, n)` and the Ruby receiver is TS argument 1.
