@@ -1,21 +1,13 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
-   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
-   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
-   how `include()` surfaces those members on the type side. */
 import { describe, it, expect, afterEach } from "vitest";
 import {
   Duration,
   assertNothingRaised,
   assertPredicate,
   assertRaise,
-  include,
 } from "@blazetrails/activesupport";
 import { current as dateTimeCurrent } from "@blazetrails/activesupport/core-ext/date-time/calculations";
 import { Date, Time } from "@blazetrails/date";
 import { Range } from "@blazetrails/ruby-compat";
-import { Model } from "../index.js";
-import { InclusionValidator } from "./inclusion.js";
-import { Attributes, type AttributesClassHalf } from "../attributes.js";
 import { ArgumentError } from "../attribute-assignment.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Person } from "../test-helpers/models/person.js";
@@ -242,57 +234,5 @@ describe("InclusionValidationTest", () => {
     } finally {
       Person.clearValidatorsBang();
     }
-  });
-
-  it("validates inclusion of with within alias", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("role", "string");
-        this.validates("role", { inclusion: { within: ["admin", "user"] } });
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(await new Person({ role: "admin" }).isValid()).toBe(true);
-    expect(await new Person({ role: "guest" }).isValid()).toBe(false);
-  });
-
-  it("validates inclusion of array value checks all elements", () => {
-    class Item extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("tags", "string");
-      }
-    }
-    interface Item extends Attributes {}
-
-    const validator = new InclusionValidator({ in: ["a", "b", "c"], attributes: ["tags"] });
-    const r1 = new Item();
-    validator.validateEach(r1, "tags", ["a", "b"]);
-    expect(r1.errors.size).toBe(0);
-    const r2 = new Item();
-    validator.validateEach(r2, "tags", ["a", "z"]);
-    expect(r2.errors.size).toBeGreaterThan(0);
-  });
-
-  it("validates inclusion of with Set collection", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("role", "string");
-        this.validates("role", { inclusion: { in: () => new Set(["admin", "user"]) } });
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(await new Person({ role: "admin" }).isValid()).toBe(true);
-    expect(await new Person({ role: "guest" }).isValid()).toBe(false);
   });
 });

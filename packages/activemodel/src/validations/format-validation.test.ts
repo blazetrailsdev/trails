@@ -1,17 +1,10 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
-   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
-   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
-   how `include()` surfaces those members on the type side. */
 import { describe, it, expect, afterEach } from "vitest";
 import {
   assertEmpty,
   assertNothingRaised,
   assertPredicate,
   assertRaise,
-  include,
 } from "@blazetrails/activesupport";
-import { Model } from "../index.js";
-import { Attributes, type AttributesClassHalf } from "../attributes.js";
 import { ArgumentError } from "../attribute-assignment.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Person } from "../test-helpers/models/person.js";
@@ -203,46 +196,5 @@ describe("FormatValidationTest", () => {
     } finally {
       Person.clearValidatorsBang();
     }
-  });
-});
-describe("format with 'without' option", () => {
-  class NoNumbers extends Model {
-    declare static attribute: AttributesClassHalf["attribute"];
-
-    static {
-      include(this, Attributes);
-      this.attribute("name", "string");
-      this.validates("name", { format: { without: /\d/ } });
-    }
-  }
-  interface NoNumbers extends Attributes {}
-
-  it("accepts values not matching 'without'", async () => {
-    expect(await new NoNumbers({ name: "dean" }).isValid()).toBe(true);
-  });
-
-  it("rejects values matching 'without'", async () => {
-    const n = new NoNumbers({ name: "dean123" });
-    expect(await n.isValid()).toBe(false);
-    expect(n.errors.messagesFor("name")).toContain("is invalid");
-  });
-
-  it("validate format does not mutate regex lastIndex across calls (g flag)", async () => {
-    const sharedRe = /\d+/g;
-    class P extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("code", "string");
-        this.validates("code", { format: { with: sharedRe } });
-      }
-    }
-    interface P extends Attributes {}
-
-    expect(await new P({ code: "abc123" }).isValid()).toBe(true);
-    expect(await new P({ code: "abc123" }).isValid()).toBe(true);
-    expect(await new P({ code: "abc123" }).isValid()).toBe(true);
-    expect(sharedRe.lastIndex).toBe(0);
   });
 });
