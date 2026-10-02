@@ -98,8 +98,6 @@
  * activerecord enrolled there directly under the
  * `activerecord-extra-surface-receipt-burndown` RFC, once its receipt stories
  * drove both its 340 novel and its 396 moved extras to zero.
- * activemodel followed under RFC 0173, once
- * `activemodel-burn-extra-surface-to-zero` retired its 1 novel and 24 moved.
  * Enrollment is only-grow, exactly like RFC 0121's: a package joins when it
  * reaches zero and is never moved back out to turn a red run green.
  *
