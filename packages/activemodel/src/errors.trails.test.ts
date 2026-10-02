@@ -301,10 +301,13 @@ describe("Errors — trails-only coverage", () => {
       expect(target.added("title", ":invalid")).toBe(true);
     });
 
-    it("import raises for a nil :type override, which has no to_sym", () => {
+    it("import raises for a nil :attribute or :type override, which has no to_sym", () => {
       const source = new Errors({});
       source.add("name", ":invalid");
       const target = new Errors({});
+      expect(() => target.import(source.objects[0], { attribute: undefined })).toThrow(
+        NoMethodError,
+      );
       expect(() => target.import(source.objects[0], { type: undefined })).toThrow(NoMethodError);
     });
 

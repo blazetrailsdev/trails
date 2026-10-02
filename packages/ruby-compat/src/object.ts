@@ -205,6 +205,19 @@ export function rbModName(klass: abstract new (...args: never) => unknown): stri
 }
 
 /**
+ * The methods a package defines on `Object`, as `rb_define_method` on
+ * `rb_cObject` (`vendor/ruby/v3.3.11/class.c:2134`) does, keyed by the camelCased Ruby
+ * name, which {@link rbFSend} dispatches for a receiver whose own class
+ * defines none: ActiveSupport's `Object#in?`
+ * (`activesupport/lib/active_support/core_ext/object/inclusion.rb:15`) is
+ * reached by `value.public_send(:in?, range)` on an Integer.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const OBJECT_METHOD_TABLE: Record<string, (self: never, ...args: never[]) => unknown> =
+  Object.create(null);
+
+/**
  * The methods bound on a Temporal seat, keyed by its `Symbol.toStringTag` and
  * then by the camelCased Ruby name, which {@link rbFSend} dispatches and
  * {@link basicObjRespondTo} answers for: a Temporal value's prototype carries
@@ -477,7 +490,11 @@ export function toSym(obj: unknown): string {
  * `-1` for an infinity and `nil` otherwise, as `Integer#infinite?`
  * (`vendor/ruby/v3.3.11/numeric.rb:48`) always does. `odd?` and `even?` are
  * dispatched for an Integer alone (`rb_int_odd_p` / `rb_int_even_p`,
- * `vendor/ruby/v3.3.11/numeric.c:3564,3588`): a Float defines neither. An operator is sent by its
+ * `vendor/ruby/v3.3.11/numeric.c:3564,3588`): a Float defines neither. A
+ * predicate sent by its Ruby name (`:odd?`, the value Rails' `NUMBER_CHECKS`
+ * holds) reaches those two arms and `OBJECT_METHOD_TABLE` by its `is`-prefixed
+ * TS spelling; every other lookup, `method_missing` included, sees the name as
+ * sent. An operator is sent by its
  * Ruby name (`">"`), which has no TS method spelling. `==` is {@link rbEqual},
  * which sends the receiver's own `==`, and `!=` its negation
  * (`rb_obj_not_equal`, `vendor/ruby/v3.3.11/object.c:248`). The four ordering
@@ -545,6 +562,9 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   const name = rbCheckStringType(vid);
   if (name === null) throw new TypeError(`${rbInspect(vid)} is not a symbol nor a string`);
   const mid = isSymbol(name) ? symbolToS(name) : name;
+  const predicate = mid.endsWith("?")
+    ? `is_${mid.slice(0, -1)}`.replace(/_([a-z\d])/g, (_, c: string) => c.toUpperCase())
+    : mid;
   if (argc === 1) {
     const other = args[0];
     if (mid === "==") return rbEqual(recv, other);
@@ -565,9 +585,9 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   }
   if (
     (typeof recv === "bigint" || Number.isInteger(recv)) &&
-    (mid === "isOdd" || mid === "isEven")
+    (predicate === "isOdd" || predicate === "isEven")
   ) {
-    return (BigInt(recv as number | bigint) % 2n !== 0n) === (mid === "isOdd");
+    return (BigInt(recv as number | bigint) % 2n !== 0n) === (predicate === "isOdd");
   }
   const bound = temporalMethod(recv, mid);
   if (bound !== undefined) return bound(recv, ...args);
@@ -591,6 +611,9 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     }
     if (isPlainHash(recv)) return hasKey(recv, args[0] as PropertyKey);
     if (recv == null) throw new NoMethodError("undefined method 'include?' for nil", "include?");
+  }
+  if (Object.hasOwn(OBJECT_METHOD_TABLE, predicate)) {
+    return (OBJECT_METHOD_TABLE[predicate] as AnyFunction)(recv, ...args);
   }
   if (typeof obj.methodMissing === "function") {
     return (obj.methodMissing as AnyFunction).call(recv, mid, ...args);

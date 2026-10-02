@@ -471,11 +471,7 @@ export function eachKey<T>(
   block?: (key: string) => unknown,
 ): Record<string, T> | string[] {
   const own = ownMethod(hash, "eachKey");
-  if (own && !block) return own.call(hash) as string[];
-  if (own) {
-    own.call(hash, block);
-    return hash;
-  }
+  if (own) return (block ? own.call(hash, block) : own.call(hash)) as string[];
   if (!block) return Object.keys(hash);
   for (const key of Object.keys(hash)) {
     block(key);

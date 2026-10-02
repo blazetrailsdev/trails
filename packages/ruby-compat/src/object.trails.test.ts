@@ -8,6 +8,7 @@ import {
   rbObjId,
   rbObjAsString as toS,
   rbObjRespondTo,
+  OBJECT_METHOD_TABLE,
   rbFPublicSend,
   rbModAttrReader,
   rbModAttrWriter,
@@ -403,11 +404,23 @@ describe("rbFSend", () => {
   });
 
   it("answers odd? and even? for an Integer alone", () => {
-    expect(rbFPublicSend(3, ":isOdd")).toBe(true);
+    expect(rbFPublicSend(3, ":odd?")).toBe(true);
+    expect(rbFPublicSend(4, ":even?")).toBe(true);
     expect(rbFPublicSend(-3, "isEven")).toBe(false);
     expect(rbFPublicSend(4n, "isEven")).toBe(true);
     expect(rbFPublicSend(4n, "isOdd")).toBe(false);
     expect(() => rbFPublicSend(1.5, "isOdd")).toThrow(NoMethodError);
+  });
+
+  it("dispatches a method a package defines on Object, after the receiver's own", () => {
+    OBJECT_METHOD_TABLE.isProbe = (self: unknown, other: unknown) => [self, other];
+    try {
+      expect(rbFPublicSend(3, ":probe?", 4)).toEqual([3, 4]);
+      expect(rbFPublicSend({ "probe?": () => "own" }, ":probe?")).toBe("own");
+    } finally {
+      delete OBJECT_METHOD_TABLE.isProbe;
+    }
+    expect(() => rbFPublicSend(3, ":probe?", 4)).toThrow(NoMethodError);
   });
 });
 

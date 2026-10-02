@@ -11,7 +11,7 @@ import {
 
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { underscore, BigDecimal, isIn, mergeBang, slice } from "@blazetrails/activesupport";
+import { underscore, BigDecimal, mergeBang, slice } from "@blazetrails/activesupport";
 import { COMPARE_CHECKS, errorOptions } from "./comparability.js";
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
@@ -95,7 +95,9 @@ export class NumericalityValidator extends EachValidator {
         }
       } else if (isInclude(RANGE_CHECKS, option)) {
         const range = optionValue as unknown as Range<unknown>;
-        if (!isIn(value, range)) {
+        if (
+          !rtest(rbFPublicSend(value, RANGE_CHECKS[option as keyof typeof RANGE_CHECKS], range))
+        ) {
           record.errors.add(
             attrName,
             `:${option}`,
@@ -120,7 +122,7 @@ const INTEGER_REGEX = /^[+-]?\d+(?![\s\S])/;
 const HEXADECIMAL_REGEX = /^[+-]?0[xX]/;
 
 const RANGE_CHECKS = { in: ":in?" } as const;
-const NUMBER_CHECKS = { odd: ":isOdd", even: ":isEven" } as const;
+const NUMBER_CHECKS = { odd: ":odd?", even: ":even?" } as const;
 
 const RESERVED_OPTIONS = [
   ...Object.keys(COMPARE_CHECKS),

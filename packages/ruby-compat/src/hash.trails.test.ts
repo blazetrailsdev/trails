@@ -349,7 +349,7 @@ describe("a Hash send to a receiver that defines the method itself", () => {
     expect([hasKey(row, "ID"), hasKey(row, "age")]).toEqual([true, false]);
     expect(keys(row)).toEqual(["id", "name"]);
     const seen: string[] = [];
-    expect(eachKey(row, (key) => seen.push(key))).toBe(row);
+    expect(eachKey(row, (key) => seen.push(key))).toBeUndefined();
     expect(seen).toEqual(["id", "name"]);
   });
 

@@ -92,7 +92,7 @@ export class Errors<TBase extends object = object> {
     error: ActiveModelError,
     overrideOptions: { attribute?: string; type?: string } = {},
   ): void {
-    for (const key of ["type"] as const) {
+    for (const key of ["attribute", "type"] as const) {
       if (hasKey(overrideOptions, key)) {
         overrideOptions[key] = toSym(overrideOptions[key]);
       }
