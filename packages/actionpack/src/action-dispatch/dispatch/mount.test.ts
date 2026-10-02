@@ -1,7 +1,6 @@
 import { beforeEach, describe, it } from "vitest";
 import { assert, assertEqual, assertNotEqual, TopLevel } from "@blazetrails/activesupport";
 import { bodyFromString, type RackEnv, type RackResponse } from "@blazetrails/rack";
-import { rbModPublicMethodDefined } from "@blazetrails/ruby-compat";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
 import type { MountableApp } from "../routing/mapper.js";
@@ -80,7 +79,7 @@ describe("TestRoutingMount", () => {
 
   it("app name is properly generated when engine is mounted in resources", () => {
     assert(
-      rbModPublicMethodDefined(Router.mountedHelpers(), "user_fake_mounted_at_resource"),
+      Router.mountedHelpers().isMethodDefined("userFakeMountedAtResource"),
       "A mounted helper should be defined with a parent's prefix",
     );
     assert(

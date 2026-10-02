@@ -251,8 +251,8 @@ describe("WithMountedEngine", () => {
   include(WithMountedEngine, BlogEngine.routes().mountedHelpers());
 
   let t: WithMountedEngine;
-  beforeEach(() => {
-    t = new WithMountedEngine();
+  beforeEach(({ task }) => {
+    t = new WithMountedEngine(task.name);
     t.beforeSetup();
     t.setup();
   });
@@ -509,8 +509,8 @@ describe("EngineMountedAtRoot", () => {
   }
 
   let t: EngineMountedAtRoot;
-  beforeEach(() => {
-    t = new EngineMountedAtRoot();
+  beforeEach(({ task }) => {
+    t = new EngineMountedAtRoot(task.name);
   });
 
   const verifyRedirect = (url: string, status: number = 301): void => {
