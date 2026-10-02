@@ -1,6 +1,6 @@
 import { ArgumentError } from "./argument-error.js";
 import { FrozenError } from "./frozen-error.js";
-import { rbInspect, rbObjClass } from "./object.js";
+import { rbInspect, rbObjClassname } from "./object.js";
 import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { TypeError } from "./type-error.js";
@@ -105,7 +105,7 @@ export const Struct = {
       initializeCopy(s: StructInstance): this {
         if (this === s) return this;
         if (Object.isFrozen(this)) {
-          throw new FrozenError(`can't modify frozen ${rbObjClass(this)}: ${rbInspect(this)}`, {
+          throw new FrozenError(`can't modify frozen ${rbObjClassname(this)}: ${rbInspect(this)}`, {
             receiver: this,
           });
         }
