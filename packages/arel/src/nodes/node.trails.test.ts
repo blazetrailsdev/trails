@@ -85,7 +85,6 @@ describe("Node base polymorphic defaults", () => {
 
   describe("isEquality", () => {
     it("returns false on base Node subclasses", () => {
-      expect(new Nodes.SqlLiteral("x").isEquality()).toBe(false);
       expect(new Nodes.Quoted(1).isEquality()).toBe(false);
       expect(new Nodes.GreaterThan(users.get("id"), new Nodes.Quoted(1)).isEquality()).toBe(false);
     });

@@ -58,7 +58,7 @@ export const FactoryMethods: FactoryMethodsModule = {
   },
 
   createAnd(clauses: (ArelNode | string)[]): And {
-    return new Nodes.And(clauses as Node[]);
+    return new Nodes.And(clauses);
   },
 
   createOn(expr: ArelNode): On {
