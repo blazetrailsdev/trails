@@ -104,9 +104,7 @@ export class NumericalityValidator extends EachValidator {
       } else if (option in COMPARE_CHECKS) {
         optionValue = this.optionAsNumber(record, optionValue, precision, scale);
         if (optionValue === undefined) continue;
-        if (
-          !rtest(rbFPublicSend(value, COMPARE_CHECKS[option as CompareKey], optionValue))
-        ) {
+        if (!rtest(rbFPublicSend(value, COMPARE_CHECKS[option as CompareKey], optionValue))) {
           record.errors.add(
             attrName,
             `:${underscore(option)}`,
