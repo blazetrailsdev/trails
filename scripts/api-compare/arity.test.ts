@@ -6,6 +6,7 @@ import {
   shouldSkipArity,
   isForwardingRubyEntry,
   renderSig,
+  threadsSuper,
 } from "./arity.js";
 import type { MethodInfo, ParamInfo } from "@blazetrails/parity/types";
 
@@ -248,6 +249,29 @@ describe("arityMatches", () => {
 
   it("does not strip a trailing non-callback param", () => {
     expect(arityMatches([], [req("value")]).ok).toBe(false);
+  });
+});
+
+describe("threadsSuper", () => {
+  const superThis: ParamInfo = req("this");
+
+  it("is true for a leading `super_`, with or without a `this:` receiver", () => {
+    expect(threadsSuper([req("super_"), req("other")])).toBe(true);
+    expect(threadsSuper([superThis, req("super_")])).toBe(true);
+  });
+
+  it("is false for any other leading parameter", () => {
+    expect(threadsSuper([])).toBe(false);
+    expect(threadsSuper([superThis, req("other")])).toBe(false);
+    expect(threadsSuper([req("other"), req("super_")])).toBe(false);
+  });
+
+  it("never matches, even where Ruby's optionals would absorb the extra slot", () => {
+    expect(arityMatches([opt("options")], [superThis, req("super_"), opt("options")]).ok).toBe(
+      false,
+    );
+    expect(arityMatches([rest("args")], [superThis, req("super_")]).ok).toBe(false);
+    expect(arityMatches([req("other")], [req("super_"), req("other")]).ok).toBe(false);
   });
 });
 

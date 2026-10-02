@@ -85,6 +85,24 @@ export function rbModConstSet<T>(
 }
 
 /**
+ * Mirrors: Ruby's Module#const_defined? — vendor/ruby/v3.3.11/object.c:2596
+ * `rb_mod_const_defined`, which raises `NameError` for a name that is not a
+ * constant name and otherwise answers `rb_const_defined`: the constant on the
+ * module or one of its ancestors. Trails passes one name, never a `::` path.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModConstDefined(
+  mod: Module | (abstract new (...args: never) => unknown) | { readonly name: string },
+  name: string,
+): boolean {
+  if (!/^[\p{Lu}\p{Lt}](?:\w|\P{ASCII})*$/u.test(name)) {
+    throw new NameError(`wrong constant name ${name}`, name);
+  }
+  return name in mod;
+}
+
+/**
  * Ruby's `Module.new` — an anonymous module built at runtime and populated
  * after the fact (`mod.module_eval { define_method … }`), then mixed into a
  * class with `include`.
@@ -417,6 +435,10 @@ export class Module {
    * method is the module's own table, not the includer's link, so the link is
    * found on the receiver's prototype chain instead.
    *
+   * Every ancestry ends in `Object`, which includes `Kernel`, so a `super` that
+   * no link beneath the caller answers reaches `Kernel`'s method. No JS object
+   * stands at that root, so the search ends in the `Kernel` module's table.
+   *
    * A reader and writer generated as one accessor pair are two Ruby methods,
    * `name` and `name=`, so `name` answers the next getter and `name=` the next
    * setter, each looked up independently the way Ruby looks each method up.
@@ -441,7 +463,10 @@ export class Module {
             ? (descriptor.value as (...args: unknown[]) => unknown).bind(receiver)
             : undefined;
         }
-        return undefined;
+        const root = writer ? undefined : Kernel.instanceMethod(key)?.value;
+        return typeof root === "function"
+          ? (root as (...args: unknown[]) => unknown).bind(receiver)
+          : undefined;
       }
       proto = Object.getPrototypeOf(proto) as object | null;
     }
@@ -1311,3 +1336,25 @@ export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass | 
     (mod as ModuleHooks)[extended]!(klass);
   }
 }
+
+/**
+ * Ruby's `Kernel`, the module `Object` includes and so the last stop of every
+ * method search. It holds the instance methods a module's `super` reaches when
+ * nothing beneath it in the receiver's ancestry defines one: `initialize_dup`
+ * (vendor/ruby/v3.3.11/object.c:654 `rb_obj_init_dup_clone`, which sends
+ * `initialize_copy`) and `freeze` (vendor/ruby/v3.3.11/object.c:1284
+ * `rb_obj_freeze`), defined at vendor/ruby/v3.3.11/object.c:4382,4385. A gem that reopens
+ * `Object` defines its method here, as ActiveSupport does for `as_json`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const Kernel = new Module((mod) => {
+  mod.defineMethod("initializeDup", function (this: object, orig: unknown): object {
+    const initializeCopy = (this as { initializeCopy?: unknown }).initializeCopy;
+    if (typeof initializeCopy === "function") initializeCopy.call(this, orig);
+    return this;
+  });
+  mod.defineMethod("freeze", function (this: object): object {
+    return Object.freeze(this);
+  });
+});

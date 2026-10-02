@@ -2,7 +2,7 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
 import { ActiveSupportJSON } from "../../json.js";
 import { Encoding, type EncodeOptions } from "../../json/encoding.js";
-import { Range as RangeValue } from "@blazetrails/ruby-compat";
+import { Kernel, Range as RangeValue } from "@blazetrails/ruby-compat";
 import { BigDecimal as BigDecimalValue } from "../big-decimal/conversions.js";
 import * as instanceVariables from "./instance-variables.js";
 import { formattedOffset } from "../time/conversions.js";
@@ -40,6 +40,10 @@ export class Object {
     return Hash.asJson(instanceVariables.Object.instanceValues(value), options);
   }
 }
+
+Kernel.defineMethod("asJson", function (this: object, options: EncodeOptions | null = null) {
+  return Object.asJson(this, options);
+});
 
 export class TrueClass {
   static asJson(value: boolean, options: EncodeOptions | null = null): boolean {

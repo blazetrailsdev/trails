@@ -18,9 +18,7 @@
  *
  * As in Ruby, the target need not already define the method: prepending a
  * module that is the only definition is legal, and `super_` is then a no-op
- * root — which is how a `super`-opening chain (ActiveModel's
- * `init_internals`, validations.rb:467-471 / dirty.rb:371-376) is built in
- * include order without a root definition.
+ * root.
  *
  * Idempotency is the caller's responsibility — calling `prepend()` on
  * the same target+module twice will wrap twice, producing a chain.

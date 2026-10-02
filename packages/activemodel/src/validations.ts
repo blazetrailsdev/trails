@@ -9,7 +9,7 @@ import {
   runCallbacks,
 } from "@blazetrails/activesupport";
 
-import { block as rbBlock, rbBlockGivenP, rbFPublicSend } from "@blazetrails/ruby-compat";
+import { block as rbBlock, Module, rbBlockGivenP, rbFPublicSend } from "@blazetrails/ruby-compat";
 
 import { Errors } from "./errors.js";
 import { inspectAccessor } from "./validations/_accessor.js";
@@ -57,6 +57,7 @@ type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
 
 export class Validations {
   static [included](base: IncludingClass): void {
+    include(base, SuperMethods);
     include(base, { validatesWith: withValidatesWith });
 
     extend(base, ClassMethods);
@@ -348,11 +349,10 @@ const _predicatesForValidationContexts = new Map<
 
 export function initializeDup<TBase extends object>(
   this: ValidationsInternalsHost<TBase>,
-  super_: (other: unknown) => void,
   other: unknown,
 ): void {
   this._errors = undefined;
-  super_(other);
+  SuperMethods.superMethod(this, "initializeDup")!(other);
 }
 
 export const VALID_OPTIONS_FOR_VALIDATE = ["on", "if", "unless", "prepend", "exceptOn"] as const;
@@ -366,13 +366,15 @@ export interface ReadAttributeForValidationHost {
 }
 
 /** @internal */
-export function initInternals<TBase extends object>(
-  this: ValidationsInternalsHost<TBase>,
-  super_: () => void,
-): void {
-  super_();
+export function initInternals<TBase extends object>(this: ValidationsInternalsHost<TBase>): void {
+  SuperMethods.superMethod(this, "initInternals")!();
   this._contextForValidation = undefined;
 }
+
+const SuperMethods = new Module((mod) => {
+  mod.defineMethod("initializeDup", initializeDup);
+  mod.defineMethod("initInternals", initInternals);
+});
 
 export type ConditionFn = ((record: ValidatableRecord) => boolean) | string;
 

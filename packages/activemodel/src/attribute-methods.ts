@@ -6,6 +6,8 @@ import {
   hasKey,
   isInclude,
   rbFSend,
+  rbModConstDefined,
+  rbModConstSet,
   unpack1,
 } from "@blazetrails/ruby-compat";
 import {
@@ -15,7 +17,6 @@ import {
   extend,
   include,
   included,
-  prepend,
   type Extended,
   type Included,
   Module,
@@ -38,12 +39,10 @@ export class MissingAttributeError extends globalThis.Error {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
-export namespace AttrNames {
-  const DEF_SAFE_NAME = /^[a-zA-Z_]\w*$/;
+export class AttrNames {
+  static readonly DEF_SAFE_NAME = /^[a-zA-Z_]\w*$/;
 
-  /** @missingRailsCall const_set — CONVERGEABLE attr-names-and-build-mangled-name-open-code-unpack1-h */
-  export function defineAttributeAccessorMethod(
+  static defineAttributeAccessorMethod(
     owner: unknown,
     attrName: string,
     { writer = false }: { writer?: boolean },
@@ -51,23 +50,17 @@ export namespace AttrNames {
   ): void {
     const methodName = `${attrName}${writer ? "=" : ""}`;
     // eslint-disable-next-line no-control-regex -- Ruby's `ascii_only?` (attribute_methods.rb:579)
-    if (/^[\x00-\x7f]*$/.test(attrName) && DEF_SAFE_NAME.test(attrName)) {
+    if (/^[\x00-\x7f]*$/.test(attrName) && AttrNames.DEF_SAFE_NAME.test(attrName)) {
       block(methodName, `'${attrName}'`);
     } else {
       const safeName = unpack1(b(attrName), "h*");
       const constName = `ATTR_${safeName}`;
+      if (!rbModConstDefined(this, constName)) rbModConstSet(this, constName, attrName);
       const tempMethodName = `__temp__${safeName}${writer ? "=" : ""}`;
       const attrNameExpr = `::ActiveModel::AttributeMethods::AttrNames::${constName}`;
       block(tempMethodName, attrNameExpr);
     }
   }
-}
-
-export class AttributeMethod {
-  constructor(
-    readonly proxyTarget: string,
-    readonly attrName: string,
-  ) {}
 }
 
 export class AttributeMethodPattern {
@@ -112,6 +105,13 @@ export class AttributeMethodPattern {
   private get camelJoined(): boolean {
     return this.prefix !== "" && !this.prefix.endsWith("_");
   }
+}
+
+export class AttributeMethod {
+  constructor(
+    readonly proxyTarget: string,
+    readonly attrName: string,
+  ) {}
 }
 
 export interface ReadWriteHost {
@@ -480,7 +480,7 @@ export const AttributeMethods = {
       instanceWriter: false,
       default: [new AttributeMethodPattern()],
     });
-    prepend(base.prototype, { initInternals });
+    include(base, SuperMethods);
   },
 
   methodMissing(this: InstanceMethodsHost, method: string, ...args: unknown[]): unknown {
@@ -659,10 +659,12 @@ export function defineMethodAttribute(
  * @internal
  * @noRailsEquivalent CONVERGEABLE attribute-methods-construction-time-resurrection-has-no-rails-site
  */
-export function initInternals(this: { constructor: ClassMethodsHost }, super_: () => void): void {
+export function initInternals(this: { constructor: ClassMethodsHost }): void {
   _resurrectAttributeMethods(this.constructor);
-  super_();
+  SuperMethods.superMethod(this, "initInternals")!();
 }
+
+const SuperMethods = new Module((mod) => mod.defineMethod("initInternals", initInternals));
 
 export function _resurrectAttributeMethods(klass: ClassMethodsHost): void {
   const patterns = klass.attributeMethodPatterns;
