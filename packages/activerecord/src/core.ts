@@ -505,7 +505,7 @@ export type ConnectedToEntry = {
 
 const CONNECTED_TO_STACK_KEY = Symbol.for("ar_connected_to_stack");
 
-/** @missingRailsCall new — PERMANENT */
+/** @missingRailsCall new — CONVERGEABLE call-gate-credits-argumentless-hash-new-as-a-literal */
 export function connectedToStack(): ConnectedToEntry[] {
   let connectedToStack = IsolatedExecutionState.get<ConnectedToEntry[]>(CONNECTED_TO_STACK_KEY);
   if (connectedToStack != null) {
@@ -517,18 +517,11 @@ export function connectedToStack(): ConnectedToEntry[] {
   }
 }
 
-function isBase(klass: any): boolean {
-  return (
-    typeof klass === "function" &&
-    Object.prototype.hasOwnProperty.call(klass, "_isActiveRecordBase")
-  );
-}
-
 export function currentRole(this: CoreHost): string {
   const stack = connectedToStack();
   for (let i = stack.length - 1; i >= 0; i--) {
     const hash = stack[i];
-    if (hash.role && hash.klasses.some(isBase)) return hash.role;
+    if (hash.role && hash.klasses.includes(ActiveRecord.Base)) return hash.role;
     if (hash.role && hash.klasses.includes(connectionClassForSelf.call(this))) return hash.role;
   }
 
@@ -539,7 +532,7 @@ export function currentShard(this: CoreHost): string {
   const stack = connectedToStack();
   for (let i = stack.length - 1; i >= 0; i--) {
     const hash = stack[i];
-    if (hash.shard && hash.klasses.some(isBase)) return hash.shard;
+    if (hash.shard && hash.klasses.includes(ActiveRecord.Base)) return hash.shard;
     if (hash.shard && hash.klasses.includes(connectionClassForSelf.call(this))) return hash.shard;
   }
 
@@ -550,7 +543,8 @@ export function currentPreventingWrites(this: CoreHost): boolean {
   const stack = connectedToStack();
   for (let i = stack.length - 1; i >= 0; i--) {
     const hash = stack[i];
-    if (hash.preventWrites !== undefined && hash.klasses.some(isBase)) return hash.preventWrites;
+    if (hash.preventWrites !== undefined && hash.klasses.includes(ActiveRecord.Base))
+      return hash.preventWrites;
     if (
       hash.preventWrites !== undefined &&
       hash.klasses.includes(connectionClassForSelf.call(this))
@@ -561,12 +555,12 @@ export function currentPreventingWrites(this: CoreHost): boolean {
   return false;
 }
 
-/** @missingRailsCall include? — PERMANENT */
 export function isPreventingWrites(className?: string): boolean {
   const stack = connectedToStack();
   for (let i = stack.length - 1; i >= 0; i--) {
     const hash = stack[i];
-    if (hash.preventWrites !== undefined && hash.klasses.some(isBase)) return hash.preventWrites;
+    if (hash.preventWrites !== undefined && hash.klasses.includes(ActiveRecord.Base))
+      return hash.preventWrites;
     if (
       hash.preventWrites !== undefined &&
       hash.klasses.some((klass) => typeof klass === "function" && klass.name === className)
@@ -793,7 +787,7 @@ interface CloneRecord {
   errors: { constructor: new (base: unknown) => unknown };
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE adopt-rbobjdup-rbobjclone-at-remaining-copy-sites */
 export function clone<T extends CloneRecord>(this: T): T {
   const copy = Object.create(Object.getPrototypeOf(this)) as T;
   Object.assign(copy, this);

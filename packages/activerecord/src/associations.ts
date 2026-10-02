@@ -149,14 +149,14 @@ function guardCanonicalNameShadow(name: string, model: typeof Base): void {
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE model-class-names-resolve-through-constantize-not-a-model-registry
  */
 export function registerModelConstant(name: string, model: typeof Base): void {
   guardCanonicalNameShadow(name, model);
   registerConstant(name, model);
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE model-class-names-resolve-through-constantize-not-a-model-registry */
 export function registerModel(model: typeof Base): void;
 export function registerModel(name: string, model: typeof Base): void;
 export function registerModel(models: (typeof Base)[]): void;
@@ -203,7 +203,7 @@ export function _setCanonicalModelAutoloadIndex(index: ReadonlyMap<string, typeo
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE model-class-names-resolve-through-constantize-not-a-model-registry
  */
 export function autoloadModel(name: string): void {
   const bare = name.replace(/^::/, "");

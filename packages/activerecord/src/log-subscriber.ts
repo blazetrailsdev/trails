@@ -1,5 +1,6 @@
 import { Attribute } from "@blazetrails/activemodel";
 import {
+  any,
   BacktraceCleaner,
   callerLocations,
   classAttribute,
@@ -59,7 +60,6 @@ export class LogSubscriber extends BaseLogSubscriber {
     });
   }
 
-  /** @missingRailsCall any? — PERMANENT */
   sql(event: Event): void {
     const payload = event.payload;
 
@@ -80,13 +80,13 @@ export class LogSubscriber extends BaseLogSubscriber {
     const sql = payload.sql as string;
     let binds: string | null = null;
 
-    if (payload.binds && Array.isArray(payload.binds) && payload.binds.length > 0) {
+    if (payload.binds != null && any(payload.binds as unknown[])) {
       const castedParams = this.typeCastedBinds(
         payload.type_casted_binds ?? payload.typeCastedBinds,
       );
       const bindPairs: [string | null, unknown][] = [];
 
-      for (const [i, attr] of payload.binds.entries()) {
+      for (const [i, attr] of (payload.binds as any[]).entries()) {
         const attributeName: string | null = rbObjRespondTo(attr, "name")
           ? attr.name
           : rbObjRespondTo(attr, "get") && rbObjRespondTo(attr[i], "name")

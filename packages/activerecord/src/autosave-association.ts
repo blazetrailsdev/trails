@@ -543,7 +543,7 @@ export function _ensureNoDuplicateErrors(this: AutosaveAssociationHost): void {
 
 /**
  * @internal
- * @missingRailsCall define_method — PERMANENT
+ * @missingRailsCall define_method — CONVERGEABLE define-method-on-a-class-receiver-goes-through-ruby-compat
  */
 export function defineNonCyclicMethod(this: any, name: string, fn: (this: any) => any): void {
   const klass = this;

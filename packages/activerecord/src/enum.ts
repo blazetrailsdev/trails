@@ -191,7 +191,7 @@ function enumMethod(
 export { enumMethod as enum };
 
 /**
- * @missingRailsCall define_method — PERMANENT
+ * @missingRailsCall define_method — CONVERGEABLE define-method-on-a-class-receiver-goes-through-ruby-compat
  * @internal
  */
 export function _enum(

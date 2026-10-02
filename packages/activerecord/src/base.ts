@@ -953,7 +953,7 @@ export class Base extends Model {
     return polymorphicClassFor(this, name);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE extra-surface-credits-a-cross-package-extend-edge-to-its-extender */
   declare static readonly subclasses: (typeof Base)[];
 
   static get descendants(): (typeof Base)[] {
@@ -1620,7 +1620,7 @@ export class Base extends Model {
   declare static counterCachedAssociationNames: string[];
   declare static isCounterCachedAssociationNames: boolean;
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE base-allocate-comes-from-a-ruby-compat-rb-obj-alloc */
   static allocate<T extends typeof Base>(this: T): InstanceType<T> {
     const hadOwnSuppress = Object.prototype.hasOwnProperty.call(
       this,

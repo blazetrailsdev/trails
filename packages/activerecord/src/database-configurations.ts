@@ -1,4 +1,4 @@
-import { hasKey, isSymbol, rbInspect, symbolToS } from "@blazetrails/ruby-compat";
+import { compact, hasKey, isSymbol, rbInspect, symbolToS } from "@blazetrails/ruby-compat";
 import { getEnv } from "@blazetrails/activesupport";
 import { AdapterNotSpecified } from "./errors.js";
 import {
@@ -135,13 +135,13 @@ export class DatabaseConfigurations {
 
   /**
    * @internal
-   * @missingRailsCall call — PERMANENT
+   * @missingRailsCall call — CONVERGEABLE call-gate-credits-invoking-a-proc-valued-member-as-proc-call
    */
   private defaultEnv(): string {
     return String(ActiveRecord.ConnectionHandling.DEFAULT_ENV());
   }
 
-  /** @missingRailsName compact — PERMANENT */
+  /** @internal */
   private buildConfigs(
     configs: RawConfigurations | HashConfig[] | DatabaseConfigurations,
   ): HashConfig[] {
@@ -162,10 +162,7 @@ export class DatabaseConfigurations {
       dbConfigs.push(this.environmentUrlConfig(this.defaultEnv(), "primary", {}));
     }
 
-    return this.mergeDbEnvironmentVariables(
-      this.defaultEnv(),
-      dbConfigs.filter((c) => c != null),
-    );
+    return this.mergeDbEnvironmentVariables(this.defaultEnv(), compact(dbConfigs));
   }
 
   /** @internal */

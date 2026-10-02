@@ -240,7 +240,7 @@ function announceMigrationText(header: string, message: string): string {
 const toRun = Symbol("toRun");
 
 export class ReversibleBlockHelper {
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE reversible-block-helper-up-down-yield-in-line */
   [toRun]: Array<() => Promise<void>> = [];
 
   constructor(public reverting: boolean) {}
@@ -1049,7 +1049,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     };
   }
 
-  /** @missingRailsCall call — PERMANENT */
+  /** @missingRailsCall call — CONVERGEABLE call-gate-credits-invoking-a-proc-valued-member-as-proc-call */
   static async copy(
     destination: string,
     sources: Record<string, string>,
@@ -1264,7 +1264,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /**
    * @internal
-   * @missingRailsCall call — PERMANENT
+   * @missingRailsCall call — CONVERGEABLE call-gate-credits-invoking-a-proc-valued-member-as-proc-call
    */
   static env(): string {
     return ActiveRecord.ConnectionHandling.DEFAULT_ENV();
@@ -1369,7 +1369,7 @@ export class MigrationProxy {
 
   /**
    * @internal
-   * @missingRailsCall load — PERMANENT
+   * @missingRailsCall load — CONVERGEABLE call-gate-credits-a-dynamic-import-as-kernel-load
    */
   async loadMigration(): Promise<Migration> {
     const { pathToFileURL } = await import("node:url");
@@ -1526,7 +1526,7 @@ export class MigrationContext<
     });
   }
 
-  /** @missingRailsCall call — PERMANENT */
+  /** @missingRailsCall call — CONVERGEABLE call-gate-credits-invoking-a-proc-valued-member-as-proc-call */
   get currentEnvironment(): string {
     return ActiveRecord.ConnectionHandling.DEFAULT_ENV();
   }
@@ -1569,7 +1569,7 @@ export class MigrationContext<
     }
   }
 
-  /** @missingRailsCall size — PERMANENT */
+  /** @missingRailsCall size — CONVERGEABLE call-gate-credits-a-length-read-as-array-size */
   async needsMigration(this: MigrationContext): Promise<boolean> {
     return (await this.pendingMigrationVersions()).length > 0;
   }
@@ -2086,7 +2086,7 @@ export class CheckPending {
     return this.app(env);
   }
 
-  /** @missingRailsCall call — PERMANENT */
+  /** @missingRailsCall call — CONVERGEABLE call-gate-credits-invoking-a-proc-valued-member-as-proc-call */
   private buildWatcher(block: () => Promise<void> | void): FileUpdateChecker {
     const currentEnvironment = ActiveRecord.ConnectionHandling.DEFAULT_ENV();
     const allConfigs = ActiveRecord.Base.configurations().configsFor({

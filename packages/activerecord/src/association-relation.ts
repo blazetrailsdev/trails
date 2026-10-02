@@ -27,7 +27,7 @@ export class AssociationRelation<T extends Base> extends Relation<T, boolean> {
 
   /**
    * @internal
-   * @noRailsEquivalent PERMANENT
+   * @noRailsEquivalent CONVERGEABLE relation-subclasses-inherit-clone-without-overrides
    */
   override clone(): Relation<T, boolean> {
     const Ctor = relationClassFor.call(AssociationRelation, this.model);

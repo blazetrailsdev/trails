@@ -179,7 +179,7 @@ const INTRINSIC_FUNCTION_PROPS = new Set(["length", "name", "prototype"]);
 
 let _dangerousMethodsCache: Set<string> | null = null;
 
-/** @missingRailsCall map — PERMANENT */
+/** @missingRailsCall map — CONVERGEABLE dangerous-attribute-methods-computed-not-curated */
 export function dangerousAttributeMethods(): Set<string> {
   if (_dangerousMethodsCache) return _dangerousMethodsCache;
   _dangerousMethodsCache = new Set([

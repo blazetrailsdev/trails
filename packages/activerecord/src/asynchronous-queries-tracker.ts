@@ -39,7 +39,7 @@ export class AsynchronousQueriesTracker {
     asynchronousQueriesTracker.finalizeSession();
   }
 
-  /** @missingRailsCall last — PERMANENT */
+  /** @missingRailsCall last — CONVERGEABLE call-gate-proves-array-literal-ivars-and-kernel-array-receivers */
   get currentSession(): Session {
     const session = this.#stack[this.#stack.length - 1];
     if (!session)

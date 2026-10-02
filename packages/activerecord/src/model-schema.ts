@@ -281,7 +281,7 @@ export function resetTableName(this: SchemaHost): string | null {
   return this._tableName;
 }
 
-/** @missingRailsArgs module_parents — PERMANENT */
+/** @missingRailsArgs module_parents — CONVERGEABLE model-namespace-reads-the-constant-path-not-a-module-name-static */
 export function fullTableNamePrefix(this: SchemaHost): string {
   return (
     (moduleParents({ name: qualifiedName(this as typeof Base) }).find((p) =>
@@ -290,7 +290,7 @@ export function fullTableNamePrefix(this: SchemaHost): string {
   ).tableNamePrefix;
 }
 
-/** @missingRailsArgs module_parents — PERMANENT */
+/** @missingRailsArgs module_parents — CONVERGEABLE model-namespace-reads-the-constant-path-not-a-module-name-static */
 export function fullTableNameSuffix(this: SchemaHost): string {
   return (
     (moduleParents({ name: qualifiedName(this as typeof Base) }).find((p) =>
@@ -782,7 +782,7 @@ export const ClassMethods = {
   loadSchemaFromAdapter,
 };
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE model-schema-instance-readers-come-from-delegate-to-class */
 export const InstanceMethods = {
   typeForAttribute(
     this: { constructor: unknown },
