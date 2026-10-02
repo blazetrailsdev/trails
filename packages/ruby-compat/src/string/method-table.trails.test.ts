@@ -7,7 +7,14 @@ import { TypeError } from "../type-error.js";
 import { bytes } from "./bytes.js";
 import { include, rbObjClone } from "../include.js";
 import { rbHash } from "../rb-hash.js";
-import { rbStrInit, rbStrSend, stringSuperclass, type StringInstance } from "./method-table.js";
+import {
+  matchOperator,
+  rbStrInit,
+  rbStrSend,
+  stringSuperclass,
+  strip,
+  type StringInstance,
+} from "./method-table.js";
 
 type Row = [string, string, unknown[], unknown];
 
@@ -1095,5 +1102,22 @@ describe("stringSuperclass", () => {
 
   it("hashes as its String contents", () => {
     expect(literal("a").hash()).toBe(rbHash("a"));
+  });
+});
+
+describe("strip and matchOperator", () => {
+  it("strip removes NUL and ASCII whitespace only, as MRI does", () => {
+    expect(strip("\0 \t\n\v\f\r yes \r\n\0")).toBe("yes");
+    expect(strip("\u00a0a\u00a0")).toBe("\u00a0a\u00a0");
+    expect(strip("\ufeffa\u2003")).toBe("\ufeffa\u2003");
+    expect(strip(" \n")).toBe("");
+  });
+
+  it("matchOperator dispatches =~ on nil, a String and a receiver's own method", () => {
+    expect(matchOperator(null, /a/)).toBeNull();
+    expect(matchOperator(undefined, /a/)).toBeNull();
+    expect(matchOperator("😀yes", /yes/)).toBe(1);
+    expect(matchOperator("no", /yes/)).toBeNull();
+    expect(matchOperator({ matchOperator: (pattern: unknown) => [pattern] }, "p")).toEqual(["p"]);
   });
 });

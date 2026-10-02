@@ -264,11 +264,13 @@ export { rbStrDump } from "./string/convert.js";
 export { stringDelete } from "./string/delete.js";
 export { sliceBang } from "./string/slice.js";
 export {
+  matchOperator,
   rbDefineMethod,
   rbStrMatch,
   rbStrInit,
   rbStrRespondTo,
   rbStrSend,
+  strip,
   STRING_METHOD_TABLE,
   stringSuperclass,
   type StringReceiver,
