@@ -128,6 +128,20 @@ to **3.1.20** by `vendor/rails/v8.0.2/Gemfile.lock:145`. The port is
 `packages/bcrypt`, over the `bcryptjs` npm client where the gem calls its C
 extension (`__bc_crypt`, `__bc_salt`).
 
+**The backend is `bcryptjs`, and that is settled** (operator decision on
+trails#8402): the gem's own `ext/mri/crypt_blowfish.c` is not ported.
+`bcryptjs.hashSync` takes a JS string and UTF-8 encodes it, which fixes three
+differences from the gem:
+
+- `Engine.hash_secret` omits `secret.byteslice(0, MAX_SECRET_BYTESIZE)`
+  (`lib/bcrypt/engine.rb:63-64`). A slice that splits a character is not a JS
+  string; `bcryptjs` truncates the encoded bytes at 72 itself, which matches
+  the gem (`packages/bcrypt/src/engine.trails.test.ts`).
+- A `$2x$` salt raises `Invalid salt revision`, where the gem hashes it.
+- A secret holding invalid UTF-8 (`"\xa3"`) cannot be passed at all, so 23 of
+  the 68 vectors in `spec/bcrypt/engine_spec.rb:80-155` are not ported; the
+  other 45 are.
+
 `compareApi` and `compareTests` are both on. The gem's examples are
 `specify "..." do`, which `scripts/test-compare/extract-ruby-tests.rb` reads as
 it reads `it`.
