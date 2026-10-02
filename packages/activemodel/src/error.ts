@@ -83,10 +83,15 @@ export class Error {
   rawType: string | null;
   options: Record<string, unknown>;
 
-  static fullMessage(attribute: string, message: string | null, base: ModelBase): string | null {
+  static fullMessage(attribute: string, message: string | null, base: ModelBase): string | null;
+  static fullMessage(
+    attribute: string,
+    message: string | null,
+    base: ValidatableBase,
+  ): string | null {
     if (attribute === "base") return message;
 
-    const baseClass = (base as ValidatableBase).constructor;
+    const baseClass = base.constructor;
 
     let defaults: unknown[];
     if (this.i18nCustomizeFullMessage && rbObjRespondTo(baseClass, "i18nScope")) {
@@ -137,6 +142,12 @@ export class Error {
     attribute: string,
     type: string,
     base: ModelBase,
+    options?: Record<string, unknown>,
+  ): string;
+  static generateMessage(
+    attribute: string,
+    type: string,
+    base: ValidatableBase,
     options: Record<string, unknown> = {},
   ): string {
     const msgOpt = options.message;
@@ -147,26 +158,22 @@ export class Error {
     }
     const typeName = type.slice(1);
 
-    const baseClass = (base as ValidatableBase).constructor;
-    const value =
-      attribute !== "base"
-        ? (base as ValidatableBase).readAttributeForValidation(attribute)
-        : undefined;
+    const value = attribute !== "base" ? base.readAttributeForValidation(attribute) : null;
 
     options = {
-      model: (base as ValidatableBase).modelName.human(),
-      attribute: baseClass.humanAttributeName(attribute, { base }),
+      model: base.modelName.human(),
+      attribute: base.constructor.humanAttributeName(attribute, { base }),
       value,
       object: base,
       ...options,
     };
 
     let defaults: unknown[];
-    if (rbObjRespondTo(baseClass, "i18nScope")) {
-      const i18nScope = baseClass.i18nScope;
+    if (rbObjRespondTo(base.constructor, "i18nScope")) {
+      const i18nScope = base.constructor.i18nScope;
       attribute = attribute.replace(/\[\d+\]/g, "");
 
-      defaults = baseClass
+      defaults = base.constructor
         .lookupAncestors()
         .flatMap((klass) => [
           `:${i18nScope}.errors.models.${klass.modelName.i18nKey}.attributes.${attribute}.${typeName}`,

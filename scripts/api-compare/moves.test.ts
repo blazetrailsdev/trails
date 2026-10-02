@@ -10,8 +10,6 @@ describe("relocationsByRoute", () => {
   };
 
   it("leaves out a mixin member ported in the file Rails defines it in", () => {
-    // `interface AbstractAdapter { openTransactions(): number }` in the host,
-    // the body on the `DatabaseStatements` mixin object in its own file.
     const files: FileResult[] = [
       {
         rubyFile: "connection_adapters/abstract_adapter.rb",
