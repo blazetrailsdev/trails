@@ -259,10 +259,9 @@ export type TransactionConnection = DatabaseAdapter & {
   resetIsolationLevel?(): void | Promise<void>;
   supportsLazyTransactions(): boolean;
   supportsRestartDbTransaction?(): Promise<boolean>;
-  addTransactionRecord?(record: unknown): void;
+  addTransactionRecord(record: unknown): void;
   lock?: MonitorMixin;
   active?(): boolean | Promise<boolean>;
-  currentTransaction?(): Transaction | NullTransaction;
   throwAwayBang?(): void | Promise<void>;
 };
 
@@ -482,7 +481,7 @@ export class Transaction {
         } else {
           let record: unknown;
           while ((record = ite.shift())) {
-            this.connection.addTransactionRecord!(record);
+            this.connection.addTransactionRecord(record);
           }
         }
       } finally {

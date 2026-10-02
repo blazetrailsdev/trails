@@ -4772,14 +4772,6 @@ function isFalsinessOf(test: ts.Expression, target: string): boolean {
   );
 }
 
-/**
- * The `throw` of `if (falsy(x)) throw …; return x;`, or undefined for any
- * other `if`. That pair is Ruby's `x || raise(…)`
- * (`activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1770-1773`)
- * spelled the only way TS can, since `throw` is a statement: a short-circuit,
- * which tokens as `or`. The `return` of the same name is what tells it from
- * `raise … unless x`, whose value nothing reads.
- */
 function orRaise(statement: ts.IfStatement): ts.ThrowStatement | undefined {
   if (statement.elseStatement !== undefined || !ts.isBlock(statement.parent)) return undefined;
   let body = statement.thenStatement;
@@ -4800,11 +4792,6 @@ function orRaise(statement: ts.IfStatement): ts.ThrowStatement | undefined {
   return isFalsinessOf(statement.expression, returned.text) ? body : undefined;
 }
 
-/**
- * The parameters `test` asks the KIND of, or undefined when it asks anything
- * else: `typeof p` against a literal, `p` against `null`, or
- * `Array.isArray(p)`, joined by `&&` / `||` / `!`.
- */
 function parameterKindTest(
   test: ts.Expression,
   parameters: readonly string[],
@@ -4839,22 +4826,6 @@ function parameterKindTest(
   }
 }
 
-/**
- * Whether this `if` only moves a trailing options hash, or a block, out of the
- * positional slot it arrived in. Ruby binds `remove_index(table_name,
- * column_name = nil, **options)`
- * (`activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:966`)
- * at the call; TS has no keyword arguments, so `removeIndex("t", { name })`
- * lands the hash in `columnName` and the body has to move it. That is the
- * signature's work, not an arm, and it tokens as nothing.
- *
- * Four conditions keep a real Rails branch out: the `if` leads the body, its
- * test is a {@link parameterKindTest}, every statement it guards assigns to a
- * parameter, and one hands the tested parameter, or a spread of it, to the
- * LAST one. The last tells it from a coercion Rails writes out
- * (`query_params = parse_nested_query(query_params) if query_params.is_a?(String)`,
- * `vendor/rack-test/v2.2.0/lib/rack/test.rb:341`).
- */
 function isKwargsRebindingGuard(statement: ts.IfStatement): boolean {
   const body = statement.parent;
   if (!ts.isBlock(body) || !ts.isFunctionLike(body.parent)) return false;
