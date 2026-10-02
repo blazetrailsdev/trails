@@ -2573,6 +2573,8 @@ class ApiExtractor
     parts = name.split("::")
     const = parts.last
     container = parts[0...-1].join("::")
+    own = store.dig(current_fqn, const)
+    return own if own && !absolute && container.empty?
     store.each do |fqn, consts|
       next unless consts.key?(const)
       if absolute

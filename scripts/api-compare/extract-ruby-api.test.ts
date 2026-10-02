@@ -2173,6 +2173,29 @@ describe(
       ]);
     });
 
+    it("resolves a bare loop constant to the enclosing class's own before a same-named one", () => {
+      const m = metaMethods(`
+      class Thor
+        class Argument
+          VALID_TYPES = [:numeric, :string]
+        end
+
+        class Option < Argument
+          VALID_TYPES = [:boolean, :numeric, :string]
+
+          VALID_TYPES.each do |type|
+            class_eval <<-RUBY, __FILE__, __LINE__ + 1
+              def #{type}?
+                self.type == #{type.inspect}
+              end
+            RUBY
+          end
+        end
+      end
+    `);
+      expect(m["Thor::Option"].map((x) => x.name)).toEqual(["boolean?", "numeric?", "string?"]);
+    });
+
     // The class_eval-with-a-string-template half of RFC 0126: the template is
     // re-parsed per member so the generated body reaches record_body_facts the
     // way a literal `def`'s does. `command_recorder.rb:125-131` is the live

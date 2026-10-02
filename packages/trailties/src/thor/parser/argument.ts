@@ -26,19 +26,23 @@ export interface ArgumentOptions {
 export class Argument {
   static VALID_TYPES = ["numeric", "hash", "array", "string"];
 
-  readonly name: string;
-  readonly description: string | null;
-  readonly enum: unknown;
-  readonly required: unknown;
-  readonly type: string;
-  readonly default: unknown;
-  readonly banner: string | null;
+  name!: string;
+  description!: string | null;
+  enum: unknown;
+  required: unknown;
+  type!: string;
+  default: unknown;
+  banner!: string | null;
 
   get humanName(): string {
     return this.name;
   }
 
   constructor(name: string | null, options: ArgumentOptions = {}) {
+    this.initialize(name, options);
+  }
+
+  protected initialize(name: string | null, options: ArgumentOptions = {}): void {
     const className = rbModName(this.constructor as typeof Argument)!
       .split("::")
       .at(-1)!;
