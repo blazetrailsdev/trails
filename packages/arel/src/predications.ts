@@ -1,4 +1,5 @@
 import type { Node } from "./nodes/node.js";
+import type { ArelNode } from "./arel.js";
 import type {
   NotEqual,
   GreaterThan,
@@ -19,6 +20,7 @@ import type { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
 import { Nodes } from "./namespaces.js";
 import { rbEqual } from "@blazetrails/activesupport";
 import {
+  isNil,
   NoMethodError,
   rbFSend,
   rbObjClass,
@@ -87,7 +89,7 @@ interface RangePredicates {
   lteq(right: unknown): Node;
 }
 
-type BetweenHost = Node & PredicationHost & RangePredicates;
+type BetweenHost = ArelNode & PredicationHost & RangePredicates;
 
 export interface RangeLike {
   begin: unknown;
@@ -170,34 +172,34 @@ export interface PredicationsModule extends GroupingFolders {
 }
 
 export const Predications: PredicationsModule = {
-  eq(this: Node & PredicationHost, other: unknown): Equality {
+  eq(this: ArelNode & PredicationHost, other: unknown): Equality {
     return new Nodes.Equality(this, this.quotedNode(other));
   },
-  notEq(this: Node & PredicationHost, other: unknown): NotEqual {
+  notEq(this: ArelNode & PredicationHost, other: unknown): NotEqual {
     return new Nodes.NotEqual(this, this.quotedNode(other));
   },
-  gt(this: Node & PredicationHost, right: unknown): GreaterThan {
+  gt(this: ArelNode & PredicationHost, right: unknown): GreaterThan {
     return new Nodes.GreaterThan(this, this.quotedNode(right));
   },
-  gteq(this: Node & PredicationHost, right: unknown): GreaterThanOrEqual {
+  gteq(this: ArelNode & PredicationHost, right: unknown): GreaterThanOrEqual {
     return new Nodes.GreaterThanOrEqual(this, this.quotedNode(right));
   },
-  lt(this: Node & PredicationHost, right: unknown): LessThan {
+  lt(this: ArelNode & PredicationHost, right: unknown): LessThan {
     return new Nodes.LessThan(this, this.quotedNode(right));
   },
-  lteq(this: Node & PredicationHost, right: unknown): LessThanOrEqual {
+  lteq(this: ArelNode & PredicationHost, right: unknown): LessThanOrEqual {
     return new Nodes.LessThanOrEqual(this, this.quotedNode(right));
   },
 
-  isDistinctFrom(this: Node & PredicationHost, other: unknown): IsDistinctFrom {
+  isDistinctFrom(this: ArelNode & PredicationHost, other: unknown): IsDistinctFrom {
     return new Nodes.IsDistinctFrom(this, this.quotedNode(other));
   },
-  isNotDistinctFrom(this: Node & PredicationHost, other: unknown): IsNotDistinctFrom {
+  isNotDistinctFrom(this: ArelNode & PredicationHost, other: unknown): IsNotDistinctFrom {
     return new Nodes.IsNotDistinctFrom(this, this.quotedNode(other));
   },
 
   matches(
-    this: Node & PredicationHost,
+    this: ArelNode & PredicationHost,
     other: unknown,
     escape: string | Node | null = null,
     caseSensitive = false,
@@ -205,26 +207,30 @@ export const Predications: PredicationsModule = {
     return new Nodes.Matches(this, this.quotedNode(other), escape, caseSensitive);
   },
   doesNotMatch(
-    this: Node & PredicationHost,
+    this: ArelNode & PredicationHost,
     other: unknown,
     escape: string | Node | null = null,
     caseSensitive = false,
   ): DoesNotMatch {
     return new Nodes.DoesNotMatch(this, this.quotedNode(other), escape, caseSensitive);
   },
-  matchesRegexp(this: Node & PredicationHost, other: string, caseSensitive = true): RegexpNode {
+  matchesRegexp(this: ArelNode & PredicationHost, other: string, caseSensitive = true): RegexpNode {
     return new Nodes.Regexp(this, this.quotedNode(other), caseSensitive);
   },
-  doesNotMatchRegexp(this: Node & PredicationHost, other: string, caseSensitive = true): NotRegexp {
+  doesNotMatchRegexp(
+    this: ArelNode & PredicationHost,
+    other: string,
+    caseSensitive = true,
+  ): NotRegexp {
     return new Nodes.NotRegexp(this, this.quotedNode(other), caseSensitive);
   },
 
-  in(this: Node & PredicationHost, other: unknown): In {
+  in(this: ArelNode & PredicationHost, other: unknown): In {
     if (isSelectManagerLike(other)) return new Nodes.In(this, other.ast);
     if (isEnumerable(other)) return new Nodes.In(this, this.quotedArray([...other]));
     return new Nodes.In(this, this.quotedNode(other));
   },
-  notIn(this: Node & PredicationHost, other: unknown): NotIn {
+  notIn(this: ArelNode & PredicationHost, other: unknown): NotIn {
     if (isSelectManagerLike(other)) return new Nodes.NotIn(this, other.ast);
     if (isEnumerable(other)) return new Nodes.NotIn(this, this.quotedArray([...other]));
     return new Nodes.NotIn(this, this.quotedNode(other));
@@ -408,16 +414,16 @@ export const Predications: PredicationsModule = {
   ): Grouping {
     return this.groupingAll("notIn", others);
   },
-  when(this: Node & PredicationHost, right: unknown): Case {
+  when(this: ArelNode & PredicationHost, right: unknown): Case {
     return new Nodes.Case(this).when(this.quotedNode(right));
   },
-  concat(this: Node, other: NodeOrValue): Concat {
+  concat(this: ArelNode, other: NodeOrValue): Concat {
     return new Nodes.Concat(this, other);
   },
-  contains(this: Node & PredicationHost, other: unknown): Contains {
+  contains(this: ArelNode & PredicationHost, other: unknown): Contains {
     return new Nodes.Contains(this, this.quotedNode(other));
   },
-  overlaps(this: Node & PredicationHost, other: unknown): Overlaps {
+  overlaps(this: ArelNode & PredicationHost, other: unknown): Overlaps {
     return new Nodes.Overlaps(this, this.quotedNode(other));
   },
   quotedArray(this: PredicationHost, others: unknown[]): ReturnType<typeof Nodes.buildQuoted>[] {
@@ -446,7 +452,7 @@ export const Predications: PredicationsModule = {
     return new Nodes.Grouping(new Nodes.And(nodes));
   },
 
-  quotedNode(this: Node, other: unknown): ReturnType<typeof Nodes.buildQuoted> {
+  quotedNode(this: ArelNode, other: unknown): ReturnType<typeof Nodes.buildQuoted> {
     return Nodes.buildQuoted(other, this);
   },
   isInfinity(this: PredicationHost, value: unknown): 1 | -1 | null | false {
@@ -469,11 +475,6 @@ export const Predications: PredicationsModule = {
     },
     value: unknown,
   ): boolean {
-    const isNil =
-      value === null ||
-      value === undefined ||
-      (typeof (value as { isNil?: () => boolean }).isNil === "function" &&
-        (value as { isNil: () => boolean }).isNil());
-    return isNil || rtest(this.isInfinity(value)) || rtest(this.isUnboundable(value));
+    return isNil(value) || rtest(this.isInfinity(value)) || rtest(this.isUnboundable(value));
   },
 };

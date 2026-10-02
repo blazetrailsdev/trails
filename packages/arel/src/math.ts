@@ -1,4 +1,4 @@
-import type { Node } from "./nodes/node.js";
+import type { ArelNode } from "./arel.js";
 import type { Multiplication, Division } from "./nodes/infix-operation.js";
 import type { Grouping } from "./nodes/grouping.js";
 import type { BitwiseNot } from "./nodes/unary-operation.js";
@@ -19,34 +19,34 @@ export interface MathModule {
 }
 
 export const Math: MathModule = {
-  multiply(this: Node, other: NodeOrValue): Multiplication {
+  multiply(this: ArelNode, other: NodeOrValue): Multiplication {
     return new Nodes.Multiplication(this, other);
   },
-  add(this: Node, other: NodeOrValue): Grouping {
+  add(this: ArelNode, other: NodeOrValue): Grouping {
     return new Nodes.Grouping(new Nodes.Addition(this, other));
   },
-  subtract(this: Node, other: NodeOrValue): Grouping {
+  subtract(this: ArelNode, other: NodeOrValue): Grouping {
     return new Nodes.Grouping(new Nodes.Subtraction(this, other));
   },
-  divide(this: Node, other: NodeOrValue): Division {
+  divide(this: ArelNode, other: NodeOrValue): Division {
     return new Nodes.Division(this, other);
   },
-  bitwiseAnd(this: Node, other: NodeOrValue): Grouping {
+  bitwiseAnd(this: ArelNode, other: NodeOrValue): Grouping {
     return new Nodes.Grouping(new Nodes.BitwiseAnd(this, other));
   },
-  bitwiseOr(this: Node, other: NodeOrValue): Grouping {
+  bitwiseOr(this: ArelNode, other: NodeOrValue): Grouping {
     return new Nodes.Grouping(new Nodes.BitwiseOr(this, other));
   },
-  bitwiseXor(this: Node, other: NodeOrValue): Grouping {
+  bitwiseXor(this: ArelNode, other: NodeOrValue): Grouping {
     return new Nodes.Grouping(new Nodes.BitwiseXor(this, other));
   },
-  bitwiseShiftLeft(this: Node, other: NodeOrValue): Grouping {
+  bitwiseShiftLeft(this: ArelNode, other: NodeOrValue): Grouping {
     return new Nodes.Grouping(new Nodes.BitwiseShiftLeft(this, other));
   },
-  bitwiseShiftRight(this: Node, other: NodeOrValue): Grouping {
+  bitwiseShiftRight(this: ArelNode, other: NodeOrValue): Grouping {
     return new Nodes.Grouping(new Nodes.BitwiseShiftRight(this, other));
   },
-  bitwiseNot(this: Node): BitwiseNot {
+  bitwiseNot(this: ArelNode): BitwiseNot {
     return new Nodes.BitwiseNot(this);
   },
 };

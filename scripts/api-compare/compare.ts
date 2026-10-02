@@ -1343,6 +1343,7 @@ interface MoveResult {
   rubyModule: string;
   expectedFile: string;
   actualFile: string;
+  inDefiningFile?: true;
 }
 
 interface FileResult {
@@ -5469,6 +5470,7 @@ export function main() {
             rubyModule,
             expectedFile: expectedTs,
             actualFile: creditedToMixin.tsFile,
+            inDefiningFile: true,
           });
           continue;
         }

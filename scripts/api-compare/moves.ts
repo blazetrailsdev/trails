@@ -12,17 +12,19 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { fileURLToPath } from "url";
 import { OUTPUT_DIR } from "./config.js";
 
-interface MoveResult {
+export interface MoveResult {
   tsName: string;
   rubyName: string;
   rubyModule: string;
   expectedFile: string;
   actualFile: string;
+  inDefiningFile?: true;
 }
 
-interface FileResult {
+export interface FileResult {
   rubyFile: string;
   expectedTsFile: string;
   moves: MoveResult[];
@@ -31,6 +33,33 @@ interface FileResult {
 interface PackageResult {
   package: string;
   files: FileResult[];
+}
+
+/**
+ * The relocation plan for one package: every move grouped by
+ * `actualFile → expectedFile`.
+ *
+ * A move flagged `inDefiningFile` is left out. Ruby's `include` flattens
+ * `DatabaseStatements#open_transactions`
+ * (`connection_adapters/abstract/database_statements.rb:367`) onto
+ * `AbstractAdapter`, so compare.ts expects it in abstract-adapter.ts and
+ * credits it through the body in abstract/database-statements.ts. That body
+ * is in the file Rails defines it in; the host carries at most a bodiless
+ * `interface AbstractAdapter` signature, the type-level cost of `include`.
+ * Reporting it would tell the reader to move a method out of its Rails file.
+ */
+export function relocationsByRoute(files: readonly FileResult[]): Map<string, MoveResult[]> {
+  const movesByRoute = new Map<string, MoveResult[]>();
+  for (const file of files) {
+    for (const move of file.moves || []) {
+      if (move.inDefiningFile === true) continue;
+      const key = `${move.actualFile} → ${move.expectedFile}`;
+      const list = movesByRoute.get(key) || [];
+      list.push(move);
+      movesByRoute.set(key, list);
+    }
+  }
+  return movesByRoute;
 }
 
 function main() {
@@ -58,16 +87,7 @@ function main() {
   for (const pkg of results) {
     if (filterPkg && pkg.package !== filterPkg) continue;
 
-    // Collect all moves grouped by actualFile → expectedFile
-    const movesByRoute = new Map<string, MoveResult[]>();
-    for (const file of pkg.files) {
-      for (const move of file.moves || []) {
-        const key = `${move.actualFile} → ${move.expectedFile}`;
-        const list = movesByRoute.get(key) || [];
-        list.push(move);
-        movesByRoute.set(key, list);
-      }
-    }
+    const movesByRoute = relocationsByRoute(pkg.files);
 
     if (movesByRoute.size === 0) continue;
 
@@ -90,4 +110,4 @@ function main() {
   console.log("");
 }
 
-main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
