@@ -1,7 +1,8 @@
 import { stringInspect } from "./string/inspect.js";
 import { rbCheckStringType } from "./string/support.js";
 import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
-import { rubyClass, type Comparable } from "./comparable.js";
+import { cmp, rbCmpint, rubyClass, type Comparable } from "./comparable.js";
+import { rbEqual } from "./rb-equal.js";
 import { TypeError } from "./type-error.js";
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
@@ -362,7 +363,21 @@ export function toSym(obj: unknown): string {
  * whose prototypes carry no such member: `Float#infinite?`
  * (`rb_flo_is_infinite_p`, `vendor/ruby/v3.3.11/numeric.c:1992`) answers `1` /
  * `-1` for an infinity and `nil` otherwise, as `Integer#infinite?`
- * (`vendor/ruby/v3.3.11/numeric.rb:48`) always does.
+ * (`vendor/ruby/v3.3.11/numeric.rb:48`) always does. An operator is sent by its
+ * Ruby name (`">"`), which has no TS method spelling. `==` is {@link rbEqual},
+ * which sends the receiver's own `==`, and `!=` its negation
+ * (`rb_obj_not_equal`, `vendor/ruby/v3.3.11/object.c:248`). The four ordering
+ * operators answer for the receivers that define them in Ruby: between two
+ * numbers they are `Integer`'s and `Float`'s own (`rb_int_gt`,
+ * `vendor/ruby/v3.3.11/numeric.c:4743`, and `rb_float_gt`, `:1753`), false for
+ * a NaN operand and never raising;
+ * a receiver defining the operator itself (`greaterThan` and its siblings, the
+ * spelling `Date` and `TimeWithZone` give them) answers it; a number against
+ * anything else, and any other `Comparable` receiver (a String, a Time or
+ * Date, or an object defining `<=>`), go through `cmpint`
+ * (`vendor/ruby/v3.3.11/compar.c:105-147`) and raise `ArgumentError` for a pair
+ * `<=>` cannot place. Any other receiver, `nil` included, has no such method
+ * and raises `NoMethodError`.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#send` (`vendor/ruby/v3.3.11/vm_eval.c:1330`).
  */
@@ -388,11 +403,45 @@ export function conversionMismatch(
   );
 }
 
+const RELOPS = new Map<string, [string, (c: number) => boolean]>([
+  [">", ["greaterThan", (c) => c > 0]],
+  [">=", ["greaterThanOrEqual", (c) => c >= 0]],
+  ["<", ["lessThan", (c) => c < 0]],
+  ["<=", ["lessThanOrEqual", (c) => c <= 0]],
+]);
+
+function isNumeric(value: unknown): value is number | bigint {
+  return typeof value === "number" || typeof value === "bigint";
+}
+
+function isComparable(recv: unknown): boolean {
+  if (typeof recv === "string") return true;
+  if (typeof recv !== "object" || recv === null) return false;
+  if (recv instanceof Date || recv instanceof Number || temporalTag(recv) !== null) return true;
+  const { compareTo, cmp } = recv as { compareTo?: unknown; cmp?: unknown };
+  return typeof compareTo === "function" || typeof cmp === "function";
+}
+
 function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown): unknown {
   const [vid, ...args] = argv;
   const name = rbCheckStringType(vid);
   if (name === null) throw new TypeError(`${rbInspect(vid)} is not a symbol nor a string`);
   const mid = isSymbol(name) ? symbolToS(name) : name;
+  if (argc === 1) {
+    const other = args[0];
+    if (mid === "==") return rbEqual(recv, other);
+    if (mid === "!=") return !rbEqual(recv, other);
+    const [spelling, relop] = RELOPS.get(mid) ?? [];
+    if (relop !== undefined && isNumeric(recv) && isNumeric(other)) {
+      return relop(recv < other ? -1 : recv > other ? 1 : recv == other ? 0 : NaN);
+    }
+    if (spelling !== undefined && rbObjRespondTo(recv, spelling)) {
+      return sendInternal(argc, [spelling, other], recv);
+    }
+    if (relop !== undefined && (isNumeric(recv) || isComparable(recv))) {
+      return relop(rbCmpint(cmp(recv, other), recv, other));
+    }
+  }
   if ((typeof recv === "number" || typeof recv === "bigint") && mid === "isInfinite") {
     return recv === Infinity ? 1 : recv === -Infinity ? -1 : null;
   }

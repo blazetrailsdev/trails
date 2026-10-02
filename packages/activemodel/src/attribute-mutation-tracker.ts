@@ -1,6 +1,6 @@
 import { Temporal } from "@blazetrails/date";
 import { HashWithIndifferentAccess, isDuplicable } from "@blazetrails/activesupport";
-import { Hash, NoMethodError, TypeError } from "@blazetrails/ruby-compat";
+import { Hash, NoMethodError, rbEqual, TypeError } from "@blazetrails/ruby-compat";
 import { AttributeSet } from "./attribute-set.js";
 
 /** @internal */
@@ -24,13 +24,6 @@ function dupValue(value: unknown): unknown {
     result[k] = dupValue(v);
   }
   return result;
-}
-
-function valuesEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (typeof a === "number" && typeof b === "number" && Number.isNaN(a) && Number.isNaN(b))
-    return true;
-  return false;
 }
 
 export class AttributeMutationTracker {
@@ -85,9 +78,8 @@ export class AttributeMutationTracker {
     return (
       this.attributeChanged(attrName) &&
       (OPTION_NOT_GIVEN === from ||
-        valuesEqual(this.originalValue(attrName), this.typeCast(attrName, from))) &&
-      (OPTION_NOT_GIVEN === to ||
-        valuesEqual(this.fetchValue(attrName), this.typeCast(attrName, to)))
+        rbEqual(this.originalValue(attrName), this.typeCast(attrName, from))) &&
+      (OPTION_NOT_GIVEN === to || rbEqual(this.fetchValue(attrName), this.typeCast(attrName, to)))
     );
   }
 

@@ -10,6 +10,11 @@ function classWith(baseClass: any, block: (klass: any) => void): any {
 }
 
 describe("AttributeRegistration internals", () => {
+  it("resolveAttributeName answers name.to_s", () => {
+    const klass = classWith(null, () => {});
+    expect(klass.resolveAttributeName(1)).toBe("1");
+  });
+
   it("_pendingAttributeModifications queue is populated by attribute()", () => {
     const klass = classWith(null, (k) => {
       k.attribute("name", "string");

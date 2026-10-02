@@ -1,5 +1,5 @@
 import { DescendantsTracker, extend, included, registerSubclass } from "@blazetrails/activesupport";
-import { block as rbBlock, fetch } from "@blazetrails/ruby-compat";
+import { block as rbBlock, fetch, rbObjAsString } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
 import { defaultValue } from "./type.js";
 import { typeRegistry } from "./type/registry.js";
@@ -241,8 +241,8 @@ export const ClassMethods = {
   },
 
   /** @internal */
-  resolveAttributeName(this: AttributeHostInternals, name: string): string {
-    return name;
+  resolveAttributeName(name: string): string {
+    return rbObjAsString(name);
   },
 
   /** @internal */

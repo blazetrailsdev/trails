@@ -1,4 +1,4 @@
-import { included } from "./include.js";
+import { ArgumentError } from "./argument-error.js";
 import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 
@@ -62,9 +62,8 @@ function recursiveEql(s: StructInstance, s2: StructInstance, recur: boolean): bo
 
 /**
  * Ruby's `Struct` (`vendor/ruby/v3.3.11/struct.c:2166` `rb_cStruct`). `Struct.new`
- * returns the members' anonymous class as a module: a class that JS already
- * gives another superclass `include`s it where Ruby would inherit from it, and
- * each member is read off the instance by name.
+ * returns the members' anonymous class, which `class X < Struct.new(...)`
+ * inherits from; each member is read off the instance by name.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -74,53 +73,59 @@ export const Struct = {
    *
    * @noRailsEquivalent PERMANENT
    */
-  new(...memberNames: string[]) {
-    return {
+  new(...memberNames: string[]): new (...values: unknown[]) => StructInstance {
+    const klass = class {
+      /** `rb_struct_initialize_m` (`vendor/ruby/v3.3.11/struct.c:742`). */
+      constructor(...values: unknown[]) {
+        if (memberNames.length < values.length) throw new ArgumentError("struct size differs");
+        memberNames.forEach((member, i) => {
+          (this as Record<string, unknown>)[member] = values[i] ?? null;
+        });
+      }
+
       /**
        * `rb_struct_members_m` (`vendor/ruby/v3.3.11/struct.c:227`).
        *
        * @noRailsEquivalent PERMANENT
        */
-      members(this: StructInstance): string[] {
+      members(): string[] {
         return [...memberNames];
-      },
+      }
 
       /**
        * `rb_struct_equal` (`vendor/ruby/v3.3.11/struct.c:1400`).
        *
        * @noRailsEquivalent PERMANENT
        */
-      equals(this: StructInstance, other: unknown): boolean {
+      equals(other: unknown): boolean {
         if (this === other) return true;
         if (!isStruct(other)) return false;
         if (this.constructor !== other.constructor) return false;
         return rbExecRecursivePaired(recursiveEqual, this, other);
-      },
+      }
 
       /**
        * `rb_struct_eql` (`vendor/ruby/v3.3.11/struct.c:1481`).
        *
        * @noRailsEquivalent PERMANENT
        */
-      eql(this: StructInstance, other: unknown): boolean {
+      eql(other: unknown): boolean {
         if (this === other) return true;
         if (!isStruct(other)) return false;
         if (this.constructor !== other.constructor) return false;
         return rbExecRecursivePaired(recursiveEql, this, other);
-      },
+      }
 
       /**
        * `rb_struct_hash` (`vendor/ruby/v3.3.11/struct.c:1432`).
        *
        * @noRailsEquivalent PERMANENT
        */
-      hash(this: StructInstance): number {
+      hash(): number {
         return rbHash([this.constructor, ...structValues(this)]);
-      },
-
-      [included](klass: { prototype: object }): void {
-        structClasses.add(klass.prototype);
-      },
+      }
     };
+    structClasses.add(klass.prototype);
+    return klass;
   },
 };

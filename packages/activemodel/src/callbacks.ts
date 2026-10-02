@@ -11,7 +11,6 @@ import {
   defineCallbacks,
   setCallback,
   Callbacks as ASCallbacks,
-  extend,
   include,
   extended,
 } from "@blazetrails/activesupport";
@@ -20,8 +19,7 @@ type AnyClass = new (...args: never[]) => object;
 
 export class Callbacks {
   static [extended](base: AnyClass): void {
-    include(base, ASCallbacks.InstanceMethods);
-    extend(base, ASCallbacks.ClassMethods);
+    include(base, ASCallbacks);
   }
 
   static defineModelCallbacks = defineModelCallbacks;

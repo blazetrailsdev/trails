@@ -1,4 +1,4 @@
-import { Nodes } from "@blazetrails/arel";
+import { Nodes, arelNode } from "@blazetrails/arel";
 import {
   NoMethodError,
   rbObjClass,
@@ -468,7 +468,7 @@ export function constructRelationForExists(this: FinderRelation, conditions: unk
   if (Array.isArray(conditions)) {
     const [sql, ...binds] = conditions as unknown[];
     if (sql !== undefined) relation = relation.where(sql, ...binds);
-  } else if (conditions instanceof Nodes.Node) {
+  } else if (arelNode(conditions)) {
     relation = relation.where(conditions);
   } else if (conditions !== null && typeof conditions === "object") {
     if (Object.keys(conditions).length > 0) relation = relation.where(conditions);

@@ -1,9 +1,10 @@
-import { block, kernelThrow } from "@blazetrails/ruby-compat";
+import { block, include, kernelThrow } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import {
   Value,
   CallbackChain,
   Callback,
+  Callbacks,
   defineCallbacks,
   setCallback,
   skipCallback,
@@ -73,6 +74,26 @@ describe("CallbackChain compile memoization (trails)", () => {
     const first = chain.compile();
     chain.clear();
     expect(chain.compile()).not.toBe(first);
+  });
+});
+
+describe("include ActiveSupport::Callbacks (trails)", () => {
+  it("mixes in run_callbacks and extends ClassMethods, which stays off the instance", () => {
+    class Record {
+      declare static setCallback: (typeof Callbacks.ClassMethods)["setCallback"];
+      declare runCallbacks: (typeof Callbacks)["runCallbacks"];
+    }
+    include(Record, Callbacks);
+    defineCallbacks(Record.prototype, "save");
+    const log: string[] = [];
+    Record.setCallback("save", "before", () => log.push("before"));
+
+    const record = new Record();
+    record.runCallbacks("save", () => log.push("save"));
+
+    expect(log).toEqual(["before", "save"]);
+    expect("ClassMethods" in record).toBe(false);
+    expect("ClassMethods" in Record).toBe(false);
   });
 });
 

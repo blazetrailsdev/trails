@@ -60,9 +60,8 @@ export const Callbacks = {
   [included](base: AnyClass): void {
     extend(base, ClassMethods);
 
-    include(base, ASCallbacks.InstanceMethods);
+    include(base, ASCallbacks);
     include(base, { _runValidationCallbacks });
-    extend(base, ASCallbacks.ClassMethods);
     defineCallbacks(base.prototype, "validation", {
       skipAfterCallbacksIfTerminated: true,
       scope: ["kind", "name"],

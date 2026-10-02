@@ -1,13 +1,7 @@
 import { Nodes } from "../namespaces.js";
 import { ArgumentError, include } from "@blazetrails/activesupport";
-import {
-  stringSuperclass,
-  type StringInstance,
-  rbModConstSet,
-  rbStrInit,
-} from "@blazetrails/ruby-compat";
+import { stringSuperclass, rbModConstSet } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
-import { Node } from "./node.js";
 import { Fragments } from "./fragments.js";
 import { Expressions, type ExpressionsModule } from "../expressions.js";
 import { Predications, type PredicationsModule } from "../predications.js";
@@ -16,13 +10,12 @@ import { OrderPredications, type OrderPredicationsModule } from "../order-predic
 import type { Attribute } from "../attributes/attribute.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class SqlLiteral extends Node {
+export class SqlLiteral extends stringSuperclass("eql", "hash", "isBlank", "isEmpty") {
   readonly retryable: boolean;
 
   constructor(string: string | SqlLiteral, options?: { retryable?: boolean }) {
-    super();
+    super(string);
     this.retryable = options?.retryable ?? false;
-    rbStrInit(this, string);
   }
 
   fetchAttribute(_block?: (attr: Attribute) => boolean): boolean | undefined {
@@ -43,14 +36,8 @@ export class SqlLiteral extends Node {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SqlLiteral
-  extends
-    Pick<StringInstance, "eql" | "hash" | "isBlank" | "isEmpty">,
-    PredicationsModule,
-    ExpressionsModule,
-    AliasPredicationModule,
-    OrderPredicationsModule {}
+  extends PredicationsModule, ExpressionsModule, AliasPredicationModule, OrderPredicationsModule {}
 
-include(SqlLiteral, stringSuperclass("eql", "hash", "isBlank", "isEmpty"));
 include(SqlLiteral, Expressions);
 include(SqlLiteral, Predications);
 include(SqlLiteral, AliasPredication);

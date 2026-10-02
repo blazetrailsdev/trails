@@ -19,6 +19,7 @@ export function buildQuoted(
     other instanceof Attributes.Attribute ||
     other instanceof Arel.Table ||
     other instanceof Arel.SelectManager ||
+    other instanceof Nodes.SqlLiteral ||
     other instanceof ModelAttribute
   )
     return other;

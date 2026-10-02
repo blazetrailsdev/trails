@@ -75,11 +75,11 @@ export class WhereClause {
     if (leftClause.isEmpty() || rightClause.isEmpty()) {
       return common;
     } else {
-      let left: Nodes.Node = leftClause.ast;
-      if (left instanceof Nodes.Grouping && left.expr instanceof Nodes.Node) left = left.expr;
+      let left: Arel.ArelNode = leftClause.ast;
+      if (left instanceof Nodes.Grouping) left = left.expr as Arel.ArelNode;
 
-      let right: Nodes.Node = rightClause.ast;
-      if (right instanceof Nodes.Grouping && right.expr instanceof Nodes.Node) right = right.expr;
+      let right: Arel.ArelNode = rightClause.ast;
+      if (right instanceof Nodes.Grouping) right = right.expr as Arel.ArelNode;
 
       const orClause =
         left instanceof Nodes.Or

@@ -349,10 +349,7 @@ describe("FormHelperTest", () => {
   });
 
   it("label with non active record object", () => {
-    class Person {
-      constructor(public name: unknown) {}
-    }
-    include(Person, Struct.new("name"));
+    const Person = Struct.new("name");
 
     formFor(
       new Person("ok"),

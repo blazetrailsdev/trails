@@ -1,4 +1,11 @@
-import { kernelCatch, NoMethodError, rbBlockGivenP, RuntimeError } from "@blazetrails/ruby-compat";
+import {
+  extend,
+  included,
+  kernelCatch,
+  NoMethodError,
+  rbBlockGivenP,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
 
 import { kernelArray } from "./array-utils.js";
 import { ArgumentError } from "./hash-utils.js";
@@ -1040,127 +1047,127 @@ function observeProceed(
   };
 }
 
-export namespace Callbacks {
-  export function defineCallbacks<T extends object>(
-    target: T,
-    name: string,
-    options: DefineCallbacksOptions<T> = {},
-  ): void {
-    const chains = getCallbackChains(target);
-    if (!chains.has(name)) {
-      chains.set(name, new CallbackChain(name, options as DefineCallbacksOptions));
-    }
-
-    if (Object.prototype.hasOwnProperty.call(target, "constructor")) {
-      Object.defineProperty(target.constructor, `_${camelize(name, false)}Callbacks`, {
-        get(this: { prototype: object }) {
-          return ClassMethods.getCallbacks.call(this, name);
-        },
-        set(this: { prototype: object }, value: CallbackChain) {
-          ClassMethods.setCallbacks.call(this, name, value);
-        },
-        configurable: true,
-      });
-    }
+export function defineCallbacks<T extends object>(
+  target: T,
+  name: string,
+  options: DefineCallbacksOptions<T> = {},
+): void {
+  const chains = getCallbackChains(target);
+  if (!chains.has(name)) {
+    chains.set(name, new CallbackChain(name, options as DefineCallbacksOptions));
   }
 
-  export function setCallback<T extends object>(
-    target: T,
-    name: string,
-    ...filterList: FilterListEntry<T>[]
-  ): void {
-    const block = rbBlockGivenP(filterList[filterList.length - 1])
-      ? (filterList.pop() as AnyCallback)
-      : null;
-    const [type, filters, options] = normalizeCallbackParams(
-      filterList as Parameters<typeof normalizeCallbackParams>[0],
-      block,
-    );
-    const chains = getCallbackChains(target);
-    const chain = chains.get(name);
-    if (!chain) {
-      throw new RuntimeError(`No callback chain "${name}" defined. Call defineCallbacks first.`);
-    }
-    const mapped = filters.map((filter) =>
-      Callback.build(
-        chain,
-        filter as AnyCallback | CallbackObject,
-        type,
-        options as CallbackOptions,
-      ),
-    );
-    if (options.prepend) {
-      chain.prepend(...mapped);
-    } else {
-      chain.append(...mapped);
-    }
+  if (Object.prototype.hasOwnProperty.call(target, "constructor")) {
+    Object.defineProperty(target.constructor, `_${camelize(name, false)}Callbacks`, {
+      get(this: { prototype: object }) {
+        return Callbacks.ClassMethods.getCallbacks.call(this, name);
+      },
+      set(this: { prototype: object }, value: CallbackChain) {
+        Callbacks.ClassMethods.setCallbacks.call(this, name, value);
+      },
+      configurable: true,
+    });
   }
+}
 
-  export function skipCallback<T extends object>(
-    target: T,
-    name: string,
-    ...filterList: FilterListEntry<T>[]
-  ): void {
-    const block = rbBlockGivenP(filterList[filterList.length - 1])
-      ? (filterList.pop() as AnyCallback)
-      : null;
-    const [type, filters, options] = normalizeCallbackParams(
-      filterList as Parameters<typeof normalizeCallbackParams>[0],
-      block,
+export function setCallback<T extends object>(
+  target: T,
+  name: string,
+  ...filterList: FilterListEntry<T>[]
+): void {
+  const block = rbBlockGivenP(filterList[filterList.length - 1])
+    ? (filterList.pop() as AnyCallback)
+    : null;
+  const [type, filters, options] = normalizeCallbackParams(
+    filterList as Parameters<typeof normalizeCallbackParams>[0],
+    block,
+  );
+  const chains = getCallbackChains(target);
+  const selfChain = chains.get(name);
+  if (!selfChain) {
+    throw new RuntimeError(`No callback chain "${name}" defined. Call defineCallbacks first.`);
+  }
+  const mapped = filters.map((filter) =>
+    Callback.build(
+      selfChain,
+      filter as AnyCallback | CallbackObject,
+      type,
+      options as CallbackOptions,
+    ),
+  );
+  if (options.prepend) {
+    selfChain.prepend(...mapped);
+  } else {
+    selfChain.append(...mapped);
+  }
+}
+
+export function skipCallback<T extends object>(
+  target: T,
+  name: string,
+  ...filterList: FilterListEntry<T>[]
+): void {
+  const block = rbBlockGivenP(filterList[filterList.length - 1])
+    ? (filterList.pop() as AnyCallback)
+    : null;
+  const [type, filters, options] = normalizeCallbackParams(
+    filterList as Parameters<typeof normalizeCallbackParams>[0],
+    block,
+  );
+  if (!("raise" in options)) options.raise = true;
+
+  let chain = peekCallbackChain(target, name);
+  if (!chain) return;
+  for (const filter of filters) {
+    let callback = chain.entries.find((c) =>
+      c.matches(type, filter as AnyCallback | CallbackObject),
     );
-    if (!("raise" in options)) options.raise = true;
 
-    let chain = peekCallbackChain(target, name);
-    if (!chain) return;
-    for (const filter of filters) {
-      let callback = chain.entries.find((c) =>
-        c.matches(type, filter as AnyCallback | CallbackObject),
+    if (!callback && options.raise) {
+      throw new ArgumentError(
+        `${type.charAt(0).toUpperCase() + type.slice(1)} ${name} callback ${String(filter)} has not been defined`,
       );
-
-      if (!callback && options.raise) {
-        throw new ArgumentError(
-          `${type.charAt(0).toUpperCase() + type.slice(1)} ${name} callback ${String(filter)} has not been defined`,
-        );
-      }
-      if (!callback) continue;
-
-      if (!Object.prototype.hasOwnProperty.call(target, CALLBACKS)) {
-        chain = getCallbackChains(target).get(name)!;
-        callback = chain.entries.find((c) =>
-          c.matches(type, filter as AnyCallback | CallbackObject),
-        )!;
-      }
-
-      if ("if" in options || "unless" in options) {
-        const newCallback = callback.mergeConditionalOptions(chain, {
-          ifOption: options.if,
-          unlessOption: options.unless,
-        });
-        chain.insert(chain.index(callback), newCallback);
-      }
-      chain.delete(callback);
     }
-  }
+    if (!callback) continue;
 
-  export function resetCallbacks(target: object, name: string): void {
-    const callbacks = getCallbackChains(target).get(name)!;
-    const klass = target.constructor as AnyClass;
-
-    for (const target of DescendantsTracker.descendants(klass)) {
-      const chain = getCallbackChains(target.prototype as object).get(name)!;
-      callbacks.each((c) => chain.delete(c));
+    if (!Object.prototype.hasOwnProperty.call(target, CALLBACKS)) {
+      chain = getCallbackChains(target).get(name)!;
+      callback = chain.entries.find((c) =>
+        c.matches(type, filter as AnyCallback | CallbackObject),
+      )!;
     }
 
-    callbacks.clear();
+    if ("if" in options || "unless" in options) {
+      const newCallback = callback.mergeConditionalOptions(chain, {
+        ifOption: options.if,
+        unlessOption: options.unless,
+      });
+      chain.insert(chain.index(callback), newCallback);
+    }
+    chain.delete(callback);
+  }
+}
+
+export function resetCallbacks(target: object, name: string): void {
+  const callbacks = getCallbackChains(target).get(name)!;
+  const klass = target.constructor as AnyClass;
+
+  for (const target of DescendantsTracker.descendants(klass)) {
+    const chain = getCallbackChains(target.prototype as object).get(name)!;
+    callbacks.each((c) => chain.delete(c));
   }
 
-  export const ClassMethods = {
+  callbacks.clear();
+}
+
+export const Callbacks = {
+  ClassMethods: {
     setCallback(
       this: { prototype: object },
       name: string,
       ...filterList: FilterListEntry<any>[]
     ): void {
-      Callbacks.setCallback(this.prototype, name, ...filterList);
+      setCallback(this.prototype, name, ...filterList);
     },
 
     skipCallback(
@@ -1168,11 +1175,11 @@ export namespace Callbacks {
       name: string,
       ...filterList: FilterListEntry<any>[]
     ): void {
-      Callbacks.skipCallback(this.prototype, name, ...filterList);
+      skipCallback(this.prototype, name, ...filterList);
     },
 
     resetCallbacks(this: { prototype: object }, name: string): void {
-      Callbacks.resetCallbacks(this.prototype, name);
+      resetCallbacks(this.prototype, name);
     },
 
     getCallbacks(this: { prototype: object }, name: string): CallbackChain | undefined {
@@ -1188,50 +1195,24 @@ export namespace Callbacks {
       __callbacks.set(name, callbacks);
       return __callbacks;
     },
-  };
+  },
 
-  export const InstanceMethods = {
-    runCallbacks(
-      this: object,
-      name: string,
-      block?: () => unknown,
-      opts?: RunCallbacksOptions,
-      type?: CallbackKind,
-    ): unknown {
-      return runCallbacks(this, name, block, opts, type);
-    },
+  runCallbacks(
+    this: object,
+    name: string,
+    block?: () => unknown,
+    opts?: RunCallbacksOptions,
+    type?: CallbackKind,
+  ): unknown {
+    return runCallbacks(this, name, block, opts, type);
+  },
 
-    haltedCallbackHook(_filter: unknown, _name: string): void {},
-  };
-}
+  haltedCallbackHook(_filter: unknown, _name: string): void {},
 
-export function defineCallbacks<T extends object>(
-  target: T,
-  name: string,
-  options: DefineCallbacksOptions<T> = {},
-): void {
-  Callbacks.defineCallbacks(target, name, options);
-}
-
-export function setCallback<T extends object>(
-  target: T,
-  name: string,
-  ...filterList: FilterListEntry<T>[]
-): void {
-  Callbacks.setCallback(target, name, ...filterList);
-}
-
-export function skipCallback<T extends object>(
-  target: T,
-  name: string,
-  ...filterList: FilterListEntry<T>[]
-): void {
-  Callbacks.skipCallback(target, name, ...filterList);
-}
-
-export function resetCallbacks(target: object, name: string): void {
-  Callbacks.resetCallbacks(target, name);
-}
+  [included](base: AnyClass): void {
+    extend(base as never, Callbacks.ClassMethods);
+  },
+};
 
 export function runCallbacks(
   target: object,

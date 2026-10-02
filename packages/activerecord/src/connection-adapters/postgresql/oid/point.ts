@@ -6,19 +6,17 @@ import {
   Struct,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
-import { include, isBlank, isPlainObject } from "@blazetrails/activesupport";
+import { isBlank, isPlainObject } from "@blazetrails/activesupport";
 import { ActiveRecord } from "../../../namespaces.js";
 
-ActiveRecord.Point = class Point {
-  x: number;
-  y: number;
+ActiveRecord.Point = class Point extends Struct.new("x", "y") {
+  declare x: number;
+  declare y: number;
 
   constructor(x: number, y: number) {
-    this.x = x;
-    this.y = y;
+    super(x, y);
   }
 };
-include(ActiveRecord.Point, Struct.new("x", "y"));
 
 export class Point extends ValueType {
   override type(): string {

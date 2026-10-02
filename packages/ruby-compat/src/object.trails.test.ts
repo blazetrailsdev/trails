@@ -23,6 +23,7 @@ import {
 } from "./object.js";
 import { Module, include, rbModAncestors, rbModInstanceMethod } from "./include.js";
 import { cmp } from "./comparable.js";
+import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { NoMethodError } from "./no-method-error.js";
@@ -260,6 +261,50 @@ describe("rbFSend", () => {
 
   it("raises NoMethodError for an unbound name", () => {
     expect(() => rbFSend(new Req(), "nope")).toThrow(NoMethodError);
+  });
+
+  it("sends an operator by its Ruby name", () => {
+    expect(rbFPublicSend(2, ">", 1)).toBe(true);
+    expect(rbFPublicSend(1, ">=", 1)).toBe(true);
+    expect(rbFPublicSend(2, "<", 1)).toBe(false);
+    expect(rbFPublicSend(1n, "<=", 2)).toBe(true);
+    expect(rbFPublicSend("b", ">", "a")).toBe(true);
+    expect(rbFPublicSend([1], "==", [1])).toBe(true);
+    expect(rbFPublicSend(1, "!=", "a")).toBe(true);
+    expect(rbFPublicSend(1, "==", "a")).toBe(false);
+    expect(rbFPublicSend(2, ":>", 1)).toBe(true);
+    expect(rbFPublicSend(1, ":!=", 1)).toBe(false);
+  });
+
+  it("raises ArgumentError for an ordering operator <=> cannot place", () => {
+    expect(() => rbFPublicSend(1, ">", "a")).toThrow(ArgumentError);
+    expect(() => rbFPublicSend(1, ">", "a")).toThrow("comparison of Integer with String failed");
+    expect(() => rbFPublicSend("a", "<", 1)).toThrow(ArgumentError);
+  });
+
+  it("answers false for an ordering operator with a NaN operand, as Float does", () => {
+    for (const op of [">", ">=", "<", "<="]) {
+      expect(rbFPublicSend(NaN, op, 1)).toBe(false);
+      expect(rbFPublicSend(1, op, NaN)).toBe(false);
+    }
+  });
+
+  it("sends == to the receiver's own ==", () => {
+    const recv = { equals: (other: unknown) => other === "same" };
+    expect(rbFPublicSend(recv, "==", "same")).toBe(true);
+    expect(rbFPublicSend(recv, "!=", "same")).toBe(false);
+  });
+
+  it("sends an ordering operator to the receiver's own method before its <=>", () => {
+    const recv = { greaterThan: () => "own", compareTo: () => -1 };
+    expect(rbFPublicSend(recv, ">", 1)).toBe("own");
+    expect(rbFPublicSend(recv, "<", 1)).toBe(true);
+  });
+
+  it("raises NoMethodError for an ordering operator the receiver does not define", () => {
+    expect(() => rbFPublicSend(null, ">", 1)).toThrow(NoMethodError);
+    expect(() => rbFPublicSend([1], ">", [0])).toThrow(NoMethodError);
+    expect(() => rbFPublicSend(true, "<", false)).toThrow(NoMethodError);
   });
 
   it("answers infinite? for a Float and an Integer, whose JS values do not define it", () => {
