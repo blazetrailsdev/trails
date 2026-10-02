@@ -7,6 +7,7 @@ import { IOError } from "./io-error.js";
 import { ArgumentError } from "./argument-error.js";
 import { stderr, stdout, type WriteStream } from "./process-adapter.js";
 import { verbose } from "./verbose.js";
+import { format } from "./kernel-format.js";
 
 /** The `rb_exec_recursive` guard `io_puts_ary` (`vendor/ruby/v3.3.11/io.c:8880`) is called through. */
 const putsAryInFlight = new Set<unknown[]>();
@@ -82,6 +83,17 @@ export function ioPutsAry(this: GenericWritable, ary: unknown[]): void {
  */
 export function print(this: GenericWritable, ...args: unknown[]): null {
   for (const arg of args) this.write(arg == null ? "" : String(arg));
+  return null;
+}
+
+/**
+ * `rb_io_printf` (`vendor/ruby/v3.3.11/io.c:8589`): `rb_f_sprintf`'s String,
+ * written to the receiver, answering `nil`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `IO#printf` (`vendor/ruby/v3.3.11/io.c:8589`).
+ */
+export function printf(this: GenericWritable, fmt: string, ...argv: unknown[]): null {
+  this.write(format(fmt, ...argv));
   return null;
 }
 
