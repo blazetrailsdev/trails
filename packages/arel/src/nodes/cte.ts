@@ -1,5 +1,5 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import { Binary } from "./binary.js";
@@ -58,5 +58,4 @@ export class Cte extends Binary {
   }
 }
 
-rbSetClassPathString(Cte, Nodes, "Cte");
-Nodes.Cte = Cte;
+rbModConstSet(Nodes, "Cte", Cte);

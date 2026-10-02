@@ -809,14 +809,14 @@ describe("MetalIntegrationTest", () => {
     assertResponse(200);
     assertResponse("success");
     assertResponse("ok");
-    expect(t.responseBody).toBe("Hello World!");
+    expect(t.response.body).toBe("Hello World!");
   });
 
   it("failed get", async () => {
     await t.get("/failure");
     assertResponse(404);
     assertResponse("not_found");
-    expect(t.responseBody).toBe("");
+    expect(t.response.body).toBe("");
   });
 
   it("generate url without controller", () => {

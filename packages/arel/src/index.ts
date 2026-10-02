@@ -1,9 +1,9 @@
 export { Table } from "./table.js";
 import "./nodes/index.js";
 import "./visitors/index.js";
-export { Attributes, Nodes, Visitors } from "./namespaces.js";
+import "./collectors/index.js";
+export { Attributes, Collectors, Nodes, Visitors } from "./namespaces.js";
 export { Attribute } from "./attributes/attribute.js";
-export * as Collectors from "./collectors/index.js";
 export { SelectManager } from "./select-manager.js";
 export { InsertManager } from "./insert-manager.js";
 export { UpdateManager } from "./update-manager.js";

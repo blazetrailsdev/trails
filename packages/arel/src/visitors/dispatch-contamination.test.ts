@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes, Visitors } from "../index.js";
 
 describe("DispatchContaminationTest", () => {
@@ -21,8 +21,8 @@ describe("DispatchContaminationTest", () => {
   it("is threadsafe when implementing superclass fallback", () => {
     class DummySuperNode {}
     class DummySubNode extends DummySuperNode {}
-    rbSetClassPathString(DummySuperNode, Visitors, "DummySuperNode");
-    rbSetClassPathString(DummySubNode, Visitors, "DummySubNode");
+    rbModConstSet(Visitors, "DummySuperNode", DummySuperNode);
+    rbModConstSet(Visitors, "DummySubNode", DummySubNode);
 
     class DummyVisitor extends Visitors.Visitor {
       protected visitArelVisitorsDummySuperNode(_node: unknown): number {

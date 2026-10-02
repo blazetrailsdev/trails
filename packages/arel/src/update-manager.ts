@@ -9,6 +9,8 @@ import { SqlLiteral } from "./nodes/sql-literal.js";
 import { BoundSqlLiteral } from "./nodes/bound-sql-literal.js";
 import { Table } from "./table.js";
 import type { UpdateValues } from "./crud.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Arel } from "./namespaces.js";
 
 export class UpdateManager extends TreeManager<UpdateStatement> {
   declare key: unknown;
@@ -59,3 +61,5 @@ export class UpdateManager extends TreeManager<UpdateStatement> {
 }
 
 include(UpdateManager, StatementMethods);
+
+rbModConstSet(Arel, "UpdateManager", UpdateManager);

@@ -1,3 +1,6 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Collectors } from "../namespaces.js";
+
 export class Bind {
   private binds: unknown[];
   retryable?: boolean;
@@ -29,3 +32,5 @@ export class Bind {
     return this.binds;
   }
 }
+
+rbModConstSet(Collectors, "Bind", Bind);

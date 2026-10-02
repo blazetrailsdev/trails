@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Binary } from "./binary.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -11,5 +11,4 @@ type _WindowPredications = import("../window-predications.js").WindowPredication
    @typescript-eslint/no-unsafe-declaration-merging */
 export interface Filter extends _WindowPredications {}
 
-rbSetClassPathString(Filter, Nodes, "Filter");
-Nodes.Filter = Filter;
+rbModConstSet(Nodes, "Filter", Filter);

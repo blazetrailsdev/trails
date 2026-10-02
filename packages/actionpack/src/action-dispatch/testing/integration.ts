@@ -9,19 +9,12 @@ import {
   rbObjRespondTo,
   stringSplit,
   type Generic,
+  type Included,
 } from "@blazetrails/ruby-compat";
 import { TestResponse } from "./test-response.js";
-import { FlashHash } from "../middleware/flash.js";
 import { RouteSet } from "../routing/route-set.js";
 import type { Metal } from "../../action-controller/metal.js";
-import {
-  flash as testProcessFlash,
-  redirectToUrl as testProcessRedirectToUrl,
-  fileFixtureUpload as testProcessFileFixtureUpload,
-  fixtureFileUpload as testProcessFixtureFileUpload,
-  assigns as assignsFn,
-  type TestProcessHost,
-} from "./test-process.js";
+import { FixtureFile, TestProcess } from "./test-process.js";
 import * as routingAssertions from "./assertions/routing.js";
 import * as responseAssertions from "./assertions/response.js";
 import { htmlDocument, type HtmlDocumentHost } from "./assertions.js";
@@ -34,7 +27,6 @@ import * as pageDumpHelper from "./test-helpers/page-dump-helper.js";
 import { ActionDispatch } from "../../namespaces.js";
 import { Session as RackTestSession, type CookieJar } from "@blazetrails/rack-test";
 import { DEFAULT_PORTS, type RackApp, type RackMiddleware } from "@blazetrails/rack";
-import type { UploadedFile } from "@blazetrails/rack-test";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 
 export interface IntegrationRequestOptions {
@@ -55,10 +47,9 @@ const DEFAULT_ACCEPT =
   "text/html;q=0.9,text/plain;q=0.8,image/png," +
   "*/*;q=0.5";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class IntegrationTest extends TestCase {
   routes: RouteSet = new RouteSet();
-
-  session: Record<string, unknown> = {};
 
   host: string = DEFAULT_HOST;
 
@@ -97,7 +88,6 @@ export class IntegrationTest extends TestCase {
   }
 
   resetBang(): void {
-    this.session = {};
     this._mockSessionMemo = undefined;
     this._htmlDocument?.dispose();
     this._htmlDocument = undefined;
@@ -346,29 +336,12 @@ export class IntegrationTest extends TestCase {
     return this.request == null ? null : this.request.path;
   }
 
-  get responseBody(): string {
-    return this.response?.body ?? this.controller?.responseBody ?? "";
-  }
-
-  get parsedBody(): unknown {
-    return JSON.parse(this.responseBody);
-  }
-
   get redirectUrl(): string | undefined {
     return this.response?.getHeader("location") ?? this.controller?.headers.get("location");
   }
 
-  get flash(): FlashHash {
-    if (!this.request) return new FlashHash();
-    return testProcessFlash.call(this as unknown as TestProcessHost);
-  }
-
   get cookies(): CookieJar {
     return this._mockSession.cookieJar;
-  }
-
-  get redirectToUrl(): string | undefined {
-    return testProcessRedirectToUrl.call(this as unknown as TestProcessHost);
   }
 
   get htmlDocument(): XmlDocument {
@@ -516,28 +489,6 @@ export class IntegrationTest extends TestCase {
     RequestEncoder.registerEncoder(args, options);
   }
 
-  assigns(key?: string | symbol): never {
-    return assignsFn.call(this as unknown as TestProcessHost, key);
-  }
-
-  fileFixtureUpload(path: string, mimeType?: string | null, binary: boolean = false): UploadedFile {
-    return testProcessFileFixtureUpload.call(
-      this as unknown as TestProcessHost,
-      path,
-      mimeType,
-      binary,
-    );
-  }
-
-  fixtureFileUpload(path: string, mimeType?: string | null, binary: boolean = false): UploadedFile {
-    return testProcessFixtureFileUpload.call(
-      this as unknown as TestProcessHost,
-      path,
-      mimeType,
-      binary,
-    );
-  }
-
   inspect(): string {
     const url = this.request?.env?.REQUEST_URI ?? "(no request)";
     return `#<${this.constructor.name} ${url}>`;
@@ -602,6 +553,13 @@ export class IntegrationTest extends TestCase {
     this.resetBang();
   }
 }
+
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include TestProcess` and `include TestProcess::FixtureFile` (`actionpack/lib/action_dispatch/testing/integration.rb:95,651`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface IntegrationTest
+  extends Omit<Included<typeof TestProcess>, "cookies">, Included<typeof FixtureFile> {}
+
+include(IntegrationTest, TestProcess);
+include(IntegrationTest, FixtureFile);
 
 const proto = IntegrationTest.prototype as unknown as Record<string, unknown>;
 proto.assertRecognizes = routingAssertions.assertRecognizes;

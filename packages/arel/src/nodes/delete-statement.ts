@@ -1,4 +1,4 @@
-import { rbObjClone, rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
@@ -59,5 +59,4 @@ export class DeleteStatement extends Node {
   }
 }
 
-rbSetClassPathString(DeleteStatement, Nodes, "DeleteStatement");
-Nodes.DeleteStatement = DeleteStatement;
+rbModConstSet(Nodes, "DeleteStatement", DeleteStatement);

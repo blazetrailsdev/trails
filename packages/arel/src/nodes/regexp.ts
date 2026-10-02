@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Binary, NodeOrValue } from "./binary.js";
 
 export class Regexp extends Binary {
@@ -18,7 +18,5 @@ export class NotRegexp extends Binary {
   }
 }
 
-rbSetClassPathString(Regexp, Nodes, "Regexp");
-Nodes.Regexp = Regexp;
-rbSetClassPathString(NotRegexp, Nodes, "NotRegexp");
-Nodes.NotRegexp = NotRegexp;
+rbModConstSet(Nodes, "Regexp", Regexp);
+rbModConstSet(Nodes, "NotRegexp", NotRegexp);

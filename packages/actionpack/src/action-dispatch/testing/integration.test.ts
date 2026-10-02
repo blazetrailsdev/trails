@@ -208,25 +208,25 @@ describe("ActionDispatch::IntegrationTest", () => {
     it("GET /posts returns JSON", async () => {
       await app.get("/posts");
       expect(app.response.mediaType).toBe("application/json");
-      expect(app.parsedBody).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(app.response.parsedBody).toEqual([{ id: 1 }, { id: 2 }]);
     });
 
     it("GET /posts/:id returns show", async () => {
       await app.get("/posts/42");
       app.assertResponse(200);
-      expect(app.parsedBody).toEqual({ id: "42" });
+      expect(app.response.parsedBody).toEqual({ id: "42" });
     });
 
     it("POST /posts creates resource", async () => {
       await app.post("/posts", { params: { title: "Test" } });
       app.assertResponse("created");
-      expect(app.parsedBody).toEqual({ title: "Test", created: true });
+      expect(app.response.parsedBody).toEqual({ title: "Test", created: true });
     });
 
     it("PUT /posts/:id updates resource", async () => {
       await app.put("/posts/5", { params: { title: "Updated" } });
       app.assertResponse("success");
-      expect((app.parsedBody as any).updated).toBe(true);
+      expect((app.response.parsedBody as any).updated).toBe(true);
     });
 
     it("PATCH /posts/:id updates resource", async () => {
@@ -249,19 +249,19 @@ describe("ActionDispatch::IntegrationTest", () => {
     it("nested resources work", async () => {
       await app.get("/posts/1/comments");
       app.assertResponse("success");
-      expect((app.parsedBody as any).postId).toBe("1");
+      expect((app.response.parsedBody as any).postId).toBe("1");
     });
 
     it("nested resource POST works", async () => {
       await app.post("/posts/3/comments", { params: { body: "Nice" } });
       app.assertResponse("created");
-      expect((app.parsedBody as any).postId).toBe("3");
+      expect((app.response.parsedBody as any).postId).toBe("3");
     });
 
     it("namespaced resources work", async () => {
       await app.get("/admin/posts");
       app.assertResponse("success");
-      expect((app.parsedBody as any).admin).toBe(true);
+      expect((app.response.parsedBody as any).admin).toBe(true);
     });
 
     it("singular resource works", async () => {
@@ -294,7 +294,7 @@ describe("ActionDispatch::IntegrationTest", () => {
       await app.get("/posts/redirect");
       await app.followRedirectBang();
       app.assertResponse("success");
-      expect(app.parsedBody).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(app.response.parsedBody).toEqual([{ id: 1 }, { id: 2 }]);
     });
 
     it("followRedirect throws when no redirect", async () => {
@@ -336,7 +336,7 @@ describe("ActionDispatch::IntegrationTest", () => {
     it("session persists across requests", async () => {
       await app.post("/posts", { params: { title: "Persisted" } });
       await app.get("/posts/session");
-      expect((app.parsedBody as any).lastPost).toBe("Persisted");
+      expect((app.response.parsedBody as any).lastPost).toBe("Persisted");
     });
 
     it("login flow with session", async () => {
@@ -344,7 +344,7 @@ describe("ActionDispatch::IntegrationTest", () => {
       app.assertResponse("redirect");
 
       await app.get("/session");
-      expect((app.parsedBody as any).userId).toBe(42);
+      expect((app.response.parsedBody as any).userId).toBe(42);
 
       await app.delete("/session");
       app.assertResponse("no_content");
@@ -354,7 +354,7 @@ describe("ActionDispatch::IntegrationTest", () => {
       await app.post("/posts", { params: { title: "Before Reset" } });
       app.reset();
       await app.get("/posts/session");
-      expect((app.parsedBody as any).lastPost).toBe("none");
+      expect((app.response.parsedBody as any).lastPost).toBe("none");
     });
   });
 
@@ -364,21 +364,21 @@ describe("ActionDispatch::IntegrationTest", () => {
       expect(app.cookies.get("token")).toBe("abc123");
 
       await app.get("/posts/read-cookie");
-      expect(app.responseBody).toContain("token=abc123");
+      expect(app.body).toContain("token=abc123");
     });
 
     it("reset clears cookies", async () => {
       await app.get("/posts/set-cookie");
       app.reset();
       await app.get("/posts/read-cookie");
-      expect(app.responseBody).not.toContain("token=abc123");
+      expect(app.body).not.toContain("token=abc123");
     });
   });
 
   describe("flash", () => {
     it("flash is accessible after request", async () => {
       await app.post("/posts", { params: { title: "Flash!" } });
-      expect(app.flash.get("notice")).toBe("Post created!");
+      expect(app.flash().get("notice")).toBe("Post created!");
     });
 
     it("flash survives a redirect and is swept on the request after", async () => {
@@ -386,27 +386,27 @@ describe("ActionDispatch::IntegrationTest", () => {
       app.assertResponse(302);
 
       await app.followRedirectBang();
-      expect(app.responseBody).toBe("Post created!");
+      expect(app.body).toBe("Post created!");
 
       await app.get("/posts/flash");
-      expect(app.responseBody).toBe("none");
+      expect(app.body).toBe("none");
     });
 
     it("assertFlash throws when not set", async () => {
       await app.get("/posts");
-      expect(app.flash.get("notice")).toBeUndefined();
+      expect(app.flash().get("notice")).toBeUndefined();
     });
   });
 
   describe("response body", () => {
     it("responseBody returns response body", async () => {
       await app.get("/posts");
-      expect(app.responseBody).toContain("[");
+      expect(app.body).toContain("[");
     });
 
     it("parsedBody returns parsed JSON", async () => {
       await app.get("/posts");
-      expect(Array.isArray(app.parsedBody)).toBe(true);
+      expect(Array.isArray(app.response.parsedBody)).toBe(true);
     });
 
     it("status accessor returns status code", async () => {

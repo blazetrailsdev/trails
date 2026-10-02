@@ -5,6 +5,8 @@ import { Attribute } from "./attributes/attribute.js";
 import { ValuesList } from "./nodes/values-list.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Arel } from "./namespaces.js";
 
 export class InsertManager extends TreeManager<InsertStatement> {
   constructor(table?: Table | null) {
@@ -62,3 +64,5 @@ export class InsertManager extends TreeManager<InsertStatement> {
     return new ValuesList(rows);
   }
 }
+
+rbModConstSet(Arel, "InsertManager", InsertManager);

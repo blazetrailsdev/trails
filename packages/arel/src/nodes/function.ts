@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import type { NodeOrValue } from "./binary.js";
@@ -60,15 +60,9 @@ type _FilterPredications = import("../filter-predications.js").FilterPredication
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Function extends _WindowPredications, _FilterPredications {}
 
-rbSetClassPathString(Function, Nodes, "Function");
-Nodes.Function = Function;
-rbSetClassPathString(Exists, Nodes, "Exists");
-Nodes.Exists = Exists;
-rbSetClassPathString(Sum, Nodes, "Sum");
-Nodes.Sum = Sum;
-rbSetClassPathString(Max, Nodes, "Max");
-Nodes.Max = Max;
-rbSetClassPathString(Min, Nodes, "Min");
-Nodes.Min = Min;
-rbSetClassPathString(Avg, Nodes, "Avg");
-Nodes.Avg = Avg;
+rbModConstSet(Nodes, "Function", Function);
+rbModConstSet(Nodes, "Exists", Exists);
+rbModConstSet(Nodes, "Sum", Sum);
+rbModConstSet(Nodes, "Max", Max);
+rbModConstSet(Nodes, "Min", Min);
+rbModConstSet(Nodes, "Avg", Avg);

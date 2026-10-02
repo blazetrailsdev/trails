@@ -1,5 +1,5 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { Arel, Attributes, Nodes } from "../namespaces.js";
@@ -95,7 +95,5 @@ type _AliasPredication = import("../alias-predication.js").AliasPredicationModul
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface Casted extends _AliasPredication {}
 
-rbSetClassPathString(Quoted, Nodes, "Quoted");
-Nodes.Quoted = Quoted;
-rbSetClassPathString(Casted, Nodes, "Casted");
-Nodes.Casted = Casted;
+rbModConstSet(Nodes, "Quoted", Quoted);
+rbModConstSet(Nodes, "Casted", Casted);

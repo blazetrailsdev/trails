@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import type { NodeOrValue } from "./binary.js";
 import { Function } from "./function.js";
@@ -21,5 +21,4 @@ export class NamedFunction extends Function {
   }
 }
 
-rbSetClassPathString(NamedFunction, Nodes, "NamedFunction");
-Nodes.NamedFunction = NamedFunction;
+rbModConstSet(Nodes, "NamedFunction", NamedFunction);

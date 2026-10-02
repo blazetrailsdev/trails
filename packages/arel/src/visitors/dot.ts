@@ -6,7 +6,7 @@ import { Nodes, Visitors } from "../namespaces.js";
 import { PlainString } from "../collectors/plain-string.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { camelize } from "@blazetrails/activesupport";
-import { rbObjClass, rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbObjClass, rbModConstSet } from "@blazetrails/ruby-compat";
 
 type AppendableCollector = { append(s: string): unknown; value: string };
 
@@ -421,5 +421,6 @@ export class Edge {
   }
 }
 
-rbSetClassPathString(Dot, Visitors, "Dot");
-Visitors.Dot = Dot;
+rbModConstSet(Visitors, "Dot", Dot);
+rbModConstSet(Dot, "Node", Node);
+rbModConstSet(Dot, "Edge", Edge);

@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Binary, type NodeOrValue } from "./binary.js";
 
 export class Over extends Binary {
@@ -12,5 +12,4 @@ export class Over extends Binary {
   }
 }
 
-rbSetClassPathString(Over, Nodes, "Over");
-Nodes.Over = Over;
+rbModConstSet(Nodes, "Over", Over);

@@ -12211,13 +12211,6 @@
   {
     "package": "actiondispatch",
     "rubyFile": "testing/integration.rb",
-    "rubyName": "assigns",
-    "digest": "8acef0e84cd60218",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
     "rubyName": "before_setup",
     "digest": "ada4c43cec2dc29a",
     "ref": "v8.0.2"
@@ -12311,20 +12304,6 @@
     "rubyFile": "testing/integration.rb",
     "rubyName": "fail_on",
     "digest": "2eece60b19ee1dd1",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
-    "rubyName": "file_fixture_upload",
-    "digest": "13927765ac68e9f1",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
-    "rubyName": "flash",
-    "digest": "996ad6ed69c7456d",
     "ref": "v8.0.2"
   },
   {
@@ -12519,13 +12498,6 @@
   {
     "package": "actiondispatch",
     "rubyFile": "testing/integration.rb",
-    "rubyName": "redirect_to_url",
-    "digest": "7ab71de51b6fbd39",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
     "rubyName": "register_encoder",
     "digest": "03f69e34b6a746a6",
     "ref": "v8.0.2"
@@ -12563,13 +12535,6 @@
     "rubyFile": "testing/integration.rb",
     "rubyName": "route_for",
     "digest": "72a84c03ef364715",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
-    "rubyName": "session",
-    "digest": "4314c3adc7a9eaf1",
     "ref": "v8.0.2"
   },
   {

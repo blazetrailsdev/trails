@@ -1,4 +1,4 @@
-import { rbObjClone, rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { ArgumentError, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { arelNode } from "../arel.js";
@@ -36,5 +36,4 @@ export class Fragments extends Node {
   }
 }
 
-rbSetClassPathString(Fragments, Nodes, "Fragments");
-Nodes.Fragments = Fragments;
+rbModConstSet(Nodes, "Fragments", Fragments);
