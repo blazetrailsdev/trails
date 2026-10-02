@@ -729,7 +729,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   private referencesEagerLoadedTables(): boolean {
-    const joinedTables = this.buildJoins([]).flatMap((join: Nodes.Join) =>
+    let joinedTables = this.buildJoins([]).flatMap((join: Nodes.Join) =>
       join instanceof Nodes.StringJoin
         ? this.tablesInString(join.left as Nodes.Node)
         : [(join.left as unknown as { name: string }).name],
@@ -737,12 +737,12 @@ export class Relation<T extends Base, G extends boolean = false> {
 
     joinedTables.push(String(this.table.name));
 
-    const downcased = joinedTables.map((name) => name.toLowerCase());
+    joinedTables = joinedTables.map((name) => name.toLowerCase());
 
     return !isEmpty(
       this.referencesValues
         .map((ref) => (typeof ref === "string" && ref.startsWith(":") ? ref.slice(1) : String(ref)))
-        .filter((ref) => !downcased.includes(ref)),
+        .filter((ref) => !joinedTables.includes(ref)),
     );
   }
 

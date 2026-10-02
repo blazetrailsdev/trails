@@ -60,11 +60,13 @@ export class Merger {
   }
 
   private mergeSelectValues(rel: any): void {
-    const otherSelect = this.other.selectValues;
-    if (isEmpty(otherSelect)) return;
-    const columns =
-      this.other.model === rel.model ? otherSelect : arelColumns.call(this.other, otherSelect);
-    rel._selectBang(...columns);
+    if (isEmpty(this.other.selectValues)) return;
+
+    if (this.other.model === rel.model) {
+      rel._selectBang(...this.other.selectValues);
+    } else {
+      rel._selectBang(...arelColumns.call(this.other, this.other.selectValues));
+    }
   }
 
   private mergePreloads(rel: any): void {
