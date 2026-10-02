@@ -1,3 +1,4 @@
+import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { SingularAssociation } from "./associations/singular-association.js";
 import {
@@ -246,7 +247,7 @@ describe("AssociationProxyTest", () => {
   it("save on parent does not load target", async () => {
     const david = developers("david") as any;
     assertNotPredicate(david.projects, (p: any) => p.loaded);
-    await david.updateColumns({ created_at: new Date() });
+    await david.updateColumns({ created_at: RubyTime.now() });
     assertNotPredicate(david.projects, (p: any) => p.loaded);
   });
   it("inspect does not reload a not yet loaded target", async () => {

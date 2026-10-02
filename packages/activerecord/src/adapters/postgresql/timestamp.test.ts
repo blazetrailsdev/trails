@@ -62,8 +62,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("timestamp type cast", async () => {
       const rows = await adapter.execute("SELECT TIMESTAMP '2023-06-15 14:30:00' AS val");
-      expect(rows[0].val).toBeInstanceOf(Temporal.Instant);
-      expect((rows[0].val as Temporal.Instant).toZonedDateTimeISO("UTC").year).toBe(2023);
+      expect(rows[0].val).toBeInstanceOf(RubyTime);
+      expect((rows[0].val as RubyTime).getutc().year).toBe(2023);
     });
 
     it("timestamp with time zone", async () => {
@@ -77,7 +77,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           [id],
         )
       ).toArray();
-      expect(rows[0].occurred_at).toBeInstanceOf(Temporal.Instant);
+      expect(rows[0].occurred_at).toBeInstanceOf(RubyTime);
     });
 
     it("timestamp precision", async () => {
@@ -95,8 +95,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("timestamp before epoch", async () => {
       const rows = await adapter.execute("SELECT TIMESTAMP '1969-12-31 23:59:59' AS val");
-      expect(rows[0].val).toBeInstanceOf(Temporal.Instant);
-      expect((rows[0].val as Temporal.Instant).toZonedDateTimeISO("UTC").year).toBe(1969);
+      expect(rows[0].val).toBeInstanceOf(RubyTime);
+      expect((rows[0].val as RubyTime).getutc().year).toBe(1969);
     });
 
     it("timestamp schema dump", async () => {
@@ -120,7 +120,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("datetime type cast", async () => {
       const rows = await adapter.execute("SELECT TIMESTAMP '2023-01-15 10:00:00' AS val");
-      expect(rows[0].val).toBeInstanceOf(Temporal.Instant);
+      expect(rows[0].val).toBeInstanceOf(RubyTime);
     });
 
     it("datetime precision", async () => {

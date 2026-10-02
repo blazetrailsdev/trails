@@ -1,12 +1,12 @@
 import {
   ArgumentError,
   Date as RubyDate,
-  Temporal,
+  type Temporal,
   Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
 import { include } from "@blazetrails/activesupport";
-import { rbObjRespondTo, StandardError, registerConstant } from "@blazetrails/ruby-compat";
+import { rbFSend, rbObjRespondTo, StandardError, registerConstant } from "@blazetrails/ruby-compat";
 import { toFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import {
   AcceptsMultiparameterTime,
@@ -44,18 +44,8 @@ export class DateType extends ValueType<DateCastResult> {
     if (typeof value === "string") {
       if (value === "") return null;
       return this.fastStringToDate(value) ?? this.fallbackStringToDate(value);
-    } else if (value instanceof Temporal.PlainDateTime) {
-      return value.toPlainDate();
-      // boundary: a JS Date assigned to a date attribute is Ruby's ::Time.
-    } else if (value instanceof Date) {
-      if (Number.isNaN(value.getTime())) return null;
-      return Temporal.PlainDate.from({
-        year: value.getUTCFullYear(),
-        month: value.getUTCMonth() + 1,
-        day: value.getUTCDate(),
-      });
     } else if (rbObjRespondTo(value, "toDate")) {
-      return (value as { toDate(): DateCastResult }).toDate();
+      return rbFSend(value, "toDate") as DateCastResult;
     } else {
       return value as DateCastResult;
     }

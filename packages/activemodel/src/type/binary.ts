@@ -1,8 +1,7 @@
-import { rbEqual, registerConstant } from "@blazetrails/ruby-compat";
+import { rbEqual, rbObjAsString as toS, registerConstant } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 
 const textEncoder = new TextEncoder();
-const textDecoder = new TextDecoder();
 
 export class BinaryType extends ValueType<unknown> {
   type(): string {
@@ -15,7 +14,7 @@ export class BinaryType extends ValueType<unknown> {
 
   cast(value: unknown): unknown {
     if (value instanceof Data) {
-      return value.bytes;
+      return value.toString();
     } else {
       value = super.cast(value);
       if (typeof value === "string") value = textEncoder.encode(value);
@@ -35,37 +34,31 @@ export class BinaryType extends ValueType<unknown> {
 }
 
 export class Data {
-  /** @noRailsEquivalent PERMANENT */
-  readonly bytes: Uint8Array;
+  private value: Uint8Array;
 
   constructor(value: unknown) {
-    if (value instanceof Data) this.bytes = value.bytes;
-    else if (value instanceof Uint8Array) this.bytes = value;
-    else this.bytes = textEncoder.encode(String(value));
+    value = toS(value);
+    if (typeof value === "string") value = textEncoder.encode(value);
+    this.value = value as Uint8Array;
   }
 
-  toString(): string {
-    return textDecoder.decode(this.bytes);
+  toString(): Uint8Array {
+    return this.value;
   }
 
   hex(): string {
-    return Array.from(this.bytes)
+    return Array.from(this.value)
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
   }
 
   equals(other: unknown): boolean {
-    let otherBytes: Uint8Array;
-    if (other instanceof Data) otherBytes = other.bytes;
-    else if (other instanceof Uint8Array) otherBytes = other;
-    else if (typeof other === "string") otherBytes = textEncoder.encode(other);
-    else return false;
+    return rbEqual(other, this.toString()) || this === other;
+  }
 
-    if (this.bytes.length !== otherBytes.length) return false;
-    for (let i = 0; i < this.bytes.length; i++) {
-      if (this.bytes[i] !== otherBytes[i]) return false;
-    }
-    return true;
+  /** @noRailsEquivalent PERMANENT */
+  toStr(): Uint8Array {
+    return this.toString();
   }
 }
 

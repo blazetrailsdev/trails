@@ -1,18 +1,26 @@
 /** @noRailsEquivalent CONVERGEABLE temporal-wire-parsers-fold-into-the-oid-and-type-cast-bodies */
 
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import {
   DateInfinity,
   DateNegativeInfinity,
   type DateInfinityType,
   type DateNegativeInfinityType,
 } from "@blazetrails/activemodel";
+import { defaultTimezone } from "../../active-record.js";
 import { defaultSqlTimezone } from "./sql-datetime.js";
 
 export { DateInfinity, DateNegativeInfinity };
 
 function naiveIsoToInstant(iso: string): Temporal.Instant {
   return Temporal.PlainDateTime.from(iso).toZonedDateTime(defaultSqlTimezone()).toInstant();
+}
+
+export function timeFromInstant<T>(value: Temporal.Instant | T): Time | T {
+  if (!(value instanceof Temporal.Instant)) return value;
+  const time = Time.at(new Rational(value.epochNanoseconds, 1_000_000_000n));
+  return defaultTimezone() === "utc" ? time.getutc() : time.getlocal();
 }
 
 export function parsePostgresInstant(

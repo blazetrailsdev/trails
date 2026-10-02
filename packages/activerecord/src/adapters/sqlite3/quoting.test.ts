@@ -1,5 +1,5 @@
 import { it, expect, beforeEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { base36, BigDecimal, TimeWithZone, TimeZone, toFs } from "@blazetrails/activesupport";
 import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
@@ -64,14 +64,14 @@ describeIfSqlite("SQLite3QuotingTest", () => {
   });
 
   it("quoted time returns date qualified time", () => {
-    const value = Temporal.ZonedDateTime.from("2000-01-01T12:30:00.999999+00:00[UTC]").toInstant();
+    const value = RubyTime.utc(2000, 1, 1, 12, 30, 0, 999999);
     const type = new Type.Time();
 
     expect(conn.quote(type.serialize(value))).toBe("'2000-01-01 12:30:00.999999'");
   });
 
   it("quoted time normalizes date qualified time", () => {
-    const value = Temporal.ZonedDateTime.from("2018-03-11T12:30:00.999999+00:00[UTC]").toInstant();
+    const value = RubyTime.utc(2018, 3, 11, 12, 30, 0, 999999);
     const type = new Type.Time();
 
     expect(conn.quote(type.serialize(value))).toBe("'2000-01-01 12:30:00.999999'");

@@ -11,7 +11,7 @@ import { Array as OidArray } from "./connection-adapters/postgresql/oid/array.js
 import { RangeType } from "./connection-adapters/postgresql/oid/range.js";
 import { BigDecimal, TimeWithZone, assertNotCalled } from "@blazetrails/activesupport";
 import { DateTimeType } from "@blazetrails/activemodel";
-import { Temporal, Time } from "@blazetrails/date";
+import { Time } from "@blazetrails/date";
 import { rbObjClass } from "@blazetrails/ruby-compat";
 import { TimeZoneConverter } from "./attribute-methods/time-zone-conversion.js";
 
@@ -166,7 +166,7 @@ describe("CustomPropertiesTest", () => {
           precision: 3,
           limit: 2,
           scale: 1,
-          default: () => Temporal.Now.instant(),
+          default: () => Time.now(),
         });
       }
     }
@@ -189,9 +189,9 @@ describe("CustomPropertiesTest", () => {
           static {
             this.attribute("starts_at", "datetime", {
               precision: 3,
-              default: () => Temporal.Now.instant(),
+              default: () => Time.now(),
             });
-            this.attribute("ends_at", { default: () => Temporal.Now.instant() });
+            this.attribute("ends_at", { default: () => Time.now() });
           }
         }
 

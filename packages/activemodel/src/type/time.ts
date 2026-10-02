@@ -1,12 +1,18 @@
 import {
   ArgumentError,
   Date as RubyDate,
-  Temporal,
+  type Temporal,
   Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
-import { TimeWithZone, isPresent, include, type Included } from "@blazetrails/activesupport";
-import { Rational, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  TimeWithZone,
+  isBlank,
+  isPresent,
+  include,
+  type Included,
+} from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import {
   AcceptsMultiparameterTime,
   type InstanceMethods,
@@ -53,53 +59,35 @@ export class TimeType extends ValueType<TimeWithZone | RubyTime> {
 
   /** @internal */
   protected castValue(value: unknown): TimeWithZone | RubyTime | null {
-    if (typeof value !== "string") {
-      // boundary: a `Temporal.Instant` and a `Temporal.PlainDateTime` each stand for the zoneless Ruby ::Time `cast_value` receives.
-      let seconds: Rational | null = null;
-      if (value instanceof Temporal.Instant) {
-        seconds = new Rational(value.epochNanoseconds, 1_000_000_000n);
-      } else if (value instanceof Temporal.PlainDateTime) {
-        seconds = new Rational(
-          value.toZonedDateTime(this.zoneId()).epochNanoseconds,
-          1_000_000_000n,
-        );
-      }
-      if (seconds != null) {
-        const time = RubyTime.at(seconds);
-        value = this.isUtc ? time.getutc() : time.getlocal();
-      }
+    if (typeof value !== "string")
       return this.applySecondsPrecision(value) as TimeWithZone | RubyTime | null;
-    }
-    if (value.trim() === "") return null;
+    if (isBlank(value)) return null;
 
     const dummyTimeValue = value.replace(/^\d{4}-\d\d-\d\d(?:T|\s)|/, "2000-01-01 ");
 
-    const fast = this.fastStringToTime(dummyTimeValue);
-    if (fast) return fast;
+    return (
+      this.fastStringToTime(dummyTimeValue) ??
+      (() => {
+        let timeHash: DateParts | undefined;
+        try {
+          timeHash = RubyDate._parse(dummyTimeValue);
+        } catch (error) {
+          if (!(error instanceof ArgumentError)) throw error;
+        }
 
-    let timeHash: DateParts | undefined;
-    try {
-      timeHash = RubyDate._parse(dummyTimeValue);
-    } catch (error) {
-      if (!(error instanceof ArgumentError)) throw error;
-    }
-    if (timeHash == null || timeHash.hour == null) return null;
-
-    return this.newTime(
-      timeHash.year,
-      timeHash.mon,
-      timeHash.mday,
-      timeHash.hour,
-      timeHash.min,
-      timeHash.sec,
-      timeHash.secFraction,
-      timeHash.offset,
+        if (timeHash == null || timeHash.hour == null) return null;
+        return this.newTime(
+          timeHash.year,
+          timeHash.mon,
+          timeHash.mday,
+          timeHash.hour,
+          timeHash.min,
+          timeHash.sec,
+          timeHash.secFraction,
+          timeHash.offset,
+        );
+      })()
     );
-  }
-
-  /** @internal */
-  private zoneId(): string {
-    return this.isUtc ? "UTC" : Temporal.Now.timeZoneId();
   }
 }
 

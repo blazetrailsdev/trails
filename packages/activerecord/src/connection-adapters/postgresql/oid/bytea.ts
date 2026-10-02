@@ -5,7 +5,7 @@ import { unescapeBytea } from "../quoting.js";
 export class Bytea extends BinaryType {
   override deserialize(value: unknown): unknown {
     if (value == null) return null;
-    if (value instanceof BinaryData) return value.bytes;
+    if (value instanceof BinaryData) return value.toString();
     if (typeof value === "string") return unescapeBytea(value);
     return super.deserialize(value);
   }

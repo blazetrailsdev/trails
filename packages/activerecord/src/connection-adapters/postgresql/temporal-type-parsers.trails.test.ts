@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import pg from "pg";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { makeGetTypeParser } from "./temporal-type-parsers.js";
 
@@ -22,13 +22,17 @@ function parse(oid: number, value: string): unknown {
 describe("getTypeParser — timestamptz (OID 1184)", () => {
   it("returns a Temporal.Instant", () => {
     const result = parse(OID_TIMESTAMPTZ, "2026-04-26 14:23:55.123456+00");
-    expect(result).toBeInstanceOf(Temporal.Instant);
-    expect((result as Temporal.Instant).toString()).toBe("2026-04-26T14:23:55.123456Z");
+    expect(result).toBeInstanceOf(RubyTime);
+    expect((result as RubyTime).getutc().toZonedDateTime().toInstant().toString()).toBe(
+      "2026-04-26T14:23:55.123456Z",
+    );
   });
 
   it("preserves microseconds", () => {
-    const result = parse(OID_TIMESTAMPTZ, "2024-01-01 00:00:00.000001+00") as Temporal.Instant;
-    expect(result.toString()).toBe("2024-01-01T00:00:00.000001Z");
+    const result = parse(OID_TIMESTAMPTZ, "2024-01-01 00:00:00.000001+00") as RubyTime;
+    expect(result.getutc().toZonedDateTime().toInstant().toString()).toBe(
+      "2024-01-01T00:00:00.000001Z",
+    );
   });
 
   it("returns DateInfinity for 'infinity'", () => {
@@ -40,17 +44,18 @@ describe("getTypeParser — timestamptz (OID 1184)", () => {
   });
 
   it("handles BC timestamps", () => {
-    const result = parse(OID_TIMESTAMPTZ, "0044-03-15 12:00:00+00 BC") as Temporal.Instant;
-    const zdt = result.toZonedDateTimeISO("UTC");
-    expect(zdt.year).toBe(-43);
+    const result = parse(OID_TIMESTAMPTZ, "0044-03-15 12:00:00+00 BC") as RubyTime;
+    expect(result.getutc().year).toBe(-43);
   });
 });
 
 describe("getTypeParser — timestamp (OID 1114)", () => {
   it("returns a Temporal.Instant (UTC)", () => {
-    const result = parse(OID_TIMESTAMP, "2026-04-26 14:23:55.123456") as Temporal.Instant;
-    expect(result).toBeInstanceOf(Temporal.Instant);
-    expect(result.toString()).toBe("2026-04-26T14:23:55.123456Z");
+    const result = parse(OID_TIMESTAMP, "2026-04-26 14:23:55.123456") as RubyTime;
+    expect(result).toBeInstanceOf(RubyTime);
+    expect(result.getutc().toZonedDateTime().toInstant().toString()).toBe(
+      "2026-04-26T14:23:55.123456Z",
+    );
   });
 
   it("returns DateInfinity for 'infinity'", () => {

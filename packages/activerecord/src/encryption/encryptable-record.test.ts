@@ -1,5 +1,5 @@
 import { OpenSSL } from "@blazetrails/ruby-compat";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import {
   freshAdapter,
@@ -338,7 +338,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Book = makeEncryptedBook();
     Configurable.config.supportUnencryptedData = true;
     const book = await Book.createBang({ name: "Dune" });
-    await book.updateBang({ created_at: Temporal.Now.instant().subtract({ hours: 1 }) });
+    await book.updateBang({ created_at: RubyTime.now().minus(3600) });
     expect(book.attributePreviouslyChanged("name")).toBeFalsy();
 
     await book.updateBang({ name: "A new title!" });
@@ -850,7 +850,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const book = encryptedBooks("awdr");
 
     await Encryption.withEncryptionContext({ frozenEncryption: true }, async () => {
-      await book.updateBang({ updated_at: Temporal.Now.instant() });
+      await book.updateBang({ updated_at: RubyTime.now() });
     });
 
     await Encryption.withEncryptionContext({ frozenEncryption: true }, async () => {

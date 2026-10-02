@@ -1,10 +1,10 @@
 import { weeks } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { atWithoutCoercion } from "@blazetrails/activesupport/core-ext/time/calculations";
 import { Range } from "@blazetrails/activerecord";
 import { Order } from "./models.js";
 
 // Ruby `Time.now`. Built from `Date.now()`, not `Temporal.Now.instant()`:
 // only the former is pinned by the runner's frozen clock.
-const now = Temporal.Instant.fromEpochMilliseconds(Date.now());
+const now = atWithoutCoercion(Date.now() / 1000);
 const weekAgo = weeks(1).ago(now);
 export default Order.where({ created_at: new Range(weekAgo, now) });

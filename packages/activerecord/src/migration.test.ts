@@ -1237,7 +1237,7 @@ describe("MigrationTest", () => {
       await WeNeedReminders.migrate("up");
       expect(await Reminder.tableExists()).toBeTruthy();
       Reminder.resetColumnInformation();
-      expect(await Reminder.create({ content: "hello world", remind_at: new Date() })).toBeTruthy();
+      expect(await Reminder.create({ content: "hello world", remind_at: Time.now() })).toBeTruthy();
       expect(((await Reminder.first()) as any).content).toBe("hello world");
 
       await WeNeedReminders.migrate("down");

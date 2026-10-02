@@ -8,7 +8,7 @@ import {
   NotificationEvent as Event,
   type Logger,
 } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { verboseQueryLogs } from "./active-record.js";
 import { ActiveRecord } from "./namespaces.js";
 
@@ -24,7 +24,7 @@ function byteLength(value: unknown): number {
     if (ArrayBuffer.isView(value)) return value.byteLength;
   }
   if (typeof (value as any).byteLength === "number") return (value as any).byteLength;
-  return byteLength(String(value));
+  return byteLength(rbObjAsString(value));
 }
 
 function unwrapDelegator(v: unknown): unknown {

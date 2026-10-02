@@ -1,5 +1,5 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { DateTime as OidDateTime } from "../../connection-adapters/postgresql/oid/date-time.js";
 
@@ -26,9 +26,9 @@ describeIfPg("PostgreSQLAdapter OID::DateTime", () => {
       expect(serialized).toBe(literal);
 
       const rows = await adapter.execute(`SELECT '${serialized}'::timestamp AS val`);
-      const roundTripped = rows[0].val as Temporal.Instant;
-      expect(roundTripped).toBeInstanceOf(Temporal.Instant);
-      expect(roundTripped.epochMilliseconds).toBe(instant.toI() * 1000);
+      const roundTripped = rows[0].val as RubyTime;
+      expect(roundTripped).toBeInstanceOf(RubyTime);
+      expect(roundTripped.toI()).toBe(instant.toI());
     });
   }
 });

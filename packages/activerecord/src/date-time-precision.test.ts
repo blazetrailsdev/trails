@@ -50,7 +50,7 @@ describe("DateTimePrecisionTest", () => {
       await adapter.addColumn("foos", "created_at", "datetime", { precision: 0 });
       await adapter.addColumn("foos", "updated_at", "datetime", { precision: 6 });
       await Foo.loadSchema();
-      const time = Temporal.Instant.from("2000-01-01T12:00:00.123456789Z");
+      const time = RubyTime.now().change({ nsec: 123456789 });
       const foo = new Foo({ created_at: time, updated_at: time });
       expect(nsec((foo as any).created_at)).toBe(0);
       expect(nsec((foo as any).updated_at)).toBe(123456000);

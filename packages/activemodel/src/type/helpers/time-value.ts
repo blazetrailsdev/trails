@@ -1,5 +1,5 @@
 import { Temporal, Time } from "@blazetrails/date";
-import { ArgumentError, Rational } from "@blazetrails/ruby-compat";
+import { ArgumentError, Rational, rbFSend } from "@blazetrails/ruby-compat";
 import {
   actsLike,
   TimeWithZone,
@@ -22,11 +22,10 @@ export function serializeCastValue(this: TimeValueHost, value: unknown): unknown
   value = this.applySecondsPrecision(value);
 
   if (actsLike.call(value, "time")) {
-    const time = value as Time | TimeWithZone;
     if (this.isUtc) {
-      if (!time.isUtc()) value = time.getutc();
+      if (!rbFSend(value, "isUtc")) value = rbFSend(value, "getutc");
     } else {
-      value = time.getlocal();
+      value = rbFSend(value, "getlocal");
     }
   }
 

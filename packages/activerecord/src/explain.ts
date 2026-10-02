@@ -3,7 +3,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import { Attribute } from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/date";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect, rbObjAsString } from "@blazetrails/ruby-compat";
 
 /** @internal */
 export interface ExplainHost {
@@ -56,7 +56,7 @@ function byteSize(value: unknown): number {
     if (value instanceof ArrayBuffer) return value.byteLength;
     if (ArrayBuffer.isView(value)) return value.byteLength;
   }
-  return byteSize(String(value));
+  return byteSize(rbObjAsString(value));
 }
 
 function binaryByteLength(value: unknown): number | null {

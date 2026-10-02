@@ -1,3 +1,4 @@
+import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
 import { Builder } from "./insert-all.js";
 import { fixtures } from "./test-fixtures.js";
@@ -28,7 +29,7 @@ describe("InsertAll verify_attributes", () => {
 
   it("accepts rows that differ only in explicitly-given timestamp columns", async () => {
     await withRecordTimestamps(Ship as unknown as typeof Base, true, async () => {
-      const now = new Date();
+      const now = RubyTime.now();
       await expect(
         Ship.insertAll([
           { name: "RSS Boaty McBoatface", created_at: now, updated_at: now },

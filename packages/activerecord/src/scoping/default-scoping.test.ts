@@ -2,7 +2,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { assertDifference, assertEmpty, assertNotEmpty } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
-import { Temporal } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import "../index.js";
 import { registerModel, RecordNotFound } from "../index.js";
 import { captureSql } from "../testing/sql-capture.js";
@@ -846,7 +846,7 @@ describe("DefaultScopingTest", () => {
     const post = posts("thinking") as any;
     const expected = [comments("does_it_hurt").id];
 
-    await post.specialComments.updateAll({ deleted_at: Temporal.Now.instant() });
+    await post.specialComments.updateAll({ deleted_at: RubyTime.now() });
 
     await expect(Post.joins(":specialComments").find(post.id)).rejects.toThrow(RecordNotFound);
     expect(await (await post.specialComments.reload()).toArray()).toEqual([]);

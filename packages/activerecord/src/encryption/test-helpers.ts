@@ -467,17 +467,18 @@ function _assertEncryptedAttributeOnModel(
       type && typeof type.castType?.serialize === "function"
         ? type.castType.serialize(expectedValue)
         : null;
-    const serializedPlaintext = rawSerialized != null ? String(rawSerialized) : null;
+    const serializedPlaintext =
+      rawSerialized == null || rawSerialized instanceof BinaryData ? null : String(rawSerialized);
 
     const dbBytes =
       dbValue instanceof BinaryData
-        ? dbValue.bytes
+        ? dbValue.toString()
         : dbValue instanceof Uint8Array
           ? dbValue
           : null;
     const plaintextBytes =
       rawSerialized instanceof BinaryData
-        ? rawSerialized.bytes
+        ? rawSerialized.toString()
         : rawSerialized instanceof Uint8Array
           ? rawSerialized
           : null;
