@@ -20,6 +20,7 @@ import {
 } from "./url-for.js";
 import type { PolymorphicHost } from "./polymorphic-routes.js";
 import { include } from "@blazetrails/activesupport";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Routing } from "../../namespaces.js";
 
 export type RoutesProxyHelpers = Record<string, unknown>;
@@ -107,6 +108,11 @@ export class RoutesProxy implements UrlForHost {
       [UrlForRoutes, () => Record<string, unknown>],
       Record<string, unknown>
     >(this.scope, this.routes, () => this.scope.urlOptions());
+  }
+
+  /** @internal */
+  private respondToMissing(method: string, _: boolean): boolean {
+    return rbObjRespondTo(this._helpers, method);
   }
 
   /** @internal */

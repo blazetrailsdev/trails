@@ -319,7 +319,10 @@ export class Config {
   }
 }
 
-export class MountedHelpers {}
+export const MountedHelpers = new Module((mod) => {
+  extend(mod, Concern);
+  mod.include(UrlFor);
+});
 
 export class UrlHelper {
   static create(route: Route, options: Record<string, unknown>, routeName: string): UrlHelper {
@@ -643,10 +646,7 @@ export class NamedRouteCollection {
   ): void {
     mod.defineMethod(name, function (this: UrlHelperContext, ...args: unknown[]): string {
       const last = args[args.length - 1];
-      const options =
-        (last as object | null)?.constructor === Object
-          ? (args.pop() as Record<string, unknown>)
-          : undefined;
+      const options = isPlainObject(last) ? (args.pop() as Record<string, unknown>) : undefined;
       return helper.call(this, name, args, options, urlStrategy);
     });
   }
@@ -907,33 +907,34 @@ export class RouteSet {
   }
 
   defineMountedHelper(name: string, scriptNamer: ScriptNamer | null = null): void {
-    const proto = MountedHelpers.prototype as Record<string, unknown>;
-    if (Object.hasOwn(proto, name)) return;
-    const cacheKey = `_${name}` as const;
-    const buildProxy = (ctx: Record<string, unknown>): RoutesProxy => {
-      const scope =
-        (ctx as unknown as UrlForHost & { _routesContext?: () => UrlForHost })._routesContext?.() ??
-        (ctx as unknown as UrlForHost);
-      return new RoutesProxy(
-        this._routes,
-        scope,
-        this.urlHelpers() as unknown as Record<string, unknown>,
-        scriptNamer,
-      );
-    };
-    proto[cacheKey] = function (this: Record<string, unknown>): RoutesProxy {
-      return buildProxy(this);
-    };
-    Object.defineProperty(proto, name, {
-      configurable: true,
-      get(this: Record<string, unknown>): RoutesProxy {
-        const memo = `@_${name}` as const;
-        const existing = this[memo] as RoutesProxy | undefined;
-        if (existing) return existing;
-        const built = (this[cacheKey] as () => RoutesProxy).call(this);
-        this[memo] = built;
-        return built;
+    const helper = camelize(name, "lower");
+    if (MountedHelpers.isMethodDefined(helper)) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- `routes = self` (`route_set.rb:514`).
+    const routes = this;
+    const helpers = routes.urlHelpers();
+
+    MountedHelpers.defineMethod(
+      `_${helper}`,
+      function (this: UrlForHost & { _routesContext(): UrlForHost }): RoutesProxy {
+        return new RoutesProxy(
+          routes,
+          this._routesContext(),
+          helpers as unknown as Record<string, unknown>,
+          scriptNamer,
+        );
       },
+    );
+
+    MountedHelpers.moduleEval((mod) => {
+      Object.defineProperty(mod, helper, {
+        configurable: true,
+        get(this: Record<string, unknown>): RoutesProxy {
+          return (this[`@_${name}`] ??= (this[`_${helper}`] as () => RoutesProxy).call(
+            this,
+          )) as RoutesProxy;
+        },
+      });
     });
   }
 
