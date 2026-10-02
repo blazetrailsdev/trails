@@ -61,7 +61,7 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 
   sql(event: Event): void {
-    const payload = event.payload;
+    const payload = event.payload as Event["payload"] & { binds?: any[] | null };
 
     if (LogSubscriber.IGNORE_PAYLOAD_NAMES.includes(payload.name as string)) return;
 
@@ -80,13 +80,13 @@ export class LogSubscriber extends BaseLogSubscriber {
     const sql = payload.sql as string;
     let binds: string | null = null;
 
-    if (payload.binds != null && any(payload.binds as unknown[])) {
+    if (payload.binds != null && any(payload.binds)) {
       const castedParams = this.typeCastedBinds(
         payload.type_casted_binds ?? payload.typeCastedBinds,
       );
       const bindPairs: [string | null, unknown][] = [];
 
-      for (const [i, attr] of (payload.binds as any[]).entries()) {
+      for (const [i, attr] of payload.binds.entries()) {
         const attributeName: string | null = rbObjRespondTo(attr, "name")
           ? attr.name
           : rbObjRespondTo(attr, "get") && rbObjRespondTo(attr[i], "name")
