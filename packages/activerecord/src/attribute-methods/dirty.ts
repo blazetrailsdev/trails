@@ -131,6 +131,17 @@ interface DirtyPrivateHost {
   };
 }
 
+export async function reload<T extends DirtyPrivateHost>(
+  this: T,
+  super_: (...args: unknown[]) => Promise<T>,
+  ...args: unknown[]
+): Promise<T> {
+  const record = await super_(...args);
+  this._mutationsBeforeLastSave = null;
+  this._mutationsFromDatabase = null;
+  return record;
+}
+
 /** @internal */
 export function initInternals(this: DirtyPrivateHost, super_: () => void): void {
   super_();

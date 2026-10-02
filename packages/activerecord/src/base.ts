@@ -2726,6 +2726,7 @@ prepend(Base.prototype, { initializeDup: LockingOptimistic.initializeDup as Prep
 prepend(Base.prototype, { initializeDup: Timestamp.initializeDup as PrependMethod });
 prepend(Base.prototype, { initializeDup: _associationsInitializeDup as PrependMethod });
 _registerAssociationBuilderExtension(AssociationBuilder.extensions);
+prepend(Base.prototype, { reload: _AttributeMethodsDirty.reload as PrependMethod });
 {
   const inheritedReload = (Base.prototype as any).reload as (
     this: Base,
