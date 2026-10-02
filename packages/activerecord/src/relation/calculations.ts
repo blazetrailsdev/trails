@@ -61,7 +61,7 @@ interface AliasingConnection {
 
 interface CalculationConnection {
   adapterName: string;
-  visitor?: { compile(node: any, collector?: any): any };
+  visitor: { compile(node: any, collector?: any): any };
   toSql(arel: unknown): string;
   quote(value: unknown): string;
   quoteTableName(name: unknown): string;
@@ -840,14 +840,10 @@ export async function executeGroupedCalculation(
   return rel.model.withConnection(async (connection) => {
     const columnAliasTracker = new ColumnAliasTracker(connection);
 
-    const groupAliases = groupNodes.map((field) =>
-      columnAliasTracker.aliasFor(
-        (arelNode(field)
-          ? (connection.visitor?.compile(field) ?? String(field))
-          : String(field)
-        ).toLowerCase(),
-      ),
-    );
+    const groupAliases = groupNodes.map((field: ArelNode | string) => {
+      if (arelNode(field)) field = connection.visitor.compile(field);
+      return columnAliasTracker.aliasFor(String(field).toLowerCase());
+    });
     const groupColumns = groupAliases.map((aliaz, i) => [aliaz, groupNodes[i]] as const);
 
     const column = aggregateColumn(relation, columnName);
@@ -1046,7 +1042,7 @@ export async function selectForCount(rel: CalculationRelation): Promise<string> 
   if (isEmpty(rel.selectValues)) return ":all";
   return rel.withConnection((conn) =>
     (arelColumns.call(rel as never, rel.selectValues as never[]) as ArelNode[])
-      .map((column) => (conn.visitor ? conn.visitor.compile(column) : String(column)))
+      .map((column) => conn.visitor.compile(column))
       .join(", "),
   );
 }

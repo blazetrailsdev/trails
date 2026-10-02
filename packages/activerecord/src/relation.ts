@@ -1859,10 +1859,14 @@ export class Relation<T extends Base, G extends boolean = false> {
     return values.map(([name, value]) => {
       const attr = this.table.get(name);
       if (Arel.arelNode(value)) {
-        return [attr, value instanceof Nodes.SqlLiteral ? new Nodes.Grouping(value) : value];
+        if (value instanceof Nodes.SqlLiteral) {
+          value = new Nodes.Grouping(value);
+        }
+      } else {
+        const type = this.model.typeForAttribute(String(attr.name));
+        value = this.predicateBuilder.buildBindAttribute(String(attr.name), type!.cast(value));
       }
-      const type = this.model.typeForAttribute(String(attr.name));
-      return [attr, this.predicateBuilder.buildBindAttribute(String(attr.name), type!.cast(value))];
+      return [attr, value];
     });
   }
 
