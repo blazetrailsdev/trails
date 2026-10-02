@@ -495,6 +495,9 @@ const TS_CONSTRUCT_SKELETON_NAMES = new Map([
   ["kernelCatch", "try"],
 ]);
 
+const NIL_GUARD_TOKEN = "if:nil-guard";
+const RETRY_LOOP_TOKEN = "loop:retry";
+
 export function foldSkeletonTokens(
   skeleton: readonly string[],
   side: SkeletonSide = "ruby",
@@ -503,7 +506,22 @@ export function foldSkeletonTokens(
   const folded: string[] = [];
   const surplus =
     side === "ruby" && counterpart !== undefined ? idiomSurplus(skeleton, counterpart) : undefined;
+  const unclaimed = (arm: string) => {
+    if (side !== "ts" || counterpart === undefined) return Infinity;
+    const count = (tokens: readonly string[]) => tokens.filter((t) => t === arm).length;
+    return count(counterpart) - count(skeleton);
+  };
+  let unclaimedIfs = unclaimed("if");
+  let unclaimedLoops = unclaimed("loop");
   for (const [index, token] of skeleton.entries()) {
+    if (token === NIL_GUARD_TOKEN) {
+      folded.push(unclaimedIfs-- > 0 ? "if" : "and");
+      continue;
+    }
+    if (token === RETRY_LOOP_TOKEN) {
+      if (unclaimedLoops-- > 0) folded.push("loop");
+      continue;
+    }
     if (!token.startsWith("ref:")) {
       folded.push(token);
       continue;
@@ -517,7 +535,8 @@ export function foldSkeletonTokens(
     const lowering = side === "ruby" ? skeletonIdiomLowering(name, surplus) : undefined;
     if (lowering !== undefined) {
       folded.push(...lowering);
-      for (const spent of lowering) {
+      const alternatives = SKELETON_IDIOM_LOWERINGS.get(name)!.length;
+      for (const spent of alternatives > 1 ? lowering : []) {
         const at = surplus?.indexOf(spent) ?? -1;
         if (at !== -1) surplus!.splice(at, 1);
       }
@@ -4799,7 +4818,7 @@ export function main() {
           };
           const localSets = tsLocalSkeletonByFileName.get(tsFile)?.get(tsName);
           const tsOwnNameDelegate = localSets?.length === 1 ? localSets[0] : undefined;
-          const tsFolded = foldSkeletonTokens(tsSkeletons[0], "ts");
+          const tsFolded = foldSkeletonTokens(tsSkeletons[0], "ts", rubySkeleton);
           callSkeletons.push({
             rubyFile,
             rubyName,

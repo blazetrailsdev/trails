@@ -4627,13 +4627,61 @@ function isFallenThroughInto(clause: ts.CaseClause): boolean {
   return previous !== undefined && ts.isCaseClause(previous) && previous.statements.length === 0;
 }
 
+function isNilLiteral(node: ts.Expression): boolean {
+  return (
+    node.kind === ts.SyntaxKind.NullKeyword || (ts.isIdentifier(node) && node.text === "undefined")
+  );
+}
+
+function isNilGuardConditional(node: ts.ConditionalExpression): boolean {
+  const test = node.condition;
+  if (!ts.isBinaryExpression(test) || !isNilLiteral(test.right)) return false;
+  switch (test.operatorToken.kind) {
+    case ts.SyntaxKind.EqualsEqualsToken:
+    case ts.SyntaxKind.EqualsEqualsEqualsToken:
+      return isNilLiteral(node.whenTrue);
+    case ts.SyntaxKind.ExclamationEqualsToken:
+    case ts.SyntaxKind.ExclamationEqualsEqualsToken:
+      return isNilLiteral(node.whenFalse);
+    default:
+      return false;
+  }
+}
+
+function isRetryLoop(statement: ts.ForStatement | ts.WhileStatement): boolean {
+  const unconditional = ts.isForStatement(statement)
+    ? !statement.initializer && !statement.condition && !statement.incrementor
+    : statement.expression.kind === ts.SyntaxKind.TrueKeyword;
+  if (!unconditional || !ts.isBlock(statement.statement)) return false;
+  const body = statement.statement.statements.filter((s) => !ts.isVariableStatement(s));
+  return body.length === 1 && ts.isTryStatement(body[0]) && body[0].catchClause !== undefined;
+}
+
+function isRescueClassGuard(statement: ts.Statement): boolean {
+  if (!ts.isIfStatement(statement) || statement.elseStatement !== undefined) return false;
+  const test = statement.expression;
+  if (!ts.isPrefixUnaryExpression(test) || test.operator !== ts.SyntaxKind.ExclamationToken) {
+    return false;
+  }
+  const operand = ts.isParenthesizedExpression(test.operand)
+    ? test.operand.expression
+    : test.operand;
+  if (!isInstanceOfTest(operand)) return false;
+  const then = ts.isBlock(statement.thenStatement)
+    ? statement.thenStatement.statements
+    : [statement.thenStatement];
+  return then.length === 1 && ts.isThrowStatement(then[0]) && ts.isIdentifier(then[0].expression);
+}
+
 function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const tokens: string[] = [];
   const visit = (n: ts.Node): void => {
     switch (n.kind) {
-      case ts.SyntaxKind.IfStatement:
       case ts.SyntaxKind.ConditionalExpression:
+        tokens.push(isNilGuardConditional(n as ts.ConditionalExpression) ? "if:nil-guard" : "if");
+        break;
+      case ts.SyntaxKind.IfStatement:
         tokens.push("if");
         break;
       case ts.SyntaxKind.CaseClause:
@@ -4651,8 +4699,10 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
         break;
       }
       case ts.SyntaxKind.WhileStatement:
-      case ts.SyntaxKind.DoStatement:
       case ts.SyntaxKind.ForStatement:
+        tokens.push(isRetryLoop(n as ts.ForStatement | ts.WhileStatement) ? "loop:retry" : "loop");
+        break;
+      case ts.SyntaxKind.DoStatement:
       case ts.SyntaxKind.ForOfStatement:
       case ts.SyntaxKind.ForInStatement:
         tokens.push("loop");
@@ -4735,7 +4785,8 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
     const chain = statements.find((s) => ts.isIfStatement(s) && isInstanceOfTest(s.expression));
     if (chain === undefined) {
       tokens.push("rescue");
-      statements.forEach(visit);
+      const guarded = statements.length > 0 && isRescueClassGuard(statements[0]);
+      statements.slice(guarded ? 1 : 0).forEach(visit);
       return;
     }
     for (const statement of statements) {

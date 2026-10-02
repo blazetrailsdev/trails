@@ -240,6 +240,7 @@ function rbStrEql(str1: string, str2: unknown): boolean {
 export interface StringInstance {
   eql(other: unknown): boolean;
   hash(): number;
+  isEmpty(): boolean;
 }
 
 /**

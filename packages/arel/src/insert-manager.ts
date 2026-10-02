@@ -5,7 +5,7 @@ import { Attribute } from "./attributes/attribute.js";
 import { ValuesList } from "./nodes/values-list.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { isEmpty, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Arel } from "./namespaces.js";
 
 export class InsertManager extends TreeManager<InsertStatement> {
@@ -32,27 +32,22 @@ export class InsertManager extends TreeManager<InsertStatement> {
     return this;
   }
 
-  insert(fields: string | [Attribute | Node, unknown][] | null | undefined): this {
-    if (fields == null) return this;
+  insert(fields: string | [Attribute | Node, unknown][]): this | undefined {
+    if (isEmpty(fields)) return;
 
     if (typeof fields === "string") {
       this.ast.values = new SqlLiteral(fields);
-      return this;
-    }
+    } else {
+      this.ast.relation ||= (fields[0][0] as Attribute).relation as Table | Node;
 
-    if (fields.length === 0) return this;
+      const values: unknown[] = [];
 
-    if (this.ast.relation == null) {
-      const first = fields[0]?.[0] as { relation?: Node } | undefined;
-      if (first?.relation) this.ast.relation = first.relation;
+      for (const [column, value] of fields) {
+        this.ast.columns.push(column);
+        values.push(value);
+      }
+      this.ast.values = this.createValues(values);
     }
-
-    const values: unknown[] = [];
-    for (const [column, value] of fields) {
-      this.ast.columns.push(column);
-      values.push(value);
-    }
-    this.ast.values = this.createValues(values);
     return this;
   }
 

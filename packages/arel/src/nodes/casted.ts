@@ -1,5 +1,5 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { Arel, Attributes, Nodes } from "../namespaces.js";
@@ -82,8 +82,8 @@ export class Quoted extends Unary {
   isInfinite(): 1 | -1 | false {
     if (this.value === Infinity) return 1;
     if (this.value === -Infinity) return -1;
-    const v = this.value as { isInfinite?: () => 1 | -1 | false } | null | undefined;
-    return typeof v?.isInfinite === "function" ? v.isInfinite() : false;
+    const value = this.value as { isInfinite(): 1 | -1 | false };
+    return rbObjRespondTo(value, "isInfinite") && value.isInfinite();
   }
 
   get value(): unknown {

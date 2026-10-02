@@ -5,7 +5,7 @@ import { Visitor } from "./visitor.js";
 import { Nodes, Visitors } from "../namespaces.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { camelize } from "@blazetrails/activesupport";
-import { rbObjClass, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbFSend, rbObjAsString, rbObjClass, rbModConstSet } from "@blazetrails/ruby-compat";
 
 export class Dot extends Visitor {
   private nodes: Node[] = [];
@@ -205,10 +205,7 @@ export class Dot extends Visitor {
   }
 
   protected visitString(o: unknown): void {
-    const top = this.nodeStack[this.nodeStack.length - 1];
-    if (!top) return;
-    const value = o instanceof Nodes.SqlLiteral ? o.toString() : o;
-    top.fields.push(value == null ? "" : String(value));
+    this.nodeStack[this.nodeStack.length - 1].fields.push(o);
   }
 
   protected visitTime(o: unknown): void {
@@ -289,13 +286,9 @@ export class Dot extends Visitor {
     this.visitEdge(o, "default");
   }
 
+  /** @missingRailsName send — PERMANENT */
   protected visitEdge(o: object, method: string): void {
-    if (!(camelize(method, false) in o)) {
-      const klass = rbObjClass(o);
-      // eslint-disable-next-line blazetrails/rails-error-parity -- Ruby raises NoMethodError/TypeError here; TypeError is its JS analogue, not a missing ported class.
-      throw new TypeError(`undefined method '${method}' for ${klass}`);
-    }
-    this.edge(method, () => this.visit((o as Record<string, unknown>)[camelize(method, false)]));
+    this.edge(method, () => this.visit(rbFSend(o, camelize(method, false))));
   }
 
   protected override visit(object: unknown, _collector?: unknown): unknown {
@@ -339,26 +332,23 @@ export class Dot extends Visitor {
     const edge = new Edge(name, this.nodeStack[this.nodeStack.length - 1]);
     this.edgeStack.push(edge);
     this.edges.push(edge);
-    try {
-      block();
-    } finally {
-      this.edgeStack.pop();
-    }
+    block();
+    this.edgeStack.pop();
   }
 
   protected withNode(node: Node, block: () => void): void {
-    const e = this.edgeStack[this.edgeStack.length - 1];
-    if (e) e.to = node;
-    this.nodeStack.push(node);
-    try {
-      block();
-    } finally {
-      this.nodeStack.pop();
+    const edge = this.edgeStack[this.edgeStack.length - 1];
+    if (edge) {
+      edge.to = node;
     }
+
+    this.nodeStack.push(node);
+    block();
+    this.nodeStack.pop();
   }
 
   protected quote(string: unknown): string {
-    return String(string).replace(/"/g, '\\"');
+    return rbObjAsString(string).replace(/"/g, '\\"');
   }
 
   protected toDot(): string {
@@ -383,9 +373,9 @@ export class Dot extends Visitor {
 export class Node {
   readonly name: string;
   readonly id: number;
-  readonly fields: string[];
+  readonly fields: unknown[];
 
-  constructor(name: string, id: number, fields: string[] = []) {
+  constructor(name: string, id: number, fields: unknown[] = []) {
     this.name = name;
     this.id = id;
     this.fields = fields;

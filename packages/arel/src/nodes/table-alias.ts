@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Node } from "./node.js";
 import { Binary } from "./binary.js";
 import { Cte } from "./cte.js";
@@ -55,8 +55,8 @@ export class TableAlias extends Binary {
   }
 
   isAbleToTypeCast(): boolean {
-    const rel = this.relation as unknown as TypeCastable;
-    return typeof rel?.isAbleToTypeCast === "function" ? rel.isAbleToTypeCast() : false;
+    const relation = this.relation as unknown as Required<TypeCastable>;
+    return rbObjRespondTo(relation, "isAbleToTypeCast") && relation.isAbleToTypeCast();
   }
 
   toCte(): Cte {

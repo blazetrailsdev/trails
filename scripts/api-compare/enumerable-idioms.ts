@@ -278,6 +278,7 @@ export const SKELETON_IDIOM_LOWERINGS = new Map<string, readonly (readonly strin
   // Ruby's mutating `concat` is a `push` loop in a port that cannot spread an
   // unbounded array. Part of audit row 31.
   ["concat", [[], ["loop"]]],
+  ["scan", [[], ["loop"]]],
   // `value.dig("session_id", "public_id")`
   // (actionpack/lib/action_controller/metal/request_forgery_protection.rb:343) —
   // an optional-chain `a?.b?.c`, which emits nothing, or a spelled-out guard

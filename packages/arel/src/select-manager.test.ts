@@ -811,7 +811,7 @@ describe("SelectManagerTest", () => {
     it("takes a string", () => {
       const mgr = new SelectManager();
       mgr.from(users);
-      const stmt = mgr.compileUpdate("foo = bar", users.get("id"));
+      const stmt = mgr.compileUpdate(new Nodes.SqlLiteral("foo = bar"), users.get("id"));
       expect(stmt.toSql()).toBe('UPDATE "users" SET foo = bar');
     });
 

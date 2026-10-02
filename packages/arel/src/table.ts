@@ -10,7 +10,7 @@ import { SqlLiteral } from "./nodes/sql-literal.js";
 import { StringJoin } from "./nodes/string-join.js";
 import type { Join } from "./nodes/binary.js";
 import { TableAlias } from "./nodes/table-alias.js";
-import { isSymbol, rbModConstSet, symbolToS } from "@blazetrails/ruby-compat";
+import { isEmpty, isSymbol, rbModConstSet, symbolToS } from "@blazetrails/ruby-compat";
 
 export interface TableKlass {
   readonly attributeAliases: Record<string, string>;
@@ -67,8 +67,7 @@ export class Table {
     if (relation == null) return this.from();
 
     if (typeof relation === "string" || relation instanceof SqlLiteral) {
-      const text = typeof relation === "string" ? relation : relation.toString();
-      if (text.length === 0) throw new EmptyJoinError();
+      if (isEmpty(relation)) throw new EmptyJoinError();
       klass = StringJoin as unknown as new (left: Node | Table, right: Node | null) => Join;
     }
 
@@ -111,9 +110,9 @@ export class Table {
     if (isSymbol(name)) name = symbolToS(name);
     if (this.klass != null) {
       name =
-        (typeof name === "string" && Object.hasOwn(this.klass.attributeAliases, name)
-          ? this.klass.attributeAliases[name]
-          : null) ?? name;
+        (Object.getOwnPropertyDescriptor(this.klass.attributeAliases, name as string)?.value as
+          | string
+          | undefined) ?? name;
     }
     return new Attribute(table, name);
   }

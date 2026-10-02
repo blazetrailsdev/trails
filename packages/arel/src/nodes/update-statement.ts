@@ -6,11 +6,11 @@ import type { Table } from "../table.js";
 
 export class UpdateStatement extends Node {
   relation: Node | Table | null;
-  values: Node[];
+  values: (Node | string)[];
   wheres: Node[];
   orders: Node[];
   groups: Node[];
-  havings: Node[];
+  havings: (Node | string)[];
   limit: Node | null;
   offset: Node | null;
   key: Node | Node[] | null;

@@ -11,7 +11,7 @@ export class SelectCore extends Node {
   projections: (Node | Node[])[];
   wheres: Node[];
   groups: Node[];
-  havings: Node[];
+  havings: (Node | string)[];
   windows: Node[];
   setQuantifier: Node | null;
   optimizerHints: OptimizerHints | null;

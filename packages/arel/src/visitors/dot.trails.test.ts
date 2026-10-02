@@ -54,7 +54,7 @@ describe("Dot (trails-only)", () => {
   });
 
   it("walks a manager-built InsertStatement's values", () => {
-    const stmt = new InsertManager(users).insert([[users.get("name"), "dean"]]).ast;
+    const stmt = new InsertManager(users).insert([[users.get("name"), "dean"]])!.ast;
     const out = dot.accept(stmt, new Collectors.PlainString()).value;
     expect(out).toMatch('[label="<f0>Arel::Nodes::InsertStatement"]');
     expect(out).toMatch('[label="<f0>Arel::Nodes::ValuesList"]');
@@ -255,7 +255,7 @@ describe("TestDot", () => {
       type Internals = { visitEdge(o: object, method: string): void };
       const tbl = new Table("users");
       expect(() => (v as unknown as Internals).visitEdge(tbl, "definitelyNotAField")).toThrow(
-        /undefined method 'definitelyNotAField' for Arel::Table/,
+        /undefined method 'definitelyNotAField' for an instance of Arel::Table/,
       );
     });
 
@@ -265,7 +265,7 @@ describe("TestDot", () => {
       type Internals = { visitEdge(o: object, method: string): void };
       const grouping = new Nodes.Grouping(new Nodes.SqlLiteral("1"));
       expect(() => (v as unknown as Internals).visitEdge(grouping, "definitelyNotAField")).toThrow(
-        "undefined method 'definitelyNotAField' for Arel::Nodes::Grouping",
+        "undefined method 'definitelyNotAField' for an instance of Arel::Nodes::Grouping",
       );
     });
 
@@ -329,7 +329,7 @@ describe("TestDot", () => {
     it("Extract walks expressions + alias, as Rails does", () => {
       const node = new Nodes.Extract(users.get("created_at"), "year");
       expect(() => dot.accept(node, new Collectors.PlainString()).value).toThrow(
-        /undefined method 'expressions' for Arel::Nodes::Extract/,
+        /undefined method 'expressions' for an instance of Arel::Nodes::Extract/,
       );
     });
 

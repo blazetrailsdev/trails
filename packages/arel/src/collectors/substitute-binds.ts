@@ -1,4 +1,4 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbFSend, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Collectors } from "../namespaces.js";
 
 export class SubstituteBinds {
@@ -21,13 +21,7 @@ export class SubstituteBinds {
   }
 
   addBind(bind: unknown, _block: (index: number) => string): this {
-    if (bind != null && typeof bind === "object" && "valueForDatabase" in bind) {
-      const valueForDatabase = (bind as Record<string, unknown>).valueForDatabase;
-      bind =
-        typeof valueForDatabase === "function"
-          ? (valueForDatabase as () => unknown).call(bind)
-          : valueForDatabase;
-    }
+    if (rbObjRespondTo(bind, "valueForDatabase")) bind = rbFSend(bind, "valueForDatabase");
     return this.append(this.quoter.quote(bind));
   }
 
