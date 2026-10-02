@@ -23,3 +23,14 @@ function columnScaleFor(record: any, attribute: string): number | undefined {
   if (typeof klass.typeForAttribute !== "function") return undefined;
   return klass.typeForAttribute(String(attribute))?.scale ?? undefined;
 }
+
+interface HelperMethodHost {
+  validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
+  _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
+}
+
+export function validatesNumericalityOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
+  this.validatesWith(NumericalityValidator, this._mergeAttributes(attrNames));
+}
+
+export const ClassMethods = { validatesNumericalityOf };

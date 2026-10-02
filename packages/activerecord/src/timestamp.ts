@@ -98,7 +98,7 @@ export function allTimestampAttributesInModel(this: TimestampHost): string[] {
   return this._allTimestampAttributesInModel;
 }
 
-/** @missingRailsCall with_connection — PERMANENT */
+/** @missingRailsCall with_connection — CONVERGEABLE timestamp-current-time-from-proper-timezone-reads-the-connection-default-timezone */
 export function currentTimeFromProperTimezone(): RubyTime {
   const now = RubyTime.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n));
   return defaultTimezone() === "utc" ? now.getutc() : now.getlocal();
@@ -228,7 +228,7 @@ export function clearTimestampAttributes(this: TimestampInstanceHost): void {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE comparator-reads-a-module-named-const-as-the-instance-seat */
 export const InstanceMethods = {
   recordUpdateTimestamps,
   shouldRecordTimestamps,

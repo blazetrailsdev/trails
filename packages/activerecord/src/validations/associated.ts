@@ -47,3 +47,5 @@ function recordValidationContextForAssociation(record: any): string | undefined 
   }
   return undefined;
 }
+
+export const ClassMethods = { validatesAssociated };

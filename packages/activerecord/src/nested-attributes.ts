@@ -13,13 +13,9 @@ import { except, rbFSend, rbObjMethod, rbObjRespondTo } from "@blazetrails/ruby-
 import { defineAutosaveValidationCallbacks } from "./autosave-association.js";
 import { ArgumentError, BooleanType } from "@blazetrails/activemodel";
 
-export class TooManyRecords extends ActiveRecordError {
-  /** @noRailsEquivalent PERMANENT */
-  constructor(message?: string) {
-    super(message);
-    this.name = "ActiveRecord::NestedAttributes::TooManyRecords";
-  }
-}
+export class TooManyRecords extends ActiveRecordError {}
+
+TooManyRecords.prototype.name = "ActiveRecord::NestedAttributes::TooManyRecords";
 
 export function _destroy(this: Base): boolean {
   return this.markedForDestruction();
@@ -469,8 +465,7 @@ function resolveCollectionTargetModel(
   return modelRegistry.get(assocDef.className);
 }
 
-/** @noRailsEquivalent PERMANENT */
-export const InstanceMethods = {
+export const NestedAttributes = {
   _destroy,
   hasDestroyFlag,
   isAllowDestroy,

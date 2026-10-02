@@ -11,3 +11,18 @@ export class LengthValidator extends BaseLengthValidator {
     super.validateEach(record, attribute, associationOrValue);
   }
 }
+
+interface HelperMethodHost {
+  validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
+  _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
+}
+
+export function validatesLengthOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
+  this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
+}
+
+export function validatesSizeOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
+  this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
+}
+
+export const ClassMethods = { validatesLengthOf, validatesSizeOf };

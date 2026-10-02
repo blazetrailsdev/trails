@@ -5,13 +5,9 @@ import { union } from "@blazetrails/ruby-compat";
 import { writeAttribute as _writeAttributeSuper } from "./attribute-methods/write.js";
 import { raiseOnAssignToAttrReadonly } from "./active-record.js";
 
-export class ReadonlyAttributeError extends ActiveRecordError {
-  /** @noRailsEquivalent PERMANENT */
-  constructor(attribute: string) {
-    super(attribute);
-    this.name = "ActiveRecord::ReadonlyAttributeError";
-  }
-}
+export class ReadonlyAttributeError extends ActiveRecordError {}
+
+ReadonlyAttributeError.prototype.name = "ActiveRecord::ReadonlyAttributeError";
 
 export const ReadonlyAttributes = {
   [included](base: object): void {

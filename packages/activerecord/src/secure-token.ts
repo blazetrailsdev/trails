@@ -1,18 +1,15 @@
 import { base58 } from "@blazetrails/activesupport";
+import { StandardError } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import { generateSecureTokenOn } from "./active-record.js";
 
-export class MinimumLengthError extends Error {
-  /** @noRailsEquivalent PERMANENT */
-  constructor(message?: string) {
-    super(message);
-    this.name = "ActiveRecord::SecureToken::MinimumLengthError";
-  }
-}
+export class MinimumLengthError extends StandardError {}
+
+MinimumLengthError.prototype.name = "ActiveRecord::SecureToken::MinimumLengthError";
 
 const MINIMUM_TOKEN_LENGTH = 24;
 
-/** @missingRailsCall define_method — PERMANENT */
+/** @missingRailsCall define_method — CONVERGEABLE define-method-on-a-class-receiver-goes-through-ruby-compat */
 export function hasSecureToken(
   this: typeof Base,
   attribute: string = "token",

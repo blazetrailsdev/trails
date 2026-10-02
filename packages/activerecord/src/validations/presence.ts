@@ -11,3 +11,14 @@ export class PresenceValidator extends BasePresenceValidator {
     super.validateEach(record, attribute, associationOrValue);
   }
 }
+
+interface HelperMethodHost {
+  validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
+  _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
+}
+
+export function validatesPresenceOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
+  this.validatesWith(PresenceValidator, this._mergeAttributes(attrNames));
+}
+
+export const ClassMethods = { validatesPresenceOf };

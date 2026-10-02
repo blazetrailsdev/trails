@@ -120,7 +120,7 @@ export function performValidations(
   return this.isValid(options?.context);
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE ar-read-attribute-for-validation-is-not-send */
 export function readAttributeForValidation(this: ValidationsHost, attribute: string): unknown {
   if (typeof this.association === "function") {
     try {
@@ -137,42 +137,6 @@ export function readAttributeForValidation(this: ValidationsHost, attribute: str
   }
   return this.readAttribute(attribute);
 }
-
-interface HelperMethodHost {
-  validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
-  _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
-}
-
-export function validatesPresenceOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
-  this.validatesWith(PresenceValidator, this._mergeAttributes(attrNames));
-}
-
-export function validatesAbsenceOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
-  this.validatesWith(AbsenceValidator, this._mergeAttributes(attrNames));
-}
-
-export function validatesLengthOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
-  this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
-}
-
-export function validatesSizeOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
-  this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
-}
-
-export function validatesNumericalityOf(this: HelperMethodHost, ...attrNames: unknown[]): void {
-  this.validatesWith(NumericalityValidator, this._mergeAttributes(attrNames));
-}
-
-/** @noRailsEquivalent PERMANENT */
-export const ClassMethods = {
-  validatesAssociated,
-  validatesUniquenessOf,
-  validatesPresenceOf,
-  validatesAbsenceOf,
-  validatesLengthOf,
-  validatesSizeOf,
-  validatesNumericalityOf,
-};
 
 /** @internal */
 export function raiseValidationError(record: unknown): never {

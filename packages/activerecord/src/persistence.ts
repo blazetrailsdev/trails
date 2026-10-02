@@ -1,6 +1,6 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import { type TouchArgs, type TouchOptions } from "./timestamp.js";
-import { Rational, basicObjRespondTo, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { Rational, basicObjRespondTo, merge, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
 import type { IndexedRow } from "./result.js";
@@ -659,11 +659,6 @@ interface ReloadRecord {
  * just-saved row (Rails uses `find_by!`).
  *
  * Mirrors: ActiveRecord::Persistence#reload
- *
- * @missingRailsCall merge — PERMANENT: persistence.rb:746 `(options ||
- *   {}).merge(all_queries: true)` — Ruby Hash#merge returning a new hash is JS
- *   object spread (`{ ...findOptions, allQueries: true }`, persistence.ts:1422);
- *   there is no Hash object to call `merge` on. Language shortcoming.
  */
 export async function reload<T extends ReloadRecord>(
   this: T,
@@ -672,11 +667,10 @@ export async function reload<T extends ReloadRecord>(
   const ctor = this.constructor;
   ctor.clearQueryCachesForCurrentThread?.();
 
-  const findOptions = { lock: options?.lock };
   const fresh = (
     isApplyScoping.call(this as never, options)
-      ? await _findRecord.call(this as never, { ...findOptions, allQueries: true })
-      : await ctor.unscoped(() => _findRecord.call(this as never, findOptions))
+      ? await _findRecord.call(this as never, merge(options ?? {}, { allQueries: true }))
+      : await ctor.unscoped(() => _findRecord.call(this as never, options))
   ) as {
     _attributes: unknown;
     _associationCache: Map<string, { owner: unknown }>;
@@ -769,6 +763,7 @@ interface PersistencePrivateHost {
   _destroyed: boolean;
   _previouslyNewRecord: boolean;
   _readonly?: boolean;
+  attribute(attrName: string): unknown;
   readAttribute(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
   isNewRecord(): boolean;
@@ -848,10 +843,7 @@ export function _findRecord(
   return scope.findByBang(_inMemoryQueryConstraintsHash.call(this));
 }
 
-/**
- * @internal
- * @missingRailsCall attribute — PERMANENT
- */
+/** @internal */
 export function _inMemoryQueryConstraintsHash(
   this: PersistencePrivateHost,
 ): Record<string, unknown> {
@@ -860,7 +852,9 @@ export function _inMemoryQueryConstraintsHash(
     const pk = this.constructor.primaryKey as string;
     return { [pk]: this.id };
   }
-  return Object.fromEntries(constraintsList.map((col) => [col, this.readAttribute(col)]));
+  return Object.fromEntries(
+    constraintsList.map((columnName) => [columnName, this.attribute(columnName)]),
+  );
 }
 
 /** @internal */
@@ -1127,7 +1121,7 @@ export function buildDefaultConstraint(this: {
   return defaultWhereClause.isEmpty() ? undefined : defaultWhereClause.ast;
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE comparator-reads-a-module-named-const-as-the-instance-seat */
 export const InstanceMethods = {
   _updateRecord: instanceUpdateRecord,
 };
