@@ -6,6 +6,8 @@ import {
   rbCheckArity,
   rbIseqMinMaxArity,
   rbObjMethod,
+  rbObjMethods,
+  rbObjPublicMethods,
 } from "./method.js";
 import { NameError } from "./name-error.js";
 
@@ -127,5 +129,30 @@ describe("Method#source_location", () => {
 
   it("answers nil for a body with no location", () => {
     expect(rbObjMethod(new Located(), "native").sourceLocation()).toBeNull();
+  });
+});
+
+describe("rbObjMethods / rbObjPublicMethods", () => {
+  class Parent {
+    inherited(): void {}
+  }
+  class Child extends Parent {
+    title = "ivar";
+    own(): void {}
+  }
+
+  it("lists singleton, class and ancestor methods, Object's included", () => {
+    const child = Object.assign(new Child(), { singleton: () => 1 });
+    expect(rbObjMethods(child)).toEqual(
+      expect.arrayContaining(["singleton", "own", "inherited", "toString"]),
+    );
+    expect(rbObjMethods(child)).not.toContain("constructor");
+    expect(rbObjMethods(child)).not.toContain("title");
+    expect(rbObjPublicMethods(child)).toEqual(rbObjMethods(child));
+  });
+
+  it("stops at the receiver's own class when all is false", () => {
+    const child = Object.assign(new Child(), { singleton: () => 1 });
+    expect(rbObjPublicMethods(child, false)).toEqual(["singleton", "own"]);
   });
 });

@@ -1,6 +1,6 @@
 import { NameError } from "./name-error.js";
 import { checkArity } from "./string/support.js";
-import { rbObjClass } from "./object.js";
+import { FL_SINGLETON, rbObjClass } from "./object.js";
 
 /**
  * Ruby core `Method` (`vendor/ruby/v3.3.11/proc.c:1657` `mnew_missing` builds the
@@ -118,6 +118,47 @@ export function rbObjMethod(obj: unknown, vid: string): Method {
   throw new NameError(`undefined method '${vid}' for an instance of ${rbObjClass(obj)}`, vid, {
     receiver: obj,
   });
+}
+
+/**
+ * `class_instance_method_list` (`vendor/ruby/v3.3.11/class.c:1818`) for an
+ * object: the receiver's singleton methods, then its class's, then every
+ * ancestor's while `recur` is set. A JS entry carries no visibility (see
+ * CLAUDE.md, "Method visibility is compile-time only"), so every
+ * function-valued entry is listed.
+ */
+function classInstanceMethodList(obj: unknown, recur: boolean): string[] {
+  const list = new Set<string>();
+  for (let mod: object | null = Object(obj); mod; mod = Object.getPrototypeOf(mod)) {
+    for (const mid of Object.getOwnPropertyNames(mod)) {
+      const me = Object.getOwnPropertyDescriptor(mod, mid)!;
+      if (mid !== "constructor" && typeof me.value === "function") list.add(mid);
+    }
+    const particularClass = mod === obj || Object.prototype.hasOwnProperty.call(mod, FL_SINGLETON);
+    if (!recur && !particularClass) break;
+  }
+  return [...list];
+}
+
+/**
+ * `Object#methods` (`vendor/ruby/v3.3.11/class.c:1993` `rb_obj_methods`): the
+ * names of the receiver's public and protected methods.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjMethods(obj: unknown): string[] {
+  return classInstanceMethodList(obj, true);
+}
+
+/**
+ * `Object#public_methods` (`vendor/ruby/v3.3.11/class.c:2042`
+ * `rb_obj_public_methods`): the names of the receiver's public methods, its
+ * singleton's and its own class's alone when `all` is false.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjPublicMethods(obj: unknown, all = true): string[] {
+  return classInstanceMethodList(obj, all);
 }
 
 /**

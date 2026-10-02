@@ -46,4 +46,10 @@ describe("Struct", () => {
     expect(rbHash(new Customer("Joe", 1))).not.toBe(rbHash(new Customer("Joe", 2)));
     expect(rbHash(new Customer("Joe", 1))).not.toBe(rbHash(new Other("Joe", 1)));
   });
+
+  it("copies the members of the struct it is initialized from", () => {
+    const copy = new Customer();
+    expect(copy.initializeCopy(new Customer("Joe", 1))).toBe(copy);
+    expect([copy.name, copy.zip]).toEqual(["Joe", 1]);
+  });
 });

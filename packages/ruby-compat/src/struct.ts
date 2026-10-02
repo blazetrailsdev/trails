@@ -1,6 +1,7 @@
 import { ArgumentError } from "./argument-error.js";
 import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
+import { TypeError } from "./type-error.js";
 
 /**
  * An instance of a class built by `Struct.new` (`vendor/ruby/v3.3.11/struct.c:643`
@@ -11,6 +12,7 @@ import { rbHash } from "./rb-hash.js";
  */
 export interface StructInstance {
   members(): string[];
+  initializeCopy(s: StructInstance): this;
   equals(other: unknown): boolean;
   eql(other: unknown): boolean;
   hash(): number;
@@ -90,6 +92,23 @@ export const Struct = {
        */
       members(): string[] {
         return [...memberNames];
+      }
+
+      /**
+       * `rb_struct_init_copy` (`vendor/ruby/v3.3.11/struct.c:1123`).
+       *
+       * @noRailsEquivalent PERMANENT
+       */
+      initializeCopy(s: StructInstance): this {
+        if (this === s) return this;
+        if (this.members().length !== s.members().length) {
+          throw new TypeError("struct size mismatch");
+        }
+        const values = structValues(s);
+        memberNames.forEach((member, i) => {
+          (this as Record<string, unknown>)[member] = values[i];
+        });
+        return this;
       }
 
       /**
