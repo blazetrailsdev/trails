@@ -7,6 +7,7 @@ import type { CacheStore, Logger } from "@blazetrails/activesupport";
 import { Application } from "./application.js";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
 import { Engine } from "./engine.js";
+import { Trailtie } from "./trailtie.js";
 import type { Configuration } from "./application/configuration.js";
 import { resolveEnv } from "./database.js";
 import type { InitializerGroup } from "./initializable.js";
@@ -33,6 +34,10 @@ export class Trails {
 
   static get Engine(): typeof Engine {
     return Engine;
+  }
+
+  static get Trailtie(): typeof Trailtie {
+    return Trailtie;
   }
 
   declare static ActionMethods: typeof ActionMethods;

@@ -45,6 +45,7 @@ export const TopLevel: {
     } | null;
     Application: abstract new (...args: never[]) => unknown;
     Engine: abstract new (...args: never[]) => unknown;
+    Trailtie: abstract new (...args: never[]) => unknown;
     root(): string | null | undefined;
   };
   ActionDispatch?: {

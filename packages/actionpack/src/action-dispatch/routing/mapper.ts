@@ -18,6 +18,7 @@ import {
   kernelArray,
   pluralize,
   singularize,
+  TopLevel,
   transformKeys,
   underscore,
 } from "@blazetrails/activesupport";
@@ -1516,7 +1517,11 @@ export class Mapper {
 
   /** @internal */
   isRailsApp(app: MountableApp): app is RailsApp {
-    return typeof app === "function" && Boolean((app as { railtieName?: unknown }).railtieName);
+    return (
+      typeof app === "function" &&
+      Object.getOwnPropertyDescriptor(app, "prototype")?.writable === false &&
+      app.prototype instanceof TopLevel.Trails!.Trailtie
+    );
   }
 
   /** @internal */
