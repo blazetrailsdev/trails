@@ -4316,8 +4316,11 @@ class ApiExtractor
       return ident_name(inner) if inner.is_a?(Array) && inner[0] == :symbol
       inner.is_a?(Array) ? ident_name(inner[1]) : nil
     when :dyna_symbol
-      # Dynamic symbols — skip
-      nil
+      content = node[1]
+      content = content[1..] if content.is_a?(Array) && content[0] == :string_content
+      return nil unless content.is_a?(Array) && content.length == 1
+      part = content[0]
+      part.is_a?(Array) && part[0] == :@tstring_content ? part[1] : nil
     else
       nil
     end

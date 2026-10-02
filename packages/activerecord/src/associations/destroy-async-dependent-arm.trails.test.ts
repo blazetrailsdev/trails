@@ -10,7 +10,7 @@ registerConstant("DestroyAsyncTestJob", DestroyAsyncTestJob);
 class AsyncBook extends Base {
   static _tableName = "books";
   static {
-    this.destroyAssociationAsyncJob("DestroyAsyncTestJob");
+    this.destroyAssociationAsyncJob = "DestroyAsyncTestJob";
     this.hasMany("essays", {
       dependent: "destroyAsync",
       className: "AsyncEssay",
@@ -27,7 +27,7 @@ class AsyncBook extends Base {
 class AsyncEssay extends Base {
   static _tableName = "essays";
   static {
-    this.destroyAssociationAsyncJob("DestroyAsyncTestJob");
+    this.destroyAssociationAsyncJob = "DestroyAsyncTestJob";
     this.belongsTo("book", { dependent: "destroyAsync", className: "AsyncBook" });
   }
 }

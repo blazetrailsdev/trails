@@ -22,6 +22,15 @@ describe("naming (trails-only)", () => {
     expect(BlogPost.modelName.plural).toBe("blog_posts");
   });
 
+  it("=~ and !~ delegate to the name", () => {
+    const modelName = new ModelName("Post::TrackBack");
+    expect(modelName.matchOperator(/Track/)).toBe(6);
+    expect(modelName.matchOperator(/Comment/)).toBeNull();
+    expect(modelName.notMatchOperator(/Track/)).toBe(false);
+    expect(modelName.notMatchOperator(/Comment/)).toBe(true);
+    expect(() => modelName.matchOperator("Track")).toThrow("type mismatch: String given");
+  });
+
   it("instance delegates to class", () => {
     const p = new Post();
     expect(p.modelName.name).toBe("Post");

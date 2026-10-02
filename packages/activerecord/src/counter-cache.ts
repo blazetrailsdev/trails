@@ -1,8 +1,18 @@
 import type { Base } from "./base.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { extractOptionsBang, wrap } from "@blazetrails/activesupport";
+import { classAttribute, extractOptionsBang, included, wrap } from "@blazetrails/activesupport";
 import { pendingCounterCacheColumns } from "./counter-cache-state.js";
 import { type CounterCacheTouchOption, type TouchAllOptions } from "./timestamp.js";
+
+export const CounterCache = {
+  [included](base: object): void {
+    classAttribute.call(base, "_counterCacheColumns", { instanceAccessor: false, default: [] });
+    classAttribute.call(base, "counterCachedAssociationNames", {
+      instanceWriter: false,
+      default: [],
+    });
+  },
+};
 
 export async function incrementCounter(
   this: typeof Base,

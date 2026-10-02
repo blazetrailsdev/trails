@@ -68,7 +68,18 @@ export const Core = {
     classAttribute.call(base, "logger", { instanceWriter: false });
     classAttribute.call(base, "_destroyAssociationAsyncJob", {
       instanceAccessor: false,
-      default: null,
+      default: "ActiveRecord::DestroyAssociationAsyncJob",
+    });
+    Object.defineProperty(base, "destroyAssociationAsyncJob", {
+      configurable: true,
+      get: destroyAssociationAsyncJob,
+      set: Object.getOwnPropertyDescriptor(base, "_destroyAssociationAsyncJob")!.set,
+    });
+    Object.defineProperty((base as CoreHost).prototype, "destroyAssociationAsyncJob", {
+      configurable: true,
+      get(this: { constructor: CoreHost }) {
+        return this.constructor.destroyAssociationAsyncJob;
+      },
     });
     classAttribute.call(base, "destroyAssociationAsyncBatchSize", {
       instanceWriter: false,
@@ -434,6 +445,7 @@ interface CoreHost {
   _inspectionFilter?: any;
   _connectionClass?: boolean;
   _destroyAssociationAsyncJob?: any;
+  destroyAssociationAsyncJob?: any;
   _findByStatementCache?: Map<boolean, Map<unknown, any>>;
   _generatedAssociationMethods?: Module;
   _predicateBuilder?: any;
@@ -450,20 +462,16 @@ function parentClass(klass: CoreHost): CoreHost | null {
   return typeof proto === "function" ? (proto as CoreHost) : null;
 }
 
-export function destroyAssociationAsyncJob(this: CoreHost, value?: any): any {
-  if (value !== undefined) {
-    this._destroyAssociationAsyncJob = value;
-    return this._destroyAssociationAsyncJob;
-  }
-  if (typeof this._destroyAssociationAsyncJob === "string") {
-    try {
+export function destroyAssociationAsyncJob(this: CoreHost): any {
+  try {
+    if (typeof this._destroyAssociationAsyncJob === "string") {
       this._destroyAssociationAsyncJob = constantize(this._destroyAssociationAsyncJob);
-    } catch (error) {
-      if (!(error instanceof NameError)) throw error;
-      throw new NameError(`Unable to load destroy_association_async_job: ${error.message}`);
     }
+    return this._destroyAssociationAsyncJob;
+  } catch (error) {
+    if (!(error instanceof NameError)) throw error;
+    throw new NameError(`Unable to load destroy_association_async_job: ${error.message}`);
   }
-  return this._destroyAssociationAsyncJob ?? null;
 }
 
 let _configurations!: DatabaseConfigurations;

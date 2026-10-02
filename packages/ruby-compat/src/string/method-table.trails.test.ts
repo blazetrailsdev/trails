@@ -9,6 +9,7 @@ import { include, rbObjClone } from "../include.js";
 import { rbHash } from "../rb-hash.js";
 import {
   matchOperator,
+  rbObjNotMatch,
   rbStrInit,
   rbStrSend,
   stringSuperclass,
@@ -1119,5 +1120,12 @@ describe("strip and matchOperator", () => {
     expect(matchOperator("😀yes", /yes/)).toBe(1);
     expect(matchOperator("no", /yes/)).toBeNull();
     expect(matchOperator({ matchOperator: (pattern: unknown) => [pattern] }, "p")).toEqual(["p"]);
+  });
+
+  it("rbObjNotMatch negates the receiver's =~", () => {
+    expect(rbObjNotMatch("no", /yes/)).toBe(true);
+    expect(rbObjNotMatch("yes", /yes/)).toBe(false);
+    expect(rbObjNotMatch(null, /a/)).toBe(true);
+    expect(rbObjNotMatch({ matchOperator: () => 0 }, /a/)).toBe(false);
   });
 });

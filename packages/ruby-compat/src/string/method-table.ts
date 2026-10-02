@@ -6,6 +6,7 @@ import { format } from "../kernel-format.js";
 import { included } from "../include.js";
 import { NilClass } from "../nil-class.js";
 import { NoMethodError } from "../no-method-error.js";
+import { rtest } from "../object.js";
 import { Range } from "../range.js";
 import { rbEqual } from "../rb-equal.js";
 import { rbHash } from "../rb-hash.js";
@@ -357,6 +358,17 @@ export function matchOperator(obj: unknown, pattern: unknown): unknown {
   if (obj == null) return NilClass.matchOperator(pattern);
   if (typeof obj === "string") return rbStrMatch(obj, pattern);
   return (obj as { matchOperator(pattern: unknown): unknown }).matchOperator(pattern);
+}
+
+/**
+ * `Kernel#!~` (`vendor/ruby/v3.3.11/object.c:1639` `rb_obj_not_match`): the negation
+ * of the receiver's `=~`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjNotMatch(obj1: unknown, obj2: unknown): boolean {
+  const result = matchOperator(obj1, obj2);
+  return !rtest(result);
 }
 
 /**

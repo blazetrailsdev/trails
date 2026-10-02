@@ -1047,9 +1047,11 @@ export class Base extends Model {
   declare static encryptedAttributes: Set<string> | undefined;
   declare static readonly isEncryptedAttributes: boolean;
   declare static _attrReadonly: string[];
+  declare static is_attrReadonly: boolean;
   declare static defaultScopes: import("./scoping/default.js").DefaultScope[];
   declare static defaultScopeOverride: boolean | null;
   declare static _reflections: Record<string, _Reflection.AssociationReflection>;
+  declare static is_reflections: boolean;
   declare static aggregateReflections: Record<string, _Reflection.AggregateReflection>;
   declare static isAggregateReflections: boolean;
   declare static _reflectOnAssociation: typeof _Reflection.ClassMethods._reflectOnAssociation;
@@ -1614,7 +1616,9 @@ export class Base extends Model {
   declare static resetCounters: typeof CounterCache.resetCounters;
   declare static isCounterCacheColumn: typeof CounterCache.isCounterCacheColumn;
   declare static _counterCacheColumns: string[];
+  declare static is_counterCacheColumns: boolean;
   declare static counterCachedAssociationNames: string[];
+  declare static isCounterCachedAssociationNames: boolean;
 
   /** @noRailsEquivalent PERMANENT */
   static allocate<T extends typeof Base>(this: T): InstanceType<T> {
@@ -1998,8 +2002,10 @@ export class Base extends Model {
   declare static isAttributesForInspect: () => boolean;
 
   declare static _destroyAssociationAsyncJob: unknown;
+  declare static is_destroyAssociationAsyncJob: boolean;
 
-  static destroyAssociationAsyncJob = _Core.destroyAssociationAsyncJob;
+  declare static destroyAssociationAsyncJob: any;
+  declare destroyAssociationAsyncJob: any;
 
   declare static destroyAssociationAsyncBatchSize: number | null;
 
@@ -2475,7 +2481,9 @@ extend(Base, {
 });
 extend(Base, Translation.ClassMethods);
 extend(Base, Sanitization.ClassMethods);
+include(Base, ReadonlyAttributes.ReadonlyAttributes);
 extend(Base, ReadonlyAttributes.ClassMethods);
+include(Base, CounterCache.CounterCache);
 extend(Base, CounterCache.ClassMethods);
 {
   const superUpdateCounters = CounterCache.updateCounters;
@@ -2524,8 +2532,6 @@ extend(Base, {
 });
 extend(Base, _Reflection.ClassMethods);
 include(Base, _Reflection.Reflection);
-classAttribute.call(Base, "_counterCacheColumns", { instanceAccessor: false, default: [] });
-classAttribute.call(Base, "_attrReadonly", { instanceAccessor: false, default: [] });
 classAttribute.call(Base, "defaultScopes", {
   instanceWriter: false,
   instancePredicate: false,
@@ -2562,10 +2568,6 @@ classAttribute.call(Base, "tokenDefinitions", {
 classAttribute.call(Base, "generatedTokenVerifier", {
   instanceAccessor: false,
   instancePredicate: false,
-});
-classAttribute.call(Base, "counterCachedAssociationNames", {
-  instanceWriter: false,
-  default: [],
 });
 extend(Base, {
   defaultScope: _defaultScope,
@@ -2752,7 +2754,6 @@ include(Base, {
   initWithAttributes: _Core.initWithAttributes,
   encodeWith: _Core.encodeWith,
   fullInspect: _Core.fullInspect,
-  destroyAssociationAsyncJob: _Core.destroyAssociationAsyncJob,
   initializeInternalsCallback: _Core.initializeInternalsCallback,
   isCustomInspectMethodDefined: _Core.isCustomInspectMethodDefined,
   inspectWithAttributes: _Core.inspectWithAttributes,

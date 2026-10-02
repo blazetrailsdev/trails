@@ -616,34 +616,6 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "parameters instead, so these zero-arg helpers can't be faithfully ported.",
     names: ["target", "start", "finish"],
   },
-  {
-    reason:
-      "Underscore-prefixed `class_attribute` storage slots whose camelCased name " +
-      "IS the dynamically-assigned class field trails reads/writes directly " +
-      "(`Model._reflections`, `Model._counterCacheColumns`). Exposing a same-named " +
-      "reader method would clobber the storage slot, so the field IS the accessor; " +
-      "there is no separate method to match. `_attr_readonly` is likewise trails' " +
-      "private `_readonlyAttributes` set — its public reader is `readonlyAttributes` " +
-      "(Rails: `readonly_attributes` reads `_attr_readonly`), which is ported. " +
-      "`_destroy_association_async_job` is likewise the underscore storage slot " +
-      "(trails' `_destroyAssociationAsyncJob` field) behind the ported public " +
-      "accessor `destroyAssociationAsyncJob` (Rails aliases " +
-      "`destroy_association_async_job=` to `_destroy_association_async_job=`).",
-    names: [
-      "_reflections",
-      "_reflections=",
-      "_reflections?",
-      "_counter_cache_columns",
-      "_counter_cache_columns=",
-      "_counter_cache_columns?",
-      "_attr_readonly",
-      "_attr_readonly=",
-      "_attr_readonly?",
-      "_destroy_association_async_job",
-      "_destroy_association_async_job=",
-      "_destroy_association_async_job?",
-    ],
-  },
 ];
 
 export const SKIP = new Set<string>(SKIP_GROUPS.flatMap((g) => g.names));
@@ -719,21 +691,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "thor's base.rb.",
     names: ["subclass_files"],
     rubyFiles: ["base.rb"],
-  },
-  {
-    reason:
-      "Ruby's match operators on ActiveModel::Name, which delegates `=~` and " +
-      "`!~` to `@name` along with `==`/`===`/`<=>`/`eql?`/`match?` " +
-      "(naming.rb:151-152). `String#=~` answers the Integer OFFSET of the " +
-      "match (string.c `rb_str_match`) and `!~` its negation " +
-      "(Object#!~, object.c) — a different value from the boolean `match?` " +
-      "already ported as `match`, so neither can share that spelling, and " +
-      "TypeScript has no operator to overload for either. Nothing in trails " +
-      "consumes a match offset, so a port would exist only to be named. " +
-      "Scoped to naming.rb so the operators stay expected wherever a real " +
-      "offset-returning surface is ported.",
-    names: ["=~", "!~"],
-    rubyFiles: ["naming.rb"],
   },
   {
     reason:

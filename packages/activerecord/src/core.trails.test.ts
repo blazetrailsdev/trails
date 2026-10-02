@@ -274,6 +274,69 @@ describe("hash agrees with ==", () => {
   });
 });
 
+describe("underscore class_attribute slots", () => {
+  it("_destroy_association_async_job defaults to Rails' job name and is written per class", () => {
+    class Job {}
+    class Parent extends Topic {}
+    class Child extends Parent {}
+
+    expect(Base._destroyAssociationAsyncJob).toBe("ActiveRecord::DestroyAssociationAsyncJob");
+    expect(Base.is_destroyAssociationAsyncJob).toBe(true);
+    expect(() => Parent.destroyAssociationAsyncJob).toThrow(
+      /Unable to load destroy_association_async_job: /,
+    );
+
+    Parent.destroyAssociationAsyncJob = Job;
+    expect(Child.destroyAssociationAsyncJob).toBe(Job);
+    expect(new Child().destroyAssociationAsyncJob).toBe(Job);
+    expect(Base._destroyAssociationAsyncJob).toBe("ActiveRecord::DestroyAssociationAsyncJob");
+    expect(Topic._destroyAssociationAsyncJob).toBe("ActiveRecord::DestroyAssociationAsyncJob");
+    expect("_destroyAssociationAsyncJob" in Parent.prototype).toBe(false);
+  });
+
+  it("destroy_association_async_job= is the slot's own writer, local to the class assigned", () => {
+    class Job {}
+    class Sub extends Topic {}
+    class Sibling extends Topic {}
+
+    Sub.destroyAssociationAsyncJob = Job;
+
+    expect(Object.getOwnPropertyDescriptor(Base, "destroyAssociationAsyncJob")?.set).toBe(
+      Object.getOwnPropertyDescriptor(Base, "_destroyAssociationAsyncJob")?.set,
+    );
+    expect(Sub._destroyAssociationAsyncJob).toBe(Job);
+    expect(Sibling._destroyAssociationAsyncJob).toBe("ActiveRecord::DestroyAssociationAsyncJob");
+    expect(Topic._destroyAssociationAsyncJob).toBe("ActiveRecord::DestroyAssociationAsyncJob");
+    expect(Base._destroyAssociationAsyncJob).toBe("ActiveRecord::DestroyAssociationAsyncJob");
+  });
+
+  it("_attr_readonly and _counter_cache_columns stay local to the subclass that writes them", () => {
+    class Parent extends Topic {}
+    class Child extends Parent {}
+
+    Child.attrReadonly("title");
+    Child._counterCacheColumns = [...Child._counterCacheColumns, "written_on_count"];
+
+    expect(Child.readonlyAttributes).toContain("title");
+    expect(Parent._attrReadonly).not.toContain("title");
+    expect(Parent._counterCacheColumns).toEqual(Topic._counterCacheColumns);
+    expect(Child.isCounterCacheColumn("written_on_count")).toBe(true);
+    expect(Parent.isCounterCacheColumn("written_on_count")).toBe(false);
+    expect(Child.is_attrReadonly).toBe(true);
+    expect(Child.is_counterCacheColumns).toBe(true);
+    expect("_attrReadonly" in Child.prototype).toBe(false);
+    expect("_counterCacheColumns" in Child.prototype).toBe(false);
+  });
+
+  it("_reflections keeps its instance reader and predicate, and no instance writer", () => {
+    expect(Reply.is_reflections).toBe(true);
+    const reply = new Reply() as unknown as { _reflections: object; is_reflections: boolean };
+    expect(reply._reflections).toBe(Reply._reflections);
+    expect(reply.is_reflections).toBe(true);
+    expect(Object.getOwnPropertyDescriptor(Base.prototype, "_reflections")?.set).toBeUndefined();
+  });
+});
+
 describe("Core's included class attributes", () => {
   it("leaves belongs_to_required_by_default unset, as core.rb:89 declares no default", () => {
     class Unconfigured extends Base {}

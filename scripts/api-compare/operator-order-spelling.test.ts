@@ -34,6 +34,11 @@ describe("operatorSpelling", () => {
     expect(operatorSpelling("ActiveModel::Name", "<=>")).toEqual(["compare"]);
   });
 
+  it("resolves ActiveModel::Name's `=~` / `!~` to the match-operator ports", () => {
+    expect(operatorSpelling("ActiveModel::Name", "=~")).toEqual(["matchOperator"]);
+    expect(operatorSpelling("ActiveModel::Name", "!~")).toEqual(["notMatchOperator"]);
+  });
+
   it("resolves `[]` / `[]=` pairs to distinct accessor spellings", () => {
     const pool = "ActiveRecord::ConnectionAdapters::StatementPool";
     expect(operatorSpelling(pool, "[]")).toEqual(["get"]);

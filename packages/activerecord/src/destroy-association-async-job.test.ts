@@ -7,28 +7,28 @@ import { ConfigurationError } from "./errors.js";
 class UndefinedConstantAsync extends Base {
   static _tableName = "essays";
   static {
-    this.destroyAssociationAsyncJob("UndefinedConstantJob");
+    this.destroyAssociationAsyncJob = "UndefinedConstantJob";
   }
 }
 
 class UnusedBelongsToAsync extends Base {
   static _tableName = "essays";
   static {
-    this.destroyAssociationAsyncJob(null);
+    this.destroyAssociationAsyncJob = null;
   }
 }
 
 class UnusedHasOneAsync extends Base {
   static _tableName = "essays";
   static {
-    this.destroyAssociationAsyncJob(null);
+    this.destroyAssociationAsyncJob = null;
   }
 }
 
 class UnusedHasManyAsync extends Base {
   static _tableName = "essays";
   static {
-    this.destroyAssociationAsyncJob(null);
+    this.destroyAssociationAsyncJob = null;
   }
 }
 
@@ -37,7 +37,7 @@ class ResolvableJob {}
 class ResolvableJobAsync extends Base {
   static _tableName = "essays";
   static {
-    this.destroyAssociationAsyncJob("ResolvableJob");
+    this.destroyAssociationAsyncJob = "ResolvableJob";
   }
 }
 
@@ -94,7 +94,7 @@ describe("DestroyAssociationAsyncJobTest", () => {
 
   it("resolves a job configured by name and caches the class", () => {
     registerConstant("ResolvableJob", ResolvableJob);
-    expect(ResolvableJobAsync.destroyAssociationAsyncJob()).toBe(ResolvableJob);
+    expect(ResolvableJobAsync.destroyAssociationAsyncJob).toBe(ResolvableJob);
     expect(ResolvableJobAsync._destroyAssociationAsyncJob).toBe(ResolvableJob);
     expect(() =>
       ResolvableJobAsync.hasMany("essayDestroyAsyncs", { dependent: "destroyAsync" }),

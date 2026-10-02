@@ -4269,7 +4269,7 @@ describe("HasManyAssociationsTest", () => {
     await assertNothingRaised(() => {
       void class extends Base {
         static {
-          this.destroyAssociationAsyncJob(class {});
+          this.destroyAssociationAsyncJob = class {};
 
           this.hasMany("books", { dependent: "destroyAsync", ensuringOwnerWas: "isDestroyed" });
         }
