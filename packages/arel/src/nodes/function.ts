@@ -1,10 +1,12 @@
 import { Nodes } from "../namespaces.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
-import { rbEqual, rbHash } from "@blazetrails/activesupport";
+import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import type { NodeOrValue } from "./binary.js";
 import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
+import { WindowPredications, type WindowPredicationsModule } from "../window-predications.js";
+import { FilterPredications, type FilterPredicationsModule } from "../filter-predications.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Function extends NodeExpression {
@@ -46,10 +48,11 @@ export class Max extends Function {}
 export class Min extends Function {}
 export class Avg extends Function {}
 
-type _WindowPredications = import("../window-predications.js").WindowPredicationsModule;
-type _FilterPredications = import("../filter-predications.js").FilterPredicationsModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Function extends _WindowPredications, _FilterPredications {}
+export interface Function extends WindowPredicationsModule, FilterPredicationsModule {}
+
+include(Function, WindowPredications);
+include(Function, FilterPredications);
 
 rbModConstSet(Nodes, "Function", Function);
 rbModConstSet(Nodes, "Exists", Exists);

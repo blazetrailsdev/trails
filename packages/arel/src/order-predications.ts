@@ -1,6 +1,7 @@
-import { Ascending } from "./nodes/ascending.js";
-import { Descending } from "./nodes/descending.js";
+import type { Ascending } from "./nodes/ascending.js";
+import type { Descending } from "./nodes/descending.js";
 import type { Node } from "./nodes/node.js";
+import { Nodes } from "./namespaces.js";
 
 export interface OrderPredicationsModule {
   asc(): Ascending;
@@ -9,9 +10,9 @@ export interface OrderPredicationsModule {
 
 export const OrderPredications: OrderPredicationsModule = {
   asc(this: Node): Ascending {
-    return new Ascending(this);
+    return new Nodes.Ascending(this);
   },
   desc(this: Node): Descending {
-    return new Descending(this);
+    return new Nodes.Descending(this);
   },
 };

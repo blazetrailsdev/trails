@@ -1,4 +1,4 @@
-import { rbEqual, rbHash } from "@blazetrails/activesupport";
+import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Attribute } from "./attributes/attribute.js";
 import { EmptyJoinError } from "./errors.js";
 import { _engine, ArelEngine, Node } from "./nodes/node.js";
@@ -11,6 +11,8 @@ import { StringJoin } from "./nodes/string-join.js";
 import type { Join } from "./nodes/binary.js";
 import { TableAlias } from "./nodes/table-alias.js";
 import { isEmpty, isSymbol, rbModConstSet, symbolToS } from "@blazetrails/ruby-compat";
+import { FactoryMethods, type FactoryMethodsModule } from "./factory-methods.js";
+import { AliasPredication, type AliasPredicationModule } from "./alias-predication.js";
 
 export interface TableKlass {
   readonly attributeAliases: Record<string, string>;
@@ -148,10 +150,10 @@ export class Table {
   }
 }
 
-type _FactoryMethodsModule = import("./factory-methods.js").FactoryMethodsModule;
-type _AliasPredication = import("./alias-predication.js").AliasPredicationModule;
-
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
-export interface Table extends _FactoryMethodsModule, _AliasPredication {}
+export interface Table extends FactoryMethodsModule, AliasPredicationModule {}
+
+include(Table, FactoryMethods);
+include(Table, AliasPredication);
 
 rbModConstSet(Arel, "Table", Table);

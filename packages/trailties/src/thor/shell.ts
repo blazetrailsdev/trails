@@ -8,6 +8,7 @@ import {
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { Basic } from "./shell/basic.js";
+import { Color } from "./shell/color.js";
 
 type ShellClass = new () => Basic;
 
@@ -147,7 +148,7 @@ function _sharedConfiguration(this: Shell): Record<string, unknown> {
 }
 
 export const Shell = new Module((mod) => {
-  Object.assign(mod, { SHELL_DELEGATED_METHODS, Basic });
+  Object.assign(mod, { SHELL_DELEGATED_METHODS, Basic, Color });
 
   (mod as unknown as Record<symbol, unknown>)[initialize] = function (
     this: Shell,
@@ -182,6 +183,6 @@ export const Shell = new Module((mod) => {
 }) as Module & {
   SHELL_DELEGATED_METHODS: string[];
   Basic: typeof Basic;
-  Color?: typeof Basic;
+  Color: typeof Color;
   HTML?: typeof Basic;
 };

@@ -1,17 +1,8 @@
 import type { Node } from "./nodes/node.js";
-import {
-  Addition,
-  Subtraction,
-  Multiplication,
-  Division,
-  BitwiseAnd,
-  BitwiseOr,
-  BitwiseXor,
-  BitwiseShiftLeft,
-  BitwiseShiftRight,
-} from "./nodes/infix-operation.js";
-import { Grouping } from "./nodes/grouping.js";
-import { BitwiseNot } from "./nodes/unary-operation.js";
+import type { Multiplication, Division } from "./nodes/infix-operation.js";
+import type { Grouping } from "./nodes/grouping.js";
+import type { BitwiseNot } from "./nodes/unary-operation.js";
+import { Nodes } from "./namespaces.js";
 import type { NodeOrValue } from "./nodes/binary.js";
 
 export interface MathModule {
@@ -29,33 +20,33 @@ export interface MathModule {
 
 export const Math: MathModule = {
   multiply(this: Node, other: NodeOrValue): Multiplication {
-    return new Multiplication(this, other);
+    return new Nodes.Multiplication(this, other);
   },
   add(this: Node, other: NodeOrValue): Grouping {
-    return new Grouping(new Addition(this, other));
+    return new Nodes.Grouping(new Nodes.Addition(this, other));
   },
   subtract(this: Node, other: NodeOrValue): Grouping {
-    return new Grouping(new Subtraction(this, other));
+    return new Nodes.Grouping(new Nodes.Subtraction(this, other));
   },
   divide(this: Node, other: NodeOrValue): Division {
-    return new Division(this, other);
+    return new Nodes.Division(this, other);
   },
   bitwiseAnd(this: Node, other: NodeOrValue): Grouping {
-    return new Grouping(new BitwiseAnd(this, other));
+    return new Nodes.Grouping(new Nodes.BitwiseAnd(this, other));
   },
   bitwiseOr(this: Node, other: NodeOrValue): Grouping {
-    return new Grouping(new BitwiseOr(this, other));
+    return new Nodes.Grouping(new Nodes.BitwiseOr(this, other));
   },
   bitwiseXor(this: Node, other: NodeOrValue): Grouping {
-    return new Grouping(new BitwiseXor(this, other));
+    return new Nodes.Grouping(new Nodes.BitwiseXor(this, other));
   },
   bitwiseShiftLeft(this: Node, other: NodeOrValue): Grouping {
-    return new Grouping(new BitwiseShiftLeft(this, other));
+    return new Nodes.Grouping(new Nodes.BitwiseShiftLeft(this, other));
   },
   bitwiseShiftRight(this: Node, other: NodeOrValue): Grouping {
-    return new Grouping(new BitwiseShiftRight(this, other));
+    return new Nodes.Grouping(new Nodes.BitwiseShiftRight(this, other));
   },
   bitwiseNot(this: Node): BitwiseNot {
-    return new BitwiseNot(this);
+    return new Nodes.BitwiseNot(this);
   },
 };

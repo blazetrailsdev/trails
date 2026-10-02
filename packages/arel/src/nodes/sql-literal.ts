@@ -9,10 +9,10 @@ import {
 import { arelNode } from "../arel.js";
 import { Node } from "./node.js";
 import { Fragments } from "./fragments.js";
-import type { PredicationsModule } from "../predications.js";
-import type { AliasPredicationModule } from "../alias-predication.js";
-import type { OrderPredicationsModule } from "../order-predications.js";
-import type { ExpressionsModule } from "../expressions.js";
+import { Expressions, type ExpressionsModule } from "../expressions.js";
+import { Predications, type PredicationsModule } from "../predications.js";
+import { AliasPredication, type AliasPredicationModule } from "../alias-predication.js";
+import { OrderPredications, type OrderPredicationsModule } from "../order-predications.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SqlLiteral extends Node {
@@ -50,5 +50,9 @@ export interface SqlLiteral
     OrderPredicationsModule {}
 
 include(SqlLiteral, stringSuperclass("eql", "hash", "isBlank", "isEmpty"));
+include(SqlLiteral, Expressions);
+include(SqlLiteral, Predications);
+include(SqlLiteral, AliasPredication);
+include(SqlLiteral, OrderPredications);
 
 rbModConstSet(Nodes, "SqlLiteral", SqlLiteral);
