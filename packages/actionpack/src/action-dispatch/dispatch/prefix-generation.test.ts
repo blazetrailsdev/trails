@@ -238,10 +238,12 @@ describe("WithMountedEngine", () => {
     engineObject!: EngineObject;
     appObject!: AppObject;
 
-    override setup(): void {
-      RailsApplication.routes().defaultUrlOptions = {};
-      this.engineObject = new EngineObject({ kw: 1 });
-      this.appObject = new AppObject({ kw: 2 });
+    static {
+      this.prototype.setup = function (this: WithMountedEngine): void {
+        RailsApplication.routes().defaultUrlOptions = {};
+        this.engineObject = new EngineObject({ kw: 1 });
+        this.appObject = new AppObject({ kw: 2 });
+      };
     }
   }
   interface WithMountedEngine {
