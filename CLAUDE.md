@@ -1284,8 +1284,10 @@ connection's `ThreadLoadInterlockAwareMonitor`
 (`concurrency/load_interlock_aware_monitor.rb:36-68`) keeps Rails' `@owner` /
 `@count` / `@mutex` bodies, which exclude another `Thread`, and its prepended
 `synchronize` runs the block through that same ruby-compat `synchronize`
-where Rails has `Thread.handle_interrupt(EXCEPTION_IMMEDIATE, &block)`
-(`:18-28`), so the owning thread's sibling promises still take turns. For the same
+inside Rails' `Thread.handle_interrupt(EXCEPTION_IMMEDIATE, &block)`
+(`:18-28`), so the owning thread's sibling promises still take turns. An
+uncontended entry runs its block before `synchronize` returns, as a Ruby
+monitor does: callers that do not await `lock.synchronize` depend on it. For the same
 reason `SQLite3Adapter#disconnectBang` closes the handle under `lock`, where
 Rails' `disconnect!` (`sqlite3_adapter.rb:221-226`) closes it after `super`
 releases `@lock`: a statement can be in flight on the adapter from the same
