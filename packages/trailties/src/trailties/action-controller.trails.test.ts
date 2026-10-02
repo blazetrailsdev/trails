@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Deprecators, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
+import { Deprecators, resetLoadHooks, runLoadHooks, TopLevel } from "@blazetrails/activesupport";
 import { ActionController, Request, Response, RouteSet } from "@blazetrails/actionpack";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
+import { Application } from "../application.js";
 import { Configuration } from "../application/configuration.js";
 import { Trailtie, type ActionControllerConfig } from "./action-controller.js";
 
@@ -104,5 +105,60 @@ describe("ActionController::Railtie action_controller.request_forgery_protection
     config.allowForgeryProtection = false;
     const controller = await postWithoutToken("action_controller", "action_controller_base");
     expect(controller.status).toBe(201);
+  });
+});
+
+describe("ActionController::Railtie action_controller.test_case", () => {
+  class HeadController extends ActionController.Base {
+    index() {
+      this.head("ok");
+    }
+  }
+  class TestApplication extends Application {}
+
+  const trails = TopLevel.Trails;
+
+  afterEach(() => {
+    ActionController.TestCase.executorAroundEachRequest = null;
+    TopLevel.Trails = trails;
+  });
+
+  async function runsInExecutor(name: string): Promise<number> {
+    const application = new TestApplication();
+    let runs = 0;
+    application.executor.toRun(() => {
+      runs += 1;
+    });
+    TopLevel.Trails = { application } as unknown as typeof trails;
+
+    await runTrailtieInitializers(Trailtie, app);
+    runLoadHooks("action_controller_test_case", ActionController.TestCase);
+
+    const tc = new ActionController.TestCase(name);
+    tc.controller = new HeadController();
+    await tc.beforeSetup();
+    tc.routes = app.routes();
+    tc.routes.draw(function () {
+      this.get("head/index", { to: "head#index" });
+    });
+    await tc.get("index");
+    expect(tc.response.status).toBe(200);
+    return runs;
+  }
+
+  it("runs a controller test request inside the application executor when executorAroundTestCase is on", async ({
+    task,
+  }) => {
+    app.config.activeSupport.executorAroundTestCase = true;
+    expect(await runsInExecutor(task.name)).toBe(1);
+    expect(ActionController.TestCase.executorAroundEachRequest).toBe(true);
+  });
+
+  it("leaves the request outside the executor when executorAroundTestCase is off", async ({
+    task,
+  }) => {
+    app.config.activeSupport.executorAroundTestCase = false;
+    expect(await runsInExecutor(task.name)).toBe(0);
+    expect(ActionController.TestCase.executorAroundEachRequest).toBe(false);
   });
 });

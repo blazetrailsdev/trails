@@ -4,8 +4,11 @@ import { Mime } from "../http/mime-type.js";
 import { isPresent, reverseMergeBang, runLoadHooks } from "@blazetrails/activesupport";
 import {
   HTTPS,
+  RuntimeError,
   URI,
+  hasKey,
   include,
+  rbFPublicSend,
   rbObjRespondTo,
   stringSplit,
   type Generic,
@@ -275,30 +278,22 @@ export class IntegrationTest extends TestCase {
     this.host = host;
   }
 
-  async followRedirectBang(options: IntegrationRequestOptions = {}): Promise<number> {
-    if (!this.isRedirect) throw new Error(`not a redirect! ${this.status} ${this.statusMessage}`);
-    const location = this.redirectUrl;
-    if (!location) throw new Error("not a redirect! (no Location header)");
-
-    const preserveVerb = this.status === 307 || this.status === 308;
-    const method = preserveVerb
-      ? ((this.request?.env?.REQUEST_METHOD as string | undefined)?.toLowerCase() ?? "get")
-      : "get";
-
-    const headers = { ...(options.headers ?? {}) };
-    const hasReferer = Object.keys(headers).some(
-      (k) => k === "HTTP_REFERER" || k.toLowerCase() === "referer",
-    );
-    if (!hasReferer && this.request) {
-      const env = this.request.env as Record<string, string | undefined>;
-      const qs = env.QUERY_STRING ? `?${env.QUERY_STRING}` : "";
-      const prev =
-        `${env["rack.url_scheme"] ?? "http"}://${env.HTTP_HOST ?? this.host}` +
-        `${env.PATH_INFO ?? ""}${qs}`;
-      headers["HTTP_REFERER"] = prev;
+  async followRedirectBang({ headers = {}, ...args }: IntegrationRequestOptions = {}): Promise<
+    number | null
+  > {
+    if (!this.isRedirect) {
+      throw new RuntimeError(`not a redirect! ${this.status} ${this.statusMessage}`);
     }
 
-    await this.process(method, location, { ...options, headers });
+    const method = [307, 308].includes(this.response.status)
+      ? this.request.method.toLowerCase()
+      : "get";
+
+    if (![":HTTP_REFERER", "HTTP_REFERER"].some((key) => hasKey(headers, key))) {
+      headers["HTTP_REFERER"] = this.request.url;
+    }
+
+    await rbFPublicSend(this, method, this.response.location, { headers, ...args });
     return this.status;
   }
 
@@ -310,8 +305,8 @@ export class IntegrationTest extends TestCase {
 
   response!: TestResponse;
 
-  get status(): number {
-    return this.response?.statusCode ?? this.controller?.status ?? 0;
+  get status(): number | null {
+    return this.response == null ? null : this.response.status;
   }
 
   get statusMessage(): string | null {
@@ -332,10 +327,6 @@ export class IntegrationTest extends TestCase {
 
   get path(): string | null {
     return this.request == null ? null : this.request.path;
-  }
-
-  get redirectUrl(): string | undefined {
-    return this.response?.getHeader("location") ?? this.controller?.headers.get("location");
   }
 
   get cookies(): CookieJar {

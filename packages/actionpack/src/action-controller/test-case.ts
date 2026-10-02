@@ -105,6 +105,7 @@ interface BehaviorClassMethods {
 
 interface BehaviorClass extends BehaviorClassMethods {
   name: string;
+  determineConstantFromTestName(testName: string, block: (constant: unknown) => unknown): unknown;
   _controllerClass: ControllerClass | null | undefined;
 }
 
@@ -135,10 +136,10 @@ export const ClassMethods: BehaviorClassMethods & ThisType<BehaviorClass> = {
   },
 
   determineDefaultControllerClass(name: string): ControllerClass | null {
-    return (ConstantLookup.determineConstantFromTestName(
+    return this.determineConstantFromTestName(
       name,
       (constant) => typeof constant === "function" && constant.prototype instanceof Metal,
-    ) ?? null) as ControllerClass | null;
+    ) as ControllerClass | null;
   },
 };
 
@@ -471,6 +472,7 @@ function checkRequiredIvars(this: Behavior): void {
 export const Behavior = new Module((mod) => {
   extend(mod, Concern);
   mod.include(TestProcess);
+  mod.include(ConstantLookup);
 
   (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
 
@@ -548,7 +550,7 @@ export interface TestCase extends Behavior {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class TestCase extends ActiveSupportTestCase {
-  static executorAroundEachRequest: boolean | null = null;
+  static executorAroundEachRequest: boolean | null | undefined = null;
 
   declare response: TestResponse | LiveTestResponse;
   declare request: TestRequest;
@@ -562,6 +564,7 @@ export declare namespace TestCase {
   const tests: BehaviorClassMethods["tests"];
   let controllerClass: ControllerClass | null;
   const determineDefaultControllerClass: BehaviorClassMethods["determineDefaultControllerClass"];
+  const determineConstantFromTestName: BehaviorClass["determineConstantFromTestName"];
   let withRouting: typeof routingAssertions.ClassMethods.withRouting;
 }
 

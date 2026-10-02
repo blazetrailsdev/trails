@@ -1,7 +1,13 @@
 import { ValueType } from "./type/value.js";
 import { defaultValue } from "./type.js";
 import { MissingAttributeError } from "./attribute-methods.js";
-import { hasKey, rbEqual, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  hasKey,
+  rbEqual,
+  rbModConstSet,
+  rbObjDup,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { isDuplicable } from "@blazetrails/activesupport";
 import { ActiveModel } from "./namespaces.js";
 import type { UserProvidedDefault } from "./attribute/user-provided-default.js";
@@ -266,9 +272,7 @@ export abstract class Attribute {
   }
 
   dup(): Attribute {
-    const dup = Object.assign(Object.create(Object.getPrototypeOf(this) as object), this) as this;
-    dup.initializeDup(this);
-    return dup;
+    return rbObjDup(this);
   }
 }
 

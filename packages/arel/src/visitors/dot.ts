@@ -5,17 +5,20 @@ import { Visitor } from "./visitor.js";
 import { Nodes, Visitors } from "../namespaces.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { camelize } from "@blazetrails/activesupport";
-import { rbFSend, rbObjAsString, rbObjClass, rbModConstSet } from "@blazetrails/ruby-compat";
+import {
+  rbFSend,
+  rbObjAsString,
+  rbObjClass,
+  rbObjId,
+  rbModConstSet,
+} from "@blazetrails/ruby-compat";
 
 export class Dot extends Visitor {
   private nodes: Node[] = [];
   private edges: Edge[] = [];
   private nodeStack: Node[] = [];
   private edgeStack: Edge[] = [];
-  private seen: Map<unknown, Node> = new Map();
-  private nextId = 0;
-
-  private static readonly NIL_SENTINEL = Symbol("Dot.NIL_SENTINEL");
+  private seen: Map<number | bigint, Node> = new Map();
 
   override accept<C extends { append(str: string): C }>(object: unknown, collector: C): C {
     this.visit(object);
@@ -291,41 +294,23 @@ export class Dot extends Visitor {
     this.edge(method, () => this.visit(rbFSend(o, camelize(method, false))));
   }
 
-  protected override visit(object: unknown, _collector?: unknown): unknown {
-    const seenKey: unknown = (() => {
-      if (object === null || object === undefined) return Dot.NIL_SENTINEL;
-      const t = typeof object;
-      if (t === "object") return object;
-      if (t === "boolean") return `boolean:${object as boolean}`;
-      if (t === "number") {
-        const n = object as number;
-        if (Number.isNaN(n)) return "number:NaN";
-        if (Object.is(n, -0)) return "number:-0";
-        return `number:${n}`;
-      }
-      if (t === "bigint") return `bigint:${(object as bigint).toString()}`;
-      if (t === "symbol") return object;
-      return undefined;
-    })();
-
-    if (seenKey !== undefined) {
-      const seenNode = this.seen.get(seenKey);
-      if (seenNode) {
-        const e = this.edgeStack[this.edgeStack.length - 1];
-        if (e) e.to = seenNode;
-        return undefined;
-      }
+  /**
+   * @missingRailsName name — PERMANENT
+   * @missingRailsName objectId — PERMANENT
+   */
+  protected override visit(o: unknown): unknown {
+    let node = this.seen.get(rbObjId(o));
+    if (node != null) {
+      this.edgeStack[this.edgeStack.length - 1].to = node;
+      return;
     }
 
-    const node = new Node(rbObjClass(object), this.nextId++);
-    if (seenKey !== undefined) {
-      this.seen.set(seenKey, node);
-    }
+    node = new Node(rbObjClass(o), rbObjId(o));
+    this.seen.set(node.id, node);
     this.nodes.push(node);
     this.withNode(node, () => {
-      super.visit(object);
+      super.visit(o);
     });
-    return undefined;
   }
 
   protected edge(name: string, block: () => void): void {
@@ -372,10 +357,10 @@ export class Dot extends Visitor {
 
 export class Node {
   readonly name: string;
-  readonly id: number;
+  readonly id: number | bigint;
   readonly fields: unknown[];
 
-  constructor(name: string, id: number, fields: unknown[] = []) {
+  constructor(name: string, id: number | bigint, fields: unknown[] = []) {
     this.name = name;
     this.id = id;
     this.fields = fields;

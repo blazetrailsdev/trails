@@ -20,6 +20,7 @@ export interface ActiveSupportConfig {
   deprecation?: BehaviorSetting;
   disallowedDeprecation?: DisallowedBehaviorSetting;
   disallowedDeprecationWarnings?: Deprecation["disallowedWarnings"];
+  executorAroundTestCase?: boolean | null;
 }
 
 declare module "../trailtie/configuration.js" {
