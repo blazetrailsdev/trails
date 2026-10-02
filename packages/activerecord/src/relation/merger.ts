@@ -4,7 +4,7 @@ import { assertValidKeys, isBlank, isPlainObject } from "@blazetrails/activesupp
 import { Relation } from "../relation.js";
 import type { ValueMethod } from "../relation.js";
 import type { AssociationSpec } from "./query-methods.js";
-import { union } from "@blazetrails/ruby-compat";
+import { isEmpty, union } from "@blazetrails/ruby-compat";
 import { arelColumns, constructJoinDependency, QueryMethods } from "./query-methods.js";
 
 export class Merger {
@@ -59,24 +59,22 @@ export class Merger {
     return rel;
   }
 
-  /** @missingRailsCall empty? — PERMANENT */
   private mergeSelectValues(rel: any): void {
     const otherSelect = this.other.selectValues;
-    if (otherSelect == null || otherSelect.length === 0) return;
+    if (isEmpty(otherSelect)) return;
     const columns =
       this.other.model === rel.model ? otherSelect : arelColumns.call(this.other, otherSelect);
     rel._selectBang(...columns);
   }
 
-  /** @missingRailsCall empty? — PERMANENT */
   private mergePreloads(rel: any): void {
-    if (this.other.preloadValues.length === 0 && this.other.includesValues.length === 0) return;
+    if (isEmpty(this.other.preloadValues) && isEmpty(this.other.includesValues)) return;
 
     if (this.other.model === rel.model) {
-      if (this.other.preloadValues.length > 0) {
+      if (!isEmpty(this.other.preloadValues)) {
         rel.preloadValues = union(rel.preloadValues, this.other.preloadValues);
       }
-      if (this.other.includesValues.length > 0) {
+      if (!isEmpty(this.other.includesValues)) {
         rel.includesValues = union(rel.includesValues, this.other.includesValues);
       }
       return;
@@ -87,10 +85,10 @@ export class Merger {
       .find((r: { className: string }) => r.className === this.other.model.name);
     if (!reflection) return;
 
-    if (this.other.preloadValues.length > 0) {
+    if (!isEmpty(this.other.preloadValues)) {
       rel.preloadBang({ [`:${reflection.name}`]: this.other.preloadValues });
     }
-    if (this.other.includesValues.length > 0) {
+    if (!isEmpty(this.other.includesValues)) {
       rel.includesBang({ [`:${reflection.name}`]: this.other.includesValues });
     }
   }

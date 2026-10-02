@@ -1,6 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { kernelArray as Array } from "@blazetrails/activesupport";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { isEmpty, slice } from "@blazetrails/ruby-compat";
 import { stripThenable } from "./thenable.js";
 import { BatchEnumerator } from "./batches/batch-enumerator.js";
 import type { Base } from "../base.js";
@@ -238,7 +238,7 @@ export class Batches {
 
 /**
  * @internal
- * @missingRailsCall size — PERMANENT
+ * @missingRailsCall size — CONVERGEABLE call-gate-credits-a-length-read-as-array-size
  */
 export async function ensureValidOptionsForBatchingBang(
   relation: any,
@@ -391,13 +391,9 @@ export async function batchOnLoadedRelation(opts: {
   return result;
 }
 
-/**
- * @internal
- * @missingRailsCall slice — PERMANENT
- */
+/** @internal */
 export function recordCursorValues(record: any, cursor: string[]): unknown[] {
-  const attributes = record.attributes;
-  return cursor.filter((column) => column in attributes).map((column) => attributes[column]);
+  return Object.values(slice(record.attributes, ...cursor));
 }
 
 /** @internal */

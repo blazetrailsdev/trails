@@ -481,6 +481,30 @@ export function first<T>(ary: readonly T[]): T | undefined {
 }
 
 /**
+ * Ruby `Array#last` (`vendor/ruby/v3.3.11/array.c:1914` `rb_ary_last`): the last
+ * element, or `nil` for an empty array (`ary_last`, `array.c:1907`); with `n`,
+ * the last `n` elements in order. `n` past the length takes them all, and a
+ * negative `n` raises (`ary_take_first_or_last_n`, `array.c:1292-1307`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function last<T>(ary: readonly T[]): T | undefined;
+/** @noRailsEquivalent PERMANENT — Ruby core `Array#last` (`vendor/ruby/v3.3.11/array.c:1914`). */
+export function last<T>(ary: readonly T[], n: number): T[];
+/** @noRailsEquivalent PERMANENT — Ruby core `Array#last` (`vendor/ruby/v3.3.11/array.c:1914`). */
+export function last<T>(ary: readonly T[], n?: number): T | undefined | T[] {
+  const len = ary.length;
+  if (n === undefined) return len === 0 ? undefined : ary[len - 1];
+  n = num2long(n);
+  if (n > len) {
+    n = len;
+  } else if (n < 0) {
+    throw new ArgumentError("negative array size");
+  }
+  return ary.slice(len - n);
+}
+
+/**
  * Ruby `Array#count` (`vendor/ruby/v3.3.11/array.c:6275` `rb_ary_count`): the number
  * of elements the block answers truthily for (`RTEST`), or the length with no
  * block. The `count(obj)` arm is not ported: nothing calls it.

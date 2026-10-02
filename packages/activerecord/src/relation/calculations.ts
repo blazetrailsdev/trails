@@ -3,7 +3,7 @@ import type * as Arel from "@blazetrails/arel";
 import { Nodes, Table, SelectManager, sql, star } from "@blazetrails/arel";
 import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
 import { any, BigDecimal, isPresent, many, tryCall } from "@blazetrails/activesupport";
-import { block, fetch, isEmpty, uniq } from "@blazetrails/ruby-compat";
+import { block, fetch, first, isEmpty, uniq } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { Result, type ColumnType, type ColumnTypes } from "../result.js";
@@ -380,7 +380,6 @@ export async function calculate(
   }
 }
 
-/** @missingRailsName first — PERMANENT */
 export async function pluck(
   this: CalculationRelation,
   ...columnNames: Array<
@@ -402,7 +401,7 @@ export async function pluck(
     );
   }
 
-  if (hasInclude(this as any, columnNames.at(0))) {
+  if (hasInclude(this as any, first(columnNames))) {
     return this.applyJoinDependency({}, (relation) => relation.pluck(...columnNames));
   }
 
@@ -754,10 +753,7 @@ function buildCountSubquery(
     : relation.buildSubquery(subqueryAlias, selectValue);
 }
 
-/**
- * @internal
- * @missingRailsCall first — PERMANENT
- */
+/** @internal */
 export async function executeSimpleCalculation(
   rel: CalculationRelation,
   operation: string,
@@ -821,12 +817,12 @@ export async function executeSimpleCalculation(
     if (type instanceof EnumType) type = type.subtype;
   }
 
-  return typeCastCalculatedValue(result.castValues()[0], operation, type);
+  return typeCastCalculatedValue(first(result.castValues()), operation, type);
 }
 
 /**
  * @internal
- * @missingRailsArgs fetch — PERMANENT
+ * @missingRailsArgs fetch — CONVERGEABLE call-args-gate-aligns-the-receiver-of-function-form-fetch-and-max
  */
 export async function executeGroupedCalculation(
   rel: CalculationRelation,
@@ -969,7 +965,7 @@ export function typeFor(
 
 /**
  * @internal
- * @missingRailsArgs fetch — PERMANENT
+ * @missingRailsArgs fetch — CONVERGEABLE call-args-gate-aligns-the-receiver-of-function-form-fetch-and-max
  */
 export function lookupCastTypeFromJoinDependencies(
   rel: CalculationRelation,
@@ -987,7 +983,7 @@ export function lookupCastTypeFromJoinDependencies(
 
 /**
  * @internal
- * @missingRailsCall size — PERMANENT
+ * @missingRailsCall size — CONVERGEABLE call-gate-credits-a-length-read-as-array-size
  */
 export async function typeCastPluckValues(
   this: CalculationRelation,
