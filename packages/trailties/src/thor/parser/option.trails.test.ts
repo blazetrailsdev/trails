@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError, env, setEnv, stderr } from "@blazetrails/ruby-compat";
+import { HashWithIndifferentAccess } from "../core-ext/hash-with-indifferent-access.js";
 import { Option } from "./option.js";
 
 describe("Thor::Option", () => {
@@ -17,6 +18,17 @@ describe("Thor::Option", () => {
     expect(new Option("f").switchName).toBe("-f");
     expect(new Option("X").switchName).toBe("-X");
     expect(new Option("FOO_bar").switchName).toBe("--FOO-bar");
+  });
+
+  it("names the key the parsed options hash is read by, while the switch stays --skip-git", () => {
+    const option = new Option("skipGit", { type: "boolean" });
+    const options = new HashWithIndifferentAccess({ [option.humanName]: true }) as {
+      skipGit?: boolean;
+      isSkipGit?: boolean;
+    };
+    expect(option.switchName).toBe("--skip-git");
+    expect(options.skipGit).toBe(true);
+    expect(options.isSkipGit).toBe(true);
   });
 
   it("documents no negative switch for a camelCase no / skip name, as Thor does for :skip_git", () => {
