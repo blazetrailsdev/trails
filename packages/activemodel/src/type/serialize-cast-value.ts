@@ -31,9 +31,15 @@ export const ClassMethods = {
       }
       return { owner };
     };
-    return (this._serializeCastValueCompatible =
+    const compatible =
       ancestors.indexOf(instanceMethod("serializeCastValue").owner) <=
-      ancestors.indexOf(instanceMethod("serialize").owner));
+      ancestors.indexOf(instanceMethod("serialize").owner);
+    Object.defineProperty(this, "_serializeCastValueCompatible", {
+      value: compatible,
+      writable: true,
+      configurable: true,
+    });
+    return compatible;
   },
 };
 

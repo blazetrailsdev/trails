@@ -4524,12 +4524,6 @@ describe("buildReport — members Ruby supplies without a def in the mapped file
             klass: [method("instance")],
           }),
           "ActiveModel::Plain": rubyClass({ name: "Plain", file: "plain.rb" }),
-          "ActiveModel::AttributeSet": rubyClass({
-            name: "AttributeSet",
-            file: "attribute_set.rb",
-            instance: [method("deep_dup")],
-          }),
-          "ActiveModel::Attribute": rubyClass({ name: "Attribute", file: "attribute.rb" }),
           "ActiveModel::Type::Value": rubyClass({
             name: "Value",
             file: "type/value.rb",
@@ -4585,13 +4579,6 @@ describe("buildReport — members Ruby supplies without a def in the mapped file
         Plain: tsClass("Plain", "plain.ts", [], ["instance"]),
       }),
     ).toEqual({ "plain.ts": ["instance"] });
-  });
-
-  it("credits Object#deep_dup to a class that defines none in Rails", () => {
-    // core_ext/object/deep_dup.rb:15-17; attribute_set.rb:72-74 sends it to each Attribute.
-    expect(extrasByFile({ Attribute: tsClass("Attribute", "attribute.ts", ["deepDup"]) })).toEqual(
-      {},
-    );
   });
 
   it("credits the DefaultImplementation that SerializeCastValue.included injects", () => {

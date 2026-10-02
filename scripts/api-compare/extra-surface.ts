@@ -223,17 +223,6 @@ const AMBIENT_RAILTIE_MIXINS: Record<string, { includes: string[] }> = {
  */
 const OBJECT_AMBIENT_MIXINS: readonly string[] = ["ActiveSupport::ToJsonWithActiveSupportEncoder"];
 
-/**
- * Methods every Ruby object answers because Active Support defines them on
- * `Object` itself. `Object#deep_dup` (`core_ext/object/deep_dup.rb:15-17`) is
- * `duplicable? ? dup : self`, so `attributes.transform_values(&:deep_dup)`
- * (`active_model/attribute_set.rb:72-74`) and `other.errors.deep_dup`
- * (`active_model/errors.rb:139`) reach it on a class that defines none. trails'
- * `deepDup(obj)` dispatches to a `deepDup()` the class carries, so that member
- * is the port of `Object#deep_dup` and not surface moved from another class.
- */
-const OBJECT_AMBIENT_METHODS: readonly string[] = ["deep_dup"];
-
 const HOOK_INJECTED_MIXINS: Record<string, { includes: string[] }> = {
   "ActiveModel::Callbacks": {
     includes: ["ActiveSupport::Callbacks"],
@@ -1817,7 +1806,6 @@ function collectAllowedNames(
       walkMixin(inc, fqn, target, methodFile);
 
     for (const inc of OBJECT_AMBIENT_MIXINS) walkMixin(inc, fqn, target);
-    for (const name of OBJECT_AMBIENT_METHODS) addRubyName(name, target);
 
     for (const name of PORTED_METHODS_FROM_UNPORTED_MIXINS[fqn] ?? []) addRubyName(name, target);
 

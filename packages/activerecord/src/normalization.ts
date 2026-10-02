@@ -147,8 +147,6 @@ export class NormalizedValueType extends DelegateClass(ValueType) {
 }
 
 include(NormalizedValueType, SerializeCastValue);
-NormalizedValueType.prototype.itselfIfSerializeCastValueCompatible = SerializeCastValue.prototype
-  .itselfIfSerializeCastValueCompatible as () => NormalizedValueType | null;
 
 function castTypesEqual(a: ValueType, b: ValueType): boolean {
   const equals = (a as { equals?(other: ValueType): boolean }).equals;

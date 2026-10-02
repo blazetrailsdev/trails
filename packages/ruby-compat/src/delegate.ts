@@ -106,6 +106,10 @@ export function DelegateClass<T extends MixinBase>(
     }
   };
 
+  Object.defineProperty(klass.prototype, Symbol.for("@blazetrails/ruby-compat:delegateClass"), {
+    value: true,
+  });
+
   const ignores = new Set(["constructor", "toString", "inspect"]);
   for (
     let proto: object | null = superclass.prototype as object;
