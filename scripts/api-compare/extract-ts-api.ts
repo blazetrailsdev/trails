@@ -4627,23 +4627,12 @@ function isFallenThroughInto(clause: ts.CaseClause): boolean {
   return previous !== undefined && ts.isCaseClause(previous) && previous.statements.length === 0;
 }
 
-/** `null` or `undefined`, the two spellings of Ruby's `nil`. */
 function isNilLiteral(node: ts.Expression): boolean {
   return (
     node.kind === ts.SyntaxKind.NullKeyword || (ts.isIdentifier(node) && node.text === "undefined")
   );
 }
 
-/**
- * Whether `node` is the nil-guard conditional `x == null ? null : e` (or
- * `x != null ? e : null`) — the only faithful TS lowering of Ruby's
- * value-context `x && e`: `@alias = aliaz && SqlLiteral.new(aliaz)`
- * (`activerecord/lib/arel/nodes/function.rb:13`) cannot be spelled with JS
- * `&&`, which also short-circuits on `""` and `0` and answers that operand
- * rather than `nil`. It is also how a Ruby `e if x` in value position ports, so
- * the token is `if:nil-guard` and `compare.ts#foldSkeletonTokens` decides,
- * against the Ruby stream, whether it reads as the `if` or as the `and`.
- */
 function isNilGuardConditional(node: ts.ConditionalExpression): boolean {
   const test = node.condition;
   if (!ts.isBinaryExpression(test) || !isNilLiteral(test.right)) return false;
@@ -4659,14 +4648,6 @@ function isNilGuardConditional(node: ts.ConditionalExpression): boolean {
   }
 }
 
-/**
- * Whether `statement` is the `for (;;)` / `while (true)` a Ruby `retry` is
- * lowered to: an unconditional loop whose body is one `try` with a handler,
- * beside nothing but declarations. `Visitor#visit`
- * (`activerecord/lib/arel/visitors/visitor.rb:27-40`) re-enters its method body
- * from the `rescue` clause; `retry` is a keyword and tokens nothing on the Ruby
- * side, so the loop that spells it tokens nothing here (RFC 0113).
- */
 function isRetryLoop(statement: ts.ForStatement | ts.WhileStatement): boolean {
   const unconditional = ts.isForStatement(statement)
     ? !statement.initializer && !statement.condition && !statement.incrementor
@@ -4676,12 +4657,6 @@ function isRetryLoop(statement: ts.ForStatement | ts.WhileStatement): boolean {
   return body.length === 1 && ts.isTryStatement(body[0]) && body[0].catchClause !== undefined;
 }
 
-/**
- * Whether `statement` is `if (!(e instanceof X)) throw e;` — the guard that
- * opens the handler of a Ruby `rescue X => e` whose body is not itself an
- * `instanceof` chain. It is the clause's class filter, not an arm of its body,
- * and the rethrow is what an unmatched Ruby `rescue` does implicitly.
- */
 function isRescueClassGuard(statement: ts.Statement): boolean {
   if (!ts.isIfStatement(statement) || statement.elseStatement !== undefined) return false;
   const test = statement.expression;

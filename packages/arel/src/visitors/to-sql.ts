@@ -1,5 +1,11 @@
 import { Nodes, Visitors } from "../namespaces.js";
-import { isEmpty, NotImplementedError, rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
+import {
+  aryDeleteIf,
+  isEmpty,
+  NotImplementedError,
+  rbObjClone,
+  rbModConstSet,
+} from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
@@ -645,13 +651,13 @@ export class ToSql extends Visitor {
 
   private visitArelNodesIn(o: Nodes.In, collector: SQLString): SQLString {
     const attr = o.left;
-    let values = o.right;
+    const values = o.right;
 
     if (Array.isArray(values)) {
       collector.preparable = false;
 
       if (!isEmpty(values)) {
-        values = values.filter((value) => !this.isUnboundable(value));
+        aryDeleteIf(values, (value) => this.isUnboundable(value));
       }
 
       if (isEmpty(values)) return collector.append("1=0");
@@ -663,13 +669,13 @@ export class ToSql extends Visitor {
 
   private visitArelNodesNotIn(o: Nodes.NotIn, collector: SQLString): SQLString {
     const attr = o.left;
-    let values = o.right;
+    const values = o.right;
 
     if (Array.isArray(values)) {
       collector.preparable = false;
 
       if (!isEmpty(values)) {
-        values = values.filter((value) => !this.isUnboundable(value));
+        aryDeleteIf(values, (value) => this.isUnboundable(value));
       }
 
       if (isEmpty(values)) return collector.append("1=1");

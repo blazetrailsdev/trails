@@ -278,10 +278,6 @@ export const SKELETON_IDIOM_LOWERINGS = new Map<string, readonly (readonly strin
   // Ruby's mutating `concat` is a `push` loop in a port that cannot spread an
   // unbounded array. Part of audit row 31.
   ["concat", [[], ["loop"]]],
-  // `o.sql_with_placeholders.scan(/\?|([^?]+)/) do … end`
-  // (activerecord/lib/arel/visitors/to_sql.rb:801,812) — the block form walks
-  // the matches, which JS spells `for (const m of s.matchAll(re))`; the
-  // blockless form is the `[...s.matchAll(re)]` array and emits nothing.
   ["scan", [[], ["loop"]]],
   // `value.dig("session_id", "public_id")`
   // (actionpack/lib/action_controller/metal/request_forgery_protection.rb:343) —

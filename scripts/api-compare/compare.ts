@@ -495,16 +495,6 @@ const TS_CONSTRUCT_SKELETON_NAMES = new Map([
   ["kernelCatch", "try"],
 ]);
 
-/**
- * The token extract-ts-api.ts emits for a nil-guard conditional,
- * `x == null ? null : e`. It is the port of Ruby's `x && e` AND of a Ruby
- * `e if x` in value position, which token differently (`and` / `if`), so the
- * TS fold reads it against `counterpart` — here the RAW Ruby stream: as an `if`
- * while Ruby still shows one the port's plain `if`s have not claimed, else as
- * the `and`. With no counterpart it stays the `if` it was before the split, so
- * the reading can only discharge an invented arm, never manufacture a missing
- * one (RFC 0113).
- */
 const NIL_GUARD_TOKEN = "if:nil-guard";
 
 export function foldSkeletonTokens(
@@ -536,8 +526,6 @@ export function foldSkeletonTokens(
     const lowering = side === "ruby" ? skeletonIdiomLowering(name, surplus) : undefined;
     if (lowering !== undefined) {
       folded.push(...lowering);
-      // A single-lowering row was already spent by idiomSurplus; spending it
-      // again here took a loop a later alternative-lowering idiom was owed.
       const alternatives = SKELETON_IDIOM_LOWERINGS.get(name)!.length;
       for (const spent of alternatives > 1 ? lowering : []) {
         const at = surplus?.indexOf(spent) ?? -1;
