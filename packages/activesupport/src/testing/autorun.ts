@@ -35,10 +35,11 @@ afterEach(async (context: TestContext) => {
   };
   testCase.assertions = (expect.getState().assertionCalls ?? 0) + _takeAssertions();
   testCase.sourceLocation = [task.file?.filepath ?? "", task.location?.line ?? 0];
-  if (task.mode === "skip" || task.mode === "todo") testCase.failures.push(new Skip());
-  if (task.result?.state === "fail" || (task.result?.errors?.length ?? 0) > 0) {
-    testCase.failures.push(new UnexpectedError(new Error(context.task.name)));
+  if (task.mode === "skip" || task.mode === "todo" || task.result?.state === "skip") {
+    testCase.failures.push(new Skip());
   }
+  for (const e of task.result?.errors ?? [])
+    testCase.failures.push(new UnexpectedError(e as Error));
   const failures = testCase.failures.length;
   await testCase.afterTeardown();
   if (testCase.failures.length > failures) throw testCase.failures[failures];

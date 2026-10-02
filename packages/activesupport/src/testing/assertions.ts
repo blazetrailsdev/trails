@@ -49,11 +49,15 @@ export class Skip extends Assertion {
 
 /** @noRailsEquivalent PERMANENT */
 export class Test {
+  /** @noRailsEquivalent PERMANENT */
   name: string;
+  /** @noRailsEquivalent PERMANENT */
   failures: Assertion[];
+  /** @noRailsEquivalent PERMANENT */
   sourceLocation: [string, number];
   private _assertions: number;
 
+  /** @noRailsEquivalent PERMANENT */
   constructor(name: string) {
     this.name = name;
     this.failures = [];
@@ -61,6 +65,7 @@ export class Test {
     this.sourceLocation = ["", 0];
   }
 
+  /** @noRailsEquivalent PERMANENT */
   get assertions(): number {
     return this._assertions;
   }
@@ -69,22 +74,27 @@ export class Test {
     this._assertions = assertions;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   get failure(): Assertion | undefined {
     return this.failures[0];
   }
 
+  /** @noRailsEquivalent PERMANENT */
   isSkipped(): boolean {
     return this.failure != null && this.failure instanceof Skip;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   isError(): boolean {
     return this.failures.some((failure) => failure instanceof UnexpectedError);
   }
 
+  /** @noRailsEquivalent PERMANENT */
   beforeSetup(): unknown {
     return undefined;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   afterTeardown(): unknown {
     return undefined;
   }
