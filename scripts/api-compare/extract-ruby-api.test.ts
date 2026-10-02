@@ -62,6 +62,42 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     return rubyField(fixtures, "calls");
   }
 
+  it("records the opener of a string default that is not double-quoted", () => {
+    const r = rubyField(
+      {
+        "quoted.rb": [
+          "class Foo",
+          "  def like(double = \"\\\\\", single = '\\s', percent = %q(a\\)b), upper = %Q(\\s), plain = 'x')",
+          "  end",
+          "",
+          "  def here(raw = <<~'EOS', cooked = <<~EOS, sym = :\"a\\n\", after = '\\d')",
+          "    a\\nb",
+          "  EOS",
+          "    c\\nd",
+          "  EOS",
+          "  end",
+          "end",
+          "",
+        ].join("\n"),
+      },
+      "params",
+    ) as unknown as Record<string, { name: string; literal: { opener?: string } }[]>;
+    const openers = (key: string) => r[key].map((p) => [p.name, p.literal.opener]);
+    expect(openers("Foo#like")).toEqual([
+      ["double", undefined],
+      ["single", "'"],
+      ["percent", "%q("],
+      ["upper", undefined],
+      ["plain", undefined],
+    ]);
+    expect(openers("Foo#here")).toEqual([
+      ["raw", "<<~'EOS'"],
+      ["cooked", undefined],
+      ["sym", undefined],
+      ["after", "'"],
+    ]);
+  });
+
   // Class fqn -> the module names recorded as `includes` on it.
   function rubyIncludes(fixtures: Record<string, string>): Record<string, string[]> {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "includes-rb-"));
@@ -1761,8 +1797,7 @@ describe(
     // Returns a map of "<fqn>#<method>" -> the method's expanded option_keys.
     function optionKeys(
       fixtures: Record<string, string>,
-      field = "option_keys",
-    ): Record<string, string[] | true | null | undefined> {
+    ): Record<string, string[] | null | undefined> {
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), "optkeys-rb-"));
       try {
         for (const [rel, src] of Object.entries(fixtures)) {
@@ -1781,7 +1816,7 @@ describe(
         out = {}
         (ex.classes.to_a + ex.modules.to_a).each do |fqn, info|
           (info[:instanceMethods] + info[:classMethods]).each do |m|
-            out["#{fqn}##{m[:name]}"] = m[:${field}]
+            out["#{fqn}##{m[:name]}"] = m[:option_keys]
           end
         end
         puts JSON.generate(out)
@@ -1816,45 +1851,25 @@ describe(
       expect(r["Bar::Rel#build"]).toEqual(["top_a", "top_b"]);
     });
 
-    it("flags a body that hands its options var whole to a callee", () => {
-      const r = optionKeys(
-        {
-          "fwd.rb": `
+    it("reads the keys of a values_at and of a compound assignment", () => {
+      const r = optionKeys({
+        "reads.rb": `
         class Rel
-          def as_json(options = nil)
-            root = options[:root]
-            serializable_hash(options).as_json
+          def add_enum_value(type_name, value, **options)
+            before, after = options.values_at(:before, :after)
+            options[:if_not_exists]
           end
 
-          def splatted(name, **options)
-            options[:on]
-            build(name, **options)
-          end
-
-          def after_star(*args, options)
-            options[:on]
-            build(*args, options)
-          end
-
-          def zsuper(options = {})
-            options[:on]
-            super
-          end
-
-          def reads_only(options)
-            options[:on] = Array(options[:on])
-            options.fetch(:if, nil)
+          def change_column(table_name, **options)
+            options[:precision] ||= nil
+            options[:_skip] = true
+            options[:null] = false
           end
         end
       `,
-        },
-        "option_keys_forwarded",
-      );
-      expect(r["Rel#as_json"]).toBe(true);
-      expect(r["Rel#splatted"]).toBe(true);
-      expect(r["Rel#after_star"]).toBe(true);
-      expect(r["Rel#zsuper"]).toBe(true);
-      expect(r["Rel#reads_only"]).toBeNull();
+      });
+      expect(r["Rel#add_enum_value"]).toEqual(["after", "before", "if_not_exists"]);
+      expect(r["Rel#change_column"]).toEqual(["precision"]);
     });
   },
 );

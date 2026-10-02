@@ -999,6 +999,7 @@ export interface TsPortedWithArgsMaps {
    * against the file the method actually MATCHED in.
    */
   optionKeysByFileName: Map<string, Map<string, (string[] | null)[]>>;
+  optionReadsByFileName: Map<string, Map<string, string[][]>>;
 }
 
 export function newTsPortedWithArgsMaps(): TsPortedWithArgsMaps {
@@ -1008,6 +1009,7 @@ export function newTsPortedWithArgsMaps(): TsPortedWithArgsMaps {
     paramsByFileOwnerNameInPkg: new Map(),
     writerSigs: new Set(),
     optionKeysByFileName: new Map(),
+    optionReadsByFileName: new Map(),
   };
 }
 
@@ -1045,6 +1047,11 @@ export function recordTsPortedWithArgs(
     const byName = maps.optionKeysByFileName.get(file) ?? new Map<string, (string[] | null)[]>();
     byName.set(m.name, [...(byName.get(m.name) ?? []), m.optionKeys]);
     maps.optionKeysByFileName.set(file, byName);
+  }
+  if (m.optionReads !== undefined) {
+    const byName = maps.optionReadsByFileName.get(file) ?? new Map<string, string[][]>();
+    byName.set(m.name, [...(byName.get(m.name) ?? []), m.optionReads]);
+    maps.optionReadsByFileName.set(file, byName);
   }
 }
 
@@ -3849,6 +3856,7 @@ export function main() {
       paramsByFileOwnerNameInPkg: tsParamsByFileOwnerNameInPkg,
       writerSigs: tsWriterSigs,
       optionKeysByFileName: tsOptionKeysByFileName,
+      optionReadsByFileName: tsOptionReadsByFileName,
     } = portedWithArgsMaps;
     // Body call-sets scoped per (file, name) for the advisory calls-parity check.
     const tsCallsByFileName = new Map<string, Map<string, string[][]>>();
@@ -4456,9 +4464,7 @@ export function main() {
       // always describes the very params the arity check would compare.
       const rubyForwardingNames = new Set<string>();
       const rubyBlockOwners = new Map<string, string[]>();
-      // First-sighting Ruby option keys per name (mirrors rubyParamsByName).
       const rubyOptionKeysByName = new Map<string, string[]>();
-      const rubyOptionKeysForwarded = new Set<string>();
       // First-sighting Ruby body call-set per name (advisory calls-parity check).
       const rubyCallsByName = new Map<string, string[]>();
       // Same first-sighting keying: the inert-receiver subset of that call-set
@@ -4526,9 +4532,11 @@ export function main() {
             const blockKey = `${rmLevel}|${rm.name}`;
             rubyBlockOwners.set(blockKey, [...(rubyBlockOwners.get(blockKey) ?? []), item.fqn]);
           }
-          if (rm.option_keys && !rubyOptionKeysByName.has(rm.name)) {
-            rubyOptionKeysByName.set(rm.name, rm.option_keys);
-            if (rm.option_keys_forwarded) rubyOptionKeysForwarded.add(rm.name);
+          if (rm.option_keys) {
+            rubyOptionKeysByName.set(rm.name, [
+              ...(rubyOptionKeysByName.get(rm.name) ?? []),
+              ...rm.option_keys,
+            ]);
           }
           rubyOwnersByName.set(
             rm.name,
@@ -4581,11 +4589,16 @@ export function main() {
         const positionalParams = (rubyParamsByName.get(rubyName) ?? [])
           .filter((p) => p.kind === "required" || p.kind === "optional")
           .map((p) => p.name);
+        const keywordParams = (rubyParamListsByName.get(rubyName) ?? [])
+          .flat()
+          .filter((p) => p.kind === "keyword")
+          .map((p) => p.name);
         const verdict = matchOptionKeysAgainst(
           rubyKeys,
           candidates,
           positionalParams,
-          rubyOptionKeysForwarded.has(rubyName),
+          tsOptionReadsByFileName.get(tsFile)?.get(tsName) ?? [],
+          keywordParams,
         );
         if (!verdict.comparable) return;
         optionKeysCompared++;

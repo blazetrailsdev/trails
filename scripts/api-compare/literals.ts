@@ -11,7 +11,6 @@ import { snakeToCamel } from "@blazetrails/parity/conventions";
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\x00\x1b\r\n\t]/g;
 
-/** Canonicalize so Ruby raw source escapes (`\e`, `\r\n`) and TS resolved control chars compare equal. */
 function canonString(s: string): string {
   const real: Record<string, string> = {
     "\x00": "<0>",
@@ -20,10 +19,81 @@ function canonString(s: string): string {
     "\n": "<n>",
     "\t": "<t>",
   };
-  return s
-    .replace(CONTROL_CHARS, (c) => real[c])
-    .replace(/\\e|\\033|\\x1[bB]|\\u001[bB]/g, "<e>")
-    .replace(/\\([0rnt])/g, (_, c) => `<${c}>`);
+  return s.replace(CONTROL_CHARS, (c) => real[c]);
+}
+
+const RUBY_SIMPLE_ESCAPES: Record<string, string> = {
+  n: "\n",
+  t: "\t",
+  r: "\r",
+  f: "\f",
+  v: "\v",
+  a: "\x07",
+  b: "\b",
+  e: "\x1b",
+  s: " ",
+  "\n": "",
+};
+
+const RUBY_CLOSING_DELIMITERS: Record<string, string> = { "(": ")", "[": "]", "{": "}", "<": ">" };
+
+const RUBY_ESCAPE =
+  /\\(?:([0-7]{1,3})|x([0-9a-fA-F]{1,2})|u([0-9a-fA-F]{4})|u\{([0-9a-fA-F \t]+)\}|(?:c|C-)([\s\S])|([\s\S]))/g;
+
+/**
+ * The VALUE of a Ruby double-quoted string literal, from the source text
+ * between its quotes — which is what extract-ruby-api.rb records, since Ripper's
+ * `@tstring_content` is undecoded. The TS extractor records `node.text`, already
+ * decoded, so comparing the two spellings counts every Ruby backslash twice:
+ * `"\\"` (sanitization.rb:132) and TS `"\\"` are the same one-backslash string.
+ *
+ * Mirrors MRI's `read_escape` (vendor/ruby/v3.3.11/parse.y:7989): octal
+ * `\nnn`, `\xHH`, `\uHHHH`, `\u{H…}`, control `\cx` / `\C-x`, the named escapes, a backslash-newline continuation,
+ * and any other `\X`, which is `X`. `\M-x` is not decoded: it yields a byte
+ * that is not a character, and falls through the last arm.
+ *
+ * `opener` is the literal's opening token when it is not double-quoted, which
+ * extract-ruby-api.rb reads off the lexer since the sexp drops it. A `'…'` or
+ * `%q(…)` literal knows only a backslash before another backslash or before
+ * its own delimiter, and keeps every other one: `'\s*'` (action_view.rb:35) is
+ * three characters. A `<<~'EOS'` heredoc has no escapes at all.
+ */
+export function decodeRubyString(source: string, opener?: string): string {
+  if (opener?.startsWith("<<")) return source;
+  if (opener !== undefined) {
+    const open = opener.at(-1)!;
+    const close = RUBY_CLOSING_DELIMITERS[open] ?? open;
+    return source.replace(/\\([\s\S])/g, (escape, char: string) =>
+      char === "\\" || char === open || char === close ? char : escape,
+    );
+  }
+  return source.replace(
+    RUBY_ESCAPE,
+    (
+      _,
+      octal: string | undefined,
+      hex: string | undefined,
+      unicode: string | undefined,
+      braced: string | undefined,
+      control: string | undefined,
+      other: string | undefined,
+    ) => {
+      if (octal !== undefined) return String.fromCharCode(parseInt(octal, 8) & 0xff);
+      if (hex !== undefined) return String.fromCharCode(parseInt(hex, 16));
+      if (unicode !== undefined) return String.fromCharCode(parseInt(unicode, 16));
+      if (braced !== undefined) {
+        return braced
+          .trim()
+          .split(/[ \t]+/)
+          .map((point) => String.fromCodePoint(parseInt(point, 16)))
+          .join("");
+      }
+      if (control !== undefined) {
+        return control === "?" ? "\x7f" : String.fromCharCode(control.charCodeAt(0) & 0x9f);
+      }
+      return RUBY_SIMPLE_ESCAPES[other!] ?? other!;
+    },
+  );
 }
 
 /** Canonical comparison key, or null when uncomparable (`expr`); int/float parse numerically. */
@@ -69,7 +139,11 @@ export function compareLiteral(
   ts: LiteralValue,
   symbolDiscriminated = false,
 ): LiteralVerdict {
-  const r = normalizeLiteral(ruby);
+  const r = normalizeLiteral(
+    ruby.kind === "string"
+      ? { kind: "string", value: decodeRubyString(String(ruby.value ?? ""), ruby.opener) }
+      : ruby,
+  );
   const t = normalizeLiteral(ts);
   if (r === null || t === null) return "skip";
   if ((r === "nil") !== (t === "nil")) return "skip";

@@ -1,11 +1,16 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { any, pluralize, symbolizeKeys } from "@blazetrails/activesupport";
-import { rbInspect, rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import {
+  except,
+  hashDelete,
+  rbInspect,
+  rbObjAsString as toS,
+  slice,
+} from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type {
   AddForeignKeyOptions,
   ForeignKeyDefinition,
-  ForeignKeyLookupOptions,
   RemoveForeignKeyOptions,
 } from "../abstract/schema-definitions.js";
 import { CheckConstraintDefinition } from "../abstract/schema-definitions.js";
@@ -128,41 +133,37 @@ export async function removeForeignKey(
   } else {
     options = { ...options };
   }
-  const ifExists = options.ifExists === true;
-  delete options.ifExists;
-
-  if (ifExists && !(await this.foreignKeyExists(fromTable, toTable))) return;
+  if (
+    hashDelete<unknown>(options as Record<string, unknown>, "ifExists") === true &&
+    !(await this.foreignKeyExists(fromTable, toTable))
+  ) {
+    return;
+  }
 
   toTable ??= options.toTable;
-  let matchOptions: ForeignKeyLookupOptions = { ...options };
-  delete matchOptions.name;
-  delete matchOptions.toTable;
-  delete matchOptions.validate;
-
+  options = except(options as Record<string, unknown>, "name", "toTable", "validate");
   const foreignKeys = await this.foreignKeys(fromTable);
+
   const fkey = foreignKeys.find((fk) => {
     let table: string;
     if (toTable != null) {
       table = toTable;
     } else {
-      table = toS(matchOptions.column).replace(/_id$/, "");
+      table = toS(options.column).replace(/_id$/, "");
       table = ActiveRecord.Base.pluralizeTableNames ? pluralize(table) : table;
     }
     table = this.stripTableNamePrefixAndSuffix(table);
     const fkOptions = fk.options as Record<string, unknown>;
-    matchOptions = Object.fromEntries(
-      Object.entries(matchOptions).filter(([k]) => k in fkOptions),
-    ) as ForeignKeyLookupOptions;
+    options = slice(options as Record<string, unknown>, ...Object.keys(fkOptions));
     const fkToTable = this.stripTableNamePrefixAndSuffix(fk.toTable);
     return (
-      fkToTable === table &&
-      Object.entries(matchOptions).every(([k, v]) => toS(fkOptions[k]) === toS(v))
+      fkToTable === table && Object.entries(options).every(([k, v]) => toS(fkOptions[k]) === toS(v))
     );
   });
 
   if (!fkey) {
     throw new ArgumentError(
-      `Table '${fromTable}' has no foreign key for ${toTable ?? toS(symbolizeKeys(matchOptions as Record<string, unknown>))}`,
+      `Table '${fromTable}' has no foreign key for ${toTable ?? toS(symbolizeKeys(options as Record<string, unknown>))}`,
     );
   }
 

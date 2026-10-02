@@ -3964,6 +3964,55 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     expect(fns.find((m) => m.name === "bag")!.optionKeys).toBeNull();
   });
 
+  it("reads option keys off the body, not the options type", () => {
+    const info = extractFromFiles("/p", {
+      "schema-definitions.ts": `
+        interface ColumnOptions { limit?: number; null?: boolean; precision?: number; after?: string; type?: string; unsigned?: boolean }
+        declare function fetch(h: object, k: string, d?: unknown): unknown;
+        declare function valuesAt(h: object, ...k: string[]): unknown[];
+        export function timestamps(options: ColumnOptions = {}): void {
+          column("created_at", options);
+        }
+        export function reads(name: string, options: ColumnOptions = {}): void {
+          if (options.null) return;
+          options.unsigned = true;
+          options.limit ??= 8;
+          const { precision, ...rest } = options;
+          const copy = { ...rest };
+          if ("after" in copy) fetch(options as object, "type", null);
+        }
+        export function destructured({ limit, ...options }: ColumnOptions): void {
+          valuesAt(options, "null", "after");
+          delete options.precision;
+        }
+        export function inert(options: ColumnOptions = {}): void {
+          options.toString();
+          options.hasOwnProperty("null");
+          let limit, rest: ColumnOptions;
+          ({ limit, ...rest } = options);
+          const { after: { length } = "" } = rest;
+        }
+        export function bag({ types, options }: { types: string[]; options: ColumnOptions }): void {
+          options["limit"];
+        }
+        export declare function bodiless(options: ColumnOptions): void;
+        declare function column(name: string, options: ColumnOptions): void;
+      `,
+    });
+    const fns = Object.values(info.modules).flatMap((m) => [
+      ...m.instanceMethods,
+      ...m.classMethods,
+    ]);
+    const reads = (name: string) => fns.find((m) => m.name === name)!.optionReads;
+    expect(reads("timestamps")).toEqual([]);
+    expect(reads("reads")).toEqual(["after", "limit", "null", "precision", "type"]);
+    expect(reads("destructured")).toEqual(["after", "limit", "null", "precision"]);
+    expect(reads("inert")).toEqual(["after", "limit", "null"]);
+    expect(reads("bag")).toEqual(["limit"]);
+    expect(reads("bodiless")).toBeUndefined();
+    expect(fns.find((m) => m.name === "timestamps")!.optionKeys).toHaveLength(6);
+  });
+
   it("extracts parameters onto a synthesized __mixin constructor", () => {
     const info = extractFromFiles("/p", {
       "attributes.ts": `

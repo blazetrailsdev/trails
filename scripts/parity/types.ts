@@ -8,6 +8,10 @@
 export interface LiteralValue {
   kind: "int" | "float" | "string" | "symbol" | "bool" | "nil" | "array" | "hash" | "expr";
   value?: string | boolean; // int/float token (underscores kept), string/symbol text, or boolean
+  /** Ruby side only: the opening token of a string whose source text does not
+   *  decode by the double-quoted rules — `'`, `%q(`, or a `<<~'EOS'` heredoc.
+   *  See literals.ts `decodeRubyString`. */
+  opener?: string;
 }
 
 /**
@@ -255,9 +259,6 @@ export interface MethodInfo {
   /** Ruby-side option symbols consumed from an `options`/`opts`/`**kwargs`
    *  param (raw snake_case); advisory under-approximation. See options-keys.ts. */
   option_keys?: string[];
-  /** Ruby-side only: the body hands the options var whole to a callee, so the
-   *  keys that callee reads are not in `option_keys`. See options-keys.ts. */
-  option_keys_forwarded?: boolean;
   /**
    * TS-side only: this entry is a `set` accessor. Ruby spells the writer as its
    * OWN method (`where_clause=`), but conventions.ts maps that onto the bare
@@ -291,6 +292,9 @@ export interface MethodInfo {
   /** TS-side property names of the trailing options-object param; `null` when
    *  uncheckable (`any`/`Record<string, unknown>`), absent when not an object. */
   optionKeys?: string[] | null;
+  /** TS-side keys the BODY reads off that param — the counterpart of the Ruby
+   *  `option_keys`. Absent on a bodiless signature. See options-keys.ts. */
+  optionReads?: string[];
   /**
    * TS-side only, on `synthesizedMixin` pseudo-modules: the file that actually
    * declares this member, when it is NOT the file the pseudo-module is keyed

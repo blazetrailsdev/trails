@@ -98,7 +98,7 @@ end
 
 # ---- Param extraction from Ripper AST ----
 
-def extract_params(params_node)
+def extract_params(params_node, opener_at = nil)
   return [] if params_node.nil?
   return [] unless params_node.is_a?(Array) && params_node[0] == :params
 
@@ -120,7 +120,7 @@ def extract_params(params_node)
       name = ident_name(p[0])
       if name
         entry = { name: name, kind: "optional", default: "..." }
-        lit = literal_value(p[1])
+        lit = literal_value(p[1], opener_at)
         entry[:literal] = lit if lit
         result << entry
       end
@@ -151,7 +151,7 @@ def extract_params(params_node)
           result << { name: name.chomp(":"), kind: "keyword" }
         else
           entry = { name: name.chomp(":"), kind: "keyword", default: "..." }
-          lit = literal_value(kw[1])
+          lit = literal_value(kw[1], opener_at)
           entry[:literal] = lit if lit
           result << entry
         end
@@ -265,7 +265,7 @@ end
 
 # Classify a default-value or constant-RHS node as a literal {kind:, value:};
 # {kind: "expr"} for non-literals (calls, refs, lambdas), nil when no node.
-def literal_value(node)
+def literal_value(node, opener_at = nil)
   return nil if node.nil?
   return { kind: "expr" } unless node.is_a?(Array)
   case node[0]
@@ -275,7 +275,11 @@ def literal_value(node)
     { kind: "float", value: node[1] }
   when :string_literal
     val = string_literal_value(node)
-    val.nil? ? { kind: "expr" } : { kind: "string", value: val }
+    return { kind: "expr" } if val.nil?
+    lit = { kind: "string", value: val }
+    opener = val.include?("\\") && opener_at ? opener_at.call(node.dig(1, 1, 2)) : nil
+    lit[:opener] = opener if opener && raw_string_opener?(opener)
+    lit
   when :symbol_literal
     inner = node[1]
     name = inner.is_a?(Array) && inner[0] == :symbol ? ident_name(inner[1]) : nil
@@ -316,6 +320,10 @@ def string_literal_value(node)
     str << part[1]
   end
   str
+end
+
+def raw_string_opener?(opener)
+  opener == "'" || opener.start_with?("%q") || (opener.start_with?("<<") && opener.include?("'"))
 end
 
 # ---- Dependency detection patterns ----
@@ -423,9 +431,37 @@ class ApiExtractor
   # (`options.fetch(:k, default)`).
   OPTION_READER_METHODS = %w[fetch delete key? has_key? include? member?].to_set
 
+  STRING_OPENER_TOKENS = %i[
+    on_tstring_beg on_qwords_beg on_words_beg on_qsymbols_beg on_symbols_beg on_backtick
+  ].freeze
+
+  def string_opener_at(pos)
+    @string_openers ||= lex_string_openers
+    @string_openers[pos]
+  end
+
+  def lex_string_openers
+    openers = {}
+    stack = []
+    heredocs = []
+    Ripper.lex(@source).each do |pos, type, tok|
+      case type
+      when *STRING_OPENER_TOKENS then stack.push(tok)
+      when :on_symbeg then stack.push(tok) if tok.length > 1
+      when :on_tstring_end then stack.pop
+      when :on_heredoc_beg then heredocs.push(tok)
+      when :on_heredoc_end then heredocs.shift
+      when :on_tstring_content then openers[pos] = stack.last || heredocs.first
+      end
+    end
+    openers
+  end
+
   def process_file(filepath, package_root)
     source = File.read(filepath)
     @source_lines = source.lines
+    @source = source
+    @string_openers = nil
     sexp = Ripper.sexp(source)
     return unless sexp
 
@@ -822,7 +858,7 @@ class ApiExtractor
     name = ident_name(name_node)
     return unless name
 
-    params = extract_params(find_params(node))
+    params = extract_params(find_params(node), method(:string_opener_at))
     vis = current_visibility
     vis = :public if @current_doc_methods&.include?(name)
 
@@ -868,7 +904,7 @@ class ApiExtractor
     name = ident_name(name_node)
     return unless name
 
-    params = extract_params(find_params_defs(node))
+    params = extract_params(find_params_defs(node), method(:string_opener_at))
     vis = current_visibility
     vis = :public if @current_doc_methods&.include?(name)
 
@@ -1948,7 +1984,7 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return false unless target
 
-    record_metaprogrammed_method(fqn, target, name, extract_params(params_node), "define_method",
+    record_metaprogrammed_method(fqn, target, name, extract_params(params_node, method(:string_opener_at)), "define_method",
                                  body: body, params_node: params_node)
     maybe_update_module_file(fqn, target)
     true
@@ -2006,7 +2042,7 @@ class ApiExtractor
         name = unrolled_name(list[0], loop_var, member)
         next unless name
         if kind == "define_method"
-          record_metaprogrammed_method(fqn, target, name, extract_params(params_node), "define_method",
+          record_metaprogrammed_method(fqn, target, name, extract_params(params_node, method(:string_opener_at)), "define_method",
                                        body: body, params_node: params_node)
         else
           old = list[1] && unrolled_name(list[1], loop_var, member)
@@ -2099,9 +2135,6 @@ class ApiExtractor
     entry[:skeleton] = skeleton unless skeleton.empty?
     opt_keys = collect_option_keys(body, entry[:params], fqn)
     entry[:option_keys] = opt_keys unless opt_keys.empty?
-    if !opt_keys.empty? && forwards_option_var?(body, option_var_names(entry[:params]))
-      entry[:option_keys_forwarded] = true
-    end
     record_file_hash_keys(opt_keys)
     record_file_hash_keys(collect_ivar_option_keys(body))
     digest = body_digest(body)
@@ -3248,7 +3281,7 @@ class ApiExtractor
     maybe_record_collection_constant(const[1], rhs)
     maybe_record_symbol_hash_keys(const[1], rhs)
     record_file_hash_keys(literal_hash_keys(rhs))
-    lit = literal_value(rhs)
+    lit = literal_value(rhs, method(:string_opener_at))
     return if lit.nil?
     (@file_constants[@current_file] ||= {})[const[1]] = lit
   end
@@ -3394,27 +3427,17 @@ class ApiExtractor
     names
   end
 
-  def forwards_option_var?(node, vars)
-    return false unless node.is_a?(Array)
-    case node[0]
-    when :zsuper
-      return true
-    when :assoc_splat
-      return true if option_var?(node[1], vars)
-    when :args_add_block
-      list = node[1]
-      list = list[1..] if list.is_a?(Array) && list[0] == :args_add_star
-      return true if list.is_a?(Array) && list.any? { |arg| option_var?(arg, vars) }
-    end
-    node.any? { |child| forwards_option_var?(child, vars) }
-  end
-
   def walk_for_option_keys(node, vars, consts, keys)
     return unless node.is_a?(Array)
     case node[0]
     when :aref
       # options[:foo]
       traverse_for_symbols(node[2], keys) if option_var?(node[1], vars)
+    when :opassign
+      target = node[1]
+      if target.is_a?(Array) && target[0] == :aref_field && option_var?(target[1], vars)
+        traverse_for_symbols(target[2], keys)
+      end
     when :method_add_arg, :command_call
       # `options.fetch(:k)` (parens) and `options.assert_valid_keys :a` (no
       # parens). A bare `:call` (`options.keys`) never carries a key arg.
@@ -3448,6 +3471,8 @@ class ApiExtractor
         members = c.start_with?("::") ? resolve_const_symbol_array(c) : consts[c]
         (members || []).each { |s| keys << s }
       end
+    elsif meth == "values_at"
+      traverse_for_symbols(args, keys)
     elsif OPTION_READER_METHODS.include?(meth)
       syms = []
       traverse_for_symbols(args, syms)
