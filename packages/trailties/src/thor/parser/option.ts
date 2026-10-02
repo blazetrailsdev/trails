@@ -26,7 +26,7 @@ export interface OptionOptions extends ArgumentOptions {
 
 export class Option extends Argument {
   declare aliases: string[];
-  declare group: string | null;
+  declare group: string | undefined;
   declare lazyDefault: unknown;
   declare hide: unknown;
   declare repeatable: unknown;
@@ -65,7 +65,7 @@ export class Option extends Argument {
     let type: string | null = null;
     if (isSymbol(value)) {
       default_ = null;
-      if (this.VALID_TYPES.includes(symbolToS(value))) {
+      if (Option.VALID_TYPES.includes(symbolToS(value))) {
         type = symbolToS(value);
       } else if ((required = value === ":required")) {
         type = "string";

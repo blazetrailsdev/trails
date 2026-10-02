@@ -2565,10 +2565,7 @@ class ApiExtractor
   # lookup: the container is anchored to the top level (`fqn == container`, or
   # the empty top level for `::CONST`) and the relative `end_with?` suffix match
   # is skipped, honouring Ruby's rule that `::Foo::KEYS` binds to top-level
-  # `Foo`, never a nested `X::Foo`. A bare `CONST` binds lexically first: the
-  # enclosing class's own constant wins over a same-named one recorded earlier
-  # (`Thor::Option::VALID_TYPES` over `Thor::Argument::VALID_TYPES`,
-  # vendor/thor/v1.3.2/lib/thor/parser/option.rb:5,116).
+  # `Foo`, never a nested `X::Foo`.
   def resolve_const_members(name, store)
     return nil unless name
     absolute = name.start_with?("::")
