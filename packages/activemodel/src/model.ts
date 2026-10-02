@@ -161,10 +161,7 @@ export class Model {
   declare runCallbacks: Included<typeof ASCallbacks.InstanceMethods>["runCallbacks"];
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE model-constructor-calls-init-internals-rails-does-not
- */
+/** @internal */
 export function initInternals(this: Model): void {}
 
 include(Model, new Module((mod) => mod.defineMethod("initInternals", initInternals)));
