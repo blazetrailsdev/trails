@@ -33,9 +33,9 @@ function valuesEqual(a: unknown, b: unknown): boolean {
   return false;
 }
 
-const OPTION_NOT_GIVEN: unknown = Object.freeze({});
-
 export class AttributeMutationTracker {
+  static readonly OPTION_NOT_GIVEN: unknown = Object.freeze({});
+
   protected attributes: AttributeSet;
   protected forcedChanges: Map<string, unknown> = new Map();
 
@@ -80,6 +80,7 @@ export class AttributeMutationTracker {
   }
 
   isChanged(attrName: string, options: { from?: unknown; to?: unknown } = {}): boolean {
+    const { OPTION_NOT_GIVEN } = AttributeMutationTracker;
     const { from, to } = { from: OPTION_NOT_GIVEN, to: OPTION_NOT_GIVEN, ...options };
     return (
       this.attributeChanged(attrName) &&
