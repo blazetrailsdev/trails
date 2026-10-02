@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { BigDecimal, include, isModuleIncluded, TopLevel } from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
-import { b, StringIO } from "@blazetrails/ruby-compat";
+import { b, setVerbose, stderr, StringIO, verbose } from "@blazetrails/ruby-compat";
 import { UploadedFile } from "@blazetrails/rack-test";
 import {
   Behavior,
@@ -176,8 +176,41 @@ describe("TestCase#wrap_execution", () => {
       expect(wrapped).toBe(1);
       expect(tc.response.status).toBe(200);
     } finally {
-      TestCase.executorAroundEachRequest = false;
+      TestCase.executorAroundEachRequest = null;
       TopLevel.Trails = trails;
+    }
+  });
+});
+
+describe("TestCase#setup_controller_request_and_response", () => {
+  class UnconstructibleController extends Base {
+    constructor() {
+      super();
+      throw new Error("boom");
+    }
+  }
+  Object.defineProperty(UnconstructibleController, "name", { value: "UnconstructibleController" });
+
+  it("warns under $VERBOSE when the controller cannot be constructed", async () => {
+    class UnconstructibleTest extends TestCase {}
+    UnconstructibleTest.tests(UnconstructibleController);
+    const written: string[] = [];
+    const write = vi.spyOn(stderr, "write").mockImplementation((s: string) => {
+      written.push(s);
+      return true;
+    });
+    const was = verbose();
+    try {
+      await new UnconstructibleTest().beforeSetup();
+      expect(written).toEqual([]);
+      setVerbose(true);
+      const tc = new UnconstructibleTest();
+      await tc.beforeSetup();
+      expect(tc.controller).toBeNull();
+      expect(written).toEqual(["could not construct controller UnconstructibleController\n"]);
+    } finally {
+      setVerbose(was);
+      write.mockRestore();
     }
   });
 });

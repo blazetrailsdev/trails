@@ -27,6 +27,8 @@ import {
   RuntimeError,
   SecureRandom,
   StringIO,
+  verbose,
+  warn,
 } from "@blazetrails/ruby-compat";
 import {
   DEFAULT_OPTIONS,
@@ -308,7 +310,10 @@ function setupControllerRequestAndResponse(this: Behavior): void {
       try {
         this.controller = new klass();
       } catch {
-        this.controller = null!;
+        const verboseGlobal = verbose();
+        if (verboseGlobal != null && verboseGlobal !== false) {
+          warn(`could not construct controller ${klass.name}`);
+        }
       }
     }
   }
@@ -534,28 +539,16 @@ export interface TestCase extends Behavior {
   assertTemplate: typeof TemplateAssertions.assertTemplate;
   assertResponse: typeof responseAssertions.assertResponse;
   assertRedirectedTo: typeof responseAssertions.assertRedirectedTo;
-  /** @internal */
-  parameterize: typeof responseAssertions.parameterize;
-  /** @internal */
-  normalizeArgumentToRedirection: typeof responseAssertions.normalizeArgumentToRedirection;
   setup(): void;
   assertRecognizes: typeof routingAssertions.assertRecognizes;
   assertGenerates: typeof routingAssertions.assertGenerates;
   assertRouting: typeof routingAssertions.assertRouting;
   withRouting: typeof routingAssertions.withRouting;
-  /** @internal */
-  createRoutes: typeof routingAssertions.createRoutes;
-  /** @internal */
-  resetRoutes: typeof routingAssertions.resetRoutes;
-  /** @internal */
-  recognizedRequestFor: typeof routingAssertions.recognizedRequestFor;
-  /** @internal */
-  failOn: typeof routingAssertions.failOn;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class TestCase extends ActiveSupportTestCase {
-  static executorAroundEachRequest = false;
+  static executorAroundEachRequest: boolean | null = null;
 
   declare response: TestResponse | LiveTestResponse;
   declare request: TestRequest;
