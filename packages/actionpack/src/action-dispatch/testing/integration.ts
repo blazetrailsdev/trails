@@ -19,8 +19,7 @@ import { RouteSet } from "../routing/route-set.js";
 import type { Metal } from "../../action-controller/metal.js";
 import { FixtureFile, TestProcess } from "./test-process.js";
 import * as routingAssertions from "./assertions/routing.js";
-import * as responseAssertions from "./assertions/response.js";
-import { htmlDocument, type HtmlDocumentHost } from "./assertions.js";
+import { Assertions } from "./assertions.js";
 import type { XmlDocument } from "@blazetrails/nokogiri";
 import * as urlForMod from "../routing/url-for.js";
 import * as polymorphicRoutes from "../routing/polymorphic-routes.js";
@@ -333,10 +332,6 @@ export class IntegrationTest extends TestCase {
     return this._mockSession.cookieJar;
   }
 
-  get htmlDocument(): XmlDocument {
-    return htmlDocument.call(this as unknown as HtmlDocumentHost);
-  }
-
   get documentRootElement() {
     return this.htmlDocument.root;
   }
@@ -435,10 +430,6 @@ export class IntegrationTest extends TestCase {
   /** @internal */
   _originalRoutes?: RouteSet;
 
-  setup(): void {
-    routingAssertions.setup.call(this);
-  }
-
   /** @internal */
   _app?: unknown;
 
@@ -480,17 +471,11 @@ export class IntegrationTest extends TestCase {
     return `#<${this.constructor.name} ${url}>`;
   }
 
-  // @internal
-  declare assertRecognizes: typeof routingAssertions.assertRecognizes;
-  declare assertGenerates: typeof routingAssertions.assertGenerates;
-  declare assertRouting: typeof routingAssertions.assertRouting;
   declare withRouting: typeof routingAssertions.WithIntegrationRouting.withRouting;
   /** @internal */
   declare createRoutes: typeof routingAssertions.WithIntegrationRouting.createRoutes;
   /** @internal */
   declare resetRoutes: typeof routingAssertions.WithIntegrationRouting.resetRoutes;
-  declare recognizedRequestFor: typeof routingAssertions.recognizedRequestFor;
-  declare failOn: typeof routingAssertions.failOn;
   declare urlFor: typeof urlForMod.urlFor;
   declare fullUrlFor: typeof urlForMod.fullUrlFor;
   declare routeFor: typeof urlForMod.routeFor;
@@ -503,10 +488,6 @@ export class IntegrationTest extends TestCase {
   declare polymorphicUrlForAction: typeof polymorphicRoutes.polymorphicUrlForAction;
   declare polymorphicPathForAction: typeof polymorphicRoutes.polymorphicPathForAction;
   declare polymorphicMapping: typeof polymorphicRoutes.polymorphicMapping;
-  declare parameterize: typeof responseAssertions.parameterize;
-  declare normalizeArgumentToRedirection: typeof responseAssertions.normalizeArgumentToRedirection;
-  declare assertResponse: typeof responseAssertions.assertResponse;
-  declare assertRedirectedTo: typeof responseAssertions.assertRedirectedTo;
   declare saveAndOpenPage: typeof pageDumpHelper.saveAndOpenPage;
   /** @internal */
   declare savePage: typeof pageDumpHelper.savePage;
@@ -514,26 +495,6 @@ export class IntegrationTest extends TestCase {
   declare openFile: typeof pageDumpHelper.openFile;
   /** @internal */
   declare htmlDumpDefaultPath: typeof pageDumpHelper.htmlDumpDefaultPath;
-  /** @internal */
-  generateResponseMessage(expected: number | string, actual: number): string {
-    return responseAssertions.generateResponseMessage(this, expected, actual);
-  }
-  /** @internal */
-  responseBodyIfShort(): string {
-    return responseAssertions.responseBodyIfShort(this);
-  }
-  /** @internal */
-  exceptionIfPresent(): string {
-    return responseAssertions.exceptionIfPresent(this);
-  }
-  /** @internal */
-  locationIfRedirected(): string {
-    return responseAssertions.locationIfRedirected(this);
-  }
-  /** @internal */
-  codeWithName(codeOrName: number | string): string {
-    return responseAssertions.codeWithName(codeOrName);
-  }
 
   reset(): void {
     this.resetBang();
@@ -542,20 +503,19 @@ export class IntegrationTest extends TestCase {
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include TestProcess` and `include TestProcess::FixtureFile` (`actionpack/lib/action_dispatch/testing/integration.rb:95,651`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface IntegrationTest
-  extends Omit<Included<typeof TestProcess>, "cookies">, Included<typeof FixtureFile> {}
+  extends
+    Omit<Included<typeof TestProcess>, "cookies">,
+    Included<typeof FixtureFile>,
+    Omit<Assertions, "withRouting" | "createRoutes" | "resetRoutes"> {}
 
 include(IntegrationTest, TestProcess);
 include(IntegrationTest, FixtureFile);
+include(IntegrationTest, Assertions);
 
 const proto = IntegrationTest.prototype as unknown as Record<string, unknown>;
-proto.assertRecognizes = routingAssertions.assertRecognizes;
-proto.assertGenerates = routingAssertions.assertGenerates;
-proto.assertRouting = routingAssertions.assertRouting;
 proto.withRouting = routingAssertions.WithIntegrationRouting.withRouting;
 proto.createRoutes = routingAssertions.WithIntegrationRouting.createRoutes;
 proto.resetRoutes = routingAssertions.WithIntegrationRouting.resetRoutes;
-proto.recognizedRequestFor = routingAssertions.recognizedRequestFor;
-proto.failOn = routingAssertions.failOn;
 proto.urlFor = urlForMod.urlFor;
 proto.fullUrlFor = urlForMod.fullUrlFor;
 proto.routeFor = urlForMod.routeFor;
@@ -567,15 +527,10 @@ proto.polymorphicPath = polymorphicRoutes.polymorphicPath;
 proto.polymorphicUrlForAction = polymorphicRoutes.polymorphicUrlForAction;
 proto.polymorphicPathForAction = polymorphicRoutes.polymorphicPathForAction;
 proto.polymorphicMapping = polymorphicRoutes.polymorphicMapping;
-proto.parameterize = responseAssertions.parameterize;
-proto.normalizeArgumentToRedirection = responseAssertions.normalizeArgumentToRedirection;
-proto.assertResponse = responseAssertions.assertResponse;
-proto.assertRedirectedTo = responseAssertions.assertRedirectedTo;
 proto.saveAndOpenPage = pageDumpHelper.saveAndOpenPage;
 proto.savePage = pageDumpHelper.savePage;
 proto.openFile = pageDumpHelper.openFile;
 proto.htmlDumpDefaultPath = pageDumpHelper.htmlDumpDefaultPath;
-routingAssertions.spliceMethodMissing(proto);
 include(IntegrationTest, urlForMod.UrlFor);
 
 runLoadHooks("action_dispatch_integration_test", IntegrationTest);

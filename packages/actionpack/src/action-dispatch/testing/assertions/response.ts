@@ -1,13 +1,3 @@
-/**
- * ActionDispatch::Assertions::ResponseAssertions
- *
- * Functional port of the Rails ResponseAssertions module. Each
- * exported function is `this`-typed — invoke via `fn.call(host, ...)`
- * or assign onto a test class (`Test.prototype.assertResponse =
- * assertResponse`) so the host's `response`/`request`/`controller`
- * resolve from `this` at call time, per the CLAUDE.md mixin pattern.
- */
-
 import {
   assert,
   assertEqual,
@@ -15,7 +5,7 @@ import {
   isPresent,
   UnexpectedError,
 } from "@blazetrails/activesupport";
-import { rbEqq } from "@blazetrails/ruby-compat";
+import { Module, rbEqq } from "@blazetrails/ruby-compat";
 import { AssertionResponse } from "../assertion-response.js";
 import { _computeRedirectToLocation } from "../../../action-controller/metal/redirecting.js";
 
@@ -45,7 +35,7 @@ export function assertResponse(
   type: number | string,
   message?: string | (() => string),
 ): void {
-  message ??= () => generateResponseMessage(this, type, this.response.status);
+  message ??= generateResponseMessage.call(this, type);
 
   if (Object.hasOwn(RESPONSE_PREDICATES, type)) {
     assert(RESPONSE_PREDICATES[type](this.response.status), message);
@@ -98,17 +88,15 @@ export function normalizeArgumentToRedirection(
 
 /** @internal */
 export function generateResponseMessage(
-  host: AssertionResponseHost,
+  this: AssertionResponseHost,
   expected: number | string,
-  actual: number,
-): string {
-  const parts = [
-    `Expected response to be a <${codeWithName(expected)}>, but was a <${codeWithName(actual)}>`,
-  ];
-  parts.push(locationIfRedirected(host));
-  parts.push(exceptionIfPresent(host));
-  parts.push(responseBodyIfShort(host));
-  return parts.join("");
+  actual: number = this.response.status,
+): () => string {
+  return () =>
+    `Expected response to be a <${codeWithName(expected)}>, but was a <${codeWithName(actual)}>`
+      .concat(locationIfRedirected.call(this))
+      .concat(exceptionIfPresent.call(this))
+      .concat(responseBodyIfShort.call(this));
 }
 
 /** @internal */
@@ -117,22 +105,57 @@ export function codeWithName(codeOrName: number | string): string {
 }
 
 /** @internal */
-export function locationIfRedirected(host: AssertionResponseHost): string {
-  if (!(host.response.isRedirection && isPresent(host.response.location))) return "";
-  const location = normalizeArgumentToRedirection.call(host, host.response.location);
+export function locationIfRedirected(this: AssertionResponseHost): string {
+  if (!(this.response.isRedirection && isPresent(this.response.location))) return "";
+  const location = normalizeArgumentToRedirection.call(this, this.response.location);
   return ` redirect to <${location}>`;
 }
 
 /** @internal */
-export function exceptionIfPresent(host: AssertionResponseHost): string {
-  const ex = host.request?.env?.["action_dispatch.exception"];
+export function exceptionIfPresent(this: AssertionResponseHost): string {
+  const ex = this.request?.env?.["action_dispatch.exception"];
   if (ex == null || ex === false) return "";
   return `\n\nException while processing request: ${new UnexpectedError(ex as Error).message}\n`;
 }
 
 /** @internal */
-export function responseBodyIfShort(host: AssertionResponseHost): string {
-  const body = host.response.body ?? "";
+export function responseBodyIfShort(this: AssertionResponseHost): string {
+  const body = this.response.body ?? "";
   if (body.length > 500) return "";
   return `\nResponse body: ${body}`;
 }
+
+export type ResponseAssertions = {
+  assertResponse: typeof assertResponse;
+  assertRedirectedTo: typeof assertRedirectedTo;
+  /** @internal */
+  parameterize: typeof parameterize;
+  /** @internal */
+  normalizeArgumentToRedirection: typeof normalizeArgumentToRedirection;
+  /** @internal */
+  generateResponseMessage: typeof generateResponseMessage;
+  /** @internal */
+  responseBodyIfShort: typeof responseBodyIfShort;
+  /** @internal */
+  exceptionIfPresent: typeof exceptionIfPresent;
+  /** @internal */
+  locationIfRedirected: typeof locationIfRedirected;
+  /** @internal */
+  codeWithName: typeof codeWithName;
+};
+
+export const ResponseAssertions = new Module((mod) => {
+  mod.moduleEval((m) => {
+    Object.assign(m, {
+      assertResponse,
+      assertRedirectedTo,
+      parameterize,
+      normalizeArgumentToRedirection,
+      generateResponseMessage,
+      responseBodyIfShort,
+      exceptionIfPresent,
+      locationIfRedirected,
+      codeWithName,
+    });
+  });
+});

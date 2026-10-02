@@ -66,6 +66,8 @@ export { AcceptsMultiparameterTime } from "./type/helpers/accepts-multiparameter
 export { Mutable } from "./type/helpers/mutable.js";
 export { ModelName, Naming } from "./naming.js";
 export { Conversion } from "./conversion.js";
+export { VERSION, gemVersion } from "./gem-version.js";
+export { version } from "./version.js";
 export { Translation } from "./translation.js";
 export type { ModelLike } from "./naming.js";
 export { Dirty } from "./dirty.js";

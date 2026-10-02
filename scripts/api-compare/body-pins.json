@@ -12155,41 +12155,6 @@
   {
     "package": "actiondispatch",
     "rubyFile": "testing/integration.rb",
-    "rubyName": "assert_generates",
-    "digest": "6c2469381ed34a40",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
-    "rubyName": "assert_recognizes",
-    "digest": "bc853a8652e5dbad",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
-    "rubyName": "assert_redirected_to",
-    "digest": "627924170b31d17b",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
-    "rubyName": "assert_response",
-    "digest": "f1f782a496ec465c",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
-    "rubyName": "assert_routing",
-    "digest": "70054c6451ad12fc",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
     "rubyName": "assertions",
     "digest": "c61da66dfc1a9c29",
     "ref": "v8.0.2"
@@ -12220,13 +12185,6 @@
     "rubyFile": "testing/integration.rb",
     "rubyName": "build_full_uri",
     "digest": "8c1ac2e059e82345",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
-    "rubyName": "code_with_name",
-    "digest": "41f4a757260f0a72",
     "ref": "v8.0.2"
   },
   {
@@ -12288,20 +12246,6 @@
   {
     "package": "actiondispatch",
     "rubyFile": "testing/integration.rb",
-    "rubyName": "exception_if_present",
-    "digest": "b9e32289b89d3aba",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
-    "rubyName": "fail_on",
-    "digest": "2eece60b19ee1dd1",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
     "rubyName": "follow_redirect!",
     "digest": "982754c5d5dc8e7c",
     "ref": "v8.0.2"
@@ -12311,13 +12255,6 @@
     "rubyFile": "testing/integration.rb",
     "rubyName": "full_url_for",
     "digest": "d0f3b19c52f20371",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
-    "rubyName": "generate_response_message",
-    "digest": "91762427f20ec093",
     "ref": "v8.0.2"
   },
   {
@@ -12379,20 +12316,6 @@
   {
     "package": "actiondispatch",
     "rubyFile": "testing/integration.rb",
-    "rubyName": "location_if_redirected",
-    "digest": "c1016ad1b5263fb1",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
-    "rubyName": "normalize_argument_to_redirection",
-    "digest": "ac77a6b70b280f92",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
     "rubyName": "open_session",
     "digest": "4e3703c6b8b28292",
     "ref": "v8.0.2"
@@ -12409,13 +12332,6 @@
     "rubyFile": "testing/integration.rb",
     "rubyName": "options",
     "digest": "ab32ef24a1f22d74",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
-    "rubyName": "parameterize",
-    "digest": "81d203aa692e36b3",
     "ref": "v8.0.2"
   },
   {
@@ -12484,13 +12400,6 @@
   {
     "package": "actiondispatch",
     "rubyFile": "testing/integration.rb",
-    "rubyName": "recognized_request_for",
-    "digest": "8717532b0925be21",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
     "rubyName": "register_encoder",
     "digest": "03f69e34b6a746a6",
     "ref": "v8.0.2"
@@ -12519,22 +12428,8 @@
   {
     "package": "actiondispatch",
     "rubyFile": "testing/integration.rb",
-    "rubyName": "response_body_if_short",
-    "digest": "e2be28d685324fbb",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
     "rubyName": "route_for",
     "digest": "72a84c03ef364715",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
-    "rubyName": "setup",
-    "digest": "87853dc0d6c95d98",
     "ref": "v8.0.2"
   },
   {
