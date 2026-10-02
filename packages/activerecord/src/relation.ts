@@ -1858,11 +1858,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   private _substituteValues(values: [string, unknown][]): [any, any][] {
     return values.map(([name, value]) => {
       const attr = this.table.get(name);
-      if (
-        value instanceof Nodes.Node ||
-        value instanceof Nodes.SqlLiteral ||
-        value instanceof Arel.Attribute
-      ) {
+      if (Arel.arelNode(value)) {
         return [attr, value instanceof Nodes.SqlLiteral ? new Nodes.Grouping(value) : value];
       }
       const type = this.model.typeForAttribute(String(attr.name));

@@ -1,4 +1,4 @@
-import { Nodes, sql as arelSql, type ArelNode } from "@blazetrails/arel";
+import { Nodes, arelNode, sql as arelSql, type ArelNode } from "@blazetrails/arel";
 import { actsLike, isBlank } from "@blazetrails/activesupport";
 import { format, rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
@@ -21,7 +21,7 @@ export function disallowRawSqlBang(
   const unexpected: string[] = [];
   for (const arg of args) {
     if (typeof arg === "symbol" || (typeof arg === "string" && arg.startsWith(":"))) continue;
-    if (arg instanceof Nodes.Node) continue;
+    if (arelNode(arg)) continue;
     const str = arg == null ? "" : arg.toString();
     if (!columnMatcher.test(str.trim())) {
       unexpected.push(str);
@@ -107,9 +107,8 @@ export function sanitizeSqlForOrder(
     disallowRawSqlBang(args: (string | symbol | ArelNode)[], options?: { permit?: RegExp }): void;
     sanitizeSqlArray(ary: [string, ...unknown[]]): string;
   },
-  condition: string | [string | ArelNode, ...unknown[]] | Nodes.Node,
+  condition: string | ArelNode | [string | ArelNode, ...unknown[]],
 ): string | ArelNode | [string | ArelNode, ...unknown[]] {
-  if (condition instanceof Nodes.Node) return condition;
   if (Array.isArray(condition)) {
     const first: unknown = condition[0];
     const firstText = first instanceof Nodes.SqlLiteral ? first.toString() : String(first);

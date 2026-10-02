@@ -1,6 +1,6 @@
 import { TypeError } from "@blazetrails/ruby-compat";
 import type * as Arel from "@blazetrails/arel";
-import { Nodes, Table, SelectManager, sql, star, type ArelNode } from "@blazetrails/arel";
+import { Nodes, Table, SelectManager, arelNode, sql, star, type ArelNode } from "@blazetrails/arel";
 import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
 import { any, BigDecimal, isPresent, many, tryCall } from "@blazetrails/activesupport";
 import { block, fetch, first, isEmpty, uniq } from "@blazetrails/ruby-compat";
@@ -842,7 +842,7 @@ export async function executeGroupedCalculation(
 
     const groupAliases = groupNodes.map((field) =>
       columnAliasTracker.aliasFor(
-        (field instanceof Nodes.Node
+        (arelNode(field)
           ? (connection.visitor?.compile(field) ?? String(field))
           : String(field)
         ).toLowerCase(),
