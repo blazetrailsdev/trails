@@ -84,7 +84,8 @@ export class SQLiteDatabaseTasks {
     let flags: string | undefined;
     if (extraFlags != null) flags = extraFlags.join(" ");
     const childProcess = await getChildProcessAsync();
-    const args = [...(flags?.split(" ") ?? []), this.dbConfig.database as string];
+    const words = (flags ?? "").split(/\s+/).filter((word) => word !== "");
+    const args = [...words, this.dbConfig.database as string];
     childProcess.spawnSync("sqlite3", args, { encoding: "utf8", in: filename });
   }
 

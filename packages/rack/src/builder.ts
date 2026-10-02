@@ -58,22 +58,23 @@ export class Builder {
     options: Record<string, unknown> = {},
   ): RackApp {
     const builder = new this(null, options);
-    let source = `"use strict";\n${builderScript}`;
-    if (path) {
-      source += `\n//# sourceURL=${path.replace(/\\/g, "/").replace(/[\r\n\u2028\u2029]/g, "")}`;
-    }
+    const source =
+      `"use strict";\n${builderScript}` +
+      `\n//# sourceURL=${path.replace(/\\/g, "/").replace(/[\r\n\u2028\u2029]/g, "")}`;
     let configFn: (b: Builder) => void;
     try {
       configFn = new Function("builder", source) as (b: Builder) => void;
     } catch (err) {
-      const msg = path ? `Error parsing config from ${path}` : "Error parsing config string";
-      throw new Error(`${msg}: ${(err as Error).message}`, { cause: err });
+      throw new Error(`Error parsing config from ${path}: ${(err as Error).message}`, {
+        cause: err,
+      });
     }
     try {
       configFn(builder);
     } catch (err) {
-      const msg = path ? `Error evaluating config from ${path}` : "Error evaluating config string";
-      throw new Error(`${msg}: ${(err as Error).message}`, { cause: err });
+      throw new Error(`Error evaluating config from ${path}: ${(err as Error).message}`, {
+        cause: err,
+      });
     }
     return builder.toApp();
   }

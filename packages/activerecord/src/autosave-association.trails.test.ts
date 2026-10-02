@@ -1,6 +1,6 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { Associations } from "./associations.js";
 import { Company as CanonicalCompany, Firm, Client } from "./test-helpers/models/company.js";
@@ -424,5 +424,25 @@ describe("AutosaveAssociation::AssociationBuilderExtension.build", () => {
     build(Convict, Prisoner.reflectOnAssociation("ship"));
 
     expect(callbacks(Convict).length).toBeGreaterThan(before);
+  });
+
+  it("runs from the extensions loop, ahead of the builder's own touch callbacks", () => {
+    class Convict extends Base {
+      static {
+        this._tableName = "prisoners";
+      }
+    }
+    const beforeSave = vi.spyOn(Convict, "beforeSave");
+    const afterCreate = vi.spyOn(Convict, "afterCreate");
+
+    Convict.belongsTo("ship", {
+      autosave: true,
+      touch: true,
+      className: "ShipWithoutNestedAttributes",
+    });
+
+    expect(beforeSave.mock.invocationCallOrder[0]).toBeLessThan(
+      afterCreate.mock.invocationCallOrder[0],
+    );
   });
 });
