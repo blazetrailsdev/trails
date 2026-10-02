@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { Time } from "@blazetrails/date";
 import { Engine, Errors, Password } from "./index.js";
 
 describe("BCrypt::Engine", () => {
@@ -13,9 +14,9 @@ describe("BCrypt::Engine", () => {
 
 describe("The BCrypt engine", () => {
   it("should calculate the optimal cost factor to fit in a specific time", () => {
-    const startTime = performance.now();
+    const startTime = Time.now();
     Password.create("testing testing", { cost: Engine.MIN_COST + 1 });
-    const minTimeMs = performance.now() - startTime;
+    const minTimeMs = (Time.now().minus(startTime) as number) * 1000;
     const first = Engine.calibrate(minTimeMs)!;
     const second = Engine.calibrate(minTimeMs * 4)!;
     expect(second).toBeGreaterThan(first);

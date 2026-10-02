@@ -1,5 +1,6 @@
 import bcryptjs from "bcryptjs";
-import { rbObjAsString, toI, warn } from "@blazetrails/ruby-compat";
+import { Time } from "@blazetrails/date";
+import { rbObjAsString, rbObjRespondTo, toI, warn } from "@blazetrails/ruby-compat";
 import { Errors } from "./error.js";
 import { Password } from "./password.js";
 
@@ -58,14 +59,14 @@ export class Engine {
   }
 
   static isValidSecret(secret: unknown): boolean {
-    return secret == null || typeof (secret as { toString?: unknown }).toString === "function";
+    return rbObjRespondTo(secret, "toString");
   }
 
   static calibrate(upperTimeLimitInMs: number): number | undefined {
     for (let i = Engine.MIN_COST; i <= Engine.MAX_COST - 1; i++) {
-      const startTime = performance.now() / 1_000;
+      const startTime = Time.now();
       Password.create("testing testing", { cost: i + 1 });
-      const endTime = performance.now() / 1_000 - startTime;
+      const endTime = Time.now().minus(startTime) as number;
       if (endTime * 1_000 > upperTimeLimitInMs) return i;
     }
   }

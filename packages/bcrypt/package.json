@@ -19,6 +19,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@blazetrails/date": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "bcryptjs": "^3.0.3"
   }
