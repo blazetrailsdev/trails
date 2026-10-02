@@ -161,7 +161,13 @@ export class Model {
   declare runCallbacks: Included<typeof ASCallbacks.InstanceMethods>["runCallbacks"];
 }
 
-include(Model, new Module((mod) => mod.defineMethod("initInternals", function () {})));
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE model-constructor-calls-init-internals-rails-does-not
+ */
+export function initInternals(this: Model): void {}
+
+include(Model, new Module((mod) => mod.defineMethod("initInternals", initInternals)));
 include(Model, API);
 
 include(Model, ToJsonWithActiveSupportEncoder);

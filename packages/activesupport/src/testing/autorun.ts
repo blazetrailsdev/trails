@@ -13,6 +13,7 @@ declare module "vitest" {
 }
 
 const capturing = new WeakSet<object>();
+const captured = new WeakMap<TestCase, { from: number; at: number; count: number }>();
 
 beforeEach(async (context: TestContext) => {
   _takeAssertions();
@@ -24,6 +25,7 @@ beforeEach(async (context: TestContext) => {
     }
   }
   const testCase = (context.testCase = new klass(context.task.name));
+  captured.set(testCase, { from: context.task.result?.errors?.length ?? 0, at: -1, count: 0 });
   const run = getFn(context.task);
   if (!capturing.has(run)) {
     const captureExceptions = async (): Promise<void> => {
@@ -31,6 +33,9 @@ beforeEach(async (context: TestContext) => {
         await run();
       } catch (e) {
         if ((e as { code?: unknown } | null)?.code !== "VITEST_PENDING") {
+          const body = captured.get(context.testCase)!;
+          body.at = context.task.result?.errors?.length ?? 0;
+          body.count = Array.isArray(e) ? e.length : 1;
           context.testCase.failures.push(
             e instanceof Assertion ? e : new UnexpectedError(e as Error),
           );
@@ -55,10 +60,11 @@ afterEach(async (context: TestContext) => {
   };
   testCase.assertions = (expect.getState().assertionCalls ?? 0) + _takeAssertions();
   testCase.sourceLocation = [task.file?.filepath ?? "", task.location?.line ?? 0];
-  if (testCase.failures.length === 0) {
-    for (const e of task.result?.errors ?? [])
-      testCase.failures.push(new UnexpectedError(e as Error));
-  }
+  const { from, at, count } = captured.get(testCase) ?? { from: 0, at: -1, count: 0 };
+  (task.result?.errors ?? []).forEach((e, i) => {
+    if (i < from || (i >= at && i < at + count)) return;
+    testCase.failures.push(new UnexpectedError(e as Error));
+  });
   if (task.mode === "skip" || task.mode === "todo" || task.result?.state === "skip") {
     testCase.failures.push(new Skip());
   }

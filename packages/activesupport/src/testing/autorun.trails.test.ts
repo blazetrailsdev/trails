@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
 
 import type { TestCase } from "../test-case.js";
@@ -48,6 +48,51 @@ describe("autorun captures the body's exception (minitest/test.rb:190-198)", () 
   it("stays quiet about missing assertions for a test that raised", () => {
     const warned = warn.mock.calls.map((call) => String(call[0])).join("\n");
     expect(warned).not.toMatch(/Test is missing assertions: `raises any other exception`/);
+  });
+
+  it.fails("fails a soft expectation, then raises", () => {
+    expect.soft(1).toBe(2);
+    throw raised;
+  });
+
+  it("seats the errors the body did not raise beside the one it did", () => {
+    const testCase = ran.get("fails a soft expectation, then raises")!;
+    expect(testCase.failures.length).toBe(2);
+    expect((testCase.failures[0] as UnexpectedError).error).toBe(raised);
+    expect(testCase.failures[1]).toBeInstanceOf(UnexpectedError);
+    expect((testCase.failures[1] as UnexpectedError).error.message).toMatch(/expected 1 to be 2/);
+  });
+
+  describe("when a beforeEach hook raises", () => {
+    beforeEach((context) => {
+      if (context.task.name === "never runs its body") throw raised;
+    });
+
+    it.fails("never runs its body", () => {});
+
+    it("seats the hook's error as an UnexpectedError", () => {
+      const testCase = ran.get("never runs its body")!;
+      expect(testCase.failures.length).toBe(1);
+      expect(testCase.isError()).toBe(true);
+      expect((testCase.failures[0] as UnexpectedError).error.message).toBe("boom");
+    });
+  });
+
+  let tries = 0;
+  const outcomes = [
+    (): void => {
+      throw raised;
+    },
+    (): void => {},
+  ];
+
+  it("raises on its first try only", { retry: 1 }, () => {
+    outcomes[tries++]();
+  });
+
+  it("gives each try a test case holding that try's errors alone", () => {
+    expect(tries).toBe(2);
+    expect(ran.get("raises on its first try only")!.failures).toEqual([]);
   });
 
   it("seats a skip called from the body as a Skip, not an error", (context) => {
