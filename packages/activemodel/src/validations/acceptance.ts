@@ -29,7 +29,7 @@ export class AcceptanceValidator extends EachValidator {
 
   /**
    * @internal
-   * @missingRailsCall include? — PERMANENT
+   * @missingRailsCall include? — CONVERGEABLE acceptance-setup-asks-is-module-included-not-included-modules-include
    */
   setupBang(klass: AttributeMethodQueryable): void {
     const defineAttributes = new LazilyDefineAttributes(this.attributes);
@@ -83,10 +83,7 @@ export class LazilyDefineAttributes extends Module {
     this.#lock = null;
   }
 
-  /**
-   * @missingRailsCall define_method — PERMANENT
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @noRailsEquivalent PERMANENT */
   [included](klass: AttributeMethodQueryable): void {
     this.#lock = {};
     this.defineOn(klass);

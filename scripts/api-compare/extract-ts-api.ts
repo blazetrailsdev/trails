@@ -1646,7 +1646,7 @@ export function extractFromProgram(
   // above run, so it shares the `extends` array they push onto but not the
   // `extendsFiles` object they replace. Re-syncing the map keeps a re-exported
   // host's mixin edges resolvable: without it a cross-package edge
-  // (`include(Json, MutableModule)`, activemodel's module reached from
+  // (`include(Json, Mutable)`, activemodel's module reached from
   // activerecord) arrives at the clone as a bare short name and resolves to
   // nothing, dropping the whole inheritance edge.
   for (const entity of [...Object.values(info.classes), ...Object.values(info.modules)]) {

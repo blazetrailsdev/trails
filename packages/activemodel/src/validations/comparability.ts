@@ -26,7 +26,7 @@ export interface Comparability {
   errorOptions(value: unknown, optionValue: unknown): Record<string, unknown>;
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE comparability-compare-operator-stands-in-for-public-send-of-an-operator */
 export function compareOperator(
   op: (typeof COMPARE_CHECKS)[CompareKey],
   a: number | bigint,

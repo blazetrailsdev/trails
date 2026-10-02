@@ -63,8 +63,7 @@ export { PresenceValidator } from "./validations/presence.js";
 export { LengthValidator } from "./validations/length.js";
 export { NumericalityValidator } from "./validations/numericality.js";
 export { AcceptsMultiparameterTime } from "./type/helpers/accepts-multiparameter-time.js";
-export { MutableModule } from "./type/helpers/mutable.js";
-export type { Mutable } from "./type/helpers/mutable.js";
+export { Mutable } from "./type/helpers/mutable.js";
 export { ModelName, Naming } from "./naming.js";
 export { Conversion } from "./conversion.js";
 export { Translation } from "./translation.js";
@@ -135,12 +134,7 @@ export {
 } from "./secure-password.js";
 export { SerializeCastValue } from "./type/serialize-cast-value.js";
 export { Builder as AttributeSetBuilder } from "./attribute-set/builder.js";
-export {
-  DateInfinity,
-  DateNegativeInfinity,
-  isDateInfinity,
-  isDateNegativeInfinity,
-} from "./type/internal/sentinels.js";
+export { DateInfinity, DateNegativeInfinity } from "./type/internal/sentinels.js";
 export type {
   DateInfinity as DateInfinityType,
   DateNegativeInfinity as DateNegativeInfinityType,

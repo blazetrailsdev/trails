@@ -63,7 +63,7 @@ export class NumericalityValidator extends EachValidator {
     }
   }
 
-  /** @missingRailsArgs merge! — PERMANENT */
+  /** @missingRailsArgs merge! — CONVERGEABLE numericality-range-count-is-stringified-because-interpolation-skips-to-s */
   validateEach(
     record: ValidatableRecord,
     attrName: string,
@@ -153,7 +153,7 @@ export function optionAsNumber(
 
 /**
  * @internal
- * @missingRailsArgs parse_float — PERMANENT
+ * @missingRailsName float — PERMANENT
  */
 export function parseAsNumber(
   rawValue: unknown,

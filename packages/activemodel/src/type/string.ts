@@ -20,7 +20,7 @@ export class StringType extends ImmutableStringType {
 
   /**
    * @internal
-   * @missingRailsCall new — PERMANENT
+   * @missingRailsCall new — CONVERGEABLE type-string-cast-value-string-new-has-no-js-carrier
    */
   protected castValue(value: unknown): string | null {
     if (typeof value === "string") return String(value);

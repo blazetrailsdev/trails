@@ -3029,19 +3029,22 @@ describe("extractFromProgram — re-export attribution", () => {
 
   it("re-syncs a clone's extendsFiles, which the include pass writes after cloning", () => {
     const info = extractFromFiles("/p", {
-      "type/helpers/mutable.ts": `export const MutableModule = { cast() {} };`,
+      "type/helpers/mutable.ts": `
+        export const Mutable = { cast() {} };
+        export type Mutable = typeof Mutable;
+      `,
       "type/json.ts": `
         import { include } from "@blazetrails/activesupport";
-        import { MutableModule } from "./helpers/mutable.js";
+        import { Mutable } from "./helpers/mutable.js";
         export class Json { deserialize(): void {} }
-        include(Json, MutableModule);
+        include(Json, Mutable);
       `,
       "type.ts": `export { Json } from "./type/json.js";`,
     });
 
     const declaring = info.classes["type/json.ts:Json"];
     const clone = info.classes["type.ts:Json"];
-    expect(clone.extends).toEqual(["MutableModule"]);
+    expect(clone.extends).toEqual(["Mutable"]);
     expect(clone.extendsFiles).toEqual(declaring.extendsFiles);
   });
 

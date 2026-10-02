@@ -1,4 +1,4 @@
-import { MutableModule, ValueType, BinaryData, type Mutable } from "@blazetrails/activemodel";
+import { Mutable, ValueType, BinaryData } from "@blazetrails/activemodel";
 import { include } from "@blazetrails/activesupport";
 import { DelegateClass, rbEqual, registerConstant } from "@blazetrails/ruby-compat";
 import { IndifferentHashAccessor } from "../store.js";
@@ -83,6 +83,6 @@ export class Serialized extends DelegateClass(ValueType) {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge carries `include ActiveModel::Type::Helpers::Mutable`'s members onto the class; it declares none of its own.
 export interface Serialized extends Mutable {}
 
-include(Serialized, MutableModule);
+include(Serialized, Mutable);
 
 registerConstant("ActiveRecord::Type::Serialized", Serialized);
