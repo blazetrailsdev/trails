@@ -77,10 +77,10 @@ describe("where / having with a SqlLiteral (trails)", () => {
   });
 
   it("binds the rest arguments of a SqlLiteral having statement", () => {
-    const sql = Topic.group("author_name").having(new Nodes.SqlLiteral("count(*) > ?"), 1).toSql();
-    expect(sql).toMatch(/HAVING \(?count\(\*\) > 1/);
-    expect(Topic.having(new Nodes.SqlLiteral("count(*) > ?"), 1).toSql()).toMatch(
-      /count\(\*\) > 1/,
-    );
+    const literal = new Nodes.SqlLiteral("count(*) > ?");
+    const sql = Topic.group("author_name").having(literal, 1).toSql();
+    expect(sql).not.toContain("?");
+    expect(sql).toBe(Topic.group("author_name").having("count(*) > ?", 1).toSql());
+    expect(Topic.having(literal, 1).toSql()).toBe(Topic.having("count(*) > ?", 1).toSql());
   });
 });
