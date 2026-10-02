@@ -47,6 +47,11 @@ interface PackageResult {
  * is in the file Rails defines it in; the host carries at most a bodiless
  * `interface AbstractAdapter` signature, the type-level cost of `include`.
  * Reporting it would tell the reader to move a method out of its Rails file.
+ *
+ * The flag is set wherever compare.ts finds the body in the file mirroring the
+ * defining `.rb`: the mixin's own file, a reopening's own file
+ * (`validations/acceptance.rb:108` reopens `HelperMethods`), and either of
+ * those when an includer's bodyless declaration matched first.
  */
 export function relocationsByRoute(files: readonly FileResult[]): Map<string, MoveResult[]> {
   const movesByRoute = new Map<string, MoveResult[]>();

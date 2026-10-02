@@ -3040,6 +3040,163 @@ export function reopeningMethodCreditedToOwnFile(
   return tsName === undefined ? null : { tsName, tsFile };
 }
 
+/**
+ * The file mirroring the `.rb` that defines this method, when a BODY for it
+ * sits there.
+ *
+ * The include-chain arm credits a flattened expectation through whichever
+ * includer names it first, and an includer names every mixin member it types:
+ * `declare static modelName` on `Model`, a `validatesAbsenceOf` signature on
+ * `interface API`. That declaration is the type-level cost of `include`, not
+ * the port. `model_name` is defined by `naming.rb:270` and ported in naming.ts;
+ * `validates_acceptance_of` by `validations/acceptance.rb:108`, a reopening of
+ * `HelperMethods`, and ported in validations/acceptance.ts. Naming the
+ * includer's file as where the member lives tells the reader to move a method
+ * out of its Rails file.
+ *
+ * A bodyless-only presence in the defining file is not a port
+ * ({@link declarationOnlyInFile}), so it earns nothing here and the includer's
+ * file is still reported.
+ */
+export function bodyInDefiningFile(
+  rm: {
+    rubyName: string;
+    rubyModule: string;
+    mixinFile?: string;
+    definedInFile?: string;
+    notes?: string;
+  },
+  hostRubyFile: string,
+  pkg: string,
+  rubyFileHasBucket: (rubyFile: string) => boolean,
+  tsMethodsByFile: ReadonlyMap<string, Set<string>>,
+  bodylessOwnersByFile: ReadonlyMap<string, Map<string, Set<string>>>,
+  bodiedOwnersByFile: ReadonlyMap<string, Map<string, Set<string>>>,
+  aliasNamesByFile?: ReadonlyMap<string, ReadonlySet<string>>,
+): { tsName: string; tsFile: string } | null {
+  const credited =
+    mixinMethodCreditedToOwnFile(rm, hostRubyFile, pkg, rubyFileHasBucket, tsMethodsByFile) ??
+    reopeningMethodCreditedToOwnFile(rm, hostRubyFile, pkg, tsMethodsByFile);
+  if (credited === null) return null;
+  const declarationOnly = declarationOnlyInFile(
+    credited.tsFile,
+    credited.tsName,
+    bodylessOwnersByFile,
+    bodiedOwnersByFile,
+    rm.notes,
+    aliasNamesByFile,
+  );
+  return declarationOnly ? null : credited;
+}
+
+/**
+ * Which cross-file arm credits a method the expected file does not port: the
+ * member the move row names (`move`) and the member the pair is compared
+ * against (`compared`).
+ *
+ * - `"include"`: an includer names it. `compared` is the includer's member,
+ *   the pair this arm has always measured. `move` is the includer's member
+ *   too when no body sits in the defining file: that is drift (the four
+ *   `crud.rb` bodies in select-manager.ts) and a relocation. When
+ *   {@link bodyInDefiningFile} finds the body, `move` names that member and
+ *   file instead and is flagged `inDefiningFile`.
+ * - `"mixin"`: ported in the file mirroring the mixin's own `.rb`. `compared`
+ *   is null: the same pair is compared in the mixin's own bucket, so a second
+ *   run per host double-counts every mismatch.
+ * - `"reopening"`: ported in the file mirroring the reopening that defines it,
+ *   and compared against that member.
+ *
+ * `moves.ts` leaves an `inDefiningFile` move out of the relocation plan.
+ */
+export function crossFileCredit(
+  rm: {
+    rubyName: string;
+    rubyModule: string;
+    mixinFile?: string;
+    definedInFile?: string;
+    notes?: string;
+  },
+  hostRubyFile: string,
+  pkg: string,
+  rubyFileHasBucket: (rubyFile: string) => boolean,
+  tsMethodsByFile: ReadonlyMap<string, Set<string>>,
+  bodylessOwnersByFile: ReadonlyMap<string, Map<string, Set<string>>>,
+  bodiedOwnersByFile: ReadonlyMap<string, Map<string, Set<string>>>,
+  aliasNamesByFile: ReadonlyMap<string, ReadonlySet<string>> | undefined,
+  viaInclude: { tsName: string; tsFile: string } | null,
+): {
+  arm: "include" | "mixin" | "reopening";
+  move: { tsName: string; tsFile: string; inDefiningFile: boolean };
+  compared: { tsName: string; tsFile: string } | null;
+} | null {
+  if (viaInclude !== null) {
+    const definedIn = bodyInDefiningFile(
+      rm,
+      hostRubyFile,
+      pkg,
+      rubyFileHasBucket,
+      tsMethodsByFile,
+      bodylessOwnersByFile,
+      bodiedOwnersByFile,
+      aliasNamesByFile,
+    );
+    return {
+      arm: "include",
+      move:
+        definedIn === null
+          ? { ...viaInclude, inDefiningFile: false }
+          : { ...definedIn, inDefiningFile: true },
+      compared: viaInclude,
+    };
+  }
+  const mixin = mixinMethodCreditedToOwnFile(
+    rm,
+    hostRubyFile,
+    pkg,
+    rubyFileHasBucket,
+    tsMethodsByFile,
+  );
+  if (mixin !== null) {
+    return { arm: "mixin", move: { ...mixin, inDefiningFile: true }, compared: null };
+  }
+  const reopening = reopeningMethodCreditedToOwnFile(rm, hostRubyFile, pkg, tsMethodsByFile);
+  if (reopening === null) return null;
+  return { arm: "reopening", move: { ...reopening, inDefiningFile: true }, compared: reopening };
+}
+
+/**
+ * The extractor's name for `static [initialize]`: a computed member is recorded
+ * by its source text. `CONCERN_HOOK_MEMBERS.initialize` in extra-surface.ts is
+ * the same spelling.
+ */
+export const MODULE_INITIALIZE_HOOK = "[initialize]";
+
+/**
+ * The TS candidates for a Ruby method, with a MODULE's `def initialize` offered
+ * its hook first.
+ *
+ * A module has no constructor to be. `SerializeCastValue#initialize`
+ * (`type/serialize_cast_value.rb:41`) is ported as the symbol-keyed
+ * `static [initialize]` that `initializeIncludedModules` runs where the
+ * includer's `initialize` calls `super`. Offered only `constructor`, the
+ * expectation is answered by the includer's own constructor
+ * (`ValueType`, type/value.ts) and reported as a method to relocate.
+ *
+ * The hook is offered only when the expected file declares one, so a module
+ * whose `initialize` is unported still falls through to the arms that report
+ * it.
+ */
+export function moduleInitializeCandidates(
+  rubyName: string,
+  ownerIsModule: boolean,
+  tsMethods: ReadonlySet<string>,
+  candidates: string[],
+): string[] {
+  if (rubyName !== "initialize" || !ownerIsModule) return candidates;
+  if (!tsMethods.has(MODULE_INITIALIZE_HOOK)) return candidates;
+  return [MODULE_INITIALIZE_HOOK, ...candidates];
+}
+
 /** A Ruby class or module, paired with the fully-qualified name it was found under. */
 export interface RubyEntity {
   fqn: string;
@@ -5282,11 +5439,17 @@ export function main() {
       ] of seen) {
         // Null once the sibling set is known (`new` beside `initialize`), so it
         // is dropped the way `seen`'s own no-candidate gate drops one.
-        const tsCandidates =
+        const mirrorCandidates =
           tsMirrorNames === undefined
             ? rubyMethodToTsForFqn(rubyModule, rubyName, siblingRubyNames, pkg)
             : scopedSkipMirrorCandidates(tsMirrorNames, tsMethods);
-        if (tsCandidates === null) continue;
+        if (mirrorCandidates === null) continue;
+        const tsCandidates = moduleInitializeCandidates(
+          rubyName,
+          Object.hasOwn(rubyPkg.modules, rubyModule),
+          tsMethods,
+          mirrorCandidates,
+        );
         const notePredicateKind = (tsFile: string, tsName: string) => {
           const admits = tsAdmitsBooleanByFileName.get(tsFile)?.get(tsName);
           if (predicateKindMismatch(rubyName, tsName, admits)) {
@@ -5442,77 +5605,44 @@ export function main() {
           if (foundViaInclude) break;
         }
 
-        if (foundViaInclude && !declOnly) {
-          fileMatched++;
-          notePredicateKind(foundViaInclude, matchedCandidate!);
-          checkArity(
-            rubyName,
-            matchedCandidate!,
-            foundViaInclude,
-            rubyModule,
-            writerPairedWithReader(rubyName, matchedCandidate!, siblingRubyNames),
-            false,
-            level,
-          );
-          moves.push({
-            tsName: matchedCandidate!,
-            rubyName,
-            rubyModule,
-            expectedFile: expectedTs,
-            actualFile: foundViaInclude,
-          });
-          continue;
-        }
-
-        // Mixed in from another Ruby file and ported there, once, exactly as
-        // Rails writes it — see `mixinMethodCreditedToOwnFile`.
-        const creditedToMixin = mixinMethodCreditedToOwnFile(
-          { rubyName, rubyModule, mixinFile },
+        const credit = crossFileCredit(
+          { rubyName, rubyModule, mixinFile, definedInFile, notes },
           rubyFile,
           pkg,
           (f) => byFile.has(f),
           tsMethodsByFile,
+          tsBodylessOwnersByFileName,
+          tsBodiedOwnersByFileName,
+          tsAliasNamesByFileName,
+          foundViaInclude && !declOnly
+            ? { tsName: matchedCandidate!, tsFile: foundViaInclude }
+            : null,
         );
-        if (creditedToMixin) {
-          fileMatched++;
-          // No `checkArity`: the same pair is already compared in the mixin's
-          // own bucket, so re-running it per host double-counts every mismatch.
-          moves.push({
-            tsName: creditedToMixin.tsName,
-            rubyName,
-            rubyModule,
-            expectedFile: expectedTs,
-            actualFile: creditedToMixin.tsFile,
-            inDefiningFile: true,
-          });
-          continue;
-        }
 
-        // Defined by a reopening of this class in another Ruby file, and ported
-        // there — see `reopeningMethodCreditedToOwnFile`.
-        const creditedToReopening = reopeningMethodCreditedToOwnFile(
-          { rubyName, rubyModule, definedInFile },
-          rubyFile,
-          pkg,
-          tsMethodsByFile,
-        );
-        if (creditedToReopening) {
+        if (credit !== null) {
           fileMatched++;
-          checkArity(
-            rubyName,
-            creditedToReopening.tsName,
-            creditedToReopening.tsFile,
-            rubyModule,
-            false,
-            false,
-            level,
-          );
+          if (credit.arm === "include") {
+            notePredicateKind(credit.compared!.tsFile, credit.compared!.tsName);
+          }
+          if (credit.compared !== null) {
+            checkArity(
+              rubyName,
+              credit.compared.tsName,
+              credit.compared.tsFile,
+              rubyModule,
+              credit.arm === "include" &&
+                writerPairedWithReader(rubyName, credit.compared.tsName, siblingRubyNames),
+              false,
+              level,
+            );
+          }
           moves.push({
-            tsName: creditedToReopening.tsName,
+            tsName: credit.move.tsName,
             rubyName,
             rubyModule,
             expectedFile: expectedTs,
-            actualFile: creditedToReopening.tsFile,
+            actualFile: credit.move.tsFile,
+            ...(credit.move.inDefiningFile ? { inDefiningFile: true as const } : {}),
           });
           continue;
         }

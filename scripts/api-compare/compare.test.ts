@@ -9,7 +9,10 @@ import {
   methodInMode,
   tsShouldIncludeInIndex,
   flattenIncludedMethodInfos,
+  bodyInDefiningFile,
+  crossFileCredit,
   mixinMethodCreditedToOwnFile,
+  moduleInitializeCandidates,
   reopeningMethodCreditedToOwnFile,
   resolveModuleName,
   buildModuleIncluderFqns,
@@ -3115,6 +3118,267 @@ describe("mixinMethodCreditedToOwnFile", () => {
         tsMethodsByFile,
       ),
     ).toBeNull();
+  });
+});
+
+describe("bodyInDefiningFile", () => {
+  const tsMethodsByFile = new Map([
+    ["naming.ts", new Set(["modelName"])],
+    ["validations/acceptance.ts", new Set(["validatesAcceptanceOf"])],
+    ["model.ts", new Set(["modelName", "validatesAcceptanceOf"])],
+  ]);
+  const hasBucket = (f: string) => f === "naming.rb" || f === "validations/absence.rb";
+  const bodied = new Map([
+    ["naming.ts", new Map([["modelName", new Set(["Naming"])]])],
+    ["validations/acceptance.ts", new Map([["validatesAcceptanceOf", new Set(["HelperMethods"])]])],
+  ]);
+  const none = new Map<string, Map<string, Set<string>>>();
+
+  it("names the mixin's own file when the body is there", () => {
+    expect(
+      bodyInDefiningFile(
+        { rubyName: "model_name", rubyModule: "ActiveModel::API", mixinFile: "naming.rb" },
+        "api.rb",
+        "activemodel",
+        hasBucket,
+        tsMethodsByFile,
+        none,
+        bodied,
+      ),
+    ).toEqual({ tsName: "modelName", tsFile: "naming.ts" });
+  });
+
+  it("names a reopening's own file when the mixin's first file does not hold it", () => {
+    expect(
+      bodyInDefiningFile(
+        {
+          rubyName: "validates_acceptance_of",
+          rubyModule: "ActiveModel::Validations",
+          mixinFile: "validations/absence.rb",
+          definedInFile: "validations/acceptance.rb",
+        },
+        "validations.rb",
+        "activemodel",
+        hasBucket,
+        tsMethodsByFile,
+        none,
+        bodied,
+      ),
+    ).toEqual({ tsName: "validatesAcceptanceOf", tsFile: "validations/acceptance.ts" });
+  });
+
+  it("is null when the defining file only declares the name", () => {
+    const bodyless = new Map([["naming.ts", new Map([["modelName", new Set(["Naming"])]])]]);
+    expect(
+      bodyInDefiningFile(
+        { rubyName: "model_name", rubyModule: "ActiveModel::API", mixinFile: "naming.rb" },
+        "api.rb",
+        "activemodel",
+        hasBucket,
+        tsMethodsByFile,
+        bodyless,
+        none,
+      ),
+    ).toBeNull();
+  });
+
+  it("is null for a method the host's own file defines", () => {
+    expect(
+      bodyInDefiningFile(
+        { rubyName: "persisted?", rubyModule: "ActiveModel::API" },
+        "api.rb",
+        "activemodel",
+        hasBucket,
+        tsMethodsByFile,
+        none,
+        bodied,
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("crossFileCredit", () => {
+  const tsMethodsByFile = new Map([
+    ["naming.ts", new Set(["modelName"])],
+    ["validations/acceptance.ts", new Set(["validatesAcceptanceOf"])],
+    ["model.ts", new Set(["modelName", "validatesAcceptanceOf", "insert"])],
+  ]);
+  const hasBucket = (f: string) => f === "naming.rb" || f === "validations/absence.rb";
+  const bodied = new Map([
+    ["naming.ts", new Map([["modelName", new Set(["Naming"])]])],
+    ["validations/acceptance.ts", new Map([["validatesAcceptanceOf", new Set(["HelperMethods"])]])],
+  ]);
+  const none = new Map<string, Map<string, Set<string>>>();
+  const credit = (
+    rm: Parameters<typeof crossFileCredit>[0],
+    viaInclude: Parameters<typeof crossFileCredit>[8],
+    bodyless = none,
+    withBody = bodied,
+  ) =>
+    crossFileCredit(
+      rm,
+      "api.rb",
+      "activemodel",
+      hasBucket,
+      tsMethodsByFile,
+      bodyless,
+      withBody,
+      undefined,
+      viaInclude,
+    );
+
+  const includer = (tsName: string) => ({ tsName, tsFile: "model.ts" });
+
+  it("names the mixin's own member in the move and still compares the includer's", () => {
+    expect(
+      credit(
+        { rubyName: "model_name", rubyModule: "ActiveModel::API", mixinFile: "naming.rb" },
+        includer("modelName"),
+      ),
+    ).toEqual({
+      arm: "include",
+      move: { tsName: "modelName", tsFile: "naming.ts", inDefiningFile: true },
+      compared: includer("modelName"),
+    });
+  });
+
+  it("names a reopening's own member in the move when an includer declares the name", () => {
+    expect(
+      credit(
+        {
+          rubyName: "validates_acceptance_of",
+          rubyModule: "ActiveModel::API",
+          mixinFile: "validations/absence.rb",
+          definedInFile: "validations/acceptance.rb",
+        },
+        includer("validatesAcceptanceOf"),
+      ),
+    ).toEqual({
+      arm: "include",
+      move: {
+        tsName: "validatesAcceptanceOf",
+        tsFile: "validations/acceptance.ts",
+        inDefiningFile: true,
+      },
+      compared: includer("validatesAcceptanceOf"),
+    });
+  });
+
+  it("takes the move's name from the defining file, not from the includer's candidate", () => {
+    expect(
+      crossFileCredit(
+        {
+          rubyName: "initialize_dup",
+          rubyModule: "ActiveModel::Type::Value",
+          mixinFile: "type/serialize_cast_value.rb",
+        },
+        "type/value.rb",
+        "activemodel",
+        () => true,
+        new Map([["type/serialize-cast-value.ts", new Set(["_initializeDup"])]]),
+        none,
+        new Map([
+          [
+            "type/serialize-cast-value.ts",
+            new Map([["_initializeDup", new Set(["SerializeCastValue"])]]),
+          ],
+        ]),
+        undefined,
+        { tsName: "initializeDup", tsFile: "type/value.ts" },
+      )?.move,
+    ).toEqual({
+      tsName: "_initializeDup",
+      tsFile: "type/serialize-cast-value.ts",
+      inDefiningFile: true,
+    });
+  });
+
+  it("reports the includer as a relocation when no body sits in the defining file", () => {
+    expect(
+      credit(
+        { rubyName: "insert", rubyModule: "ActiveModel::API", mixinFile: "naming.rb" },
+        includer("insert"),
+      ),
+    ).toEqual({
+      arm: "include",
+      move: { ...includer("insert"), inDefiningFile: false },
+      compared: includer("insert"),
+    });
+
+    const bodyless = new Map([["naming.ts", new Map([["modelName", new Set(["Naming"])]])]]);
+    expect(
+      credit(
+        { rubyName: "model_name", rubyModule: "ActiveModel::API", mixinFile: "naming.rb" },
+        includer("modelName"),
+        bodyless,
+        none,
+      )?.move,
+    ).toEqual({ ...includer("modelName"), inDefiningFile: false });
+  });
+
+  it("flags the mixin arm and compares nothing", () => {
+    expect(
+      credit(
+        { rubyName: "model_name", rubyModule: "ActiveModel::API", mixinFile: "naming.rb" },
+        null,
+      ),
+    ).toEqual({
+      arm: "mixin",
+      move: { tsName: "modelName", tsFile: "naming.ts", inDefiningFile: true },
+      compared: null,
+    });
+  });
+
+  it("flags the reopening arm and compares the reopening's member", () => {
+    const reopening = { tsName: "validatesAcceptanceOf", tsFile: "validations/acceptance.ts" };
+    expect(
+      credit(
+        {
+          rubyName: "validates_acceptance_of",
+          rubyModule: "ActiveModel::API",
+          mixinFile: "validations/absence.rb",
+          definedInFile: "validations/acceptance.rb",
+        },
+        null,
+      ),
+    ).toEqual({
+      arm: "reopening",
+      move: { ...reopening, inDefiningFile: true },
+      compared: reopening,
+    });
+  });
+
+  it("is null when nothing ports it", () => {
+    expect(credit({ rubyName: "persisted?", rubyModule: "ActiveModel::API" }, null)).toBeNull();
+  });
+});
+
+describe("moduleInitializeCandidates", () => {
+  const withHook = new Set(["[initialize]", "itselfIfSerializeCastValueCompatible"]);
+
+  it("offers a module's initialize its [initialize] hook first", () => {
+    expect(moduleInitializeCandidates("initialize", true, withHook, ["constructor"])).toEqual([
+      "[initialize]",
+      "constructor",
+    ]);
+  });
+
+  it("leaves a class's initialize as the constructor", () => {
+    expect(moduleInitializeCandidates("initialize", false, withHook, ["constructor"])).toEqual([
+      "constructor",
+    ]);
+  });
+
+  it("leaves a module without the hook to report through its other arms", () => {
+    expect(moduleInitializeCandidates("initialize", true, new Set(), ["constructor"])).toEqual([
+      "constructor",
+    ]);
+  });
+
+  it("leaves every other name alone", () => {
+    expect(moduleInitializeCandidates("serialize", true, withHook, ["serialize"])).toEqual([
+      "serialize",
+    ]);
   });
 });
 
