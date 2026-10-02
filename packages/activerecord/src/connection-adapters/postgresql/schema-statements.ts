@@ -590,6 +590,8 @@ export class SchemaStatements extends AbstractSchemaStatements {
     defaultOrChanges: unknown,
   ): Promise<ChangeColumnDefaultDefinition | undefined> {
     const column = await this.columnFor(tableName, columnName);
+    if (column == null) return;
+
     const default_ = this.extractNewDefaultValue(defaultOrChanges);
     return new ChangeColumnDefaultDefinition(column, default_);
   }
