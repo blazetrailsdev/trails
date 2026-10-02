@@ -905,6 +905,10 @@ describe("body call capture", () => {
           if (!("type" in options)) throw new ArgumentError("missing keyword: :type");
           return this.run(options);
         }
+        positionalArray(columnNames: unknown[]) {
+          const options = extractOptionsBang(columnNames);
+          if (!("type" in options)) throw new ArgumentError("missing keyword: :type");
+        }
         afterSideEffect(options: object) {
           this.log(options);
           if (!("type" in options)) throw new ArgumentError("missing keyword: :type");
@@ -930,7 +934,7 @@ describe("body call capture", () => {
     expect(skeleton("required")).toEqual(["ref:extractOptionsBang", "ref:run"]);
     expect(skeleton("arity")).toEqual(["ref:run"]);
     const arms = (name: string) => skeleton(name)!.filter((t) => !t.includes(":"));
-    for (const kept of ["afterSideEffect", "notAnArgument", "otherMessage"]) {
+    for (const kept of ["positionalArray", "afterSideEffect", "notAnArgument", "otherMessage"]) {
       expect(arms(kept)).toEqual(["if"]);
     }
   });

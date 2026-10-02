@@ -98,6 +98,17 @@ describe("mixin declaration drift", () => {
     expect(requiredInterfaceMethodNames("adapter.ts", source, "Adapter")).toEqual(["addIndex"]);
   });
 
+  it("erases a destructured element's default, which an interface cannot spell", () => {
+    const mixinSource = [
+      "export class Mixin {",
+      "  remove({ force = false, to: target = { a: 1 }, ...options }: Options = {}): void {}",
+      "}",
+    ].join("\n");
+    expect(mixinSignatures("mixin.ts", mixinSource, "Mixin")).toEqual([
+      { name: "remove", signature: "({ force, to: target, ...options }?: Options): void" },
+    ]);
+  });
+
   it("compares a mixin getter against the interface property that restates it", () => {
     const mixinSource = [
       "export class Mixin {",

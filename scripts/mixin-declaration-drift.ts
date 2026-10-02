@@ -69,15 +69,24 @@ function signatureOf(node: ts.SignatureDeclarationBase): string {
     .map((p) => {
       const dots = p.dotDotDotToken ? "..." : "";
       const optional = p.questionToken || p.initializer ? "?" : "";
-      const name = p.name
-        .getText()
-        .replace(/^_+/, "")
-        .replace(/ = [^,}]+/g, "");
+      const name = bindingNameText(p.name).replace(/^_+/, "");
       const type = p.type ? typeText(p.type) : p.initializer ? WILDCARD : "";
       return `${dots}${name}${optional}: ${type}`;
     })
     .join(", ");
   return `${typeParams}(${params}): ${typeText(node.type) ?? ""}`;
+}
+
+function bindingNameText(name: ts.BindingName): string {
+  if (ts.isIdentifier(name)) return name.text;
+  const elements = name.elements.map((e) => {
+    if (ts.isOmittedExpression(e)) return "";
+    const property = e.propertyName ? `${e.propertyName.getText()}: ` : "";
+    return `${e.dotDotDotToken ? "..." : ""}${property}${bindingNameText(e.name)}`;
+  });
+  return ts.isObjectBindingPattern(name)
+    ? `{ ${elements.join(", ")} }`
+    : `[${elements.join(", ")}]`;
 }
 
 /** Stands in for a parameter type TypeScript infers rather than spells. */

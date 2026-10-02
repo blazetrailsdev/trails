@@ -4795,9 +4795,9 @@ function orRaise(statement: ts.IfStatement): ts.ThrowStatement | undefined {
 function isArgumentBindingGuard(statement: ts.IfStatement): boolean {
   const body = statement.parent;
   if (!ts.isBlock(body) || !ts.isFunctionLike(body.parent)) return false;
-  const bound = body.parent.parameters.flatMap((p) =>
-    ts.isIdentifier(p.name) ? [p.name.text] : [],
-  );
+  const parameters = body.parent.parameters.filter((p) => ts.isIdentifier(p.name));
+  const bound = parameters.map((p) => p.name.getText());
+  const splat = parameters.filter((p) => p.dotDotDotToken).map((p) => p.name.getText());
   for (const earlier of body.statements) {
     if (earlier === statement) break;
     if (ts.isIfStatement(earlier) && isArgumentBindingGuard(earlier)) continue;
@@ -4808,7 +4808,7 @@ function isArgumentBindingGuard(statement: ts.IfStatement): boolean {
     if (!call || !ts.isCallExpression(call) || !ts.isIdentifier(declaration.name)) return false;
     const [rest] = call.arguments;
     if (call.expression.getText() !== "extractOptionsBang" || !ts.isIdentifier(rest)) return false;
-    if (!bound.includes(rest.text)) return false;
+    if (!splat.includes(rest.text)) return false;
     bound.push(declaration.name.text);
   }
   let test = statement.expression;
