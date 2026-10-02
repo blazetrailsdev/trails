@@ -502,7 +502,7 @@ describe("main cross-package and parked-stub credit", () => {
 
   it("does not count a pending stub for an unported case as extra", async () => {
     const name = "errors are marshalable";
-    const stubs = [tc(["ErrorsTest"], name, true), tc(["ErrorsTest"], "inspect", true)];
+    const stubs = [tc(["ErrorsTest"], name, true), tc(["OtherTest"], name, true)];
     const result = await compare(
       "errors_test.rb",
       {
