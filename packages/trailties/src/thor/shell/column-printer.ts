@@ -1,4 +1,6 @@
 import {
+  fixDiv,
+  fixMod,
   isEmpty,
   max,
   printf,
@@ -35,7 +37,7 @@ export class ColumnPrinter {
     const colwidth = (max(array.map((el) => strlen(toS(el)))) ?? 0) + 2;
     array.forEach((value, index) => {
       if (
-        ((index + 1) % Math.floor(Terminal.terminalWidth() / colwidth) === 0 && index !== 0) ||
+        (fixMod(index + 1, fixDiv(Terminal.terminalWidth(), colwidth)) === 0 && index !== 0) ||
         index + 1 === array.length
       ) {
         puts.call(this.stdout, value);

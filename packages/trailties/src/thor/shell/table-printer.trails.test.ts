@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { capture } from "@blazetrails/activesupport";
-import { env, setEnv } from "@blazetrails/ruby-compat";
+import { env, setEnv, ZeroDivisionError } from "@blazetrails/ruby-compat";
 import { Basic } from "./basic.js";
 
 describe("Thor::Shell printers", () => {
@@ -23,6 +23,13 @@ describe("Thor::Shell printers", () => {
       "1234567890  a           b           c           d           e\nf           g\n",
     );
     expect(await capture(":stdout", () => shell.printInColumns([]))).toBe("");
+  });
+
+  it("ColumnPrinter raises ZeroDivisionError for an element wider than the terminal", async () => {
+    setEnv("THOR_COLUMNS", "10");
+    await capture(":stdout", () => {
+      expect(() => shell.printInColumns(["a".repeat(9), "b"])).toThrow(ZeroDivisionError);
+    });
   });
 
   it("TablePrinter counts a cell's width in characters, not UTF-16 units", async () => {
