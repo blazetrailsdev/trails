@@ -1,4 +1,6 @@
 import { ArgumentError } from "./argument-error.js";
+import { FrozenError } from "./frozen-error.js";
+import { rbInspect, rbObjClass } from "./object.js";
 import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { TypeError } from "./type-error.js";
@@ -95,12 +97,21 @@ export const Struct = {
       }
 
       /**
-       * `rb_struct_init_copy` (`vendor/ruby/v3.3.11/struct.c:1123`).
+       * `rb_struct_init_copy` (`vendor/ruby/v3.3.11/struct.c:1123`), whose
+       * `OBJ_INIT_COPY` is `rb_obj_init_copy` (`vendor/ruby/v3.3.11/object.c:634`).
        *
        * @noRailsEquivalent PERMANENT
        */
       initializeCopy(s: StructInstance): this {
         if (this === s) return this;
+        if (Object.isFrozen(this)) {
+          throw new FrozenError(`can't modify frozen ${rbObjClass(this)}: ${rbInspect(this)}`, {
+            receiver: this,
+          });
+        }
+        if (this.constructor !== s.constructor) {
+          throw new TypeError("initialize_copy should take same class object");
+        }
         if (this.members().length !== s.members().length) {
           throw new TypeError("struct size mismatch");
         }

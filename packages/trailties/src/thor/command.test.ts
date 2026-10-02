@@ -77,7 +77,9 @@ describe("Thor::Command", () => {
 
     it("does not invoke an existing method", async () => {
       class Double {
+        declare ["constructor"]: typeof Double;
         static handleNoCommandError = vi.fn();
+        static handleArgumentError = vi.fn();
       }
       const dub = new Double();
       await new DynamicCommand("toString").run(dub);
@@ -98,17 +100,26 @@ describe("Thor::Command", () => {
 
   describe("#run", () => {
     it("runs a command by calling a method in the given instance", async () => {
-      const dub = { can_has: vi.fn((...args: unknown[]) => args) };
+      class Double {
+        declare ["constructor"]: typeof Double;
+        static handleNoCommandError = vi.fn();
+        static handleArgumentError = vi.fn();
+        can_has = vi.fn((...args: unknown[]) => args);
+      }
+      const dub = new Double();
       expect(await command().run(dub, [1, 2, 3])).toEqual([1, 2, 3]);
       expect(dub.can_has).toHaveBeenCalled();
     });
 
     // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
     it.skip("raises an error if the method to be invoked is private", async () => {
-      const klass = class {
+      const klass = class Klass {
+        declare ["constructor"]: typeof Klass;
         static handleNoCommandError(name: string) {
           return name;
         }
+
+        static handleArgumentError() {}
 
         private can_has() {
           return "fail";

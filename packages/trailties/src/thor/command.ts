@@ -36,6 +36,10 @@ interface UsageClass {
   arguments(): Argument[];
 }
 
+interface Instance {
+  constructor: CommandClass;
+}
+
 type Method = (...args: unknown[]) => unknown;
 
 export class Command extends Struct.new(
@@ -94,18 +98,17 @@ export class Command extends Struct.new(
     return false;
   }
 
-  async run(instance: object, args: unknown[] = []): Promise<unknown> {
+  async run(instance: Instance, args: unknown[] = []): Promise<unknown> {
     let arity: number | null = null;
     let caller: unknown = null;
-    const klass = instance.constructor as unknown as CommandClass;
 
     try {
       if (this.isPrivateMethod(instance)) {
-        return klass.handleNoCommandError(this.name);
+        return instance.constructor.handleNoCommandError(this.name);
       } else if (this.isPublicMethod(instance)) {
         arity = rbObjMethod(instance, this.name).arity();
         try {
-          rbCheckArity((instance as Record<string, Method>)[this.name], args.length);
+          rbCheckArity((instance as unknown as Record<string, Method>)[this.name], args.length);
         } catch (e) {
           caller = e;
           throw e;
@@ -114,18 +117,18 @@ export class Command extends Struct.new(
       } else if (this.isLocalMethod(instance, "methodMissing")) {
         return await rbFSend(instance, "methodMissing", this.name, ...args);
       } else {
-        return klass.handleNoCommandError(this.name);
+        return instance.constructor.handleNoCommandError(this.name);
       }
     } catch (e) {
       if (e instanceof ArgumentError) {
         if (this.isHandleArgumentError(instance, e, caller)) {
-          return klass.handleArgumentError(this, e, args, arity);
+          return instance.constructor.handleArgumentError(this, e, args, arity);
         } else {
           throw e;
         }
       } else if (e instanceof NoMethodError) {
         if (this.isHandleNoMethodError(instance, e, caller)) {
-          return klass.handleNoCommandError(this.name);
+          return instance.constructor.handleNoCommandError(this.name);
         } else {
           throw e;
         }
@@ -192,9 +195,10 @@ export class Command extends Struct.new(
   }
 
   /** @internal */
-  protected isNotDebugging(instance: object): boolean {
-    const klass = instance.constructor as unknown as CommandClass;
-    return !(rbObjRespondTo(klass, "debugging") && rtest(klass.debugging));
+  protected isNotDebugging(instance: Instance): boolean {
+    return !(
+      rbObjRespondTo(instance.constructor, "debugging") && rtest(instance.constructor.debugging)
+    );
   }
 
   /** @internal */
@@ -207,7 +211,7 @@ export class Command extends Struct.new(
   }
 
   /** @internal */
-  protected isPublicMethod(instance: object): boolean {
+  protected isPublicMethod(instance: Instance): boolean {
     return rbObjPublicMethods(instance).includes(this.name);
   }
 
@@ -215,12 +219,12 @@ export class Command extends Struct.new(
    * @internal
    * @missingRailsCall private_methods — PERMANENT
    */
-  protected isPrivateMethod(_instance: object): boolean {
+  protected isPrivateMethod(_instance: Instance): boolean {
     return false;
   }
 
   /** @internal */
-  protected isLocalMethod(instance: object, name: string): boolean {
+  protected isLocalMethod(instance: Instance, name: string): boolean {
     const methods = rbObjPublicMethods(instance, false);
     return methods.includes(name);
   }
@@ -243,7 +247,7 @@ export class Command extends Struct.new(
    * @missingRailsCall sans_backtrace — PERMANENT
    */
   protected isHandleArgumentError(
-    instance: object,
+    instance: Instance,
     error: ArgumentError,
     caller: unknown,
   ): boolean {
@@ -257,7 +261,7 @@ export class Command extends Struct.new(
 
   /** @internal */
   protected isHandleNoMethodError(
-    instance: object,
+    instance: Instance,
     error: NoMethodError,
     _caller: unknown,
   ): boolean {
@@ -293,11 +297,11 @@ export class DynamicCommand extends Command {
     );
   }
 
-  override async run(instance: object, args: unknown[] = []): Promise<unknown> {
+  override async run(instance: Instance, args: unknown[] = []): Promise<unknown> {
     if (!rbObjMethods(instance).includes(this.name)) {
       return super.run(instance, args);
     } else {
-      return (instance.constructor as unknown as CommandClass).handleNoCommandError(this.name);
+      return instance.constructor.handleNoCommandError(this.name);
     }
   }
 }

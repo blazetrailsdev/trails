@@ -11,7 +11,8 @@ import {
 
 describe("Thor::Command", () => {
   function host(methods: Record<string, (...args: never[]) => unknown> = {}, debugging = false) {
-    const klass = class {
+    const klass = class Host {
+      declare ["constructor"]: typeof Host;
       static get debugging() {
         return debugging;
       }

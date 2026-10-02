@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
+import { FrozenError } from "./frozen-error.js";
 import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { Struct } from "./struct.js";
+import { TypeError } from "./type-error.js";
 
 class Customer extends Struct.new("name", "zip") {
   declare name: unknown;
@@ -51,5 +53,15 @@ describe("Struct", () => {
     const copy = new Customer();
     expect(copy.initializeCopy(new Customer("Joe", 1))).toBe(copy);
     expect([copy.name, copy.zip]).toEqual(["Joe", 1]);
+    expect(copy.initializeCopy(copy)).toBe(copy);
+  });
+
+  it("refuses to copy into a frozen struct or from another class", () => {
+    expect(() => Object.freeze(new Customer()).initializeCopy(new Customer("Joe", 1))).toThrow(
+      FrozenError,
+    );
+    expect(() => new Customer().initializeCopy(new Other("Joe", 1))).toThrow(
+      new TypeError("initialize_copy should take same class object"),
+    );
   });
 });
