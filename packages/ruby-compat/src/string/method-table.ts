@@ -4,6 +4,7 @@ import { Encoding } from "../encoding.js";
 import { IndexError } from "../index-error.js";
 import { format } from "../kernel-format.js";
 import { included } from "../include.js";
+import { NilClass } from "../nil-class.js";
 import { NoMethodError } from "../no-method-error.js";
 import { Range } from "../range.js";
 import { rbEqual } from "../rb-equal.js";
@@ -168,7 +169,7 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
     gsub: (self, ...argv) => strGsub(self, argv, false),
     chop: rbDefineMethod(0, (self) => rbStrChop(self.string)),
     chomp: (self, ...args) => rbStrChomp(self.string, args),
-    strip: rbDefineMethod(0, (self) => self.string.replace(LSTRIP, "").replace(RSTRIP, "")),
+    strip: rbDefineMethod(0, (self) => strip(self.string)),
     lstrip: rbDefineMethod(0, (self) => self.string.replace(LSTRIP, "")),
     rstrip: rbDefineMethod(0, (self) => self.string.replace(RSTRIP, "")),
     deletePrefix: rbDefineMethod(1, (self, prefix) => deletePrefix(self.string, prefix)),
@@ -341,6 +342,34 @@ export function rbStrMatch(x: string, y: unknown): unknown {
     return match ? rbStrSublen(x, match.index) : null;
   }
   return (y as { matchOperator(x: string): unknown }).matchOperator(x);
+}
+
+/**
+ * Ruby's `obj =~ pattern` send, dispatched on the receiver's class:
+ * `NilClass#=~` (`vendor/ruby/v3.3.11/object.c:4419` `nil_match`), which answers
+ * `nil` for any pattern, `String#=~` ({@link rbStrMatch}), else the receiver's
+ * own `matchOperator`.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby method send, which JS has no receiver
+ * for on `null` or a primitive.
+ */
+export function matchOperator(obj: unknown, pattern: unknown): unknown {
+  if (obj == null) return NilClass.matchOperator(pattern);
+  if (typeof obj === "string") return rbStrMatch(obj, pattern);
+  return (obj as { matchOperator(pattern: unknown): unknown }).matchOperator(pattern);
+}
+
+/**
+ * `String#strip` (`vendor/ruby/v3.3.11/string.c:10020` `rb_str_strip`): the receiver
+ * without its leading and trailing NUL and ASCII whitespace
+ * (`lstrip_offset`, `rstrip_offset`). JS `trim()` also removes NBSP, U+FEFF
+ * and the Unicode space separators, which Ruby keeps.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `String#strip`, which Thor calls on
+ * a prompt's answer (`vendor/thor/v1.3.2/lib/thor/shell/basic.rb:339`).
+ */
+export function strip(str: string): string {
+  return str.replace(LSTRIP, "").replace(RSTRIP, "");
 }
 
 /**

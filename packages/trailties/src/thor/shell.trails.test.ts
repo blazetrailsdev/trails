@@ -111,6 +111,14 @@ describe("Thor::Shell::Basic#ask", () => {
     });
   });
 
+  it("strips an answer as String#strip does, keeping non-ASCII spaces", async () => {
+    const shell = new Basic();
+    answering(" \u00a0yes\u00a0\0\r\n");
+    await capture(":stdout", async () => {
+      expect(await shell.ask("Sure?")).toBe("\u00a0yes\u00a0");
+    });
+  });
+
   it("re-asks a limited_to question until an answer matches", async () => {
     const shell = new Basic();
     const gets = answering("mint\n", "VANILLA\n", "vanilla\n", "VANILLA\n");

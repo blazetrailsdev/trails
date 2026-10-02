@@ -3,6 +3,7 @@ import {
   fetch,
   Hash,
   isSymbol,
+  matchOperator,
   print,
   puts,
   rbConstGet,
@@ -10,10 +11,10 @@ import {
   rbEqual,
   rbObjAsString as toS,
   rbObjClass,
-  rbStrMatch,
   rtest,
   stderr as $stderr,
   stdout as $stdout,
+  strip,
   symbolToS,
   type StdStream,
   uniq,
@@ -130,13 +131,15 @@ export class Basic {
   }
 
   async isYes(statement: unknown, color: unknown = null): Promise<boolean> {
-    const answer = await this.ask(statement, color, { addToHistory: false });
-    return answer != null && rbStrMatch(answer as string, this.is("yes")) != null;
+    return rtest(
+      matchOperator(await this.ask(statement, color, { addToHistory: false }), this.is("yes")),
+    );
   }
 
   async isNo(statement: unknown, color: unknown = null): Promise<boolean> {
-    const answer = await this.ask(statement, color, { addToHistory: false });
-    return answer != null && rbStrMatch(answer as string, this.is("no")) != null;
+    return rtest(
+      matchOperator(await this.ask(statement, color, { addToHistory: false }), this.is("no")),
+    );
   }
 
   error(statement: unknown): void {
@@ -178,10 +181,10 @@ export class Basic {
   protected is(value: unknown): RegExp {
     value = toS(value);
 
-    if ((value as string).length === 1) {
+    if ([...(value as string)].length === 1) {
       return new RegExp(`^${value}$`, "i");
     } else {
-      return new RegExp(`^(${value}|${(value as string).slice(0, 1)})$`, "i");
+      return new RegExp(`^(${value}|${[...(value as string)].slice(0, 1).join("")})$`, "i");
     }
   }
 
@@ -211,7 +214,7 @@ export class Basic {
 
     if (result == null) return null;
 
-    result = result.trim();
+    result = strip(result);
 
     if (rtest(default_) && result === "") {
       return default_;
@@ -230,7 +233,7 @@ export class Basic {
     const caseInsensitive = fetch(options, "caseInsensitive", false);
     let correctAnswer: unknown = null;
     while (!rtest(correctAnswer)) {
-      const answers = answerSet.join(", ");
+      const answers = answerSet.flat(Infinity).join(", ");
       const answer = await this.askSimply(`${toS(statement)} [${answers}]`, color, options);
       correctAnswer = this.answerMatch(answerSet, answer, caseInsensitive);
       if (!rtest(correctAnswer)) {
