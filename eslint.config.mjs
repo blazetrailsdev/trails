@@ -127,7 +127,7 @@ const canonicalTables = canonicalTableNames();
 
 // Linting the whole repo (`pnpm lint`) needs more than node's ~4.5 GB default
 // heap now that `scripts/**` is in scope — 500 extra files, several of them
-// thousands of lines. package.json's `lint` script raises it to 6144 MB; a
+// thousands of lines. package.json's `lint` script raises it to 10240 MB; a
 // bare `eslint .` OOMs.
 export default defineConfig(
   {
