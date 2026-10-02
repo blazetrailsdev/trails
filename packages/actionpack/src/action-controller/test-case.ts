@@ -12,6 +12,7 @@ import {
   isModuleIncluded,
   isPlainObject,
   runLoadHooks,
+  TopLevel,
   toQuery,
   toXml,
   type Included,
@@ -169,7 +170,7 @@ export interface Behavior extends Included<typeof TestProcess> {
   /** @internal */
   setupRequest: OmitThisParameter<typeof setupRequest>;
   /** @internal */
-  wrapExecution: OmitThisParameter<typeof wrapExecution>;
+  wrapExecution<T>(block: () => T): T;
   /** @internal */
   processControllerResponse: OmitThisParameter<typeof processControllerResponse>;
   /** @internal */
@@ -180,41 +181,61 @@ export interface Behavior extends Included<typeof TestProcess> {
   checkRequiredIvars: OmitThisParameter<typeof checkRequiredIvars>;
 }
 
-async function get(this: Behavior, action: string, options: RequestOptions = {}): Promise<void> {
-  await this.process(action, { method: "GET", ...options });
+async function get(
+  this: Behavior,
+  action: string,
+  options: RequestOptions = {},
+): Promise<Behavior["response"]> {
+  return this.process(action, { method: "GET", ...options });
 }
 
-async function post(this: Behavior, action: string, options: RequestOptions = {}): Promise<void> {
-  await this.process(action, { method: "POST", ...options });
+async function post(
+  this: Behavior,
+  action: string,
+  options: RequestOptions = {},
+): Promise<Behavior["response"]> {
+  return this.process(action, { method: "POST", ...options });
 }
 
-async function patch(this: Behavior, action: string, options: RequestOptions = {}): Promise<void> {
-  await this.process(action, { method: "PATCH", ...options });
+async function patch(
+  this: Behavior,
+  action: string,
+  options: RequestOptions = {},
+): Promise<Behavior["response"]> {
+  return this.process(action, { method: "PATCH", ...options });
 }
 
-async function put(this: Behavior, action: string, options: RequestOptions = {}): Promise<void> {
-  await this.process(action, { method: "PUT", ...options });
+async function put(
+  this: Behavior,
+  action: string,
+  options: RequestOptions = {},
+): Promise<Behavior["response"]> {
+  return this.process(action, { method: "PUT", ...options });
 }
 
 async function deleteRequest(
   this: Behavior,
   action: string,
   options: RequestOptions = {},
-): Promise<void> {
-  await this.process(action, { method: "DELETE", ...options });
+): Promise<Behavior["response"]> {
+  return this.process(action, { method: "DELETE", ...options });
 }
 
 export { deleteRequest as delete };
 
-async function head(this: Behavior, action: string, options: RequestOptions = {}): Promise<void> {
-  await this.process(action, { method: "HEAD", ...options });
+async function head(
+  this: Behavior,
+  action: string,
+  options: RequestOptions = {},
+): Promise<Behavior["response"]> {
+  return this.process(action, { method: "HEAD", ...options });
 }
 
 async function process(
   this: Behavior,
   action: string,
   options: RequestOptions = {},
-): Promise<void> {
+): Promise<Behavior["response"]> {
   const { method = "GET", params, session, body, flash = {}, xhr = false, as } = options;
   let { format } = options;
 
@@ -257,7 +278,7 @@ async function process(
   }
 
   this.setupRequest(this.controllerClassName(), action, parameters, session, flash, xhr);
-  await this.processControllerResponse(action, this.cookies(), xhr);
+  return this.processControllerResponse(action, this.cookies(), xhr);
 }
 
 function controllerClassName(this: Behavior): string {
@@ -355,8 +376,16 @@ function setupRequest(
 }
 
 /** @internal */
-function wrapExecution(this: Behavior, fn: () => Promise<void>): Promise<void> {
-  return fn();
+function wrapExecution<T>(this: Behavior, block: () => T): T {
+  if (
+    TestCase.executorAroundEachRequest &&
+    TopLevel.Trails !== undefined &&
+    TopLevel.Trails.application
+  ) {
+    return TopLevel.Trails.application.executor.wrap(block);
+  } else {
+    return block();
+  }
 }
 
 /** @internal */
@@ -365,13 +394,11 @@ async function processControllerResponse(
   action: string,
   cookies: CookieJar,
   xhr: boolean,
-): Promise<void> {
+): Promise<Behavior["response"]> {
   try {
     this.controller.recycleBang();
 
-    await this.wrapExecution(() =>
-      this.controller.dispatch(action, this.request, this.response).then(() => {}),
-    );
+    await this.wrapExecution(() => this.controller.dispatch(action, this.request, this.response));
   } finally {
     this.request = this.controller.request as TestRequest;
     this.response = this.controller.response as Behavior["response"];
@@ -400,6 +427,8 @@ async function processControllerResponse(
 
     this.response.sentBang();
   }
+
+  return this.response;
 }
 
 /** @internal */
@@ -412,9 +441,9 @@ function scrubEnvBang(this: Behavior, env: Record<string, unknown>): Record<stri
     )
       delete env[key];
   }
+  env["rack.input"] = new StringIO();
   delete env["CONTENT_LENGTH"];
   delete env["RAW_POST_DATA"];
-  env["rack.input"] = new StringIO();
   return env;
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { BigDecimal, include, isModuleIncluded } from "@blazetrails/activesupport";
+import { BigDecimal, include, isModuleIncluded, TopLevel } from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import { b, StringIO } from "@blazetrails/ruby-compat";
 import { UploadedFile } from "@blazetrails/rack-test";
@@ -140,6 +140,45 @@ describe("TestCase::Behavior", () => {
     expect(tc.controller).toBeInstanceOf(PlainController);
     expect(tc.request).toBeInstanceOf(TestRequest);
     expect(() => tc.assertTemplate()).toThrow(/extracted to a gem/);
+  });
+});
+
+describe("TestCase#wrap_execution", () => {
+  class HeadController extends Base {
+    async index() {
+      this.head("ok");
+    }
+  }
+
+  async function request(): Promise<TestCase> {
+    const tc = new TestCase();
+    tc.controller = new HeadController();
+    await tc.beforeSetup();
+    expect(await tc.get("index")).toBe(tc.response);
+    return tc;
+  }
+
+  it("wraps the dispatch in the application executor when executor_around_each_request is set", async () => {
+    const trails = TopLevel.Trails;
+    let wrapped = 0;
+    const executor = {
+      wrap<T>(block: () => T): T {
+        wrapped += 1;
+        return block();
+      },
+    };
+    TopLevel.Trails = { application: { executor } } as unknown as typeof trails;
+    try {
+      await request();
+      expect(wrapped).toBe(0);
+      TestCase.executorAroundEachRequest = true;
+      const tc = await request();
+      expect(wrapped).toBe(1);
+      expect(tc.response.status).toBe(200);
+    } finally {
+      TestCase.executorAroundEachRequest = false;
+      TopLevel.Trails = trails;
+    }
   });
 });
 

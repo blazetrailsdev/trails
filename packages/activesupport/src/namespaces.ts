@@ -41,6 +41,7 @@ export const TopLevel: {
         paths(): { get(path: string): { toAry(): string[] } | undefined };
       };
       reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
+      executor: { wrap<T>(block: () => T): T };
     } | null;
     Application: abstract new (...args: never[]) => unknown;
     Engine: abstract new (...args: never[]) => unknown;

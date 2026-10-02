@@ -123,7 +123,7 @@ describe("ActionController::RequestForgeryProtection", () => {
     tc.session().set("_csrf_token", token);
   }
 
-  async function assertBlocked(block: () => Promise<void>): Promise<void> {
+  async function assertBlocked(block: () => Promise<unknown>): Promise<void> {
     tc.session().set("something_like_user_id", 1);
     await block();
     expect(
@@ -133,14 +133,14 @@ describe("ActionController::RequestForgeryProtection", () => {
     tc.assertResponse("success");
   }
 
-  async function assertNotBlocked(block: () => Promise<void>): Promise<void> {
+  async function assertNotBlocked(block: () => Promise<unknown>): Promise<void> {
     tc.session().set("something_like_user_id", 1);
     await assertNothingRaised(block);
     expect(tc.session().get("something_like_user_id")).toBe(1);
     tc.assertResponse("success");
   }
 
-  async function forgeryProtectionOriginCheck(block: () => Promise<void>): Promise<void> {
+  async function forgeryProtectionOriginCheck(block: () => Promise<unknown>): Promise<void> {
     const oldSetting = Base.forgeryProtectionOriginCheck;
     Base.forgeryProtectionOriginCheck = true;
     try {
@@ -399,11 +399,11 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
       Base.requestForgeryProtectionToken = oldRequestForgeryProtectionToken;
     });
 
-    async function assertCrossOriginBlocked(block: () => Promise<void>): Promise<void> {
+    async function assertCrossOriginBlocked(block: () => Promise<unknown>): Promise<void> {
       await assertRaises([InvalidCrossOriginRequest], {}, block);
     }
 
-    async function assertCrossOriginNotBlocked(block: () => Promise<void>): Promise<void> {
+    async function assertCrossOriginNotBlocked(block: () => Promise<unknown>): Promise<void> {
       tc.session().set("something_like_user_id", 1);
       await assertNothingRaised(block);
       expect(tc.session().get("something_like_user_id")).toBe(1);
