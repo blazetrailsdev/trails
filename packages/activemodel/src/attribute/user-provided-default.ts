@@ -1,12 +1,11 @@
-import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { rbModConstSet, registerConstant, rtest } from "@blazetrails/ruby-compat";
 import { Attribute, FromUser } from "../attribute.js";
 import { ValueType } from "../type/value.js";
 
 export class UserProvidedDefault extends FromUser {
   /** @internal */
   readonly userProvidedValue: unknown;
-  private _memoizedVBTC: unknown;
-  private _hasMemoizedVBTC: boolean = false;
+  private memoizedValueBeforeTypeCast: unknown;
 
   constructor(
     name: string | null,
@@ -20,13 +19,12 @@ export class UserProvidedDefault extends FromUser {
 
   override get valueBeforeTypeCast(): unknown {
     if (typeof this.userProvidedValue === "function") {
-      if (!this._hasMemoizedVBTC) {
-        this._memoizedVBTC = this.userProvidedValue();
-        this._hasMemoizedVBTC = true;
-      }
-      return this._memoizedVBTC;
+      return rtest(this.memoizedValueBeforeTypeCast)
+        ? this.memoizedValueBeforeTypeCast
+        : (this.memoizedValueBeforeTypeCast = this.userProvidedValue());
+    } else {
+      return this.userProvidedValue;
     }
-    return this.userProvidedValue;
   }
 
   override withType(type: ValueType | null): Attribute {

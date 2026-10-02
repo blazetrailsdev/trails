@@ -1,4 +1,5 @@
 import {
+  indexWith,
   isPlainObject,
   reverseMergeBang as hashReverseMergeBang,
 } from "@blazetrails/activesupport";
@@ -232,11 +233,7 @@ export class AttributeSet {
   }
 
   toHash(): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const name of this.keys()) {
-      result[name] = this.getAttribute(name).value();
-    }
-    return result;
+    return Object.fromEntries(indexWith(this.keys(), (name) => this.getAttribute(name).value()));
   }
 
   toH(): Record<string, unknown> {

@@ -59,12 +59,10 @@ export class JSON {
   fromJson(
     this: this & AttributesWriter,
     json: string,
-    ...includeRoot: [includeRoot?: boolean | string | null]
+    includeRoot: boolean | string | null = (this.constructor as typeof JSON).includeRootInJson,
   ): this {
-    const ctor = this.constructor as typeof JSON;
-    const root = includeRoot.length > 0 ? includeRoot[0] : ctor.includeRootInJson;
     let hash = ActiveSupportJSON.decode(json);
-    if (root !== false && root != null) {
+    if (includeRoot !== false && includeRoot != null) {
       hash = first(Object.values(hash as object));
     }
     void this.setAttributes(hash);

@@ -47,7 +47,6 @@ export class NumericalityValidator extends EachValidator {
     for (const [option, value] of Object.entries(
       slice(this.options, ...Object.keys(COMPARE_CHECKS)),
     )) {
-      if (value === undefined) continue;
       if (!isNumeric(value) && typeof value !== "function" && !isSymbol(value)) {
         throw new ArgumentError(`:${underscore(option)} must be a number, a symbol or a proc`);
       }
@@ -56,7 +55,6 @@ export class NumericalityValidator extends EachValidator {
     for (const [option, value] of Object.entries(
       slice(this.options, ...Object.keys(RANGE_CHECKS)),
     )) {
-      if (value === undefined) continue;
       if (!(value instanceof Range)) {
         throw new ArgumentError(`:${option} must be a range`);
       }

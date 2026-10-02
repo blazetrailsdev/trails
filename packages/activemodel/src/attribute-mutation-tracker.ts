@@ -34,6 +34,8 @@ function valuesEqual(a: unknown, b: unknown): boolean {
 }
 
 export class AttributeMutationTracker {
+  static readonly OPTION_NOT_GIVEN: unknown = Object.freeze({});
+
   protected attributes: AttributeSet;
   protected forcedChanges: Map<string, unknown> = new Map();
 
@@ -77,21 +79,16 @@ export class AttributeMutationTracker {
     return this.attrNames().some((attr) => this.isChanged(attr));
   }
 
-  isChanged(attrName: string, options?: { from?: unknown; to?: unknown }): boolean {
-    if (!this.attributeChanged(attrName)) return false;
-    if (
-      options &&
-      "from" in options &&
-      !valuesEqual(this.originalValue(attrName), this.typeCast(attrName, options.from))
-    )
-      return false;
-    if (
-      options &&
-      "to" in options &&
-      !valuesEqual(this.fetchValue(attrName), this.typeCast(attrName, options.to))
-    )
-      return false;
-    return true;
+  isChanged(attrName: string, options: { from?: unknown; to?: unknown } = {}): boolean {
+    const { OPTION_NOT_GIVEN } = AttributeMutationTracker;
+    const { from, to } = { from: OPTION_NOT_GIVEN, to: OPTION_NOT_GIVEN, ...options };
+    return (
+      this.attributeChanged(attrName) &&
+      (OPTION_NOT_GIVEN === from ||
+        valuesEqual(this.originalValue(attrName), this.typeCast(attrName, from))) &&
+      (OPTION_NOT_GIVEN === to ||
+        valuesEqual(this.fetchValue(attrName), this.typeCast(attrName, to)))
+    );
   }
 
   changedInPlace(attrName: string): boolean {

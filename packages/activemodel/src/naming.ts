@@ -257,13 +257,10 @@ export class ModelName {
 
   /** @internal */
   i18nKeys(): string[] {
-    if (this._cachedI18nKeys) return this._cachedI18nKeys;
-    const keys =
+    return (this._cachedI18nKeys ||=
       typeof this._klass?.lookupAncestors === "function"
-        ? this._klass.lookupAncestors().map((k) => k.modelName.i18nKey)
-        : [];
-    this._cachedI18nKeys = keys;
-    return keys;
+        ? this._klass.lookupAncestors().map((klass) => klass.modelName.i18nKey)
+        : []);
   }
 
   /** @internal */

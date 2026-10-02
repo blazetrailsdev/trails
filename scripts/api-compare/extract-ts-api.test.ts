@@ -745,7 +745,6 @@ describe("body call capture", () => {
       "ref:busy",
       "rescue",
       "ref:locked",
-      "throw",
     ]);
   });
 
@@ -763,7 +762,93 @@ describe("body call capture", () => {
       }`,
     );
     const cloneValue = cls.instanceMethods.find((m) => m.name === "cloneValue")!;
-    expect(cloneValue.skeleton).toEqual(["try", "ref:clone", "rescue", "ref:value", "throw"]);
+    expect(cloneValue.skeleton).toEqual(["try", "ref:clone", "rescue", "ref:value"]);
+  });
+
+  it("reads a typed catch's rethrow of the unmatched exception as no arm", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        guarded() {
+          try {
+            this.work();
+          } catch (e) {
+            if (!(e instanceof ArgumentError)) throw e;
+            this.log(e);
+          }
+        }
+        alternate() {
+          try {
+            this.work();
+          } catch (e) {
+            if (e instanceof ArgumentError) this.log(e);
+            else throw e;
+          }
+        }
+        reraised() {
+          try {
+            this.work();
+          } catch (error) {
+            if (error instanceof NoMethodError) {
+              if (this.strict) throw error;
+              this.log(error);
+            } else {
+              throw error;
+            }
+          }
+        }
+        fallsThrough() {
+          try {
+            this.work();
+          } catch (e) {
+            if (e instanceof InvalidForeignKey) this.warn(e);
+            throw e;
+          }
+        }
+        catchAll() {
+          try {
+            this.work();
+          } catch (error) {
+            if (error instanceof DatabaseAlreadyExists) return this.warn(error);
+            this.log(error);
+            throw error;
+          }
+        }
+        wrapped() {
+          try {
+            this.work();
+          } catch (e) {
+            if (e instanceof NameError) throw new ArgumentError("m");
+            throw e;
+          }
+        }
+      }`,
+    );
+    const arms = (name: string) =>
+      cls.instanceMethods
+        .find((m) => m.name === name)!
+        .skeleton!.filter((t) => !t.startsWith("ref:") && !t.startsWith("new:"));
+    expect(arms("guarded")).toEqual(["try", "rescue"]);
+    expect(arms("alternate")).toEqual(["try", "rescue"]);
+    expect(arms("reraised")).toEqual(["try", "rescue", "if", "throw"]);
+    expect(arms("wrapped")).toEqual(["try", "rescue", "throw:ArgumentError"]);
+    expect(arms("fallsThrough")).toEqual(["try", "rescue", "throw"]);
+    expect(arms("catchAll")).toEqual(["try", "rescue", "throw"]);
+  });
+
+  it("reads `rtest(x) ? x : y` as the `or` of Ruby's `x || y`, not as an arm", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        delimiter() {
+          return rtest(this.cache) ? this.cache : (this.cache = this.compute());
+        }
+        other() {
+          return rtest(this.cache) ? this.compute() : this.cache;
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("delimiter")).toEqual(["ref:rtest", "ref:cache", "or", "ref:compute"]);
+    expect(skeleton("other")!.filter((t) => t === "if" || t === "or")).toEqual(["if"]);
   });
 
   it("carries the thrown class on the throw token", () => {

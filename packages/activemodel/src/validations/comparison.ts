@@ -25,15 +25,14 @@ export class ComparisonValidator extends EachValidator {
     for (const [option, rawOptionValue] of Object.entries(
       slice(this.options, ...(Object.keys(COMPARE_CHECKS) as CompareKey[])),
     ) as [CompareKey, unknown][]) {
-      if (rawOptionValue === undefined) continue;
-      const optionValue = this.resolveValue(record, rawOptionValue);
-
-      if (value == null || isBlank(value)) {
-        record.errors.add(attrName, ":blank", this.errorOptions(value, optionValue));
-        return;
-      }
-
       try {
+        const optionValue = this.resolveValue(record, rawOptionValue);
+
+        if (value == null || isBlank(value)) {
+          record.errors.add(attrName, ":blank", this.errorOptions(value, optionValue));
+          return;
+        }
+
         if (
           !compareOperator(
             COMPARE_CHECKS[option],
