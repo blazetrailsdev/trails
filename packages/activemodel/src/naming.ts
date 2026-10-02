@@ -12,6 +12,7 @@ import {
   extended,
   type Included,
 } from "@blazetrails/activesupport";
+import { rbObjNotMatch, rbStrMatch } from "@blazetrails/ruby-compat";
 import { ArgumentError, TypeError } from "./attribute-assignment.js";
 
 export interface Naming {
@@ -153,6 +154,14 @@ export class ModelName {
     const name = other instanceof ModelName ? other.name : other;
     if (typeof name !== "string") return undefined;
     return this.name === name ? 0 : this.name < name ? -1 : 1;
+  }
+
+  matchOperator(pattern: unknown): unknown {
+    return rbStrMatch(this.name, pattern);
+  }
+
+  notMatchOperator(pattern: unknown): boolean {
+    return rbObjNotMatch(this.name, pattern);
   }
 
   eql(other: unknown): boolean {

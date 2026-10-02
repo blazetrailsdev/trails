@@ -99,11 +99,16 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // error.rb:190 `def ==(other)` → error.ts `equals`.
   "ActiveModel::Error": { "==": ["equals"] },
   // naming.rb:151 `delegate :==, :===, :<=>, :=~, :"!~", :eql?, …, to: :name` →
-  // naming.ts `equals`, `caseEquals` and `compare` (`eql?` is not an operator;
-  // it ports as `eql` and `rubyMethodToTs` already spells it). `=~` and `!~`
-  // stay UNMAPPED under the naming.rb entry in `SCOPED_SKIP_GROUPS`, which
-  // carries the reason.
-  "ActiveModel::Name": { "==": ["equals"], "===": ["caseEquals"], "<=>": ["compare"] },
+  // naming.ts `equals`, `caseEquals`, `compare`, `matchOperator` and
+  // `notMatchOperator` (`eql?` is not an operator; it ports as `eql` and
+  // `rubyMethodToTs` already spells it).
+  "ActiveModel::Name": {
+    "==": ["equals"],
+    "===": ["caseEquals"],
+    "<=>": ["compare"],
+    "=~": ["matchOperator"],
+    "!~": ["notMatchOperator"],
+  },
   // multibyte/chars.rb:53 `delegate :<=>, :=~, :match?, :acts_like_string?, to: :wrapped_string`
   // → chars.ts `compareTo` and `matchOperator` (`match?` is `isMatch`).
   "ActiveSupport::Multibyte::Chars": { "<=>": ["compareTo"], "=~": ["matchOperator"] },

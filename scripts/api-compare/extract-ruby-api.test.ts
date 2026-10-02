@@ -1406,6 +1406,21 @@ describe("Ruby extractor alias arity resolution", { timeout: RUBY_SUBPROCESS_TIM
     expect(r["Pkg::Querying#in_groups_of"]).toMatchObject({ params: [], notes: "delegate" });
   });
 
+  it("reads a quoted symbol with no interpolation as a delegated name", () => {
+    const r = aliasParams({
+      "d.rb": `
+        module Pkg
+          class Name
+            delegate :=~, :"!~", :"a#{b}", to: :name
+          end
+        end
+      `,
+    });
+    expect(r["Pkg::Name#=~"]).toMatchObject({ notes: "delegate" });
+    expect(r["Pkg::Name#!~"]).toMatchObject({ notes: "delegate" });
+    expect(Object.keys(r)).toEqual(["Pkg::Name#=~", "Pkg::Name#!~"]);
+  });
+
   // Forwardable's `def_delegators :@errors, :each, …` (activemodel errors.rb:103)
   // is the other generated-forwarding form. The accessor is the leading ivar
   // symbol and is NOT a generated method; every symbol after it is.

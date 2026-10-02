@@ -266,6 +266,7 @@ export { sliceBang } from "./string/slice.js";
 export {
   matchOperator,
   rbDefineMethod,
+  rbObjNotMatch,
   rbStrMatch,
   rbStrInit,
   rbStrRespondTo,

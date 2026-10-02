@@ -55,6 +55,7 @@ const OPERATOR_METHOD_NAMES: Record<string, string> = {
   multiply: "*",
   divide: "/",
   matchOperator: "=~",
+  notMatchOperator: "!~",
   append: "<<",
   uplus: "+@",
   uminus: "-@",
