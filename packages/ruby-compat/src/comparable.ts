@@ -313,12 +313,14 @@ export function isBetween(this: Comparable, min: unknown, max: unknown): boolean
 }
 
 /**
- * Ruby `Array#max` (`vendor/ruby/v3.3.11/array.c:5848` `rb_ary_max`), the no-argument,
- * no-block arm: `nil` for an empty array, and otherwise the first element
- * carried through `ary_max_generic` (`vendor/ruby/v3.3.11/array.c:5719`). MRI's
- * `CMP_OPTIMIZABLE` fast paths for a Fixnum / String / Float first element are
- * omitted — each one falls back to `ary_max_generic` the moment an element is
- * not of that type, so they change speed, not the answer.
+ * Ruby `Array#max` (`vendor/ruby/v3.3.11/array.c:5848` `rb_ary_max`), the
+ * no-argument arms. Without a block: `nil` for an empty array, and otherwise
+ * the first element carried through `ary_max_generic`
+ * (`vendor/ruby/v3.3.11/array.c:5719`). MRI's `CMP_OPTIMIZABLE` fast paths for a
+ * Fixnum / String / Float first element are omitted — each one falls back to
+ * `ary_max_generic` the moment an element is not of that type, so they change
+ * speed, not the answer. With a block: the element the block's `<=>` answer
+ * ranks highest, the first of any tie (`vendor/ruby/v3.3.11/array.c:5859-5866`).
  *
  * It lives beside {@link rbCmpint} rather than in an `array.ts` because that is
  * the whole of it: `ary_max_generic` is `rb_cmpint(rb_cmp(vmax, v), vmax, v)`,
@@ -327,8 +329,18 @@ export function isBetween(this: Comparable, min: unknown, max: unknown): boolean
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Array#max` (`vendor/ruby/v3.3.11/array.c:5848`).
  */
-export function max<T>(ary: readonly T[]): T | null {
+export function max<T>(ary: readonly T[], block?: (a: T, b: T) => number | null): T | null {
   const n = ary.length;
+  if (block) {
+    let result: T | null = null;
+    for (let i = 0; i < ary.length; i++) {
+      const v = ary[i];
+      if (i === 0 || rbCmpint(block(v, result as T), v, result) > 0) {
+        result = v;
+      }
+    }
+    return result;
+  }
   if (n === 0) return null;
   const result = ary[0];
   if (n > 1) return aryMaxGeneric(ary, 1, result);

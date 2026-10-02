@@ -30,7 +30,7 @@ export function round(x: number, ndigits = 0): number {
  */
 export function fixDiv(x: number, y: number): number {
   if (y === 0) throw new ZeroDivisionError("divided by 0");
-  return Math.floor(x / y);
+  return Math.floor(x / y) + 0;
 }
 
 /**
@@ -43,7 +43,8 @@ export function fixDiv(x: number, y: number): number {
 export function fixMod(x: number, y: number): number {
   if (y === 0) throw new ZeroDivisionError("divided by 0");
   const mod = x % y;
-  return mod !== 0 && mod < 0 !== y < 0 ? mod + y : mod;
+  if (mod === 0) return 0;
+  return mod < 0 !== y < 0 ? mod + y : mod;
 }
 
 /**

@@ -66,6 +66,12 @@ describe("Integer#/ and Integer#%", () => {
     expect([fixMod(10, 3), fixMod(10, -3), fixMod(-10, 3), fixMod(10, 2)]).toEqual([1, -2, 2, 0]);
   });
 
+  it("answers 0, never -0, for an exact division", () => {
+    expect(Object.is(fixMod(-4, 2), 0)).toBe(true);
+    expect(Object.is(fixMod(4, -2), 0)).toBe(true);
+    expect(Object.is(fixDiv(0, -3), 0)).toBe(true);
+  });
+
   it("raises ZeroDivisionError for a zero divisor", () => {
     expect(() => fixDiv(1, 0)).toThrow(new ZeroDivisionError("divided by 0"));
     expect(() => fixMod(1, 0)).toThrow(new ZeroDivisionError("divided by 0"));

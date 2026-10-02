@@ -109,6 +109,12 @@ describe("Thor::Shell printers", () => {
     );
   });
 
+  it("WrappedPrinter raises for an empty paragraph, where Thor sends length to nil", async () => {
+    await capture(":stdout", () => {
+      expect(() => shell.printWrapped("\n\nfoo")).toThrow(TypeError);
+    });
+  });
+
   it("WrappedPrinter turns a \\005 into a forced line break", async () => {
     const content = await capture(":stdout", () => shell.printWrapped("a one\x05two three"));
     expect(content).toBe("a one\ntwo three\n");

@@ -1,6 +1,7 @@
 import {
   arySlice,
   BigDecimal,
+  cmp,
   Complex,
   format,
   isEmpty,
@@ -75,7 +76,7 @@ export class TablePrinter extends ColumnPrinter {
     if (this._colwidth != null) this._formats.push(`%-${this._colwidth + 2}s`);
     const start = this._colwidth != null ? 1 : 0;
 
-    const colcount = (array as unknown[][]).reduce((a, b) => (b.length > a.length ? b : a)).length;
+    const colcount = max(array as unknown[][], (a, b) => cmp(a.length, b.length))!.length;
 
     for (let index = start; index <= colcount - 1; index++) {
       const maxima = max(

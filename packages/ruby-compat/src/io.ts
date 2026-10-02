@@ -87,8 +87,13 @@ export function print(this: GenericWritable, ...args: unknown[]): null {
 }
 
 /**
- * `rb_io_printf` (`vendor/ruby/v3.3.11/io.c:8589`): `rb_f_sprintf`'s String,
- * written to the receiver, answering `nil`.
+ * `rb_io_printf` (`vendor/ruby/v3.3.11/io.c:8589`), `IO#printf`:
+ * `rb_f_sprintf`'s String, written to the receiver, answering `nil`. The
+ * `printf(io, format_string, *objects)` form and the no-argument `nil` belong
+ * to `Kernel#printf` (`rb_f_printf`, `vendor/ruby/v3.3.11/io.c:8630`), a
+ * separate function that is not ported; `rb_f_sprintf` raises "too few
+ * arguments" for an `IO#printf` with none, which `fmt` being required stands
+ * in for.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `IO#printf` (`vendor/ruby/v3.3.11/io.c:8589`).
  */

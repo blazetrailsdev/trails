@@ -139,6 +139,18 @@ describe("Array#max", () => {
   });
 });
 
+describe("Array#max with a block", () => {
+  it("returns the element the block ranks highest, the first of a tie", () => {
+    const byLength = (a: string, b: string) => cmp(a.length, b.length);
+    expect(max(["0", "000", "00", "abc"], byLength)).toBe("000");
+    expect(max([] as string[], byLength)).toBeNull();
+  });
+
+  it("raises rb_cmperr's ArgumentError when the block answers nil", () => {
+    expect(() => max([1, 2], () => null)).toThrow("comparison of Integer with 1 failed");
+  });
+});
+
 describe("Array#min", () => {
   it("returns nil for an empty array, as rb_ary_min does", () => {
     expect(min([])).toBeNull();
