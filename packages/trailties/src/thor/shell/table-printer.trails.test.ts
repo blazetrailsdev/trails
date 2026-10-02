@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { capture } from "@blazetrails/activesupport";
-import { env, setEnv, ZeroDivisionError } from "@blazetrails/ruby-compat";
+import { env, rational, setEnv, ZeroDivisionError } from "@blazetrails/ruby-compat";
 import { Basic } from "./basic.js";
 
 describe("Thor::Shell printers", () => {
@@ -56,6 +56,15 @@ describe("Thor::Shell printers", () => {
         "",
       ].join("\n"),
     );
+  });
+
+  it("TablePrinter right-aligns every Numeric, not only Integer and Float", async () => {
+    const table = [
+      ["Name", "Number", "Color"],
+      ["Erik", rational(1, 2), "green"],
+    ];
+    const content = await capture(":stdout", () => shell.printTable(table));
+    expect(content).toBe("Name  Number  Color\nErik     1/2  green\n");
   });
 
   it("TablePrinter truncates to the terminal width for truncate: true and to a number otherwise", async () => {

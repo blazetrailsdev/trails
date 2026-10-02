@@ -1,9 +1,12 @@
 import {
   arySlice,
+  BigDecimal,
+  Complex,
   format,
   isEmpty,
   max,
   puts,
+  Rational,
   rbEqual,
   rbObjAsString as toS,
   rtest,
@@ -97,7 +100,13 @@ export class TablePrinter extends ColumnPrinter {
     const maxima = this._maximas[index];
 
     let f: string;
-    if (typeof column === "number" || typeof column === "bigint") {
+    if (
+      typeof column === "number" ||
+      typeof column === "bigint" ||
+      column instanceof Rational ||
+      column instanceof Complex ||
+      column instanceof BigDecimal
+    ) {
       if (rtest(this.options.borders)) {
         f = `%${toS(maxima)}s`;
       } else if (index === rowSize - 1) {
