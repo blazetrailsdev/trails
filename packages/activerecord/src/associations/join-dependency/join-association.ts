@@ -102,11 +102,11 @@ export class JoinAssociation extends JoinPart {
       }
 
       const arel = scope.arel(aliasTracker);
-      let nodes: Nodes.Node = first(arel.constraints)!;
+      let nodes: Nodes.And["children"][number] = first(arel.constraints)!;
 
-      const others: Nodes.Node[] = [];
+      const others: Nodes.And["children"] = [];
       if (nodes instanceof Nodes.And) {
-        const remaining: Nodes.Node[] = [];
+        const remaining: Nodes.And["children"] = [];
         for (const child of nodes.children) {
           if (!nodeReferencesTable(child, String(table.tableAlias ?? table.name))) {
             others.push(child);
@@ -163,7 +163,7 @@ export class JoinAssociation extends JoinPart {
   }
 }
 
-function nodeReferencesTable(node: Nodes.Node, tableName: string): boolean {
+function nodeReferencesTable(node: unknown, tableName: string): boolean {
   let found = false;
   fetchAttribute(node, (attr: Nodes.Node): boolean => {
     if (attr instanceof Arel.Attribute) {

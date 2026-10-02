@@ -9,9 +9,11 @@ import { SqlLiteral } from "./sql-literal.js";
 import type { Cte } from "./cte.js";
 import type { SelectManager } from "../select-manager.js";
 import type { Table } from "../table.js";
+import type { ArelNode } from "../arel.js";
+import type { Attribute } from "../attributes/attribute.js";
 
 export type NodeOrValue =
-  | Node
+  | ArelNode
   | ModelAttribute
   | SelectManager
   | Table
@@ -24,13 +26,13 @@ export type NodeOrValue =
   | Temporal.PlainDateTime
   | Temporal.PlainDate
   | Temporal.PlainTime
-  | Node[]
+  | NodeOrValue[]
   | null;
 
 export const FetchAttribute = {
-  fetchAttribute(this: Binary, block: (attr: Node) => boolean): boolean | undefined {
-    if (this.left instanceof Attributes.Attribute) return block(this.left as Node);
-    if (this.right instanceof Attributes.Attribute) return block(this.right as Node);
+  fetchAttribute(this: Binary, block: (attr: Attribute) => boolean): boolean | undefined {
+    if (this.left instanceof Attributes.Attribute) return block(this.left);
+    if (this.right instanceof Attributes.Attribute) return block(this.right);
     return undefined;
   },
 };
@@ -121,46 +123,46 @@ export class NotIn extends Binary {
 export class Assignment extends Binary {}
 
 export abstract class Join extends Binary {
-  declare left: Node | Table;
-  declare right: Node | Table | null;
+  declare left: ArelNode | Table;
+  declare right: ArelNode | Table | null;
 
-  constructor(left: Node | Table, right: Node | Table | null = null) {
+  constructor(left: ArelNode | Table, right: ArelNode | Table | null = null) {
     super(left, right);
   }
 }
 
 export class Union extends Binary {
-  declare left: Node;
-  declare right: Node;
+  declare left: ArelNode;
+  declare right: ArelNode;
 
-  constructor(left: Node, right: Node) {
+  constructor(left: ArelNode, right: ArelNode) {
     super(left, right);
   }
 }
 
 export class UnionAll extends Binary {
-  declare left: Node;
-  declare right: Node;
+  declare left: ArelNode;
+  declare right: ArelNode;
 
-  constructor(left: Node, right: Node) {
+  constructor(left: ArelNode, right: ArelNode) {
     super(left, right);
   }
 }
 
 export class Intersect extends Binary {
-  declare left: Node;
-  declare right: Node;
+  declare left: ArelNode;
+  declare right: ArelNode;
 
-  constructor(left: Node, right: Node) {
+  constructor(left: ArelNode, right: ArelNode) {
     super(left, right);
   }
 }
 
 export class Except extends Binary {
-  declare left: Node;
-  declare right: Node;
+  declare left: ArelNode;
+  declare right: ArelNode;
 
-  constructor(left: Node, right: Node) {
+  constructor(left: ArelNode, right: ArelNode) {
     super(left, right);
   }
 }

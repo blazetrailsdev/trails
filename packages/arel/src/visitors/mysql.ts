@@ -6,6 +6,7 @@ import "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";
 import { sql } from "../arel.js";
+import type { ArelNode } from "../arel.js";
 
 export class MySQL extends ToSql {
   protected override visitArelNodesBin(o: Nodes.Bin, collector: SQLString): SQLString {
@@ -122,15 +123,15 @@ export class MySQL extends ToSql {
   }
 
   protected override buildSubselect(
-    key: Node | Node[],
+    key: ArelNode | ArelNode[],
     o: {
-      relation: Node | Table | null;
-      wheres: Node[];
-      groups: Node[];
-      havings: Node[];
+      relation: ArelNode | Table | null;
+      wheres: ArelNode[];
+      groups: ArelNode[];
+      havings: ArelNode[];
       limit: Node | null;
       offset: Node | null;
-      orders: Node[];
+      orders: ArelNode[];
     },
   ): Nodes.SelectStatement {
     const subselect = super.buildSubselect(key, o);

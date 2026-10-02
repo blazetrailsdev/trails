@@ -6,11 +6,12 @@ import { Cte } from "./cte.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { Attribute } from "../attributes/attribute.js";
 import { Table } from "../table.js";
+import type { ArelNode } from "../arel.js";
 
 interface TypeCastable {
   name?: string;
-  typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown;
-  typeForAttribute(name: string | Node | null): unknown;
+  typeCastForDatabase(attrName: string | ArelNode | null, value: unknown): unknown;
+  typeForAttribute(name: string | ArelNode | null): unknown;
   isAbleToTypeCast?: () => boolean;
 }
 
@@ -46,11 +47,11 @@ export class TableAlias extends Binary {
     return typeof rel?.name === "string" ? rel.name : this.nameString;
   }
 
-  typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown {
+  typeCastForDatabase(attrName: string | ArelNode | null, value: unknown): unknown {
     return (this.relation as unknown as TypeCastable).typeCastForDatabase(attrName, value);
   }
 
-  typeForAttribute(name: string | Node | null): unknown {
+  typeForAttribute(name: string | ArelNode | null): unknown {
     return (this.relation as unknown as TypeCastable).typeForAttribute(name);
   }
 

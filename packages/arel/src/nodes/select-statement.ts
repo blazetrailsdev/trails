@@ -5,17 +5,18 @@ import { Node } from "./node.js";
 import type { Table } from "../table.js";
 import { NodeExpression } from "./node-expression.js";
 import { SelectCore } from "./select-core.js";
+import type { ArelNode } from "../arel.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SelectStatement extends NodeExpression {
   cores: SelectCore[];
-  orders: Node[];
+  orders: ArelNode[];
   limit: Node | null;
   offset: Node | null;
   lock: Node | null;
   with: Node | null;
 
-  constructor(relation: Node | Table | null = null) {
+  constructor(relation: ArelNode | Table | null = null) {
     super();
     this.cores = [new SelectCore(relation)];
     this.orders = [];

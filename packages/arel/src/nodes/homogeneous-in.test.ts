@@ -9,7 +9,7 @@ const fakePgCaster = { typeForAttribute: () => STRING_TYPE };
 class TypedNode extends Nodes.NamedFunction {
   readonly typeCaster: unknown;
 
-  constructor(name: string, expr: Nodes.Node[], type: unknown) {
+  constructor(name: string, expr: Nodes.NodeOrValue[], type: unknown) {
     super(name, expr, undefined);
     this.typeCaster = type;
   }

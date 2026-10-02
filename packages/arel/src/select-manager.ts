@@ -33,6 +33,7 @@ import { And } from "./nodes/nary.js";
 import { JoinSource } from "./nodes/join-source.js";
 import { Crud } from "./crud.js";
 import { include } from "@blazetrails/activesupport";
+import type { ArelNode } from "./arel.js";
 
 type Subqueries = Node | Subqueries[];
 
@@ -41,7 +42,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
   /** @internal */
   private ctx: SelectCore;
 
-  constructor(table?: Table | Node | null) {
+  constructor(table?: Table | ArelNode | null) {
     super();
     this.ast = new SelectStatement(table ?? null);
     this.ctx = this.ast.cores.at(-1)!;
@@ -59,7 +60,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
     return this.limit;
   }
 
-  get constraints(): Node[] {
+  get constraints(): ArelNode[] {
     return [...this.ctx.wheres];
   }
 
@@ -87,7 +88,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
     );
   }
 
-  lock(locking: string | Node | boolean = sql("FOR UPDATE")): this {
+  lock(locking: string | ArelNode | boolean = sql("FOR UPDATE")): this {
     if (locking === true) {
       locking = sql("FOR UPDATE");
     } else if (locking instanceof SqlLiteral) {
@@ -104,14 +105,14 @@ export class SelectManager extends TreeManager<SelectStatement> {
     return this.ast.lock;
   }
 
-  on(...exprs: (Node | string | null | undefined)[]): this {
+  on(...exprs: (ArelNode | string | null | undefined)[]): this {
     const joins = this.ctx.source.right;
     const lastJoin = joins[joins.length - 1] as unknown as { right: Node | null };
     lastJoin.right = new On(this.collapse(exprs));
     return this;
   }
 
-  group(...columns: (Node | string)[]): this {
+  group(...columns: (ArelNode | string)[]): this {
     for (let column of columns) {
       if (typeof column === "string" && !isSymbol(column)) column = new SqlLiteral(column);
       if (isSymbol(column)) column = new SqlLiteral(symbolToS(column));
@@ -121,7 +122,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
     return this;
   }
 
-  from(table: Table | Node | string): this {
+  from(table: Table | ArelNode | string): this {
     const node = typeof table === "string" ? new SqlLiteral(table) : table;
     if (node instanceof Join) {
       this.ctx.source.right.push(node);
@@ -131,30 +132,30 @@ export class SelectManager extends TreeManager<SelectStatement> {
     return this;
   }
 
-  get froms(): Node[] {
-    return this.ast.cores.map((c) => c.from).filter((x): x is Node => x !== null);
+  get froms(): ArelNode[] {
+    return this.ast.cores.map((c) => c.from).filter((x): x is ArelNode => x !== null);
   }
 
   join(
-    relation: Node | Table | string | null | undefined,
-    klass: new (left: Node | Table, right: Node | null) => Join = InnerJoin,
+    relation: ArelNode | Table | string | null | undefined,
+    klass: new (left: ArelNode | Table, right: ArelNode | null) => Join = InnerJoin,
   ): this {
     if (relation == null) return this;
 
     if (typeof relation === "string" || relation instanceof SqlLiteral) {
       if (isEmpty(relation)) throw new EmptyJoinError();
-      klass = StringJoin as unknown as new (left: Node | Table, right: Node | null) => Join;
+      klass = StringJoin;
     }
 
     this.ctx.source.right.push(this.createJoin(relation, null, klass));
     return this;
   }
 
-  outerJoin(relation: Node | Table | string | null | undefined): this {
+  outerJoin(relation: ArelNode | Table | string | null | undefined): this {
     return this.join(relation, OuterJoin);
   }
 
-  having(expr: Node): this {
+  having(expr: ArelNode): this {
     this.ctx.havings.push(expr);
     return this;
   }
@@ -165,7 +166,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
     return window;
   }
 
-  project(...projections: (Node | string)[]): this {
+  project(...projections: (ArelNode | string)[]): this {
     for (const x of projections) {
       if (typeof x === "string") {
         this.ctx.projections.push(new SqlLiteral(x));
@@ -176,11 +177,11 @@ export class SelectManager extends TreeManager<SelectStatement> {
     return this;
   }
 
-  get projections(): (Node | Node[])[] {
+  get projections(): (ArelNode | ArelNode[])[] {
     return [...this.ctx.projections];
   }
 
-  set projections(value: (Node | Node[])[]) {
+  set projections(value: (ArelNode | ArelNode[])[]) {
     this.ctx.projections.length = 0;
     this.ctx.projections.push(...value);
   }
@@ -197,21 +198,21 @@ export class SelectManager extends TreeManager<SelectStatement> {
     return this;
   }
 
-  distinctOn(value: Node | false | null): this {
+  distinctOn(value: ArelNode | false | null): this {
     this.ctx.setQuantifier = value === false || value == null ? null : new DistinctOn(value);
     return this;
   }
 
-  order(...expr: (Node | string)[]): this {
+  order(...expr: (ArelNode | string)[]): this {
     this.ast.orders.push(...expr.map((x) => (typeof x === "string" ? new SqlLiteral(x) : x)));
     return this;
   }
 
-  get orders(): Node[] {
+  get orders(): ArelNode[] {
     return [...this.ast.orders];
   }
 
-  where(expr: Node | TreeManager): this {
+  where(expr: ArelNode | TreeManager): this {
     this.ctx.wheres.push(expr instanceof TreeManager ? expr.ast : expr);
     return this;
   }
@@ -286,7 +287,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
     return this;
   }
 
-  protected collapse(exprs: unknown[]): Node {
+  protected collapse(exprs: unknown[]): ArelNode {
     exprs = exprs
       .filter((expr) => expr !== null && expr !== undefined)
       .map((expr) => (typeof expr === "string" ? sql(expr) : (expr as Node)));

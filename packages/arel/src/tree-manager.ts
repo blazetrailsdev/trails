@@ -6,12 +6,13 @@ import { PlainString } from "./collectors/plain-string.js";
 import { Limit, Offset } from "./nodes/unary.js";
 import { buildQuoted } from "./nodes/casted.js";
 import { FactoryMethods, type FactoryMethodsModule } from "./factory-methods.js";
+import type { ArelNode } from "./arel.js";
 
 type StatementMethodsHost = {
   ast: {
     key?: unknown;
-    wheres?: Node[];
-    orders?: Node[];
+    wheres?: ArelNode[];
+    orders?: ArelNode[];
     limit?: Node | null;
     offset?: Node | null;
   };
@@ -30,7 +31,7 @@ export class StatementMethods {
     return this;
   }
 
-  order(this: StatementMethodsHost, ...expr: Node[]): unknown {
+  order(this: StatementMethodsHost, ...expr: ArelNode[]): unknown {
     this.ast.orders = expr;
     return this;
   }
@@ -43,15 +44,15 @@ export class StatementMethods {
     return this.ast.key;
   }
 
-  set wheres(exprs: Node[]) {
+  set wheres(exprs: ArelNode[]) {
     this.ast.wheres = exprs;
   }
 
-  get wheres(): Node[] {
+  get wheres(): ArelNode[] {
     return this.ast.wheres ?? [];
   }
 
-  where(this: StatementMethodsHost, expr: Node): unknown {
+  where(this: StatementMethodsHost, expr: ArelNode): unknown {
     (this.ast.wheres ??= []).push(expr);
     return this;
   }

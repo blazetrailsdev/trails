@@ -3,16 +3,17 @@ import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import type { Table } from "../table.js";
+import type { ArelNode } from "../arel.js";
 
 export type InsertSelectSource = Node | { ast: Node; toSql: () => string } | null;
 
 export class InsertStatement extends Node {
-  relation: Node | Table | null;
-  columns: Node[];
-  values: Node | null;
+  relation: ArelNode | Table | null;
+  columns: ArelNode[];
+  values: ArelNode | null;
   select: InsertSelectSource;
 
-  constructor(relation: Node | Table | null = null) {
+  constructor(relation: ArelNode | Table | null = null) {
     super();
     this.relation = relation;
     this.columns = [];

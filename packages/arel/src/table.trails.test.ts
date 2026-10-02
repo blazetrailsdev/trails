@@ -106,7 +106,7 @@ describe("TableTest", () => {
 
   it("star returns an Attribute that compiles to table.*", () => {
     expect(users.get(star())).toBeInstanceOf(Attributes.Attribute);
-    expect(users.get(star()).toSql()).toBe('"users".*');
+    expect(new Visitors.ToSql(testConnection).compile(users.get(star()))).toBe('"users".*');
   });
 
   it("star splits schema-qualified name", () => {

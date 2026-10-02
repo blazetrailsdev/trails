@@ -9,11 +9,11 @@ import { Unary } from "./unary.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Case extends NodeExpression {
-  case: Node | null;
+  case: NodeOrValue;
   conditions: When[];
-  default: Node | null;
+  default: NodeOrValue;
 
-  constructor(expression?: Node, defaultValue?: Node) {
+  constructor(expression?: NodeOrValue, defaultValue?: NodeOrValue) {
     super();
     this.case = expression ?? null;
     this.conditions = [];

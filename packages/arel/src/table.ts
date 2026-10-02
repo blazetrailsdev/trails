@@ -1,7 +1,7 @@
 import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Attribute } from "./attributes/attribute.js";
 import { EmptyJoinError } from "./errors.js";
-import { _engine, ArelEngine, Node } from "./nodes/node.js";
+import { _engine, ArelEngine } from "./nodes/node.js";
 import { Arel } from "./namespaces.js";
 import { SelectManager } from "./select-manager.js";
 import { InnerJoin } from "./nodes/inner-join.js";
@@ -13,6 +13,7 @@ import { TableAlias } from "./nodes/table-alias.js";
 import { isEmpty, isSymbol, rbModConstSet, symbolToS } from "@blazetrails/ruby-compat";
 import { FactoryMethods, type FactoryMethodsModule } from "./factory-methods.js";
 import { AliasPredication, type AliasPredicationModule } from "./alias-predication.js";
+import type { ArelNode } from "./arel.js";
 
 export interface TableKlass {
   readonly attributeAliases: Record<string, string>;
@@ -30,12 +31,12 @@ export class Table {
     _engine.current = value;
   }
 
-  name: string | Node;
+  name: string | ArelNode;
   readonly tableAlias: string | null;
   private readonly klass: TableKlass | null;
 
   constructor(
-    name: string | Node,
+    name: string | ArelNode,
     {
       as = null,
       klass = null,
@@ -63,36 +64,36 @@ export class Table {
   }
 
   join(
-    relation: Node | Table | string | null | undefined,
-    klass: new (left: Node | Table, right: Node | null) => Join = InnerJoin,
+    relation: ArelNode | Table | string | null | undefined,
+    klass: new (left: ArelNode | Table, right: ArelNode | null) => Join = InnerJoin,
   ): SelectManager {
     if (relation == null) return this.from();
 
     if (typeof relation === "string" || relation instanceof SqlLiteral) {
       if (isEmpty(relation)) throw new EmptyJoinError();
-      klass = StringJoin as unknown as new (left: Node | Table, right: Node | null) => Join;
+      klass = StringJoin;
     }
 
     return this.from().join(relation, klass);
   }
 
-  outerJoin(relation: Node | Table | string): SelectManager {
+  outerJoin(relation: ArelNode | Table | string): SelectManager {
     return this.join(relation, OuterJoin);
   }
 
-  group(...columns: (Node | string)[]): SelectManager {
+  group(...columns: (ArelNode | string)[]): SelectManager {
     return this.from().group(...columns);
   }
 
-  order(...expr: (Node | string)[]): SelectManager {
+  order(...expr: (ArelNode | string)[]): SelectManager {
     return this.from().order(...expr);
   }
 
-  where(condition: Node): SelectManager {
+  where(condition: ArelNode): SelectManager {
     return this.from().where(condition);
   }
 
-  project(...things: (Node | string)[]): SelectManager {
+  project(...things: (ArelNode | string)[]): SelectManager {
     return this.from().project(...things);
   }
 
@@ -104,11 +105,11 @@ export class Table {
     return this.from().skip(amount);
   }
 
-  having(expr: Node): SelectManager {
+  having(expr: ArelNode): SelectManager {
     return this.from().having(expr);
   }
 
-  get(name: Node | string | null, table: Attribute["relation"] = this): Attribute {
+  get(name: ArelNode | string | null, table: Attribute["relation"] = this): Attribute {
     if (isSymbol(name)) name = symbolToS(name);
     if (this.klass != null) {
       name =
@@ -132,16 +133,16 @@ export class Table {
     );
   }
 
-  typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown {
+  typeCastForDatabase(attrName: string | ArelNode | null, value: unknown): unknown {
     return this.typeCaster!.typeCastForDatabase(attrName, value);
   }
 
   private readonly typeCaster: {
-    typeCastForDatabase(attrName: string | Node | null, value: unknown): unknown;
-    typeForAttribute(name: string | Node | null): unknown;
+    typeCastForDatabase(attrName: string | ArelNode | null, value: unknown): unknown;
+    typeForAttribute(name: string | ArelNode | null): unknown;
   } | null;
 
-  typeForAttribute(name: string | Node | null): unknown {
+  typeForAttribute(name: string | ArelNode | null): unknown {
     return this.typeCaster!.typeForAttribute(name);
   }
 

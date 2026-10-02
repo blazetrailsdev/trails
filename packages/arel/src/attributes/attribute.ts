@@ -9,12 +9,13 @@ import { Predications, type PredicationsModule, type RangeLike } from "../predic
 import { AliasPredication, type AliasPredicationModule } from "../alias-predication.js";
 import { OrderPredications, type OrderPredicationsModule } from "../order-predications.js";
 import { Math as MathMixin, type MathModule } from "../math.js";
+import type { ArelNode } from "../arel.js";
 
 export interface RelationLike {
-  name: string | Node;
+  name: string | ArelNode;
   tableAlias?: string | SqlLiteral | null;
-  typeCastForDatabase: (attrName: string | Node | null, value: unknown) => unknown;
-  typeForAttribute: (name: string | Node | null) => unknown;
+  typeCastForDatabase: (attrName: string | ArelNode | null, value: unknown) => unknown;
+  typeForAttribute: (name: string | ArelNode | null) => unknown;
   isAbleToTypeCast: () => boolean;
   lower: (column: unknown) => NamedFunction;
 }
@@ -22,9 +23,9 @@ export interface RelationLike {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Attribute extends Node {
   readonly relation: RelationLike;
-  readonly name: string | Node | null;
+  readonly name: string | ArelNode | null;
 
-  constructor(relation: RelationLike | null, name: string | Node | null) {
+  constructor(relation: RelationLike | null, name: string | ArelNode | null) {
     super();
     this.relation = relation as RelationLike;
     this.name = name;

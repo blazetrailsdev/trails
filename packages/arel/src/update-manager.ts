@@ -1,4 +1,3 @@
-import { Node } from "./nodes/node.js";
 import { TreeManager, StatementMethods } from "./tree-manager.js";
 import { include } from "@blazetrails/activesupport";
 import { UpdateStatement } from "./nodes/update-statement.js";
@@ -11,21 +10,22 @@ import { Table } from "./table.js";
 import type { UpdateValues } from "./crud.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Arel } from "./namespaces.js";
+import type { ArelNode } from "./arel.js";
 
 export class UpdateManager extends TreeManager<UpdateStatement> {
   declare key: unknown;
-  declare wheres: Node[];
-  declare where: (expr: Node) => this;
+  declare wheres: ArelNode[];
+  declare where: (expr: ArelNode) => this;
   declare take: (limit: unknown) => this;
   declare offset: (offset: unknown) => this;
-  declare order: (...expr: Node[]) => this;
+  declare order: (...expr: ArelNode[]) => this;
 
-  constructor(table: Table | Node | null = null) {
+  constructor(table: Table | ArelNode | null = null) {
     super();
     this.ast = new UpdateStatement(table);
   }
 
-  table(table: Table | Node): this {
+  table(table: Table | ArelNode): this {
     this.ast.relation = table;
     return this;
   }
@@ -45,7 +45,7 @@ export class UpdateManager extends TreeManager<UpdateStatement> {
     return this;
   }
 
-  group(columns: (Node | string)[]): this {
+  group(columns: (ArelNode | string)[]): this {
     for (let column of columns) {
       if (typeof column === "string") {
         column = new SqlLiteral(column.startsWith(":") ? column.slice(1) : column);
@@ -56,7 +56,7 @@ export class UpdateManager extends TreeManager<UpdateStatement> {
     return this;
   }
 
-  having(expr: Node | string): this {
+  having(expr: ArelNode | string): this {
     this.ast.havings.push(expr);
     return this;
   }

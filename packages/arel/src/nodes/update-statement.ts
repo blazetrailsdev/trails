@@ -3,19 +3,20 @@ import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import type { Table } from "../table.js";
+import type { ArelNode } from "../arel.js";
 
 export class UpdateStatement extends Node {
-  relation: Node | Table | null;
-  values: (Node | string)[];
-  wheres: Node[];
-  orders: Node[];
-  groups: Node[];
-  havings: (Node | string)[];
+  relation: ArelNode | Table | null;
+  values: (ArelNode | string)[];
+  wheres: ArelNode[];
+  orders: ArelNode[];
+  groups: ArelNode[];
+  havings: (ArelNode | string)[];
   limit: Node | null;
   offset: Node | null;
-  key: Node | Node[] | null;
+  key: ArelNode | ArelNode[] | null;
 
-  constructor(relation: Node | Table | null = null) {
+  constructor(relation: ArelNode | Table | null = null) {
     super();
     this.relation = relation;
     this.values = [];

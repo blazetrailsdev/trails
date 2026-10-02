@@ -1,12 +1,12 @@
 import { Nodes } from "../namespaces.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
-import { Node } from "./node.js";
+import type { Attribute } from "../attributes/attribute.js";
 import { Unary } from "./unary.js";
 
 export class Grouping extends Unary {
-  fetchAttribute(block: (attr: Node) => boolean): boolean | undefined {
+  fetchAttribute(block: (attr: Attribute) => boolean): boolean | undefined {
     return (
-      this.expr as { fetchAttribute(block: (attr: Node) => boolean): boolean | undefined }
+      this.expr as { fetchAttribute(block: (attr: Attribute) => boolean): boolean | undefined }
     ).fetchAttribute(block);
   }
 }

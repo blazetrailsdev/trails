@@ -1,16 +1,16 @@
 import { Nodes } from "../namespaces.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Binary, NodeOrValue } from "./binary.js";
-import type { Node } from "./node.js";
 import { buildQuoted } from "./casted.js";
+import type { ArelNode } from "../arel.js";
 
 export class Matches extends Binary {
-  readonly escape: Node | null;
+  readonly escape: ReturnType<typeof buildQuoted> | null;
   caseSensitive: boolean;
   constructor(
     left: NodeOrValue,
     right: NodeOrValue,
-    escape: string | Node | null = null,
+    escape: string | ArelNode | null = null,
     caseSensitive = false,
   ) {
     super(left, right);
