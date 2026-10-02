@@ -142,13 +142,13 @@ export class Error {
     attribute: string,
     type: string,
     base: ModelBase,
-    options?: Record<string, unknown>,
+    options: Record<string, unknown>,
   ): string;
   static generateMessage(
     attribute: string,
     type: string,
     base: ValidatableBase,
-    options: Record<string, unknown> = {},
+    options: Record<string, unknown>,
   ): string {
     const msgOpt = options.message;
     if (typeof msgOpt === "string" && msgOpt.startsWith(":")) {

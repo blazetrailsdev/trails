@@ -267,7 +267,7 @@ export class Errors<TBase extends object = object> {
   generateMessage(
     attribute: string,
     type: string = ":invalid",
-    options?: Record<string, unknown>,
+    options: Record<string, unknown> = {},
   ): string {
     return ActiveModelError.generateMessage(attribute, type, this._base, options);
   }

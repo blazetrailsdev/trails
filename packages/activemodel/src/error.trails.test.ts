@@ -169,7 +169,7 @@ describe("Error and Errors surface", () => {
 
     try {
       const record = new Child({ name: "" }) as any;
-      const msg = ModelError.generateMessage("name", ":blank", record);
+      const msg = ModelError.generateMessage("name", ":blank", record, {});
       expect(msg).toBe("parent-level blank");
     } finally {
       resetI18n();
@@ -191,7 +191,7 @@ describe("Error and Errors surface", () => {
     interface ARModel extends Attributes {}
 
     const record = new ARModel({}) as any;
-    const msg = ModelError.generateMessage("name", ":blank", record);
+    const msg = ModelError.generateMessage("name", ":blank", record, {});
     expect(msg).toBe("can't be blank");
   });
 
