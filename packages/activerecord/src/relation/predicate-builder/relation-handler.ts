@@ -5,16 +5,15 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { NotImplementedError } from "../../errors.js";
 
 import { DeferredIdsIn } from "./deferred-distinct-pk-in.js";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { isEmpty, rbInspect } from "@blazetrails/ruby-compat";
 
 export class RelationHandler {
-  /** @missingRailsCall empty? — PERMANENT */
   call(attribute: Arel.Attribute, value: any): Nodes.Node {
     const deferred = this.deferDistinctPkMaterialization(attribute, value);
     if (deferred) return deferred;
     value = this.applyJoinDependency(value);
 
-    if (value.selectValues.length === 0) {
+    if (isEmpty(value.selectValues)) {
       const model = value.model;
       if (model.compositePrimaryKey) {
         throw new ArgumentError(

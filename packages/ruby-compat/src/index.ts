@@ -142,6 +142,8 @@ export {
   sort,
   take,
   toA,
+  toH,
+  zip,
   isIntersect,
   union,
   uniq,

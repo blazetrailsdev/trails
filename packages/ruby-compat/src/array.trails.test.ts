@@ -3,6 +3,8 @@ import { ArgumentError } from "./argument-error.js";
 import { TypeError } from "./type-error.js";
 import {
   aryCount,
+  toH,
+  zip,
   aryDelete,
   aryDeleteIf,
   aryPop,
@@ -202,6 +204,50 @@ describe("Array#to_a", () => {
     expect(result).not.toBe(ary);
     expect(result.constructor).toBe(Array);
     expect(result).toEqual([1, 2]);
+  });
+});
+
+describe("Array#zip", () => {
+  it("pairs each element with the same index of every argument", () => {
+    expect(zip([1, 2], ["a", "b"])).toEqual([
+      [1, "a"],
+      [2, "b"],
+    ]);
+    expect(zip<number, string | boolean>([1, 2], ["a", "b"], [true, false])).toEqual([
+      [1, "a", true],
+      [2, "b", false],
+    ]);
+  });
+
+  it("is as long as the receiver, nil past an argument's end", () => {
+    expect(zip([1, 2, 3], ["a"])).toEqual([
+      [1, "a"],
+      [2, undefined],
+      [3, undefined],
+    ]);
+    expect(zip([1], ["a", "b"])).toEqual([[1, "a"]]);
+  });
+});
+
+describe("Array#to_h", () => {
+  it("builds a Hash from [key, value] pairs, the last of a repeated key winning", () => {
+    const hash = toH<string, number>([
+      ["a", 1],
+      ["b", 2],
+      ["a", 3],
+    ]);
+    expect([...hash]).toEqual([
+      ["a", 3],
+      ["b", 2],
+    ]);
+  });
+
+  it("raises TypeError for an element that is not an array", () => {
+    expect(() => toH([["a", 1], "b"])).toThrow("wrong element type String at 1 (expected array)");
+  });
+
+  it("raises ArgumentError for a pair of the wrong length", () => {
+    expect(() => toH([["a", 1, 2]])).toThrow("wrong array length at 0 (expected 2, was 3)");
   });
 });
 

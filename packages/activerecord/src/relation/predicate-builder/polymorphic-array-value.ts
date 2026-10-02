@@ -1,6 +1,6 @@
 import type { Base } from "../../base.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { isEmpty, rbInspect } from "@blazetrails/ruby-compat";
 export class PolymorphicArrayValue {
   private readonly _associatedTable: {
     joinForeignKey: string | string[];
@@ -31,10 +31,9 @@ export class PolymorphicArrayValue {
     return this._values;
   }
 
-  /** @missingRailsCall empty? — PERMANENT */
   queries(): Record<string, unknown>[] {
     const fk = this.associatedTable.joinForeignKey;
-    if (this.values.length === 0) {
+    if (isEmpty(this.values)) {
       if (Array.isArray(fk)) {
         return [Object.fromEntries(fk.map((col) => [col, this.values]))];
       }

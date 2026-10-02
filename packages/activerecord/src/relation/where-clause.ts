@@ -1,5 +1,5 @@
 import { extractBang, rbEqual } from "@blazetrails/activesupport";
-import { isModuleIncluded, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { first, isEmpty, isModuleIncluded, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import * as Arel from "@blazetrails/arel";
 import { Nodes, Predications, fetchAttribute, sql } from "@blazetrails/arel";
@@ -51,15 +51,16 @@ export class WhereClause {
     return new WhereClause(unionNodes(filtered, other.predicates));
   }
 
-  /**
-   * @missingRailsCall first — PERMANENT
-   * @missingRailsCall size — PERMANENT
-   */
+  /** @missingRailsCall size — CONVERGEABLE call-gate-proves-where-clause-predicates-an-array-for-size */
   invert(): WhereClause {
+    let invertedPredicates: (Nodes.Node | string)[];
     if (this.predicates.length === 1) {
-      return new WhereClause([invertPredicate(this.predicates[0])]);
+      invertedPredicates = [invertPredicate(first(this.predicates))];
+    } else {
+      invertedPredicates = [new Nodes.Not(this.ast)];
     }
-    return new WhereClause([new Nodes.Not(this.ast)]);
+
+    return new WhereClause(invertedPredicates);
   }
 
   except(...columns: unknown[]): WhereClause {
@@ -105,19 +106,15 @@ export class WhereClause {
     );
   }
 
-  /** @missingRailsCall any? — PERMANENT */
   isContradiction(): boolean {
-    for (const node of this.predicates) {
-      if (node instanceof Nodes.In) {
-        const right = (node as any).right;
-        if (Array.isArray(right) && right.length === 0) return true;
+    return this.predicates.some((x) => {
+      if (x instanceof Nodes.In) {
+        return Array.isArray(x.right) && isEmpty(x.right);
+      } else if (x instanceof Nodes.Equality) {
+        return rbObjRespondTo(x.right, "isUnboundable") && (x.right as any).isUnboundable();
       }
-      if (node instanceof Nodes.Equality) {
-        const right = (node as any).right;
-        if (rbObjRespondTo(right, "isUnboundable") && right.isUnboundable()) return true;
-      }
-    }
-    return false;
+      return false;
+    });
   }
 
   extractAttributes(): (string | Arel.Attribute | Nodes.Node)[] {

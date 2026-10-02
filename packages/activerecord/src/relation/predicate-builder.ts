@@ -1,13 +1,16 @@
 import {
   ArgumentError,
+  last,
   rbFPublicSend,
   rbObjAsString as toS,
   rbObjRespondTo,
   Range,
+  toH,
+  zip,
 } from "@blazetrails/ruby-compat";
 import type * as Arel from "@blazetrails/arel";
 import { Nodes, sql } from "@blazetrails/arel";
-import { kernelArray, Tryable, wrap } from "@blazetrails/activesupport";
+import { kernelArray, stringifyKeys, Tryable, wrap } from "@blazetrails/activesupport";
 
 import { QueryAttribute } from "./query-attribute.js";
 import { ArrayHandler } from "./predicate-builder/array-handler.js";
@@ -48,7 +51,6 @@ export class PredicateBuilder {
     return this.expandFromHash(attributes, block);
   }
 
-  /** @missingRailsArgs expand_from_hash — PERMANENT */
   protected expandFromHash(
     attributes: Attributes,
     block?: (tableName: string) => unknown,
@@ -76,13 +78,13 @@ export class PredicateBuilder {
           if (!Array.isArray(idsSet)) {
             throw new ArgumentError(`Expected corresponding value for ${toS(cols)} to be an Array`);
           }
-          return this.expandFromHash(new Map(cols.map((col, index) => [col, idsSet[index]])));
+          return this.expandFromHash(toH(zip(cols, idsSet)));
         });
         return this.groupingQueries(queries);
       } else if (isPlainObject(value) && !this.table.hasColumn(key)) {
         return this.table
           .associatedTable(key, block as (name: string) => never)
-          .predicateBuilder.expandFromHash(value);
+          .predicateBuilder.expandFromHash(stringifyKeys(value));
       } else if (this.table.isAssociatedWith(key)) {
         const associatedTable = this.table.associatedTable(key);
         let klass: typeof PolymorphicArrayValue | typeof AssociationQueryValue | undefined;
@@ -282,15 +284,16 @@ export class PredicateBuilder {
     return Object.fromEntries(converted as Map<string, unknown>);
   }
 
-  /** @missingRailsCall last — PERMANENT */
   private handlerFor(object: unknown): { call(attr: Arel.Attribute, value: any): Nodes.Node } {
-    return this.handlers.find(([klass]) =>
-      klass === BasicObject
-        ? true
-        : klass === Relation
-          ? this.isRelation(object)
-          : object instanceof klass,
-    )![1];
+    return last(
+      this.handlers.find(([klass]) =>
+        klass === BasicObject
+          ? true
+          : klass === Relation
+            ? this.isRelation(object)
+            : object instanceof klass,
+      )!,
+    ) as { call(attr: Arel.Attribute, value: any): Nodes.Node };
   }
 }
 

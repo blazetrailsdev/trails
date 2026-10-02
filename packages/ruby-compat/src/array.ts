@@ -2,6 +2,7 @@ import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { ArgumentError } from "./argument-error.js";
 import { cmp, rbCmpint } from "./comparable.js";
+import { Hash } from "./hash.js";
 import { rbBuiltinClassName } from "./object.js";
 import { Range } from "./range.js";
 import { num2long } from "./string/support.js";
@@ -536,6 +537,53 @@ export function partition<T>(ary: readonly T[], block: (item: T) => unknown): [T
     (result != null && result !== false ? v1 : v2).push(i);
   }
   return [v1, v2];
+}
+
+/**
+ * Ruby `Array#to_h` with no block (`vendor/ruby/v3.3.11/array.c:2988` `rb_ary_to_h`):
+ * a Hash of the receiver's `[key, value]` pairs. The block arm is not ported:
+ * nothing calls it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function toH<K = unknown, V = unknown>(ary: readonly unknown[]): Hash<K, V> {
+  const hash = new Hash<K, V>();
+  for (let i = 0; i < ary.length; i++) {
+    const keyValuePair = ary[i];
+    if (!Array.isArray(keyValuePair)) {
+      throw new TypeError(
+        `wrong element type ${rbBuiltinClassName(keyValuePair)} at ${i} (expected array)`,
+      );
+    }
+    if (keyValuePair.length !== 2) {
+      throw new ArgumentError(
+        `wrong array length at ${i} (expected 2, was ${keyValuePair.length})`,
+      );
+    }
+    hash.set(keyValuePair[0], keyValuePair[1]);
+  }
+  return hash;
+}
+
+/**
+ * Ruby `Array#zip` with no block (`vendor/ruby/v3.3.11/array.c:4422` `rb_ary_zip`):
+ * one array per receiver element, holding it and the element at the same
+ * index of each argument, `nil` past an argument's end. The arguments are
+ * Arrays: `take_items`' `to_ary` / `each` conversion (`:4349`) and the block
+ * arm are not ported, as nothing calls them.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function zip<T, U>(ary: readonly T[], ...argv: (readonly U[])[]): (T | U | undefined)[][] {
+  const result: (T | U | undefined)[][] = [];
+  for (let i = 0; i < ary.length; i++) {
+    const tmp: (T | U | undefined)[] = [ary[i]];
+    for (let j = 0; j < argv.length; j++) {
+      tmp.push(argv[j][i]);
+    }
+    result.push(tmp);
+  }
+  return result;
 }
 
 /**

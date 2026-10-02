@@ -1,4 +1,4 @@
-import { hasKey } from "@blazetrails/ruby-compat";
+import { hasKey, isEmpty } from "@blazetrails/ruby-compat";
 export interface AssocTableMeta {
   joinForeignKey: string | string[];
   joinPrimaryKey(klass?: unknown): string | string[] | null;
@@ -109,12 +109,9 @@ export class AssociationQueryValue {
     return !hasKey(hash, type);
   }
 
-  /** @missingRailsCall empty? — PERMANENT */
+  /** @internal */
   private isSelectClause(): boolean {
-    const sv = (this.value as any).selectValues;
-    if (typeof sv === "function") return sv.call(this.value).length === 0;
-    if (Array.isArray(sv)) return sv.length === 0;
-    return false;
+    return isEmpty((this.value as any).selectValues);
   }
 
   private convertToId(value: unknown): unknown {
