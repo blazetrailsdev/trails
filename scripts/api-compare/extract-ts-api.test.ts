@@ -874,6 +874,86 @@ describe("body call capture", () => {
     }
   });
 
+  it("emits or, not an arm, for a throw guarded by the Ruby-falsiness of the value then returned", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        bang(t: string) {
+          const fk = this.find(t);
+          if (!rtest(fk)) throw new ArgumentError("none");
+          return fk!;
+        }
+        unless(t: string) {
+          const fk = this.find(t);
+          if (!rtest(fk)) throw new ArgumentError("none");
+          this.log(fk);
+        }
+        other(t: string) {
+          const fk = this.find(t);
+          if (!rtest(t)) throw new ArgumentError("none");
+          return fk;
+        }
+      }`,
+    );
+    const arms = (name: string) =>
+      cls.instanceMethods
+        .find((m) => m.name === name)!
+        .skeleton!.filter((t) => !t.startsWith("ref:") && !t.startsWith("new:"));
+    expect(arms("bang")).toEqual(["or", "throw:ArgumentError"]);
+    expect(arms("unless")).toEqual(["if", "throw:ArgumentError"]);
+    expect(arms("other")).toEqual(["if", "throw:ArgumentError"]);
+  });
+
+  it("emits no arm for a leading guard that moves an options hash or block out of a positional parameter", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        removeIndex(t: string, columnName: unknown = null, options: object = {}) {
+          if (!(typeof columnName === "string" || Array.isArray(columnName))) {
+            options = { ...(columnName as object), ...options };
+            columnName = null;
+          }
+          return this.run(t, columnName, options);
+        }
+        twice(a: unknown, b: unknown, options: object = {}) {
+          if (typeof b === "object" && b !== null) options = b;
+          if (typeof a === "object") options = a as object;
+          return this.run(a, b, options);
+        }
+        block(unit: unknown, block?: () => void) {
+          if (typeof unit === "function") {
+            block = unit as () => void;
+            unit = "second";
+          }
+          return this.run(unit, block);
+        }
+        notLeading(t: string, toTable: unknown, options: object = {}) {
+          this.log(t);
+          if (typeof toTable === "object") options = toTable as object;
+          return options;
+        }
+        notAKindTest(t: string, toTable: unknown, options: object = {}) {
+          if (this.supports(toTable)) options = toTable as object;
+          return options;
+        }
+        coerce(error: unknown, options: object = {}) {
+          if (typeof error === "string") error = new RuntimeError(error);
+          return this.report(error, options);
+        }
+        coerceLast(queryArray: string[], queryParams: unknown) {
+          if (typeof queryParams === "string") queryParams = this.parse(queryParams);
+          queryArray.push(this.build(queryParams));
+        }
+      }`,
+    );
+    const arms = (name: string) =>
+      cls.instanceMethods.find((m) => m.name === name)!.skeleton!.filter((t) => !t.includes(":"));
+    expect(arms("removeIndex")).toEqual([]);
+    expect(arms("twice")).toEqual([]);
+    expect(arms("block")).toEqual([]);
+    for (const kept of ["notLeading", "notAKindTest", "coerce", "coerceLast"]) {
+      expect(arms(kept)).toEqual(["if"]);
+    }
+  });
+
   it("carries the thrown class on the throw token", () => {
     const cls = extractFromSource(
       `class Foo {

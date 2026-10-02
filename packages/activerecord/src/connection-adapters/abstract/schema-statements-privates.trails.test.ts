@@ -1,6 +1,7 @@
 import type { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { describe, it, expect, vi } from "vitest";
 import { SchemaStatements } from "./schema-statements.js";
+import { indexNameLength, maxIdentifierLength, tableNameLength } from "./database-limits.js";
 import {
   CheckConstraintDefinition,
   ForeignKeyDefinition,
@@ -53,6 +54,9 @@ function makeStatements(
   adapter["supportsExclusionConstraints"] ??= () => false;
   adapter["supportsUniqueConstraints"] ??= () => false;
   adapter["useForeignKeys"] ??= () => true;
+  adapter["maxIdentifierLength"] ??= maxIdentifierLength;
+  adapter["tableNameLength"] ??= tableNameLength;
+  adapter["indexNameLength"] ??= indexNameLength;
   adapter["nativeDatabaseTypes"] ??= () => SQLite3Adapter.NATIVE_DATABASE_TYPES;
   adapter["dataSourceSql"] ??= (name?: string | null) =>
     name == null

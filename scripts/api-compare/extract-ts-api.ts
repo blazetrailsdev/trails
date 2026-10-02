@@ -4772,6 +4772,130 @@ function isFalsinessOf(test: ts.Expression, target: string): boolean {
   );
 }
 
+/**
+ * The `throw` of `if (falsy(x)) throw …; return x;`, or undefined for any
+ * other `if`. That pair is Ruby's `x || raise(…)`
+ * (`activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1770-1773`)
+ * spelled the only way TS can, since `throw` is a statement: a short-circuit,
+ * which tokens as `or`. The `return` of the same name is what tells it from
+ * `raise … unless x`, whose value nothing reads.
+ */
+function orRaise(statement: ts.IfStatement): ts.ThrowStatement | undefined {
+  if (statement.elseStatement !== undefined || !ts.isBlock(statement.parent)) return undefined;
+  let body = statement.thenStatement;
+  if (ts.isBlock(body)) {
+    if (body.statements.length !== 1) return undefined;
+    body = body.statements[0];
+  }
+  if (!ts.isThrowStatement(body)) return undefined;
+  const siblings = statement.parent.statements;
+  const next = siblings[siblings.indexOf(statement) + 1];
+  if (next === undefined || !ts.isReturnStatement(next) || next.expression === undefined) {
+    return undefined;
+  }
+  const returned = ts.isNonNullExpression(next.expression)
+    ? next.expression.expression
+    : next.expression;
+  if (!ts.isIdentifier(returned)) return undefined;
+  return isFalsinessOf(statement.expression, returned.text) ? body : undefined;
+}
+
+/**
+ * The parameters `test` asks the KIND of, or undefined when it asks anything
+ * else: `typeof p` against a literal, `p` against `null`, or
+ * `Array.isArray(p)`, joined by `&&` / `||` / `!`.
+ */
+function parameterKindTest(
+  test: ts.Expression,
+  parameters: readonly string[],
+): string[] | undefined {
+  while (ts.isParenthesizedExpression(test)) test = test.expression;
+  if (ts.isPrefixUnaryExpression(test) && test.operator === ts.SyntaxKind.ExclamationToken) {
+    return parameterKindTest(test.operand, parameters);
+  }
+  const parameter = (e: ts.Expression): string[] | undefined =>
+    ts.isIdentifier(e) && parameters.includes(e.text) ? [e.text] : undefined;
+  if (ts.isCallExpression(test)) {
+    return test.expression.getText() === "Array.isArray" && test.arguments.length === 1
+      ? parameter(test.arguments[0])
+      : undefined;
+  }
+  if (!ts.isBinaryExpression(test)) return undefined;
+  switch (test.operatorToken.kind) {
+    case ts.SyntaxKind.AmpersandAmpersandToken:
+    case ts.SyntaxKind.BarBarToken: {
+      const left = parameterKindTest(test.left, parameters);
+      const right = parameterKindTest(test.right, parameters);
+      return left && right ? [...left, ...right] : undefined;
+    }
+    case ts.SyntaxKind.EqualsEqualsEqualsToken:
+    case ts.SyntaxKind.ExclamationEqualsEqualsToken:
+      if (ts.isTypeOfExpression(test.left)) {
+        return ts.isStringLiteral(test.right) ? parameter(test.left.expression) : undefined;
+      }
+      return test.right.kind === ts.SyntaxKind.NullKeyword ? parameter(test.left) : undefined;
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Whether this `if` only moves a trailing options hash, or a block, out of the
+ * positional slot it arrived in. Ruby binds `remove_index(table_name,
+ * column_name = nil, **options)`
+ * (`activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:966`)
+ * at the call; TS has no keyword arguments, so `removeIndex("t", { name })`
+ * lands the hash in `columnName` and the body has to move it. That is the
+ * signature's work, not an arm, and it tokens as nothing.
+ *
+ * Four conditions keep a real Rails branch out: the `if` leads the body, its
+ * test is a {@link parameterKindTest}, every statement it guards assigns to a
+ * parameter, and one hands the tested parameter, or a spread of it, to the
+ * LAST one. The last tells it from a coercion Rails writes out
+ * (`query_params = parse_nested_query(query_params) if query_params.is_a?(String)`,
+ * `vendor/rack-test/v2.2.0/lib/rack/test.rb:341`).
+ */
+function isKwargsRebindingGuard(statement: ts.IfStatement): boolean {
+  const body = statement.parent;
+  if (!ts.isBlock(body) || !ts.isFunctionLike(body.parent)) return false;
+  const parameters = body.parent.parameters.flatMap((p) =>
+    ts.isIdentifier(p.name) ? [p.name.text] : [],
+  );
+  const tested = parameterKindTest(statement.expression, parameters);
+  if (tested === undefined) return false;
+  const last = parameters[parameters.length - 1];
+  const isTested = (e: ts.Expression): boolean => {
+    while (ts.isParenthesizedExpression(e) || ts.isAsExpression(e)) e = e.expression;
+    return ts.isIdentifier(e) && e.text !== last && tested.includes(e.text);
+  };
+  let moves = false;
+  const rebinds = (branch: ts.Statement | undefined): boolean => {
+    if (branch === undefined) return true;
+    const statements = ts.isBlock(branch) ? branch.statements : [branch];
+    return statements.every((s) => {
+      if (!ts.isExpressionStatement(s) || !ts.isBinaryExpression(s.expression)) return false;
+      const { left, operatorToken, right } = s.expression;
+      if (operatorToken.kind !== ts.SyntaxKind.EqualsToken) return false;
+      if (!ts.isIdentifier(left) || !parameters.includes(left.text)) return false;
+      if (left.text === last) {
+        moves ||= ts.isObjectLiteralExpression(right)
+          ? right.properties.some((p) => ts.isSpreadAssignment(p) && isTested(p.expression))
+          : isTested(right);
+      }
+      return true;
+    });
+  };
+  if (!rebinds(statement.thenStatement) || !rebinds(statement.elseStatement) || !moves) {
+    return false;
+  }
+  const index = body.statements.indexOf(statement);
+  return (
+    index === 0 ||
+    (ts.isIfStatement(body.statements[index - 1]) &&
+      isKwargsRebindingGuard(body.statements[index - 1] as ts.IfStatement))
+  );
+}
+
 function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const tokens: string[] = [];
@@ -4793,6 +4917,18 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
         if (write !== undefined) {
           tokens.push("or");
           visit(write);
+          return;
+        }
+        const raise = orRaise(n as ts.IfStatement);
+        if (raise !== undefined) {
+          tokens.push("or");
+          visit(raise);
+          return;
+        }
+        if (isKwargsRebindingGuard(n as ts.IfStatement)) {
+          visit((n as ts.IfStatement).thenStatement);
+          const alternate = (n as ts.IfStatement).elseStatement;
+          if (alternate !== undefined) visit(alternate);
           return;
         }
         tokens.push("if");
