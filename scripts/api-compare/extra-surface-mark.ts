@@ -83,7 +83,8 @@
  * the row.
  *
  * arel enrolled first, being the only package measured at `novel: 0`;
- * ruby-compat joined it once RFC 0129 burnt its 4 down to zero.
+ * ruby-compat joined it once RFC 0129 burnt its 4 down to zero. arel has since
+ * moved on to rowless (below).
  *
  * ROWLESS MODE is the end of that road. Once a package's `total` is burnt to
  * zero as well — every moved-not-novel extra receipted, deleted, or relocated
@@ -97,7 +98,10 @@
  *
  * activerecord enrolled there directly under the
  * `activerecord-extra-surface-receipt-burndown` RFC, once its receipt stories
- * drove both its 340 novel and its 396 moved extras to zero.
+ * drove both its 340 novel and its 396 moved extras to zero. arel followed
+ * under RFC 0172 once its moved extras and its inlined-from bucket reached
+ * zero; a rowless package in {@link INLINED_FROM_PACKAGES} has that third
+ * dimension pinned at 0 as well.
  * Enrollment is only-grow, exactly like RFC 0121's: a package joins when it
  * reaches zero and is never moved back out to turn a red run green.
  *
@@ -124,14 +128,14 @@ export const COUNTED_PACKAGES = [] as const;
  * a row, because `total` stays gated in both modes. Only-grow: a package joins
  * on reaching zero and never leaves.
  */
-export const TAGGED_ONLY_PACKAGES = ["arel", "ruby-compat"] as const;
+export const TAGGED_ONLY_PACKAGES = ["ruby-compat"] as const;
 
 /**
  * Gated packages pinned at the constant 0 in BOTH `novel` and `total`, which
  * therefore carry no mark row — see ROWLESS MODE in the module comment.
  * Only-grow, like {@link TAGGED_ONLY_PACKAGES}.
  */
-export const ROWLESS_PACKAGES = ["activemodel", "activerecord"] as const;
+export const ROWLESS_PACKAGES = ["activemodel", "activerecord", "arel"] as const;
 
 /**
  * The packages this gate covers, in either mode. Everything else is measured
@@ -290,7 +294,8 @@ export function strandedMarks(marks: SurfaceMarks): string[] {
 
 /**
  * Every tagged-only package measured with novel surface left, and every
- * rowless package measured with novel OR moved surface left. Non-empty means
+ * rowless package measured with novel OR moved surface left (or, where it is
+ * gated, inlined-from surface). Non-empty means
  * a public TS name with no Ruby counterpart in its own file was added without
  * a `@noRailsEquivalent` receipt — the fix is the receipt or the deletion.
  *
@@ -310,9 +315,10 @@ export function taggedOnlyViolations(current: SurfaceMarks): MarkViolation[] {
   for (const name of ROWLESS_PACKAGES) {
     const now = current[name];
     if (!now) continue;
-    for (const dimension of ["novel", "total"] as const) {
-      if (now[dimension] > 0) {
-        violations.push({ package: name, dimension, mark: 0, current: now[dimension] });
+    for (const dimension of dimensionsFor(name)) {
+      const nowValue = now[dimension] ?? 0;
+      if (nowValue > 0) {
+        violations.push({ package: name, dimension, mark: 0, current: nowValue });
       }
     }
   }

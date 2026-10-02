@@ -521,7 +521,7 @@ write.
    package's rule 1 is not enforced by this gate (see
    [its README](packages/ruby-compat/README.md#1-only-what-trails-actually-calls)).
 
-   A package that has burnt its untagged novel surface to zero (`arel` today)
+   A package that has burnt its untagged novel surface to zero (`ruby-compat` today)
    is additionally **pinned**: its `novel` is the constant 0 regardless of what
    its row says, so widening the row cannot clear a red run. The only two
    remedies are a `@noRailsEquivalent PERMANENT|CONVERGEABLE <story-id>`
@@ -535,16 +535,18 @@ write.
    file and cannot see a cross-file relocation, and `parity:api:moves` only
    reports. So `total` stays gated in both modes.
 
-   A package that burns `total` to zero as well (`activemodel` and `activerecord` today) is
+   A package that burns `total` to zero as well (`activemodel`, `activerecord` and `arel` today) is
    **rowless**: both `novel` and `total` are the constant 0, it carries **no
    row** in the mark file, and the gate fails if one is re-added. Every extra
    there — novel or moved — needs a receipt at its declaration, a deletion, or
-   a relocation to the file mirroring the `.rb` that defines it.
+   a relocation to the file mirroring the `.rb` that defines it. arel's
+   `inlined-from` bucket (a module member whose body sits on an including
+   class's file) is pinned at 0 the same way.
 
    A package gets pinned as a reviewed step of its own burndown (the
    `activerecord-extra-surface-receipt-burndown` RFC for activerecord's 342 novel
    and 396 moved, now rowless; RFC 0173 for activemodel's 1 novel and 24 moved, now rowless;
-   RFC 0129 for ruby-compat's 4). That direction is **only-grow**: no package
+   RFC 0129 for ruby-compat's 4; RFC 0172 for arel, now rowless). That direction is **only-grow**: no package
    is ever un-pinned to turn a red run green. Other packages are still measured
    and ungated; widening `GATED_PACKAGES` is a separate decision with its own
    burndown, not a mechanical step.
