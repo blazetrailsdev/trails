@@ -248,6 +248,8 @@ export {
   rbCheckArity,
   rbObjMethod,
   rbObjMethods,
+  rbObjPrivateMethods,
+  rbObjProtectedMethods,
   rbObjPublicMethods,
 } from "./method.js";
 export { regexpEscape } from "./regexp.js";

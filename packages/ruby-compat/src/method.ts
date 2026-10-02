@@ -122,10 +122,8 @@ export function rbObjMethod(obj: unknown, vid: string): Method {
 
 /**
  * `class_instance_method_list` (`vendor/ruby/v3.3.11/class.c:1818`) for an
- * object: the receiver's singleton methods, then its class's, then every
- * ancestor's while `recur` is set. A JS entry carries no visibility (see
- * CLAUDE.md, "Method visibility is compile-time only"), so every
- * function-valued entry is listed.
+ * object: its singleton methods, its class's, then every ancestor's while
+ * `recur` is set. Every function-valued entry is listed (see {@link rbObjPrivateMethods}).
  */
 function classInstanceMethodList(obj: unknown, recur: boolean): string[] {
   const list = new Set<string>();
@@ -159,6 +157,27 @@ export function rbObjMethods(obj: unknown): string[] {
  */
 export function rbObjPublicMethods(obj: unknown, all = true): string[] {
   return classInstanceMethodList(obj, all);
+}
+
+/**
+ * `Object#private_methods` (`vendor/ruby/v3.3.11/class.c:2027`
+ * `rb_obj_private_methods`). A JS entry carries no visibility (CLAUDE.md,
+ * "Method visibility is compile-time only"), so no method is private.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjPrivateMethods(_obj: unknown, _all = true): string[] {
+  return [];
+}
+
+/**
+ * `Object#protected_methods` (`vendor/ruby/v3.3.11/class.c:2012`
+ * `rb_obj_protected_methods`), empty as {@link rbObjPrivateMethods} is.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjProtectedMethods(_obj: unknown, _all = true): string[] {
+  return [];
 }
 
 /**

@@ -57,11 +57,9 @@ describe("Struct", () => {
   });
 
   it("refuses to copy into a frozen struct or from another class", () => {
-    expect(() => Object.freeze(new Customer()).initializeCopy(new Customer("Joe", 1))).toThrow(
-      FrozenError,
-    );
-    expect(() => new Customer().initializeCopy(new Other("Joe", 1))).toThrow(
-      new TypeError("initialize_copy should take same class object"),
-    );
+    const joe = new Customer("Joe", 1);
+    expect(() => Object.freeze(new Customer()).initializeCopy(joe)).toThrow(FrozenError);
+    const typeError = new TypeError("initialize_copy should take same class object");
+    expect(() => new Other().initializeCopy(joe)).toThrow(typeError);
   });
 });

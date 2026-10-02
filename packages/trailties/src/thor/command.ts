@@ -9,6 +9,8 @@ import {
   rbObjAsString,
   rbObjMethod,
   rbObjMethods,
+  rbObjPrivateMethods,
+  rbObjProtectedMethods,
   rbObjPublicMethods,
   rbObjRespondTo,
   rbSetClassPathString,
@@ -34,16 +36,9 @@ interface CommandClass {
   ): unknown;
 }
 
-interface UsageClass {
-  namespace(): string;
-  arguments(): Argument[];
-}
+type UsageClass = { namespace(): string; arguments(): Argument[] };
 
-interface Instance {
-  constructor: CommandClass;
-}
-
-type Method = (...args: unknown[]) => unknown;
+type Instance = { constructor: CommandClass };
 
 export class Command extends Struct.new(
   "name",
@@ -109,7 +104,10 @@ export class Command extends Struct.new(
         return instance.constructor.handleNoCommandError(this.name);
       } else if (this.isPublicMethod(instance)) {
         arity = rbObjMethod(instance, this.name).arity();
-        rbCheckArity((instance as unknown as Record<string, Method>)[this.name], args.length);
+        rbCheckArity(
+          (instance as unknown as Record<string, () => unknown>)[this.name],
+          args.length,
+        );
         return await rbFSend(instance, this.name, ...args);
       } else if (this.isLocalMethod(instance, "methodMissing")) {
         return await rbFSend(instance, "methodMissing", this.name, ...args);
@@ -212,17 +210,18 @@ export class Command extends Struct.new(
     return rbObjPublicMethods(instance).includes(this.name);
   }
 
-  /**
-   * @internal
-   * @missingRailsCall private_methods — PERMANENT
-   */
-  protected isPrivateMethod(_instance: Instance): boolean {
-    return false;
+  /** @internal */
+  protected isPrivateMethod(instance: Instance): boolean {
+    return rbObjPrivateMethods(instance).includes(this.name);
   }
 
   /** @internal */
   protected isLocalMethod(instance: Instance, name: string): boolean {
-    const methods = rbObjPublicMethods(instance, false);
+    const methods = [
+      ...rbObjPublicMethods(instance, false),
+      ...rbObjPrivateMethods(instance, false),
+      ...rbObjProtectedMethods(instance, false),
+    ];
     return methods.includes(name);
   }
 

@@ -8,6 +8,8 @@ import {
   rbIseqMinMaxArity,
   rbObjMethod,
   rbObjMethods,
+  rbObjPrivateMethods,
+  rbObjProtectedMethods,
   rbObjPublicMethods,
 } from "./method.js";
 import { NameError } from "./name-error.js";
@@ -111,16 +113,15 @@ describe("rbCheckArity", () => {
   });
 
   it("raises with a backtrace that begins at its caller", () => {
-    function sender(): void {
-      rbCheckArity((a: unknown) => a, 0);
-    }
-    let exc!: Error;
-    try {
-      sender();
-    } catch (e) {
-      exc = e as Error;
-    }
-    expect(excBacktraceLocations(exc)![0].label).toBe("sender");
+    const sender = (): void => rbCheckArity((a: unknown) => a, 0);
+    const exc = (() => {
+      try {
+        return sender();
+      } catch (e) {
+        return e;
+      }
+    })();
+    expect(excBacktraceLocations(exc as Error)![0].label).toBe("sender");
   });
 
   it("answers nothing when argc is in range", () => {
@@ -164,18 +165,16 @@ describe("rbObjMethods / rbObjPublicMethods", () => {
     expect(rbObjMethods(child)).not.toContain("title");
     expect(rbObjPublicMethods(child)).toEqual(rbObjMethods(child));
     expect(rbObjPublicMethods(child, false)).toEqual(["singleton", "own"]);
+    expect([rbObjPrivateMethods(child), rbObjProtectedMethods(child, false)]).toEqual([[], []]);
   });
 });
 
 describe("rbFCaller", () => {
   it("lists the frames above the method calling it", () => {
-    function inner(): string[] {
-      return rbFCaller();
-    }
-    function outer(): string[] {
+    const inner = (): string[] => rbFCaller();
+    const caller = (function outer() {
       return inner();
-    }
-    const caller = outer();
+    })();
     expect(caller[0]).toMatch(/^at outer /);
     expect(caller.some((frame) => /^at inner /.test(frame))).toBe(false);
   });

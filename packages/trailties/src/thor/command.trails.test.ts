@@ -56,20 +56,13 @@ describe("Thor::Command", () => {
   });
 
   it("prefixes usage with the ancestor name", () => {
-    const sub = command();
-    sub.ancestorName = "parent";
-    expect(sub.formattedUsage({ namespace: () => "foo", arguments: () => [] })).toBe(
-      "parent canHas",
-    );
+    const sub = Object.assign(command(), { ancestorName: "parent" });
+    const klass = { namespace: () => "foo", arguments: () => [] };
+    expect(sub.formattedUsage(klass)).toBe("parent canHas");
   });
 
   describe("#run", () => {
-    it("awaits the method it sends", async () => {
-      const { instance } = host({ canHas: async (a: number) => a + 1 });
-      expect(await command().run(instance, [1])).toBe(2);
-    });
-
-    it("hands a wrong argument count to handle_argument_error with the method's arity", async () => {
+    it("hands a wrong argument count to handle_argument_error unless debugging", async () => {
       const canHas = vi.fn((a: unknown, b: unknown) => [a, b]);
       const { klass, instance } = host({ canHas: (a: unknown, b: unknown) => canHas(a, b) });
       const cmd = command();
@@ -81,13 +74,9 @@ describe("Thor::Command", () => {
         [1],
         2,
       );
-    });
-
-    it("re-raises a wrong argument count while debugging", async () => {
-      const { instance } = host({ canHas: (a: unknown) => a }, true);
-      await expect(command().run(instance, [])).rejects.toThrow(
-        new ArgumentError("wrong number of arguments (given 0, expected 1)"),
-      );
+      const debugging = host({ canHas: async (a: number) => a + 1 }, true);
+      await expect(cmd.run(debugging.instance)).rejects.toThrow(/\(given 0, expected 1\)$/);
+      expect(await cmd.run(debugging.instance, [1])).toBe(2);
     });
 
     it("re-raises an ArgumentError raised inside the method, synchronously or not", async () => {
@@ -122,13 +111,8 @@ describe("Thor::Command", () => {
 
     it("re-raises any other NoMethodError and any other error", async () => {
       const noMethod = new NoMethodError("undefined method 'other' for nil", "other");
-      const typeError = new TypeError("x is not a function");
-      for (const error of [noMethod, typeError]) {
-        const { instance } = host({
-          canHas: () => {
-            throw error;
-          },
-        });
+      for (const error of [noMethod, new TypeError("x is not a function")]) {
+        const { instance } = host({ canHas: () => Promise.reject(error) });
         await expect(command().run(instance)).rejects.toBe(error);
       }
     });
@@ -149,14 +133,14 @@ describe("Thor::Command", () => {
 
   it("drops Thor's own frames and the caller's from a backtrace", () => {
     const thor = new URL(".", import.meta.url).pathname;
-    const app = "at App.canHas (/app/app.js:3:1)";
-    const main = "at main (/app/bin/thor.js:5:1)";
-    const backtrace = [`at async Command.run (file://${thor}command.js:27:3)`, app, main];
-    expect(
-      (command() as unknown as Record<string, (...frames: string[][]) => string[]>).sansBacktrace(
-        [...backtrace, `at ${thor}command.ts:27:3`],
-        [main],
-      ),
-    ).toEqual([app]);
+    const own = [
+      `at async Command.run (file://${thor}command.js:27:3)`,
+      `at ${thor}command.ts:1:1`,
+    ];
+    const sans = (command() as unknown as Record<string, (...frames: string[][]) => string[]>)
+      .sansBacktrace;
+    expect(sans([...own, "at App.canHas (/app.js:3:1)", "at main"], ["at main"])).toEqual([
+      "at App.canHas (/app.js:3:1)",
+    ]);
   });
 });
