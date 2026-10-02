@@ -20,6 +20,7 @@ import {
   Rational,
   kernelInteger,
   rbDefineAllocFunc,
+  rbObjDup,
   rbObjRespondTo,
   stringInspect,
 } from "@blazetrails/ruby-compat";
@@ -1609,24 +1610,16 @@ export class Time {
     this.#utcOffsetMemo = null;
     this.#timeZoneId = "UTC";
     this.#localZone = false;
+    this.#zoneObject = null;
+    this.#isdstMemo = null;
 
     this.#tzmodeUtc = true;
     return this;
   }
 
+  /** `time_getgmtime` (`vendor/ruby/v3.3.11/time.c:4291`). */
   getutc(): Time {
-    const plain = this.#plain.add({ seconds: -this.#utcOffset });
-    return new Time(
-      plain.year,
-      plain.month,
-      plain.day,
-      plain.hour,
-      plain.minute,
-      new Rational(plain.second, 1).add(
-        new Rational(this.nsec, 1).add(this.#subnano).quo(1_000_000_000),
-      ),
-      "UTC",
-    );
+    return rbObjDup(this).utc();
   }
 
   getlocal(utcOffset: number | string | object | null = null): Time {

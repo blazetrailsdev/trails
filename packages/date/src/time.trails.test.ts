@@ -487,6 +487,14 @@ describe("Time", () => {
       expect(summer.zone).toBe(tz);
       expect(summer.utcOffset).toBe(-14400);
       expect(summer.isdst).toBe(true);
+      const utc = summer.getutc();
+      expect(utc.zone).toBe("UTC");
+      expect(utc.isdst).toBe(false);
+      expect(utc.eql(summer)).toBe(true);
+      expect(summer.zone).toBe(tz);
+      expect(summer.isdst).toBe(true);
+      expect(summer.utc()).toBe(summer);
+      expect(summer.isdst).toBe(false);
       expect(Time.utc(2020, 1, 1).getlocal(new Rational(3600, 1)).utcOffset).toBe(3600);
       expect(() => Time.utc(2020, 1, 1).getlocal({})).toThrow(TypeError);
     });
