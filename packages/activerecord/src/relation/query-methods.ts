@@ -201,6 +201,7 @@ interface QueryMethodsHost {
   aliasTracker(joins?: Nodes.Node[], aliases?: Hash<string, number>): AliasTracker;
   clone(): any;
   spawn(): any;
+  except(...skips: ExceptSkip[]): any;
   /** @internal */
   buildArel(connection: unknown, aliases?: AliasTracker): any;
   skipPreloadingValue: boolean;
@@ -1370,7 +1371,7 @@ export function buildSubquery(
   subqueryAlias: string | Nodes.SqlLiteral,
   selectValue: unknown,
 ): SelectManager {
-  const subquery = (this as any).except("optimizerHints").arel().as(subqueryAlias);
+  const subquery = this.except("optimizerHints").arel().as(subqueryAlias);
 
   const arel = new SelectManager(subquery).project(selectValue as any);
   if (!isEmpty(this.optimizerHintsValues)) arel.optimizerHints(...this.optimizerHintsValues);
