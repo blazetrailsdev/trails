@@ -2,7 +2,7 @@ import { Complex } from "./complex.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { NilClass } from "./nil-class.js";
 import { NoMethodError } from "./no-method-error.js";
-import { rbBuiltinClassName, rbObjClass } from "./object.js";
+import { rbBuiltinClassName, rbObjClassname } from "./object.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
 import { TypeError } from "./type-error.js";
 import { rbStrToF, rbStrToI } from "./string/convert.js";
@@ -161,7 +161,7 @@ export function toI(obj: unknown): number | bigint {
   if (typeof (obj as { toI?: unknown }).toI === "function") {
     return (obj as { toI(): number | bigint }).toI();
   }
-  throw new NoMethodError(`undefined method 'to_i' for an instance of ${rbObjClass(obj)}`);
+  throw new NoMethodError(`undefined method 'to_i' for an instance of ${rbObjClassname(obj)}`);
 }
 
 /**
@@ -184,7 +184,7 @@ export function toF(obj: unknown): number {
   if (typeof (obj as { toF?: unknown }).toF === "function") {
     return rbDbl2num((obj as { toF(): number }).toF());
   }
-  throw new NoMethodError(`undefined method 'to_f' for an instance of ${rbObjClass(obj)}`);
+  throw new NoMethodError(`undefined method 'to_f' for an instance of ${rbObjClassname(obj)}`);
 }
 
 /**
@@ -199,12 +199,12 @@ export function isNan(obj: unknown): boolean {
   if (typeof (obj as { isNan?: unknown } | null)?.isNan === "function") {
     return (obj as { isNan(): boolean }).isNan();
   }
-  throw new NoMethodError(`undefined method 'nan?' for an instance of ${rbObjClass(obj)}`);
+  throw new NoMethodError(`undefined method 'nan?' for an instance of ${rbObjClassname(obj)}`);
 }
 
 /**
  * `RB_FLOAT_TYPE_P` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:263`)
- * over the Float seats `rbObjClass` reads: a fractional `number`, or a boxed one.
+ * over the Float seats `rbObjClassname` reads: a fractional `number`, or a boxed one.
  * @noRailsEquivalent PERMANENT
  */
 export function rbFloatTypeP(x: unknown): x is number {
@@ -257,7 +257,7 @@ export function numericMul(x: unknown, y: unknown): unknown {
     if (rbFloatTypeP(y)) return rbDbl2num(Number(x) * y.valueOf());
     if (y instanceof Rational) return y.mul(x);
   }
-  throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClass(x)}`);
+  throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClassname(x)}`);
 }
 
 /**
@@ -284,7 +284,7 @@ export function numericPlus(x: unknown, y: unknown): unknown {
   }
   const coerce = (y as { coerce?: unknown } | null)?.coerce;
   if (typeof coerce !== "function") {
-    throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClass(x)}`);
+    throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClassname(x)}`);
   }
   const [a, b] = coerce.call(y, x) as [unknown, unknown];
   return rbPlus(a, b);
@@ -312,6 +312,6 @@ export function rbPlus(v: unknown, i: unknown): unknown {
   const plus = (v as { plus?: unknown } | null)?.plus;
   if (typeof plus === "function") return plus.call(v, i);
   throw new NoMethodError(
-    `undefined method '+' for ${v == null ? "nil" : `an instance of ${rbObjClass(v)}`}`,
+    `undefined method '+' for ${v == null ? "nil" : `an instance of ${rbObjClassname(v)}`}`,
   );
 }

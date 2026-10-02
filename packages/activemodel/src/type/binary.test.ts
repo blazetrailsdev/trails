@@ -18,7 +18,7 @@ describe("BinaryTest", () => {
 
   it("serialize binary strings", () => {
     const type = new Types.BinaryType();
-    expect(type.serialize("ƒée")!.bytes).toEqual(new TextEncoder().encode("ƒée"));
+    expect(type.serialize("ƒée")!.toString()).toEqual(new TextEncoder().encode("ƒée"));
     expect(type.serialize("ƒée")).not.toEqual("ƒée");
   });
 });

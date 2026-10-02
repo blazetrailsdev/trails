@@ -589,7 +589,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
       await PgArrays.loadSchema();
       const bc = Temporal.Instant.from("-000042-03-15T12:34:56.123456Z");
-      const record = await (PgArrays as any).create({ datetimes: [bc] });
+      const record = await (PgArrays as any).create({
+        datetimes: [RubyTime.at(new Rational(bc.epochNanoseconds, 1_000_000_000n))],
+      });
       await record.reload();
       expect(record.datetimes).toHaveLength(1);
       expect(

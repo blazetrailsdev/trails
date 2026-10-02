@@ -138,7 +138,7 @@ describe("quote dispatches through quoted_binary", () => {
     const bytes = new Uint8Array([0xde, 0xad]);
     quote.call(host, bytes);
     expect(received).toBeInstanceOf(BinaryData);
-    expect((received as BinaryData).bytes).toEqual(bytes);
+    expect((received as BinaryData).toString()).toEqual(bytes);
   });
 
   it("falls back to the module quoted_binary helper without a host", () => {

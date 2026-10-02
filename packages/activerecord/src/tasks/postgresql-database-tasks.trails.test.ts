@@ -30,6 +30,7 @@ describe("PostgreSQLDatabaseTasks", () => {
     });
     vi.spyOn(tasks, "create").mockImplementation(async (alreadyConnected?: boolean) => {
       calls.push(alreadyConnected ? "create(true)" : "create");
+      return undefined as never;
     });
     await tasks.purge();
     expect(calls).toEqual(["drop", "create(true)"]);

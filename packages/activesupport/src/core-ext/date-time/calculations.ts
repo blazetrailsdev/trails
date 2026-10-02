@@ -1,5 +1,5 @@
 import { Date as RubyDate, DateTime as RubyDateTime, Temporal, Time } from "@blazetrails/date";
-import { Rational, rational } from "@blazetrails/ruby-compat";
+import { Rational, rational, TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "../../hash-utils.js";
 import { instantFrom } from "../../temporal.js";
 import { currentTime } from "../../time-travel.js";
@@ -278,4 +278,8 @@ export function compare(datetime: DateTime, other: unknown): number | null {
   } else {
     return new RubyDateTime(datetime).cmp(other);
   }
+}
+
+for (const seat of ["Temporal.PlainDateTime", "Temporal.ZonedDateTime"]) {
+  Object.assign(TEMPORAL_METHOD_TABLE[seat], { isUtc, getutc, getlocal });
 }

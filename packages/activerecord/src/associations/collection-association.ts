@@ -554,44 +554,6 @@ export abstract class CollectionAssociation extends Association {
     }
   }
 
-  protected setOwnerAttributes(record: Base): void {
-    if (this.reflection.options.through) return;
-
-    const ctor = this.owner.constructor as any;
-    const fks = this.foreignKeyColumns();
-    const richPk = (
-      ctor._reflectOnAssociation?.(this.reflection.name) as
-        | { activeRecordPrimaryKey?: string | string[] }
-        | undefined
-    )?.activeRecordPrimaryKey;
-    const configuredPk = this.reflection.options.primaryKey ?? richPk ?? ctor.primaryKey ?? "id";
-    const pks = Array.isArray(configuredPk) ? configuredPk : [configuredPk];
-
-    for (let i = 0; i < fks.length; i++) {
-      const pkCol = pks[i] ?? pks[0];
-      const pkValue =
-        typeof (this.owner as any)._readAttribute === "function"
-          ? (this.owner as any)._readAttribute(pkCol)
-          : (this.owner as any)[pkCol];
-
-      if (typeof (record as any)._writeAttribute === "function") {
-        (record as any)._writeAttribute(fks[i], pkValue);
-      } else {
-        (record as any)[fks[i]] = pkValue;
-      }
-    }
-
-    if (this.reflection.options.as) {
-      const typeCol = this.polymorphicTypeColumn()!;
-      const typeName = (ctor as typeof Base).polymorphicName();
-      if (typeof (record as any)._writeAttribute === "function") {
-        (record as any)._writeAttribute(typeCol, typeName);
-      } else {
-        (record as any)[typeCol] = typeName;
-      }
-    }
-  }
-
   private foreignKeyColumns(): string[] {
     const foreignKey = this.reflection.foreignKey();
     return Array.isArray(foreignKey) ? foreignKey : [foreignKey];

@@ -1,4 +1,4 @@
-import { rbObjClass, stringInspect } from "@blazetrails/ruby-compat";
+import { rbObjClassname, stringInspect } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 import {
   REQUEST_METHOD,
@@ -189,7 +189,7 @@ export class Lint {
   private checkHeaders(headers: Record<string, any>): void {
     if (headers === null || typeof headers !== "object" || Array.isArray(headers)) {
       throw new LintError(
-        `headers object should be a hash, but isn't (got ${rbObjClass(headers)} as headers)`,
+        `headers object should be a hash, but isn't (got ${rbObjClassname(headers)} as headers)`,
       );
     }
 
@@ -199,7 +199,7 @@ export class Lint {
 
     for (const [key, value] of Object.entries(headers)) {
       if (typeof key !== "string") {
-        throw new LintError(`header key must be a string, was ${rbObjClass(key)}`);
+        throw new LintError(`header key must be a string, was ${rbObjClassname(key)}`);
       }
 
       if (key.startsWith("rack.")) continue;
@@ -216,7 +216,7 @@ export class Lint {
         for (const v of value) this.checkHeaderValue(key, v);
       } else {
         throw new LintError(
-          `a header value must be a String or Array of Strings, but the value of '${key}' is a ${rbObjClass(value)}`,
+          `a header value must be a String or Array of Strings, but the value of '${key}' is a ${rbObjClassname(value)}`,
         );
       }
     }

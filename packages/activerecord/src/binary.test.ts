@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFile } from "fs/promises";
+import type { BinaryData } from "@blazetrails/activemodel";
 import { fixtures } from "./test-fixtures.js";
 import { Binary } from "./test-helpers/models/binary.js";
 
@@ -55,7 +56,7 @@ describe("BinaryTest", () => {
     expect(binary.readAttributeBeforeTypeCast("name")).toEqual("123");
     expect(new Uint8Array(binary.data)).toEqual(textBytes);
     expect(
-      new Uint8Array((binary.readAttributeBeforeTypeCast("data") as { bytes: Uint8Array }).bytes),
+      new Uint8Array((binary.readAttributeBeforeTypeCast("data") as BinaryData).toString()),
     ).toEqual(textBytes);
 
     await binary.reload();

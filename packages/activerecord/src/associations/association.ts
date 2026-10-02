@@ -92,7 +92,7 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
   }
 
   isStaleTarget(): boolean {
-    return this.loaded && this._staleState !== this.staleState();
+    return this.loaded && !rbEqual(this._staleState, this.staleState());
   }
 
   reset(): void {
@@ -285,7 +285,10 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
     return this.findTarget(options).then((result) => {
       if (result !== undefined) {
         if (result !== null) this.setStrictLoading(result as Base);
-        if (this.loaded && (!this.isStaleTarget() || this.staleState() !== staleStateBeforeLoad))
+        if (
+          this.loaded &&
+          (!this.isStaleTarget() || !rbEqual(this.staleState(), staleStateBeforeLoad))
+        )
           return;
         this._writeTargetStore(result);
       }

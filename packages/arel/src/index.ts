@@ -14,6 +14,7 @@ export { ArelError, EmptyJoinError, BindError } from "./errors.js";
 export { sql, star, arelNode, fetchAttribute } from "./arel.js";
 export type { ArelNode } from "./arel.js";
 export { Predications } from "./predications.js";
+export { Expressions } from "./expressions.js";
 
 import "./nodes/unary.js";
 import "./nodes/grouping.js";

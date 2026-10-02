@@ -142,7 +142,7 @@ export class PredicateBuilder {
     queries = queries as (Nodes.Node | Nodes.SqlLiteral)[][];
     if (queries.length === 1) return queries[0];
     queries = queries.map((query) =>
-      query.reduce((left, right) => (left as Nodes.Node).and(right)),
+      query.reduce((left, right) => rbFPublicSend(left, "and", right) as Nodes.Node),
     );
     queries = new Nodes.Or(queries);
     return [new Nodes.Grouping(queries)];

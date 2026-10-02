@@ -2,6 +2,7 @@ import {
   parsePostgresInstant,
   parsePostgresTimestampAsInstant,
   parsePostgresDate,
+  timeFromInstant,
 } from "../abstract/temporal-wire.js";
 
 const OID_DATE = 1082;
@@ -31,8 +32,8 @@ const parseInt8: PgParser = (v) => {
 };
 
 const CONNECTION_PARSERS: ReadonlyMap<number, PgParser> = new Map<number, PgParser>([
-  [OID_TIMESTAMPTZ, (v) => parsePostgresInstant(v as string)],
-  [OID_TIMESTAMP, (v) => parsePostgresTimestampAsInstant(v as string)],
+  [OID_TIMESTAMPTZ, (v) => timeFromInstant(parsePostgresInstant(v as string))],
+  [OID_TIMESTAMP, (v) => timeFromInstant(parsePostgresTimestampAsInstant(v as string))],
   [OID_DATE, (v) => parsePostgresDate(v as string)],
   [OID_INT8, parseInt8],
   [OID_CIRCLE, passthrough],

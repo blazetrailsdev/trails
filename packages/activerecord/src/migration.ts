@@ -403,8 +403,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   async addIndex(
     ...args: [tableName: string, columns: string | string[], options?: AddIndexOptions]
-  ): Promise<void> {
-    await this.methodMissing("addIndex", ...args);
+  ): Promise<unknown> {
+    return await this.methodMissing("addIndex", ...args);
   }
 
   async removeIndex(
@@ -416,8 +416,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
         | { column?: string | string[]; name?: string; ifExists?: boolean },
       options?: { column?: string | string[]; name?: string; ifExists?: boolean },
     ]
-  ): Promise<void> {
-    await this.methodMissing("removeIndex", ...args);
+  ): Promise<unknown> {
+    return await this.methodMissing("removeIndex", ...args);
   }
 
   async changeColumn(
@@ -1885,7 +1885,7 @@ export class Migrator {
   }
 
   /** @internal */
-  private validate(migrations: MigrationProxy[]): void {
+  private validate(migrations: MigrationProxy[]): undefined {
     const [name] = [...groupBy(migrations, (m) => m.name)].find(([, v]) => v.length > 1) ?? [];
     if (name != null) throw new DuplicateMigrationNameError(name);
 

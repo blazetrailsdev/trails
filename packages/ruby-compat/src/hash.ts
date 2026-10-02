@@ -997,6 +997,23 @@ export class Hash<K, V> extends Map<K, V> {
   }
 
   /**
+   * `Hash#each` (`vendor/ruby/v3.3.11/hash.c:7219`), `rb_hash_each_pair`
+   * (`hash.c:3149`): yields the key and the value to a block taking two
+   * parameters (`each_pair_i_fast`) and one `[key, value]` pair otherwise
+   * (`each_pair_i`), and returns the receiver.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  each(block: ((pair: [K, V]) => void) | ((key: K, value: V) => void)): this {
+    if (block.length > 1) {
+      for (const [key, value] of super.entries()) (block as (key: K, value: V) => void)(key, value);
+    } else {
+      for (const pair of super.entries()) (block as (pair: [K, V]) => void)(pair);
+    }
+    return this;
+  }
+
+  /**
    * `Hash#keys` (`vendor/ruby/v3.3.11/hash.c:3584` `rb_hash_keys`): an Array of the
    * keys, where `Map#keys` is an iterator. A TS override may not narrow that
    * return, so it declares `MapBoundaryReturn`, the same Map boundary `delete`

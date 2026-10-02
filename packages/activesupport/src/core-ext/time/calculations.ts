@@ -1,5 +1,5 @@
 import { Date as RubyDate, Temporal, Time as RubyTime } from "@blazetrails/date";
-import { Rational, rbObjClass, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Rational, rbObjClassname, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { deprecator } from "../../deprecator.js";
 import { Duration } from "../../duration.js";
 import { ArgumentError } from "../../hash-utils.js";
@@ -222,7 +222,7 @@ export function since(this: RubyTime, seconds: number | Duration | RubyTime): Ru
     if (!(e instanceof TypeError)) throw e;
     const result = dateTimeSince(this.toDatetime(), seconds as RubyTime);
     deprecator().warn(
-      `Passing an instance of ${rbObjClass(seconds)} to ${rbObjClass(this)}#since is deprecated. This behavior will raise ` +
+      `Passing an instance of ${rbObjClassname(seconds)} to ${rbObjClassname(this)}#since is deprecated. This behavior will raise ` +
         "a `TypeError` in Rails 8.1.",
     );
     return result as unknown as RubyTime;

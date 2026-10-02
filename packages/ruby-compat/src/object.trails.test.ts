@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  rbCBasicObject,
   rbClassSuperclass,
   basicObjRespondTo,
   objRespondToMissing,
@@ -22,11 +23,12 @@ import {
   rbObjIvarSet,
   rbModName,
   rbModToS,
-  rbObjClass,
+  rbObjClassname,
   rbSetClassPathString,
 } from "./object.js";
-import { Module, include, rbModAncestors, rbModInstanceMethod } from "./include.js";
+import { Kernel, Module, include, rbModAncestors, rbModInstanceMethod } from "./include.js";
 import { cmp } from "./comparable.js";
+import { Range } from "./range.js";
 import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
@@ -106,7 +108,41 @@ describe("Object#to_s", () => {
     expect(toS(3)).toBe("3");
     expect(toS(null)).toBe("");
     expect(toS("hi")).toBe("hi");
+    const bytes = new Uint8Array([0x80, 0x81]);
+    expect(toS(bytes)).toBe(bytes);
+    class Data {
+      toString() {
+        return bytes;
+      }
+    }
+    expect(toS(new Data())).toBe(bytes);
+    let sends = 0;
+    class Counted {
+      toString() {
+        sends += 1;
+        return "counted";
+      }
+    }
+    expect(toS(new Counted())).toBe("counted");
+    expect(sends).toBe(1);
     expect(toS([{ a: 1 }])).toBe('[{"a"=>1}]');
+  });
+
+  it("sends to_s to a receiver defining it", () => {
+    expect(toS(new Range(1, 3))).toBe("1..3");
+    class Ported {
+      toS(): string {
+        return "ported";
+      }
+    }
+    expect(toS(new Ported())).toBe("ported");
+    expect(toS(Object.assign(() => {}, { toS: () => "proc" }))).toBe("proc");
+    class Unported {
+      toS(): number {
+        return 1;
+      }
+    }
+    expect(toS(new Unported())).toMatch(/^#<Unported/);
   });
 });
 
@@ -123,6 +159,26 @@ describe("Object#respond_to?", () => {
     expect(basicObjRespondTo({}, "id")).toBe(false);
     expect(basicObjRespondTo(null, "toString")).toBe(true);
     expect(basicObjRespondTo(null, "id")).toBe(false);
+  });
+
+  it("answers and dispatches the methods bound on a Temporal seat", () => {
+    const date = { [Symbol.toStringTag]: "Temporal.PlainDate" };
+    const plain = { toPlainDate: () => date };
+    const datetime = { [Symbol.toStringTag]: "Temporal.PlainDateTime", ...plain };
+    expect(basicObjRespondTo(date, "toDate")).toBe(true);
+    expect(basicObjRespondTo(datetime, "toDate")).toBe(true);
+    expect(basicObjRespondTo({ [Symbol.toStringTag]: "Temporal.Instant" }, "toDate")).toBe(false);
+    expect(basicObjRespondTo("2026-01-01", "toDate")).toBe(false);
+    expect(rbFSend(date, "toDate")).toBe(date);
+    expect(rbFSend(datetime, "toDate")).toBe(date);
+  });
+
+  it("does not answer length or name for a Proc", () => {
+    expect(basicObjRespondTo((a: unknown, b: unknown) => [a, b], "length")).toBe(false);
+    expect(basicObjRespondTo(function named() {}, "name")).toBe(false);
+    expect(basicObjRespondTo(() => {}, "call")).toBe(true);
+    expect(basicObjRespondTo("abc", "length")).toBe(true);
+    expect(basicObjRespondTo([1], "length")).toBe(true);
   });
 
   it("sends an overridden respond_to? and otherwise falls back to the default", () => {
@@ -435,7 +491,7 @@ describe("rbModAncestors / rbModInstanceMethod", () => {
     const mod = new Module();
     mod.defineMethod("cast", () => {});
     mod.appendFeatures(Sub);
-    expect(rbModAncestors(Sub)).toEqual([Sub, mod, Base, Object, "Kernel", "BasicObject"]);
+    expect(rbModAncestors(Sub)).toEqual([Sub, mod, Base, Object, Kernel, rbCBasicObject]);
     expect(rbModInstanceMethod(Sub, "cast").owner).toBe(mod);
     expect(rbModInstanceMethod(Sub, "serialize").owner).toBe(Base);
     expect(() => rbModInstanceMethod(Sub, "nope")).toThrow(NameError);
@@ -572,11 +628,11 @@ describe("Module#name", () => {
   });
 
   it("is what rb_obj_class reports for an instance", () => {
-    expect(rbObjClass(new Base())).toBe("Outer::Space::Base");
-    expect(rbObjClass(new Derived())).toBe("Derived");
-    expect(rbObjClass(Derived)).toBe("Class");
-    expect(rbObjClass(() => {})).toBe("Proc");
-    expect(rbObjClass(new (class extends Base {})())).toMatch(/^#<Class:0x[0-9a-f]+>$/);
+    expect(rbObjClassname(new Base())).toBe("Outer::Space::Base");
+    expect(rbObjClassname(new Derived())).toBe("Derived");
+    expect(rbObjClassname(Derived)).toBe("Class");
+    expect(rbObjClassname(() => {})).toBe("Proc");
+    expect(rbObjClassname(new (class extends Base {})())).toMatch(/^#<Class:0x[0-9a-f]+>$/);
   });
 });
 
@@ -584,11 +640,11 @@ describe("rb_obj_class over trails' date and hash seats", () => {
   const tagged = (tag: string) => ({ [Symbol.toStringTag]: tag });
 
   it("answers Date, DateTime and Time for the Temporal plain shapes and a JS Date", () => {
-    expect(rbObjClass(tagged("Temporal.PlainDate"))).toBe("Date");
-    expect(rbObjClass(tagged("Temporal.PlainDateTime"))).toBe("DateTime");
-    expect(rbObjClass(tagged("Temporal.PlainTime"))).toBe("Time");
-    expect(rbObjClass(new Date(0))).toBe("Time");
-    expect(rbObjClass(new (class Stamp extends Date {})(0))).toBe("Stamp");
+    expect(rbObjClassname(tagged("Temporal.PlainDate"))).toBe("Date");
+    expect(rbObjClassname(tagged("Temporal.PlainDateTime"))).toBe("DateTime");
+    expect(rbObjClassname(tagged("Temporal.PlainTime"))).toBe("Time");
+    expect(rbObjClassname(new Date(0))).toBe("Time");
+    expect(rbObjClassname(new (class Stamp extends Date {})(0))).toBe("Stamp");
   });
 
   it("orders two PlainTimes by their own compare, not on an instant they do not carry", () => {
@@ -604,10 +660,10 @@ describe("rb_obj_class over trails' date and hash seats", () => {
 
   it("answers Hash for a record whose prototype chain holds no class", () => {
     class Klass {}
-    expect(rbObjClass(Object.create({ inherited: "x" }))).toBe("Hash");
-    expect(rbObjClass(Object.create(Object.create(null)))).toBe("Hash");
-    expect(rbObjClass(Object.create({ constructor: Klass }))).toBe("Hash");
-    expect(rbObjClass(new Klass())).toBe("Klass");
+    expect(rbObjClassname(Object.create({ inherited: "x" }))).toBe("Hash");
+    expect(rbObjClassname(Object.create(Object.create(null)))).toBe("Hash");
+    expect(rbObjClassname(Object.create({ constructor: Klass }))).toBe("Hash");
+    expect(rbObjClassname(new Klass())).toBe("Klass");
   });
 });
 

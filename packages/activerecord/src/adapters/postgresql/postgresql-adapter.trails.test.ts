@@ -1,7 +1,7 @@
 import { StringIO } from "@blazetrails/ruby-compat";
 import pg from "pg";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { ValueType } from "@blazetrails/activemodel";
 import {
   describeIfPg,
@@ -782,7 +782,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("date time decoding", async () => {
       const rows = await adapter.execute(`SELECT TIMESTAMP '2023-06-15 10:30:00' AS val`);
-      expect(rows[0].val).toBeInstanceOf(Temporal.Instant);
+      expect(rows[0].val).toBeInstanceOf(RubyTime);
     });
 
     it("date decoding", async () => {
@@ -798,16 +798,16 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("timestamp decoding", async () => {
       const rows = await adapter.execute(`SELECT TIMESTAMP '2023-06-15 10:30:00' AS val`);
-      const d = rows[0].val as Temporal.Instant;
-      expect(d).toBeInstanceOf(Temporal.Instant);
-      expect(d.toZonedDateTimeISO("UTC").year).toBe(2023);
+      const d = rows[0].val as RubyTime;
+      expect(d).toBeInstanceOf(RubyTime);
+      expect(d.getutc().year).toBe(2023);
     });
 
     it("timestamp with time zone decoding", async () => {
       const rows = await adapter.execute(`SELECT TIMESTAMPTZ '2023-06-15 10:30:00+00' AS val`);
-      const d = rows[0].val as Temporal.Instant;
-      expect(d).toBeInstanceOf(Temporal.Instant);
-      expect(d.toZonedDateTimeISO("UTC").year).toBe(2023);
+      const d = rows[0].val as RubyTime;
+      expect(d).toBeInstanceOf(RubyTime);
+      expect(d.getutc().year).toBe(2023);
     });
 
     it("interval decoding", async () => {

@@ -11,8 +11,8 @@ import { Array as OidArray } from "./connection-adapters/postgresql/oid/array.js
 import { RangeType } from "./connection-adapters/postgresql/oid/range.js";
 import { BigDecimal, TimeWithZone, assertNotCalled } from "@blazetrails/activesupport";
 import { DateTimeType } from "@blazetrails/activemodel";
-import { Temporal, Time } from "@blazetrails/date";
-import { rbObjClass } from "@blazetrails/ruby-compat";
+import { Time } from "@blazetrails/date";
+import { rbObjClassname } from "@blazetrails/ruby-compat";
 import { TimeZoneConverter } from "./attribute-methods/time-zone-conversion.js";
 
 import { registerModel } from "./associations.js";
@@ -100,7 +100,7 @@ describe("CustomPropertiesTest", () => {
     const lastOverloaded = await OverloadedType.last();
     expect(Number.isInteger(lastOverloaded!.overloaded_float)).toBe(true);
     expect(((await UnoverloadedType.last()) as any).overloaded_float).toEqual(new Number(2.0));
-    expect(rbObjClass(((await UnoverloadedType.last()) as any).overloaded_float)).toBe("Float");
+    expect(rbObjClassname(((await UnoverloadedType.last()) as any).overloaded_float)).toBe("Float");
   });
 
   it("properties assigned in constructor", () => {
@@ -166,7 +166,7 @@ describe("CustomPropertiesTest", () => {
           precision: 3,
           limit: 2,
           scale: 1,
-          default: () => Temporal.Now.instant(),
+          default: () => Time.now(),
         });
       }
     }
@@ -189,9 +189,9 @@ describe("CustomPropertiesTest", () => {
           static {
             this.attribute("starts_at", "datetime", {
               precision: 3,
-              default: () => Temporal.Now.instant(),
+              default: () => Time.now(),
             });
-            this.attribute("ends_at", { default: () => Temporal.Now.instant() });
+            this.attribute("ends_at", { default: () => Time.now() });
           }
         }
 

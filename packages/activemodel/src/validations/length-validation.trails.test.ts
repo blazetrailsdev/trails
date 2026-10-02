@@ -6,6 +6,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { include } from "@blazetrails/activesupport";
 import { Model, NoMethodError } from "../index.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
+import { LengthValidator } from "./length.js";
 import { Range } from "@blazetrails/ruby-compat";
 
 class Person extends Model {
@@ -93,6 +94,21 @@ describe("LengthValidator (trails)", () => {
     Person.validatesLengthOf("title", { maximum: 10, allowBlank: false });
     expect(await new Person({ title: "" }).isValid()).toBe(false);
     expect(await new Person({ title: "a" }).isValid()).toBe(true);
+  });
+
+  it("measures a Proc value by its to_s, not its arity", () => {
+    const value = (a: unknown, b: unknown) => [a, b];
+    const person = new Person();
+    new LengthValidator({ attributes: ["title"], is: 2 }).validateEach(person, "title", value);
+    expect(person.errors.details.get("title")).toEqual([{ error: ":wrong_length", count: 2 }]);
+
+    person.errors.clear();
+    new LengthValidator({ attributes: ["title"], is: String(value).length }).validateEach(
+      person,
+      "title",
+      value,
+    );
+    expect(person.errors.isEmpty()).toBe(true);
   });
 
   it("throws at definition time when the range is empty", () => {

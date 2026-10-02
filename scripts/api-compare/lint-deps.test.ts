@@ -718,6 +718,38 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
     expect(refs.has("executionContextId")).toBe(true);
   });
 
+  it("credits a wrapper sent through its own .call", () => {
+    const pkg = "@blazetrails/arel";
+    const dir = writePkg({
+      "query-methods.ts": `
+        import { sql } from "${pkg}";
+        export function arelColumn(this: unknown, field: string) { return sql(field); }
+        export function arelColumnAliasesFromHash(this: unknown, key: string) {
+          return arelColumn.call(this, key);
+        }
+      `,
+    });
+    const program = programFor(dir);
+    const { tainted } = collectTaintedSymbols(program, dir, pkg, [], "arel");
+    const sf = program.getSourceFiles().find((f) => f.fileName.endsWith("query-methods.ts"))!;
+    const fn = sf.statements.filter((s): s is ts.FunctionDeclaration =>
+      ts.isFunctionDeclaration(s),
+    )[1];
+    const refs = new Set<string>();
+    const uses = methodUsesDepImport(
+      fn,
+      collectDirectImports(sf, pkg),
+      new Set(),
+      "arel",
+      sf,
+      fn,
+      { checker: program.getTypeChecker(), taintedSymbols: tainted },
+      refs,
+    );
+    expect(uses).toBe(true);
+    expect(refs.has("arelColumn")).toBe(true);
+  });
+
   it("inherits a wrapper's alias-resolved refs through taint", () => {
     const pkg = "@blazetrails/activemodel";
     const dir = writePkg({

@@ -108,7 +108,7 @@ export class Car extends Base {
       return this.order("name asc");
     });
 
-    this.attribute("wheels_owned_at", "datetime", { default: () => Temporal.Now.instant() });
+    this.attribute("wheels_owned_at", "datetime", { default: () => RubyTime.now() });
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

@@ -1,6 +1,6 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { Associations } from "./associations.js";
 import { Company as CanonicalCompany, Firm, Client } from "./test-helpers/models/company.js";
@@ -10,6 +10,9 @@ import { Ship } from "./test-helpers/models/ship.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Eye, Iris, IrisWithReadOnlyForeignKey } from "./test-helpers/models/eye.js";
 import { fixtures } from "./test-fixtures.js";
+import { build } from "./autosave-association.js";
+import { Prisoner } from "./test-helpers/models/ship.js";
+import { getCallbackChains } from "@blazetrails/activesupport";
 
 function cacheAssoc(record: Base, name: string, value: unknown) {
   const association = record.association(name) as any;
@@ -396,5 +399,50 @@ describe("TestAutosaveAssociationOnAHasOneAssociation marked_for_destruction?", 
 
     await pirate.save();
     expect(await Ship.where({ id: ship.id }).count()).toBe(0);
+  });
+});
+
+describe("AutosaveAssociation::AssociationBuilderExtension.build", () => {
+  const callbacks = (model: typeof Base) =>
+    [...getCallbackChains(model.prototype).values()].flatMap((chain) => chain.entries);
+
+  it("leaves the reflection's validate option unwritten", () => {
+    const reflection = Prisoner.reflectOnAssociation("ship")!;
+
+    expect("validate" in reflection.options).toBe(false);
+    expect(reflection.validate).toBe(true);
+  });
+
+  it("adds the autosave callbacks to the model", () => {
+    class Convict extends Base {
+      static {
+        this._tableName = "prisoners";
+      }
+    }
+    const before = callbacks(Convict).length;
+
+    build(Convict, Prisoner.reflectOnAssociation("ship"));
+
+    expect(callbacks(Convict).length).toBeGreaterThan(before);
+  });
+
+  it("runs from the extensions loop, ahead of the builder's own touch callbacks", () => {
+    class Convict extends Base {
+      static {
+        this._tableName = "prisoners";
+      }
+    }
+    const beforeSave = vi.spyOn(Convict, "beforeSave");
+    const afterCreate = vi.spyOn(Convict, "afterCreate");
+
+    Convict.belongsTo("ship", {
+      autosave: true,
+      touch: true,
+      className: "ShipWithoutNestedAttributes",
+    });
+
+    expect(beforeSave.mock.invocationCallOrder[0]).toBeLessThan(
+      afterCreate.mock.invocationCallOrder[0],
+    );
   });
 });

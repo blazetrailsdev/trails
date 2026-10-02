@@ -204,7 +204,11 @@ export class EncryptedAttributeType extends ValueType {
     const casted = this.castType.serialize?.(value) ?? value;
     if (casted === null || casted === undefined) return null;
     const bytes =
-      casted instanceof BinaryData ? casted.bytes : casted instanceof Uint8Array ? casted : null;
+      casted instanceof BinaryData
+        ? casted.toString()
+        : casted instanceof Uint8Array
+          ? casted
+          : null;
     const str = bytes
       ? Buffer.from(bytes).toString("latin1")
       : typeof casted === "string"

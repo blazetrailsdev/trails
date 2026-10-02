@@ -687,7 +687,7 @@ describe("InsertAllTest", () => {
           name: "Out of the Silent Planet",
           author_id: 7,
           isbn: "1974522598",
-          published_on: Temporal.Instant.from("1938-04-01T00:00:00Z"),
+          published_on: RubyTime.utc(1938, 4, 1),
         },
       ]);
       await Book.upsertAll([{ name: "Perelandra", author_id: 7, isbn: "1974522598" }], {
@@ -703,7 +703,7 @@ describe("InsertAllTest", () => {
     "insert_on_duplicate_update",
     "upsert all does not touch updated at when values do not change",
     async () => {
-      const updatedAt = Temporal.Instant.from("2018-01-01T00:00:00Z");
+      const updatedAt = RubyTime.utc(2018, 1, 1);
       await Book.insertAll(
         [
           {
@@ -730,7 +730,7 @@ describe("InsertAllTest", () => {
     "insert_on_duplicate_update",
     "upsert all touches updated at and updated on when values change",
     async () => {
-      const old = Temporal.Instant.from("2018-01-01T00:00:00Z");
+      const old = RubyTime.utc(2018, 1, 1);
       await Book.insertAll(
         [
           {
@@ -762,7 +762,7 @@ describe("InsertAllTest", () => {
             id: 101,
             name: "Out of the Silent Planet",
             published_on: "1938-04-01",
-            updated_at: Temporal.Instant.from("2018-01-01T00:00:00Z"),
+            updated_at: RubyTime.utc(2018, 1, 1),
           },
         ],
         { recordTimestamps: false },
@@ -781,14 +781,14 @@ describe("InsertAllTest", () => {
     "insert_on_duplicate_update",
     "upsert all uses given updated at over implicit updated at",
     async () => {
-      const updatedAt = Temporal.Instant.from("2025-01-01T00:00:00Z");
+      const updatedAt = RubyTime.utc(2025, 1, 1);
       await Book.insertAll(
         [
           {
             id: 101,
             name: "Out of the Silent Planet",
             published_on: "1938-04-01",
-            updated_at: Temporal.Instant.from("2018-01-01T00:00:00Z"),
+            updated_at: RubyTime.utc(2018, 1, 1),
           },
         ],
         { recordTimestamps: false },
@@ -923,7 +923,7 @@ describe("InsertAllTest", () => {
     "upsert all implicitly sets timestamps on update when model record timestamps is true",
     async () => {
       await withRecordTimestamps(Ship, true, async () => {
-        const seed = Temporal.Instant.from("2016-04-17T00:00:00Z");
+        const seed = RubyTime.utc(2016, 4, 17);
         await Ship.insertAll(
           [{ id: 101, name: "RSS Boaty McBoatface", created_at: seed, created_on: "2016-04-17" }],
           { recordTimestamps: false },
@@ -944,7 +944,7 @@ describe("InsertAllTest", () => {
     "upsert all does not implicitly set timestamps on update when model record timestamps is true but overridden",
     async () => {
       await withRecordTimestamps(Ship, true, async () => {
-        const seed = Temporal.Instant.from("2016-04-17T00:00:00Z");
+        const seed = RubyTime.utc(2016, 4, 17);
         await Ship.insertAll(
           [
             {

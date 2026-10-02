@@ -10,44 +10,61 @@ import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { temporalTag } from "./temporal-tag.js";
 import { NoMethodError } from "./no-method-error.js";
+import { Hash } from "./hash.js";
+
+type Klass = abstract new (...args: never) => unknown;
 
 /**
- * `rb_obj_class` (`vendor/ruby/v3.3.11/object.c:296`) over the values trails carries:
- * the immediates Ruby answers a class for without a heap object, the
- * {@link rubyClass} brand, and otherwise the constructor's own name.
+ * `rb_obj_class` (`vendor/ruby/v3.3.11/object.c:265`), `Object#class`: the
+ * class object, read as `rb_class_of`
+ * (`vendor/ruby/v3.3.11/include/ruby/internal/globals.h:172`) reads it for the
+ * immediates Ruby answers a class for without a heap object, and otherwise
+ * the constructor, which a singleton class leaves naming the real class.
  *
  * @boundary: a JS `number` is the seat for both `Integer` and `Float`, so
  *  which one it is is read off the value; a Temporal value carrying an instant
  *  is a Ruby `Time`, by the same reading `cmp` orders it with, and so are a JS
  *  `Date` and a `Temporal.PlainTime`. A function is a `Class` when its
  *  `prototype` is non-writable and a `Proc` otherwise. `Temporal.PlainDate` and
- *  `Temporal.PlainDateTime` are the seats of `Date` and `DateTime`. Any other
- *  object answers its class's {@link rbModToS}, which is how Ruby interpolates
- *  the class `rb_obj_class` returns.
+ *  `Temporal.PlainDateTime` are the seats of `Date` and `DateTime`, and a
+ *  record whose prototype chain holds no class is a `Hash`.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_class` (`vendor/ruby/v3.3.11/object.c:296`).
+ * @noRailsEquivalent PERMANENT
  */
-export function rbObjClass(x: unknown): string {
-  if (x === null || x === undefined) return "NilClass";
-  if (typeof x === "boolean") return x ? "TrueClass" : "FalseClass";
-  if (typeof x === "bigint") return "Integer";
-  if (typeof x === "number") return Number.isInteger(x) ? "Integer" : "Float";
-  if (x instanceof Number) return "Float";
-  if (typeof x === "string") return "String";
-  const branded = (x as Comparable)[rubyClass];
-  if (branded != null) return branded;
-  if (typeof x === "function") {
-    return Object.getOwnPropertyDescriptor(x, "prototype")?.writable === false ? "Class" : "Proc";
+export function rbObjClass(obj: unknown): Klass {
+  if (obj === null || obj === undefined) return rbCNilClass;
+  if (typeof obj === "boolean") return obj ? rbCTrueClass : rbCFalseClass;
+  if (typeof obj === "bigint") return rbCInteger;
+  if (typeof obj === "number") return Number.isInteger(obj) ? rbCInteger : rbCFloat;
+  if (obj instanceof Number) return rbCFloat;
+  if (typeof obj === "string") return rbCString;
+  if (typeof obj === "function") {
+    return Object.getOwnPropertyDescriptor(obj, "prototype")?.writable === false
+      ? rbCClass
+      : rbCProc;
   }
-  if (hasEpochNanoseconds(x)) return "Time";
-  const tag = temporalTag(x);
-  if (tag === "Temporal.PlainDate") return "Date";
-  if (tag === "Temporal.PlainDateTime") return "DateTime";
-  if (tag === "Temporal.PlainTime") return "Time";
-  if (isPlainHash(x)) return "Hash";
-  const klass = (x as object).constructor as (abstract new (...args: never) => unknown) | undefined;
-  if (klass === Date) return "Time";
-  return typeof klass === "function" ? rbModToS(klass) : typeof x;
+  if (hasEpochNanoseconds(obj)) return rbCTime;
+  const tag = temporalTag(obj);
+  if (tag === "Temporal.PlainDate") return rbCDate;
+  if (tag === "Temporal.PlainDateTime") return rbCDateTime;
+  if (tag === "Temporal.PlainTime") return rbCTime;
+  if (isPlainHash(obj)) return Hash;
+  const klass = (obj as object).constructor as Klass | undefined;
+  if (klass === Date) return rbCTime;
+  return typeof klass === "function" ? klass : Object;
+}
+
+/**
+ * `rb_obj_classname` (`vendor/ruby/v3.3.11/variable.c:498`): the
+ * {@link rbModToS} of the class {@link rbObjClass} answers, which is how Ruby
+ * interpolates `obj.class`, or the {@link rubyClass} brand.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjClassname(x: unknown): string {
+  const branded = typeof x === "object" && x !== null ? (x as Comparable)[rubyClass] : null;
+  if (branded != null) return branded;
+  return rbModToS(rbObjClass(x));
 }
 
 /**
@@ -156,6 +173,59 @@ export function rbClassSuperclass<T extends object>(klass: T): T | null {
  */
 export const classpaths = new WeakMap<object, { path: string; permanent: boolean }>();
 
+/** `rb_define_class` (`vendor/ruby/v3.3.11/class.c:972`) for a core class no JS constructor seats. */
+function rbDefineClass(name: string, superclass: Klass = Object): Klass {
+  const klass = class extends (superclass as new () => object) {};
+  classpaths.set(klass, { path: name, permanent: true });
+  return klass;
+}
+
+/**
+ * `rb_cBasicObject` (`vendor/ruby/v3.3.11/object.c:4200`). `Object.prototype`
+ * is the seat of `Object`, so this prototype has no parent.
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCBasicObject = rbDefineClass("BasicObject");
+Object.setPrototypeOf(rbCBasicObject.prototype, null);
+
+/**
+ * `rb_cClass` (`vendor/ruby/v3.3.11/object.c:4203`), a `Module` once include.ts loads.
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCClass = rbDefineClass("Class");
+
+/**
+ * `rb_cNumeric` (`vendor/ruby/v3.3.11/numeric.c:6156`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCNumeric = rbDefineClass("Numeric");
+
+/**
+ * `rb_cString` (`vendor/ruby/v3.3.11/string.c:12121`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCString = rbDefineClass("String");
+
+/**
+ * `rb_cTime` (`vendor/ruby/v3.3.11/time.c:5832`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCTime = rbDefineClass("Time");
+
+/**
+ * `cDate` (`vendor/ruby/v3.3.11/ext/date/date_core.c:9604`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCDate = rbDefineClass("Date");
+
+const rbCNilClass = rbDefineClass("NilClass");
+const rbCTrueClass = rbDefineClass("TrueClass");
+const rbCFalseClass = rbDefineClass("FalseClass");
+const rbCInteger = rbDefineClass("Integer", rbCNumeric);
+const rbCFloat = rbDefineClass("Float", rbCNumeric);
+const rbCProc = rbDefineClass("Proc");
+const rbCDateTime = rbDefineClass("DateTime", rbCDate);
+
 /**
  * `rb_mod_singleton_p` (`vendor/ruby/v3.3.11/object.c:3050`), `Module#singleton_class?`.
  *
@@ -200,8 +270,36 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbModName(klass: abstract new (...args: never) => unknown): string | null {
-  return classpaths.get(klass)?.path ?? (klass.name || null);
+export function rbModName(klass: object): string | null {
+  return classpaths.get(klass)?.path ?? ((klass as { name?: string | null }).name || null);
+}
+
+/**
+ * The methods bound on a Temporal seat, keyed by its `Symbol.toStringTag` and
+ * then by the camelCased Ruby name, which {@link rbFSend} dispatches and
+ * {@link basicObjRespondTo} answers for: a Temporal value's prototype carries
+ * none of them. `to_date` is Ruby's own, for Date and DateTime
+ * (`date_to_date` and `datetime_to_date`,
+ * `vendor/ruby/v3.3.11/ext/date/date_core.c:10054,10058`). A package that
+ * reopens one of those classes, as ActiveSupport's `core_ext/date_time` does,
+ * assigns an entry, as it does on `STRING_METHOD_TABLE`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const TEMPORAL_METHOD_TABLE: Record<
+  string,
+  Record<string, (self: never, ...args: never[]) => unknown>
+> = {
+  "Temporal.PlainDate": { toDate: (self: unknown) => self },
+  "Temporal.PlainDateTime": { toDate: (self: { toPlainDate(): unknown }) => self.toPlainDate() },
+  "Temporal.ZonedDateTime": { toDate: (self: { toPlainDate(): unknown }) => self.toPlainDate() },
+};
+
+function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unknown) | undefined {
+  const table = obj == null ? undefined : TEMPORAL_METHOD_TABLE[temporalTag(obj) ?? ""];
+  return table !== undefined && Object.hasOwn(table, mid)
+    ? (table[mid] as (...args: unknown[]) => unknown)
+    : undefined;
 }
 
 /**
@@ -223,13 +321,15 @@ export function rbModName(klass: abstract new (...args: never) => unknown): stri
  * (`":name"`); Symbol answers `to_sym` too (`symbol.rb:8`). `toAry` is bound for a JS array
  * (`array.c:8619`), whose prototype carries no such member. `isInfinite` is
  * bound for a JS number and bigint, which spell Float (`numeric.c:6376`) and
- * Integer (`numeric.rb:48`).
+ * Integer (`numeric.rb:48`). A Temporal seat answers for the methods
+ * {@link TEMPORAL_METHOD_TABLE} binds on it.
  *
  * A class receiver (a non-writable `prototype`, which a plain function, the
  * JS spelling of a `Proc`, does not have) answers `Module#respond_to?`: its static data fields hold
  * what Ruby keeps in class-level ivars, not methods, and the lookup stops
  * short of `Function.prototype`, whose `call` / `apply` / `bind` no Ruby
- * `Module` defines.
+ * `Module` defines. A plain function's own `length` and `name` are its JS
+ * arity and function name, which no Ruby `Proc` defines.
  *
  * A writer `name=` is answered by a JS accessor's setter, the entry
  * {@link rbFSend} dispatches it to.
@@ -247,6 +347,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   if (typeof obj === "string" && (mid === "toStr" || mid === "toSym")) return true;
   if (Array.isArray(obj) && mid === "toAry") return true;
   if ((typeof obj === "number" || typeof obj === "bigint") && mid === "isInfinite") return true;
+  if (temporalMethod(obj, mid) !== undefined) return true;
   if (
     mid === "get" &&
     (typeof obj === "string" || Array.isArray(obj) || obj instanceof Map || isPlainHash(obj))
@@ -266,6 +367,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   const klass =
     typeof obj === "function" &&
     Object.getOwnPropertyDescriptor(obj, "prototype")?.writable === false;
+  if (typeof obj === "function" && !klass && (mid === "length" || mid === "name")) return false;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   for (
     let o: object | null = Object(obj);
@@ -429,7 +531,7 @@ export function toSym(obj: unknown): string {
   if (typeof obj === "string") return stringToSym(obj);
   if (obj == null) throw new NoMethodError("undefined method 'to_sym' for nil", "to_sym");
   throw new NoMethodError(
-    `undefined method 'to_sym' for an instance of ${rbObjClass(obj)}`,
+    `undefined method 'to_sym' for an instance of ${rbObjClassname(obj)}`,
     "to_sym",
     [],
     false,
@@ -483,9 +585,9 @@ export function conversionMismatch(
   method: string,
   result: unknown,
 ): never {
-  const cname = rbObjClass(val);
+  const cname = rbObjClassname(val);
   throw new TypeError(
-    `can't convert ${cname} to ${tname} (${cname}#${method} gives ${rbObjClass(result)})`,
+    `can't convert ${cname} to ${tname} (${cname}#${method} gives ${rbObjClassname(result)})`,
   );
 }
 
@@ -531,6 +633,8 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if ((typeof recv === "number" || typeof recv === "bigint") && mid === "isInfinite") {
     return recv === Infinity ? 1 : recv === -Infinity ? -1 : null;
   }
+  const bound = temporalMethod(recv, mid);
+  if (bound !== undefined) return bound(recv, ...args);
   const obj = Object(recv) as Record<string, unknown>;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   for (let o: object | null = obj; o; o = Object.getPrototypeOf(o) as object | null) {
@@ -555,9 +659,13 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (typeof obj.methodMissing === "function") {
     return (obj.methodMissing as AnyFunction).call(recv, mid, ...args);
   }
-  throw new NoMethodError(`undefined method '${mid}' for an instance of ${rbObjClass(recv)}`, mid, {
-    receiver: recv,
-  });
+  throw new NoMethodError(
+    `undefined method '${mid}' for an instance of ${rbObjClassname(recv)}`,
+    mid,
+    {
+      receiver: recv,
+    },
+  );
 }
 
 type AnyFunction = (...args: unknown[]) => unknown;
@@ -601,7 +709,7 @@ export function rbObjRespondTo(obj: unknown, mid: string, priv: boolean = false)
  * errors name their operand by: `builtin_class_name` (`error.c:1189`) answers
  * the LOWERCASE `"nil"` / `"true"` / `"false"` for those three immediates —
  * `Float(nil)` is `can't convert nil into Float`, not `NilClass` — and
- * everything else falls through to {@link rbObjClass}.
+ * everything else falls through to {@link rbObjClassname}.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_builtin_class_name` (`vendor/ruby/v3.3.11/error.c:1216`).
  */
@@ -609,7 +717,7 @@ export function rbBuiltinClassName(x: unknown): string {
   if (x === null || x === undefined) return "nil";
   if (x === true) return "true";
   if (x === false) return "false";
-  return rbObjClass(x);
+  return rbObjClassname(x);
 }
 
 /**
@@ -691,7 +799,7 @@ function objAddress(obj: object): string {
  * (`vendor/ruby/v3.3.11/internal/numeric.h:243-262`).
  *
  * @boundary: a JS `number` is the seat for both `Integer` and `Float`, read
- *  off the value as {@link rbObjClass} reads it, so `1.0`, `0.0` and `-0`
+ *  off the value as {@link rbObjClassname} reads it, so `1.0`, `0.0` and `-0`
  *  answer the Fixnum id where MRI answers a flonum's. A JS string has no
  *  identity, so each send hands out a fresh id, as a fresh `String` would get;
  *  a Symbol's static id is not modelled. A Bignum and a Float outside the
@@ -776,6 +884,10 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
     return rbModToS(value as abstract new (...args: never) => unknown);
   }
   if (typeof value === "function") return rbAnyToS(value);
+  if (typeof value === "object" && !(value instanceof Uint8Array)) {
+    const str: unknown = rbObjAsString(value);
+    return typeof str === "string" ? str : rbObjInspect(value);
+  }
   return String(value);
 }
 
@@ -900,18 +1012,41 @@ export function isNil(obj: unknown): boolean {
  * `Array#to_s` and `Hash#to_s` are aliases of `inspect`
  * (`vendor/ruby/v3.3.11/array.c:8616`, `vendor/ruby/v3.3.11/hash.c:7197`), so those two classes
  * render through {@link rbInspect}; every other value — a String above all,
- * which `rb_obj_as_string` returns unquoted — is its own `to_s`.
+ * which `rb_obj_as_string` returns unquoted — is its own `to_s`. A
+ * `Uint8Array` is the binary String seat (see {@link rbEqual}), so it is
+ * returned as it is (`string.c:1658`), and so is one a receiver's `to_s`
+ * answers (`rb_obj_as_string_result`, `string.c:1666`). Otherwise
+ * it is a send (`rb_funcall(obj, idTo_s, 0)`, `string.c:1661`): a ported class
+ * defining `toS` answers it, and an answer that is not a String falls back to
+ * {@link rbAnyToS}. A ported `String` subclass that is not a JS string
+ * (`ActiveSupport::SafeBuffer`) marks itself one by `toStr`, so that is the
+ * `T_STRING` test on a `toS` answer.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_as_string`
  * (`vendor/ruby/v3.3.11/string.c:1653`); JS `String(x)` is not the same function, since
  * it gives the comma-joined form for a nested Array and `[object Object]` for a
  * Hash.
  */
-export function rbObjAsString(value: unknown): string {
+export function rbObjAsString(value: Uint8Array | { toString(): Uint8Array }): Uint8Array;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_obj_as_string` (`vendor/ruby/v3.3.11/string.c:1653`). */
+export function rbObjAsString(value: unknown): string;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_obj_as_string` (`vendor/ruby/v3.3.11/string.c:1653`). */
+export function rbObjAsString(value: unknown): string | Uint8Array {
   if (value == null) return "";
+  if (value instanceof Uint8Array) return value;
   if (Array.isArray(value)) return rbInspect(value);
   if (isPlainHash(value) || value instanceof Map) return rbInspect(value);
   if (typeof value === "number" || value instanceof Number) return floToS(value);
+  if (rbObjRespondTo(value, "toS")) {
+    const str = (value as { toS(): unknown }).toS();
+    if (str instanceof Uint8Array) return str;
+    return rbCheckStringType(str) ?? rbAnyToS(value as object);
+  }
+  if (typeof value === "object") {
+    const str: unknown = value.toString();
+    if (typeof str === "string" || str instanceof Uint8Array) return str;
+    return rbAnyToS(value);
+  }
   return String(value);
 }
 
@@ -1032,7 +1167,7 @@ export function rbObjIvarGet(obj: object, iv: string): unknown {
 export function rbObjIvarSet(obj: object, iv: string, val: unknown): unknown {
   const id = idForVar(obj, iv);
   if (Object.isFrozen(obj)) {
-    throw new FrozenError(`can't modify frozen ${rbObjClass(obj)}: ${rbInspect(obj)}`, {
+    throw new FrozenError(`can't modify frozen ${rbObjClassname(obj)}: ${rbInspect(obj)}`, {
       receiver: obj,
     });
   }

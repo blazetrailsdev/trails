@@ -30,19 +30,17 @@ export const ClassMethods = {
   },
 };
 
-export const DefaultImplementation = {
+export const DefaultImplementation = new Module().include({
   serializeCastValue(value: unknown): unknown {
     return value;
   },
-};
-
-const defaultImplementation = new Module().include(DefaultImplementation);
+});
 
 export class SerializeCastValue {
   static [included](klass: { prototype: object }): void {
     extend(klass, ClassMethods);
     if (!rbModPublicMethodDefined(klass, "serializeCastValue")) {
-      include(klass, defaultImplementation);
+      include(klass, DefaultImplementation);
     }
   }
 

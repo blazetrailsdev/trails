@@ -218,7 +218,7 @@ export class Topic extends Base {
   /** @internal */
   private async defaultWrittenOn() {
     if (!(this as any).attributePresent("written_on")) {
-      this.writeAttribute("written_on", Temporal.Now.instant());
+      this.writeAttribute("written_on", RubyTime.now());
     }
   }
 

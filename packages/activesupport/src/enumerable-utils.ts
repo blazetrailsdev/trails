@@ -254,11 +254,14 @@ export function tally<T extends string | number>(collection: T[]): Record<string
   return result;
 }
 
-export function filterMap<T, U>(collection: T[], fn: (item: T) => U | null | undefined): U[] {
+export function filterMap<T, U>(
+  collection: T[],
+  fn: (item: T) => U | false | null | undefined,
+): U[] {
   const result: U[] = [];
   for (const item of collection) {
     const mapped = fn(item);
-    if (mapped !== null && mapped !== undefined) {
+    if (mapped !== null && mapped !== undefined && mapped !== false) {
       result.push(mapped);
     }
   }

@@ -1,5 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rbInspect, rbObjClass, registerConstant } from "@blazetrails/ruby-compat";
+import { rbInspect, rbObjClassname, registerConstant } from "@blazetrails/ruby-compat";
 import { SerializationTypeMismatch } from "../errors.js";
 
 type CoderLike = { dump(obj: unknown): string | null; load(payload: unknown): unknown };
@@ -65,7 +65,7 @@ export class ColumnSerializer {
     if (!(object instanceof this._objectClass)) {
       throw new SerializationTypeMismatch(
         `can't ${action} \`${this._attrName}\`: was supposed to be a ${this._objectClass.name}, ` +
-          `but was a ${rbObjClass(object)}. -- ${rbInspect(object)}`,
+          `but was a ${rbObjClassname(object)}. -- ${rbInspect(object)}`,
       );
     }
   }

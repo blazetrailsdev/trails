@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { NoMethodError, TypeError, rbFSend } from "@blazetrails/ruby-compat";
+import { NoMethodError, TypeError, rbObjClass, rbFSend } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import { Node } from "../nodes/node.js";
+import { SqlLiteral } from "../nodes/sql-literal.js";
 import { Visitor } from "./visitor.js";
 import { UnsupportedVisitError } from "./to-sql.js";
 
@@ -116,6 +117,15 @@ describe("Visitor dispatch", () => {
     expect(() => new DateVisitor().accept(1)).toThrow(/Cannot visit Integer/);
   });
 
+  it("walks a String subclass's ancestors: a SqlLiteral reaches visit_String", () => {
+    class StringVisitor extends Visitor {
+      visitString(): string {
+        return "String";
+      }
+    }
+    expect(new StringVisitor().accept(new SqlLiteral("x"))).toBe("String");
+  });
+
   it("keeps an underscore that is part of the class name", () => {
     class Some_Thing {}
     class UnderscoreVisitor extends Visitor {}
@@ -128,7 +138,7 @@ describe("Visitor dispatch", () => {
     expect(cache.isCompareByIdentity()).toBe(true);
     expect(cache.get(Node)).toBe("visitArelNodesNode");
     expect(cache.get(class {})).toBe("visit_");
-    expect(cache.get("Integer")).toBe("visitInteger");
+    expect(cache.get(rbObjClass(1))).toBe("visitInteger");
     expect(NamingVisitor.dispatchCache()).toBe(cache);
   });
 

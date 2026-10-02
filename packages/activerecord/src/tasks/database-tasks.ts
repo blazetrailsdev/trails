@@ -224,15 +224,15 @@ export class DatabaseTasks {
     });
   }
 
-  static async migrate(options?: { skipInitialize?: boolean }): Promise<void>;
+  static async migrate(options?: { skipInitialize?: boolean }): Promise<undefined>;
   static async migrate(
     version: number | string | null,
     options?: { skipInitialize?: boolean },
-  ): Promise<void>;
+  ): Promise<undefined>;
   static async migrate(
     version: number | string | null | { skipInitialize?: boolean } = null,
     options: { skipInitialize?: boolean } = {},
-  ): Promise<void> {
+  ): Promise<undefined> {
     if (version !== null && typeof version === "object") {
       options = version;
       version = null;
@@ -928,7 +928,7 @@ export class DatabaseTasks {
 _setDatabaseTasks(DatabaseTasks);
 
 export interface DatabaseTaskInstance {
-  create?(): Promise<void>;
+  create?(): Promise<unknown>;
   drop?(): Promise<void>;
   purge?(): Promise<void>;
   charset?(): Promise<string | null>;

@@ -5,7 +5,7 @@
 import { BigDecimal, include } from "@blazetrails/activesupport";
 import { Dirty } from "../dirty.js";
 import { describe, it, expect } from "vitest";
-import { cmp, rbEql, rbEqual, rbObjAsString, rbObjClass } from "@blazetrails/ruby-compat";
+import { cmp, rbEql, rbEqual, rbObjAsString, rbObjClassname } from "@blazetrails/ruby-compat";
 import * as Types from "../index.js";
 import { Model } from "../index.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
@@ -21,7 +21,7 @@ describe("FloatType (trails)", () => {
   it("cast_value sends to_f, raising for a receiver that has none", () => {
     const type = new Types.FloatType();
     expect(type.cast("1.5abc")).toBe(1.5);
-    expect(rbObjClass(type.cast(3))).toBe("Float");
+    expect(rbObjClassname(type.cast(3))).toBe("Float");
     expect(() => type.cast({ a: 1 })).toThrow("undefined method 'to_f'");
   });
 
@@ -128,7 +128,7 @@ describe("FloatType (trails)", () => {
     const read = (attrs: Record<string, unknown>) =>
       (new MyModel(attrs) as unknown as Attributes)._readAttribute("value");
     const value = read({ value: "1" });
-    expect(rbObjClass(value)).toBe("Float");
+    expect(rbObjClassname(value)).toBe("Float");
     expect(rbObjAsString(value)).toBe("1.0");
     expect(rbObjAsString(read({ value: 2 }))).toBe("2.0");
   });

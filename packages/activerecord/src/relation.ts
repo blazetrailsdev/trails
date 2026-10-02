@@ -746,13 +746,9 @@ export class Relation<T extends Base, G extends boolean = false> {
     );
   }
 
-  private tablesInString(
-    string: Nodes.Node | Nodes.SqlLiteral | string | null | undefined,
-  ): string[] {
-    if (string instanceof Nodes.SqlLiteral) string = string.toString();
-    else if (string instanceof Nodes.Node) string = string.toSql();
-    if (!string) return [];
-    const matches = string.match(/[a-zA-Z_][\w.]+(?=.?\.)/g) ?? [];
+  private tablesInString(string: Nodes.SqlLiteral | string): string[] {
+    if (isBlank(string)) return [];
+    const matches = string.toString().match(/[a-zA-Z_][\w.]+(?=.?\.)/g) ?? [];
     return matches.map((s) => s.toLowerCase()).filter((s) => s !== "raw_sql_");
   }
 

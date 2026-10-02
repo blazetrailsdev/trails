@@ -144,7 +144,7 @@ describe("CollectionCacheKeyTest", () => {
     const developers = Developer.where({ name: "David" });
     const cacheKey = await developers.cacheKey();
 
-    await developers.updateAll({ updated_at: Temporal.Now.instant() });
+    await developers.updateAll({ updated_at: RubyTime.now() });
 
     expect(await developers.cacheKey()).not.toBe(cacheKey);
   });
@@ -153,7 +153,7 @@ describe("CollectionCacheKeyTest", () => {
     const developers = Developer.includes(":projects").where({ "projects.name": "Active Record" });
     const cacheKey = await developers.cacheKey();
 
-    await developers.updateAll({ updated_at: Temporal.Now.instant() });
+    await developers.updateAll({ updated_at: RubyTime.now() });
 
     expect(await developers.cacheKey()).not.toBe(cacheKey);
   });
@@ -307,7 +307,7 @@ describe("CollectionCacheKeyTest", () => {
       expect(await developers.cacheVersion()).toBe(await Developer.all().cacheVersion());
 
       await Developer.updateAll({
-        updated_at: Temporal.Now.instant().add({ seconds: 1 }),
+        updated_at: RubyTime.now().plus(1),
       });
       developers.reset();
 

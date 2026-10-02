@@ -151,7 +151,7 @@ export class BelongsToAssociation extends SingularAssociation {
     );
   }
 
-  protected override replace(record: Base | null): void {
+  protected override replace(record: Base | null): Base | null {
     if (record) {
       this.raiseOnTypeMismatchBang(record);
       this.setInverseInstance(record);
@@ -161,7 +161,8 @@ export class BelongsToAssociation extends SingularAssociation {
     }
 
     this.replaceKeys(record, { force: true });
-    this.target = record;
+
+    return (this.target = record);
   }
 
   protected override staleState(): unknown {

@@ -11,6 +11,16 @@ describe("rbEqual over the values a Ruby binary String stands in for", () => {
     expect(rbEqual(new Uint8Array([0x80]), "")).toBe(false);
   });
 
+  it("compares a String with a binary String only where both are 7-bit", () => {
+    expect(rbEqual("1", new Uint8Array([0x31]))).toBe(true);
+    expect(rbEqual(new Uint8Array([0x31]), "1")).toBe(true);
+    expect(rbEqual("", new Uint8Array([]))).toBe(true);
+    expect(rbEqual("12", new Uint8Array([0x31]))).toBe(false);
+    expect(rbEqual("ƒée", new TextEncoder().encode("ƒée"))).toBe(false);
+    expect(rbEqual("\u00c6", new Uint8Array([0xc6]))).toBe(false);
+    expect(rbEql(new Uint8Array([0x31]), "1")).toBe(true);
+  });
+
   it("compares two Temporal values by class and instant, never by their own equals", () => {
     const at = (tag: string, value: number, widened?: unknown) => ({
       [Symbol.toStringTag]: tag,

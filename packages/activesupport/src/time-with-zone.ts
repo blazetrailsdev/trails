@@ -10,7 +10,7 @@ import {
   lessThanOrEqual,
   NoMethodError,
   PROTOCOL_PROBES,
-  rbObjClass,
+  rbObjClassname,
   rubyClass,
 } from "@blazetrails/ruby-compat";
 import { actsLike } from "./core-ext/object/acts-like.js";
@@ -181,7 +181,7 @@ export class TimeWithZone {
     try {
       if (typeof time[method] !== "function") {
         throw new NoMethodError(
-          `undefined method '${method}' for an instance of ${rbObjClass(time)}`,
+          `undefined method '${method}' for an instance of ${rbObjClassname(time)}`,
         );
       }
       return this._wrapWithTimeZone(

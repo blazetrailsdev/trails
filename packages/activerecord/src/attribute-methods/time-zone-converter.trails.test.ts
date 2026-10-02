@@ -21,8 +21,7 @@ describe("TimeZoneConverterTest", () => {
   it("cast wraps Temporal.Instant in TimeWithZone for current zone", () => {
     setZone("Eastern Time (US & Canada)");
     const converter = new TimeZoneConverter(new DateTime());
-    const instant = Temporal.Instant.from("2024-06-15T14:00:00Z");
-    const result = converter.cast(instant);
+    const result = converter.cast(RubyTime.utc(2024, 6, 15, 14));
     expect(result).toBeInstanceOf(TimeWithZone);
     const twz = result as TimeWithZone;
     expect(twz.hour).toBe(10);
@@ -83,8 +82,7 @@ describe("TimeZoneConverterTest", () => {
   it("cast returns raw subtype result when no zone is configured", () => {
     setZone(null);
     const converter = new TimeZoneConverter(new DateTime());
-    const instant = Temporal.Instant.from("2024-06-15T14:00:00Z");
-    const result = converter.cast(instant);
+    const result = converter.cast(RubyTime.utc(2024, 6, 15, 14));
     expect(result).toBeInstanceOf(RubyTime);
   });
 

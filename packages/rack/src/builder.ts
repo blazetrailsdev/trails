@@ -14,55 +14,67 @@ export class Builder {
   private _run: RackApp | null = null;
   private _warmupBlock: ((app: RackApp) => void) | null = null;
   private _frozen = false;
+  readonly options: Record<string, unknown>;
 
-  constructor(appOrBlock?: RackApp | ((builder: Builder) => void)) {
-    if (typeof appOrBlock === "function" && appOrBlock.length === 1) {
-      /** @empty */
-    }
+  constructor(
+    defaultApp: RackApp | null = null,
+    options: Record<string, unknown> = {},
+    block?: (builder: Builder) => void,
+  ) {
+    this._run = defaultApp;
+    this.options = options;
+
+    if (block) block(this);
   }
 
-  static parseFile(path: string): RackApp {
-    let content = File.read(path);
+  /** @missingRailsCall map — CONVERGEABLE rack-builder-parse-file-ru-guard-and-require-arm */
+  static parseFile(path: string, options: Record<string, unknown> = {}): RackApp {
+    return this.loadFile(path, options);
+  }
 
-    if (content.charCodeAt(0) === 0xfeff) {
-      content = content.slice(1);
-    }
+  static loadFile(path: string, options: Record<string, unknown> = {}): RackApp {
+    let config = File.read(path);
+    if (config.charCodeAt(0) === 0xfeff) config = config.slice(1);
 
-    const firstLine = content.split("\n")[0];
-    if (firstLine.startsWith("#\\")) {
+    if (/^#\\(.*)/m.test(config)) {
       throw new Error(
-        "Parsing options from the first comment line is no longer supported. Remove the '#\\ ...' line or configure server options elsewhere.",
+        `Parsing options from the first comment line is no longer supported: ${path}`,
       );
     }
 
-    content = content.replace(/^#(?!\\)[^\n]*\n/gm, "\n");
+    config = config.replace(/^#(?!\\)[^\n]*\n/gm, "\n");
 
-    const endMatch = content.match(/^__END__\s*$/m);
+    const endMatch = config.match(/^__END__\s*$/m);
     if (endMatch && typeof endMatch.index === "number") {
-      content = content.substring(0, endMatch.index);
+      config = config.substring(0, endMatch.index);
     }
 
-    return Builder.newFromString(content, path);
+    return this.newFromString(config, path, options);
   }
 
-  static newFromString(content: string, file?: string): RackApp {
-    const builder = new Builder();
-    let source = `"use strict";\n${content}`;
-    if (file) {
-      source += `\n//# sourceURL=${file.replace(/\\/g, "/").replace(/[\r\n\u2028\u2029]/g, "")}`;
-    }
+  static newFromString(
+    builderScript: string,
+    path = "(rackup)",
+    options: Record<string, unknown> = {},
+  ): RackApp {
+    const builder = new this(null, options);
+    const source =
+      `"use strict";\n${builderScript}` +
+      `\n//# sourceURL=${path.replace(/\\/g, "/").replace(/[\r\n\u2028\u2029]/g, "")}`;
     let configFn: (b: Builder) => void;
     try {
       configFn = new Function("builder", source) as (b: Builder) => void;
     } catch (err) {
-      const msg = file ? `Error parsing config from ${file}` : "Error parsing config string";
-      throw new Error(`${msg}: ${(err as Error).message}`, { cause: err });
+      throw new Error(`Error parsing config from ${path}: ${(err as Error).message}`, {
+        cause: err,
+      });
     }
     try {
       configFn(builder);
     } catch (err) {
-      const msg = file ? `Error evaluating config from ${file}` : "Error evaluating config string";
-      throw new Error(`${msg}: ${(err as Error).message}`, { cause: err });
+      throw new Error(`Error evaluating config from ${path}: ${(err as Error).message}`, {
+        cause: err,
+      });
     }
     return builder.toApp();
   }
@@ -99,15 +111,8 @@ export class Builder {
     return this;
   }
 
-  static loadFile(path: string, ..._options: any[]): RackApp {
-    return Builder.parseFile(path);
-  }
-
-  static app(defaultApp?: RackApp | null, block?: (b: Builder) => void): RackApp {
-    const builder = new Builder();
-    if (defaultApp) builder.run(defaultApp);
-    if (block) block(builder);
-    return builder.toApp();
+  static app(defaultApp: RackApp | null = null, block?: (b: Builder) => void): RackApp {
+    return new this(defaultApp, {}, block).toApp();
   }
 
   async call(env: Record<string, any>): Promise<any> {

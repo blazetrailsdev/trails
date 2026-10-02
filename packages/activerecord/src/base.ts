@@ -1264,19 +1264,10 @@ export class Base extends Model {
       | Nodes.SqlLiteral,
     ...rest: unknown[]
   ): Relation<InstanceType<T>> | WhereChain<Relation<InstanceType<T>>> {
-    if (conditionsOrSql === undefined) {
-      return this.all().where();
-    }
-    if (typeof conditionsOrSql === "string" || conditionsOrSql instanceof Nodes.SqlLiteral) {
-      return this.all().where(conditionsOrSql, ...rest);
-    }
-    if (conditionsOrSql instanceof Nodes.Node) {
-      return this.all().where(conditionsOrSql);
-    }
-    if (Array.isArray(conditionsOrSql)) {
-      return this.all().where(conditionsOrSql as unknown[]);
-    }
-    return this.all().where(conditionsOrSql as Record<string, unknown>);
+    const all: {
+      where(...args: unknown[]): Relation<InstanceType<T>> | WhereChain<Relation<InstanceType<T>>>;
+    } = this.all();
+    return all.where(conditionsOrSql, ...rest);
   }
 
   static update<T extends typeof Base>(
@@ -2720,7 +2711,6 @@ include(Base, _AttributeAssignment.AttributeAssignment);
 include(Base, AutosaveAssociation);
 prepend(Base, { loadSchemaBang: CounterCache.loadSchemaBang as PrependMethod });
 prepend(Base, { loadSchemaBang: _EncryptableRecord.loadSchemaBang as PrependMethod });
-prepend(Base.prototype, { reload: _DirtyModule.reload as PrependMethod });
 prepend(Base.prototype, { initInternals: _Core.initInternals as PrependMethod });
 prepend(Base.prototype, { initInternals: _Persistence.initInternals as PrependMethod });
 prepend(Base.prototype, {
@@ -2737,6 +2727,7 @@ prepend(Base.prototype, { initializeDup: LockingOptimistic.initializeDup as Prep
 prepend(Base.prototype, { initializeDup: Timestamp.initializeDup as PrependMethod });
 prepend(Base.prototype, { initializeDup: _associationsInitializeDup as PrependMethod });
 _registerAssociationBuilderExtension(AssociationBuilder.extensions);
+prepend(Base.prototype, { reload: _AttributeMethodsDirty.reload as PrependMethod });
 {
   const inheritedReload = (Base.prototype as any).reload as (
     this: Base,

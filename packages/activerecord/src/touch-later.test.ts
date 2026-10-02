@@ -184,7 +184,7 @@ describe("surreptitiouslyTouch reads _touchTime from instance (Story K gap 3)", 
   it("uses _touchTime stored on the record rather than an explicit argument", async () => {
     const { surreptitiouslyTouch } = await import("./touch-later.js");
     const inv = await Invoice.create();
-    const touchTime = new Date(1_000_000);
+    const touchTime = RubyTime.at(1000);
     (inv as any)._touchTime = touchTime;
 
     const written: [string, unknown][] = [];

@@ -422,7 +422,7 @@ describe("DirtyTest", () => {
         await pirate.saveBang();
       });
       await Pirate.where({ id: pirate.id }).updateAll({
-        updated_on: Temporal.Instant.from("2020-01-01T00:00:00Z"),
+        updated_on: RubyTime.utc(2020, 1, 1),
       });
     });
 
@@ -1044,7 +1044,7 @@ describe("DirtyTest", () => {
 
   it("partial insert off with changed default function attribute", async () => {
     await withPartialWrites(Aircraft, false, async () => {
-      const manufacturingDate = new Date("2025-01-01T00:00:00Z");
+      const manufacturingDate = RubyTime.utc(2025, 1, 1);
       const aircraft = new Aircraft({
         name: "Boeing2",
         manufactured_at: manufacturingDate,
@@ -1052,14 +1052,14 @@ describe("DirtyTest", () => {
 
       expect(aircraft.name).toBe("Boeing2");
       const castAt = aircraft.manufactured_at as RubyTime;
-      expect(castAt.toI()).toBe(Math.floor(manufacturingDate.getTime() / 1000));
+      expect(castAt.toI()).toBe(manufacturingDate.toI());
 
       await aircraft.saveBang();
       await aircraft.reload();
 
       expect(aircraft.name).toBe("Boeing2");
       const reloadedAt = aircraft.manufactured_at as RubyTime;
-      const expectedStr = manufacturingDate.toISOString().slice(0, 19).replace("T", " ");
+      const expectedStr = manufacturingDate.xmlschema().slice(0, 19).replace("T", " ");
       const actualStr = reloadedAt.getutc().xmlschema().slice(0, 19).replace("T", " ");
       expect(actualStr).toBe(expectedStr);
     });

@@ -1,5 +1,5 @@
 import { presence } from "./core-ext/object/blank.js";
-import { KeyError, merge, rbObjClass } from "@blazetrails/ruby-compat";
+import { KeyError, merge, rbObjClassname } from "@blazetrails/ruby-compat";
 
 export class OrderedOptions {
   static name = "ActiveSupport::OrderedOptions";
@@ -79,7 +79,9 @@ export class OrderedOptions {
       }
       if (Array.isArray(obj)) {
         if (typeof identifier !== "number") {
-          throw new TypeError(`no implicit conversion of ${rbObjClass(identifier)} into Integer`);
+          throw new TypeError(
+            `no implicit conversion of ${rbObjClassname(identifier)} into Integer`,
+          );
         }
         obj = obj[identifier < 0 ? obj.length + identifier : identifier];
         continue;
@@ -93,7 +95,7 @@ export class OrderedOptions {
       if (typeof dig === "function") {
         return (dig as (...args: (string | number)[]) => unknown).apply(obj, identifiers.slice(i));
       }
-      throw new TypeError(`${rbObjClass(obj)} does not have #dig method`);
+      throw new TypeError(`${rbObjClassname(obj)} does not have #dig method`);
     }
     return obj;
   }

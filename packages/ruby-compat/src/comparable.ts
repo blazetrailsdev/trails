@@ -17,7 +17,7 @@
  */
 
 import { ArgumentError } from "./argument-error.js";
-import { rbInspect, rbObjClass, rbObjRespondTo } from "./object.js";
+import { rbInspect, rbObjClassname, rbObjRespondTo } from "./object.js";
 import { rbEqual } from "./rb-equal.js";
 import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 
@@ -61,7 +61,7 @@ interface CmpSpelling {
  * @boundary: a Temporal value carrying an instant is trails' seat for a Ruby
  * `Time`, whose `<=>` (`vendor/ruby/v3.3.11/time.c:3951` `time_cmp`) orders by that
  * instant, so it is ordered on `epochNanoseconds` — reached through
- * {@link rbObjClass}'s `Time` arm, which seats that reading, rather than
+ * {@link rbObjClassname}'s `Time` arm, which seats that reading, rather than
  * through `@blazetrails/date`, which this package does not depend on. The receiver's
  * own `<=>` still wins, as it does in Ruby. A Temporal value carrying no
  * instant still reaches `rb_obj_cmp`;
@@ -87,7 +87,7 @@ export function cmp(a: unknown, b: unknown): number | null {
   if (b instanceof Number) b = b.valueOf();
   if (isComparable(a)) return a.compareTo(b) ?? null;
   if (isCmpSpelling(a)) return a.cmp(b) ?? null;
-  if (rbObjClass(a) === "Time" && rbObjClass(b) === "Time") {
+  if (rbObjClassname(a) === "Time" && rbObjClassname(b) === "Time") {
     if (typeof (a as { compare?: unknown }).compare === "function") {
       return (a as { compare(o: unknown): number | null }).compare(b) ?? null;
     }
@@ -217,8 +217,8 @@ function isCmpSpelling(value: unknown): value is CmpSpelling {
  * Ruby's `rb_cmperr` (`vendor/ruby/v3.3.11/compar.c:28`), which names the operand by
  * `inspect` for a special constant or a Float and by `rb_obj_class` otherwise. */
 function rbCmperr(x: unknown, y: unknown): never {
-  const classname = specialConstP(y) ? rbInspect(y) : rbObjClass(y);
-  throw new ArgumentError(`comparison of ${rbObjClass(x)} with ${classname} failed`);
+  const classname = specialConstP(y) ? rbInspect(y) : rbObjClassname(y);
+  throw new ArgumentError(`comparison of ${rbObjClassname(x)} with ${classname} failed`);
 }
 
 /**

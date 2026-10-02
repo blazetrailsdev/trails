@@ -1,3 +1,4 @@
+import { Time as RubyTime } from "@blazetrails/date";
 import { StringIO } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
@@ -576,25 +577,45 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(await Thing3.count()).toEqual(0);
       expect(await Thing4.count()).toEqual(0);
 
-      await Thing1.create({ id: 1, name: "thing1", email: "thing1@localhost", moment: new Date() });
+      await Thing1.create({
+        id: 1,
+        name: "thing1",
+        email: "thing1@localhost",
+        moment: RubyTime.now(),
+      });
       expect(await Thing1.count()).toEqual(1);
       expect(await Thing2.count()).toEqual(0);
       expect(await Thing3.count()).toEqual(0);
       expect(await Thing4.count()).toEqual(0);
 
-      await Thing2.create({ id: 1, name: "thing1", email: "thing1@localhost", moment: new Date() });
+      await Thing2.create({
+        id: 1,
+        name: "thing1",
+        email: "thing1@localhost",
+        moment: RubyTime.now(),
+      });
       expect(await Thing1.count()).toEqual(1);
       expect(await Thing2.count()).toEqual(1);
       expect(await Thing3.count()).toEqual(0);
       expect(await Thing4.count()).toEqual(0);
 
-      await Thing3.create({ id: 1, name: "thing1", email: "thing1@localhost", moment: new Date() });
+      await Thing3.create({
+        id: 1,
+        name: "thing1",
+        email: "thing1@localhost",
+        moment: RubyTime.now(),
+      });
       expect(await Thing1.count()).toEqual(1);
       expect(await Thing2.count()).toEqual(1);
       expect(await Thing3.count()).toEqual(1);
       expect(await Thing4.count()).toEqual(0);
 
-      await Thing4.create({ id: 1, name: "thing1", email: "thing1@localhost", moment: new Date() });
+      await Thing4.create({
+        id: 1,
+        name: "thing1",
+        email: "thing1@localhost",
+        moment: RubyTime.now(),
+      });
       expect(await Thing1.count()).toEqual(1);
       expect(await Thing2.count()).toEqual(1);
       expect(await Thing3.count()).toEqual(1);
@@ -826,7 +847,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             id: 1,
             name: `thing inside ${SCHEMA_NAME}`,
             email: "thing1@localhost",
-            moment: new Date(),
+            moment: RubyTime.now(),
           });
         });
       }

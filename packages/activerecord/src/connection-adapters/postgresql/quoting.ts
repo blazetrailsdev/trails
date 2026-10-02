@@ -168,7 +168,7 @@ export function quotedDate(value: TemporalDateLike): string {
 }
 
 export function quotedBinary(value: BinaryData): string {
-  return `'${escapeBytea(value.bytes)}'`;
+  return `'${escapeBytea(value.toString())}'`;
 }
 
 export function quoteDefaultExpression(
@@ -192,7 +192,7 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value === DateInfinity) return "infinity";
   if (value === DateNegativeInfinity) return "-infinity";
   if (value instanceof BinaryData) {
-    const u8 = value.bytes;
+    const u8 = value.toString();
     return Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength);
   }
   if (value instanceof XmlData || value instanceof BitData) {

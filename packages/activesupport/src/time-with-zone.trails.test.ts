@@ -4,11 +4,17 @@ import { TimeZone, Timezone } from "./values/time-zone.js";
 import { Temporal, Time } from "@blazetrails/date";
 import { DATE_FORMATS } from "./core-ext/time/conversions.js";
 import { Range } from "@blazetrails/ruby-compat/range";
+import { rbObjClass, rbObjClassname } from "@blazetrails/ruby-compat";
 
 describe("TimeWithZone sub-millisecond precision", () => {
   const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
   const subMs = () =>
     new TimeWithZone(Temporal.Instant.from("2000-01-01T00:00:00.123456789Z"), eastern);
+
+  it("answers its own class for Object#class, and the branded name", () => {
+    expect(rbObjClass(subMs())).toBe(TimeWithZone);
+    expect(rbObjClassname(subMs())).toBe("ActiveSupport::TimeWithZone");
+  });
 
   it("usec answers the full microseconds", () => {
     expect(subMs().usec).toBe(123456);

@@ -1,6 +1,5 @@
 import type { Module } from "@blazetrails/ruby-compat";
 import { SingularAssociation } from "./singular-association.js";
-import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 
 export class HasOne extends SingularAssociation {
   static override macro(): string {
@@ -45,7 +44,6 @@ export class HasOne extends SingularAssociation {
   static override defineCallbacks(model: any, reflection: any): void {
     super.defineCallbacks(model, reflection);
     const options = reflection.options ?? {};
-    addAutosaveAssociationCallbacks.call(model, reflection);
     if (options.touch) {
       this.addTouchCallbacks(model, reflection);
     }

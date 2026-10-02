@@ -3,9 +3,13 @@ import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
-import { underscore, wrap as arrayWrap } from "@blazetrails/activesupport";
+import { underscore } from "@blazetrails/activesupport";
 import { _reflectOnAssociation, reflectOnAllAssociations } from "../reflection.js";
-import { ForeignAssociation, foreignKeyPresent } from "./foreign-association.js";
+import {
+  ForeignAssociation,
+  foreignKeyPresent,
+  setOwnerAttributes,
+} from "./foreign-association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { queryConstraintsList } from "../persistence.js";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
@@ -128,14 +132,17 @@ export class HasOneAssociation extends SingularAssociation {
     return Promise.resolve(this.loadTarget());
   }
 
-  protected override replace(record: Base | null, save: false): void | Promise<void>;
-  protected override replace(record: Base | null, save?: boolean): void | Promise<void>;
-  protected override replace(record: Base | null, save = true): void | Promise<void> {
+  protected override replace(record: Base | null, save: false): Base | null | Promise<Base | null>;
+  protected override replace(
+    record: Base | null,
+    save?: boolean,
+  ): Base | null | Promise<Base | null>;
+  protected override replace(record: Base | null, save = true): Base | null | Promise<Base | null> {
     if (save) {
       return (async () => {
         if (record) (this as any).raiseOnTypeMismatchBang(record);
         if (!this.loaded) await this.loadTarget();
-        if (!this.target && !record) return;
+        if (!this.target && !record) return this.target;
         const assigningAnotherRecord = !rbEqual(this.target, record);
         if (assigningAnotherRecord || record?.hasChangesToSave === true) {
           save = (this.owner as { isPersisted?: () => boolean }).isPersisted?.() === true;
@@ -157,7 +164,7 @@ export class HasOneAssociation extends SingularAssociation {
             }
           });
         }
-        this.target = record;
+        return (this.target = record);
       })();
     }
     {
@@ -180,8 +187,7 @@ export class HasOneAssociation extends SingularAssociation {
           this.setInverseInstance(record);
         }
       }
-      this.target = record;
-      return;
+      return (this.target = record);
     }
   }
 
@@ -234,51 +240,10 @@ export class HasOneAssociation extends SingularAssociation {
     return this.foreignKeyColumns()[0];
   }
 
-  private setOwnerAttributes(record: Base): void {
-    if (this.reflection.options.through) return;
+  /** @internal */
+  declare setOwnerAttributes: (record: Base) => void;
 
-    const ctor = (this.owner as any).constructor;
-    const richReflection = ctor._reflectOnAssociation?.(this.reflection.name) as {
-      joinPrimaryKey?: (klass?: typeof Base) => string | string[];
-      joinForeignKey?: string | string[];
-      type?: string | null;
-    } | null;
-
-    const configuredPk = this.reflection.options.primaryKey ?? ctor.primaryKey ?? "id";
-    const primaryKeyAttributeNames = arrayWrap(
-      richReflection?.joinPrimaryKey?.() ??
-        (Array.isArray(this.reflection.foreignKey())
-          ? this.reflection.foreignKey()
-          : this.foreignKeyColumn()),
-    );
-    const foreignKeyAttributeNames = arrayWrap(richReflection?.joinForeignKey ?? configuredPk);
-
-    for (const [i, primaryKey] of primaryKeyAttributeNames.entries()) {
-      const foreignKey = foreignKeyAttributeNames[i] ?? foreignKeyAttributeNames[0];
-      const value =
-        typeof (this.owner as any)._readAttribute === "function"
-          ? (this.owner as any)._readAttribute(foreignKey)
-          : (this.owner as any)[foreignKey];
-
-      if (typeof (record as any)._writeAttribute === "function") {
-        (record as any)._writeAttribute(primaryKey, value);
-      } else {
-        (record as any)[primaryKey] = value;
-      }
-    }
-
-    const type = richReflection?.type ?? null;
-    if (type) {
-      const typeName = (ctor as typeof Base).polymorphicName();
-      if (typeof (record as any)._writeAttribute === "function") {
-        (record as any)._writeAttribute(type, typeName);
-      } else {
-        (record as any)[type] = typeName;
-      }
-    }
-  }
-
-  protected override setNewRecord(record: Base): void | Promise<void> {
+  protected override setNewRecord(record: Base): Base | null | Promise<Base | null> {
     return this.replace(record, false);
   }
 
@@ -406,6 +371,6 @@ function nullifiedOwnerAttributes(assoc: HasOneAssociation): Record<string, null
   });
 }
 
-Object.assign(HasOneAssociation.prototype, { foreignKeyPresent });
+Object.assign(HasOneAssociation.prototype, { foreignKeyPresent, setOwnerAttributes });
 
 Associations.HasOneAssociation = HasOneAssociation;

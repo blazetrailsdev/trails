@@ -1,6 +1,13 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { wrap } from "@blazetrails/activesupport";
-import { NoMethodError, rbObjClass, rtest, symbolToS, toSym, uniq } from "@blazetrails/ruby-compat";
+import {
+  NoMethodError,
+  rbObjClassname,
+  rtest,
+  symbolToS,
+  toSym,
+  uniq,
+} from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import type { AbstractReflection } from "../../reflection.js";
 import { Association } from "./association.js";
@@ -32,7 +39,7 @@ export class Branch {
       } catch (error) {
         if (error instanceof NoMethodError) {
           throw new ArgumentError(
-            `Association names must be Symbol or String, got: ${rbObjClass(association)}`,
+            `Association names must be Symbol or String, got: ${rbObjClassname(association)}`,
           );
         }
         throw error;

@@ -2038,6 +2038,45 @@ describe("extractFromProgram — include() detection", () => {
     expect(mod.objectLiteral).toBe(true);
   });
 
+  it("records the methods an exported Module instance includes", () => {
+    const info = extractFromFiles("/p", {
+      "serialize-cast-value.ts": `
+        declare class Module { include(mod: object): this; }
+        export const DefaultImplementation = new Module().include({
+          serializeCastValue(value: unknown): unknown { return value; },
+        });
+      `,
+    });
+    const mod = info.modules["serialize-cast-value.ts:DefaultImplementation"];
+    expect(mod.instanceMethods.map((m) => m.name)).toEqual(["serializeCastValue"]);
+    expect(mod.instanceMethods[0].params.map((p) => p.name)).toEqual(["value"]);
+    expect(mod.objectLiteral).toBeUndefined();
+  });
+
+  it("records the methods an exported Module instance defines in its block", () => {
+    const info = extractFromFiles("/p", {
+      "core-queries.ts": `
+        declare class Module {
+          constructor(block?: (mod: Module) => void);
+          defineMethod(name: string, body: (...args: never[]) => unknown): void;
+        }
+        function findBy(...args: unknown[]): unknown { return args; }
+        export const ClassMethods = new Module((mod) => {
+          mod.defineMethod("findBy", findBy);
+          mod.defineMethod("exists", function (conditions: unknown) { return conditions; });
+          [].forEach(() => mod.defineMethod("nested", findBy));
+        });
+        export const Other = new Set([1]);
+      `,
+    });
+    const methods = info.modules["core-queries.ts:ClassMethods"].instanceMethods;
+    expect(methods.map((m) => [m.name, m.bodyless === true])).toEqual([
+      ["findBy", true],
+      ["exists", false],
+    ]);
+    expect(info.modules["core-queries.ts:Other"]).toBeUndefined();
+  });
+
   it("does not record a SCREAMING_SNAKE method-table constant as a module", () => {
     // `ActiveSupport::Deprecation::DEFAULT_BEHAVIORS`
     // (deprecation/behaviors.rb:13-63) is a Ruby Hash, not a module. Counting

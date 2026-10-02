@@ -36,10 +36,11 @@ describe("SQLiteDatabaseTasks run_cmd output redirect", () => {
     expect(fs.readFileSync(out, "utf8")).toBe("ok");
   });
 
-  it("raises with the failed command and its stderr", async () => {
+  it("raises run_cmd_error for a failed command", async () => {
     const out = tmpOutPath();
-    await expect(runCmd("sh", ["-c", "echo boom 1>&2; exit 3"], out)).rejects.toThrow(
-      /failed to execute:\nsh -c[\s\S]*Exit status: 3[\s\S]*stderr:\nboom/,
+    await expect(runCmd("sh", ["-c", "exit 3"], out)).rejects.toThrow(
+      "failed to execute:\nsh -c exit 3\n\n" +
+        "Please check the output above for any errors and make sure that `sh` is installed in your PATH and has proper permissions.\n\n",
     );
   });
 });

@@ -508,37 +508,36 @@ export function methodUsesDepImport(
       if (!isDeclarationName(n)) {
         // Skip namespace identifiers that are the left side of a property
         // access — the property access handler above captures the leaf.
-        if (collectRefs && ts.isPropertyAccessExpression(n.parent) && n.parent.expression === n) {
-          // don't record the namespace import itself as a ref
-        } else {
-          const inType = isWithinTypeNode(n);
-          if (!inType || inSignatureType) {
-            if (importedNames.has(n.text) || knownIdentifiers.has(n.text)) {
-              found = true;
-              recordRef(n.text);
-              if (collectRefs && transitive && importedNames.has(n.text)) {
-                const owner = moduleFunctionOwner(n, transitive.checker, transitive.depRoot);
-                if (owner) collectRefs.add(owner);
-                const constant = declaredConstantName(n, transitive.checker);
-                if (constant) collectRefs.add(constant);
-              }
-              if (!collectRefs) return;
+        const receiver =
+          collectRefs !== undefined &&
+          ts.isPropertyAccessExpression(n.parent) &&
+          n.parent.expression === n;
+        if (!isWithinTypeNode(n) || inSignatureType) {
+          if (!receiver && (importedNames.has(n.text) || knownIdentifiers.has(n.text))) {
+            found = true;
+            recordRef(n.text);
+            if (collectRefs && transitive && importedNames.has(n.text)) {
+              const owner = moduleFunctionOwner(n, transitive.checker, transitive.depRoot);
+              if (owner) collectRefs.add(owner);
+              const constant = declaredConstantName(n, transitive.checker);
+              if (constant) collectRefs.add(constant);
             }
-            if (transitive && transitive.taintedSymbols.size > 0) {
-              const sym = transitive.checker.getSymbolAtLocation(n);
-              if (sym) {
-                const resolved =
-                  sym.flags & ts.SymbolFlags.Alias ? transitive.checker.getAliasedSymbol(sym) : sym;
-                if (transitive.taintedSymbols.has(resolved)) {
-                  found = true;
-                  const wrapperRefs = transitive.taintedRefs?.get(resolved);
-                  if (collectRefs && wrapperRefs && wrapperRefs.size > 0) {
-                    for (const r of wrapperRefs) collectRefs.add(r);
-                  } else {
-                    recordRef(n.text);
-                  }
-                  if (!collectRefs) return;
+            if (!collectRefs) return;
+          }
+          if (transitive && transitive.taintedSymbols.size > 0) {
+            const sym = transitive.checker.getSymbolAtLocation(n);
+            if (sym) {
+              const resolved =
+                sym.flags & ts.SymbolFlags.Alias ? transitive.checker.getAliasedSymbol(sym) : sym;
+              if (transitive.taintedSymbols.has(resolved)) {
+                found = true;
+                const wrapperRefs = transitive.taintedRefs?.get(resolved);
+                if (collectRefs && wrapperRefs && wrapperRefs.size > 0) {
+                  for (const r of wrapperRefs) collectRefs.add(r);
+                } else {
+                  recordRef(n.text);
                 }
+                if (!collectRefs) return;
               }
             }
           }

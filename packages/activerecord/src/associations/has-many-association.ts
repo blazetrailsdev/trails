@@ -19,7 +19,11 @@ import {
 } from "./errors.js";
 import { CollectionAssociation, isThenable } from "./collection-association.js";
 import type { Association } from "./association.js";
-import { ForeignAssociation, foreignKeyPresent } from "./foreign-association.js";
+import {
+  ForeignAssociation,
+  foreignKeyPresent,
+  setOwnerAttributes,
+} from "./foreign-association.js";
 import { compositeQueryConstraintsList, queryConstraintsList } from "../persistence.js";
 import { eachSlice, min, selectBang, underscore } from "@blazetrails/activesupport";
 
@@ -32,6 +36,8 @@ export class HasManyAssociation extends CollectionAssociation {
   declare updateCounter: (difference: number, reflection?: AssociationDefinition) => Promise<void>;
   /** @internal */
   declare deleteCount: (method: string, scope: any) => Promise<number>;
+  /** @internal */
+  declare setOwnerAttributes: (record: Base) => void;
 
   protected override difference(a: Base[], b: Base[]): Base[] {
     return a.filter((record) => !b.some((r) => rbEqual(r, record)));
@@ -456,6 +462,6 @@ Object.assign(HasManyAssociation.prototype, {
   deleteCount,
 });
 
-Object.assign(HasManyAssociation.prototype, { foreignKeyPresent });
+Object.assign(HasManyAssociation.prototype, { foreignKeyPresent, setOwnerAttributes });
 
 Associations.HasManyAssociation = HasManyAssociation;

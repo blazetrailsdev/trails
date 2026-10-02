@@ -22,7 +22,7 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal, Chars, TimeWithZone } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type ValueType } from "@blazetrails/activemodel";
-import { rbObjAsString, rbObjClass } from "@blazetrails/ruby-compat";
+import { rbObjAsString, rbObjClassname } from "@blazetrails/ruby-compat";
 import type { TypeMap } from "../../type/type-map.js";
 import { NotImplementedError } from "../../errors.js";
 import { formatPlainDateTimeForSql, formatPlainDateForSql } from "./sql-datetime.js";
@@ -95,14 +95,14 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "function" && value.name) {
     return `'${value.name}'`;
   }
-  throw new TypeError(`can't quote ${rbObjClass(value)}`);
+  throw new TypeError(`can't quote ${rbObjClassname(value)}`);
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (typeof value === "symbol" || value instanceof Chars) {
     return value instanceof Chars ? value.toS() : (value.description ?? String(value));
   }
-  if (value instanceof BinaryData) return value.bytes;
+  if (value instanceof BinaryData) return value.toString();
   if (typeof value === "boolean") return value ? this.unquotedTrue() : this.unquotedFalse();
   if (value === null || value === undefined) return value;
   if (value instanceof BigDecimal) return value.toString("F");
@@ -210,7 +210,7 @@ export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): s
 }
 
 export function quotedBinary(value: BinaryData): string {
-  return `'${quoteString(Buffer.from(value.bytes).toString("latin1"))}'`;
+  return `'${quoteString(Buffer.from(value.toString()).toString("latin1"))}'`;
 }
 
 export function sanitizeAsSqlComment(value: unknown): string {
