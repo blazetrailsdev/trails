@@ -480,7 +480,7 @@ describe("RelationTest", () => {
   });
 
   it("finding with arel assoc order", async () => {
-    const topicsRel = Topic.order({ [arelSql("id").toSql()]: "desc" });
+    const topicsRel = Topic.order(new Map([[arelSql("id"), "desc"]]));
     expect(await topicsRel.size()).toBe(5);
     expect((await topicsRel.first())!.title).toBe(topics("fifth").title);
   });
@@ -492,7 +492,7 @@ describe("RelationTest", () => {
   });
 
   it("finding with reversed arel assoc order", async () => {
-    const topicsRel = Topic.order({ [arelSql("id").toSql()]: "asc" }).reverseOrder();
+    const topicsRel = Topic.order(new Map([[arelSql("id"), "asc"]])).reverseOrder();
     expect(await topicsRel.size()).toBe(5);
     expect((await topicsRel.first())!.title).toBe(topics("fifth").title);
   });

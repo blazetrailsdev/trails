@@ -1,4 +1,4 @@
-import { Nodes, sql as arelSql } from "@blazetrails/arel";
+import { Nodes, arelNode, sql as arelSql, type ArelNode } from "@blazetrails/arel";
 import { actsLike, isBlank } from "@blazetrails/activesupport";
 import { format, rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
@@ -13,7 +13,7 @@ export type Quoter = Pick<
 
 export function disallowRawSqlBang(
   this: { adapterClass(): unknown },
-  args: (string | symbol | Nodes.Node)[],
+  args: (string | symbol | ArelNode)[],
   { permit }: { permit?: RegExp } = {},
 ): void {
   const columnMatcher =
@@ -21,7 +21,7 @@ export function disallowRawSqlBang(
   const unexpected: string[] = [];
   for (const arg of args) {
     if (typeof arg === "symbol" || (typeof arg === "string" && arg.startsWith(":"))) continue;
-    if (arg instanceof Nodes.Node) continue;
+    if (arelNode(arg)) continue;
     const str = arg == null ? "" : arg.toString();
     if (!columnMatcher.test(str.trim())) {
       unexpected.push(str);
@@ -104,12 +104,11 @@ export function sanitizeSqlForAssignment(
 export function sanitizeSqlForOrder(
   this: QuoterHost & {
     adapterClass(): unknown;
-    disallowRawSqlBang(args: (string | symbol | Nodes.Node)[], options?: { permit?: RegExp }): void;
+    disallowRawSqlBang(args: (string | symbol | ArelNode)[], options?: { permit?: RegExp }): void;
     sanitizeSqlArray(ary: [string, ...unknown[]]): string;
   },
-  condition: string | [string | Nodes.Node, ...unknown[]] | Nodes.Node,
-): string | Nodes.Node | [string | Nodes.Node, ...unknown[]] {
-  if (condition instanceof Nodes.Node) return condition;
+  condition: string | ArelNode | [string | ArelNode, ...unknown[]],
+): string | ArelNode | [string | ArelNode, ...unknown[]] {
   if (Array.isArray(condition)) {
     const first: unknown = condition[0];
     const firstText = first instanceof Nodes.SqlLiteral ? first.toString() : String(first);
@@ -117,7 +116,7 @@ export function sanitizeSqlForOrder(
       const adapterClass = this.adapterClass() as {
         columnNameWithOrderMatcher(): RegExp;
       };
-      this.disallowRawSqlBang([first as string | symbol | Nodes.Node], {
+      this.disallowRawSqlBang([first as string | symbol | ArelNode], {
         permit: adapterClass.columnNameWithOrderMatcher(),
       });
       const sanitized = this.sanitizeSqlArray([firstText, ...condition.slice(1)]);

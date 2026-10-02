@@ -96,7 +96,7 @@ export function buildPkWhere(this: typeof Base, idValue: unknown): string {
 export function buildPkWhereNode(
   this: typeof Base,
   idValue: unknown,
-): InstanceType<typeof Nodes.Node> {
+): Nodes.Node | Nodes.SqlLiteral {
   const table = this.arelTable;
   const pk = this.primaryKey;
   if (Array.isArray(pk)) {

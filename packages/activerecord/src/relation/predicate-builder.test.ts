@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
-import { Table, Visitors, Nodes, Collectors } from "@blazetrails/arel";
+import { Table, Visitors, Nodes, Collectors, type ArelNode } from "@blazetrails/arel";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { WhereClause } from "./where-clause.js";
 import { Substitute } from "../statement-cache.js";
@@ -128,7 +128,7 @@ describe("PredicateBuilderTest", () => {
 
   describe("buildFromHash", () => {
     const table = castedTable("posts");
-    const compile = (node: Nodes.Node) => new Visitors.ToSql(testConnection).compile(node);
+    const compile = (node: ArelNode) => new Visitors.ToSql(testConnection).compile(node);
 
     it("builds equality for scalars", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
@@ -225,7 +225,7 @@ describe("PredicateBuilderTest", () => {
 
   describe("buildNegatedFromHash", () => {
     const table = castedTable("posts");
-    const compile = (node: Nodes.Node) => new Visitors.ToSql(testConnection).compile(node);
+    const compile = (node: ArelNode) => new Visitors.ToSql(testConnection).compile(node);
     const buildInverted = (builder: PredicateBuilder, hash: Record<string, unknown>) =>
       new WhereClause(builder.buildFromHash(hash)).invert().predicates as Nodes.Node[];
 

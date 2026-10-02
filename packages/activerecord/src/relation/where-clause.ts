@@ -6,19 +6,19 @@ import { Nodes, Predications, fetchAttribute, sql } from "@blazetrails/arel";
 import { ArgumentError, Attribute as ModelAttribute } from "@blazetrails/activemodel";
 
 export class WhereClause {
-  private _predicates: (Nodes.Node | string)[];
+  private _predicates: (Nodes.Node | Nodes.SqlLiteral | string)[];
 
   /** @internal */
-  get predicates(): (Nodes.Node | string)[] {
+  get predicates(): (Nodes.Node | Nodes.SqlLiteral | string)[] {
     return this._predicates;
   }
 
   /** @internal */
-  set predicates(value: (Nodes.Node | string)[]) {
+  set predicates(value: (Nodes.Node | Nodes.SqlLiteral | string)[]) {
     this._predicates = value;
   }
 
-  constructor(predicates: (Nodes.Node | string)[] = []) {
+  constructor(predicates: (Nodes.Node | Nodes.SqlLiteral | string)[] = []) {
     this._predicates = predicates;
   }
 
@@ -53,7 +53,7 @@ export class WhereClause {
 
   /** @missingRailsCall size — CONVERGEABLE call-gate-proves-where-clause-predicates-an-array-for-size */
   invert(): WhereClause {
-    let invertedPredicates: (Nodes.Node | string)[];
+    let invertedPredicates: (Nodes.Node | Nodes.SqlLiteral | string)[];
     if (this.predicates.length === 1) {
       invertedPredicates = [invertPredicate(first(this.predicates))];
     } else {
@@ -135,7 +135,7 @@ export class WhereClause {
   }
 
   /** @internal */
-  private exceptPredicates(columns: unknown[]): (Nodes.Node | string)[] {
+  private exceptPredicates(columns: unknown[]): (Nodes.Node | Nodes.SqlLiteral | string)[] {
     const attrs = extractBang(columns, (node) => node instanceof Arel.Attribute);
     const nonAttrs = extractBang(
       columns,
@@ -168,7 +168,7 @@ export class WhereClause {
   }
 
   /** @internal */
-  private nonEmptyPredicates(): (Nodes.Node | string)[] {
+  private nonEmptyPredicates(): (Nodes.Node | Nodes.SqlLiteral | string)[] {
     return this.predicates.filter(
       (n) => n !== "" && !(n instanceof Nodes.SqlLiteral && n.toString() === ""),
     );
@@ -176,7 +176,7 @@ export class WhereClause {
 
   /** @internal */
   private eachAttributes(
-    fn: (attr: Arel.Attribute | Nodes.Node, node: Nodes.Node | string) => void,
+    fn: (attr: Arel.Attribute | Nodes.Node, node: Nodes.Node | Nodes.SqlLiteral | string) => void,
   ): void {
     for (const node of this.predicates) {
       let attr: Arel.Attribute | Nodes.Node | null = extractAttribute(node);
@@ -189,8 +189,8 @@ export class WhereClause {
   }
 
   /** @internal */
-  protected referencedColumns(): Record<string, Nodes.Node | string> {
-    const hash: Record<string, Nodes.Node | string> = {};
+  protected referencedColumns(): Record<string, Nodes.Node | Nodes.SqlLiteral | string> {
+    const hash: Record<string, Nodes.Node | Nodes.SqlLiteral | string> = {};
     this.eachAttributes((attr, node) => {
       const key =
         attr instanceof Arel.Attribute
@@ -203,21 +203,23 @@ export class WhereClause {
 }
 
 /** @internal */
-function invertPredicate(node: Nodes.Node | string | null | undefined): Nodes.Node {
+function invertPredicate(
+  node: Nodes.Node | Nodes.SqlLiteral | string | null | undefined,
+): Nodes.Node {
   if (node == null) {
     throw new ArgumentError("Invalid argument for .where.not(), got nil.");
   }
-  if (typeof node === "string") {
+  if (typeof node === "string" || node instanceof Nodes.SqlLiteral) {
     return new Nodes.Not(new Nodes.SqlLiteral(node));
   }
   return node.invert();
 }
 
 function subtractNodes(
-  a: (Nodes.Node | string)[],
-  b: (Nodes.Node | string)[],
-): (Nodes.Node | string)[] {
-  const result: (Nodes.Node | string)[] = [];
+  a: (Nodes.Node | Nodes.SqlLiteral | string)[],
+  b: (Nodes.Node | Nodes.SqlLiteral | string)[],
+): (Nodes.Node | Nodes.SqlLiteral | string)[] {
+  const result: (Nodes.Node | Nodes.SqlLiteral | string)[] = [];
   for (const node of a) {
     if (!b.some((other) => rbEqual(typeof node === "string" ? sql(node) : node, other))) {
       result.push(node);
@@ -227,7 +229,10 @@ function subtractNodes(
 }
 
 /** @internal */
-function equalities(predicates: (Nodes.Node | string)[], equalityOnly: boolean): Nodes.Node[] {
+function equalities(
+  predicates: (Nodes.Node | Nodes.SqlLiteral | string)[],
+  equalityOnly: boolean,
+): Nodes.Node[] {
   const result: Nodes.Node[] = [];
   for (const node of predicates) {
     const matches = equalityOnly ? node instanceof Nodes.Equality : isEqualityNode(node);
@@ -258,10 +263,10 @@ function extractNodeValue(node: unknown): unknown {
 }
 
 function unionNodes(
-  a: (Nodes.Node | string)[],
-  b: (Nodes.Node | string)[],
-): (Nodes.Node | string)[] {
-  const result: (Nodes.Node | string)[] = [...a];
+  a: (Nodes.Node | Nodes.SqlLiteral | string)[],
+  b: (Nodes.Node | Nodes.SqlLiteral | string)[],
+): (Nodes.Node | Nodes.SqlLiteral | string)[] {
+  const result: (Nodes.Node | Nodes.SqlLiteral | string)[] = [...a];
   for (const node of b) {
     if (
       !result.some((existing) =>
@@ -275,7 +280,7 @@ function unionNodes(
 }
 
 /** @internal */
-function predicates(wc: WhereClause): (Nodes.Node | string)[] {
+function predicates(wc: WhereClause): (Nodes.Node | Nodes.SqlLiteral | string)[] {
   return wc.predicates;
 }
 
@@ -288,9 +293,9 @@ function wrapSqlLiteral(node: Nodes.SqlLiteral | string): Nodes.Node {
 }
 
 /** @internal */
-function extractAttribute(node: Nodes.Node | string): Arel.Attribute | null {
+function extractAttribute(node: Nodes.Node | Nodes.SqlLiteral | string): Arel.Attribute | null {
   let attrNode: Arel.Attribute | null = null;
-  fetchAttribute(node, (attr: Nodes.Node): boolean => {
+  fetchAttribute(node, (attr: Arel.Attribute): boolean => {
     if (!(attr instanceof Arel.Attribute)) return true;
     if (attrNode !== null && !rbEqual(attrNode, attr)) {
       attrNode = null;
@@ -303,7 +308,7 @@ function extractAttribute(node: Nodes.Node | string): Arel.Attribute | null {
 }
 
 /** @internal */
-function isEqualityNode(node: Nodes.Node | string): boolean {
+function isEqualityNode(node: Nodes.Node | Nodes.SqlLiteral | string): boolean {
   if (typeof node === "string") return false;
   if (node instanceof Nodes.Equality) return true;
   if (typeof (node as any).isEquality === "function") return (node as any).isEquality();

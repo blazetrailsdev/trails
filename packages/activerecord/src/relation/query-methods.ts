@@ -15,7 +15,13 @@ import {
   uniq,
 } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
-import { Nodes, Predications, SelectManager, Table as ArelTable } from "@blazetrails/arel";
+import {
+  Nodes,
+  Predications,
+  SelectManager,
+  Table as ArelTable,
+  type ArelNode,
+} from "@blazetrails/arel";
 import {
   ArgumentError,
   Attribute,
@@ -160,10 +166,10 @@ type OrderDirection = "asc" | "desc" | "ASC" | "DESC";
 export type OrderArg =
   | string
   | Record<string, OrderDirection | Record<string, OrderDirection>>
-  | Nodes.Node
+  | ArelNode
   | string[]
-  | [Nodes.Node, ...unknown[]]
-  | Map<Nodes.Node | string, OrderDirection>
+  | [ArelNode, ...unknown[]]
+  | Map<ArelNode | string, OrderDirection>
   | null;
 
 interface QueryMethodsHost {
@@ -176,8 +182,8 @@ interface QueryMethodsHost {
   eagerLoadValues: AssociationSpec[];
   preloadValues: AssociationSpec[];
   selectValues: any[];
-  groupValues: Array<string | Nodes.Node>;
-  orderValues: Array<string | Nodes.Node>;
+  groupValues: Array<string | ArelNode>;
+  orderValues: Array<string | ArelNode>;
   joinsValues: (AssociationSpec | string | Nodes.Join | JoinDependency)[];
   leftOuterJoinsValues: AssociationSpec[];
   referencesValues: Array<string | Nodes.SqlLiteral>;
@@ -404,14 +410,14 @@ function _selectBang(this: QueryMethodsHost, ...fields: any[]): any {
   return this;
 }
 
-function group(this: QueryMethodsHost, ...args: (string | Nodes.Node)[]): any {
+function group(this: QueryMethodsHost, ...args: (string | ArelNode)[]): any {
   checkIfMethodHasArgumentsBang.call(this, ":group", args as unknown[]);
   return groupBang.apply(this.spawn(), args);
 }
 
 function groupBang(
   this: QueryMethodsHost,
-  ...args: (string | import("@blazetrails/arel").Nodes.Node)[]
+  ...args: (string | import("@blazetrails/arel").ArelNode)[]
 ): any {
   this.groupValues = [...this.groupValues, ...(args as string[])];
   return this;
@@ -424,7 +430,7 @@ function regroup(this: QueryMethodsHost, ...args: string[]): any {
 
 function regroupBang(
   this: QueryMethodsHost,
-  ...args: (string | import("@blazetrails/arel").Nodes.Node)[]
+  ...args: (string | import("@blazetrails/arel").ArelNode)[]
 ): any {
   this.groupValues = [...(args as string[])];
   return this;
@@ -445,7 +451,7 @@ function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
 
 function inOrderOf(
   this: QueryMethodsHost,
-  column: string | Nodes.Node,
+  column: string | ArelNode,
   values: unknown[],
   filter = true,
 ): any {
@@ -644,7 +650,8 @@ export function buildWhereClause(
     return buildWhereClause.call(this, head, tail);
   }
 
-  let parts: (Nodes.Node | string)[];
+  let parts: (Nodes.Node | Nodes.SqlLiteral | string)[];
+  if (opts instanceof Nodes.SqlLiteral) opts = opts.toString();
   if (typeof opts === "string") {
     if (rest.length === 0) {
       parts = [Arel.sql(opts)];
@@ -699,6 +706,7 @@ function where(
     | Map<unknown, unknown>
     | string
     | Nodes.Node
+    | Nodes.SqlLiteral
     | string[]
     | unknown[]
     | null,
@@ -710,7 +718,7 @@ function where(
   }
   return whereBang.call(
     this.spawn(),
-    conditionsOrSql as Record<string, unknown> | string | Nodes.Node | null,
+    conditionsOrSql as Record<string, unknown> | string | ArelNode | null,
     ...rest,
   );
 }
@@ -916,7 +924,7 @@ function orBang(this: QueryMethodsHost, other: any): any {
 
 function having(
   this: QueryMethodsHost,
-  opts: string | Record<string, unknown> | Nodes.Node,
+  opts: string | Record<string, unknown> | Nodes.Node | Nodes.SqlLiteral,
   ...rest: unknown[]
 ): any {
   if (opts == null || isBlank(opts)) return this;
@@ -925,7 +933,7 @@ function having(
 
 function havingBang(
   this: QueryMethodsHost,
-  opts: string | Record<string, unknown> | Nodes.Node,
+  opts: string | Record<string, unknown> | Nodes.Node | Nodes.SqlLiteral,
   ...rest: unknown[]
 ): any {
   this.havingClause = this.havingClause.plus(buildWhereClause.call(this, opts, rest));
@@ -1159,7 +1167,7 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
     r instanceof ActiveRecord.Base ? (r as any).id : r,
   );
   const inlineSubquery = (this.predicateBuilder.build(attribute, deferredRelations[0]) as Nodes.In)
-    .right as Nodes.Node;
+    .right as ArelNode;
   this.whereClause = this.whereClause.plus(
     new WhereClause([
       new DeferredIdsNotIn(attribute, inlineSubquery, [
@@ -1507,7 +1515,7 @@ function orderedNode(node: unknown, dir: unknown): unknown {
 
 /** @internal */
 export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]): void {
-  this.model.disallowRawSqlBang(flattenedArgs(orderArgs) as (string | symbol | Nodes.Node)[], {
+  this.model.disallowRawSqlBang(flattenedArgs(orderArgs) as (string | symbol | ArelNode)[], {
     permit: (
       this.model.adapterClass() as unknown as { columnNameWithOrderMatcher(): RegExp }
     ).columnNameWithOrderMatcher(),
@@ -1797,7 +1805,7 @@ export function isTableNameMatches(this: QueryMethodsHost, from: unknown): boole
 /** @internal */
 export function arelColumn(
   this: QueryMethodsHost,
-  field: string | number | Nodes.Node | null,
+  field: string | number | ArelNode | null,
   fallback?: (attr: string) => unknown,
 ): unknown {
   const modelClass: any = this.model;
@@ -2096,7 +2104,7 @@ export function buildArel(
   if (this.offsetValue !== null) arel.skip(buildCastValue("OFFSET", toI(this.offsetValue)));
 
   if (this.groupValues.length > 0)
-    arel.group(...(arelColumns.call(this, uniq(this.groupValues)) as (Nodes.Node | string)[]));
+    arel.group(...(arelColumns.call(this, uniq(this.groupValues)) as (ArelNode | string)[]));
 
   buildOrder.call(this, arel);
   buildWith.call(this, arel);
