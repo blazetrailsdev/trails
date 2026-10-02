@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   rbClassSuperclass,
   basicObjRespondTo,
+  objRespondToMissing,
   rbInspect as inspect,
   rbObjInspect,
   rbObjId,
@@ -103,6 +104,13 @@ describe("Object#to_s", () => {
     expect(toS(null)).toBe("");
     expect(toS("hi")).toBe("hi");
     expect(toS([{ a: 1 }])).toBe('[{"a"=>1}]');
+  });
+});
+
+describe("Object#respond_to_missing?", () => {
+  it("answers false for every name", () => {
+    expect(objRespondToMissing({ id: 1 }, "id", false)).toBe(false);
+    expect(objRespondToMissing({}, "missing", true)).toBe(false);
   });
 });
 

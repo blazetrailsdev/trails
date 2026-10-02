@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
-import { rbModPublicMethodDefined } from "@blazetrails/ruby-compat";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
 
@@ -370,9 +369,7 @@ describe("Mapper#mount", () => {
       });
 
       expect(set.namedRoutes.isKey("shorthand_app")).toBe(true);
-      expect(
-        rbModPublicMethodDefined(ShorthandApp.routes().mountedHelpers(), "shorthand_app"),
-      ).toBe(true);
+      expect(ShorthandApp.routes().mountedHelpers().isMethodDefined("shorthandApp")).toBe(true);
     } finally {
       TopLevel.Trails = trails;
     }

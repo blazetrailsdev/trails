@@ -17,6 +17,7 @@ import {
   isPresent,
   kernelArray,
   pluralize,
+  reverseMergeBang,
   singularize,
   TopLevel,
   transformKeys,
@@ -24,14 +25,18 @@ import {
 } from "@blazetrails/activesupport";
 import {
   Enumerable,
+  extend,
   getFs,
   getPath,
   hashAref,
   hashAset,
   include,
+  Module,
   RFC2396_PARSER,
   rbInspect,
+  rbFPublicSend,
   rbFSend,
+  slice,
   rbModPublicMethodDefined,
   rbObjRespondTo,
   rtest,
@@ -137,6 +142,7 @@ const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
 /** @internal */
 interface RouteSetLike {
   namedRoutes: { get(name: string): unknown };
+  urlHelpers(): object;
   addRoute(mapping: Mapping, name?: string | null | false): unknown;
   resourcesPathNames: Record<string, string>;
   drawPaths: string[];
@@ -1532,7 +1538,7 @@ export class Mapper {
       merge({ to: app as MountableApp, anchor: false, format: false }, options as RouteOptions),
     );
 
-    if (railsApp) this.defineGeneratePrefix(app as RailsApp, targetAs!, path);
+    if (railsApp) this.defineGeneratePrefix(app as RailsApp, targetAs!);
     return this;
   }
 
@@ -1560,22 +1566,48 @@ export class Mapper {
   }
 
   /** @internal */
-  defineGeneratePrefix(app: RailsApp, name: string, mountPath: string): void {
+  defineGeneratePrefix(app: RailsApp, name: string): void {
+    const _route = this._set.namedRoutes.get(name) as JourneyRoute;
+    const _routes = this._set;
+    const _urlHelpers = this._set.urlHelpers();
+
     const scriptNamer = (options: Record<string, unknown>): string => {
-      if (options.originalScriptName) return mountPath;
-      const sn = options.scriptName;
-      return typeof sn === "string" && sn.length > 0 ? sn : mountPath;
+      const prefixOptions = slice(options, ..._route.segmentKeys);
+      if (options.originalScriptName != null && options.originalScriptName !== false) {
+        prefixOptions.scriptName = "";
+      }
+
+      if (options._recall != null && options._recall !== false) {
+        reverseMergeBang(
+          prefixOptions,
+          slice(options._recall as Record<string, unknown>, ..._route.segmentKeys),
+        );
+      }
+
+      _route.segmentKeys.forEach((k) => delete options[k]);
+      return rbFPublicSend(_urlHelpers, camelize(`${name}_path`, "lower"), prefixOptions) as string;
     };
-    this._mountedScriptNamers.set(name, { app, scriptNamer });
 
     app.routes().defineMountedHelper(name, scriptNamer);
-  }
 
-  /** @internal */
-  _mountedScriptNamers: Map<
-    string,
-    { app: MountableApp; scriptNamer: (options: Record<string, unknown>) => string }
-  > = new Map();
+    extend(
+      app.routes(),
+      new Module((mod) => {
+        mod.defineMethod("isOptimizeRoutesGeneration", () => false);
+
+        mod.defineMethod(
+          "findScriptName",
+          function (this: RouteSet, options: Record<string, unknown>): string {
+            if (hasKey(options, "scriptName") && isPresent(options.scriptName)) {
+              return mod.superMethod(this, "findScriptName")!(options) as string;
+            } else {
+              return scriptNamer(options);
+            }
+          },
+        );
+      }),
+    );
+  }
 
   /** @internal */
   mapMatch(

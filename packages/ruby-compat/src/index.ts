@@ -29,6 +29,7 @@ export { Enumerable } from "./enumerable.js";
 export type { Each } from "./enumerable.js";
 export {
   basicObjRespondTo,
+  objRespondToMissing,
   rbBuiltinClassName,
   rbInspect,
   rbObjInspect,

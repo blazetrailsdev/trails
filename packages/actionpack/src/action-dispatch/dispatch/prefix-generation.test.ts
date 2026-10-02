@@ -1,28 +1,56 @@
-import { describe, it, expect } from "vitest";
-import { TopLevel } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat";
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging --
+   Ruby `include BlogEngine.routes.url_helpers` / `include RailsApplication.routes.mounted_helpers`;
+   the class/interface merge is how `include()` surfaces those members on the type side. */
+import { beforeEach, describe, it, expect } from "vitest";
+import { ModelName, Naming } from "@blazetrails/activemodel";
+import { assertRespondTo, extend, TopLevel } from "@blazetrails/activesupport";
+import {
+  File,
+  include,
+  initialize,
+  initializeIncludedModules,
+  Module,
+} from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
+import { Base } from "../../action-controller/base.js";
+import { controllerConstants } from "../http/request.js";
 import type { MountableApp } from "../routing/mapper.js";
 import { RouteSet } from "../routing/route-set.js";
+import type { RoutesProxyInstance } from "../routing/routes-proxy.js";
+import { UrlFor } from "../routing/url-for.js";
+import { IntegrationTest } from "../testing/integration.js";
 import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
 
 TopLevel.Trails = { Engine, Trailtie } as unknown as typeof TopLevel.Trails;
 
-function get(app: Engine, path: string): Promise<RackResponse> {
-  const env: RackEnv = {
-    REQUEST_METHOD: "GET",
-    PATH_INFO: path,
-    SCRIPT_NAME: "",
-    SERVER_NAME: "www.example.com",
-    SERVER_PORT: "80",
-    "rack.url_scheme": "http",
-  };
-  return app.call(env);
-}
+type Helper = (...args: unknown[]) => string;
 
-describe("TestGenerationPrefix::WithMountedEngine", () => {
+class Post {
+  declare readonly modelName: ModelName;
+
+  toParam(): string {
+    return "1";
+  }
+
+  static get modelName(): ModelName {
+    const klass = "Post";
+
+    return new ModelName(klass);
+  }
+
+  toModel(): this {
+    return this;
+  }
+
+  isPersisted(): boolean {
+    return true;
+  }
+}
+extend(Post, Naming);
+
+describe("WithMountedEngine", () => {
   class BlogEngine extends Engine {
     declare static routes: () => RouteSet;
 
@@ -94,125 +122,321 @@ describe("TestGenerationPrefix::WithMountedEngine", () => {
     }
   }
 
-  const app = (): Engine => RailsApplication.instance();
+  RailsApplication.routes().defineMountedHelper("main_app");
 
-  it.skip("[ENGINE] generating engine's URL use SCRIPT_NAME from request", () => {});
+  class InsideEngineGeneratingController extends Base {
+    async index(): Promise<void> {
+      await this.render({ plain: this.postsPath() });
+    }
 
-  it.skip("[ENGINE] generating application's URL never uses SCRIPT_NAME from request", () => {});
+    async show(): Promise<void> {
+      await this.render({ plain: this.postPath({ id: this.params.get("id") }) });
+    }
 
-  it.skip("[ENGINE] generating engine's URL with polymorphic path", () => {});
+    async url_to_application(): Promise<void> {
+      const path = this.mainApp.urlFor({
+        controller: "outside_engine_generating",
+        action: "index",
+        onlyPath: true,
+      });
+      await this.render({ plain: path });
+    }
 
-  it.skip("[ENGINE] url_helpers from engine have higher priority than application's url_helpers", () => {});
+    async polymorphic_path_for_engine(): Promise<void> {
+      await this.render({ plain: this.polymorphicPath(new Post()) });
+    }
 
-  describe("[ENGINE] redirects use SCRIPT_NAME from request", () => {
-    it("[ENGINE] relative path root uses SCRIPT_NAME from request", async () => {
-      const res = await get(app(), "/awesome/blog/relative_path_root");
-      expect(res[0]).toBe(301);
-      expect(res[1]["location"]).toBe("http://www.example.com/awesome/blog");
-    });
+    async conflicting(): Promise<void> {
+      await this.render({ plain: "engine" });
+    }
+  }
+  interface InsideEngineGeneratingController {
+    postsPath: Helper;
+    postPath: Helper;
+    polymorphicPath: Helper;
+    mainApp: RoutesProxyInstance;
+  }
+  include(InsideEngineGeneratingController, BlogEngine.routes().urlHelpers());
+  include(InsideEngineGeneratingController, RailsApplication.routes().mountedHelpers());
+  controllerConstants.set("inside_engine_generating", InsideEngineGeneratingController);
 
-    it("[ENGINE] relative path redirect uses SCRIPT_NAME from request", async () => {
-      const res = await get(app(), "/awesome/blog/relative_path_redirect");
-      expect(res[0]).toBe(301);
-      expect(res[1]["location"]).toBe("http://www.example.com/awesome/blog/foo");
-    });
+  class OutsideEngineGeneratingController extends Base {
+    async index(): Promise<void> {
+      await this.render({ plain: this.blogEngine.postPath({ id: 1 }) });
+    }
 
-    it("[ENGINE] relative option root uses SCRIPT_NAME from request", async () => {
-      const res = await get(app(), "/awesome/blog/relative_option_root");
-      expect(res[0]).toBe(301);
-      expect(res[1]["location"]).toBe("http://www.example.com/awesome/blog");
-    });
+    async polymorphic_path_for_engine(): Promise<void> {
+      await this.render({ plain: this.blogEngine.polymorphicPath(new Post()) });
+    }
 
-    it("[ENGINE] relative option redirect uses SCRIPT_NAME from request", async () => {
-      const res = await get(app(), "/awesome/blog/relative_option_redirect");
-      expect(res[0]).toBe(301);
-      expect(res[1]["location"]).toBe("http://www.example.com/awesome/blog/foo");
-    });
+    async polymorphic_path_for_app(): Promise<void> {
+      await this.render({ plain: this.polymorphicPath(new Post()) });
+    }
 
-    it("[ENGINE] relative custom root uses SCRIPT_NAME from request", async () => {
-      const res = await get(app(), "/awesome/blog/relative_custom_root");
-      expect(res[0]).toBe(301);
-      expect(res[1]["location"]).toBe("http://www.example.com/awesome/blog");
-    });
+    async polymorphic_with_url_for(): Promise<void> {
+      await this.render({ plain: this.blogEngine.urlFor(new Post()) });
+    }
 
-    it("[ENGINE] relative custom redirect uses SCRIPT_NAME from request", async () => {
-      const res = await get(app(), "/awesome/blog/relative_custom_redirect");
-      expect(res[0]).toBe(301);
-      expect(res[1]["location"]).toBe("http://www.example.com/awesome/blog/foo");
-    });
+    async conflicting(): Promise<void> {
+      await this.render({ plain: "application" });
+    }
 
-    it("[ENGINE] absolute path root doesn't use SCRIPT_NAME from request", async () => {
-      const res = await get(app(), "/awesome/blog/absolute_path_root");
-      expect(res[0]).toBe(301);
-      expect(res[1]["location"]).toBe("http://www.example.com/");
-    });
+    async ivar_usage(): Promise<void> {
+      (this as { blogEngine: unknown }).blogEngine = "Not the engine route helper";
+      await this.render({ plain: this.blogEngine.postPath({ id: 1 }) });
+    }
+  }
+  interface OutsideEngineGeneratingController {
+    polymorphicPath: Helper;
+    blogEngine: RoutesProxyInstance;
+  }
+  include(OutsideEngineGeneratingController, BlogEngine.routes().mountedHelpers());
+  include(OutsideEngineGeneratingController, RailsApplication.routes().urlHelpers());
+  controllerConstants.set("outside_engine_generating", OutsideEngineGeneratingController);
 
-    it("[ENGINE] absolute path redirect doesn't use SCRIPT_NAME from request", async () => {
-      const res = await get(app(), "/awesome/blog/absolute_path_redirect");
-      expect(res[0]).toBe(301);
-      expect(res[1]["location"]).toBe("http://www.example.com/foo");
-    });
-
-    it("[ENGINE] absolute option root doesn't use SCRIPT_NAME from request", async () => {
-      const res = await get(app(), "/awesome/blog/absolute_option_root");
-      expect(res[0]).toBe(301);
-      expect(res[1]["location"]).toBe("http://www.example.com/");
-    });
-
-    it("[ENGINE] absolute option redirect doesn't use SCRIPT_NAME from request", async () => {
-      const res = await get(app(), "/awesome/blog/absolute_option_redirect");
-      expect(res[0]).toBe(301);
-      expect(res[1]["location"]).toBe("http://www.example.com/foo");
-    });
-
-    it("[ENGINE] absolute custom root doesn't use SCRIPT_NAME from request", async () => {
-      const res = await get(app(), "/awesome/blog/absolute_custom_root");
-      expect(res[0]).toBe(301);
-      expect(res[1]["location"]).toBe("http://www.example.com/");
-    });
-
-    it("[ENGINE] absolute custom redirect doesn't use SCRIPT_NAME from request", async () => {
-      const res = await get(app(), "/awesome/blog/absolute_custom_redirect");
-      expect(res[0]).toBe(301);
-      expect(res[1]["location"]).toBe("http://www.example.com/foo");
-    });
+  const KwObject = new Module((mod) => {
+    (mod as unknown as Record<symbol, unknown>)[initialize] = function (_options: {
+      kw: unknown;
+    }) {};
   });
 
-  it.skip("[APP] generating engine's route includes prefix", () => {});
+  class EngineObject {
+    constructor(...args: unknown[]) {
+      initializeIncludedModules(this, ...args);
+    }
+  }
+  interface EngineObject {
+    postPath: Helper;
+    postsPath: Helper;
+    postsUrl: Helper;
+    urlFor: Helper;
+    polymorphicPath: Helper;
+    polymorphicUrl: Helper;
+  }
+  include(EngineObject, KwObject);
+  include(EngineObject, UrlFor);
+  include(EngineObject, BlogEngine.routes().urlHelpers());
 
-  it.skip("[APP] generating engine's route includes default_url_options[:script_name]", () => {});
+  class AppObject {
+    constructor(...args: unknown[]) {
+      initializeIncludedModules(this, ...args);
+    }
+  }
+  interface AppObject {
+    rootPath: Helper;
+  }
+  include(AppObject, KwObject);
+  include(AppObject, UrlFor);
+  include(AppObject, RailsApplication.routes().urlHelpers());
 
-  it.skip("[APP] generating engine's URL with polymorphic path", () => {});
+  class WithMountedEngine extends IntegrationTest {
+    override get app(): unknown {
+      return RailsApplication.instance();
+    }
 
-  it.skip("polymorphic_path_for_app", () => {});
+    engineObject!: EngineObject;
+    appObject!: AppObject;
 
-  it.skip("[APP] generating engine's URL with url_for(@post)", () => {});
+    static {
+      this.prototype.setup = function (this: WithMountedEngine): void {
+        RailsApplication.routes().defaultUrlOptions = {};
+        this.engineObject = new EngineObject({ kw: 1 });
+        this.appObject = new AppObject({ kw: 2 });
+      };
+    }
+  }
+  interface WithMountedEngine {
+    blogEngine: RoutesProxyInstance;
+  }
+  include(WithMountedEngine, BlogEngine.routes().mountedHelpers());
 
-  it.skip("[APP] instance variable with same name as engine", () => {});
+  let t: WithMountedEngine;
+  beforeEach(({ task }) => {
+    t = new WithMountedEngine(task.name);
+    t.beforeSetup();
+    t.setup();
+  });
 
-  it.skip("[OBJECT] proxy route should override respond_to?() as expected", () => {});
+  const verifyRedirect = (url: string, status: number = 301): void => {
+    expect(t.response.status).toBe(status);
+    expect(t.response.headers.get("Location")).toBe(url);
+    expect(t.response.body).toBe("");
+  };
 
-  it.skip("[OBJECT] generating engine's route includes prefix", () => {});
+  it("[ENGINE] generating engine's URL use SCRIPT_NAME from request", async () => {
+    await t.get("/pure-awesomeness/blog/posts/1");
+    expect(t.response.body).toBe("/pure-awesomeness/blog/posts/1");
+  });
 
-  it.skip("[OBJECT] generating engine's route includes dynamic prefix", () => {});
+  it("[ENGINE] generating application's URL never uses SCRIPT_NAME from request", async () => {
+    await t.get("/pure-awesomeness/blog/url_to_application");
+    expect(t.response.body).toBe("/generate");
+  });
 
-  it.skip("[OBJECT] generating engine's route includes default_url_options[:script_name]", () => {});
+  it("[ENGINE] generating engine's URL with polymorphic path", async () => {
+    await t.get("/pure-awesomeness/blog/polymorphic_path_for_engine");
+    expect(t.response.body).toBe("/pure-awesomeness/blog/posts/1");
+  });
 
-  it.skip("[OBJECT] generating application's route", () => {});
+  it("[ENGINE] url_helpers from engine have higher priority than application's url_helpers", async () => {
+    await t.get("/awesome/blog/conflicting_url");
+    expect(t.response.body).toBe("engine");
+  });
 
-  it.skip("[OBJECT] generating application's route includes default_url_options[:script_name]", () => {});
+  it("[ENGINE] relative path root uses SCRIPT_NAME from request", async () => {
+    await t.get("/awesome/blog/relative_path_root");
+    verifyRedirect("http://www.example.com/awesome/blog");
+  });
 
-  it.skip("[OBJECT] generating application's route includes default_url_options[:trailing_slash]", () => {});
+  it("[ENGINE] relative path redirect uses SCRIPT_NAME from request", async () => {
+    await t.get("/awesome/blog/relative_path_redirect");
+    verifyRedirect("http://www.example.com/awesome/blog/foo");
+  });
 
-  it.skip("[OBJECT] generating engine's route with url_for", () => {});
+  it("[ENGINE] relative option root uses SCRIPT_NAME from request", async () => {
+    await t.get("/awesome/blog/relative_option_root");
+    verifyRedirect("http://www.example.com/awesome/blog");
+  });
 
-  it.skip("[OBJECT] generating engine's route with named route helpers", () => {});
+  it("[ENGINE] relative option redirect uses SCRIPT_NAME from request", async () => {
+    await t.get("/awesome/blog/relative_option_redirect");
+    verifyRedirect("http://www.example.com/awesome/blog/foo");
+  });
 
-  it.skip("[OBJECT] generating engine's route with polymorphic_url", () => {});
+  it("[ENGINE] relative custom root uses SCRIPT_NAME from request", async () => {
+    await t.get("/awesome/blog/relative_custom_root");
+    verifyRedirect("http://www.example.com/awesome/blog");
+  });
+
+  it("[ENGINE] relative custom redirect uses SCRIPT_NAME from request", async () => {
+    await t.get("/awesome/blog/relative_custom_redirect");
+    verifyRedirect("http://www.example.com/awesome/blog/foo");
+  });
+
+  it("[ENGINE] absolute path root doesn't use SCRIPT_NAME from request", async () => {
+    await t.get("/awesome/blog/absolute_path_root");
+    verifyRedirect("http://www.example.com/");
+  });
+
+  it("[ENGINE] absolute path redirect doesn't use SCRIPT_NAME from request", async () => {
+    await t.get("/awesome/blog/absolute_path_redirect");
+    verifyRedirect("http://www.example.com/foo");
+  });
+
+  it("[ENGINE] absolute option root doesn't use SCRIPT_NAME from request", async () => {
+    await t.get("/awesome/blog/absolute_option_root");
+    verifyRedirect("http://www.example.com/");
+  });
+
+  it("[ENGINE] absolute option redirect doesn't use SCRIPT_NAME from request", async () => {
+    await t.get("/awesome/blog/absolute_option_redirect");
+    verifyRedirect("http://www.example.com/foo");
+  });
+
+  it("[ENGINE] absolute custom root doesn't use SCRIPT_NAME from request", async () => {
+    await t.get("/awesome/blog/absolute_custom_root");
+    verifyRedirect("http://www.example.com/");
+  });
+
+  it("[ENGINE] absolute custom redirect doesn't use SCRIPT_NAME from request", async () => {
+    await t.get("/awesome/blog/absolute_custom_redirect");
+    verifyRedirect("http://www.example.com/foo");
+  });
+  it("[APP] generating engine's route includes prefix", async () => {
+    await t.get("/generate");
+    expect(t.response.body).toBe("/awesome/blog/posts/1");
+  });
+
+  it("[APP] generating engine's route includes default_url_options[:script_name]", async () => {
+    RailsApplication.routes().defaultUrlOptions = { scriptName: "/something" };
+    await t.get("/generate");
+    expect(t.response.body).toBe("/something/awesome/blog/posts/1");
+  });
+
+  it("[APP] generating engine's URL with polymorphic path", async () => {
+    await t.get("/polymorphic_path_for_engine");
+    expect(t.response.body).toBe("/awesome/blog/posts/1");
+  });
+
+  it("polymorphic_path_for_app", async () => {
+    await t.get("/polymorphic_path_for_app");
+    expect(t.response.body).toBe("/posts/1");
+  });
+
+  it("[APP] generating engine's URL with url_for(@post)", async () => {
+    await t.get("/polymorphic_with_url_for");
+    expect(t.response.body).toBe("http://www.example.com/awesome/blog/posts/1");
+  });
+
+  it.skip("[APP] instance variable with same name as engine", () => {
+    // PERMANENT-SKIP: asserts that Ruby's `@blog_engine` ivar and its `blog_engine` method are separate names; a JS object has one namespace for fields and methods, so the controller's `blogEngine` field IS the mounted helper and assigning it raises TypeError.
+  });
+
+  it("[OBJECT] proxy route should override respond_to?() as expected", () => {
+    assertRespondTo(t.blogEngine, "namedHelperThatShouldBeInvokedOnlyInRespondToTestPath");
+  });
+
+  it("[OBJECT] generating engine's route includes prefix", () => {
+    expect(t.engineObject.postPath({ id: 1 })).toBe("/awesome/blog/posts/1");
+  });
+
+  it("[OBJECT] generating engine's route includes dynamic prefix", () => {
+    expect(t.engineObject.postPath({ id: 3, omg: "pure-awesomeness" })).toBe(
+      "/pure-awesomeness/blog/posts/3",
+    );
+  });
+
+  it("[OBJECT] generating engine's route includes default_url_options[:script_name]", () => {
+    RailsApplication.routes().defaultUrlOptions = { scriptName: "/something" };
+    expect(t.engineObject.postPath({ id: 3, omg: "pure-awesomeness" })).toBe(
+      "/something/pure-awesomeness/blog/posts/3",
+    );
+  });
+
+  it("[OBJECT] generating application's route", () => {
+    expect(t.appObject.rootPath()).toBe("/");
+  });
+
+  it("[OBJECT] generating application's route includes default_url_options[:script_name]", () => {
+    RailsApplication.routes().defaultUrlOptions = { scriptName: "/something" };
+    expect(t.appObject.rootPath()).toBe("/something/");
+  });
+
+  it("[OBJECT] generating application's route includes default_url_options[:trailing_slash]", () => {
+    RailsApplication.routes().defaultUrlOptions["trailingSlash"] = true;
+    expect(t.engineObject.postsPath()).toBe("/awesome/blog/posts");
+  });
+
+  it("[OBJECT] generating engine's route with url_for", () => {
+    const path = t.engineObject.urlFor({
+      controller: "inside_engine_generating",
+      action: "show",
+      onlyPath: true,
+      omg: "omg",
+      id: 1,
+    });
+    expect(path).toBe("/omg/blog/posts/1");
+  });
+
+  it("[OBJECT] generating engine's route with named route helpers", () => {
+    let path = t.engineObject.postsPath();
+    expect(path).toBe("/awesome/blog/posts");
+
+    path = t.engineObject.postsUrl({ host: "example.com" });
+    expect(path).toBe("http://example.com/awesome/blog/posts");
+  });
+
+  it("[OBJECT] generating engine's route with polymorphic_url", () => {
+    let path = t.engineObject.polymorphicPath(new Post());
+    expect(path).toBe("/awesome/blog/posts/1");
+
+    path = t.engineObject.polymorphicUrl(new Post(), { host: "www.example.com" });
+    expect(path).toBe("http://www.example.com/awesome/blog/posts/1");
+  });
 });
 
-describe("TestGenerationPrefix::EngineMountedAtRoot", () => {
-  class BlogEngine extends Engine {
+describe("EngineMountedAtRoot", () => {
+  class BlogEngine {
     static _routes?: RouteSet;
 
     static routes(): RouteSet {
@@ -240,7 +464,7 @@ describe("TestGenerationPrefix::EngineMountedAtRoot", () => {
       })());
     }
 
-    static override call(env: RackEnv): Promise<RackResponse> {
+    static call(env: RackEnv): Promise<RackResponse> {
       env["action_dispatch.routes"] = this.routes();
       return this.routes().call(env);
     }
@@ -249,7 +473,6 @@ describe("TestGenerationPrefix::EngineMountedAtRoot", () => {
       Object.defineProperty(this, "name", {
         value: "TestGenerationPrefix::EngineMountedAtRoot::BlogEngine",
       });
-      Engine.register(this, File.dirname(FIXTURE_LOAD_PATH));
     }
   }
 
@@ -267,79 +490,97 @@ describe("TestGenerationPrefix::EngineMountedAtRoot", () => {
     }
   }
 
-  const app = (): Engine => RailsApplication.instance();
+  class PostsController extends Base {
+    async show(): Promise<void> {
+      await this.render({ plain: this.postPath({ id: this.params.get("id") }) });
+    }
+  }
+  interface PostsController {
+    postPath: Helper;
+  }
+  include(PostsController, BlogEngine.routes().urlHelpers());
+  include(PostsController, RailsApplication.routes().mountedHelpers());
+  controllerConstants.set("posts", PostsController);
 
-  it.skip("generating path inside engine", () => {});
+  class EngineMountedAtRoot extends IntegrationTest {
+    override get app(): unknown {
+      return RailsApplication.instance();
+    }
+  }
+
+  let t: EngineMountedAtRoot;
+  beforeEach(({ task }) => {
+    t = new EngineMountedAtRoot(task.name);
+  });
+
+  const verifyRedirect = (url: string, status: number = 301): void => {
+    expect(t.response.status).toBe(status);
+    expect(t.response.headers.get("Location")).toBe(url);
+    expect(t.response.body).toBe("");
+  };
+
+  it("generating path inside engine", async () => {
+    await t.get("/posts/1");
+    expect(t.response.body).toBe("/posts/1");
+  });
 
   it("[ENGINE] relative path root uses SCRIPT_NAME from request", async () => {
-    const res = await get(app(), "/relative_path_root");
-    expect(res[0]).toBe(301);
-    expect(res[1]["location"]).toBe("http://www.example.com/");
+    await t.get("/relative_path_root");
+    verifyRedirect("http://www.example.com/");
   });
 
   it("[ENGINE] relative path redirect uses SCRIPT_NAME from request", async () => {
-    const res = await get(app(), "/relative_path_redirect");
-    expect(res[0]).toBe(301);
-    expect(res[1]["location"]).toBe("http://www.example.com/foo");
+    await t.get("/relative_path_redirect");
+    verifyRedirect("http://www.example.com/foo");
   });
 
   it("[ENGINE] relative option root uses SCRIPT_NAME from request", async () => {
-    const res = await get(app(), "/relative_option_root");
-    expect(res[0]).toBe(301);
-    expect(res[1]["location"]).toBe("http://www.example.com/");
+    await t.get("/relative_option_root");
+    verifyRedirect("http://www.example.com/");
   });
 
   it("[ENGINE] relative option redirect uses SCRIPT_NAME from request", async () => {
-    const res = await get(app(), "/relative_option_redirect");
-    expect(res[0]).toBe(301);
-    expect(res[1]["location"]).toBe("http://www.example.com/foo");
+    await t.get("/relative_option_redirect");
+    verifyRedirect("http://www.example.com/foo");
   });
 
   it("[ENGINE] relative custom root uses SCRIPT_NAME from request", async () => {
-    const res = await get(app(), "/relative_custom_root");
-    expect(res[0]).toBe(301);
-    expect(res[1]["location"]).toBe("http://www.example.com/");
+    await t.get("/relative_custom_root");
+    verifyRedirect("http://www.example.com/");
   });
 
   it("[ENGINE] relative custom redirect uses SCRIPT_NAME from request", async () => {
-    const res = await get(app(), "/relative_custom_redirect");
-    expect(res[0]).toBe(301);
-    expect(res[1]["location"]).toBe("http://www.example.com/foo");
+    await t.get("/relative_custom_redirect");
+    verifyRedirect("http://www.example.com/foo");
   });
 
   it("[ENGINE] absolute path root doesn't use SCRIPT_NAME from request", async () => {
-    const res = await get(app(), "/absolute_path_root");
-    expect(res[0]).toBe(301);
-    expect(res[1]["location"]).toBe("http://www.example.com/");
+    await t.get("/absolute_path_root");
+    verifyRedirect("http://www.example.com/");
   });
 
   it("[ENGINE] absolute path redirect doesn't use SCRIPT_NAME from request", async () => {
-    const res = await get(app(), "/absolute_path_redirect");
-    expect(res[0]).toBe(301);
-    expect(res[1]["location"]).toBe("http://www.example.com/foo");
+    await t.get("/absolute_path_redirect");
+    verifyRedirect("http://www.example.com/foo");
   });
 
   it("[ENGINE] absolute option root doesn't use SCRIPT_NAME from request", async () => {
-    const res = await get(app(), "/absolute_option_root");
-    expect(res[0]).toBe(301);
-    expect(res[1]["location"]).toBe("http://www.example.com/");
+    await t.get("/absolute_option_root");
+    verifyRedirect("http://www.example.com/");
   });
 
   it("[ENGINE] absolute option redirect doesn't use SCRIPT_NAME from request", async () => {
-    const res = await get(app(), "/absolute_option_redirect");
-    expect(res[0]).toBe(301);
-    expect(res[1]["location"]).toBe("http://www.example.com/foo");
+    await t.get("/absolute_option_redirect");
+    verifyRedirect("http://www.example.com/foo");
   });
 
   it("[ENGINE] absolute custom root doesn't use SCRIPT_NAME from request", async () => {
-    const res = await get(app(), "/absolute_custom_root");
-    expect(res[0]).toBe(301);
-    expect(res[1]["location"]).toBe("http://www.example.com/");
+    await t.get("/absolute_custom_root");
+    verifyRedirect("http://www.example.com/");
   });
 
   it("[ENGINE] absolute custom redirect doesn't use SCRIPT_NAME from request", async () => {
-    const res = await get(app(), "/absolute_custom_redirect");
-    expect(res[0]).toBe(301);
-    expect(res[1]["location"]).toBe("http://www.example.com/foo");
+    await t.get("/absolute_custom_redirect");
+    verifyRedirect("http://www.example.com/foo");
   });
 });
