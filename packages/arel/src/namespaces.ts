@@ -1,5 +1,6 @@
 import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
 import type { Attribute as AttributeClass } from "./attributes/attribute.js";
+import type * as CollectorsModule from "./collectors/index.js";
 import type * as NodesModule from "./nodes/index.js";
 import type { SelectManager } from "./select-manager.js";
 import type { Table } from "./table.js";
@@ -35,6 +36,18 @@ export const Attributes = { name: "Arel::Attributes", loadPath } as AutoloadModu
 };
 extend(Attributes, Autoload);
 Attributes.autoload("Attribute", "arel/attributes/attribute");
+
+export const Collectors = { name: "Arel::Collectors" } as {
+  name: string;
+} & typeof CollectorsModule;
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export declare namespace Collectors {
+  export type SQLString = CollectorsModule.SQLString;
+  export type Bind = CollectorsModule.Bind;
+  export type Composite = CollectorsModule.Composite;
+  export type PlainString = CollectorsModule.PlainString;
+  export type SubstituteBinds = CollectorsModule.SubstituteBinds;
+}
 
 export const Nodes = { name: "Arel::Nodes", loadPath } as AutoloadModule & typeof NodesModule;
 // eslint-disable-next-line @typescript-eslint/no-namespace

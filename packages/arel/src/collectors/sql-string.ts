@@ -1,4 +1,6 @@
 import { PlainString } from "./plain-string.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Collectors } from "../namespaces.js";
 
 export class SQLString extends PlainString {
   preparable?: boolean;
@@ -29,3 +31,5 @@ export class SQLString extends PlainString {
     return this;
   }
 }
+
+rbModConstSet(Collectors, "SQLString", SQLString);

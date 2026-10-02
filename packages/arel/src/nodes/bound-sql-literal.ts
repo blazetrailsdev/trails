@@ -1,6 +1,6 @@
 import { Nodes } from "../namespaces.js";
 import { ArgumentError, rbEqual, rbHash, symbolizeKeys } from "@blazetrails/activesupport";
-import { rbInspect, rbModName, rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbInspect, rbModName, rbModConstSet } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
@@ -97,5 +97,4 @@ type _AliasPredication = import("../alias-predication.js").AliasPredicationModul
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface BoundSqlLiteral extends _AliasPredication {}
 
-rbSetClassPathString(BoundSqlLiteral, Nodes, "BoundSqlLiteral");
-Nodes.BoundSqlLiteral = BoundSqlLiteral;
+rbModConstSet(Nodes, "BoundSqlLiteral", BoundSqlLiteral);

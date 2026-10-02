@@ -22,7 +22,7 @@ import {
   capitalize,
   isSymbol,
   rbConstGet,
-  rbSetClassPathString,
+  rbModConstSet,
   symbolToS,
 } from "@blazetrails/ruby-compat";
 import { Comment } from "./nodes/comment.js";
@@ -310,5 +310,4 @@ export interface SelectManager extends _FactoryMethodsModule, Crud {}
 
 include(SelectManager, Crud);
 
-rbSetClassPathString(SelectManager, Arel, "SelectManager");
-Arel.SelectManager = SelectManager;
+rbModConstSet(Arel, "SelectManager", SelectManager);

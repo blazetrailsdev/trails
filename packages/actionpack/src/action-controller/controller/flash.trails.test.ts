@@ -53,7 +53,7 @@ describe("add_flash_types readers", () => {
 
     expect((t.controller as NoticesController).notice).toBe("Post was successfully created.");
     expect((t.controller as NoticesController).alert).toBeUndefined();
-    expect(t.responseBody).toBe('<p style="color: green">Post was successfully created.</p>');
+    expect(t.body).toBe('<p style="color: green">Post was successfully created.</p>');
   });
 
   it("drops a flash type from action methods cached before add_flash_types", () => {

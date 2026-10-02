@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Node } from "./node.js";
 import type { Table } from "../table.js";
 import { Binary } from "./binary.js";
@@ -14,5 +14,4 @@ export class JoinSource extends Binary<Node | Table | null, Node[]> {
   }
 }
 
-rbSetClassPathString(JoinSource, Nodes, "JoinSource");
-Nodes.JoinSource = JoinSource;
+rbModConstSet(Nodes, "JoinSource", JoinSource);

@@ -1,4 +1,4 @@
-import { rbObjClone, rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
@@ -123,17 +123,10 @@ export class Following extends Unary {
   }
 }
 
-rbSetClassPathString(Window, Nodes, "Window");
-Nodes.Window = Window;
-rbSetClassPathString(NamedWindow, Nodes, "NamedWindow");
-Nodes.NamedWindow = NamedWindow;
-rbSetClassPathString(Preceding, Nodes, "Preceding");
-Nodes.Preceding = Preceding;
-rbSetClassPathString(Following, Nodes, "Following");
-Nodes.Following = Following;
-rbSetClassPathString(CurrentRow, Nodes, "CurrentRow");
-Nodes.CurrentRow = CurrentRow;
-rbSetClassPathString(Rows, Nodes, "Rows");
-Nodes.Rows = Rows;
-rbSetClassPathString(Range, Nodes, "Range");
-Nodes.Range = Range;
+rbModConstSet(Nodes, "Window", Window);
+rbModConstSet(Nodes, "NamedWindow", NamedWindow);
+rbModConstSet(Nodes, "Preceding", Preceding);
+rbModConstSet(Nodes, "Following", Following);
+rbModConstSet(Nodes, "CurrentRow", CurrentRow);
+rbModConstSet(Nodes, "Rows", Rows);
+rbModConstSet(Nodes, "Range", Range);

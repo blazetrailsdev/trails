@@ -1,3 +1,6 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Collectors } from "../namespaces.js";
+
 type CollectorLike = {
   append(str: string): unknown;
   addBind(value: unknown, block: (index: number) => string): unknown;
@@ -58,3 +61,5 @@ export class Composite {
   private left: CollectorLike;
   private right: CollectorLike;
 }
+
+rbModConstSet(Collectors, "Composite", Composite);

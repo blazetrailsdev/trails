@@ -9,7 +9,7 @@ import {
   rbModToS,
   rbObjClass,
   rbObjRespondTo,
-  rbSetClassPathString,
+  rbModConstSet,
 } from "@blazetrails/ruby-compat";
 import { Visitors } from "../namespaces.js";
 
@@ -85,5 +85,4 @@ export abstract class Visitor {
   }
 }
 
-rbSetClassPathString(Visitor, Visitors, "Visitor");
-Visitors.Visitor = Visitor;
+rbModConstSet(Visitors, "Visitor", Visitor);

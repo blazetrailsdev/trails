@@ -3,7 +3,7 @@ import { ArgumentError, include } from "@blazetrails/activesupport";
 import {
   stringSuperclass,
   type StringInstance,
-  rbSetClassPathString,
+  rbModConstSet,
   rbStrInit,
 } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
@@ -51,5 +51,4 @@ export interface SqlLiteral
 
 include(SqlLiteral, stringSuperclass("eql", "hash", "isBlank"));
 
-rbSetClassPathString(SqlLiteral, Nodes, "SqlLiteral");
-Nodes.SqlLiteral = SqlLiteral;
+rbModConstSet(Nodes, "SqlLiteral", SqlLiteral);

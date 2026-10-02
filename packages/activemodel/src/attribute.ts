@@ -1,7 +1,7 @@
 import { ValueType } from "./type/value.js";
 import { defaultValue } from "./type.js";
 import { MissingAttributeError } from "./attribute-methods.js";
-import { hasKey, rbEqual, rbSetClassPathString, registerConstant } from "@blazetrails/ruby-compat";
+import { hasKey, rbEqual, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import { isDuplicable } from "@blazetrails/activesupport";
 import { ActiveModel } from "./namespaces.js";
 import type { UserProvidedDefault } from "./attribute/user-provided-default.js";
@@ -381,18 +381,12 @@ export class Uninitialized extends Attribute {
   }
 }
 
-rbSetClassPathString(Attribute, ActiveModel, "Attribute");
-rbSetClassPathString(FromDatabase, Attribute, "FromDatabase");
-rbSetClassPathString(FromUser, Attribute, "FromUser");
-rbSetClassPathString(WithCastValue, Attribute, "WithCastValue");
-rbSetClassPathString(Null, Attribute, "Null");
-rbSetClassPathString(Uninitialized, Attribute, "Uninitialized");
-Attribute.FromDatabase = FromDatabase;
-Attribute.FromUser = FromUser;
-Attribute.WithCastValue = WithCastValue;
-Attribute.Null = Null;
-Attribute.Uninitialized = Uninitialized;
-ActiveModel.Attribute = Attribute;
+rbModConstSet(ActiveModel, "Attribute", Attribute);
+rbModConstSet(Attribute, "FromDatabase", FromDatabase);
+rbModConstSet(Attribute, "FromUser", FromUser);
+rbModConstSet(Attribute, "WithCastValue", WithCastValue);
+rbModConstSet(Attribute, "Null", Null);
+rbModConstSet(Attribute, "Uninitialized", Uninitialized);
 
 registerConstant("ActiveModel::Attribute", Attribute);
 registerConstant("ActiveModel::Attribute::FromDatabase", FromDatabase);

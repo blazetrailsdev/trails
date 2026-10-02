@@ -1,5 +1,5 @@
 import { Attributes, Nodes, Visitors } from "../namespaces.js";
-import { NotImplementedError, rbObjClone, rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { NotImplementedError, rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
@@ -1310,7 +1310,5 @@ export class ToSql extends Visitor {
   }
 }
 
-rbSetClassPathString(UnsupportedVisitError, Visitors, "UnsupportedVisitError");
-Visitors.UnsupportedVisitError = UnsupportedVisitError;
-rbSetClassPathString(ToSql, Visitors, "ToSql");
-Visitors.ToSql = ToSql;
+rbModConstSet(Visitors, "UnsupportedVisitError", UnsupportedVisitError);
+rbModConstSet(Visitors, "ToSql", ToSql);

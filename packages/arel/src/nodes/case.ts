@@ -1,4 +1,4 @@
-import { rbObjClone, rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
@@ -74,9 +74,6 @@ type _AliasPredication = import("../alias-predication.js").AliasPredicationModul
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface Case extends _AliasPredication {}
 
-rbSetClassPathString(Case, Nodes, "Case");
-Nodes.Case = Case;
-rbSetClassPathString(When, Nodes, "When");
-Nodes.When = When;
-rbSetClassPathString(Else, Nodes, "Else");
-Nodes.Else = Else;
+rbModConstSet(Nodes, "Case", Case);
+rbModConstSet(Nodes, "When", When);
+rbModConstSet(Nodes, "Else", Else);

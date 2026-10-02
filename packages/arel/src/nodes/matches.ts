@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Binary, NodeOrValue } from "./binary.js";
 import type { Node } from "./node.js";
 import { buildQuoted } from "./casted.js";
@@ -21,7 +21,5 @@ export class Matches extends Binary {
 
 export class DoesNotMatch extends Matches {}
 
-rbSetClassPathString(Matches, Nodes, "Matches");
-Nodes.Matches = Matches;
-rbSetClassPathString(DoesNotMatch, Nodes, "DoesNotMatch");
-Nodes.DoesNotMatch = DoesNotMatch;
+rbModConstSet(Nodes, "Matches", Matches);
+rbModConstSet(Nodes, "DoesNotMatch", DoesNotMatch);

@@ -1,5 +1,5 @@
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
@@ -45,14 +45,11 @@ export class And extends Nary {}
 
 export class Or extends Nary {}
 
-rbSetClassPathString(And, Nodes, "And");
-Nodes.And = And;
-rbSetClassPathString(Or, Nodes, "Or");
-Nodes.Or = Or;
+rbModConstSet(Nodes, "And", And);
+rbModConstSet(Nodes, "Or", Or);
 
 type _AliasPredication = import("../alias-predication.js").AliasPredicationModule;
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface Nary extends _AliasPredication {}
 
-rbSetClassPathString(Nary, Nodes, "Nary");
-Nodes.Nary = Nary;
+rbModConstSet(Nodes, "Nary", Nary);

@@ -1,3 +1,6 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Collectors } from "../namespaces.js";
+
 export class SubstituteBinds {
   private quoter: { quote(value: unknown): string };
   private delegate: { append(str: string): unknown; value: string };
@@ -41,3 +44,5 @@ export class SubstituteBinds {
     return this.delegate.value;
   }
 }
+
+rbModConstSet(Collectors, "SubstituteBinds", SubstituteBinds);

@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { rbSetClassPathString } from "@blazetrails/ruby-compat";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Node } from "./node.js";
 import { Unary } from "./unary.js";
 
@@ -18,7 +18,5 @@ export class BitwiseNot extends UnaryOperation {
   }
 }
 
-rbSetClassPathString(UnaryOperation, Nodes, "UnaryOperation");
-Nodes.UnaryOperation = UnaryOperation;
-rbSetClassPathString(BitwiseNot, Nodes, "BitwiseNot");
-Nodes.BitwiseNot = BitwiseNot;
+rbModConstSet(Nodes, "UnaryOperation", UnaryOperation);
+rbModConstSet(Nodes, "BitwiseNot", BitwiseNot);

@@ -1,5 +1,5 @@
 import { include } from "@blazetrails/activesupport";
-import { rbSetClassPathString, Struct, type StructInstance } from "@blazetrails/ruby-compat";
+import { rbModConstSet, Struct, type StructInstance } from "@blazetrails/ruby-compat";
 import { Arel, Attributes } from "../namespaces.js";
 import { Node } from "../nodes/node.js";
 import { SqlLiteral } from "../nodes/sql-literal.js";
@@ -76,6 +76,5 @@ include(Attribute, AliasPredication);
 include(Attribute, OrderPredications);
 include(Attribute, MathMixin);
 
-rbSetClassPathString(Attribute, Attributes, "Attribute");
-Attributes.Attribute = Attribute;
+rbModConstSet(Attributes, "Attribute", Attribute);
 Arel.Attribute = Attributes.Attribute;
