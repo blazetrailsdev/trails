@@ -184,9 +184,7 @@ export class Developer extends Base {
       return this.where({ name: "Jamis" });
     });
 
-    this.validates("salary", {
-      inclusion: { in: { includes: (v: unknown) => Number(v) >= 50000 && Number(v) <= 200000 } },
-    } as any);
+    this.validatesInclusionOf("salary", { in: new Range(50000, 200000) });
     this.validates("name", { length: { in: new Range(3, 20) } });
 
     this.beforeCreate(async function (developer: Developer) {

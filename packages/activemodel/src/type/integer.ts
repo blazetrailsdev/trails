@@ -1,5 +1,5 @@
 import { isBlank } from "@blazetrails/activesupport";
-import { Range, rbDeclareIvar, toI, registerConstant } from "@blazetrails/ruby-compat";
+import { Range, rbDeclareIvar, rbModToS, toI, registerConstant } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 import { RangeError } from "../errors.js";
 import { applyNumericMixin, isNonNumericString } from "./helpers/numeric.js";
@@ -63,9 +63,8 @@ export class IntegerType extends NumericValueType {
   /** @internal */
   protected ensureInRange(value: number | bigint | null): number | bigint | null {
     if (!this.isInRange(value)) {
-      const klass = (this.constructor as { name: string }).name;
       throw new RangeError(
-        `${value} is out of range for ${klass} with limit ${this._limit()} bytes`,
+        `${value} is out of range for ${rbModToS(this.constructor as typeof IntegerType)} with limit ${this._limit()} bytes`,
       );
     }
     return value;

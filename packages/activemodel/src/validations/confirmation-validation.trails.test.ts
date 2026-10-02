@@ -5,6 +5,8 @@ import { describe, it, expect } from "vitest";
 import { include } from "@blazetrails/activesupport";
 import { Model } from "../index.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
+import { AcceptanceValidator } from "./acceptance.js";
+import { ConfirmationValidator } from "./confirmation.js";
 
 describe("ConfirmationValidationTest (trails-only)", () => {
   it("setup! auto-defines confirmation attribute", async () => {
@@ -104,5 +106,38 @@ describe("confirmation options pass-through", () => {
     expect(
       u.errors.objects.find((d) => d.attribute === "titleConfirmation")?.options?.caseSensitive,
     ).toBeUndefined();
+  });
+});
+
+describe("ConfirmationValidator and AcceptanceValidator defaults", () => {
+  it("merges the defaults into options in initialize", () => {
+    class Person extends Model {}
+    expect(new ConfirmationValidator({ attributes: ["email"], class: Person }).options).toEqual({
+      caseSensitive: true,
+    });
+    expect(
+      new ConfirmationValidator({ attributes: ["email"], class: Person, caseSensitive: false })
+        .options,
+    ).toEqual({ caseSensitive: false });
+    expect(new AcceptanceValidator({ attributes: ["terms"], class: Person }).options).toEqual({
+      allowNil: true,
+      accept: ["1", true],
+    });
+  });
+
+  it("folds only ASCII letters when case_sensitive is false, as String#casecmp does", async () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        this.attribute("email", "string");
+        this.validates("email", { confirmation: { caseSensitive: false } });
+      }
+    }
+    interface Person extends Attributes {}
+
+    expect(await new Person({ email: "ÉA", emailConfirmation: "Éa" }).isValid()).toBe(true);
+    expect(await new Person({ email: "ÉA", emailConfirmation: "éa" }).isValid()).toBe(false);
   });
 });

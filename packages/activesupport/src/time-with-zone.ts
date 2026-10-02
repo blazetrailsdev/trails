@@ -20,7 +20,7 @@ import { zone as timeZone, findZone, findZoneBang } from "./time-zone-config.js"
 import { DateTime, Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { Time } from "@blazetrails/date";
-import { Rational, rational, rbEqual, rbInspect } from "@blazetrails/ruby-compat";
+import { Rational, rational, rbEqual, rbInspect, rbObjDup } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "./hash-utils.js";
 import { Encoding } from "./json/encoding.js";
 import { DATE_FORMATS, toFs } from "./core-ext/time/conversions.js";
@@ -862,6 +862,16 @@ export class TimeWithZone {
 
   isPresent(): boolean {
     return true;
+  }
+
+  /**
+   * `Object#dup` (`vendor/ruby/v3.3.11/object.c:591`): the copy is wrapped as the
+   * constructor wraps `this`, so it keeps answering `method_missing`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  dup(): this {
+    return new Proxy(rbObjDup(this), METHOD_MISSING_HANDLER) as this;
   }
 
   freeze(): this {

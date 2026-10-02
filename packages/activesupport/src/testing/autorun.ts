@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect } from "vitest";
 import type { TestContext } from "vitest";
 import { getFn, setFn } from "vitest/suite";
 import { Time } from "@blazetrails/date";
+import { iseqLocationSetup } from "@blazetrails/ruby-compat";
 import { safeConstantize } from "../inflector.js";
 import { TestCase } from "../test-case.js";
 import { Assertion, Skip, UnexpectedError, _takeAssertions } from "./assertions.js";
@@ -46,6 +47,11 @@ beforeEach(async (context: TestContext) => {
     capturing.add(captureExceptions);
     setFn(context.task, captureExceptions);
   }
+  const test = getFn(context.task);
+  iseqLocationSetup(test, context.task.file.filepath, context.task.location?.line ?? 0);
+  if (!(testCase.name in testCase)) {
+    Object.defineProperty(testCase, testCase.name, { value: test, configurable: true });
+  }
   await testCase.beforeSetup();
 });
 
@@ -54,12 +60,9 @@ afterEach(async (context: TestContext) => {
   if (testCase === undefined) return;
   const task = context.task as {
     mode?: string;
-    location?: { line?: number };
-    file?: { filepath?: string };
     result?: { state?: string; errors?: unknown[] };
   };
   testCase.assertions = (expect.getState().assertionCalls ?? 0) + _takeAssertions();
-  testCase.sourceLocation = [task.file?.filepath ?? "", task.location?.line ?? 0];
   const { from, at, count } = captured.get(testCase) ?? { from: 0, at: -1, count: 0 };
   (task.result?.errors ?? []).forEach((e, i) => {
     if (i < from || (i >= at && i < at + count)) return;

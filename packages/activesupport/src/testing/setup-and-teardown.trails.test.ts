@@ -15,16 +15,19 @@ vi.mock("./time-helpers.js", async (importOriginal) => {
 import { Assertion, Skip, UnexpectedError } from "./assertions.js";
 import { _takeAssertions, assertNot, assertRaises } from "./assertions.js";
 import { TestCase } from "../test-case.js";
-import { Module, include } from "@blazetrails/ruby-compat";
+import { Module, include, iseqLocationSetup } from "@blazetrails/ruby-compat";
 
 function testCase(): typeof TestCase {
   return class extends TestCase {};
 }
 
+const aTest = (): void => {};
+iseqLocationSetup(aTest, "some_test.ts", 12);
+
 function runningTest(klass: typeof TestCase = TestCase): TestCase {
   const test = new klass("a test");
   test.assertions = 1;
-  test.sourceLocation = ["some_test.ts", 12];
+  Object.defineProperty(test, "a test", { value: aTest, configurable: true });
   return test;
 }
 

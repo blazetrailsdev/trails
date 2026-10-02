@@ -9,6 +9,9 @@ import {
   rbObjAsString as toS,
   rbObjRespondTo,
   rbFPublicSend,
+  rbModAttrReader,
+  rbModAttrWriter,
+  rbModMethodDefined,
   rbFSend,
   toSym,
   isNil,
@@ -248,6 +251,27 @@ class Req {
   }
 }
 
+describe("rbFPublicSend include?", () => {
+  it("answers for the core receivers with no isInclude entry of their own", () => {
+    expect(rbFPublicSend("rubyist", "isInclude", "ruby")).toBe(true);
+    expect(rbFPublicSend([1, 2], "isInclude", 2)).toBe(true);
+    expect(rbFPublicSend(new Set([1]), "isInclude", 2)).toBe(false);
+    expect(rbFPublicSend(new Map([["a", 1]]), "isInclude", "a")).toBe(true);
+    expect(rbFPublicSend({ a: 1 }, "isInclude", "a")).toBe(true);
+    expect(rbFPublicSend({ a: 1 }, "isInclude", "toString")).toBe(false);
+  });
+
+  it("raises TypeError for String#include? with a non-String", () => {
+    expect(() => rbFPublicSend("rubyist", "isInclude", 1)).toThrow(
+      "no implicit conversion of Integer into String",
+    );
+  });
+
+  it("raises NoMethodError for a receiver that does not define it", () => {
+    expect(() => rbFPublicSend(1, "isInclude", 1)).toThrow(NoMethodError);
+  });
+});
+
 describe("rbFSend", () => {
   it("calls a method, a getter, or reads a field by name", () => {
     const req = new Req();
@@ -341,6 +365,43 @@ describe("rbModPublicMethodDefined", () => {
     expect(rbModPublicMethodDefined(Req, "field")).toBe(false);
     expect(rbModPublicMethodDefined(Req, "hasOwnProperty")).toBe(false);
     expect(rbModPublicMethodDefined(Req, "nope")).toBe(false);
+  });
+});
+
+describe("rbModAttrReader / rbModAttrWriter / rbModMethodDefined", () => {
+  it("defines a reader and a writer over one ivar, each keeping the other half", () => {
+    class Person {}
+    expect(rbModMethodDefined(Person, "name")).toBe(false);
+    expect(rbModMethodDefined(Person, "name=")).toBe(false);
+
+    rbModAttrReader(Person, "name");
+    expect(rbModMethodDefined(Person, "name")).toBe(true);
+    expect(rbModMethodDefined(Person, "name=")).toBe(false);
+
+    rbModAttrWriter(Person, "name=");
+    expect(rbModMethodDefined(Person, "name=")).toBe(true);
+
+    const person = new Person() as { name: unknown };
+    expect(person.name).toBeNull();
+    person.name = "dhh";
+    expect(person.name).toBe("dhh");
+    expect(rbObjIvarGet(person, "@name")).toBe("dhh");
+  });
+
+  it("keeps an inherited writer when only the reader is defined", () => {
+    class Base {
+      written: unknown;
+      set title(value: unknown) {
+        this.written = value;
+      }
+    }
+    class Sub extends Base {}
+    rbModAttrReader(Sub, "title");
+
+    const sub = new Sub() as unknown as { title: unknown; written: unknown };
+    sub.title = "x";
+    expect(sub.written).toBe("x");
+    expect(sub.title).toBeNull();
   });
 });
 

@@ -1513,6 +1513,29 @@ export class Time {
     return n > 0n ? 1 : -1;
   }
 
+  /**
+   * `Object#dup` over `time_s_alloc` and `time_init_copy`
+   * (`vendor/ruby/v3.3.11/time.c:1905,4046`), whose `MEMCPY` copies the whole
+   * `time_object`. The seats are private fields, which only the constructor
+   * can install.
+   */
+  dup(): this {
+    seatedTime = {
+      zoned: this.#zoned,
+      plain: this.#plainMemo,
+      utcOffset: this.#utcOffsetMemo,
+      instant: this.#instant,
+      timeZoneId: this.#timeZoneId,
+      tzmodeUtc: this.#tzmodeUtc,
+      localZone: this.#localZone,
+      subnano: this.#subnano,
+    };
+    const dup = new (this.constructor as typeof Time)(0) as this;
+    dup.#zoneObject = this.#zoneObject;
+    dup.#isdstMemo = this.#isdstMemo;
+    return dup;
+  }
+
   eql(other: unknown): boolean {
     if (!(other instanceof Time)) return false;
     return (

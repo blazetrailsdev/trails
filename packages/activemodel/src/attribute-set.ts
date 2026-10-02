@@ -1,4 +1,5 @@
 import {
+  deepDup,
   indexWith,
   isPlainObject,
   reverseMergeBang as hashReverseMergeBang,
@@ -183,7 +184,7 @@ export class AttributeSet {
   }
 
   deepDup(): AttributeSet {
-    return new AttributeSet(transformValues(this.attributes(), (attr) => attr.deepDup()));
+    return new AttributeSet(transformValues(this.attributes(), (attr) => deepDup(attr)));
   }
 
   initializeDup(_: AttributeSet): void {

@@ -22,6 +22,7 @@
 
 import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
+import { temporalTag } from "./temporal-tag.js";
 import { FL_SINGLETON, T_ICLASS, classpaths, rbAnyToS, rbModName, rbModToS } from "./object.js";
 
 type AnyClass = new (...args: never[]) => unknown;
@@ -1126,10 +1127,15 @@ export type Extended<M extends object> = CallableMethods<M>;
  * then `initialize_clone(orig)` dispatched on the copy, which is frozen after
  * that hook runs when the receiver is. The singleton class is copied, not
  * shared, so the clone's `extend()` registries are its own. A JS primitive is
- * MRI's `special_object_p` (:380-393) and is returned as is (:539); an array is
- * allocated as one (`rb_obj_alloc`), so its elements, which Ruby copies in
- * `Array#initialize_copy` (`array.c:8613`, `rb_ary_replace`), land on a real
- * array.
+ * MRI's `special_object_p` (:380-393) and is returned as is (:539), and so is
+ * a Temporal value, which is immutable and keeps its state where no copy can
+ * reach. An array is allocated as one (`rb_obj_alloc`), so its elements, which
+ * Ruby copies in `Array#initialize_copy` (`array.c:8613`, `rb_ary_replace`),
+ * land on a real array. A JS `Date`, `Map`, `Set` and `RegExp` hold their
+ * state in internal slots, so each is allocated from the receiver the way its
+ * Ruby class's `initialize_copy` fills the allocation (`time_init_copy`,
+ * `vendor/ruby/v3.3.11/time.c:4046`; `rb_hash_replace`, `hash.c:2967`;
+ * `Set#initialize_dup`, `lib/set.rb:284`; `rb_reg_init_copy`, `re.c:4386`).
  *
  * Ruby's `Object#initialize_clone` / `#initialize_dup` default to
  * `initialize_copy` (`rb_obj_init_clone` / `rb_obj_init_dup_clone`, object.c:4382-4383), so a
@@ -1143,6 +1149,7 @@ export type Extended<M extends object> = CallableMethods<M>;
  */
 export function rbObjClone<T>(obj: T): T {
   if (obj === null || (typeof obj !== "object" && typeof obj !== "function")) return obj;
+  if (temporalTag(obj) !== null) return obj;
   const frozen = Object.isFrozen(obj);
   const descriptors = copiedDescriptors(obj, frozen);
   for (const registry of [extendedKeys, includedModulesKey]) {
@@ -1168,6 +1175,7 @@ export function rbObjClone<T>(obj: T): T {
  */
 export function rbObjDup<T>(obj: T): T {
   if (obj === null || (typeof obj !== "object" && typeof obj !== "function")) return obj;
+  if (temporalTag(obj) !== null) return obj;
   const descriptors = copiedDescriptors(obj, true);
   const singletonKeys = Object.prototype.hasOwnProperty.call(obj, extendedKeys)
     ? ((obj as Record<symbol, unknown>)[extendedKeys] as Set<string>)
@@ -1185,7 +1193,12 @@ export function rbObjDup<T>(obj: T): T {
 }
 
 function rbObjAlloc(obj: object, proto: object | null): object {
-  return Array.isArray(obj) ? Object.setPrototypeOf([], proto) : Object.create(proto);
+  if (Array.isArray(obj)) return Object.setPrototypeOf([], proto);
+  if (obj instanceof Date) return Object.setPrototypeOf(new Date(obj.getTime()), proto);
+  if (obj instanceof Map) return Object.setPrototypeOf(new Map(obj), proto);
+  if (obj instanceof Set) return Object.setPrototypeOf(new Set(obj), proto);
+  if (obj instanceof RegExp) return Object.setPrototypeOf(new RegExp(obj), proto);
+  return Object.create(proto);
 }
 
 function copiedDescriptors(
@@ -1199,7 +1212,10 @@ function copiedDescriptors(
   if (unfreeze) {
     for (const key of Reflect.ownKeys(descriptors)) {
       const descriptor = descriptors[key as string];
-      descriptor.configurable = !(key === "length" && Array.isArray(obj));
+      descriptor.configurable = !(
+        (key === "length" && Array.isArray(obj)) ||
+        (key === "lastIndex" && obj instanceof RegExp)
+      );
       if (!descriptor.get && !descriptor.set) descriptor.writable = true;
     }
   }

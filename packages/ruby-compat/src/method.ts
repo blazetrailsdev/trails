@@ -63,6 +63,35 @@ export class Method {
     const [min, max] = rbIseqMinMaxArity(this.#func);
     return min === max ? min : -min - 1;
   }
+
+  /**
+   * `Method#source_location` (`vendor/ruby/v3.3.11/proc.c:3015` `rb_method_location`,
+   * over `method_def_location` at `:2989` and `iseq_location` at `:1354`): the
+   * body's `[path, first_lineno]`, or `nil` for a body no
+   * {@link iseqLocationSetup} located, as for a method not defined in Ruby.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  sourceLocation(): [string, number] | null {
+    return locations.get(this.#func) ?? null;
+  }
+}
+
+const locations = new WeakMap<object, [string, number]>();
+
+/**
+ * `iseq_location_setup` (`vendor/ruby/v3.3.11/iseq.c:550`): the `path` and
+ * `first_lineno` a body is compiled with. A JS function does not expose where
+ * it was written, so whoever defines the method records it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function iseqLocationSetup(
+  iseq: (...args: never[]) => unknown,
+  path: string,
+  firstLineno: number,
+): void {
+  locations.set(iseq, [path, firstLineno]);
 }
 
 /**

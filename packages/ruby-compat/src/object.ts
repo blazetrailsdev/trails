@@ -1,5 +1,7 @@
+import { aryIncludes } from "./array.js";
+import { hasKey } from "./hash.js";
 import { stringInspect } from "./string/inspect.js";
-import { rbCheckStringType } from "./string/support.js";
+import { rbCheckStringType, stringValue } from "./string/support.js";
 import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
 import { cmp, rbCmpint, rubyClass, type Comparable } from "./comparable.js";
 import { rbEqual } from "./rb-equal.js";
@@ -304,6 +306,7 @@ export function objRespondToMissing(_obj: unknown, _mid: string, _priv: boolean)
 }
 
 function checkDefinitionVisibility(mod: { prototype: object }, mid: string): boolean {
+  const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   for (
     let o: object | null = mod.prototype;
     o && o !== Object.prototype;
@@ -311,8 +314,78 @@ function checkDefinitionVisibility(mod: { prototype: object }, mid: string): boo
   ) {
     const me = Object.getOwnPropertyDescriptor(o, mid);
     if (me) return typeof me.value === "function" || me.get !== undefined;
+    if (attr !== undefined && Object.getOwnPropertyDescriptor(o, attr)?.set) return true;
   }
   return false;
+}
+
+/**
+ * `Module#method_defined?` (`rb_mod_method_defined`,
+ * `vendor/ruby/v3.3.11/vm_method.c:2055`, through `check_definition_visibility`,
+ * `:1988`): whether `mod`'s instances have a public or protected method `mid`.
+ * A JS entry carries no visibility, so it answers as
+ * {@link rbModPublicMethodDefined} does. A writer `name=` is answered by a JS
+ * accessor's setter, the entry {@link rbFSend} dispatches it to.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModMethodDefined(mod: { prototype: object }, mid: string): boolean {
+  return checkDefinitionVisibility(mod, mid);
+}
+
+/**
+ * `rb_attr` (`vendor/ruby/v3.3.11/vm_method.c:1863`): the reader `id` and the
+ * writer `id=` over the ivar `@id`. A JS accessor is one descriptor, so the
+ * half not being defined keeps the nearest entry's, and the ivar behind a
+ * same-named reader lives in the `_`-prefixed field ({@link rbDeclareIvar}).
+ */
+function rbAttr(klass: { prototype: object }, id: string, read: boolean, write: boolean): void {
+  const attriv = `_${id}`;
+  rbDeclareIvar(klass, `@${id.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)}`, attriv);
+  let me: PropertyDescriptor | undefined;
+  for (
+    let o: object | null = klass.prototype;
+    o && !me;
+    o = Object.getPrototypeOf(o) as object | null
+  ) {
+    me = Object.getOwnPropertyDescriptor(o, id);
+  }
+  Object.defineProperty(klass.prototype, id, {
+    configurable: true,
+    get: read
+      ? function (this: Record<string, unknown>) {
+          return this[attriv] ?? null;
+        }
+      : me?.get,
+    set: write
+      ? function (this: Record<string, unknown>, val: unknown) {
+          this[attriv] = val;
+        }
+      : me?.set,
+  });
+}
+
+/**
+ * `Module#attr_reader` (`rb_mod_attr_reader`, `vendor/ruby/v3.3.11/object.c:2279`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModAttrReader(klass: { prototype: object }, ...argv: string[]): void {
+  for (const id of argv) {
+    rbAttr(klass, id, true, false);
+  }
+}
+
+/**
+ * `Module#attr_writer` (`rb_mod_attr_writer`, `vendor/ruby/v3.3.11/object.c:2335`).
+ * A name is spelled with or without the writer's `=`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModAttrWriter(klass: { prototype: object }, ...argv: string[]): void {
+  for (const id of argv) {
+    rbAttr(klass, id.endsWith("=") ? id.slice(0, -1) : id, false, true);
+  }
 }
 
 /**
@@ -390,7 +463,11 @@ export function toSym(obj: unknown): string {
  * Date, or an object defining `<=>`), go through `cmpint`
  * (`vendor/ruby/v3.3.11/compar.c:105-147`) and raise `ArgumentError` for a pair
  * `<=>` cannot place. Any other receiver, `nil` included, has no such method
- * and raises `NoMethodError`.
+ * and raises `NoMethodError`. `include?` is dispatched
+ * for the core receivers {@link basicObjRespondTo} binds it for, when no entry
+ * of their own answers: `String#include?` (`vendor/ruby/v3.3.11/string.c:12215`),
+ * `Array#include?` (`array.c:8679`), `Hash#include?` (`hash.c:7255`) and
+ * `Set#include?` (`lib/set.rb:393`).
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#send` (`vendor/ruby/v3.3.11/vm_eval.c:1330`).
  */
@@ -466,6 +543,12 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     if (desc && argc === 0) return desc.get ? desc.get.call(recv) : desc.value;
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
     if (setter) return setter.call(recv, args[0]);
+  }
+  if (mid === "isInclude") {
+    if (typeof recv === "string") return recv.includes(stringValue(args[0]));
+    if (Array.isArray(recv)) return aryIncludes(recv, args[0]);
+    if (recv instanceof Set || recv instanceof Map) return recv.has(args[0]);
+    if (isPlainHash(recv)) return hasKey(recv, args[0] as PropertyKey);
   }
   if (typeof obj.methodMissing === "function") {
     return (obj.methodMissing as AnyFunction).call(recv, mid, ...args);

@@ -287,11 +287,6 @@ export class Error {
     return [this.base, this.attribute, this.rawType, except(this.options, ...CALLBACKS_OPTIONS)];
   }
 
-  /** @noRailsEquivalent CONVERGEABLE deep-dup-has-no-object-arm-so-classes-hand-write-it */
-  deepDup(): this {
-    return rbObjDup(this);
-  }
-
   inspect(): string {
     return `#<${rbModName(this.constructor as typeof Error) ?? ""} attribute=${isSymbol(this.attribute) ? symbolToS(this.attribute) : this.attribute}, type=${isSymbol(this.type) ? symbolToS(this.type) : this.type}, options=${rbInspect(this.options)}>`;
   }

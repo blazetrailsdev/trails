@@ -4,11 +4,13 @@ import {
   dup,
   hashDelete,
   isSymbol,
+  rbObjDup,
   rbObjRespondTo,
   symbolToS,
   valuesAt,
 } from "@blazetrails/ruby-compat";
 import { isBlank } from "./core-ext/object/blank.js";
+import { isDuplicable } from "./core-ext/object/duplicable.js";
 import * as XmlMini from "./xml-mini.js";
 import { XMLConverter } from "./core-ext/hash/conversions.js";
 import { ActiveSupportJSON } from "./json.js";
@@ -79,9 +81,6 @@ export function deepDup<T>(obj: T): T {
     }
     return hash as T;
   }
-  if (typeof (obj as { deepDup?: unknown }).deepDup === "function") {
-    return (obj as unknown as { deepDup(): T }).deepDup();
-  }
   if (typeof obj === "object" && isPlainObject(obj)) {
     const result: AnyObject = {};
     for (const key of Object.keys(obj as AnyObject)) {
@@ -89,7 +88,15 @@ export function deepDup<T>(obj: T): T {
     }
     return result as T;
   }
-  return obj;
+  if (rbObjRespondTo(obj, "deepDup")) {
+    return (obj as unknown as { deepDup(): T }).deepDup();
+  }
+  if (typeof obj !== "object") return obj;
+  return isDuplicable(obj)
+    ? rbObjRespondTo(obj, "dup")
+      ? (obj as unknown as { dup(): T }).dup()
+      : rbObjDup(obj)
+    : obj;
 }
 
 export function slice<T extends AnyObject, K extends keyof T>(obj: T, ...keys: K[]): Pick<T, K> {
