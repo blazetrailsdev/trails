@@ -179,7 +179,7 @@ class FlashIntegrationTestSession extends IntegrationTest {
 }
 
 async function withTestRouteSet(block: (t: IntegrationTest) => Promise<void>): Promise<void> {
-  const t = new FlashIntegrationTestSession();
+  const t = new FlashIntegrationTestSession(expect.getState().currentTestName!);
   t.routes.draw(function () {
     this.get("/set_bar", { to: "flash_integration_test#setBar" });
   });

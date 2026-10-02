@@ -26,12 +26,15 @@ import {
   Enumerable,
   getFs,
   getPath,
+  hashAref,
+  hashAset,
   include,
   RFC2396_PARSER,
   rbInspect,
   rbFSend,
   rbModPublicMethodDefined,
   rbObjRespondTo,
+  rtest,
   stringSplit,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -1320,7 +1323,7 @@ export class Mapper {
       }
     }
 
-    if (!path) {
+    if (path == null) {
       let msg =
         `Your router tried to #draw the external file ${name}.ts,\n` +
         "but the file was not found in:\n\n";
@@ -1488,35 +1491,53 @@ export class Mapper {
     }
   }
 
-  mount(app: MountableApp, options: MountOptions = {}): void {
-    const path = options.at;
-    if (typeof app !== "function" && typeof (app as { call?: unknown })?.call !== "function") {
-      throw new Error("A rack application must be specified");
+  mount(app: MountableApp, options?: MountOptions | null): this;
+  mount(app: Map<unknown, unknown>): this;
+  mount(
+    app: MountableApp | Map<unknown, unknown>,
+    options: MountOptions | Map<unknown, unknown> | null = null,
+  ): this {
+    let path: string | null | undefined;
+    if (options) {
+      path = hashDelete(options, "at") as string | null;
+    } else if (app instanceof Map) {
+      options = app;
+      [app, path] = ([...options].find(([k, _]) => rbObjRespondTo(k, "call")) ?? []) as [
+        MountableApp,
+        string,
+      ];
+      if (app) options.delete(app);
     }
-    if (!path) {
-      throw new Error('Must be called with mount point\n\n  mount SomeRackApp, at: "some_route"');
+
+    if (!rbObjRespondTo(app, "call")) {
+      throw new ArgumentError("A rack application must be specified");
     }
+    if (path == null) {
+      throw new ArgumentError(
+        "Must be called with mount point\n\n" +
+          '  mount SomeRackApp, at: "some_route"\n' +
+          "  or\n" +
+          '  mount(SomeRackApp => "some_route")\n',
+      );
+    }
+
     const railsApp = this.isRailsApp(app);
-    const asName = options.as ?? this.appName(app, railsApp);
-    const matchOpts: RouteOptions & { via?: string | string[]; at?: string } = {
-      anchor: false,
-      format: false,
-      ...options,
-      via: options.via ?? ":all",
-      to: app,
-    };
-    if (asName) matchOpts.as = asName;
-    delete matchOpts.at;
-    this.match(path, matchOpts);
-    if (asName) this._mountedApps.set(asName, { app, path });
-    if (railsApp && asName) this.defineGeneratePrefix(app, asName, path);
+    if (!rtest(hashAref(options!, "as"))) hashAset(options!, "as", this.appName(app, railsApp));
+
+    const targetAs = this.nameForAction(hashAref(options!, "as") as string | null, path);
+    if (!rtest(hashAref(options!, "via"))) hashAset(options!, "via", ":all");
+
+    this.match(
+      path,
+      merge({ to: app as MountableApp, anchor: false, format: false }, options as RouteOptions),
+    );
+
+    if (railsApp) this.defineGeneratePrefix(app as RailsApp, targetAs!, path);
+    return this;
   }
 
   /** @internal */
-  _mountedApps: Map<string, { app: MountableApp; path: string }> = new Map();
-
-  /** @internal */
-  isRailsApp(app: MountableApp): app is RailsApp {
+  isRailsApp(app: unknown): app is RailsApp {
     return (
       typeof app === "function" &&
       Object.getOwnPropertyDescriptor(app, "prototype")?.writable === false &&
@@ -1525,7 +1546,7 @@ export class Mapper {
   }
 
   /** @internal */
-  appName(app: MountableApp, railsApp: boolean): string | undefined {
+  appName(app: unknown, railsApp: boolean): string | undefined {
     if (railsApp) {
       return (app as RailsApp).railtieName();
     } else if (
@@ -2009,7 +2030,10 @@ export class Mapper {
   }
 
   /** @internal */
-  prefixNameForAction(as: string | undefined, action: string | undefined): string | undefined {
+  prefixNameForAction(
+    as: string | null | undefined,
+    action: string | undefined,
+  ): string | undefined {
     let prefix: string | undefined;
     if (as !== undefined && as !== null) prefix = as;
     else if (action && !this.canonicalAction(action)) prefix = action;
@@ -2020,7 +2044,7 @@ export class Mapper {
   }
 
   /** @internal */
-  nameForAction(as: string | undefined, action: string | undefined): string | undefined {
+  nameForAction(as: string | null | undefined, action: string | undefined): string | undefined {
     const prefix = this.prefixNameForAction(as, action);
     const namePrefix = this._scope.get("as") as string | undefined;
     let collectionName: string | undefined;
@@ -2255,7 +2279,7 @@ interface ScopeOptions {
 
 interface MountOptions extends RouteOptions {
   at?: string;
-  via?: string | string[];
+  via?: string | string[] | false | null;
 }
 
 function allowedActions(options: RouteOptions, all: ResourceAction[]): Set<ResourceAction> {

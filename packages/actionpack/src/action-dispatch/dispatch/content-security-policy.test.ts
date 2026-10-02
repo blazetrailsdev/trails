@@ -465,7 +465,7 @@ CspIntegrationController.contentSecurityPolicy({ only: ["api"] }, (p) => {
 });
 
 function buildCspApp() {
-  const app = new IntegrationTest();
+  const app = new IntegrationTest(expect.getState().currentTestName!);
   app.routes.draw(function () {
     this.get("/", { to: "csp#index" });
     this.get("/inline", { to: "csp#inline" });
@@ -596,12 +596,12 @@ describe("DefaultContentSecurityPolicyIntegrationTest", () => {
     );
   });
 
-  it("redirect works with dynamic sources", async () => {
+  it("redirect works with dynamic sources", async ({ task }) => {
     const dynamicPolicy = new ContentSecurityPolicy((p) => {
       p.defaultSrc(() => ":self");
       p.scriptSrc(() => ":https");
     });
-    const app = new IntegrationTest();
+    const app = new IntegrationTest(task.name);
     app.routes.draw(function () {
       this.get("/redirect", { to: "csp#redirect" });
       this.get("/", { to: "csp#index" });
@@ -627,13 +627,13 @@ describe("DefaultContentSecurityPolicyIntegrationTest", () => {
 });
 
 describe("NonceDirectiveContentSecurityPolicyIntegrationTest", () => {
-  it("generate nonce only specified in nonce directives", async () => {
+  it("generate nonce only specified in nonce directives", async ({ task }) => {
     const policy = new ContentSecurityPolicy((p) => {
       p.defaultSrc(() => ":self");
       p.scriptSrc(() => ":https");
       p.styleSrc(() => ":https");
     });
-    const app = new IntegrationTest();
+    const app = new IntegrationTest(task.name);
     app.routes.draw(function () {
       this.get("/", { to: "csp#index" });
     });

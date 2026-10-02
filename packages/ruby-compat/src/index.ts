@@ -67,6 +67,8 @@ export {
   except,
   fetch,
   hasKey,
+  hashAref,
+  hashAset,
   hashDelete,
   inspect,
   isInclude,

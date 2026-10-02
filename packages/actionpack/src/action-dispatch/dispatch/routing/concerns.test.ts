@@ -51,8 +51,8 @@ describe("RoutingConcernsTest", () => {
     controllerConstants.set("reviews", ReviewsController);
   });
 
-  beforeEach(() => {
-    session = new IntegrationTest();
+  beforeEach(({ task }) => {
+    session = new IntegrationTest(task.name);
     session.routes = Routes;
     session.app = Routes;
   });

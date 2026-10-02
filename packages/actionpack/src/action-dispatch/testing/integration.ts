@@ -70,23 +70,9 @@ export class IntegrationTest extends TestCase {
   /** @internal */
   _defaultUrlOptions: Record<string, unknown> = {};
 
-  constructor(name?: string) {
-    super(name!);
-    this.resetBang();
-    const app = this.app as { routes?: unknown } | null;
-    const routes = typeof app?.routes === "function" ? app.routes() : app?.routes;
-    if (rbObjRespondTo(app, "routes") && routes instanceof RouteSet) {
-      const session = this.constructor as typeof IntegrationTest;
-      let klass = APP_SESSIONS.get(app);
-      if (klass === undefined || Object.getPrototypeOf(klass) !== session) {
-        klass = class extends session {};
-        klass.prototype.constructor = session;
-        include(klass, routes.urlHelpers());
-        include(klass, routes.mountedHelpers());
-        APP_SESSIONS.set(app, klass);
-      }
-      Object.setPrototypeOf(this, klass.prototype);
-    }
+  constructor(...args: ConstructorParameters<typeof TestCase>) {
+    super(...args);
+    this._integrationSession = null;
   }
 
   resetBang(): void {
@@ -101,6 +87,7 @@ export class IntegrationTest extends TestCase {
     this.host = DEFAULT_HOST;
     this.remoteAddr = DEFAULT_REMOTE_ADDR;
     this.accept = DEFAULT_ACCEPT;
+    this._integrationSession = this.createSession(this.app);
   }
 
   httpsBang(flag: boolean = true): void {
@@ -370,17 +357,37 @@ export class IntegrationTest extends TestCase {
     await this.process("OPTIONS", path, options);
   }
 
+  /** @internal */
+  _integrationSession: this | null;
+
   get integrationSession(): this {
-    return this;
+    return (this._integrationSession ??= this.createSession(this.app));
   }
 
-  /** @internal */
-  createSession(app?: unknown): IntegrationTest {
-    const Ctor = this.constructor as new () => IntegrationTest;
-    const sess = new Ctor();
-    sess.routes = this.routes;
-    sess._app = app ?? this._app;
-    return sess;
+  /**
+   * @internal
+   * @missingRailsCall new — CONVERGEABLE integration-runner-merged-into-session
+   */
+  createSession(app: unknown): this {
+    const session = this.constructor as typeof IntegrationTest;
+    let klass = APP_SESSIONS.get(app);
+    if (klass === undefined || Object.getPrototypeOf(klass) !== session) {
+      klass = class extends session {};
+      klass.prototype.constructor = session;
+      const railsApp = app as { routes: RouteSet | (() => RouteSet) };
+      if (
+        rbObjRespondTo(app, "routes") &&
+        (typeof railsApp.routes === "function" ? railsApp.routes() : railsApp.routes) instanceof
+          RouteSet
+      ) {
+        const routes = typeof railsApp.routes === "function" ? railsApp.routes() : railsApp.routes;
+        include(klass, routes.urlHelpers());
+        include(klass, routes.mountedHelpers());
+      }
+      APP_SESSIONS.set(app, klass);
+    }
+    Object.setPrototypeOf(this, klass.prototype);
+    return this;
   }
 
   /** @internal */
@@ -501,6 +508,32 @@ export class IntegrationTest extends TestCase {
   }
 }
 
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function spliceMethodMissing(proto: object): void {
+  Object.setPrototypeOf(
+    proto,
+    new Proxy(Object.create(Object.getPrototypeOf(proto) as object) as object, {
+      get(target, prop, receiver: IntegrationTest) {
+        if (
+          typeof prop === "symbol" ||
+          Reflect.has(target, prop) ||
+          !Object.hasOwn(receiver, "_integrationSession")
+        ) {
+          return Reflect.get(target, prop, receiver);
+        }
+        if (Reflect.has(receiver.integrationSession, prop)) {
+          return Reflect.get(receiver.integrationSession, prop, receiver);
+        } else {
+          return Reflect.get(target, prop, receiver);
+        }
+      },
+    }),
+  );
+}
+
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include TestProcess` and `include TestProcess::FixtureFile` (`actionpack/lib/action_dispatch/testing/integration.rb:95,651`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface IntegrationTest
   extends
@@ -531,6 +564,7 @@ proto.saveAndOpenPage = pageDumpHelper.saveAndOpenPage;
 proto.savePage = pageDumpHelper.savePage;
 proto.openFile = pageDumpHelper.openFile;
 proto.htmlDumpDefaultPath = pageDumpHelper.htmlDumpDefaultPath;
+spliceMethodMissing(proto);
 include(IntegrationTest, urlForMod.UrlFor);
 
 runLoadHooks("action_dispatch_integration_test", IntegrationTest);

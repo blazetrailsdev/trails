@@ -8,8 +8,8 @@ import { RoutedRackApp } from "../../../test-helpers/abstract-unit.js";
 describe("RoutingInstrumentationTest", () => {
   let t: IntegrationTest;
 
-  beforeEach(() => {
-    t = new IntegrationTest();
+  beforeEach(({ task }) => {
+    t = new IntegrationTest(task.name);
   });
 
   it("redirect is instrumented", async () => {

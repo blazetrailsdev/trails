@@ -1430,6 +1430,7 @@ the capability, in a different place. Each is decided here, and each but
 | `action_controller/metal/mime_responds.rb`            | Proxy                 |
 | `action_dispatch/http/mime_type.rb`                   | Proxy (`is…` names)   |
 | `action_dispatch/testing/assertions/routing.rb`       | Proxy (proto chain)   |
+| `action_dispatch/testing/integration.rb`              | Proxy (proto chain)   |
 | `thor/core_ext/hash_with_indifferent_access.rb`       | Proxy (proto chain)   |
 
 A Proxy row whose Ruby class also defines `respond_to_missing?` forwards a

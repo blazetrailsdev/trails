@@ -235,21 +235,71 @@ export function hashDelete<T, U = null>(
   hash: Record<string, T>,
   key: string,
   block?: (key: string) => U,
-): T | U | null {
+): T | U | null;
+/**
+ * The Map arm: `rb_hash_delete_m` is the same removal whichever hash it is given.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#delete` (`vendor/ruby/v3.3.11/hash.c:2441`).
+ */
+export function hashDelete<K, V, U = null>(
+  hash: Map<K, V>,
+  key: K,
+  block?: (key: K) => U,
+): V | U | null;
+/**
+ * Either hash, where the caller holds one it cannot tell apart statically.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#delete` (`vendor/ruby/v3.3.11/hash.c:2441`).
+ */
+export function hashDelete(hash: object, key: unknown): unknown;
+/** @noRailsEquivalent PERMANENT — Ruby core `Hash#delete` (`vendor/ruby/v3.3.11/hash.c:2441`). */
+export function hashDelete(hash: object, key: unknown, block?: (key: never) => unknown): unknown {
+  if (hash instanceof Map) {
+    if (hash.has(key)) {
+      const val = hash.get(key);
+      hash.delete(key);
+      return val;
+    }
+  } else {
+    if (Object.isFrozen(hash)) {
+      throw new FrozenError(`can't modify frozen Hash: ${rbInspect(hash)}`, { receiver: hash });
+    }
+    if (Object.hasOwn(hash, key as string)) {
+      const val = (hash as Record<string, unknown>)[key as string];
+      delete (hash as Record<string, unknown>)[key as string];
+      return val;
+    }
+  }
+  if (block) {
+    return block(key as never);
+  } else {
+    return null;
+  }
+}
+
+/**
+ * Ruby `Hash#[]` (`vendor/ruby/v3.3.11/hash.c:2121` `rb_hash_aref`) — the stored
+ * value, or `nil` when the key is absent, whichever hash it is given.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#[]` (`vendor/ruby/v3.3.11/hash.c:2121`).
+ */
+export function hashAref(hash: object, key: unknown): unknown {
+  if (hash instanceof Map) return hash.has(key) ? hash.get(key) : null;
+  return hasKey(hash, key as string) ? (hash as Record<string, unknown>)[key as string] : null;
+}
+
+/**
+ * Ruby `Hash#[]=` (`vendor/ruby/v3.3.11/hash.c:2018` `rb_hash_aset`) — stores the
+ * pair and returns the value, as the assignment expression does.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#[]=` (`vendor/ruby/v3.3.11/hash.c:2018`).
+ */
+export function hashAset<T>(hash: object, key: unknown, val: T): T {
+  if (hash instanceof Map) {
+    hash.set(key, val);
+    return val;
+  }
   if (Object.isFrozen(hash)) {
     throw new FrozenError(`can't modify frozen Hash: ${rbInspect(hash)}`, { receiver: hash });
   }
-  if (Object.hasOwn(hash, key)) {
-    const val = hash[key];
-    delete hash[key];
-    return val;
-  } else {
-    if (block) {
-      return block(key);
-    } else {
-      return null;
-    }
-  }
+  (hash as Record<string, unknown>)[key as string] = val;
+  return val;
 }
 
 /**
