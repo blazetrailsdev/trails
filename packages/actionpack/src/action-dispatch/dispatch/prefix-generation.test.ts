@@ -24,77 +24,78 @@ function get(app: Engine, path: string): Promise<RackResponse> {
 
 describe("TestGenerationPrefix::WithMountedEngine", () => {
   class BlogEngine extends Engine {
+    declare static routes: () => RouteSet;
+
     static {
       Object.defineProperty(this, "name", {
         value: "TestGenerationPrefix::WithMountedEngine::BlogEngine",
       });
       Engine.register(this, File.dirname(FIXTURE_LOAD_PATH));
-      this.instance()
-        .routes()
-        .draw(function () {
-          this.get("/posts/:id", { to: "inside_engine_generating#show", as: "post" });
-          this.get("/posts", { to: "inside_engine_generating#index", as: "posts" });
-          this.get("/url_to_application", { to: "inside_engine_generating#url_to_application" });
-          this.get("/polymorphic_path_for_engine", {
-            to: "inside_engine_generating#polymorphic_path_for_engine",
-          });
-          this.get("/conflicting_url", { to: "inside_engine_generating#conflicting" });
-          this.get("/foo", {
-            to: "never#invoked",
-            as: "named_helper_that_should_be_invoked_only_in_respond_to_test",
-          });
-
-          this.get("/relative_path_root", { to: this.redirect("") });
-          this.get("/relative_path_redirect", { to: this.redirect("foo") });
-          this.get("/relative_option_root", { to: this.redirect({ path: "" }) });
-          this.get("/relative_option_redirect", { to: this.redirect({ path: "foo" }) });
-          this.get("/relative_custom_root", { to: this.redirect(() => "") });
-          this.get("/relative_custom_redirect", { to: this.redirect(() => "foo") });
-
-          this.get("/absolute_path_root", { to: this.redirect("/") });
-          this.get("/absolute_path_redirect", { to: this.redirect("/foo") });
-          this.get("/absolute_option_root", { to: this.redirect({ path: "/" }) });
-          this.get("/absolute_option_redirect", { to: this.redirect({ path: "/foo" }) });
-          this.get("/absolute_custom_root", { to: this.redirect(() => "/") });
-          this.get("/absolute_custom_redirect", { to: this.redirect(() => "/foo") });
+      this.routes().draw(function () {
+        this.get("/posts/:id", { to: "inside_engine_generating#show", as: "post" });
+        this.get("/posts", { to: "inside_engine_generating#index", as: "posts" });
+        this.get("/url_to_application", { to: "inside_engine_generating#url_to_application" });
+        this.get("/polymorphic_path_for_engine", {
+          to: "inside_engine_generating#polymorphic_path_for_engine",
         });
+        this.get("/conflicting_url", { to: "inside_engine_generating#conflicting" });
+        this.get("/foo", {
+          to: "never#invoked",
+          as: "named_helper_that_should_be_invoked_only_in_respond_to_test",
+        });
+
+        this.get("/relative_path_root", { to: this.redirect("") });
+        this.get("/relative_path_redirect", { to: this.redirect("foo") });
+        this.get("/relative_option_root", { to: this.redirect({ path: "" }) });
+        this.get("/relative_option_redirect", { to: this.redirect({ path: "foo" }) });
+        this.get("/relative_custom_root", { to: this.redirect(() => "") });
+        this.get("/relative_custom_redirect", { to: this.redirect(() => "foo") });
+
+        this.get("/absolute_path_root", { to: this.redirect("/") });
+        this.get("/absolute_path_redirect", { to: this.redirect("/foo") });
+        this.get("/absolute_option_root", { to: this.redirect({ path: "/" }) });
+        this.get("/absolute_option_redirect", { to: this.redirect({ path: "/foo" }) });
+        this.get("/absolute_custom_root", { to: this.redirect(() => "/") });
+        this.get("/absolute_custom_redirect", { to: this.redirect(() => "/foo") });
+      });
     }
   }
 
   class RailsApplication extends Engine {
+    declare static routes: () => RouteSet;
+
     static {
       Object.defineProperty(this, "name", {
         value: "TestGenerationPrefix::WithMountedEngine::RailsApplication",
       });
       Engine.register(this, File.dirname(FIXTURE_LOAD_PATH));
-      this.instance()
-        .routes()
-        .draw(function () {
-          this.scope("/:omg", { omg: "awesome" }, () => {
-            this.mount(BlogEngine as unknown as MountableApp, {
-              at: "/blog",
-              as: "blog_engine",
-            });
+      this.routes().draw(function () {
+        this.scope("/:omg", { omg: "awesome" }, () => {
+          this.mount(BlogEngine as unknown as MountableApp, {
+            at: "/blog",
+            as: "blog_engine",
           });
-          this.get("/posts/:id", { to: "outside_engine_generating#post", as: "post" });
-          this.get("/generate", { to: "outside_engine_generating#index" });
-          this.get("/polymorphic_path_for_app", {
-            to: "outside_engine_generating#polymorphic_path_for_app",
-          });
-          this.get("/polymorphic_path_for_engine", {
-            to: "outside_engine_generating#polymorphic_path_for_engine",
-          });
-          this.get("/polymorphic_with_url_for", {
-            to: "outside_engine_generating#polymorphic_with_url_for",
-          });
-          this.get("/conflicting_url", { to: "outside_engine_generating#conflicting" });
-          this.get("/ivar_usage", { to: "outside_engine_generating#ivar_usage" });
-          this.root({ to: "outside_engine_generating#index" });
         });
+        this.get("/posts/:id", { to: "outside_engine_generating#post", as: "post" });
+        this.get("/generate", { to: "outside_engine_generating#index" });
+        this.get("/polymorphic_path_for_app", {
+          to: "outside_engine_generating#polymorphic_path_for_app",
+        });
+        this.get("/polymorphic_path_for_engine", {
+          to: "outside_engine_generating#polymorphic_path_for_engine",
+        });
+        this.get("/polymorphic_with_url_for", {
+          to: "outside_engine_generating#polymorphic_with_url_for",
+        });
+        this.get("/conflicting_url", { to: "outside_engine_generating#conflicting" });
+        this.get("/ivar_usage", { to: "outside_engine_generating#ivar_usage" });
+        this.root({ to: "outside_engine_generating#index" });
+      });
     }
   }
 
   const app = (): Engine => RailsApplication.instance();
+
   it.skip("[ENGINE] generating engine's URL use SCRIPT_NAME from request", () => {});
 
   it.skip("[ENGINE] generating application's URL never uses SCRIPT_NAME from request", () => {});
@@ -253,16 +254,16 @@ describe("TestGenerationPrefix::EngineMountedAtRoot", () => {
   }
 
   class RailsApplication extends Engine {
+    declare static routes: () => RouteSet;
+
     static {
       Object.defineProperty(this, "name", {
         value: "TestGenerationPrefix::EngineMountedAtRoot::RailsApplication",
       });
       Engine.register(this, File.dirname(FIXTURE_LOAD_PATH));
-      this.instance()
-        .routes()
-        .draw(function () {
-          this.mount(BlogEngine as unknown as MountableApp, { at: "/" });
-        });
+      this.routes().draw(function () {
+        this.mount(BlogEngine as unknown as MountableApp, { at: "/" });
+      });
     }
   }
 
