@@ -38,10 +38,10 @@ describe("Case", () => {
     it("is not an await operand the compiler accepts", () => {
       const node = new Nodes.Case(users.get("status")).when("active").then("A");
       async function awaited() {
-        // @ts-expect-error TS1320: a callable `then` that is not a promise's
+        // @ts-expect-error TS1320
         await node;
       }
-      // @ts-expect-error TS1058: a callable `then` that is not a promise's
+      // @ts-expect-error TS1058
       async function returned() {
         return node;
       }

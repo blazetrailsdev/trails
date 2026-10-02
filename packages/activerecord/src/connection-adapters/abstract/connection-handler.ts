@@ -88,12 +88,15 @@ export class ConnectionHandler {
   }
 
   eachConnectionPool(role?: string | null): Enumerator<ConnectionPool>;
-  eachConnectionPool(block: (pool: ConnectionPool) => void): void;
-  eachConnectionPool(role: string | null | undefined, block: (pool: ConnectionPool) => void): void;
+  eachConnectionPool(block: (pool: ConnectionPool) => void): Map<string, PoolManager>;
+  eachConnectionPool(
+    role: string | null | undefined,
+    block: (pool: ConnectionPool) => void,
+  ): Map<string, PoolManager>;
   eachConnectionPool(
     role?: string | null | ((pool: ConnectionPool) => void),
     block?: (pool: ConnectionPool) => void,
-  ): Enumerator<ConnectionPool> | void {
+  ): Enumerator<ConnectionPool> | Map<string, PoolManager> {
     if (typeof role === "function") [role, block] = [null, role];
     if (role === "all") role = null;
     if (!block) return toEnum<ConnectionPool>(this, "eachConnectionPool", role);
@@ -103,6 +106,7 @@ export class ConnectionHandler {
         block(poolConfig.pool);
       });
     }
+    return this._connectionNameToPoolManager;
   }
 
   async establishConnection(
