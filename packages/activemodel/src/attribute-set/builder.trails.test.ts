@@ -69,14 +69,26 @@ describe("LazyAttributeSet", () => {
   });
 
   describe("over an indexed row", () => {
+    class IndexedRow {
+      constructor(
+        private readonly columnIndexes: Record<string, number>,
+        private readonly row: unknown[],
+      ) {}
+      isKey(column: string) {
+        return Object.hasOwn(this.columnIndexes, column);
+      }
+      keys() {
+        return Object.keys(this.columnIndexes);
+      }
+      eachKey(block: (key: string) => void) {
+        Object.keys(this.columnIndexes).forEach(block);
+      }
+      fetch(column: string, block?: () => unknown) {
+        return this.isKey(column) ? this.row[this.columnIndexes[column]] : block?.();
+      }
+    }
     function indexedRow(columnIndexes: Record<string, number>, row: unknown[]) {
-      return {
-        isKey: (column: string) => Object.hasOwn(columnIndexes, column),
-        keys: () => Object.keys(columnIndexes),
-        eachKey: (block: (key: string) => void) => Object.keys(columnIndexes).forEach(block),
-        fetch: (column: string, block?: () => unknown) =>
-          Object.hasOwn(columnIndexes, column) ? row[columnIndexes[column]] : block?.(),
-      };
+      return new IndexedRow(columnIndexes, row) as unknown as Record<string, unknown>;
     }
 
     it("reads present values through fetch and casts them", () => {

@@ -21,6 +21,7 @@ import {
   mergeBang,
   reject,
   slice,
+  keys,
   transformValues,
   update,
   valuesAt,
@@ -315,6 +316,52 @@ describe("Hash#transform_values", () => {
     expect(result).toBeInstanceOf(Hash);
     expect([...result]).toEqual([["foo", 100]]);
     expect(result.get("bar")).toBeUndefined();
+  });
+});
+
+describe("a Hash send to a receiver that defines the method itself", () => {
+  class Row {
+    constructor(private readonly row: Record<string, unknown>) {}
+    isKey(column: string): boolean {
+      return column.toLowerCase() in this.row;
+    }
+    keys(): string[] {
+      return Object.keys(this.row);
+    }
+    eachKey(block: (key: string) => void): void {
+      this.keys().forEach(block);
+    }
+    fetch(column: string, fallback?: () => unknown): unknown {
+      return this.isKey(column) ? this.row[column.toLowerCase()] : fallback?.();
+    }
+  }
+  const row = new Row({ id: 1, name: null }) as unknown as Record<string, unknown>;
+
+  it("reaches the receiver's own fetch, key?, keys and each_key", () => {
+    let missed = false;
+    const miss = block(() => {
+      missed = true;
+    });
+    expect(fetch(row, "NAME", miss)).toBeNull();
+    expect(missed).toBe(false);
+    expect(fetch(row, "age", miss)).toBeUndefined();
+    expect(missed).toBe(true);
+    expect([hasKey(row, "ID"), hasKey(row, "age")]).toEqual([true, false]);
+    expect(keys(row)).toEqual(["id", "name"]);
+    const seen: string[] = [];
+    expect(eachKey(row, (key) => seen.push(key))).toBe(row);
+    expect(seen).toEqual(["id", "name"]);
+  });
+
+  it("reads a plain object's fetch, isKey and keys entries as Hash data", () => {
+    const hash = { fetch: () => 1, isKey: () => true, keys: () => [] };
+    expect(hasKey(hash, "missing")).toBe(false);
+    expect(keys(hash)).toEqual(["fetch", "isKey", "keys"]);
+    expect(fetch(hash, "missing", 2)).toBe(2);
+  });
+
+  it("answers the keys of a Map", () => {
+    expect(keys(new Map([["a", 1]]))).toEqual(["a"]);
   });
 });
 

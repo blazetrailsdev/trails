@@ -14,6 +14,7 @@ import {
   isIntersect,
   last,
   pack,
+  each,
   groupBy,
   partition,
   sort,
@@ -283,6 +284,16 @@ describe("Array#count", () => {
 
   it("answers the length with no block", () => {
     expect(aryCount([1, null, 3])).toBe(3);
+  });
+});
+
+describe("Array#each", () => {
+  it("yields each element and returns the receiver, with or without a block", () => {
+    const ary = [1, 2];
+    const seen: number[] = [];
+    expect(each(ary, (i) => seen.push(i))).toBe(ary);
+    expect(seen).toEqual([1, 2]);
+    expect(each(ary)).toBe(ary);
   });
 });
 

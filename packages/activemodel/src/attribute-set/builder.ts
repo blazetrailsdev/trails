@@ -3,11 +3,13 @@ import type { Block } from "@blazetrails/ruby-compat";
 import {
   block as rbBlock,
   dup,
+  each,
   eachKey,
   eachValue,
   except,
   fetch,
   hasKey,
+  keys as hashKeys,
   rbDeclareIvar,
   rbEqual,
   rbObjDup,
@@ -16,19 +18,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "../type/value.js";
 import { AttributeSet } from "../attribute-set.js";
-
-interface IndexedRow {
-  isKey(column: string): boolean;
-  keys(): string[];
-  eachKey(block: (key: string) => void): void;
-  fetch(column: string, block?: () => unknown): unknown;
-}
-
-type Values = Record<string, unknown> | IndexedRow;
-
-function isIndexedRow(values: Values): values is IndexedRow {
-  return typeof values.fetch === "function";
-}
 
 export class Builder {
   readonly types: Record<string, ValueType>;
@@ -40,7 +29,7 @@ export class Builder {
   }
 
   buildFromDatabase(
-    values: Values = {},
+    values: Record<string, unknown> = {},
     additionalTypes: Record<string, ValueType> = {},
   ): AttributeSet {
     return new LazyAttributeSet(values, this.types, additionalTypes, this.defaultAttributes);
@@ -49,7 +38,7 @@ export class Builder {
 
 export class LazyAttributeSet extends AttributeSet {
   declare protected _attributes: Record<string, Attribute>;
-  private values: Values;
+  private values: Record<string, unknown>;
   private types: Record<string, ValueType>;
   private additionalTypes: Record<string, ValueType>;
   private defaultAttributes: Record<string, Attribute>;
@@ -57,7 +46,7 @@ export class LazyAttributeSet extends AttributeSet {
   private materialized: boolean;
 
   constructor(
-    values: Values,
+    values: Record<string, unknown>,
     types: Record<string, ValueType>,
     additionalTypes: Record<string, ValueType>,
     defaultAttributes: Record<string, Attribute>,
@@ -74,19 +63,16 @@ export class LazyAttributeSet extends AttributeSet {
 
   override isKey(name: string): boolean {
     return (
-      ((isIndexedRow(this.values) ? this.values.isKey(name) : hasKey(this.values, name)) ||
-        hasKey(this.types, name) ||
-        hasKey(this._attributes, name)) &&
+      (hasKey(this.values, name) || hasKey(this.types, name) || hasKey(this._attributes, name)) &&
       this.getAttribute(name).isInitialized()
     );
   }
 
-  /** @missingRailsArgs keys — CONVERGEABLE lazy-attribute-set-keys-drops-args-receipt-after-pairing-tiebreak */
   override keys(): string[] {
     const keys = new Set([
-      ...(isIndexedRow(this.values) ? this.values.keys() : Object.keys(this.values)),
-      ...Object.keys(this.types),
-      ...Object.keys(this._attributes),
+      ...hashKeys(this.values),
+      ...hashKeys(this.types),
+      ...hashKeys(this._attributes),
     ]);
     return [...keys].filter((name) => this.getAttribute(name).isInitialized());
   }
@@ -102,17 +88,13 @@ export class LazyAttributeSet extends AttributeSet {
       name,
       rbBlock(() => {
         let valuePresent: boolean = true;
-        const value = isIndexedRow(this.values)
-          ? this.values.fetch(name, () => {
-              valuePresent = false;
-            })
-          : fetch<unknown>(
-              this.values,
-              name,
-              rbBlock(() => {
-                valuePresent = false;
-              }),
-            );
+        const value = fetch<unknown>(
+          this.values,
+          name,
+          rbBlock(() => {
+            valuePresent = false;
+          }),
+        );
 
         if (valuePresent) {
           const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
@@ -127,11 +109,7 @@ export class LazyAttributeSet extends AttributeSet {
 
   protected override attributes(): Record<string, Attribute> {
     if (!this.materialized) {
-      if (isIndexedRow(this.values)) {
-        this.values.eachKey((key) => this.getAttribute(key));
-      } else {
-        eachKey(this.values, (key) => this.getAttribute(key));
-      }
+      eachKey(this.values, (key) => this.getAttribute(key));
       eachKey(this.types, (key) => this.getAttribute(key));
       this.materialized = true;
     }
@@ -141,17 +119,13 @@ export class LazyAttributeSet extends AttributeSet {
   protected override defaultAttribute(
     name: string,
     valuePresent: boolean = true,
-    value: unknown = isIndexedRow(this.values)
-      ? this.values.fetch(name, () => {
-          valuePresent = false;
-        })
-      : fetch<unknown>(
-          this.values,
-          name,
-          rbBlock(() => {
-            valuePresent = false;
-          }),
-        ),
+    value: unknown = fetch<unknown>(
+      this.values,
+      name,
+      rbBlock(() => {
+        valuePresent = false;
+      }),
+    ),
   ): Attribute {
     const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
 
@@ -237,13 +211,12 @@ export class LazyAttributeHash {
   eachKey(block?: (key: string) => void): string[] {
     const keys = [
       ...new Set([
-        ...Object.keys(this.types),
-        ...Object.keys(this.values),
-        ...Object.keys(this.delegateHash()),
+        ...hashKeys(this.types),
+        ...hashKeys(this.values),
+        ...hashKeys(this.delegateHash()),
       ]),
     ];
-    if (block) keys.forEach(block);
-    return keys;
+    return each(keys, block);
   }
 
   equals(other: unknown): boolean {
