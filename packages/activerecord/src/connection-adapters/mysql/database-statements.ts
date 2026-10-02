@@ -9,6 +9,7 @@ import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
 import {
   defaultInsertValue as abstractDefaultInsertValue,
   returningColumnValues as abstractReturningColumnValues,
+  type DatabaseStatementsHost,
 } from "../abstract/database-statements.js";
 import { AbstractAdapter, type Version } from "../abstract-adapter.js";
 
@@ -110,7 +111,10 @@ export async function returningColumnValues(
   if (await this.supportsInsertReturning()) {
     return first(result.rows);
   } else {
-    return abstractReturningColumnValues.call(this as never, result);
+    return abstractReturningColumnValues.call(
+      this as SupportsInsertReturningHost & DatabaseStatementsHost,
+      result,
+    );
   }
 }
 
