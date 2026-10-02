@@ -1513,12 +1513,7 @@ export class Time {
     return n > 0n ? 1 : -1;
   }
 
-  /**
-   * `Object#dup` over `time_s_alloc` and `time_init_copy`
-   * (`vendor/ruby/v3.3.11/time.c:1905,4046`), whose `MEMCPY` copies the whole
-   * `time_object`. The seats are private fields, which only the constructor
-   * can install.
-   */
+  /** @noRailsEquivalent CONVERGEABLE rb-obj-dup-has-no-allocator-for-private-state-classes */
   dup(): this {
     seatedTime = {
       zoned: this.#zoned,

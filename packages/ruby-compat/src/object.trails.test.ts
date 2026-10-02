@@ -378,7 +378,7 @@ describe("rbModAttrReader / rbModAttrWriter / rbModMethodDefined", () => {
     expect(rbModMethodDefined(Person, "name")).toBe(true);
     expect(rbModMethodDefined(Person, "name=")).toBe(false);
 
-    rbModAttrWriter(Person, "name=");
+    rbModAttrWriter(Person, "name");
     expect(rbModMethodDefined(Person, "name=")).toBe(true);
 
     const person = new Person() as { name: unknown };

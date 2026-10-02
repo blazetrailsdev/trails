@@ -378,13 +378,12 @@ export function rbModAttrReader(klass: { prototype: object }, ...argv: string[])
 
 /**
  * `Module#attr_writer` (`rb_mod_attr_writer`, `vendor/ruby/v3.3.11/object.c:2335`).
- * A name is spelled with or without the writer's `=`.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbModAttrWriter(klass: { prototype: object }, ...argv: string[]): void {
   for (const id of argv) {
-    rbAttr(klass, id.endsWith("=") ? id.slice(0, -1) : id, false, true);
+    rbAttr(klass, id, false, true);
   }
 }
 

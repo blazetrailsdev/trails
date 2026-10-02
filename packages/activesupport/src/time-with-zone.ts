@@ -864,12 +864,7 @@ export class TimeWithZone {
     return true;
   }
 
-  /**
-   * `Object#dup` (`vendor/ruby/v3.3.11/object.c:591`): the copy is wrapped as the
-   * constructor wraps `this`, so it keeps answering `method_missing`.
-   *
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @noRailsEquivalent CONVERGEABLE rb-obj-dup-has-no-allocator-for-private-state-classes */
   dup(): this {
     return new Proxy(rbObjDup(this), METHOD_MISSING_HANDLER) as this;
   }
