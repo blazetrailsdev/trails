@@ -15,16 +15,4 @@ export class ForbiddenClass extends Base {}
 
 export class EncryptedContentIntegrity extends Base {}
 
-for (const [id, klass] of Object.entries({
-  Base,
-  Encoding,
-  Decryption,
-  Encryption,
-  Configuration,
-  ForbiddenClass,
-  EncryptedContentIntegrity,
-})) {
-  klass.prototype.name = `ActiveRecord::Encryption::Errors::${id}`;
-}
-
 ActiveRecordEncryption.Errors = Errors;

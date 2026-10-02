@@ -62,8 +62,8 @@ export class Contexts {
   }
 
   /** @missingRailsArgs last — CONVERGEABLE call-args-gate-reads-an-explicit-self-receiver-as-a-simple-receiver */
-  static get currentCustomContext(): Context | null {
-    return (this.customContexts && last(this.customContexts)) ?? null;
+  static get currentCustomContext(): Context | null | undefined {
+    return this.customContexts && last(this.customContexts);
   }
 
   static resetDefaultContext(): void {
