@@ -4747,7 +4747,9 @@ function isSymbolToSConditional(node: ts.ConditionalExpression): boolean {
     return false;
   }
   return (
-    node.whenFalse.getText() === receiver || soleArgumentOf(node.whenFalse, "String") === receiver
+    node.whenFalse.getText() === receiver ||
+    soleArgumentOf(node.whenFalse, "String") === receiver ||
+    soleArgumentOf(node.whenFalse, "rbObjAsString") === receiver
   );
 }
 

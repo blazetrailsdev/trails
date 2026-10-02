@@ -1061,6 +1061,9 @@ describe("body call capture", () => {
         stringified(key: unknown) {
           return isSymbol(key) ? symbolToS(key) : String(key);
         }
+        asString(key: unknown) {
+          return isSymbol(key) ? symbolToS(key) : rbObjAsString(key);
+        }
         otherReceiver(key: string, other: string) {
           return isSymbol(key) ? symbolToS(other) : key;
         }
@@ -1076,6 +1079,12 @@ describe("body call capture", () => {
       "ref:isSymbol",
       "ref:symbolToS",
       "ref:String",
+    ]);
+    expect(skeleton("asString")).toEqual([
+      "if:to-s",
+      "ref:isSymbol",
+      "ref:symbolToS",
+      "ref:rbObjAsString",
     ]);
     expect(skeleton("otherReceiver")).toEqual(["if", "ref:isSymbol", "ref:symbolToS"]);
     expect(skeleton("otherFallback")).toEqual(["if", "ref:isSymbol", "ref:symbolToS", "ref:build"]);

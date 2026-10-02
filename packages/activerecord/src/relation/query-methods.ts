@@ -1407,7 +1407,7 @@ export function columnReferences(orderArgs: unknown[]): Nodes.SqlLiteral[] {
       } else if (isHash(arg)) {
         return (toA(arg) as [unknown, unknown][]).map(([key, value]) => {
           if (isHash(value)) {
-            return isSymbol(key) ? symbolToS(key) : String(key);
+            return isSymbol(key) ? symbolToS(key) : rbObjAsString(key);
           } else {
             return typeof key === "string" ? extractTableNameFrom(key) : null;
           }
@@ -1464,8 +1464,8 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
                   orderColumn.call(
                     this,
                     [
-                      isSymbol(key) ? symbolToS(key) : String(key),
-                      isSymbol(field) ? symbolToS(field) : String(field),
+                      isSymbol(key) ? symbolToS(key) : rbObjAsString(key),
+                      isSymbol(field) ? symbolToS(field) : rbObjAsString(field),
                     ].join("."),
                   ),
                   rbFSend(dir, "downcase"),
@@ -1480,7 +1480,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
                 return rbFPublicSend(key, rbFSend(value, "downcase"));
               } else {
                 return rbFPublicSend(
-                  orderColumn.call(this, isSymbol(key) ? symbolToS(key) : String(key)),
+                  orderColumn.call(this, isSymbol(key) ? symbolToS(key) : rbObjAsString(key)),
                   rbFSend(value, "downcase"),
                 );
               }
