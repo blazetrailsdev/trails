@@ -150,7 +150,7 @@ export class Errors<TBase extends object = object> {
   }
 
   get attributeNames(): string[] {
-    return [...new Set(this._errors.map((e) => e.attribute))];
+    return Object.freeze([...new Set(this._errors.map((e) => e.attribute))]) as string[];
   }
 
   asJson(options?: Record<string, unknown> | null): Record<string, (string | null)[]> {
@@ -251,7 +251,7 @@ export class Errors<TBase extends object = object> {
   }
 
   fullMessagesFor(attribute: string): (string | null)[] {
-    return this.where(attribute).map((e) => e.fullMessage);
+    return Object.freeze(this.where(attribute).map((e) => e.fullMessage)) as (string | null)[];
   }
 
   messagesFor(attribute: string): (string | null)[] {

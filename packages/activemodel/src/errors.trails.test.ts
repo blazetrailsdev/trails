@@ -682,3 +682,14 @@ describe("Errors#messages", () => {
     expect(() => details.set("name", [])).toThrow(FrozenError);
   });
 });
+
+describe("Errors frozen readers", () => {
+  it("attribute_names and full_messages_for return frozen arrays", () => {
+    const errors = new Errors(new Person());
+    errors.add("name", ":blank");
+
+    expect(Object.isFrozen(errors.attributeNames)).toBe(true);
+    expect(Object.isFrozen(errors.fullMessagesFor("name"))).toBe(true);
+    expect(errors.attributeNames).toEqual(["name"]);
+  });
+});

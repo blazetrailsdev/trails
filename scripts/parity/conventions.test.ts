@@ -190,10 +190,18 @@ const bareCandidates = (name: string, siblings?: ReadonlySet<string>): string[] 
 const bareCandidatesIgnoringSkip = (name: string): string[] | null =>
   rubyMethodToTsIgnoringSkip(name)?.filter((c) => !c.startsWith("_")) ?? null;
 
+describe("freeze / initialize_clone / klasses are scored, not skipped", () => {
+  it("maps each to its camelCase spelling", () => {
+    expect(bareCandidates("freeze")).toEqual(["freeze"]);
+    expect(bareCandidates("initialize_clone")).toEqual(["initializeClone"]);
+    expect(bareCandidates("klasses")).toEqual(["klasses"]);
+  });
+});
+
 describe("rubyMethodToTsIgnoringSkip", () => {
   it("maps SKIP names that rubyMethodToTs refuses", () => {
-    expect(rubyMethodToTs("freeze")).toBeNull();
-    expect(bareCandidatesIgnoringSkip("freeze")).toEqual(["freeze"]);
+    expect(rubyMethodToTs("clone")).toBeNull();
+    expect(bareCandidatesIgnoringSkip("clone")).toEqual(["clone"]);
     expect(bareCandidatesIgnoringSkip("lookup_cast_type")).toEqual(["lookupCastType"]);
     expect(bareCandidatesIgnoringSkip("pretty_print")).toEqual(["prettyPrint"]);
   });

@@ -537,11 +537,10 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "`instance_variable_get` / `instance_variable_set` / `instance_variables`), " +
       "dispatch (`send`, `public_send`, `tap`, " +
       "`yield_self`), numeric coercion (`to_i`, `to_f`, `to_r`, `to_c`), " +
-      "`clone` / `initialize_clone` / `freeze`, and `to_ary` / `then`, which JS " +
+      "`clone`, and `to_ary` / `then`, which JS " +
       "would read as array destructuring and as a thenable `await` calls.",
     names: [
       "clone",
-      "freeze",
       "object_id",
       "class",
       "send",
@@ -554,7 +553,6 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "instance_variable_get",
       "instance_variable_set",
       "instance_variables",
-      "initialize_clone",
       "to_ary",
       "to_i",
       "to_f",
@@ -604,13 +602,6 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "for it.",
     names: ["const_missing"],
     tsMirrorIsDrift: true,
-  },
-  {
-    reason:
-      "NoTouching: TS uses a Map-based depth counter (_noTouchingDepth) instead " +
-      "of a thread-local array; klasses() is the Rails internal accessor for " +
-      "that array.",
-    names: ["klasses"],
   },
   {
     reason:

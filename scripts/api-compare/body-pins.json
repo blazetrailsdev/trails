@@ -16808,9 +16808,25 @@
   {
     "package": "activemodel",
     "rubyFile": "attribute_set.rb",
+    "rubyName": "freeze",
+    "digest": "359c511ffe52c708",
+    "ref": "v8.0.2",
+    "reason": "activemodel-score-core-object-freeze-and-initialize-clone"
+  },
+  {
+    "package": "activemodel",
+    "rubyFile": "attribute_set.rb",
     "rubyName": "initialize",
     "digest": "acfef1b6326a48b6",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activemodel",
+    "rubyFile": "attribute_set.rb",
+    "rubyName": "initialize_clone",
+    "digest": "f26b4a0717193040",
+    "ref": "v8.0.2",
+    "reason": "activemodel-score-core-object-freeze-and-initialize-clone"
   },
   {
     "package": "activemodel",
@@ -17074,6 +17090,14 @@
     "rubyName": "define_method_attribute=",
     "digest": "d33d6072ed277775",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activemodel",
+    "rubyFile": "attributes.rb",
+    "rubyName": "freeze",
+    "digest": "0418b97585955358",
+    "ref": "v8.0.2",
+    "reason": "activemodel-score-core-object-freeze-and-initialize-clone"
   },
   {
     "package": "activemodel",
@@ -18897,6 +18921,14 @@
     "rubyName": "errors",
     "digest": "617287c3a07e2831",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activemodel",
+    "rubyFile": "validations.rb",
+    "rubyName": "freeze",
+    "digest": "2a6cb55afaa02279",
+    "ref": "v8.0.2",
+    "reason": "activemodel-score-core-object-freeze-and-initialize-clone"
   },
   {
     "package": "activemodel",
@@ -40399,6 +40431,14 @@
   {
     "package": "activerecord",
     "rubyFile": "inheritance.rb",
+    "rubyName": "initialize_clone",
+    "digest": "59f9559bd24a35bd",
+    "ref": "v8.0.2",
+    "reason": "activemodel-score-core-object-freeze-and-initialize-clone"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "inheritance.rb",
     "rubyName": "initialize_internals_callback",
     "digest": "d0d9984c1cb1cd65",
     "ref": "v8.0.2"
@@ -42810,6 +42850,14 @@
     "rubyName": "apply_to",
     "digest": "91c54ab42e9d3e80",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "no_touching.rb",
+    "rubyName": "klasses",
+    "digest": "7d2e9c792ec2d357",
+    "ref": "v8.0.2",
+    "reason": "activerecord-retire-no-touching-klasses-skip"
   },
   {
     "package": "activerecord",
@@ -47235,6 +47283,14 @@
     "rubyName": "fetch",
     "digest": "17c37f63cfa88cec",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "result.rb",
+    "rubyName": "freeze",
+    "digest": "6d6ff501290c6904",
+    "ref": "v8.0.2",
+    "reason": "activemodel-score-core-object-freeze-and-initialize-clone"
   },
   {
     "package": "activerecord",

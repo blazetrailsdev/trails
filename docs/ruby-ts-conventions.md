@@ -158,8 +158,8 @@ anything else takes the plain kebab-case rule.
 
 parity:api never expects a TS counterpart for these Ruby methods:
 
-- Ruby core object methods outside `PROTOCOL_DEFINITION_NAMES`: identity (`object_id`, `equal?`, `class`), reflection (`instance_of?`, `instance_variable_get` / `instance_variable_set` / `instance_variables`), dispatch (`send`, `public_send`, `tap`, `yield_self`), numeric coercion (`to_i`, `to_f`, `to_r`, `to_c`), `clone` / `initialize_clone` / `freeze`, and `to_ary` / `then`, which JS would read as array destructuring and as a thenable `await` calls.
-  - `clone`, `freeze`, `object_id`, `class`, `send`, `public_send`, `tap`, `then`, `yield_self`, `instance_of?`, `equal?`, `instance_variable_get`, `instance_variable_set`, `instance_variables`, `initialize_clone`, `to_ary`, `to_i`, `to_f`, `to_r`, `to_c`
+- Ruby core object methods outside `PROTOCOL_DEFINITION_NAMES`: identity (`object_id`, `equal?`, `class`), reflection (`instance_of?`, `instance_variable_get` / `instance_variable_set` / `instance_variables`), dispatch (`send`, `public_send`, `tap`, `yield_self`), numeric coercion (`to_i`, `to_f`, `to_r`, `to_c`), `clone`, and `to_ary` / `then`, which JS would read as array destructuring and as a thenable `await` calls.
+  - `clone`, `object_id`, `class`, `send`, `public_send`, `tap`, `then`, `yield_self`, `instance_of?`, `equal?`, `instance_variable_get`, `instance_variable_set`, `instance_variables`, `to_ary`, `to_i`, `to_f`, `to_r`, `to_c`
 - Scored per definition in `PROTOCOL_DEFINITION_ENROLLED_PACKAGES`, and skipped elsewhere only until that package's burndown story enrolls it (RFC 0156): these translate directly, so a Ruby file defining one expects it in the mirroring TS file.
   - `inspect`, `pretty_print`, `dup`, `initialize_copy`, `initialize_dup`, `encode_with`, `init_with`, `to_a`, `to_h`, `to_hash`
 - PERMANENT for scoring by name — JS spells `is_a?` as `instanceof`, customised by `static [Symbol.hasInstance]` on the class tested AGAINST, so `TimeWithZone#is_a?(Time)` ports as a hook on `Time`. A same-named `isA` is judged against its Rails body per class (CLAUDE.md § "Ruby protocol methods with a different JS mechanism").
@@ -172,8 +172,6 @@ parity:api never expects a TS counterpart for these Ruby methods:
   - `singleton_method_added`
 - Ruby constant-resolution hook — the VM calls it when a constant name misses. JS resolves nothing at runtime by name, so there is no slot for it.
   - `const_missing`
-- NoTouching: TS uses a Map-based depth counter (\_noTouchingDepth) instead of a thread-local array; klasses() is the Rails internal accessor for that array.
-  - `klasses`
 - CheckPending helpers — depend on Rails.root, system("bin/rails ..."), and the ActiveRecord::Tasks infrastructure that has no JS equivalent.
   - `any_schema_needs_update?`, `db_configs_in_current_env`, `load_schema!`
 - Migrator internal index helpers — Rails stores @target_version / @direction as instance variables; our TS Migrator passes them as method parameters instead, so these zero-arg helpers can't be faithfully ported.

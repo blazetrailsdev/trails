@@ -23,3 +23,23 @@ describe("Result::IndexedRow", () => {
     expect(row.equals({ col_1: "row 1 col 1", col_2: "row 1 col 2" })).toBe(true);
   });
 });
+
+describe("Result#freeze", () => {
+  it("freezes hash_rows and indexed_rows along with the result", () => {
+    const result = new Result(["col_1"], [["row 1 col 1"]]);
+
+    expect(result.freeze()).toBe(result);
+
+    expect(Object.isFrozen(result)).toBe(true);
+    expect(Object.isFrozen(result.toArray())).toBe(true);
+    expect(Object.isFrozen(result.indexedRows)).toBe(true);
+    expect(result.toArray()).toEqual([{ col_1: "row 1 col 1" }]);
+  });
+
+  it("Result.empty is frozen through Result#freeze", () => {
+    const empty = Result.empty();
+
+    expect(Object.isFrozen(empty)).toBe(true);
+    expect(Object.isFrozen(empty.toArray())).toBe(true);
+  });
+});

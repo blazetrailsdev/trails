@@ -1,9 +1,12 @@
+import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
-const _klasses: Array<typeof Base> = [];
-
+/** @internal */
 function klasses(): Array<typeof Base> {
-  return _klasses;
+  return (
+    IsolatedExecutionState.get<Array<typeof Base>>("active_record_no_touching_classes") ??
+    IsolatedExecutionState.set("active_record_no_touching_classes", [])
+  );
 }
 
 export function noTouching<R>(modelClass: typeof Base, fn: () => R | Promise<R>): R | Promise<R> {

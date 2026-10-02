@@ -209,6 +209,10 @@ export class ClassMethods {
   static set abstractClass(value: boolean) {
     (this as any)._abstractClass = value;
   }
+
+  static initializeClone(this: typeof Base, other: unknown): void {
+    setBaseClass(this);
+  }
 }
 
 /**
