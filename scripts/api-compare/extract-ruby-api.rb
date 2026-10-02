@@ -275,7 +275,10 @@ def literal_value(node)
     { kind: "float", value: node[1] }
   when :string_literal
     val = string_literal_value(node)
-    val.nil? ? { kind: "expr" } : { kind: "string", value: val }
+    return { kind: "expr" } if val.nil?
+    lit = { kind: "string", value: val }
+    lit[:singleQuoted] = true if single_quoted_literal?(node)
+    lit
   when :symbol_literal
     inner = node[1]
     name = inner.is_a?(Array) && inner[0] == :symbol ? ident_name(inner[1]) : nil
@@ -316,6 +319,19 @@ def string_literal_value(node)
     str << part[1]
   end
   str
+end
+
+# Is this string literal `'…'` or `%q(…)`? Ripper's `@tstring_content` is the
+# undecoded source either way and the sexp drops the delimiter, so it is read
+# back off the source line. literals.ts decodes the value by this: a
+# single-quoted literal knows only `\\` and `\'`.
+def single_quoted_literal?(node)
+  part = node.dig(1, 1)
+  return false unless part.is_a?(Array) && part[0] == :@tstring_content && $literal_source_lines
+  line, col = part[2]
+  text = $literal_source_lines[line - 1]
+  return false if text.nil? || col.zero?
+  text.byteslice(col - 1, 1) == "'" || (col >= 3 && text.byteslice(col - 3, 2) == "%q")
 end
 
 # ---- Dependency detection patterns ----
@@ -426,6 +442,7 @@ class ApiExtractor
   def process_file(filepath, package_root)
     source = File.read(filepath)
     @source_lines = source.lines
+    $literal_source_lines = @source_lines
     sexp = Ripper.sexp(source)
     return unless sexp
 
@@ -2098,9 +2115,6 @@ class ApiExtractor
     entry[:skeleton] = skeleton unless skeleton.empty?
     opt_keys = collect_option_keys(body, entry[:params], fqn)
     entry[:option_keys] = opt_keys unless opt_keys.empty?
-    if !opt_keys.empty? && forwards_option_var?(body, option_var_names(entry[:params]))
-      entry[:option_keys_forwarded] = true
-    end
     record_file_hash_keys(opt_keys)
     record_file_hash_keys(collect_ivar_option_keys(body))
     digest = body_digest(body)
@@ -3393,27 +3407,19 @@ class ApiExtractor
     names
   end
 
-  def forwards_option_var?(node, vars)
-    return false unless node.is_a?(Array)
-    case node[0]
-    when :zsuper
-      return true
-    when :assoc_splat
-      return true if option_var?(node[1], vars)
-    when :args_add_block
-      list = node[1]
-      list = list[1..] if list.is_a?(Array) && list[0] == :args_add_star
-      return true if list.is_a?(Array) && list.any? { |arg| option_var?(arg, vars) }
-    end
-    node.any? { |child| forwards_option_var?(child, vars) }
-  end
-
   def walk_for_option_keys(node, vars, consts, keys)
     return unless node.is_a?(Array)
     case node[0]
     when :aref
       # options[:foo]
       traverse_for_symbols(node[2], keys) if option_var?(node[1], vars)
+    when :opassign
+      # `options[:foo] ||= v` reads the key before it writes it; a plain
+      # `options[:foo] = v` (`:assign`) does not.
+      target = node[1]
+      if target.is_a?(Array) && target[0] == :aref_field && option_var?(target[1], vars)
+        traverse_for_symbols(target[2], keys)
+      end
     when :method_add_arg, :command_call
       # `options.fetch(:k)` (parens) and `options.assert_valid_keys :a` (no
       # parens). A bare `:call` (`options.keys`) never carries a key arg.
@@ -3447,6 +3453,8 @@ class ApiExtractor
         members = c.start_with?("::") ? resolve_const_symbol_array(c) : consts[c]
         (members || []).each { |s| keys << s }
       end
+    elsif meth == "values_at"
+      traverse_for_symbols(args, keys)
     elsif OPTION_READER_METHODS.include?(meth)
       syms = []
       traverse_for_symbols(args, syms)

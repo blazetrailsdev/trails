@@ -85,6 +85,18 @@ import {
 } from "./missing-rails-args-tags.js";
 import { TAG as MISSING_RAILS_NAME_TAG, suppressedNamesIn } from "./missing-rails-name-tags.js";
 
+/** TS spellings of extract-ruby-api.rb `OPTION_READER_METHODS`: a call that
+ *  reads the key named by the string literal following the options hash. */
+const OPTION_READER_FUNCTIONS = new Set([
+  "fetch",
+  "hasKey",
+  "hasOwn",
+  "hashDelete",
+  "deleteKey",
+  "deleteWithDefault",
+]);
+const OPTION_READER_METHODS = new Set(["fetch", "get", "has", "delete", "hasOwnProperty"]);
+
 /** Memo for `internalJsDocTagApplies`'s file-level receipt lookup. */
 const fileLevelReceipts = new WeakMap<ts.SourceFile, boolean>();
 
@@ -855,6 +867,7 @@ export function extractFromProgram(
       } else if (ts.isFunctionDeclaration(node) && node.name && isExported(node)) {
         const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
         const fnOptionKeys = extractOptionKeys(node.parameters, checker);
+        const fnOptionReads = extractOptionReads(node.parameters, node.body);
         const fnCalls = extractCalls(node.body);
         const fnCallSeq = extractCallSeq(node.body);
         const fnCallArgs = extractCallArgs(node.body);
@@ -878,6 +891,9 @@ export function extractFromProgram(
           ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
           ...(signatureReturnsVoid(node, checker) ? { returnsVoid: true } : {}),
           ...(fnOptionKeys !== undefined ? { optionKeys: fnOptionKeys } : {}),
+          ...(fnOptionKeys != null && fnOptionReads !== undefined
+            ? { optionReads: fnOptionReads }
+            : {}),
           ...(fnCalls !== undefined ? { calls: fnCalls } : {}),
           ...(fnCallSeq !== undefined ? { callSeq: fnCallSeq } : {}),
           ...(fnCallArgs !== undefined ? { callArgs: fnCallArgs } : {}),
@@ -3320,6 +3336,7 @@ export function harvestObjectLiteralMethods(
     // the real arity into the candidate pool.
     let params: ParamInfo[] = [];
     let optionKeys: string[] | null | undefined;
+    let optionReads: string[] | undefined;
     let calls: string[] | undefined;
     let callSeq: string[] | undefined;
     let callArgs: CallSite[] | undefined;
@@ -3343,6 +3360,7 @@ export function harvestObjectLiteralMethods(
       mname = prop.name.text;
       params = extractParameters(prop.parameters);
       optionKeys = extractOptionKeys(prop.parameters, checker);
+      optionReads = extractOptionReads(prop.parameters, prop.body);
       calls = extractCalls(prop.body);
       callSeq = extractCallSeq(prop.body);
       callArgs = extractCallArgs(prop.body);
@@ -3371,6 +3389,7 @@ export function harvestObjectLiteralMethods(
         mname = prop.name.text;
         params = extractParameters(init.parameters);
         optionKeys = extractOptionKeys(init.parameters, checker);
+        optionReads = extractOptionReads(init.parameters, init.body);
         calls = extractCalls(init.body);
         callSeq = extractCallSeq(init.body);
         callArgs = extractCallArgs(init.body);
@@ -3415,6 +3434,7 @@ export function harvestObjectLiteralMethods(
         ? { noRailsEquivalentInherited: true }
         : {}),
       ...(optionKeys !== undefined ? { optionKeys } : {}),
+      ...(optionKeys != null && optionReads !== undefined ? { optionReads } : {}),
       ...(calls !== undefined ? { calls } : {}),
       ...(callSeq !== undefined ? { callSeq } : {}),
       ...(callArgs !== undefined ? { callArgs } : {}),
@@ -3790,6 +3810,7 @@ export function extractClass(
     if (ts.isMethodDeclaration(member) && memberName) {
       const params = extractParameters(member.parameters);
       const optionKeys = extractOptionKeys(member.parameters, checker);
+      const optionReads = extractOptionReads(member.parameters, member.body);
       // A host-class method whose whole body is a trivial delegation to a
       // same-named module function pulled in via a namespace import — e.g.
       // `buildJoins(arel) { _qm.buildJoins.call(this, arel); }` in relation.ts,
@@ -3818,6 +3839,7 @@ export function extractClass(
         ...tagged,
         ...(signatureReturnsVoid(member, checker) ? { returnsVoid: true } : {}),
         ...(optionKeys !== undefined ? { optionKeys } : {}),
+        ...(optionKeys != null && optionReads !== undefined ? { optionReads } : {}),
         ...(calls !== undefined ? { calls } : {}),
         ...(callSeq !== undefined ? { callSeq } : {}),
         ...(callArgs !== undefined ? { callArgs } : {}),
@@ -5848,6 +5870,161 @@ export function extractOptionKeys(
   return [...new Set(names)].sort();
 }
 
+/**
+ * The option keys a body READS off its trailing options param — the TS half of
+ * extract-ruby-api.rb `collect_option_keys`, and like it an under-approximation
+ * read off the same shapes: `options.k` / `options["k"]` (Ruby `options[:k]`),
+ * a destructuring of the hash, `"k" in options`, and a reader call
+ * (`fetch(options, "k")`, Ruby `options.fetch(:k)`). A plain assignment target
+ * (`options.k = v`) is not a read; a compound one (`options.k ??= v`, Ruby
+ * `options[:k] ||= v`) is.
+ *
+ * The declared options TYPE says what a caller may pass, which for a shared
+ * type (`ColumnOptions`) is every key any method on the surface accepts, so
+ * {@link extractOptionKeys} cannot say which keys this body branches on. A rest
+ * binding (`{ types, ...options }`) and a copy (`const opts = { ...options }`)
+ * carry the hash on under a new name. `undefined` when there is no body or no
+ * trailing options param.
+ */
+export function extractOptionReads(
+  parameters: ts.NodeArray<ts.ParameterDeclaration>,
+  body: ts.Node | undefined,
+): string[] | undefined {
+  if (parameters.length === 0 || body === undefined) return undefined;
+  const last = parameters[parameters.length - 1];
+  if (last.dotDotDotToken) return undefined;
+  const vars = new Set<string>();
+  const bags = new Set<string>();
+  const keys = new Set<string>();
+
+  const unwrap = (e: ts.Expression): ts.Expression => {
+    while (
+      ts.isParenthesizedExpression(e) ||
+      ts.isAsExpression(e) ||
+      ts.isNonNullExpression(e) ||
+      ts.isSatisfiesExpression(e)
+    ) {
+      e = e.expression;
+    }
+    if (
+      ts.isBinaryExpression(e) &&
+      (e.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken ||
+        e.operatorToken.kind === ts.SyntaxKind.BarBarToken)
+    ) {
+      return unwrap(e.left);
+    }
+    return e;
+  };
+  const isOptionsName = (name: string): boolean => name === "options" || name === "opts";
+  const isOptions = (expr: ts.Expression): boolean => {
+    const e = unwrap(expr);
+    if (ts.isIdentifier(e)) return vars.has(e.text);
+    // The kwargs bag carrying the hash as its `options` property — see extractOptionKeys.
+    return (
+      ts.isPropertyAccessExpression(e) &&
+      isOptionsName(e.name.text) &&
+      ts.isIdentifier(e.expression) &&
+      bags.has(e.expression.text)
+    );
+  };
+  const bind = (pattern: ts.ObjectBindingPattern, bag: boolean): void => {
+    for (const el of pattern.elements) {
+      if (!ts.isIdentifier(el.name)) continue;
+      const key = el.propertyName ?? el.name;
+      if (el.dotDotDotToken) vars.add(el.name.text);
+      else if (bag && ts.isIdentifier(key) && isOptionsName(key.text)) vars.add(el.name.text);
+      else if (!bag && (ts.isIdentifier(key) || ts.isStringLiteralLike(key))) keys.add(key.text);
+    }
+  };
+  const isBag = (pattern: ts.ObjectBindingPattern): boolean =>
+    pattern.elements.some((el) => {
+      const key = el.propertyName ?? el.name;
+      return !el.dotDotDotToken && ts.isIdentifier(key) && isOptionsName(key.text);
+    });
+
+  if (ts.isIdentifier(last.name)) {
+    vars.add(last.name.text);
+    bags.add(last.name.text);
+  } else if (ts.isObjectBindingPattern(last.name)) {
+    bind(last.name, isBag(last.name));
+  } else {
+    return undefined;
+  }
+
+  const isAssignmentTarget = (node: ts.Node): boolean => {
+    const parent = node.parent;
+    return (
+      ts.isBinaryExpression(parent) &&
+      parent.left === node &&
+      parent.operatorToken.kind === ts.SyntaxKind.EqualsToken
+    );
+  };
+  const readerKeys = (call: ts.CallExpression): string[] => {
+    const callee = call.expression;
+    const name = ts.isIdentifier(callee)
+      ? callee.text
+      : ts.isPropertyAccessExpression(callee)
+        ? callee.name.text
+        : undefined;
+    if (name === undefined) return [];
+    // `Object.prototype.hasOwnProperty.call(options, "k")`
+    const viaCall =
+      name === "call" &&
+      ts.isPropertyAccessExpression(callee) &&
+      ts.isPropertyAccessExpression(callee.expression) &&
+      callee.expression.name.text === "hasOwnProperty";
+    const at = call.arguments.findIndex((a) => isOptions(a));
+    if (at === -1) return [];
+    const after = call.arguments.slice(at + 1).filter(ts.isStringLiteralLike);
+    // `valuesAt(options, "before", "after")` reads every key it names.
+    if (name === "valuesAt") return after.map((a) => a.text);
+    if (!viaCall && !OPTION_READER_FUNCTIONS.has(name)) return [];
+    const key = call.arguments[at + 1];
+    return key !== undefined && ts.isStringLiteralLike(key) ? [key.text] : [];
+  };
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && node.initializer) {
+      const init = unwrap(node.initializer);
+      if (ts.isObjectBindingPattern(node.name)) {
+        if (isOptions(init)) bind(node.name, false);
+        else if (ts.isIdentifier(init) && bags.has(init.text) && isBag(node.name)) {
+          bind(node.name, true);
+        }
+      } else if (ts.isIdentifier(node.name)) {
+        const copies =
+          ts.isObjectLiteralExpression(init) &&
+          init.properties.some((p) => ts.isSpreadAssignment(p) && isOptions(p.expression));
+        if (copies || isOptions(init)) vars.add(node.name.text);
+      }
+    } else if (ts.isPropertyAccessExpression(node) && isOptions(node.expression)) {
+      const call = node.parent;
+      if (ts.isCallExpression(call) && call.expression === node) {
+        const key = call.arguments[0];
+        if (!OPTION_READER_METHODS.has(node.name.text)) keys.add(node.name.text);
+        else if (key !== undefined && ts.isStringLiteralLike(key)) keys.add(key.text);
+      } else if (!isAssignmentTarget(node)) {
+        keys.add(node.name.text);
+      }
+    } else if (ts.isElementAccessExpression(node) && isOptions(node.expression)) {
+      const key = node.argumentExpression;
+      if (ts.isStringLiteralLike(key) && !isAssignmentTarget(node)) keys.add(key.text);
+    } else if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.InKeyword &&
+      ts.isStringLiteralLike(node.left) &&
+      isOptions(node.right)
+    ) {
+      keys.add(node.left.text);
+    } else if (ts.isCallExpression(node)) {
+      for (const key of readerKeys(node)) keys.add(key);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(body);
+  return [...keys].sort();
+}
+
 /** Does a type node carry a string/number index signature in its syntax? Covers
  *  inline `{ [k: string]: … }` literals (whose index info is lost by
  *  `getTypeFromTypeNode`) and intersection arms that contain one. */
@@ -5896,13 +6073,16 @@ function getMemberName(member: ts.ClassElement): string | undefined {
 function declarationArity(
   decl: ts.Declaration | undefined,
   checker: ts.TypeChecker,
-): { params: ParamInfo[]; optionKeys?: string[] | null } {
+): { params: ParamInfo[]; optionKeys?: string[] | null; optionReads?: string[] } {
   const parameters = decl !== undefined ? parameterListOf(decl) : undefined;
   if (parameters === undefined) return { params: [] };
   const optionKeys = extractOptionKeys(parameters, checker);
+  const body = ts.isMethodSignature(decl!) ? undefined : (decl as ts.FunctionLikeDeclaration).body;
+  const optionReads = extractOptionReads(parameters, body);
   return {
     params: extractParameters(parameters),
     ...(optionKeys !== undefined ? { optionKeys } : {}),
+    ...(optionKeys != null && optionReads !== undefined ? { optionReads } : {}),
   };
 }
 

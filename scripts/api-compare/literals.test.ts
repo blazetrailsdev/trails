@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   compareLiteral,
+  decodeRubyString,
   compareDefaults,
   constantNameMatches,
   normalizeConstantSpelling,
@@ -84,6 +85,49 @@ describe("compareLiteral", () => {
     expect(
       compareLiteral({ kind: "string", value: "\\r\\n" }, { kind: "string", value: "\r\n" }),
     ).toBe("match");
+  });
+
+  it("decodes a Ruby double-quoted escape before comparing", () => {
+    // sanitization.rb:132 — `escape_character = "\\"`
+    expect(compareLiteral({ kind: "string", value: "\\\\" }, { kind: "string", value: "\\" })).toBe(
+      "match",
+    );
+    // journey/router/utils.rb:44 — `SUB_DELIMS = "!\\$&'\\(\\)\\*\\+,;="`
+    expect(
+      compareLiteral(
+        { kind: "string", value: "!\\\\$&'\\\\(\\\\)\\\\*\\\\+,;=" },
+        { kind: "string", value: "!\\$&'\\(\\)\\*\\+,;=" },
+      ),
+    ).toBe("match");
+    // i18n backend/flatten.rb — `SEPARATOR_ESCAPE_CHAR = "\001"`
+    expect(
+      compareLiteral({ kind: "string", value: "\\001" }, { kind: "string", value: "\u0001" }),
+    ).toBe("match");
+  });
+
+  it("keeps the backslashes of a single-quoted Ruby literal", () => {
+    // action_view.rb:35 — `ENCODING_FLAG = '#.*coding[:=]\s*(\S+)[ \t]*'`
+    expect(
+      compareLiteral(
+        { kind: "string", value: "#.*coding[:=]\\s*(\\S+)[ \\t]*", singleQuoted: true },
+        { kind: "string", value: "#.*coding[:=]\\s*(\\S+)[ \\t]*" },
+      ),
+    ).toBe("match");
+    expect(
+      compareLiteral(
+        { kind: "string", value: "a\\\\b\\'c", singleQuoted: true },
+        { kind: "string", value: "a\\b'c" },
+      ),
+    ).toBe("match");
+  });
+
+  it("still reports a Ruby string whose decoded value differs", () => {
+    expect(
+      compareLiteral({ kind: "string", value: "\\\\" }, { kind: "string", value: "\\\\" }),
+    ).toBe("mismatch");
+    expect(
+      compareLiteral({ kind: "string", value: "\\001" }, { kind: "string", value: "\u0002" }),
+    ).toBe("mismatch");
   });
 
   it("skips when either side is a non-literal expr (exclusion)", () => {
@@ -188,5 +232,17 @@ describe("normalizeConstantSpelling", () => {
     for (const name of ["MAX", "MAX_VALUE", "MIN", "MIN_VALUE", "EPSILON", "PI"]) {
       expect(normalizeConstantSpelling(name)).toBeNull();
     }
+  });
+});
+
+describe("decodeRubyString", () => {
+  it("decodes each escape form of a double-quoted literal", () => {
+    expect(decodeRubyString("a\\\\b")).toBe("a\\b");
+    expect(decodeRubyString("\\n\\t\\r\\e\\s\\a")).toBe("\n\t\r\x1b \x07");
+    expect(decodeRubyString("\\0\\001\\177")).toBe("\x00\x01\x7f");
+    expect(decodeRubyString("\\x41\\u00e9\\u{1F600 41}")).toBe("A\u00e9\u{1F600}A");
+    expect(decodeRubyString("\\cA\\C-a\\c?")).toBe("\x01\x01\x7f");
+    expect(decodeRubyString('\\$\\(\\"')).toBe('$("');
+    expect(decodeRubyString("a\\\nb")).toBe("ab");
   });
 });

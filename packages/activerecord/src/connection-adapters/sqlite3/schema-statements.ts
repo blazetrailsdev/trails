@@ -1,6 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { any, pluralize, symbolizeKeys } from "@blazetrails/activesupport";
-import { rbInspect, rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import { except, rbInspect, rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type {
   AddForeignKeyOptions,
@@ -134,10 +134,12 @@ export async function removeForeignKey(
   if (ifExists && !(await this.foreignKeyExists(fromTable, toTable))) return;
 
   toTable ??= options.toTable;
-  let matchOptions: ForeignKeyLookupOptions = { ...options };
-  delete matchOptions.name;
-  delete matchOptions.toTable;
-  delete matchOptions.validate;
+  let matchOptions: ForeignKeyLookupOptions = except(
+    options as Record<string, unknown>,
+    "name",
+    "toTable",
+    "validate",
+  );
 
   const foreignKeys = await this.foreignKeys(fromTable);
   const fkey = foreignKeys.find((fk) => {

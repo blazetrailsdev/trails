@@ -26,6 +26,68 @@ function canonString(s: string): string {
     .replace(/\\([0rnt])/g, (_, c) => `<${c}>`);
 }
 
+const RUBY_SIMPLE_ESCAPES: Record<string, string> = {
+  n: "\n",
+  t: "\t",
+  r: "\r",
+  f: "\f",
+  v: "\v",
+  a: "\x07",
+  b: "\b",
+  e: "\x1b",
+  s: " ",
+  "\n": "",
+};
+
+const RUBY_ESCAPE =
+  /\\(?:([0-7]{1,3})|x([0-9a-fA-F]{1,2})|u([0-9a-fA-F]{4})|u\{([0-9a-fA-F \t]+)\}|(?:c|C-)([\s\S])|([\s\S]))/g;
+
+/**
+ * The VALUE of a Ruby double-quoted string literal, from the source text
+ * between its quotes — which is what extract-ruby-api.rb records, since Ripper's
+ * `@tstring_content` is undecoded. The TS extractor records `node.text`, already
+ * decoded, so comparing the two spellings counts every Ruby backslash twice:
+ * `"\\"` (sanitization.rb:132) and TS `"\\"` are the same one-backslash string.
+ *
+ * Mirrors MRI's `read_escape` (vendor/ruby/v3.3.11/parse.y:7989): octal `\nnn`, `\xHH`, `\uHHHH`, `\u{H…}`,
+ * control `\cx` / `\C-x`, the named escapes, a backslash-newline continuation,
+ * and any other `\X`, which is `X`. `\M-x` is not decoded: it yields a byte
+ * that is not a character, and falls through the last arm.
+ *
+ * A single-quoted literal knows two escapes, `\\` and `\'`, and keeps every
+ * other backslash: `'\s*'` (action_view.rb:35) is three characters.
+ */
+export function decodeRubyString(source: string, singleQuoted = false): string {
+  if (singleQuoted) return source.replace(/\\([\\'])/g, "$1");
+  return source.replace(
+    RUBY_ESCAPE,
+    (
+      _,
+      octal: string | undefined,
+      hex: string | undefined,
+      unicode: string | undefined,
+      braced: string | undefined,
+      control: string | undefined,
+      other: string | undefined,
+    ) => {
+      if (octal !== undefined) return String.fromCharCode(parseInt(octal, 8) & 0xff);
+      if (hex !== undefined) return String.fromCharCode(parseInt(hex, 16));
+      if (unicode !== undefined) return String.fromCharCode(parseInt(unicode, 16));
+      if (braced !== undefined) {
+        return braced
+          .trim()
+          .split(/[ \t]+/)
+          .map((point) => String.fromCodePoint(parseInt(point, 16)))
+          .join("");
+      }
+      if (control !== undefined) {
+        return control === "?" ? "\x7f" : String.fromCharCode(control.charCodeAt(0) & 0x9f);
+      }
+      return RUBY_SIMPLE_ESCAPES[other!] ?? other!;
+    },
+  );
+}
+
 /** Canonical comparison key, or null when uncomparable (`expr`); int/float parse numerically. */
 export function normalizeLiteral(lit: LiteralValue): string | null {
   switch (lit.kind) {
@@ -69,7 +131,11 @@ export function compareLiteral(
   ts: LiteralValue,
   symbolDiscriminated = false,
 ): LiteralVerdict {
-  const r = normalizeLiteral(ruby);
+  const r = normalizeLiteral(
+    ruby.kind === "string"
+      ? { kind: "string", value: decodeRubyString(String(ruby.value ?? ""), ruby.singleQuoted) }
+      : ruby,
+  );
   const t = normalizeLiteral(ts);
   if (r === null || t === null) return "skip";
   if ((r === "nil") !== (t === "nil")) return "skip";

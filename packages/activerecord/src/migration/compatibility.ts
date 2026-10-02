@@ -1,6 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isPresent } from "@blazetrails/activesupport";
 import {
+  except,
   include,
   prepend,
   rbInspect,
@@ -653,7 +654,7 @@ export class V4_2 extends V5_0 {
 
     if (!(await connection.indexNameExists(tableName, indexName))) {
       if (Object.hasOwn(options, "name")) {
-        const { column: _column, ...optionsWithoutColumn } = options;
+        const optionsWithoutColumn = except(options, "column");
         const indexNameWithoutColumn = connection.indexName(tableName, optionsWithoutColumn);
 
         if (await connection.indexNameExists(tableName, indexNameWithoutColumn)) {
