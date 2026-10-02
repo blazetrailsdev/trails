@@ -4627,13 +4627,86 @@ function isFallenThroughInto(clause: ts.CaseClause): boolean {
   return previous !== undefined && ts.isCaseClause(previous) && previous.statements.length === 0;
 }
 
+/** `null` or `undefined`, the two spellings of Ruby's `nil`. */
+function isNilLiteral(node: ts.Expression): boolean {
+  return (
+    node.kind === ts.SyntaxKind.NullKeyword || (ts.isIdentifier(node) && node.text === "undefined")
+  );
+}
+
+/**
+ * Whether `node` is the nil-guard conditional `x == null ? null : e` (or
+ * `x != null ? e : null`) — the only faithful TS lowering of Ruby's
+ * value-context `x && e`: `@alias = aliaz && SqlLiteral.new(aliaz)`
+ * (`activerecord/lib/arel/nodes/function.rb:13`) cannot be spelled with JS
+ * `&&`, which also short-circuits on `""` and `0` and answers that operand
+ * rather than `nil`. It is also how a Ruby `e if x` in value position ports, so
+ * the token is `if:nil-guard` and `compare.ts#foldSkeletonTokens` decides,
+ * against the Ruby stream, whether it reads as the `if` or as the `and`.
+ */
+function isNilGuardConditional(node: ts.ConditionalExpression): boolean {
+  const test = node.condition;
+  if (!ts.isBinaryExpression(test) || !isNilLiteral(test.right)) return false;
+  switch (test.operatorToken.kind) {
+    case ts.SyntaxKind.EqualsEqualsToken:
+    case ts.SyntaxKind.EqualsEqualsEqualsToken:
+      return isNilLiteral(node.whenTrue);
+    case ts.SyntaxKind.ExclamationEqualsToken:
+    case ts.SyntaxKind.ExclamationEqualsEqualsToken:
+      return isNilLiteral(node.whenFalse);
+    default:
+      return false;
+  }
+}
+
+/**
+ * Whether `statement` is the `for (;;)` / `while (true)` a Ruby `retry` is
+ * lowered to: an unconditional loop whose body is one `try` with a handler,
+ * beside nothing but declarations. `Visitor#visit`
+ * (`activerecord/lib/arel/visitors/visitor.rb:27-40`) re-enters its method body
+ * from the `rescue` clause; `retry` is a keyword and tokens nothing on the Ruby
+ * side, so the loop that spells it tokens nothing here (RFC 0113).
+ */
+function isRetryLoop(statement: ts.ForStatement | ts.WhileStatement): boolean {
+  const unconditional = ts.isForStatement(statement)
+    ? !statement.initializer && !statement.condition && !statement.incrementor
+    : statement.expression.kind === ts.SyntaxKind.TrueKeyword;
+  if (!unconditional || !ts.isBlock(statement.statement)) return false;
+  const body = statement.statement.statements.filter((s) => !ts.isVariableStatement(s));
+  return body.length === 1 && ts.isTryStatement(body[0]) && body[0].catchClause !== undefined;
+}
+
+/**
+ * Whether `statement` is `if (!(e instanceof X)) throw e;` — the guard that
+ * opens the handler of a Ruby `rescue X => e` whose body is not itself an
+ * `instanceof` chain. It is the clause's class filter, not an arm of its body,
+ * and the rethrow is what an unmatched Ruby `rescue` does implicitly.
+ */
+function isRescueClassGuard(statement: ts.Statement): boolean {
+  if (!ts.isIfStatement(statement) || statement.elseStatement !== undefined) return false;
+  const test = statement.expression;
+  if (!ts.isPrefixUnaryExpression(test) || test.operator !== ts.SyntaxKind.ExclamationToken) {
+    return false;
+  }
+  const operand = ts.isParenthesizedExpression(test.operand)
+    ? test.operand.expression
+    : test.operand;
+  if (!isInstanceOfTest(operand)) return false;
+  const then = ts.isBlock(statement.thenStatement)
+    ? statement.thenStatement.statements
+    : [statement.thenStatement];
+  return then.length === 1 && ts.isThrowStatement(then[0]) && ts.isIdentifier(then[0].expression);
+}
+
 function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const tokens: string[] = [];
   const visit = (n: ts.Node): void => {
     switch (n.kind) {
-      case ts.SyntaxKind.IfStatement:
       case ts.SyntaxKind.ConditionalExpression:
+        tokens.push(isNilGuardConditional(n as ts.ConditionalExpression) ? "if:nil-guard" : "if");
+        break;
+      case ts.SyntaxKind.IfStatement:
         tokens.push("if");
         break;
       case ts.SyntaxKind.CaseClause:
@@ -4651,8 +4724,10 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
         break;
       }
       case ts.SyntaxKind.WhileStatement:
-      case ts.SyntaxKind.DoStatement:
       case ts.SyntaxKind.ForStatement:
+        if (!isRetryLoop(n as ts.ForStatement | ts.WhileStatement)) tokens.push("loop");
+        break;
+      case ts.SyntaxKind.DoStatement:
       case ts.SyntaxKind.ForOfStatement:
       case ts.SyntaxKind.ForInStatement:
         tokens.push("loop");
@@ -4735,7 +4810,8 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
     const chain = statements.find((s) => ts.isIfStatement(s) && isInstanceOfTest(s.expression));
     if (chain === undefined) {
       tokens.push("rescue");
-      statements.forEach(visit);
+      const guarded = statements.length > 0 && isRescueClassGuard(statements[0]);
+      statements.slice(guarded ? 1 : 0).forEach(visit);
       return;
     }
     for (const statement of statements) {

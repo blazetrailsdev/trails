@@ -859,6 +859,61 @@ describe("body call capture", () => {
     expect(skeleton("memo")).toEqual(["ref:_memo", "or", "ref:build"]);
   });
 
+  it("tokens a nil-guard conditional apart from an ordinary one, in either polarity", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        guard(aliaz: string | null) {
+          return aliaz == null ? null : new Lit(aliaz);
+        }
+        flipped(aliaz: string | undefined) {
+          return aliaz !== undefined ? new Lit(aliaz) : undefined;
+        }
+        plain(aliaz: string | null) {
+          return aliaz == null ? this.build() : new Lit(aliaz);
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("guard")).toEqual(["if:nil-guard", "new:Lit"]);
+    expect(skeleton("flipped")).toEqual(["if:nil-guard", "new:Lit"]);
+    expect(skeleton("plain")).toEqual(["if", "ref:build", "new:Lit"]);
+  });
+
+  it("emits no loop for the unconditional loop a Ruby `retry` lowers to, and no arm for its rescue class guard", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        visit(object: unknown) {
+          for (;;) {
+            let name: string | undefined;
+            try {
+              return this.send(name!, object);
+            } catch (e) {
+              if (!(e instanceof NoMethodError)) throw e;
+              if (this.respondTo(name!)) throw e;
+              this.remember(object);
+            }
+          }
+        }
+        poll() {
+          for (;;) {
+            if (this.done()) return;
+          }
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("visit")).toEqual([
+      "try",
+      "ref:send",
+      "rescue",
+      "if",
+      "ref:respondTo",
+      "throw",
+      "ref:remember",
+    ]);
+    expect(skeleton("poll")).toEqual(["loop", "if", "ref:done"]);
+  });
+
   it("marks a call made in a negated position with the ! prefix", () => {
     // The faithful port of ActiveSupport's `exclude?` (`!include?`); the
     // call ratchet requires the marker before crediting a negating alias.

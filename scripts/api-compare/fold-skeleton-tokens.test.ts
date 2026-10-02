@@ -178,6 +178,40 @@ describe("sameFileHelperSkeletons", () => {
     ]);
   });
 
+  it("folds a block `scan` onto the `for … of matchAll` loop its port spells, and a blockless one onto nothing", () => {
+    expect(foldSkeletonTokens(["ref:scan", "ref:call"], "ruby", ["loop", "ref:matchAll"])).toEqual([
+      "loop",
+      "ref:call",
+    ]);
+    expect(foldSkeletonTokens(["ref:scan"], "ruby", ["ref:matchAll"])).toEqual([]);
+  });
+
+  it("spends a single-lowering idiom once, leaving the loops later idioms are owed", () => {
+    expect(
+      foldSkeletonTokens(["ref:each_with_index", "ref:save", "ref:scan", "ref:scan"], "ruby", [
+        "loop",
+        "loop",
+        "loop",
+      ]),
+    ).toEqual(["loop", "ref:save", "loop", "loop"]);
+  });
+
+  it("reads a nil-guard conditional as `and` unless the Ruby stream still shows an unclaimed `if`", () => {
+    const ts = ["ref:super", "if:nil-guard", "new:SqlLiteral"];
+    expect(foldSkeletonTokens(ts, "ts", ["ref:super", "and", "new:SqlLiteral"])).toEqual([
+      "ref:super",
+      "and",
+      "new:SqlLiteral",
+    ]);
+    expect(foldSkeletonTokens(ts, "ts", ["ref:super", "if", "new:SqlLiteral"])).toEqual([
+      "ref:super",
+      "if",
+      "new:SqlLiteral",
+    ]);
+    expect(foldSkeletonTokens(["if", "if:nil-guard"], "ts", ["if"])).toEqual(["if", "and"]);
+    expect(foldSkeletonTokens(ts, "ts")).toEqual(["ref:super", "if", "new:SqlLiteral"]);
+  });
+
   it("reads a blockless each_with_index chained into map as no loop of its own", () => {
     expect(foldSkeletonTokens(["ref:each_with_index", "ref:map", "new:Column"], "ruby")).toEqual([
       "ref:map",

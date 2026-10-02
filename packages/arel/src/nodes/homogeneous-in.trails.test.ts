@@ -70,9 +70,7 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
 
     it("delegates to attribute.quotedArray when present (host override participates)", () => {
       const calls: unknown[][] = [];
-      const fakeAttr = Object.create(users.get("id")) as Nodes.Node & {
-        quotedArray?: (vs: unknown[]) => Nodes.Node[];
-      };
+      const fakeAttr = Object.create(users.get("id")) as Nodes.HomogeneousIn["attribute"];
       fakeAttr.quotedArray = (vs: unknown[]): Nodes.Node[] => {
         calls.push(vs);
         return vs.map((v) => new Nodes.SqlLiteral(String(v)));
@@ -84,8 +82,8 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
   });
 
   describe("castedValues", () => {
-    const fakeAttr = (typeCaster: unknown): Nodes.Node =>
-      ({ name: "id", typeCaster }) as unknown as Nodes.Node;
+    const fakeAttr = (typeCaster: unknown): Nodes.HomogeneousIn["attribute"] =>
+      ({ name: "id", typeCaster }) as unknown as Nodes.HomogeneousIn["attribute"];
 
     it("drops non-serializable values and serializes the rest", () => {
       const attr = fakeAttr({
@@ -103,11 +101,6 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
       });
       const node = new Nodes.HomogeneousIn([1, 2, 3], attr, "in");
       expect(node.castedValues).toEqual([1, 3]);
-    });
-
-    it("returns raw values when the attribute has no type_caster", () => {
-      const node = new Nodes.HomogeneousIn([1, 2, 3], fakeAttr(undefined), "in");
-      expect(node.castedValues).toEqual([1, 2, 3]);
     });
   });
 

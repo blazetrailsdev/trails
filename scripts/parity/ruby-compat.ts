@@ -55,6 +55,7 @@ export const RUBY_COMPAT_EXPORTS = new Map<string, string>([
   ["Kernel#Integer", "kernelInteger"],
   ["Kernel#catch", "kernelCatch"],
   ["Kernel#inspect", "rbInspect"],
+  ["Kernel#send", "rbFSend"],
   ["Kernel#throw", "kernelThrow"],
   ["Kernel#Rational", "rational"],
   ["Range#cover?", "cover"],

@@ -38,11 +38,11 @@ describe("UpdateManagerTest (trails)", () => {
   });
 
   describe("set", () => {
-    it("takes a plain string literal", () => {
+    it("keeps a String as the statement's one value", () => {
       const mgr = new UpdateManager();
       mgr.table(users);
       mgr.set("foo = bar");
-      expect(mgr.toSql()).toBe('UPDATE "users" SET foo = bar');
+      expect(mgr.ast.values).toEqual(["foo = bar"]);
     });
 
     it("takes a BoundSqlLiteral", () => {

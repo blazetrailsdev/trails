@@ -31,10 +31,12 @@ export class UpdateManager extends TreeManager<UpdateStatement> {
   }
 
   set(values: UpdateValues): this {
-    if (typeof values === "string") {
-      this.ast.values = [new SqlLiteral(values)];
-    } else if (values instanceof SqlLiteral || values instanceof BoundSqlLiteral) {
-      this.ast.values = [values];
+    if (
+      typeof values === "string" ||
+      values instanceof SqlLiteral ||
+      values instanceof BoundSqlLiteral
+    ) {
+      this.ast.values = [values as Node];
     } else {
       this.ast.values = values.map(
         ([column, value]) => new Assignment(new UnqualifiedColumn(column), value as NodeOrValue),
@@ -55,7 +57,7 @@ export class UpdateManager extends TreeManager<UpdateStatement> {
   }
 
   having(expr: Node | string): this {
-    this.ast.havings.push(typeof expr === "string" ? new SqlLiteral(expr) : expr);
+    this.ast.havings.push(expr as Node);
     return this;
   }
 }

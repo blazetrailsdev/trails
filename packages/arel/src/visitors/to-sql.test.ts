@@ -558,20 +558,23 @@ describe("the to_sql visitor", () => {
   });
 
   it("should mark collector as non-retryable if SQL literal is not retryable", () => {
-    const lit = new Nodes.SqlLiteral("1");
-    const collector = new Visitors.ToSql(fakeRecordConnection).accept(
-      lit,
-      new Collectors.SQLString(),
+    const node = new Nodes.As(
+      new Nodes.SqlLiteral("`product.id`"),
+      new Nodes.SqlLiteral("`product.id`", { retryable: true }),
     );
+    const collector = new Collectors.SQLString();
+    collector.retryable = true;
+    new Visitors.ToSql(fakeRecordConnection).accept(node, collector);
+
     expect(collector.retryable).toBe(false);
   });
 
   it("should mark collector as non-retryable when visiting SQL literal", () => {
-    const lit = new Nodes.SqlLiteral("1");
-    const collector = new Visitors.ToSql(fakeRecordConnection).accept(
-      lit,
-      new Collectors.SQLString(),
-    );
+    const node = new Nodes.SqlLiteral("COUNT(*)");
+    const collector = new Collectors.SQLString();
+    collector.retryable = true;
+    new Visitors.ToSql(fakeRecordConnection).accept(node, collector);
+
     expect(collector.retryable).toBe(false);
   });
 
@@ -594,7 +597,7 @@ describe("the to_sql visitor", () => {
   });
 
   it("should mark collector as non-retryable when visiting insert statement node", () => {
-    const stmt = new InsertManager(users).insert([[users.get("name"), "dean"]]).ast;
+    const stmt = new InsertManager(users).insert([[users.get("name"), "dean"]])!.ast;
     const collector = new Visitors.ToSql(fakeRecordConnection).accept(
       stmt,
       new Collectors.SQLString(),

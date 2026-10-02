@@ -1,5 +1,5 @@
 import { Nodes, Visitors } from "../namespaces.js";
-import { NotImplementedError, rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
+import { isEmpty, NotImplementedError, rbObjClone, rbModConstSet } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
@@ -60,7 +60,7 @@ export class ToSql extends Visitor {
     } else {
       collector.append("DELETE FROM ");
     }
-    if (o.relation) this.visit(o.relation, collector);
+    collector = this.visit(o.relation, collector);
 
     this.collectNodesFor(o.wheres, collector, " WHERE ", " AND ");
     this.collectNodesFor(o.orders, collector, " ORDER BY ");
@@ -74,7 +74,7 @@ export class ToSql extends Visitor {
     collector.retryable = false;
     o = this.prepareUpdateStatement(o);
     collector.append("UPDATE ");
-    if (o.relation) this.visit(o.relation, collector);
+    collector = this.visit(o.relation, collector);
 
     this.collectNodesFor(o.values, collector, " SET ");
 
@@ -121,18 +121,7 @@ export class ToSql extends Visitor {
   }
 
   protected visitArelNodesCasted(o: Nodes.Casted, collector: SQLString): SQLString {
-    let valueForDatabase = o.valueForDatabase();
-    if (
-      valueForDatabase &&
-      typeof valueForDatabase === "object" &&
-      "valueForDatabase" in valueForDatabase
-    ) {
-      const held = valueForDatabase;
-      const inner = (held as Record<string, unknown>).valueForDatabase;
-      valueForDatabase = typeof inner === "function" ? (inner as () => unknown).call(held) : inner;
-    }
-    collector.append(this.quote(valueForDatabase));
-    return collector;
+    return collector.append(this.quote(o.valueForDatabase()));
   }
 
   private visitArelNodesQuoted(o: Nodes.Quoted, collector: SQLString): SQLString {
@@ -507,17 +496,9 @@ export class ToSql extends Visitor {
   }
 
   private visitArelNodesBetween(o: Nodes.Between, collector: SQLString): SQLString {
-    this.visit(o.left, collector);
+    collector = this.visit(o.left, collector);
     collector.append(" BETWEEN ");
-    if (o.right instanceof Nodes.And) {
-      const and = o.right;
-      this.visit(and.children[0], collector);
-      collector.append(" AND ");
-      this.visit(and.children[1], collector);
-    } else {
-      this.visit(o.right, collector);
-    }
-    return collector;
+    return this.visit(o.right, collector);
   }
 
   protected visitArelNodesGreaterThanOrEqual(
@@ -665,68 +646,37 @@ export class ToSql extends Visitor {
   private visitArelNodesIn(o: Nodes.In, collector: SQLString): SQLString {
     const attr = o.left;
     let values = o.right;
+
     if (Array.isArray(values)) {
       collector.preparable = false;
-      if (values.length > 0) {
-        values = values.filter((v) => this.unboundableSign(v) === 0);
+
+      if (!isEmpty(values)) {
+        values = values.filter((value) => !this.isUnboundable(value));
       }
-      if (values.length === 0) {
-        collector.append("1=0");
-        return collector;
-      }
+
+      if (isEmpty(values)) return collector.append("1=0");
     }
-    this.visit(attr, collector);
-    if (
-      values &&
-      typeof values === "object" &&
-      !Array.isArray(values) &&
-      "ast" in (values as unknown as Record<string, unknown>) &&
-      "toSql" in (values as unknown as Record<string, unknown>)
-    ) {
-      collector.append(" IN ");
-      this.visit(values, collector);
-      return collector;
-    }
-    collector.append(" IN (");
-    if (Array.isArray(values)) {
-      for (let i = 0; i < values.length; i++) {
-        if (i > 0) collector.append(", ");
-        this.visit(values[i], collector);
-      }
-    } else {
-      this.visit(values, collector);
-    }
-    collector.append(")");
-    return collector;
+
+    this.visit(attr, collector).append(" IN (");
+    return this.visit(values, collector).append(")");
   }
 
   private visitArelNodesNotIn(o: Nodes.NotIn, collector: SQLString): SQLString {
     const attr = o.left;
     let values = o.right;
+
     if (Array.isArray(values)) {
       collector.preparable = false;
-      if (values.length > 0) {
-        values = values.filter((v) => this.unboundableSign(v) === 0);
+
+      if (!isEmpty(values)) {
+        values = values.filter((value) => !this.isUnboundable(value));
       }
-      if (values.length === 0) {
-        collector.append("1=1");
-        return collector;
-      }
+
+      if (isEmpty(values)) return collector.append("1=1");
     }
-    this.visit(attr, collector);
-    if (Array.isArray(values)) {
-      collector.append(" NOT IN (");
-      for (let i = 0; i < values.length; i++) {
-        if (i > 0) collector.append(", ");
-        this.visit(values[i], collector);
-      }
-      collector.append(")");
-    } else {
-      collector.append(" NOT IN (");
-      this.visit(values, collector);
-      collector.append(")");
-    }
-    return collector;
+
+    this.visit(attr, collector).append(" NOT IN (");
+    return this.visit(values, collector).append(")");
   }
 
   private visitArelNodesAnd(o: Nodes.And, collector: SQLString): SQLString {
@@ -890,12 +840,9 @@ export class ToSql extends Visitor {
   }
 
   private visitArelNodesSqlLiteral(o: Nodes.SqlLiteral, collector: SQLString): SQLString {
-    if (!(o as { retryable?: boolean }).retryable) {
-      collector.retryable = false;
-    }
     collector.preparable = false;
-    collector.append(o.toString());
-    return collector;
+    collector.retryable &&= o.retryable;
+    return collector.append(o.toString());
   }
 
   private visitArelNodesBoundSqlLiteral(o: Nodes.BoundSqlLiteral, collector: SQLString): SQLString {

@@ -35,14 +35,12 @@ export class Case extends NodeExpression {
       );
       return;
     }
-    this.conditions[this.conditions.length - 1].right = buildQuoted(
-      expression === undefined ? null : expression,
-    );
+    this.conditions[this.conditions.length - 1].right = buildQuoted(expression);
     return this;
   }
 
   else(expression: Node | unknown): this {
-    this.default = new Else(buildQuoted(expression === undefined ? null : expression));
+    this.default = new Else(buildQuoted(expression));
     return this;
   }
 

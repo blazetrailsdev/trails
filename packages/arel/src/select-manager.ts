@@ -20,6 +20,7 @@ import { sql } from "./arel.js";
 import { Arel, Nodes } from "./namespaces.js";
 import {
   capitalize,
+  isEmpty,
   isSymbol,
   rbConstGet,
   rbModConstSet,
@@ -141,8 +142,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
     if (relation == null) return this;
 
     if (typeof relation === "string" || relation instanceof SqlLiteral) {
-      const text = typeof relation === "string" ? relation : relation.toString();
-      if (text.length === 0) throw new EmptyJoinError();
+      if (isEmpty(relation)) throw new EmptyJoinError();
       klass = StringJoin as unknown as new (left: Node | Table, right: Node | null) => Join;
     }
 

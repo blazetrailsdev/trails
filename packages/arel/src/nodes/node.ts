@@ -33,15 +33,8 @@ export class Node {
   }
 
   toSql(engine: ArelEngine | null = _engine.current): string {
-    if (!engine) {
-      // eslint-disable-next-line blazetrails/rails-error-parity -- Ruby raises NoMethodError/TypeError here; TypeError is its JS analogue, not a missing ported class.
-      throw new TypeError(
-        "undefined method `with_connection' for nil — Arel::Table.engine is unset. " +
-          "Set it to your ActiveRecord base class, or pass an engine to toSql().",
-      );
-    }
     const collector = new SQLString();
-    return engine.withConnection((connection) => connection.visitor.accept(this, collector).value);
+    return engine!.withConnection((connection) => connection.visitor.accept(this, collector).value);
   }
 
   fetchAttribute(_block?: (attr: Node) => boolean): boolean | undefined {

@@ -495,6 +495,18 @@ const TS_CONSTRUCT_SKELETON_NAMES = new Map([
   ["kernelCatch", "try"],
 ]);
 
+/**
+ * The token extract-ts-api.ts emits for a nil-guard conditional,
+ * `x == null ? null : e`. It is the port of Ruby's `x && e` AND of a Ruby
+ * `e if x` in value position, which token differently (`and` / `if`), so the
+ * TS fold reads it against `counterpart` — here the RAW Ruby stream: as an `if`
+ * while Ruby still shows one the port's plain `if`s have not claimed, else as
+ * the `and`. With no counterpart it stays the `if` it was before the split, so
+ * the reading can only discharge an invented arm, never manufacture a missing
+ * one (RFC 0113).
+ */
+const NIL_GUARD_TOKEN = "if:nil-guard";
+
 export function foldSkeletonTokens(
   skeleton: readonly string[],
   side: SkeletonSide = "ruby",
@@ -503,7 +515,14 @@ export function foldSkeletonTokens(
   const folded: string[] = [];
   const surplus =
     side === "ruby" && counterpart !== undefined ? idiomSurplus(skeleton, counterpart) : undefined;
+  const count = (tokens: readonly string[]) => tokens.filter((t) => t === "if").length;
+  let unclaimedIfs =
+    side === "ts" && counterpart !== undefined ? count(counterpart) - count(skeleton) : Infinity;
   for (const [index, token] of skeleton.entries()) {
+    if (token === NIL_GUARD_TOKEN) {
+      folded.push(unclaimedIfs-- > 0 ? "if" : "and");
+      continue;
+    }
     if (!token.startsWith("ref:")) {
       folded.push(token);
       continue;
@@ -517,7 +536,10 @@ export function foldSkeletonTokens(
     const lowering = side === "ruby" ? skeletonIdiomLowering(name, surplus) : undefined;
     if (lowering !== undefined) {
       folded.push(...lowering);
-      for (const spent of lowering) {
+      // A single-lowering row was already spent by idiomSurplus; spending it
+      // again here took a loop a later alternative-lowering idiom was owed.
+      const alternatives = SKELETON_IDIOM_LOWERINGS.get(name)!.length;
+      for (const spent of alternatives > 1 ? lowering : []) {
         const at = surplus?.indexOf(spent) ?? -1;
         if (at !== -1) surplus!.splice(at, 1);
       }
@@ -4799,7 +4821,7 @@ export function main() {
           };
           const localSets = tsLocalSkeletonByFileName.get(tsFile)?.get(tsName);
           const tsOwnNameDelegate = localSets?.length === 1 ? localSets[0] : undefined;
-          const tsFolded = foldSkeletonTokens(tsSkeletons[0], "ts");
+          const tsFolded = foldSkeletonTokens(tsSkeletons[0], "ts", rubySkeleton);
           callSkeletons.push({
             rubyFile,
             rubyName,

@@ -20,10 +20,10 @@ export class Function extends NodeExpression {
     this._alias = typeof value === "string" ? new SqlLiteral(value) : value;
   }
 
-  constructor(expr: NodeOrValue[] | NodeOrValue, aliaz: Node | string | null = null) {
+  constructor(expr: NodeOrValue[] | NodeOrValue, aliaz: string | SqlLiteral | null = null) {
     super();
     this.expressions = expr;
-    this._alias = typeof aliaz === "string" ? new SqlLiteral(aliaz) : aliaz;
+    this._alias = aliaz == null ? null : new SqlLiteral(aliaz);
     this.distinct = false;
   }
 

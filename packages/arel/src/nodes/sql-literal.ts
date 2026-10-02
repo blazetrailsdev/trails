@@ -43,12 +43,12 @@ export class SqlLiteral extends Node {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SqlLiteral
   extends
-    Pick<StringInstance, "eql" | "hash" | "isBlank">,
+    Pick<StringInstance, "eql" | "hash" | "isBlank" | "isEmpty">,
     PredicationsModule,
     ExpressionsModule,
     AliasPredicationModule,
     OrderPredicationsModule {}
 
-include(SqlLiteral, stringSuperclass("eql", "hash", "isBlank"));
+include(SqlLiteral, stringSuperclass("eql", "hash", "isBlank", "isEmpty"));
 
 rbModConstSet(Nodes, "SqlLiteral", SqlLiteral);
