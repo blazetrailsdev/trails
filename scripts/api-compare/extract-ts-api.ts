@@ -4733,6 +4733,45 @@ function everyCatchArmExits(arm: ts.IfStatement): boolean {
     : false;
 }
 
+function guardedWrite(statement: ts.IfStatement): ts.BinaryExpression | undefined {
+  if (statement.elseStatement !== undefined) return undefined;
+  let body = statement.thenStatement;
+  if (ts.isBlock(body)) {
+    if (body.statements.length !== 1) return undefined;
+    body = body.statements[0];
+  }
+  if (!ts.isExpressionStatement(body) || !ts.isBinaryExpression(body.expression)) return undefined;
+  const write = body.expression;
+  if (write.operatorToken.kind !== ts.SyntaxKind.EqualsToken) return undefined;
+  return isFalsinessOf(statement.expression, write.left.getText()) ? write : undefined;
+}
+
+function isFalsinessOf(test: ts.Expression, target: string): boolean {
+  while (ts.isParenthesizedExpression(test)) test = test.expression;
+  if (ts.isPrefixUnaryExpression(test) && test.operator === ts.SyntaxKind.ExclamationToken) {
+    const operand = test.operand;
+    return (
+      ts.isCallExpression(operand) &&
+      ts.isIdentifier(operand.expression) &&
+      operand.expression.text === "rtest" &&
+      operand.arguments.length === 1 &&
+      operand.arguments[0].getText() === target
+    );
+  }
+  if (!ts.isBinaryExpression(test) || test.operatorToken.kind !== ts.SyntaxKind.BarBarToken) {
+    return false;
+  }
+  const compares = (e: ts.Expression, op: ts.SyntaxKind, to: ts.SyntaxKind): boolean =>
+    ts.isBinaryExpression(e) &&
+    e.operatorToken.kind === op &&
+    e.left.getText() === target &&
+    e.right.kind === to;
+  return (
+    compares(test.left, ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.NullKeyword) &&
+    compares(test.right, ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.FalseKeyword)
+  );
+}
+
 function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const tokens: string[] = [];
@@ -4749,9 +4788,16 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
         tokens.push(isNilGuardConditional(n as ts.ConditionalExpression) ? "if:nil-guard" : "if");
         break;
       }
-      case ts.SyntaxKind.IfStatement:
+      case ts.SyntaxKind.IfStatement: {
+        const write = guardedWrite(n as ts.IfStatement);
+        if (write !== undefined) {
+          tokens.push("or");
+          visit(write);
+          return;
+        }
         tokens.push("if");
         break;
+      }
       case ts.SyntaxKind.CaseClause:
         if (!isFallenThroughInto(n as ts.CaseClause)) tokens.push("if");
         break;

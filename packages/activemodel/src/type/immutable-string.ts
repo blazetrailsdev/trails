@@ -1,5 +1,5 @@
 import { BigDecimal, Duration } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { Rational, rbObjAsString as toS, registerConstant } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 
 export interface ImmutableStringTypeOptions {
@@ -25,8 +25,16 @@ export class ImmutableStringType extends ValueType<string> {
   }
 
   serialize(value: unknown): unknown {
-    if (typeof value === "number" || typeof value === "bigint") return String(value);
-    if (value instanceof BigDecimal || value instanceof Duration) return String(value);
+    if (
+      typeof value === "number" ||
+      typeof value === "bigint" ||
+      value instanceof Number ||
+      value instanceof BigDecimal ||
+      value instanceof Rational ||
+      value instanceof Duration
+    ) {
+      return toS(value);
+    }
     if (value === true) return this.true;
     if (value === false) return this.false;
     return super.serialize(value);

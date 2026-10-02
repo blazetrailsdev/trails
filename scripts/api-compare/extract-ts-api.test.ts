@@ -851,6 +851,29 @@ describe("body call capture", () => {
     expect(skeleton("other")!.filter((t) => t === "if" || t === "or")).toEqual(["if"]);
   });
 
+  it("emits or, not an arm, for a write guarded by the Ruby-falsiness of its own target", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        defaults(h: Record<string, unknown>, k: string, v: unknown) {
+          if (h[k] == null || h[k] === false) h[k] = v;
+        }
+        truthy(h: Record<string, unknown>) { if (!rtest(h.a)) { h.a = this.build(); } }
+        other(h: Record<string, unknown>) { if (h.a == null || h.a === false) h.b = 1; }
+        unlessDefined() { if (this._x === undefined) this._x = 1; }
+        nil(h: Record<string, unknown>) { if (h.a == null) h.a = 1; }
+        orElse(h: Record<string, unknown>) { if (!rtest(h.a)) h.a = 1; else this.log(); }
+        more(h: Record<string, unknown>) { if (!rtest(h.a)) { h.a = 1; this.log(); } }
+      }`,
+    );
+    const arms = (name: string) =>
+      cls.instanceMethods.find((m) => m.name === name)!.skeleton!.filter((t) => !t.includes(":"));
+    expect(arms("defaults")).toEqual(["or"]);
+    expect(arms("truthy")).toEqual(["or"]);
+    for (const kept of ["other", "unlessDefined", "nil", "orElse", "more"]) {
+      expect(arms(kept).filter((t) => t === "if")).toEqual(["if"]);
+    }
+  });
+
   it("carries the thrown class on the throw token", () => {
     const cls = extractFromSource(
       `class Foo {

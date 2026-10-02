@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Duration } from "@blazetrails/activesupport";
+import { Rational } from "@blazetrails/ruby-compat";
 import * as Types from "../index.js";
 import { ImmutableStringType } from "./immutable-string.js";
 
@@ -9,6 +10,8 @@ describe("ImmutableStringType (trails)", () => {
     const object = {},
       array = [true];
     expect(type.serialize(123)).toBe("123");
+    expect(type.serialize(new Number(2))).toBe("2.0");
+    expect(type.serialize(new Rational(1, 3))).toBe("1/3");
     expect(type.serialize(Duration.seconds(5))).toBe(String(Duration.seconds(5)));
     expect(type.serialize(object)).toBe(object);
     expect(type.serialize(array)).toBe(array);

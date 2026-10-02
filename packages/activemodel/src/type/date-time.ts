@@ -5,7 +5,13 @@ import {
   Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
-import { Rational, rbObjAsString as toS, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  numericMul,
+  Rational,
+  rbObjAsString as toS,
+  registerConstant,
+  toI,
+} from "@blazetrails/ruby-compat";
 import {
   type DateInfinity as DateInfinityType,
   type DateNegativeInfinity as DateNegativeInfinityType,
@@ -62,11 +68,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
 
   /** @internal */
   protected microseconds(time: DateParts): number {
-    const secFraction = time.secFraction;
-    if (secFraction == null) return 0;
-    if (secFraction instanceof Rational) return secFraction.mul(1_000_000).toI();
-    if (typeof secFraction === "bigint") return Number(secFraction * 1_000_000n);
-    return Math.trunc(secFraction * 1_000_000);
+    return time.secFraction != null ? Number(toI(numericMul(time.secFraction, 1_000_000))) : 0;
   }
 
   /** @internal */

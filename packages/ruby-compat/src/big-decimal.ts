@@ -37,10 +37,16 @@ export class BigDecimal {
     value: string | number | bigint | BigDecimal | { numerator: bigint; denominator: bigint },
     ndigits = 0,
   ) {
-    const isRational = typeof value === "object" && !(value instanceof BigDecimal);
+    const boxed: unknown = value;
+    const isFloat = typeof value === "number" || boxed instanceof Number;
+    const isRational = !isFloat && typeof value === "object" && !(value instanceof BigDecimal);
     const parsed = isRational
-      ? parseRational(value, ndigits)
-      : parse(value instanceof BigDecimal ? value.toString("F") : value);
+      ? parseRational(value as RationalLike, ndigits)
+      : parse(
+          value instanceof BigDecimal
+            ? value.toString("F")
+            : (value.valueOf() as string | number | bigint),
+        );
     if (parsed === null) {
       throw new TypeError(`BigDecimal: cannot parse ${String(value)}`);
     }
@@ -48,7 +54,7 @@ export class BigDecimal {
     this.digits = parsed.digits;
     this.exp = parsed.exp;
     this.nonFinite = parsed.nonFinite;
-    if (parsed.nonFinite === null && ndigits > 0 && (isRational || typeof value === "number")) {
+    if (parsed.nonFinite === null && ndigits > 0 && (isRational || isFloat)) {
       const rounded = this.round(ndigits - this.exponent());
       this._sign = rounded._sign;
       this.digits = rounded.digits;

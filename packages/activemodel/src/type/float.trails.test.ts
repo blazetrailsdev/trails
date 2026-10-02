@@ -2,7 +2,7 @@
    Each model below spells `include ActiveModel::Dirty` in its class body, the way the Rails test
    model it mirrors does; the empty class/interface merge beside it is how `include()` surfaces
    those members on the type side. */
-import { include } from "@blazetrails/activesupport";
+import { BigDecimal, include } from "@blazetrails/activesupport";
 import { Dirty } from "../dirty.js";
 import { describe, it, expect } from "vitest";
 import { cmp, rbEql, rbEqual, rbObjAsString, rbObjClass } from "@blazetrails/ruby-compat";
@@ -11,6 +11,26 @@ import { Model } from "../index.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
 
 describe("FloatType (trails)", () => {
+  it("casts a blank non-numeric value to nil, as value.presence does", () => {
+    const type = new Types.FloatType();
+    expect(type.cast([])).toBeNull();
+    expect(type.cast({})).toBeNull();
+    expect(type.cast("  ")).toBeNull();
+  });
+
+  it("cast_value sends to_f, raising for a receiver that has none", () => {
+    const type = new Types.FloatType();
+    expect(type.cast("1.5abc")).toBe(1.5);
+    expect(rbObjClass(type.cast(3))).toBe("Float");
+    expect(() => type.cast({ a: 1 })).toThrow("undefined method 'to_f'");
+  });
+
+  it("type_cast_for_schema answers ::Float::NAN for any value answering nan?", () => {
+    const type = new Types.FloatType();
+    expect(type.typeCastForSchema(new BigDecimal("NaN"))).toBe("::Float::NAN");
+    expect(type.typeCastForSchema(-Infinity)).toBe("-::Float::INFINITY");
+  });
+
   it("tracks a float attribute change through the model", () => {
     class MyModel extends Model {
       declare static attribute: AttributesClassHalf["attribute"];

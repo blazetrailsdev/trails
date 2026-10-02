@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { FloatDomainError } from "./float-domain-error.js";
 import { NoMethodError } from "./no-method-error.js";
-import { anybits, fixDiv, fixMod, round, toI } from "./numeric.js";
-import { ZeroDivisionError } from "./rational.js";
+import { anybits, fixDiv, fixMod, isNan, numericMul, round, toF, toI } from "./numeric.js";
+import { Rational, ZeroDivisionError } from "./rational.js";
 
 describe("Float#round", () => {
   it("rounds to the given number of digits", () => {
@@ -39,6 +39,72 @@ describe("anybits", () => {
     expect(anybits(~42, 42)).toBe(false);
     expect(anybits(-42, -42)).toBe(true);
     expect(anybits(~0b100, ~0b1)).toBe(true);
+  });
+});
+
+describe("Float#round past the double's own digits", () => {
+  it("answers the receiver once ndigits overflows it, and zero once it underflows", () => {
+    expect(round(1.5, 400)).toBe(1.5);
+    expect(round(1.0e-320, 3)).toBe(0);
+  });
+
+  it("rounds the exact Rational past 14 digits, and half up below them", () => {
+    expect(round(0.1, 16)).toBe(0.1);
+    expect(round(0.1234567890123449, 15)).toBe(0.123456789012345);
+    expect(round(1.005, 2)).toBe(1.01);
+    expect(round(-2.675, 2)).toBe(-2.68);
+  });
+
+  it("rounds the truncated Integer for a negative ndigits", () => {
+    expect(round(15.5, -1)).toBe(20);
+    expect(round(-15.5, -1)).toBe(-20);
+    expect(round(14.9, -1)).toBe(10);
+    expect(round(1234.5, -400)).toBe(0);
+    expect(Object.is(round(-0, -1), 0)).toBe(true);
+    expect(Object.is(round(-0, 1), -0)).toBe(true);
+  });
+});
+
+describe("Numeric#*", () => {
+  it("multiplies across the Integer, Float and Rational seats", () => {
+    expect(numericMul(3, 4)).toBe(12);
+    expect(numericMul(0.5, 3)).toBe(1.5);
+    expect(numericMul(new Rational(1, 4), 1_000_000)).toEqual(new Rational(250_000, 1));
+    expect(numericMul(2n ** 60n, 4)).toBe(2n ** 62n);
+    expect(toI(numericMul(0.5, 1_000_000))).toBe(500000);
+    expect(() => numericMul(1, "a")).toThrow("String can't be coerced into Integer");
+  });
+});
+
+describe("#to_f", () => {
+  it("dispatches on the receiver the way a Ruby send does", () => {
+    expect(toF(null).valueOf()).toBe(0);
+    expect(toF(1.5)).toBe(1.5);
+    expect(toF("12.5abc")).toBe(12.5);
+    expect(toF("abc").valueOf()).toBe(0);
+    expect(toF({ toF: () => 2.5 })).toBe(2.5);
+  });
+
+  it("seats a whole-valued answer as a Float", () => {
+    expect(toF(3)).toBeInstanceOf(Number);
+    expect(toF(2n).valueOf()).toBe(2);
+    expect(toF("7")).toBeInstanceOf(Number);
+    const boxed = new Number(4) as unknown as number;
+    expect(toF(boxed)).toBe(boxed);
+  });
+
+  it("raises where Ruby raises", () => {
+    expect(() => toF({})).toThrow(NoMethodError);
+    expect(() => toF(":false")).toThrow("undefined method 'to_f' for an instance of Symbol");
+  });
+});
+
+describe("#nan?", () => {
+  it("dispatches on the receiver the way a Ruby send does", () => {
+    expect(isNan(NaN)).toBe(true);
+    expect(isNan(new Number(1))).toBe(false);
+    expect(isNan({ isNan: () => true })).toBe(true);
+    expect(() => isNan(null)).toThrow("undefined method 'nan?' for an instance of NilClass");
   });
 });
 

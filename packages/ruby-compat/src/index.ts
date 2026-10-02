@@ -190,8 +190,9 @@ export { KERNEL_METHODS, PROTOCOL_PROBES, methodMissingProxy } from "./method-mi
 export { NameError } from "./name-error.js";
 export { NilClass } from "./nil-class.js";
 export { NoMethodError } from "./no-method-error.js";
-export { anybits, fixDiv, fixMod, round, toI } from "./numeric.js";
+export { anybits, fixDiv, fixMod, isNan, round, toF, toI } from "./numeric.js";
 export {
+  numericMul,
   numericPlus,
   rbBigNorm,
   rbDbl2num,

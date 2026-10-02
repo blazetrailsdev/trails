@@ -205,6 +205,11 @@ describe("Time", () => {
     expect(time.strftime("%z")).toBe(local.offset.replace(":", ""));
   });
 
+  it("Time.utc reads a nil usec as none, and an Integer one as microseconds", () => {
+    expect(Time.utc(2008, 3, 1, 6, 0, 1, null).nsec).toBe(0);
+    expect(Time.utc(2008, 3, 1, 6, 0, 1, 5n).usec).toBe(5);
+  });
+
   it("Time.utc keeps a fractional second", () => {
     const time = Time.utc(2008, 3, 1, 6, 0, 0.5);
     expect(time.sec).toBe(0);

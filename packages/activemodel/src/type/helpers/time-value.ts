@@ -43,12 +43,16 @@ type NsecBearing =
 
 const NANOS_PER_SECOND = 1_000_000_000n;
 
+/**
+ * @boundary: `precision` is an Integer, so `10 ** n` is taken over BigInt, the
+ *  Integer arm of Ruby's `**`. A negative exponent there is a Rational, which
+ *  divides every Integer nsec, as `10 ** 0` does.
+ */
 export function applySecondsPrecision<T>(this: { precision?: number }, value: T): T {
   const precision = this.precision;
   if (precision == null || !respondToNsec(value)) return value;
-  if (!Number.isInteger(precision) || precision < 0 || precision > 9) return value;
   const numberOfInsignificantDigits = 9 - precision;
-  const roundPower = 10n ** BigInt(numberOfInsignificantDigits);
+  const roundPower = 10n ** BigInt(Math.max(numberOfInsignificantDigits, 0));
   const roundedOffNsec = nsec(value) % roundPower;
   if (roundedOffNsec > 0n) {
     return changeNsec(value, nsec(value) - roundedOffNsec) as T;
@@ -92,12 +96,10 @@ export function newTime(
 ): Time | null {
   if (year == null || (year === 0 && mon === 0 && mday === 0)) return null;
 
-  const usec = typeof microsec === "bigint" ? Number(microsec) : (microsec ?? 0);
-
   if (offset != null) {
     let time: Time | null;
     try {
-      time = Time.utc(Number(year), mon, mday, hour, min, sec, usec);
+      time = Time.utc(Number(year), mon, mday, hour, min, sec, microsec);
     } catch {
       time = null;
     }
@@ -109,13 +111,13 @@ export function newTime(
     return this.isUtc ? time : time.getlocal();
   } else if (this.isUtc) {
     try {
-      return Time.utc(Number(year), mon, mday, hour, min, sec, usec);
+      return Time.utc(Number(year), mon, mday, hour, min, sec, microsec);
     } catch {
       return null;
     }
   } else {
     try {
-      return Time.local(Number(year), mon, mday, hour, min, sec, usec);
+      return Time.local(Number(year), mon, mday, hour, min, sec, microsec);
     } catch {
       return null;
     }
@@ -124,13 +126,17 @@ export function newTime(
 
 /** @internal */
 export function fastStringToTime(this: TimezoneAware, string: string): Time | null {
-  if (!string.includes("-")) return null;
-
   try {
-    return this.isUtc ? Time.new(string, { in: "UTC" }) : Time.new(string);
+    if (!string.includes("-")) return null;
+
+    if (this.isUtc) {
+      return Time.new(string, { in: "UTC" });
+    } else {
+      return Time.new(string);
+    }
   } catch (error) {
-    if (error instanceof ArgumentError) return null;
-    throw error;
+    if (!(error instanceof ArgumentError)) throw error;
+    return null;
   }
 }
 

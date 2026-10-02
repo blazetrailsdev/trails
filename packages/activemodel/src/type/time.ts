@@ -5,13 +5,7 @@ import {
   Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
-import {
-  TimeWithZone,
-  change as timeChange,
-  isBlank,
-  include,
-  type Included,
-} from "@blazetrails/activesupport";
+import { TimeWithZone, isPresent, include, type Included } from "@blazetrails/activesupport";
 import { Rational, registerConstant } from "@blazetrails/ruby-compat";
 import {
   AcceptsMultiparameterTime,
@@ -39,8 +33,7 @@ export class TimeType extends ValueType<TimeWithZone | RubyTime> {
   userInputInTimeZone(
     value: unknown,
   ): TimeWithZone | Temporal.ZonedDateTime | Temporal.Instant | RubyTime | null {
-    if (value == null || value === false) return null;
-    if (typeof value === "string" && isBlank(value)) return null;
+    if (!isPresent(value)) return null;
 
     if (typeof value === "string") {
       value = `2000-01-01 ${value}`;
@@ -51,10 +44,8 @@ export class TimeType extends ValueType<TimeWithZone | RubyTime> {
         if (!(error instanceof ArgumentError)) throw error;
       }
       if (timeHash == null || timeHash.hour == null) return null;
-    } else if (value instanceof TimeWithZone) {
+    } else if (value instanceof TimeWithZone || value instanceof RubyTime) {
       value = value.change({ year: 2000, day: 1, month: 1 });
-    } else if (value instanceof RubyTime) {
-      value = timeChange(value, { year: 2000, day: 1, month: 1 });
     }
 
     return TimeValue.userInputInTimeZone.call(this, value);

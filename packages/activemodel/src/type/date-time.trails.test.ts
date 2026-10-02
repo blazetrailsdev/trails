@@ -42,6 +42,18 @@ describe("DateTimeType fallback string parsing", () => {
   });
 });
 
+describe("DateTimeType#microseconds", () => {
+  it("multiplies sec_fraction whichever Numeric seats it", () => {
+    const type = new Types.DateTimeType() as unknown as {
+      microseconds(time: { secFraction?: number | bigint | Rational }): number;
+    };
+    expect(type.microseconds({ secFraction: new Rational(123456, 1_000_000) })).toBe(123456);
+    expect(type.microseconds({ secFraction: 0.5 })).toBe(500000);
+    expect(type.microseconds({ secFraction: 0 })).toBe(0);
+    expect(type.microseconds({})).toBe(0);
+  });
+});
+
 describe("DateTimeType fallback zone and ordering coverage", () => {
   const type = new Types.DateTimeType();
   const cast = (s: string) => (type.cast(s) as RubyTime | null)?.getutc().xmlschema() ?? null;
