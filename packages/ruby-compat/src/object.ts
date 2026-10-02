@@ -153,31 +153,6 @@ export function rbClassSuperclass<T extends object>(klass: T): T | null {
 export const classpaths = new WeakMap<object, { path: string; permanent: boolean }>();
 
 /**
- * `rb_mod_instance_method` (`vendor/ruby/v3.3.11/proc.c:2190`), `Module#instance_method`,
- * answering the `owner` (`method_owner`, `vendor/ruby/v3.3.11/proc.c:1988`): the
- * `Module#ancestors` entry that defines `mid`, which is the module an iclass
- * link stands for and the class a prototype belongs to.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function rbModInstanceMethod(mod: { prototype: object }, mid: string): { owner: unknown } {
-  for (
-    let link: object | null = mod.prototype;
-    link && link !== Object.prototype;
-    link = Object.getPrototypeOf(link) as object | null
-  ) {
-    if (!Object.hasOwn(link, mid)) continue;
-    if (Object.hasOwn(link, T_ICLASS))
-      return { owner: (link as { [T_ICLASS]: unknown })[T_ICLASS] };
-    return { owner: link.constructor };
-  }
-  throw new NameError(
-    `undefined method '${mid}' for class '${rbModToS(mod as unknown as new () => unknown)}'`,
-    mid,
-  );
-}
-
-/**
  * `rb_mod_singleton_p` (`vendor/ruby/v3.3.11/object.c:3050`), `Module#singleton_class?`.
  *
  * @noRailsEquivalent PERMANENT

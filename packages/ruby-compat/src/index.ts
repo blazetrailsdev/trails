@@ -52,7 +52,6 @@ export {
   rbFSend,
   toSym,
   rbModPublicMethodDefined,
-  rbModInstanceMethod,
   rtest,
 } from "./object.js";
 export {
@@ -166,6 +165,7 @@ export {
   initializeIncludedModules,
   isModuleIncluded,
   rbModAncestors,
+  rbModInstanceMethod,
   moduleVisibility,
   publicInstanceMethods,
 } from "./include.js";
