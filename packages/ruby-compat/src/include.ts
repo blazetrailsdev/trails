@@ -339,6 +339,7 @@ export class Module {
     let links = includerCarriers.get(this);
     if (!links) includerCarriers.set(this, (links = []));
     links.push(link);
+    Object.defineProperty(link, T_ICLASS, { value: this });
     Object.setPrototypeOf(proto, link);
   }
 
@@ -826,6 +827,51 @@ export function rbModAncestors(mod: { prototype: object } | string): unknown[] {
     if (p === Object.prototype) ary.push("Kernel", "BasicObject");
   }
   return ary;
+}
+
+/**
+ * `rb_mod_instance_method` (`vendor/ruby/v3.3.11/proc.c:2190`), `Module#instance_method`,
+ * answering the `owner` (`method_owner`, `vendor/ruby/v3.3.11/proc.c:1988`): the
+ * {@link rbModAncestors} entry that defines `mid`. That is the `Module` an
+ * iclass link stands for, the module `include()` copied the entry from, most
+ * recently included first, or the class the prototype belongs to.
+ *
+ * An `Object.prototype` member raises `NameError`: no Ruby class defines it,
+ * the line `rbModPublicMethodDefined` draws for `Module#method_defined?`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModInstanceMethod(mod: { prototype: object }, mid: string): { owner: unknown } {
+  for (
+    let link: object | null = mod.prototype;
+    link && link !== Object.prototype;
+    link = Object.getPrototypeOf(link) as object | null
+  ) {
+    if (!Object.hasOwn(link, mid)) continue;
+    const table = link as Record<symbol, unknown>;
+    if (Object.hasOwn(link, T_ICLASS)) return { owner: table[T_ICLASS] };
+    if (Object.hasOwn(link, includedKeys) && (table[includedKeys] as Set<string>).has(mid)) {
+      const mods = [...(table[includedModulesKey] as Set<unknown>)].reverse();
+      const owner = mods.find((m) => {
+        if (m instanceof Module) return false;
+        if (typeof m === "function") return Object.hasOwn(m.prototype as object, mid);
+        for (
+          let ancestor = m as object | null;
+          ancestor && ancestor !== Object.prototype;
+          ancestor = Object.getPrototypeOf(ancestor) as object | null
+        ) {
+          if (Object.hasOwn(ancestor, mid)) return true;
+        }
+        return false;
+      });
+      if (owner !== undefined) return { owner };
+    }
+    return { owner: link.constructor };
+  }
+  throw new NameError(
+    `undefined method '${mid}' for class '${rbModToS(mod as unknown as new () => unknown)}'`,
+    mid,
+  );
 }
 
 /**

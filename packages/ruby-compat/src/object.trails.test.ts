@@ -11,8 +11,6 @@ import {
   rbFSend,
   toSym,
   rbModPublicMethodDefined,
-  rbModAncestors,
-  rbModInstanceMethod,
   rbDeclareIvar,
   rbObjInstanceVariables,
   rbObjIvarGet,
@@ -22,7 +20,7 @@ import {
   rbObjClass,
   rbSetClassPathString,
 } from "./object.js";
-import { Module } from "./include.js";
+import { Module, include, rbModAncestors, rbModInstanceMethod } from "./include.js";
 import { cmp } from "./comparable.js";
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
@@ -264,11 +262,35 @@ describe("rbModAncestors / rbModInstanceMethod", () => {
     const mod = new Module();
     mod.defineMethod("cast", () => {});
     mod.appendFeatures(Sub);
-    const ancestors = rbModAncestors(Sub);
-    expect(ancestors.map((link) => Object.hasOwn(link, "cast"))).toEqual([false, true, false]);
-    expect(rbModInstanceMethod(Sub, "cast").owner).toBe(ancestors[1]);
-    expect(rbModInstanceMethod(Sub, "serialize").owner).toBe(Base.prototype);
+    expect(rbModAncestors(Sub)).toEqual([Sub, mod, Base, Object, "Kernel", "BasicObject"]);
+    expect(rbModInstanceMethod(Sub, "cast").owner).toBe(mod);
+    expect(rbModInstanceMethod(Sub, "serialize").owner).toBe(Base);
     expect(() => rbModInstanceMethod(Sub, "nope")).toThrow(NameError);
+  });
+
+  it("names the module include() copied a method from, and the class for its own", () => {
+    const first = { cast() {}, serialize() {} };
+    const second = { cast() {} };
+    class Mixin {
+      deserialize(): void {}
+    }
+    class Type {
+      serialize(): void {}
+    }
+    include(Type, first);
+    include(Type, second);
+    include(Type, Mixin);
+    const ancestors = rbModAncestors(Type);
+    expect(ancestors.slice(0, 4)).toEqual([Type, Mixin, second, first]);
+    expect(rbModInstanceMethod(Type, "cast").owner).toBe(second);
+    expect(rbModInstanceMethod(Type, "deserialize").owner).toBe(Mixin);
+    expect(rbModInstanceMethod(Type, "serialize").owner).toBe(Type);
+  });
+
+  it("raises NameError for an Object.prototype member, which method_defined? does not answer", () => {
+    class Type {}
+    expect(rbModPublicMethodDefined(Type, "hasOwnProperty")).toBe(false);
+    expect(() => rbModInstanceMethod(Type, "hasOwnProperty")).toThrow(NameError);
   });
 });
 

@@ -121,7 +121,7 @@ export function rbObjSingletonClass(obj: object): abstract new (...args: never) 
 
 /**
  * `T_ICLASS` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:140`), the
- * type of the hidden class an `extend` splices above its receiver. A link
+ * type of the hidden class an `include` or `extend` splices into an ancestry. A link
  * carries the module it stands for under this key.
  *
  * @noRailsEquivalent PERMANENT
@@ -151,43 +151,6 @@ export function rbClassSuperclass<T extends object>(klass: T): T | null {
  * @noRailsEquivalent PERMANENT
  */
 export const classpaths = new WeakMap<object, { path: string; permanent: boolean }>();
-
-/**
- * `rb_mod_ancestors` (`vendor/ruby/v3.3.11/class.c:1570`), `Module#ancestors`: the
- * method-table chain, nearest first. Each entry is a class's own table or the
- * link a `Module` contributed, the walk MRI makes over `RCLASS_SUPER`.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function rbModAncestors(mod: { prototype: object }): object[] {
-  const ancestors: object[] = [];
-  for (
-    let link: object | null = mod.prototype;
-    link && link !== Object.prototype;
-    link = Object.getPrototypeOf(link) as object | null
-  ) {
-    ancestors.push(link);
-  }
-  return ancestors;
-}
-
-/**
- * `rb_mod_instance_method` (`vendor/ruby/v3.3.11/proc.c:2190`), `Module#instance_method`,
- * answering the `owner` (`method_owner`, `vendor/ruby/v3.3.11/proc.c:1988`): the
- * {@link rbModAncestors} entry that defines `mid`.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function rbModInstanceMethod(mod: { prototype: object }, mid: string): { owner: object } {
-  const owner = rbModAncestors(mod).find((link) => Object.hasOwn(link, mid));
-  if (owner === undefined) {
-    throw new NameError(
-      `undefined method '${mid}' for class '${rbModToS(mod as unknown as new () => unknown)}'`,
-      mid,
-    );
-  }
-  return { owner };
-}
 
 /**
  * `rb_mod_singleton_p` (`vendor/ruby/v3.3.11/object.c:3050`), `Module#singleton_class?`.
