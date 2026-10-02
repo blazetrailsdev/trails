@@ -443,7 +443,7 @@ export interface AbstractAdapter {
   removeReference(
     tableName: string,
     refName: string,
-    options?: RemoveReferenceOptions,
+    { foreignKey, polymorphic, ...options }?: RemoveReferenceOptions,
   ): Promise<void>;
   removeBelongsTo(
     tableName: string,

@@ -4793,57 +4793,48 @@ function orRaise(statement: ts.IfStatement): ts.ThrowStatement | undefined {
 }
 
 function isArgumentBindingGuard(statement: ts.IfStatement): boolean {
-  const guard =
-    /^if \((!\("\w+" in \w+\)|\w+ === undefined)\) (\{ )?throw new ArgumentError\("(missing keyword: :\w+|wrong number of arguments \(given \d+, expected [\d.+]+\))"\);( \})?$/;
-  return guard.test(statement.getText().replace(/\s+/g, " "));
-}
-
-function parameterKindTest(
-  test: ts.Expression,
-  parameters: readonly string[],
-): string[] | undefined {
-  const atom = /typeof (\w+) [!=]== "\w+"|(\w+) [!=]== null|Array\.isArray\((\w+)\)/g;
-  const tested: string[] = [];
-  const rest = test.getText().replace(atom, (_atom, a, b, c) => {
-    tested.push(a ?? b ?? c);
-    return "";
-  });
-  const kindOnly = /^[\s!()&|]*$/.test(rest) && tested.every((p) => parameters.includes(p));
-  return kindOnly && tested.length > 0 ? tested : undefined;
-}
-
-function isKwargsRebindingGuard(statement: ts.IfStatement): boolean {
   const body = statement.parent;
   if (!ts.isBlock(body) || !ts.isFunctionLike(body.parent)) return false;
-  const parameters = body.parent.parameters.flatMap((p) =>
+  const bound = body.parent.parameters.flatMap((p) =>
     ts.isIdentifier(p.name) ? [p.name.text] : [],
   );
-  const tested = parameterKindTest(statement.expression, parameters);
-  if (tested === undefined) return false;
-  const last = parameters[parameters.length - 1];
-  const isTested = (e: ts.Expression): boolean => {
-    while (ts.isParenthesizedExpression(e) || ts.isAsExpression(e)) e = e.expression;
-    return ts.isIdentifier(e) && e.text !== last && tested.includes(e.text);
-  };
-  let moves = false;
-  const rebinds = (branch: ts.Statement | undefined): boolean => {
-    if (branch === undefined) return true;
-    const statements = ts.isBlock(branch) ? branch.statements : [branch];
-    return statements.every((s) => {
-      if (!ts.isExpressionStatement(s) || !ts.isBinaryExpression(s.expression)) return false;
-      const { left, operatorToken, right } = s.expression;
-      if (operatorToken.kind !== ts.SyntaxKind.EqualsToken) return false;
-      if (!ts.isIdentifier(left) || !parameters.includes(left.text)) return false;
-      if (left.text === last) {
-        moves ||= ts.isObjectLiteralExpression(right)
-          ? right.properties.some((p) => ts.isSpreadAssignment(p) && isTested(p.expression))
-          : isTested(right);
-      }
-      return true;
-    });
-  };
-  const leads = body.statements.indexOf(statement) === 0;
-  return leads && rebinds(statement.thenStatement) && rebinds(statement.elseStatement) && moves;
+  for (const earlier of body.statements) {
+    if (earlier === statement) break;
+    if (ts.isIfStatement(earlier) && isArgumentBindingGuard(earlier)) continue;
+    const declaration = ts.isVariableStatement(earlier)
+      ? earlier.declarationList.declarations[0]
+      : undefined;
+    const call = declaration?.initializer;
+    if (!call || !ts.isCallExpression(call) || !ts.isIdentifier(declaration.name)) return false;
+    const [rest] = call.arguments;
+    if (call.expression.getText() !== "extractOptionsBang" || !ts.isIdentifier(rest)) return false;
+    if (!bound.includes(rest.text)) return false;
+    bound.push(declaration.name.text);
+  }
+  let test = statement.expression;
+  let message: RegExp;
+  if (ts.isPrefixUnaryExpression(test) && test.operator === ts.SyntaxKind.ExclamationToken) {
+    test = test.operand;
+    while (ts.isParenthesizedExpression(test)) test = test.expression;
+    if (!ts.isBinaryExpression(test) || test.operatorToken.kind !== ts.SyntaxKind.InKeyword) {
+      return false;
+    }
+    test = test.right;
+    message = /^missing keyword: :\w+$/;
+  } else {
+    if (!ts.isBinaryExpression(test) || test.right.getText() !== "undefined") return false;
+    if (test.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken) return false;
+    test = test.left;
+    message = /^wrong number of arguments \(given \d+, expected [\d.+]+\)$/;
+  }
+  if (!ts.isIdentifier(test) || !bound.includes(test.text)) return false;
+  let raise = statement.thenStatement;
+  if (ts.isBlock(raise) && raise.statements.length === 1) raise = raise.statements[0];
+  if (statement.elseStatement || !ts.isThrowStatement(raise)) return false;
+  const thrown = raise.expression;
+  if (!ts.isNewExpression(thrown) || thrown.expression.getText() !== "ArgumentError") return false;
+  const [text] = thrown.arguments ?? [];
+  return text !== undefined && ts.isStringLiteral(text) && message.test(text.text);
 }
 
 function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
@@ -4876,12 +4867,6 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
           return;
         }
         if (isArgumentBindingGuard(n as ts.IfStatement)) return;
-        if (isKwargsRebindingGuard(n as ts.IfStatement)) {
-          visit((n as ts.IfStatement).thenStatement);
-          const alternate = (n as ts.IfStatement).elseStatement;
-          if (alternate !== undefined) visit(alternate);
-          return;
-        }
         tokens.push("if");
         break;
       }

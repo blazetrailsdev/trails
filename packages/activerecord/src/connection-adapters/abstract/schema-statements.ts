@@ -505,10 +505,9 @@ export class SchemaStatements {
   async removeReference(
     tableName: string,
     refName: string,
-    options: RemoveReferenceOptions = {},
+    { foreignKey = false, polymorphic = false, ...options }: RemoveReferenceOptions = {},
   ): Promise<void> {
-    const { foreignKey = false, polymorphic = false, ...rest } = options;
-    const conditionalOptions = slice(rest, "ifExists", "ifNotExists");
+    const conditionalOptions = slice(options, "ifExists", "ifNotExists");
 
     if (foreignKey) {
       const referenceName = ActiveRecord.Base.pluralizeTableNames

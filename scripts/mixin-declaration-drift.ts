@@ -54,7 +54,8 @@ function typeText(node: ts.TypeNode | undefined): string | null {
  * Normalized signature: type parameters, parameters, return type. Class-only
  * spellings that an interface cannot express are erased so they never read as
  * drift — a `this` parameter, a defaulted parameter (which the interface spells
- * `?`), and the `_` prefix an unused parameter carries.
+ * `?`), a destructured element's default, and the `_` prefix an unused
+ * parameter carries.
  *
  * A parameter typed only by inference (`columnName = "id"`) has no annotation to
  * compare, so its type is `null` — a wildcard the declared side always matches.
@@ -68,7 +69,10 @@ function signatureOf(node: ts.SignatureDeclarationBase): string {
     .map((p) => {
       const dots = p.dotDotDotToken ? "..." : "";
       const optional = p.questionToken || p.initializer ? "?" : "";
-      const name = p.name.getText().replace(/^_+/, "");
+      const name = p.name
+        .getText()
+        .replace(/^_+/, "")
+        .replace(/ = [^,}]+/g, "");
       const type = p.type ? typeText(p.type) : p.initializer ? WILDCARD : "";
       return `${dots}${name}${optional}: ${type}`;
     })

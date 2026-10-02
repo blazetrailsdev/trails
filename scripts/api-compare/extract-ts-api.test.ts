@@ -897,54 +897,23 @@ describe("body call capture", () => {
     expect(arms("unless")).toEqual(["if", "throw:ArgumentError"]);
   });
 
-  it("emits no arm for a leading guard that moves an options hash or block out of a positional parameter", () => {
-    const cls = extractFromSource(
-      `class Foo {
-        removeIndex(t: string, columnName: unknown = null, options: object = {}) {
-          if (!(typeof columnName === "string" || Array.isArray(columnName))) {
-            options = { ...(columnName as object), ...options };
-            columnName = null;
-          }
-          return this.run(t, columnName, options);
-        }
-        block(unit: unknown, block?: () => void) {
-          if (typeof unit === "function") block = unit as () => void;
-          return this.run(unit, block);
-        }
-        notLeading(t: string, toTable: unknown, options: object = {}) {
-          this.log(t);
-          if (typeof toTable === "object") options = toTable as object;
-          return options;
-        }
-        notAKindTest(t: string, toTable: unknown, options: object = {}) {
-          if (this.supports(toTable)) options = toTable as object;
-          return options;
-        }
-        coerce(error: unknown, options: object = {}) {
-          if (typeof error === "string") error = new RuntimeError(error);
-          return this.report(error, options);
-        }
-        coerceLast(queryArray: string[], queryParams: unknown) {
-          if (typeof queryParams === "string") queryParams = this.parse(queryParams);
-          queryArray.push(this.build(queryParams));
-        }
-      }`,
-    );
-    const arms = (name: string) =>
-      cls.instanceMethods.find((m) => m.name === name)!.skeleton!.filter((t) => !t.includes(":"));
-    expect(arms("removeIndex")).toEqual([]);
-    expect(arms("block")).toEqual([]);
-    for (const kept of ["notLeading", "notAKindTest", "coerce", "coerceLast"]) {
-      expect(arms(kept)).toEqual(["if"]);
-    }
-  });
-
   it("emits nothing for the guard that raises the ArgumentError Ruby raises binding the arguments", () => {
     const cls = extractFromSource(
       `class Foo {
-        required(options: object) {
+        required(...columnNames: unknown[]) {
+          const options = extractOptionsBang(columnNames);
           if (!("type" in options)) throw new ArgumentError("missing keyword: :type");
           return this.run(options);
+        }
+        afterSideEffect(options: object) {
+          this.log(options);
+          if (!("type" in options)) throw new ArgumentError("missing keyword: :type");
+        }
+        notAnArgument(options: object) {
+          const found = this.find(options);
+          if (found === undefined) {
+            throw new ArgumentError("wrong number of arguments (given 1, expected 2..3)");
+          }
         }
         arity(columnName?: string) {
           if (columnName === undefined) {
@@ -958,9 +927,12 @@ describe("body call capture", () => {
       }`,
     );
     const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
-    expect(skeleton("required")).toEqual(["ref:run"]);
+    expect(skeleton("required")).toEqual(["ref:extractOptionsBang", "ref:run"]);
     expect(skeleton("arity")).toEqual(["ref:run"]);
-    expect(skeleton("otherMessage")).toEqual(["if", "throw:ArgumentError", "new:ArgumentError"]);
+    const arms = (name: string) => skeleton(name)!.filter((t) => !t.includes(":"));
+    for (const kept of ["afterSideEffect", "notAnArgument", "otherMessage"]) {
+      expect(arms(kept)).toEqual(["if"]);
+    }
   });
 
   it("carries the thrown class on the throw token", () => {
