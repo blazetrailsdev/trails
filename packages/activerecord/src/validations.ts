@@ -1,8 +1,8 @@
-import type { AttrNameArg, ValidationContext } from "@blazetrails/activemodel";
+import type { AttrNameArg } from "@blazetrails/activemodel";
 import { I18n } from "@blazetrails/activemodel";
 import { ActiveRecordError } from "./errors.js";
 
-export type ValidationContextArg = string | string[] | ValidationContext | null;
+export type ValidationContextArg = string | string[] | null;
 import { AbsenceValidator } from "./validations/absence.js";
 import { AssociatedValidator, validatesAssociated } from "./validations/associated.js";
 import { LengthValidator } from "./validations/length.js";

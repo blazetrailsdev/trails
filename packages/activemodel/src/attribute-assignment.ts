@@ -59,15 +59,10 @@ export function attributeWriterMissing(
 }
 
 /** @internal */
-export function _assignAttribute(
-  this: AttributeAssignment,
-  k: string,
-  v: unknown,
-): Promise<void> | void {
+export function _assignAttribute(this: AttributeAssignment, k: string, v: unknown): unknown {
   const setter = `${k}=`;
   try {
-    const result = rbFPublicSend(this, setter, v);
-    return result instanceof Promise ? (result as Promise<void>) : undefined;
+    return rbFPublicSend(this, setter, v);
   } catch (error) {
     if (!(error instanceof NoMethodError)) throw error;
     if (rbObjRespondTo(this, setter)) {
@@ -85,7 +80,7 @@ export interface AttributeAssignment {
   /** @internal */
   _assignAttributes(attributes: Record<string, unknown>): Promise<void> | void;
   /** @internal */
-  _assignAttribute(k: string, v: unknown): Promise<void> | void;
+  _assignAttribute(k: string, v: unknown): unknown;
 }
 
 function respondToEachPair(attrs: unknown): attrs is Record<string, unknown> {

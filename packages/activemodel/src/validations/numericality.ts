@@ -1,15 +1,17 @@
 import {
   ArgumentError,
+  isInclude,
   isSymbol,
   kernelFloat,
   rbFPublicSend,
   rtest,
   Range,
+  toI,
 } from "@blazetrails/ruby-compat";
 
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { underscore, BigDecimal, mergeBang, slice } from "@blazetrails/activesupport";
+import { underscore, BigDecimal, isIn, mergeBang, slice } from "@blazetrails/activesupport";
 import { COMPARE_CHECKS, errorOptions } from "./comparability.js";
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
@@ -79,31 +81,29 @@ export class NumericalityValidator extends EachValidator {
       return;
     }
 
-    const num = parseAsNumber(value, precision, scale) as number | bigint;
-    value = num;
+    value = parseAsNumber(value, precision, scale);
 
     for (const [option, rawOptionValue] of Object.entries(
       slice(this.options, ...RESERVED_OPTIONS),
     )) {
       let optionValue = rawOptionValue as NumericValue | undefined;
-      if (optionValue === undefined) continue;
-      if (option in NUMBER_CHECKS) {
-        const odd = typeof num === "bigint" ? num % 2n !== 0n : Math.trunc(num) % 2 !== 0;
-        if (NUMBER_CHECKS[option as keyof typeof NUMBER_CHECKS] === ":odd?" ? !odd : odd) {
+      if (isInclude(NUMBER_CHECKS, option)) {
+        if (
+          !rtest(rbFPublicSend(toI(value), NUMBER_CHECKS[option as keyof typeof NUMBER_CHECKS]))
+        ) {
           record.errors.add(attrName, `:${option}`, this.filteredOptions(value));
         }
-      } else if (option in RANGE_CHECKS) {
-        const range = optionValue as unknown as Range<number>;
-        if (!range.isInclude(num as number)) {
+      } else if (isInclude(RANGE_CHECKS, option)) {
+        const range = optionValue as unknown as Range<unknown>;
+        if (!isIn(value, range)) {
           record.errors.add(
             attrName,
             `:${option}`,
             mergeBang(this.filteredOptions(value), { count: range.toS() }),
           );
         }
-      } else if (option in COMPARE_CHECKS) {
+      } else if (isInclude(COMPARE_CHECKS, option)) {
         optionValue = this.optionAsNumber(record, optionValue, precision, scale);
-        if (optionValue === undefined) continue;
         if (!rtest(rbFPublicSend(value, COMPARE_CHECKS[option as CompareKey], optionValue))) {
           record.errors.add(
             attrName,
@@ -120,7 +120,7 @@ const INTEGER_REGEX = /^[+-]?\d+(?![\s\S])/;
 const HEXADECIMAL_REGEX = /^[+-]?0[xX]/;
 
 const RANGE_CHECKS = { in: ":in?" } as const;
-const NUMBER_CHECKS = { odd: ":odd?", even: ":even?" } as const;
+const NUMBER_CHECKS = { odd: ":isOdd", even: ":isEven" } as const;
 
 const RESERVED_OPTIONS = [
   ...Object.keys(COMPARE_CHECKS),
@@ -152,18 +152,15 @@ export function parseAsNumber(
   precision: number,
   scale?: number,
 ): number | bigint | undefined {
-  if (typeof rawValue === "number") {
-    if (Number.isNaN(rawValue)) return undefined;
-    return rawValue % 1 === 0 ? rawValue : parseFloat(rawValue, precision, scale);
-  }
-  if (rawValue instanceof BigDecimal) return round(Number(rawValue.toString("F")), scale);
-  if (isInteger(rawValue)) {
-    const int = BigInt(String(rawValue));
-    return int >= BigInt(Number.MIN_SAFE_INTEGER) && int <= BigInt(Number.MAX_SAFE_INTEGER)
-      ? Number(int)
-      : int;
-  }
-  if (!isHexadecimalLiteral(rawValue)) {
+  if (typeof rawValue === "number" && rawValue % 1 !== 0) {
+    return parseFloat(rawValue, precision, scale);
+  } else if (rawValue instanceof BigDecimal) {
+    return round(Number(rawValue.toString("F")), scale);
+  } else if (isNumeric(rawValue)) {
+    return rawValue as number | bigint;
+  } else if (isInteger(rawValue)) {
+    return toI(rawValue);
+  } else if (!isHexadecimalLiteral(rawValue)) {
     return parseFloat(kernelFloat(rawValue), precision, scale);
   }
   return undefined;

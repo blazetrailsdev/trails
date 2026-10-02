@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   ownerRecordsNothing,
+  skeletonIsAnotherOwners,
   nameMatches,
   superclassesMatch,
   primaryClassesPerFile,
@@ -3418,6 +3419,26 @@ describe("suppressedCallClaims", () => {
       () => ["methodDefined"],
     );
     expect([...claimed]).toEqual([]);
+  });
+});
+
+describe("skeletonIsAnotherOwners", () => {
+  // `validations/with.ts`: the top-level instance `validatesWith` (owner "")
+  // records the file's one skeleton; `ClassMethods.validatesWith` has a body
+  // and no skeleton.
+  const owners = new Set([""]);
+
+  it("refuses the instance function's skeleton for the object-literal ClassMethods body", () => {
+    expect(skeletonIsAnotherOwners(true, "ClassMethods", owners)).toBe(true);
+  });
+
+  it("keeps a bodyless declaration paired with the file's top-level body", () => {
+    expect(skeletonIsAnotherOwners(false, "Dirty", owners)).toBe(false);
+  });
+
+  it("keeps an owner paired with the skeleton it recorded, and an unresolved owner", () => {
+    expect(skeletonIsAnotherOwners(true, "Errors", new Set(["Errors"]))).toBe(false);
+    expect(skeletonIsAnotherOwners(false, undefined, owners)).toBe(false);
   });
 });
 

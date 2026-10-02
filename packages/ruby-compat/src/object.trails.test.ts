@@ -401,6 +401,14 @@ describe("rbFSend", () => {
     expect(rbObjRespondTo("1", "isInfinite")).toBe(false);
     expect(() => rbFSend("1", "isInfinite")).toThrow(NoMethodError);
   });
+
+  it("answers odd? and even? for an Integer alone", () => {
+    expect(rbFPublicSend(3, ":isOdd")).toBe(true);
+    expect(rbFPublicSend(-3, "isEven")).toBe(false);
+    expect(rbFPublicSend(4n, "isEven")).toBe(true);
+    expect(rbFPublicSend(4n, "isOdd")).toBe(false);
+    expect(() => rbFPublicSend(1.5, "isOdd")).toThrow(NoMethodError);
+  });
 });
 
 describe("rbModPublicMethodDefined", () => {

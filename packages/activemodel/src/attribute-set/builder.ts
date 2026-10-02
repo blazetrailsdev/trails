@@ -97,30 +97,32 @@ export class LazyAttributeSet extends AttributeSet {
       return attr.value(block);
     }
 
-    if (hasKey(this.castedValues, name)) return this.castedValues[name];
+    return fetch<unknown>(
+      this.castedValues,
+      name,
+      rbBlock(() => {
+        let valuePresent: boolean = true;
+        const value = isIndexedRow(this.values)
+          ? this.values.fetch(name, () => {
+              valuePresent = false;
+            })
+          : fetch<unknown>(
+              this.values,
+              name,
+              rbBlock(() => {
+                valuePresent = false;
+              }),
+            );
 
-    let valuePresent: boolean = true;
-    const value = isIndexedRow(this.values)
-      ? this.values.fetch(name, () => {
-          valuePresent = false;
-        })
-      : fetch<unknown>(
-          this.values,
-          name,
-          rbBlock(() => {
-            valuePresent = false;
-          }),
-        );
-
-    if (valuePresent) {
-      const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
-      const casted = type.deserialize(value);
-      this.castedValues[name] = casted;
-      return casted;
-    } else {
-      const attr = this.defaultAttribute(name, valuePresent, value);
-      return attr.value(block);
-    }
+        if (valuePresent) {
+          const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
+          return (this.castedValues[name] = type.deserialize(value));
+        } else {
+          const attr = this.defaultAttribute(name, valuePresent, value);
+          return attr.value(block);
+        }
+      }),
+    );
   }
 
   protected override attributes(): Record<string, Attribute> {
@@ -138,24 +140,19 @@ export class LazyAttributeSet extends AttributeSet {
 
   protected override defaultAttribute(
     name: string,
-    valuePresent?: boolean,
-    value?: unknown,
-  ): Attribute {
-    if (valuePresent === undefined) {
-      valuePresent = true;
-      value = isIndexedRow(this.values)
-        ? this.values.fetch(name, () => {
+    valuePresent: boolean = true,
+    value: unknown = isIndexedRow(this.values)
+      ? this.values.fetch(name, () => {
+          valuePresent = false;
+        })
+      : fetch<unknown>(
+          this.values,
+          name,
+          rbBlock(() => {
             valuePresent = false;
-          })
-        : fetch<unknown>(
-            this.values,
-            name,
-            rbBlock(() => {
-              valuePresent = false;
-            }),
-          );
-    }
-
+          }),
+        ),
+  ): Attribute {
     const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
 
     if (valuePresent) {

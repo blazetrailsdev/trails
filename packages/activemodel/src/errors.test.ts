@@ -489,7 +489,7 @@ describe("ErrorsTest", () => {
 
   it("as_json returns a hash without default proc", () => {
     const person = new Person();
-    expect((person.errors.asJson() as { defaultProc?: unknown }).defaultProc).toBeUndefined();
+    expect(person.errors.asJson().defaultProc()).toBeUndefined();
   });
 
   it("messages returns empty frozen array when accessed with non-existent attribute", async () => {
@@ -575,14 +575,16 @@ describe("ErrorsTest", () => {
     const person = new Person();
     person.validateBang();
 
-    expect(person.errors.asJson()).toEqual({ name: ["cannot be nil"] });
+    expect(Object.fromEntries(person.errors.asJson())).toEqual({ name: ["cannot be nil"] });
   });
 
   it("as_json with :full_messages option creates a json formatted representation of the errors containing complete messages", () => {
     const person = new Person();
     person.validateBang();
 
-    expect(person.errors.asJson({ fullMessages: true })).toEqual({ name: ["name cannot be nil"] });
+    expect(Object.fromEntries(person.errors.asJson({ fullMessages: true }))).toEqual({
+      name: ["name cannot be nil"],
+    });
   });
 
   it("generate_message works without i18n_scope", async () => {
@@ -633,7 +635,7 @@ describe("ErrorsTest", () => {
     const error = person.errors.add("name", ":invalid", { message: "is bad" });
     const hash = person.errors.groupByAttribute();
 
-    expect(hash).toEqual({ name: [error] });
+    expect(Object.fromEntries(hash)).toEqual({ name: [error] });
   });
 
   it("dup duplicates details", () => {

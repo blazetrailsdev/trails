@@ -307,6 +307,23 @@ describe("Hash#transform_values", () => {
     expect(transformValues(hash, (v) => v * 100)).toEqual({ foo: 0, bar: 100, baz: 200 });
     expect(hash).toEqual({ foo: 0, bar: 1, baz: 2 });
   });
+
+  it("answers a bare Hash for a Hash receiver, without its default", () => {
+    const hash = new Hash<string, number>(7);
+    hash.set("foo", 1);
+    const result = transformValues(hash, (v) => v * 100);
+    expect(result).toBeInstanceOf(Hash);
+    expect([...result]).toEqual([["foo", 100]]);
+    expect(result.get("bar")).toBeUndefined();
+  });
+});
+
+describe("Hash and JSON.stringify", () => {
+  it("writes each pair, where a bare Map stringifies as {}", () => {
+    const hash = new Hash<string, number[]>();
+    hash.set("name", [1]);
+    expect(JSON.stringify({ errors: hash })).toBe('{"errors":{"name":[1]}}');
+  });
 });
 
 describe("Hash#slice", () => {

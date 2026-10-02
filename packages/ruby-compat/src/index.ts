@@ -146,6 +146,7 @@ export {
   drop,
   first,
   flatten,
+  groupBy,
   last,
   pack,
   partition,

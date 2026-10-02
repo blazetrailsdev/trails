@@ -475,7 +475,9 @@ export function toSym(obj: unknown): string {
  * whose prototypes carry no such member: `Float#infinite?`
  * (`rb_flo_is_infinite_p`, `vendor/ruby/v3.3.11/numeric.c:1992`) answers `1` /
  * `-1` for an infinity and `nil` otherwise, as `Integer#infinite?`
- * (`vendor/ruby/v3.3.11/numeric.rb:48`) always does. An operator is sent by its
+ * (`vendor/ruby/v3.3.11/numeric.rb:48`) always does. `odd?` and `even?` are
+ * dispatched for an Integer alone (`rb_int_odd_p` / `rb_int_even_p`,
+ * `vendor/ruby/v3.3.11/numeric.c:3564,3588`): a Float defines neither. An operator is sent by its
  * Ruby name (`">"`), which has no TS method spelling. `==` is {@link rbEqual},
  * which sends the receiver's own `==`, and `!=` its negation
  * (`rb_obj_not_equal`, `vendor/ruby/v3.3.11/object.c:248`). The four ordering
@@ -560,6 +562,12 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   }
   if ((typeof recv === "number" || typeof recv === "bigint") && mid === "isInfinite") {
     return recv === Infinity ? 1 : recv === -Infinity ? -1 : null;
+  }
+  if (
+    (typeof recv === "bigint" || Number.isInteger(recv)) &&
+    (mid === "isOdd" || mid === "isEven")
+  ) {
+    return (BigInt(recv as number | bigint) % 2n !== 0n) === (mid === "isOdd");
   }
   const bound = temporalMethod(recv, mid);
   if (bound !== undefined) return bound(recv, ...args);

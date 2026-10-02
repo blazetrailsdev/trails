@@ -851,6 +851,24 @@ describe("body call capture", () => {
     expect(skeleton("other")!.filter((t) => t === "if" || t === "or")).toEqual(["if"]);
   });
 
+  it("reads the `&block` popped off a splat as a parameter binding, not as an arm", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        validatesWith(...args: unknown[]) {
+          const block = rbBlockGivenP(args[args.length - 1]) ? (args.pop() as Block) : undefined;
+          for (const klass of args) this.build(klass, block);
+        }
+        other(...args: unknown[]) {
+          const block = rbBlockGivenP(args[0]) ? args.pop() : undefined;
+          return rbBlockGivenP(args[args.length - 1]) ? args.pop() : this.build(block);
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("validatesWith")).toEqual(["loop", "ref:build"]);
+    expect(skeleton("other")!.filter((t) => t === "if")).toEqual(["if", "if"]);
+  });
+
   it("emits or, not an arm, for a write guarded by the Ruby-falsiness of its own target", () => {
     const cls = extractFromSource(
       `class Foo {

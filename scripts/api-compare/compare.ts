@@ -1745,6 +1745,25 @@ export function ownerRecordsNothing(
 }
 
 /**
+ * Whether the skeleton recorded for (file, name) is some OTHER owner's body.
+ *
+ * Skeletons are keyed by (file, name) alone, and an object-literal module
+ * member records calls but no skeleton. So `validations/with.ts`, which holds
+ * `ClassMethods.validatesWith` beside the top-level instance `validatesWith`,
+ * has one skeleton for two bodies, and Rails' `ClassMethods#validates_with`
+ * (`activemodel/lib/active_model/validations/with.rb:88`) was held to the
+ * instance function's arms. A resolved owner with a body of its own compares
+ * only against a skeleton that owner recorded.
+ */
+export function skeletonIsAnotherOwners(
+  ownerHasBody: boolean,
+  tsClass: string | undefined,
+  skeletonOwners: ReadonlySet<string> | undefined,
+): boolean {
+  return tsClass !== undefined && ownerHasBody && skeletonOwners?.has(tsClass) !== true;
+}
+
+/**
  * The owners of `tsName` a matched pair may be held to: the ones whose
  * declaration has a BODY, wherever the file declares at least one.
  *
@@ -3854,6 +3873,7 @@ export function main() {
     const tsCallsByFileName = new Map<string, Map<string, string[][]>>();
     const tsCallSeqByFileName = new Map<string, Map<string, string[][]>>();
     const tsSkeletonByFileName = new Map<string, Map<string, string[][]>>();
+    const tsSkeletonOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     const tsLocalSkeletonByFileName = new Map<string, Map<string, string[][]>>();
     const tsCallArgsByFileName = new Map<string, Map<string, CallSite[][]>>();
     // The same two populations narrowed by declaring class (file → name → owner
@@ -4086,6 +4106,9 @@ export function main() {
         const byName = tsSkeletonByFileName.get(file) ?? new Map<string, string[][]>();
         byName.set(m.name, [...(byName.get(m.name) ?? []), m.skeleton]);
         tsSkeletonByFileName.set(file, byName);
+        const owners = tsSkeletonOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
+        owners.set(m.name, (owners.get(m.name) ?? new Set<string>()).add(owner));
+        tsSkeletonOwnersByFileName.set(file, owners);
       }
       if (m.localSkeleton !== undefined && scope === "package") {
         const byName = tsLocalSkeletonByFileName.get(file) ?? new Map<string, string[][]>();
@@ -4811,7 +4834,16 @@ export function main() {
           ? rubySkeletonByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
           : rubySkeletonByName.get(rubyName);
         const tsSkeletons = tsSkeletonByFileName.get(tsFile)?.get(tsName);
-        if (rubySkeleton !== undefined && tsSkeletons?.length === 1) {
+        if (
+          rubySkeleton !== undefined &&
+          tsSkeletons?.length === 1 &&
+          !skeletonIsAnotherOwners(
+            tsClass !== undefined &&
+              tsCallsByFileNameOwner.get(tsFile)?.get(tsName)?.get(tsClass) !== undefined,
+            tsClass,
+            tsSkeletonOwnersByFileName.get(tsFile)?.get(tsName),
+          )
+        ) {
           const tsSkeletonOf = (name: string) => {
             const sets = tsSkeletonByFileName.get(tsFile)?.get(name);
             if (sets?.length === 1) return sets[0];

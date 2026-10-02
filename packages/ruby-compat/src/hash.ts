@@ -457,12 +457,30 @@ export function eachKey<T>(
 export function transformValues<T, U>(
   hash: Record<string, T>,
   block: (value: T) => U,
-): Record<string, U> {
+): Record<string, U>;
+/**
+ * The Map arm: `rb_hash_transform_values` answers a bare `Hash`
+ * (`rb_hash_new`), whatever the receiver's class and without its default.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#transform_values` (`vendor/ruby/v3.3.11/hash.c:3366`).
+ */
+export function transformValues<K, T, U>(hash: Map<K, T>, block: (value: T) => U): Hash<K, U>;
+/** @noRailsEquivalent PERMANENT — Ruby core `Hash#transform_values` (`vendor/ruby/v3.3.11/hash.c:3366`). */
+export function transformValues(
+  hash: Record<string, unknown> | Map<unknown, unknown>,
+  block: (value: unknown) => unknown,
+): Record<string, unknown> | Hash<unknown, unknown> {
+  if (hash instanceof Map) {
+    const result = new Hash<unknown, unknown>();
+    for (const [key, value] of hash) {
+      result.set(key, block(value));
+    }
+    return result;
+  }
   /* `rb_hash_transform_values` (`vendor/ruby/v3.3.11/hash.c:3366`) builds the new hash
      with `rb_hash_new`, which has no ancestors: `__proto__` is an ordinary key
      there, where `result["__proto__"] = v` on a plain `{}` reaches
      Object.prototype's setter and stores nothing. */
-  const result: Record<string, U> = Object.create(null) as Record<string, U>;
+  const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
   for (const key of Object.keys(hash)) {
     result[key] = block(hash[key]);
   }
@@ -760,6 +778,22 @@ export class Hash<K, V> extends Map<K, V> {
       return this.#defaultProc(this, key[0]);
     }
     return this.#default;
+  }
+
+  /**
+   * The `JSON.stringify` protocol: a `Map`'s entries are not properties, so
+   * without it a Hash stringifies as `{}` where `Hash#to_json`
+   * (`vendor/ruby/v3.3.11/ext/json/generator/generator.c:430` `mHash_to_json`)
+   * writes each pair under its key's `to_s`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  toJSON(): Record<string, V> {
+    const result = Object.create(null) as Record<string, V>;
+    for (const [key, value] of this) {
+      result[String(key)] = value;
+    }
+    return result;
   }
 
   /**

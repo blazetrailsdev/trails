@@ -14,6 +14,7 @@ import {
   isIntersect,
   last,
   pack,
+  groupBy,
   partition,
   sort,
   toA,
@@ -282,6 +283,16 @@ describe("Array#count", () => {
 
   it("answers the length with no block", () => {
     expect(aryCount([1, null, 3])).toBe(3);
+  });
+});
+
+describe("Enumerable#group_by", () => {
+  it("groups the elements under the block's result, keeping order", () => {
+    const hash = groupBy(["apple", "avocado", "banana"], (i) => i[0]);
+    expect([...hash]).toEqual([
+      ["a", ["apple", "avocado"]],
+      ["b", ["banana"]],
+    ]);
   });
 });
 
