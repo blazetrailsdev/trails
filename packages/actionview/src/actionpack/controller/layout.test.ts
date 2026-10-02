@@ -85,9 +85,9 @@ describe("LayoutAutoDiscoveryTest", () => {
     expect(await get(new ItemController(), "hello")).toBe("item.erb hello.erb");
   });
 
-  test("third party template library auto discovers layout", async () => {
+  test("third party template library auto discovers layout", async ({ task }) => {
     await withTemplateHandler("mab", mab, async () => {
-      testCase = new ActionController.TestCase();
+      testCase = new ActionController.TestCase(task.name);
       testCase.controller = new ThirdPartyTemplateLibraryController();
       await testCase.beforeSetup();
       testCase.routes = SharedTestRoutes;
@@ -255,8 +255,8 @@ class LayoutStatusIsRendered extends LayoutTest {
 }
 
 describe("LayoutStatusIsRenderedTest", () => {
-  test("layout status is rendered", async () => {
-    testCase = new ActionController.TestCase();
+  test("layout status is rendered", async ({ task }) => {
+    testCase = new ActionController.TestCase(task.name);
     testCase.controller = new LayoutStatusIsRendered();
     await testCase.beforeSetup();
     testCase.routes = SharedTestRoutes;
@@ -272,8 +272,8 @@ class LayoutSymlinkedTest extends LayoutTest {
 }
 
 describe("LayoutSymlinkedIsRenderedTest", () => {
-  test("symlinked layout is rendered", async () => {
-    testCase = new ActionController.TestCase();
+  test("symlinked layout is rendered", async ({ task }) => {
+    testCase = new ActionController.TestCase(task.name);
     testCase.controller = new LayoutSymlinkedTest();
     await testCase.beforeSetup();
     testCase.routes = SharedTestRoutes;

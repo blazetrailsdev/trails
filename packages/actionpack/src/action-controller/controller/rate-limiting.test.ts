@@ -40,10 +40,10 @@ describe("RateLimitingTest", () => {
   let tc: TestCase;
   const assertResponse = (type: number | string): void => tc.assertResponse(type);
 
-  beforeEach(async () => {
+  beforeEach(async ({ task }) => {
     vi.useFakeTimers();
     (RateLimitedController as unknown as CacheStoreHost).cacheStore.clear();
-    tc = new TestCase();
+    tc = new TestCase(task.name);
     tc.controller = new RateLimitedController();
     await tc.beforeSetup();
   });

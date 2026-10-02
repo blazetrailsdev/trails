@@ -254,8 +254,8 @@ describe("RespondToControllerTest", () => {
 
   let tc: TestCase;
 
-  beforeEach(async () => {
-    tc = new TestCase();
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
     tc.controller = new RespondToController();
     await tc.beforeSetup();
     MimeType.register("text/x-mobile", ":mobile");

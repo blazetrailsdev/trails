@@ -11,10 +11,12 @@ describe("WelcomeController", () => {
     expect(WelcomeController._layout).toBe(false);
   });
 
-  it("index raises MissingExactTemplate when no template resolver is configured", async () => {
+  it("index raises MissingExactTemplate when no template resolver is configured", async ({
+    task,
+  }) => {
     class WelcomeControllerTest extends ActionController.TestCase {}
     WelcomeControllerTest.tests(WelcomeController);
-    const t = new WelcomeControllerTest();
+    const t = new WelcomeControllerTest(task.name);
     await t.beforeSetup();
     t.routes = new RouteSet();
     t.routes.draw(function () {

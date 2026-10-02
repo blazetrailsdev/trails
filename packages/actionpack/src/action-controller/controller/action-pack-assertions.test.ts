@@ -135,8 +135,8 @@ describe("ActionPackAssertionsControllerTest", () => {
     Pick<InnerModuleController, "adminInnerModulePath" | "topLevelPath">;
   const assertRedirectedTo = (...args: Parameters<TestCase["assertRedirectedTo"]>): true =>
     tc.assertRedirectedTo(...args);
-  beforeEach(async () => {
-    tc = new TestCase() as typeof tc;
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name) as typeof tc;
     tc.controller = new ActionPackAssertionsController();
     await tc.beforeSetup();
   });
@@ -437,15 +437,15 @@ describe("ActionPackAssertionsControllerTest", () => {
     assertRedirectedTo({ controller: "admin/user" });
   });
 
-  it("assert response uses exception message", async () => {
-    const tc2 = new TestCase();
+  it("assert response uses exception message", async ({ task }) => {
+    const tc2 = new TestCase(task.name);
     tc2.controller = new AssertResponseWithUnexpectedErrorController();
     await tc2.beforeSetup();
     await expect(tc2.get("index")).rejects.toThrow("FAIL");
   });
 
-  it("assert response failure response with no exception", async () => {
-    const tc2 = new TestCase();
+  it("assert response failure response with no exception", async ({ task }) => {
+    const tc2 = new TestCase(task.name);
     tc2.controller = new AssertResponseWithUnexpectedErrorController();
     await tc2.beforeSetup();
     await tc2.get("show");
@@ -456,8 +456,8 @@ describe("ActionPackAssertionsControllerTest", () => {
 
 describe("ActionPackHeaderTest", () => {
   let tc: TestCase;
-  beforeEach(async () => {
-    tc = new TestCase();
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
     tc.controller = new ActionPackAssertionsController();
     await tc.beforeSetup();
   });

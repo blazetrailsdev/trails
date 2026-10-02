@@ -48,8 +48,8 @@ SharedTestRoutes.draw(function () {
 describe("RenderTest", () => {
   let testCase: InstanceType<typeof ActionController.TestCase>;
 
-  beforeEach(async () => {
-    testCase = new ActionController.TestCase();
+  beforeEach(async ({ task }) => {
+    testCase = new ActionController.TestCase(task.name);
     testCase.controller = new TestController();
     await testCase.beforeSetup();
     testCase.routes = SharedTestRoutes;

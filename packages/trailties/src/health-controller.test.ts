@@ -7,10 +7,10 @@ describe("HealthController", () => {
     expect(HealthController.controllerPath()).toBe("rails/health");
   });
 
-  it("health controller renders green success page", async () => {
+  it("health controller renders green success page", async ({ task }) => {
     class HealthControllerTest extends ActionController.TestCase {}
     HealthControllerTest.tests(HealthController);
-    const t = new HealthControllerTest();
+    const t = new HealthControllerTest(task.name);
     await t.beforeSetup();
     t.routes = new RouteSet();
     t.routes.draw(function () {
@@ -21,7 +21,7 @@ describe("HealthController", () => {
     expect(t.response.body).toMatch(/background-color: green/);
   });
 
-  it("health controller renders red internal server error page", async () => {
+  it("health controller renders red internal server error page", async ({ task }) => {
     class FailingController extends HealthController {
       override async renderUp(): Promise<void> {
         throw new Error("some exception");
@@ -29,7 +29,7 @@ describe("HealthController", () => {
     }
     class HealthControllerTest extends ActionController.TestCase {}
     HealthControllerTest.tests(FailingController);
-    const t = new HealthControllerTest();
+    const t = new HealthControllerTest(task.name);
     await t.beforeSetup();
     t.routes = new RouteSet();
     t.routes.draw(function () {
