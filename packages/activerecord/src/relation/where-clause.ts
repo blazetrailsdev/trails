@@ -153,9 +153,7 @@ export class WhereClause {
             : undefined) ||
           fetchAttribute(
             node,
-            (attr) =>
-              attrs.some((a) => rbEqual(a, attr)) ||
-              columns.includes(String((attr as Arel.Attribute).name)),
+            (attr) => attrs.some((a) => rbEqual(a, attr)) || columns.includes(String(attr.name)),
           )
         ),
     );
