@@ -47,9 +47,7 @@ export class ForeignAssociation {
     reflection: Pick<AssociationReflection, "foreignKey" | "type">,
   ): Record<string, null> {
     const attrs: Record<string, null> = {};
-    const foreignKey = reflection.foreignKey();
-    const fks = globalThis.Array.isArray(foreignKey) ? foreignKey : [foreignKey];
-    for (const fk of fks) attrs[fk] = null;
+    for (const foreignKey of Array(reflection.foreignKey())) attrs[foreignKey] = null;
     if (reflection.type) attrs[reflection.type] = null;
     return attrs;
   }

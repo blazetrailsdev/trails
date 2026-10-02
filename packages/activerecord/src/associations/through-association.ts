@@ -99,7 +99,7 @@ export function constructJoinAttributes(
   const sourceRefl = refl?.sourceReflection;
   if (!sourceRefl) return {};
   const assocPk = sourceRefl.associationPrimaryKey?.(refl.klass) ?? sourceRefl.primaryKey ?? "id";
-  const pkArr: string[] = globalThis.Array.isArray(assocPk) ? assocPk : [assocPk];
+  const pkArr: string[] = Array(assocPk);
   const compositeConstraints: string[] = compositeQueryConstraintsList.call(refl.klass);
 
   let joinAttributes: Record<string, unknown>;

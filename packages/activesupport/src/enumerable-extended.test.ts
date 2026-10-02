@@ -133,6 +133,11 @@ describe("EnumerableTests", () => {
     expect(result).toEqual([20, 40]);
   });
 
+  it("filterMap — removes false as well as nil, and keeps other falsy values", () => {
+    const result = filterMap([0, 1, 2, 3], (x) => (x === 1 ? false : x === 2 ? null : x));
+    expect(result).toEqual([0, 3]);
+  });
+
   it("filterMap — empty array", () => {
     expect(filterMap([], (x: number) => x)).toEqual([]);
   });
