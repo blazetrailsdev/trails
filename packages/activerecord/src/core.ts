@@ -96,7 +96,13 @@ export const Core = {
     classAttribute.call(base, "shardSelector", { instanceAccessor: false, default: null });
     classAttribute.call(base, "attributesForInspect", { instanceAccessor: false, default: ":all" });
 
-    (base as { filterAttributes: CoreHost["_filterAttributes"] }).filterAttributes = [];
+    (base as CoreHost).filterAttributes = [];
+
+    Object.defineProperty(base, "connectionClass", {
+      configurable: true,
+      get: connectionClass,
+      set: connectionClass,
+    });
 
     (base as { defaultConnectionHandler: ConnectionHandler }).defaultConnectionHandler =
       new ConnectionHandler();
@@ -112,9 +118,29 @@ import {
   writingRole,
 } from "./active-record.js";
 
-export const ClassMethods = {
+type FilterAttributes = (string | RegExp | ((key: string, value: unknown) => unknown))[];
+
+export class ClassMethods {
+  static get filterAttributes(): FilterAttributes {
+    const host = this as unknown as CoreHost;
+    if (
+      !Object.prototype.hasOwnProperty.call(host, "_filterAttributes") ||
+      host._filterAttributes == null
+    ) {
+      return parentClass(host)!.filterAttributes;
+    } else {
+      return host._filterAttributes;
+    }
+  }
+
+  static set filterAttributes(filterAttributes: FilterAttributes) {
+    const host = this as unknown as CoreHost;
+    host._inspectionFilter = null;
+    host._filterAttributes = filterAttributes;
+  }
+
   /** @missingRailsCall table_exists? — PERMANENT */
-  inspect(
+  static inspect(
     this: (abstract new (...args: never) => unknown) & {
       abstractClass: boolean;
       isConnected(): boolean;
@@ -140,8 +166,8 @@ export const ClassMethods = {
     } else {
       return `${name}(Table doesn't exist)`;
     }
-  },
-};
+  }
+}
 
 interface CoreRecord {
   id: unknown;
@@ -403,7 +429,8 @@ interface CoreHost {
   tableName?: string | null;
   primaryKey?: string | string[];
   compositePrimaryKey?: boolean;
-  _filterAttributes?: (string | RegExp | ((key: string, value: unknown) => unknown))[];
+  filterAttributes: FilterAttributes;
+  _filterAttributes?: FilterAttributes;
   _inspectionFilter?: any;
   _connectionClass?: boolean;
   _destroyAssociationAsyncJob?: any;
@@ -624,21 +651,6 @@ export function generatedAssociationMethods(this: CoreHost): Module {
     this._generatedAssociationMethods = mod;
   }
   return this._generatedAssociationMethods!;
-}
-
-export function filterAttributes(
-  this: CoreHost,
-  value?: (string | RegExp | ((key: string, value: unknown) => unknown))[],
-): (string | RegExp | ((key: string, value: unknown) => unknown))[] {
-  if (value !== undefined) {
-    this._filterAttributes = value;
-    this._inspectionFilter = null;
-  }
-  if (Object.prototype.hasOwnProperty.call(this, "_filterAttributes"))
-    return this._filterAttributes!;
-  const parent = parentClass(this);
-  if (parent) return filterAttributes.call(parent);
-  return [];
 }
 
 export function predicateBuilder(this: CoreHost): PredicateBuilder {

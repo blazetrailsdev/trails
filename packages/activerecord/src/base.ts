@@ -258,7 +258,6 @@ import {
   hash as _hash,
   isPresent as _isPresent,
   isBlank as _isBlank,
-  filterAttributes as _coreFilterAttributes,
 } from "./core.js";
 import * as _Core from "./core.js";
 import * as _AttributeMethodsDirty from "./attribute-methods/dirty.js";
@@ -581,15 +580,7 @@ export class Base extends Model {
   /** @internal */
   declare static _registryKeys: string[];
 
-  static get filterAttributes(): (string | RegExp | ((key: string, value: unknown) => unknown))[] {
-    return _coreFilterAttributes.call(this);
-  }
-
-  static set filterAttributes(
-    value: (string | RegExp | ((key: string, value: unknown) => unknown))[],
-  ) {
-    _coreFilterAttributes.call(this, value);
-  }
+  declare static filterAttributes: (string | RegExp | ((key: string, value: unknown) => unknown))[];
 
   static inspectionFilter(): ParameterFilter {
     return _Core.inspectionFilter.call(this);
@@ -640,17 +631,9 @@ export class Base extends Model {
     }
   }
 
-  static get connectionClass(): boolean {
-    return _Core.connectionClass.call(this);
-  }
+  declare static connectionClass: boolean;
 
-  static set connectionClass(value: boolean) {
-    _Core.connectionClass.call(this, value);
-  }
-
-  static isConnectionClass(): boolean {
-    return !!this.connectionClass;
-  }
+  static isConnectionClass = _Core.isConnectionClass;
 
   static asynchronousQueriesSession(): Session {
     return _Core.asynchronousQueriesSession();
@@ -2425,6 +2408,7 @@ extend(Base, ConnectionHandling.ConnectionHandling);
 extend(Base, Inheritance.ClassMethods);
 extend(Base, LockingOptimistic.ClassMethods);
 extend(Base, SignedId.ClassMethods);
+extend(Base, _Core.ClassMethods);
 include(Base, _Core.Core);
 include(Base, Inheritance.Inheritance);
 include(Base, _Integration);

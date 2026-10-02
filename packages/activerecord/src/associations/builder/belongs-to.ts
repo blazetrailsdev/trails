@@ -258,9 +258,9 @@ export class BelongsTo extends SingularAssociation {
       options.optional = !hashDelete(options, "required");
     }
 
-    let required: boolean;
+    let required: boolean | null | undefined;
     if (options.optional == null) {
-      required = !!(model.belongsToRequiredByDefault ?? false);
+      required = model.belongsToRequiredByDefault;
     } else {
       required = !options.optional;
     }
