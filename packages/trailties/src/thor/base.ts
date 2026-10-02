@@ -1,6 +1,15 @@
-import { dup, Hash, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { dup, env, Hash, rbObjRespondTo, warn } from "@blazetrails/ruby-compat";
 
 export const TEMPLATE_EXTNAME = ".tt";
+
+export function deprecationWarning(message: string): void {
+  if (env["THOR_SILENCE_DEPRECATION"] == null) {
+    warn(
+      `Deprecation warning: ${message}\n` +
+        "You can silence deprecations warning by setting the environment variable THOR_SILENCE_DEPRECATION.",
+    );
+  }
+}
 
 /** @internal */
 export function fromSuperclass(
