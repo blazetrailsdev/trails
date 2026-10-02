@@ -390,7 +390,6 @@ export function conversionMismatch(
 
 function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown): unknown {
   const [vid, ...args] = argv;
-  const [vid, ...args] = argv;
   const name = rbCheckStringType(vid);
   if (name === null) throw new TypeError(`${rbInspect(vid)} is not a symbol nor a string`);
   const mid = isSymbol(name) ? symbolToS(name) : name;
