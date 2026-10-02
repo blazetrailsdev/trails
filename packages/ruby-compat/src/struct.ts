@@ -1,6 +1,9 @@
 import { ArgumentError } from "./argument-error.js";
+import { FrozenError } from "./frozen-error.js";
+import { rbInspect, rbObjClass } from "./object.js";
 import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
+import { TypeError } from "./type-error.js";
 
 /**
  * An instance of a class built by `Struct.new` (`vendor/ruby/v3.3.11/struct.c:643`
@@ -11,6 +14,7 @@ import { rbHash } from "./rb-hash.js";
  */
 export interface StructInstance {
   members(): string[];
+  initializeCopy(s: StructInstance): this;
   equals(other: unknown): boolean;
   eql(other: unknown): boolean;
   hash(): number;
@@ -90,6 +94,32 @@ export const Struct = {
        */
       members(): string[] {
         return [...memberNames];
+      }
+
+      /**
+       * `rb_struct_init_copy` (`vendor/ruby/v3.3.11/struct.c:1123`), whose
+       * `OBJ_INIT_COPY` is `rb_obj_init_copy` (`vendor/ruby/v3.3.11/object.c:634`).
+       *
+       * @noRailsEquivalent PERMANENT
+       */
+      initializeCopy(s: StructInstance): this {
+        if (this === s) return this;
+        if (Object.isFrozen(this)) {
+          throw new FrozenError(`can't modify frozen ${rbObjClass(this)}: ${rbInspect(this)}`, {
+            receiver: this,
+          });
+        }
+        if (this.constructor !== s.constructor) {
+          throw new TypeError("initialize_copy should take same class object");
+        }
+        if (this.members().length !== s.members().length) {
+          throw new TypeError("struct size mismatch");
+        }
+        const values = structValues(s);
+        memberNames.forEach((member, i) => {
+          (this as Record<string, unknown>)[member] = values[i];
+        });
+        return this;
       }
 
       /**

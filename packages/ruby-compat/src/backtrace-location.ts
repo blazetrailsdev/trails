@@ -74,3 +74,18 @@ export function excBacktraceLocations(exc: Error): Location[] | null {
     .filter((line) => /^\s+at\s/.test(line))
     .map((line) => new Location(line));
 }
+
+/**
+ * `Kernel#caller` (`vendor/ruby/v3.3.11/vm_backtrace.c:1233` `rb_f_caller`): the
+ * frames above the method calling it, each as `Exception#backtrace` spells it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbFCaller(): string[] {
+  const exc = new Error();
+  (Error as { captureStackTrace?: (exc: object, fn: unknown) => void }).captureStackTrace?.(
+    exc,
+    rbFCaller,
+  );
+  return (excBacktraceLocations(exc) ?? []).slice(1).map((location) => location.toString());
+}

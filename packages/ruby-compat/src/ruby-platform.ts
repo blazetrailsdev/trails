@@ -31,3 +31,13 @@ export function RUBY_PLATFORM(): string {
   const platform = getProcessAdapter().platform();
   return OS_TOKENS[platform] ?? platform;
 }
+
+/**
+ * `RUBY_ENGINE` (`vendor/ruby/v3.3.11/version.c:120`): MRI's value, since the
+ * ported sources are MRI's own. A function, as {@link RUBY_PLATFORM} is.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function RUBY_ENGINE(): string {
+  return "ruby";
+}

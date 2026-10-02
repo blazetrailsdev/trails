@@ -242,12 +242,21 @@ export type {
   WriteStream,
 } from "./process-adapter.js";
 export type { PrependMethod, PrependModule } from "./prepend.js";
-export { Method, iseqLocationSetup, rbCheckArity, rbObjMethod } from "./method.js";
+export {
+  Method,
+  iseqLocationSetup,
+  rbCheckArity,
+  rbObjMethod,
+  rbObjMethods,
+  rbObjPrivateMethods,
+  rbObjProtectedMethods,
+  rbObjPublicMethods,
+} from "./method.js";
 export { regexpEscape } from "./regexp.js";
 export { Range } from "./range.js";
 export { Rational, ZeroDivisionError, rational } from "./rational.js";
 export { Enumerator, toEnum } from "./enumerator.js";
-export { RUBY_PLATFORM } from "./ruby-platform.js";
+export { RUBY_ENGINE, RUBY_PLATFORM } from "./ruby-platform.js";
 export { rbEql, rbEqq, rbEqual } from "./rb-equal.js";
 export { rbHash, rbObjHash } from "./rb-hash.js";
 export {
@@ -310,7 +319,7 @@ export { Queue, SizedQueue } from "./queue.js";
 export { Fiber } from "./fiber.js";
 export { FiberError } from "./fiber-error.js";
 export { Thread } from "./thread.js";
-export { Location, excBacktraceLocations } from "./backtrace-location.js";
+export { Location, excBacktraceLocations, rbFCaller } from "./backtrace-location.js";
 export { ThreadError } from "./thread-error.js";
 export { ThreadPoolExecutor } from "./thread-pool-executor.js";
 export type { MonitorMixin } from "./monitor.js";

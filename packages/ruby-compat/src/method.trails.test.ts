@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
+import { excBacktraceLocations, rbFCaller } from "./backtrace-location.js";
 import {
   Method,
   iseqLocationSetup,
   rbCheckArity,
   rbIseqMinMaxArity,
   rbObjMethod,
+  rbObjMethods,
+  rbObjPrivateMethods,
+  rbObjProtectedMethods,
+  rbObjPublicMethods,
 } from "./method.js";
 import { NameError } from "./name-error.js";
 
@@ -107,6 +112,18 @@ describe("rbCheckArity", () => {
     );
   });
 
+  it("raises with a backtrace that begins at its caller", () => {
+    const sender = (): void => rbCheckArity((a: unknown) => a, 0);
+    const exc = (() => {
+      try {
+        return sender();
+      } catch (e) {
+        return e;
+      }
+    })();
+    expect(excBacktraceLocations(exc as Error)![0].label).toBe("sender");
+  });
+
   it("answers nothing when argc is in range", () => {
     expect(() => rbCheckArity(function (_a: unknown, _b = {}) {}, 1)).not.toThrow();
     expect(() => rbCheckArity(function (_a: unknown, _b = {}) {}, 2)).not.toThrow();
@@ -127,5 +144,38 @@ describe("Method#source_location", () => {
 
   it("answers nil for a body with no location", () => {
     expect(rbObjMethod(new Located(), "native").sourceLocation()).toBeNull();
+  });
+});
+
+describe("rbObjMethods / rbObjPublicMethods", () => {
+  class Parent {
+    inherited(): void {}
+  }
+  class Child extends Parent {
+    title = "ivar";
+    own(): void {}
+  }
+
+  it("lists singleton, class and ancestor methods, or the receiver's own class alone", () => {
+    const child = Object.assign(new Child(), { singleton: () => 1 });
+    expect(rbObjMethods(child)).toEqual(
+      expect.arrayContaining(["singleton", "own", "inherited", "toString"]),
+    );
+    expect(rbObjMethods(child)).not.toContain("constructor");
+    expect(rbObjMethods(child)).not.toContain("title");
+    expect(rbObjPublicMethods(child)).toEqual(rbObjMethods(child));
+    expect(rbObjPublicMethods(child, false)).toEqual(["singleton", "own"]);
+    expect([rbObjPrivateMethods(child), rbObjProtectedMethods(child, false)]).toEqual([[], []]);
+  });
+});
+
+describe("rbFCaller", () => {
+  it("lists the frames above the method calling it", () => {
+    const inner = (): string[] => rbFCaller();
+    const caller = (function outer() {
+      return inner();
+    })();
+    expect(caller[0]).toMatch(/^at outer /);
+    expect(caller.some((frame) => /^at inner /.test(frame))).toBe(false);
   });
 });

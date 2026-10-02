@@ -1,6 +1,6 @@
 import { NameError } from "./name-error.js";
 import { checkArity } from "./string/support.js";
-import { rbObjClass } from "./object.js";
+import { FL_SINGLETON, rbObjClass } from "./object.js";
 
 /**
  * Ruby core `Method` (`vendor/ruby/v3.3.11/proc.c:1657` `mnew_missing` builds the
@@ -121,6 +121,66 @@ export function rbObjMethod(obj: unknown, vid: string): Method {
 }
 
 /**
+ * `class_instance_method_list` (`vendor/ruby/v3.3.11/class.c:1818`) for an
+ * object: its singleton methods, its class's, then every ancestor's while
+ * `recur` is set. Every function-valued entry is listed (see {@link rbObjPrivateMethods}).
+ */
+function classInstanceMethodList(obj: unknown, recur: boolean): string[] {
+  const list = new Set<string>();
+  for (let mod: object | null = Object(obj); mod; mod = Object.getPrototypeOf(mod)) {
+    for (const mid of Object.getOwnPropertyNames(mod)) {
+      const me = Object.getOwnPropertyDescriptor(mod, mid)!;
+      if (mid !== "constructor" && typeof me.value === "function") list.add(mid);
+    }
+    const particularClass = mod === obj || Object.prototype.hasOwnProperty.call(mod, FL_SINGLETON);
+    if (!recur && !particularClass) break;
+  }
+  return [...list];
+}
+
+/**
+ * `Object#methods` (`vendor/ruby/v3.3.11/class.c:1993` `rb_obj_methods`): the
+ * names of the receiver's public and protected methods.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjMethods(obj: unknown): string[] {
+  return classInstanceMethodList(obj, true);
+}
+
+/**
+ * `Object#public_methods` (`vendor/ruby/v3.3.11/class.c:2042`
+ * `rb_obj_public_methods`): the names of the receiver's public methods, its
+ * singleton's and its own class's alone when `all` is false.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjPublicMethods(obj: unknown, all = true): string[] {
+  return classInstanceMethodList(obj, all);
+}
+
+/**
+ * `Object#private_methods` (`vendor/ruby/v3.3.11/class.c:2027`
+ * `rb_obj_private_methods`). A JS entry carries no visibility (CLAUDE.md,
+ * "Method visibility is compile-time only"), so no method is private.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjPrivateMethods(_obj: unknown, _all = true): string[] {
+  return [];
+}
+
+/**
+ * `Object#protected_methods` (`vendor/ruby/v3.3.11/class.c:2012`
+ * `rb_obj_protected_methods`), empty as {@link rbObjPrivateMethods} is.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjProtectedMethods(_obj: unknown, _all = true): string[] {
+  return [];
+}
+
+/**
  * `rb_iseq_min_max_arity` (`vendor/ruby/v3.3.11/proc.c:1069`): a body's
  * `[min, max]` argument counts, `max` `Infinity` for `UNLIMITED_ARGUMENTS`
  * once a rest parameter appears. JS `Function#length` stops counting at the
@@ -184,11 +244,21 @@ export function rbIseqMinMaxArity(func: (...args: never[]) => unknown): [number,
  * `setup_parameters_complex` finds `argc` outside the callee's range. JS never
  * checks call arity (a missing argument is `undefined`, an extra one is
  * dropped), so a caller whose Ruby body rescues that `ArgumentError` checks
- * the body's parameter list before sending.
+ * the body's parameter list before sending. `raise_argument_error` (`:777`)
+ * takes the backtrace at the call, so the error's begins at this function's
+ * caller.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbCheckArity(method: (...args: never[]) => unknown, argc: number): void {
   const [min, max] = rbIseqMinMaxArity(method);
-  checkArity(argc, min, max);
+  try {
+    checkArity(argc, min, max);
+  } catch (exc) {
+    (Error as { captureStackTrace?: (exc: object, fn: unknown) => void }).captureStackTrace?.(
+      exc as object,
+      rbCheckArity,
+    );
+    throw exc;
+  }
 }
