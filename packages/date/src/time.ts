@@ -589,7 +589,7 @@ export class Time {
     hour: number | string | null = 0,
     min: number | string | null = 0,
     sec: number | string | Rational | null = 0,
-    usec?: number | Rational,
+    usec?: number | bigint | Rational | null,
   ): Time {
     return new Time(
       year,
@@ -597,7 +597,7 @@ export class Time {
       day,
       hour,
       min,
-      usec === undefined
+      usec == null
         ? sec
         : new Rational(sec instanceof Rational ? sec.toI() : obj2vint(sec ?? 0), 1).add(
             numExact(usec).quo(1_000_000),
@@ -615,7 +615,7 @@ export class Time {
           hour?: number | string | null,
           min?: number | string | null,
           sec?: number | string | Rational | null,
-          usec?: number | Rational,
+          usec?: number | bigint | Rational | null,
         ]
       | [
           sec: number | string | Rational | null,
@@ -641,7 +641,7 @@ export class Time {
       day ?? 1,
       hour ?? 0,
       min ?? 0,
-      usec === undefined
+      usec == null
         ? (sec ?? 0)
         : new Rational(sec instanceof Rational ? sec.toI() : obj2vint(sec ?? 0), 1).add(
             numExact(usec).quo(1_000_000),

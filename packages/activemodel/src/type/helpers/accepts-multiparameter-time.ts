@@ -1,5 +1,6 @@
 import { Time } from "@blazetrails/date";
 import { Module, isPlainObject } from "@blazetrails/activesupport";
+import { rtest } from "@blazetrails/ruby-compat";
 
 export interface InstanceMethods<T = unknown> {
   serialize(value: unknown): unknown;
@@ -70,9 +71,9 @@ export class AcceptsMultiparameterTime extends Module {
         valuesHash: Record<string, unknown>,
       ): Time | null {
         for (const [k, v] of Object.entries(defaults)) {
-          if (valuesHash[k] == null || valuesHash[k] === false) valuesHash[k] = v;
+          if (!rtest(valuesHash[k])) valuesHash[k] = v;
         }
-        if (!truthy(valuesHash["1"]) || !truthy(valuesHash["2"]) || !truthy(valuesHash["3"])) {
+        if (!(rtest(valuesHash["1"]) && rtest(valuesHash["2"]) && rtest(valuesHash["3"]))) {
           return null;
         }
         const values = Object.entries(valuesHash)
@@ -82,8 +83,4 @@ export class AcceptsMultiparameterTime extends Module {
       },
     );
   }
-}
-
-function truthy(value: unknown): boolean {
-  return value != null && value !== false;
 }

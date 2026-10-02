@@ -26,6 +26,12 @@ describe("AcceptsMultiparameterTime defaults", () => {
     expect((result as { hour: number }).hour).toBe(15);
   });
 
+  it("a false slot takes its default, as ||= replaces it", () => {
+    const wrapper = typeIncluding({ "4": 9 });
+    const result = wrapper.cast({ "1": 2025, "2": 7, "3": 4, "4": false });
+    expect((result as { hour: number }).hour).toBe(9);
+  });
+
   it("a blank slot is a present value and reaches ::Time", () => {
     const wrapper = typeIncluding({ "4": 0 });
     expect(() => wrapper.cast({ "1": 2025, "2": 7, "3": 4, "4": "" })).toThrow(

@@ -1,33 +1,44 @@
-import { BigDecimal } from "@blazetrails/activesupport";
+import { BigDecimal, presence } from "@blazetrails/activesupport";
+import {
+  cmp,
+  isNan,
+  Rational,
+  rbFloatTypeP,
+  rbObjAsString as toS,
+  rbObjClass,
+} from "@blazetrails/ruby-compat";
 import { ValueType } from "../value.js";
 
 const NUMERIC_REGEX = /^\s*[+-]?\d/;
 
 /** @internal */
 export function isEqualNan(oldValue: unknown, newValue: unknown): boolean {
-  if (typeof oldValue === "number") {
-    return Number.isNaN(oldValue) && typeof newValue === "number" && Number.isNaN(newValue);
-  }
   return (
-    oldValue instanceof BigDecimal &&
-    oldValue.isNan() &&
-    newValue instanceof BigDecimal &&
-    newValue.isNan()
+    (rbFloatTypeP(oldValue) || oldValue instanceof BigDecimal) &&
+    isNan(oldValue) &&
+    rbObjClass(oldValue) === rbObjClass(newValue) &&
+    isNan(newValue)
   );
 }
 
 /** @internal */
 export function isNumberToNonNumber(oldValue: unknown, newValueBeforeTypeCast: unknown): boolean {
-  if (oldValue === null || oldValue === undefined) return false;
-  if (typeof newValueBeforeTypeCast === "number" || typeof newValueBeforeTypeCast === "bigint") {
-    return false;
-  }
-  return isNonNumericString(newValueBeforeTypeCast);
+  return (
+    oldValue != null &&
+    !(
+      typeof newValueBeforeTypeCast === "number" ||
+      typeof newValueBeforeTypeCast === "bigint" ||
+      newValueBeforeTypeCast instanceof Number ||
+      newValueBeforeTypeCast instanceof BigDecimal ||
+      newValueBeforeTypeCast instanceof Rational
+    ) &&
+    isNonNumericString(toS(newValueBeforeTypeCast))
+  );
 }
 
 /** @internal */
-export function isNonNumericString(value: unknown): boolean {
-  return !NUMERIC_REGEX.test(String(value));
+export function isNonNumericString(value: string): boolean {
+  return !NUMERIC_REGEX.test(value);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -49,19 +60,10 @@ export function applyNumericMixin<TBase extends AbstractValueTypeCtor>(
 ): TBase & { prototype: NumericMixinMethods } {
   class NumericType extends (Base as AbstractValueTypeCtor) {
     override cast(value: unknown) {
-      let v: unknown;
-      if (typeof value === "number" || typeof value === "bigint") {
-        v = value;
-      } else if (value === true) {
-        v = 1;
-      } else if (value === false) {
-        v = 0;
-      } else if (typeof value === "string" && value.trim() === "") {
-        v = null;
-      } else {
-        v = value;
-      }
-      return super.cast(v);
+      value =
+        cmp(value, 0) != null ? value : value === true ? 1 : value === false ? 0 : presence(value);
+
+      return super.cast(value);
     }
 
     override serialize(value: unknown): unknown {

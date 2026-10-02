@@ -1,4 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { BigDecimal } from "@blazetrails/activesupport";
+import { isNan, rbFloatTypeP, registerConstant, toF } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 import { applyNumericMixin } from "./helpers/numeric.js";
 
@@ -10,25 +11,30 @@ export class FloatType extends NumericValueType {
   }
 
   typeCastForSchema(value: unknown): unknown {
-    if (typeof value === "number") {
-      if (isNaN(value)) return "::Float::NAN";
-      if (value === Infinity) return "::Float::INFINITY";
-      if (value === -Infinity) return "-::Float::INFINITY";
+    if ((rbFloatTypeP(value) || value instanceof BigDecimal) && isNan(value)) return "::Float::NAN";
+    switch (value) {
+      case Infinity:
+        return "::Float::INFINITY";
+      case -Infinity:
+        return "-::Float::INFINITY";
+      default:
+        return super.typeCastForSchema(value);
     }
-    return super.typeCastForSchema(value);
   }
 
   /** @internal */
   protected castValue(value: unknown): number | null {
-    if (value instanceof Number || (typeof value === "number" && !Number.isInteger(value))) {
-      return value as number;
+    if (rbFloatTypeP(value)) return value;
+    switch (value) {
+      case "Infinity":
+        return Number.POSITIVE_INFINITY;
+      case "-Infinity":
+        return Number.NEGATIVE_INFINITY;
+      case "NaN":
+        return Number.NaN;
+      default:
+        return toF(value);
     }
-    if (value === "Infinity") return Number.POSITIVE_INFINITY;
-    if (value === "-Infinity") return Number.NEGATIVE_INFINITY;
-    if (value === "NaN") return Number.NaN;
-    const parsed = typeof value === "number" ? value : parseFloat(String(value));
-    const toF = isNaN(parsed) ? 0 : parsed;
-    return (Number.isInteger(toF) ? new Number(toF) : toF) as number;
   }
 }
 

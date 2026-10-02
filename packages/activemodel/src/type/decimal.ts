@@ -1,6 +1,14 @@
 import { BigDecimal, toD } from "@blazetrails/activesupport";
-import { rbInspect as inspect, rbObjRespondTo, registerConstant } from "@blazetrails/ruby-compat";
-import { Rational } from "@blazetrails/ruby-compat";
+import {
+  Rational,
+  rbFloatTypeP,
+  rbInspect as inspect,
+  rbObjAsString as toS,
+  rbObjRespondTo,
+  registerConstant,
+  round,
+  toI,
+} from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 import { applyNumericMixin } from "./helpers/numeric.js";
 
@@ -8,23 +16,25 @@ const NumericValueType = applyNumericMixin(ValueType<BigDecimal>);
 
 const BIGDECIMAL_PRECISION = 18;
 
+const FLOAT_DIG = 15;
+
 export class DecimalType extends NumericValueType {
   type(): string {
     return "decimal";
   }
 
+  /** @missingRailsArgs inspect — PERMANENT */
   typeCastForSchema(value: unknown): string {
-    return inspect(value === null || value === undefined ? "" : String(value));
+    return inspect(toS(value));
   }
 
   /** @internal */
   protected castValue(value: unknown): BigDecimal | null {
-    if (value === null || value === undefined) return null;
-
-    let castedValue: BigDecimal | null;
-    if (typeof value === "number") {
+    let castedValue: BigDecimal;
+    if (rbFloatTypeP(value)) {
       castedValue = this.convertFloatToBigDecimal(value);
     } else if (
+      typeof value === "number" ||
       value instanceof BigDecimal ||
       typeof value === "bigint" ||
       value instanceof Rational
@@ -40,7 +50,7 @@ export class DecimalType extends NumericValueType {
       if (rbObjRespondTo(value, "toD")) {
         castedValue = (value as { toD(): BigDecimal }).toD();
       } else {
-        castedValue = this.castValue(String(value));
+        castedValue = this.castValue(toS(value)) as BigDecimal;
       }
     }
 
@@ -57,21 +67,22 @@ export class DecimalType extends NumericValueType {
 
   /** @internal */
   protected floatPrecision(): number {
-    const raw = this.precision ?? 0;
-    const p = Number.isFinite(raw) ? Math.trunc(raw) : 0;
-    return p > 16 ? 16 : p;
+    if (Number(toI(this.precision)) > FLOAT_DIG + 1) {
+      return FLOAT_DIG + 1;
+    } else {
+      return Number(toI(this.precision));
+    }
   }
 
   /** @internal */
   protected applyScale(value: number): number;
-  protected applyScale(value: BigDecimal | null): BigDecimal | null;
-  protected applyScale(value: BigDecimal | number | null): BigDecimal | number | null {
-    if (this.scale == null) return value;
-    if (value instanceof BigDecimal) return value.round(this.scale);
-    if (typeof value === "number") {
-      return Number(new BigDecimal(String(value)).round(this.scale).toString("F"));
+  protected applyScale(value: BigDecimal): BigDecimal;
+  protected applyScale(value: BigDecimal | number): BigDecimal | number {
+    if (this.scale != null) {
+      return round(value, this.scale);
+    } else {
+      return value;
     }
-    return value;
   }
 }
 

@@ -44,8 +44,6 @@ export class DateType extends ValueType<DateCastResult> {
     if (typeof value === "string") {
       if (value === "") return null;
       return this.fastStringToDate(value) ?? this.fallbackStringToDate(value);
-    } else if (value instanceof Temporal.PlainDate) {
-      return value;
     } else if (value instanceof Temporal.PlainDateTime) {
       return value.toPlainDate();
       // boundary: a JS Date assigned to a date attribute is Ruby's ::Time.

@@ -5,20 +5,92 @@ import { NoMethodError } from "./no-method-error.js";
 import { rbBuiltinClassName, rbObjClass } from "./object.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
 import { TypeError } from "./type-error.js";
-import { rbStrToI } from "./string/convert.js";
+import { rbStrToF, rbStrToI } from "./string/convert.js";
 import { isSymbol } from "./symbol.js";
 
 /**
  * Ruby `Float#round` (`vendor/ruby/v3.3.11/numeric.c:2505` `flo_round`): rounds to
  * `ndigits` decimal places, half away from zero — which is where JS
  * `Math.round` differs, rounding `-0.5` up to `-0` where Ruby answers `-1`.
+ * A negative `ndigits` rounds the truncated Integer (`rb_int_round`,
+ * `vendor/ruby/v3.3.11/numeric.c:2341`). A positive one answers the receiver
+ * itself once `float_round_overflow` (`numeric.c:2544`) says it holds no digit
+ * past `ndigits`, zero once `float_round_underflow` (`numeric.c:2572`) says it
+ * is smaller than the last one, and past 14 digits rounds the exact Rational
+ * (`rb_flo_round_by_rational`, `vendor/ruby/v3.3.11/rational.c:1549`); otherwise
+ * `round_half_up` (`numeric.c:110`), whose correction is what makes
+ * `1.005.round(2)` answer `1.01` although `1.005 * 100` is
+ * `100.49999999999999`.
+ * Any other receiver answers its own `round`, as the Ruby send would.
  * @noRailsEquivalent PERMANENT — Ruby core `Float#round` (`vendor/ruby/v3.3.11/numeric.c:2505`).
  */
-export function round(x: number, ndigits = 0): number {
-  const f = 10 ** ndigits;
-  const scaled = x * f;
-  const rounded = Math.sign(scaled) * Math.round(Math.abs(scaled));
-  return ndigits === 0 ? rounded : rounded / f;
+export function round(x: number, ndigits?: number): number;
+/** @noRailsEquivalent PERMANENT — Ruby core `Float#round` (`vendor/ruby/v3.3.11/numeric.c:2505`). */
+export function round<T extends { round(ndigits?: number): T }>(x: T, ndigits?: number): T;
+/** @noRailsEquivalent PERMANENT — Ruby core `Float#round` (`vendor/ruby/v3.3.11/numeric.c:2505`). */
+export function round<T extends { round(ndigits?: number): T }>(
+  x: number | T,
+  ndigits?: number,
+): number | T;
+/** @noRailsEquivalent PERMANENT — Ruby core `Float#round` (`vendor/ruby/v3.3.11/numeric.c:2505`). */
+export function round(x: number | { round(ndigits?: number): unknown }, ndigits = 0): unknown {
+  if (typeof x !== "number" && !(x instanceof Number)) return x.round(ndigits);
+  const number = x.valueOf();
+  if (number === 0) return ndigits > 0 ? number : 0;
+  if (ndigits < 0) return intRound(Number(toI(number)), ndigits);
+  if (ndigits === 0) return roundHalfUp(number, 1);
+  if (Number.isFinite(number)) {
+    const binexp = frexp(number);
+    if (floatRoundOverflow(ndigits, binexp)) return number;
+    if (floatRoundUnderflow(ndigits, binexp)) return 0;
+    if (ndigits > 14) return floRoundByRational(number, ndigits);
+    const f = 10 ** ndigits;
+    return roundHalfUp(number, f) / f;
+  }
+  return number;
+}
+
+function roundHalfUp(x: number, s: number): number {
+  const xs = x * s;
+  let f = Math.sign(xs) * Math.round(Math.abs(xs));
+  if (s === 1) return f;
+  if (x > 0) {
+    if ((f + 0.5) / s <= x) f += 1;
+  } else if ((f - 0.5) / s >= x) {
+    f -= 1;
+  }
+  return f;
+}
+
+function intRound(num: number, ndigits: number): number {
+  const f = 10 ** -ndigits;
+  if (!Number.isFinite(f)) return 0;
+  const x = Math.abs(num);
+  return Math.sign(num) * Math.floor((x + f / 2) / f) * f + 0;
+}
+
+function frexp(number: number): number {
+  let binexp = Math.floor(Math.log2(Math.abs(number))) + 1;
+  while (Math.abs(number) >= 2 ** binexp) binexp += 1;
+  while (Math.abs(number) < 2 ** (binexp - 1)) binexp -= 1;
+  return binexp;
+}
+
+function floatRoundOverflow(ndigits: number, binexp: number): boolean {
+  const floatDig = 15 + 2;
+  return ndigits >= floatDig - (binexp > 0 ? Math.trunc(binexp / 4) : Math.trunc(binexp / 3) - 1);
+}
+
+function floatRoundUnderflow(ndigits: number, binexp: number): boolean {
+  return ndigits < -(binexp > 0 ? Math.trunc(binexp / 3) + 1 : Math.trunc(binexp / 4));
+}
+
+function floRoundByRational(number: number, ndigits: number): number {
+  const r = new Rational(number, 1);
+  const num = r.numerator * 10n ** BigInt(ndigits);
+  const abs = num < 0n ? -num : num;
+  const q = (2n * abs + r.denominator) / (2n * r.denominator);
+  return Number(`${num < 0n ? "-" : ""}${q}e-${ndigits}`);
 }
 
 /**
@@ -78,9 +150,9 @@ export function anybits(x: number | bigint, mask: number | bigint): boolean {
 export function toI(obj: unknown): number | bigint {
   if (obj == null) return NilClass.toI() as number;
   if (typeof obj === "bigint") return obj;
-  if (typeof obj === "number") {
-    if (!Number.isFinite(obj)) throw new FloatDomainError(String(obj));
-    return Math.trunc(obj);
+  if (typeof obj === "number" || obj instanceof Number) {
+    if (!Number.isFinite(obj.valueOf())) throw new FloatDomainError(String(obj));
+    return Math.trunc(obj.valueOf());
   }
   if (isSymbol(obj)) throw new NoMethodError("undefined method 'to_i' for an instance of Symbol");
   if (typeof obj === "string") return rbStrToI(obj);
@@ -88,6 +160,44 @@ export function toI(obj: unknown): number | bigint {
     return (obj as { toI(): number | bigint }).toI();
   }
   throw new NoMethodError(`undefined method 'to_i' for an instance of ${rbObjClass(obj)}`);
+}
+
+/**
+ * Ruby's `obj.to_f` send, dispatched on the receiver's class: `NilClass#to_f`
+ * (`vendor/ruby/v3.3.11/nilclass.rb:22`), `Float#to_f`
+ * (`vendor/ruby/v3.3.11/numeric.rb:312`), `Integer#to_f`
+ * (`vendor/ruby/v3.3.11/numeric.c:5356` `int_to_f`), `String#to_f`
+ * (`vendor/ruby/v3.3.11/string.c:6633` `rb_str_to_f`, {@link rbStrToF}), else the
+ * receiver's own `toF`. The answer is a Float, so it is seated by
+ * {@link rbDbl2num}.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function toF(obj: unknown): number {
+  if (obj == null) return rbDbl2num(NilClass.toF() as number);
+  if (obj instanceof Number) return obj as number;
+  if (typeof obj === "number" || typeof obj === "bigint") return rbDbl2num(Number(obj));
+  if (isSymbol(obj)) throw new NoMethodError("undefined method 'to_f' for an instance of Symbol");
+  if (typeof obj === "string") return rbDbl2num(rbStrToF(obj));
+  if (typeof (obj as { toF?: unknown }).toF === "function") {
+    return rbDbl2num((obj as { toF(): number }).toF());
+  }
+  throw new NoMethodError(`undefined method 'to_f' for an instance of ${rbObjClass(obj)}`);
+}
+
+/**
+ * Ruby's `obj.nan?` send: `Float#nan?` (`vendor/ruby/v3.3.11/numeric.c:1961`
+ * `flo_is_nan_p`) over the `number` seat, else the receiver's own `isNan`
+ * (`BigDecimal#nan?`, `vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:1208`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function isNan(obj: unknown): boolean {
+  if (typeof obj === "number" || obj instanceof Number) return Number.isNaN(obj.valueOf());
+  if (typeof (obj as { isNan?: unknown } | null)?.isNan === "function") {
+    return (obj as { isNan(): boolean }).isNan();
+  }
+  throw new NoMethodError(`undefined method 'nan?' for an instance of ${rbObjClass(obj)}`);
 }
 
 /**
@@ -121,6 +231,31 @@ export function rbIntegerTypeP(x: unknown): x is number | bigint {
  */
 export function rbBigNorm(x: bigint): number | bigint {
   return Number.isSafeInteger(Number(x)) ? Number(x) : x;
+}
+
+/**
+ * `fix_mul` (`vendor/ruby/v3.3.11/numeric.c:4045`), `rb_float_mul` (`numeric.c:1237`),
+ * `rb_rational_mul` (`vendor/ruby/v3.3.11/rational.c:861`).
+ * @noRailsEquivalent PERMANENT
+ */
+export function numericMul(x: unknown, y: unknown): unknown {
+  if (rbFloatTypeP(x)) {
+    if (rbIntegerTypeP(y) || rbFloatTypeP(y)) return rbDbl2num(x.valueOf() * Number(y.valueOf()));
+    if (y instanceof Rational) return rbDbl2num(x.valueOf() * y.toF());
+  } else if (x instanceof Rational) {
+    if (rbIntegerTypeP(y)) return x.mul(y);
+    if (rbFloatTypeP(y)) return rbDbl2num(x.toF() * y.valueOf());
+  } else if (rbIntegerTypeP(x)) {
+    if (rbIntegerTypeP(y)) {
+      if (typeof x === "number" && typeof y === "number" && Number.isSafeInteger(x * y)) {
+        return x * y;
+      }
+      return rbBigNorm(BigInt(x) * BigInt(y));
+    }
+    if (rbFloatTypeP(y)) return rbDbl2num(Number(x) * y.valueOf());
+    if (y instanceof Rational) return y.mul(x);
+  }
+  throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClass(x)}`);
 }
 
 /**

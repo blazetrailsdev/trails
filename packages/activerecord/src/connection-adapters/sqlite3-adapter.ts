@@ -1030,23 +1030,14 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
    * @internal
    * @missingRailsName connectionParameters — PERMANENT
    */
-  private connect(): void | Promise<void> {
-    const rescue = (ex: unknown): never => {
-      if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
-      throw ex;
-    };
+  private async connect(): Promise<void> {
     try {
-      const rawConnection = (this.constructor as typeof SQLite3Adapter).newClient(
+      this._rawConnection = await (this.constructor as typeof SQLite3Adapter).newClient(
         this._connectionParameters,
       );
-      if (rawConnection instanceof Promise) {
-        return rawConnection.then((connection) => {
-          this._rawConnection = connection;
-        }, rescue);
-      }
-      this._rawConnection = rawConnection;
     } catch (ex) {
-      rescue(ex);
+      if (!(ex instanceof ConnectionNotEstablished)) throw ex;
+      throw ex.setPool(this.pool);
     }
   }
 

@@ -25,13 +25,13 @@ describe("applySecondsPrecision", () => {
     expect(applySecondsPrecision.call({ precision: 9 }, dt)).toBe(dt);
   });
 
-  it("rejects non-integer precision", () => {
-    expect(applySecondsPrecision.call({ precision: 3.5 }, dt)).toBe(dt);
+  it("returns value unchanged for a precision past the nanosecond", () => {
+    expect(applySecondsPrecision.call({ precision: 10 }, dt)).toBe(dt);
   });
 
-  it("rejects out-of-range precision", () => {
-    expect(applySecondsPrecision.call({ precision: -1 }, dt)).toBe(dt);
-    expect(applySecondsPrecision.call({ precision: 10 }, dt)).toBe(dt);
+  it("a negative precision rounds every sub-second digit off", () => {
+    const r = applySecondsPrecision.call({ precision: -1 }, dt) as Temporal.PlainDateTime;
+    expect(r.toString()).toBe("2024-01-02T03:04:05");
   });
 
   it("precision 0 truncates to whole seconds", () => {
