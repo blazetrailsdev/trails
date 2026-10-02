@@ -13,6 +13,7 @@ import {
   rbObjPublicMethods,
 } from "./method.js";
 import { NameError } from "./name-error.js";
+import { TypeError } from "./type-error.js";
 
 describe("rbObjMethod", () => {
   class Missing {
@@ -29,6 +30,18 @@ describe("rbObjMethod", () => {
     const method = rbObjMethod(new Missing(), "forwarded");
     expect(method.name()).toEqual("forwarded");
     expect(method.call(1)).toEqual(["forwarded", 1]);
+  });
+
+  it("takes the name as a Symbol or a String, and raises TypeError for anything else", () => {
+    const obj = {
+      check(): string {
+        return "checked";
+      },
+    };
+    expect(rbObjMethod(obj, ":check").name()).toEqual("check");
+    expect(rbObjMethod(obj, "check").call()).toEqual("checked");
+    expect(() => rbObjMethod(obj, 1)).toThrow(TypeError);
+    expect(() => rbObjMethod(obj, 1)).toThrow("1 is not a symbol nor a string");
   });
 
   it("raises NameError for a name the receiver does not answer", () => {

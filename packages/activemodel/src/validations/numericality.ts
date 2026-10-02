@@ -61,7 +61,6 @@ export class NumericalityValidator extends EachValidator {
     }
   }
 
-  /** @missingRailsArgs merge! — CONVERGEABLE numericality-range-count-is-stringified-because-interpolation-skips-to-s */
   validateEach(
     record: ValidatableRecord,
     attrName: string,
@@ -98,7 +97,7 @@ export class NumericalityValidator extends EachValidator {
           record.errors.add(
             attrName,
             `:${option}`,
-            mergeBang(this.filteredOptions(value), { count: range.toS() }),
+            mergeBang(this.filteredOptions(value), { count: optionValue }),
           );
         }
       } else if (option in COMPARE_CHECKS) {

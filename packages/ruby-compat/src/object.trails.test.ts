@@ -28,6 +28,7 @@ import {
 } from "./object.js";
 import { Kernel, Module, include, rbModAncestors, rbModInstanceMethod } from "./include.js";
 import { cmp } from "./comparable.js";
+import { Range } from "./range.js";
 import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
@@ -126,6 +127,23 @@ describe("Object#to_s", () => {
     expect(sends).toBe(1);
     expect(toS([{ a: 1 }])).toBe('[{"a"=>1}]');
   });
+
+  it("sends to_s to a receiver defining it", () => {
+    expect(toS(new Range(1, 3))).toBe("1..3");
+    class Ported {
+      toS(): string {
+        return "ported";
+      }
+    }
+    expect(toS(new Ported())).toBe("ported");
+    expect(toS(Object.assign(() => {}, { toS: () => "proc" }))).toBe("proc");
+    class Unported {
+      toS(): number {
+        return 1;
+      }
+    }
+    expect(toS(new Unported())).toMatch(/^#<Unported/);
+  });
 });
 
 describe("Object#respond_to_missing?", () => {
@@ -153,6 +171,14 @@ describe("Object#respond_to?", () => {
     expect(basicObjRespondTo("2026-01-01", "toDate")).toBe(false);
     expect(rbFSend(date, "toDate")).toBe(date);
     expect(rbFSend(datetime, "toDate")).toBe(date);
+  });
+
+  it("does not answer length or name for a Proc", () => {
+    expect(basicObjRespondTo((a: unknown, b: unknown) => [a, b], "length")).toBe(false);
+    expect(basicObjRespondTo(function named() {}, "name")).toBe(false);
+    expect(basicObjRespondTo(() => {}, "call")).toBe(true);
+    expect(basicObjRespondTo("abc", "length")).toBe(true);
+    expect(basicObjRespondTo([1], "length")).toBe(true);
   });
 
   it("sends an overridden respond_to? and otherwise falls back to the default", () => {

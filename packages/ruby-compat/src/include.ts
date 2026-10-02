@@ -1392,11 +1392,13 @@ export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass | 
  * @noRailsEquivalent PERMANENT
  */
 export const Kernel = new Module((mod) => {
+  /** @noRailsEquivalent PERMANENT */
   mod.defineMethod("initializeDup", function (this: object, orig: unknown): object {
     const initializeCopy = (this as { initializeCopy?: unknown }).initializeCopy;
     if (typeof initializeCopy === "function") initializeCopy.call(this, orig);
     return this;
   });
+  /** @noRailsEquivalent PERMANENT */
   mod.defineMethod("freeze", function (this: object): object {
     return Object.freeze(this);
   });

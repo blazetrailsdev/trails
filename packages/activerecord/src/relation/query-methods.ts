@@ -6,6 +6,7 @@ import {
   isEmpty,
   isModuleIncluded,
   rbInspect,
+  rbObjAsString,
   rbObjClassname,
   rbObjRespondTo,
   RuntimeError,
@@ -53,8 +54,6 @@ import {
   included,
   isBlank,
   kernelArray,
-  rbEqual,
-  rbHash,
   wrap,
 } from "@blazetrails/activesupport";
 
@@ -344,69 +343,12 @@ function reselect(this: QueryMethodsHost, ...args: any[]): any {
 }
 
 function reselectBang(this: QueryMethodsHost, ...args: any[]): any {
-  this.selectValues = args.map((c: any) => {
-    if (Arel.arelNode(c)) return c;
-    if (typeof c === "object" && c !== null && "value" in c)
-      return new Nodes.SqlLiteral((c as { value: string }).value);
-    return String(c);
-  });
+  this.selectValues = args;
   return this;
 }
 
 function _selectBang(this: QueryMethodsHost, ...fields: any[]): any {
-  const flat = fields.flat(Infinity);
-  const normalized = flat.map((c: any) => {
-    if (Arel.arelNode(c)) return c;
-    if (typeof c === "function") return c;
-    if (typeof c === "object" && c !== null && "value" in c)
-      return new Nodes.SqlLiteral((c as { value: string }).value);
-    return String(c);
-  });
-  const seenStrings = new Set<string>();
-  const seenNodeHashes = new Map<number, Arel.ArelNode[]>();
-  const nodeIsDuplicate = (node: Arel.ArelNode): boolean => {
-    const h = rbHash(node);
-    const bucket = seenNodeHashes.get(h);
-    if (!bucket) return false;
-    return bucket.some((n) => rbEqual(n, node));
-  };
-  const addNodeToSeen = (node: Arel.ArelNode): void => {
-    const h = rbHash(node);
-    const bucket = seenNodeHashes.get(h);
-    if (bucket) bucket.push(node);
-    else seenNodeHashes.set(h, [node]);
-  };
-  const seenThunks = new Set<unknown>();
-  for (const existing of this.selectValues) {
-    if (typeof existing === "string") seenStrings.add(existing);
-    else if (Arel.arelNode(existing)) addNodeToSeen(existing);
-    else if (typeof existing === "function") seenThunks.add(existing);
-    else seenStrings.add((existing as { value: string }).value);
-  }
-  for (const col of normalized) {
-    if (typeof col === "string") {
-      if (!seenStrings.has(col)) {
-        this.selectValues = [...this.selectValues, col];
-        seenStrings.add(col);
-      }
-    } else if (Arel.arelNode(col)) {
-      if (!nodeIsDuplicate(col)) {
-        this.selectValues = [...this.selectValues, col];
-        addNodeToSeen(col);
-      }
-    } else if (typeof col === "function") {
-      if (!seenThunks.has(col)) {
-        this.selectValues = [...this.selectValues, col];
-        seenThunks.add(col);
-      }
-    } else {
-      const key = (col as { value: string }).value;
-      if (!seenStrings.has(key)) {
-        this.selectValues = [...this.selectValues, col];
-        seenStrings.add(key);
-      }
-    }
-  }
+  this.selectValues = union(this.selectValues, fields);
   return this;
 }
 
@@ -1532,7 +1474,9 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
     } else if (arg instanceof Map) {
       for (const [key, value] of arg) {
         mapped.push(
-          Arel.arelNode(key)
+          key instanceof Nodes.SqlLiteral ||
+            key instanceof Nodes.Node ||
+            key instanceof Arel.Attribute
             ? orderedNode(key, value)
             : orderedNode(orderColumn.call(this, String(key)), value),
         );
@@ -1853,7 +1797,7 @@ export function arelColumnWithTable(
   this: QueryMethodsHost,
   tableName: string,
   columnName: string,
-): unknown {
+): Arel.Attribute | Nodes.SqlLiteral {
   (this as any).referencesValues = unionReferences((this as any).referencesValues ?? [], [
     Arel.sql(tableName, { retryable: true }),
   ]);
@@ -1910,37 +1854,41 @@ export function processSelectArgs(this: QueryMethodsHost, fields: unknown[]): un
   });
 }
 
-function nodeAs(attr: unknown, quotedAlias: string): unknown {
-  if (typeof (attr as any)?.as === "function") return (attr as any).as(quotedAlias);
-  const attrSql = typeof (attr as any)?.toSql === "function" ? (attr as any).toSql() : String(attr);
-  return Arel.sql(`${attrSql} AS ${quotedAlias}`);
-}
-
 /** @internal */
 export function arelColumnAliasesFromHash(
   this: QueryMethodsHost,
   fields: Record<string, unknown>,
 ): unknown[] {
-  return Object.keys(fields).flatMap((key) => {
-    const columnsAliases = fields[key];
+  return Object.entries(fields).flatMap<unknown>(([key, columnsAliases]) => {
     const tableName = isRubySymbol(key) ? symbolToName(key) : key;
-    const modelClass: any = this.model;
-    const quoteAlias = (a: unknown): string =>
-      modelClass.adapterClass().quoteColumnName(isRubySymbol(a) ? symbolToName(a) : String(a));
     if (isPlainObject(columnsAliases)) {
-      return Object.keys(columnsAliases as object).map((col) => {
-        const alias = (columnsAliases as any)[col];
-        const attr = arelColumnWithTable.call(this, tableName, col);
-        return nodeAs(Arel.arelNode(attr) ? attr : Arel.sql(String(col)), quoteAlias(alias));
-      });
+      return Object.entries(columnsAliases).map(([column, columnAlias]) =>
+        arelColumnWithTable
+          .call(this, tableName, column)
+          .as(
+            this.model
+              .adapterClass()
+              .quoteColumnName(
+                isRubySymbol(columnAlias) ? symbolToName(columnAlias) : rbObjAsString(columnAlias),
+              ),
+          ),
+      );
     }
     if (Array.isArray(columnsAliases)) {
-      return (columnsAliases as string[]).map((col) =>
-        arelColumnWithTable.call(this, tableName, col),
+      return (columnsAliases as string[]).map((column) =>
+        arelColumnWithTable.call(this, tableName, column),
       );
     }
     if (typeof columnsAliases === "string") {
-      return [nodeAs(arelColumn.call(this, key), quoteAlias(columnsAliases))];
+      return [
+        (arelColumn.call(this, key) as Arel.Attribute | Nodes.SqlLiteral).as(
+          this.model
+            .adapterClass()
+            .quoteColumnName(
+              isRubySymbol(columnsAliases) ? symbolToName(columnsAliases) : columnsAliases,
+            ),
+        ),
+      ];
     }
     return [];
   });

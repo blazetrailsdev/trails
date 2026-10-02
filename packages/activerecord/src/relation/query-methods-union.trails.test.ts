@@ -24,6 +24,19 @@ describe("QueryMethods Array#| dedup", () => {
     expect(Post.all().reorder("id", "id").orderValues).toEqual(["id"]);
   });
 
+  it("_select! unions fields by eql?, whatever their class", () => {
+    const relation = Post.select("id", sql("title"))._selectBang(
+      "id",
+      sql("title"),
+      1,
+      2,
+      ["id", "title"],
+      ["id", "title"],
+      ["title"],
+    );
+    expect(relation.selectValues).toEqual(["id", sql("title"), 1, 2, ["id", "title"], ["title"]]);
+  });
+
   it("joins! dedups separately built eql? join nodes", () => {
     const join = () =>
       new Nodes.StringJoin(sql("INNER JOIN comments ON comments.post_id = posts.id"));

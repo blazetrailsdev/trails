@@ -1,18 +1,12 @@
 import { extractOptionsBang } from "@blazetrails/activesupport";
-import {
-  rbBlockGivenP,
-  rbFSend,
-  rbObjMethod,
-  stringToSym,
-  symbolToS,
-} from "@blazetrails/ruby-compat";
+import { rbBlockGivenP, rbFSend, rbObjMethod } from "@blazetrails/ruby-compat";
 
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 
 export class WithValidator extends EachValidator {
   validateEach(record: ValidatableRecord, attr: string, _val: unknown): void {
-    const methodName = symbolToS(stringToSym(this.options.with as string));
+    const methodName = this.options.with;
 
     if (rbObjMethod(record, methodName).arity() === 0) {
       rbFSend(record, methodName);
