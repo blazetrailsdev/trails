@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as Types from "../index.js";
 import { BinaryData } from "../index.js";
+import { rbEqual, rbInspect } from "@blazetrails/ruby-compat";
 
 describe("BinaryTypeTrails", () => {
   it("serialize returns null for nil rather than wrapping it", () => {
@@ -22,6 +23,14 @@ describe("BinaryTypeTrails", () => {
     expect(new BinaryData(new BinaryData(bytes)).toString()).toBe(bytes);
     expect(new BinaryData("ƒée").toString()).toEqual(new TextEncoder().encode("ƒée"));
     expect(new BinaryData(1).toString()).toEqual(new Uint8Array([0x31]));
+  });
+
+  it("Data answers to_str, so a String compares with it and inspect does not coerce it", () => {
+    const data = new BinaryData("hello");
+    expect(data.toStr()).toBe(data.toString());
+    expect(rbEqual("hello", data)).toBe(true);
+    expect(rbEqual("hellO", data)).toBe(false);
+    expect(rbInspect(new BinaryData(new Uint8Array([0x80])))).toMatch(/^#<.*@value=/);
   });
 
   it("Data#equals compares a non-ASCII String as Ruby does a UTF-8 one with a binary one", () => {

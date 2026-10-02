@@ -114,6 +114,15 @@ describe("Object#to_s", () => {
       }
     }
     expect(toS(new Data())).toBe(bytes);
+    let sends = 0;
+    class Counted {
+      toString() {
+        sends += 1;
+        return "counted";
+      }
+    }
+    expect(toS(new Counted())).toBe("counted");
+    expect(sends).toBe(1);
     expect(toS([{ a: 1 }])).toBe('[{"a"=>1}]');
   });
 });
@@ -133,13 +142,16 @@ describe("Object#respond_to?", () => {
     expect(basicObjRespondTo(null, "id")).toBe(false);
   });
 
-  it("answers to_date for the Temporal seats of Date and DateTime", () => {
-    const tagged = (tag: string) => ({ [Symbol.toStringTag]: tag });
-    expect(basicObjRespondTo(tagged("Temporal.PlainDate"), "toDate")).toBe(true);
-    expect(basicObjRespondTo(tagged("Temporal.PlainDateTime"), "toDate")).toBe(true);
-    expect(basicObjRespondTo(tagged("Temporal.ZonedDateTime"), "toDate")).toBe(true);
-    expect(basicObjRespondTo(tagged("Temporal.Instant"), "toDate")).toBe(false);
+  it("answers and dispatches the methods bound on a Temporal seat", () => {
+    const date = { [Symbol.toStringTag]: "Temporal.PlainDate" };
+    const plain = { toPlainDate: () => date };
+    const datetime = { [Symbol.toStringTag]: "Temporal.PlainDateTime", ...plain };
+    expect(basicObjRespondTo(date, "toDate")).toBe(true);
+    expect(basicObjRespondTo(datetime, "toDate")).toBe(true);
+    expect(basicObjRespondTo({ [Symbol.toStringTag]: "Temporal.Instant" }, "toDate")).toBe(false);
     expect(basicObjRespondTo("2026-01-01", "toDate")).toBe(false);
+    expect(rbFSend(date, "toDate")).toBe(date);
+    expect(rbFSend(datetime, "toDate")).toBe(date);
   });
 
   it("sends an overridden respond_to? and otherwise falls back to the default", () => {

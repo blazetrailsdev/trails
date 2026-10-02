@@ -1,5 +1,5 @@
 import { Temporal, Time } from "@blazetrails/date";
-import { ArgumentError, Rational } from "@blazetrails/ruby-compat";
+import { ArgumentError, Rational, rbFSend } from "@blazetrails/ruby-compat";
 import {
   actsLike,
   TimeWithZone,
@@ -7,7 +7,6 @@ import {
   toFs,
   zone,
 } from "@blazetrails/activesupport";
-import * as dateTime from "@blazetrails/activesupport/core-ext/date-time/calculations";
 
 export interface TimezoneAware {
   readonly isUtc: boolean;
@@ -23,11 +22,10 @@ export function serializeCastValue(this: TimeValueHost, value: unknown): unknown
   value = this.applySecondsPrecision(value);
 
   if (actsLike.call(value, "time")) {
-    const time = value as Time | TimeWithZone | DateTime;
     if (this.isUtc) {
-      if (!isUtc.call(time)) value = getutc.call(time);
+      if (!rbFSend(value, "isUtc")) value = rbFSend(value, "getutc");
     } else {
-      value = getlocal.call(time);
+      value = rbFSend(value, "getlocal");
     }
   }
 
@@ -149,24 +147,6 @@ export const TimeValue = {
   newTime,
   fastStringToTime,
 };
-
-type DateTime = Temporal.PlainDateTime | Temporal.ZonedDateTime;
-
-function isUtc(this: Time | TimeWithZone | DateTime): boolean {
-  return this instanceof Time || this instanceof TimeWithZone ? this.isUtc() : dateTime.isUtc(this);
-}
-
-function getutc(this: Time | TimeWithZone | DateTime): unknown {
-  return this instanceof Time || this instanceof TimeWithZone
-    ? this.getutc()
-    : dateTime.getutc(this);
-}
-
-function getlocal(this: Time | TimeWithZone | DateTime): unknown {
-  return this instanceof Time || this instanceof TimeWithZone
-    ? this.getlocal()
-    : dateTime.getlocal(this);
-}
 
 function respondToNsec(value: unknown): value is NsecBearing {
   return (

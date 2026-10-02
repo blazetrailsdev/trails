@@ -55,6 +55,11 @@ export class Data {
   equals(other: unknown): boolean {
     return rbEqual(other, this.toString()) || this === other;
   }
+
+  /** @noRailsEquivalent PERMANENT */
+  toStr(): Uint8Array {
+    return this.toString();
+  }
 }
 
 registerConstant("ActiveModel::Type::Binary", BinaryType);

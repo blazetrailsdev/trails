@@ -1,12 +1,12 @@
 import {
   ArgumentError,
   Date as RubyDate,
-  Temporal,
+  type Temporal,
   Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
 import { include } from "@blazetrails/activesupport";
-import { rbObjRespondTo, StandardError, registerConstant } from "@blazetrails/ruby-compat";
+import { rbFSend, rbObjRespondTo, StandardError, registerConstant } from "@blazetrails/ruby-compat";
 import { toFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import {
   AcceptsMultiparameterTime,
@@ -45,7 +45,7 @@ export class DateType extends ValueType<DateCastResult> {
       if (value === "") return null;
       return this.fastStringToDate(value) ?? this.fallbackStringToDate(value);
     } else if (rbObjRespondTo(value, "toDate")) {
-      return toDate(value);
+      return rbFSend(value, "toDate") as DateCastResult;
     } else {
       return value as DateCastResult;
     }
@@ -104,14 +104,6 @@ export class DateType extends ValueType<DateCastResult> {
 }
 
 const ISO_DATE = /^(\d{4})-(\d\d)-(\d\d)$/;
-
-function toDate(value: unknown): DateCastResult {
-  if (value instanceof Temporal.PlainDate) return value;
-  if (value instanceof Temporal.PlainDateTime || value instanceof Temporal.ZonedDateTime) {
-    return value.toPlainDate();
-  }
-  return (value as { toDate(): DateCastResult }).toDate();
-}
 
 include(DateType, Timezone);
 

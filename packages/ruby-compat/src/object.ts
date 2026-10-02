@@ -204,11 +204,33 @@ export function rbModName(klass: abstract new (...args: never) => unknown): stri
   return classpaths.get(klass)?.path ?? (klass.name || null);
 }
 
-const DATE_SEATS: ReadonlySet<string> = new Set([
-  "Temporal.PlainDate",
-  "Temporal.PlainDateTime",
-  "Temporal.ZonedDateTime",
-]);
+/**
+ * The methods bound on a Temporal seat, keyed by its `Symbol.toStringTag` and
+ * then by the camelCased Ruby name, which {@link rbFSend} dispatches and
+ * {@link basicObjRespondTo} answers for: a Temporal value's prototype carries
+ * none of them. `to_date` is Ruby's own, for Date and DateTime
+ * (`date_to_date` and `datetime_to_date`,
+ * `vendor/ruby/v3.3.11/ext/date/date_core.c:10054,10058`). A package that
+ * reopens one of those classes, as ActiveSupport's `core_ext/date_time` does,
+ * assigns an entry, as it does on `STRING_METHOD_TABLE`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const TEMPORAL_METHOD_TABLE: Record<
+  string,
+  Record<string, (self: never, ...args: never[]) => unknown>
+> = {
+  "Temporal.PlainDate": { toDate: (self: unknown) => self },
+  "Temporal.PlainDateTime": { toDate: (self: { toPlainDate(): unknown }) => self.toPlainDate() },
+  "Temporal.ZonedDateTime": { toDate: (self: { toPlainDate(): unknown }) => self.toPlainDate() },
+};
+
+function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unknown) | undefined {
+  const table = obj == null ? undefined : TEMPORAL_METHOD_TABLE[temporalTag(obj) ?? ""];
+  return table !== undefined && Object.hasOwn(table, mid)
+    ? (table[mid] as (...args: unknown[]) => unknown)
+    : undefined;
+}
 
 /**
  * `basic_obj_respond_to` (`vendor/ruby/v3.3.11/vm_method.c:2864`) — the default
@@ -229,8 +251,8 @@ const DATE_SEATS: ReadonlySet<string> = new Set([
  * (`":name"`); Symbol answers `to_sym` too (`symbol.rb:8`). `toAry` is bound for a JS array
  * (`array.c:8619`), whose prototype carries no such member. `isInfinite` is
  * bound for a JS number and bigint, which spell Float (`numeric.c:6376`) and
- * Integer (`numeric.rb:48`). `toDate` is bound for the Temporal seats of Date and
- * DateTime, which define `to_date` (`ext/date/date_core.c:10054,10058`).
+ * Integer (`numeric.rb:48`). A Temporal seat answers for the methods
+ * {@link TEMPORAL_METHOD_TABLE} binds on it.
  *
  * A class receiver (a non-writable `prototype`, which a plain function, the
  * JS spelling of a `Proc`, does not have) answers `Module#respond_to?`: its static data fields hold
@@ -254,7 +276,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   if (typeof obj === "string" && (mid === "toStr" || mid === "toSym")) return true;
   if (Array.isArray(obj) && mid === "toAry") return true;
   if ((typeof obj === "number" || typeof obj === "bigint") && mid === "isInfinite") return true;
-  if (mid === "toDate" && obj != null && DATE_SEATS.has(temporalTag(obj) ?? "")) return true;
+  if (temporalMethod(obj, mid) !== undefined) return true;
   if (
     mid === "get" &&
     (typeof obj === "string" || Array.isArray(obj) || obj instanceof Map || isPlainHash(obj))
@@ -539,6 +561,8 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if ((typeof recv === "number" || typeof recv === "bigint") && mid === "isInfinite") {
     return recv === Infinity ? 1 : recv === -Infinity ? -1 : null;
   }
+  const bound = temporalMethod(recv, mid);
+  if (bound !== undefined) return bound(recv, ...args);
   const obj = Object(recv) as Record<string, unknown>;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   for (let o: object | null = obj; o; o = Object.getPrototypeOf(o) as object | null) {
@@ -784,6 +808,10 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
     return rbModToS(value as abstract new (...args: never) => unknown);
   }
   if (typeof value === "function") return rbAnyToS(value);
+  if (typeof value === "object" && !(value instanceof Uint8Array)) {
+    const str: unknown = rbObjAsString(value);
+    return typeof str === "string" ? str : rbObjInspect(value);
+  }
   return String(value);
 }
 
@@ -918,6 +946,8 @@ export function isNil(obj: unknown): boolean {
  * it gives the comma-joined form for a nested Array and `[object Object]` for a
  * Hash.
  */
+export function rbObjAsString(value: Uint8Array | { toString(): Uint8Array }): Uint8Array;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_obj_as_string` (`vendor/ruby/v3.3.11/string.c:1653`). */
 export function rbObjAsString(value: unknown): string;
 /** @noRailsEquivalent PERMANENT — Ruby core `rb_obj_as_string` (`vendor/ruby/v3.3.11/string.c:1653`). */
 export function rbObjAsString(value: unknown): string | Uint8Array {
@@ -928,7 +958,8 @@ export function rbObjAsString(value: unknown): string | Uint8Array {
   if (typeof value === "number" || value instanceof Number) return floToS(value);
   if (typeof value === "object") {
     const str: unknown = value.toString();
-    if (str instanceof Uint8Array) return str;
+    if (typeof str === "string" || str instanceof Uint8Array) return str;
+    return rbAnyToS(value);
   }
   return String(value);
 }
