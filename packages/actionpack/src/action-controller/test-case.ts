@@ -24,6 +24,7 @@ import {
   KeyError,
   merge,
   Module,
+  NilClass,
   RuntimeError,
   SecureRandom,
   StringIO,
@@ -52,6 +53,7 @@ import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
 import type { CookieJar, CookieResponse } from "../action-dispatch/middleware/cookies.js";
 import { TestProcess } from "../action-dispatch/testing/test-process.js";
 import type { RouteSet } from "../action-dispatch/routing/route-set.js";
+import type { DispatchableControllerClass } from "../action-dispatch/routing/dispatcher.js";
 import * as responseAssertions from "../action-dispatch/testing/assertions/response.js";
 import * as routingAssertions from "../action-dispatch/testing/assertions/routing.js";
 import { Metal } from "./metal.js";
@@ -319,7 +321,9 @@ function setupControllerRequestAndResponse(this: Behavior): void {
     }
   }
 
-  this.request = TestRequest.create(this.controller?.constructor ?? klass);
+  this.request = TestRequest.create(
+    this.controller == null ? NilClass : this.controller.constructor,
+  );
   this.response = this.buildResponse(this._responseKlass);
   this.response.request = this.request;
 
@@ -581,8 +585,11 @@ export class TestRequest extends AbstractTestRequest {
     return new TestSession();
   }
 
-  /** @internal */
-  private _testControllerClass: unknown;
+  private _controllerClass: unknown;
+
+  override controllerClass(): DispatchableControllerClass {
+    return this._controllerClass as DispatchableControllerClass;
+  }
 
   static create(controllerClass?: unknown): TestRequest {
     const env: Record<string, unknown> = {};
@@ -607,7 +614,7 @@ export class TestRequest extends AbstractTestRequest {
 
     this.session = session as never;
     this.sessionOptions = { ...TestSession.DEFAULT_OPTIONS };
-    this._testControllerClass = controllerClass;
+    this._controllerClass = controllerClass;
   }
 
   get queryString(): string {
