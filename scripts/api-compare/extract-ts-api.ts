@@ -4427,7 +4427,6 @@ export function extractInternalFileConstants(sourceFile: ts.SourceFile): string[
   return out;
 }
 
-/** Collect relative-module renamed-import aliases (`import { a as b }` → b→a). */
 function rubyCompatBindingsFor(sourceFile: ts.SourceFile): ReadonlyMap<string, string> {
   let bindings = rubyCompatBindings.get(sourceFile);
   if (!bindings) {
@@ -4456,6 +4455,7 @@ function collectRubyCompatBindings(sourceFile: ts.SourceFile): Map<string, strin
   return bindings;
 }
 
+/** Collect relative-module renamed-import aliases (`import { a as b }` → b→a). */
 function collectImportAliases(sourceFile: ts.SourceFile): Map<string, string> {
   const aliases = new Map<string, string>();
   ts.forEachChild(sourceFile, (node) => {

@@ -1,16 +1,11 @@
 import { block, fetch, first, KeyError, transformValues } from "@blazetrails/ruby-compat";
 import { FutureResult, type Complete } from "./future-result.js";
+import { defaultValue } from "./type.js";
 
 export type ColumnType = { deserialize(value: unknown): unknown };
 export type ColumnTypes = Record<string | number, ColumnType>;
 
 const EMPTY_COLUMN_TYPES: ColumnTypes = Object.freeze({}) as ColumnTypes;
-
-const IDENTITY_TYPE: ColumnType = {
-  deserialize(value: unknown) {
-    return value;
-  },
-};
 
 export class IndexedRow {
   private readonly columnIndexes: Record<string, number>;
@@ -254,10 +249,7 @@ function emptyAsync(): Complete {
   return (EMPTY_ASYNC ??= FutureResult.wrap(EMPTY) as Complete);
 }
 
-/**
- * @internal
- * @missingRailsArgs fetch — CONVERGEABLE call-args-gate-aligns-the-receiver-of-function-form-fetch-and-max
- */
+/** @internal */
 export function columnType(
   result: Result,
   name: string,
@@ -266,13 +258,13 @@ export function columnType(
 ): ColumnType {
   const columnTypes = result.columnTypes;
   return fetch<ColumnType>(
-    typeOverrides ?? {},
+    typeOverrides,
     name,
     block(() =>
       fetch<ColumnType>(
         columnTypes,
         index as unknown as string,
-        block(() => fetch<ColumnType>(columnTypes, name, IDENTITY_TYPE)),
+        block(() => fetch<ColumnType>(columnTypes, name, defaultValue())),
       ),
     ),
   );
