@@ -894,9 +894,11 @@ where Ruby resolves the constant. Two instances exist and are the only ones, plu
 modules converged onto `Autoload`:
 
 - `arel/src/namespaces.ts` — not a slot: the `Arel` / `Arel::Attributes` /
-  `Arel::Collectors` / `Arel::Nodes` / `Arel::Visitors` namespace objects,
-  extended with `ActiveSupport::Autoload` where Rails autoloads from them
-  (RFC 0151). Each constant is `autoload`ed there, seated by its defining
+  `Arel::Collectors` / `Arel::Nodes` / `Arel::Visitors` namespace objects.
+  All but `Collectors` are extended with `ActiveSupport::Autoload` (RFC 0151):
+  Rails `require`s the collectors (`arel.rb:19`, `collectors/sql_string.rb:3`)
+  and nothing reads one through the namespace at call time, so it carries no
+  `autoload`. Each autoloaded constant is seated by its defining
   module and read as a property at call time (`new Nodes.Not(this)`). The seat
   is the constant binding, `rbModConstSet(Nodes, "Not", Not)`: as Ruby's
   `const_set` does (`vendor/ruby/v3.3.11/variable.c:3648-3668`), binding a

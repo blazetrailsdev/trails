@@ -47,7 +47,7 @@ const DEFAULT_ACCEPT =
   "text/html;q=0.9,text/plain;q=0.8,image/png," +
   "*/*;q=0.5";
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class IntegrationTest extends TestCase {
   routes: RouteSet = new RouteSet();
 
@@ -554,7 +554,7 @@ export class IntegrationTest extends TestCase {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include TestProcess` and `include TestProcess::FixtureFile` (`actionpack/lib/action_dispatch/testing/integration.rb:95,651`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface IntegrationTest
   extends Omit<Included<typeof TestProcess>, "cookies">, Included<typeof FixtureFile> {}
 
