@@ -257,11 +257,6 @@ export abstract class Attribute {
     if (this._hasValue) coder["value"] = this.value();
   }
 
-  /** @noRailsEquivalent CONVERGEABLE deep-dup-has-no-object-arm-so-classes-hand-write-it */
-  deepDup(): Attribute {
-    return this.dup();
-  }
-
   withUserDefault(value: unknown): Attribute {
     return new Attribute.UserProvidedDefault(
       this.name,

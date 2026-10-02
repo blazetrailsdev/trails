@@ -53,8 +53,6 @@ export class Test {
   name: string;
   /** @noRailsEquivalent PERMANENT */
   failures: Assertion[];
-  /** @noRailsEquivalent PERMANENT */
-  sourceLocation: [string, number];
   private _assertions: number;
 
   /** @noRailsEquivalent PERMANENT */
@@ -62,7 +60,6 @@ export class Test {
     this.name = name;
     this.failures = [];
     this._assertions = 0;
-    this.sourceLocation = ["", 0];
   }
 
   /** @noRailsEquivalent PERMANENT */

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
-import { Method, rbCheckArity, rbIseqMinMaxArity, rbObjMethod } from "./method.js";
+import {
+  Method,
+  iseqLocationSetup,
+  rbCheckArity,
+  rbIseqMinMaxArity,
+  rbObjMethod,
+} from "./method.js";
 import { NameError } from "./name-error.js";
 
 describe("rbObjMethod", () => {
@@ -105,5 +111,21 @@ describe("rbCheckArity", () => {
     expect(() => rbCheckArity(function (_a: unknown, _b = {}) {}, 1)).not.toThrow();
     expect(() => rbCheckArity(function (_a: unknown, _b = {}) {}, 2)).not.toThrow();
     expect(() => rbCheckArity((..._a: unknown[]) => 1, 7)).not.toThrow();
+  });
+});
+
+describe("Method#source_location", () => {
+  class Located {
+    here(): void {}
+    native(): void {}
+  }
+  iseqLocationSetup(Located.prototype.here, "located.ts", 12);
+
+  it("answers the path and first line the body was set up with", () => {
+    expect(rbObjMethod(new Located(), "here").sourceLocation()).toEqual(["located.ts", 12]);
+  });
+
+  it("answers nil for a body with no location", () => {
+    expect(rbObjMethod(new Located(), "native").sourceLocation()).toBeNull();
   });
 });

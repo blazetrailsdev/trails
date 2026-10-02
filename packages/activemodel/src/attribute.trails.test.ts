@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { deepDup } from "@blazetrails/activesupport";
 import { Attribute, FromUser, UNINITIALIZED_ORIGINAL_VALUE } from "./attribute.js";
 import { UNINITIALIZED_ORIGINAL_VALUE as UNINITIALIZED_FROM_INDEX } from "./index.js";
 import { typeRegistry } from "./type/registry.js";
@@ -234,7 +235,7 @@ describe("Attribute — trails-only coverage", () => {
       const original = Attribute.fromDatabase("name", "Alice", type);
       const assigned = original.withValueFromUser("Bob");
 
-      const duped = assigned.deepDup();
+      const duped = deepDup(assigned);
 
       expect(duped).not.toBe(assigned);
       expect(duped.originalAttribute).toBe(assigned.originalAttribute);
@@ -250,7 +251,7 @@ describe("Attribute — trails-only coverage", () => {
 
       const attr = Attribute.fromDatabase("data", '["a"]', type as never);
       void attr.value();
-      const duped = attr.deepDup();
+      const duped = deepDup(attr);
       (duped.value() as string[]).push("b");
 
       expect(attr.value()).toEqual(["a"]);

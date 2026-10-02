@@ -1,6 +1,6 @@
 import { resolveValue } from "./resolve-value.js";
-import { ArgumentError, NoMethodError } from "../attribute-assignment.js";
-import { Range, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "../attribute-assignment.js";
+import { Range, rbFPublicSend, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
 
 export { resolveValue };
 
@@ -14,7 +14,7 @@ export interface Clusivity {
   /** @internal */
   delimiter(): unknown;
   /** @internal */
-  inclusionMethod(enumerable: unknown): "include?" | "cover?";
+  inclusionMethod(enumerable: unknown): "isInclude" | "cover";
   /** @internal */
   isInclude(record: unknown, value: unknown): boolean;
 }
@@ -25,7 +25,7 @@ interface ClusivityHost {
   /** @internal */
   delimiter(): unknown;
   /** @internal */
-  inclusionMethod(enumerable: unknown): "include?" | "cover?";
+  inclusionMethod(enumerable: unknown): "isInclude" | "cover";
   _delimiterCache?: unknown;
 }
 
@@ -44,11 +44,12 @@ export function checkValidityBang(this: ClusivityHost): void {
 /** @internal */
 export function isInclude(this: ClusivityHost, record: unknown, value: unknown): boolean {
   const members = this.resolveValue(record, this.delimiter());
-  const method = this.inclusionMethod(members);
+
   if (Array.isArray(value)) {
-    return value.every((v) => testMembership(members, v, method));
+    return value.every((v) => rtest(rbFPublicSend(members, this.inclusionMethod(members), v)));
+  } else {
+    return rtest(rbFPublicSend(members, this.inclusionMethod(members), value));
   }
-  return testMembership(members, value, method);
 }
 
 /** @internal */
@@ -59,42 +60,11 @@ export function delimiter(this: ClusivityHost): unknown {
 }
 
 /** @internal */
-export function inclusionMethod(enumerable: unknown): "include?" | "cover?" {
+export function inclusionMethod(enumerable: unknown): "isInclude" | "cover" {
   if (enumerable instanceof Range) {
     const endpoint = enumerable.begin ?? enumerable.end;
     // boundary: ruby-compat's `Range` comparators accept JS Date alongside number,
-    if (typeof endpoint === "number" || endpoint instanceof Date) return "cover?";
+    if (typeof endpoint === "number" || endpoint instanceof Date) return "cover";
   }
-  return "include?";
-}
-
-function testMembership(members: unknown, value: unknown, method: "include?" | "cover?"): boolean {
-  if (members instanceof Range) {
-    if (method === "cover?") return members.cover(value);
-    return members.isInclude(value);
-  }
-  return isMemberOf(members, value);
-}
-
-function isMemberOf(members: unknown, value: unknown): boolean {
-  if (members === null || members === undefined) {
-    throw new NoMethodError(
-      `undefined method 'include?' for ${members === null ? "null" : "undefined"}`,
-    );
-  }
-  if (typeof members === "string") {
-    return typeof value === "string" && members.includes(value);
-  }
-  if (members instanceof Set || members instanceof Map) return members.has(value);
-  if (Array.isArray(members)) return members.includes(value);
-  const m = members as { includes?: (v: unknown) => boolean; has?: (v: unknown) => boolean };
-  if (typeof m.includes === "function") return m.includes(value);
-  if (typeof m.has === "function") return m.has(value);
-  if (typeof (members as Iterable<unknown>)[Symbol.iterator] === "function") {
-    for (const item of members as Iterable<unknown>) {
-      if (item === value) return true;
-    }
-    return false;
-  }
-  return false;
+  return "isInclude";
 }

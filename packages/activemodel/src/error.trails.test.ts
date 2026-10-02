@@ -12,7 +12,7 @@ import { Errors, Model } from "./index.js";
 import { I18n } from "./i18n.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
-import { include } from "@blazetrails/activesupport";
+import { deepDup, include } from "@blazetrails/activesupport";
 
 class Person extends Model {
   name: string | null = null;
@@ -105,7 +105,7 @@ describe("Error and Errors surface", () => {
   it("dup gives the copy its own options and its own errors", () => {
     const errors = new Errors({});
     const error = errors.add("name", ":too_short", { count: 3, tags: ["a"] });
-    const copy = error.deepDup();
+    const copy = deepDup(error);
     expect(copy).toBeInstanceOf(ModelError);
     expect(copy.options).toEqual(error.options);
     expect(copy.options).not.toBe(error.options);

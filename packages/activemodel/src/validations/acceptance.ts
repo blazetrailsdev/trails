@@ -1,6 +1,6 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { include, included, kernelArray, Module } from "@blazetrails/activesupport";
+import { include, included, kernelArray, mergeBang, Module } from "@blazetrails/activesupport";
 import { aryIncludes, except, includedModules } from "@blazetrails/ruby-compat";
 import { inspectAccessor } from "./_accessor.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
@@ -15,7 +15,7 @@ export class AcceptanceValidator extends EachValidator {
   declare isAcceptableOption: typeof isAcceptableOption;
 
   constructor(options: Record<string, unknown> & { attributes?: string | string[] }) {
-    super({ allowNil: true, accept: ["1", true], ...options });
+    super(mergeBang({ allowNil: true, accept: ["1", true] }, options));
     this.setupBang(options.class as AttributeMethodQueryable);
   }
 
@@ -99,7 +99,7 @@ export function isAcceptableOption(
   this: { options: Record<string, unknown> },
   value: unknown,
 ): boolean {
-  return kernelArray(this.options.accept).includes(value);
+  return aryIncludes(kernelArray(this.options.accept), value);
 }
 
 AcceptanceValidator.prototype.isAcceptableOption = isAcceptableOption;

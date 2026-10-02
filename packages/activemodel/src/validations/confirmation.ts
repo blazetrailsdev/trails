@@ -1,8 +1,17 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { mergeBang } from "@blazetrails/activesupport";
-import { except } from "@blazetrails/ruby-compat";
-import { inspectAccessor } from "./_accessor.js";
+import { filterMap, mergeBang } from "@blazetrails/activesupport";
+import {
+  casecmp,
+  except,
+  isNil,
+  rbEqual,
+  rbFPublicSend,
+  rbModAttrReader,
+  rbModAttrWriter,
+  rbModMethodDefined,
+  rtest,
+} from "@blazetrails/ruby-compat";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 export class ConfirmationValidator extends EachValidator {
@@ -12,24 +21,23 @@ export class ConfirmationValidator extends EachValidator {
   declare isConfirmationValueEqual: typeof isConfirmationValueEqual;
 
   constructor(options: Record<string, unknown> & { attributes?: string | string[] }) {
-    super(options);
-    this.setupBang(options.class);
+    super(mergeBang({ caseSensitive: true }, options));
+    this.setupBang(options.class as { prototype: object });
   }
 
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
-    const confirmationAttr = `${attribute}Confirmation`;
-    const rec = record as unknown as Record<string, unknown>;
-    const confirmed = rec[confirmationAttr];
-    if (confirmed == null) return;
-    if (!this.isConfirmationValueEqual(record, attribute, value, confirmed)) {
-      const humanAttributeName = (
-        rec.constructor as unknown as { humanAttributeName(attribute: string): string }
-      ).humanAttributeName(attribute);
-      record.errors.add(
-        confirmationAttr,
-        ":confirmation",
-        mergeBang(except(this.options, "caseSensitive"), { attribute: humanAttributeName }),
-      );
+    const confirmed = rbFPublicSend(record, `${attribute}Confirmation`);
+    if (!isNil(confirmed)) {
+      if (!this.isConfirmationValueEqual(record, attribute, value, confirmed)) {
+        const humanAttributeName = (
+          record.constructor as unknown as { humanAttributeName(attribute: string): string }
+        ).humanAttributeName(attribute);
+        record.errors.add(
+          `${attribute}Confirmation`,
+          ":confirmation",
+          mergeBang(except(this.options, "caseSensitive"), { attribute: humanAttributeName }),
+        );
+      }
     }
   }
 }
@@ -39,28 +47,24 @@ interface ConfirmationHost {
 }
 
 /** @internal */
-export function setupBang(this: ConfirmationHost, klass: unknown): void {
-  if (typeof klass !== "function") return;
-  const ctor = klass as { prototype: object };
-  for (const attribute of this.attributes) {
-    const confirmationAttr = `${attribute}Confirmation`;
-    const inherited = inspectAccessor(ctor.prototype, confirmationAttr);
-    if (inherited.hasGetter && inherited.hasSetter) continue;
-    const slot = `_${confirmationAttr}`;
-    Object.defineProperty(ctor.prototype, confirmationAttr, {
-      configurable: true,
-      get:
-        inherited.getter ??
-        function (this: Record<string, unknown>) {
-          return this[slot];
-        },
-      set:
-        inherited.setter ??
-        function (this: Record<string, unknown>, v: unknown) {
-          this[slot] = v;
-        },
-    });
-  }
+export function setupBang(this: ConfirmationHost, klass: { prototype: object }): void {
+  rbModAttrReader(
+    klass,
+    ...filterMap([...this.attributes], (attribute) => {
+      if (!rbModMethodDefined(klass, `${attribute}Confirmation`)) {
+        return `${attribute}Confirmation`;
+      }
+    }),
+  );
+
+  rbModAttrWriter(
+    klass,
+    ...filterMap([...this.attributes], (attribute) => {
+      if (!rbModMethodDefined(klass, `${attribute}Confirmation=`)) {
+        return `${attribute}Confirmation`;
+      }
+    }),
+  );
 }
 
 /** @internal */
@@ -71,11 +75,11 @@ export function isConfirmationValueEqual(
   value: unknown,
   confirmed: unknown,
 ): boolean {
-  const caseSensitive = this.options.caseSensitive ?? true;
-  if (!caseSensitive && typeof value === "string" && typeof confirmed === "string") {
-    return value.toLowerCase() === confirmed.toLowerCase();
+  if (!rtest(this.options.caseSensitive) && typeof value === "string") {
+    return casecmp(value, confirmed) === 0;
+  } else {
+    return rbEqual(value, confirmed);
   }
-  return value === confirmed;
 }
 
 ConfirmationValidator.prototype.setupBang = setupBang;

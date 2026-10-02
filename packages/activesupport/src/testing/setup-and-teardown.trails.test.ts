@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const travelBack = vi.hoisted(() => ({ raises: null as Error | null }));
 vi.mock("./time-helpers.js", async (importOriginal) => {
@@ -15,16 +15,25 @@ vi.mock("./time-helpers.js", async (importOriginal) => {
 import { Assertion, Skip, UnexpectedError } from "./assertions.js";
 import { _takeAssertions, assertNot, assertRaises } from "./assertions.js";
 import { TestCase } from "../test-case.js";
-import { Module, include } from "@blazetrails/ruby-compat";
+import {
+  Module,
+  include,
+  iseqLocationSetup,
+  rbObjMethod,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 
 function testCase(): typeof TestCase {
   return class extends TestCase {};
 }
 
+const aTest = (): void => {};
+iseqLocationSetup(aTest, "some_test.ts", 12);
+
 function runningTest(klass: typeof TestCase = TestCase): TestCase {
   const test = new klass("a test");
   test.assertions = 1;
-  test.sourceLocation = ["some_test.ts", 12];
+  Object.defineProperty(test, "a test", { value: aTest, configurable: true });
   return test;
 }
 
@@ -209,5 +218,26 @@ describe("TestCase lifecycle hooks", () => {
     ).rejects.toBe(travelBack.raises);
     travelBack.raises = null;
     expect(ran).toEqual(["after_teardown"]);
+  });
+});
+
+class DeclarativeCollisionTest extends TestCase {
+  ["test_is_already_defined"](): void {}
+}
+registerConstant("DeclarativeCollisionTest", DeclarativeCollisionTest);
+
+describe("DeclarativeCollisionTest", () => {
+  let raised: { name?: string; message?: string } | undefined;
+  afterEach(({ task }) => void (raised ??= task.result?.errors?.[0]));
+
+  it.fails("is already defined", () => {});
+
+  it("names the running test as Declarative#test does", ({ testCase }) => {
+    expect(raised?.name).toBe("RuntimeError");
+    expect(raised?.message).toBe(
+      "test_is_already_defined is already defined in DeclarativeCollisionTest",
+    );
+    expect(testCase.name).toBe("test_names_the_running_test_as_Declarative#test_does");
+    expect(rbObjMethod(testCase, testCase.name).sourceLocation()).not.toBeNull();
   });
 });

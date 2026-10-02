@@ -2,6 +2,12 @@ import { afterEach, beforeEach, expect } from "vitest";
 import type { TestContext } from "vitest";
 import { getFn, setFn } from "vitest/suite";
 import { Time } from "@blazetrails/date";
+import {
+  RuntimeError,
+  iseqLocationSetup,
+  rbModMethodDefined,
+  rbModToS,
+} from "@blazetrails/ruby-compat";
 import { safeConstantize } from "../inflector.js";
 import { TestCase } from "../test-case.js";
 import { Assertion, Skip, UnexpectedError, _takeAssertions } from "./assertions.js";
@@ -24,7 +30,10 @@ beforeEach(async (context: TestContext) => {
       klass = constant as typeof TestCase;
     }
   }
-  const testCase = (context.testCase = new klass(context.task.name));
+  const testName = `test_${context.task.name.replace(/\s+/g, "_")}`;
+  const defined = rbModMethodDefined(klass, testName);
+  if (defined) throw new RuntimeError(`${testName} is already defined in ${rbModToS(klass)}`);
+  const testCase = (context.testCase = new klass(testName));
   captured.set(testCase, { from: context.task.result?.errors?.length ?? 0, at: -1, count: 0 });
   const run = getFn(context.task);
   if (!capturing.has(run)) {
@@ -46,6 +55,9 @@ beforeEach(async (context: TestContext) => {
     capturing.add(captureExceptions);
     setFn(context.task, captureExceptions);
   }
+  const test = getFn(context.task);
+  iseqLocationSetup(test, context.task.file.filepath, context.task.location?.line ?? 0);
+  Object.defineProperty(testCase, testName, { value: test, configurable: true });
   await testCase.beforeSetup();
 });
 
@@ -54,12 +66,9 @@ afterEach(async (context: TestContext) => {
   if (testCase === undefined) return;
   const task = context.task as {
     mode?: string;
-    location?: { line?: number };
-    file?: { filepath?: string };
     result?: { state?: string; errors?: unknown[] };
   };
   testCase.assertions = (expect.getState().assertionCalls ?? 0) + _takeAssertions();
-  testCase.sourceLocation = [task.file?.filepath ?? "", task.location?.line ?? 0];
   const { from, at, count } = captured.get(testCase) ?? { from: 0, at: -1, count: 0 };
   (task.result?.errors ?? []).forEach((e, i) => {
     if (i < from || (i >= at && i < at + count)) return;

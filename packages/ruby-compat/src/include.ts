@@ -22,6 +22,7 @@
 
 import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
+import { temporalTag } from "./temporal-tag.js";
 import { FL_SINGLETON, T_ICLASS, classpaths, rbAnyToS, rbModName, rbModToS } from "./object.js";
 
 type AnyClass = new (...args: never[]) => unknown;
@@ -1126,10 +1127,12 @@ export type Extended<M extends object> = CallableMethods<M>;
  * then `initialize_clone(orig)` dispatched on the copy, which is frozen after
  * that hook runs when the receiver is. The singleton class is copied, not
  * shared, so the clone's `extend()` registries are its own. A JS primitive is
- * MRI's `special_object_p` (:380-393) and is returned as is (:539); an array is
- * allocated as one (`rb_obj_alloc`), so its elements, which Ruby copies in
- * `Array#initialize_copy` (`array.c:8613`, `rb_ary_replace`), land on a real
- * array.
+ * MRI's `special_object_p` (:380-393) and is returned as is (:539), as is a
+ * Temporal value; an array is allocated as one (`rb_obj_alloc`), so its
+ * elements, which Ruby copies in `Array#initialize_copy` (`array.c:8613`,
+ * `rb_ary_replace`), land on a real array, and so are a JS `Date`, `Map`, `Set`
+ * and `RegExp`. A class with an allocator ({@link rbDefineAllocFunc}) is
+ * allocated through it. The copy hook is found as a method entry.
  *
  * Ruby's `Object#initialize_clone` / `#initialize_dup` default to
  * `initialize_copy` (`rb_obj_init_clone` / `rb_obj_init_dup_clone`, object.c:4382-4383), so a
@@ -1143,6 +1146,7 @@ export type Extended<M extends object> = CallableMethods<M>;
  */
 export function rbObjClone<T>(obj: T): T {
   if (obj === null || (typeof obj !== "object" && typeof obj !== "function")) return obj;
+  if (temporalTag(obj) !== null) return obj;
   const frozen = Object.isFrozen(obj);
   const descriptors = copiedDescriptors(obj, frozen);
   for (const registry of [extendedKeys, includedModulesKey]) {
@@ -1168,6 +1172,7 @@ export function rbObjClone<T>(obj: T): T {
  */
 export function rbObjDup<T>(obj: T): T {
   if (obj === null || (typeof obj !== "object" && typeof obj !== "function")) return obj;
+  if (temporalTag(obj) !== null) return obj;
   const descriptors = copiedDescriptors(obj, true);
   const singletonKeys = Object.prototype.hasOwnProperty.call(obj, extendedKeys)
     ? ((obj as Record<symbol, unknown>)[extendedKeys] as Set<string>)
@@ -1184,8 +1189,39 @@ export function rbObjDup<T>(obj: T): T {
   return dup as T;
 }
 
+const allocFuncs = new WeakMap<object, (klass: never) => object>();
+
+/**
+ * `rb_define_alloc_func` (`vendor/ruby/v3.3.11/vm_method.c:1270`): the allocator
+ * for `klass` and its subclasses (`rb_get_alloc_func`, `:1286`), declared when
+ * instances hold state `Object.create` cannot make (`#private` fields, a Proxy).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbDefineAllocFunc<K extends abstract new (...args: never) => object>(
+  klass: K,
+  func: (klass: K) => InstanceType<K>,
+): void {
+  allocFuncs.set(klass, func);
+}
+
+function rbGetAllocFunc(klass: unknown): ((klass: never) => object) | undefined {
+  for (; typeof klass === "function"; klass = Object.getPrototypeOf(klass)) {
+    const allocator = allocFuncs.get(klass);
+    if (allocator) return allocator;
+  }
+}
+
 function rbObjAlloc(obj: object, proto: object | null): object {
-  return Array.isArray(obj) ? Object.setPrototypeOf([], proto) : Object.create(proto);
+  const klass = (proto as { constructor?: unknown } | null)?.constructor;
+  const allocator = rbGetAllocFunc(klass);
+  if (allocator) return Object.setPrototypeOf(allocator(klass as never), proto);
+  if (Array.isArray(obj)) return Object.setPrototypeOf([], proto);
+  if (obj instanceof Date) return Object.setPrototypeOf(new Date(obj.getTime()), proto);
+  if (obj instanceof Map) return Object.setPrototypeOf(new Map(obj), proto);
+  if (obj instanceof Set) return Object.setPrototypeOf(new Set(obj), proto);
+  if (obj instanceof RegExp) return Object.setPrototypeOf(new RegExp(obj), proto);
+  return Object.create(proto);
 }
 
 function copiedDescriptors(
@@ -1199,7 +1235,10 @@ function copiedDescriptors(
   if (unfreeze) {
     for (const key of Reflect.ownKeys(descriptors)) {
       const descriptor = descriptors[key as string];
-      descriptor.configurable = !(key === "length" && Array.isArray(obj));
+      descriptor.configurable = !(
+        (key === "length" && Array.isArray(obj)) ||
+        (key === "lastIndex" && obj instanceof RegExp)
+      );
       if (!descriptor.get && !descriptor.set) descriptor.writable = true;
     }
   }
@@ -1211,9 +1250,15 @@ function initCopyHook(
   hook: "initializeClone" | "initializeDup",
   orig: unknown,
 ): void {
-  const host = copy as Record<string, unknown>;
-  const fn = typeof host[hook] === "function" ? host[hook] : host.initializeCopy;
-  if (typeof fn === "function") (fn as (orig: unknown) => unknown).call(copy, orig);
+  for (const mid of [hook, "initializeCopy"]) {
+    for (let o: object | null = copy; o; o = Object.getPrototypeOf(o) as object | null) {
+      const me = Object.getOwnPropertyDescriptor(o, mid);
+      if (!me) continue;
+      if (typeof me.value !== "function") break;
+      (me.value as (orig: unknown) => unknown).call(copy, orig);
+      return;
+    }
+  }
 }
 
 /**

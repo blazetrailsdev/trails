@@ -52,6 +52,9 @@ export {
   rbFPublicSend,
   rbFSend,
   toSym,
+  rbModAttrReader,
+  rbModAttrWriter,
+  rbModMethodDefined,
   rbModPublicMethodDefined,
   rtest,
   isNil,
@@ -168,6 +171,7 @@ export {
   extend,
   extended,
   rbObjClone,
+  rbDefineAllocFunc,
   rbObjDup,
   include,
   included,
@@ -238,7 +242,7 @@ export type {
   WriteStream,
 } from "./process-adapter.js";
 export type { PrependMethod, PrependModule } from "./prepend.js";
-export { Method, rbCheckArity, rbObjMethod } from "./method.js";
+export { Method, iseqLocationSetup, rbCheckArity, rbObjMethod } from "./method.js";
 export { regexpEscape } from "./regexp.js";
 export { Range } from "./range.js";
 export { Rational, ZeroDivisionError, rational } from "./rational.js";
@@ -270,7 +274,7 @@ export { b } from "./string/b.js";
 export { bytes } from "./string/bytes.js";
 export { byteslice } from "./string/byte-methods.js";
 export { scrub } from "./string/scrub.js";
-export { capitalize } from "./string/case-mapping.js";
+export { capitalize, casecmp } from "./string/case-mapping.js";
 export { chomp } from "./string/chomp.js";
 export { rbStrDump } from "./string/convert.js";
 export { stringDelete } from "./string/delete.js";

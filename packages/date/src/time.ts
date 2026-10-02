@@ -16,7 +16,13 @@ import {
   SubMinuteOffsetZonedDateTime,
   timeToDf,
 } from "./date.js";
-import { Rational, kernelInteger, rbObjRespondTo, stringInspect } from "@blazetrails/ruby-compat";
+import {
+  Rational,
+  kernelInteger,
+  rbDefineAllocFunc,
+  rbObjRespondTo,
+  stringInspect,
+} from "@blazetrails/ruby-compat";
 
 let localTimeZoneId: string | null = null;
 
@@ -1513,6 +1519,22 @@ export class Time {
     return n > 0n ? 1 : -1;
   }
 
+  /** `time_init_copy` (`vendor/ruby/v3.3.11/time.c:4046`), whose `MEMCPY` copies the whole `time_object`. */
+  initializeCopy(time: Time): this {
+    if ((this as Time) === time) return this;
+    this.#plainMemo = time.#plainMemo;
+    this.#zoned = time.#zoned;
+    this.#instant = time.#instant;
+    this.#timeZoneId = time.#timeZoneId;
+    this.#tzmodeUtc = time.#tzmodeUtc;
+    this.#localZone = time.#localZone;
+    this.#utcOffsetMemo = time.#utcOffsetMemo;
+    this.#subnano = time.#subnano;
+    this.#zoneObject = time.#zoneObject;
+    this.#isdstMemo = time.#isdstMemo;
+    return this;
+  }
+
   eql(other: unknown): boolean {
     if (!(other instanceof Time)) return false;
     return (
@@ -1664,3 +1686,17 @@ export class Time {
 Time.rfc822 = Time.rfc2822;
 Time.iso8601 = Time.xmlschema;
 Time.prototype.iso8601 = Time.prototype.xmlschema;
+
+rbDefineAllocFunc(Time, (klass) => {
+  seatedTime = {
+    zoned: null,
+    plain: null,
+    utcOffset: null,
+    instant: Temporal.Instant.fromEpochNanoseconds(0n),
+    timeZoneId: null,
+    tzmodeUtc: false,
+    localZone: false,
+    subnano: new Rational(0, 1),
+  };
+  return new klass(0);
+});
