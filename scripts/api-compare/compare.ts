@@ -1188,13 +1188,6 @@ export const SAME_FILE_CLOSURE_DEPTH = 3;
 const SYNTHETIC_CALL_NAMES: ReadonlySet<string> = new Set(["constructor"]);
 
 /**
- * The extractor's name for `static [initialize]`: a computed member is recorded
- * by its source text. `CONCERN_HOOK_MEMBERS.initialize` in extra-surface.ts is
- * the same spelling.
- */
-const MODULE_INITIALIZE_HOOK = "[initialize]";
-
-/**
  * {@link rubyCallToTs} for one body's call, given the receiver kinds its sites
  * had. In a file defining an instance `def new`, a `recv.new(...)` whose
  * receivers are never a constant may be that method — `@scope.new(...)`
@@ -3038,6 +3031,88 @@ export function reopeningMethodCreditedToOwnFile(
   if (reopeningTsMethods === undefined) return null;
   const tsName = candidates.find((c) => reopeningTsMethods.has(c));
   return tsName === undefined ? null : { tsName, tsFile };
+}
+
+/**
+ * The file mirroring the `.rb` that defines this method, when a BODY for it
+ * sits there.
+ *
+ * The include-chain arm credits a flattened expectation through whichever
+ * includer names it first, and an includer names every mixin member it types:
+ * `declare static modelName` on `Model`, a `validatesAbsenceOf` signature on
+ * `interface API`. That declaration is the type-level cost of `include`, not
+ * the port. `model_name` is defined by `naming.rb:270` and ported in naming.ts;
+ * `validates_acceptance_of` by `validations/acceptance.rb:117`, a reopening of
+ * `HelperMethods`, and ported in validations/acceptance.ts. Naming the
+ * includer's file as where the member lives tells the reader to move a method
+ * out of its Rails file.
+ *
+ * A bodyless-only presence in the defining file is not a port
+ * ({@link declarationOnlyInFile}), so it earns nothing here and the includer's
+ * file is still reported.
+ */
+export function bodyInDefiningFile(
+  rm: {
+    rubyName: string;
+    rubyModule: string;
+    mixinFile?: string;
+    definedInFile?: string;
+    notes?: string;
+  },
+  hostRubyFile: string,
+  pkg: string,
+  rubyFileHasBucket: (rubyFile: string) => boolean,
+  tsMethodsByFile: ReadonlyMap<string, Set<string>>,
+  bodylessOwnersByFile: ReadonlyMap<string, Map<string, Set<string>>>,
+  bodiedOwnersByFile: ReadonlyMap<string, Map<string, Set<string>>>,
+  aliasNamesByFile?: ReadonlyMap<string, ReadonlySet<string>>,
+): { tsName: string; tsFile: string } | null {
+  const credited =
+    mixinMethodCreditedToOwnFile(rm, hostRubyFile, pkg, rubyFileHasBucket, tsMethodsByFile) ??
+    reopeningMethodCreditedToOwnFile(rm, hostRubyFile, pkg, tsMethodsByFile);
+  if (credited === null) return null;
+  const declarationOnly = declarationOnlyInFile(
+    credited.tsFile,
+    credited.tsName,
+    bodylessOwnersByFile,
+    bodiedOwnersByFile,
+    rm.notes,
+    aliasNamesByFile,
+  );
+  return declarationOnly ? null : credited;
+}
+
+/**
+ * The extractor's name for `static [initialize]`: a computed member is recorded
+ * by its source text. `CONCERN_HOOK_MEMBERS.initialize` in extra-surface.ts is
+ * the same spelling.
+ */
+export const MODULE_INITIALIZE_HOOK = "[initialize]";
+
+/**
+ * The TS candidates for a Ruby method, with a MODULE's `def initialize` offered
+ * its hook first.
+ *
+ * A module has no constructor to be. `SerializeCastValue#initialize`
+ * (`type/serialize_cast_value.rb:41`) is ported as the symbol-keyed
+ * `static [initialize]` that `initializeIncludedModules` runs where the
+ * includer's `initialize` calls `super`. Offered only `constructor`, the
+ * expectation is answered by the includer's own constructor
+ * (`ValueType`, type/value.ts) and reported as a method to relocate.
+ *
+ * The hook is offered only when the expected file declares one, so a module
+ * whose `initialize` is unported still falls through to the arms that report
+ * it.
+ */
+export function moduleInitializeCandidates(
+  rubyName: string,
+  ownerIsModule: boolean,
+  tsMethods: ReadonlySet<string>,
+  candidates: string[],
+): string[] {
+  if (rubyName !== "initialize" || !ownerIsModule) return candidates;
+  if (!tsMethods.has(MODULE_INITIALIZE_HOOK)) return candidates;
+  return [MODULE_INITIALIZE_HOOK, ...candidates];
 }
 
 /** A Ruby class or module, paired with the fully-qualified name it was found under. */
@@ -5281,17 +5356,12 @@ export function main() {
             ? rubyMethodToTsForFqn(rubyModule, rubyName, siblingRubyNames, pkg)
             : scopedSkipMirrorCandidates(tsMirrorNames, tsMethods);
         if (mirrorCandidates === null) continue;
-        // A MODULE's `def initialize` (`type/serialize_cast_value.rb:41`) has no
-        // constructor to be: it is ported as the symbol-keyed `[initialize]`
-        // hook `initializeIncludedModules` runs where the includer calls
-        // `super`. Without it the includer's own constructor answers for the
-        // module's, and reports as a method to move out of its Rails file.
-        const tsCandidates =
-          rubyName === "initialize" &&
-          Object.hasOwn(rubyPkg.modules, rubyModule) &&
-          tsMethods.has(MODULE_INITIALIZE_HOOK)
-            ? [MODULE_INITIALIZE_HOOK, ...mirrorCandidates]
-            : mirrorCandidates;
+        const tsCandidates = moduleInitializeCandidates(
+          rubyName,
+          Object.hasOwn(rubyPkg.modules, rubyModule),
+          tsMethods,
+          mirrorCandidates,
+        );
         const notePredicateKind = (tsFile: string, tsName: string) => {
           const admits = tsAdmitsBooleanByFileName.get(tsFile)?.get(tsName);
           if (predicateKindMismatch(rubyName, tsName, admits)) {
@@ -5459,39 +5529,16 @@ export function main() {
             false,
             level,
           );
-          // The includer's own declaration of the name (`declare static
-          // modelName` on `Model`, a signature on `interface API`) is the
-          // type-level cost of `include`, not the port: when a body sits in
-          // the file mirroring the `.rb` that defines the method
-          // (`naming.rb:270` in naming.ts), the member is where Rails put it.
-          // The credit above is unchanged; the move names the defining file so
-          // the relocation plan leaves it out.
-          const credited =
-            mixinMethodCreditedToOwnFile(
-              { rubyName, rubyModule, mixinFile },
-              rubyFile,
-              pkg,
-              (f) => byFile.has(f),
-              tsMethodsByFile,
-            ) ??
-            reopeningMethodCreditedToOwnFile(
-              { rubyName, rubyModule, definedInFile },
-              rubyFile,
-              pkg,
-              tsMethodsByFile,
-            );
-          const definedIn =
-            credited !== null &&
-            !declarationOnlyInFile(
-              credited.tsFile,
-              credited.tsName,
-              tsBodylessOwnersByFileName,
-              tsBodiedOwnersByFileName,
-              notes,
-              tsAliasNamesByFileName,
-            )
-              ? credited
-              : null;
+          const definedIn = bodyInDefiningFile(
+            { rubyName, rubyModule, mixinFile, definedInFile, notes },
+            rubyFile,
+            pkg,
+            (f) => byFile.has(f),
+            tsMethodsByFile,
+            tsBodylessOwnersByFileName,
+            tsBodiedOwnersByFileName,
+            tsAliasNamesByFileName,
+          );
           moves.push({
             tsName: matchedCandidate!,
             rubyName,

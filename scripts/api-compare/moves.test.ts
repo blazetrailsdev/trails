@@ -49,4 +49,24 @@ describe("relocationsByRoute", () => {
     expect([...routes.keys()]).toEqual([`${mixin} → ${host}`]);
     expect(routes.get(`${mixin} → ${host}`)?.map((m) => m.tsName)).toEqual(["isActive"]);
   });
+
+  it("leaves out a reopening's member ported in the file that reopening mirrors", () => {
+    const files: FileResult[] = [
+      {
+        rubyFile: "api.rb",
+        expectedTsFile: "api.ts",
+        moves: [
+          {
+            tsName: "validatesAcceptanceOf",
+            rubyName: "validates_acceptance_of",
+            rubyModule: "ActiveModel::API",
+            expectedFile: "api.ts",
+            actualFile: "validations/acceptance.ts",
+            inDefiningFile: true,
+          },
+        ],
+      },
+    ];
+    expect(relocationsByRoute(files).size).toBe(0);
+  });
 });

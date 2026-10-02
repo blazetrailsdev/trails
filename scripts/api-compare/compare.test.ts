@@ -9,7 +9,9 @@ import {
   methodInMode,
   tsShouldIncludeInIndex,
   flattenIncludedMethodInfos,
+  bodyInDefiningFile,
   mixinMethodCreditedToOwnFile,
+  moduleInitializeCandidates,
   reopeningMethodCreditedToOwnFile,
   resolveModuleName,
   buildModuleIncluderFqns,
@@ -3115,6 +3117,111 @@ describe("mixinMethodCreditedToOwnFile", () => {
         tsMethodsByFile,
       ),
     ).toBeNull();
+  });
+});
+
+describe("bodyInDefiningFile", () => {
+  const tsMethodsByFile = new Map([
+    ["naming.ts", new Set(["modelName"])],
+    ["validations/acceptance.ts", new Set(["validatesAcceptanceOf"])],
+    ["model.ts", new Set(["modelName", "validatesAcceptanceOf"])],
+  ]);
+  const hasBucket = (f: string) => f === "naming.rb" || f === "validations/absence.rb";
+  const bodied = new Map([
+    ["naming.ts", new Map([["modelName", new Set(["Naming"])]])],
+    ["validations/acceptance.ts", new Map([["validatesAcceptanceOf", new Set(["HelperMethods"])]])],
+  ]);
+  const none = new Map<string, Map<string, Set<string>>>();
+
+  it("names the mixin's own file when the body is there", () => {
+    expect(
+      bodyInDefiningFile(
+        { rubyName: "model_name", rubyModule: "ActiveModel::API", mixinFile: "naming.rb" },
+        "api.rb",
+        "activemodel",
+        hasBucket,
+        tsMethodsByFile,
+        none,
+        bodied,
+      ),
+    ).toEqual({ tsName: "modelName", tsFile: "naming.ts" });
+  });
+
+  it("names a reopening's own file when the mixin's first file does not hold it", () => {
+    expect(
+      bodyInDefiningFile(
+        {
+          rubyName: "validates_acceptance_of",
+          rubyModule: "ActiveModel::Validations",
+          mixinFile: "validations/absence.rb",
+          definedInFile: "validations/acceptance.rb",
+        },
+        "validations.rb",
+        "activemodel",
+        hasBucket,
+        tsMethodsByFile,
+        none,
+        bodied,
+      ),
+    ).toEqual({ tsName: "validatesAcceptanceOf", tsFile: "validations/acceptance.ts" });
+  });
+
+  it("is null when the defining file only declares the name", () => {
+    const bodyless = new Map([["naming.ts", new Map([["modelName", new Set(["Naming"])]])]]);
+    expect(
+      bodyInDefiningFile(
+        { rubyName: "model_name", rubyModule: "ActiveModel::API", mixinFile: "naming.rb" },
+        "api.rb",
+        "activemodel",
+        hasBucket,
+        tsMethodsByFile,
+        bodyless,
+        none,
+      ),
+    ).toBeNull();
+  });
+
+  it("is null for a method the host's own file defines", () => {
+    expect(
+      bodyInDefiningFile(
+        { rubyName: "persisted?", rubyModule: "ActiveModel::API" },
+        "api.rb",
+        "activemodel",
+        hasBucket,
+        tsMethodsByFile,
+        none,
+        bodied,
+      ),
+    ).toBeNull();
+  });
+});
+
+describe("moduleInitializeCandidates", () => {
+  const withHook = new Set(["[initialize]", "itselfIfSerializeCastValueCompatible"]);
+
+  it("offers a module's initialize its [initialize] hook first", () => {
+    expect(moduleInitializeCandidates("initialize", true, withHook, ["constructor"])).toEqual([
+      "[initialize]",
+      "constructor",
+    ]);
+  });
+
+  it("leaves a class's initialize as the constructor", () => {
+    expect(moduleInitializeCandidates("initialize", false, withHook, ["constructor"])).toEqual([
+      "constructor",
+    ]);
+  });
+
+  it("leaves a module without the hook to report through its other arms", () => {
+    expect(moduleInitializeCandidates("initialize", true, new Set(), ["constructor"])).toEqual([
+      "constructor",
+    ]);
+  });
+
+  it("leaves every other name alone", () => {
+    expect(moduleInitializeCandidates("serialize", true, withHook, ["serialize"])).toEqual([
+      "serialize",
+    ]);
   });
 });
 
