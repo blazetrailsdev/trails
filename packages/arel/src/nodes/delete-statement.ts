@@ -3,18 +3,19 @@ import { Nodes } from "../namespaces.js";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import type { Table } from "../table.js";
+import type { ArelNode } from "../arel.js";
 
 export class DeleteStatement extends Node {
-  relation: Node | Table | null;
-  wheres: Node[];
-  orders: Node[];
-  groups: Node[];
-  havings: Node[];
+  relation: ArelNode | Table | null;
+  wheres: ArelNode[];
+  orders: ArelNode[];
+  groups: ArelNode[];
+  havings: ArelNode[];
   limit: Node | null;
   offset: Node | null;
-  key: Node | Node[] | null;
+  key: ArelNode | ArelNode[] | null;
 
-  constructor(relation: Node | Table | null = null, wheres: Node[] = []) {
+  constructor(relation: ArelNode | Table | null = null, wheres: ArelNode[] = []) {
     super();
     this.relation = relation;
     this.wheres = wheres;

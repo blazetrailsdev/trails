@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Attribute, Attributes, Table, Nodes, SelectManager } from "./index.js";
+import { Attribute, Attributes, Table, Nodes, SelectManager, type ArelNode } from "./index.js";
 import { Predications } from "./predications.js";
 
 const users = new Table("users");
@@ -195,7 +195,7 @@ describe("between / notBetween self-dispatch (mirror Rails' implicit self)", () 
 
 describe("SelectManager#collapse (Rails-fidelity helper)", () => {
   class TestManager extends SelectManager {
-    callCollapse(exprs: unknown[]): Nodes.Node {
+    callCollapse(exprs: unknown[]): ArelNode {
       return (this as unknown as { collapse(e: unknown[]): Nodes.Node }).collapse(exprs);
     }
   }

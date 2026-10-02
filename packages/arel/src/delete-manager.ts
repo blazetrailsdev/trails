@@ -1,4 +1,3 @@
-import { Node } from "./nodes/node.js";
 import { TreeManager, StatementMethods } from "./tree-manager.js";
 import { include } from "@blazetrails/activesupport";
 import { DeleteStatement } from "./nodes/delete-statement.js";
@@ -7,16 +6,17 @@ import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Arel } from "./namespaces.js";
+import type { ArelNode } from "./arel.js";
 
 export class DeleteManager extends TreeManager<DeleteStatement> {
   declare key: unknown;
-  declare wheres: Node[];
-  declare where: (expr: Node) => this;
+  declare wheres: ArelNode[];
+  declare where: (expr: ArelNode) => this;
   declare take: (limit: unknown) => this;
   declare offset: (offset: unknown) => this;
-  declare order: (...expr: Node[]) => this;
+  declare order: (...expr: ArelNode[]) => this;
 
-  constructor(table: Table | Node | null = null) {
+  constructor(table: Table | ArelNode | null = null) {
     super();
     this.ast = new DeleteStatement(table);
   }
@@ -26,7 +26,7 @@ export class DeleteManager extends TreeManager<DeleteStatement> {
     return this;
   }
 
-  group(columns: (Node | string)[]): this {
+  group(columns: (ArelNode | string)[]): this {
     for (let column of columns) {
       if (typeof column === "string") {
         column = new SqlLiteral(column.startsWith(":") ? column.slice(1) : column);
@@ -37,7 +37,7 @@ export class DeleteManager extends TreeManager<DeleteStatement> {
     return this;
   }
 
-  having(expr: Node): this {
+  having(expr: ArelNode): this {
     this.ast.havings.push(expr);
     return this;
   }

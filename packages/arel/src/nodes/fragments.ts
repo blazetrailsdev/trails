@@ -3,11 +3,12 @@ import { Nodes } from "../namespaces.js";
 import { ArgumentError, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { arelNode } from "../arel.js";
 import { Node } from "./node.js";
+import type { ArelNode } from "../arel.js";
 
 export class Fragments extends Node {
-  values: Node[];
+  values: ArelNode[];
 
-  constructor(values: Node[] = []) {
+  constructor(values: ArelNode[] = []) {
     super();
     this.values = values;
   }

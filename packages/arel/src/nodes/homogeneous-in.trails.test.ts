@@ -71,7 +71,7 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
     it("delegates to attribute.quotedArray when present (host override participates)", () => {
       const calls: unknown[][] = [];
       const fakeAttr = Object.create(users.get("id")) as Nodes.HomogeneousIn["attribute"];
-      fakeAttr.quotedArray = (vs: unknown[]): Nodes.Node[] => {
+      fakeAttr.quotedArray = (vs: unknown[]): Nodes.SqlLiteral[] => {
         calls.push(vs);
         return vs.map((v) => new Nodes.SqlLiteral(String(v)));
       };

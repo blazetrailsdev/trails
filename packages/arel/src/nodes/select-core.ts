@@ -5,19 +5,20 @@ import { Node } from "./node.js";
 import type { Table } from "../table.js";
 import { JoinSource } from "./join-source.js";
 import type { OptimizerHints } from "./unary.js";
+import type { ArelNode } from "../arel.js";
 
 export class SelectCore extends Node {
   source: JoinSource;
-  projections: (Node | Node[])[];
-  wheres: Node[];
-  groups: Node[];
-  havings: (Node | string)[];
+  projections: (ArelNode | ArelNode[])[];
+  wheres: ArelNode[];
+  groups: ArelNode[];
+  havings: (ArelNode | string)[];
   windows: Node[];
   setQuantifier: Node | null;
   optimizerHints: OptimizerHints | null;
   comment: Node | null;
 
-  constructor(relation: Node | Table | null = null) {
+  constructor(relation: ArelNode | Table | null = null) {
     super();
     this.source = new JoinSource(relation);
     this.projections = [];
@@ -30,19 +31,19 @@ export class SelectCore extends Node {
     this.comment = null;
   }
 
-  get from(): Node | Table | null {
+  get from(): ArelNode | Table | null {
     return this.source.left;
   }
 
-  set from(value: Node | Table | null) {
+  set from(value: ArelNode | Table | null) {
     this.source.left = value;
   }
 
-  get froms(): Node | Table | null {
+  get froms(): ArelNode | Table | null {
     return this.from;
   }
 
-  set froms(value: Node | Table | null) {
+  set froms(value: ArelNode | Table | null) {
     this.from = value;
   }
 

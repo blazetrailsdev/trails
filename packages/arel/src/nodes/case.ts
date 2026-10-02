@@ -6,14 +6,15 @@ import { NodeExpression } from "./node-expression.js";
 import { buildQuoted } from "./casted.js";
 import { Binary, type NodeOrValue } from "./binary.js";
 import { Unary } from "./unary.js";
+import type { ArelNode } from "../arel.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Case extends NodeExpression {
-  case: Node | null;
+  case: ArelNode | null;
   conditions: When[];
-  default: Node | null;
+  default: ArelNode | null;
 
-  constructor(expression?: Node, defaultValue?: Node) {
+  constructor(expression?: ArelNode, defaultValue?: ArelNode) {
     super();
     this.case = expression ?? null;
     this.conditions = [];

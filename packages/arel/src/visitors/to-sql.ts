@@ -26,6 +26,7 @@ export class UnsupportedVisitError extends Error {
 
 export type { ArelConnection } from "./connection.js";
 import type { ArelConnection } from "./connection.js";
+import type { ArelNode } from "../arel.js";
 
 function isActiveModelAttribute(v: unknown): boolean {
   return v instanceof ModelAttribute;
@@ -46,10 +47,10 @@ export class ToSql extends Visitor {
     this.connection = connection;
   }
 
-  compile(node: Node | Table | ReadonlyArray<Nodes.NodeOrValue>): string;
-  compile<T>(node: Node | Table | ReadonlyArray<Nodes.NodeOrValue>, collector: { value: T }): T;
+  compile(node: ArelNode | Table | ReadonlyArray<Nodes.NodeOrValue>): string;
+  compile<T>(node: ArelNode | Table | ReadonlyArray<Nodes.NodeOrValue>, collector: { value: T }): T;
   compile(
-    node: Node | Table | ReadonlyArray<Nodes.NodeOrValue>,
+    node: ArelNode | Table | ReadonlyArray<Nodes.NodeOrValue>,
     collector: { value: unknown } = new SQLString(),
   ): unknown {
     return this.accept(node, collector as unknown as SQLString).value;
@@ -231,7 +232,7 @@ export class ToSql extends Visitor {
   }
 
   protected collectNodesFor(
-    nodes: (Node | Node[] | string)[],
+    nodes: (ArelNode | ArelNode[] | string)[],
     collector: SQLString,
     spacer: string,
     connector = ", ",
@@ -818,7 +819,7 @@ export class ToSql extends Visitor {
     o: Nodes.UnqualifiedColumn,
     collector: SQLString,
   ): SQLString {
-    collector.append(this.quoteColumnName(o.name as string | Node | null));
+    collector.append(this.quoteColumnName(o.name as string | ArelNode | null));
     return collector;
   }
 
@@ -1015,13 +1016,13 @@ export class ToSql extends Visitor {
   }
 
   /** @internal */
-  protected quoteTableName(name: string | Node | null): string {
+  protected quoteTableName(name: string | ArelNode | null): string {
     if (name instanceof Nodes.SqlLiteral) return name.toString();
     return this.connection.quoteTableName(name);
   }
 
   /** @internal */
-  protected quoteColumnName(name: string | Node | null): string {
+  protected quoteColumnName(name: string | ArelNode | null): string {
     if (name instanceof Nodes.SqlLiteral) return name.toString();
     return this.connection.quoteColumnName(name);
   }
@@ -1035,7 +1036,7 @@ export class ToSql extends Visitor {
     return this.maybeVisit(o.optimizerHints, collector);
   }
 
-  protected maybeVisit(thing: Node | null | undefined, collector: SQLString): SQLString {
+  protected maybeVisit(thing: ArelNode | null | undefined, collector: SQLString): SQLString {
     if (!thing) return collector;
     collector.append(" ");
     this.visit(thing, collector);
@@ -1061,14 +1062,14 @@ export class ToSql extends Visitor {
     );
   }
 
-  protected hasJoinSources(o: { relation: Node | Table | null }): boolean {
+  protected hasJoinSources(o: { relation: ArelNode | Table | null }): boolean {
     return o.relation instanceof Nodes.JoinSource && o.relation.right.length > 0;
   }
 
   protected hasLimitOrOffsetOrOrders(o: {
     limit: Node | null;
     offset: Node | null;
-    orders: Node[];
+    orders: ArelNode[];
   }): boolean {
     return !!(o.limit || o.offset || o.orders.length > 0);
   }
@@ -1103,15 +1104,15 @@ export class ToSql extends Visitor {
   }
 
   protected buildSubselect(
-    key: Node | Node[],
+    key: ArelNode | ArelNode[],
     o: {
-      relation: Node | Table | null;
-      wheres: Node[];
-      groups: Node[];
-      havings: (Node | string)[];
+      relation: ArelNode | Table | null;
+      wheres: ArelNode[];
+      groups: ArelNode[];
+      havings: (ArelNode | string)[];
       limit: Node | null;
       offset: Node | null;
-      orders: Node[];
+      orders: ArelNode[];
     },
   ): Nodes.SelectStatement {
     const stmt = new Nodes.SelectStatement();
@@ -1139,12 +1140,12 @@ export class ToSql extends Visitor {
   }
 
   protected infixValueWithParen(
-    o: Node & { left: Node; right: Node },
+    o: Node & { left: ArelNode; right: ArelNode },
     collector: SQLString,
     value: string,
     suppressParens = false,
   ): SQLString {
-    const sameClass = (child: Node): child is typeof o =>
+    const sameClass = (child: ArelNode): child is typeof o =>
       Object.getPrototypeOf(child) === Object.getPrototypeOf(o);
 
     if (!suppressParens) collector.append("( ");
@@ -1164,7 +1165,7 @@ export class ToSql extends Visitor {
   }
 
   protected groupingParentheses(
-    o: Node,
+    o: ArelNode,
     collector: SQLString,
     alwaysWrapSelects = true,
   ): SQLString {

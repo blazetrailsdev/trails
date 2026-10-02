@@ -6,6 +6,7 @@ import { FactoryMethods, type FactoryMethodsModule } from "../factory-methods.js
 import type { And } from "./nary.js";
 import type { Not } from "./unary.js";
 import type { Grouping } from "./grouping.js";
+import type { Attribute } from "../attributes/attribute.js";
 
 export interface ArelEngine {
   withConnection<T>(
@@ -38,7 +39,7 @@ export class Node {
     return engine!.withConnection((connection) => connection.visitor.accept(this, collector).value);
   }
 
-  fetchAttribute(_block?: (attr: Node) => boolean): boolean | undefined {
+  fetchAttribute(_block?: (attr: Attribute) => boolean): boolean | undefined {
     return undefined;
   }
 

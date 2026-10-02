@@ -1,4 +1,3 @@
-import { Node } from "./nodes/node.js";
 import { TreeManager } from "./tree-manager.js";
 import { InsertStatement, type InsertSelectSource } from "./nodes/insert-statement.js";
 import { Attribute } from "./attributes/attribute.js";
@@ -7,6 +6,7 @@ import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
 import { isEmpty, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Arel } from "./namespaces.js";
+import type { ArelNode } from "./arel.js";
 
 export class InsertManager extends TreeManager<InsertStatement> {
   constructor(table?: Table | null) {
@@ -19,11 +19,11 @@ export class InsertManager extends TreeManager<InsertStatement> {
     return this;
   }
 
-  get columns(): Node[] {
+  get columns(): ArelNode[] {
     return this.ast.columns;
   }
 
-  set values(val: Node | null) {
+  set values(val: ArelNode | null) {
     this.ast.values = val;
   }
 
@@ -32,13 +32,13 @@ export class InsertManager extends TreeManager<InsertStatement> {
     return this;
   }
 
-  insert(fields: string | [Attribute | Node, unknown][]): this | undefined {
+  insert(fields: string | [ArelNode, unknown][]): this | undefined {
     if (isEmpty(fields)) return;
 
     if (typeof fields === "string") {
       this.ast.values = new SqlLiteral(fields);
     } else {
-      this.ast.relation ||= (fields[0][0] as Attribute).relation as Table | Node;
+      this.ast.relation ||= (fields[0][0] as Attribute).relation as Table | ArelNode;
 
       const values: unknown[] = [];
 

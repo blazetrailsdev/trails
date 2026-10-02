@@ -4,10 +4,11 @@ import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import { Unary } from "./unary.js";
 import { SqlLiteral } from "./sql-literal.js";
+import type { ArelNode } from "../arel.js";
 
 export class Window extends Node {
-  orders: Node[];
-  partitions: Node[];
+  orders: ArelNode[];
+  partitions: ArelNode[];
   framing: Node | null;
 
   constructor() {
@@ -17,12 +18,12 @@ export class Window extends Node {
     this.framing = null;
   }
 
-  order(...expr: (Node | string)[]): this {
+  order(...expr: (ArelNode | string)[]): this {
     this.orders.push(...expr.map((x) => (typeof x === "string" ? new SqlLiteral(x) : x)));
     return this;
   }
 
-  partition(...expr: (Node | string)[]): this {
+  partition(...expr: (ArelNode | string)[]): this {
     this.partitions.push(...expr.map((x) => (typeof x === "string" ? new SqlLiteral(x) : x)));
     return this;
   }

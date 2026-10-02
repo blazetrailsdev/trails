@@ -4,9 +4,10 @@ import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 import type { Attribute } from "../attributes/attribute.js";
 import { Attribute as AMAttribute, defaultValue } from "@blazetrails/activemodel";
+import type { ArelNode } from "../arel.js";
 
 export class HomogeneousIn extends Node {
-  readonly attribute: Node & Pick<Attribute, "quotedArray" | "typeCaster">;
+  readonly attribute: ArelNode & Pick<Attribute, "quotedArray" | "typeCaster">;
   readonly values: unknown[];
   readonly type: "in" | "notin";
 
@@ -38,11 +39,11 @@ export class HomogeneousIn extends Node {
     return new HomogeneousIn(this.values, this.attribute, this.type === "in" ? "notin" : "in");
   }
 
-  get left(): Node {
+  get left(): ArelNode {
     return this.attribute;
   }
 
-  get right(): Node[] {
+  get right(): ArelNode[] {
     return this.attribute.quotedArray(this.values);
   }
 
@@ -68,12 +69,12 @@ export class HomogeneousIn extends Node {
       );
   }
 
-  fetchAttribute(block: (attr: Node) => boolean): boolean | undefined {
+  fetchAttribute(block: (attr: HomogeneousIn["attribute"]) => boolean): boolean | undefined {
     if (this.attribute) return block(this.attribute);
     return undefined;
   }
 
-  protected ivars(): [Node, unknown[], HomogeneousIn["type"]] {
+  protected ivars(): [ArelNode, unknown[], HomogeneousIn["type"]] {
     return [this.attribute, this.values, this.type];
   }
 }

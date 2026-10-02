@@ -1,7 +1,6 @@
 import { Nodes } from "../namespaces.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
-import { Node } from "./node.js";
 import type { NodeOrValue } from "./binary.js";
 import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
@@ -11,7 +10,7 @@ import { FilterPredications, type FilterPredicationsModule } from "../filter-pre
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Function extends NodeExpression {
   expressions: NodeOrValue[] | NodeOrValue;
-  alias: Node | null;
+  alias: SqlLiteral | null;
   distinct: boolean | null;
   constructor(expr: NodeOrValue[] | NodeOrValue, aliaz: string | SqlLiteral | null = null) {
     super();

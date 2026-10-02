@@ -1,13 +1,13 @@
 import { Nodes } from "../namespaces.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
-import { Node } from "./node.js";
 import { Unary } from "./unary.js";
+import type { ArelNode } from "../arel.js";
 
 export class Extract extends Unary {
   field: string;
 
-  constructor(expr: Node | Node[], field: string) {
+  constructor(expr: ArelNode | ArelNode[], field: string) {
     super(expr);
     this.field = field;
   }

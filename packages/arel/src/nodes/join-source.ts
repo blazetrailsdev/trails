@@ -1,11 +1,11 @@
 import { Nodes } from "../namespaces.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
-import { Node } from "./node.js";
 import type { Table } from "../table.js";
 import { Binary } from "./binary.js";
+import type { ArelNode } from "../arel.js";
 
-export class JoinSource extends Binary<Node | Table | null, Node[]> {
-  constructor(singleSource: Node | Table | null, joinop: Node[] = []) {
+export class JoinSource extends Binary<ArelNode | Table | null, ArelNode[]> {
+  constructor(singleSource: ArelNode | Table | null, joinop: ArelNode[] = []) {
     super(singleSource, joinop);
   }
 

@@ -4,6 +4,7 @@ import "../nodes/index.js";
 import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";
+import type { ArelNode } from "../arel.js";
 
 export class SQLite extends ToSql {
   protected override visitArelNodesLock(_o: Nodes.Lock, collector: SQLString): SQLString {
@@ -49,12 +50,12 @@ export class SQLite extends ToSql {
   }
 
   protected override infixValueWithParen(
-    o: Node & { left: Node; right: Node },
+    o: Node & { left: ArelNode; right: ArelNode },
     collector: SQLString,
     value: string,
     suppressParens = false,
   ): SQLString {
-    const sameClass = (child: Node): child is typeof o =>
+    const sameClass = (child: ArelNode): child is typeof o =>
       Object.getPrototypeOf(child) === Object.getPrototypeOf(o);
 
     if (!suppressParens) collector.append("( ");
@@ -80,9 +81,9 @@ export class SQLite extends ToSql {
     return super.quote(value);
   }
 
-  private unwrapGrouping(node: Node): Node {
+  private unwrapGrouping(node: ArelNode): ArelNode {
     if (node instanceof Nodes.Grouping && node.expr && typeof node.expr === "object") {
-      return node.expr as Node;
+      return node.expr as ArelNode;
     }
     return node;
   }

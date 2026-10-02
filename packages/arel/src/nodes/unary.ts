@@ -3,6 +3,7 @@ import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Nodes } from "../namespaces.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
+import type { ArelNode } from "../arel.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Unary<E = unknown> extends NodeExpression {
@@ -46,8 +47,8 @@ export class Limit extends Unary {}
 
 export class Lock extends Unary {}
 export class Not extends Unary {
-  declare expr: Node;
-  constructor(expr: Node) {
+  declare expr: ArelNode;
+  constructor(expr: ArelNode) {
     super(expr);
   }
 }

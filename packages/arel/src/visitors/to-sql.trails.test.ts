@@ -206,7 +206,7 @@ describe("OuterJoin guard", () => {
 describe("Table with Node name", () => {
   it("visits the Node when name is an Arel Node", () => {
     const tbl = new Table("ignored");
-    (tbl as unknown as { name: Nodes.Node }).name = new Nodes.SqlLiteral("my_subq");
+    (tbl as unknown as { name: Nodes.SqlLiteral }).name = new Nodes.SqlLiteral("my_subq");
     expect(new Visitors.ToSql(fakeRecordConnection).compile(tbl)).toBe("my_subq");
   });
 });

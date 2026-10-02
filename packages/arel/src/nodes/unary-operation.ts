@@ -1,19 +1,19 @@
 import { Nodes } from "../namespaces.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
-import { Node } from "./node.js";
 import { Unary } from "./unary.js";
+import type { ArelNode } from "../arel.js";
 
-export class UnaryOperation extends Unary<Node> {
+export class UnaryOperation extends Unary<ArelNode> {
   readonly operator: string;
 
-  constructor(operator: string, operand: Node) {
+  constructor(operator: string, operand: ArelNode) {
     super(operand);
     this.operator = operator;
   }
 }
 
 export class BitwiseNot extends UnaryOperation {
-  constructor(operand: Node) {
+  constructor(operand: ArelNode) {
     super("~", operand);
   }
 }

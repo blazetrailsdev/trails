@@ -6,8 +6,9 @@ import { Arel, Attributes, Nodes } from "../namespaces.js";
 import { Unary } from "./unary.js";
 import type { Attribute } from "../attributes/attribute.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
+import type { ArelNode } from "../arel.js";
 
-export function buildQuoted(other: unknown, attribute?: unknown): Node {
+export function buildQuoted(other: unknown, attribute?: unknown): ArelNode {
   if (
     other instanceof Node ||
     other instanceof Attributes.Attribute ||
@@ -15,7 +16,7 @@ export function buildQuoted(other: unknown, attribute?: unknown): Node {
     other instanceof Arel.SelectManager ||
     other instanceof ModelAttribute
   )
-    return other as Node;
+    return other as ArelNode;
   if (attribute instanceof Attributes.Attribute) return new Casted(other, attribute);
   return new Quoted(other);
 }

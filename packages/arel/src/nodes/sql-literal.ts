@@ -13,6 +13,7 @@ import { Expressions, type ExpressionsModule } from "../expressions.js";
 import { Predications, type PredicationsModule } from "../predications.js";
 import { AliasPredication, type AliasPredicationModule } from "../alias-predication.js";
 import { OrderPredications, type OrderPredicationsModule } from "../order-predications.js";
+import type { Attribute } from "../attributes/attribute.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SqlLiteral extends Node {
@@ -24,7 +25,7 @@ export class SqlLiteral extends Node {
     rbStrInit(this, string);
   }
 
-  fetchAttribute(_block?: (attr: Node) => boolean): boolean | undefined {
+  fetchAttribute(_block?: (attr: Attribute) => boolean): boolean | undefined {
     return undefined;
   }
 
@@ -36,7 +37,7 @@ export class SqlLiteral extends Node {
     if (!arelNode(other)) {
       throw new ArgumentError("Expected Arel node");
     }
-    return new Fragments([this, other as Node]);
+    return new Fragments([this, other]);
   }
 }
 
