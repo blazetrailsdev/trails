@@ -217,7 +217,9 @@ export function rbModName(klass: abstract new (...args: never) => unknown): stri
  * `string.c:12215`, `lib/set.rb:393`), and `toSym` for every JS string
  * (`string.c:12212`), which spells both a Ruby String and a Ruby Symbol
  * (`":name"`); Symbol answers `to_sym` too (`symbol.rb:8`). `toAry` is bound for a JS array
- * (`array.c:8619`), whose prototype carries no such member.
+ * (`array.c:8619`), whose prototype carries no such member. `isInfinite` is
+ * bound for a JS number and bigint, which spell Float (`numeric.c:6376`) and
+ * Integer (`numeric.rb:48`).
  *
  * A class receiver (a non-writable `prototype`, which a plain function, the
  * JS spelling of a `Proc`, does not have) answers `Module#respond_to?`: its static data fields hold
@@ -240,6 +242,7 @@ export function rbModName(klass: abstract new (...args: never) => unknown): stri
 export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true): boolean {
   if (typeof obj === "string" && (mid === "toStr" || mid === "toSym")) return true;
   if (Array.isArray(obj) && mid === "toAry") return true;
+  if ((typeof obj === "number" || typeof obj === "bigint") && mid === "isInfinite") return true;
   if (
     mid === "get" &&
     (typeof obj === "string" || Array.isArray(obj) || obj instanceof Map || isPlainHash(obj))
@@ -354,7 +357,11 @@ export function toSym(obj: unknown): string {
  * `Kernel#send` (`rb_f_send`, `vendor/ruby/v3.3.11/vm_eval.c:1330`): calls the nearest
  * entry for `mid` whatever its visibility. A zero-argument reader ported as a
  * JS accessor or a field answers through its getter or its value, as the Ruby
- * reader it ports would.
+ * reader it ports would. `infinite?` is dispatched for a JS number and bigint,
+ * whose prototypes carry no such member: `Float#infinite?`
+ * (`rb_flo_is_infinite_p`, `vendor/ruby/v3.3.11/numeric.c:1992`) answers `1` /
+ * `-1` for an infinity and `nil` otherwise, as `Integer#infinite?`
+ * (`vendor/ruby/v3.3.11/numeric.rb:48`) always does.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#send` (`vendor/ruby/v3.3.11/vm_eval.c:1330`).
  */
@@ -364,6 +371,9 @@ export function rbFSend(recv: unknown, mid: string, ...args: unknown[]): unknown
 
 function sendInternal(argc: number, argv: [string, ...unknown[]], recv: unknown): unknown {
   const [mid, ...args] = argv;
+  if ((typeof recv === "number" || typeof recv === "bigint") && mid === "isInfinite") {
+    return recv === Infinity ? 1 : recv === -Infinity ? -1 : null;
+  }
   const obj = Object(recv) as Record<string, unknown>;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   for (let o: object | null = obj; o; o = Object.getPrototypeOf(o) as object | null) {

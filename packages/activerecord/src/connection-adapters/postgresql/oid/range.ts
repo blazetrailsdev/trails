@@ -5,6 +5,7 @@ import {
   ArgumentError,
   Range,
   rbEqual,
+  rbFSend,
   rbObjRespondTo,
   registerConstant,
   stringSplit,
@@ -135,10 +136,8 @@ export class RangeType extends ValueType<Range<unknown>> {
   }
 
   /** @internal */
-  private isInfinity(value: unknown): boolean {
-    if (!rbObjRespondTo(value, "isInfinite")) return value === Infinity || value === -Infinity;
-    const result = (value as { isInfinite(): unknown }).isInfinite();
-    return result != null && result !== false;
+  private isInfinity(value: unknown): 1 | -1 | null | false {
+    return rbObjRespondTo(value, "isInfinite") && (rbFSend(value, "isInfinite") as 1 | -1 | null);
   }
 }
 

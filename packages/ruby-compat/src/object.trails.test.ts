@@ -256,6 +256,20 @@ describe("rbFSend", () => {
   it("raises NoMethodError for an unbound name", () => {
     expect(() => rbFSend(new Req(), "nope")).toThrow(NoMethodError);
   });
+
+  it("answers infinite? for a Float and an Integer, whose JS values do not define it", () => {
+    // vendor/ruby/v3.3.11/numeric.c:1992 rb_flo_is_infinite_p, numeric.rb:48 Integer#infinite?.
+    for (const obj of [Infinity, -Infinity, 1.5, NaN, 1, 1n]) {
+      expect(rbObjRespondTo(obj, "isInfinite")).toBe(true);
+    }
+    expect(rbFSend(Infinity, "isInfinite")).toBe(1);
+    expect(rbFSend(-Infinity, "isInfinite")).toBe(-1);
+    expect(rbFSend(1.5, "isInfinite")).toBe(null);
+    expect(rbFSend(NaN, "isInfinite")).toBe(null);
+    expect(rbFSend(1n, "isInfinite")).toBe(null);
+    expect(rbObjRespondTo("1", "isInfinite")).toBe(false);
+    expect(() => rbFSend("1", "isInfinite")).toThrow(NoMethodError);
+  });
 });
 
 describe("rbModPublicMethodDefined", () => {

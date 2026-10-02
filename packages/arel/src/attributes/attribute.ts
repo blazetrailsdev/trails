@@ -61,7 +61,7 @@ export interface Attribute
     MathModule,
     StructInstance {
   /** @internal */
-  isInfinity(value: unknown): 1 | -1 | 0;
+  isInfinity(value: unknown): 1 | -1 | null | false;
   /** @internal */
   isUnboundable(value: unknown): 1 | -1 | false;
   /** @internal */

@@ -108,7 +108,7 @@ describe("QueryAttribute", () => {
   it("isInfinite returns the sign for Infinity/-Infinity", () => {
     expect(new QueryAttribute("x", Infinity, intType).isInfinite()).toBe(1);
     expect(new QueryAttribute("x", -Infinity, intType).isInfinite()).toBe(-1);
-    expect(new QueryAttribute("x", 999, intType).isInfinite()).toBe(false);
+    expect(new QueryAttribute("x", 999, intType).isInfinite()).toBe(null);
   });
 
   it("isInfinite checks valueForDatabase for serializable types", () => {

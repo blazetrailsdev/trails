@@ -1,5 +1,6 @@
 import { Attribute, ValueType } from "@blazetrails/activemodel";
 import { deepDup } from "@blazetrails/activesupport";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Substitute } from "../statement-cache.js";
 
 type CastType = Pick<ValueType, "cast" | "serialize">;
@@ -70,7 +71,7 @@ export class QueryAttribute extends Attribute {
     return forDatabase === null || forDatabase === undefined;
   }
 
-  isInfinite(): 1 | -1 | false {
+  isInfinite(): 1 | -1 | null | false {
     return (
       isInfinity(this.valueBeforeTypeCast) ||
       (this.isSerializable() && isInfinity(this.valueForDatabase))
@@ -90,15 +91,8 @@ export class QueryAttribute extends Attribute {
 }
 
 /** @internal */
-function isInfinity(value: unknown): 1 | -1 | false {
-  if (value === Infinity) return 1;
-  if (value === -Infinity) return -1;
-  if (value === null || value === undefined) return false;
-  const fn = (value as { isInfinite?: unknown }).isInfinite;
-  if (typeof fn !== "function") return false;
-  const result = (fn as () => unknown).call(value);
-  if (result === 1 || result === -1) return result;
-  return false;
+function isInfinity(value: unknown): 1 | -1 | null | false {
+  return rbObjRespondTo(value, "isInfinite") && (rbFSend(value, "isInfinite") as 1 | -1 | null);
 }
 
 /** @internal */
