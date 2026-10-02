@@ -591,13 +591,13 @@ export class TestRequest extends AbstractTestRequest {
     return this._controllerClass as DispatchableControllerClass;
   }
 
-  static create(controllerClass?: unknown): TestRequest {
+  static create(controllerClass: unknown): TestRequest {
     const env: Record<string, unknown> = {};
     env["rack.request.cookie_hash"] = {};
     return new TestRequest(
       merge(TestRequest.defaultEnv(), env),
       TestRequest.newSession(),
-      controllerClass ?? null,
+      controllerClass,
     );
   }
 

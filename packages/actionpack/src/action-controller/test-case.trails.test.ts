@@ -38,7 +38,7 @@ import "../test-helpers/abstract-unit.js";
 
 describe("TestRequest#assignParameters Content-Type case", () => {
   it("raises on a Content-Type no Mime::Type is registered for", () => {
-    const req = TestRequest.create();
+    const req = TestRequest.create(null);
     req.setHeader("REQUEST_METHOD", "POST");
     req.setHeader("CONTENT_TYPE", "Application/Vnd.Custom+Json; charset=utf-8");
     expect(() => req.assignParameters(null, "api", "create", { x: "1" }, "/api", ["x"])).toThrow(
@@ -47,7 +47,7 @@ describe("TestRequest#assignParameters Content-Type case", () => {
   });
 
   it("encodes an :xml body with to_xml", () => {
-    const req = TestRequest.create();
+    const req = TestRequest.create(null);
     req.setHeader("REQUEST_METHOD", "POST");
     req.setHeader("CONTENT_TYPE", "application/xml");
     req.assignParameters(null, "api", "create", { x: "1" }, "/api", ["x"]);
@@ -55,7 +55,7 @@ describe("TestRequest#assignParameters Content-Type case", () => {
   });
 
   it("encodes a :json body with ActiveSupport::JSON.encode", () => {
-    const req = TestRequest.create();
+    const req = TestRequest.create(null);
     req.setHeader("REQUEST_METHOD", "POST");
     req.setHeader("CONTENT_TYPE", "application/json");
     const price = new BigDecimal("1.50");
@@ -72,7 +72,7 @@ describe("ActionController::TestSession", () => {
 
 describe("TestRequest#assignParameters multipart body", () => {
   it("parses non-ASCII file bytes and text parts back out of the encoded body", () => {
-    const req = TestRequest.create();
+    const req = TestRequest.create(null);
     req.setHeader("REQUEST_METHOD", "POST");
     const file = new UploadedFile(new StringIO(b("héllo")), "text/plain", false, {
       originalFilename: "h.txt",
@@ -565,13 +565,13 @@ describe("TestCase class helpers", () => {
 
 describe("ActionController::TestRequest helpers", () => {
   it("queryString= sets QUERY_STRING header", () => {
-    const req = TestRequest.create();
+    const req = TestRequest.create(null);
     req.queryString = "foo=bar&baz=1";
     expect(req.getHeader("QUERY_STRING")).toBe("foo=bar&baz=1");
   });
 
   it("contentType= sets CONTENT_TYPE header", () => {
-    const req = TestRequest.create();
+    const req = TestRequest.create(null);
     req.contentType = "application/json";
     expect(req.getHeader("CONTENT_TYPE")).toBe("application/json");
   });
@@ -583,7 +583,7 @@ describe("ActionController::TestRequest helpers", () => {
   });
 
   it("create returns a TestRequest with default env", () => {
-    const req = TestRequest.create();
+    const req = TestRequest.create(null);
     expect(req).toBeInstanceOf(TestRequest);
     expect(req.getHeader("HTTP_HOST")).toBe("test.host");
   });
@@ -595,7 +595,7 @@ describe("ActionController::TestRequest helpers", () => {
   });
 
   it("assignParameters wires path + query params for GET", () => {
-    const req = TestRequest.create();
+    const req = TestRequest.create(null);
     req.setHeader("REQUEST_METHOD", "GET");
     req.assignParameters(null, "posts", "index", { id: "42", format: "json" }, "/posts/42", [
       "format",
@@ -608,7 +608,7 @@ describe("ActionController::TestRequest helpers", () => {
   });
 
   it("assignParameters leaves a present-but-empty PATH_INFO alone (Rails: fetch_header)", () => {
-    const req = TestRequest.create();
+    const req = TestRequest.create(null);
     req.setHeader("REQUEST_METHOD", "GET");
     req.setHeader("PATH_INFO", "");
     req.assignParameters(null, "posts", "index", {}, "/posts", []);
@@ -616,7 +616,7 @@ describe("ActionController::TestRequest helpers", () => {
   });
 
   it("assignParameters encodes body for POST url-encoded", () => {
-    const req = TestRequest.create();
+    const req = TestRequest.create(null);
     req.setHeader("REQUEST_METHOD", "POST");
     req.setHeader("CONTENT_TYPE", "application/x-www-form-urlencoded");
     req.assignParameters(null, "posts", "create", { title: "Hello" }, "/posts", ["title"]);
@@ -626,7 +626,7 @@ describe("ActionController::TestRequest helpers", () => {
   });
 
   it("assignParameters builds real multipart body when params include an UploadedFile", () => {
-    const req = TestRequest.create();
+    const req = TestRequest.create(null);
     req.setHeader("REQUEST_METHOD", "POST");
     const file = new UploadedFile(new StringIO("hi"), "text/plain", false, {
       originalFilename: "hello.txt",
@@ -646,7 +646,7 @@ describe("ActionController::TestRequest helpers", () => {
   });
 
   it("assignParameters registers custom parser for unknown content types, wired into requestParameters", () => {
-    const req = TestRequest.create();
+    const req = TestRequest.create(null);
     req.setHeader("REQUEST_METHOD", "POST");
     req.setHeader("CONTENT_TYPE", "application/vnd.custom+json");
     MimeType.register("application/vnd.custom+json", ":custom");
@@ -660,7 +660,7 @@ describe("ActionController::TestRequest helpers", () => {
   });
 
   it("paramsParsers returns the custom parsers map", () => {
-    const req = TestRequest.create();
+    const req = TestRequest.create(null);
     const parsers = req.paramsParsers();
     expect(typeof parsers).toBe("object");
     expect(parsers).toHaveProperty("xml");
