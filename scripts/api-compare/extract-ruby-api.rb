@@ -3427,9 +3427,20 @@ class ApiExtractor
     names
   end
 
+  # Calls that hand on a copy of the hash, whose keys are the hash's own:
+  # `route_options = options.dup` (mapper.rb:1992). The TS collector follows the
+  # port's `const routeOptions = { ...options }` the same way.
+  OPTION_COPY_METHODS = %w[dup clone merge except slice].to_set
+
   def walk_for_option_keys(node, vars, consts, keys)
     return unless node.is_a?(Array)
     case node[0]
+    when :assign
+      target = node[1]
+      if target.is_a?(Array) && target[0] == :var_field && target[1].is_a?(Array) &&
+          target[1][0] == :@ident && option_copy?(node[2], vars)
+        vars << target[1][1]
+      end
     when :aref
       # options[:foo]
       traverse_for_symbols(node[2], keys) if option_var?(node[1], vars)
@@ -3478,6 +3489,14 @@ class ApiExtractor
       traverse_for_symbols(args, syms)
       keys << syms.first if syms.first
     end
+  end
+
+  # The options var itself, or a chain of OPTION_COPY_METHODS called on it.
+  def option_copy?(node, vars)
+    return false unless node.is_a?(Array)
+    call = node[0] == :method_add_arg ? node[1] : node
+    return option_var?(call, vars) unless call.is_a?(Array) && call[0] == :call
+    OPTION_COPY_METHODS.include?(ident_name(call[3])) && option_copy?(call[1], vars)
   end
 
   # `options` / `opts` (a local or param, `:@ident`) and `@options` / `@opts`
@@ -4016,7 +4035,7 @@ class ApiExtractor
     when :symbol_literal then "sym:#{ident_name(node[1]) || "?"}"
     when :dyna_symbol
       literal = describe_string(node[1])
-      literal.start_with?("str:") ? "sym:#{literal.delete_prefix("str:")}" : "?"
+      literal.match?(/\Ar?str:/) ? literal.sub("str:", "sym:") : "?"
     when :vcall, :fcall then "id:#{ident_name(node[1]) || "?"}"
     when :call, :command, :command_call, :method_add_arg, :method_add_block
       name = nested_call_name(node)
@@ -4060,6 +4079,11 @@ class ApiExtractor
 
   # `[:string_content, part…]` for a `:string_literal`, a bare part list for a
   # `:dyna_symbol`. An interpolated part makes the whole value opaque.
+  #
+  # Ripper's `@tstring_content` is the undecoded source text, so a value holding
+  # a backslash is emitted as `rstr:<opener>:<text>`, which call-args.ts decodes
+  # through literals.ts#decodeRubyString; the opener is empty for a
+  # double-quoted literal, as `literal_value` records none for one.
   def describe_string(node)
     return "?" unless node.is_a?(Array)
 
@@ -4067,7 +4091,11 @@ class ApiExtractor
     return "?" unless parts.is_a?(Array)
     return "str:" if parts.empty?
     return "str-interp" unless parts.all? { |p| p.is_a?(Array) && p[0] == :@tstring_content }
-    "str:#{escape_descriptor_text(parts.map { |p| p[1] }.join)}"
+    text = parts.map { |p| p[1] }.join
+    return "str:#{escape_descriptor_text(text)}" unless text.include?("\\")
+    opener = string_opener_at(parts[0][2])
+    opener = nil unless opener && raw_string_opener?(opener)
+    "rstr:#{escape_descriptor_text(opener.to_s).gsub(":", "%3A")}:#{escape_descriptor_text(text)}"
   end
 
   # The four grammar delimiters, so a string VALUE carrying one does not read as

@@ -57,7 +57,18 @@ describe("normalizeArg", () => {
   });
 
   it("canonicalizes an escape through literals.ts", () => {
-    expect(normalizeArg("str:\\n")).toBe(normalizeArg("str:\n"));
+    expect(normalizeArg("rstr::\\n")).toBe(normalizeArg("str:\n"));
+  });
+
+  it("decodes a Ruby string argument's source text before comparing it", () => {
+    expect(normalizeArg(String.raw`rstr::\\`)).toBe(normalizeArg("str:\\"));
+    expect(normalizeArg(String.raw`rstr::\\n`)).toBe(normalizeArg(String.raw`str:\n`));
+    expect(normalizeArg(String.raw`rstr::\\n`)).not.toBe(normalizeArg("str:\n"));
+    expect(normalizeArg(String.raw`rstr:':\n`)).toBe(normalizeArg(String.raw`str:\n`));
+    expect(normalizeArg(String.raw`rstr:':\n`)).not.toBe(normalizeArg("str:\n"));
+    expect(normalizeArg(String.raw`rstr::\e[0m`)).toBe(normalizeArg("str:\x1b[0m"));
+    expect(normalizeArg(String.raw`rstr:%25q(:a\)b`)).toBe(normalizeArg("str:a)b"));
+    expect(normalizeArg(String.raw`rsym::a\nb`)).toBe(normalizeArg("str:a\nb"));
   });
 
   it("normalizes numbers through one numeric key", () => {

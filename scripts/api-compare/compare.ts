@@ -1000,6 +1000,14 @@ export interface TsPortedWithArgsMaps {
    */
   optionKeysByFileName: Map<string, Map<string, (string[] | null)[]>>;
   optionReadsByFileName: Map<string, Map<string, string[][]>>;
+  /**
+   * The same two keyed by DECLARING CLASS too (`<owner>#<name>`), so a pair is
+   * compared against its own class's member: unioned per file, `A#foo`'s
+   * missing key is masked by a sibling `B#foo` declaring it
+   * (schema_definitions.rb's three `defined_for?`). See {@link optionKeyPair}.
+   */
+  optionKeysByFileOwnerName: Map<string, Map<string, (string[] | null)[]>>;
+  optionReadsByFileOwnerName: Map<string, Map<string, string[][]>>;
 }
 
 export function newTsPortedWithArgsMaps(): TsPortedWithArgsMaps {
@@ -1010,6 +1018,8 @@ export function newTsPortedWithArgsMaps(): TsPortedWithArgsMaps {
     writerSigs: new Set(),
     optionKeysByFileName: new Map(),
     optionReadsByFileName: new Map(),
+    optionKeysByFileOwnerName: new Map(),
+    optionReadsByFileOwnerName: new Map(),
   };
 }
 
@@ -1044,15 +1054,72 @@ export function recordTsPortedWithArgs(
   maps.paramsByFileOwnerNameInPkg.set(file, pkgByOwnerName);
   if (m.writer) maps.writerSigs.add(m.params);
   if (m.optionKeys !== undefined) {
-    const byName = maps.optionKeysByFileName.get(file) ?? new Map<string, (string[] | null)[]>();
-    byName.set(m.name, [...(byName.get(m.name) ?? []), m.optionKeys]);
-    maps.optionKeysByFileName.set(file, byName);
+    const optionKeys = m.optionKeys;
+    for (const [byFile, key] of [
+      [maps.optionKeysByFileName, m.name],
+      [maps.optionKeysByFileOwnerName, ownerKey],
+    ] as const) {
+      const byName = byFile.get(file) ?? new Map<string, (string[] | null)[]>();
+      byName.set(key, [...(byName.get(key) ?? []), optionKeys]);
+      byFile.set(file, byName);
+    }
   }
   if (m.optionReads !== undefined) {
-    const byName = maps.optionReadsByFileName.get(file) ?? new Map<string, string[][]>();
-    byName.set(m.name, [...(byName.get(m.name) ?? []), m.optionReads]);
-    maps.optionReadsByFileName.set(file, byName);
+    const optionReads = m.optionReads;
+    for (const [byFile, key] of [
+      [maps.optionReadsByFileName, m.name],
+      [maps.optionReadsByFileOwnerName, ownerKey],
+    ] as const) {
+      const byName = byFile.get(file) ?? new Map<string, string[][]>();
+      byName.set(key, [...(byName.get(key) ?? []), optionReads]);
+      byFile.set(file, byName);
+    }
   }
+}
+
+/** One Ruby body's option keys and the params that filter them. */
+export interface RubyOptionKeys {
+  keys: string[];
+  params: ParamInfo[];
+}
+
+/**
+ * The two sides the option-key check compares for one matched pair.
+ *
+ * Paired by (owner, name) wherever the TS file carries a checkable options type
+ * on the member of the Ruby owner's class: both sides then come from that one
+ * class, since a union on EITHER side masks a finding — a sibling's TS type
+ * hides a `missingInTs`, a sibling's Ruby body an `extraInTs`. Where it does
+ * not (a mixin's `static x = x` re-export holds no options type), both sides
+ * fall back to the per-name union, together, as keying one side alone would
+ * manufacture rows. `undefined` when the chosen Ruby side read no keys.
+ */
+export function optionKeyPair(
+  rubyName: string,
+  tsName: string,
+  tsFile: string,
+  rubyModule: string,
+  ruby: { byName: Map<string, RubyOptionKeys>; byOwnerName: Map<string, RubyOptionKeys> },
+  maps: TsPortedWithArgsMaps,
+): { ruby: RubyOptionKeys; candidates: (string[] | null)[]; reads: string[][] } | undefined {
+  const tsOwnerKey = `${rubyModule.split("::").at(-1) ?? rubyModule}#${tsName}`;
+  const ownerCandidates = maps.optionKeysByFileOwnerName.get(tsFile)?.get(tsOwnerKey);
+  if (ownerCandidates?.some((c) => c !== null)) {
+    const rubyOwned = ruby.byOwnerName.get(`${rubyModule}#${rubyName}`);
+    if (rubyOwned === undefined) return undefined;
+    return {
+      ruby: rubyOwned,
+      candidates: ownerCandidates,
+      reads: maps.optionReadsByFileOwnerName.get(tsFile)?.get(tsOwnerKey) ?? [],
+    };
+  }
+  const rubyUnion = ruby.byName.get(rubyName);
+  if (rubyUnion === undefined) return undefined;
+  return {
+    ruby: rubyUnion,
+    candidates: maps.optionKeysByFileName.get(tsFile)?.get(tsName) ?? [],
+    reads: maps.optionReadsByFileName.get(tsFile)?.get(tsName) ?? [],
+  };
 }
 
 /**
@@ -2411,6 +2478,7 @@ interface ArityResult {
 interface OptionKeyMismatch {
   rubyFile: string;
   tsFile: string;
+  rubyModule: string;
   rubyName: string;
   tsName: string;
   missingInTs: string[];
@@ -4012,8 +4080,6 @@ export function main() {
       paramsByFileNameInPkg: tsParamsByFileNameInPkg,
       paramsByFileOwnerNameInPkg: tsParamsByFileOwnerNameInPkg,
       writerSigs: tsWriterSigs,
-      optionKeysByFileName: tsOptionKeysByFileName,
-      optionReadsByFileName: tsOptionReadsByFileName,
     } = portedWithArgsMaps;
     // Body call-sets scoped per (file, name) for the advisory calls-parity check.
     const tsCallsByFileName = new Map<string, Map<string, string[][]>>();
@@ -4621,7 +4687,12 @@ export function main() {
       // always describes the very params the arity check would compare.
       const rubyForwardingNames = new Set<string>();
       const rubyBlockOwners = new Map<string, string[]>();
-      const rubyOptionKeysByName = new Map<string, string[]>();
+      // Every same-file body's keys per name, and each owner's own (see
+      // optionKeyPair); the union's params are the first sighting's.
+      const rubyOptionKeys = {
+        byName: new Map<string, RubyOptionKeys>(),
+        byOwnerName: new Map<string, RubyOptionKeys>(),
+      };
       // First-sighting Ruby body call-set per name (advisory calls-parity check).
       const rubyCallsByName = new Map<string, string[]>();
       // Same first-sighting keying: the inert-receiver subset of that call-set
@@ -4690,10 +4761,15 @@ export function main() {
             rubyBlockOwners.set(blockKey, [...(rubyBlockOwners.get(blockKey) ?? []), item.fqn]);
           }
           if (rm.option_keys) {
-            rubyOptionKeysByName.set(rm.name, [
-              ...(rubyOptionKeysByName.get(rm.name) ?? []),
-              ...rm.option_keys,
-            ]);
+            const union = rubyOptionKeys.byName.get(rm.name);
+            rubyOptionKeys.byName.set(rm.name, {
+              keys: [...(union?.keys ?? []), ...rm.option_keys],
+              params: union?.params ?? rubyParamsByName.get(rm.name)!,
+            });
+            rubyOptionKeys.byOwnerName.set(`${item.fqn}#${rm.name}`, {
+              keys: rm.option_keys,
+              params: rm.params,
+            });
           }
           rubyOwnersByName.set(
             rm.name,
@@ -4738,12 +4814,22 @@ export function main() {
 
       // Advisory option-key check: diff the Ruby method's consumed option
       // symbols against the TS options-object keys (see options-keys.ts).
-      const checkOptionKeys = (rubyName: string, tsName: string, tsFile: string) => {
-        const rubyKeys = rubyOptionKeysByName.get(rubyName);
-        if (!rubyKeys) return;
-        const candidates = tsOptionKeysByFileName.get(tsFile)?.get(tsName);
-        if (!candidates || candidates.length === 0) return;
-        const positionalParams = (rubyParamsByName.get(rubyName) ?? [])
+      const checkOptionKeys = (
+        rubyName: string,
+        tsName: string,
+        tsFile: string,
+        rubyModule: string,
+      ) => {
+        const pair = optionKeyPair(
+          rubyName,
+          tsName,
+          tsFile,
+          rubyModule,
+          rubyOptionKeys,
+          portedWithArgsMaps,
+        );
+        if (!pair || pair.candidates.length === 0) return;
+        const positionalParams = pair.ruby.params
           .filter((p) => p.kind === "required" || p.kind === "optional")
           .map((p) => p.name);
         const keywordParams = (rubyParamListsByName.get(rubyName) ?? [])
@@ -4751,10 +4837,10 @@ export function main() {
           .filter((p) => p.kind === "keyword")
           .map((p) => p.name);
         const verdict = matchOptionKeysAgainst(
-          rubyKeys,
-          candidates,
+          pair.ruby.keys,
+          pair.candidates,
           positionalParams,
-          tsOptionReadsByFileName.get(tsFile)?.get(tsName) ?? [],
+          pair.reads,
           keywordParams,
         );
         if (!verdict.comparable) return;
@@ -4763,6 +4849,7 @@ export function main() {
         optionKeyMismatches.push({
           rubyFile,
           tsFile,
+          rubyModule,
           rubyName,
           tsName,
           missingInTs: verdict.missingInTs,
@@ -5238,7 +5325,7 @@ export function main() {
         guessedFile = false,
         level: OwnerSeat = rubyOwnerSeat(rubyModule, false),
       ) => {
-        checkOptionKeys(rubyName, tsName, tsFile);
+        checkOptionKeys(rubyName, tsName, tsFile, rubyModule);
         checkLiterals(rubyName, tsName, tsFile);
         if (!skipCalls) {
           checkCalls(rubyName, tsName, tsFile, rubyModule, level);
@@ -5551,6 +5638,7 @@ export function main() {
               if (otherLevel !== level) continue;
               if (!tsOwners?.has(other.split("::").at(-1) ?? other)) continue;
               checkCalls(rubyName, directMatch, expectedTs, other, otherLevel);
+              checkOptionKeys(rubyName, directMatch, expectedTs, other);
             }
           }
           continue;

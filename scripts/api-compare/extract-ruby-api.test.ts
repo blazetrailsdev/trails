@@ -1871,6 +1871,24 @@ describe(
       expect(r["Rel#add_enum_value"]).toEqual(["after", "before", "if_not_exists"]);
       expect(r["Rel#change_column"]).toEqual(["precision"]);
     });
+
+    it("follows a local copied from the options hash", () => {
+      const r = optionKeys({
+        "copies.rb": `
+        class Mapper
+          def map_match(paths, options)
+            route_options = options.dup
+            get_to_from_path(route_options[:action])
+            trimmed = options.except(:via).merge(on: nil)
+            trimmed[:anchor]
+            other = paths.dup
+            other[:not_a_key]
+          end
+        end
+      `,
+      });
+      expect(r["Mapper#map_match"]).toEqual(["action", "anchor"]);
+    });
   },
 );
 
@@ -2664,6 +2682,27 @@ describe("Ruby extractor call-argument capture", { timeout: RUBY_SUBPROCESS_TIME
     expect(argsOf(c["Foo#m"], "to_sentence")).toEqual([
       "kwargs{last_word_connector=str:%2C or ,sep=str:a%3Db%7Bc%7Dd}",
     ]);
+  });
+
+  it("carries a backslash-bearing string argument's opener for decoding", () => {
+    const c = rubyCallArgs({
+      "foo.rb": String.raw`
+        class Foo
+          def m
+            a("\\")
+            b("\\n")
+            c('\n')
+            d("\e[0m")
+            e(%q(x\)y))
+          end
+        end
+      `,
+    });
+    expect(argsOf(c["Foo#m"], "a")).toEqual([String.raw`rstr::\\`]);
+    expect(argsOf(c["Foo#m"], "b")).toEqual([String.raw`rstr::\\n`]);
+    expect(argsOf(c["Foo#m"], "c")).toEqual([String.raw`rstr:':\n`]);
+    expect(argsOf(c["Foo#m"], "d")).toEqual([String.raw`rstr::\e[0m`]);
+    expect(argsOf(c["Foo#m"], "e")).toEqual([String.raw`rstr:%25q(:x\)y`]);
   });
 
   it("recurses into a nested keyword hash", () => {

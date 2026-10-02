@@ -14,7 +14,7 @@
 import type { CallSite, LiteralValue, ParamInfo } from "@blazetrails/parity/types";
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/conventions";
 import { stripThis, isReceiverParam } from "./arity.js";
-import { normalizeConstantSpelling, normalizeLiteral } from "./literals.js";
+import { decodeRubyString, normalizeConstantSpelling, normalizeLiteral } from "./literals.js";
 import { normalizeRubyKey } from "./options-keys.js";
 import { JS_ENUMERABLE_ALIASES } from "./enumerable-idioms.js";
 import { NO_JS_CALL_FORM } from "./compare.js";
@@ -250,14 +250,6 @@ function refKeysEqual(rubyKey: string, tsKey: string): boolean {
   return (rubyMethodToTsIgnoringSkip(rubyName) ?? []).includes(tsName);
 }
 
-const SOURCE_ESCAPES: Record<string, string> = { "0": "\x00", r: "\r", n: "\n", t: "\t" };
-
-function foldSourceEscapes(value: string): string {
-  return value
-    .replace(/\\e|\\033|\\x1[bB]|\\u001[bB]/g, "\x1b")
-    .replace(/\\([0rnt])/g, (_, c: string) => SOURCE_ESCAPES[c]);
-}
-
 /**
  * A literal's key, through literals.ts#normalizeLiteral so escapes, numeric
  * underscores and symbol-vs-string spellings are absorbed exactly once.
@@ -269,10 +261,7 @@ function foldSourceEscapes(value: string): string {
  * the same value here and must compare equal.
  */
 function normalizeLiteralArg(kind: LiteralValue["kind"], value: string): string | ArgFailure {
-  const key = normalizeLiteral({
-    kind,
-    value: kind === "string" || kind === "symbol" ? foldSourceEscapes(value) : value,
-  });
+  const key = normalizeLiteral({ kind, value });
   // A token the numeric arm cannot parse is uncomparable, not the value NaN: the
   // TS extractor records a BigInt literal with its `n` suffix (`123n`), which no
   // Ruby token ever spells, so comparing it would manufacture a shape row.
@@ -315,13 +304,13 @@ function splitPairs(body: string): string[] {
  * whole call site is silently dropped as uncomparable, losing exactly the
  * SQL-fragment arguments RFC 0095 §2 calls load-bearing.
  *
- * Percent- rather than backslash-escaped, because a `str:` payload's backslash
- * is NOT free: {@link foldSourceEscapes} canonicalizes `\n` and friends, so a
- * backslash escape here would consume the marker that arm reads and `"\\n"`
- * would stop comparing equal to a real newline.
+ * Percent- rather than backslash-escaped, because an `rstr:` payload's
+ * backslash is NOT free: it is Ruby source that literals.ts#decodeRubyString
+ * decodes, so a backslash escape here would be read as a Ruby one. `:` is
+ * escaped only in an `rstr:` opener, whose end it marks.
  */
 function unescapeDescriptorText(text: string): string {
-  return text.replace(/%(25|2C|3D|7B|7D)/g, (_, hex: string) =>
+  return text.replace(/%(25|2C|3A|3D|7B|7D)/g, (_, hex: string) =>
     String.fromCharCode(parseInt(hex, 16)),
   );
 }
@@ -379,6 +368,15 @@ function normalizeArgOrFailure(descriptor: string): string | ArgFailure {
   const value = descriptor.slice(sep + 1);
   if (kind === "id" || kind === "call") return `ref:${normalizeRef(value)}`;
   if (kind === "const") return normalizeConstantSpelling(value) ?? `const:${value}`;
+  if (kind === "rstr" || kind === "rsym") {
+    const openerEnd = value.indexOf(":");
+    const opener = unescapeDescriptorText(value.slice(0, openerEnd));
+    const text = decodeRubyString(
+      unescapeDescriptorText(value.slice(openerEnd + 1)),
+      opener || undefined,
+    );
+    return normalizeLiteralArg(kind === "rstr" ? "string" : "symbol", text);
+  }
   const literalKind = LITERAL_KINDS[kind];
   return literalKind === undefined
     ? OPAQUE

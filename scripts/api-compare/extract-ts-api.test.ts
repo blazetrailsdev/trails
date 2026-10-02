@@ -4049,6 +4049,23 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     expect(fns.find((m) => m.name === "timestamps")!.optionKeys).toHaveLength(6);
   });
 
+  it("takes a non-trailing param named options as the options hash", () => {
+    const info = extractFromFiles("/p", {
+      "collection-caching.ts": `
+        interface RenderOptions { cached?: boolean; as?: string }
+        interface View { controller: { performCaching?: boolean } }
+        export function isWillCache(options: RenderOptions, view: View): boolean {
+          return options.cached === true && view.controller.performCaching === true;
+        }
+      `,
+    });
+    const fn = Object.values(info.modules)
+      .flatMap((m) => [...m.instanceMethods, ...m.classMethods])
+      .find((m) => m.name === "isWillCache")!;
+    expect(fn.optionKeys).toEqual(["as", "cached"]);
+    expect(fn.optionReads).toEqual(["cached"]);
+  });
+
   it("extracts parameters onto a synthesized __mixin constructor", () => {
     const info = extractFromFiles("/p", {
       "attributes.ts": `

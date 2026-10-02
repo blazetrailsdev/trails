@@ -34,10 +34,7 @@ export function truncate(
 
   const textStr = text instanceof SafeBuffer ? text.toString() : text;
   const length = options.length ?? 30;
-  const truncated = stringTruncate(textStr, length, {
-    omission: options.omission,
-    separator: options.separator,
-  });
+  const truncated = stringTruncate(textStr, length, options);
 
   let content: SafeBuffer = options.escape === false ? htmlSafe(truncated) : htmlEscape(truncated);
 

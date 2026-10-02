@@ -5921,8 +5921,23 @@ function typeAdmitsBoolean(type: ts.Type): boolean {
 }
 
 /**
- * Advisory option-key extraction (see options-keys.ts). Resolves the LAST
- * parameter's object type to its property names. Returns: undefined (no
+ * The parameter that carries the options hash: one named `options` / `opts`,
+ * the names extract-ruby-api.rb `option_var_names` picks, else the trailing one.
+ * `will_cache?(options, view)` (partial_renderer/collection_caching.rb:16) keeps
+ * its hash first, so the trailing param would be `view`.
+ */
+function optionsParam(
+  parameters: ts.NodeArray<ts.ParameterDeclaration>,
+): ts.ParameterDeclaration | undefined {
+  return (
+    parameters.find((p) => ts.isIdentifier(p.name) && /^(options|opts)$/.test(p.name.text)) ??
+    parameters[parameters.length - 1]
+  );
+}
+
+/**
+ * Advisory option-key extraction (see options-keys.ts). Resolves the options
+ * parameter's ({@link optionsParam}) object type to its property names. Returns: undefined (no
  * options-shaped trailing param), null (uncheckable — `any`/`unknown` or a
  * string-index bag like `Record<string, unknown>`, distinct from `[]`), or the
  * sorted/deduped property names. Only interface/type-literal/intersection
@@ -5935,9 +5950,8 @@ export function extractOptionKeys(
   parameters: ts.NodeArray<ts.ParameterDeclaration>,
   checker: ts.TypeChecker,
 ): string[] | null | undefined {
-  if (parameters.length === 0) return undefined;
-  const last = parameters[parameters.length - 1];
-  if (last.dotDotDotToken || !last.type) return undefined;
+  const last = optionsParam(parameters);
+  if (last === undefined || last.dotDotDotToken || !last.type) return undefined;
   const tn = last.type;
   if (!ts.isTypeLiteralNode(tn) && !ts.isIntersectionTypeNode(tn) && !ts.isTypeReferenceNode(tn)) {
     return undefined;
@@ -5990,15 +6004,14 @@ export function extractOptionKeys(
  * `options` property is read through to it, as {@link extractOptionKeys} does.
  * The reader calls are the TS spellings of extract-ruby-api.rb
  * `OPTION_READER_METHODS`, plus `valuesAt`, which reads every key it names.
- * `undefined` when there is no body or no trailing options param.
+ * `undefined` when there is no body or no options param ({@link optionsParam}).
  */
 export function extractOptionReads(
   parameters: ts.NodeArray<ts.ParameterDeclaration>,
   body: ts.Node | undefined,
 ): string[] | undefined {
-  if (parameters.length === 0 || body === undefined) return undefined;
-  const last = parameters[parameters.length - 1];
-  if (last.dotDotDotToken) return undefined;
+  const last = optionsParam(parameters);
+  if (last === undefined || body === undefined || last.dotDotDotToken) return undefined;
   const vars = new Set<string>();
   const bags = new Set<string>();
   const keys = new Set<string>();
