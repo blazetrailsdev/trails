@@ -794,7 +794,7 @@ export class PostgreSQLAdapter
     let schema: string | undefined;
     [schema, name] = valuesAt(String(name).split("."), -2, -1) as [string | undefined, string];
     let sql = `CREATE EXTENSION IF NOT EXISTS "${name}"`;
-    if (schema) sql += ` SCHEMA ${schema}`;
+    if (schema != null) sql += ` SCHEMA ${schema}`;
     await this.internalExecQuery(sql);
     await this.reloadTypeMap();
   }
@@ -1119,7 +1119,7 @@ export class PostgreSQLAdapter
   }
   /** @internal */
   hasDefaultFunction(defaultValue: unknown, default_: string | null): boolean {
-    return defaultValue == null && default_ != null && DEFAULT_FUNCTION_RE.test(default_);
+    return !rtest(defaultValue) && default_ != null && DEFAULT_FUNCTION_RE.test(default_);
   }
   /** @internal */
   translateException(

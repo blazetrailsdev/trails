@@ -134,6 +134,7 @@ describe("PoolManager", () => {
 
     it("returns undefined for missing entries", () => {
       expect(manager.removePoolConfig("writing", "default")).toBeNull();
+      expect(manager.roleNames).toEqual(["writing"]);
     });
   });
 
