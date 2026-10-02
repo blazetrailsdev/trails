@@ -1,4 +1,4 @@
-import { Nodes, arelNode } from "@blazetrails/arel";
+import { Nodes } from "@blazetrails/arel";
 import {
   NoMethodError,
   rbObjClassname,
@@ -10,7 +10,7 @@ import {
   take as aryTake,
   uniq,
 } from "@blazetrails/ruby-compat";
-import { inOrderOf, wrap } from "@blazetrails/activesupport";
+import { inOrderOf, isPlainObject, wrap } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
 import {
   ArgumentError,
@@ -465,13 +465,8 @@ export function constructRelationForExists(this: FinderRelation, conditions: unk
   if (conditions === undefined) {
     return relation;
   }
-  if (Array.isArray(conditions)) {
-    const [sql, ...binds] = conditions as unknown[];
-    if (sql !== undefined) relation = relation.where(sql, ...binds);
-  } else if (arelNode(conditions)) {
-    relation = relation.where(conditions);
-  } else if (conditions !== null && typeof conditions === "object") {
-    if (Object.keys(conditions).length > 0) relation = relation.where(conditions);
+  if (Array.isArray(conditions) || isPlainObject(conditions) || conditions instanceof Map) {
+    if (!isEmpty(conditions)) relation = relation.where(conditions);
   } else {
     const pk = this.primaryKey;
     if (Array.isArray(pk)) {

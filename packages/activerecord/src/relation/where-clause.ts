@@ -309,8 +309,5 @@ function extractAttribute(node: Nodes.Node | Nodes.SqlLiteral | string): Arel.At
 
 /** @internal */
 function isEqualityNode(node: Nodes.Node | Nodes.SqlLiteral | string): boolean {
-  if (typeof node === "string") return false;
-  if (node instanceof Nodes.Equality) return true;
-  if (typeof (node as any).isEquality === "function") return (node as any).isEquality();
-  return false;
+  return !(typeof node === "string" || node instanceof Nodes.SqlLiteral) && node.isEquality();
 }

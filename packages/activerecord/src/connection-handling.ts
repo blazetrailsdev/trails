@@ -322,8 +322,8 @@ export function isPrimaryClass(this: typeof Base): boolean | undefined {
   return (this as unknown) === ActiveRecord.Base || coreIsApplicationRecordClass.call(this as any);
 }
 
-export function adapterClass(this: typeof Base): new (...args: any[]) => DatabaseAdapter {
-  return this.connectionPool().dbConfig.adapterClass() as new (...args: any[]) => DatabaseAdapter;
+export function adapterClass(this: typeof Base): typeof DatabaseAdapter {
+  return this.connectionPool().dbConfig.adapterClass() as typeof DatabaseAdapter;
 }
 
 export async function removeConnection(this: typeof Base): Promise<HashConfig | undefined> {

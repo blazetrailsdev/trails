@@ -910,8 +910,11 @@ export function extractFromProgram(
         for (const decl of node.declarationList.declarations) {
           if (!decl.name || !ts.isIdentifier(decl.name)) continue;
           if (isConstantCaseName(decl.name.text)) continue;
-          if (!decl.initializer || !ts.isObjectLiteralExpression(decl.initializer)) continue;
-          const methods = harvestObjectLiteralMethods(decl.initializer, checker, relPath);
+          if (!decl.initializer) continue;
+          const objectLiteral = ts.isObjectLiteralExpression(decl.initializer);
+          const methods = ts.isObjectLiteralExpression(decl.initializer)
+            ? harvestObjectLiteralMethods(decl.initializer, checker, relPath)
+            : harvestModuleInstanceMethods(decl.initializer, checker, relPath);
           if (methods.length === 0) continue;
           const modKey = `${relPath}:${decl.name.text}`;
           if (info.classes[modKey]) continue;
@@ -925,7 +928,7 @@ export function extractFromProgram(
               ...prior.instanceMethods.filter((m) => !bodied.has(m.name)),
             ];
             prior.noRailsEquivalent ??= modReason;
-            prior.objectLiteral = true;
+            if (objectLiteral) prior.objectLiteral = true;
             continue;
           }
           info.modules[modKey] = {
@@ -935,7 +938,7 @@ export function extractFromProgram(
             extends: [],
             instanceMethods: methods,
             classMethods: [],
-            objectLiteral: true,
+            ...(objectLiteral ? { objectLiteral: true } : {}),
             ...(modReason !== undefined ? { noRailsEquivalent: modReason } : {}),
           };
           fileHasClassOrModule = true;
@@ -3304,6 +3307,76 @@ function unwrapAssertions(expr: ts.Expression): ts.Expression {
   let cur = expr;
   while (ts.isAsExpression(cur) || ts.isSatisfiesExpression(cur)) cur = cur.expression;
   return cur;
+}
+
+/**
+ * The methods an exported `Module` instance is built with — Ruby's
+ * `module X; def m; end; end` ported as a live module (ruby-compat/src/include.ts):
+ *
+ * - `new Module().include({ m() {} })` — every object literal an `.include(...)`
+ *   chained on the construction is handed.
+ * - `new Module((mod) => { mod.defineMethod("m", fn) })` — every `defineMethod`
+ *   the block calls on its own parameter with a literal name.
+ */
+export function harvestModuleInstanceMethods(
+  init: ts.Expression,
+  checker: ts.TypeChecker,
+  file: string,
+): MethodInfo[] {
+  const literals: ts.ObjectLiteralExpression[] = [];
+  let cur = unwrapAssertions(init);
+  while (
+    ts.isCallExpression(cur) &&
+    ts.isPropertyAccessExpression(cur.expression) &&
+    cur.expression.name.text === "include"
+  ) {
+    const arg = cur.arguments[0] && unwrapAssertions(cur.arguments[0]);
+    if (arg && ts.isObjectLiteralExpression(arg)) literals.unshift(arg);
+    cur = unwrapAssertions(cur.expression.expression);
+  }
+  if (!ts.isNewExpression(cur) || !ts.isIdentifier(cur.expression)) return [];
+  if (cur.expression.text !== "Module") return [];
+  const out = literals.flatMap((literal) => harvestObjectLiteralMethods(literal, checker, file));
+
+  const block = cur.arguments?.[0];
+  if (!block || !(ts.isArrowFunction(block) || ts.isFunctionExpression(block))) return out;
+  const mod = block.parameters[0]?.name;
+  if (!mod || !ts.isIdentifier(mod)) return out;
+  const visit = (node: ts.Node): void => {
+    if (ts.isFunctionLike(node) && node !== block) return;
+    ts.forEachChild(node, visit);
+    if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return;
+    const receiver = node.expression.expression;
+    if (!ts.isIdentifier(receiver) || receiver.text !== mod.text) return;
+    if (node.expression.name.text !== "defineMethod") return;
+    const [name, body] = node.arguments;
+    if (!name || !ts.isStringLiteralLike(name) || !body) return;
+    const inline = ts.isFunctionExpression(body) || ts.isArrowFunction(body);
+    const params = inline ? extractParameters(body.parameters) : paramsOfCallableRef(body, checker);
+    if (!params) return;
+    const optionKeys = inline ? extractOptionKeys(body.parameters, checker) : undefined;
+    const calls = inline ? extractCalls(body.body) : undefined;
+    const callSeq = inline ? extractCallSeq(body.body) : undefined;
+    const callArgs = inline ? extractCallArgs(body.body) : undefined;
+    const noRailsEquivalent = ts.isExpressionStatement(node.parent)
+      ? noRailsEquivalentReason(node.parent)
+      : undefined;
+    out.push({
+      name: name.text,
+      visibility: "public",
+      params,
+      line: node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1,
+      file,
+      ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
+      ...(optionKeys !== undefined ? { optionKeys } : {}),
+      ...(calls !== undefined ? { calls } : {}),
+      ...(callSeq !== undefined ? { callSeq } : {}),
+      ...(callArgs !== undefined ? { callArgs } : {}),
+      ...(inline ? {} : { bodyless: true }),
+    });
+  };
+  visit(block.body);
+  return out;
 }
 
 export function harvestObjectLiteralMethods(

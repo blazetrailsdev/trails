@@ -7,6 +7,7 @@ import { Model, Errors } from "../index.js";
 import { NumericalityValidator, prepareValueForValidation } from "./numericality.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
 import { include } from "@blazetrails/activesupport";
+import { Range } from "@blazetrails/ruby-compat";
 
 class Person extends Model {
   name: string | null = null;
@@ -14,6 +15,25 @@ class Person extends Model {
 }
 
 describe("NumericalityValidator (trails-only)", () => {
+  it("hands the Range to the error and renders it through to_s", async () => {
+    class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static validatesNumericalityOf: (...args: unknown[]) => void;
+
+      static {
+        include(this, Attributes);
+        this.attribute("approved", "integer");
+        this.validatesNumericalityOf("approved", { in: new Range(1, 3) });
+      }
+    }
+    interface User extends Attributes {}
+
+    const user = new User({ approved: 4 });
+    expect(await user.isValid()).toBe(false);
+    expect(user.errors.get("approved")).toEqual(["must be in 1..3"]);
+    expect(user.errors.details.get("approved")![0].count).toBeInstanceOf(Range);
+  });
+
   it("rejects blank and whitespace-only strings", async () => {
     class User extends Model {
       declare static attribute: AttributesClassHalf["attribute"];

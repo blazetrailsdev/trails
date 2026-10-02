@@ -328,7 +328,8 @@ function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unk
  * JS spelling of a `Proc`, does not have) answers `Module#respond_to?`: its static data fields hold
  * what Ruby keeps in class-level ivars, not methods, and the lookup stops
  * short of `Function.prototype`, whose `call` / `apply` / `bind` no Ruby
- * `Module` defines.
+ * `Module` defines. A plain function's own `length` and `name` are its JS
+ * arity and function name, which no Ruby `Proc` defines.
  *
  * A writer `name=` is answered by a JS accessor's setter, the entry
  * {@link rbFSend} dispatches it to.
@@ -366,6 +367,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   const klass =
     typeof obj === "function" &&
     Object.getOwnPropertyDescriptor(obj, "prototype")?.writable === false;
+  if (typeof obj === "function" && !klass && (mid === "length" || mid === "name")) return false;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   for (
     let o: object | null = Object(obj);
@@ -1013,7 +1015,12 @@ export function isNil(obj: unknown): boolean {
  * which `rb_obj_as_string` returns unquoted — is its own `to_s`. A
  * `Uint8Array` is the binary String seat (see {@link rbEqual}), so it is
  * returned as it is (`string.c:1658`), and so is one a receiver's `to_s`
- * answers (`rb_obj_as_string_result`, `string.c:1666`).
+ * answers (`rb_obj_as_string_result`, `string.c:1666`). Otherwise
+ * it is a send (`rb_funcall(obj, idTo_s, 0)`, `string.c:1661`): a ported class
+ * defining `toS` answers it, and an answer that is not a String falls back to
+ * {@link rbAnyToS}. A ported `String` subclass that is not a JS string
+ * (`ActiveSupport::SafeBuffer`) marks itself one by `toStr`, so that is the
+ * `T_STRING` test on a `toS` answer.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_as_string`
  * (`vendor/ruby/v3.3.11/string.c:1653`); JS `String(x)` is not the same function, since
@@ -1030,6 +1037,11 @@ export function rbObjAsString(value: unknown): string | Uint8Array {
   if (Array.isArray(value)) return rbInspect(value);
   if (isPlainHash(value) || value instanceof Map) return rbInspect(value);
   if (typeof value === "number" || value instanceof Number) return floToS(value);
+  if (rbObjRespondTo(value, "toS")) {
+    const str = (value as { toS(): unknown }).toS();
+    if (str instanceof Uint8Array) return str;
+    return rbCheckStringType(str) ?? rbAnyToS(value as object);
+  }
   if (typeof value === "object") {
     const str: unknown = value.toString();
     if (typeof str === "string" || str instanceof Uint8Array) return str;

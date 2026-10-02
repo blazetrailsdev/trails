@@ -1,4 +1,4 @@
-import { sprintf } from "@blazetrails/ruby-compat";
+import { rbObjAsString, sprintf } from "@blazetrails/ruby-compat";
 import { ArgumentError, ReservedInterpolationKey } from "../exceptions.js";
 import { config, reservedKeysPattern, toSym } from "../i18n.js";
 
@@ -46,7 +46,7 @@ export function interpolateHash(string: string, values: Record<string, unknown>)
           ? values[key.slice(1)]
           : config().missingInterpolationArgumentHandler(key, values, string);
       if (typeof value === "function") value = (value as (v: unknown) => unknown)(values);
-      return format ? sprintf(`%${format}`, value) : String(value);
+      return format ? sprintf(`%${format}`, value) : rbObjAsString(value);
     },
   );
 

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { interpolate } from "./ruby.js";
 import { resetConfig } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
-import { ArgumentError as RubyArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError as RubyArgumentError, Range } from "@blazetrails/ruby-compat";
 import { ReservedInterpolationKey } from "../exceptions.js";
 
 describe("I18n.interpolate", () => {
@@ -17,6 +17,11 @@ describe("I18n.interpolate", () => {
       name: (v: { gender: string }) => (v.gender === "m" ? "Mr" : "Mrs"),
     };
     expect(interpolate("%{name}", values)).toBe("Mrs");
+  });
+
+  it("renders a value through its to_s", () => {
+    expect(interpolate("must be in %{count}", { count: new Range(1, 3) })).toBe("must be in 1..3");
+    expect(interpolate("%{list}|%{none}", { list: [1, "a"], none: null })).toBe('[1, "a"]|');
   });
 
   it("raises ReservedInterpolationKey for a reserved key", () => {

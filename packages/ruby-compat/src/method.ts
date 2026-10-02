@@ -1,6 +1,8 @@
 import { NameError } from "./name-error.js";
-import { checkArity } from "./string/support.js";
-import { FL_SINGLETON, rbObjClassname } from "./object.js";
+import { checkArity, rbCheckStringType } from "./string/support.js";
+import { isSymbol, symbolToS } from "./symbol.js";
+import { TypeError } from "./type-error.js";
+import { FL_SINGLETON, rbInspect, rbObjClassname } from "./object.js";
 
 /**
  * Ruby core `Method` (`vendor/ruby/v3.3.11/proc.c:1657` `mnew_missing` builds the
@@ -95,15 +97,20 @@ export function iseqLocationSetup(
  * `Kernel#method` (`vendor/ruby/v3.3.11/proc.c:2079` `rb_obj_method`, over `obj_method`
  * at `:2025`): the receiver's own method, else a `method_missing`-backed one
  * when `respond_to_missing?` answers for the name (`mnew_missing_by_name`,
- * `:1680`), else `rb_method_name_error`'s `NameError` (`:1996`).
+ * `:1680`), else `rb_method_name_error`'s `NameError` (`:1996`). The name is
+ * a Symbol (`":name"`) or a String, as `rb_check_id`
+ * (`vendor/ruby/v3.3.11/symbol.c:1096`) takes it.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbObjMethod(obj: unknown, vid: string): Method {
+export function rbObjMethod(obj: unknown, vid: unknown): Method {
+  const name = rbCheckStringType(vid);
+  if (name === null) throw new TypeError(`${rbInspect(vid)} is not a symbol nor a string`);
+  const id = isSymbol(name) ? symbolToS(name) : name;
   for (let o: object | null = Object(obj); o; o = Object.getPrototypeOf(o) as object | null) {
-    const entry = Object.getOwnPropertyDescriptor(o, vid);
+    const entry = Object.getOwnPropertyDescriptor(o, id);
     if (entry && typeof entry.value === "function") {
-      return new Method(obj, vid, entry.value as (...args: unknown[]) => unknown);
+      return new Method(obj, id, entry.value as (...args: unknown[]) => unknown);
     }
     if (entry) break;
   }
@@ -111,11 +118,11 @@ export function rbObjMethod(obj: unknown, vid: string): Method {
     respondToMissing?: (method: string, includePrivate: boolean) => unknown;
     methodMissing?: (method: string, ...args: unknown[]) => unknown;
   };
-  const found = target.respondToMissing?.(vid, false);
+  const found = target.respondToMissing?.(id, false);
   if (found != null && found !== false) {
-    return new Method(obj, vid, (...args) => target.methodMissing!(vid, ...args));
+    return new Method(obj, id, (...args) => target.methodMissing!(id, ...args));
   }
-  throw new NameError(`undefined method '${vid}' for an instance of ${rbObjClassname(obj)}`, vid, {
+  throw new NameError(`undefined method '${id}' for an instance of ${rbObjClassname(obj)}`, id, {
     receiver: obj,
   });
 }

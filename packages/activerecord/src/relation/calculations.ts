@@ -1,9 +1,18 @@
 import { TypeError } from "@blazetrails/ruby-compat";
 import type * as Arel from "@blazetrails/arel";
-import { Nodes, Table, SelectManager, arelNode, sql, star, type ArelNode } from "@blazetrails/arel";
+import {
+  Expressions,
+  Nodes,
+  Table,
+  SelectManager,
+  arelNode,
+  sql,
+  star,
+  type ArelNode,
+} from "@blazetrails/arel";
 import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
 import { any, BigDecimal, isPresent, many, tryCall } from "@blazetrails/activesupport";
-import { block, fetch, first, isEmpty, uniq } from "@blazetrails/ruby-compat";
+import { block, fetch, first, isEmpty, isModuleIncluded, uniq } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { Result, type ColumnType, type ColumnTypes } from "../result.js";
@@ -635,7 +644,13 @@ export function aggregateColumn(
   rel: CalculationRelation,
   columnName: string | ArelNode | number | null,
 ): unknown {
-  if (arelNode(columnName)) return columnName;
+  if (
+    columnName != null &&
+    typeof columnName === "object" &&
+    isModuleIncluded(columnName.constructor, Expressions)
+  ) {
+    return columnName;
+  }
   if (columnName === ":all") return star();
   return arelColumn.call(rel as never, columnName);
 }

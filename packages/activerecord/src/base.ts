@@ -1264,19 +1264,10 @@ export class Base extends Model {
       | Nodes.SqlLiteral,
     ...rest: unknown[]
   ): Relation<InstanceType<T>> | WhereChain<Relation<InstanceType<T>>> {
-    if (conditionsOrSql === undefined) {
-      return this.all().where();
-    }
-    if (typeof conditionsOrSql === "string" || conditionsOrSql instanceof Nodes.SqlLiteral) {
-      return this.all().where(conditionsOrSql, ...rest);
-    }
-    if (conditionsOrSql instanceof Nodes.Node) {
-      return this.all().where(conditionsOrSql);
-    }
-    if (Array.isArray(conditionsOrSql)) {
-      return this.all().where(conditionsOrSql as unknown[]);
-    }
-    return this.all().where(conditionsOrSql as Record<string, unknown>);
+    const all: {
+      where(...args: unknown[]): Relation<InstanceType<T>> | WhereChain<Relation<InstanceType<T>>>;
+    } = this.all();
+    return all.where(conditionsOrSql, ...rest);
   }
 
   static update<T extends typeof Base>(
