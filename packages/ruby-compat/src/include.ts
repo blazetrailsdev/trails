@@ -339,6 +339,7 @@ export class Module {
     let links = includerCarriers.get(this);
     if (!links) includerCarriers.set(this, (links = []));
     links.push(link);
+    Object.defineProperty(link, T_ICLASS, { value: this });
     Object.setPrototypeOf(proto, link);
   }
 

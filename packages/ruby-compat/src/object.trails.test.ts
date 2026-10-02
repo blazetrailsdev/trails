@@ -11,7 +11,6 @@ import {
   rbFSend,
   toSym,
   rbModPublicMethodDefined,
-  rbModAncestors,
   rbModInstanceMethod,
   rbDeclareIvar,
   rbObjInstanceVariables,
@@ -22,7 +21,7 @@ import {
   rbObjClass,
   rbSetClassPathString,
 } from "./object.js";
-import { Module } from "./include.js";
+import { Module, rbModAncestors } from "./include.js";
 import { cmp } from "./comparable.js";
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
@@ -264,10 +263,9 @@ describe("rbModAncestors / rbModInstanceMethod", () => {
     const mod = new Module();
     mod.defineMethod("cast", () => {});
     mod.appendFeatures(Sub);
-    const ancestors = rbModAncestors(Sub);
-    expect(ancestors.map((link) => Object.hasOwn(link, "cast"))).toEqual([false, true, false]);
-    expect(rbModInstanceMethod(Sub, "cast").owner).toBe(ancestors[1]);
-    expect(rbModInstanceMethod(Sub, "serialize").owner).toBe(Base.prototype);
+    expect(rbModAncestors(Sub)).toEqual([Sub, mod, Base, Object, "Kernel", "BasicObject"]);
+    expect(rbModInstanceMethod(Sub, "cast").owner).toBe(mod);
+    expect(rbModInstanceMethod(Sub, "serialize").owner).toBe(Base);
     expect(() => rbModInstanceMethod(Sub, "nope")).toThrow(NameError);
   });
 });
