@@ -271,6 +271,16 @@ describe("compareCallArgs built-in receiver as argument 1", () => {
       compareCallArgs(ruby, site("mergeBang", ["call:except", "id:extra", kwargs])).verdict,
     ).toBe("mismatch");
   });
+
+  it("strips the chained receiver of Enumerable#index_with", () => {
+    // access.rb:9 `methods.flatten.index_with { |method| public_send(method) }`,
+    // ported as `indexWith(methods.flat(), (method) => …)`.
+    const ruby = { ...site("index_with", [], ["block"]), recv: "call:flatten" };
+    expect(compareCallArgs(ruby, site("indexWith", ["call:flat"])).verdict).toBe("match");
+    expect(compareCallArgs(ruby, site("indexWith", ["call:flat", "id:extra"])).verdict).toBe(
+      "mismatch",
+    );
+  });
 });
 
 describe("compareCallArgs Regexp flag argument", () => {

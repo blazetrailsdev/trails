@@ -18,6 +18,7 @@
       "@blazetrails/ruby-compat/name-error": ["../../ruby-compat/src/name-error.ts"],
       "@blazetrails/ruby-compat/range": ["../../ruby-compat/src/range.ts"],
       "@blazetrails/ruby-compat": ["../../ruby-compat/src/index.ts"],
+      "@blazetrails/bcrypt": ["../../bcrypt/src/index.ts"],
       "@blazetrails/date": ["../../date/src/index.ts"],
       "@blazetrails/did-you-mean": ["../../did-you-mean/src/index.ts"],
       "@blazetrails/tse-compiler": ["../../tse-compiler/src/index.ts"],

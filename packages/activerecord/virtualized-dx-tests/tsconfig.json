@@ -18,6 +18,7 @@
       "@blazetrails/ruby-compat": ["../../ruby-compat/src/index.ts"],
       "@blazetrails/html-sanitizer": ["../../html-sanitizer/src/index.ts"],
       "@blazetrails/nokogiri": ["../../nokogiri/src/index.ts"],
+      "@blazetrails/bcrypt": ["../../bcrypt/src/index.ts"],
       "@blazetrails/date": ["../../date/src/index.ts"],
       "@blazetrails/activesupport/message-verifier": [
         "../../activesupport/src/message-verifier.ts"

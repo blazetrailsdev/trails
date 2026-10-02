@@ -1,6 +1,6 @@
 import { camelize, include, isPresent, Module } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { Engine, Password } from "./bcrypt.js";
+import { Engine, Password } from "@blazetrails/bcrypt";
 import { Validations } from "./validations.js";
 import { Model } from "./model.js";
 

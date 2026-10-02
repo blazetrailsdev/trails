@@ -4,7 +4,7 @@
 import { assertRespondTo, assertNotRespondTo, assertNil } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Engine, Password } from "./bcrypt.js";
+import { Engine, Password } from "@blazetrails/bcrypt";
 import { hasSecurePassword, SecurePassword } from "./secure-password.js";
 import { Validations } from "./validations.js";
 import { User } from "./test-helpers/models/user.js";

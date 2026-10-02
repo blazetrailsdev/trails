@@ -64,6 +64,7 @@ export const GATED_PACKAGES = [
   "activerecord-test-support",
   "activesupport",
   "arel",
+  "bcrypt",
   "did-you-mean",
   "globalid",
   "i18n",

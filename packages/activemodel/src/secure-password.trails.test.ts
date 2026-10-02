@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Model } from "./index.js";
 import { hasSecurePassword, SecurePassword } from "./secure-password.js";
-import { Engine, Errors, Password } from "./bcrypt.js";
+import { Errors } from "@blazetrails/bcrypt";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 import { include } from "@blazetrails/activesupport";
 import { User } from "./test-helpers/models/user.js";
@@ -190,26 +190,6 @@ describe("SecurePasswordTrailsTest", () => {
     const user = new User();
     user.password_digest = "not-a-bcrypt-hash";
     expect(() => user.authenticate("secret")).toThrow(Errors.InvalidHash);
-  });
-
-  it("BCrypt::Password.create falls back to Engine.cost for a nil or false cost", () => {
-    const original = Engine.cost;
-    try {
-      Engine.cost = 5;
-      expect(Password.create("secret", { cost: null }).cost).toBe(5);
-      expect(Password.create("secret", { cost: false }).cost).toBe(5);
-      expect(Password.create("secret", { cost: 4 }).version).toBe("2a");
-    } finally {
-      Engine.cost = original;
-    }
-  });
-
-  it("BCrypt::Engine.hash_secret truncates a secret at 72 bytes and rejects one with no to_s", () => {
-    const salt = Engine.generateSalt(4);
-    const secret = "é".repeat(36);
-    expect(Engine.hashSecret(`${secret}zz`, salt)).toBe(Engine.hashSecret(secret, salt));
-    expect(() => Engine.hashSecret(Object.create(null), salt)).toThrow(Errors.InvalidSecret);
-    expect(() => Engine.hashSecret("secret", "nope")).toThrow(Errors.InvalidSalt);
   });
 
   it("password_salt returns the bcrypt salt from the digest", () => {

@@ -196,6 +196,7 @@ export const MANIFEST_PACKAGES = [
   "globalid",
   "i18n",
   "did-you-mean",
+  "bcrypt",
   "sqlite3",
   "thor",
 ] as const;

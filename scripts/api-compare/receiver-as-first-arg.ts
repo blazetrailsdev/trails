@@ -100,6 +100,11 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // the same reason `group_by` is: the Hash is keyed by VALUE, not by string
   // coercion, so no `Array.prototype` analogue exists.
   "index_by",
+  // active_support/core_ext/enumerable.rb:75-87 — `methods.flatten.index_with { … }`
+  // (activemodel/lib/active_model/access.rb:9), exported by
+  // @blazetrails/activesupport as `indexWith(collection, block)`, as `index_by`
+  // above is.
+  "index_with",
   // active_support/core_ext/enumerable.rb:184-186 — `values.compact_blank`,
   // exported by @blazetrails/activesupport as `compactBlank(collection)`.
   "compact_blank",

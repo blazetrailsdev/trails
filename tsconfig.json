@@ -22,6 +22,7 @@
     { "path": "packages/ruby-compat/tsconfig.test.json" },
     { "path": "packages/date" },
     { "path": "packages/activesupport" },
+    { "path": "packages/bcrypt" },
     { "path": "packages/tse-compiler" },
     { "path": "packages/arel" },
     { "path": "packages/activemodel" },

@@ -88,6 +88,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "activerecord-test-support",
   "activesupport",
   "arel",
+  "bcrypt",
   "did-you-mean",
   "globalid",
   "i18n",

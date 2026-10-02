@@ -109,6 +109,20 @@ describe("vendor/sources.ts", () => {
     expect(vendoredRoot("rack-test").endsWith("vendor/rack-test/v2.2.0")).toBe(true);
   });
 
+  it("declares the bcrypt-ruby source, enrolled in api-compare only", () => {
+    // vendor/rails/v8.0.2/Gemfile:34 declares `gem "bcrypt", "~> 3.1.11"`;
+    // v3.1.20 is what vendor/rails/v8.0.2/Gemfile.lock:145 resolves.
+    const bcrypt = SOURCES.find((s) => s.name === "bcrypt-ruby");
+    expect(bcrypt!.origin).toEqual({
+      type: "git",
+      url: "https://github.com/bcrypt-ruby/bcrypt-ruby.git",
+      ref: "v3.1.20",
+    });
+    expect(apiComparePackages()).toContain("bcrypt");
+    expect(Object.keys(testPathsManifest())).not.toContain("bcrypt");
+    expect(resolvePath("bcrypt").endsWith("vendor/bcrypt-ruby/v3.1.20/lib/bcrypt")).toBe(true);
+  });
+
   it("declares the globalid source (wave 3)", () => {
     const gid = SOURCES.find((s) => s.name === "globalid");
     expect(gid).toBeDefined();
@@ -360,6 +374,7 @@ describe("vendor/sources.ts", () => {
         "activerecord-test-support",
         "activesupport",
         "arel",
+        "bcrypt",
         "did-you-mean",
         "globalid",
         "i18n",
