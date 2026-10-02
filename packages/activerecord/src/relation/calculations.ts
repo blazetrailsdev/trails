@@ -824,10 +824,7 @@ export async function executeSimpleCalculation(
   return typeCastCalculatedValue(first(result.castValues()), operation, type);
 }
 
-/**
- * @internal
- * @missingRailsArgs fetch — CONVERGEABLE call-args-gate-aligns-the-receiver-of-function-form-fetch-and-max
- */
+/** @internal */
 export async function executeGroupedCalculation(
   rel: CalculationRelation,
   operation: string,
@@ -963,10 +960,7 @@ export function typeFor(
   return rel.model.typeForAttribute?.(fieldName, block);
 }
 
-/**
- * @internal
- * @missingRailsArgs fetch — CONVERGEABLE call-args-gate-aligns-the-receiver-of-function-form-fetch-and-max
- */
+/** @internal */
 export function lookupCastTypeFromJoinDependencies(
   rel: CalculationRelation,
   name: string,

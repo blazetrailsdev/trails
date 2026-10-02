@@ -132,12 +132,13 @@ let currentImportAliases: ReadonlyMap<string, string> | undefined;
 let currentChecker: ts.TypeChecker | undefined;
 
 /**
- * The local names a file binds `block` from `@blazetrails/ruby-compat` to —
- * the mark a value-or-block argument position carries (`rb_block_given_p`,
- * `vendor/ruby/v3.3.11/eval.c:866`). Read by `isMarkedBlockArg`, so a same-named local
- * parameter cannot pass for it.
+ * Per file, each local name bound from `@blazetrails/ruby-compat` → the export
+ * it binds. Read by `isMarkedBlockArg` for `block`, the mark a value-or-block
+ * argument position carries (`rb_block_given_p`, `vendor/ruby/v3.3.11/eval.c:866`),
+ * so a same-named local parameter cannot pass for it; and by `recordCallSite`
+ * for `CallSite.rubyCompat`.
  */
-const blockMarkNames = new WeakMap<ts.SourceFile, ReadonlySet<string>>();
+const rubyCompatBindings = new WeakMap<ts.SourceFile, ReadonlyMap<string, string>>();
 
 interface CacheEntry {
   schemaVersion: string;
@@ -4427,17 +4428,17 @@ export function extractInternalFileConstants(sourceFile: ts.SourceFile): string[
 }
 
 /** Collect relative-module renamed-import aliases (`import { a as b }` → b→a). */
-function blockMarkNamesFor(sourceFile: ts.SourceFile): ReadonlySet<string> {
-  let names = blockMarkNames.get(sourceFile);
-  if (!names) {
-    names = collectBlockMarkNames(sourceFile);
-    blockMarkNames.set(sourceFile, names);
+function rubyCompatBindingsFor(sourceFile: ts.SourceFile): ReadonlyMap<string, string> {
+  let bindings = rubyCompatBindings.get(sourceFile);
+  if (!bindings) {
+    bindings = collectRubyCompatBindings(sourceFile);
+    rubyCompatBindings.set(sourceFile, bindings);
   }
-  return names;
+  return bindings;
 }
 
-function collectBlockMarkNames(sourceFile: ts.SourceFile): Set<string> {
-  const names = new Set<string>();
+function collectRubyCompatBindings(sourceFile: ts.SourceFile): Map<string, string> {
+  const bindings = new Map<string, string>();
   ts.forEachChild(sourceFile, (node) => {
     if (
       !ts.isImportDeclaration(node) ||
@@ -4449,10 +4450,10 @@ function collectBlockMarkNames(sourceFile: ts.SourceFile): Set<string> {
     }
     if (!node.moduleSpecifier.text.startsWith("@blazetrails/ruby-compat")) return;
     for (const el of node.importClause.namedBindings.elements) {
-      if ((el.propertyName ?? el.name).text === "block") names.add(el.name.text);
+      bindings.set(el.name.text, (el.propertyName ?? el.name).text);
     }
   });
-  return names;
+  return bindings;
 }
 
 function collectImportAliases(sourceFile: ts.SourceFile): Map<string, string> {
@@ -5369,6 +5370,9 @@ function recordCallSite(
       ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)
         ? describeArg(callee.expression, [])
         : undefined;
+    const rubyCompat = ts.isIdentifier(callee)
+      ? rubyCompatBindingsFor(call.getSourceFile()).get(callee.text)
+      : undefined;
     sites.push({
       name,
       args,
@@ -5376,6 +5380,7 @@ function recordCallSite(
       ...(recv !== undefined && recv !== "?" && recv !== "id:this" && !recv.startsWith("const:")
         ? { recv }
         : {}),
+      ...(rubyCompat !== undefined ? { rubyCompat } : {}),
     });
   }
 
@@ -5454,7 +5459,9 @@ function dispatchedCallName(call: ts.CallExpression): string | undefined {
 function isMarkedBlockArg(expr: ts.Expression): boolean {
   if (!ts.isCallExpression(expr)) return false;
   if (!ts.isIdentifier(expr.expression)) return false;
-  if (!blockMarkNamesFor(expr.getSourceFile()).has(expr.expression.text)) return false;
+  if (rubyCompatBindingsFor(expr.getSourceFile()).get(expr.expression.text) !== "block") {
+    return false;
+  }
   if (expr.arguments.length !== 1) return false;
   const inner = expr.arguments[0];
   return ts.isArrowFunction(inner) || ts.isFunctionExpression(inner);

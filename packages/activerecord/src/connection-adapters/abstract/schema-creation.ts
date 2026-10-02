@@ -320,10 +320,7 @@ export class SchemaCreation {
     return createSql;
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs merge — CONVERGEABLE call-args-gate-aligns-the-receiver-of-a-function-form-hash-merge
-   */
+  /** @internal */
   protected columnOptions(o: ColumnDefinition): Record<string, unknown> {
     return merge(o.options, { column: o });
   }

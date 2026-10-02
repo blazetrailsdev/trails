@@ -42,6 +42,14 @@ export interface CallSite {
    * Ruby receiver into the argument list.
    */
   recv?: string;
+  /**
+   * TS side only: the `@blazetrails/ruby-compat` export a bare-identifier
+   * callee binds to (`merge` for `merge(a, b)` under
+   * `import { merge } from "@blazetrails/ruby-compat"`). It proves the port
+   * moved a Ruby built-in's receiver into argument 1, which the call NAME alone
+   * cannot where Rails defines the same name (`Relation#merge`).
+   */
+  rubyCompat?: string;
 }
 
 export interface ParamInfo {

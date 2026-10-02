@@ -1200,3 +1200,117 @@ describe("pairCallSites core_ext receiver as argument 1", () => {
     expect(result.tsArgs).toEqual(["ref:length"]);
   });
 });
+
+describe("compareCallArgs function-form Hash#merge", () => {
+  // schema_definitions.rb:267 `as_options(index).merge(conditional_options)`,
+  // ported as ruby-compat's `merge(this.asOptions(index), this.conditionalOptions())`.
+  const ruby = { ...site("merge", ["call:conditional_options"]), recv: "call:as_options" };
+
+  it("aligns the receiver of ruby-compat's merge export", () => {
+    const ts = {
+      ...site("merge", ["call:asOptions", "call:conditionalOptions"]),
+      rubyCompat: "merge",
+    };
+    expect(compareCallArgs(ruby, ts).verdict).toBe("match");
+    // schema_creation.rb:147 `o.options.merge(column: o)`.
+    expect(
+      compareCallArgs(
+        { ...site("merge", ["kwargs{column=id:o}"]), recv: "call:options" },
+        { ...site("merge", ["call:options", "kwargs{column=id:o}"]), rubyCompat: "merge" },
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("still flags a genuine extra argument past the receiver", () => {
+    const ts = {
+      ...site("merge", ["call:asOptions", "call:conditionalOptions", "id:extra"]),
+      rubyCompat: "merge",
+    };
+    expect(compareCallArgs(ruby, ts).verdict).toBe("mismatch");
+  });
+
+  it("does not align a bare merge that is not the ruby-compat export", () => {
+    expect(
+      compareCallArgs(ruby, site("merge", ["call:asOptions", "call:conditionalOptions"])).verdict,
+    ).toBe("mismatch");
+    expect(
+      compareCallArgs(ruby, {
+        ...site("merge", ["call:asOptions", "call:conditionalOptions"]),
+        rubyCompat: "mergeBang",
+      }).verdict,
+    ).toBe("mismatch");
+  });
+
+  it("compares a Relation#merge method call as written", () => {
+    // relation/spawn_methods.rb:33 `Relation#merge(other, *rest)`.
+    const relation = { ...site("merge", ["id:other"]), recv: "id:relation" };
+    expect(
+      compareCallArgs(relation, { ...site("merge", ["id:other"]), recv: "id:relation" }).verdict,
+    ).toBe("match");
+    const extra = compareCallArgs(relation, {
+      ...site("merge", ["id:other", "id:extra"]),
+      recv: "id:relation",
+    });
+    expect(extra.verdict).toBe("mismatch");
+    expect(extra.class).toBe("shape");
+    // A method call carries no `rubyCompat`, so its leading argument is never
+    // read as the Ruby receiver.
+    expect(
+      compareCallArgs(ruby, {
+        ...site("merge", ["call:asOptions", "call:conditionalOptions"]),
+        recv: "id:scope",
+      }).verdict,
+    ).toBe("mismatch");
+  });
+});
+
+describe("compareCallArgs function-form Hash#fetch", () => {
+  // calculations.rb:570 `calculated_data.column_types.fetch(aliaz, Type.default_value)`.
+  const ruby = { ...site("fetch", ["id:aliaz", "call:default_value"]), recv: "call:column_types" };
+
+  it("aligns the receiver of ruby-compat's fetch export", () => {
+    const ts = {
+      ...site("fetch", ["call:columnTypes", "id:aliaz", "call:defaultValue"]),
+      rubyCompat: "fetch",
+    };
+    expect(compareCallArgs(ruby, ts).verdict).toBe("match");
+  });
+
+  it("compares a Cache::Store#fetch method call as written", () => {
+    // cache.rb:444 `Store#fetch(name, options = nil, &block)`.
+    const cache = { ...site("fetch", ["id:key"]), recv: "id:cache" };
+    expect(compareCallArgs(cache, { ...site("fetch", ["id:key"]), recv: "id:cache" }).verdict).toBe(
+      "match",
+    );
+    const extra = compareCallArgs(cache, {
+      ...site("fetch", ["id:key", "id:options"]),
+      recv: "id:cache",
+    });
+    expect(extra.verdict).toBe("mismatch");
+    expect(extra.class).toBe("shape");
+  });
+});
+
+describe("pairCallSites receiver-name tie-break", () => {
+  // attribute_set/builder.rb:36-39 `values.keys | types.keys | @attributes.keys`.
+  const rubySites = [
+    { ...site("keys", []), recv: "id:values" },
+    { ...site("keys", []), recv: "id:types" },
+    { ...site("keys", []), recv: "id:@attributes" },
+  ];
+  const indexedRowArm = { ...site("keys", []), recv: "id:values" };
+  const hashArm = site("keys", ["id:values"]);
+  const tail = [site("keys", ["id:types"]), site("keys", ["id:_attributes"])];
+
+  for (const [order, tsSites] of [
+    ["IndexedRow arm first", [indexedRowArm, hashArm, ...tail]],
+    ["Hash arm first", [hashArm, indexedRowArm, ...tail]],
+  ] as const) {
+    it(`pairs @attributes with keys(_attributes), ${order}`, () => {
+      const pairs = pairCallSites(rubySites, tsSites);
+      const attributes = pairs.find((p) => p.ruby.recv === "id:@attributes");
+      expect(attributes?.ts.args).toEqual(["id:_attributes"]);
+      expect(pairs.find((p) => p.ruby.recv === "id:types")?.ts.args).toEqual(["id:types"]);
+    });
+  }
+});
