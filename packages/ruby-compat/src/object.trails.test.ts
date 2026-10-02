@@ -106,6 +106,14 @@ describe("Object#to_s", () => {
     expect(toS(3)).toBe("3");
     expect(toS(null)).toBe("");
     expect(toS("hi")).toBe("hi");
+    const bytes = new Uint8Array([0x80, 0x81]);
+    expect(toS(bytes)).toBe(bytes);
+    class Data {
+      toString() {
+        return bytes;
+      }
+    }
+    expect(toS(new Data())).toBe(bytes);
     expect(toS([{ a: 1 }])).toBe('[{"a"=>1}]');
   });
 });

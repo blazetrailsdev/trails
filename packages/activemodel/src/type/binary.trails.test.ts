@@ -17,6 +17,17 @@ describe("BinaryTypeTrails", () => {
     expect(result!.bytes).toEqual(bytes);
   });
 
+  it("Data#initialize takes another Data's bytes without decoding them", () => {
+    const bytes = new Uint8Array([0x80, 0x81]);
+    expect(new BinaryData(new BinaryData(bytes)).toString()).toBe(bytes);
+    expect(new BinaryData("ƒée").toString()).toEqual(new TextEncoder().encode("ƒée"));
+    expect(new BinaryData(1).toString()).toEqual(new Uint8Array([0x31]));
+  });
+
+  it("Data#equals compares a non-ASCII String as Ruby does a UTF-8 one with a binary one", () => {
+    expect(new BinaryData("ƒée").equals("ƒée")).toBe(false);
+  });
+
   it("Data#equals compares bytes, not the decoded string", () => {
     const a = new BinaryData(new Uint8Array([0x80, 0x81]));
     const b = new BinaryData(new Uint8Array([0x82, 0x83]));

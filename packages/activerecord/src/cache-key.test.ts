@@ -111,7 +111,7 @@ describe("CacheKeyTest", () => {
       const CacheMeWithVersion = cacheMeWithVersion();
       const record = await CacheMeWithVersion.create({});
       await record.updateColumns({
-        updated_at: Temporal.Instant.from("2016-11-12T00:00:00.000000Z"),
+        updated_at: RubyTime.utc(2016, 11, 12, 0, 0, 0, 0),
       });
       const recordFromDb = await CacheMeWithVersion.find(record.id);
       const spy = vi.spyOn(recordFromDb, "readAttribute");
@@ -163,7 +163,7 @@ describe("CacheKeyTest", () => {
     const record = await CacheMeWithVersion.create({});
     const recordFromDb = await CacheMeWithVersion.find(record.id);
     const spy = vi.spyOn(recordFromDb, "readAttribute");
-    recordFromDb.updated_at = new Date("2016-11-12T01:02:03Z");
+    recordFromDb.updated_at = RubyTime.utc(2016, 11, 12, 1, 2, 3);
     recordFromDb.cacheVersion();
     expect(spy).toHaveBeenCalledWith("updated_at");
   });
@@ -194,7 +194,7 @@ describe("CacheKeyTest", () => {
     const record = await CacheMeWithVersion.create({});
     const recordFromDb = await CacheMeWithVersion.find(record.id);
     const spy = vi.spyOn(recordFromDb, "readAttribute");
-    recordFromDb.updated_at = new Date(Date.UTC(2016, 10, 12, 1, 2, 3));
+    recordFromDb.updated_at = RubyTime.utc(2016, 11, 12, 1, 2, 3);
     recordFromDb.cacheVersion();
     expect(spy).toHaveBeenCalledWith("updated_at");
   });

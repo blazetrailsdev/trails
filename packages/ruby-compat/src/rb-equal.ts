@@ -44,6 +44,14 @@ export function rbEql(a: unknown, b: unknown): boolean {
 function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
+  /* `rb_str_equal` (`vendor/ruby/v3.3.11/string.c:3742`) compares a UTF-8 String
+     with a binary one, whose seat is a `Uint8Array`, only where
+     `rb_str_comparable` (`string.c:3671`) allows it, which is when one of them
+     is 7-bit, and then by their bytes. */
+  if (typeof a === "string" && b instanceof Uint8Array) {
+    return a.length === b.length && b.every((byte, i) => byte < 0x80 && byte === a.charCodeAt(i));
+  }
+  if (a instanceof Uint8Array && typeof b === "string") return equalOrEql(b, a, eql);
   /* `rb_str_equal` (`vendor/ruby/v3.3.11/string.c:3742`): a non-String answering
      `to_str` is asked `other == self` in turn. */
   if (typeof a === "string" && typeof b !== "string") {

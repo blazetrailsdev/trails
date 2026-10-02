@@ -1,6 +1,5 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 
 function epochMs(v: unknown): number {
   if (v instanceof RubyTime) return v.toF() * 1000;
@@ -564,8 +563,8 @@ describe("PersistenceTest", () => {
   it("save touch false", async () => {
     const parrot = await Parrot.createBang({
       name: "Bob",
-      created_at: instant("2003-07-15T14:28:11.223Z"),
-      updated_at: instant("2003-07-15T14:28:11.223Z"),
+      created_at: RubyTime.utc(2003, 7, 15, 14, 28, 11, 223000),
+      updated_at: RubyTime.utc(2003, 7, 15, 14, 28, 11, 223000),
     });
 
     const createdAt = parrot.created_at;
@@ -895,11 +894,11 @@ describe("PersistenceTest", () => {
   fixtures(["parrots"]);
 
   it("create with custom timestamps", async () => {
-    const customDatetime = instant("2026-01-01T00:00:00Z");
+    const customDatetime = RubyTime.utc(2026, 1, 1);
     for (const attr of ["created_at", "created_on", "updated_at", "updated_on"]) {
       const parrot = await LiveParrot.create({ name: "colombian", [attr]: customDatetime });
       expect(Math.floor(epochMs(parrot.readAttribute(attr) as RubyTime) / 1000)).toBe(
-        Math.floor(customDatetime.epochMilliseconds / 1000),
+        Math.floor(epochMs(customDatetime) / 1000),
       );
     }
   });
@@ -929,14 +928,14 @@ describe("PersistenceTest", () => {
 
   it("update column should not modify updated at", async () => {
     const developer = await Developer.find(1);
-    const prevMonth = instant("2026-05-25T12:00:00Z");
+    const prevMonth = RubyTime.utc(2026, 5, 25, 12);
     await developer.updateColumn("updated_at", prevMonth);
-    expect(epochMs(developer.readAttribute("updated_at"))).toBe(prevMonth.epochMilliseconds);
+    expect(epochMs(developer.readAttribute("updated_at"))).toBe(epochMs(prevMonth));
     await developer.updateColumn("salary", 80001);
-    expect(epochMs(developer.readAttribute("updated_at"))).toBe(prevMonth.epochMilliseconds);
+    expect(epochMs(developer.readAttribute("updated_at"))).toBe(epochMs(prevMonth));
     await developer.reload();
     expect(Math.floor(epochMs(developer.readAttribute("updated_at")) / 1000)).toBe(
-      Math.floor(prevMonth.epochMilliseconds / 1000),
+      Math.floor(epochMs(prevMonth) / 1000),
     );
   });
 
@@ -1307,16 +1306,16 @@ describe("PersistenceTest", () => {
 
   it("update attribute for updated at on", async () => {
     const developer = await CanonicalDeveloper.find(1);
-    const prevMonth = instant("2026-05-25T12:00:00Z");
+    const prevMonth = RubyTime.utc(2026, 5, 25, 12);
 
     await developer.updateAttribute("updated_at", prevMonth);
-    expect(epochMs(developer.updated_at)).toBe(prevMonth.epochMilliseconds);
+    expect(epochMs(developer.updated_at)).toBe(epochMs(prevMonth));
 
     await developer.updateAttribute("salary", 80001);
-    expect(epochMs(developer.updated_at)).not.toBe(prevMonth.epochMilliseconds);
+    expect(epochMs(developer.updated_at)).not.toBe(epochMs(prevMonth));
 
     await developer.reload();
-    expect(epochMs(developer.updated_at)).not.toBe(prevMonth.epochMilliseconds);
+    expect(epochMs(developer.updated_at)).not.toBe(epochMs(prevMonth));
   });
 
   it("update attribute!", async () => {
@@ -1333,16 +1332,16 @@ describe("PersistenceTest", () => {
 
   it("update attribute for updated at on!", async () => {
     const developer = await CanonicalDeveloper.find(1);
-    const prevMonth = instant("2026-05-25T12:00:00Z");
+    const prevMonth = RubyTime.utc(2026, 5, 25, 12);
 
     await developer.updateAttributeBang("updated_at", prevMonth);
-    expect(epochMs(developer.updated_at)).toBe(prevMonth.epochMilliseconds);
+    expect(epochMs(developer.updated_at)).toBe(epochMs(prevMonth));
 
     await developer.updateAttributeBang("salary", 80001);
-    expect(epochMs(developer.updated_at)).not.toBe(prevMonth.epochMilliseconds);
+    expect(epochMs(developer.updated_at)).not.toBe(epochMs(prevMonth));
 
     await developer.reload();
-    expect(epochMs(developer.updated_at)).not.toBe(prevMonth.epochMilliseconds);
+    expect(epochMs(developer.updated_at)).not.toBe(epochMs(prevMonth));
   });
 
   it("update columns should not leave the object dirty", async () => {
@@ -1736,17 +1735,17 @@ describe("PersistenceTest", () => {
   it("update columns should not modify updated at", async () => {
     void developers;
     const developer = await CanonicalDeveloper.find(1);
-    const prevMonth = Temporal.Instant.from("2003-06-16T00:00:00Z");
+    const prevMonth = RubyTime.utc(2003, 6, 16);
 
     await (developer as any).updateColumns({ updated_at: prevMonth });
-    expect(epochMs((developer as any).updated_at)).toBe(prevMonth.epochMilliseconds);
+    expect(epochMs((developer as any).updated_at)).toBe(epochMs(prevMonth));
 
     await (developer as any).updateColumns({ salary: 80000 });
-    expect(epochMs((developer as any).updated_at)).toBe(prevMonth.epochMilliseconds);
+    expect(epochMs((developer as any).updated_at)).toBe(epochMs(prevMonth));
     expect((developer as any).salary).toBe(80000);
 
     await (developer as any).reload();
-    expect(epochMs((developer as any).updated_at)).toBe(prevMonth.epochMilliseconds);
+    expect(epochMs((developer as any).updated_at)).toBe(epochMs(prevMonth));
     expect((developer as any).salary).toBe(80000);
   });
 });

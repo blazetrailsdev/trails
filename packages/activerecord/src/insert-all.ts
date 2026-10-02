@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import * as Arel from "@blazetrails/arel";
 import { Nodes } from "@blazetrails/arel";
 import { ArgumentError, SerializeCastValue, type ValueType } from "@blazetrails/activemodel";
@@ -411,7 +411,7 @@ export class InsertAll {
 
   /** @internal */
   private timestampsForCreate(): Record<string, unknown> {
-    const now = Temporal.Now.instant();
+    const now = RubyTime.now();
     const result: Record<string, unknown> = {};
     for (const col of this.model.allTimestampAttributesInModel()) {
       result[col] = now;

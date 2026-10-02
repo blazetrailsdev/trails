@@ -110,7 +110,7 @@ async function assertTouching(
   attributes: string[],
   block: () => Promise<void>,
 ): Promise<void> {
-  const fiveMinutesAgo = Temporal.Now.instant().subtract({ hours: 0, minutes: 5 });
+  const fiveMinutesAgo = RubyTime.now().minus(300);
   const stale: Record<string, unknown> = {};
   for (const attr of attributes) stale[attr] = fiveMinutesAgo;
   await record.updateColumns(stale);
@@ -562,7 +562,7 @@ describe("CounterCacheTest", () => {
   });
 
   it("update counters doesn't touch timestamps by default", async () => {
-    await topic.updateColumn("updated_at", Temporal.Now.instant().subtract({ minutes: 5 }));
+    await topic.updateColumn("updated_at", RubyTime.now().minus(300));
     const previouslyUpdatedAt = topic.updated_at;
 
     await Topic.updateCounters(topic.id, { replies_count: -1 });
@@ -571,7 +571,7 @@ describe("CounterCacheTest", () => {
   });
 
   it("update counters doesn't touch timestamps with touch: []", async () => {
-    await topic.updateColumn("updated_at", Temporal.Now.instant().subtract({ minutes: 5 }));
+    await topic.updateColumn("updated_at", RubyTime.now().minus(300));
     const previouslyUpdatedAt = topic.updated_at;
 
     await Topic.updateCounters(topic.id, { replies_count: -1, touch: [] as string[] });

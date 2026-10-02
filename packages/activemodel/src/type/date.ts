@@ -46,14 +46,6 @@ export class DateType extends ValueType<DateCastResult> {
       return this.fastStringToDate(value) ?? this.fallbackStringToDate(value);
     } else if (value instanceof Temporal.PlainDateTime) {
       return value.toPlainDate();
-      // boundary: a JS Date assigned to a date attribute is Ruby's ::Time.
-    } else if (value instanceof Date) {
-      if (Number.isNaN(value.getTime())) return null;
-      return Temporal.PlainDate.from({
-        year: value.getUTCFullYear(),
-        month: value.getUTCMonth() + 1,
-        day: value.getUTCDate(),
-      });
     } else if (rbObjRespondTo(value, "toDate")) {
       return (value as { toDate(): DateCastResult }).toDate();
     } else {

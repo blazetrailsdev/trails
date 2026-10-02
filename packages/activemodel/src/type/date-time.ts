@@ -45,12 +45,8 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
   /** @internal */
   protected castValue(value: unknown): DateTimeCastResult | null {
     let seconds: Rational | null = null;
-    // boundary: a JS `Date`, a `Temporal.Instant`, and the `Temporal.PlainDateTime` / `Temporal.ZonedDateTime` `DateTime.civil` returns each stand for the Ruby ::Time or ::DateTime `cast_value` receives.
-    if (value instanceof Date) {
-      seconds = new Rational(value.getTime(), 1000);
-    } else if (value instanceof Temporal.Instant) {
-      seconds = new Rational(value.epochNanoseconds, 1_000_000_000n);
-    } else if (value instanceof Temporal.PlainDateTime) {
+    // boundary: the `Temporal.PlainDateTime` / `Temporal.ZonedDateTime` `DateTime.civil` returns stands for the Ruby ::DateTime `cast_value` receives.
+    if (value instanceof Temporal.PlainDateTime) {
       seconds = new Rational(value.toZonedDateTime("UTC").epochNanoseconds, 1_000_000_000n);
     } else if (value instanceof Temporal.ZonedDateTime) {
       seconds = new Rational(value.epochNanoseconds, 1_000_000_000n);

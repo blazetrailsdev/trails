@@ -900,18 +900,28 @@ export function isNil(obj: unknown): boolean {
  * `Array#to_s` and `Hash#to_s` are aliases of `inspect`
  * (`vendor/ruby/v3.3.11/array.c:8616`, `vendor/ruby/v3.3.11/hash.c:7197`), so those two classes
  * render through {@link rbInspect}; every other value — a String above all,
- * which `rb_obj_as_string` returns unquoted — is its own `to_s`.
+ * which `rb_obj_as_string` returns unquoted — is its own `to_s`. A
+ * `Uint8Array` is the binary String seat (see {@link rbEqual}), so it is
+ * returned as it is (`string.c:1658`), and so is one a receiver's `to_s`
+ * answers (`rb_obj_as_string_result`, `string.c:1666`).
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_as_string`
  * (`vendor/ruby/v3.3.11/string.c:1653`); JS `String(x)` is not the same function, since
  * it gives the comma-joined form for a nested Array and `[object Object]` for a
  * Hash.
  */
-export function rbObjAsString(value: unknown): string {
+export function rbObjAsString(value: unknown): string;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_obj_as_string` (`vendor/ruby/v3.3.11/string.c:1653`). */
+export function rbObjAsString(value: unknown): string | Uint8Array {
   if (value == null) return "";
+  if (value instanceof Uint8Array) return value;
   if (Array.isArray(value)) return rbInspect(value);
   if (isPlainHash(value) || value instanceof Map) return rbInspect(value);
   if (typeof value === "number" || value instanceof Number) return floToS(value);
+  if (typeof value === "object") {
+    const str: unknown = value.toString();
+    if (str instanceof Uint8Array) return str;
+  }
   return String(value);
 }
 

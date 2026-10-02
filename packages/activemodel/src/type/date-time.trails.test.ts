@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError, Rational } from "@blazetrails/ruby-compat";
-import { instant, plainDateTime } from "@blazetrails/activesupport/testing/temporal-helpers";
+import { plainDateTime } from "@blazetrails/activesupport/testing/temporal-helpers";
 import * as Types from "../index.js";
 import { ValueType } from "../index.js";
 
@@ -222,13 +222,6 @@ describe("DateTimeType cast and serialize coverage", () => {
     expect((result as RubyTime).getutc().usec).toBe(123456);
   });
 
-  it("Temporal.Instant passthrough", () => {
-    const original = instant("2026-04-26T14:23:55.123456Z");
-    expect((type.cast(original) as RubyTime).getutc().xmlschema(6)).toBe(
-      "2026-04-26T14:23:55.123456Z",
-    );
-  });
-
   it("Temporal.PlainDateTime is converted to Instant (treated as UTC)", () => {
     const pdt = plainDateTime("2026-04-26T14:23:55.123456");
     const result = type.cast(pdt) as RubyTime;
@@ -253,7 +246,7 @@ describe("DateTimeType cast and serialize coverage", () => {
   });
 
   it("serialize returns the cast Instant (not a SQL string)", () => {
-    const i = instant("2026-04-26T14:23:55.123456Z");
+    const i = RubyTime.utc(2026, 4, 26, 14, 23, 55, 123456);
     expect((type.serialize(i) as RubyTime).getutc().xmlschema(6)).toBe(
       "2026-04-26T14:23:55.123456Z",
     );
@@ -272,7 +265,7 @@ describe("DateTimeType cast and serialize coverage", () => {
 
   it("serialize respects column precision", () => {
     const t = new Types.DateTimeType({ precision: 3 });
-    const i = instant("2026-04-26T14:23:55.123456Z");
+    const i = RubyTime.utc(2026, 4, 26, 14, 23, 55, 123456);
     expect((t.serialize(i) as RubyTime).getutc().xmlschema(3)).toBe("2026-04-26T14:23:55.123Z");
   });
 

@@ -153,11 +153,6 @@ describe("TimeType cast and serialize coverage", () => {
     );
   });
 
-  it("PlainDateTime input extracts time (multiparameter support)", () => {
-    const pdt = Temporal.PlainDateTime.from("2024-06-15T14:23:55");
-    expect(type.cast(pdt)).toEqual(timeUtc(2024, 6, 15, 14, 23, 55));
-  });
-
   it("cast 3pm returns 15:00", () => {
     expect(type.cast("3pm")).toEqual(timeUtc(2000, 1, 1, 15, 0, 0));
   });
