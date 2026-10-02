@@ -2058,6 +2058,7 @@ export function inlinedModuleMembers(
     const hostTs = rubyFileToTs(host.file, pkg);
     const hostBodies = bodiedByTsFile.get(hostTs);
     if (hostBodies === undefined) continue;
+    const hostDefinesInitialize = host.instanceMethods.some((im) => im.name === "initialize");
     for (const incName of host.includes ?? []) {
       const fqn = resolveModuleName(incName, hostFqn, moduleFqnByShort);
       const mod = rubyModules[fqn];
@@ -2070,7 +2071,12 @@ export function inlinedModuleMembers(
         const candidates = operatorSpelling(fqn, m.name) ?? rubyMethodCandidates(m.name);
         if (!candidates) continue;
         if (m.name === "initialize" && moduleBodies?.has(CONCERN_HOOK_MEMBERS.initialize)) continue;
-        const tsName = candidates.find((c) => hostBodies.has(c) && moduleBodies?.has(c) !== true);
+        const tsName = candidates.find(
+          (c) =>
+            !(c === "constructor" && m.name === "new" && hostDefinesInitialize) &&
+            hostBodies.has(c) &&
+            moduleBodies?.has(c) !== true,
+        );
         if (tsName === undefined) continue;
         const key = `${hostTs}#${tsName}`;
         if (seen.has(key)) continue;

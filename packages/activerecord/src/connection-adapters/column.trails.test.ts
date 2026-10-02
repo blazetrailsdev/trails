@@ -118,4 +118,25 @@ describe("NullColumn", () => {
     expect(() => col.deduplicate()).not.toThrow();
     expect(col.deduplicate()).toBe(col);
   });
+
+  it("new returns the registered instance for an equal column", () => {
+    const first = Column.new("dedup_new", null, makeMetadata());
+    const second = Column.new("dedup_new", null, makeMetadata());
+    expect(Object.isFrozen(first)).toBe(true);
+    expect(second).toBe(first);
+    expect(new Column("dedup_new", null, makeMetadata())).not.toBe(first);
+  });
+
+  it("negate is deduplicate", () => {
+    const first = Column.new("dedup_negate", null, makeMetadata());
+    expect(new Column("dedup_negate", null, makeMetadata()).negate()).toBe(first);
+    expect(makeMetadata({ sqlType: "dedup_negate" }).negate()).toBe(
+      makeMetadata({ sqlType: "dedup_negate" }).deduplicate(),
+    );
+  });
+
+  it("keeps a registry per class", () => {
+    expect(Column.registry()).toBe(Column.registry());
+    expect(Column.registry()).not.toBe(SqlTypeMetadata.registry());
+  });
 });

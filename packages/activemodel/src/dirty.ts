@@ -4,6 +4,7 @@ import {
   kernelArray,
   prepend,
 } from "@blazetrails/activesupport";
+import { include, Module } from "@blazetrails/ruby-compat";
 import type { Hash } from "@blazetrails/ruby-compat";
 
 import { AttributeSet } from "./attribute-set.js";
@@ -34,6 +35,7 @@ export class Dirty {
     base.attributeMethodAffix({ prefix: "restore", suffix: "!", parameters: false });
     base.attributeMethodAffix({ prefix: "clear", suffix: "Change", parameters: false });
     prepend(base.prototype, { initInternals, initializeDup });
+    include(base, InitAttributes);
   }
 
   declare _attributes: AttributeSet;
@@ -170,10 +172,9 @@ export function initializeDup(
 
 export function initAttributes(
   this: { constructor: { _defaultAttributes?: () => AttributeSet } },
-  super_: (other: unknown) => AttributeSet,
   other: unknown,
 ): AttributeSet {
-  const attrs = super_(other);
+  const attrs = InitAttributes.superMethod(this, "initAttributes")!(other) as AttributeSet;
   const klass = this.constructor;
   if ((other as { isPersisted(): boolean }).isPersisted() && klass._defaultAttributes) {
     return klass
@@ -182,6 +183,8 @@ export function initAttributes(
   }
   return attrs;
 }
+
+const InitAttributes = new Module((mod) => mod.defineMethod("initAttributes", initAttributes));
 
 export interface DirtyInternalsHost {
   _mutationsBeforeLastSave: AttributeMutationTracker | NullMutationTracker | null;

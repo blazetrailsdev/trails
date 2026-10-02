@@ -736,12 +736,12 @@ describe("SCOPED_SKIP_GROUPS", () => {
     });
   });
 
-  it("scopes `-@` to AR value objects but not ActiveSupport::Duration", () => {
-    expect(isScopedSkip("-@", "connection_adapters/deduplicable.rb")).toBe(true);
+  it("does not scope-skip `-@` (Deduplicable#-@ is ported as `negate`)", () => {
+    expect(isScopedSkip("-@", "connection_adapters/deduplicable.rb")).toBe(false);
     expect(isScopedSkip("-@", "duration.rb")).toBe(false);
   });
 
-  it("maps Ruby `-@` to `negate` globally (real surface outside the skip files)", () => {
+  it("maps Ruby `-@` to `negate` globally", () => {
     expect(rubyMethodToTs("-@")).toEqual(["negate"]);
   });
 });

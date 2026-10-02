@@ -1598,7 +1598,7 @@ export class SchemaStatements {
     ..._rest: unknown[]
   ): SqlTypeMetadata | Promise<SqlTypeMetadata> {
     const castType = this.lookupCastType(sqlType);
-    return new SqlTypeMetadata({
+    return SqlTypeMetadata.new({
       sqlType,
       type: castType?.type(),
       limit: castType?.limit,

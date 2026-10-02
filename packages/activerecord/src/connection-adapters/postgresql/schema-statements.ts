@@ -18,6 +18,7 @@ import {
 import { StatementInvalid } from "../../errors.js";
 import type { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import { Column } from "./column.js";
+import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { TypeMetadata } from "./type-metadata.js";
 import { quoteColumnName as pgQuoteColumnName } from "./quoting.js";
 import { Name, Utils } from "./utils.js";
@@ -1170,14 +1171,14 @@ export class SchemaStatements extends AbstractSchemaStatements {
       serial = this.sequenceNameFromParts(tableName, columnName, suffix) === sequenceName;
     }
 
-    return new Column(columnName, defaultValue, typeMetadata, !notnull, {
+    return Column.new(columnName, defaultValue, typeMetadata, !notnull, {
       defaultFunction: defaultFunction ?? undefined,
       collation: collation ?? undefined,
       comment: comment || null,
       serial,
       identity: identity || null,
       generated: gen,
-    }).deduplicate();
+    });
   }
 
   /** @internal */
@@ -1188,16 +1189,14 @@ export class SchemaStatements extends AbstractSchemaStatements {
     fmod: number,
   ): Promise<TypeMetadata> {
     const castType = await this.getOidType(oid, fmod, columnName, sqlType);
-    return new TypeMetadata(
-      {
-        sqlType,
-        type: castType.type(),
-        limit: castType.limit ?? null,
-        precision: castType.precision ?? null,
-        scale: castType.scale ?? null,
-      },
-      { oid, fmod },
-    );
+    const simpleType = SqlTypeMetadata.new({
+      sqlType,
+      type: castType.type(),
+      limit: castType.limit ?? null,
+      precision: castType.precision ?? null,
+      scale: castType.scale ?? null,
+    });
+    return TypeMetadata.new(simpleType, { oid, fmod });
   }
 
   /** @internal */

@@ -1,8 +1,13 @@
-import { deduplicate } from "./deduplicable.js";
-import { rbHash } from "@blazetrails/ruby-compat";
-import type { Deduplicable } from "./deduplicable.js";
+import { Deduplicable } from "./deduplicable.js";
+import type { ClassMethods, deduplicate } from "./deduplicable.js";
+import { include, rbHash } from "@blazetrails/ruby-compat";
 
-export class SqlTypeMetadata implements Deduplicable {
+export class SqlTypeMetadata {
+  declare static registry: typeof ClassMethods.registry;
+  declare static new: typeof ClassMethods.new;
+  declare deduplicate: typeof deduplicate;
+  declare negate: typeof deduplicate;
+
   readonly sqlType: string | null;
   readonly type: string | undefined;
   readonly limit: number | null;
@@ -49,10 +54,8 @@ export class SqlTypeMetadata implements Deduplicable {
 
   /** @internal */
   deduplicated(): this {
-    return Object.freeze(this);
-  }
-
-  deduplicate(): this {
-    return deduplicate(this);
+    return Deduplicable.instanceMethod("deduplicated")!.value.call(this);
   }
 }
+
+include(SqlTypeMetadata, Deduplicable);

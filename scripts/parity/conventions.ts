@@ -875,23 +875,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "Ruby `-@` deduplication operator (`alias :-@ :deduplicate` in " +
-      "ConnectionAdapters::Deduplicable). TS has no unary-minus method; trails " +
-      "realizes dedup via the `deduplicate` free function plus the " +
-      "DeduplicableBase constructor, so the alias has no separate TS surface on " +
-      "these value objects. Scoped to the AR adapter value-object files so it " +
-      "can't silence ActiveSupport::Duration#-@ (ported as `Duration#negate`).",
-    names: ["-@"],
-    rubyFiles: [
-      "connection_adapters/deduplicable.rb",
-      "connection_adapters/column.rb",
-      "connection_adapters/sql_type_metadata.rb",
-      "connection_adapters/mysql/type_metadata.rb",
-      "connection_adapters/postgresql/type_metadata.rb",
-    ],
-  },
-  {
-    reason:
       "`config` / `config_file` / `read_config` are the memoized read of " +
       "test/config.yml; trails ships no config.yml — the `connections:` hash " +
       "is expressed directly as the CONNECTIONS table in " +
@@ -1701,9 +1684,7 @@ function rubyMethodToTsWithoutUnderscore(
   if (name === "to_json") return ["toJSON"];
   if (name === "to_sql") return ["toSql"];
   // Ruby unary minus (`-@`) ports to a named `negate` method (e.g.
-  // ActiveSupport::Duration#-@ → Duration#negate). Files where `-@` has no TS
-  // surface (the AR Deduplicable value objects, where `-@` is just Ruby's
-  // `alias :-@ :deduplicate`) suppress it via SCOPED_SKIP_GROUPS instead.
+  // ActiveSupport::Duration#-@ → Duration#negate).
   if (name === "-@") return ["negate"];
   if (name === "to_a") return ["toA", "toArray"];
   if (COPY_HOOKS.has(name)) {
