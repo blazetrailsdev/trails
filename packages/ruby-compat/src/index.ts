@@ -53,6 +53,7 @@ export {
   toSym,
   rbModPublicMethodDefined,
   rtest,
+  isNil,
 } from "./object.js";
 export {
   Hash,
