@@ -1,4 +1,5 @@
-import { Module, NoMethodError } from "@blazetrails/ruby-compat";
+import { Module, NoMethodError, rbModConstSet } from "@blazetrails/ruby-compat";
+import { ActionController } from "../namespaces.js";
 
 export function assertTemplate(options: Record<string, unknown> = {}, message?: string): never {
   throw new NoMethodError(
@@ -13,3 +14,5 @@ export type TemplateAssertions = {
 export const TemplateAssertions = new Module((mod) => {
   mod.defineMethod("assertTemplate", assertTemplate);
 });
+
+rbModConstSet(ActionController, "TemplateAssertions", TemplateAssertions);

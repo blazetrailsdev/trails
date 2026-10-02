@@ -508,9 +508,9 @@ export interface IntegrationTest
     Included<typeof FixtureFile>,
     Omit<Assertions, "withRouting" | "createRoutes" | "resetRoutes"> {}
 
+include(IntegrationTest, Assertions);
 include(IntegrationTest, TestProcess);
 include(IntegrationTest, FixtureFile);
-include(IntegrationTest, Assertions);
 
 const proto = IntegrationTest.prototype as unknown as Record<string, unknown>;
 proto.withRouting = routingAssertions.WithIntegrationRouting.withRouting;

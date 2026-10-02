@@ -543,6 +543,8 @@ export declare namespace TestCase {
   let withRouting: typeof RoutingAssertionsClassMethods.withRouting;
 }
 
+rbModConstSet(ActionController, "TestCase", TestCase);
+
 include(TestCase, Behavior);
 
 export class TestRequest extends AbstractTestRequest {
