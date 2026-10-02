@@ -111,16 +111,16 @@ function sayStatus(this: Shell, ...args: Parameters<Basic["sayStatus"]>): void {
   return this.shell.sayStatus(...args);
 }
 
-function printInColumns(this: Shell, ...args: unknown[]): unknown {
-  return (this.shell as unknown as Delegated).printInColumns(...args);
+function printInColumns(this: Shell, ...args: Parameters<Basic["printInColumns"]>): void {
+  return this.shell.printInColumns(...args);
 }
 
-function printTable(this: Shell, ...args: unknown[]): unknown {
-  return (this.shell as unknown as Delegated).printTable(...args);
+function printTable(this: Shell, ...args: Parameters<Basic["printTable"]>): void {
+  return this.shell.printTable(...args);
 }
 
-function printWrapped(this: Shell, ...args: unknown[]): unknown {
-  return (this.shell as unknown as Delegated).printWrapped(...args);
+function printWrapped(this: Shell, ...args: Parameters<Basic["printWrapped"]>): void {
+  return this.shell.printWrapped(...args);
 }
 
 function fileCollision(this: Shell, ...args: unknown[]): unknown {

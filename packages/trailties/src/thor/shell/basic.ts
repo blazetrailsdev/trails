@@ -20,6 +20,9 @@ import {
   uniq,
 } from "@blazetrails/ruby-compat";
 import * as LineEditor from "../line-editor.js";
+import { ColumnPrinter, type ColumnPrinterOptions } from "./column-printer.js";
+import { TablePrinter } from "./table-printer.js";
+import { WrappedPrinter } from "./wrapped-printer.js";
 import * as Terminal from "./terminal.js";
 
 export class Basic {
@@ -140,6 +143,21 @@ export class Basic {
     return rtest(
       matchOperator(await this.ask(statement, color, { addToHistory: false }), this.is("no")),
     );
+  }
+
+  printInColumns(array: unknown[]): void {
+    const printer = new ColumnPrinter(this.stdout());
+    printer.print(array);
+  }
+
+  printTable(array: unknown[], options: ColumnPrinterOptions = {}): void {
+    const printer = new TablePrinter(this.stdout(), options);
+    printer.print(array);
+  }
+
+  printWrapped(message: string, options: ColumnPrinterOptions = {}): void {
+    const printer = new WrappedPrinter(this.stdout(), options);
+    printer.print(message);
   }
 
   error(statement: unknown): void {

@@ -3,7 +3,7 @@ import { FloatDomainError } from "./float-domain-error.js";
 import { NilClass } from "./nil-class.js";
 import { NoMethodError } from "./no-method-error.js";
 import { rbBuiltinClassName, rbObjClass } from "./object.js";
-import { Rational } from "./rational.js";
+import { Rational, ZeroDivisionError } from "./rational.js";
 import { TypeError } from "./type-error.js";
 import { rbStrToI } from "./string/convert.js";
 import { isSymbol } from "./symbol.js";
@@ -19,6 +19,32 @@ export function round(x: number, ndigits = 0): number {
   const scaled = x * f;
   const rounded = Math.sign(scaled) * Math.round(Math.abs(scaled));
   return ndigits === 0 ? rounded : rounded / f;
+}
+
+/**
+ * Ruby `Integer#/` over two Fixnums (`vendor/ruby/v3.3.11/numeric.c:4164`
+ * `fix_divide`, the `FIXNUM_P(y)` arm): `rb_num_zerodiv` for a zero divisor,
+ * else `rb_fix_div_fix` (`vendor/ruby/v3.3.11/internal/fixnum.h:149`), which
+ * floors where JS `/` answers a fraction.
+ * @noRailsEquivalent PERMANENT — Ruby core `Integer#/` (`vendor/ruby/v3.3.11/numeric.c:4164`).
+ */
+export function fixDiv(x: number, y: number): number {
+  if (y === 0) throw new ZeroDivisionError("divided by 0");
+  return Math.floor(x / y) + 0;
+}
+
+/**
+ * Ruby `Integer#%` over two Fixnums (`vendor/ruby/v3.3.11/numeric.c:4268`
+ * `fix_mod`, the `FIXNUM_P(y)` arm): `rb_num_zerodiv` for a zero divisor,
+ * else `rb_fix_mod_fix` (`vendor/ruby/v3.3.11/internal/fixnum.h:160`), whose
+ * result takes the divisor's sign where JS `%` takes the dividend's.
+ * @noRailsEquivalent PERMANENT — Ruby core `Integer#%` (`vendor/ruby/v3.3.11/numeric.c:4268`).
+ */
+export function fixMod(x: number, y: number): number {
+  if (y === 0) throw new ZeroDivisionError("divided by 0");
+  const mod = x % y;
+  if (mod === 0) return 0;
+  return mod < 0 !== y < 0 ? mod + y : mod;
 }
 
 /**

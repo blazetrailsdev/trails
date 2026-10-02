@@ -41,9 +41,13 @@ const UNION_NODE_CLASSES: Record<
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SelectManager extends TreeManager<SelectStatement> {
+  /** @internal */
+  private ctx: SelectCore;
+
   constructor(table?: Table | Node | null) {
     super();
     this.ast = new SelectStatement(table ?? null);
+    this.ctx = this.ast.cores.at(-1)!;
   }
 
   get limit(): Limit["expr"] | null {
@@ -59,7 +63,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
   }
 
   get constraints(): Node[] {
-    return [...this.core.wheres];
+    return [...this.ctx.wheres];
   }
 
   get offset(): Offset["expr"] | null {
@@ -104,7 +108,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
   }
 
   on(...exprs: (Node | string | null | undefined)[]): this {
-    const joins = this.core.source.right;
+    const joins = this.ctx.source.right;
     const lastJoin = joins[joins.length - 1] as unknown as { right: Node | null };
     lastJoin.right = new On(this.collapse(exprs));
     return this;
@@ -115,7 +119,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
       if (typeof column === "string" && !isSymbol(column)) column = new SqlLiteral(column);
       if (isSymbol(column)) column = new SqlLiteral(symbolToS(column));
 
-      this.core.groups.push(new Group(column));
+      this.ctx.groups.push(new Group(column));
     }
     return this;
   }
@@ -123,9 +127,9 @@ export class SelectManager extends TreeManager<SelectStatement> {
   from(table: Table | Node | string): this {
     const node = typeof table === "string" ? new SqlLiteral(table) : table;
     if (node instanceof Join) {
-      this.core.source.right.push(node);
+      this.ctx.source.right.push(node);
     } else {
-      this.core.source.left = node;
+      this.ctx.source.left = node;
     }
     return this;
   }
@@ -146,7 +150,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
       klass = StringJoin as unknown as new (left: Node | Table, right: Node | null) => Join;
     }
 
-    this.core.source.right.push(this.createJoin(relation, null, klass));
+    this.ctx.source.right.push(this.createJoin(relation, null, klass));
     return this;
   }
 
@@ -155,50 +159,50 @@ export class SelectManager extends TreeManager<SelectStatement> {
   }
 
   having(expr: Node): this {
-    this.core.havings.push(expr);
+    this.ctx.havings.push(expr);
     return this;
   }
 
   window(name: string): NamedWindow {
     const window = new NamedWindow(name);
-    this.core.windows.push(window);
+    this.ctx.windows.push(window);
     return window;
   }
 
   project(...projections: (Node | string)[]): this {
     for (const x of projections) {
       if (typeof x === "string") {
-        this.core.projections.push(new SqlLiteral(x));
+        this.ctx.projections.push(new SqlLiteral(x));
       } else {
-        this.core.projections.push(x);
+        this.ctx.projections.push(x);
       }
     }
     return this;
   }
 
   get projections(): (Node | Node[])[] {
-    return [...this.core.projections];
+    return [...this.ctx.projections];
   }
 
   set projections(value: (Node | Node[])[]) {
-    this.core.projections.length = 0;
-    this.core.projections.push(...value);
+    this.ctx.projections.length = 0;
+    this.ctx.projections.push(...value);
   }
 
   optimizerHints(...hints: (string | SqlLiteral)[]): this {
     if (hints.length > 0) {
-      this.core.optimizerHints = new OptimizerHints(hints);
+      this.ctx.optimizerHints = new OptimizerHints(hints);
     }
     return this;
   }
 
   distinct(value: unknown = true): this {
-    this.core.setQuantifier = value === false || value == null ? null : new Distinct();
+    this.ctx.setQuantifier = value === false || value == null ? null : new Distinct();
     return this;
   }
 
   distinctOn(value: Node | false | null): this {
-    this.core.setQuantifier = value === false || value == null ? null : new DistinctOn(value);
+    this.ctx.setQuantifier = value === false || value == null ? null : new DistinctOn(value);
     return this;
   }
 
@@ -212,13 +216,13 @@ export class SelectManager extends TreeManager<SelectStatement> {
   }
 
   where(expr: Node | TreeManager): this {
-    this.core.wheres.push(expr instanceof TreeManager ? expr.ast : expr);
+    this.ctx.wheres.push(expr instanceof TreeManager ? expr.ast : expr);
     return this;
   }
 
   whereSql(engine: ArelEngine | null = _engine.current): SqlLiteral | null {
-    if (this.core.wheres.length === 0) return null;
-    return new SqlLiteral(`WHERE ${new And(this.core.wheres).toSql(engine)}`);
+    if (this.ctx.wheres.length === 0) return null;
+    return new SqlLiteral(`WHERE ${new And(this.ctx.wheres).toSql(engine)}`);
   }
 
   union(
@@ -277,15 +281,15 @@ export class SelectManager extends TreeManager<SelectStatement> {
   }
 
   joinSources(): Join[] {
-    return this.core.source.right as Join[];
+    return this.ctx.source.right as Join[];
   }
 
   get source(): JoinSource {
-    return this.core.source;
+    return this.ctx.source;
   }
 
   comment(...values: string[]): this {
-    this.core.comment = new Comment(values);
+    this.ctx.comment = new Comment(values);
     return this;
   }
 
@@ -297,8 +301,9 @@ export class SelectManager extends TreeManager<SelectStatement> {
     return this.createAnd(exprs as Node[]);
   }
 
-  private get core(): SelectCore {
-    return this.ast.cores[this.ast.cores.length - 1];
+  override initializeCopy(other: SelectManager): void {
+    super.initializeCopy(other);
+    this.ctx = this.ast.cores.at(-1)!;
   }
 }
 

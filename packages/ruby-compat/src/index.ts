@@ -8,7 +8,7 @@ export { EOFError } from "./eof-error.js";
 export { Errno, SystemCallError } from "./errno.js";
 export { File } from "./file.js";
 export { Base64 } from "./base64.js";
-export { IO, STDOUT, print, puts } from "./io.js";
+export { IO, STDOUT, print, printf, puts } from "./io.js";
 export { IOError } from "./io-error.js";
 export {
   cmp,
@@ -187,7 +187,7 @@ export { KERNEL_METHODS, PROTOCOL_PROBES, methodMissingProxy } from "./method-mi
 export { NameError } from "./name-error.js";
 export { NilClass } from "./nil-class.js";
 export { NoMethodError } from "./no-method-error.js";
-export { anybits, round, toI } from "./numeric.js";
+export { anybits, fixDiv, fixMod, round, toI } from "./numeric.js";
 export {
   numericPlus,
   rbBigNorm,
@@ -280,6 +280,7 @@ export { Struct, type StructInstance } from "./struct.js";
 export { MatchData } from "./match-data.js";
 export { StringScanner } from "./string-scanner.js";
 export { stringSplit } from "./string/split.js";
+export { strlen } from "./string/support.js";
 export { forceEncoding, isValidEncoding } from "./string/force-encoding.js";
 export { Encoding } from "./encoding.js";
 export { stringInspect } from "./string/inspect.js";

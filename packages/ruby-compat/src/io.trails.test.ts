@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Encoding } from "./encoding.js";
 import { File } from "./file.js";
-import { IO, STDOUT, puts } from "./io.js";
+import { IO, STDOUT, printf, puts } from "./io.js";
 import { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";
 import { stderr, stdout } from "./process-adapter.js";
 
@@ -344,5 +344,14 @@ describe("STDOUT", () => {
     } finally {
       write.mockRestore();
     }
+  });
+});
+
+describe("printf", () => {
+  it("writes the formatted String to the receiver and answers nil", () => {
+    const written: string[] = [];
+    const io = { write: (string: string) => written.push(string) };
+    expect(printf.call(io, "%-5s|%3d", "é", 7)).toBeNull();
+    expect(written).toEqual(["é    |  7"]);
   });
 });

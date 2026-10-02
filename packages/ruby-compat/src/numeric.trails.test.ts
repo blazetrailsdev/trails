@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { FloatDomainError } from "./float-domain-error.js";
 import { NoMethodError } from "./no-method-error.js";
-import { anybits, round, toI } from "./numeric.js";
+import { anybits, fixDiv, fixMod, round, toI } from "./numeric.js";
+import { ZeroDivisionError } from "./rational.js";
 
 describe("Float#round", () => {
   it("rounds to the given number of digits", () => {
@@ -56,5 +57,23 @@ describe("#to_i", () => {
     expect(() => toI(NaN)).toThrow(FloatDomainError);
     expect(() => toI({})).toThrow(NoMethodError);
     expect(() => toI(":false")).toThrow("undefined method 'to_i' for an instance of Symbol");
+  });
+});
+
+describe("Integer#/ and Integer#%", () => {
+  it("floors the quotient and gives the remainder the divisor's sign", () => {
+    expect([fixDiv(4, 3), fixDiv(4, -3), fixDiv(-4, 3), fixDiv(-4, -3)]).toEqual([1, -2, -2, 1]);
+    expect([fixMod(10, 3), fixMod(10, -3), fixMod(-10, 3), fixMod(10, 2)]).toEqual([1, -2, 2, 0]);
+  });
+
+  it("answers 0, never -0, for an exact division", () => {
+    expect(Object.is(fixMod(-4, 2), 0)).toBe(true);
+    expect(Object.is(fixMod(4, -2), 0)).toBe(true);
+    expect(Object.is(fixDiv(0, -3), 0)).toBe(true);
+  });
+
+  it("raises ZeroDivisionError for a zero divisor", () => {
+    expect(() => fixDiv(1, 0)).toThrow(new ZeroDivisionError("divided by 0"));
+    expect(() => fixMod(1, 0)).toThrow(new ZeroDivisionError("divided by 0"));
   });
 });
