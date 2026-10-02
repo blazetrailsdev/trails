@@ -26,7 +26,7 @@ export interface OptionOptions extends ArgumentOptions {
 
 export class Option extends Argument {
   declare aliases: string[];
-  declare group: string | undefined;
+  declare group: string | null;
   declare lazyDefault: unknown;
   declare hide: unknown;
   declare repeatable: unknown;
@@ -43,7 +43,7 @@ export class Option extends Argument {
     this.repeatable = fetch(options, "repeatable", false);
     super.initialize(name, options);
     this.lazyDefault = options.lazyDefault ?? null;
-    if (rtest(options.group)) this.group = capitalize(rbObjAsString(options.group), []);
+    this.group = rtest(options.group) ? capitalize(rbObjAsString(options.group), []) : null;
     this.aliases = this.normalizeAliases(options.aliases);
     this.hide = options.hide ?? null;
   }

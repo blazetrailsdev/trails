@@ -58,7 +58,7 @@ describe("Thor::Option", () => {
     expect(option.lazyDefault).toBe("x");
     expect(option.hide).toBe(null);
     expect(option.repeatable).toBe(false);
-    expect(new Option("foo").group).toBeUndefined();
+    expect(new Option("foo").group).toBe(null);
     expect(new Option("foo", { aliases: ["-f", "g"] }).usage(10)).toBe("-f, -g,   [--foo=FOO]");
   });
 
