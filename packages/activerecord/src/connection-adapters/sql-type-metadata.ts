@@ -1,4 +1,4 @@
-import { Deduplicable, deduplicated } from "./deduplicable.js";
+import { Deduplicable } from "./deduplicable.js";
 import type { ClassMethods, deduplicate } from "./deduplicable.js";
 import { include, rbHash } from "@blazetrails/ruby-compat";
 
@@ -54,7 +54,7 @@ export class SqlTypeMetadata {
 
   /** @internal */
   deduplicated(): this {
-    return deduplicated.call(this) as this;
+    return Deduplicable.instanceMethod("deduplicated")!.value.call(this);
   }
 }
 

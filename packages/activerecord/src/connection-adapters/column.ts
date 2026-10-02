@@ -1,4 +1,4 @@
-import { Deduplicable, deduplicated } from "./deduplicable.js";
+import { Deduplicable } from "./deduplicable.js";
 import type { ClassMethods, deduplicate } from "./deduplicable.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { humanize } from "@blazetrails/activesupport";
@@ -114,7 +114,7 @@ export class Column {
     if (this.sqlTypeMetadata) {
       this.sqlTypeMetadata = this.sqlTypeMetadata.deduplicate();
     }
-    return deduplicated.call(this) as this;
+    return Deduplicable.instanceMethod("deduplicated")!.value.call(this);
   }
 
   initWith(coder: ColumnCoder): void {
