@@ -221,9 +221,34 @@ describe("UpdateManager subselect", () => {
     const sql = new Visitors.ToSql(fakeRecordConnection).compile(um.ast);
     expect(sql).toContain('IN (SELECT "users"."id"');
   });
+
+  it("renders a composite key as a row value and a row of projections", () => {
+    const um = new UpdateManager();
+    um.table(users);
+    um.set([[users.get("name"), "x"]]);
+    um.take(1);
+    um.key = [users.get("shop_id"), users.get("id")];
+    const sql = new Visitors.ToSql(fakeRecordConnection).compile(um.ast);
+    expect(sql).toBe(
+      'UPDATE "users" SET "name" = \'x\' WHERE ("users"."shop_id", "users"."id") IN ' +
+        '(SELECT "users"."shop_id", "users"."id" FROM "users" LIMIT 1)',
+    );
+  });
 });
 
 describe("DeleteManager subselect", () => {
+  it("renders a composite key as a row value and a row of projections", () => {
+    const dm = new DeleteManager();
+    dm.from(users);
+    dm.take(1);
+    dm.key = [users.get("shop_id"), users.get("id")];
+    const sql = new Visitors.ToSql(fakeRecordConnection).compile(dm.ast);
+    expect(sql).toBe(
+      'DELETE FROM "users" WHERE ("users"."shop_id", "users"."id") IN ' +
+        '(SELECT "users"."shop_id", "users"."id" FROM "users" LIMIT 1)',
+    );
+  });
+
   it("renders WHERE pk IN (SELECT pk ...) when limit is present", () => {
     const dm = new DeleteManager();
     dm.from(users);

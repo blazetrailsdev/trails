@@ -17,6 +17,12 @@ describe("SelectManagerTest (trails)", () => {
     expect(() => mgr.join(new Nodes.SqlLiteral(""))).toThrow(EmptyJoinError);
   });
 
+  it("groups by a Symbol's name", () => {
+    const mgr = new SelectManager(users);
+    mgr.group(":foo");
+    expect(mgr.toSql()).toBe('SELECT FROM "users" GROUP BY foo');
+  });
+
   it("does not raise on a whitespace-only relation", () => {
     const mgr = new SelectManager(users);
     expect(() => mgr.join(" ")).not.toThrow();

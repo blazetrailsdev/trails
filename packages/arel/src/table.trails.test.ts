@@ -28,6 +28,34 @@ describe("TableTest (trails)", () => {
     expect(() => users.join(new Nodes.SqlLiteral(""))).toThrow(EmptyJoinError);
   });
 
+  it("takes a Symbol's name as the table name", () => {
+    expect(new Table(":users").name).toBe("users");
+  });
+
+  it("takes a Symbol's name as the attribute name", () => {
+    expect(users.get(":id").name).toBe("id");
+  });
+
+  it("resolves an attribute alias for a Symbol's name", () => {
+    const klass = { attributeAliases: { title: "name" }, typeCaster: () => null };
+    expect(new Table("users", { klass }).get(":title").name).toBe("name");
+  });
+
+  it("drops a Symbol alias naming the table itself", () => {
+    expect(new Table("users", { as: ":users" }).tableAlias).toBeNull();
+  });
+
+  it("does not read an inherited property as an attribute alias", () => {
+    const klass = { attributeAliases: {}, typeCaster: () => null };
+    expect(new Table("users", { klass }).get("constructor").name).toBe("constructor");
+  });
+
+  it("does not default an explicit null type caster from klass", () => {
+    const klass = { attributeAliases: {}, typeCaster: () => ({}) };
+    expect(new Table("users", { klass }).isAbleToTypeCast()).toBe(true);
+    expect(new Table("users", { klass, typeCaster: null }).isAbleToTypeCast()).toBe(false);
+  });
+
   it("does not raise on a whitespace-only relation", () => {
     expect(() => users.join(" ")).not.toThrow();
   });
@@ -154,14 +182,18 @@ describe("TableTest", () => {
 
   describe("attribute_aliases", () => {
     it("resolves an aliased attribute name", () => {
-      const t = new Table("users", { klass: { attributeAliases: { nickname: "name" } } });
+      const t = new Table("users", {
+        klass: { attributeAliases: { nickname: "name" }, typeCaster: () => null },
+      });
       const attr = t.get("nickname");
       expect(attr).toBeInstanceOf(Attributes.Attribute);
       expect(attr.name).toBe("name");
     });
 
     it("passes through an unaliased attribute name", () => {
-      const t = new Table("users", { klass: { attributeAliases: { nickname: "name" } } });
+      const t = new Table("users", {
+        klass: { attributeAliases: { nickname: "name" }, typeCaster: () => null },
+      });
       const attr = t.get("name");
       expect(attr.name).toBe("name");
     });
