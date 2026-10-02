@@ -18,7 +18,6 @@ import {
   type Included,
 } from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
-import { DomTestingAssertions } from "@blazetrails/actionview";
 import {
   ArgumentError,
   b,
@@ -476,7 +475,6 @@ export const Behavior = new Module((mod) => {
   extend(mod, Concern);
   mod.include(TestProcess);
   mod.include(ConstantLookup);
-  mod.include(DomTestingAssertions);
 
   (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
 

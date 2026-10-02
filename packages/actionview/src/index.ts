@@ -11,7 +11,6 @@ export type { BacktraceLocation, Spot } from "./template/handlers/tse-translate-
 
 export { FileSystemResolver, Resolver } from "./template/resolver.js";
 export { FixtureResolver, NullResolver } from "./testing/resolvers.js";
-export { Assertions as DomTestingAssertions } from "./testing/assertions.js";
 
 export { LookupContext, DetailsKey } from "./lookup-context.js";
 
