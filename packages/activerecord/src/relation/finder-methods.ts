@@ -1,5 +1,15 @@
 import { Nodes } from "@blazetrails/arel";
-import { NoMethodError, rbObjClass, rbInspect, compact, uniq } from "@blazetrails/ruby-compat";
+import {
+  NoMethodError,
+  rbObjClass,
+  rbInspect,
+  compact,
+  first as aryFirst,
+  isEmpty,
+  last as aryLast,
+  take as aryTake,
+  uniq,
+} from "@blazetrails/ruby-compat";
 import { inOrderOf, wrap } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
 import {
@@ -221,21 +231,14 @@ export async function findNthWithLimit(
   return relation.limit(limit).toArray();
 }
 
-/**
- * @internal
- * @missingRailsCall empty? — PERMANENT
- */
+/** @internal */
 export async function findNthFromLast(this: FinderRelation, index: number): Promise<any | null> {
   if (this.isLoaded) {
     const records: any[] = await this.records();
     return records[records.length - index] ?? null;
   }
   const relation: any = orderedRelation.call(this);
-  if (
-    relation.orderValues.length === 0 ||
-    relation.limitValue != null ||
-    relation.offsetValue != null
-  ) {
+  if (isEmpty(relation.orderValues) || relation.hasLimitOrOffset) {
     const records = await relation.records();
     return records[records.length - index] ?? null;
   }
@@ -291,7 +294,7 @@ export const fortyTwoBang = bangFinder(fortyTwo);
 export const secondToLastBang = bangFinder(secondToLast);
 export const thirdToLastBang = bangFinder(thirdToLast);
 
-/** @missingRailsCall size — PERMANENT */
+/** @missingRailsCall size — CONVERGEABLE call-gate-credits-a-length-read-as-array-size */
 export async function isExists(
   this: FinderRelation,
   conditions?: Record<string, unknown> | unknown,
@@ -343,7 +346,7 @@ export async function isInclude(this: FinderRelation, record: any): Promise<bool
 export const isMember = isInclude;
 
 /**
- * @missingRailsCall size — PERMANENT
+ * @missingRailsCall size — CONVERGEABLE call-gate-credits-a-length-read-as-array-size
  * @missingRailsName size — PERMANENT
  */
 export function raiseRecordNotFoundExceptionBang(
@@ -490,7 +493,7 @@ export function usingLimitableReflections(
 
 /**
  * @internal
- * @missingRailsCall first — PERMANENT
+ * @missingRailsCall first — CONVERGEABLE call-gate-credits-a-ruby-compat-import-renamed-around-a-module-homonym
  */
 export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Promise<any> {
   if (this.primaryKey == null) throw new UnknownPrimaryKey(this.model as any);
@@ -503,12 +506,12 @@ export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Prom
     );
   }
   const expectsArray = this.model.compositePrimaryKey
-    ? Array.isArray((ids[0] as unknown[])[0])
-    : Array.isArray(ids[0]);
+    ? Array.isArray(aryFirst(aryFirst(ids) as unknown[]))
+    : Array.isArray(aryFirst(ids));
 
-  if (expectsArray && (ids[0] as unknown[]).length === 0) return [];
+  if (expectsArray && isEmpty(aryFirst(ids) as unknown[])) return [];
 
-  if (expectsArray) ids = ids[0] as unknown[];
+  if (expectsArray) ids = aryFirst(ids) as unknown[];
 
   ids = uniq(compact(ids));
 
@@ -520,7 +523,7 @@ export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Prom
       throw new RecordNotFound(errorMessage, modelName, this.primaryKey);
     }
     case 1: {
-      const result = await findOne.call(this, ids[0]);
+      const result = await findOne.call(this, aryFirst(ids));
       return expectsArray ? [result] : result;
     }
     default:
@@ -616,32 +619,32 @@ export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Pro
 
 /**
  * @internal
- * @missingRailsCall first — PERMANENT
+ * @missingRailsCall first — CONVERGEABLE call-gate-credits-a-ruby-compat-import-renamed-around-a-module-homonym
  */
 export async function findTake(this: FinderRelation): Promise<any | null> {
-  if (this.isLoaded) return (await this.records())[0] ?? null;
-  (this as any)._take ??= (await (this as any).limit(1).records())[0] ?? null;
+  if (this.isLoaded) return aryFirst(await this.records()) ?? null;
+  (this as any)._take ??= aryFirst(await (this as any).limit(1).records()) ?? null;
   return (this as any)._take;
 }
 
 /**
  * @internal
- * @missingRailsCall take — PERMANENT
+ * @missingRailsCall take — CONVERGEABLE call-gate-credits-a-ruby-compat-import-renamed-around-a-module-homonym
  */
 export async function findTakeWithLimit(this: FinderRelation, limit: number): Promise<any[]> {
-  if (this.isLoaded) return (await this.records()).slice(0, limit);
+  if (this.isLoaded) return aryTake(await this.records(), limit);
   return (this as any).limit(limit).toArray();
 }
 
 /**
  * @internal
- * @missingRailsCall first — PERMANENT
+ * @missingRailsCall first — CONVERGEABLE call-gate-credits-a-ruby-compat-import-renamed-around-a-module-homonym
  */
 export async function findNth(this: FinderRelation, index: number): Promise<any | null> {
   const offsets = ((this as any)._offsets ??= new Map<number, any>());
   let record = offsets.get(index) ?? null;
   if (record == null) {
-    record = (await this.findNthWithLimit(index, 1))[0] ?? null;
+    record = aryFirst(await this.findNthWithLimit(index, 1)) ?? null;
     offsets.set(index, record);
   }
   return record;
@@ -649,24 +652,20 @@ export async function findNth(this: FinderRelation, index: number): Promise<any 
 
 /**
  * @internal
- * @missingRailsCall last — PERMANENT
+ * @missingRailsCall last — CONVERGEABLE call-gate-credits-a-ruby-compat-import-renamed-around-a-module-homonym
  */
 export async function findLast(this: FinderRelation, limit?: number): Promise<any> {
   const records: any[] = await this.records();
-  if (limit === undefined) return records[records.length - 1] ?? null;
-  return limit === 0 ? [] : records.slice(-limit);
+  return limit != null ? aryLast(records, limit) : (aryLast(records) ?? null);
 }
 
-/**
- * @internal
- * @missingRailsCall empty? — PERMANENT
- */
+/** @internal */
 export function orderedRelation(this: FinderRelation): any {
   const mc = this.model as any;
   const pk = this.primaryKey;
   const implicitOrder: string | null | undefined = mc?.implicitOrderColumn;
   const constraintsList: string[] | null = mc ? _queryConstraintsListFn.call(mc) : null;
-  if (this.orderValues.length === 0 && (implicitOrder || constraintsList != null || pk)) {
+  if (isEmpty(this.orderValues) && (implicitOrder || constraintsList != null || pk)) {
     const cols = _orderColumns.call(this);
     if (cols.length > 0) {
       return (this as any).order(

@@ -9,6 +9,7 @@ import {
   arySlice,
   compact,
   isIntersect,
+  last,
   pack,
   partition,
   sort,
@@ -328,6 +329,24 @@ describe("aryDelete", () => {
     expect(aryDelete(ary, 3)).toBeUndefined();
     expect(aryDelete(ary, 3, (item) => `not found: ${item}`)).toBe("not found: 3");
     expect(ary).toEqual([1, 2]);
+  });
+});
+
+describe("last", () => {
+  it("answers the last element, or nil for an empty array", () => {
+    expect(last([1, 2, 3])).toBe(3);
+    expect(last([])).toBeUndefined();
+  });
+
+  it("answers the last n elements in order", () => {
+    expect(last([1, 2, 3], 2)).toEqual([2, 3]);
+    expect(last([1, 2, 3], 0)).toEqual([]);
+    expect(last([1], 5)).toEqual([1]);
+  });
+
+  it("raises on a negative n", () => {
+    expect(() => last([1], -1)).toThrow(ArgumentError);
+    expect(() => last([1], -1)).toThrow("negative array size");
   });
 });
 

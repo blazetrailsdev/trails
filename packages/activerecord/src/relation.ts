@@ -237,11 +237,11 @@ export interface ExplainProxy<T extends Base> {
     onfulfilled?: ((value: string) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
   ): Promise<TResult1 | TResult2>;
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE explain-proxy-drops-thenable-callers-await-inspect */
   catch<TResult = never>(
     onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
   ): Promise<string | TResult>;
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE explain-proxy-drops-thenable-callers-await-inspect */
   finally(onfinally?: (() => void) | null): Promise<string>;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
@@ -469,7 +469,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   /**
    * @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
-   * @missingRailsCall load — PERMANENT
+   * @missingRailsCall load — CONVERGEABLE load-async-disabled-arm-calls-load-and-dedupes-in-flight-load
    */
   loadAsync(): Relation<T, G> {
     this._model.connectionPool().withConnectionSync((c: DatabaseAdapter) => {
@@ -604,7 +604,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     return isBlank(await this.records());
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE relation-presence-comes-from-activesupport-object-presence */
   async presence(): Promise<LoadedRelation<Relation<T, G>> | null> {
     return (await isPresent(this)) ? stripThenable(this as Relation<T, G>) : null;
   }
@@ -728,9 +728,8 @@ export class Relation<T extends Base, G extends boolean = false> {
     }) as Result | Promise<Result> | FutureResult | Complete;
   }
 
-  /** @missingRailsCall empty? — PERMANENT */
   private referencesEagerLoadedTables(): boolean {
-    const joinedTables = this.buildJoins([]).flatMap((join: Nodes.Join) =>
+    let joinedTables = this.buildJoins([]).flatMap((join: Nodes.Join) =>
       join instanceof Nodes.StringJoin
         ? this.tablesInString(join.left as Nodes.Node)
         : [(join.left as unknown as { name: string }).name],
@@ -738,12 +737,13 @@ export class Relation<T extends Base, G extends boolean = false> {
 
     joinedTables.push(String(this.table.name));
 
-    const downcased = joinedTables.map((name) => name.toLowerCase());
+    joinedTables = joinedTables.map((name) => name.toLowerCase());
 
-    return this.referencesValues.some((ref) => {
-      const string = typeof ref === "string" && ref.startsWith(":") ? ref.slice(1) : String(ref);
-      return !downcased.includes(string);
-    });
+    return !isEmpty(
+      this.referencesValues
+        .map((ref) => (typeof ref === "string" && ref.startsWith(":") ? ref.slice(1) : String(ref)))
+        .filter((ref) => !joinedTables.includes(ref)),
+    );
   }
 
   private tablesInString(string: Nodes.Node | string | null | undefined): string[] {
@@ -759,7 +759,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this.limit(2).count() as Promise<number>;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE relation-async-iterator-has-no-rails-counterpart */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {
     const records = await this.toArray();
     for (const record of records) {
@@ -1544,9 +1544,9 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   get isEagerLoading(): boolean {
     return (this._shouldEagerLoad ||=
-      this.eagerLoadValues.length > 0 ||
-      (this.includesValues.length > 0 &&
-        (this.joinedIncludesValues.length > 0 || this.referencesEagerLoadedTables())));
+      any(this.eagerLoadValues) ||
+      (any(this.includesValues) &&
+        (any(this.joinedIncludesValues) || this.referencesEagerLoadedTables())));
   }
 
   get joinedIncludesValues(): AssociationSpec[] {
@@ -1672,7 +1672,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   /**
    * @internal
-   * @missingRailsArgs max — PERMANENT
+   * @missingRailsArgs max — CONVERGEABLE call-args-gate-aligns-the-receiver-of-function-form-fetch-and-max
    */
   async computeCacheVersion(timestampColumn = "updated_at"): Promise<string> {
     timestampColumn = String(timestampColumn);

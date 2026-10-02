@@ -136,6 +136,7 @@ export {
   compact,
   drop,
   first,
+  last,
   pack,
   partition,
   sort,

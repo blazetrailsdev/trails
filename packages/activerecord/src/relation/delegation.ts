@@ -30,8 +30,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ActiveRecord, Associations } from "../namespaces.js";
 
-type AnyCallable = (...args: any[]) => any;
-
 type FamilyCtor = new (...args: any[]) => any;
 
 export function delegatedClasses(): FamilyCtor[] {
@@ -58,7 +56,6 @@ export function uncacheableMethods(): Set<string> {
 
 const _relationDelegateCache = new WeakMap<typeof Base, Map<FamilyCtor, FamilyCtor>>();
 const _generatedRelationMethodsByModel = new WeakMap<typeof Base, GeneratedRelationMethods>();
-const _includedCarriers = new WeakMap<GeneratedRelationMethods, Record<string, unknown>[]>();
 
 export class DelegateCache {
   static delegateBaseMethods = true;
@@ -95,11 +92,7 @@ export class DelegateCache {
         delegate,
       );
     }
-    const mod = this.generatedRelationMethods();
-    include(delegate, mod);
-    const carriers = _includedCarriers.get(mod) ?? [];
-    carriers.push(Object.getPrototypeOf(delegate.prototype) as Record<string, unknown>);
-    _includedCarriers.set(mod, carriers);
+    include(delegate, this.generatedRelationMethods());
   }
 
   /** @internal */
@@ -116,29 +109,26 @@ export class DelegateCache {
 
 export class GeneratedRelationMethods extends Module {
   /**
-   * @missingRailsCall define_method — PERMANENT
-   * @missingRailsCall include? — PERMANENT
+   * @missingRailsCall include? — CONVERGEABLE call-gate-generate-method-set-has-claim-and-heredoc-order
+   * @missingRailsCall order:scoping,defineMethod — CONVERGEABLE call-gate-generate-method-set-has-claim-and-heredoc-order
    */
   generateMethod(method: string): void {
-    if (this.moduleEval((mod) => Object.prototype.hasOwnProperty.call(mod, method))) return;
+    if (this.isMethodDefined(method)) return;
 
-    let fn: AnyCallable;
     if (
       /^[a-zA-Z_]\w*[!?]?$/.test(method) &&
       !ActiveSupportDelegation.RESERVED_METHOD_NAMES.has(String(method))
     ) {
-      fn = function (this: any, ...args: any[]) {
-        return this.scoping(() => this._model[method](...args));
-      };
+      this.moduleEval((mod) => {
+        mod[method] = function (this: any, ...args: any[]) {
+          return this.scoping(() => this._model[method](...args));
+        };
+      });
     } else {
-      fn = function (this: any, ...args: any[]) {
+      this.defineMethod(method, function (this: any, ...args: any[]) {
         return this.scoping(() => rbFPublicSend(this._model, method, ...args));
-      };
+      });
     }
-    this.moduleEval((mod) => {
-      mod[method] = fn;
-    });
-    for (const carrier of _includedCarriers.get(this) ?? []) carrier[method] = fn;
   }
 }
 
