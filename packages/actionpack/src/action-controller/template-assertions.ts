@@ -12,7 +12,9 @@ export type TemplateAssertions = {
 };
 
 export const TemplateAssertions = new Module((mod) => {
-  mod.defineMethod("assertTemplate", assertTemplate);
+  mod.moduleEval((m) => {
+    Object.assign(m, { assertTemplate });
+  });
 });
 
 rbModConstSet(ActionController, "TemplateAssertions", TemplateAssertions);

@@ -116,6 +116,9 @@ describe("#to_i", () => {
     expect(toI(2 ** 62)).toBe(2n ** 62n);
     expect(toI(-(2 ** 62))).toBe(-(2n ** 62n));
     expect(toI(2 ** 53 - 1)).toBe(2 ** 53 - 1);
+    expect(toI(-1e20)).toBe(-100000000000000000000n);
+    expect(toI(new Number(3.9))).toBe(3);
+    expect(toI(new Number(1e20))).toBe(100000000000000000000n);
     expect(toI("12abc")).toBe(12);
     expect(toI("abc")).toBe(0);
     expect(toI(2n ** 70n)).toBe(2n ** 70n);
