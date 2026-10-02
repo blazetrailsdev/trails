@@ -916,7 +916,11 @@ modules converged onto `Autoload`:
   `log_subscriber.rb:59`, `digestor.rb:39`); `ActionDispatch.Request`
   (`action_dispatch.rb:63`, read by `http/headers.rb:55`,
   `content_security_policy.rb:46`, `permissions_policy.rb:42`,
-  `middleware/cookies.rb:705`). A constant Rails `require`s rather than
+  `middleware/cookies.rb:705`); `ActionController.TestRequest`
+  (`action_controller.rb:69-73`, read by `testing/assertions/routing.rb:315`),
+  which breaks `assertions/routing.ts -> test-case.ts -> assertions.ts`, whose
+  `mod.include(RoutingAssertions)` reads `RoutingAssertions` in TDZ when
+  routing.ts is the entry module. A constant Rails `require`s rather than
   autoloads is seated on its namespace with no `autoload` call:
   `ActiveSupport.BroadcastLogger` (`active_support.rb:30`, read at
   `logger.rb:21`), and `Attribute.UserProvidedDefault` on the class Rails nests

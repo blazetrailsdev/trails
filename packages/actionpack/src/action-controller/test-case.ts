@@ -24,6 +24,7 @@ import {
   KeyError,
   merge,
   Module,
+  rbModConstSet,
   RuntimeError,
   SecureRandom,
   StringIO,
@@ -45,7 +46,7 @@ import {
 import { Mime } from "../action-dispatch/http/mime-type.js";
 import { Response } from "../action-dispatch/http/response.js";
 import { TestResponse } from "../action-dispatch/testing/test-response.js";
-import { htmlDocument } from "../action-dispatch/testing/assertions.js";
+import { Assertions } from "../action-dispatch/testing/assertions.js";
 import type { XmlDocument } from "@blazetrails/nokogiri";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
@@ -53,10 +54,10 @@ import type { CookieJar, CookieResponse } from "../action-dispatch/middleware/co
 import { TestProcess } from "../action-dispatch/testing/test-process.js";
 import type { RouteSet } from "../action-dispatch/routing/route-set.js";
 import type { DispatchableControllerClass } from "../action-dispatch/routing/dispatcher.js";
-import * as responseAssertions from "../action-dispatch/testing/assertions/response.js";
-import * as routingAssertions from "../action-dispatch/testing/assertions/routing.js";
+import type { ClassMethods as RoutingAssertionsClassMethods } from "../action-dispatch/testing/assertions/routing.js";
+import { ActionController } from "../namespaces.js";
 import { Metal } from "./metal.js";
-import * as TemplateAssertions from "./template-assertions.js";
+import { TemplateAssertions } from "./template-assertions.js";
 import { Functional } from "./metal/testing.js";
 import { Buffer as LiveBuffer, Live, type LiveControllerHost } from "./metal/live.js";
 
@@ -498,25 +499,7 @@ export const Behavior = new Module((mod) => {
     mod as unknown as { included(base: null, block: (this: typeof TestCase) => void): void }
   ).included(null, function (this: typeof TestCase) {
     include(this, TemplateAssertions);
-    const proto = this.prototype as unknown as Record<string, unknown>;
-    Object.defineProperty(proto, "htmlDocument", { get: htmlDocument, configurable: true });
-    proto.assertResponse = responseAssertions.assertResponse;
-    proto.assertRedirectedTo = responseAssertions.assertRedirectedTo;
-    proto.parameterize = responseAssertions.parameterize;
-    proto.normalizeArgumentToRedirection = responseAssertions.normalizeArgumentToRedirection;
-    (this as { withRouting: typeof TestCase.withRouting }).withRouting = function (block) {
-      routingAssertions.ClassMethods.withRouting.call(this, block);
-    };
-    proto.setup = routingAssertions.setup;
-    proto.assertRecognizes = routingAssertions.assertRecognizes;
-    proto.assertGenerates = routingAssertions.assertGenerates;
-    proto.assertRouting = routingAssertions.assertRouting;
-    proto.withRouting = routingAssertions.withRouting;
-    proto.createRoutes = routingAssertions.createRoutes;
-    proto.resetRoutes = routingAssertions.resetRoutes;
-    proto.recognizedRequestFor = routingAssertions.recognizedRequestFor;
-    proto.failOn = routingAssertions.failOn;
-    routingAssertions.spliceMethodMissing(proto);
+    include(this, Assertions);
     classAttribute.call(this, "_controllerClass");
     this.setup(":setupControllerRequestAndResponse");
     runLoadHooks("action_controller_test_case", this);
@@ -538,16 +521,7 @@ export const Behavior = new Module((mod) => {
 });
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Behavior` (`actionpack/lib/action_controller/test_case.rb:696`) and the two `include`s of its `included do` block (`:597-598`); the class/interface merge is how a mixin surfaces on the type side. */
-export interface TestCase extends Behavior {
-  assertTemplate: typeof TemplateAssertions.assertTemplate;
-  assertResponse: typeof responseAssertions.assertResponse;
-  assertRedirectedTo: typeof responseAssertions.assertRedirectedTo;
-  setup(): void;
-  assertRecognizes: typeof routingAssertions.assertRecognizes;
-  assertGenerates: typeof routingAssertions.assertGenerates;
-  assertRouting: typeof routingAssertions.assertRouting;
-  withRouting: typeof routingAssertions.withRouting;
-}
+export interface TestCase extends Behavior, TemplateAssertions, Assertions {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class TestCase extends ActiveSupportTestCase {
@@ -566,8 +540,10 @@ export declare namespace TestCase {
   let controllerClass: ControllerClass | null;
   const determineDefaultControllerClass: BehaviorClassMethods["determineDefaultControllerClass"];
   const determineConstantFromTestName: BehaviorClass["determineConstantFromTestName"];
-  let withRouting: typeof routingAssertions.ClassMethods.withRouting;
+  let withRouting: typeof RoutingAssertionsClassMethods.withRouting;
 }
+
+rbModConstSet(ActionController, "TestCase", TestCase);
 
 include(TestCase, Behavior);
 
@@ -744,6 +720,8 @@ export class TestRequest extends AbstractTestRequest {
     return merge<unknown>(base, this._customParamParsers) as ParameterParsers;
   }
 }
+
+rbModConstSet(ActionController, "TestRequest", TestRequest);
 
 export class LiveTestResponse extends Response {
   get isSuccess(): boolean {

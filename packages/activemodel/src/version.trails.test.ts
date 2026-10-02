@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Gem } from "@blazetrails/ruby-compat";
-import { VERSION, gemVersion } from "./gem-version.js";
-import { version } from "./version.js";
+import { VERSION, gemVersion, version } from "./index.js";
 
 describe("ActiveModel.version", () => {
   it("is the Gem::Version gem_version answers", () => {

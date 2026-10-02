@@ -140,7 +140,8 @@ export function anybits(x: number | bigint, mask: number | bigint): boolean {
  * Ruby's `obj.to_i` send, dispatched on the receiver's class: `NilClass#to_i`
  * (`vendor/ruby/v3.3.11/object.c:4414`), `Integer#to_i` (`vendor/ruby/v3.3.11/numeric.c`
  * `int_to_i`), `Float#to_i` (`flo_to_i`, `FloatDomainError` off the finite
- * range), `String#to_i` (`rb_str_to_i`, {@link rbStrToI}), else the
+ * range; `dbl2ival`'s Bignum arm, `vendor/ruby/v3.3.11/numeric.c:1436-1442`,
+ * past the safe-integer range), `String#to_i` (`rb_str_to_i`, {@link rbStrToI}), else the
  * receiver's own `toI`. A Symbol has no `to_i` (`vendor/ruby/v3.3.11/string.c`
  * defines none on `rb_cSymbol`), so a colon-prefixed string raises.
  *
@@ -152,7 +153,8 @@ export function toI(obj: unknown): number | bigint {
   if (typeof obj === "bigint") return obj;
   if (typeof obj === "number" || obj instanceof Number) {
     if (!Number.isFinite(obj.valueOf())) throw new FloatDomainError(String(obj));
-    return Math.trunc(obj.valueOf());
+    const f = Math.trunc(obj.valueOf());
+    return Number.isSafeInteger(f) ? f : BigInt(f);
   }
   if (isSymbol(obj)) throw new NoMethodError("undefined method 'to_i' for an instance of Symbol");
   if (typeof obj === "string") return rbStrToI(obj);
