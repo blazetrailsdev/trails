@@ -15,10 +15,10 @@ import {
   isBlank,
   isPlainObject,
   isPresent,
-  TopLevel,
   kernelArray,
   pluralize,
   singularize,
+  TopLevel,
   transformKeys,
   underscore,
 } from "@blazetrails/activesupport";

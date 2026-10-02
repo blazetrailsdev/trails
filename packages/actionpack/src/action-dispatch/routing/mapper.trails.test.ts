@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
+import { Trailtie } from "@blazetrails/trailties/trailtie";
 
 import {
   Constraints,
@@ -330,14 +331,13 @@ describe("Mapper::Mapping#build_conditions", () => {
 
 describe("Mapper#rails_app?", () => {
   it("answers app < Rails::Railtie (mapper.rb:657-659)", () => {
-    class Railtie {}
-    class App extends Railtie {}
+    class App extends Trailtie {}
     const trails = TopLevel.Trails;
-    TopLevel.Trails = { Trailtie: Railtie } as never;
+    TopLevel.Trails = { Trailtie } as never;
     try {
       const mapper = new Mapper(new RouteSet());
       expect(mapper.isRailsApp(App as unknown as MountableApp)).toBe(true);
-      expect(mapper.isRailsApp(Railtie as unknown as MountableApp)).toBe(false);
+      expect(mapper.isRailsApp(Trailtie as unknown as MountableApp)).toBe(false);
       expect(mapper.isRailsApp(new App() as unknown as MountableApp)).toBe(false);
       expect(mapper.isRailsApp(() => [200, {}, []] as never)).toBe(false);
     } finally {
