@@ -891,14 +891,14 @@ describe("UniquenessValidationWithIndexTest", () => {
 
     const e1 = await Event.createBang({ title: "abc" });
     const e2 = await Event.createBang({ title: "cde" });
-    const t = await TopicWithEvent.createBang({ parent_id: (e1 as any).id });
+    const t = await TopicWithEvent.createBang({ event: e1 });
     try {
       t.writeAttribute("content", "hello world");
       await assertNoQueries(false, async () => {
         await t.isValid();
       });
 
-      t.writeAttribute("parent_id", (e2 as any).id);
+      t.event = e2;
       await assertQueriesCount(1, false, async () => {
         await t.isValid();
       });
@@ -1023,6 +1023,7 @@ class BigIntReverseTest extends Base {
 }
 
 class TopicWithEvent extends Topic {
+  declare event: Event | null;
   static {
     this.belongsTo("event", { foreignKey: "parent_id" });
     this.validatesUniquenessOf("event");

@@ -23,7 +23,6 @@ import {
   inspectionFilter as _coreInspectionFilter,
 } from "./core.js";
 import { queryAttribute as _queryAttribute } from "./attribute-methods/query.js";
-import { reload as _reload } from "./persistence.js";
 import { cachedTableExists, isSchemaLoaded, loadSchema } from "./model-schema.js";
 import { attributeNamesForSerialization as _attrNamesForSerialization } from "./serialization.js";
 import { AttributeMethods as AttributeMethodsNamespace } from "./namespaces.js";
@@ -668,10 +667,6 @@ export function set(this: InstanceMethodHost, attrName: string, value: unknown):
 
 export function queryAttribute(this: InstanceMethodHost, attrName: string): boolean {
   return _queryAttribute.call(this as any, attrName);
-}
-
-export async function reload<T>(this: T): Promise<T> {
-  return _reload.call(this as any) as unknown as Promise<T>;
 }
 
 /** @internal */

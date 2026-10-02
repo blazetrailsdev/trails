@@ -240,7 +240,7 @@ describe("SelectManagerTest", () => {
     });
 
     it("should union all", () => {
-      const node = m1.union(":all", m2);
+      const node = m1.union("all", m2);
       expect(mustBeLike(visitor.compile(node))).toBe(
         mustBeLike(
           `( SELECT * FROM "users" WHERE "users"."age" < 18 UNION ALL SELECT * FROM "users" WHERE "users"."age" > 99 )`,

@@ -18,6 +18,17 @@ interface DirtyRecord {
   mutationsBeforeLastSave: AttributeMutationTracker | NullMutationTracker;
 }
 
+export async function reload<T>(
+  this: { _mutationsBeforeLastSave: unknown; _mutationsFromDatabase: unknown },
+  _args: unknown[],
+  superFn: () => Promise<T>,
+): Promise<T> {
+  const result = await superFn();
+  this._mutationsBeforeLastSave = null;
+  this._mutationsFromDatabase = null;
+  return result;
+}
+
 export function isSavedChangeToAttribute(
   record: DirtyRecord,
   attrName: string,

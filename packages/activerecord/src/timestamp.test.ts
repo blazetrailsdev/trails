@@ -120,12 +120,12 @@ describe("TimestampTest", () => {
 
   it("touching updates timestamp with given time", async () => {
     const previouslyUpdatedAt2 = developer.legacy_updated_at as RubyTime;
-    const newTime = new Date(Date.UTC(2015, 1, 16, 0, 0, 0));
+    const newTime = RubyTime.utc(2015, 2, 16, 0, 0, 0);
     await developer.touch({ time: newTime });
 
     expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt2);
     const updatedAt = developer.legacy_updated_at as RubyTime;
-    expect(updatedAt.toF() * 1000).toBe(newTime.getTime());
+    expect(updatedAt.toF()).toBe(newTime.toF());
   });
 
   it("touching an attribute updates timestamp", async () => {
@@ -167,15 +167,15 @@ describe("TimestampTest", () => {
   it("touching an attribute updates timestamp with given time", async () => {
     const previouslyUpdatedAt2 = developer.legacy_updated_at as RubyTime;
     const previousCreatedAt = developer.legacy_created_at as RubyTime;
-    const newTime = new Date(Date.UTC(2015, 1, 16, 4, 54, 0));
+    const newTime = RubyTime.utc(2015, 2, 16, 4, 54, 0);
     await developer.touch("legacy_created_at", { time: newTime });
 
     expect(developer.legacy_created_at).not.toEqual(previousCreatedAt);
     expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt2);
     const createdAt = developer.legacy_created_at as RubyTime;
     const updatedAt = developer.legacy_updated_at as RubyTime;
-    expect(createdAt.toF() * 1000).toBe(newTime.getTime());
-    expect(updatedAt.toF() * 1000).toBe(newTime.getTime());
+    expect(createdAt.toF()).toBe(newTime.toF());
+    expect(updatedAt.toF()).toBe(newTime.toF());
   });
 
   it("touching many attributes updates them", async () => {

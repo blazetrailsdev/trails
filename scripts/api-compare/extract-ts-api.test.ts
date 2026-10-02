@@ -1088,6 +1088,42 @@ describe("body call capture", () => {
     expect(skeleton("poll")).toEqual(["loop", "if", "ref:done"]);
   });
 
+  it("reads a loop that only pushes an awaited element as the `map` an awaiting `collect` block lowers to", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        async create(attributes: unknown[]) {
+          const records: unknown[] = [];
+          for (const attr of attributes) records.push(await this.create(attr));
+          return records;
+        }
+        async braced(attributes: unknown[]) {
+          const records: unknown[] = [];
+          for (const attr of attributes) {
+            records.push(await this.create(attr));
+          }
+          return records;
+        }
+        async guarded(attributes: unknown[]) {
+          const records: unknown[] = [];
+          for (const attr of attributes) {
+            if (attr) records.push(await this.create(attr));
+          }
+          return records;
+        }
+        sync(attributes: unknown[]) {
+          const records: unknown[] = [];
+          for (const attr of attributes) records.push(this.build(attr));
+          return records;
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("create")).toEqual(["ref:map", "ref:create"]);
+    expect(skeleton("braced")).toEqual(["ref:map", "ref:create"]);
+    expect(skeleton("guarded")).toEqual(["loop", "if", "ref:push", "ref:create"]);
+    expect(skeleton("sync")).toEqual(["loop", "ref:push", "ref:build"]);
+  });
+
   it("marks a call made in a negated position with the ! prefix", () => {
     // The faithful port of ActiveSupport's `exclude?` (`!include?`); the
     // call ratchet requires the marker before crediting a negating alias.

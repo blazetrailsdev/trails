@@ -2650,7 +2650,11 @@ include(Base, {
   updateBang: _Persistence.updateBang,
   delete: _Persistence.delete,
   _updateRow: _Persistence._updateRow,
-  reload: _Persistence.reload,
+  reload(this: Base, options?: { lock?: boolean | string; unscoped?: boolean }) {
+    return _DirtyModule.reload.call(this as any, [options], () =>
+      _Persistence.reload.call(this as any, options),
+    );
+  },
   slice: Access.prototype.slice,
   valuesAt: Access.prototype.valuesAt,
   updateAttribute: _Persistence.updateAttribute,
@@ -2878,6 +2882,19 @@ for (const [name, fn] of [
             ),
           ),
         ),
+      );
+    },
+  ],
+  [
+    "incrementBang",
+    function (
+      this: Base,
+      attribute: string,
+      by?: number,
+      options?: { touch?: boolean | string | string[] },
+    ): Promise<unknown> {
+      return _Callbacks.incrementBang.call(this, attribute, by, options, () =>
+        LockingOptimistic.incrementBang.call(this as any, attribute, by, options),
       );
     },
   ],

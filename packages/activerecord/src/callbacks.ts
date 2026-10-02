@@ -2,7 +2,9 @@ import type { Base } from "./base.js";
 import { include, included } from "@blazetrails/activesupport";
 import { ValidationsCallbacks } from "@blazetrails/activemodel";
 import { runCallbacks } from "@blazetrails/activesupport";
+import { rtest } from "@blazetrails/ruby-compat";
 import { _createRecord as counterCacheCreateRecord } from "./counter-cache.js";
+import { _createRecord as lockingCreateRecord } from "./locking/optimistic.js";
 import { _createRecord as encryptableRecordCreateRecord } from "./encryption/encryptable-record.js";
 import { recordUpdateTimestamps } from "./timestamp.js";
 import {
@@ -41,6 +43,16 @@ export function touch(
   return runCallbacks(this, "touch", superFn) as Promise<boolean>;
 }
 
+export function incrementBang<T>(
+  this: any,
+  _attribute: string,
+  _by: number | undefined,
+  options: { touch?: unknown } | undefined,
+  superFn: () => Promise<T>,
+): Promise<T> {
+  return rtest(options?.touch) ? (runCallbacks(this, "touch", superFn) as Promise<T>) : superFn();
+}
+
 /** @internal */
 export async function _createRecord(
   this: any,
@@ -50,10 +62,15 @@ export async function _createRecord(
   const ctor = this.constructor;
   return await runCallbacks(this, "create", () =>
     dirtyCreateRecord.call(this, attributeNames, (names: string[]) =>
-      encryptableRecordCreateRecord.call(this, names, (encryptedNames: string[]) =>
-        counterCacheCreateRecord.call(this, encryptedNames, (names2: string[]) =>
-          persistenceCreateRecord.call(this, names2, block),
-        ),
+      encryptableRecordCreateRecord.call(
+        this,
+        names,
+        (encryptedNames: string[]) =>
+          lockingCreateRecord.call(this, encryptedNames, (lockedNames: string[]) =>
+            counterCacheCreateRecord.call(this, lockedNames, (names2: string[]) =>
+              persistenceCreateRecord.call(this, names2, block),
+            ),
+          ) as Promise<unknown>,
       ),
     ),
   );

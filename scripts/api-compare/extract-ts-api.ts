@@ -4657,6 +4657,35 @@ function isRetryLoop(statement: ts.ForStatement | ts.WhileStatement): boolean {
   return body.length === 1 && ts.isTryStatement(body[0]) && body[0].catchClause !== undefined;
 }
 
+/**
+ * The `f(x)` of `for (const x of xs) out.push(await f(x))`, or undefined for
+ * any other loop. That shape is Ruby's `xs.collect { |x| f(x) }` whose block
+ * awaits (`attributes.collect { |attr| create(attr, &block) }`,
+ * `activerecord/lib/active_record/persistence.rb:34`): a `map` callback cannot
+ * await its elements in turn, so the call form the fold expects of `collect`
+ * is not available to the port.
+ */
+function awaitedCollect(statement: ts.ForOfStatement): ts.Expression | undefined {
+  let body = statement.statement;
+  if (ts.isBlock(body)) {
+    if (body.statements.length !== 1) return undefined;
+    body = body.statements[0];
+  }
+  if (!ts.isExpressionStatement(body) || !ts.isCallExpression(body.expression)) return undefined;
+  const push = body.expression;
+  const [pushed] = push.arguments;
+  if (
+    !ts.isPropertyAccessExpression(push.expression) ||
+    !ts.isIdentifier(push.expression.expression) ||
+    push.expression.name.text !== "push" ||
+    push.arguments.length !== 1 ||
+    !ts.isAwaitExpression(pushed)
+  ) {
+    return undefined;
+  }
+  return pushed.expression;
+}
+
 function isRescueClassGuard(statement: ts.Statement): boolean {
   if (!ts.isIfStatement(statement) || statement.elseStatement !== undefined) return false;
   const test = statement.expression;
@@ -4888,8 +4917,18 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
       case ts.SyntaxKind.ForStatement:
         tokens.push(isRetryLoop(n as ts.ForStatement | ts.WhileStatement) ? "loop:retry" : "loop");
         break;
+      case ts.SyntaxKind.ForOfStatement: {
+        const collected = awaitedCollect(n as ts.ForOfStatement);
+        if (collected !== undefined) {
+          visit((n as ts.ForOfStatement).expression);
+          tokens.push("ref:map");
+          visit(collected);
+          return;
+        }
+        tokens.push("loop");
+        break;
+      }
       case ts.SyntaxKind.DoStatement:
-      case ts.SyntaxKind.ForOfStatement:
       case ts.SyntaxKind.ForInStatement:
         tokens.push("loop");
         break;
