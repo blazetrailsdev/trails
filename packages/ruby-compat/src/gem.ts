@@ -1,3 +1,5 @@
+import { Deprecate } from "./gem/deprecate.js";
+import { Version } from "./gem/version.js";
 import { getOs } from "./os-adapter.js";
 
 /**
@@ -9,6 +11,9 @@ import { getOs } from "./os-adapter.js";
  * @noRailsEquivalent PERMANENT — Ruby stdlib `Gem`.
  */
 export const Gem = {
+  Deprecate,
+  Version,
+
   /**
    * `vendor/ruby/v3.3.11/lib/rubygems/defaults.rb:37` — `Gem.default_dir`.
    *

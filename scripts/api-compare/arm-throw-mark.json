@@ -43,10 +43,8 @@
     }
   },
   "arel": {
-    "total": 1,
-    "byFile": {
-      "visitors/visitor.ts": 1
-    }
+    "total": 0,
+    "byFile": {}
   },
   "did-you-mean": {
     "total": 0,

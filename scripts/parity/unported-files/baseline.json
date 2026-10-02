@@ -672,10 +672,6 @@
     "reason": "Pre-1.0: one arm of `acts_like?`; trails ports the Time/Date arms only."
   },
   {
-    "pattern": "/version.rb",
-    "reason": "`Module.version` / `VERSION` returns the gem version as a Gem::Version (e.g. active_record/version.rb:8). Every trails package carries its version in package.json, which is the JS ecosystem's registry for it, so there is nothing to port. Anchored (leading `/`) so it cannot also exclude `gem_version.rb`, which IS ported and owns real surface (`ActionPack.gem_version`)."
-  },
-  {
     "testFile": "adapter_test.rb",
     "className": "AdapterConnectionTest",
     "tests": ["transaction restores after remote disconnection"],

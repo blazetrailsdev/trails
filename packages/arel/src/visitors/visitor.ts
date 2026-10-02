@@ -1,12 +1,36 @@
-import { rbModName, rbObjClass, rbSetClassPathString } from "@blazetrails/ruby-compat";
+import {
+  Hash,
+  NoMethodError,
+  TypeError,
+  classpaths,
+  rbFSend,
+  rbModAncestors,
+  rbModName,
+  rbModToS,
+  rbObjClass,
+  rbObjRespondTo,
+  rbSetClassPathString,
+} from "@blazetrails/ruby-compat";
 import { Visitors } from "../namespaces.js";
 
 export type NodeCtor = abstract new (...args: never[]) => object;
 
-const PER_CLASS_CACHE = new WeakMap<typeof Visitor, Map<NodeCtor, string>>();
+type Klass = NodeCtor | string;
+
+function objectClass(object: unknown): Klass {
+  const klass = (object as { constructor?: unknown } | null | undefined)?.constructor;
+  if (typeof klass !== "function") return rbObjClass(object);
+  if (classpaths.has(klass) && Object.getPrototypeOf(object) === klass.prototype) {
+    return klass as NodeCtor;
+  }
+  const name = rbObjClass(object);
+  return rbModToS(klass as NodeCtor) === name ? (klass as NodeCtor) : name;
+}
 
 export abstract class Visitor {
-  protected dispatch: Map<NodeCtor, string>;
+  protected dispatch: Hash<Klass, string>;
+
+  private static _dispatchCache?: Hash<Klass, string>;
 
   constructor() {
     this.dispatch = this.getDispatchCache();
@@ -14,79 +38,50 @@ export abstract class Visitor {
 
   accept<C>(object: unknown, collector: C): C;
   accept(object: unknown): unknown;
-  accept(object: unknown, collector?: unknown): unknown {
+  accept(object: unknown, collector: unknown = null): unknown {
     return this.visit(object, collector);
   }
 
   /** @internal */
-  static dispatchCache(this: typeof Visitor): Map<NodeCtor, string> {
-    let cache = PER_CLASS_CACHE.get(this);
-    if (!cache) {
-      const parent = Object.getPrototypeOf(this) as typeof Visitor | null;
-      const inherited =
-        parent && typeof parent.dispatchCache === "function" && parent !== this
-          ? parent.dispatchCache()
-          : undefined;
-      cache = new Map(inherited);
-      PER_CLASS_CACHE.set(this, cache);
+  static dispatchCache(this: typeof Visitor): Hash<Klass, string> {
+    if (!Object.prototype.hasOwnProperty.call(this, "_dispatchCache")) {
+      this._dispatchCache = new Hash<Klass, string>((hash, klass) => {
+        const name = typeof klass === "string" ? klass : rbModName(klass);
+        const path = (name ?? "").replaceAll("::", "");
+        const dispatchMethod = path === "" ? "visit_" : `visit${path}`;
+        hash.set(klass, dispatchMethod);
+        return dispatchMethod;
+      }).compareByIdentity();
     }
-    return cache;
+    return this._dispatchCache!;
   }
 
-  protected getDispatchCache(): Map<NodeCtor, string> {
+  protected getDispatchCache(): Hash<Klass, string> {
     return (this.constructor as typeof Visitor).dispatchCache();
   }
 
   protected visit<C>(object: unknown, collector: C): C;
   protected visit(object: unknown): unknown;
-  protected visit(object: unknown, collector?: unknown): unknown {
-    const methodName = this.dispatchMethod(object);
-    if (!methodName) {
-      // eslint-disable-next-line blazetrails/rails-error-parity -- Ruby raises NoMethodError/TypeError here; TypeError is its JS analogue, not a missing ported class.
-      throw new TypeError(`Cannot visit ${rbObjClass(object)}`);
-    }
-    const fn = (this as unknown as Record<string, unknown>)[methodName] as (
-      n: unknown,
-      c?: unknown,
-    ) => unknown;
-    return fn.call(this, object, collector);
-  }
-
-  private dispatchMethod(object: unknown): string | undefined {
-    const klass = rbObjClass(object);
-    if (klass !== "Hash") {
-      const ctor = (object as { constructor?: NodeCtor } | null | undefined)?.constructor;
-      if (typeof ctor === "function") {
-        const byCtor = this.resolveDispatch(ctor);
-        if (byCtor) return byCtor;
+  protected visit(object: unknown, collector: unknown = null): unknown {
+    for (;;) {
+      let dispatchMethod: string | undefined;
+      try {
+        dispatchMethod = this.dispatch.get(objectClass(object));
+        if (collector != null && collector !== false) {
+          return rbFSend(this, dispatchMethod!, object, collector);
+        } else {
+          return rbFSend(this, dispatchMethod!, object);
+        }
+      } catch (e) {
+        if (!(e instanceof NoMethodError)) throw e;
+        if (rbObjRespondTo(this, dispatchMethod!, true)) throw e;
+        const superklass = (rbModAncestors(objectClass(object)) as Klass[]).find((klass) =>
+          rbObjRespondTo(this, this.dispatch.get(klass)!, true),
+        );
+        if (superklass == null) throw new TypeError(`Cannot visit ${rbObjClass(object)}`);
+        this.dispatch.set(objectClass(object), this.dispatch.get(superklass)!);
       }
     }
-    const byName = `visit${klass.replaceAll("::", "")}`;
-    return this.respondsTo(byName) ? byName : undefined;
-  }
-
-  private respondsTo(methodName: string): boolean {
-    return typeof (this as unknown as Record<string, unknown>)[methodName] === "function";
-  }
-
-  private resolveDispatch(ctor: NodeCtor): string | undefined {
-    let cur: NodeCtor | null = ctor;
-    while (cur) {
-      const found = this.dispatch.get(cur) ?? this.deriveDispatch(cur);
-      if (found && this.respondsTo(found)) {
-        this.dispatch.set(ctor, found);
-        return found;
-      }
-      const proto = Object.getPrototypeOf(cur.prototype) as object | null;
-      const parent = proto?.constructor as NodeCtor | undefined;
-      cur = !parent || (parent as unknown) === Object ? null : parent;
-    }
-    return undefined;
-  }
-
-  private deriveDispatch(klass: NodeCtor): string | undefined {
-    const name = rbModName(klass);
-    return name === null ? undefined : `visit${name.replaceAll("::", "")}`;
   }
 }
 

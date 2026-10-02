@@ -2040,6 +2040,9 @@ export class Base extends Model {
 
   static shardSelector: unknown = null;
 
+  declare static attributesForInspect: ":all" | string[];
+  declare static isAttributesForInspect: () => boolean;
+
   static _destroyAssociationAsyncJob: unknown = null;
 
   static destroyAssociationAsyncJob = _Core.destroyAssociationAsyncJob;
