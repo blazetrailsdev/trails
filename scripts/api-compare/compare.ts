@@ -5082,10 +5082,6 @@ export function main() {
         if (!rubyParams) return;
         // Every signature recorded for this TS name; a pair matches when it
         // overlaps ANY (see tsParamsByName above for why this is global).
-        // A `super_`-threading signature in the matched file IS the port of a
-        // Rails method that calls `super`, so it is compared alone: pooled, it
-        // is outvoted by any unrelated same-named method (`Errors#initializeDup`
-        // credited `Dirty#initializeDup(super_, other)`).
         const threaded = (tsParamsByFileNameInPkg.get(tsFile)?.get(tsName) ?? []).filter(
           threadsSuper,
         );

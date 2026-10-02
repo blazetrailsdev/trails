@@ -267,11 +267,9 @@ describe("threadsSuper", () => {
   });
 
   it("never matches, even where Ruby's optionals would absorb the extra slot", () => {
-    // Dirty#as_json(options = {}) against asJson(super_, options = {}).
     expect(arityMatches([opt("options")], [superThis, req("super_"), opt("options")]).ok).toBe(
       false,
     );
-    // Attributes#initialize(*) against constructor(super_).
     expect(arityMatches([rest("args")], [superThis, req("super_")]).ok).toBe(false);
     expect(arityMatches([req("other")], [req("super_"), req("other")]).ok).toBe(false);
   });

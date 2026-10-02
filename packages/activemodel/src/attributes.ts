@@ -27,9 +27,10 @@ import {
 
 export function constructor(
   this: AttributeInstanceHost & { constructor: { _defaultAttributes(): AttributeSet } },
+  ...args: unknown[]
 ): void {
   this._attributes = this.constructor._defaultAttributes().deepDup();
-  SuperMethods.superMethod(this, "initInternals")!();
+  SuperMethods.superMethod(this, "initInternals")!(...args);
 }
 
 export function initializeDup(this: AttributeInstanceHost, other: unknown): void {
