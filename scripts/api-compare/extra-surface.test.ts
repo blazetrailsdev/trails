@@ -4491,14 +4491,9 @@ describe("inlinedModuleMembers", () => {
 });
 
 describe("buildReport — members Ruby supplies without a def in the mapped file", () => {
-  function tsClass(
-    name: string,
-    file: string,
-    instance: string[],
-    klass: string[] = [],
-  ): ClassInfo {
+  function tsClass(file: string, instance: string[], klass: string[] = []): ClassInfo {
     return {
-      name,
+      name: "",
       file,
       includes: [],
       extends: [],
@@ -4517,11 +4512,6 @@ describe("buildReport — members Ruby supplies without a def in the mapped file
             name: "NullMutationTracker",
             file: "attribute_mutation_tracker.rb",
             includes: ["Singleton"],
-          }),
-          "ActiveModel::Registry": rubyClass({
-            name: "Registry",
-            file: "registry.rb",
-            klass: [method("instance")],
           }),
           "ActiveModel::Plain": rubyClass({ name: "Plain", file: "plain.rb" }),
           "ActiveModel::Type::Value": rubyClass({
@@ -4549,6 +4539,7 @@ describe("buildReport — members Ruby supplies without a def in the mapped file
   };
 
   function extrasByFile(classes: Record<string, ClassInfo>): Record<string, string[]> {
+    for (const [name, info] of Object.entries(classes)) info.name = name;
     const ts: ApiManifest = {
       source: "typescript",
       generatedAt: "",
@@ -4566,27 +4557,19 @@ describe("buildReport — members Ruby supplies without a def in the mapped file
   }
 
   it("credits Singleton's instance to a class that includes it, and to no other", () => {
-    // attribute_mutation_tracker.rb:157 `include Singleton`; stdlib singleton.rb
-    // supplies `.instance`, which no vendored gem defs.
     expect(
       extrasByFile({
-        NullMutationTracker: tsClass(
-          "NullMutationTracker",
-          "attribute-mutation-tracker.ts",
-          [],
-          ["instance"],
-        ),
-        Plain: tsClass("Plain", "plain.ts", [], ["instance"]),
+        NullMutationTracker: tsClass("attribute-mutation-tracker.ts", [], ["instance"]),
+        Plain: tsClass("plain.ts", [], ["instance"]),
       }),
     ).toEqual({ "plain.ts": ["instance"] });
   });
 
   it("credits the DefaultImplementation that SerializeCastValue.included injects", () => {
-    // type/serialize_cast_value.rb:21-23, reached from type/value.rb:10.
     expect(
       extrasByFile({
-        ValueType: tsClass("ValueType", "type/value.ts", ["serialize", "serializeCastValue"]),
-        Other: tsClass("Other", "type/other.ts", ["serializeCastValue"]),
+        ValueType: tsClass("type/value.ts", ["serialize", "serializeCastValue"]),
+        Other: tsClass("type/other.ts", ["serializeCastValue"]),
       }),
     ).toEqual({ "type/other.ts": ["serializeCastValue"] });
   });

@@ -285,8 +285,7 @@ const HOOK_INJECTED_MIXINS: Record<string, { includes: string[] }> = {
  * spelled `compare` by MIRROR_CANDIDATE_OVERRIDES.
  *
  * `Singleton` (stdlib `singleton.rb`) supplies `instance` to the including
- * class: `ActiveModel::NullMutationTracker` (`attribute_mutation_tracker.rb:157`)
- * and `Mime::AllType` / `Mime::NullType` (`http/mime_type.rb:349,370`).
+ * class: `ActiveModel::NullMutationTracker` (`attribute_mutation_tracker.rb:157`).
  *
  * Values are `Enumerable.instance_methods(false)` / `Comparable
  * .instance_methods(false)` (Ruby 3.4). An ActiveSupport core_ext reopening of
@@ -1467,10 +1466,8 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
  * which is also how the symbol import resolves at every site in the repo,
  * since the binding is imported under that bare name.
  *
- * `[initialize]` is the third: a MODULE's `def initialize`, which joins the
- * includer's constructor chain through `super`
- * (`initializeIncludedModules`, `packages/ruby-compat/src/include.ts`). It is
- * credited off the manifest, to a file whose module defines `initialize`.
+ * `[initialize]` is the third: a MODULE's `def initialize`, reached through the
+ * includer's `super` (`initializeIncludedModules`), credited off the manifest.
  *
  * The string-named `included` / `extended` / `inherited` methods are a
  * different thing and stay drift: `SKIP_GROUPS` in `scripts/parity/conventions.ts`

@@ -51,6 +51,8 @@ export {
   rbFSend,
   toSym,
   rbModPublicMethodDefined,
+  rbModAncestors,
+  rbModInstanceMethod,
   rtest,
 } from "./object.js";
 export {

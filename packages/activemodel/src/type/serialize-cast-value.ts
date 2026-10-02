@@ -1,5 +1,9 @@
 import { extend, include, included, initialize, Module } from "@blazetrails/activesupport";
-import { NameError, rbModPublicMethodDefined, rbModToS } from "@blazetrails/ruby-compat";
+import {
+  rbModAncestors,
+  rbModInstanceMethod,
+  rbModPublicMethodDefined,
+} from "@blazetrails/ruby-compat";
 
 interface SerializeCastValueHost {
   constructor: { serializeCastValueCompatible(): boolean };
@@ -13,27 +17,10 @@ export const ClassMethods = {
     if (Object.hasOwn(this, "_serializeCastValueCompatible")) {
       return this._serializeCastValueCompatible as boolean;
     }
-    const ancestors: object[] = [];
-    for (
-      let proto: object | null = this.prototype;
-      proto && proto !== Object.prototype;
-      proto = Object.getPrototypeOf(proto)
-    ) {
-      ancestors.push(proto);
-    }
-    const instanceMethod = (name: string): { owner: object } => {
-      const owner = ancestors.find((proto) => Object.prototype.hasOwnProperty.call(proto, name));
-      if (owner === undefined) {
-        throw new NameError(
-          `undefined method '${name}' for class '${rbModToS(this as unknown as new () => unknown)}'`,
-          name,
-        );
-      }
-      return { owner };
-    };
+    const ancestors = rbModAncestors(this);
     const compatible =
-      ancestors.indexOf(instanceMethod("serializeCastValue").owner) <=
-      ancestors.indexOf(instanceMethod("serialize").owner);
+      ancestors.indexOf(rbModInstanceMethod(this, "serializeCastValue").owner) <=
+      ancestors.indexOf(rbModInstanceMethod(this, "serialize").owner);
     Object.defineProperty(this, "_serializeCastValueCompatible", {
       value: compatible,
       writable: true,
