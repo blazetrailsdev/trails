@@ -8,8 +8,7 @@ import { AliasPredication, type AliasPredicationModule } from "../alias-predicat
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Filter extends Binary {}
 
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
-   @typescript-eslint/no-unsafe-declaration-merging */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Filter extends WindowPredicationsModule, AliasPredicationModule {}
 
 include(Filter, WindowPredications);
