@@ -6,7 +6,10 @@ import type { ExplainOption } from "../abstract/database-statements.js";
 import type { Nodes } from "@blazetrails/arel";
 import { Result } from "../../result.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
-import { defaultInsertValue as abstractDefaultInsertValue } from "../abstract/database-statements.js";
+import {
+  defaultInsertValue as abstractDefaultInsertValue,
+  returningColumnValues as abstractReturningColumnValues,
+} from "../abstract/database-statements.js";
 import { AbstractAdapter, type Version } from "../abstract-adapter.js";
 
 const READ_QUERY = AbstractAdapter.buildReadQueryRegexp(
@@ -38,7 +41,7 @@ export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
 
 interface SupportsInsertReturningHost {
   /** @internal */
-  supportsInsertReturning?(): Promise<boolean>;
+  supportsInsertReturning(): Promise<boolean>;
 }
 
 interface AutoIncrementColumnHost {
@@ -101,13 +104,14 @@ export function defaultInsertValue(column: AutoIncrementColumnHost): Nodes.SqlLi
 
 /** @internal */
 export async function returningColumnValues(
-  this: SupportsInsertReturningHost | void,
+  this: SupportsInsertReturningHost,
   result: Result,
 ): Promise<unknown[] | undefined> {
-  if (await (this as SupportsInsertReturningHost | null)?.supportsInsertReturning?.()) {
+  if (await this.supportsInsertReturning()) {
     return first(result.rows);
+  } else {
+    return abstractReturningColumnValues.call(this as never, result);
   }
-  return undefined;
 }
 
 /** @internal */
