@@ -4700,7 +4700,7 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
       }
       case ts.SyntaxKind.WhileStatement:
       case ts.SyntaxKind.ForStatement:
-        if (!isRetryLoop(n as ts.ForStatement | ts.WhileStatement)) tokens.push("loop");
+        tokens.push(isRetryLoop(n as ts.ForStatement | ts.WhileStatement) ? "loop:retry" : "loop");
         break;
       case ts.SyntaxKind.DoStatement:
       case ts.SyntaxKind.ForOfStatement:

@@ -879,7 +879,7 @@ describe("body call capture", () => {
     expect(skeleton("plain")).toEqual(["if", "ref:build", "new:Lit"]);
   });
 
-  it("emits no loop for the unconditional loop a Ruby `retry` lowers to, and no arm for its rescue class guard", () => {
+  it("tokens the unconditional loop a Ruby `retry` lowers to apart from a loop, and emits no arm for its rescue class guard", () => {
     const cls = extractFromSource(
       `class Foo {
         visit(object: unknown) {
@@ -903,6 +903,7 @@ describe("body call capture", () => {
     );
     const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
     expect(skeleton("visit")).toEqual([
+      "loop:retry",
       "try",
       "ref:send",
       "rescue",

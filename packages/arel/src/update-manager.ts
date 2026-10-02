@@ -36,7 +36,7 @@ export class UpdateManager extends TreeManager<UpdateStatement> {
       values instanceof SqlLiteral ||
       values instanceof BoundSqlLiteral
     ) {
-      this.ast.values = [values as Node];
+      this.ast.values = [values];
     } else {
       this.ast.values = values.map(
         ([column, value]) => new Assignment(new UnqualifiedColumn(column), value as NodeOrValue),
@@ -57,7 +57,7 @@ export class UpdateManager extends TreeManager<UpdateStatement> {
   }
 
   having(expr: Node | string): this {
-    this.ast.havings.push(expr as Node);
+    this.ast.havings.push(expr);
     return this;
   }
 }

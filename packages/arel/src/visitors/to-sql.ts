@@ -229,7 +229,7 @@ export class ToSql extends Visitor {
   }
 
   protected collectNodesFor(
-    nodes: (Node | Node[])[],
+    nodes: (Node | Node[] | string)[],
     collector: SQLString,
     spacer: string,
     connector = ", ",
@@ -1095,7 +1095,7 @@ export class ToSql extends Visitor {
       relation: Node | Table | null;
       wheres: Node[];
       groups: Node[];
-      havings: Node[];
+      havings: (Node | string)[];
       limit: Node | null;
       offset: Node | null;
       orders: Node[];

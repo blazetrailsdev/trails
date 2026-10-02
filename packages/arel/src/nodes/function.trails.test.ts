@@ -4,10 +4,10 @@ import { Table, Nodes, Visitors } from "../index.js";
 import { SqlLiteral } from "./sql-literal.js";
 
 describe("Function alias slot", () => {
-  describe("alias= setter wraps strings in SqlLiteral", () => {
-    it("wraps a string via the setter", () => {
+  describe("alias is a plain accessor; #as wraps in SqlLiteral", () => {
+    it("wraps a string through #as", () => {
       const fn = new Nodes.NamedFunction("COUNT", []);
-      fn.alias = "total";
+      fn.as("total");
       expect(fn.alias).toBeInstanceOf(Nodes.SqlLiteral);
       expect((fn.alias as Nodes.SqlLiteral).toString()).toBe("total");
     });

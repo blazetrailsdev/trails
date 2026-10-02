@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Table, Nodes } from "../index.js";
+import { fakeRecordConnection } from "../test-helpers/connection.js";
+import { Table, Nodes, Visitors } from "../index.js";
 
 describe("Case", () => {
   const users = new Table("users");
@@ -24,6 +25,14 @@ describe("Case", () => {
     it("throws when called before #when", () => {
       const node = new Nodes.Case(users.get("status"));
       expect(() => node.then("A")).toThrow(TypeError);
+    });
+
+    it("renders an undefined #then / #else expression as NULL, as Ruby's nil does", () => {
+      const node = new Nodes.Case(users.get("status")).when("a").then(undefined).else(undefined);
+      expect((node.conditions[0].right as Nodes.Quoted).isNil()).toBe(true);
+      expect(new Visitors.ToSql(fakeRecordConnection).compile(node)).toBe(
+        'CASE "users"."status" WHEN \'a\' THEN NULL ELSE NULL END',
+      );
     });
 
     it("Promise.resolve rejects rather than hanging (thenable hazard)", async () => {

@@ -496,6 +496,7 @@ const TS_CONSTRUCT_SKELETON_NAMES = new Map([
 ]);
 
 const NIL_GUARD_TOKEN = "if:nil-guard";
+const RETRY_LOOP_TOKEN = "loop:retry";
 
 export function foldSkeletonTokens(
   skeleton: readonly string[],
@@ -505,12 +506,20 @@ export function foldSkeletonTokens(
   const folded: string[] = [];
   const surplus =
     side === "ruby" && counterpart !== undefined ? idiomSurplus(skeleton, counterpart) : undefined;
-  const count = (tokens: readonly string[]) => tokens.filter((t) => t === "if").length;
-  let unclaimedIfs =
-    side === "ts" && counterpart !== undefined ? count(counterpart) - count(skeleton) : Infinity;
+  const unclaimed = (arm: string) => {
+    if (side !== "ts" || counterpart === undefined) return Infinity;
+    const count = (tokens: readonly string[]) => tokens.filter((t) => t === arm).length;
+    return count(counterpart) - count(skeleton);
+  };
+  let unclaimedIfs = unclaimed("if");
+  let unclaimedLoops = unclaimed("loop");
   for (const [index, token] of skeleton.entries()) {
     if (token === NIL_GUARD_TOKEN) {
       folded.push(unclaimedIfs-- > 0 ? "if" : "and");
+      continue;
+    }
+    if (token === RETRY_LOOP_TOKEN) {
+      if (unclaimedLoops-- > 0) folded.push("loop");
       continue;
     }
     if (!token.startsWith("ref:")) {

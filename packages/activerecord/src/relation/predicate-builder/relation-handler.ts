@@ -32,7 +32,7 @@ export class RelationHandler {
     if (typeof value?._isDeferredDistinctPkSubquery !== "function") return null;
     if (!value._isDeferredDistinctPkSubquery()) return null;
     const inlineSubquery = value._buildDeferredDistinctPkInlineSubquery();
-    return new DeferredIdsIn(attribute, inlineSubquery, [
+    return new DeferredIdsIn(attribute, inlineSubquery.ast, [
       { ids: () => value._materializeDistinctPkIds() },
     ]);
   }

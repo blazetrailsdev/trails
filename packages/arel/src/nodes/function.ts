@@ -9,26 +9,17 @@ import { SqlLiteral } from "./sql-literal.js";
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Function extends NodeExpression {
   expressions: NodeOrValue[] | NodeOrValue;
+  alias: Node | null;
   distinct: boolean | null;
-  private _alias: Node | null;
-
-  get alias(): Node | null {
-    return this._alias;
-  }
-
-  set alias(value: Node | string | null) {
-    this._alias = typeof value === "string" ? new SqlLiteral(value) : value;
-  }
-
   constructor(expr: NodeOrValue[] | NodeOrValue, aliaz: string | SqlLiteral | null = null) {
     super();
     this.expressions = expr;
-    this._alias = aliaz == null ? null : new SqlLiteral(aliaz);
+    this.alias = aliaz == null ? null : new SqlLiteral(aliaz);
     this.distinct = false;
   }
 
   as(aliaz: string): this {
-    this.alias = aliaz;
+    this.alias = new SqlLiteral(aliaz);
     return this;
   }
 

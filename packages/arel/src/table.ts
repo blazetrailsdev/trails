@@ -109,10 +109,10 @@ export class Table {
   get(name: Node | string | null, table: Attribute["relation"] = this): Attribute {
     if (isSymbol(name)) name = symbolToS(name);
     if (this.klass != null) {
-      const attributeAliases = this.klass.attributeAliases;
       name =
-        (Object.hasOwn(attributeAliases, name as string) && attributeAliases[name as string]) ||
-        name;
+        (Object.getOwnPropertyDescriptor(this.klass.attributeAliases, name as string)?.value as
+          | string
+          | undefined) ?? name;
     }
     return new Attribute(table, name);
   }

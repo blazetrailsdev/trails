@@ -212,6 +212,22 @@ describe("sameFileHelperSkeletons", () => {
     expect(foldSkeletonTokens(ts, "ts")).toEqual(["ref:super", "if", "new:SqlLiteral"]);
   });
 
+  it("drops a retry loop unless the Ruby stream still shows an unclaimed `loop`", () => {
+    const ts = ["loop:retry", "try", "ref:send", "rescue"];
+    expect(foldSkeletonTokens(ts, "ts", ["try", "ref:send", "rescue"])).toEqual([
+      "try",
+      "ref:send",
+      "rescue",
+    ]);
+    expect(foldSkeletonTokens(ts, "ts", ["loop", "try", "ref:send", "rescue"])).toEqual([
+      "loop",
+      "try",
+      "ref:send",
+      "rescue",
+    ]);
+    expect(foldSkeletonTokens(ts, "ts")).toEqual(["loop", "try", "ref:send", "rescue"]);
+  });
+
   it("reads a blockless each_with_index chained into map as no loop of its own", () => {
     expect(foldSkeletonTokens(["ref:each_with_index", "ref:map", "new:Column"], "ruby")).toEqual([
       "ref:map",
