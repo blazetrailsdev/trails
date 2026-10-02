@@ -151,6 +151,13 @@ describe("matchOptionKeysAgainst", () => {
     });
   });
 
+  it("only ever adds missingInTs when the Ruby key set widens", () => {
+    const narrow = matchOptionKeysAgainst(["root"], [["root"]], [], [["root", "only"]]);
+    const wide = matchOptionKeysAgainst(["root", "prefix"], [["root"]], [], [["root", "only"]]);
+    expect(narrow).toMatchObject({ missingInTs: [], extraInTs: ["only"] });
+    expect(wide).toMatchObject({ missingInTs: ["prefix"], extraInTs: ["only"] });
+  });
+
   it("reports nothing extra for a bodiless candidate", () => {
     expect(matchOptionKeysAgainst(["root"], [["root", "only"]])).toEqual({
       comparable: true,

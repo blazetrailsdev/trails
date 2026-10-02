@@ -62,24 +62,39 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     return rubyField(fixtures, "calls");
   }
 
-  it("flags a single-quoted string default, whose source decodes differently", () => {
+  it("records the opener of a string default that is not double-quoted", () => {
     const r = rubyField(
       {
         "quoted.rb": [
           "class Foo",
-          '  def like(double = "\\\\", single = \'\\s\', percent = %q(\\s), plain = "x")',
+          "  def like(double = \"\\\\\", single = '\\s', percent = %q(a\\)b), upper = %Q(\\s), plain = 'x')",
+          "  end",
+          "",
+          "  def here(raw = <<~'EOS', cooked = <<~EOS, sym = :\"a\\n\", after = '\\d')",
+          "    a\\nb",
+          "  EOS",
+          "    c\\nd",
+          "  EOS",
           "  end",
           "end",
           "",
         ].join("\n"),
       },
       "params",
-    ) as unknown as Record<string, { name: string; literal: unknown }[]>;
-    expect(r["Foo#like"].map((p) => [p.name, p.literal])).toEqual([
-      ["double", { kind: "string", value: "\\\\" }],
-      ["single", { kind: "string", value: "\\s", singleQuoted: true }],
-      ["percent", { kind: "string", value: "\\s", singleQuoted: true }],
-      ["plain", { kind: "string", value: "x" }],
+    ) as unknown as Record<string, { name: string; literal: { opener?: string } }[]>;
+    const openers = (key: string) => r[key].map((p) => [p.name, p.literal.opener]);
+    expect(openers("Foo#like")).toEqual([
+      ["double", undefined],
+      ["single", "'"],
+      ["percent", "%q("],
+      ["upper", undefined],
+      ["plain", undefined],
+    ]);
+    expect(openers("Foo#here")).toEqual([
+      ["raw", "<<~'EOS'"],
+      ["cooked", undefined],
+      ["sym", undefined],
+      ["after", "'"],
     ]);
   });
 

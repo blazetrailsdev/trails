@@ -11,7 +11,6 @@ import { snakeToCamel } from "@blazetrails/parity/conventions";
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\x00\x1b\r\n\t]/g;
 
-/** Canonicalize so Ruby raw source escapes (`\e`, `\r\n`) and TS resolved control chars compare equal. */
 function canonString(s: string): string {
   const real: Record<string, string> = {
     "\x00": "<0>",
@@ -20,10 +19,7 @@ function canonString(s: string): string {
     "\n": "<n>",
     "\t": "<t>",
   };
-  return s
-    .replace(CONTROL_CHARS, (c) => real[c])
-    .replace(/\\e|\\033|\\x1[bB]|\\u001[bB]/g, "<e>")
-    .replace(/\\([0rnt])/g, (_, c) => `<${c}>`);
+  return s.replace(CONTROL_CHARS, (c) => real[c]);
 }
 
 const RUBY_SIMPLE_ESCAPES: Record<string, string> = {
@@ -38,6 +34,8 @@ const RUBY_SIMPLE_ESCAPES: Record<string, string> = {
   s: " ",
   "\n": "",
 };
+
+const RUBY_CLOSING_DELIMITERS: Record<string, string> = { "(": ")", "[": "]", "{": "}", "<": ">" };
 
 const RUBY_ESCAPE =
   /\\(?:([0-7]{1,3})|x([0-9a-fA-F]{1,2})|u([0-9a-fA-F]{4})|u\{([0-9a-fA-F \t]+)\}|(?:c|C-)([\s\S])|([\s\S]))/g;
@@ -54,13 +52,21 @@ const RUBY_ESCAPE =
  * and any other `\X`, which is `X`. `\M-x` is not decoded: it yields a byte
  * that is not a character, and falls through the last arm.
  *
- * A single-quoted literal (`'…'` / `%q(…)`, which extract-ruby-api.rb reads
- * back off the source line, since the sexp drops the delimiter) knows two
- * escapes, `\\` and `\'`, and keeps every other backslash: `'\s*'`
- * (action_view.rb:35) is three characters.
+ * `opener` is the literal's opening token when it is not double-quoted, which
+ * extract-ruby-api.rb reads off the lexer since the sexp drops it. A `'…'` or
+ * `%q(…)` literal knows only a backslash before another backslash or before
+ * its own delimiter, and keeps every other one: `'\s*'` (action_view.rb:35) is
+ * three characters. A `<<~'EOS'` heredoc has no escapes at all.
  */
-export function decodeRubyString(source: string, singleQuoted = false): string {
-  if (singleQuoted) return source.replace(/\\([\\'])/g, "$1");
+export function decodeRubyString(source: string, opener?: string): string {
+  if (opener?.startsWith("<<")) return source;
+  if (opener !== undefined) {
+    const open = opener.at(-1)!;
+    const close = RUBY_CLOSING_DELIMITERS[open] ?? open;
+    return source.replace(/\\([\s\S])/g, (escape, char: string) =>
+      char === "\\" || char === open || char === close ? char : escape,
+    );
+  }
   return source.replace(
     RUBY_ESCAPE,
     (
@@ -135,7 +141,7 @@ export function compareLiteral(
 ): LiteralVerdict {
   const r = normalizeLiteral(
     ruby.kind === "string"
-      ? { kind: "string", value: decodeRubyString(String(ruby.value ?? ""), ruby.singleQuoted) }
+      ? { kind: "string", value: decodeRubyString(String(ruby.value ?? ""), ruby.opener) }
       : ruby,
   );
   const t = normalizeLiteral(ts);

@@ -8,9 +8,10 @@
 export interface LiteralValue {
   kind: "int" | "float" | "string" | "symbol" | "bool" | "nil" | "array" | "hash" | "expr";
   value?: string | boolean; // int/float token (underscores kept), string/symbol text, or boolean
-  /** Ruby side only: a `'…'` / `%q(…)` string, whose source text decodes by the
-   *  single-quoted rules. See literals.ts `decodeRubyString`. */
-  singleQuoted?: boolean;
+  /** Ruby side only: the opening token of a string whose source text does not
+   *  decode by the double-quoted rules — `'`, `%q(`, or a `<<~'EOS'` heredoc.
+   *  See literals.ts `decodeRubyString`. */
+  opener?: string;
 }
 
 /**

@@ -105,15 +105,30 @@ describe("compareLiteral", () => {
   it("keeps the backslashes of a single-quoted Ruby literal", () => {
     expect(
       compareLiteral(
-        { kind: "string", value: "#.*coding[:=]\\s*(\\S+)[ \\t]*", singleQuoted: true },
+        { kind: "string", value: "#.*coding[:=]\\s*(\\S+)[ \\t]*", opener: "'" },
         { kind: "string", value: "#.*coding[:=]\\s*(\\S+)[ \\t]*" },
       ),
     ).toBe("match");
     expect(
       compareLiteral(
-        { kind: "string", value: "a\\\\b\\'c", singleQuoted: true },
+        { kind: "string", value: "a\\\\b\\'c", opener: "'" },
         { kind: "string", value: "a\\b'c" },
       ),
+    ).toBe("match");
+  });
+
+  it("unescapes only the delimiter of a %q literal and nothing in a raw heredoc", () => {
+    expect(decodeRubyString("a\\)b\\(c\\]\\\\", "%q(")).toBe("a)b(c\\]\\");
+    expect(decodeRubyString("a\\]b", "%q[")).toBe("a]b");
+    expect(decodeRubyString("a\\nb\\\\", "<<~'EOS'")).toBe("a\\nb\\\\");
+  });
+
+  it("reports a backslash-then-letter against the control character it spells", () => {
+    expect(
+      compareLiteral({ kind: "string", value: "\\\\n" }, { kind: "string", value: "\n" }),
+    ).toBe("mismatch");
+    expect(
+      compareLiteral({ kind: "string", value: "\\\\n" }, { kind: "string", value: "\\n" }),
     ).toBe("match");
   });
 

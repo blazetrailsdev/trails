@@ -5875,7 +5875,8 @@ export function extractOptionKeys(
  * a destructuring of the hash, `"k" in options`, and a reader call
  * (`fetch(options, "k")`, Ruby `options.fetch(:k)`). A plain assignment target
  * (`options.k = v`) is not a read; a compound one (`options.k ??= v`, Ruby
- * `options[:k] ||= v`) is.
+ * `options[:k] ||= v`) is. An `Object.prototype` member (`options.toString()`)
+ * is not a key, as Ruby's bare `options.keys` is not.
  *
  * The declared options TYPE says what a caller may pass, which for a shared
  * type (`ColumnOptions`) is every key any method on the surface accepts, so
@@ -5929,11 +5930,13 @@ export function extractOptionReads(
   };
   const bind = (pattern: ts.ObjectBindingPattern, bag: boolean): void => {
     for (const el of pattern.elements) {
-      if (!ts.isIdentifier(el.name)) continue;
       const key = el.propertyName ?? el.name;
-      if (el.dotDotDotToken) vars.add(el.name.text);
-      else if (bag && ts.isIdentifier(key) && isOptionsName(key.text)) vars.add(el.name.text);
-      else if (!bag && (ts.isIdentifier(key) || ts.isStringLiteralLike(key))) keys.add(key.text);
+      const local = ts.isIdentifier(el.name) ? el.name.text : undefined;
+      if (el.dotDotDotToken || (bag && ts.isIdentifier(key) && isOptionsName(key.text))) {
+        if (local !== undefined) vars.add(local);
+      } else if (!bag && (ts.isIdentifier(key) || ts.isStringLiteralLike(key))) {
+        keys.add(key.text);
+      }
     }
   };
   const isBag = (pattern: ts.ObjectBindingPattern): boolean =>
@@ -5999,14 +6002,30 @@ export function extractOptionReads(
       const call = node.parent;
       if (ts.isCallExpression(call) && call.expression === node) {
         const key = call.arguments[0];
-        if (!OPTION_READER_METHODS.has(node.name.text)) keys.add(node.name.text);
-        else if (key !== undefined && ts.isStringLiteralLike(key)) keys.add(key.text);
-      } else if (!isAssignmentTarget(node)) {
+        if (OPTION_READER_METHODS.has(node.name.text)) {
+          if (key !== undefined && ts.isStringLiteralLike(key)) keys.add(key.text);
+        } else if (!Object.hasOwn(Object.prototype, node.name.text)) {
+          keys.add(node.name.text);
+        }
+      } else if (!isAssignmentTarget(node) && !Object.hasOwn(Object.prototype, node.name.text)) {
         keys.add(node.name.text);
       }
     } else if (ts.isElementAccessExpression(node) && isOptions(node.expression)) {
       const key = node.argumentExpression;
       if (ts.isStringLiteralLike(key) && !isAssignmentTarget(node)) keys.add(key.text);
+    } else if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      ts.isObjectLiteralExpression(node.left) &&
+      isOptions(node.right)
+    ) {
+      for (const prop of node.left.properties) {
+        if (ts.isSpreadAssignment(prop)) {
+          if (ts.isIdentifier(prop.expression)) vars.add(prop.expression.text);
+        } else if (prop.name && (ts.isIdentifier(prop.name) || ts.isStringLiteralLike(prop.name))) {
+          keys.add(prop.name.text);
+        }
+      }
     } else if (
       ts.isBinaryExpression(node) &&
       node.operatorToken.kind === ts.SyntaxKind.InKeyword &&

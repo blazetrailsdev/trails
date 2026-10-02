@@ -250,6 +250,14 @@ function refKeysEqual(rubyKey: string, tsKey: string): boolean {
   return (rubyMethodToTsIgnoringSkip(rubyName) ?? []).includes(tsName);
 }
 
+const SOURCE_ESCAPES: Record<string, string> = { "0": "\x00", r: "\r", n: "\n", t: "\t" };
+
+function foldSourceEscapes(value: string): string {
+  return value
+    .replace(/\\e|\\033|\\x1[bB]|\\u001[bB]/g, "\x1b")
+    .replace(/\\([0rnt])/g, (_, c: string) => SOURCE_ESCAPES[c]);
+}
+
 /**
  * A literal's key, through literals.ts#normalizeLiteral so escapes, numeric
  * underscores and symbol-vs-string spellings are absorbed exactly once.
@@ -261,7 +269,10 @@ function refKeysEqual(rubyKey: string, tsKey: string): boolean {
  * the same value here and must compare equal.
  */
 function normalizeLiteralArg(kind: LiteralValue["kind"], value: string): string | ArgFailure {
-  const key = normalizeLiteral({ kind, value });
+  const key = normalizeLiteral({
+    kind,
+    value: kind === "string" || kind === "symbol" ? foldSourceEscapes(value) : value,
+  });
   // A token the numeric arm cannot parse is uncomparable, not the value NaN: the
   // TS extractor records a BigInt literal with its `n` suffix (`123n`), which no
   // Ruby token ever spells, so comparing it would manufacture a shape row.
@@ -305,7 +316,7 @@ function splitPairs(body: string): string[] {
  * SQL-fragment arguments RFC 0095 §2 calls load-bearing.
  *
  * Percent- rather than backslash-escaped, because a `str:` payload's backslash
- * is NOT free: literals.ts#normalizeLiteral canonicalizes `\n` and friends, so a
+ * is NOT free: {@link foldSourceEscapes} canonicalizes `\n` and friends, so a
  * backslash escape here would consume the marker that arm reads and `"\\n"`
  * would stop comparing equal to a real newline.
  */

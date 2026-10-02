@@ -3946,6 +3946,13 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
           valuesAt(options, "null", "after");
           delete options.precision;
         }
+        export function inert(options: ColumnOptions = {}): void {
+          options.toString();
+          options.hasOwnProperty("null");
+          let limit, rest: ColumnOptions;
+          ({ limit, ...rest } = options);
+          const { after: { length } = "" } = rest;
+        }
         export function bag({ types, options }: { types: string[]; options: ColumnOptions }): void {
           options["limit"];
         }
@@ -3961,6 +3968,7 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     expect(reads("timestamps")).toEqual([]);
     expect(reads("reads")).toEqual(["after", "limit", "null", "precision", "type"]);
     expect(reads("destructured")).toEqual(["after", "limit", "null", "precision"]);
+    expect(reads("inert")).toEqual(["after", "limit", "null"]);
     expect(reads("bag")).toEqual(["limit"]);
     expect(reads("bodiless")).toBeUndefined();
     expect(fns.find((m) => m.name === "timestamps")!.optionKeys).toHaveLength(6);
