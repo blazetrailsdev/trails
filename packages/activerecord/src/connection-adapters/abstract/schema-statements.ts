@@ -347,8 +347,10 @@ export class SchemaStatements {
     type?: ColumnType,
     options: { ifExists?: boolean } = {},
   ): Promise<void> {
+    if (columnName === undefined) {
+      throw new ArgumentError("wrong number of arguments (given 1, expected 2..3)");
+    }
     if (options.ifExists === true && !(await this.columnExists(tableName, columnName))) return;
-
     await this.execute(
       `ALTER TABLE ${this.quoteTableName(tableName)} ${this.removeColumnForAlter(tableName, columnName, type, options)}`,
     );
@@ -503,9 +505,10 @@ export class SchemaStatements {
   async removeReference(
     tableName: string,
     refName: string,
-    { foreignKey = false, polymorphic = false, ...options }: RemoveReferenceOptions = {},
+    options: RemoveReferenceOptions = {},
   ): Promise<void> {
-    const conditionalOptions = slice(options, "ifExists", "ifNotExists");
+    const { foreignKey = false, polymorphic = false, ...rest } = options;
+    const conditionalOptions = slice(rest, "ifExists", "ifNotExists");
 
     if (foreignKey) {
       const referenceName = ActiveRecord.Base.pluralizeTableNames
@@ -786,9 +789,9 @@ export class SchemaStatements {
     tableName: string,
     ...columnNames: Array<string | ({ type: ColumnType } & ColumnOptions)>
   ): Promise<void> {
-    const { type, ...options } = extractOptionsBang(columnNames) as unknown as {
-      type: ColumnType;
-    } & ColumnOptions;
+    const options = extractOptionsBang(columnNames);
+    if (!("type" in options)) throw new ArgumentError("missing keyword: :type");
+    const type = hashDelete(options, "type") as ColumnType;
     for (const columnName of columnNames as string[]) {
       await this.addColumn(tableName, columnName, type, options);
     }

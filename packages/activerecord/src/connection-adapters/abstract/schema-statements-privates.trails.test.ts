@@ -321,6 +321,14 @@ describe("SchemaStatements privates (PR 8)", () => {
     ).toBe(false);
   });
 
+  it("addColumns raises ArgumentError without the type keyword", async () => {
+    const ss = makeStatements() as unknown as {
+      addColumns(tableName: string, ...columnNames: string[]): Promise<void>;
+    };
+    await expect(ss.addColumns("people", "name")).rejects.toThrow("missing keyword: :type");
+    await expect(ss.addColumns("people")).rejects.toThrow("missing keyword: :type");
+  });
+
   it("validateIndexLengthBang throws when name too long", () => {
     const ss = makeStatements();
     expect(() => ss.validateIndexLengthBang("users", "a".repeat(65))).toThrow(/too long/);

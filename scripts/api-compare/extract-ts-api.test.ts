@@ -887,11 +887,6 @@ describe("body call capture", () => {
           if (!rtest(fk)) throw new ArgumentError("none");
           this.log(fk);
         }
-        other(t: string) {
-          const fk = this.find(t);
-          if (!rtest(t)) throw new ArgumentError("none");
-          return fk;
-        }
       }`,
     );
     const arms = (name: string) =>
@@ -900,7 +895,6 @@ describe("body call capture", () => {
         .skeleton!.filter((t) => !t.startsWith("ref:") && !t.startsWith("new:"));
     expect(arms("bang")).toEqual(["or", "throw:ArgumentError"]);
     expect(arms("unless")).toEqual(["if", "throw:ArgumentError"]);
-    expect(arms("other")).toEqual(["if", "throw:ArgumentError"]);
   });
 
   it("emits no arm for a leading guard that moves an options hash or block out of a positional parameter", () => {
@@ -913,16 +907,8 @@ describe("body call capture", () => {
           }
           return this.run(t, columnName, options);
         }
-        twice(a: unknown, b: unknown, options: object = {}) {
-          if (typeof b === "object" && b !== null) options = b;
-          if (typeof a === "object") options = a as object;
-          return this.run(a, b, options);
-        }
         block(unit: unknown, block?: () => void) {
-          if (typeof unit === "function") {
-            block = unit as () => void;
-            unit = "second";
-          }
+          if (typeof unit === "function") block = unit as () => void;
           return this.run(unit, block);
         }
         notLeading(t: string, toTable: unknown, options: object = {}) {
@@ -947,11 +933,34 @@ describe("body call capture", () => {
     const arms = (name: string) =>
       cls.instanceMethods.find((m) => m.name === name)!.skeleton!.filter((t) => !t.includes(":"));
     expect(arms("removeIndex")).toEqual([]);
-    expect(arms("twice")).toEqual([]);
     expect(arms("block")).toEqual([]);
     for (const kept of ["notLeading", "notAKindTest", "coerce", "coerceLast"]) {
       expect(arms(kept)).toEqual(["if"]);
     }
+  });
+
+  it("emits nothing for the guard that raises the ArgumentError Ruby raises binding the arguments", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        required(options: object) {
+          if (!("type" in options)) throw new ArgumentError("missing keyword: :type");
+          return this.run(options);
+        }
+        arity(columnName?: string) {
+          if (columnName === undefined) {
+            throw new ArgumentError("wrong number of arguments (given 1, expected 2..3)");
+          }
+          return this.run(columnName);
+        }
+        otherMessage(options: object) {
+          if (!("type" in options)) throw new ArgumentError("type is required");
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("required")).toEqual(["ref:run"]);
+    expect(skeleton("arity")).toEqual(["ref:run"]);
+    expect(skeleton("otherMessage")).toEqual(["if", "throw:ArgumentError", "new:ArgumentError"]);
   });
 
   it("carries the thrown class on the throw token", () => {

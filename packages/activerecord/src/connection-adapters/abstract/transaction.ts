@@ -1,4 +1,5 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
+import type { Base } from "../../base.js";
 import { Transaction as UserTransaction } from "../../transaction.js";
 import {
   ActiveRecordError,
@@ -14,6 +15,19 @@ import {
 } from "@blazetrails/activesupport";
 import { Hash, isEmpty, Thread, uniq } from "@blazetrails/ruby-compat";
 import { beforeCommittedOnAllRecords } from "../../active-record.js";
+
+/** @internal */
+interface TransactionRecord {
+  _newRecordBeforeLastCommit?: unknown;
+  beforeCommittedBang(): Promise<void>;
+  committedBang(options?: { shouldRunCallbacks?: boolean }): Promise<void>;
+  isDestroyed(): boolean;
+  isTriggerTransactionalCallbacks(): boolean;
+  rolledbackBang(options?: {
+    forceRestoreState?: boolean;
+    shouldRunCallbacks?: boolean;
+  }): Promise<void>;
+}
 
 /** @internal */
 export const CURRENT_TRANSACTION_KEY = Symbol.for("ar_current_transaction");
@@ -259,7 +273,7 @@ export type TransactionConnection = DatabaseAdapter & {
   resetIsolationLevel?(): void | Promise<void>;
   supportsLazyTransactions(): boolean;
   supportsRestartDbTransaction?(): Promise<boolean>;
-  addTransactionRecord(record: unknown): void;
+  addTransactionRecord(record: TransactionRecord): void;
   lock?: MonitorMixin;
   active?(): boolean | Promise<boolean>;
   throwAwayBang?(): void | Promise<void>;
@@ -269,8 +283,8 @@ export class Transaction {
   readonly state = new TransactionState();
   readonly savepointName: string | null = null;
   private _callbacks: Callback[] | null = null;
-  private _records: unknown[] | null = null;
-  private _lazyEnrollmentRecords: Map<unknown, unknown> | null = null;
+  private _records: TransactionRecord[] | null = null;
+  private _lazyEnrollmentRecords: Map<TransactionRecord, TransactionRecord> | null = null;
   private _connection: TransactionConnection;
   private _joinable: boolean;
   readonly isolationLevel: string | null;
@@ -332,7 +346,7 @@ export class Transaction {
     return false;
   }
 
-  addRecord(record: unknown, ensureFinalize = true): void {
+  addRecord(record: TransactionRecord, ensureFinalize = true): void {
     this._records ??= [];
     if (ensureFinalize) {
       this._records.push(record);
@@ -366,7 +380,7 @@ export class Transaction {
     this._callbacks.push(new Callback("after_rollback", fn));
   }
 
-  get records(): unknown[] | null {
+  get records(): TransactionRecord[] | null {
     if (this._lazyEnrollmentRecords) {
       for (const value of this._lazyEnrollmentRecords.values()) {
         this._records!.push(value);
@@ -405,7 +419,7 @@ export class Transaction {
 
   async rollbackRecords(): Promise<void> {
     if (this.records) {
-      let ite: any[] | undefined;
+      let ite: TransactionRecord[] | undefined;
       try {
         ite = this.uniqueRecords();
 
@@ -440,7 +454,7 @@ export class Transaction {
         if (beforeCommittedOnAllRecords()) {
           const ite = this.uniqueRecords();
 
-          const instancesToRunCallbacksOn = new Hash<unknown, unknown>();
+          const instancesToRunCallbacksOn = new Hash<TransactionRecord, TransactionRecord>();
           for (const record of this.records) {
             instancesToRunCallbacksOn.set(record, record);
           }
@@ -453,7 +467,7 @@ export class Transaction {
             },
           );
         } else {
-          for (const record of uniq(this.records as any[])) await record.beforeCommittedBang();
+          for (const record of uniq(this.records)) await record.beforeCommittedBang();
         }
       }
 
@@ -464,7 +478,7 @@ export class Transaction {
   /** @missingRailsName callbacks — PERMANENT */
   async commitRecords(): Promise<void> {
     if (this.records) {
-      let ite: any[] | undefined;
+      let ite: TransactionRecord[] | undefined;
       try {
         ite = this.uniqueRecords();
 
@@ -479,7 +493,7 @@ export class Transaction {
             },
           );
         } else {
-          let record: unknown;
+          let record: TransactionRecord | undefined;
           while ((record = ite.shift())) {
             this.connection.addTransactionRecord(record);
           }
@@ -510,9 +524,9 @@ export class Transaction {
   }
 
   /** @internal */
-  private uniqueRecords(): any[] {
+  private uniqueRecords(): TransactionRecord[] {
     const seen = new Set<unknown>();
-    const result: unknown[] = [];
+    const result: TransactionRecord[] = [];
     for (const record of this.records ?? []) {
       if (!seen.has(record)) {
         seen.add(record);
@@ -524,9 +538,9 @@ export class Transaction {
 
   /** @internal */
   private async runActionOnRecords(
-    records: any[],
-    instancesToRunCallbacksOn: Hash<unknown, unknown>,
-    callback: (record: any, shouldRunCallbacks: boolean) => Promise<void> | void,
+    records: TransactionRecord[],
+    instancesToRunCallbacksOn: Hash<TransactionRecord, TransactionRecord>,
+    callback: (record: TransactionRecord, shouldRunCallbacks: boolean) => Promise<void> | void,
   ): Promise<void> {
     while (records.length > 0) {
       const record = records.shift()!;
@@ -536,8 +550,10 @@ export class Transaction {
   }
 
   /** @internal */
-  private prepareInstancesToRunCallbacksOn(records: any[]): Hash<unknown, unknown> {
-    const candidates = new Hash<unknown, any>();
+  private prepareInstancesToRunCallbacksOn(
+    records: TransactionRecord[],
+  ): Hash<TransactionRecord, TransactionRecord> {
+    const candidates = new Hash<TransactionRecord, TransactionRecord>();
     for (const record of records) {
       if (!record.isTriggerTransactionalCallbacks()) continue;
 
@@ -545,7 +561,7 @@ export class Transaction {
 
       if (
         earlierSavedCandidate &&
-        record.constructor.runCommitCallbacksOnFirstSavedInstancesInTransaction
+        (record.constructor as typeof Base).runCommitCallbacksOnFirstSavedInstancesInTransaction
       ) {
         continue;
       }

@@ -630,6 +630,8 @@ class MockAdapter {
   supportsExclusionConstraints = () => false;
   supportsUniqueConstraints = () => false;
   useForeignKeys = () => true;
+  tableNameLength = () => 64;
+  indexNameLength = () => 64;
   createTableDefinition = (n: string, opts: Record<string, unknown>) =>
     new TableDefinition(this as never, n, { ...opts });
 

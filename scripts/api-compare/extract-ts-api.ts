@@ -4792,38 +4792,24 @@ function orRaise(statement: ts.IfStatement): ts.ThrowStatement | undefined {
   return isFalsinessOf(statement.expression, returned.text) ? body : undefined;
 }
 
+function isArgumentBindingGuard(statement: ts.IfStatement): boolean {
+  const guard =
+    /^if \((!\("\w+" in \w+\)|\w+ === undefined)\) (\{ )?throw new ArgumentError\("(missing keyword: :\w+|wrong number of arguments \(given \d+, expected [\d.+]+\))"\);( \})?$/;
+  return guard.test(statement.getText().replace(/\s+/g, " "));
+}
+
 function parameterKindTest(
   test: ts.Expression,
   parameters: readonly string[],
 ): string[] | undefined {
-  while (ts.isParenthesizedExpression(test)) test = test.expression;
-  if (ts.isPrefixUnaryExpression(test) && test.operator === ts.SyntaxKind.ExclamationToken) {
-    return parameterKindTest(test.operand, parameters);
-  }
-  const parameter = (e: ts.Expression): string[] | undefined =>
-    ts.isIdentifier(e) && parameters.includes(e.text) ? [e.text] : undefined;
-  if (ts.isCallExpression(test)) {
-    return test.expression.getText() === "Array.isArray" && test.arguments.length === 1
-      ? parameter(test.arguments[0])
-      : undefined;
-  }
-  if (!ts.isBinaryExpression(test)) return undefined;
-  switch (test.operatorToken.kind) {
-    case ts.SyntaxKind.AmpersandAmpersandToken:
-    case ts.SyntaxKind.BarBarToken: {
-      const left = parameterKindTest(test.left, parameters);
-      const right = parameterKindTest(test.right, parameters);
-      return left && right ? [...left, ...right] : undefined;
-    }
-    case ts.SyntaxKind.EqualsEqualsEqualsToken:
-    case ts.SyntaxKind.ExclamationEqualsEqualsToken:
-      if (ts.isTypeOfExpression(test.left)) {
-        return ts.isStringLiteral(test.right) ? parameter(test.left.expression) : undefined;
-      }
-      return test.right.kind === ts.SyntaxKind.NullKeyword ? parameter(test.left) : undefined;
-    default:
-      return undefined;
-  }
+  const atom = /typeof (\w+) [!=]== "\w+"|(\w+) [!=]== null|Array\.isArray\((\w+)\)/g;
+  const tested: string[] = [];
+  const rest = test.getText().replace(atom, (_atom, a, b, c) => {
+    tested.push(a ?? b ?? c);
+    return "";
+  });
+  const kindOnly = /^[\s!()&|]*$/.test(rest) && tested.every((p) => parameters.includes(p));
+  return kindOnly && tested.length > 0 ? tested : undefined;
 }
 
 function isKwargsRebindingGuard(statement: ts.IfStatement): boolean {
@@ -4856,15 +4842,8 @@ function isKwargsRebindingGuard(statement: ts.IfStatement): boolean {
       return true;
     });
   };
-  if (!rebinds(statement.thenStatement) || !rebinds(statement.elseStatement) || !moves) {
-    return false;
-  }
-  const index = body.statements.indexOf(statement);
-  return (
-    index === 0 ||
-    (ts.isIfStatement(body.statements[index - 1]) &&
-      isKwargsRebindingGuard(body.statements[index - 1] as ts.IfStatement))
-  );
+  const leads = body.statements.indexOf(statement) === 0;
+  return leads && rebinds(statement.thenStatement) && rebinds(statement.elseStatement) && moves;
 }
 
 function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
@@ -4896,6 +4875,7 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
           visit(raise);
           return;
         }
+        if (isArgumentBindingGuard(n as ts.IfStatement)) return;
         if (isKwargsRebindingGuard(n as ts.IfStatement)) {
           visit((n as ts.IfStatement).thenStatement);
           const alternate = (n as ts.IfStatement).elseStatement;

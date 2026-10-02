@@ -73,8 +73,8 @@ export class QueryAttribute extends Attribute {
 
   isInfinite(): 1 | -1 | null | false {
     return (
-      isInfinity(this.valueBeforeTypeCast) ||
-      (this.isSerializable() && isInfinity(this.valueForDatabase))
+      this.isInfinity(this.valueBeforeTypeCast) ||
+      (this.isSerializable() && this.isInfinity(this.valueForDatabase))
     );
   }
 
@@ -88,11 +88,11 @@ export class QueryAttribute extends Attribute {
     }
     return this._unboundable;
   }
-}
 
-/** @internal */
-function isInfinity(value: unknown): 1 | -1 | null | false {
-  return rbObjRespondTo(value, "isInfinite") && (rbFSend(value, "isInfinite") as 1 | -1 | null);
+  /** @internal */
+  private isInfinity(value: unknown): 1 | -1 | null | false {
+    return rbObjRespondTo(value, "isInfinite") && (rbFSend(value, "isInfinite") as 1 | -1 | null);
+  }
 }
 
 /** @internal */
