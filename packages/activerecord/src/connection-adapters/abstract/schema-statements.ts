@@ -204,7 +204,7 @@ export class SchemaStatements {
         }
       | ((t: TableDefinitionOf<this>) => void | Promise<void>),
     fn?: (t: TableDefinitionOf<this>) => void | Promise<void>,
-  ): Promise<void> {
+  ): Promise<unknown> {
     let kwargs: {
       id?: boolean | ColumnType | IdHashOptions;
       primaryKey?: string | string[] | false;
@@ -256,7 +256,7 @@ export class SchemaStatements {
       await this.schemaCache.clearDataSourceCacheBang(tableName);
     }
 
-    await this.execute(await this.schemaCreation.accept(td));
+    const result = await this.execute(await this.schemaCreation.accept(td));
 
     if (!this.supportsIndexesInCreate?.()) {
       for (const [columnName, indexOptions] of td.indexes) {
@@ -287,6 +287,8 @@ export class SchemaStatements {
         }
       }
     }
+
+    return result;
   }
 
   async dropTable(
@@ -299,7 +301,7 @@ export class SchemaStatements {
           { ifExists?: boolean; force?: boolean | "cascade" } | undefined,
           ((t: TableDefinition) => void) | undefined,
         ]
-  ): Promise<void> {
+  ): Promise<unknown> {
     const rest = [...args] as unknown[];
     while (
       rest.length > 0 &&
@@ -317,6 +319,7 @@ export class SchemaStatements {
       await this.schemaCache.clearDataSourceCacheBang(tableName);
       await this.execute(`DROP TABLE${ifExists} ${this.quoteTableName(tableName)}`);
     }
+    return tableNames;
   }
 
   async addColumn(
@@ -324,10 +327,10 @@ export class SchemaStatements {
     columnName: string,
     type: ColumnType,
     options: ColumnOptions & { ifNotExists?: boolean } = {},
-  ): Promise<void> {
+  ): Promise<unknown> {
     const addColumnDef = await this.buildAddColumnDefinition(tableName, columnName, type, options);
     if (!addColumnDef) return;
-    await this.execute(await this.schemaCreation.accept(addColumnDef));
+    return this.execute(await this.schemaCreation.accept(addColumnDef));
   }
 
   async removeColumn(
@@ -360,13 +363,13 @@ export class SchemaStatements {
     tableName: string,
     columnName: string | string[],
     options: AddIndexOptions = {},
-  ): Promise<void> {
+  ): Promise<unknown> {
     const createIndex = await this.buildCreateIndexDefinition(
       tableName,
       columnName,
       options as Record<string, unknown>,
     );
-    await this.execute(await this.schemaCreation.accept(createIndex));
+    return this.execute(await this.schemaCreation.accept(createIndex));
   }
 
   async removeIndex(
@@ -377,7 +380,7 @@ export class SchemaStatements {
       | { column?: string | string[]; name?: string; ifExists?: boolean }
       | null = null,
     options: { column?: string | string[]; name?: string; ifExists?: boolean } = {},
-  ): Promise<void> {
+  ): Promise<unknown> {
     if (!(typeof columnName === "string" || Array.isArray(columnName))) {
       options = { ...columnName, ...options };
       columnName = null;
@@ -387,7 +390,7 @@ export class SchemaStatements {
 
     const indexName = await this.indexNameForRemove(tableName, columnName, options);
 
-    await this.execute(
+    return this.execute(
       `DROP INDEX ${this.quoteColumnName(indexName)} ON ${this.quoteTableName(tableName)}`,
     );
   }

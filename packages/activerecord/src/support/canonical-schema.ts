@@ -159,11 +159,7 @@ interface TableMeta {
 
 export async function emitTableIndexes(
   ss: {
-    addIndex(
-      table: string,
-      columns: string | string[],
-      options: AddIndexOptions,
-    ): Promise<void> | void;
+    addIndex(table: string, columns: string | string[], options: AddIndexOptions): unknown;
   },
   adapter: DatabaseAdapter,
   table: string,

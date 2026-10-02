@@ -28,7 +28,7 @@ export class TypeMapInitializer {
     this.store = store;
   }
 
-  run(records: PgTypeRow[]): void {
+  run(records: PgTypeRow[]): PgTypeRow[] {
     const nodes = records.filter((row) => !this.store.isKey(toI(row.oid) as number));
     const mapped = extract(nodes, (row) => this.store.isKey(row.typname));
     const ranges = extract(nodes, (row) => row.typtype === "r");
@@ -45,6 +45,7 @@ export class TypeMapInitializer {
     composites.forEach((row) => this.registerCompositeType(row));
 
     records.forEach((row) => this.registerSqlTypeName(row));
+    return composites;
   }
 
   queryConditionsForKnownTypeNames(): string {

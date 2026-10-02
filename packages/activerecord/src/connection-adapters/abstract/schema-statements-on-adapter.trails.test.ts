@@ -1,6 +1,8 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { SQLite3Adapter } from "../sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../better-sqlite3-adapter.js";
+import { Mysql2Adapter } from "../mysql2-adapter.js";
+import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { indexes as sqliteIndexes } from "../sqlite3/schema-statements.js";
 import { ForeignKeyDefinition } from "./schema-definitions.js";
@@ -69,6 +71,53 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     await sqlite.dropTable();
     await sqlite.dropTable({ ifExists: true });
     expect(sqlite.allSql).toEqual([]);
+  });
+
+  it("schema statements answer what Rails' do: execute's result, or the table names", async () => {
+    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    const execute = adapter.execute.bind(adapter);
+    (adapter as { execute: unknown }).execute = async (sql: string) => {
+      await execute(sql);
+      return { sql };
+    };
+
+    const created = await adapter.createTable("things", (t) => {
+      t.string("name");
+    });
+    expect(created).toEqual({ sql: expect.stringMatching(/^CREATE TABLE "things"/) });
+    expect(await adapter.addIndex("things", "name")).toEqual({
+      sql: expect.stringMatching(/^CREATE INDEX "index_things_on_name"/),
+    });
+    expect(await adapter.addColumn("things", "quantity", "integer")).toEqual({
+      sql: expect.stringMatching(/^ALTER TABLE "things" ADD "quantity"/),
+    });
+    expect(await adapter.removeIndex("things", "name", { ifExists: true })).toBeDefined();
+    expect(await adapter.removeIndex("things", "name", { ifExists: true })).toBeUndefined();
+    expect(await adapter.dropTable("things")).toEqual(["things"]);
+  });
+
+  it("create_database and recreate_database answer the CREATE DATABASE result", async () => {
+    const mysql = new Mysql2Adapter({ host: "localhost" });
+    Object.assign(mysql, { execute: async (sql: string) => sql, reconnectBang: async () => {} });
+    const latin1 = "CREATE DATABASE `luca` DEFAULT CHARACTER SET `latin1`";
+    expect(await mysql.createDatabase("luca", { charset: "latin1" })).toBe(latin1);
+    expect(await mysql.recreateDatabase("luca", { charset: "latin1" })).toBe(latin1);
+
+    const pg = new PostgreSQLAdapter({} as never);
+    Object.assign(pg, { execute: async (sql: string) => sql });
+    const utf8 = `CREATE DATABASE "matt" ENCODING = 'utf8'`;
+    expect(await pg.createDatabase("matt")).toBe(utf8);
+    expect(await pg.recreateDatabase("matt")).toBe(utf8);
+  });
+
+  it("PostgreSQL begin_db_transaction and commit_db_transaction answer internal_execute's result", async () => {
+    const pg = new PostgreSQLAdapter({} as never);
+    Object.assign(pg, {
+      internalExecute: async (sql: string) => sql,
+      _acquireFreshClient: async () => null,
+    });
+    expect(await pg.beginDbTransaction()).toBe("BEGIN");
+    expect(await pg.commitDbTransaction()).toBe("COMMIT");
   });
 
   it("indexes() raises NotImplementedError on an adapter that does not override it", async () => {

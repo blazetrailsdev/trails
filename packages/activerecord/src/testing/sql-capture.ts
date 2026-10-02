@@ -47,7 +47,7 @@ function installExecuteStub(adapter: StubbableAdapter): () => void {
  * @noRailsEquivalent CONVERGEABLE ActiveRecord::TestCase#capture_sql (test/cases/test_case.rb:90), async because the block it wraps is.
  */
 export async function captureSql(
-  fn: () => void | Promise<void>,
+  fn: () => unknown,
   options: { includeSchema?: boolean; stub?: StubbableAdapter } = {},
 ): Promise<string[]> {
   const { includeSchema = false, stub } = options;
@@ -76,9 +76,7 @@ export async function captureSql(
  * @internal
  * @noRailsEquivalent CONVERGEABLE ActiveRecord::TestCase#capture_sql_and_binds (test/cases/test_case.rb:102), async because the block it wraps is.
  */
-export async function captureSqlAndBinds(
-  fn: () => void | Promise<void>,
-): Promise<[string, unknown[]][]> {
+export async function captureSqlAndBinds(fn: () => unknown): Promise<[string, unknown[]][]> {
   const counter = new SQLCounter();
   return Notifications.subscribed(counter, "sql.active_record", async () => {
     await fn();

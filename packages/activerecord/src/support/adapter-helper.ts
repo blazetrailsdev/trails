@@ -96,7 +96,7 @@ type ExtensionConnection = {
   enableExtension(name: string, options?: Record<string, unknown>): Promise<void>;
   disableExtension(name: string, options?: Record<string, unknown>): Promise<void>;
   reconnectBang(): Promise<void>;
-  commitDbTransaction(): Promise<void>;
+  commitDbTransaction(): Promise<unknown>;
   isTransactionOpen(): boolean;
 };
 

@@ -24,7 +24,7 @@ export class Reaper {
   }
 
   /** @missingRailsCall spawn_thread — CONVERGEABLE reaper-register-pool-spawns-its-thread-through-spawn-thread */
-  static registerPool(pool: ReapablePool, frequency: number): void {
+  static registerPool(pool: ReapablePool, frequency: number): WeakRef<ReapablePool>[] | undefined {
     if (!frequency || frequency <= 0 || !Number.isFinite(frequency)) return;
     if (pool.isDiscarded?.()) return;
 
@@ -40,19 +40,20 @@ export class Reaper {
 
     if (alive.some((ref) => ref.deref() === pool)) {
       Reaper._pools.set(frequency, alive);
-      return;
+      return alive;
     }
 
     alive.push(new WeakRef(pool));
     Reaper._pools.set(frequency, alive);
+    return alive;
   }
 
   private static _pools = new Map<number, WeakRef<ReapablePool>[]>();
   private static _timers = new Map<number, ReturnType<typeof setTimeout>>();
 
-  run(): void {
+  run(): WeakRef<ReapablePool>[] | undefined {
     if (!this.frequency || this.frequency <= 0) return;
-    Reaper.registerPool(this.pool, this.frequency);
+    return Reaper.registerPool(this.pool, this.frequency);
   }
 
   private static _spawnTimer(frequency: number): ReturnType<typeof setTimeout> {

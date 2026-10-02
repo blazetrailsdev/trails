@@ -92,7 +92,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   override async dropTable(
     ...args: Parameters<AbstractSchemaStatements["dropTable"]>
-  ): Promise<void> {
+  ): Promise<unknown> {
     const rest = [...args] as unknown[];
     while (
       rest.length > 0 &&
@@ -111,7 +111,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
       await this.schemaCache.clearDataSourceCacheBang(tableName);
     }
     const quoted = tableNames.map((tableName) => this.quoteTableName(tableName)).join(", ");
-    await this.execute(`DROP TABLE${ifExists} ${quoted}${cascade}`);
+    return this.execute(`DROP TABLE${ifExists} ${quoted}${cascade}`);
   }
 
   /**
@@ -339,7 +339,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return (await this.queryValue("SELECT current_schema", "SCHEMA")) as string;
   }
 
-  async createDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<void> {
+  async createDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<unknown> {
     const mergedOptions: CreateDatabaseOptions = { encoding: "utf8", ...options };
 
     let optionString = "";
@@ -371,16 +371,16 @@ export class SchemaStatements extends AbstractSchemaStatements {
       }
     }
 
-    await this.execute(`CREATE DATABASE ${this.quoteTableName(name)}${optionString}`);
+    return this.execute(`CREATE DATABASE ${this.quoteTableName(name)}${optionString}`);
   }
 
   async dropDatabase(name: string): Promise<void> {
     await this.execute(`DROP DATABASE IF EXISTS ${this.quoteTableName(name)}`);
   }
 
-  async recreateDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<void> {
+  async recreateDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<unknown> {
     await this.dropDatabase(name);
-    await this.createDatabase(name, options);
+    return this.createDatabase(name, options);
   }
 
   async currentDatabase(): Promise<string> {
@@ -534,11 +534,11 @@ export class SchemaStatements extends AbstractSchemaStatements {
       comment?: string | null;
       ifNotExists?: boolean;
     } = {},
-  ): Promise<void> {
+  ): Promise<unknown> {
     await this.clearCacheBang();
     await super.addColumn(tableName, columnName, type, options);
     if ("comment" in options) {
-      await this.changeColumnComment(tableName, columnName, options.comment ?? null);
+      return this.changeColumnComment(tableName, columnName, options.comment ?? null);
     }
   }
 

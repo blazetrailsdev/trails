@@ -610,19 +610,19 @@ export class SchemaCache {
    */
   private async open(
     filename: string,
-    block: (file: { write(string: string): unknown }) => void,
-  ): Promise<void> {
+    block: (file: { write(string: string): unknown }) => unknown,
+  ): Promise<unknown> {
     FileUtils.mkdirP(File.dirname(filename));
 
-    await atomicWrite(filename, undefined, async (file) => {
+    return atomicWrite(filename, undefined, async (file) => {
       if (File.extname(filename) === ".gz") {
         const zipper = new Zlib.GzipWriter(file);
         zipper.mtime = 0;
-        block(zipper);
+        await block(zipper);
         await zipper.flush();
-        await zipper.close();
+        return zipper.close();
       } else {
-        block(file);
+        return block(file);
       }
     });
   }

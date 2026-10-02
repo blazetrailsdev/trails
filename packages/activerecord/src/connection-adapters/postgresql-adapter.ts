@@ -1872,9 +1872,9 @@ export class PostgreSQLAdapter
       include?: string | string[];
       comment?: string;
     } = {},
-  ): Promise<void> {
+  ): Promise<unknown> {
     const createIndex = (await this.buildCreateIndexDefinition(tableName, columnName, options))!;
-    await this.execute(await this.schemaCreation.accept(createIndex));
+    const result = await this.execute(await this.schemaCreation.accept(createIndex));
 
     const index = createIndex.index;
     if (index.comment) {
@@ -1882,6 +1882,7 @@ export class PostgreSQLAdapter
         `COMMENT ON INDEX ${this.quoteColumnName(index.name)} IS ${this.quote(index.comment)}`,
       );
     }
+    return result;
   }
 
   async removeIndex(
@@ -1896,7 +1897,7 @@ export class PostgreSQLAdapter
       algorithm?: string;
       ifExists?: boolean;
     } = {},
-  ): Promise<void> {
+  ): Promise<unknown> {
     if (!(typeof columnName === "string" || Array.isArray(columnName))) {
       options = { ...columnName, ...options };
       columnName = undefined;
@@ -1924,7 +1925,7 @@ export class PostgreSQLAdapter
       await this.indexNameForRemove(table.toString(), columnName, options),
     ).toString();
 
-    await this.execute(
+    return this.execute(
       `DROP INDEX ${this.indexAlgorithm(options.algorithm) ?? ""} ${this.quoteTableName(indexToRemove)}`,
     );
   }
@@ -2113,11 +2114,11 @@ export interface PostgreSQLAdapter {
     returning?: string[] | null,
   ): Promise<Result>;
 
-  beginDbTransaction(): Promise<void>;
+  beginDbTransaction(): Promise<unknown>;
 
   beginIsolatedDbTransaction(isolation: string): Promise<void>;
 
-  commitDbTransaction(): Promise<void>;
+  commitDbTransaction(): Promise<unknown>;
 
   execRollbackDbTransaction(): Promise<void>;
 
@@ -2170,7 +2171,7 @@ export interface PostgreSQLAdapter {
       comment?: string | null;
       ifNotExists?: boolean;
     },
-  ): Promise<void>;
+  ): Promise<unknown>;
 
   renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void>;
 
@@ -2290,13 +2291,13 @@ export interface PostgreSQLAdapter {
   /** @internal */
   extractSchemaQualifiedName(string: string): [string | null, string];
 
-  createDatabase(name: string, options?: CreateDatabaseOptions): Promise<void>;
+  createDatabase(name: string, options?: CreateDatabaseOptions): Promise<unknown>;
 
   dropDatabase(name: string): Promise<void>;
 
-  recreateDatabase(name: string, options?: CreateDatabaseOptions): Promise<void>;
+  recreateDatabase(name: string, options?: CreateDatabaseOptions): Promise<unknown>;
 
-  dropTable(...args: Parameters<AbstractSchemaStatements["dropTable"]>): Promise<void>;
+  dropTable(...args: Parameters<AbstractSchemaStatements["dropTable"]>): Promise<unknown>;
 
   currentDatabase(): Promise<string>;
 

@@ -35,9 +35,17 @@ describe("Case", () => {
       );
     });
 
-    it("Promise.resolve rejects rather than hanging (thenable hazard)", async () => {
+    it("is not an await operand the compiler accepts", () => {
       const node = new Nodes.Case(users.get("status")).when("active").then("A");
-      await expect(Promise.resolve(node)).rejects.toThrow(/not awaitable/);
+      async function awaited() {
+        // @ts-expect-error TS1320
+        await node;
+      }
+      // @ts-expect-error TS1058
+      async function returned() {
+        return node;
+      }
+      expect([awaited, returned]).toHaveLength(2);
     });
   });
 });

@@ -172,13 +172,14 @@ export async function execInsert(
   });
 }
 
-export async function beginDbTransaction(this: TransactionHost): Promise<void> {
+export async function beginDbTransaction(this: TransactionHost): Promise<unknown> {
   try {
-    await this.internalExecute("BEGIN", "TRANSACTION", [], {
+    const result = await this.internalExecute("BEGIN", "TRANSACTION", [], {
       materializeTransactions: false,
       allowRetry: true,
     });
     this._client = await this._acquireFreshClient();
+    return result;
   } catch (error) {
     this._client = null;
     if (this.constructor._isConnectionError(error)) this._discardRawConnection();
@@ -204,9 +205,9 @@ export async function beginIsolatedDbTransaction(
   }
 }
 
-export async function commitDbTransaction(this: TransactionHost): Promise<void> {
+export async function commitDbTransaction(this: TransactionHost): Promise<unknown> {
   try {
-    await this.internalExecute("COMMIT", "TRANSACTION", [], {
+    return await this.internalExecute("COMMIT", "TRANSACTION", [], {
       allowRetry: false,
       materializeTransactions: true,
     });

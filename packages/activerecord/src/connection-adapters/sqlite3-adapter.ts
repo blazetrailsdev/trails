@@ -434,7 +434,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       | string[]
       | { name?: string; column?: string | string[]; ifExists?: boolean },
     options: { name?: string; column?: string | string[]; ifExists?: boolean } = {},
-  ): Promise<void> {
+  ): Promise<unknown> {
     if (!(typeof columnName === "string" || Array.isArray(columnName))) {
       options = { ...columnName, ...options };
       columnName = undefined;
@@ -444,7 +444,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
     const indexName = await this.indexNameForRemove(tableName, columnName, options);
 
-    await this.execQuery(`DROP INDEX ${quoteColumnName(indexName)}`);
+    return this.execQuery(`DROP INDEX ${quoteColumnName(indexName)}`);
   }
 
   async virtualTables(): Promise<Array<[string, [string, string]]>> {
@@ -499,14 +499,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     columnName: string,
     type: string,
     options?: Record<string, unknown>,
-  ): Promise<void> {
+  ): Promise<unknown> {
     if (isInvalidAlterTableType(type, options ?? {})) {
-      await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
+      return this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
         definition.column(columnName, type as ColumnType, (options ?? {}) as ColumnOptions);
       });
-      return;
     }
-    await super.addColumn(tableName, columnName, type as ColumnType, options as ColumnOptions);
+    return super.addColumn(tableName, columnName, type as ColumnType, options as ColumnOptions);
   }
 
   async removeColumn(tableName: string, columnName: string, _type?: string): Promise<void> {
