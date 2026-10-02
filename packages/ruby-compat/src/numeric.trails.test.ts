@@ -113,6 +113,9 @@ describe("#to_i", () => {
     expect(toI(null)).toBe(0);
     expect(toI(3.9)).toBe(3);
     expect(toI(-3.9)).toBe(-3);
+    expect(toI(2 ** 62)).toBe(2n ** 62n);
+    expect(toI(-(2 ** 62))).toBe(-(2n ** 62n));
+    expect(toI(2 ** 53 - 1)).toBe(2 ** 53 - 1);
     expect(toI("12abc")).toBe(12);
     expect(toI("abc")).toBe(0);
     expect(toI(2n ** 70n)).toBe(2n ** 70n);

@@ -10,6 +10,13 @@ describe("BigIntegerType", () => {
     expect(new IntegerType().cast("bad")).toBe(0);
   });
 
+  it("a number past the safe-integer range casts to a bigint, following Float#to_i", () => {
+    const type = new BigIntegerType();
+    expect(type.cast(2 ** 62)).toBe(2n ** 62n);
+    expect(type.cast(-(2 ** 62))).toBe(-(2n ** 62n));
+    expect(type.cast(2 ** 53 - 1)).toBe(2 ** 53 - 1);
+  });
+
   it("serialize answers null for a non-numeric string, via Integer#serialize", () => {
     const type = new BigIntegerType();
     expect(type.serialize("bad")).toBeNull();
