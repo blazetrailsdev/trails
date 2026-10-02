@@ -28,7 +28,6 @@ TopLevel.Trails = { Engine, Trailtie } as unknown as typeof TopLevel.Trails;
 type Helper = (...args: unknown[]) => string;
 
 class Post {
-  declare static _modelName?: ModelName | null;
   declare readonly modelName: ModelName;
 
   toParam(): string {
