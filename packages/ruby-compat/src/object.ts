@@ -1,4 +1,5 @@
 import { stringInspect } from "./string/inspect.js";
+import { rbCheckStringType } from "./string/support.js";
 import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
 import { rubyClass, type Comparable } from "./comparable.js";
 import { TypeError } from "./type-error.js";
@@ -326,7 +327,7 @@ export function rbModPublicMethodDefined(mod: { prototype: object }, mid: string
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#public_send` (`vendor/ruby/v3.3.11/vm_eval.c:1350`).
  */
-export function rbFPublicSend(recv: unknown, mid: string, ...args: unknown[]): unknown {
+export function rbFPublicSend(recv: unknown, mid: unknown, ...args: unknown[]): unknown {
   return sendInternal(args.length, [mid, ...args], recv);
 }
 
@@ -365,13 +366,16 @@ export function toSym(obj: unknown): string {
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#send` (`vendor/ruby/v3.3.11/vm_eval.c:1330`).
  */
-export function rbFSend(recv: unknown, mid: string, ...args: unknown[]): unknown {
+export function rbFSend(recv: unknown, mid: unknown, ...args: unknown[]): unknown {
   return sendInternal(args.length, [mid, ...args], recv);
 }
 
-function sendInternal(argc: number, argv: [string, ...unknown[]], recv: unknown): unknown {
+function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown): unknown {
   const [vid, ...args] = argv;
-  const mid = isSymbol(vid) ? symbolToS(vid) : vid;
+  const [vid, ...args] = argv;
+  const name = rbCheckStringType(vid);
+  if (name === null) throw new TypeError(`${rbInspect(vid)} is not a symbol nor a string`);
+  const mid = isSymbol(name) ? symbolToS(name) : name;
   if ((typeof recv === "number" || typeof recv === "bigint") && mid === "isInfinite") {
     return recv === Infinity ? 1 : recv === -Infinity ? -1 : null;
   }

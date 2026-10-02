@@ -19,6 +19,7 @@ import {
   toA,
   union,
   uniq,
+  flatten,
   unpack1,
 } from "./array.js";
 import { Range } from "./range.js";
@@ -189,6 +190,19 @@ describe("String#byteslice over an ASCII-8BIT string", () => {
     expect(byteslice(packed, 15, 2)).toBe("ab");
     expect(byteslice(packed, new Range(15, null))).toBe("ab");
     expect(byteslice("\xFF", 0, 1)).toBe("\xFF");
+  });
+});
+
+describe("Array#flatten", () => {
+  it("flattens every level and converts an element that answers to_ary", () => {
+    const pair = { toAry: () => ["c", ["d"]] };
+    expect(flatten(["a", [["b"], pair], null])).toEqual(["a", "b", "c", "d", null]);
+  });
+
+  it("raises on an array nested in itself", () => {
+    const ary: unknown[] = [1];
+    ary.push(ary);
+    expect(() => flatten(ary)).toThrow(ArgumentError);
   });
 });
 

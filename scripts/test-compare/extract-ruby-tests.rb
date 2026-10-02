@@ -304,12 +304,16 @@ class TestExtractor
       when "describe"
         desc = extract_first_string(inner[2])
         return if desc.nil? && collect_shared_example(inner[2], node)
+        desc ||= const_name_from_args(inner[2]) unless @describe_stack.empty?
         if desc
           @describe_stack.push(desc)
           walk(block) if block.is_a?(Array)
           @describe_stack.pop
           return
         end
+      when "shared_examples"
+        name = extract_first_string(inner[2])
+        return define_shared_example(name, node) if name
       when "it", "specify"
         # Pass outer node so assertion extraction can walk the block body
         process_it(inner[2], node)
@@ -460,8 +464,10 @@ class TestExtractor
   # accessor because the definition lives in a different FILE from its callers.
   def collect_shared_example(args, node)
     name = shared_example_name(args)
-    return false unless name
+    name ? define_shared_example(name, node) : false
+  end
 
+  def define_shared_example(name, node)
     saved_cases = @test_cases
     saved_stack = @describe_stack
     @test_cases = []
@@ -480,7 +486,7 @@ class TestExtractor
   # an 8-line shell. The call site is a real line in that file and names the
   # shared body, which is the one hop a reader wants.
   def materialize_shared_example(args, node)
-    name = first_symbol_name(args)
+    name = first_symbol_name(args) || extract_first_string(args)
     return unless name
     line = extract_line(node)
     (@shared_examples[name] || []).each do |t|
@@ -544,7 +550,7 @@ class TestExtractor
     case cmd_name
     when "describe"
       process_describe(args, node)
-    when "it_behaves_like", "it_should_behave_like"
+    when "it_behaves_like", "it_should_behave_like", "include_examples"
       materialize_shared_example(args, node)
     when "it", "specify"
       process_it(args, node)

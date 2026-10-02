@@ -661,4 +661,23 @@ describe("Ruby extractor gate detection", () => {
       ["AttributesTest", ["AttributesTest", "Attributes", "equality"]],
     ]);
   });
+
+  it("materializes string-named shared examples under a nested constant describe", () => {
+    const cases = rubyCases({
+      "error_spec.rb": `
+        describe "Errors" do
+          shared_examples "descends from BCrypt::Error" do
+            specify "can be rescued" do; end
+          end
+
+          describe BCrypt::Errors::InvalidCost do
+            include_examples "descends from BCrypt::Error"
+          end
+        end
+      `,
+    });
+    expect(cases.map((c) => [c.description, c.ancestors])).toEqual([
+      ["can be rescued", ["Errors", "BCrypt::Errors::InvalidCost"]],
+    ]);
+  });
 });

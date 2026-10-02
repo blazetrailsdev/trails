@@ -177,4 +177,9 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // index, so @blazetrails/ruby-compat exports it as `valuesAt(ary, ...indexes)`
   // and the Ruby receiver is TS argument 1.
   "values_at",
+  // Ruby core `Array#flatten` (`vendor/ruby/v3.3.11/array.c:6476`) —
+  // `methods.flatten` (activemodel/lib/active_model/access.rb:9,13). JS's
+  // `flat` never sends `to_ary`, so @blazetrails/ruby-compat exports it as
+  // `flatten(ary)` and the Ruby receiver is TS argument 1.
+  "flatten",
 ]);

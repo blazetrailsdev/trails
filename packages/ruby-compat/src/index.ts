@@ -138,6 +138,7 @@ export {
   compact,
   drop,
   first,
+  flatten,
   last,
   pack,
   partition,

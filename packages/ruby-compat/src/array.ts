@@ -636,6 +636,47 @@ export function compact<T>(ary: readonly T[]): Array<NonNullable<T>> {
 }
 
 /**
+ * `rb_check_array_type` (`vendor/ruby/v3.3.11/array.c:975`): an Array, its
+ * `to_ary`, or nil.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbCheckArrayType(ary: unknown): unknown[] | null {
+  if (Array.isArray(ary)) return ary;
+  const toAry = (ary as { toAry?: unknown } | null)?.toAry;
+  if (typeof toAry === "function") return toAry.call(ary) as unknown[];
+  return null;
+}
+
+/**
+ * Ruby `Array#flatten` with no level (`vendor/ruby/v3.3.11/array.c:6476`
+ * `rb_ary_flatten`, over `flatten`, `array.c:6305`): every element that
+ * answers {@link rbCheckArrayType} is replaced by its own flattened elements,
+ * and an array reached again on its own path raises.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function flatten(ary: readonly unknown[]): unknown[] {
+  const result: unknown[] = [];
+  const memo = new Set<unknown>([ary]);
+  const walk = (level: readonly unknown[]): void => {
+    for (const elt of level) {
+      const tmp = rbCheckArrayType(elt);
+      if (tmp === null) {
+        result.push(elt);
+        continue;
+      }
+      if (memo.has(tmp)) throw new ArgumentError("tried to flatten recursive array");
+      memo.add(tmp);
+      walk(tmp);
+      memo.delete(tmp);
+    }
+  };
+  walk(ary);
+  return result;
+}
+
+/**
  * Ruby `Array#uniq` (`vendor/ruby/v3.3.11/array.c:6177` `rb_ary_uniq`): the elements in
  * order, deduplicated through `ary_make_hash` (`array.c:5342`) — a Hash, so it
  * keys on `hash`/`eql?`, never `==` or identity: `1` and `1n` collapse the way
