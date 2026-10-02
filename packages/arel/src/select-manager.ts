@@ -10,7 +10,7 @@ import { InnerJoin } from "./nodes/inner-join.js";
 import { OuterJoin } from "./nodes/outer-join.js";
 import { StringJoin } from "./nodes/string-join.js";
 import { EmptyJoinError } from "./errors.js";
-import { Union, UnionAll, Intersect, Except } from "./nodes/binary.js";
+import { Union, Intersect, Except } from "./nodes/binary.js";
 import { With } from "./nodes/with.js";
 import { TableAlias } from "./nodes/table-alias.js";
 import { Exists } from "./nodes/function.js";
@@ -23,6 +23,7 @@ import {
   isSymbol,
   rbConstGet,
   rbModConstSet,
+  rbObjAsString,
   symbolToS,
 } from "@blazetrails/ruby-compat";
 import { Comment } from "./nodes/comment.js";
@@ -33,11 +34,6 @@ import { Crud } from "./crud.js";
 import { include } from "@blazetrails/activesupport";
 
 type Subqueries = Node | Subqueries[];
-
-const UNION_NODE_CLASSES: Record<
-  string,
-  new (left: SelectStatement, right: SelectStatement) => Union
-> = { UnionAll };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SelectManager extends TreeManager<SelectStatement> {
@@ -225,22 +221,19 @@ export class SelectManager extends TreeManager<SelectStatement> {
     return new SqlLiteral(`WHERE ${new And(this.ctx.wheres).toSql(engine)}`);
   }
 
-  union(
-    operation: string | SelectManager | SelectStatement,
-    other: SelectManager | SelectStatement | null = null,
-  ): Union {
-    let nodeClass: new (left: SelectStatement, right: SelectStatement) => Union;
-    if (other) {
-      const name = String(operation).slice(1);
-      const capitalized = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
-      nodeClass = UNION_NODE_CLASSES[`Union${capitalized}`];
+  union(operation: string | SelectManager, other: SelectManager | null = null): Union {
+    let nodeClass: typeof Union;
+    if (other != null) {
+      nodeClass = rbConstGet(
+        Nodes,
+        `Union${capitalize(isSymbol(operation) ? symbolToS(operation) : rbObjAsString(operation), [])}`,
+      ) as typeof Union;
     } else {
-      other = operation as SelectManager | SelectStatement;
+      other = operation as SelectManager;
       nodeClass = Union;
     }
 
-    const otherAst = other instanceof SelectManager ? other.ast : other;
-    return new nodeClass(this.ast, otherAst);
+    return new nodeClass(this.ast, other.ast);
   }
 
   intersect(other: SelectManager): Intersect {

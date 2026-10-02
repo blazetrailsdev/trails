@@ -59,9 +59,8 @@ export class StatementMethods {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export abstract class TreeManager<T extends Node = Node> {
   toDot(): string {
-    const collector = new PlainString();
-    const dot = new Visitors.Dot();
-    dot.accept(this.ast, collector);
+    let collector = new PlainString();
+    collector = new Visitors.Dot().accept(this.ast, collector);
     return collector.value;
   }
 
