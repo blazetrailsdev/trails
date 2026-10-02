@@ -1,6 +1,6 @@
 import type { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { describe, it, expect, vi } from "vitest";
-import { SchemaStatements, canRemoveIndexByName } from "./schema-statements.js";
+import { SchemaStatements } from "./schema-statements.js";
 import {
   CheckConstraintDefinition,
   ForeignKeyDefinition,
@@ -552,24 +552,6 @@ describe("SchemaStatements#quotedColumnsForIndex", () => {
     expect(await ss.quotedColumnsForIndex(["id", "name"], { order: { id: "desc" } })).toBe(
       '"id", "name"',
     );
-  });
-});
-
-describe("canRemoveIndexByName (module-level)", () => {
-  it("is true for a bare name", () => {
-    expect(canRemoveIndexByName(null, { name: "idx" })).toBe(true);
-  });
-
-  it("tolerates an algorithm key", () => {
-    expect(canRemoveIndexByName(null, { name: "idx", algorithm: "concurrently" })).toBe(true);
-  });
-
-  it("rejects extra keys other than name/algorithm", () => {
-    expect(canRemoveIndexByName(null, { name: "idx", unique: true })).toBe(false);
-  });
-
-  it("rejects a given column name", () => {
-    expect(canRemoveIndexByName("email", { name: "idx" })).toBe(false);
   });
 });
 

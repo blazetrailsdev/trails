@@ -12,7 +12,7 @@ import {
   type MonitorMixin,
   type NotificationHandle,
 } from "@blazetrails/activesupport";
-import { Thread } from "@blazetrails/ruby-compat";
+import { isEmpty, Thread } from "@blazetrails/ruby-compat";
 import { beforeCommittedOnAllRecords } from "../../active-record.js";
 
 /** @internal */
@@ -838,9 +838,9 @@ export class TransactionManager {
   }
 
   /**
-   * @missingRailsCall empty? — PERMANENT
-   * @missingRailsCall size — PERMANENT
+   * @missingRailsCall size — CONVERGEABLE call-gate-proves-array-literal-ivars-and-kernel-array-receivers
    * @missingRailsName connection — PERMANENT
+   * @missingRailsName stack — PERMANENT
    */
   async beginTransaction(
     options: { isolation?: string | null; joinable?: boolean; _lazy?: boolean } = {},
@@ -849,7 +849,7 @@ export class TransactionManager {
     return await this._connection.lock.synchronize(async () => {
       const runCommitCallbacks = !this.currentTransaction.joinable;
       let transaction: Transaction;
-      if (this._stack.length === 0) {
+      if (isEmpty(this._stack)) {
         transaction = new RealTransaction(this._connection, {
           isolation,
           joinable,
@@ -941,10 +941,10 @@ export class TransactionManager {
     });
   }
 
-  /** @missingRailsCall last — PERMANENT */
+  /** @missingRailsCall last — CONVERGEABLE call-gate-proves-array-literal-ivars-and-kernel-array-receivers */
   async commitTransaction(): Promise<void> {
     await this._connection.lock.synchronize(async () => {
-      const transaction = this._stack[this._stack.length - 1] as Transaction;
+      const transaction = this._stack.at(-1) as Transaction;
 
       try {
         await transaction.beforeCommitRecords();
@@ -959,14 +959,14 @@ export class TransactionManager {
     });
   }
 
-  /** @missingRailsCall last — PERMANENT */
+  /** @missingRailsCall last — CONVERGEABLE call-gate-proves-array-literal-ivars-and-kernel-array-receivers */
   async rollbackTransaction(transaction?: Transaction | null): Promise<void> {
     await this._connection.lock.synchronize(async () => {
-      transaction ||= this._stack[this._stack.length - 1] as Transaction;
+      transaction ||= this._stack.at(-1) as Transaction;
       try {
         await transaction.rollback();
       } finally {
-        if (this._stack[this._stack.length - 1] === transaction) this._stack.pop();
+        if (this._stack.at(-1) === transaction) this._stack.pop();
       }
       await transaction.rollbackRecords();
     });
@@ -1023,16 +1023,14 @@ export class TransactionManager {
     });
   }
 
-  /** @missingRailsCall size — PERMANENT */
+  /** @missingRailsCall size — CONVERGEABLE call-gate-proves-array-literal-ivars-and-kernel-array-receivers */
   get openTransactions(): number {
     return this._stack.length;
   }
 
-  /** @missingRailsCall last — PERMANENT */
+  /** @missingRailsCall last — CONVERGEABLE call-gate-proves-array-literal-ivars-and-kernel-array-receivers */
   get currentTransaction(): Transaction | NullTransaction {
-    return this._stack.length > 0
-      ? this._stack[this._stack.length - 1]
-      : TransactionManager.NULL_TRANSACTION;
+    return this._stack.at(-1) ?? TransactionManager.NULL_TRANSACTION;
   }
 
   /** @internal */

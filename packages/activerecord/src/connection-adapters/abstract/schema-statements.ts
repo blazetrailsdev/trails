@@ -1,6 +1,8 @@
 import {
   block,
+  except,
   fetch,
+  isEmpty,
   KeyError,
   OpenSSL,
   partition,
@@ -52,23 +54,12 @@ import {
   presence,
   assertValidKeys,
   any,
+  first,
   mbChars,
   wrap,
 } from "@blazetrails/activesupport";
 import { SchemaDumper } from "./schema-dumper.js";
 import { ActiveRecord } from "../../namespaces.js";
-
-/** @internal */
-export function canRemoveIndexByName(
-  columnName: string | string[] | undefined | null,
-  options: Record<string, unknown>,
-): boolean {
-  return (
-    columnName == null &&
-    "name" in options &&
-    Object.keys(options).filter((k) => k !== "name" && k !== "algorithm").length === 0
-  );
-}
 
 export type JoinTableOptions = {
   tableName?: string;
@@ -1094,7 +1085,7 @@ export class SchemaStatements {
     return `${singularize(name)}_${columnName}`;
   }
 
-  /** @missingRailsCall size — PERMANENT */
+  /** @missingRailsCall size — CONVERGEABLE call-gate-proves-array-literal-ivars-and-kernel-array-receivers */
   foreignKeyOptions(
     fromTable: string,
     toTable: string,
@@ -1402,15 +1393,12 @@ export class SchemaStatements {
     return 62;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall first — PERMANENT
-   */
+  /** @internal */
   generateIndexName(tableName: string, column: string | string[]): string {
     let name = `index_${tableName}_on_${wrap(column).join("_and_")}`;
     if (new TextEncoder().encode(name).length <= this.maxIndexNameSize()) return name;
 
-    const hashedIdentifier = "_" + OpenSSL.Digest.SHA256.hexdigest(name).slice(0, 10);
+    const hashedIdentifier = "_" + first(OpenSSL.Digest.SHA256.hexdigest(name), 10);
     name = `idx_on_${wrap(column).join("_")}`;
 
     const shortLimit = this.maxIndexNameSize() - new TextEncoder().encode(hashedIdentifier).length;
@@ -1639,10 +1627,7 @@ export class SchemaStatements {
     return m ? m[1] : str;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall first — PERMANENT
-   */
+  /** @internal */
   foreignKeyName(
     tableName: string,
     options: { name?: string; column?: string | string[] },
@@ -1653,7 +1638,7 @@ export class SchemaStatements {
     }
     const columns = wrap(options.column).map(String);
     const identifier = `${tableName}_${columns.join("_and_")}_fk`;
-    const hashedIdentifier = OpenSSL.Digest.SHA256.hexdigest(identifier).slice(0, 10);
+    const hashedIdentifier = first(OpenSSL.Digest.SHA256.hexdigest(identifier), 10);
     return `fk_rails_${hashedIdentifier}`;
   }
 
@@ -1695,20 +1680,16 @@ export class SchemaStatements {
     }
   }
 
-  /** @internal */
   /**
    * @internal
-   * @missingRailsArgs fetch — PERMANENT
+   * @missingRailsName config — PERMANENT
    */
   isForeignKeysEnabled(): boolean {
     const foreignKeys = fetch<unknown>(this._config, "foreignKeys", true);
     return foreignKeys != null && foreignKeys !== false;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall first — PERMANENT
-   */
+  /** @internal */
   checkConstraintName(
     tableName: string,
     options: { name?: string; expression?: string } = {},
@@ -1719,8 +1700,8 @@ export class SchemaStatements {
     }
     const expression = options.expression;
     const identifier = `${tableName}_${expression ?? ""}_chk`;
-    const hex = OpenSSL.Digest.SHA256.hexdigest(identifier).slice(0, 10);
-    return `chk_rails_${hex}`;
+    const hashedIdentifier = first(OpenSSL.Digest.SHA256.hexdigest(identifier), 10);
+    return `chk_rails_${hashedIdentifier}`;
   }
 
   /** @internal */
@@ -1794,15 +1775,12 @@ export class SchemaStatements {
     return this.extractNewDefaultValue(defaultOrChanges) as string | null;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall empty? — PERMANENT
-   */
+  /** @internal */
   canRemoveIndexByName(
     columnName: string | string[] | undefined | null,
     options: Record<string, unknown>,
   ): boolean {
-    return canRemoveIndexByName(columnName, options);
+    return columnName == null && "name" in options && isEmpty(except(options, "name", "algorithm"));
   }
 
   /** @internal */

@@ -23,7 +23,7 @@ export class Reaper {
     this._frequency = frequency;
   }
 
-  /** @missingRailsCall spawn_thread — PERMANENT */
+  /** @missingRailsCall spawn_thread — CONVERGEABLE reaper-register-pool-spawns-its-thread-through-spawn-thread */
   static registerPool(pool: ReapablePool, frequency: number): void {
     if (!frequency || frequency <= 0 || !Number.isFinite(frequency)) return;
     if (pool.isDiscarded?.()) return;

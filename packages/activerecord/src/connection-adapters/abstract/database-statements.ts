@@ -550,13 +550,12 @@ export function resetTransaction(
   self._transactionManager = new TransactionManager(self);
 }
 
-/** @missingRailsName ensureFinalize — PERMANENT */
 export function addTransactionRecord(
   this: DatabaseStatementsHost,
   record: unknown,
-  _ensureFinalize = true,
+  ensureFinalize = true,
 ): void {
-  this.currentTransaction().addRecord(record, _ensureFinalize);
+  this.currentTransaction().addRecord(record, ensureFinalize);
 }
 
 export async function beginDbTransaction(): Promise<void> {}

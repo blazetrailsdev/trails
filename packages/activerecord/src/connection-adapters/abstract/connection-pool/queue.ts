@@ -197,7 +197,7 @@ export class Queue {
     return this._queue.length > 0;
   }
 
-  /** @missingRailsCall size — PERMANENT */
+  /** @missingRailsCall size — CONVERGEABLE call-gate-proves-array-literal-ivars-and-kernel-array-receivers */
   private canRemoveNoWait(): boolean {
     return this._queue.length > this._numWaiting;
   }

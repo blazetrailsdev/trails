@@ -54,7 +54,7 @@ export function _registerBase(base: BaseLike): void {
 
 export class ConnectionHandler {
   private _connectionNameToPoolManager: Map<string, PoolManager>;
-  /** @missingRailsArgs new — PERMANENT */
+  /** @missingRailsArgs new — CONVERGEABLE connection-handler-pool-manager-map-onto-concurrent-map */
   constructor() {
     this._connectionNameToPoolManager = new Map();
   }
@@ -71,18 +71,16 @@ export class ConnectionHandler {
     return [...this._connectionNameToPoolManager.keys()];
   }
 
-  /** @missingRailsCall map — PERMANENT */
-  connectionPoolList(role?: string | null): ConnectionPool[] {
-    const effectiveRole = role === "all" ? null : role;
-    const pools: ConnectionPool[] = [];
-    for (const manager of this._connectionNameToPoolManager.values()) {
-      const configs =
-        effectiveRole == null ? manager.poolConfigs() : manager.poolConfigs(effectiveRole);
-      for (const pc of configs) {
-        pools.push(pc.pool);
-      }
+  connectionPoolList(role: string | null = null): ConnectionPool[] {
+    if (role == null || role === "all") {
+      return [...this._connectionNameToPoolManager.values()].flatMap((m) =>
+        m.poolConfigs().map((pc) => pc.pool),
+      );
+    } else {
+      return [...this._connectionNameToPoolManager.values()].flatMap((m) =>
+        m.poolConfigs(role).map((pc) => pc.pool),
+      );
     }
-    return pools;
   }
 
   get connectionPools(): ConnectionPool[] {
