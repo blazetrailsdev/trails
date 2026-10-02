@@ -10,6 +10,7 @@ import {
 } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import { Engine } from "@blazetrails/trailties/engine";
+import { Trailtie } from "@blazetrails/trailties/trailtie";
 import { Base } from "../../action-controller/base.js";
 import { TestCase } from "../../action-controller/test-case.js";
 import { controllerConstants } from "../http/request.js";
@@ -54,7 +55,7 @@ beforeAll(() => {
 let trails: typeof TopLevel.Trails;
 beforeAll(() => {
   trails = TopLevel.Trails;
-  TopLevel.Trails = { Engine } as never;
+  TopLevel.Trails = { Engine, Trailtie } as never;
 });
 afterAll(() => {
   TopLevel.Trails = trails;

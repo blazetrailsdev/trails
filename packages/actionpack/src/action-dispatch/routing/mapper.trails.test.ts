@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
+import { TopLevel } from "@blazetrails/activesupport";
 
-import { Constraints, Mapper, Scope, type ConstraintsRequest } from "./mapper.js";
+import {
+  Constraints,
+  Mapper,
+  Scope,
+  type ConstraintsRequest,
+  type MountableApp,
+} from "./mapper.js";
 import { RouteSet } from "./route-set.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
@@ -318,5 +325,23 @@ describe("Mapper::Mapping#build_conditions", () => {
     });
     const [route] = set.routes.routes;
     expect(Object.keys(route.conditions)).toContain("checkMethod");
+  });
+});
+
+describe("Mapper#rails_app?", () => {
+  it("answers app < Rails::Railtie (mapper.rb:657-659)", () => {
+    class Railtie {}
+    class App extends Railtie {}
+    const trails = TopLevel.Trails;
+    TopLevel.Trails = { Trailtie: Railtie } as never;
+    try {
+      const mapper = new Mapper(new RouteSet());
+      expect(mapper.isRailsApp(App as unknown as MountableApp)).toBe(true);
+      expect(mapper.isRailsApp(Railtie as unknown as MountableApp)).toBe(false);
+      expect(mapper.isRailsApp(new App() as unknown as MountableApp)).toBe(false);
+      expect(mapper.isRailsApp(() => [200, {}, []] as never)).toBe(false);
+    } finally {
+      TopLevel.Trails = trails;
+    }
   });
 });

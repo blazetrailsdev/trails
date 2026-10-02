@@ -21,6 +21,8 @@ import {
   stderr,
 } from "@blazetrails/ruby-compat";
 import { XML } from "@blazetrails/nokogiri";
+import { Engine } from "@blazetrails/trailties/engine";
+import { Trailtie } from "@blazetrails/trailties/trailtie";
 import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
 import { Base } from "../base.js";
 import { Request } from "../../action-dispatch/http/request.js";
@@ -37,6 +39,8 @@ import {
 } from "../../action-dispatch/testing/test-helpers/page-dump-helper.js";
 import type { MountableApp, RouteOptions } from "../../action-dispatch/routing/mapper.js";
 import { CookieAssertions, SharedTestRoutes } from "../../test-helpers/abstract-unit.js";
+
+TopLevel.Trails = { Engine, Trailtie } as unknown as typeof TopLevel.Trails;
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -882,20 +886,17 @@ describe("ApplicationIntegrationTest", () => {
     }
   }
 
-  class MountedApp {
-    static railtieName(): string {
-      return "application_integration_test_mounted_app";
-    }
-
+  class MountedApp extends Engine {
     static _routes?: RouteSet;
 
     static routes(): RouteSet {
       return (this._routes ??= new RouteSet());
     }
 
-    static call(): void {}
+    static override call(): void {}
 
     static {
+      Engine.register(this);
       this.routes().draw(function () {
         this.get("baz", { to: "application_integration_test/test#index", as: "baz" });
       });

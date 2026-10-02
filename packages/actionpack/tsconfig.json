@@ -7,7 +7,9 @@
   },
   "include": ["src"],
   "exclude": [
+    "src/action-controller/controller/integration.test.ts",
     "src/action-controller/controller/test-case.test.ts",
+    "src/action-dispatch/dispatch/prefix-generation.test.ts",
     "src/action-dispatch/dispatch/routing-assertions.test.ts",
     "src/action-dispatch/dispatch/routing/inspector.test.ts"
   ],

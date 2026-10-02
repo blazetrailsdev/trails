@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { File, stringSplit } from "@blazetrails/ruby-compat";
 import { Engine } from "@blazetrails/trailties/engine";
+import { Trailtie } from "@blazetrails/trailties/trailtie";
 import type { MountableApp } from "../../routing/mapper.js";
 import { RouteSet, type DrawCallback } from "../../routing/route-set.js";
 import { ConsoleFormatter, RoutesFormatter, RoutesInspector } from "../../routing/inspector.js";
@@ -29,7 +30,7 @@ describe("RoutesInspectorTest", () => {
   beforeEach(() => {
     set = new RouteSet();
     trails = TopLevel.Trails;
-    TopLevel.Trails = { Engine } as never;
+    TopLevel.Trails = { Engine, Trailtie } as never;
   });
 
   afterEach(() => {
