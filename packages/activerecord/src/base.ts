@@ -1247,14 +1247,11 @@ export class Base extends Model {
   ): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(
     this: T,
-    sql: string,
+    sql: string | Nodes.SqlLiteral,
     ...binds: unknown[]
   ): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(this: T, conditions: unknown[]): Relation<InstanceType<T>>;
-  static where<T extends typeof Base>(
-    this: T,
-    node: Nodes.Node | Nodes.SqlLiteral,
-  ): Relation<InstanceType<T>>;
+  static where<T extends typeof Base>(this: T, node: Nodes.Node): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(
     this: T,
     conditionsOrSql?:
@@ -1270,11 +1267,11 @@ export class Base extends Model {
     if (conditionsOrSql === undefined) {
       return this.all().where();
     }
+    if (typeof conditionsOrSql === "string" || conditionsOrSql instanceof Nodes.SqlLiteral) {
+      return this.all().where(conditionsOrSql, ...rest);
+    }
     if (conditionsOrSql instanceof Nodes.Node) {
       return this.all().where(conditionsOrSql);
-    }
-    if (typeof conditionsOrSql === "string") {
-      return this.all().where(conditionsOrSql, ...rest);
     }
     if (Array.isArray(conditionsOrSql)) {
       return this.all().where(conditionsOrSql as unknown[]);

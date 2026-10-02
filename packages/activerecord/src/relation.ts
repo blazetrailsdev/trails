@@ -2054,7 +2054,7 @@ export interface Relation<T extends Base, G extends boolean = false>
   where(args: undefined): WhereChain<Relation<T, G>>;
   where(args: Record<string, unknown> | null): Relation<T, G>;
   where(args: Map<unknown, unknown>): Relation<T, G>;
-  where(sql: string, ...binds: unknown[]): Relation<T, G>;
+  where(sql: string | Nodes.SqlLiteral, ...binds: unknown[]): Relation<T, G>;
   where(args: Nodes.Node | Nodes.SqlLiteral): Relation<T, G>;
   where(args: unknown[]): Relation<T, G>;
   rewhere(conditions: Record<string, unknown> | null): Relation<T, G>;
@@ -2064,9 +2064,9 @@ export interface Relation<T extends Base, G extends boolean = false>
   or(other: Relation<T, boolean>): Relation<T, G>;
   excluding(...records: unknown[]): Relation<T, G>;
   without(...records: unknown[]): Relation<T, G>;
-  having(condition: string, ...binds: unknown[]): Relation<T, G>;
+  having(condition: string | Nodes.SqlLiteral, ...binds: unknown[]): Relation<T, G>;
   having(condition: Record<string, unknown>): Relation<T, G>;
-  having(condition: Nodes.Node | Nodes.SqlLiteral): Relation<T, G>;
+  having(condition: Nodes.Node): Relation<T, G>;
   having(
     condition: string | Record<string, unknown> | Nodes.Node | Nodes.SqlLiteral,
     ...binds: unknown[]

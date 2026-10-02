@@ -651,6 +651,7 @@ export function buildWhereClause(
   }
 
   let parts: (Nodes.Node | Nodes.SqlLiteral | string)[];
+  if (opts instanceof Nodes.SqlLiteral) opts = opts.toString();
   if (typeof opts === "string") {
     if (rest.length === 0) {
       parts = [Arel.sql(opts)];

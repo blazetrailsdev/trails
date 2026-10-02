@@ -1,3 +1,4 @@
+import { Nodes } from "@blazetrails/arel";
 import { hasKey, toI, type Module } from "@blazetrails/ruby-compat";
 import type { TouchAllArgs } from "./timestamp.js";
 import { Notifications, isPlainObject as _isPlainObject } from "@blazetrails/activesupport";
@@ -854,7 +855,7 @@ export function regroup<T extends typeof Base>(
 
 export function having<T extends typeof Base>(
   this: T,
-  condition: string,
+  condition: string | import("@blazetrails/arel").Nodes.SqlLiteral,
   ...binds: unknown[]
 ): Relation<InstanceType<T>>;
 export function having<T extends typeof Base>(
@@ -863,7 +864,7 @@ export function having<T extends typeof Base>(
 ): Relation<InstanceType<T>>;
 export function having<T extends typeof Base>(
   this: T,
-  condition: import("@blazetrails/arel").Nodes.Node | import("@blazetrails/arel").Nodes.SqlLiteral,
+  condition: import("@blazetrails/arel").Nodes.Node,
 ): Relation<InstanceType<T>>;
 export function having<T extends typeof Base>(
   this: T,
@@ -874,7 +875,9 @@ export function having<T extends typeof Base>(
     | import("@blazetrails/arel").Nodes.SqlLiteral,
   ...binds: unknown[]
 ): Relation<InstanceType<T>> {
-  if (typeof condition === "string") return this.all().having(condition, ...binds);
+  if (typeof condition === "string" || condition instanceof Nodes.SqlLiteral) {
+    return this.all().having(condition, ...binds);
+  }
   return this.all().having(condition as Record<string, unknown>);
 }
 
