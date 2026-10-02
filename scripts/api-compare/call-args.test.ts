@@ -1202,8 +1202,6 @@ describe("pairCallSites core_ext receiver as argument 1", () => {
 });
 
 describe("compareCallArgs function-form Hash#merge", () => {
-  // schema_definitions.rb:267 `as_options(index).merge(conditional_options)`,
-  // ported as ruby-compat's `merge(this.asOptions(index), this.conditionalOptions())`.
   const ruby = { ...site("merge", ["call:conditional_options"]), recv: "call:as_options" };
 
   it("aligns the receiver of ruby-compat's merge export", () => {
@@ -1212,7 +1210,6 @@ describe("compareCallArgs function-form Hash#merge", () => {
       rubyCompat: "merge",
     };
     expect(compareCallArgs(ruby, ts).verdict).toBe("match");
-    // schema_creation.rb:147 `o.options.merge(column: o)`.
     expect(
       compareCallArgs(
         { ...site("merge", ["kwargs{column=id:o}"]), recv: "call:options" },
@@ -1242,7 +1239,6 @@ describe("compareCallArgs function-form Hash#merge", () => {
   });
 
   it("compares a Relation#merge method call as written", () => {
-    // relation/spawn_methods.rb:33 `Relation#merge(other, *rest)`.
     const relation = { ...site("merge", ["id:other"]), recv: "id:relation" };
     expect(
       compareCallArgs(relation, { ...site("merge", ["id:other"]), recv: "id:relation" }).verdict,
@@ -1253,8 +1249,6 @@ describe("compareCallArgs function-form Hash#merge", () => {
     });
     expect(extra.verdict).toBe("mismatch");
     expect(extra.class).toBe("shape");
-    // A method call carries no `rubyCompat`, so its leading argument is never
-    // read as the Ruby receiver.
     expect(
       compareCallArgs(ruby, {
         ...site("merge", ["call:asOptions", "call:conditionalOptions"]),
@@ -1265,7 +1259,6 @@ describe("compareCallArgs function-form Hash#merge", () => {
 });
 
 describe("compareCallArgs function-form Hash#fetch", () => {
-  // calculations.rb:570 `calculated_data.column_types.fetch(aliaz, Type.default_value)`.
   const ruby = { ...site("fetch", ["id:aliaz", "call:default_value"]), recv: "call:column_types" };
 
   it("aligns the receiver of ruby-compat's fetch export", () => {
@@ -1277,7 +1270,6 @@ describe("compareCallArgs function-form Hash#fetch", () => {
   });
 
   it("compares a Cache::Store#fetch method call as written", () => {
-    // cache.rb:444 `Store#fetch(name, options = nil, &block)`.
     const cache = { ...site("fetch", ["id:key"]), recv: "id:cache" };
     expect(compareCallArgs(cache, { ...site("fetch", ["id:key"]), recv: "id:cache" }).verdict).toBe(
       "match",
@@ -1292,7 +1284,6 @@ describe("compareCallArgs function-form Hash#fetch", () => {
 });
 
 describe("pairCallSites receiver-name tie-break", () => {
-  // attribute_set/builder.rb:36-39 `values.keys | types.keys | @attributes.keys`.
   const rubySites = [
     { ...site("keys", []), recv: "id:values" },
     { ...site("keys", []), recv: "id:types" },
