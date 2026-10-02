@@ -727,11 +727,6 @@ function isModuleMethodTablePresent(klass: { prototype: object }, mod: unknown):
  * copies a module's members onto the prototype rather than splicing a link for
  * it. The registry `include()` keeps is that record.
  *
- * Ruby asks it through `included_modules.include?`, and `Array#include?`
- * compares with `==`, which a module may define by value
- * (`AcceptanceValidator::LazilyDefineAttributes#==`, acceptance.rb:71-73), so a
- * module carrying an `equals` is asked that too and not identity alone.
- *
  * Mirrors: Ruby's Module#include? — vendor/ruby/v3.3.11/class.c:1538
  * `rb_mod_include_p`.
  *
@@ -742,19 +737,7 @@ export function isModuleIncluded(
   klass: { prototype: object },
   mod: ModuleObject | AnyClass | Module,
 ): boolean {
-  if (isModuleMethodTablePresent(klass, mod)) return true;
-  const eq = (mod as { equals?: (other: unknown) => boolean }).equals;
-  if (typeof eq !== "function") return false;
-  for (
-    let proto: object | null = klass.prototype;
-    proto;
-    proto = Object.getPrototypeOf(proto) as object | null
-  ) {
-    if (!Object.prototype.hasOwnProperty.call(proto, includedModulesKey)) continue;
-    const mods = (proto as Record<symbol, unknown>)[includedModulesKey] as Set<unknown>;
-    for (const m of mods) if (eq.call(mod, m)) return true;
-  }
-  return false;
+  return isModuleMethodTablePresent(klass, mod);
 }
 
 /**

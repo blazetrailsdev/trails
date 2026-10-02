@@ -11,8 +11,8 @@ describe("BindParam", () => {
       expect(new Nodes.BindParam(null).toSql()).toBe("?");
     });
 
-    it("renders a valueless bind param as ?", () => {
-      expect(new Nodes.BindParam().toSql()).toBe("?");
+    it("renders an undefined value as ?", () => {
+      expect(new Nodes.BindParam(undefined).toSql()).toBe("?");
     });
   });
 
@@ -33,8 +33,8 @@ describe("BindParam", () => {
       expect(new Nodes.BindParam(null).isNil()).toBe(true);
     });
 
-    it("is false for a valueless positional-bind placeholder", () => {
-      expect(new Nodes.BindParam().isNil()).toBe(false);
+    it("is true when wrapping undefined, the other JS spelling of nil", () => {
+      expect(new Nodes.BindParam(undefined).isNil()).toBe(true);
     });
 
     it("is false when wrapping a non-nil scalar", () => {

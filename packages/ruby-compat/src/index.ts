@@ -131,6 +131,7 @@ export {
   aryCount,
   aryDelete,
   aryDeleteIf,
+  aryIncludes,
   aryPop,
   arySlice,
   compact,

@@ -64,7 +64,7 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
     isInfinity(this: unknown, v: unknown): 1 | -1 | 0 {
       return Predications.isInfinity.call(this as never, v);
     },
-    isUnboundable(this: unknown, v: unknown): 1 | -1 | 0 {
+    isUnboundable(this: unknown, v: unknown): 1 | -1 | false {
       return Predications.isUnboundable.call(this as never, v);
     },
   };
@@ -98,13 +98,13 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
   it("isUnboundable duck-types the protocol and yields the sign", () => {
     expect(isUnboundable({ isUnboundable: () => 1 as const })).toBe(1);
     expect(isUnboundable({ isUnboundable: () => -1 as const })).toBe(-1);
-    expect(isUnboundable({ isUnboundable: () => false as const })).toBe(0);
+    expect(isUnboundable({ isUnboundable: () => false as const })).toBe(false);
   });
 
-  it("isUnboundable is 0 for values with no unboundable? — including ±Infinity", () => {
-    expect(isUnboundable(Infinity)).toBe(0);
-    expect(isUnboundable(undefined)).toBe(0);
-    expect(isUnboundable(1)).toBe(0);
+  it("isUnboundable is false for values with no unboundable? — including ±Infinity", () => {
+    expect(isUnboundable(Infinity)).toBe(false);
+    expect(isUnboundable(undefined)).toBe(false);
+    expect(isUnboundable(1)).toBe(false);
   });
 
   it("isOpenEnded is true for null/undefined/Infinity/unboundable, false otherwise", () => {
@@ -137,7 +137,7 @@ describe("Attribute private helpers (mirror Predications)", () => {
     groupingAny: (methodId: string, others: unknown[]) => Nodes.Grouping;
     groupingAll: (methodId: string, others: unknown[]) => Nodes.Grouping;
     isInfinity: (value: unknown) => 1 | -1 | 0;
-    isUnboundable: (value: unknown) => 1 | -1 | 0;
+    isUnboundable: (value: unknown) => 1 | -1 | false;
     isOpenEnded: (value: unknown) => boolean;
   };
 
@@ -152,7 +152,7 @@ describe("Attribute private helpers (mirror Predications)", () => {
     expect(attr.isInfinity(Infinity)).toBe(1);
     expect(attr.isInfinity(-Infinity)).toBe(-1);
     expect(attr.isInfinity(0)).toBe(0);
-    expect(attr.isUnboundable(0)).toBe(0);
+    expect(attr.isUnboundable(0)).toBe(false);
     expect(attr.isOpenEnded(null)).toBe(true);
     expect(attr.isOpenEnded(Infinity)).toBe(true);
     expect(attr.isOpenEnded(0)).toBe(false);

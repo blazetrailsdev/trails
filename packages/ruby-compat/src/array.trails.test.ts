@@ -7,6 +7,7 @@ import {
   zip,
   aryDelete,
   aryDeleteIf,
+  aryIncludes,
   aryPop,
   arySlice,
   compact,
@@ -352,6 +353,27 @@ describe("aryDeleteIf", () => {
       }),
     ).toThrow("boom");
     expect(ary).toEqual([1, 3, 4, 5]);
+  });
+});
+
+describe("aryIncludes", () => {
+  it("asks each element's == with the item", () => {
+    const seen: unknown[] = [];
+    const e = {
+      equals(other: unknown) {
+        seen.push(other);
+        return other === "wanted";
+      },
+    };
+    expect(aryIncludes([1, e], "wanted")).toBe(true);
+    expect(aryIncludes([1, e], "other")).toBe(false);
+    expect(seen).toEqual(["wanted", "other"]);
+  });
+
+  it("compares with ==, not identity", () => {
+    expect(aryIncludes([[1, 2], 3], [1, 2])).toBe(true);
+    expect(aryIncludes([[1, 2], 3], [2, 1])).toBe(false);
+    expect(aryIncludes([], 1)).toBe(false);
   });
 });
 

@@ -62,7 +62,7 @@ export interface Attribute
   /** @internal */
   isInfinity(value: unknown): 1 | -1 | 0;
   /** @internal */
-  isUnboundable(value: unknown): 1 | -1 | 0;
+  isUnboundable(value: unknown): 1 | -1 | false;
   /** @internal */
   isOpenEnded(value: unknown): boolean;
   between(other: RangeLike): Node;

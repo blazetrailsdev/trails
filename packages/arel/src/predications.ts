@@ -18,7 +18,7 @@ import type { Case } from "./nodes/case.js";
 import type { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
 import { Nodes } from "./namespaces.js";
 import { rbEqual } from "@blazetrails/activesupport";
-import { NoMethodError, rbObjClass } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbObjClass, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 function isSelectManagerLike(value: unknown): value is { ast: Node } {
   return (
@@ -61,7 +61,7 @@ interface RangePredicates {
   /** @internal */
   isInfinity(value: unknown): 1 | -1 | 0;
   /** @internal */
-  isUnboundable(value: unknown): 1 | -1 | 0;
+  isUnboundable(value: unknown): 1 | -1 | false;
   /** @internal */
   isOpenEnded(value: unknown): boolean;
   /** @internal */
@@ -82,10 +82,6 @@ interface RangePredicates {
 
 interface InfiniteLike {
   isInfinite?: () => 1 | -1 | false;
-}
-
-interface UnboundableLike {
-  isUnboundable?: () => 1 | -1 | false;
 }
 
 type BetweenHost = Node & PredicationHost & RangePredicates;
@@ -166,7 +162,7 @@ export interface PredicationsModule extends GroupingFolders {
   /** @internal */
   quotedNode(other: unknown): Node;
   isInfinity(value: unknown): 1 | -1 | 0;
-  isUnboundable(value: unknown): 1 | -1 | 0;
+  isUnboundable(value: unknown): 1 | -1 | false;
   isOpenEnded(value: unknown): boolean;
 }
 
@@ -465,24 +461,18 @@ export const Predications: PredicationsModule = {
     return 0;
   },
 
-  isUnboundable(this: PredicationHost, value: unknown): 1 | -1 | 0 {
+  isUnboundable(this: PredicationHost, value: unknown): 1 | -1 | false {
     void this;
-    if (
-      value &&
-      typeof value === "object" &&
-      typeof (value as UnboundableLike).isUnboundable === "function"
-    ) {
-      const r = (value as UnboundableLike).isUnboundable!();
-      if (r === 1) return 1;
-      if (r === -1) return -1;
-    }
-    return 0;
+    return (
+      rbObjRespondTo(value, "isUnboundable") &&
+      (value as { isUnboundable(): 1 | -1 | false }).isUnboundable()
+    );
   },
 
   isOpenEnded(
     this: PredicationHost & {
       isInfinity(value: unknown): 1 | -1 | 0;
-      isUnboundable(value: unknown): 1 | -1 | 0;
+      isUnboundable(value: unknown): 1 | -1 | false;
     },
     value: unknown,
   ): boolean {
@@ -491,6 +481,6 @@ export const Predications: PredicationsModule = {
       value === undefined ||
       (typeof (value as { isNil?: () => boolean }).isNil === "function" &&
         (value as { isNil: () => boolean }).isNil());
-    return isNil || this.isInfinity(value) !== 0 || this.isUnboundable(value) !== 0;
+    return isNil || this.isInfinity(value) !== 0 || this.isUnboundable(value) !== false;
   },
 };
