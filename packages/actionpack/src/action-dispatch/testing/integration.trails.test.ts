@@ -41,3 +41,19 @@ describe("RoutingAssertions#method_missing", () => {
     expect(test.nope).toBeUndefined();
   });
 });
+
+describe("Integration::Session includes TestProcess", () => {
+  it("session, flash and redirect_to_url read the last request and response", async () => {
+    const session = new IntegrationTest();
+    session.app = async () => [302, { location: "/there" }, bodyFromString("moved")];
+    await session.get("/here");
+    expect(session.session()).toBe(session.request.session);
+    expect(session.flash()).toBe(session.request.flash);
+    expect(session.redirectToUrl()).toBe(session.response.redirectUrl);
+    expect(session.redirectToUrl()).toMatch(/\/there$/);
+  });
+
+  it("flash has no guard for a session that made no request", () => {
+    expect(() => new IntegrationTest().flash()).toThrow(TypeError);
+  });
+});
