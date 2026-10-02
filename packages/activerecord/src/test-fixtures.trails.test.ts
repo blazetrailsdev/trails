@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { NoMethodError, include } from "@blazetrails/ruby-compat";
+import { Minitest } from "@blazetrails/activesupport";
 import { TestFixtures } from "./test-fixtures.js";
 import { File as FixtureFile } from "./fixture-set/file.js";
 
@@ -20,7 +21,7 @@ describe("TestFixtures::ClassMethods", () => {
   let klass: Host;
 
   beforeEach(() => {
-    const k = class {};
+    const k = class extends Minitest.Test {};
     include(k, TestFixtures);
     klass = k as unknown as Host;
   });
@@ -95,10 +96,10 @@ describe("TestFixtures#method_missing", () => {
   let instance: Instance;
 
   beforeEach(() => {
-    const k = class {};
+    const k = class extends Minitest.Test {};
     include(k, TestFixtures);
     (k as unknown as Host).fixtures("topics");
-    instance = new k() as unknown as Instance;
+    instance = new k("a test") as unknown as Instance;
     instance._loadedFixtures = { topics: { fixtures: { first: { find: async () => "first" } } } };
     instance._fixtureCache = {};
   });

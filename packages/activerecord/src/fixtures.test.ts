@@ -14,6 +14,7 @@ import {
   Notifications,
   Duration,
   Logger,
+  Minitest,
   assertInDelta,
 } from "@blazetrails/activesupport";
 import { primaryKeyErrorFixtureData } from "./test-helpers/fixtures/primary-key-error/primary-key-error.js";
@@ -1190,7 +1191,7 @@ describe("FixtureClassNamesTest", () => {
   let savedCache: Record<string, unknown>;
 
   beforeEach(() => {
-    klass = class {} as typeof klass;
+    klass = class extends Minitest.Test {} as unknown as typeof klass;
     include(klass, TestFixtures);
     savedCache = { ...klass.fixtureClassNames };
   });
