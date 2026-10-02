@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { BigDecimal, include } from "@blazetrails/activesupport";
+import { BigDecimal, include, isModuleIncluded } from "@blazetrails/activesupport";
+import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import { b, StringIO } from "@blazetrails/ruby-compat";
 import { UploadedFile } from "@blazetrails/rack-test";
 import {
+  Behavior,
   LiveTestResponse,
   TestCase,
   TestRequest,
@@ -115,6 +117,29 @@ describe("ActionController::Live under test_case.rb", () => {
     expect(tc.response).toBeUndefined();
     await tc.beforeSetup();
     expect(tc.response).toBeInstanceOf(LiveTestResponse);
+  });
+});
+
+describe("TestCase::Behavior", () => {
+  it("is the module TestCase includes", () => {
+    expect(isModuleIncluded(TestCase, Behavior)).toBe(true);
+    expect(Object.hasOwn(TestCase.prototype, "process")).toBe(false);
+    expect(Object.hasOwn(TestCase, "tests")).toBe(true);
+    expect(typeof TestCase.prototype.process).toBe("function");
+  });
+
+  it("is includable into a test class that is not an ActionController::TestCase", async () => {
+    class PlainController extends Base {}
+    class PlainTest extends ActiveSupportTestCase {}
+    include(PlainTest, Behavior);
+    const klass = PlainTest as unknown as typeof TestCase;
+    klass.tests(PlainController);
+    expect(klass.controllerClass).toBe(PlainController);
+    const tc = new klass("test_plain");
+    await tc.beforeSetup();
+    expect(tc.controller).toBeInstanceOf(PlainController);
+    expect(tc.request).toBeInstanceOf(TestRequest);
+    expect(() => tc.assertTemplate()).toThrow(/extracted to a gem/);
   });
 });
 

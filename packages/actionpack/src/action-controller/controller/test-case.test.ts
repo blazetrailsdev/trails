@@ -402,7 +402,7 @@ describe("TestCaseTest", () => {
     });
 
     it("assertTemplate raises (extracted to gem)", () => {
-      expect(() => tc.assertTemplate("posts/index")).toThrow(/extracted to a gem/);
+      expect(() => tc.assertTemplate()).toThrow(/extracted to a gem/);
     });
   });
 });

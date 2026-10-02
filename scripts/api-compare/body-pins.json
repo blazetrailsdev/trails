@@ -3530,13 +3530,6 @@
   {
     "package": "actioncontroller",
     "rubyFile": "test_case.rb",
-    "rubyName": "assert_template",
-    "digest": "b051e4d94b56b301",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "test_case.rb",
     "rubyName": "assign_parameters",
     "digest": "a78e8210f426043a",
     "ref": "v8.0.2"
