@@ -158,7 +158,8 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
       database: ":memory:",
     });
     const connection = await new SQLiteDatabaseTasks(config).create();
-    expect(connection).toBe(await Base.connectionPool().leaseConnection());
+    const pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base")!;
+    expect(connection).toBe(await pool.leaseConnection());
     expect(mkdirSpy).not.toHaveBeenCalled();
     expect(writeSpy).not.toHaveBeenCalled();
   });
