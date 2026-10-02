@@ -3,9 +3,13 @@ import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
-import { underscore, wrap as arrayWrap } from "@blazetrails/activesupport";
+import { underscore } from "@blazetrails/activesupport";
 import { _reflectOnAssociation, reflectOnAllAssociations } from "../reflection.js";
-import { ForeignAssociation, foreignKeyPresent } from "./foreign-association.js";
+import {
+  ForeignAssociation,
+  foreignKeyPresent,
+  setOwnerAttributes,
+} from "./foreign-association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { queryConstraintsList } from "../persistence.js";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
@@ -234,49 +238,8 @@ export class HasOneAssociation extends SingularAssociation {
     return this.foreignKeyColumns()[0];
   }
 
-  private setOwnerAttributes(record: Base): void {
-    if (this.reflection.options.through) return;
-
-    const ctor = (this.owner as any).constructor;
-    const richReflection = ctor._reflectOnAssociation?.(this.reflection.name) as {
-      joinPrimaryKey?: (klass?: typeof Base) => string | string[];
-      joinForeignKey?: string | string[];
-      type?: string | null;
-    } | null;
-
-    const configuredPk = this.reflection.options.primaryKey ?? ctor.primaryKey ?? "id";
-    const primaryKeyAttributeNames = arrayWrap(
-      richReflection?.joinPrimaryKey?.() ??
-        (Array.isArray(this.reflection.foreignKey())
-          ? this.reflection.foreignKey()
-          : this.foreignKeyColumn()),
-    );
-    const foreignKeyAttributeNames = arrayWrap(richReflection?.joinForeignKey ?? configuredPk);
-
-    for (const [i, primaryKey] of primaryKeyAttributeNames.entries()) {
-      const foreignKey = foreignKeyAttributeNames[i] ?? foreignKeyAttributeNames[0];
-      const value =
-        typeof (this.owner as any)._readAttribute === "function"
-          ? (this.owner as any)._readAttribute(foreignKey)
-          : (this.owner as any)[foreignKey];
-
-      if (typeof (record as any)._writeAttribute === "function") {
-        (record as any)._writeAttribute(primaryKey, value);
-      } else {
-        (record as any)[primaryKey] = value;
-      }
-    }
-
-    const type = richReflection?.type ?? null;
-    if (type) {
-      const typeName = (ctor as typeof Base).polymorphicName();
-      if (typeof (record as any)._writeAttribute === "function") {
-        (record as any)._writeAttribute(type, typeName);
-      } else {
-        (record as any)[type] = typeName;
-      }
-    }
-  }
+  /** @internal */
+  declare setOwnerAttributes: (record: Base) => void;
 
   protected override setNewRecord(record: Base): void | Promise<void> {
     return this.replace(record, false);
@@ -406,6 +369,6 @@ function nullifiedOwnerAttributes(assoc: HasOneAssociation): Record<string, null
   });
 }
 
-Object.assign(HasOneAssociation.prototype, { foreignKeyPresent });
+Object.assign(HasOneAssociation.prototype, { foreignKeyPresent, setOwnerAttributes });
 
 Associations.HasOneAssociation = HasOneAssociation;

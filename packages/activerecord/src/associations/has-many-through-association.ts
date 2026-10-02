@@ -123,7 +123,6 @@ export class HasManyThroughAssociation extends HasManyAssociation {
 
   /**
    * @internal
-   * @missingRailsCall map — CONVERGEABLE call-gate-credits-a-module-include-edge-to-its-includer
    * @missingRailsName class — PERMANENT
    */
   override buildRecord(

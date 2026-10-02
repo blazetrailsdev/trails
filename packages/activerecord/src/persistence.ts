@@ -635,8 +635,6 @@ interface ReloadRecord {
   _attributes: unknown;
   _newRecord: boolean;
   _previouslyNewRecord: boolean;
-  _mutationsBeforeLastSave: unknown;
-  _mutationsFromDatabase: unknown;
   _associationCache: Map<string, { owner: unknown }>;
   id: unknown;
   constructor: {
@@ -687,8 +685,6 @@ export async function reload<T extends ReloadRecord>(
   }
   this._newRecord = false;
   this._previouslyNewRecord = false;
-  this._mutationsBeforeLastSave = null;
-  this._mutationsFromDatabase = null;
 
   this._associationCache = fresh._associationCache;
   for (const association of this._associationCache.values()) {
