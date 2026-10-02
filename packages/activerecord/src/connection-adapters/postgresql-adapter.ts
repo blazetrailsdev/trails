@@ -791,17 +791,19 @@ export class PostgreSQLAdapter
   }
 
   async enableExtension(name: string, _options?: Record<string, unknown>): Promise<void> {
-    const [schema, extName] = valuesAt(String(name).split("."), -2, -1);
-    let sql = `CREATE EXTENSION IF NOT EXISTS "${extName}"`;
+    let schema: string | undefined;
+    [schema, name] = valuesAt(String(name).split("."), -2, -1) as [string | undefined, string];
+    let sql = `CREATE EXTENSION IF NOT EXISTS "${name}"`;
     if (schema) sql += ` SCHEMA ${schema}`;
     await this.internalExecQuery(sql);
     await this.reloadTypeMap();
   }
 
   async disableExtension(name: string, options: { force?: "cascade" } = {}): Promise<void> {
-    const [_schema, extName] = valuesAt(String(name).split("."), -2, -1);
+    let _schema: string | undefined;
+    [_schema, name] = valuesAt(String(name).split("."), -2, -1) as [string | undefined, string];
     const cascade = options.force === "cascade" ? " CASCADE" : "";
-    await this.internalExecQuery(`DROP EXTENSION IF EXISTS "${extName}"${cascade}`);
+    await this.internalExecQuery(`DROP EXTENSION IF EXISTS "${name}"${cascade}`);
     await this.reloadTypeMap();
   }
 
