@@ -55,6 +55,9 @@ describe("Clusivity#include?", () => {
     Topic.validatesInclusionOf("title", { in: () => null });
 
     await expect(new Topic({ title: "ruby" }).isValid()).rejects.toThrow(NoMethodError);
+    await expect(new Topic({ title: "ruby" }).isValid()).rejects.toThrow(
+      "undefined method 'include?' for nil",
+    );
   });
 
   it("asks a core String, Array, Set and Hash delimiter", async () => {
