@@ -1839,7 +1839,7 @@ export function orderColumn(this: QueryMethodsHost, field: string): unknown {
     if (attrName === "count" && !isEmpty(this.groupValues)) {
       return this.table.get(attrName);
     } else {
-      return Arel.sql((this.model as any).adapterClass().quoteTableName(attrName), {
+      return Arel.sql(this.model.adapterClass().quoteTableName(attrName), {
         retryable: true,
       });
     }
