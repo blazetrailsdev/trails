@@ -165,6 +165,12 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // `Array.prototype` analogue, so @blazetrails/ruby-compat exports it as
   // `partition(ary, block)` and the Ruby receiver is TS argument 1.
   "partition",
+  // Ruby core `Array#zip` (`vendor/ruby/v3.3.11/array.c:4422`) —
+  // `Array(target.id).zip(Array(inverse.foreign_key))`
+  // (associations/through_association.rb:120). JS has no `Array.prototype`
+  // analogue, so @blazetrails/ruby-compat exports it as `zip(ary, ...argv)` and
+  // the Ruby receiver is TS argument 1.
+  "zip",
   // Ruby core `Array#uniq` (`vendor/ruby/v3.3.11/array.c:6177`) —
   // `loaders.flat_map(&:future_classes).uniq` (associations/preloader/branch.rb:33).
   // It keys on `hash`/`eql?`, which no JS `Set` round-trip does, so

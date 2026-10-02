@@ -1,4 +1,4 @@
-import { kernelArray } from "@blazetrails/activesupport";
+import { kernelArray as Array } from "@blazetrails/activesupport";
 import { zip } from "@blazetrails/ruby-compat";
 import type { AssociationReflection } from "../reflection.js";
 import type { Base } from "../base.js";
@@ -21,8 +21,8 @@ export function foreignKeyPresent(this: ForeignAssociationHost): boolean {
 export function setOwnerAttributes(this: ForeignAssociationHost, record: Base): void {
   if (this.options.through != null) return;
 
-  const primaryKeyAttributeNames = kernelArray(this.reflection.joinPrimaryKey());
-  const foreignKeyAttributeNames = kernelArray(this.reflection.joinForeignKey);
+  const primaryKeyAttributeNames = Array(this.reflection.joinPrimaryKey());
+  const foreignKeyAttributeNames = Array(this.reflection.joinForeignKey);
 
   const primaryKeyForeignKeyPairs = zip(primaryKeyAttributeNames, foreignKeyAttributeNames);
 
@@ -48,7 +48,7 @@ export class ForeignAssociation {
   ): Record<string, null> {
     const attrs: Record<string, null> = {};
     const foreignKey = reflection.foreignKey();
-    const fks = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
+    const fks = globalThis.Array.isArray(foreignKey) ? foreignKey : [foreignKey];
     for (const fk of fks) attrs[fk] = null;
     if (reflection.type) attrs[reflection.type] = null;
     return attrs;
