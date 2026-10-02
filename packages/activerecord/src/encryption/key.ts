@@ -1,3 +1,4 @@
+import { first } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/ruby-compat";
 import { Encryption } from "../namespaces.js";
 import type { KeyGenerator } from "./key-generator.js";
@@ -12,9 +13,8 @@ export class Key {
     this.publicTags = new Properties();
   }
 
-  /** @missingRailsCall first — PERMANENT */
   get id(): string {
-    return Digest.SHA1.hexdigest(this.secret).slice(0, 4);
+    return first(Digest.SHA1.hexdigest(this.secret), 4);
   }
 
   static deriveFrom(password: string): Key {

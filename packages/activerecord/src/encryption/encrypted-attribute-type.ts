@@ -4,7 +4,7 @@ import { Scheme } from "./scheme.js";
 import type { EncryptorLike } from "./encryptor.js";
 import { Encryption } from "../encryption.js";
 import { Encoding, Decryption, Base } from "./errors.js";
-import { rtest, registerConstant } from "@blazetrails/ruby-compat";
+import { first, rtest, registerConstant } from "@blazetrails/ruby-compat";
 import { NullEncryptor } from "./null-encryptor.js";
 import {
   normalizeEncoding as _normalizeEncoding,
@@ -35,7 +35,6 @@ export class EncryptedAttributeType extends ValueType {
   }
 
   cast(value: unknown): unknown {
-    if (isAdditionalValue(value)) return value;
     return this.castType.cast(value);
   }
 
@@ -195,12 +194,9 @@ export class EncryptedAttributeType extends ValueType {
       this.isFixed() && this.previousTypesWithoutCleanText().length > 0);
   }
 
-  /**
-   * @internal
-   * @missingRailsCall first — PERMANENT
-   */
+  /** @internal */
   private serializeWithOldest(value: unknown): unknown {
-    return (this.previousTypes[0] ?? this).serialize(value);
+    return first(this.previousTypes)!.serialize(value);
   }
 
   /** @internal */
@@ -295,16 +291,6 @@ export class EncryptedAttributeType extends ValueType {
     if (enc === null || enc === "utf8") return value;
     return _replaceUnencodable(value, enc === "ascii" ? 0x7f : 0xff);
   }
-}
-
-export const ADDITIONAL_VALUE_BRAND: symbol = Symbol.for("activerecord.encryption.AdditionalValue");
-
-function isAdditionalValue(value: unknown): boolean {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    (value as Record<symbol, unknown>)[ADDITIONAL_VALUE_BRAND] === true
-  );
 }
 
 Encryption.EncryptedAttributeType = EncryptedAttributeType;

@@ -1,6 +1,6 @@
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE encryption-encoding-helpers-fold-into-string-encode-and-header-reads
  */
 export function normalizeEncoding(encoding: string): "utf8" | "ascii" | "latin1" | null {
   switch (encoding.toLowerCase().replace(/[^a-z0-9]/g, "")) {
@@ -21,7 +21,7 @@ export function normalizeEncoding(encoding: string): "utf8" | "ascii" | "latin1"
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE encryption-encoding-helpers-fold-into-string-encode-and-header-reads
  */
 export function headerString(value: unknown): string | undefined {
   if (value == null) return undefined;
@@ -31,7 +31,7 @@ export function headerString(value: unknown): string | undefined {
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE encryption-encoding-helpers-fold-into-string-encode-and-header-reads
  */
 export function replaceUnencodable(value: string, maxCodePoint: number): string {
   const out: string[] = [];

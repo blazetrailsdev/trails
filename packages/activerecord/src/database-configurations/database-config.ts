@@ -148,7 +148,7 @@ export class DatabaseConfig {
     throw new NotImplementedError();
   }
 
-  /** @missingRailsCall call — PERMANENT */
+  /** @missingRailsCall call — CONVERGEABLE call-gate-credits-invoking-a-proc-valued-member-as-proc-call */
   get forCurrentEnv(): boolean {
     return this.envName === ActiveRecord.ConnectionHandling.DEFAULT_ENV();
   }

@@ -1,4 +1,5 @@
 import { groupBy } from "@blazetrails/activesupport";
+import { last } from "@blazetrails/ruby-compat";
 import { Key } from "./key.js";
 import { headerString } from "./encoding-helpers.js";
 import { Encryption } from "../namespaces.js";
@@ -13,10 +14,10 @@ export class KeyProvider {
     this._keys = Array.isArray(keys) ? keys : [keys];
   }
 
-  /** @missingRailsCall last — PERMANENT */
+  /** @missingRailsName keys — PERMANENT */
   encryptionKey(): Key {
     if (!this._encryptionKey) {
-      const key = this._keys[this._keys.length - 1];
+      const key = last(this._keys)!;
       if (Encryption.config.storeKeyReferences) {
         key.publicTags.encryptedDataKeyId = key.id;
       }

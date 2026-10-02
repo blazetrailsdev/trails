@@ -1,12 +1,7 @@
+import { StandardError } from "@blazetrails/ruby-compat";
 import * as Errors from "./errors.js";
 import { Encryption as ActiveRecordEncryption } from "../namespaces.js";
-export class Base extends Error {
-  /** @noRailsEquivalent PERMANENT */
-  constructor(message?: string) {
-    super(message);
-    this.name = this.constructor.name;
-  }
-}
+export class Base extends StandardError {}
 
 export class Encoding extends Base {}
 

@@ -22,7 +22,7 @@ import { NullEncryptor } from "./encryption/null-encryptor.js";
 import { Scheme } from "./encryption/scheme.js";
 import * as Errors from "./encryption/errors.js";
 import { Optimistic } from "./locking/optimistic.js";
-import * as Pessimistic from "./locking/pessimistic.js";
+import { Pessimistic } from "./locking/pessimistic.js";
 import { Default } from "./scoping/default.js";
 import * as Named from "./scoping/named.js";
 import { Dirty } from "./attribute-methods/dirty.js";

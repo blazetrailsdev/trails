@@ -16,7 +16,7 @@ export class Session {
     return time.epochMilliseconds;
   }
 
-  /** @missingRailsCall at — PERMANENT */
+  /** @missingRailsCall at — CONVERGEABLE database-selector-session-timestamps-are-ruby-times */
   static convertTimestampToTime(timestamp: number | undefined): Temporal.Instant {
     return timestamp != null
       ? Temporal.Instant.fromEpochMilliseconds(timestamp)

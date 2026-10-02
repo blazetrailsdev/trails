@@ -4,7 +4,7 @@ import { prepend } from "@blazetrails/activesupport";
 export class ExtendedDeterministicUniquenessValidator {
   private static _installed = false;
 
-  /** @missingRailsArgs prepend — PERMANENT */
+  /** @missingRailsArgs prepend — CONVERGEABLE call-args-gate-aligns-the-receiver-of-function-form-prepend */
   static installSupport({
     UniquenessValidator,
     EncryptedUniquenessValidator,

@@ -2,7 +2,7 @@ import { Encryption } from "../namespaces.js";
 import { Concern, any, isPlainObject, prepend, transformKeys } from "@blazetrails/activesupport";
 import { Module, extend, include, isEmpty } from "@blazetrails/ruby-compat";
 import { Relation } from "../relation.js";
-import { ADDITIONAL_VALUE_BRAND, EncryptedAttributeType } from "./encrypted-attribute-type.js";
+import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 
 export interface SerializableType {
   serialize(data: unknown): unknown;
@@ -195,8 +195,6 @@ CoreQueries.ClassMethods = new Module((mod) => mod.defineMethod("findBy", findBy
 export class AdditionalValue {
   readonly value: unknown;
   readonly type: SerializableType;
-  /** @noRailsEquivalent PERMANENT */
-  readonly [ADDITIONAL_VALUE_BRAND] = true;
 
   constructor(value: unknown, type: SerializableType) {
     this.type = type;
@@ -206,25 +204,6 @@ export class AdditionalValue {
   /** @internal */
   private process(value: unknown): unknown {
     return this.type.serialize(value);
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  toString(): string {
-    return String(this.value);
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  valueOf(): unknown {
-    return this.value;
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  [Symbol.toPrimitive](hint: string): string | number {
-    if (hint === "number") {
-      const n = Number(this.value);
-      return Number.isNaN(n) ? 0 : n;
-    }
-    return String(this.value);
   }
 }
 
