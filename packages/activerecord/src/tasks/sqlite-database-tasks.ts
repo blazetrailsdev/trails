@@ -80,10 +80,11 @@ export class SQLiteDatabaseTasks {
     await runCmd("sqlite3", args, filename);
   }
 
-  async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
-    const flags = extraFlags != null ? kernelArray(extraFlags) : [];
+  async structureLoad(filename: string, extraFlags?: string[] | null): Promise<void> {
+    let flags: string | undefined;
+    if (extraFlags != null) flags = extraFlags.join(" ");
     const childProcess = await getChildProcessAsync();
-    const args = [...flags, this.dbConfig.database as string];
+    const args = [...(flags?.split(" ") ?? []), this.dbConfig.database as string];
     childProcess.spawnSync("sqlite3", args, { encoding: "utf8", in: filename });
   }
 

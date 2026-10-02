@@ -13,11 +13,7 @@ import { assertAssignedSynchronously } from "@blazetrails/activemodel";
 export class HasOneAssociation extends SingularAssociation {
   /** @internal */
   protected syncWrite(record: Base | null): void {
-    const replaced = this.replace(record, false);
-    assertAssignedSynchronously(
-      replaced instanceof Promise ? replaced.then(() => {}) : undefined,
-      `${this.reflection.name}=`,
-    );
+    assertAssignedSynchronously(this.replace(record, false), `${this.reflection.name}=`);
   }
 
   async handleDependency(): Promise<void> {
