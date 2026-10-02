@@ -1,17 +1,24 @@
 import {
   chomp,
+  fetch,
+  Hash,
   isSymbol,
   print,
   puts,
   rbConstGet,
   rbEnsure,
+  rbEqual,
   rbObjAsString as toS,
+  rbObjClass,
+  rbStrMatch,
   rtest,
   stderr as $stderr,
   stdout as $stdout,
   symbolToS,
   type StdStream,
+  uniq,
 } from "@blazetrails/ruby-compat";
+import * as LineEditor from "../line-editor.js";
 import * as Terminal from "./terminal.js";
 
 export class Basic {
@@ -63,6 +70,20 @@ export class Basic {
     return result;
   }
 
+  ask(statement: unknown, ...args: unknown[]): Promise<unknown> {
+    const last = args.at(-1);
+    const options = (
+      rbObjClass(last) === "Hash" || last instanceof Hash ? args.pop() : {}
+    ) as Record<string, unknown>;
+    const color = args[0] ?? null;
+
+    if (rtest(options.limitedTo)) {
+      return this.askFiltered(statement, color, options);
+    } else {
+      return this.askSimply(statement, color, options);
+    }
+  }
+
   say(message: unknown = "", color: unknown = null, forceNewLine?: unknown): void {
     if (arguments.length < 3) forceNewLine = !/( |\t)(?=\n?$)/.test(toS(message));
     if (rtest(this.isQuiet())) return;
@@ -108,6 +129,16 @@ export class Basic {
     this.stdout().flush();
   }
 
+  async isYes(statement: unknown, color: unknown = null): Promise<boolean> {
+    const answer = await this.ask(statement, color, { addToHistory: false });
+    return answer != null && rbStrMatch(answer as string, this.is("yes")) != null;
+  }
+
+  async isNo(statement: unknown, color: unknown = null): Promise<boolean> {
+    const answer = await this.ask(statement, color, { addToHistory: false });
+    return answer != null && rbStrMatch(answer as string, this.is("no")) != null;
+  }
+
   error(statement: unknown): void {
     puts.call(this.stderr(), statement);
   }
@@ -144,6 +175,17 @@ export class Basic {
   }
 
   /** @internal */
+  protected is(value: unknown): RegExp {
+    value = toS(value);
+
+    if ((value as string).length === 1) {
+      return new RegExp(`^${value}$`, "i");
+    } else {
+      return new RegExp(`^(${value}|${(value as string).slice(0, 1)})$`, "i");
+    }
+  }
+
+  /** @internal */
   protected isQuiet(): unknown {
     return this.isMute() || (this.base && this.base.options["quiet"]);
   }
@@ -151,5 +193,68 @@ export class Basic {
   /** @internal */
   protected isUnix(): boolean {
     return Terminal.isUnix();
+  }
+
+  /** @internal */
+  protected async askSimply(
+    statement: unknown,
+    color: unknown,
+    options: Record<string, unknown>,
+  ): Promise<unknown> {
+    const default_ = options.default;
+    let message = uniq([statement, rtest(default_) ? `(${default_})` : null, null]).join(" ");
+    message = this.prepareMessage(
+      message,
+      ...(color == null ? [] : Array.isArray(color) ? color : [color]),
+    );
+    let result = await LineEditor.readline(message, options);
+
+    if (result == null) return null;
+
+    result = result.trim();
+
+    if (rtest(default_) && result === "") {
+      return default_;
+    } else {
+      return result;
+    }
+  }
+
+  /** @internal */
+  protected async askFiltered(
+    statement: unknown,
+    color: unknown,
+    options: Record<string, unknown>,
+  ): Promise<unknown> {
+    const answerSet = options.limitedTo as unknown[];
+    const caseInsensitive = fetch(options, "caseInsensitive", false);
+    let correctAnswer: unknown = null;
+    while (!rtest(correctAnswer)) {
+      const answers = answerSet.join(", ");
+      const answer = await this.askSimply(`${statement} [${answers}]`, color, options);
+      correctAnswer = this.answerMatch(answerSet, answer, caseInsensitive);
+      if (!rtest(correctAnswer)) {
+        this.say(`Your response must be one of: [${answers}]. Please try again.`);
+      }
+    }
+    return correctAnswer;
+  }
+
+  /** @internal */
+  protected answerMatch(
+    possibilities: unknown[],
+    answer: unknown,
+    caseInsensitive: unknown,
+  ): unknown {
+    if (rtest(caseInsensitive)) {
+      return (
+        possibilities.find(
+          (possibility) =>
+            (possibility as string).toLowerCase() === (answer as string).toLowerCase(),
+        ) ?? null
+      );
+    } else {
+      return possibilities.find((possibility) => rbEqual(possibility, answer)) ?? null;
+    }
   }
 }

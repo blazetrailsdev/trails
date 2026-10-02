@@ -79,8 +79,8 @@ function shell(this: Shell): Basic {
   return (this._shell ??= new Base.shell!());
 }
 
-function ask(this: Shell, ...args: unknown[]): unknown {
-  return (this.shell as unknown as Delegated).ask(...args);
+function ask(this: Shell, ...args: Parameters<Basic["ask"]>): ReturnType<Basic["ask"]> {
+  return this.shell.ask(...args);
 }
 
 function error(this: Shell, ...args: Parameters<Basic["error"]>): void {
@@ -91,12 +91,12 @@ function setColor(this: Shell, ...args: Parameters<Basic["setColor"]>): string {
   return this.shell.setColor(...args);
 }
 
-function isYes(this: Shell, ...args: unknown[]): unknown {
-  return (this.shell as unknown as Delegated).isYes(...args);
+function isYes(this: Shell, ...args: Parameters<Basic["isYes"]>): ReturnType<Basic["isYes"]> {
+  return this.shell.isYes(...args);
 }
 
-function isNo(this: Shell, ...args: unknown[]): unknown {
-  return (this.shell as unknown as Delegated).isNo(...args);
+function isNo(this: Shell, ...args: Parameters<Basic["isNo"]>): ReturnType<Basic["isNo"]> {
+  return this.shell.isNo(...args);
 }
 
 function say(this: Shell, ...args: Parameters<Basic["say"]>): void {

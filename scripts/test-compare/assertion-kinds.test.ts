@@ -91,6 +91,7 @@ describe("normalizeRailsKind", () => {
     });
     expect(normalizeRailsKind("expect_to_be_entered")).toBe("truthy");
     expect(normalizeRailsKind("expect_not_to_be_entered")).toBe("falsy");
+    expect(normalizeRailsKind("expect_to_be_available")).toBe("truthy");
     expect(normalizeRailsKind("expect_to_receive")).toBeNull();
     expect(normalizeRailsKind("expect_to_output")).toBeNull();
     expect(normalizeRailsKind("expect")).toBeNull();
