@@ -53,8 +53,8 @@ describe("SessionTest", () => {
 
   let session: IntegrationTest;
 
-  beforeEach(() => {
-    session = new IntegrationTest();
+  beforeEach(({ task }) => {
+    session = new IntegrationTest(task.name);
     session.app = StubApp;
   });
 
@@ -199,8 +199,8 @@ describe("SessionTest", () => {
 describe("IntegrationTestTest", () => {
   let test: IntegrationTest;
 
-  beforeEach(() => {
-    test = new IntegrationTest();
+  beforeEach(({ task }) => {
+    test = new IntegrationTest(task.name);
   });
 
   it("opens new session", () => {
@@ -245,8 +245,8 @@ class RackLintIntegrationTest extends IntegrationTest {
 }
 
 describe("RackLintIntegrationTest", () => {
-  it("integration test follows rack SPEC", async () => {
-    const t = new RackLintIntegrationTest();
+  it("integration test follows rack SPEC", async ({ task }) => {
+    const t = new RackLintIntegrationTest(task.name);
     await t.withRouting(async (set: RouteSet) => {
       set.draw(function () {
         this.get("/", { to: (_: RackEnv): RackResponse => [200, {}, bodyFromString("")] });
@@ -260,8 +260,8 @@ describe("RackLintIntegrationTest", () => {
 });
 
 describe("IntegrationTestUsesCorrectClass", () => {
-  it("integration methods called", async () => {
-    const t = new IntegrationTest();
+  it("integration methods called", async ({ task }) => {
+    const t = new IntegrationTest(task.name);
     t.resetBang();
     const headers = { Origin: "*" };
 
@@ -397,8 +397,8 @@ describe("IntegrationProcessTest", () => {
   const assertSetCookieHeader = (expected: string, header?: string): void =>
     t.assertSetCookieHeader(expected, header);
 
-  beforeEach(() => {
-    t = new IntegrationProcessTest();
+  beforeEach(({ task }) => {
+    t = new IntegrationProcessTest(task.name);
   });
 
   it.skip("get", async () => {
@@ -803,8 +803,8 @@ describe("MetalIntegrationTest", () => {
   let t: MetalIntegrationTest;
   const assertResponse = (type: number | string): void => t.assertResponse(type);
 
-  beforeEach(() => {
-    t = new MetalIntegrationTest();
+  beforeEach(({ task }) => {
+    t = new MetalIntegrationTest(task.name);
     t.app = Poller;
   });
 
@@ -948,8 +948,8 @@ describe("ApplicationIntegrationTest", () => {
   };
 
   let t: ApplicationIntegrationTest & Helpers;
-  beforeEach(() => {
-    t = new ApplicationIntegrationTest() as ApplicationIntegrationTest & Helpers;
+  beforeEach(({ task }) => {
+    t = new ApplicationIntegrationTest(task.name) as ApplicationIntegrationTest & Helpers;
   });
 
   it("includes route helpers", () => {
@@ -1032,8 +1032,8 @@ describe("EnvironmentFilterIntegrationTest", () => {
     }
   }
 
-  it("filters rack request form vars", async () => {
-    const t = new EnvironmentFilterIntegrationTest();
+  it("filters rack request form vars", async ({ task }) => {
+    const t = new EnvironmentFilterIntegrationTest(task.name);
     await t.post("/post", { params: { username: "cjolly", password: "secret" } });
 
     expect(t.request.filteredParameters()["username"]).toBe("cjolly");
@@ -1056,8 +1056,8 @@ describe("ControllerWithHeadersMethodIntegrationTest", () => {
   let t: IntegrationTest;
   const assertResponse = (type: number | string): void => t.assertResponse(type);
 
-  it("doesn't call controller's headers method", async () => {
-    t = new IntegrationTest();
+  it("doesn't call controller's headers method", async ({ task }) => {
+    t = new IntegrationTest(task.name);
     controllerConstants.set("controller_with_headers_method_integration_test/test", TestController);
     await t.withRouting(async (routes: RouteSet) => {
       routes.draw(function () {
@@ -1137,8 +1137,8 @@ describe("UrlOptionsIntegrationTest", () => {
 
   let t: UrlOptionsIntegrationTest & Helpers;
   const assertResponse = (type: number | string): void => t.assertResponse(type);
-  beforeEach(() => {
-    t = new UrlOptionsIntegrationTest() as UrlOptionsIntegrationTest & Helpers;
+  beforeEach(({ task }) => {
+    t = new UrlOptionsIntegrationTest(task.name) as UrlOptionsIntegrationTest & Helpers;
   });
 
   it("session uses default URL options from routes", () => {
@@ -1217,8 +1217,8 @@ describe("HeadWithStatusActionIntegrationTest", () => {
   let t: HeadWithStatusActionIntegrationTest;
   const assertResponse = (type: number | string): void => t.assertResponse(type);
 
-  it("get /foo/status with head result does not cause stack overflow error", async () => {
-    t = new HeadWithStatusActionIntegrationTest();
+  it("get /foo/status with head result does not cause stack overflow error", async ({ task }) => {
+    t = new HeadWithStatusActionIntegrationTest(task.name);
     await expect(t.get("/foo/status")).resolves.not.toThrow();
     assertResponse("ok");
   });
@@ -1236,8 +1236,8 @@ describe("IntegrationWithRoutingTest", () => {
   let t: IntegrationWithRoutingTest;
   const assertResponse = (type: number | string): void => t.assertResponse(type);
 
-  it("with routing resets session", async () => {
-    t = new IntegrationWithRoutingTest();
+  it("with routing resets session", async ({ task }) => {
+    t = new IntegrationWithRoutingTest(task.name);
     const klassNamespace = underscore(IntegrationWithRoutingTest.name);
     controllerConstants.set(`${klassNamespace}/foo`, FooController);
 
@@ -1278,8 +1278,8 @@ describe("IntegrationRequestsWithoutSetup", () => {
   let t: IntegrationTest;
   const assertResponse = (type: number | string): void => t.assertResponse(type);
 
-  it("request", async () => {
-    t = new IntegrationTest();
+  it("request", async ({ task }) => {
+    t = new IntegrationTest(task.name);
     await t.withRouting(async (routes: RouteSet) => {
       routes.draw(function () {
         deprecator().silence(() => {
@@ -1305,8 +1305,8 @@ describe("IntegrationRequestsWithSessionSetup", () => {
     }
   }
 
-  it("cookies set in setup are persisted through the session", async () => {
-    const t = new IntegrationRequestsWithSessionSetup();
+  it("cookies set in setup are persisted through the session", async ({ task }) => {
+    const t = new IntegrationRequestsWithSessionSetup(task.name);
     t.beforeSetup();
     t.setup();
     await t.get("/foo");
@@ -1336,8 +1336,8 @@ describe("IntegrationRequestEncodersTest", () => {
   let t: IntegrationTest;
   const assertResponse = (type: number | string): void => t.assertResponse(type);
 
-  beforeEach(() => {
-    t = new IntegrationTest();
+  beforeEach(({ task }) => {
+    t = new IntegrationTest(task.name);
   });
 
   const postToFoos = async (as: string, block: () => void): Promise<void> => {
@@ -1538,8 +1538,8 @@ describe("IntegrationFileUploadTest", () => {
     }
   }
 
-  it("fixture file upload", async () => {
-    const t = new IntegrationFileUploadTest();
+  it("fixture file upload", async ({ task }) => {
+    const t = new IntegrationFileUploadTest(task.name);
     await t.post("/test_file_upload", {
       params: {
         file: t.fixtureFileUpload("/ruby_on_rails.jpg", "image/jpeg"),

@@ -12,6 +12,8 @@ import {
   except,
   fetch,
   hasKey,
+  hashAref,
+  hashAset,
   hashDelete,
   isInclude,
   keepIf,
@@ -524,6 +526,39 @@ describe("hashDelete", () => {
     expect(hashDelete(hash, "baz")).toBeNull();
     expect(hashDelete(hash, "baz", (key) => `no ${key}`)).toBe("no baz");
     expect(hash).toEqual({ foo: 0 });
+  });
+});
+
+describe("hashDelete on a Map", () => {
+  it("removes the entry and returns its stored value, or nil for an absent key", () => {
+    const hash = new Map<string, number>([["foo", 0]]);
+    expect(hashDelete(hash, "foo")).toBe(0);
+    expect(hashDelete(hash, "foo")).toBeNull();
+    expect(hashDelete(hash, "foo", (key) => `no ${key}`)).toBe("no foo");
+    expect(hash.size).toBe(0);
+  });
+});
+
+describe("hashAref / hashAset", () => {
+  it("reads a stored value and answers nil for an absent key, on either hash", () => {
+    const key = () => {};
+    expect(hashAref({ foo: 0 }, "foo")).toBe(0);
+    expect(hashAref({ foo: 0 }, "toString")).toBeNull();
+    expect(hashAref(new Map<unknown, unknown>([[key, "v"]]), key)).toBe("v");
+    expect(hashAref(new Map(), "foo")).toBeNull();
+  });
+
+  it("stores the pair on either hash and returns the value", () => {
+    const hash: Record<string, number> = {};
+    const map = new Map<unknown, unknown>();
+    expect(hashAset(hash, "foo", 1)).toBe(1);
+    expect(hashAset(map, "foo", 1)).toBe(1);
+    expect(hash).toEqual({ foo: 1 });
+    expect([...map]).toEqual([["foo", 1]]);
+  });
+
+  it("raises FrozenError storing into a frozen hash", () => {
+    expect(() => hashAset(Object.freeze({}), "foo", 1)).toThrow(FrozenError);
   });
 });
 

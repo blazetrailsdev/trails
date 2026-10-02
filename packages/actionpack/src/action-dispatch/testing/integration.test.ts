@@ -166,8 +166,8 @@ class SessionsController extends Base {
 describe("ActionDispatch::IntegrationTest", () => {
   let app: IntegrationTest;
 
-  beforeEach(() => {
-    app = new IntegrationTestWithSession();
+  beforeEach(({ task }) => {
+    app = new IntegrationTestWithSession(task.name);
     app.routes.draw(function () {
       this.get("/posts/xml", { to: "posts#renderXml", as: "posts_xml" });
       this.get("/posts/xml2", { to: "posts#renderXml2", as: "posts_xml2" });
@@ -517,20 +517,22 @@ describe("ActionDispatch::IntegrationTest", () => {
       await expect(app.followRedirectBang()).rejects.toThrow(/not a redirect/);
     });
 
-    it("createSession propagates routes/controllers/app; app falls back to class default", async () => {
+    it("createSession propagates routes/controllers/app; app falls back to class default", async ({
+      task,
+    }) => {
       const sentinel = IntegrationTest.buildApp(app.routes, useCookieStore);
       app.app = sentinel;
-      const sess = app.createSession();
+      const sess = app.createSession(sentinel);
       expect(sess.routes).toBe(app.routes);
       expect(sess.app).toBe(sentinel);
       await sess.get("/posts");
       sess.assertResponse("success");
 
-      const fresh = new IntegrationTest();
+      const fresh = new IntegrationTest(task.name);
       expect(fresh.app).toBe(IntegrationTest.app);
       const Stub = class extends IntegrationTest {};
       Stub.app = { name: "class-default" };
-      const stubbed = new Stub();
+      const stubbed = new Stub(task.name);
       expect(stubbed.app).toEqual({ name: "class-default" });
     });
 
@@ -639,8 +641,8 @@ describe("ActionDispatch::IntegrationTest", () => {
   describe("follow_redirect! preserves HTTP_REFERER on 404 target", () => {
     let redirectApp: IntegrationTest;
 
-    beforeEach(() => {
-      redirectApp = new IntegrationTestWithSession();
+    beforeEach(({ task }) => {
+      redirectApp = new IntegrationTestWithSession(task.name);
     });
 
     afterEach(() => {

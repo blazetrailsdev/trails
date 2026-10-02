@@ -2312,8 +2312,8 @@ describe("TestUrlConstraints", () => {
   const get = (path: string): Promise<void> => t.get(path);
   const assertResponse = (type: string): void => t.assertResponse(type);
 
-  beforeEach(() => {
-    t = new IntegrationTest();
+  beforeEach(({ task }) => {
+    t = new IntegrationTest(task.name);
     t.routes = Routes;
     t.app = (env: Record<string, unknown>) => Routes.call(env);
   });

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { bodyFromString } from "@blazetrails/rack";
-import { Mapper, Mapping } from "../routing/mapper.js";
+import { Mapper, Mapping, type MountableApp } from "../routing/mapper.js";
 import { Parser } from "../journey/parser.js";
 import { RouteSet } from "../routing/route-set.js";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -160,7 +160,12 @@ describe("MapperTest", () => {
   it("can pass anchor to mount", () => {
     const fakeset = new FakeSet();
     const m = new Mapper(fakeset);
-    m.mount(app, { at: "/path", anchor: true });
+    m.mount(
+      new Map<unknown, unknown>([
+        [app, "/path"],
+        ["anchor", true],
+      ]),
+    );
     expect(fakeset.routes.routes[0].path.spec.toString()).toBe("/path");
     expect(fakeset.routes.routes[0].path.anchored).toBeTruthy();
   });
@@ -174,12 +179,12 @@ describe("MapperTest", () => {
   it("raising error when rack app is not passed", () => {
     const fakeset = new FakeSet();
     const m = new Mapper(fakeset);
-    expect(() =>
-      m.mount(10 as unknown as Parameters<Mapper["mount"]>[0], { as: "exciting" }),
-    ).toThrow(/rack application must be specified/);
-    expect(() =>
-      m.mount(undefined as unknown as Parameters<Mapper["mount"]>[0], { as: "exciting" }),
-    ).toThrow(/rack application must be specified/);
+    expect(() => m.mount(10 as unknown as MountableApp, { as: "exciting" })).toThrow(
+      /rack application must be specified/,
+    );
+    expect(() => m.mount(new Map<unknown, unknown>([["as", "exciting"]]))).toThrow(
+      /rack application must be specified/,
+    );
   });
 
   it("raising error when invalid on option is given", () => {

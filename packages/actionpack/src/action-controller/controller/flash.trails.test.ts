@@ -34,8 +34,8 @@ class NoticesSession extends IntegrationTest {
 }
 
 describe("add_flash_types readers", () => {
-  it("reads notice on the controller and in the view after a redirect", async () => {
-    const t = new NoticesSession();
+  it("reads notice on the controller and in the view after a redirect", async ({ task }) => {
+    const t = new NoticesSession(task.name);
     t.routes.draw(function () {
       this.post("/notices", { to: "notices#create" });
       this.get("/notices", { to: "notices#index" });

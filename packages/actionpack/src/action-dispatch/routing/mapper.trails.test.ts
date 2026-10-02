@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
+import { rbModPublicMethodDefined } from "@blazetrails/ruby-compat";
+import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
 
 import {
@@ -343,5 +345,60 @@ describe("Mapper#rails_app?", () => {
     } finally {
       TopLevel.Trails = trails;
     }
+  });
+});
+
+describe("Mapper#mount", () => {
+  it("names a Rails app mounted with no :as after its railtie_name (mapper.rb:629,661-663)", () => {
+    class ShorthandApp extends Engine {
+      private static _routes?: RouteSet;
+
+      static {
+        Engine.register(this);
+      }
+
+      static routes(): RouteSet {
+        return (this._routes ??= new RouteSet());
+      }
+    }
+    const trails = TopLevel.Trails;
+    TopLevel.Trails = { Engine, Trailtie } as never;
+    try {
+      const set = new RouteSet();
+      set.draw(function () {
+        this.mount(ShorthandApp as unknown as MountableApp, { at: "/shorthand_app" });
+      });
+
+      expect(set.namedRoutes.isKey("shorthand_app")).toBe(true);
+      expect(
+        rbModPublicMethodDefined(ShorthandApp.routes().mountedHelpers(), "shorthand_app"),
+      ).toBe(true);
+    } finally {
+      TopLevel.Trails = trails;
+    }
+  });
+
+  it("writes :as and :via to the shorthand hash it was given (mapper.rb:613-616,629-632)", () => {
+    const someRackApp = { call: () => [200, {}, []] };
+    const options = new Map<unknown, unknown>([[someRackApp, "/some_route"]]);
+
+    new RouteSet().draw(function () {
+      this.mount(options);
+    });
+
+    expect([...options]).toEqual([
+      ["as", undefined],
+      ["via", ":all"],
+    ]);
+  });
+
+  it("replaces a false :via, as `options[:via] ||= :all` does (mapper.rb:632)", () => {
+    const options = { at: "/app", via: false as const };
+
+    new RouteSet().draw(function () {
+      this.mount(() => [200, {}, []] as never, options);
+    });
+
+    expect(options).toEqual({ as: undefined, via: ":all" });
   });
 });
