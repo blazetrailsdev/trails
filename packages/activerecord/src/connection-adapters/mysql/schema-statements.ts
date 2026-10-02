@@ -181,7 +181,7 @@ export class SchemaStatements extends BaseSchemaStatements {
     tableName: string,
     options?: CreateTableOptions | ((t: TableDefinitionOf<this>) => void | Promise<void>),
     fn?: (t: TableDefinitionOf<this>) => void | Promise<void>,
-  ): Promise<void> {
+  ): Promise<unknown> {
     const definer = typeof options === "function" ? options : fn;
     const kwargs: CreateTableOptions = typeof options === "function" || !options ? {} : options;
     if (kwargs.options === undefined) {

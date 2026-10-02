@@ -71,6 +71,29 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(sqlite.allSql).toEqual([]);
   });
 
+  it("schema statements answer what Rails' do: execute's result, or the table names", async () => {
+    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    const execute = adapter.execute.bind(adapter);
+    (adapter as { execute: unknown }).execute = async (sql: string) => {
+      await execute(sql);
+      return { sql };
+    };
+
+    const created = await adapter.createTable("things", (t) => {
+      t.string("name");
+    });
+    expect(created).toEqual({ sql: expect.stringMatching(/^CREATE TABLE "things"/) });
+    expect(await adapter.addIndex("things", "name")).toEqual({
+      sql: expect.stringMatching(/^CREATE INDEX "index_things_on_name"/),
+    });
+    expect(await adapter.addColumn("things", "quantity", "integer")).toEqual({
+      sql: expect.stringMatching(/^ALTER TABLE "things" ADD "quantity"/),
+    });
+    expect(await adapter.removeIndex("things", "name", { ifExists: true })).toBeDefined();
+    expect(await adapter.removeIndex("things", "name", { ifExists: true })).toBeUndefined();
+    expect(await adapter.dropTable("things")).toEqual(["things"]);
+  });
+
   it("indexes() raises NotImplementedError on an adapter that does not override it", async () => {
     const stub = new StubAdapter({});
     await expect(stub.indexes("things")).rejects.toThrow(NotImplementedError);

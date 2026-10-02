@@ -49,7 +49,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("add index", async () => {
-      const sql = async (fn: () => void | Promise<void>) =>
+      const sql = async (fn: () => unknown) =>
         (await captureSql(fn, { stub: adapter, includeSchema: false }))[0];
 
       expect(

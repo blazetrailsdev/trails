@@ -396,23 +396,24 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     return "VALUES ()";
   }
 
-  async recreateDatabase(name: string, options: Record<string, unknown> = {}): Promise<void> {
+  async recreateDatabase(name: string, options: Record<string, unknown> = {}): Promise<unknown> {
     await this.dropDatabase(name);
-    await this.createDatabase(name, options);
+    const sql = await this.createDatabase(name, options);
     await this.reconnectBang();
+    return sql;
   }
 
-  async createDatabase(name: string, options: Record<string, unknown> = {}): Promise<void> {
+  async createDatabase(name: string, options: Record<string, unknown> = {}): Promise<unknown> {
     if (options.collation) {
-      await this.execute(
+      return this.execute(
         `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT COLLATE ${this.quoteTableName(String(options.collation))}`,
       );
     } else if (options.charset) {
-      await this.execute(
+      return this.execute(
         `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT CHARACTER SET ${this.quoteTableName(String(options.charset))}`,
       );
     } else if (await isRowFormatDynamicByDefault.call(this)) {
-      await this.execute(
+      return this.execute(
         `CREATE DATABASE ${this.quoteTableName(name)} DEFAULT CHARACTER SET \`utf8mb4\``,
       );
     } else {
@@ -489,7 +490,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
           { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean } | undefined,
           ((t: MysqlTableDefinition) => void) | undefined,
         ]
-  ): Promise<void> {
+  ): Promise<unknown> {
     const rest = [...args] as unknown[];
     while (
       rest.length > 0 &&
@@ -513,7 +514,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     const ifExists = options.ifExists ? " IF EXISTS" : "";
     const cascade = options.force === "cascade" ? " CASCADE" : "";
     const names = tableNames.map((tableName) => this.quoteTableName(tableName)).join(", ");
-    await this.execute(`DROP${temporary} TABLE${ifExists} ${names}${cascade}`);
+    return this.execute(`DROP${temporary} TABLE${ifExists} ${names}${cascade}`);
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
@@ -636,10 +637,10 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     tableName: string,
     columnName: string | string[],
     options: Record<string, unknown> = {},
-  ): Promise<void> {
+  ): Promise<unknown> {
     const createIndex = await this.buildCreateIndexDefinition(tableName, columnName, options);
     if (!createIndex) return;
-    await this.execute(await this.schemaCreation.accept(createIndex));
+    return this.execute(await this.schemaCreation.accept(createIndex));
   }
 
   async buildCreateIndexDefinition(
@@ -1526,13 +1527,13 @@ export interface AbstractMysqlAdapter {
     tableName: string,
     columnName: string | string[],
     options?: AddIndexOptions,
-  ): Promise<void>;
+  ): Promise<unknown>;
 
   createTable(
     tableName: string,
     options?: CreateTableOptions | ((t: TableDefinitionOf<this>) => void | Promise<void>),
     fn?: (t: TableDefinitionOf<this>) => void | Promise<void>,
-  ): Promise<void>;
+  ): Promise<unknown>;
 
   removeColumn(
     tableName: string,

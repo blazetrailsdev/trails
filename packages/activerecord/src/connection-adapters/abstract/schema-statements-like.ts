@@ -11,7 +11,7 @@ export interface SchemaStatementsLike {
     columnName: string,
     type: ColumnType,
     options?: ColumnOptions,
-  ): Promise<void>;
+  ): Promise<unknown>;
   removeColumn(
     tableName: string,
     columnName: string,
@@ -23,7 +23,11 @@ export interface SchemaStatementsLike {
     ...columnsOrOptions: Array<string | ColumnOptions>
   ): Promise<void>;
   renameColumn(tableName: string, oldName: string, newName: string): Promise<void>;
-  addIndex(tableName: string, columns: string | string[], options?: AddIndexOptions): Promise<void>;
+  addIndex(
+    tableName: string,
+    columns: string | string[],
+    options?: AddIndexOptions,
+  ): Promise<unknown>;
   removeIndex(
     tableName: string,
     columnOrOptions?:
@@ -31,7 +35,7 @@ export interface SchemaStatementsLike {
       | string[]
       | { column?: string | string[]; name?: string; ifExists?: boolean },
     options?: { column?: string | string[]; name?: string; ifExists?: boolean },
-  ): Promise<void>;
+  ): Promise<unknown>;
   addReference(tableName: string, refName: string, options?: AddReferenceOptions): Promise<void>;
   removeReference(tableName: string, refName: string, options?: AddReferenceOptions): Promise<void>;
   addTimestamps(tableName: string, options?: ColumnOptions): Promise<void>;

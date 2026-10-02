@@ -25,16 +25,7 @@ export class Case extends NodeExpression {
     return this;
   }
 
-  then(onFulfilled: (v: unknown) => unknown, onRejected: (e: unknown) => unknown): void;
-  then(expression: Node | unknown): this;
-
-  then(expression: Node | unknown, onRejected?: unknown): this | void {
-    if (typeof expression === "function" && typeof onRejected === "function") {
-      (onRejected as (e: Error) => unknown)(
-        new TypeError("Arel::Nodes::Case is not awaitable; use #toSql() to render"),
-      );
-      return;
-    }
+  then(expression: Node | unknown): this {
     this.conditions[this.conditions.length - 1].right = buildQuoted(expression);
     return this;
   }

@@ -516,8 +516,8 @@ export interface ReferenceDefinitionConnection {
     columnName: string,
     type: ColumnType,
     options?: ColumnOptions,
-  ): Promise<void>;
-  addIndex(tableName: string, columnNames: string[], options?: AddIndexOptions): Promise<void>;
+  ): Promise<unknown>;
+  addIndex(tableName: string, columnNames: string[], options?: AddIndexOptions): Promise<unknown>;
   addForeignKey(fromTable: string, toTable: string, options?: AddForeignKeyOptions): Promise<void>;
 }
 
@@ -1084,7 +1084,11 @@ export class Table {
       await this._schema.addTimestamps(this.name, options);
     }
   }
-  async change(columnName: string, type: ColumnType, options: ColumnOptions = {}): Promise<void> {
+  async change(
+    columnName: string,
+    type: ColumnType,
+    options: ColumnOptions = {},
+  ): Promise<unknown> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     return this._schema.changeColumn(this.name, columnName, type, options);
   }
@@ -1117,15 +1121,15 @@ export class Table {
   async removeIndex(
     columnName: string | string[] | { column?: string | string[]; name?: string } = {},
     options: { column?: string | string[]; name?: string } = {},
-  ): Promise<void> {
+  ): Promise<unknown> {
     const isColumn = typeof columnName === "string" || Array.isArray(columnName);
     const column = isColumn ? columnName : undefined;
     options = isColumn ? options : { ...columnName, ...options };
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     if (Object.keys(options).length === 0) {
-      await this._schema.removeIndex(this.name, column);
+      return this._schema.removeIndex(this.name, column);
     } else {
-      await this._schema.removeIndex(this.name, column, options);
+      return this._schema.removeIndex(this.name, column, options);
     }
   }
 
@@ -1312,7 +1316,7 @@ export class Table {
     await this.column(name, type, { ...options, primaryKey: true });
   }
 
-  async add(columnName: string, type: ColumnType, options?: ColumnOptions): Promise<void> {
+  async add(columnName: string, type: ColumnType, options?: ColumnOptions): Promise<unknown> {
     return this._schema.addColumn(this.name, columnName, type, options);
   }
 }

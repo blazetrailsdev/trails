@@ -9,7 +9,7 @@ import type { Column } from "./column.js";
 
 export class SchemaDumper extends AbstractSchemaDumper {
   /** @internal */
-  protected override async extensions(stream: IO | StringIO): Promise<void> {
+  protected override async extensions(stream: IO | StringIO): Promise<null | undefined> {
     const adapter = this.pgAdapter();
     if (!adapter?.extensions) return;
     const exts: string[] = await adapter.extensions();
@@ -18,7 +18,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
     for (const ext of exts.sort()) {
       stream.puts(`  await ctx.enableExtension(${JSON.stringify(ext)});`);
     }
-    stream.puts("");
+    return stream.puts("");
   }
 
   /** @internal */

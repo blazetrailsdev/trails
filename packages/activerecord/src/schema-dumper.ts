@@ -268,7 +268,7 @@ export abstract class SchemaDumper {
   }
 
   /** @internal */
-  protected extensions(_stream: IO | StringIO): Promise<void> {
+  protected extensions(_stream: IO | StringIO): Promise<unknown> {
     return Promise.resolve();
   }
 
@@ -283,7 +283,7 @@ export abstract class SchemaDumper {
   }
 
   /** @internal */
-  protected virtualTables(_stream: IO | StringIO): Promise<void> {
+  protected virtualTables(_stream: IO | StringIO): Promise<unknown> {
     return Promise.resolve();
   }
 

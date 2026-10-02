@@ -210,7 +210,7 @@ export interface AbstractAdapter {
         }
       | ((t: TableDefinitionOf<this>) => void | Promise<void>),
     fn?: (t: TableDefinitionOf<this>) => void | Promise<void>,
-  ): Promise<void>;
+  ): Promise<unknown>;
   dropTable(
     ...args:
       | string[]
@@ -221,7 +221,7 @@ export interface AbstractAdapter {
           { ifExists?: boolean; force?: boolean | "cascade" } | undefined,
           ((t: TableDefinition) => void) | undefined,
         ]
-  ): Promise<void>;
+  ): Promise<unknown>;
   renameTable(tableName: string, newName: string, options?: Record<string, unknown>): Promise<void>;
   /** @internal */
   fetchTypeMetadata(
@@ -233,7 +233,7 @@ export interface AbstractAdapter {
     columnName: string,
     type: ColumnType,
     options?: ColumnOptions & { ifNotExists?: boolean },
-  ): Promise<void>;
+  ): Promise<unknown>;
   renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void>;
   /** @internal */
   renameColumnSql(tableName: string, columnName: string, newColumnName: string): string;
@@ -269,7 +269,7 @@ export interface AbstractAdapter {
     tableName: string,
     columnName: string | string[],
     options?: AddIndexOptions,
-  ): Promise<void>;
+  ): Promise<unknown>;
   addIndexOptions(
     tableName: string,
     columnName: string | string[],
@@ -343,7 +343,7 @@ export interface AbstractAdapter {
       | { column?: string | string[]; name?: string; ifExists?: boolean }
       | null,
     options?: { column?: string | string[]; name?: string; ifExists?: boolean },
-  ): Promise<void>;
+  ): Promise<unknown>;
   renameIndex(tableName: string, oldName: string, newName: string): Promise<void>;
   indexName(
     tableName: string,
