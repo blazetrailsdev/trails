@@ -258,7 +258,6 @@ import {
   hash as _hash,
   isPresent as _isPresent,
   isBlank as _isBlank,
-  filterAttributes as _coreFilterAttributes,
 } from "./core.js";
 import * as _Core from "./core.js";
 import * as _AttributeMethodsDirty from "./attribute-methods/dirty.js";
@@ -581,27 +580,16 @@ export class Base extends Model {
   /** @internal */
   declare static _registryKeys: string[];
 
-  static _filterAttributes: (string | RegExp | ((key: string, value: unknown) => unknown))[] = [];
-
-  static get filterAttributes(): (string | RegExp | ((key: string, value: unknown) => unknown))[] {
-    return _coreFilterAttributes.call(this);
-  }
-
-  static set filterAttributes(
-    value: (string | RegExp | ((key: string, value: unknown) => unknown))[],
-  ) {
-    _coreFilterAttributes.call(this, value);
-  }
+  declare static filterAttributes: (string | RegExp | ((key: string, value: unknown) => unknown))[];
 
   static inspectionFilter(): ParameterFilter {
     return _Core.inspectionFilter.call(this);
   }
 
   static _abstractClass = false;
-  static _connectionClass = false;
   declare static automaticScopeInversing: boolean;
   declare static automaticallyInvertPluralAssociations: boolean;
-  static hasManyInversing = false;
+  declare static hasManyInversing: boolean;
   static paramDelimiter = "_";
   declare static cacheVersioning: boolean;
   declare static cacheTimestampFormat: "usec" | "number";
@@ -643,19 +631,9 @@ export class Base extends Model {
     }
   }
 
-  static get connectionClass(): boolean {
-    return Object.prototype.hasOwnProperty.call(this, "_connectionClass")
-      ? this._connectionClass
-      : false;
-  }
+  declare static connectionClass: boolean;
 
-  static set connectionClass(value: boolean) {
-    this._connectionClass = value;
-  }
-
-  static isConnectionClass(): boolean {
-    return !!this.connectionClass;
-  }
+  static isConnectionClass = _Core.isConnectionClass;
 
   static asynchronousQueriesSession(): Session {
     return _Core.asynchronousQueriesSession();
@@ -1993,39 +1971,15 @@ export class Base extends Model {
     return ModelSchema.columnDefaults.call(this as any);
   }
 
-  static _strictLoadingByDefault = false;
+  declare static strictLoadingByDefault: boolean;
 
-  static get strictLoadingByDefault(): boolean {
-    return this._strictLoadingByDefault;
-  }
-
-  static set strictLoadingByDefault(value: boolean) {
-    this._strictLoadingByDefault = value;
-  }
-
-  static _strictLoadingMode: _Core.StrictLoadingMode = "all";
-
-  static get strictLoadingMode(): _Core.StrictLoadingMode {
-    return this._strictLoadingMode;
-  }
-
-  static set strictLoadingMode(value: _Core.StrictLoadingMode) {
-    this._strictLoadingMode = value;
-  }
+  declare static strictLoadingMode: _Core.StrictLoadingMode;
 
   declare static storeFullStiClass: boolean;
 
   declare static storeFullClassName: boolean;
 
-  static _runCommitCallbacksOnFirstSavedInstancesInTransaction = true;
-
-  static get runCommitCallbacksOnFirstSavedInstancesInTransaction(): boolean {
-    return this._runCommitCallbacksOnFirstSavedInstancesInTransaction;
-  }
-
-  static set runCommitCallbacksOnFirstSavedInstancesInTransaction(value: boolean) {
-    this._runCommitCallbacksOnFirstSavedInstancesInTransaction = value;
-  }
+  declare static runCommitCallbacksOnFirstSavedInstancesInTransaction: boolean;
 
   declare static defaultConnectionHandler: ConnectionHandler;
   declare static isDefaultConnectionHandler: () => boolean;
@@ -2034,16 +1988,16 @@ export class Base extends Model {
   declare static defaultShard: string;
   declare static isDefaultShard: () => boolean;
 
-  static belongsToRequiredByDefault = false;
+  declare static belongsToRequiredByDefault: boolean | null | undefined;
 
-  static enumerateColumnsInSelectStatements = false;
+  declare static enumerateColumnsInSelectStatements: boolean;
 
-  static shardSelector: unknown = null;
+  declare static shardSelector: unknown;
 
   declare static attributesForInspect: ":all" | string[];
   declare static isAttributesForInspect: () => boolean;
 
-  static _destroyAssociationAsyncJob: unknown = null;
+  declare static _destroyAssociationAsyncJob: unknown;
 
   static destroyAssociationAsyncJob = _Core.destroyAssociationAsyncJob;
 
@@ -2454,6 +2408,7 @@ extend(Base, ConnectionHandling.ConnectionHandling);
 extend(Base, Inheritance.ClassMethods);
 extend(Base, LockingOptimistic.ClassMethods);
 extend(Base, SignedId.ClassMethods);
+extend(Base, _Core.ClassMethods);
 include(Base, _Core.Core);
 include(Base, Inheritance.Inheritance);
 include(Base, _Integration);

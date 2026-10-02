@@ -4489,6 +4489,54 @@ describe("inlinedModuleMembers", () => {
     expect(inlinedModuleMembers("arel", rubyClasses, rubyModules, byShort, bodied)).toEqual([]);
   });
 
+  it("leaves a host name that only shares a predicate's alternate spelling alone", () => {
+    expect(
+      inlinedModuleMembers(
+        "activerecord",
+        {
+          "ActiveRecord::Base": rubyClass({ name: "Base", file: "base.rb", includes: ["Core"] }),
+        },
+        {
+          "ActiveRecord::Core": rubyClass({
+            name: "Core",
+            file: "core.rb",
+            instance: [method("readonly?")],
+          }),
+        },
+        new Map([["Core", ["ActiveRecord::Core"]]]),
+        new Map([
+          ["base.ts", new Set(["isReadonly", "readonly"])],
+          ["core.ts", new Set(["isReadonly"])],
+        ]),
+      ),
+    ).toEqual([]);
+  });
+
+  it("still reports a predicate the module's own twin does not body", () => {
+    expect(
+      inlinedModuleMembers(
+        "activerecord",
+        {
+          "ActiveRecord::Base": rubyClass({ name: "Base", file: "base.rb", includes: ["Core"] }),
+        },
+        {
+          "ActiveRecord::Core": rubyClass({
+            name: "Core",
+            file: "core.rb",
+            instance: [method("readonly?")],
+          }),
+        },
+        new Map([["Core", ["ActiveRecord::Core"]]]),
+        new Map([
+          ["base.ts", new Set(["isReadonly"])],
+          ["core.ts", new Set<string>()],
+        ]),
+      ),
+    ).toEqual([
+      { tsFile: "base.ts", tsName: "isReadonly", moduleRubyFile: "core.rb", rubyName: "readonly?" },
+    ]);
+  });
+
   describe("a module `new` override beside the includer's constructor", () => {
     const dedupModules = {
       "ActiveRecord::ConnectionAdapters::Deduplicable": rubyClass({

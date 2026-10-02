@@ -2071,6 +2071,7 @@ export function inlinedModuleMembers(
         const candidates = operatorSpelling(fqn, m.name) ?? rubyMethodCandidates(m.name);
         if (!candidates) continue;
         if (m.name === "initialize" && moduleBodies?.has(CONCERN_HOOK_MEMBERS.initialize)) continue;
+        if (m.name.endsWith("?") && candidates.some((c) => moduleBodies?.has(c) === true)) continue;
         const tsName = candidates.find(
           (c) =>
             !(c === "constructor" && m.name === "new" && hostDefinesInitialize) &&

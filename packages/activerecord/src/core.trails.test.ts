@@ -273,3 +273,39 @@ describe("hash agrees with ==", () => {
     expect(rbHash([new Topic({ id: 1 })])).not.toEqual(rbHash([new Topic({ id: 2 })]));
   });
 });
+
+describe("Core's included class attributes", () => {
+  it("leaves belongs_to_required_by_default unset, as core.rb:89 declares no default", () => {
+    class Unconfigured extends Base {}
+    expect(Unconfigured.belongsToRequiredByDefault ?? null).toBeNull();
+  });
+
+  it("keeps a subclass write local to that subclass", () => {
+    class Parent extends Base {}
+    class Child extends Parent {}
+    Child.strictLoadingByDefault = true;
+    Child.hasManyInversing = true;
+    expect(Child.strictLoadingByDefault).toBe(true);
+    expect(Parent.strictLoadingByDefault).toBe(false);
+    expect(Base.strictLoadingByDefault).toBe(false);
+    expect(Parent.hasManyInversing).toBe(false);
+  });
+
+  it("answers connection_class from the class's own ivar", () => {
+    class Parent extends Base {}
+    class Child extends Parent {}
+    Parent.connectionClass = true;
+    expect(Parent.isConnectionClass()).toBe(true);
+    expect(Child.connectionClass).toBe(false);
+  });
+
+  it("reads filter_attributes from the superclass until the class sets its own", () => {
+    class Parent extends Base {}
+    class Child extends Parent {}
+    Parent.filterAttributes = ["secret"];
+    expect(Child.filterAttributes).toEqual(["secret"]);
+    Child.filterAttributes = ["token"];
+    expect(Parent.filterAttributes).toEqual(["secret"]);
+    expect(Base.filterAttributes).toEqual([]);
+  });
+});

@@ -24,7 +24,7 @@ describe("extra-surface mark", () => {
       { package: "arel", totalNovel: 0, totalExtras: 63, inlinedFrom: [] },
       { package: "activerecord", totalNovel: 399, totalExtras: 1424, inlinedFrom: [] },
       { package: "ruby-compat", totalNovel: 0, totalExtras: 0, inlinedFrom: [] },
-      { package: "activemodel", totalNovel: 12, totalExtras: 34, inlinedFrom: [] },
+      { package: "activesupport", totalNovel: 12, totalExtras: 34, inlinedFrom: [] },
     ]);
     expect(measured).toEqual({
       arel: { novel: 0, total: 63, inlinedFrom: 0 },
@@ -57,6 +57,18 @@ describe("extra-surface mark", () => {
     expect(unmarkedPackages({})).not.toContain("activerecord");
     expect(strandedMarks({ arel: { novel: 0, total: 35 } })).toEqual([]);
     expect(strandedMarks({ activerecord: { novel: 0, total: 0 } })).toEqual(["activerecord"]);
+  });
+
+  it("enrolls activemodel as rowless", () => {
+    expect(ROWLESS_PACKAGES).toContain("activemodel");
+    expect(GATED_PACKAGES).toContain("activemodel");
+    expect(unmarkedPackages({})).not.toContain("activemodel");
+    expect(unmeasuredPackages({ activerecord: { novel: 0, total: 0 } })).toContain("activemodel");
+    expect(strandedMarks({ activemodel: { novel: 0, total: 0 } })).toEqual(["activemodel"]);
+    expect(taggedOnlyViolations({ activemodel: { novel: 1, total: 2 } })).toEqual([
+      { package: "activemodel", dimension: "novel", mark: 0, current: 1 },
+      { package: "activemodel", dimension: "total", mark: 0, current: 2 },
+    ]);
   });
 
   it("pins a rowless package at zero in both dimensions with no mark to consult", () => {
