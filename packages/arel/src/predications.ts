@@ -23,7 +23,7 @@ import {
   isNil,
   NoMethodError,
   rbFSend,
-  rbObjClass,
+  rbObjClassname,
   rbObjRespondTo,
   rtest,
 } from "@blazetrails/ruby-compat";
@@ -108,7 +108,7 @@ function predicationDispatch<T extends PredicationHost>(
   const member = (host as Record<string, unknown>)[methodId];
   if (typeof member !== "function") {
     throw new NoMethodError(
-      `undefined method '${methodId}' for an instance of ${rbObjClass(host)}`,
+      `undefined method '${methodId}' for an instance of ${rbObjClassname(host)}`,
       methodId,
       { receiver: host },
     );

@@ -8,7 +8,7 @@ import {
   StringIO,
   Tempfile,
   methodMissingProxy,
-  rbObjClass,
+  rbObjClassname,
 } from "@blazetrails/ruby-compat";
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the merge is how the delegated surface reaches the class type. */
@@ -64,7 +64,9 @@ export class UploadedFile {
   get path(): string | null {
     const tempfile = this.tempfile;
     if (!("path" in tempfile)) {
-      throw new NoMethodError(`undefined method 'path' for an instance of ${rbObjClass(tempfile)}`);
+      throw new NoMethodError(
+        `undefined method 'path' for an instance of ${rbObjClassname(tempfile)}`,
+      );
     }
     return tempfile.path();
   }

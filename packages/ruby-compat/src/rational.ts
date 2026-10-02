@@ -6,7 +6,7 @@
  */
 import { FloatDomainError } from "./float-domain-error.js";
 import { rbIntegerTypeP } from "./numeric.js";
-import { rbObjClass } from "./object.js";
+import { rbObjClassname } from "./object.js";
 import { rbEqual } from "./rb-equal.js";
 import { TypeError } from "./type-error.js";
 
@@ -180,7 +180,7 @@ export class Rational {
     if (rbIntegerTypeP(other)) return [new Rational(other, 1), this];
     else if (other instanceof Number || typeof other === "number") return [other, this.toF()];
     else if (other instanceof Rational) return [other, this];
-    throw new TypeError(`${rbObjClass(other)} can't be coerced into Rational`);
+    throw new TypeError(`${rbObjClassname(other)} can't be coerced into Rational`);
   }
 
   /** `vendor/ruby/v3.3.11/rational.c:861` `rb_rational_mul` (`Rational#*`), for the

@@ -24,7 +24,7 @@ import {
   Encoding,
   File,
   rbInspect,
-  rbObjClass,
+  rbObjClassname,
   rbObjId,
   rbObjIvarGet,
   rbObjIvarSet,
@@ -227,7 +227,7 @@ class TestCaseTest extends TestCase {
 function assertKindOf(klass: StringConstructor, actual: unknown): void {
   assert(
     klass === String && typeof actual === "string",
-    `Expected ${rbInspect(actual)} to be a kind of String, not ${rbObjClass(actual)}`,
+    `Expected ${rbInspect(actual)} to be a kind of String, not ${rbObjClassname(actual)}`,
   );
 }
 
@@ -928,7 +928,7 @@ describe("TestCaseTest", () => {
           } else if (error instanceof Assertion) {
             throw error;
           } else {
-            assert(false, `expected RuntimeError, got ${rbObjClass(error as object)}`);
+            assert(false, `expected RuntimeError, got ${rbObjClassname(error as object)}`);
           }
         }
       });

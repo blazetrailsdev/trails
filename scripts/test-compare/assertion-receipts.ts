@@ -44,7 +44,7 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
       value: null,
       as: "assert_equal",
       reason:
-        'attributes_test.rb:45 `assert_kind_of Float` — a JS number has no Float class; the port asserts `rbObjClass(...)` equals "Float", the boxed Float seat FloatType#castValue produces',
+        'attributes_test.rb:45 `assert_kind_of Float` — a JS number has no Float class; the port asserts `rbObjClassname(...)` equals "Float", the boxed Float seat FloatType#castValue produces',
     },
   ],
   "activemodel:attribute_methods_test.rb › AttributeMethodsTest › should not interfere with respond_to? if the attribute has a private/protected method":

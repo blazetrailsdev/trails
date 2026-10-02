@@ -5,7 +5,7 @@ import { IndexError } from "../index-error.js";
 import { format } from "../kernel-format.js";
 import { NilClass } from "../nil-class.js";
 import { NoMethodError } from "../no-method-error.js";
-import { rtest } from "../object.js";
+import { rbCString, rtest } from "../object.js";
 import { Range } from "../range.js";
 import { rbEqual } from "../rb-equal.js";
 import { rbHash } from "../rb-hash.js";
@@ -259,9 +259,10 @@ export interface StringInstance {
 export function stringSuperclass<M extends keyof StringInstance>(
   ...methods: M[]
 ): new (orig?: unknown) => Pick<StringInstance, M> {
-  const klass = class {
+  const klass = class extends (rbCString as new () => object) {
     /** `String#initialize` (`vendor/ruby/v3.3.11/string.c:1832` `rb_str_init`). */
     constructor(orig: unknown = "") {
+      super();
       (this as unknown as Record<symbol, string>)[RSTRING_PTR] = isTString(orig)
         ? String(orig)
         : stringValue(orig);

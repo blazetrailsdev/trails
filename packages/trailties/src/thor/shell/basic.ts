@@ -10,7 +10,7 @@ import {
   rbEnsure,
   rbEqual,
   rbObjAsString as toS,
-  rbObjClass,
+  rbObjClassname,
   rtest,
   stderr as $stderr,
   stdout as $stdout,
@@ -77,7 +77,7 @@ export class Basic {
   ask(statement: unknown, ...args: unknown[]): Promise<unknown> {
     const last = args.at(-1);
     const options = (
-      rbObjClass(last) === "Hash" || last instanceof Hash ? args.pop() : {}
+      rbObjClassname(last) === "Hash" || last instanceof Hash ? args.pop() : {}
     ) as Record<string, unknown>;
     const color = args[0] ?? null;
 

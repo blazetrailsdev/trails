@@ -14,7 +14,7 @@ import {
   isSymbol,
   merge,
   rbEql,
-  rbObjClass,
+  rbObjClassname,
   symbolToS,
 } from "@blazetrails/ruby-compat";
 import {
@@ -481,7 +481,7 @@ function methodMissing(this: TestFixtures, method: string, ...args: unknown[]): 
     return this.activeRecordFixture(method, ...args);
   } else {
     throw new NoMethodError(
-      `undefined method '${method}' for an instance of ${rbObjClass(this)}`,
+      `undefined method '${method}' for an instance of ${rbObjClassname(this)}`,
       method,
       args,
       false,

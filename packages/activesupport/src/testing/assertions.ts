@@ -12,7 +12,7 @@ import {
   getChildProcess,
   rbAnyToS,
   rbEqual,
-  rbObjClass,
+  rbObjClassname,
   rbStrRespondTo,
   regexpEscape,
   stderr,
@@ -474,7 +474,7 @@ export function assertRespondTo(
   msg = message(
     msg,
     null,
-    () => `Expected ${inspect(obj)} (${rbObjClass(obj)}) to respond to #${meth}`,
+    () => `Expected ${inspect(obj)} (${rbObjClassname(obj)}) to respond to #${meth}`,
   );
   assert(respondsTo(Object(obj), meth, includeAll), msg);
 }
@@ -655,7 +655,7 @@ function diff(exp: unknown, act: unknown): string {
       result = result.replace(/^\+\+\+ .+/m, "+++ actual");
 
       if (result === "") {
-        const klass = rbObjClass(exp);
+        const klass = rbObjClassname(exp);
         result = [
           `No visible difference in the ${klass}#inspect output.\n`,
           "You should look at the implementation of #== on ",
@@ -791,7 +791,7 @@ export function assertMatch(
   msg = message(msg, null, () => `Expected ${inspect(matcher)} to match ${inspect(obj)}`);
   assert(
     typeof matcher === "string" || matcher instanceof RegExp,
-    `Expected ${inspect(matcher)} (${rbObjClass(matcher)}) to respond to #=~`,
+    `Expected ${inspect(matcher)} (${rbObjClassname(matcher)}) to respond to #=~`,
   );
   if (typeof matcher === "string") matcher = new RegExp(regexpEscape(matcher));
   const lastMatch = matcher.exec(obj);

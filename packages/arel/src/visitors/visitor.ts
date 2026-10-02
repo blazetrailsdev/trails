@@ -2,35 +2,20 @@ import {
   Hash,
   NoMethodError,
   TypeError,
-  classpaths,
+  rbObjClass,
   rbFSend,
   rbModAncestors,
   rbModName,
-  rbModToS,
-  rbObjClass,
+  rbObjClassname,
   rbObjRespondTo,
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
 import { Visitors } from "../namespaces.js";
 
-export type NodeCtor = abstract new (...args: never[]) => object;
-
-type Klass = NodeCtor | string;
-
-function objectClass(object: unknown): Klass {
-  const klass = (object as { constructor?: unknown } | null | undefined)?.constructor;
-  if (typeof klass !== "function") return rbObjClass(object);
-  if (classpaths.has(klass) && Object.getPrototypeOf(object) === klass.prototype) {
-    return klass as NodeCtor;
-  }
-  const name = rbObjClass(object);
-  return rbModToS(klass as NodeCtor) === name ? (klass as NodeCtor) : name;
-}
-
 export abstract class Visitor {
-  private _dispatch: Hash<Klass, string>;
+  private _dispatch: Hash<object, string>;
 
-  private static _dispatchCache?: Hash<Klass, string>;
+  private static _dispatchCache?: Hash<object, string>;
 
   constructor() {
     this._dispatch = this.getDispatchCache();
@@ -43,16 +28,15 @@ export abstract class Visitor {
   }
 
   /** @internal */
-  protected get dispatch(): Hash<Klass, string> {
+  protected get dispatch(): Hash<object, string> {
     return this._dispatch;
   }
 
   /** @internal */
-  static dispatchCache(this: typeof Visitor): Hash<Klass, string> {
+  static dispatchCache(this: typeof Visitor): Hash<object, string> {
     if (!Object.prototype.hasOwnProperty.call(this, "_dispatchCache")) {
-      this._dispatchCache = new Hash<Klass, string>((hash, klass) => {
-        const name = typeof klass === "string" ? klass : rbModName(klass);
-        const path = (name ?? "").replaceAll("::", "");
+      this._dispatchCache = new Hash<object, string>((hash, klass) => {
+        const path = (rbModName(klass) ?? "").replaceAll("::", "");
         const dispatchMethod = path === "" ? "visit_" : `visit${path}`;
         hash.set(klass, dispatchMethod);
         return dispatchMethod;
@@ -61,7 +45,7 @@ export abstract class Visitor {
     return this._dispatchCache!;
   }
 
-  protected getDispatchCache(): Hash<Klass, string> {
+  protected getDispatchCache(): Hash<object, string> {
     return (this.constructor as typeof Visitor).dispatchCache();
   }
 
@@ -71,7 +55,7 @@ export abstract class Visitor {
     for (;;) {
       let dispatchMethod: string | undefined;
       try {
-        dispatchMethod = this.dispatch.get(objectClass(object));
+        dispatchMethod = this.dispatch.get(rbObjClass(object));
         if (collector != null && collector !== false) {
           return rbFSend(this, dispatchMethod!, object, collector);
         } else {
@@ -80,11 +64,11 @@ export abstract class Visitor {
       } catch (e) {
         if (!(e instanceof NoMethodError)) throw e;
         if (rbObjRespondTo(this, dispatchMethod!, true)) throw e;
-        const superklass = (rbModAncestors(objectClass(object)) as Klass[]).find((klass) =>
+        const superklass = rbModAncestors(rbObjClass(object)).find((klass) =>
           rbObjRespondTo(this, this.dispatch.get(klass)!, true),
         );
-        if (superklass == null) throw new TypeError(`Cannot visit ${rbObjClass(object)}`);
-        this.dispatch.set(objectClass(object), this.dispatch.get(superklass)!);
+        if (superklass == null) throw new TypeError(`Cannot visit ${rbObjClassname(object)}`);
+        this.dispatch.set(rbObjClass(object), this.dispatch.get(superklass)!);
       }
     }
   }

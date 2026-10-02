@@ -6,7 +6,7 @@ import {
   isEmpty,
   isModuleIncluded,
   rbInspect,
-  rbObjClass,
+  rbObjClassname,
   rbObjRespondTo,
   RuntimeError,
   toI,
@@ -593,7 +593,7 @@ function unscopeBang(this: QueryMethodsHost, ...args: UnscopeArg[]): any {
       }
       assertModifiableBang.call(this);
       delete this._values[name];
-    } else if (rbObjClass(scope) === "Hash") {
+    } else if (rbObjClassname(scope) === "Hash") {
       for (const [key, targetValue] of Object.entries(scope as object)) {
         if (key !== ":where") {
           throw new ArgumentError("Hash arguments in .unscope(*args) must have :where as the key.");
@@ -2244,7 +2244,7 @@ export function buildJoinBuckets(
     } else if (join instanceof CTEJoin) {
       buckets.join_node.push(buildWithJoinNode.call(this, join.name));
     } else {
-      throw new RuntimeError(`unknown class: ${rbObjClass(join)}`);
+      throw new RuntimeError(`unknown class: ${rbObjClassname(join)}`);
     }
   });
 

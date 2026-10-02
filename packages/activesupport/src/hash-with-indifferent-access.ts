@@ -8,7 +8,7 @@ import {
   TypeError,
   eachPair,
   isSymbol,
-  rbObjClass,
+  rbObjClassname,
   rbObjRespondTo,
   symbolToS,
   toEnum,
@@ -63,7 +63,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
       for (const [i, pair] of (args[0] as unknown[][]).entries()) {
         if (!Array.isArray(pair)) {
           throw new ArgumentError(
-            `wrong element type ${rbObjClass(pair)} at ${i} (expected array)`,
+            `wrong element type ${rbObjClassname(pair)} at ${i} (expected array)`,
           );
         }
         if (pair.length < 1 || pair.length > 2) {
@@ -511,7 +511,9 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
       if (obj == null) return undefined;
       if (Array.isArray(obj)) {
         if (typeof identifier !== "number") {
-          throw new TypeError(`no implicit conversion of ${rbObjClass(identifier)} into Integer`);
+          throw new TypeError(
+            `no implicit conversion of ${rbObjClassname(identifier)} into Integer`,
+          );
         }
         obj = obj[identifier < 0 ? obj.length + identifier : identifier];
         continue;
@@ -521,7 +523,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
         return (dig as (...args: (string | number)[]) => unknown).apply(obj, identifiers.slice(i));
       }
 
-      throw new TypeError(`${rbObjClass(obj)} does not have #dig method`);
+      throw new TypeError(`${rbObjClassname(obj)} does not have #dig method`);
     }
     return obj;
   }

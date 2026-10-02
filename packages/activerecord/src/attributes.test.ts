@@ -12,7 +12,7 @@ import { RangeType } from "./connection-adapters/postgresql/oid/range.js";
 import { BigDecimal, TimeWithZone, assertNotCalled } from "@blazetrails/activesupport";
 import { DateTimeType } from "@blazetrails/activemodel";
 import { Time } from "@blazetrails/date";
-import { rbObjClass } from "@blazetrails/ruby-compat";
+import { rbObjClassname } from "@blazetrails/ruby-compat";
 import { TimeZoneConverter } from "./attribute-methods/time-zone-conversion.js";
 
 import { registerModel } from "./associations.js";
@@ -100,7 +100,7 @@ describe("CustomPropertiesTest", () => {
     const lastOverloaded = await OverloadedType.last();
     expect(Number.isInteger(lastOverloaded!.overloaded_float)).toBe(true);
     expect(((await UnoverloadedType.last()) as any).overloaded_float).toEqual(new Number(2.0));
-    expect(rbObjClass(((await UnoverloadedType.last()) as any).overloaded_float)).toBe("Float");
+    expect(rbObjClassname(((await UnoverloadedType.last()) as any).overloaded_float)).toBe("Float");
   });
 
   it("properties assigned in constructor", () => {

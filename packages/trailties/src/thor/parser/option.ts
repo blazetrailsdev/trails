@@ -7,7 +7,7 @@ import {
   isSymbol,
   rbInspect,
   rbObjAsString,
-  rbObjClass,
+  rbObjClassname,
   rbSetClassPathString,
   rtest,
   symbolToS,
@@ -74,8 +74,12 @@ export class Option extends Argument {
       type = "boolean";
     } else if (typeof value === "number" || typeof value === "bigint") {
       type = "numeric";
-    } else if (rbObjClass(value) === "Hash" || Array.isArray(value) || typeof value === "string") {
-      type = rbObjClass(value).toLowerCase();
+    } else if (
+      rbObjClassname(value) === "Hash" ||
+      Array.isArray(value) ||
+      typeof value === "string"
+    ) {
+      type = rbObjClassname(value).toLowerCase();
     }
 
     return new this(rbObjAsString(name), { required, type, default: default_, aliases });
@@ -166,11 +170,11 @@ export class Option extends Argument {
     } else if (isSymbol(this.default)) {
       defaultType = "string";
     } else if (
-      rbObjClass(this.default) === "Hash" ||
+      rbObjClassname(this.default) === "Hash" ||
       Array.isArray(this.default) ||
       typeof this.default === "string"
     ) {
-      defaultType = rbObjClass(this.default).toLowerCase();
+      defaultType = rbObjClassname(this.default).toLowerCase();
     }
 
     const expectedType = rtest(this.repeatable) && this.type !== "hash" ? "array" : this.type;

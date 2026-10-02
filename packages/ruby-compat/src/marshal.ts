@@ -6,7 +6,7 @@ import {
   rbModName,
   rbModSingletonP,
   rbModToS,
-  rbObjClass,
+  rbObjClassname,
   rbObjInstanceVariables,
   rbObjIvarGet,
 } from "./object.js";
@@ -58,7 +58,9 @@ interface DumpArg {
 
 /** `RB_TYPE_P(obj, T_OBJECT)` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:96`). */
 function tObjectP(obj: unknown): obj is object {
-  return Object.prototype.toString.call(obj) === "[object Object]" && rbObjClass(obj) !== "Hash";
+  return (
+    Object.prototype.toString.call(obj) === "[object Object]" && rbObjClassname(obj) !== "Hash"
+  );
 }
 
 /** `must_not_be_anonymous` (`vendor/ruby/v3.3.11/marshal.c:256`). */
@@ -403,7 +405,7 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
     hasiv = hasIvars((encname = encodingName(obj)));
     if (hasiv) wByte(TYPE_IVAR, arg);
 
-    if (typeof obj === "function" && rbObjClass(obj) === "Class") {
+    if (typeof obj === "function" && rbObjClassname(obj) === "Class") {
       if (rbModSingletonP(obj)) {
         throw new TypeError("singleton class can't be dumped");
       }
@@ -453,7 +455,7 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
           }
         }
       }
-    } else if (obj instanceof Map || rbObjClass(obj) === "Hash") {
+    } else if (obj instanceof Map || rbObjClassname(obj) === "Hash") {
       wUclass(obj as object, obj instanceof Hash ? Hash : obj instanceof Map ? Map : Object, arg);
       if (obj instanceof Hash && obj.isCompareByIdentity()) {
         wByte(TYPE_UCLASS, arg);
@@ -477,7 +479,7 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
       wClass(TYPE_OBJECT, obj, arg);
       wObjivar(obj, arg, limit);
     } else {
-      throw new TypeError(`no _dump_data is defined for class ${rbObjClass(obj)}`);
+      throw new TypeError(`no _dump_data is defined for class ${rbObjClassname(obj)}`);
     }
   }
   if (hasiv) {
@@ -527,7 +529,7 @@ export const Marshal = {
    *  from `0.0`, which a `Map` reads as one key. `ruby_dtoa(d, 0, …)`
    *  (`marshal.c:444`) is the shortest round-tripping digit string, which
    *  `toExponential()` also answers. A whole-valued `number` is an Integer
-   *  (`rbObjClass`), so a Float `1.0` dumps as a Float only when boxed
+   *  (`rbObjClassname`), so a Float `1.0` dumps as a Float only when boxed
    *  (`rbDbl2num`). A JS string is UTF-16, and `TextEncoder` writes a lone
    *  surrogate as U+FFFD where a Ruby String's bytes are written as they are.
    *  `T_OBJECT` is a value `Object.prototype.toString` answers

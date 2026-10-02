@@ -6,7 +6,7 @@ import {
   rbFSend,
   rbModName,
   rbObjAsString,
-  rbObjClass,
+  rbObjClassname,
   rbObjRespondTo,
   rbSetClassPathString,
   rbStrDump,
@@ -85,7 +85,7 @@ export class Argument {
     if (
       Array.isArray(this.default) ||
       typeof this.default === "string" ||
-      rbObjClass(this.default) === "Hash"
+      rbObjClassname(this.default) === "Hash"
     ) {
       return !isEmpty(this.default as object);
     } else {
@@ -112,7 +112,7 @@ export class Argument {
         Array.isArray(this.enum) ||
         this.enum instanceof Range ||
         this.enum instanceof Set ||
-        rbObjClass(this.enum) === "Hash"
+        rbObjClassname(this.enum) === "Hash"
       )
     ) {
       throw new ArgumentError("An argument cannot have an enum other than an enumerable.");

@@ -1,7 +1,7 @@
 import { Nodes, arelNode } from "@blazetrails/arel";
 import {
   NoMethodError,
-  rbObjClass,
+  rbObjClassname,
   rbInspect,
   compact,
   first as aryFirst,
@@ -118,7 +118,7 @@ export async function find(this: FinderRelation, ...args: unknown[]): Promise<an
     if (ifnone == null) return null;
     if (typeof ifnone !== "function") {
       const desc =
-        typeof ifnone === "boolean" ? String(ifnone) : `an instance of ${rbObjClass(ifnone)}`;
+        typeof ifnone === "boolean" ? String(ifnone) : `an instance of ${rbObjClassname(ifnone)}`;
       throw new NoMethodError(`undefined method \`call' for ${desc}`);
     }
     return await ifnone();
@@ -502,7 +502,7 @@ export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Prom
     throw new NoMethodError(
       ids[0] == null
         ? "undefined method 'first' for nil"
-        : `undefined method 'first' for an instance of ${rbObjClass(ids[0])}`,
+        : `undefined method 'first' for an instance of ${rbObjClassname(ids[0])}`,
     );
   }
   const expectsArray = this.model.compositePrimaryKey

@@ -8,7 +8,7 @@ import { camelize } from "@blazetrails/activesupport";
 import {
   rbFSend,
   rbObjAsString,
-  rbObjClass,
+  rbObjClassname,
   rbObjId,
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
@@ -305,7 +305,7 @@ export class Dot extends Visitor {
       return;
     }
 
-    node = new Node(rbObjClass(o), rbObjId(o));
+    node = new Node(rbObjClassname(o), rbObjId(o));
     this.seen.set(node.id, node);
     this.nodes.push(node);
     this.withNode(node, () => {

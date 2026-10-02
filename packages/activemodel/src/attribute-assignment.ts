@@ -7,7 +7,7 @@ import {
   TypeError,
   isEmpty,
   rbFPublicSend,
-  rbObjClass,
+  rbObjClassname,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { UnknownAttributeError } from "./errors.js";
@@ -15,7 +15,7 @@ import { UnknownAttributeError } from "./errors.js";
 export function assignAttributes(this: AttributeAssignment, newAttributes: unknown): void {
   if (!respondToEachPair(newAttributes)) {
     throw new ArgumentError(
-      `When assigning attributes, you must pass a hash as an argument, ${rbObjClass(newAttributes)} passed.`,
+      `When assigning attributes, you must pass a hash as an argument, ${rbObjClassname(newAttributes)} passed.`,
     );
   }
   if (isEmpty(newAttributes)) return;
@@ -42,7 +42,7 @@ export function setAttributes(
 ): Promise<void> | void {
   if (!respondToEachPair(newAttributes)) {
     throw new ArgumentError(
-      `When assigning attributes, you must pass a hash as an argument, ${rbObjClass(newAttributes)} passed.`,
+      `When assigning attributes, you must pass a hash as an argument, ${rbObjClassname(newAttributes)} passed.`,
     );
   }
   if (isEmpty(newAttributes)) return;

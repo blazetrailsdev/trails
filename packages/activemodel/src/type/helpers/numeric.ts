@@ -5,7 +5,7 @@ import {
   Rational,
   rbFloatTypeP,
   rbObjAsString as toS,
-  rbObjClass,
+  rbObjClassname,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "../value.js";
 
@@ -16,7 +16,7 @@ export function isEqualNan(oldValue: unknown, newValue: unknown): boolean {
   return (
     (rbFloatTypeP(oldValue) || oldValue instanceof BigDecimal) &&
     isNan(oldValue) &&
-    rbObjClass(oldValue) === rbObjClass(newValue) &&
+    rbObjClassname(oldValue) === rbObjClassname(newValue) &&
     isNan(newValue)
   );
 }

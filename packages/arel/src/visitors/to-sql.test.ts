@@ -15,7 +15,6 @@ import {
 import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { mustBeLike } from "../test-helpers/must-be-like.js";
 import { buildQuoted } from "../nodes/casted.js";
-import type { NodeCtor } from "./visitor.js";
 
 describe("the to_sql visitor", () => {
   const users = new Table("users");
@@ -204,7 +203,7 @@ describe("the to_sql visitor", () => {
         return "";
       }
       protected override get dispatch() {
-        return new Hash<NodeCtor | string, string>().set(Table, "hello");
+        return new Hash<object, string>().set(Table, "hello");
       }
     }
     const viz = new HelloVisitor();
