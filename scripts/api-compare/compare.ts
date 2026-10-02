@@ -123,6 +123,7 @@ import {
   renderSig,
   shouldSkipArity,
   stripThis,
+  threadsSuper,
   type ArityRange,
 } from "./arity.js";
 import { isNestedConstructorHomonym, matchParamNamesAgainst } from "./param-names.js";
@@ -5081,7 +5082,14 @@ export function main() {
         if (!rubyParams) return;
         // Every signature recorded for this TS name; a pair matches when it
         // overlaps ANY (see tsParamsByName above for why this is global).
-        const candidates = tsParamsByName.get(tsName) ?? [];
+        // A `super_`-threading signature in the matched file IS the port of a
+        // Rails method that calls `super`, so it is compared alone: pooled, it
+        // is outvoted by any unrelated same-named method (`Errors#initializeDup`
+        // credited `Dirty#initializeDup(super_, other)`).
+        const threaded = (tsParamsByFileNameInPkg.get(tsFile)?.get(tsName) ?? []).filter(
+          threadsSuper,
+        );
+        const candidates = threaded.length > 0 ? threaded : (tsParamsByName.get(tsName) ?? []);
         if (candidates.length === 0) return;
         if (!rubyForwardingNames.has(rubyName) && !guessedFile) {
           for (const blockOwner of rubyBlockOwners.get(`${level}|${rubyName}`) ?? []) {

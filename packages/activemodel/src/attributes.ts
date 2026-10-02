@@ -5,9 +5,8 @@ import {
   type CodeGenerator,
   type Included,
   included,
-  prepend,
 } from "@blazetrails/activesupport";
-import { rbObjClone } from "@blazetrails/ruby-compat";
+import { Module, rbObjClone } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
@@ -28,19 +27,14 @@ import {
 
 export function constructor(
   this: AttributeInstanceHost & { constructor: { _defaultAttributes(): AttributeSet } },
-  super_: () => void,
 ): void {
   this._attributes = this.constructor._defaultAttributes().deepDup();
-  super_();
+  SuperMethods.superMethod(this, "initInternals")!();
 }
 
-export function initializeDup(
-  this: AttributeInstanceHost,
-  super_: (other: unknown) => void,
-  other: unknown,
-): void {
+export function initializeDup(this: AttributeInstanceHost, other: unknown): void {
   this._attributes = this._attributes.deepDup();
-  super_(other);
+  SuperMethods.superMethod(this, "initializeDup")!(other);
 }
 
 export type AttributeInstanceHost = { _attributes: AttributeSet };
@@ -63,12 +57,18 @@ export function attributeNames(this: { attributeTypes(): Record<string, ValueTyp
   return Object.keys(this.attributeTypes());
 }
 
-export function freeze<T>(this: AttributeInstanceHost, super_: () => T): T {
+export function freeze<T extends AttributeInstanceHost>(this: T): T {
   if (!Object.isFrozen(this)) {
     this._attributes = rbObjClone(this._attributes).freeze();
   }
-  return super_();
+  return SuperMethods.superMethod(this, "freeze")!() as T;
 }
+
+const SuperMethods = new Module((mod) => {
+  mod.defineMethod("initInternals", constructor);
+  mod.defineMethod("initializeDup", initializeDup);
+  mod.defineMethod("freeze", freeze);
+});
 
 /** @internal */
 export function _writeAttribute(
@@ -159,9 +159,7 @@ export class Attributes {
     extend(base, ClassMethods);
     extend(base, { defineMethodAttribute });
 
-    prepend(base.prototype, { initInternals: constructor });
-    prepend(base.prototype, { initializeDup });
-    prepend(base.prototype, { freeze });
+    include(base, SuperMethods);
 
     base.attributeMethodSuffix("=", { parameters: "value" });
   }

@@ -1,15 +1,18 @@
 import { afterEach, beforeEach, expect } from "vitest";
 import type { TestContext } from "vitest";
+import { getFn, setFn } from "vitest/suite";
 import { Time } from "@blazetrails/date";
 import { safeConstantize } from "../inflector.js";
 import { TestCase } from "../test-case.js";
-import { Skip, UnexpectedError, _takeAssertions } from "./assertions.js";
+import { Assertion, Skip, UnexpectedError, _takeAssertions } from "./assertions.js";
 
 declare module "vitest" {
   interface TestContext {
     testCase: TestCase;
   }
 }
+
+const capturing = new WeakSet<object>();
 
 beforeEach(async (context: TestContext) => {
   _takeAssertions();
@@ -21,6 +24,23 @@ beforeEach(async (context: TestContext) => {
     }
   }
   const testCase = (context.testCase = new klass(context.task.name));
+  const run = getFn(context.task);
+  if (!capturing.has(run)) {
+    const captureExceptions = async (): Promise<void> => {
+      try {
+        await run();
+      } catch (e) {
+        if ((e as { code?: unknown } | null)?.code !== "VITEST_PENDING") {
+          context.testCase.failures.push(
+            e instanceof Assertion ? e : new UnexpectedError(e as Error),
+          );
+        }
+        throw e;
+      }
+    };
+    capturing.add(captureExceptions);
+    setFn(context.task, captureExceptions);
+  }
   await testCase.beforeSetup();
 });
 
@@ -35,11 +55,13 @@ afterEach(async (context: TestContext) => {
   };
   testCase.assertions = (expect.getState().assertionCalls ?? 0) + _takeAssertions();
   testCase.sourceLocation = [task.file?.filepath ?? "", task.location?.line ?? 0];
+  if (testCase.failures.length === 0) {
+    for (const e of task.result?.errors ?? [])
+      testCase.failures.push(new UnexpectedError(e as Error));
+  }
   if (task.mode === "skip" || task.mode === "todo" || task.result?.state === "skip") {
     testCase.failures.push(new Skip());
   }
-  for (const e of task.result?.errors ?? [])
-    testCase.failures.push(new UnexpectedError(e as Error));
   const failures = testCase.failures.length;
   await testCase.afterTeardown();
   if (testCase.failures.length > failures) throw testCase.failures[failures];

@@ -448,6 +448,17 @@ describe("AttrNames.defineAttributeAccessorMethod (attribute_methods.rb:577-589)
     expect(yielded("my_column(omg)", true)[0]).toBe(`${reader}=`);
   });
 
+  it("sets the ATTR_ constant the expression names, once", () => {
+    const constants = AttrNames as unknown as Record<string, string>;
+    const [, expr] = yielded("my other column", false);
+    const constName = expr.split("::").at(-1)!;
+    expect(constants[constName]).toBe("my other column");
+
+    constants[constName] = "already defined";
+    yielded("my other column", true);
+    expect(constants[constName]).toBe("already defined");
+  });
+
   it("generates a working reader and writer for a name that is not def-safe", () => {
     class Odd extends Model {
       declare static attribute: AttributesClassHalf["attribute"];

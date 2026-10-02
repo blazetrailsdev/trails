@@ -3,6 +3,7 @@ import { NameError } from "./name-error.js";
 import { rbModName, rbModToS } from "./object.js";
 import {
   include,
+  rbModConstDefined,
   rbModConstSet,
   prepend,
   extend,
@@ -10,6 +11,7 @@ import {
   extended,
   rbObjClone,
   rbObjDup,
+  Kernel,
   Module,
   initialize,
   initializeIncludedModules,
@@ -1037,6 +1039,45 @@ describe("Module#superMethod", () => {
     expect(mod.superMethod(new Lonely(), "greet")).toBeUndefined();
   });
 
+  it("ends the search in Kernel, where every ancestry ends", () => {
+    class Record {
+      copiedFrom: unknown;
+      initializeCopy(orig: unknown): void {
+        this.copiedFrom = orig;
+      }
+    }
+    const mod = new Module();
+    mod.defineMethod("initializeDup", function (this: Record, orig: unknown) {
+      return mod.superMethod(this, "initializeDup")!(orig);
+    });
+    mod.defineMethod("freeze", function (this: Record) {
+      return mod.superMethod(this, "freeze")!();
+    });
+    include(Record, mod);
+
+    const orig = new Record();
+    const record = rbObjDup(orig);
+    expect(record.copiedFrom).toBe(orig);
+    expect((record as unknown as { freeze(): Record }).freeze()).toBe(record);
+    expect(Object.isFrozen(record)).toBe(true);
+  });
+
+  it("answers a method a gem defined on Kernel, and no writer", () => {
+    class Plain {}
+    const mod = new Module();
+    include(Plain, mod);
+    Kernel.defineMethod("kernelProbe", function (this: object) {
+      return this;
+    });
+    try {
+      const plain = new Plain();
+      expect(mod.superMethod(plain, "kernelProbe")!()).toBe(plain);
+      expect(mod.superMethod(plain, "kernelProbe=")).toBeUndefined();
+    } finally {
+      Kernel.removeMethod("kernelProbe");
+    }
+  });
+
   it("answers undefined for a receiver whose ancestry lacks the module", () => {
     class Outside {}
     const mod = new Module();
@@ -1273,6 +1314,27 @@ describe("Module#dup", () => {
     expect(copy.label).toBe("original");
     expect(copy.instanceMethods()).toEqual(["greet", "extra"]);
     expect(mod.instanceMethods()).toEqual(["greet"]);
+  });
+});
+
+describe("Module#const_defined?", () => {
+  it("answers whether the module or an ancestor holds the constant", () => {
+    class Topic {}
+    class Reply extends Topic {}
+    const mod = new Module();
+    expect(rbModConstDefined(Topic, "Generated")).toBe(false);
+    rbModConstSet(Topic, "Generated", 1);
+    rbModConstSet(mod, "ATTR_d697", "my");
+    expect(rbModConstDefined(Topic, "Generated")).toBe(true);
+    expect(rbModConstDefined(Reply, "Generated")).toBe(true);
+    expect(rbModConstDefined(mod, "ATTR_d697")).toBe(true);
+    expect(rbModConstDefined(mod, "Generated")).toBe(false);
+  });
+
+  it("raises NameError for a name that is not a constant name", () => {
+    class Topic {}
+    expect(() => rbModConstDefined(Topic, "name")).toThrow(NameError);
+    expect(() => rbModConstDefined(Topic, "name")).toThrow("wrong constant name name");
   });
 });
 

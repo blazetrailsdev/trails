@@ -5,10 +5,9 @@ import {
   include,
   included,
   kernelArray as array,
-  prepend,
   runCallbacks,
 } from "@blazetrails/activesupport";
-import { hasKey, isIntersect } from "@blazetrails/ruby-compat";
+import { hasKey, isIntersect, Module } from "@blazetrails/ruby-compat";
 import type { CallbackConditions, CallbackObject } from "../callbacks.js";
 
 export const ClassMethods = {
@@ -68,7 +67,7 @@ export const Callbacks = {
       skipAfterCallbacksIfTerminated: true,
       scope: ["kind", "name"],
     });
-    prepend(base.prototype, { runValidationsBang });
+    include(base, SuperMethods);
   },
 };
 
@@ -94,12 +93,15 @@ export interface RunValidationsBangHost {
 }
 
 /** @internal */
-export async function runValidationsBang(
-  this: RunValidationsBangHost,
-  super_: (...args: unknown[]) => unknown,
-): Promise<boolean> {
-  return this._runValidationCallbacks(async () => (await super_()) as boolean);
+export async function runValidationsBang(this: RunValidationsBangHost): Promise<boolean> {
+  return this._runValidationCallbacks(
+    async () => (await SuperMethods.superMethod(this, "runValidationsBang")!()) as boolean,
+  );
 }
+
+const SuperMethods = new Module((mod) =>
+  mod.defineMethod("runValidationsBang", runValidationsBang),
+);
 
 /** @internal */
 export function setOptionsForCallback(options: CallbackOptions): void {

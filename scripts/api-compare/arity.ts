@@ -151,6 +151,13 @@ export function stripThis(params: ParamInfo[]): ParamInfo[] {
   return params.length > 0 && params[0].name === "this" ? params.slice(1) : params;
 }
 
+/** Does this signature thread Ruby's `super` as a leading `super_` parameter —
+ *  the object-literal `prepend()` shape? Ruby's `super` is a keyword, so the
+ *  parameter is one Rails never declares and no candidate form may strip it. */
+export function threadsSuper(params: ParamInfo[]): boolean {
+  return stripThis(params)[0]?.name === "super_";
+}
+
 /** Is this leading param an explicit receiver — a known/`*Host` type, a `*Class`
  *  receiver, or a conventional receiver name? */
 export function isReceiverParam(first: ParamInfo): boolean {
@@ -330,10 +337,12 @@ export function arityMatches(ruby: ParamInfo[], ts: ParamInfo[]): ArityMatch {
     stripTrailingCallback(base),
     stripTrailingCallback(stripHostParam(base)),
   ];
-  const ok = forms.some((f) => {
-    const t = positionalArity(f, "ts");
-    return rubyForms.some((rf) => rangesOverlap(rf, t));
-  });
+  const ok =
+    !threadsSuper(ts) &&
+    forms.some((f) => {
+      const t = positionalArity(f, "ts");
+      return rubyForms.some((rf) => rangesOverlap(rf, t));
+    });
 
   return {
     ok,

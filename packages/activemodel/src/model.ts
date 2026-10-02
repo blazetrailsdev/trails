@@ -1,22 +1,16 @@
 import type { Errors } from "./errors.js";
-import {
-  ValidationContext,
-  ClassMethods as ValidationsClassMethods,
-  initInternals as validationsInitInternals,
-  initializeDup as validationsInitializeDup,
-} from "./validations.js";
+import { ValidationContext, ClassMethods as ValidationsClassMethods } from "./validations.js";
 import { HelperMethods } from "./validations/helper-methods.js";
 import {
   Callbacks as ASCallbacks,
   runCallbacks,
   include,
-  prepend,
   runLoadHooks,
   ToJsonWithActiveSupportEncoder,
   type Included,
   type Extended,
 } from "@blazetrails/activesupport";
-import { rbObjDup } from "@blazetrails/ruby-compat";
+import { Module, rbObjDup } from "@blazetrails/ruby-compat";
 import { humanAttributeName as translationHumanAttributeName } from "./translation.js";
 import { ModelName } from "./naming.js";
 import { defineModelCallbacks as defineModelCallbacksImpl } from "./callbacks.js";
@@ -167,15 +161,11 @@ export class Model {
   declare runCallbacks: Included<typeof ASCallbacks.InstanceMethods>["runCallbacks"];
 }
 
+include(Model, new Module((mod) => mod.defineMethod("initInternals", function () {})));
 include(Model, API);
 
 include(Model, ToJsonWithActiveSupportEncoder);
 
 include(Model, Access);
-
-prepend(Model.prototype, {
-  initInternals: validationsInitInternals,
-  initializeDup: validationsInitializeDup,
-});
 
 runLoadHooks("active_model", Model);
