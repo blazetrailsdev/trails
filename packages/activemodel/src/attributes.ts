@@ -63,6 +63,13 @@ export function attributeNames(this: { attributeTypes(): Record<string, ValueTyp
   return Object.keys(this.attributeTypes());
 }
 
+export function freeze<T>(this: AttributeInstanceHost, super_: () => T): T {
+  if (!Object.isFrozen(this)) {
+    this._attributes = rbObjClone(this._attributes).freeze();
+  }
+  return super_();
+}
+
 /** @internal */
 export function _writeAttribute(
   this: AttributeInstanceHost,
@@ -121,13 +128,6 @@ export function setDefineMethodAttribute(
       );
     },
   );
-}
-
-export function freeze<T>(this: AttributeInstanceHost, super_: () => T): T {
-  if (!Object.isFrozen(this)) {
-    this._attributes = rbObjClone(this._attributes).freeze();
-  }
-  return super_();
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActiveModel::AttributeMethods` (attributes.rb:8); the class/interface merge is how `include()` surfaces on the type side.

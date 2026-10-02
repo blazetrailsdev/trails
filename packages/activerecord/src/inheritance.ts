@@ -307,6 +307,15 @@ export function polymorphicClassFor(modelClass: typeof Base, name: string): type
   return modelClass.computeType(name);
 }
 
+export function initializeClone(
+  this: typeof Base,
+  super_: (other: unknown) => void,
+  other: unknown,
+): void {
+  super_(other);
+  setBaseClass(this);
+}
+
 export function initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {
   super_(other);
   ensureProperType.call(this);

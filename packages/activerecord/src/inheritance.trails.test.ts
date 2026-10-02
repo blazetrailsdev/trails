@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "./test-fixtures.js";
 import { Client } from "./test-helpers/models/company.js";
-import { isFinderNeedsTypeCondition } from "./inheritance.js";
+import { initializeClone, isFinderNeedsTypeCondition } from "./inheritance.js";
 import { Author } from "./test-helpers/models/author.js";
 
 describe("_instantiate STI dispatch", () => {
@@ -99,5 +99,30 @@ describe("becomes! inheritance column writer", () => {
 
     expect(written).toEqual(["WriterClient"]);
     expect(became.type).toBe("WriterClient");
+  });
+});
+
+describe("Inheritance::ClassMethods#initialize_clone", () => {
+  fixtures([]);
+
+  it("runs the inherited hook, then recomputes the base class on the copy", () => {
+    const copy = Object.create(Client) as typeof Client & {
+      _computedBaseClass?: unknown;
+      initializeClone(other: unknown): void;
+    };
+
+    copy.initializeClone(Client);
+
+    expect(Object.prototype.hasOwnProperty.call(copy, "_computedBaseClass")).toBe(true);
+    expect(copy._computedBaseClass).toBe(Client.baseClass);
+  });
+
+  it("calls super with the original before set_base_class", () => {
+    const calls: unknown[] = [];
+    const copy = Object.create(Client) as typeof Client;
+
+    initializeClone.call(copy, (other) => calls.push(other), Client);
+
+    expect(calls).toEqual([Client]);
   });
 });

@@ -149,8 +149,8 @@ export class Errors<TBase extends object = object> {
     return this.messagesFor(attribute);
   }
 
-  get attributeNames(): string[] {
-    return [...new Set(this._errors.map((e) => e.attribute))];
+  get attributeNames(): readonly string[] {
+    return Object.freeze([...new Set(this._errors.map((e) => e.attribute))]);
   }
 
   asJson(options?: Record<string, unknown> | null): Record<string, (string | null)[]> {
@@ -250,8 +250,8 @@ export class Errors<TBase extends object = object> {
     return this._errors.map((e) => e.fullMessage);
   }
 
-  fullMessagesFor(attribute: string): (string | null)[] {
-    return this.where(attribute).map((e) => e.fullMessage);
+  fullMessagesFor(attribute: string): readonly (string | null)[] {
+    return Object.freeze(this.where(attribute).map((e) => e.fullMessage));
   }
 
   messagesFor(attribute: string): (string | null)[] {

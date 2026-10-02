@@ -206,6 +206,13 @@ export class Result {
     return new Result(this.columns, this.rows.slice(), { ...this.columnTypes });
   }
 
+  freeze(): this {
+    Object.freeze(this.hashRows());
+    Object.freeze(this.indexedRows);
+    Object.freeze(this);
+    return this;
+  }
+
   get columnIndexes(): Record<string, number> {
     if (this.#columnIndexes) return this.#columnIndexes;
     const hash: Record<string, number> = {};
@@ -242,7 +249,7 @@ export class Result {
 
 const EMPTY_COLUMNS = Object.freeze([]) as unknown as string[];
 const EMPTY_ROWS = Object.freeze([]) as unknown as unknown[][];
-const EMPTY = Object.freeze(new Result(EMPTY_COLUMNS, EMPTY_ROWS, EMPTY_COLUMN_TYPES)) as Result;
+const EMPTY = new Result(EMPTY_COLUMNS, EMPTY_ROWS, EMPTY_COLUMN_TYPES).freeze();
 
 let EMPTY_ASYNC: Complete | undefined;
 
