@@ -907,15 +907,15 @@ export class RouteSet {
   }
 
   defineMountedHelper(name: string, scriptNamer: ScriptNamer | null = null): void {
-    const helper = camelize(name, "lower");
-    if (MountedHelpers.isMethodDefined(helper)) return;
+    name = camelize(name, "lower");
+    if (MountedHelpers.isMethodDefined(name)) return;
 
     // eslint-disable-next-line @typescript-eslint/no-this-alias -- `routes = self` (`route_set.rb:514`).
     const routes = this;
     const helpers = routes.urlHelpers();
 
     MountedHelpers.defineMethod(
-      `_${helper}`,
+      `_${name}`,
       function (this: UrlForHost & { _routesContext(): UrlForHost }): RoutesProxy {
         return new RoutesProxy(
           routes,
@@ -927,10 +927,10 @@ export class RouteSet {
     );
 
     MountedHelpers.moduleEval((mod) => {
-      Object.defineProperty(mod, helper, {
+      Object.defineProperty(mod, name, {
         configurable: true,
         get(this: Record<string, unknown>): RoutesProxy {
-          return (this[`@_${name}`] ??= (this[`_${helper}`] as () => RoutesProxy).call(
+          return (this[`@_${name}`] ??= (this[`_${name}`] as () => RoutesProxy).call(
             this,
           )) as RoutesProxy;
         },
