@@ -45,8 +45,8 @@ export function touch(
 
 export function incrementBang<T>(
   this: any,
-  _attribute: string,
-  _by: number | undefined,
+  attribute: string,
+  by: number | undefined,
   options: { touch?: unknown } | undefined,
   superFn: () => Promise<T>,
 ): Promise<T> {

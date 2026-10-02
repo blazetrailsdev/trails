@@ -20,7 +20,7 @@ interface DirtyRecord {
 
 export async function reload<T>(
   this: { _mutationsBeforeLastSave: unknown; _mutationsFromDatabase: unknown },
-  _args: unknown[],
+  args: unknown[],
   superFn: () => Promise<T>,
 ): Promise<T> {
   const result = await superFn();

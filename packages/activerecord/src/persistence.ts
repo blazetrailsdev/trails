@@ -14,12 +14,7 @@ import {
   Nodes,
 } from "@blazetrails/arel";
 import { ActiveRecordError, ReadOnlyRecord, RecordNotDestroyed, RecordNotSaved } from "./errors.js";
-import { withConnection } from "./connection-handling.js";
-import {
-  attributesForCreate,
-  attributesForUpdate,
-  attributesWithValues,
-} from "./attribute-methods.js";
+import { attributesForUpdate, attributesWithValues } from "./attribute-methods.js";
 import { getStiBase, isStiSubclass } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
 import { registry } from "./suppressor.js";
@@ -612,50 +607,28 @@ interface ReloadRecord {
   _attributes: unknown;
   _newRecord: boolean;
   _previouslyNewRecord: boolean;
-  _mutationsBeforeLastSave: unknown;
-  _mutationsFromDatabase: unknown;
   _associationCache: Map<string, { owner: unknown }>;
-  id: unknown;
+  isApplyScoping(options: object | null): unknown;
+  _findRecord(options: object | null): Promise<unknown>;
   constructor: {
-    name: string;
-    primaryKey: string | string[];
-    clearQueryCachesForCurrentThread?(): void;
+    connectionPool(): { clearQueryCache(): void };
     unscoped<R>(block: () => R | Promise<R>): Promise<R>;
   };
 }
 
-/**
- * Re-fetch the record from the database and overwrite in-memory attributes,
- * resetting dirty tracking and clearing association/proxy caches.
- *
- * The refetch routes through `_findRecord` so default scopes apply exactly as
- * Rails' `apply_scoping?` dictates: with an all_queries default scope (or a
- * global current scope) and no `unscoped: true`, `_findRecord` runs with
- * `all_queries: true`; otherwise the fetch is wrapped in `unscoped { }`. This
- * also makes reload raise `RecordNotFound` when the active scope excludes the
- * just-saved row (Rails uses `find_by!`).
- *
- * Mirrors: ActiveRecord::Persistence#reload
- */
 export async function reload<T extends ReloadRecord>(
   this: T,
-  options?: { lock?: boolean | string; unscoped?: boolean },
+  options: { lock?: boolean | string; unscoped?: boolean } | null = null,
 ): Promise<T> {
-  const ctor = this.constructor;
-  ctor.clearQueryCachesForCurrentThread?.();
+  this.constructor.connectionPool().clearQueryCache();
 
-  const fresh = (
-    isApplyScoping.call(this as never, options)
-      ? await _findRecord.call(this as never, merge(options ?? {}, { allQueries: true }))
-      : await ctor.unscoped(() => _findRecord.call(this as never, options))
-  ) as {
-    _attributes: unknown;
-    _associationCache: Map<string, { owner: unknown }>;
-  };
+  const freshObject = (await (this.isApplyScoping(options)
+    ? this._findRecord(merge(options || {}, { allQueries: true }))
+    : this.constructor.unscoped(() => this._findRecord(options)))) as ReloadRecord;
 
-  this._associationCache = fresh._associationCache;
+  this._associationCache = freshObject._associationCache;
   for (const association of this._associationCache.values()) association.owner = this;
-  this._attributes = fresh._attributes;
+  this._attributes = freshObject._attributes;
   this._newRecord = false;
   this._previouslyNewRecord = false;
   return this;
@@ -772,6 +745,8 @@ type PersistenceInstanceChainHost = {
   _readAttribute(name: string): unknown;
   _writeAttribute(name: string, value: unknown): void;
   typeForAttribute(name: string): { deserialize(value: unknown): unknown };
+  attributesForCreate(attributeNames: string[]): string[];
+  attributesWithValues(attributeNames: string[]): Record<string, unknown>;
 };
 
 /** @internal */
@@ -932,15 +907,15 @@ export async function _createRecord(
   attributeNames: string[] = this.attributeNames(),
   block?: (record: any) => void,
 ): Promise<unknown> {
-  attributeNames = attributesForCreate.call(this as any, attributeNames);
+  attributeNames = this.attributesForCreate(attributeNames);
 
-  await withConnection.call(this.constructor as typeof Base, async (connection) => {
+  await this.constructor.withConnection(async (connection: any) => {
     const returningColumns = await this.constructor._returningColumnsForInsert(connection);
 
     const returningValues = (await _insertRecord.call(
       this.constructor,
       connection,
-      attributesWithValues.call(this as any, attributeNames),
+      this.attributesWithValues(attributeNames),
       returningColumns,
     )) as unknown[] | null | undefined;
 

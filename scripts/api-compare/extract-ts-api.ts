@@ -4657,14 +4657,6 @@ function isRetryLoop(statement: ts.ForStatement | ts.WhileStatement): boolean {
   return body.length === 1 && ts.isTryStatement(body[0]) && body[0].catchClause !== undefined;
 }
 
-/**
- * The `f(x)` of `for (const x of xs) out.push(await f(x))`, or undefined for
- * any other loop. That shape is Ruby's `xs.collect { |x| f(x) }` whose block
- * awaits (`attributes.collect { |attr| create(attr, &block) }`,
- * `activerecord/lib/active_record/persistence.rb:35`): a `map` callback cannot
- * await its elements in turn, so the call form the fold expects of `collect`
- * is not available to the port.
- */
 function awaitedCollect(statement: ts.ForOfStatement): ts.Expression | undefined {
   let body = statement.statement;
   if (ts.isBlock(body)) {

@@ -29,6 +29,7 @@ import {
   rollbackToSavepoint,
   defaultSequenceName,
   emptyInsertStatementValue,
+  lastInsertedId,
   sanitizeLimit,
   withYamlFallback,
   highPrecisionCurrentTimestamp,
@@ -933,15 +934,38 @@ describe("defaultInsertValue", () => {
 });
 
 describe("returningColumnValues", () => {
-  it("returns [first value of first row] from result", () => {
-    const host: DatabaseStatementsHost = { ...hostDefaults, pool, typeCastedBinds, log };
+  it("returns [first value of first row] from result", async () => {
+    const host: DatabaseStatementsHost = {
+      ...hostDefaults,
+      pool,
+      typeCastedBinds,
+      log,
+      lastInsertedId,
+    };
     const result = new Result(["id"], [[42]]);
-    expect(returningColumnValues.call(host, result)).toEqual([42]);
+    expect(await returningColumnValues.call(host, result)).toEqual([42]);
   });
 
-  it("returns [undefined] for empty result", () => {
-    const host: DatabaseStatementsHost = { ...hostDefaults, pool, typeCastedBinds, log };
-    expect(returningColumnValues.call(host, Result.empty())).toEqual([undefined]);
+  it("returns [undefined] for empty result", async () => {
+    const host: DatabaseStatementsHost = {
+      ...hostDefaults,
+      pool,
+      typeCastedBinds,
+      log,
+      lastInsertedId,
+    };
+    expect(await returningColumnValues.call(host, Result.empty())).toEqual([undefined]);
+  });
+
+  it("answers through the adapter's own lastInsertedId", async () => {
+    const host: DatabaseStatementsHost = {
+      ...hostDefaults,
+      pool,
+      typeCastedBinds,
+      log,
+      lastInsertedId: async () => 7,
+    };
+    expect(await returningColumnValues.call(host, Result.empty())).toEqual([7]);
   });
 });
 
