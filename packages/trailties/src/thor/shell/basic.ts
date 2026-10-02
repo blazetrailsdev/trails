@@ -202,7 +202,7 @@ export class Basic {
     options: Record<string, unknown>,
   ): Promise<unknown> {
     const default_ = options.default;
-    let message = uniq([statement, rtest(default_) ? `(${default_})` : null, null]).join(" ");
+    let message = uniq([statement, rtest(default_) ? `(${toS(default_)})` : null, null]).join(" ");
     message = this.prepareMessage(
       message,
       ...(color == null ? [] : Array.isArray(color) ? color : [color]),
@@ -231,7 +231,7 @@ export class Basic {
     let correctAnswer: unknown = null;
     while (!rtest(correctAnswer)) {
       const answers = answerSet.join(", ");
-      const answer = await this.askSimply(`${statement} [${answers}]`, color, options);
+      const answer = await this.askSimply(`${toS(statement)} [${answers}]`, color, options);
       correctAnswer = this.answerMatch(answerSet, answer, caseInsensitive);
       if (!rtest(correctAnswer)) {
         this.say(`Your response must be one of: [${answers}]. Please try again.`);
