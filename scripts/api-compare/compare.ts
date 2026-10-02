@@ -3042,7 +3042,7 @@ export function reopeningMethodCreditedToOwnFile(
  * `declare static modelName` on `Model`, a `validatesAbsenceOf` signature on
  * `interface API`. That declaration is the type-level cost of `include`, not
  * the port. `model_name` is defined by `naming.rb:270` and ported in naming.ts;
- * `validates_acceptance_of` by `validations/acceptance.rb:117`, a reopening of
+ * `validates_acceptance_of` by `validations/acceptance.rb:108`, a reopening of
  * `HelperMethods`, and ported in validations/acceptance.ts. Naming the
  * includer's file as where the member lives tells the reader to move a method
  * out of its Rails file.

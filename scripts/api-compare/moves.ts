@@ -50,7 +50,7 @@ interface PackageResult {
  *
  * The flag is set wherever compare.ts finds the body in the file mirroring the
  * defining `.rb`: the mixin's own file, a reopening's own file
- * (`validations/acceptance.rb:117` reopens `HelperMethods`), and either of
+ * (`validations/acceptance.rb:108` reopens `HelperMethods`), and either of
  * those when an includer's bodyless declaration matched first.
  */
 export function relocationsByRoute(files: readonly FileResult[]): Map<string, MoveResult[]> {
