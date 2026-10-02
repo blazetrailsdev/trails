@@ -35,6 +35,13 @@ describe("Object#deep_dup", () => {
     expect(deepDup(new Sealed()).secret()).toBe(1);
   });
 
+  it("returns a non-duplicable object itself", () => {
+    const fn = (): void => {};
+    const weak = new WeakMap();
+    expect(deepDup(fn)).toBe(fn);
+    expect(deepDup(weak)).toBe(weak);
+  });
+
   it("copies the JS built-ins that hold their state in internal slots", () => {
     const date = new Date(0);
     const map = new Map([["a", 1]]);

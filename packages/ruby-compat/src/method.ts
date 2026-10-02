@@ -65,10 +65,8 @@ export class Method {
   }
 
   /**
-   * `Method#source_location` (`vendor/ruby/v3.3.11/proc.c:3015` `rb_method_location`,
-   * over `method_def_location` at `:2989` and `iseq_location` at `:1354`): the
-   * body's `[path, first_lineno]`, or `nil` for a body no
-   * {@link iseqLocationSetup} located, as for a method not defined in Ruby.
+   * `Method#source_location` (`vendor/ruby/v3.3.11/proc.c:3015` `rb_method_location`):
+   * `[path, first_lineno]`, or `nil` for a body no {@link iseqLocationSetup} located.
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -81,8 +79,7 @@ const locations = new WeakMap<object, [string, number]>();
 
 /**
  * `iseq_location_setup` (`vendor/ruby/v3.3.11/iseq.c:550`): the `path` and
- * `first_lineno` a body is compiled with. A JS function does not expose where
- * it was written, so whoever defines the method records it.
+ * `first_lineno` of a body, which a JS function does not expose by itself.
  *
  * @noRailsEquivalent PERMANENT
  */

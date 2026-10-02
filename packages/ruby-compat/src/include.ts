@@ -1127,18 +1127,12 @@ export type Extended<M extends object> = CallableMethods<M>;
  * then `initialize_clone(orig)` dispatched on the copy, which is frozen after
  * that hook runs when the receiver is. The singleton class is copied, not
  * shared, so the clone's `extend()` registries are its own. A JS primitive is
- * MRI's `special_object_p` (:380-393) and is returned as is (:539), and so is
- * a Temporal value, which is immutable and keeps its state where no copy can
- * reach. An array is allocated as one (`rb_obj_alloc`), so its elements, which
- * Ruby copies in `Array#initialize_copy` (`array.c:8613`, `rb_ary_replace`),
- * land on a real array. A JS `Date`, `Map`, `Set` and `RegExp` hold their
- * state in internal slots, so each is allocated from the receiver the way its
- * Ruby class's `initialize_copy` fills the allocation (`time_init_copy`,
- * `vendor/ruby/v3.3.11/time.c:4046`; `rb_hash_replace`, `hash.c:2967`;
- * `Set#initialize_dup`, `lib/set.rb:284`; `rb_reg_init_copy`, `re.c:4386`). A
- * class with an allocator ({@link rbDefineAllocFunc}) is allocated through it.
- * The copy hook is found as a method entry, never by a property read a
- * `method_missing` Proxy would answer.
+ * MRI's `special_object_p` (:380-393) and is returned as is (:539), as is a
+ * Temporal value; an array is allocated as one (`rb_obj_alloc`), so its
+ * elements, which Ruby copies in `Array#initialize_copy` (`array.c:8613`,
+ * `rb_ary_replace`), land on a real array, and so are a JS `Date`, `Map`, `Set`
+ * and `RegExp`. A class with an allocator ({@link rbDefineAllocFunc}) is
+ * allocated through it. The copy hook is found as a method entry.
  *
  * Ruby's `Object#initialize_clone` / `#initialize_dup` default to
  * `initialize_copy` (`rb_obj_init_clone` / `rb_obj_init_dup_clone`, object.c:4382-4383), so a
@@ -1199,10 +1193,8 @@ const allocFuncs = new WeakMap<object, (klass: never) => object>();
 
 /**
  * `rb_define_alloc_func` (`vendor/ruby/v3.3.11/vm_method.c:1270`): the allocator
- * `rb_obj_alloc` calls for `klass` and its subclasses (`rb_get_alloc_func`,
- * `:1286`). A class declares one when its instances hold state
- * `Object.create` cannot make (`#private` fields, a Proxy), and copies that
- * state in `initializeCopy`.
+ * for `klass` and its subclasses (`rb_get_alloc_func`, `:1286`), declared when
+ * instances hold state `Object.create` cannot make (`#private` fields, a Proxy).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -1218,7 +1210,6 @@ function rbGetAllocFunc(klass: unknown): ((klass: never) => object) | undefined 
     const allocator = allocFuncs.get(klass);
     if (allocator) return allocator;
   }
-  return undefined;
 }
 
 function rbObjAlloc(obj: object, proto: object | null): object {

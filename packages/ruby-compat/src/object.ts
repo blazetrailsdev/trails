@@ -321,11 +321,9 @@ function checkDefinitionVisibility(mod: { prototype: object }, mid: string): boo
 
 /**
  * `Module#method_defined?` (`rb_mod_method_defined`,
- * `vendor/ruby/v3.3.11/vm_method.c:2055`, through `check_definition_visibility`,
- * `:1988`): whether `mod`'s instances have a public or protected method `mid`.
- * A JS entry carries no visibility, so it answers as
- * {@link rbModPublicMethodDefined} does. A writer `name=` is answered by a JS
- * accessor's setter, the entry {@link rbFSend} dispatches it to.
+ * `vendor/ruby/v3.3.11/vm_method.c:2055`). A JS entry carries no visibility, so
+ * it answers as {@link rbModPublicMethodDefined} does. A writer `name=` is
+ * answered by a JS accessor's setter, the entry {@link rbFSend} dispatches to.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -334,10 +332,9 @@ export function rbModMethodDefined(mod: { prototype: object }, mid: string): boo
 }
 
 /**
- * `rb_attr` (`vendor/ruby/v3.3.11/vm_method.c:1863`): the reader `id` and the
- * writer `id=` over the ivar `@id`. A JS accessor is one descriptor, so the
- * half not being defined keeps the nearest entry's, and the ivar behind a
- * same-named reader lives in the `_`-prefixed field ({@link rbDeclareIvar}).
+ * `rb_attr` (`vendor/ruby/v3.3.11/vm_method.c:1863`). A JS accessor is one
+ * descriptor, so the half not being defined keeps the nearest entry's; the
+ * ivar lives in the `_`-prefixed field ({@link rbDeclareIvar}).
  */
 function rbAttr(klass: { prototype: object }, id: string, read: boolean, write: boolean): void {
   const attriv = `_${id}`;
@@ -462,13 +459,11 @@ export function toSym(obj: unknown): string {
  * Date, or an object defining `<=>`), go through `cmpint`
  * (`vendor/ruby/v3.3.11/compar.c:105-147`) and raise `ArgumentError` for a pair
  * `<=>` cannot place. Any other receiver, `nil` included, has no such method
- * and raises `NoMethodError`. `include?` is dispatched
- * for the core receivers {@link basicObjRespondTo} binds it for, when no entry
- * of their own answers: `String#include?` (`vendor/ruby/v3.3.11/string.c:12215`),
- * `Array#include?` (`array.c:8679`), `Hash#include?` (`hash.c:7255`) and
- * `Set#include?` (`lib/set.rb:393`). A Set or Hash looks its member up by
- * `eql?`, so an object a JS `has` misses by identity is compared with
- * `rb_eql` against each key.
+ * and raises `NoMethodError`. `include?` is dispatched for the core receivers
+ * {@link basicObjRespondTo} binds it for, when no entry of their own answers
+ * (`vendor/ruby/v3.3.11/string.c:12215`, `array.c:8679`, `hash.c:7255`,
+ * `lib/set.rb:393`). A Set or Hash looks a member up by `eql?`, so an object a
+ * JS `has` misses by identity is compared with `rb_eql` against each key.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#send` (`vendor/ruby/v3.3.11/vm_eval.c:1330`).
  */
@@ -549,12 +544,10 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     if (typeof recv === "string") return recv.includes(stringValue(args[0]));
     if (Array.isArray(recv)) return aryIncludes(recv, args[0]);
     if (recv instanceof Set || recv instanceof Map) {
-      if (recv.has(args[0])) return true;
-      if (args[0] === null || typeof args[0] !== "object") return false;
-      for (const key of recv.keys()) {
-        if (rbEql(key, args[0])) return true;
+      if (recv.has(args[0]) || args[0] === null || typeof args[0] !== "object") {
+        return recv.has(args[0]);
       }
-      return false;
+      return [...recv.keys()].some((key) => rbEql(key, args[0]));
     }
     if (isPlainHash(recv)) return hasKey(recv, args[0] as PropertyKey);
     if (recv == null) throw new NoMethodError("undefined method 'include?' for nil", "include?");

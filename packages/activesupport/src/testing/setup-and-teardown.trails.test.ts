@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const travelBack = vi.hoisted(() => ({ raises: null as Error | null }));
 vi.mock("./time-helpers.js", async (importOriginal) => {
@@ -227,9 +227,16 @@ class DeclarativeCollisionTest extends TestCase {
 registerConstant("DeclarativeCollisionTest", DeclarativeCollisionTest);
 
 describe("DeclarativeCollisionTest", () => {
+  let raised: { name?: string; message?: string } | undefined;
+  afterEach(({ task }) => void (raised ??= task.result?.errors?.[0]));
+
   it.fails("is already defined", () => {});
 
   it("names the running test as Declarative#test does", ({ testCase }) => {
+    expect(raised?.name).toBe("RuntimeError");
+    expect(raised?.message).toBe(
+      "test_is_already_defined is already defined in DeclarativeCollisionTest",
+    );
     expect(testCase.name).toBe("test_names_the_running_test_as_Declarative#test_does");
     expect(rbObjMethod(testCase, testCase.name).sourceLocation()).not.toBeNull();
   });

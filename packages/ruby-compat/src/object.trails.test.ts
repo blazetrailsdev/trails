@@ -277,7 +277,13 @@ describe("rbFPublicSend include?", () => {
   });
 
   it("raises NoMethodError for nil", () => {
-    expect(() => rbFPublicSend(null, "isInclude", 1)).toThrow(NoMethodError);
+    const send = (): unknown => rbFPublicSend(null, "isInclude", 1);
+    expect(send).toThrow(NoMethodError);
+    expect(send).toThrow("undefined method 'include?' for nil");
+  });
+
+  it("raises NoMethodError for a receiver that does not define it", () => {
+    expect(() => rbFPublicSend(1, "isInclude", 1)).toThrow(NoMethodError);
   });
 
   it("raises TypeError for String#include? with a non-String", () => {
