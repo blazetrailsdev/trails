@@ -4687,8 +4687,6 @@ export function main() {
       // always describes the very params the arity check would compare.
       const rubyForwardingNames = new Set<string>();
       const rubyBlockOwners = new Map<string, string[]>();
-      // Every same-file body's keys per name, and each owner's own (see
-      // optionKeyPair); the union's params are the first sighting's.
       const rubyOptionKeys = {
         byName: new Map<string, RubyOptionKeys>(),
         byOwnerName: new Map<string, RubyOptionKeys>(),

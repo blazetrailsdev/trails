@@ -5920,12 +5920,6 @@ function typeAdmitsBoolean(type: ts.Type): boolean {
   return type.isUnionOrIntersection() && type.types.some(typeAdmitsBoolean);
 }
 
-/**
- * The parameter that carries the options hash: one named `options` / `opts`,
- * the names extract-ruby-api.rb `option_var_names` picks, else the trailing one.
- * `will_cache?(options, view)` (partial_renderer/collection_caching.rb:16) keeps
- * its hash first, so the trailing param would be `view`.
- */
 function optionsParam(
   parameters: ts.NodeArray<ts.ParameterDeclaration>,
 ): ts.ParameterDeclaration | undefined {
@@ -5937,8 +5931,9 @@ function optionsParam(
 
 /**
  * Advisory option-key extraction (see options-keys.ts). Resolves the options
- * parameter's ({@link optionsParam}) object type to its property names. Returns: undefined (no
- * options-shaped trailing param), null (uncheckable — `any`/`unknown` or a
+ * parameter's object type — one named `options` / `opts`, the names
+ * extract-ruby-api.rb `option_var_names` picks, else the trailing one — to its
+ * property names. Returns: undefined (no options-shaped param), null (uncheckable — `any`/`unknown` or a
  * string-index bag like `Record<string, unknown>`, distinct from `[]`), or the
  * sorted/deduped property names. Only interface/type-literal/intersection
  * trailing params are inspected. A trailing kwargs bag that carries the options
@@ -6004,7 +5999,7 @@ export function extractOptionKeys(
  * `options` property is read through to it, as {@link extractOptionKeys} does.
  * The reader calls are the TS spellings of extract-ruby-api.rb
  * `OPTION_READER_METHODS`, plus `valuesAt`, which reads every key it names.
- * `undefined` when there is no body or no options param ({@link optionsParam}).
+ * `undefined` when there is no body or no options param.
  */
 export function extractOptionReads(
   parameters: ts.NodeArray<ts.ParameterDeclaration>,

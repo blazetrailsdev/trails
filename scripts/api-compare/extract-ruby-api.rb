@@ -3427,9 +3427,6 @@ class ApiExtractor
     names
   end
 
-  # Calls that hand on a copy of the hash, whose keys are the hash's own:
-  # `route_options = options.dup` (mapper.rb:1992). The TS collector follows the
-  # port's `const routeOptions = { ...options }` the same way.
   OPTION_COPY_METHODS = %w[dup clone merge except slice].to_set
 
   def walk_for_option_keys(node, vars, consts, keys)
@@ -3491,7 +3488,6 @@ class ApiExtractor
     end
   end
 
-  # The options var itself, or a chain of OPTION_COPY_METHODS called on it.
   def option_copy?(node, vars)
     return false unless node.is_a?(Array)
     call = node[0] == :method_add_arg ? node[1] : node
@@ -4079,11 +4075,6 @@ class ApiExtractor
 
   # `[:string_content, part…]` for a `:string_literal`, a bare part list for a
   # `:dyna_symbol`. An interpolated part makes the whole value opaque.
-  #
-  # Ripper's `@tstring_content` is the undecoded source text, so a value holding
-  # a backslash is emitted as `rstr:<opener>:<text>`, which call-args.ts decodes
-  # through literals.ts#decodeRubyString; the opener is empty for a
-  # double-quoted literal, as `literal_value` records none for one.
   def describe_string(node)
     return "?" unless node.is_a?(Array)
 

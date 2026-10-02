@@ -7,7 +7,7 @@ import {
   truncate as stringTruncate,
 } from "@blazetrails/activesupport";
 import { OutputBuffer } from "../buffers.js";
-import { Module, chomp, regexpEscape } from "@blazetrails/ruby-compat";
+import { Module, chomp, fetch, regexpEscape } from "@blazetrails/ruby-compat";
 import { TagHelper, contentTag, type TagHelperHost } from "./tag-helper.js";
 import { SanitizeHelper, sanitize } from "./sanitize-helper.js";
 import { OutputSafetyHelper, raw } from "./output-safety-helper.js";
@@ -33,7 +33,7 @@ export function truncate(
   if (text === null || text === undefined) return null;
 
   const textStr = text instanceof SafeBuffer ? text.toString() : text;
-  const length = options.length ?? 30;
+  const length = fetch<number>(options as Record<string, unknown>, "length", 30);
   const truncated = stringTruncate(textStr, length, options);
 
   let content: SafeBuffer = options.escape === false ? htmlSafe(truncated) : htmlEscape(truncated);
