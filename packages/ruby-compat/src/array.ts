@@ -3,7 +3,7 @@ import { rbHash } from "./rb-hash.js";
 import { ArgumentError } from "./argument-error.js";
 import { cmp, rbCmpint } from "./comparable.js";
 import { Hash } from "./hash.js";
-import { rbBuiltinClassName } from "./object.js";
+import { conversionMismatch, rbBuiltinClassName } from "./object.js";
 import { Range } from "./range.js";
 import { num2long } from "./string/support.js";
 import { TypeError } from "./type-error.js";
@@ -633,6 +633,51 @@ export function drop<T>(ary: readonly T[], n: number): T[] {
  */
 export function compact<T>(ary: readonly T[]): Array<NonNullable<T>> {
   return ary.filter((element) => element != null);
+}
+
+/**
+ * `rb_check_array_type` (`vendor/ruby/v3.3.11/array.c:975`, over
+ * `rb_check_convert_type_with_id`, `vendor/ruby/v3.3.11/object.c:3184`): an
+ * Array, its `to_ary`, or nil. A `to_ary` answering anything else raises.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbCheckArrayType(ary: unknown): unknown[] | null {
+  if (Array.isArray(ary)) return ary;
+  const toAry = (ary as { toAry?: unknown } | null)?.toAry;
+  if (typeof toAry !== "function") return null;
+  const v: unknown = toAry.call(ary);
+  if (v == null) return null;
+  if (!Array.isArray(v)) conversionMismatch(ary, "Array", "to_ary", v);
+  return v;
+}
+
+/**
+ * Ruby `Array#flatten` with no level (`vendor/ruby/v3.3.11/array.c:6476`
+ * `rb_ary_flatten`, over `flatten`, `array.c:6305`): every element that
+ * answers {@link rbCheckArrayType} is replaced by its own flattened elements,
+ * and an array reached again on its own path raises.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function flatten(ary: readonly unknown[]): unknown[] {
+  const result: unknown[] = [];
+  const memo = new Set<unknown>([ary]);
+  const walk = (level: readonly unknown[]): void => {
+    for (const elt of level) {
+      const tmp = rbCheckArrayType(elt);
+      if (tmp === null) {
+        result.push(elt);
+        continue;
+      }
+      if (memo.has(tmp)) throw new ArgumentError("tried to flatten recursive array");
+      memo.add(tmp);
+      walk(tmp);
+      memo.delete(tmp);
+    }
+  };
+  walk(ary);
+  return result;
 }
 
 /**

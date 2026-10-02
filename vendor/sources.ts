@@ -249,6 +249,23 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "bcrypt-ruby",
+    origin: {
+      type: "git",
+      url: "https://github.com/bcrypt-ruby/bcrypt-ruby.git",
+      // vendor/rails/v8.0.2/Gemfile:34 declares `gem "bcrypt", "~> 3.1.11"`,
+      // resolved to 3.1.20 by vendor/rails/v8.0.2/Gemfile.lock:145.
+      ref: "v3.1.20",
+    },
+    packages: [
+      {
+        name: "bcrypt",
+        libPath: "lib/bcrypt",
+        testPath: "spec/bcrypt",
+      },
+    ],
+  },
+  {
     name: "sqlite3",
     origin: {
       type: "git",

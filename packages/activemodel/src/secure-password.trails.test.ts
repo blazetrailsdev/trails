@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Model } from "./index.js";
 import { hasSecurePassword, SecurePassword } from "./secure-password.js";
-import { Engine, Errors, Password } from "./bcrypt.js";
+import { Engine, Errors, Password } from "@blazetrails/bcrypt";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 import { include } from "@blazetrails/activesupport";
 import { User } from "./test-helpers/models/user.js";

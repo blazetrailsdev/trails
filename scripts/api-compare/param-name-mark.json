@@ -31,6 +31,10 @@
     "total": 0,
     "byFile": {}
   },
+  "bcrypt": {
+    "total": 0,
+    "byFile": {}
+  },
   "did-you-mean": {
     "total": 0,
     "byFile": {}

@@ -708,8 +708,12 @@ describe("Ruby extractor mocha expectation collection", () => {
             expect { runner.find("README") }.not_to raise_error
           end
 
-          it "stays a bare expect" do
+          specify "operators" do
             expect(count).to be > 3
+            expect(described_class).to be < BCrypt::Error
+          end
+
+          it "stays a bare expect" do
             expect(shell).to receive(:say).and_return(nil)
             mock.expect(:call, nil)
           end
@@ -725,6 +729,7 @@ describe("Ruby extractor mocha expectation collection", () => {
       "expect_to_be_nil",
     ]);
     expect(k["blocks"]).toEqual(["expect_to_raise_error", "expect_not_to_raise_error"]);
-    expect(k["stays a bare expect"]).toEqual(["expect", "expect", "expect"]);
+    expect(k["operators"]).toEqual(["expect_to_be_>", "expect_to_be_kind_of"]);
+    expect(k["stays a bare expect"]).toEqual(["expect", "expect"]);
   });
 });

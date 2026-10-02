@@ -43,6 +43,7 @@ export default [
       "packages/globalid/src/**/*.ts",
       "packages/i18n/src/**/*.ts",
       "packages/did-you-mean/src/**/*.ts",
+      "packages/bcrypt/src/**/*.ts",
       "packages/trailties/src/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
@@ -71,6 +72,7 @@ export default [
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/did-you-mean/src/**/*.ts",
+      "packages/bcrypt/src/**/*.ts",
       "packages/arel/src/**/*.ts",
       // Absent from the rails-private manifest by construction, so the
       // receipt pairing is mandatory package-wide there (RFC 0129).

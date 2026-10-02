@@ -1,5 +1,9 @@
 {
   "sources": {
+    "bcrypt-ruby": {
+      "ref": "v3.1.20",
+      "sha": "58f8afd33d8813e84706b938815bb1aa08d0b470"
+    },
     "date": {
       "ref": "v3.4.1",
       "sha": "a3295ad262773a80ad61526beb500b29e770b817"

@@ -304,13 +304,17 @@ class TestExtractor
       when "describe"
         desc = extract_first_string(inner[2])
         return if desc.nil? && collect_shared_example(inner[2], node)
+        desc ||= const_name_from_args(inner[2]) unless @describe_stack.empty?
         if desc
           @describe_stack.push(desc)
           walk(block) if block.is_a?(Array)
           @describe_stack.pop
           return
         end
-      when "it"
+      when "shared_examples"
+        name = extract_first_string(inner[2])
+        return define_shared_example(name, node) if name
+      when "it", "specify"
         # Pass outer node so assertion extraction can walk the block body
         process_it(inner[2], node)
         return
@@ -333,7 +337,7 @@ class TestExtractor
             @describe_stack.pop
             return
           end
-        when "it"
+        when "it", "specify"
           # Pass inner for desc extraction, outer node includes block for assertions
           process_it_paren(inner, node)
           return
@@ -460,8 +464,10 @@ class TestExtractor
   # accessor because the definition lives in a different FILE from its callers.
   def collect_shared_example(args, node)
     name = shared_example_name(args)
-    return false unless name
+    name ? define_shared_example(name, node) : false
+  end
 
+  def define_shared_example(name, node)
     saved_cases = @test_cases
     saved_stack = @describe_stack
     @test_cases = []
@@ -480,7 +486,7 @@ class TestExtractor
   # an 8-line shell. The call site is a real line in that file and names the
   # shared body, which is the one hop a reader wants.
   def materialize_shared_example(args, node)
-    name = first_symbol_name(args)
+    name = first_symbol_name(args) || extract_first_string(args)
     return unless name
     line = extract_line(node)
     (@shared_examples[name] || []).each do |t|
@@ -544,9 +550,9 @@ class TestExtractor
     case cmd_name
     when "describe"
       process_describe(args, node)
-    when "it_behaves_like", "it_should_behave_like"
+    when "it_behaves_like", "it_should_behave_like", "include_examples"
       materialize_shared_example(args, node)
-    when "it"
+    when "it", "specify"
       process_it(args, node)
     when "test"
       process_test_macro(args, node)
@@ -562,7 +568,7 @@ class TestExtractor
       case cmd_name
       when "describe"
         process_describe_paren(node)
-      when "it"
+      when "it", "specify"
         process_it_paren(node)
       when "test"
         process_test_macro_paren(node)
@@ -1921,6 +1927,13 @@ class TestExtractor
     return nil unless recv.is_a?(Array) && recv[0] == :fcall && ident_name(recv[1]) == "expect"
     matcher = (positional_args(node[4]) || node[4])&.first
     matcher = matcher[1] if matcher.is_a?(Array) && matcher[0] == :method_add_block
+    if matcher.is_a?(Array) && matcher[0] == :binary && matcher[1].is_a?(Array) &&
+       matcher[1][0] == :vcall && ident_name(matcher[1][1]) == "be"
+      rhs = matcher[3]
+      const = rhs.is_a?(Array) && (rhs[0] == :const_path_ref || (rhs[0] == :var_ref && rhs[1][0] == :@const))
+      name = const && %i[< <=].include?(matcher[2]) ? "be_kind_of" : "be_#{matcher[2]}"
+      return ["expect_#{to}_#{name}", recv, nil]
+    end
     args = nil
     if matcher.is_a?(Array) && matcher[0] == :method_add_arg
       args = matcher[2]

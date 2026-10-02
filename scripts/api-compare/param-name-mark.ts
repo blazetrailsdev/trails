@@ -38,6 +38,7 @@ export const GATED_PACKAGES = [
   "activerecord",
   "activesupport",
   "arel",
+  "bcrypt",
   "did-you-mean",
   "globalid",
   "rack",

@@ -1,6 +1,6 @@
 import { ArgumentError } from "../argument-error.js";
 import { IndexError } from "../index-error.js";
-import { rbBuiltinClassName } from "../object.js";
+import { conversionMismatch, rbBuiltinClassName } from "../object.js";
 import { Range } from "../range.js";
 import { RangeError as RbRangeError } from "../range-error.js";
 import { TypeError } from "../type-error.js";
@@ -79,8 +79,11 @@ export function stringValue(val: unknown): string {
 export function rbCheckStringType(val: unknown): string | null {
   if (typeof val === "string") return val;
   const toStr = (val as { toStr?: unknown } | null)?.toStr;
-  if (typeof toStr === "function") return toStr.call(val) as string;
-  return null;
+  if (typeof toStr !== "function") return null;
+  const v: unknown = toStr.call(val);
+  if (v == null) return null;
+  if (typeof v !== "string") conversionMismatch(val, "String", "to_str", v);
+  return v;
 }
 
 /**

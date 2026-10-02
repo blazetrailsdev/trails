@@ -7,7 +7,7 @@ import { Attributes, type AttributesClassHalf } from "../../attributes.js";
 import { Dirty } from "../../dirty.js";
 import { defineModelCallbacks } from "../../callbacks.js";
 import { hasSecurePassword } from "../../secure-password.js";
-import type { Password } from "../../bcrypt.js";
+import type { Password } from "@blazetrails/bcrypt";
 
 const SecurePasswordModel = Model as unknown as {
   new (attributes?: Record<string, unknown>): Model & {
