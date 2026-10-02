@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { Types } from "../index.js";
+import * as Types from "../index.js";
 import { TimeWithZone, useZone, zone, assertNil } from "@blazetrails/activesupport";
 
 function timeUtc(year: number, mon: number, mday: number, hour = 0, min = 0, sec = 0): RubyTime {

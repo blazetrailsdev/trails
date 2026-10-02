@@ -1,4 +1,10 @@
-import { classAttribute, included, rbHash } from "@blazetrails/activesupport";
+import {
+  classAttribute,
+  include,
+  included,
+  initializeIncludedModules,
+  rbHash,
+} from "@blazetrails/activesupport";
 import { SerializeCastValue, ValueType } from "@blazetrails/activemodel";
 import { DelegateClass, rbObjInspect } from "@blazetrails/ruby-compat";
 
@@ -92,6 +98,7 @@ export class NormalizedValueType extends DelegateClass(ValueType) {
     normalizeNil: boolean;
   }) {
     super(castType);
+    initializeIncludedModules(this);
     this.castType = castType;
     this.normalizer = normalizer;
     this.normalizeNil = normalizeNil;
@@ -110,14 +117,6 @@ export class NormalizedValueType extends DelegateClass(ValueType) {
       this.castType as unknown as Parameters<typeof SerializeCastValue.serialize>[0],
       value,
     );
-  }
-
-  override itselfIfSerializeCastValueCompatible(): this | null {
-    return (
-      this.constructor as unknown as { serializeCastValueCompatible(): boolean }
-    ).serializeCastValueCompatible()
-      ? this
-      : null;
   }
 
   equals(other: ValueType): boolean {
@@ -146,6 +145,8 @@ export class NormalizedValueType extends DelegateClass(ValueType) {
     return this.normalizer(value);
   }
 }
+
+include(NormalizedValueType, SerializeCastValue);
 
 function castTypesEqual(a: ValueType, b: ValueType): boolean {
   const equals = (a as { equals?(other: ValueType): boolean }).equals;

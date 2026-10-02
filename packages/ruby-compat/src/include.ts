@@ -634,6 +634,7 @@ export function initializeIncludedModules(instance: object, ...args: unknown[]):
       );
     }
     if (level.length !== 0) chain.unshift(level);
+    if (Object.prototype.hasOwnProperty.call(proto, delegateClass)) break;
   }
   for (const initializers of chain) {
     for (const initializer of initializers) initializer.call(instance, ...args);
@@ -665,6 +666,8 @@ const includedKeys = Symbol.for("@blazetrails/ruby-compat:includedKeys");
 const extendedKeys = Symbol.for("@blazetrails/ruby-compat:extendedKeys");
 
 const includedModulesKey = Symbol.for("@blazetrails/ruby-compat:includedModules");
+
+const delegateClass = Symbol.for("@blazetrails/ruby-compat:delegateClass");
 
 const STATIC_CLASS_KEYS = new Set(["prototype", "length", "name"]);
 
@@ -702,9 +705,13 @@ function isModuleMethodTablePresent(klass: { prototype: object }, mod: unknown):
     proto;
     proto = Object.getPrototypeOf(proto) as object | null
   ) {
-    if (!Object.prototype.hasOwnProperty.call(proto, includedModulesKey)) continue;
-    if (((proto as Record<symbol, unknown>)[includedModulesKey] as Set<unknown>).has(mod))
+    if (
+      Object.prototype.hasOwnProperty.call(proto, includedModulesKey) &&
+      ((proto as Record<symbol, unknown>)[includedModulesKey] as Set<unknown>).has(mod)
+    ) {
       return true;
+    }
+    if (Object.prototype.hasOwnProperty.call(proto, delegateClass)) break;
   }
   return false;
 }

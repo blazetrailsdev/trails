@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Types } from "./index.js";
+import * as Types from "./index.js";
 import { register, lookup } from "./type.js";
 
 describe("TypeTest", () => {

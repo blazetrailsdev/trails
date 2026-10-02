@@ -1,9 +1,5 @@
-export class ForbiddenAttributesError extends globalThis.Error {
-  constructor(message?: string) {
-    super(message);
-    this.name = "ForbiddenAttributesError";
-  }
-}
+export class ForbiddenAttributesError extends globalThis.Error {}
+ForbiddenAttributesError.prototype.name = "ForbiddenAttributesError";
 
 export interface PermittedAttributes {
   permitted: boolean | (() => boolean);

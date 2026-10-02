@@ -4,7 +4,7 @@
    how `include()` surfaces those members on the type side. */
 import { describe, expect, it } from "vitest";
 
-import { AttrNames, InstanceMethods, defineMethodAttribute } from "./attribute-methods.js";
+import { AttrNames, AttributeMethods, defineMethodAttribute } from "./attribute-methods.js";
 import { Model } from "./index.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 import { include } from "@blazetrails/activesupport";
@@ -251,7 +251,7 @@ describe("AttributeMethodsTest (trails)", () => {
     const stack = "custom backtrace line";
     const call = () =>
       (
-        InstanceMethods.missingAttribute as (
+        AttributeMethods.missingAttribute as (
           this: unknown,
           attrName: string,
           stack?: string,

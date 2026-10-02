@@ -25,7 +25,7 @@ export type DateTimeCastResult = RubyTime | DateInfinityType | DateNegativeInfin
 export interface DateTimeType
   extends
     Timezone,
-    Omit<InstanceMethods<DateTimeCastResult>, "valueFromMultiparameterAssignment">,
+    InstanceMethods<DateTimeCastResult>,
     Omit<Included<typeof TimeValue>, "serializeCastValue"> {
   serializeCastValue(value: DateTimeCastResult | null): DateTimeCastResult | null;
 }

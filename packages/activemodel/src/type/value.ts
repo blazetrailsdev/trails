@@ -1,12 +1,23 @@
 import {
+  include,
+  initializeIncludedModules,
   rbDeclareIvar,
   rbInspect as inspect,
   rbEqual,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "../attribute-assignment.js";
+import { SerializeCastValue } from "./serialize-cast-value.js";
 
+export interface ValueType<T = unknown> {
+  serializeCastValue(value: T | null): unknown;
+  itselfIfSerializeCastValueCompatible(): this | null;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ValueType<T = unknown> {
+  declare static serializeCastValueCompatible: () => boolean;
+
   private _precision: number | null;
   private _scale: number | null;
   private __limit: number | null;
@@ -32,6 +43,7 @@ export class ValueType<T = unknown> {
     limit?: number | null;
     scale?: number | null;
   } = {}) {
+    initializeIncludedModules(this);
     this._precision = precision;
     this._scale = scale;
     this.__limit = limit;
@@ -113,46 +125,9 @@ export class ValueType<T = unknown> {
   protected castValue(value: unknown): T | null {
     return value as T | null;
   }
-
-  serializeCastValue(value: T | null): unknown {
-    return value;
-  }
-
-  itselfIfSerializeCastValueCompatible(): this | null {
-    return (
-      this.constructor as unknown as { serializeCastValueCompatible(): boolean }
-    ).serializeCastValueCompatible()
-      ? this
-      : null;
-  }
-
-  static serializeCastValueCompatible(this: { _serializeCastValueCompatible?: boolean }): boolean {
-    if (Object.hasOwn(this, "_serializeCastValueCompatible")) {
-      return this._serializeCastValueCompatible as boolean;
-    }
-    let proto: object | null = (this as unknown as { prototype: object }).prototype;
-    let serializeDepth = -1;
-    let castDepth = -1;
-    let depth = 0;
-    while (proto && proto !== Object.prototype) {
-      if (serializeDepth < 0 && Object.prototype.hasOwnProperty.call(proto, "serialize")) {
-        serializeDepth = depth;
-      }
-      if (castDepth < 0 && Object.prototype.hasOwnProperty.call(proto, "serializeCastValue")) {
-        castDepth = depth;
-      }
-      proto = Object.getPrototypeOf(proto);
-      depth++;
-    }
-    const result = castDepth >= 0 && serializeDepth >= 0 && castDepth <= serializeDepth;
-    Object.defineProperty(this, "_serializeCastValueCompatible", {
-      value: result,
-      writable: true,
-      configurable: true,
-    });
-    return result;
-  }
 }
+
+include(ValueType, SerializeCastValue);
 
 rbDeclareIvar(ValueType, "@precision", "_precision");
 rbDeclareIvar(ValueType, "@scale", "_scale");

@@ -7,8 +7,6 @@ export interface InstanceMethods<T = unknown> {
   cast(value: unknown): T | null;
   assertValidValue(value: unknown): void;
   isValueConstructedByMassAssignment(value: unknown): boolean;
-  /** @internal */
-  valueFromMultiparameterAssignment(valuesHash: Record<string, unknown>): T | null;
 }
 
 function superOf(

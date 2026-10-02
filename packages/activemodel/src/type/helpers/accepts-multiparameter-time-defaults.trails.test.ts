@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { include } from "@blazetrails/activesupport";
-import { Types, ValueType } from "../../index.js";
+import * as Types from "../../index.js";
+import { ValueType } from "../../index.js";
 import { AcceptsMultiparameterTime } from "./accepts-multiparameter-time.js";
 import { Timezone } from "./timezone.js";
 

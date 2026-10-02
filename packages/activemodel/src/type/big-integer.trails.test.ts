@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Types, BigIntegerType, IntegerType } from "../index.js";
+import * as Types from "../index.js";
+import { BigIntegerType, IntegerType } from "../index.js";
 
 describe("BigIntegerType", () => {
   it("string with no leading digits casts to 0, following String#to_i", () => {

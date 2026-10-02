@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Duration } from "@blazetrails/activesupport";
-import { Types } from "../index.js";
+import * as Types from "../index.js";
 import { ImmutableStringType } from "./immutable-string.js";
 
 describe("ImmutableStringType (trails)", () => {

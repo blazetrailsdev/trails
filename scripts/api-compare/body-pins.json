@@ -18817,13 +18817,6 @@
   {
     "package": "activemodel",
     "rubyFile": "type/value.rb",
-    "rubyName": "itself_if_serialize_cast_value_compatible",
-    "digest": "2b1e4f51a654ec03",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activemodel",
-    "rubyFile": "type/value.rb",
     "rubyName": "map",
     "digest": "b3901e296ee71013",
     "ref": "v8.0.2"

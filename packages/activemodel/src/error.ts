@@ -280,6 +280,7 @@ export class Error {
     return [this.base, this.attribute, this.rawType, except(this.options, ...CALLBACKS_OPTIONS)];
   }
 
+  /** @noRailsEquivalent CONVERGEABLE deep-dup-has-no-object-arm-so-classes-hand-write-it */
   deepDup(): this {
     return rbObjDup(this);
   }

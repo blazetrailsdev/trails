@@ -67,7 +67,7 @@ export function isRespondTo(
   name: string,
   includePrivate: boolean = false,
 ): boolean {
-  if (!AMAttributeMethods.InstanceMethods.isRespondTo.call(this as never, name, includePrivate))
+  if (!AMAttributeMethods.AttributeMethods.isRespondTo.call(this as never, name, includePrivate))
     return false;
 
   if (this._attributes) {
@@ -655,7 +655,7 @@ export function attributeForInspect(this: InstanceMethodHost, attrName: string):
 
 export function get(this: InstanceMethodHost, attrName: string): unknown {
   return this.readAttribute(attrName, (n) =>
-    AttributeMethods.InstanceMethods.missingAttribute.call(
+    AttributeMethods.AttributeMethods.missingAttribute.call(
       this as unknown as AttributeMethodsInstanceHost,
       n,
     ),

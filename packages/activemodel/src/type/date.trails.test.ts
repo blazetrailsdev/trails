@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Date as RubyDate, Temporal } from "@blazetrails/date";
 import { plainDate } from "@blazetrails/activesupport/testing/temporal-helpers";
-import { Types, ValueType } from "../index.js";
+import * as Types from "../index.js";
+import { ValueType } from "../index.js";
 
 describe("DateType assert_valid_value", () => {
   afterEach(() => {

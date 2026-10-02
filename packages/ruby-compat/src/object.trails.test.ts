@@ -11,6 +11,8 @@ import {
   rbFSend,
   toSym,
   rbModPublicMethodDefined,
+  rbModAncestors,
+  rbModInstanceMethod,
   rbDeclareIvar,
   rbObjInstanceVariables,
   rbObjIvarGet,
@@ -250,6 +252,23 @@ describe("rbModPublicMethodDefined", () => {
     expect(rbModPublicMethodDefined(Req, "field")).toBe(false);
     expect(rbModPublicMethodDefined(Req, "hasOwnProperty")).toBe(false);
     expect(rbModPublicMethodDefined(Req, "nope")).toBe(false);
+  });
+});
+
+describe("rbModAncestors / rbModInstanceMethod", () => {
+  it("orders an included Module above the class and names the owner of a method", () => {
+    class Base {
+      serialize(): void {}
+    }
+    class Sub extends Base {}
+    const mod = new Module();
+    mod.defineMethod("cast", () => {});
+    mod.appendFeatures(Sub);
+    const ancestors = rbModAncestors(Sub);
+    expect(ancestors.map((link) => Object.hasOwn(link, "cast"))).toEqual([false, true, false]);
+    expect(rbModInstanceMethod(Sub, "cast").owner).toBe(ancestors[1]);
+    expect(rbModInstanceMethod(Sub, "serialize").owner).toBe(Base.prototype);
+    expect(() => rbModInstanceMethod(Sub, "nope")).toThrow(NameError);
   });
 });
 

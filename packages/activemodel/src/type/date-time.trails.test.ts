@@ -2,7 +2,8 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError, Rational } from "@blazetrails/ruby-compat";
 import { instant, plainDateTime } from "@blazetrails/activesupport/testing/temporal-helpers";
-import { Types, ValueType } from "../index.js";
+import * as Types from "../index.js";
+import { ValueType } from "../index.js";
 
 describe("DateTimeType fallback string parsing", () => {
   const type = new Types.DateTimeType();

@@ -1,15 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { Types } from "./index.js";
+import * as Types from "./index.js";
 
 describe("Type#itselfIfSerializeCastValueCompatible", () => {
-  it("base Type is compatible (both methods at the base class)", () => {
+  it("a subclass inheriting both from Type::Value is incompatible", () => {
     class Base extends Types.ValueType<string> {
       readonly name = "base";
       cast(v: unknown) {
         return v as string;
       }
     }
-    expect(new Base().itselfIfSerializeCastValueCompatible()).toBeInstanceOf(Base);
+    expect(new Base().itselfIfSerializeCastValueCompatible()).toBeNull();
   });
 
   it("subclass that overrides only serialize is incompatible", () => {

@@ -86,7 +86,6 @@ export interface AttributeAssignment {
   _assignAttributes(attributes: Record<string, unknown>): Promise<void> | void;
   /** @internal */
   _assignAttribute(k: string, v: unknown): Promise<void> | void;
-  methodMissing?(method: string, ...args: unknown[]): unknown;
 }
 
 function respondToEachPair(attrs: unknown): attrs is Record<string, unknown> {

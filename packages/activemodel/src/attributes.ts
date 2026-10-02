@@ -15,7 +15,6 @@ import {
   AttributeMethods,
   AttrNames,
   ClassMethods as AttributeMethodsClassMethods,
-  InstanceMethods as AttributeMethodsInstanceMethods,
   defineMethodAttribute,
   completeHalfAccessor,
   type AttributeMethodHost,
@@ -132,7 +131,7 @@ export function freeze<T>(this: AttributeInstanceHost, super_: () => T): T {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActiveModel::AttributeMethods` (attributes.rb:8); the class/interface merge is how `include()` surfaces on the type side.
-export interface Attributes extends Included<typeof AttributeMethodsInstanceMethods> {
+export interface Attributes extends Included<typeof AttributeMethods> {
   attributeMissing(match: AttributeMethod, ...args: unknown[]): unknown;
 
   /** @internal */
@@ -183,7 +182,7 @@ export class Attributes {
   }
 }
 
-include(Attributes, { attributeMissing: AttributeMethodsInstanceMethods.attributeMissing });
+include(Attributes, { attributeMissing: AttributeMethods.attributeMissing });
 
 export const ClassMethods = {
   attribute,

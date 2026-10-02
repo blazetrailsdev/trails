@@ -5,7 +5,8 @@
 import { describe, it, expect } from "vitest";
 import { include, BigDecimal } from "@blazetrails/activesupport";
 import { Dirty } from "../dirty.js";
-import { Model, Types } from "../index.js";
+import * as Types from "../index.js";
+import { Model } from "../index.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
 
 const bd = (value: string) => new BigDecimal(value);

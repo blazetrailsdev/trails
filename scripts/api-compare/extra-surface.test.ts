@@ -16,6 +16,7 @@ import {
   concernHookNames,
   concernHookKey,
   inlinedModuleMembers,
+  moduleInitializeFiles,
 } from "./extra-surface.js";
 import type { TaggedEntry, TaggedSummary } from "./extra-surface.js";
 import { extractFromProgram } from "./extract-ts-api.js";
@@ -4486,5 +4487,114 @@ describe("inlinedModuleMembers", () => {
   it("reports nothing when the includer's file declares no body for the name", () => {
     const bodied = new Map([["select-manager.ts", new Set(["project"])]]);
     expect(inlinedModuleMembers("arel", rubyClasses, rubyModules, byShort, bodied)).toEqual([]);
+  });
+});
+
+describe("buildReport — members Ruby supplies without a def in the mapped file", () => {
+  function tsClass(file: string, instance: string[], klass: string[] = []): ClassInfo {
+    return {
+      name: "",
+      file,
+      includes: [],
+      extends: [],
+      instanceMethods: instance.map((n) => method(n)),
+      classMethods: klass.map((n) => method(n)),
+    };
+  }
+
+  const ruby: ApiManifest = {
+    source: "ruby",
+    generatedAt: "",
+    packages: {
+      activemodel: {
+        classes: {
+          "ActiveModel::NullMutationTracker": rubyClass({
+            name: "NullMutationTracker",
+            file: "attribute_mutation_tracker.rb",
+            includes: ["Singleton"],
+          }),
+          "ActiveModel::Plain": rubyClass({ name: "Plain", file: "plain.rb" }),
+          "ActiveModel::Type::Value": rubyClass({
+            name: "Value",
+            file: "type/value.rb",
+            includes: ["SerializeCastValue"],
+            instance: [method("serialize")],
+          }),
+          "ActiveModel::Type::Other": rubyClass({ name: "Other", file: "type/other.rb" }),
+        },
+        modules: {
+          "ActiveModel::Type::SerializeCastValue": rubyClass({
+            name: "SerializeCastValue",
+            file: "type/serialize_cast_value.rb",
+            instance: [method("initialize")],
+          }),
+          "ActiveModel::Type::SerializeCastValue::DefaultImplementation": rubyClass({
+            name: "DefaultImplementation",
+            file: "type/serialize_cast_value.rb",
+            instance: [method("serialize_cast_value")],
+          }),
+        },
+      },
+    },
+  };
+
+  function extrasByFile(classes: Record<string, ClassInfo>): Record<string, string[]> {
+    for (const [name, info] of Object.entries(classes)) info.name = name;
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: { activemodel: { classes, modules: {} } },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    return Object.fromEntries(
+      report.packages[0].extraFiles.map((f) => [f.tsFile, f.extras.map((e) => e.name)]),
+    );
+  }
+
+  it("credits Singleton's instance to a class that includes it, and to no other", () => {
+    expect(
+      extrasByFile({
+        NullMutationTracker: tsClass("attribute-mutation-tracker.ts", [], ["instance"]),
+        Plain: tsClass("plain.ts", [], ["instance"]),
+      }),
+    ).toEqual({ "plain.ts": ["instance"] });
+  });
+
+  it("credits the DefaultImplementation that SerializeCastValue.included injects", () => {
+    expect(
+      extrasByFile({
+        ValueType: tsClass("type/value.ts", ["serialize", "serializeCastValue"]),
+        Other: tsClass("type/other.ts", ["serializeCastValue"]),
+      }),
+    ).toEqual({ "type/other.ts": ["serializeCastValue"] });
+  });
+
+  it("finds the files in which a module defines initialize", () => {
+    expect([...moduleInitializeFiles(ruby.packages.activemodel)]).toEqual([
+      "type/serialize_cast_value.rb",
+    ]);
+  });
+
+  it("does not report a host constructor as inlined once the module twin carries [initialize]", () => {
+    const { classes, modules } = ruby.packages.activemodel;
+    const byShort = new Map([["SerializeCastValue", ["ActiveModel::Type::SerializeCastValue"]]]);
+    const inlined = (twin: string[]) =>
+      inlinedModuleMembers(
+        "activemodel",
+        classes,
+        modules,
+        byShort,
+        new Map([
+          ["type/value.ts", new Set(["constructor"])],
+          ["type/serialize-cast-value.ts", new Set(twin)],
+        ]),
+      ).map((f) => f.tsName);
+    expect(inlined([])).toEqual(["constructor"]);
+    expect(inlined(["[initialize]"])).toEqual([]);
   });
 });

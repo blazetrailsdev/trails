@@ -3,7 +3,7 @@ import { rbBlockGivenP } from "@blazetrails/ruby-compat";
 
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { ArgumentError, NameError } from "../attribute-assignment.js";
+import { NameError } from "../attribute-assignment.js";
 
 export class WithValidator extends EachValidator {
   validateEach(record: ValidatableRecord, attr: string, _val: unknown): void {
@@ -18,14 +18,6 @@ export class WithValidator extends EachValidator {
       method.call(record);
     } else {
       method.call(record, attr);
-    }
-  }
-
-  override checkValidityBang(): void {
-    super.checkValidityBang();
-    const methodName = this.options.with;
-    if (typeof methodName !== "string" || methodName.trim().length === 0) {
-      throw new ArgumentError("WithValidator requires the :with option to be a non-blank string");
     }
   }
 }
