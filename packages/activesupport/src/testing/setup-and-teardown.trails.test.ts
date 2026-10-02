@@ -15,7 +15,13 @@ vi.mock("./time-helpers.js", async (importOriginal) => {
 import { Assertion, Skip, UnexpectedError } from "./assertions.js";
 import { _takeAssertions, assertNot, assertRaises } from "./assertions.js";
 import { TestCase } from "../test-case.js";
-import { Module, include, iseqLocationSetup } from "@blazetrails/ruby-compat";
+import {
+  Module,
+  include,
+  iseqLocationSetup,
+  rbObjMethod,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 
 function testCase(): typeof TestCase {
   return class extends TestCase {};
@@ -212,5 +218,19 @@ describe("TestCase lifecycle hooks", () => {
     ).rejects.toBe(travelBack.raises);
     travelBack.raises = null;
     expect(ran).toEqual(["after_teardown"]);
+  });
+});
+
+class DeclarativeCollisionTest extends TestCase {
+  ["test_is_already_defined"](): void {}
+}
+registerConstant("DeclarativeCollisionTest", DeclarativeCollisionTest);
+
+describe("DeclarativeCollisionTest", () => {
+  it.fails("is already defined", () => {});
+
+  it("names the running test as Declarative#test does", ({ testCase }) => {
+    expect(testCase.name).toBe("test_names_the_running_test_as_Declarative#test_does");
+    expect(rbObjMethod(testCase, testCase.name).sourceLocation()).not.toBeNull();
   });
 });
