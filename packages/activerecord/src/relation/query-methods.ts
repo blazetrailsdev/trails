@@ -8,6 +8,7 @@ import {
   isModuleIncluded,
   isSymbol,
   rbFPublicSend,
+  rbFSend,
   rbInspect,
   rbObjAsString,
   rbObjClassname,
@@ -1381,7 +1382,7 @@ export function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): 
 
 /** @internal */
 export function extractTableNameFrom(string: string): string | null {
-  const match = string.match(/^\W?(\w+)\W?\./);
+  const match = (isSymbol(string) ? symbolToS(string) : string).match(/^\W?(\w+)\W?\./);
   return match && match[1];
 }
 
@@ -1458,7 +1459,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
         } else if (isHash(arg)) {
           return (toA(arg) as [unknown, unknown][]).map(([key, value]) => {
             if (isHash(value)) {
-              return (toA(value) as [unknown, string][]).map(([field, dir]) =>
+              return (toA(value) as [unknown, unknown][]).map(([field, dir]) =>
                 rbFPublicSend(
                   orderColumn.call(
                     this,
@@ -1467,7 +1468,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
                       isSymbol(field) ? symbolToS(field) : String(field),
                     ].join("."),
                   ),
-                  dir.toLowerCase(),
+                  rbFSend(dir, "downcase"),
                 ),
               );
             } else {
@@ -1476,11 +1477,11 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
                 key instanceof Nodes.Node ||
                 key instanceof Arel.Attribute
               ) {
-                return rbFPublicSend(key, (value as string).toLowerCase());
+                return rbFPublicSend(key, rbFSend(value, "downcase"));
               } else {
                 return rbFPublicSend(
                   orderColumn.call(this, isSymbol(key) ? symbolToS(key) : String(key)),
-                  (value as string).toLowerCase(),
+                  rbFSend(value, "downcase"),
                 );
               }
             }

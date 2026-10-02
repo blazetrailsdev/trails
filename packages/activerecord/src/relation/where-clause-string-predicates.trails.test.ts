@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes } from "@blazetrails/arel";
+import { Hash } from "@blazetrails/ruby-compat";
 import { WhereClause } from "./where-clause.js";
 import "../index.js";
 import { registerModel } from "../associations.js";
@@ -90,14 +91,17 @@ describe("where / having with a SqlLiteral (trails)", () => {
     expect(Object.keys(clause.toH())).toEqual(["id", "name"]);
     expect(Object.keys(clause.toH("users"))).toEqual(["id"]);
     expect(clause.toH("missing")).toEqual({});
+    const literal = new WhereClause([new Table(new Nodes.SqlLiteral("users")).get("id").eq(1)]);
+    expect(Object.keys(literal.toH("users"))).toEqual(["id"]);
   });
 
   it("keys referenced_columns by the attribute itself, one entry per attribute", () => {
     const predicate = table().get("id").eq(2);
     const clause = new WhereClause([table().get("id").eq(1), predicate]);
     const columns = (
-      clause as unknown as { referencedColumns(): Map<unknown, unknown> }
+      clause as unknown as { referencedColumns(): Hash<unknown, unknown> }
     ).referencedColumns();
+    expect(columns).toBeInstanceOf(Hash);
     expect(columns.size).toBe(1);
     expect(columns.get(table().get("id"))).toBe(predicate);
   });

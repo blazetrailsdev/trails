@@ -123,7 +123,7 @@ export class WhereClause {
       left: Arel.Attribute;
       right: unknown;
     })[]) {
-      if (tableName != null && tableName !== node.left.relation.name) continue;
+      if (tableName != null && !rbEqual(tableName, node.left.relation.name)) continue;
       const name = String(node.left.name);
       const value = extractNodeValue(node.right);
       hash[name] = value;

@@ -68,6 +68,7 @@ describe("columnReferences", () => {
     const references = columnReferences([
       "posts.id",
       ":authors.name",
+      ':"people".id',
       { tags: { name: "asc" } },
       { "users.id": "desc", id: "asc" },
       new Map([[comments.get("id"), "desc"]]),
@@ -79,6 +80,7 @@ describe("columnReferences", () => {
     expect(references.map(String)).toEqual([
       "posts",
       "authors",
+      "people",
       "tags",
       "users",
       "comments",

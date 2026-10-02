@@ -41,7 +41,10 @@ export abstract class Visitor {
         hashAset(
           hash,
           klass,
-          `visit_${rbModName(klass) ?? ""}`.replace(/(?<=^visit)_(?=.)|::/g, ""),
+          `visit_${(rbModName(klass) ?? "").replaceAll("::", "_")}`.replace(
+            /_+([a-zA-Z0-9])/g,
+            (_, ch: string) => ch.toUpperCase(),
+          ),
         ),
       ).compareByIdentity())
     );
