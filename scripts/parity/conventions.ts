@@ -942,6 +942,23 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
+      "`Thor::Option#initialize` (parser/option.rb:7-16) assigns " +
+      "`@check_default_type` and `@repeatable` and only then calls `super`, and " +
+      "`Thor::Argument#initialize` (parser/argument.rb:8-26) ends in `validate!`, " +
+      "whose `Option` override reads both ivars (option.rb:126-158). A JS " +
+      "constructor cannot touch `this` before `super()` returns, so the port " +
+      "keeps the Ruby name as an `initialize` method `Argument`'s constructor " +
+      "delegates to and `Option` overrides, calling `super.initialize` where " +
+      "Ruby calls `super` — the same shape `ActiveRecord::Fixture#initialize` " +
+      "above already carries. Scoped to thor's parser/argument.rb and " +
+      "parser/option.rb so a real class's `initialize` is still expected to map " +
+      "to a `constructor`.",
+    names: ["initialize"],
+    rubyFiles: ["parser/argument.rb", "parser/option.rb"],
+    tsMirrorName: "initialize",
+  },
+  {
+    reason:
       "ActiveSupport::Dependencies (dependencies.rb), " +
       "ActiveSupport::Autoload (dependencies/autoload.rb) and the ShareLock " +
       "wrapper Dependencies.interlock returns (dependencies/interlock.rb) are Zeitwerk " +
