@@ -65,10 +65,11 @@ export class Headers extends Hash<string, string> {
     return this.size === 0;
   }
 
-  each(fn: (key: string, value: string) => void): void {
+  each(fn: (key: string, value: string) => void): this {
     for (const [k, v] of this) {
       fn(k, v);
     }
+    return this;
   }
 
   eachKey(fn: (key: string) => void): void {

@@ -68,6 +68,20 @@ Every export, with the call site that justifies it (rule 1).
 | `objRespondToMissing`                  | `vm_method.c:3009` `obj_respond_to_missing`           | `actionpack/src/action-dispatch/routing/routes-proxy.ts` (`respond_to_missing?`'s `super`, `routes_proxy.rb:27`)                                                                                                                                                                                                                                                                                              |
 | `Marshal`                              | `marshal.c:2555` `rb_define_module("Marshal")`        | none yet: `ruby-compat-has-no-marshal-for-schema-cache-and-debug` wires `Marshal.load` / `Marshal.dump` into `activerecord/src/connection-adapters/schema-cache.ts` (`schema_cache.rb:233,409`) and `actionview/src/helpers/debug-helper.ts` (`debug_helper.rb:29`); byte fixtures regenerate with `ruby packages/ruby-compat/src/marshal.fixtures.rb`                                                        |
 
+### Core classes are class objects; `Symbol` is not one
+
+`rbObjClass` answers `Object#class` as a class object. `NilClass`, `TrueClass`,
+`FalseClass`, `Numeric`, `Integer`, `Float`, `String`, `Class`, `Proc`, `Time`,
+`Date`, `DateTime` and `BasicObject` are seated in `object.ts` by
+`rb_define_class`; `Hash`, `Module`, `Kernel` and `Enumerable` are the exports
+of those names. `include.ts` wires their MRI included modules.
+
+`Symbol` has no seat. A Ruby Symbol is a bare JS string everywhere except the
+call sites that keep its colon to tell it from a String, so no reading of a
+value can answer "is a Symbol": a classifier keyed on the colon would call
+`"::1"` and `"::Float::NAN"` Symbols. `rbObjClass` answers `String` for every
+string, and a call site that discriminates uses `isSymbol`.
+
 ## The contract
 
 Four rules govern this package. Rules 2 and 3 are mechanically enforced, rule 4

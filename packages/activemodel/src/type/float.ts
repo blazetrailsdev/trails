@@ -1,9 +1,11 @@
 import { BigDecimal } from "@blazetrails/activesupport";
-import { include, isNan, rbFloatTypeP, registerConstant, toF } from "@blazetrails/ruby-compat";
+import { isNan, rbFloatTypeP, registerConstant, toF } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
-import { Numeric } from "./helpers/numeric.js";
+import { applyNumericMixin } from "./helpers/numeric.js";
 
-export class FloatType extends ValueType<number> {
+const NumericValueType = applyNumericMixin(ValueType<number>);
+
+export class FloatType extends NumericValueType {
   type(): string {
     return "float";
   }
@@ -35,7 +37,5 @@ export class FloatType extends ValueType<number> {
     }
   }
 }
-
-include(FloatType, Numeric);
 
 registerConstant("ActiveModel::Type::Float", FloatType);

@@ -1416,4 +1416,4 @@ include(rbCNumeric, rbMComparable);
 include(rbCString, rbMComparable);
 include(rbCTime, rbMComparable);
 include(rbCDate, rbMComparable);
-trackIncludedModule(Hash.prototype, Enumerable);
+include(Hash, Enumerable);

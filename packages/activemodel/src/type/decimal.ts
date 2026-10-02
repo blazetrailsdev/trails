@@ -1,6 +1,5 @@
 import { BigDecimal, toD } from "@blazetrails/activesupport";
 import {
-  include,
   Rational,
   rbFloatTypeP,
   rbInspect as inspect,
@@ -11,13 +10,15 @@ import {
   toI,
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
-import { Numeric } from "./helpers/numeric.js";
+import { applyNumericMixin } from "./helpers/numeric.js";
+
+const NumericValueType = applyNumericMixin(ValueType<BigDecimal>);
 
 const BIGDECIMAL_PRECISION = 18;
 
 const FLOAT_DIG = 15;
 
-export class DecimalType extends ValueType<BigDecimal> {
+export class DecimalType extends NumericValueType {
   type(): string {
     return "decimal";
   }
@@ -84,7 +85,5 @@ export class DecimalType extends ValueType<BigDecimal> {
     }
   }
 }
-
-include(DecimalType, Numeric);
 
 registerConstant("ActiveModel::Type::Decimal", DecimalType);

@@ -819,6 +819,14 @@ describe("Module#ancestors", () => {
     expect(names(1.5)).toBe("Float Numeric Comparable Object Kernel BasicObject");
     expect(names(null)).toBe("NilClass Object Kernel BasicObject");
     expect(names({})).toMatch(/^Hash Enumerable /);
+    const hash = new Hash<string, number>().set("a", 1).set("b", 2);
+    const included = hash as unknown as {
+      map(block: (pair: [string, number]) => string): string[];
+    };
+    expect(included.map(([key, value]) => key + value)).toEqual(["a1", "b2"]);
+    const yielded: unknown[] = [];
+    expect(hash.each((key: string, value: number) => yielded.push(key, value))).toBe(hash);
+    expect(yielded).toEqual(["a", 1, "b", 2]);
     expect(names(class {})).toBe("Class Module Object Kernel BasicObject");
     expect(names("s")).toBe("String Comparable Object Kernel BasicObject");
     expect(names(new Date(0))).toBe("Time Comparable Object Kernel BasicObject");
