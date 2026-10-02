@@ -728,7 +728,7 @@ function buildCountSubquery(
     if (!distinct) relation.selectValues = [sql(ONE_AS_ONE)];
   } else {
     columnAlias = sql("count_column");
-    const column = aggregateColumn(relation, columnName) as Nodes.Node & {
+    const column = aggregateColumn(relation, columnName) as ArelNode & {
       as(alias: Nodes.SqlLiteral): Nodes.Node;
     };
     relation.selectValues = [column.as(columnAlias)];
@@ -835,7 +835,7 @@ export async function executeGroupedCalculation(
     }
   }
   const relation = rel.except("group").distinctBang(false) as CalculationRelation;
-  const groupNodes = arelColumns.call(relation as never, groupFields) as Nodes.Node[];
+  const groupNodes = arelColumns.call(relation as never, groupFields) as ArelNode[];
 
   return rel.model.withConnection(async (connection) => {
     const columnAliasTracker = new ColumnAliasTracker(connection);
@@ -856,10 +856,10 @@ export async function executeGroupedCalculation(
     );
     const selectValue = operationOverAggregateColumn(column, fn, distinct ?? false) as any;
 
-    const selectValues: Nodes.Node[] = [selectValue.as(connection.quoteColumnName(columnAlias))];
+    const selectValues: ArelNode[] = [selectValue.as(connection.quoteColumnName(columnAlias))];
     if (!rel.havingClause.isEmpty()) {
       selectValues.push(
-        ...(arelColumns.call(rel as never, rel.selectValues as never[]) as Nodes.Node[]),
+        ...(arelColumns.call(rel as never, rel.selectValues as never[]) as ArelNode[]),
       );
     }
     selectValues.push(
@@ -1045,7 +1045,7 @@ export function typeCastCalculatedValue(value: unknown, operation: string, type:
 export async function selectForCount(rel: CalculationRelation): Promise<string> {
   if (isEmpty(rel.selectValues)) return ":all";
   return rel.withConnection((conn) =>
-    (arelColumns.call(rel as never, rel.selectValues as never[]) as Nodes.Node[])
+    (arelColumns.call(rel as never, rel.selectValues as never[]) as ArelNode[])
       .map((column) => (conn.visitor ? conn.visitor.compile(column) : String(column)))
       .join(", "),
   );

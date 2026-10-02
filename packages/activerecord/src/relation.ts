@@ -731,7 +731,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   private referencesEagerLoadedTables(): boolean {
     let joinedTables = this.buildJoins([]).flatMap((join: Nodes.Join) =>
       join instanceof Nodes.StringJoin
-        ? this.tablesInString(join.left as Nodes.Node)
+        ? this.tablesInString(join.left as Nodes.SqlLiteral)
         : [(join.left as unknown as { name: string }).name],
     );
 
@@ -798,7 +798,7 @@ export class Relation<T extends Base, G extends boolean = false> {
         ? (await this.applyJoinDependency()).arel()
         : this.buildArel(c);
       arel.source.left = this.table;
-      const groupValuesArelColumns = this.arelColumns(uniq(this.groupValues)) as Nodes.Node[];
+      const groupValuesArelColumns = this.arelColumns(uniq(this.groupValues)) as ArelNode[];
       const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
       const primaryKey = this.primaryKey;
       const key = this.model.compositePrimaryKey
@@ -836,7 +836,7 @@ export class Relation<T extends Base, G extends boolean = false> {
         ? (await this.applyJoinDependency()).arel()
         : this.buildArel(c);
       arel.source.left = this.table;
-      const groupValuesArelColumns = this.arelColumns(uniq(this.groupValues)) as Nodes.Node[];
+      const groupValuesArelColumns = this.arelColumns(uniq(this.groupValues)) as ArelNode[];
       const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
       const primaryKey = this.model.primaryKey;
       const key = this.model.compositePrimaryKey

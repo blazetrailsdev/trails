@@ -1166,7 +1166,7 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
     r instanceof ActiveRecord.Base ? (r as any).id : r,
   );
   const inlineSubquery = (this.predicateBuilder.build(attribute, deferredRelations[0]) as Nodes.In)
-    .right as Nodes.Node;
+    .right as ArelNode;
   this.whereClause = this.whereClause.plus(
     new WhereClause([
       new DeferredIdsNotIn(attribute, inlineSubquery, [

@@ -101,10 +101,7 @@ export function toSqlAndBinds(
     let sql: string;
     if (host!.preparedStatements) {
       collector.preparable = true;
-      [sql, binds] = visitor.compile(arelOrSqlString as Nodes.Node, collector) as unknown as [
-        string,
-        unknown[],
-      ];
+      [sql, binds] = visitor.compile(arelOrSqlString, collector) as unknown as [string, unknown[]];
 
       if (binds.length > (host as unknown as { bindParamsLength(): number }).bindParamsLength()) {
         return host!.unpreparedStatement!(() => toSqlAndBinds.call(host, arelOrSqlString)) as [
@@ -116,7 +113,7 @@ export function toSqlAndBinds(
       }
       preparable = collector.preparable ?? null;
     } else {
-      sql = visitor.compile(arelOrSqlString as Nodes.Node, collector) as unknown as string;
+      sql = visitor.compile(arelOrSqlString, collector) as unknown as string;
     }
     allowRetry = collector.retryable;
     return [sql, binds, preparable, allowRetry];
