@@ -24,7 +24,6 @@ import {
   KeyError,
   merge,
   Module,
-  NilClass,
   RuntimeError,
   SecureRandom,
   StringIO,
@@ -259,7 +258,7 @@ async function process(
   this.request = new TestRequest(
     this.scrubEnvBang(this.request.env),
     this.request.session as unknown as TestSession,
-    this.controller.constructor,
+    this.controller.constructor as typeof Metal,
   );
   this.response = this.buildResponse(this._responseKlass);
   this.response.request = this.request;
@@ -321,9 +320,7 @@ function setupControllerRequestAndResponse(this: Behavior): void {
     }
   }
 
-  this.request = TestRequest.create(
-    this.controller == null ? NilClass : this.controller.constructor,
-  );
+  this.request = TestRequest.create(this.controller == null ? null : this.controller.constructor);
   this.response = this.buildResponse(this._responseKlass);
   this.response.request = this.request;
 
@@ -585,10 +582,10 @@ export class TestRequest extends AbstractTestRequest {
     return new TestSession();
   }
 
-  private _controllerClass: unknown;
+  private _controllerClass: DispatchableControllerClass | null;
 
-  override controllerClass(): DispatchableControllerClass {
-    return this._controllerClass as DispatchableControllerClass;
+  override controllerClass(): DispatchableControllerClass | null {
+    return this._controllerClass;
   }
 
   static create(controllerClass: unknown): TestRequest {
@@ -597,7 +594,7 @@ export class TestRequest extends AbstractTestRequest {
     return new TestRequest(
       merge(TestRequest.defaultEnv(), env),
       TestRequest.newSession(),
-      controllerClass,
+      controllerClass as DispatchableControllerClass | null,
     );
   }
 
@@ -609,7 +606,11 @@ export class TestRequest extends AbstractTestRequest {
     return env;
   }
 
-  constructor(env: Record<string, unknown>, session: TestSession, controllerClass: unknown) {
+  constructor(
+    env: Record<string, unknown>,
+    session: TestSession,
+    controllerClass: DispatchableControllerClass | null,
+  ) {
     super(env);
 
     this.session = session as never;

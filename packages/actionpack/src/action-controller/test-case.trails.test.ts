@@ -3,7 +3,6 @@ import { BigDecimal, include, isModuleIncluded, TopLevel } from "@blazetrails/ac
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import {
   b,
-  NilClass,
   registerConstant,
   setVerbose,
   stderr,
@@ -223,7 +222,7 @@ describe("TestCase#setup_controller_request_and_response", () => {
     }
   });
 
-  it("builds the request from nil's class when the controller cannot be constructed", async ({
+  it("builds the request with no controller class when the controller cannot be constructed", async ({
     task,
   }) => {
     class UnconstructibleTest extends TestCase {}
@@ -231,7 +230,7 @@ describe("TestCase#setup_controller_request_and_response", () => {
     const tc = new UnconstructibleTest(task.name);
     await tc.beforeSetup();
     expect(tc.controller).toBeNull();
-    expect(tc.request.controllerClass()).toBe(NilClass);
+    expect(tc.request.controllerClass()).toBeNull();
   });
 
   it("builds the request from the class of the controller it holds", async ({ task }) => {
@@ -536,6 +535,17 @@ describe("TestSession Rails-mirroring API", () => {
 
 describe("TestCase class helpers", () => {
   class PostsController extends Base {}
+
+  it("tests(string) resolves <Name>Controller via globalThis", () => {
+    registerConstant("WidgetController", PostsController);
+    try {
+      class Sub extends TestCase {}
+      Sub.tests("widget");
+      expect(Sub.controllerClass).toBe(PostsController);
+    } finally {
+      unregisterConstant("WidgetController", PostsController);
+    }
+  });
 
   it("tests(string) raises NameError-style when no matching constant exists", () => {
     class Sub extends TestCase {}

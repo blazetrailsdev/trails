@@ -308,7 +308,7 @@ export function recognizedRequestFor(
   let pathStr = typeof path === "string" ? path : path.path;
 
   const controller = this.controller;
-  const request = TestRequest.create((controller as object | undefined)?.constructor);
+  const request = TestRequest.create((controller as object | undefined)?.constructor ?? null);
   if (URL_FORM_RE.test(pathStr)) {
     failOn(InvalidURIError, msg, () => {
       const uri = URI.parse(pathStr);

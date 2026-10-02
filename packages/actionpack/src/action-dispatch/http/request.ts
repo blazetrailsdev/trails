@@ -853,7 +853,7 @@ export class Request {
   /** @internal */
   declare isParamsReadable: () => boolean;
 
-  controllerClass(): DispatchableControllerClass | typeof PassNotFound {
+  controllerClass(): DispatchableControllerClass | typeof PassNotFound | null {
     const params = this.pathParameters;
     if (params["action"] == null) params["action"] = "index";
     return this.controllerClassFor(params["controller"] as string | undefined);
