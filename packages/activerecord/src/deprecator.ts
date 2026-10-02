@@ -1,4 +1,5 @@
 import { Deprecation } from "@blazetrails/activesupport";
+import type { Gem } from "@blazetrails/ruby-compat";
 import { gemVersion } from "./gem-version.js";
 
 export { Deprecation as Deprecator };
@@ -9,7 +10,7 @@ export function deprecator(): Deprecation {
   return _deprecator;
 }
 
-export function version(): string {
+export function version(): InstanceType<typeof Gem.Version> {
   return gemVersion();
 }
 

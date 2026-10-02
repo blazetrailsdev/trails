@@ -121,7 +121,7 @@ export const Integration = {
 };
 
 export const ClassMethods = {
-  /** @missingRailsCall define_method — PERMANENT */
+  /** @missingRailsCall define_method — CONVERGEABLE define-method-on-a-class-receiver-goes-through-ruby-compat */
   toParam(this: { name: string; prototype: any }, methodName?: string): string | undefined {
     if (methodName == null) {
       return this.name;

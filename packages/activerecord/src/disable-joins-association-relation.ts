@@ -44,7 +44,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T,
 
   override first(): Promise<T | null>;
   override first(n: number): Promise<T[]>;
-  /** @missingRailsCall limit — PERMANENT */
+  /** @missingRailsCall limit — CONVERGEABLE call-gate-credits-rb-f-send-of-a-literal-name-as-that-call */
   override async first(limit?: number): Promise<T | T[] | null> {
     const records = await this.toArray();
     if (limit != null) {

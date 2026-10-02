@@ -118,7 +118,7 @@ export function setBaseClass(modelClass: typeof Base): void {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE model-namespace-reads-the-constant-path-not-a-module-name-static */
 export function qualifiedName(modelClass: typeof Base): string {
   const klass = modelClass as typeof Base & { moduleName?: string; _demodulizedName?: string };
   if (modelClass === ActiveRecord.Base) return "ActiveRecord::Base";
@@ -128,7 +128,7 @@ export function qualifiedName(modelClass: typeof Base): string {
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE model-namespace-reads-the-constant-path-not-a-module-name-static
  */
 export function namespaceSegments(modelClass: typeof Base): string[] {
   const moduleName = (modelClass as typeof Base & { moduleName?: string }).moduleName;
@@ -151,7 +151,7 @@ export function polymorphicName(modelClass: typeof Base): string {
   return klass.storeFullClassName ? name : demodulize(name);
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE model-class-names-resolve-through-constantize-not-a-model-registry */
 export function registerSubclass(klass: typeof Base): void {
   const parent = rbClassSuperclass(klass);
   if (!parent) return;

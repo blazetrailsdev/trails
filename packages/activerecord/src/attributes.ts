@@ -45,7 +45,7 @@ export function defineAttribute(
 
 let replayingOverColdSchema = false;
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE enum-undeclared-type-raise-reads-no-cold-schema-replay-flag */
 export function isReplayingOverColdSchema(): boolean {
   return replayingOverColdSchema;
 }
