@@ -53,6 +53,7 @@ export {
   rbSetClassPathString,
   rbFPublicSend,
   rbFSend,
+  toS,
   toSym,
   rbModAttrReader,
   rbModAttrWriter,

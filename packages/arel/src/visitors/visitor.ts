@@ -2,6 +2,7 @@ import {
   Hash,
   NoMethodError,
   TypeError,
+  hashAset,
   rbObjClass,
   rbFSend,
   rbModAncestors,
@@ -34,15 +35,19 @@ export abstract class Visitor {
 
   /** @internal */
   static dispatchCache(this: typeof Visitor): Hash<object, string> {
-    if (!Object.prototype.hasOwnProperty.call(this, "_dispatchCache")) {
-      this._dispatchCache = new Hash<object, string>((hash, klass) => {
-        const path = (rbModName(klass) ?? "").replaceAll("::", "");
-        const dispatchMethod = path === "" ? "visit_" : `visit${path}`;
-        hash.set(klass, dispatchMethod);
-        return dispatchMethod;
-      }).compareByIdentity();
-    }
-    return this._dispatchCache!;
+    return (
+      (Object.hasOwn(this, "_dispatchCache") && this._dispatchCache) ||
+      (this._dispatchCache = new Hash<object, string>((hash, klass) =>
+        hashAset(
+          hash,
+          klass,
+          `visit_${(rbModName(klass) ?? "").replaceAll("::", "_")}`.replace(
+            /_+([a-zA-Z0-9])/g,
+            (_, ch: string) => ch.toUpperCase(),
+          ),
+        ),
+      ).compareByIdentity())
+    );
   }
 
   protected getDispatchCache(): Hash<object, string> {

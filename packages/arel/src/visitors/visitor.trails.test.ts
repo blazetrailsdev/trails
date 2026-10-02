@@ -3,6 +3,7 @@ import { NoMethodError, TypeError, rbObjClass, rbFSend } from "@blazetrails/ruby
 import { Temporal } from "@blazetrails/date";
 import { Node } from "../nodes/node.js";
 import { SqlLiteral } from "../nodes/sql-literal.js";
+import { Not } from "../nodes/unary.js";
 import { Visitor } from "./visitor.js";
 import { UnsupportedVisitError } from "./to-sql.js";
 
@@ -126,10 +127,12 @@ describe("Visitor dispatch", () => {
     expect(new StringVisitor().accept(new SqlLiteral("x"))).toBe("String");
   });
 
-  it("keeps an underscore that is part of the class name", () => {
+  it("names the method Rails' visit_Some_Thing translates to, and visit_ for an anonymous class", () => {
     class Some_Thing {}
     class UnderscoreVisitor extends Visitor {}
-    expect(UnderscoreVisitor.dispatchCache().get(Some_Thing)).toBe("visitSome_Thing");
+    expect(UnderscoreVisitor.dispatchCache().get(Some_Thing)).toBe("visitSomeThing");
+    expect(UnderscoreVisitor.dispatchCache().get(class {})).toBe("visit_");
+    expect(UnderscoreVisitor.dispatchCache().get(Not)).toBe("visitArelNodesNot");
   });
 
   it("keys the dispatch cache by identity and names a method after the class path", () => {

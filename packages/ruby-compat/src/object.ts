@@ -2,6 +2,7 @@ import { aryIncludes } from "./array.js";
 import { hasKey } from "./hash.js";
 import { stringInspect } from "./string/inspect.js";
 import { rbCheckStringType, stringValue } from "./string/support.js";
+import { STRING_METHOD_TABLE, rbStrSend } from "./string/method-table.js";
 import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
 import { cmp, rbCmpint, rubyClass, type Comparable } from "./comparable.js";
 import { rbEql, rbEqual } from "./rb-equal.js";
@@ -540,6 +541,22 @@ export function toSym(obj: unknown): string {
 }
 
 /**
+ * Ruby's `obj.to_s` send for a receiver that may be a Symbol: `Symbol#to_s`
+ * (`rb_sym_to_s`, `vendor/ruby/v3.3.11/string.c:11734`) answers the name of a
+ * colon-spelled Symbol (`":name"`), and every other receiver answers as
+ * {@link rbObjAsString} does (`String#to_s` is `rb_str_to_s`,
+ * `vendor/ruby/v3.3.11/string.c:6648`). It is the send, where
+ * {@link symbolToS} is `rb_sym_to_s` on a known Symbol, as `toSym` is to
+ * `stringToSym`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function toS(obj: unknown): string {
+  if (isSymbol(obj)) return symbolToS(obj);
+  return rbObjAsString(obj);
+}
+
+/**
  * `Kernel#send` (`rb_f_send`, `vendor/ruby/v3.3.11/vm_eval.c:1330`): calls the nearest
  * entry for `mid` whatever its visibility. A zero-argument reader ported as a
  * JS accessor or a field answers through its getter or its value, as the Ruby
@@ -643,6 +660,9 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     if (desc && argc === 0) return desc.get ? desc.get.call(recv) : desc.value;
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
     if (setter) return setter.call(recv, args[0]);
+  }
+  if (typeof recv === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) {
+    return rbStrSend(recv, mid, ...args)[0];
   }
   if (mid === "isInclude") {
     if (typeof recv === "string") return recv.includes(stringValue(args[0]));

@@ -385,6 +385,7 @@ export {
 export * from "./time-ext.js";
 import "./core-ext/time/calculations.js";
 import "./core-ext/date-time/calculations.js";
+import "./core-ext/date/zones.js";
 import "./core-ext/enumerable.js";
 export * from "./core-ext/time/conversions.js";
 export { rfc3339 } from "./time-ext.js";
