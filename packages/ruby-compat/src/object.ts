@@ -511,10 +511,13 @@ function objAddress(obj: object): string {
  * `rb_float_new_inline` packs it into
  * (`vendor/ruby/v3.3.11/internal/numeric.h:243-262`).
  *
- * @boundary: a JS string has no identity, so each send hands out a fresh id,
- *  as a fresh `String` would get; a Symbol's static id is not modelled. A
- *  Bignum and a Float outside the flonum range are heap objects in MRI and get
- *  a fresh id the same way. An id past `Number.MAX_SAFE_INTEGER` is a bigint.
+ * @boundary: a JS `number` is the seat for both `Integer` and `Float`, read
+ *  off the value as {@link rbObjClass} reads it, so `1.0`, `0.0` and `-0`
+ *  answer the Fixnum id where MRI answers a flonum's. A JS string has no
+ *  identity, so each send hands out a fresh id, as a fresh `String` would get;
+ *  a Symbol's static id is not modelled. A Bignum and a Float outside the
+ *  flonum range are heap objects in MRI and get a fresh id the same way. An id
+ *  past `Number.MAX_SAFE_INTEGER` is a bigint.
  *
  * @noRailsEquivalent PERMANENT
  */

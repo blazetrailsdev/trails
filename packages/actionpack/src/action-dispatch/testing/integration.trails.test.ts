@@ -49,6 +49,11 @@ describe("Integration::RequestHelpers#follow_redirect!", () => {
     await session.get("/here");
     await session.followRedirectBang({ headers: { HTTP_REFERER: "http://given.test/" } });
     expect(session.body).toBe("GET http://given.test/");
+
+    await session.get("/here");
+    const symbolKeyed: Record<string, string> = { ":HTTP_REFERER": "http://given.test/" };
+    await session.followRedirectBang({ headers: symbolKeyed });
+    expect(symbolKeyed["HTTP_REFERER"]).toBeUndefined();
   });
 
   it("re-sends the request's verb on a 307 and a 308, and GET otherwise", async () => {
