@@ -1,6 +1,7 @@
 import { Concern } from "@blazetrails/activesupport";
 import { XML, type XmlDocument } from "@blazetrails/nokogiri";
-import { extend, Module } from "@blazetrails/ruby-compat";
+import { extend, Module, rbModConstSet } from "@blazetrails/ruby-compat";
+import { ActionDispatch } from "../../namespaces.js";
 import { ResponseAssertions } from "./assertions/response.js";
 import { RoutingAssertions } from "./assertions/routing.js";
 
@@ -35,4 +36,11 @@ export const Assertions = new Module((mod) => {
   mod.moduleEval((m) => {
     Object.defineProperty(m, "htmlDocument", { get: htmlDocument, configurable: true });
   });
-});
+}) as Module & {
+  ResponseAssertions: typeof ResponseAssertions;
+  RoutingAssertions: typeof RoutingAssertions;
+};
+
+rbModConstSet(ActionDispatch, "Assertions", Assertions);
+rbModConstSet(Assertions, "ResponseAssertions", ResponseAssertions);
+rbModConstSet(Assertions, "RoutingAssertions", RoutingAssertions);

@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import "../test-case.js";
+import "../../test-helpers/abstract-unit.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { controllerConstants } from "../../action-dispatch/http/request.js";
 import type { DispatchableControllerClass } from "../../action-dispatch/routing/dispatcher.js";

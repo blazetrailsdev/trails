@@ -13,6 +13,7 @@ import {
   type RoutingAssertionsHost,
 } from "./assertions/routing.js";
 import { IntegrationTest } from "./integration.js";
+import { ActionController, ActionDispatch } from "../../namespaces.js";
 
 describe("ActionDispatch::Assertions", () => {
   it("is included, with the modules it includes, by ActionController::TestCase and IntegrationTest", () => {
@@ -25,6 +26,18 @@ describe("ActionDispatch::Assertions", () => {
       expect(Object.hasOwn(klass.prototype, "assertResponse")).toBe(false);
     }
     expect(isModuleIncluded(TestCase, TemplateAssertions)).toBe(true);
+  });
+
+  it("is seated at its Rails constant path, with the modules nested in it", () => {
+    expect(ActionDispatch.Assertions).toBe(Assertions);
+    expect(Assertions.ResponseAssertions).toBe(ResponseAssertions);
+    expect(Assertions.RoutingAssertions).toBe(RoutingAssertions);
+    expect(Assertions.name).toBe("ActionDispatch::Assertions");
+    expect(ResponseAssertions.name).toBe("ActionDispatch::Assertions::ResponseAssertions");
+    expect(RoutingAssertions.name).toBe("ActionDispatch::Assertions::RoutingAssertions");
+    expect(ActionController.TemplateAssertions).toBe(TemplateAssertions);
+    expect(TemplateAssertions.name).toBe("ActionController::TemplateAssertions");
+    expect(ActionController.TestCase).toBe(TestCase);
   });
 
   it("extends the includer with RoutingAssertions::ClassMethods", () => {
