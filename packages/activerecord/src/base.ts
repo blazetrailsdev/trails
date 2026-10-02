@@ -2710,7 +2710,7 @@ include(Base, new Module((mod) => mod.defineMethod("initAttributes", _Core.initA
 include(Base, AMDirty);
 include(Base, _Dirty);
 include(Base, _AttrSerialization);
-include(Base, LockingPessimistic.InstanceMethods);
+include(Base, LockingPessimistic.Pessimistic);
 include(Base, LockingOptimistic.InstanceMethods);
 include(Base, Timestamp.InstanceMethods);
 include(Base, TouchLater.InstanceMethods);

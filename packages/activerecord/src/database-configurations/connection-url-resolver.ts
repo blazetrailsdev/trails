@@ -1,4 +1,6 @@
 import type { DatabaseConfigOptions } from "./database-config.js";
+import { reverseMerge } from "@blazetrails/activesupport";
+import { merge } from "@blazetrails/ruby-compat";
 import { protocolAdapters } from "../active-record.js";
 
 export class ConnectionUrlResolver {
@@ -9,7 +11,7 @@ export class ConnectionUrlResolver {
   private readonly _query: string | null;
   private readonly _emptyAuthority: boolean;
 
-  /** @missingRailsCall split — PERMANENT */
+  /** @missingRailsCall split — CONVERGEABLE connection-url-resolver-parses-through-uri-rfc2396-parser */
   constructor(url: string) {
     if (!url || url.trim() === "") {
       throw new Error("Database URL cannot be empty");
@@ -121,33 +123,31 @@ export class ConnectionUrlResolver {
 
   /**
    * @internal
-   * @missingRailsCall merge — PERMANENT
+   * @missingRailsArgs merge — CONVERGEABLE connection-url-resolver-parses-through-uri-rfc2396-parser
    */
   private rawConfig(): Record<string, unknown> {
     if (this._opaque !== null) {
-      return {
-        ...this.queryHash(),
+      return merge(this.queryHash(), {
         adapter: this._adapter,
         database: this._opaque,
-      };
+      });
     }
 
     const parsed = this._parsed!;
     const hostname = this._emptyAuthority ? "" : parsed.hostname;
-    return {
+    return reverseMerge(this.queryHash(), {
       adapter: this._adapter,
       username: parsed.username || undefined,
       password: parsed.password || undefined,
       port: parsed.port ? Number(parsed.port) : undefined,
       database: this.databaseFromPath(),
       host: hostname ? hostname.replace(/^\[(.+)\]$/, "$1") : undefined,
-      ...this.queryHash(),
-    };
+    });
   }
 
   /**
    * @internal
-   * @missingRailsCall path — PERMANENT
+   * @missingRailsCall path — CONVERGEABLE connection-url-resolver-parses-through-uri-rfc2396-parser
    */
   private databaseFromPath(): string | undefined {
     const path = this._parsed?.pathname;

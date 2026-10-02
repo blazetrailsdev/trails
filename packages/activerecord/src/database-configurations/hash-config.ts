@@ -1,4 +1,4 @@
-import { fetch, File, hasKey } from "@blazetrails/ruby-compat";
+import { fetch, File, hasKey, merge } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "../namespaces.js";
 import { DatabaseConfig, type DatabaseConfigOptions } from "./database-config.js";
 import { schemaFormat } from "../active-record.js";
@@ -37,12 +37,9 @@ export class HashConfig extends DatabaseConfig {
     return this.configurationHash.database;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall merge — PERMANENT
-   */
+  /** @internal */
   override set _database(database: string) {
-    this._configurationHash = Object.freeze({ ...this._configurationHash, database });
+    this._configurationHash = Object.freeze(merge(this.configurationHash, { database }));
   }
 
   override get pool(): number {

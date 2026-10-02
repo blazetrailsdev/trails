@@ -55,7 +55,7 @@ import type { ReadOnlyNullEncryptor } from "./encryption/read-only-null-encrypto
 import type { Scheme } from "./encryption/scheme.js";
 import type { Fixture } from "./fixtures.js";
 import type { Optimistic } from "./locking/optimistic.js";
-import type * as Pessimistic from "./locking/pessimistic.js";
+import type { Pessimistic } from "./locking/pessimistic.js";
 import type { IrreversibleMigration, Migration } from "./migration.js";
 import type * as ModelSchema from "./model-schema.js";
 import type { Relation } from "./relation.js";

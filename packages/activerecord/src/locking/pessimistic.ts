@@ -1,7 +1,6 @@
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { Locking } from "../namespaces.js";
-import * as Pessimistic from "./pessimistic.js";
 
 export async function lockBang<T extends Base>(this: T, lock: boolean | string = true): Promise<T> {
   if (this.isPersisted()) {
@@ -79,8 +78,7 @@ export async function withLock<T extends Base>(
   }, txOptions);
 }
 
-/** @noRailsEquivalent PERMANENT */
-export const InstanceMethods = {
+export const Pessimistic = {
   lockBang,
   withLock,
 };

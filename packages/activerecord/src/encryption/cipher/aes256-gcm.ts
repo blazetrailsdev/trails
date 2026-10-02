@@ -36,7 +36,7 @@ export class Aes256Gcm {
     this.deterministic = options?.deterministic ?? false;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE nodejs-inspect-custom-hooks-come-from-one-ruby-compat-seam */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return this.inspect();
   }

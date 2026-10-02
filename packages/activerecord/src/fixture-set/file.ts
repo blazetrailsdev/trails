@@ -7,12 +7,12 @@ import { RenderContext } from "./render-context.js";
 const fixtureModules = new Map<string, Record<string, unknown>>();
 
 export class File {
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE fixture-set-file-ts-fixture-module-registry-has-no-rails-counterpart */
   static registerModule(file: string, rows: Record<string, unknown>): void {
     fixtureModules.set(file, rows);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE fixture-set-file-ts-fixture-module-registry-has-no-rails-counterpart */
   static modules(): string[] {
     return [...fixtureModules.keys()];
   }

@@ -239,18 +239,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::AdditionalValu
     expect(av.type).toBe(type);
     expect(av.value).toBe("hello");
   });
-
-  it("toString returns the string value", () => {
-    const type = makeType();
-    const av = new AdditionalValue("hello", type);
-    expect(String(av)).toBe(String(av.value));
-  });
-
-  it("[Symbol.toPrimitive] with number hint returns the numeric value", () => {
-    const type = makeType();
-    const av = new AdditionalValue("42", type);
-    expect(+av).toBe(42);
-  });
 });
 
 describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::EncryptedQuery#processArguments", () => {

@@ -1,5 +1,5 @@
 import { mattrAccessor, threadMattrAccessor } from "@blazetrails/activesupport";
-import { included, rbFSend, rbObjDup } from "@blazetrails/ruby-compat";
+import { included, last, rbFSend, rbObjDup } from "@blazetrails/ruby-compat";
 import { Encryption } from "../namespaces.js";
 import { Context } from "./context.js";
 import { NullEncryptor } from "./null-encryptor.js";
@@ -61,9 +61,9 @@ export class Contexts {
     return this.currentCustomContext ?? this.defaultContext;
   }
 
-  /** @missingRailsCall last — PERMANENT */
+  /** @missingRailsArgs last — CONVERGEABLE call-args-gate-reads-an-explicit-self-receiver-as-a-simple-receiver */
   static get currentCustomContext(): Context | null {
-    return this.customContexts?.at(-1) ?? null;
+    return (this.customContexts && last(this.customContexts)) ?? null;
   }
 
   static resetDefaultContext(): void {

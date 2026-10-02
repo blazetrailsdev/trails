@@ -86,7 +86,7 @@ export class Configurable {
     }
   }
 
-  /** @missingRailsCall new — PERMANENT */
+  /** @missingRailsCall new — CONVERGEABLE call-gate-credits-argumentless-hash-new-as-a-literal */
   static onEncryptedAttributeDeclared(callback: (klass: any, name: string) => void): () => void {
     const listeners = (this.encryptedAttributeDeclarationListeners ??= []);
     listeners.push(callback);

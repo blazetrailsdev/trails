@@ -255,7 +255,7 @@ export function hookAttributeType(this: LockingHost, name: string, castType: Val
   return castType;
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE optimistic-locking-instance-methods-fold-into-the-optimistic-module */
 export const InstanceMethods = {
   lockingEnabled,
   incrementBang,

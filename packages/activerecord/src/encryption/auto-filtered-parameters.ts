@@ -57,7 +57,7 @@ export class AutoFilteredParameters {
     );
   }
 
-  /** @missingRailsCall new — PERMANENT */
+  /** @missingRailsCall new — CONVERGEABLE call-gate-credits-argumentless-hash-new-as-a-literal */
   private collectForLater(klass: any, attribute: string): void {
     if (!this._attributesByClass.has(klass)) {
       this._attributesByClass.set(klass, []);
