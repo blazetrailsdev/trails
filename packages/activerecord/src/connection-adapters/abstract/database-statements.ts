@@ -552,7 +552,7 @@ export function resetTransaction(
 
 export function addTransactionRecord(
   this: DatabaseStatementsHost,
-  record: unknown,
+  record: Parameters<Transaction["addRecord"]>[0],
   ensureFinalize = true,
 ): void {
   this.currentTransaction().addRecord(record, ensureFinalize);

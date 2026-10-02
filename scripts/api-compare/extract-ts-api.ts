@@ -4772,6 +4772,71 @@ function isFalsinessOf(test: ts.Expression, target: string): boolean {
   );
 }
 
+function orRaise(statement: ts.IfStatement): ts.ThrowStatement | undefined {
+  if (statement.elseStatement !== undefined || !ts.isBlock(statement.parent)) return undefined;
+  let body = statement.thenStatement;
+  if (ts.isBlock(body)) {
+    if (body.statements.length !== 1) return undefined;
+    body = body.statements[0];
+  }
+  if (!ts.isThrowStatement(body)) return undefined;
+  const siblings = statement.parent.statements;
+  const next = siblings[siblings.indexOf(statement) + 1];
+  if (next === undefined || !ts.isReturnStatement(next) || next.expression === undefined) {
+    return undefined;
+  }
+  const returned = ts.isNonNullExpression(next.expression)
+    ? next.expression.expression
+    : next.expression;
+  if (!ts.isIdentifier(returned)) return undefined;
+  return isFalsinessOf(statement.expression, returned.text) ? body : undefined;
+}
+
+function isArgumentBindingGuard(statement: ts.IfStatement): boolean {
+  const body = statement.parent;
+  if (!ts.isBlock(body) || !ts.isFunctionLike(body.parent)) return false;
+  const parameters = body.parent.parameters.filter((p) => ts.isIdentifier(p.name));
+  const bound = parameters.map((p) => p.name.getText());
+  const splat = parameters.filter((p) => p.dotDotDotToken).map((p) => p.name.getText());
+  for (const earlier of body.statements) {
+    if (earlier === statement) break;
+    if (ts.isIfStatement(earlier) && isArgumentBindingGuard(earlier)) continue;
+    const declaration = ts.isVariableStatement(earlier)
+      ? earlier.declarationList.declarations[0]
+      : undefined;
+    const call = declaration?.initializer;
+    if (!call || !ts.isCallExpression(call) || !ts.isIdentifier(declaration.name)) return false;
+    const [rest] = call.arguments;
+    if (call.expression.getText() !== "extractOptionsBang" || !ts.isIdentifier(rest)) return false;
+    if (!splat.includes(rest.text)) return false;
+    bound.push(declaration.name.text);
+  }
+  let test = statement.expression;
+  let message: RegExp;
+  if (ts.isPrefixUnaryExpression(test) && test.operator === ts.SyntaxKind.ExclamationToken) {
+    test = test.operand;
+    while (ts.isParenthesizedExpression(test)) test = test.expression;
+    if (!ts.isBinaryExpression(test) || test.operatorToken.kind !== ts.SyntaxKind.InKeyword) {
+      return false;
+    }
+    test = test.right;
+    message = /^missing keyword: :\w+$/;
+  } else {
+    if (!ts.isBinaryExpression(test) || test.right.getText() !== "undefined") return false;
+    if (test.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken) return false;
+    test = test.left;
+    message = /^wrong number of arguments \(given \d+, expected [\d.+]+\)$/;
+  }
+  if (!ts.isIdentifier(test) || !bound.includes(test.text)) return false;
+  let raise = statement.thenStatement;
+  if (ts.isBlock(raise) && raise.statements.length === 1) raise = raise.statements[0];
+  if (statement.elseStatement || !ts.isThrowStatement(raise)) return false;
+  const thrown = raise.expression;
+  if (!ts.isNewExpression(thrown) || thrown.expression.getText() !== "ArgumentError") return false;
+  const [text] = thrown.arguments ?? [];
+  return text !== undefined && ts.isStringLiteral(text) && message.test(text.text);
+}
+
 function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const tokens: string[] = [];
@@ -4795,6 +4860,13 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
           visit(write);
           return;
         }
+        const raise = orRaise(n as ts.IfStatement);
+        if (raise !== undefined) {
+          tokens.push("or");
+          visit(raise);
+          return;
+        }
+        if (isArgumentBindingGuard(n as ts.IfStatement)) return;
         tokens.push("if");
         break;
       }

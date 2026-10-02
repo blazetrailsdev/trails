@@ -61,7 +61,7 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
   const host = {
     quotedNode: (v: unknown): Nodes.Node => v as Nodes.Node,
     quotedArray: (vs: unknown[]): Nodes.Node[] => vs as Nodes.Node[],
-    isInfinity(this: unknown, v: unknown): 1 | -1 | 0 {
+    isInfinity(this: unknown, v: unknown): 1 | -1 | null | false {
       return Predications.isInfinity.call(this as never, v);
     },
     isUnboundable(this: unknown, v: unknown): 1 | -1 | false {
@@ -72,11 +72,11 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
   const isUnboundable = (v: unknown) => Predications.isUnboundable.call(host, v);
   const isOpenEnded = (v: unknown) => Predications.isOpenEnded.call(host, v);
 
-  it("isInfinity yields the sign for ±Infinity, 0 otherwise", () => {
+  it("isInfinity yields the sign for ±Infinity, nil for a finite number, false otherwise", () => {
     expect(isInfinity(Infinity)).toBe(1);
     expect(isInfinity(-Infinity)).toBe(-1);
-    expect(isInfinity(0)).toBe(0);
-    expect(isInfinity("x")).toBe(0);
+    expect(isInfinity(0)).toBe(null);
+    expect(isInfinity("x")).toBe(false);
   });
 
   it("isInfinity duck-types a value exposing isInfinite()", () => {
@@ -87,11 +87,11 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
   it("isInfinity reaches a Quoted through its own infinite?, not a structural unwrap", () => {
     expect(isInfinity(new Nodes.Quoted({ isInfinite: () => 1 as const }))).toBe(1);
     expect(isInfinity(new Nodes.Quoted({ isInfinite: () => -1 as const }))).toBe(-1);
-    expect(isInfinity(new Nodes.Quoted(3))).toBe(0);
+    expect(isInfinity(new Nodes.Quoted(3))).toBe(null);
   });
 
   it("isInfinity does not unwrap Casted, which defines no infinite? in Rails", () => {
-    expect(isInfinity(new Nodes.Casted(Infinity, users.get("id")))).toBe(0);
+    expect(isInfinity(new Nodes.Casted(Infinity, users.get("id")))).toBe(false);
     expect(isOpenEnded(new Nodes.Casted(Infinity, users.get("id")))).toBe(false);
   });
 
@@ -141,7 +141,7 @@ describe("Attribute private helpers (mirror Predications)", () => {
   type AttributePrivates = Attribute & {
     groupingAny: (methodId: string, others: unknown[]) => Nodes.Grouping;
     groupingAll: (methodId: string, others: unknown[]) => Nodes.Grouping;
-    isInfinity: (value: unknown) => 1 | -1 | 0;
+    isInfinity: (value: unknown) => 1 | -1 | null | false;
     isUnboundable: (value: unknown) => 1 | -1 | false;
     isOpenEnded: (value: unknown) => boolean;
   };
@@ -156,7 +156,7 @@ describe("Attribute private helpers (mirror Predications)", () => {
     const attr = users.get("id") as AttributePrivates;
     expect(attr.isInfinity(Infinity)).toBe(1);
     expect(attr.isInfinity(-Infinity)).toBe(-1);
-    expect(attr.isInfinity(0)).toBe(0);
+    expect(attr.isInfinity(0)).toBe(null);
     expect(attr.isUnboundable(0)).toBe(false);
     expect(attr.isOpenEnded(null)).toBe(true);
     expect(attr.isOpenEnded(Infinity)).toBe(true);
@@ -172,7 +172,7 @@ describe("Attribute private helpers (mirror Predications)", () => {
 
 describe("between / notBetween self-dispatch (mirror Rails' implicit self)", () => {
   class OverridingAttribute extends Attributes.Attribute {
-    override isInfinity(_value: unknown): 1 | -1 | 0 {
+    override isInfinity(_value: unknown): 1 | -1 | null | false {
       return 1;
     }
   }

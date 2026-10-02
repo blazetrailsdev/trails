@@ -54,8 +54,12 @@ describe("BindParam", () => {
 
   describe("isInfinite", () => {
     it("returns false when value has no isInfinite", () => {
-      const bp = new Nodes.BindParam(42);
+      const bp = new Nodes.BindParam("42");
       expect(bp.isInfinite()).toBe(false);
+    });
+
+    it("returns nil for a finite number, which answers infinite?", () => {
+      expect(new Nodes.BindParam(42).isInfinite()).toBe(null);
     });
 
     it("delegates to value.isInfinite when present — positive", () => {

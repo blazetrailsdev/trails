@@ -1,5 +1,5 @@
 import { Nodes } from "../namespaces.js";
-import { isNil, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { isNil, rbFSend, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 
@@ -28,11 +28,11 @@ export class BindParam extends Node {
     return typeof v?.valueBeforeTypeCast === "function" ? v.valueBeforeTypeCast() : this.value;
   }
 
-  isInfinite(): 1 | -1 | false {
-    if (this.value === Infinity) return 1;
-    if (this.value === -Infinity) return -1;
-    const value = this.value as { isInfinite(): 1 | -1 | false };
-    return rbObjRespondTo(value, "isInfinite") && value.isInfinite();
+  isInfinite(): 1 | -1 | null | false {
+    return (
+      rbObjRespondTo(this.value, "isInfinite") &&
+      (rbFSend(this.value, "isInfinite") as 1 | -1 | null)
+    );
   }
 
   isUnboundable(): 1 | -1 | false {

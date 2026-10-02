@@ -20,7 +20,13 @@ import { Data as ArrayData } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
 import { Data as XmlData } from "./oid/xml.js";
 import { Utils } from "./utils.js";
-import { format, rbObjAsString as toS, Range } from "@blazetrails/ruby-compat";
+import {
+  format,
+  rbFSend,
+  rbObjAsString as toS,
+  rbObjRespondTo,
+  Range,
+} from "@blazetrails/ruby-compat";
 import { raiseIntWiderThan64bit } from "../../active-record.js";
 import { ConnectionNotEstablished } from "../../errors.js";
 
@@ -267,8 +273,8 @@ function typeCastRangeValue(this: QuotingDispatchHost, value: unknown): unknown 
 }
 
 /** @internal */
-function isInfinity(value: unknown): boolean {
-  return value === Infinity || value === -Infinity;
+function isInfinity(value: unknown): 1 | -1 | null | false {
+  return rbObjRespondTo(value, "isInfinite") && (rbFSend(value, "isInfinite") as 1 | -1 | null);
 }
 
 export function columnNameMatcher(): RegExp {

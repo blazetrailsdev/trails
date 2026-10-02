@@ -18,7 +18,13 @@ import type { Case } from "./nodes/case.js";
 import type { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
 import { Nodes } from "./namespaces.js";
 import { rbEqual } from "@blazetrails/activesupport";
-import { NoMethodError, rbObjClass, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
+import {
+  NoMethodError,
+  rbFSend,
+  rbObjClass,
+  rbObjRespondTo,
+  rtest,
+} from "@blazetrails/ruby-compat";
 import type { NodeOrValue } from "./nodes/binary.js";
 
 function isSelectManagerLike(value: unknown): value is { ast: Node } {
@@ -60,7 +66,7 @@ export interface GroupingFolders {
 
 interface RangePredicates {
   /** @internal */
-  isInfinity(value: unknown): 1 | -1 | 0;
+  isInfinity(value: unknown): 1 | -1 | null | false;
   /** @internal */
   isUnboundable(value: unknown): 1 | -1 | false;
   /** @internal */
@@ -79,10 +85,6 @@ interface RangePredicates {
   lt(right: unknown): Node;
   /** @internal */
   lteq(right: unknown): Node;
-}
-
-interface InfiniteLike {
-  isInfinite?: () => 1 | -1 | false;
 }
 
 type BetweenHost = Node & PredicationHost & RangePredicates;
@@ -162,7 +164,7 @@ export interface PredicationsModule extends GroupingFolders {
   quotedArray(others: unknown[]): ReturnType<typeof Nodes.buildQuoted>[];
   /** @internal */
   quotedNode(other: unknown): ReturnType<typeof Nodes.buildQuoted>;
-  isInfinity(value: unknown): 1 | -1 | 0;
+  isInfinity(value: unknown): 1 | -1 | null | false;
   isUnboundable(value: unknown): 1 | -1 | false;
   isOpenEnded(value: unknown): boolean;
 }
@@ -447,19 +449,9 @@ export const Predications: PredicationsModule = {
   quotedNode(this: Node, other: unknown): ReturnType<typeof Nodes.buildQuoted> {
     return Nodes.buildQuoted(other, this);
   },
-  isInfinity(this: PredicationHost, value: unknown): 1 | -1 | 0 {
+  isInfinity(this: PredicationHost, value: unknown): 1 | -1 | null | false {
     void this;
-    if (value === Infinity) return 1;
-    if (value === -Infinity) return -1;
-    if (
-      value &&
-      typeof value === "object" &&
-      typeof (value as InfiniteLike).isInfinite === "function"
-    ) {
-      const r = (value as InfiniteLike).isInfinite!();
-      if (r === 1 || r === -1) return r;
-    }
-    return 0;
+    return rbObjRespondTo(value, "isInfinite") && (rbFSend(value, "isInfinite") as 1 | -1 | null);
   },
 
   isUnboundable(this: PredicationHost, value: unknown): 1 | -1 | false {
@@ -472,7 +464,7 @@ export const Predications: PredicationsModule = {
 
   isOpenEnded(
     this: PredicationHost & {
-      isInfinity(value: unknown): 1 | -1 | 0;
+      isInfinity(value: unknown): 1 | -1 | null | false;
       isUnboundable(value: unknown): 1 | -1 | false;
     },
     value: unknown,
@@ -482,6 +474,6 @@ export const Predications: PredicationsModule = {
       value === undefined ||
       (typeof (value as { isNil?: () => boolean }).isNil === "function" &&
         (value as { isNil: () => boolean }).isNil());
-    return isNil || this.isInfinity(value) !== 0 || rtest(this.isUnboundable(value));
+    return isNil || rtest(this.isInfinity(value)) || rtest(this.isUnboundable(value));
   },
 };

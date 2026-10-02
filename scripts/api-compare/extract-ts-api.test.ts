@@ -874,6 +874,71 @@ describe("body call capture", () => {
     }
   });
 
+  it("emits or, not an arm, for a throw guarded by the Ruby-falsiness of the value then returned", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        bang(t: string) {
+          const fk = this.find(t);
+          if (!rtest(fk)) throw new ArgumentError("none");
+          return fk!;
+        }
+        unless(t: string) {
+          const fk = this.find(t);
+          if (!rtest(fk)) throw new ArgumentError("none");
+          this.log(fk);
+        }
+      }`,
+    );
+    const arms = (name: string) =>
+      cls.instanceMethods
+        .find((m) => m.name === name)!
+        .skeleton!.filter((t) => !t.startsWith("ref:") && !t.startsWith("new:"));
+    expect(arms("bang")).toEqual(["or", "throw:ArgumentError"]);
+    expect(arms("unless")).toEqual(["if", "throw:ArgumentError"]);
+  });
+
+  it("emits nothing for the guard that raises the ArgumentError Ruby raises binding the arguments", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        required(...columnNames: unknown[]) {
+          const options = extractOptionsBang(columnNames);
+          if (!("type" in options)) throw new ArgumentError("missing keyword: :type");
+          return this.run(options);
+        }
+        positionalArray(columnNames: unknown[]) {
+          const options = extractOptionsBang(columnNames);
+          if (!("type" in options)) throw new ArgumentError("missing keyword: :type");
+        }
+        afterSideEffect(options: object) {
+          this.log(options);
+          if (!("type" in options)) throw new ArgumentError("missing keyword: :type");
+        }
+        notAnArgument(options: object) {
+          const found = this.find(options);
+          if (found === undefined) {
+            throw new ArgumentError("wrong number of arguments (given 1, expected 2..3)");
+          }
+        }
+        arity(columnName?: string) {
+          if (columnName === undefined) {
+            throw new ArgumentError("wrong number of arguments (given 1, expected 2..3)");
+          }
+          return this.run(columnName);
+        }
+        otherMessage(options: object) {
+          if (!("type" in options)) throw new ArgumentError("type is required");
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("required")).toEqual(["ref:extractOptionsBang", "ref:run"]);
+    expect(skeleton("arity")).toEqual(["ref:run"]);
+    const arms = (name: string) => skeleton(name)!.filter((t) => !t.includes(":"));
+    for (const kept of ["positionalArray", "afterSideEffect", "notAnArgument", "otherMessage"]) {
+      expect(arms(kept)).toEqual(["if"]);
+    }
+  });
+
   it("carries the thrown class on the throw token", () => {
     const cls = extractFromSource(
       `class Foo {

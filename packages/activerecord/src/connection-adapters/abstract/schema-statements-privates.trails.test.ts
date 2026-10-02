@@ -1,6 +1,7 @@
 import type { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { describe, it, expect, vi } from "vitest";
 import { SchemaStatements } from "./schema-statements.js";
+import { indexNameLength, maxIdentifierLength, tableNameLength } from "./database-limits.js";
 import {
   CheckConstraintDefinition,
   ForeignKeyDefinition,
@@ -53,6 +54,9 @@ function makeStatements(
   adapter["supportsExclusionConstraints"] ??= () => false;
   adapter["supportsUniqueConstraints"] ??= () => false;
   adapter["useForeignKeys"] ??= () => true;
+  adapter["maxIdentifierLength"] ??= maxIdentifierLength;
+  adapter["tableNameLength"] ??= tableNameLength;
+  adapter["indexNameLength"] ??= indexNameLength;
   adapter["nativeDatabaseTypes"] ??= () => SQLite3Adapter.NATIVE_DATABASE_TYPES;
   adapter["dataSourceSql"] ??= (name?: string | null) =>
     name == null
@@ -315,6 +319,14 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(
       await ss.checkConstraintExists("users", { name: undefined, expression: "age > 0" }),
     ).toBe(false);
+  });
+
+  it("addColumns raises ArgumentError without the type keyword", async () => {
+    const ss = makeStatements() as unknown as {
+      addColumns(tableName: string, ...columnNames: string[]): Promise<void>;
+    };
+    await expect(ss.addColumns("people", "name")).rejects.toThrow("missing keyword: :type");
+    await expect(ss.addColumns("people")).rejects.toThrow("missing keyword: :type");
   });
 
   it("validateIndexLengthBang throws when name too long", () => {
