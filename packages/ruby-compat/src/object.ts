@@ -1,11 +1,10 @@
 import { aryIncludes } from "./array.js";
 import { hasKey } from "./hash.js";
-import { rbEql } from "./rb-equal.js";
 import { stringInspect } from "./string/inspect.js";
 import { rbCheckStringType, stringValue } from "./string/support.js";
 import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
 import { cmp, rbCmpint, rubyClass, type Comparable } from "./comparable.js";
-import { rbEqual } from "./rb-equal.js";
+import { rbEql, rbEqual } from "./rb-equal.js";
 import { TypeError } from "./type-error.js";
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
