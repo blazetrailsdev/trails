@@ -3,7 +3,6 @@ import { cmp } from "../comparable.js";
 import { Encoding } from "../encoding.js";
 import { IndexError } from "../index-error.js";
 import { format } from "../kernel-format.js";
-import { included } from "../include.js";
 import { NilClass } from "../nil-class.js";
 import { NoMethodError } from "../no-method-error.js";
 import { rtest } from "../object.js";
@@ -246,47 +245,43 @@ export interface StringInstance {
 
 /**
  * `rb_cString` (`vendor/ruby/v3.3.11/string.c:12119`) as the superclass of
- * `class X < String`, for a class that JS already gives another superclass:
- * it `include`s the String methods it answers, each sent through
- * {@link STRING_METHOD_TABLE} at call time with the receiver's `to_s` as its
- * string, so an entry a package reopening String assigns is found too. An
- * instance of the including class is a `T_STRING` to `rb_str_eql`, holds the
- * contents {@link rbStrInit} gave it, and answers them from `to_s`
- * (`rb_str_to_s`, `vendor/ruby/v3.3.11/string.c:6648`), which is a plain String
- * for a subclass instance. One `initialize` never ran on is empty, as the
- * String allocator leaves it (`empty_str_alloc`,
- * `vendor/ruby/v3.3.11/string.c:858`).
+ * `class X < String`: a class answering the String methods named, each sent
+ * through {@link STRING_METHOD_TABLE} at call time with the receiver's `to_s`
+ * as its string, so an entry a package reopening String assigns is found too.
+ * An instance is a `T_STRING` to `rb_str_eql`, holds the contents
+ * `String#initialize` gave it, and answers them from `to_s` (`rb_str_to_s`,
+ * `vendor/ruby/v3.3.11/string.c:6648`), which is a plain String for a subclass
+ * instance. One `initialize` never ran on is empty, as the String allocator
+ * leaves it (`empty_str_alloc`, `vendor/ruby/v3.3.11/string.c:858`).
  *
  * @noRailsEquivalent PERMANENT
  */
 export function stringSuperclass<M extends keyof StringInstance>(
   ...methods: M[]
-): Pick<StringInstance, M> {
-  const mod: Record<string | symbol, unknown> = {
-    [included](klass: { prototype: object }): void {
-      stringClasses.add(klass.prototype);
-    },
-    toString(this: Record<symbol, string>): string {
-      return this[RSTRING_PTR] ?? "";
-    },
-  };
-  for (const method of methods) {
-    mod[method] = function (this: object, ...args: unknown[]): unknown {
-      return rbStrSend(String(this), method, ...args)[0];
-    };
-  }
-  return mod as unknown as Pick<StringInstance, M>;
-}
+): new (orig?: unknown) => Pick<StringInstance, M> {
+  const klass = class {
+    /** `String#initialize` (`vendor/ruby/v3.3.11/string.c:1832` `rb_str_init`). */
+    constructor(orig: unknown = "") {
+      (this as unknown as Record<symbol, string>)[RSTRING_PTR] = isTString(orig)
+        ? String(orig)
+        : stringValue(orig);
+    }
 
-/**
- * `String#initialize` (`vendor/ruby/v3.3.11/string.c:1832` `rb_str_init`), for
- * the `super(string)` of a class whose superclass is {@link stringSuperclass}:
- * the receiver's contents become `orig`'s, read through `StringValue`.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function rbStrInit(str: object, orig: unknown = ""): void {
-  (str as Record<symbol, string>)[RSTRING_PTR] = isTString(orig) ? String(orig) : stringValue(orig);
+    toString(): string {
+      return (this as unknown as Record<symbol, string>)[RSTRING_PTR] ?? "";
+    }
+  };
+  stringClasses.add(klass.prototype);
+  for (const method of methods) {
+    Object.defineProperty(klass.prototype, method, {
+      value(this: object, ...args: unknown[]): unknown {
+        return rbStrSend(String(this), method, ...args)[0];
+      },
+      writable: true,
+      configurable: true,
+    });
+  }
+  return klass as unknown as new (orig?: unknown) => Pick<StringInstance, M>;
 }
 
 const JS_STRING_METHODS = new Set(Object.getOwnPropertyNames(String.prototype));

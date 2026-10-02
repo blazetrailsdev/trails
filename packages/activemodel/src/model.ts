@@ -164,7 +164,7 @@ export class Model {
     return rbObjDup(this);
   }
 
-  declare runCallbacks: Included<typeof ASCallbacks.InstanceMethods>["runCallbacks"];
+  declare runCallbacks: Included<typeof ASCallbacks>["runCallbacks"];
 }
 
 include(Model, API);

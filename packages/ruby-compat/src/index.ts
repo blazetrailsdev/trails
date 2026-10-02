@@ -275,7 +275,6 @@ export {
   rbDefineMethod,
   rbObjNotMatch,
   rbStrMatch,
-  rbStrInit,
   rbStrRespondTo,
   rbStrSend,
   strip,

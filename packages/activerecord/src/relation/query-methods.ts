@@ -345,7 +345,7 @@ function reselect(this: QueryMethodsHost, ...args: any[]): any {
 
 function reselectBang(this: QueryMethodsHost, ...args: any[]): any {
   this.selectValues = args.map((c: any) => {
-    if (c instanceof Nodes.Node) return c;
+    if (Arel.arelNode(c)) return c;
     if (typeof c === "object" && c !== null && "value" in c)
       return new Nodes.SqlLiteral((c as { value: string }).value);
     return String(c);
@@ -356,21 +356,21 @@ function reselectBang(this: QueryMethodsHost, ...args: any[]): any {
 function _selectBang(this: QueryMethodsHost, ...fields: any[]): any {
   const flat = fields.flat(Infinity);
   const normalized = flat.map((c: any) => {
-    if (c instanceof Nodes.Node) return c;
+    if (Arel.arelNode(c)) return c;
     if (typeof c === "function") return c;
     if (typeof c === "object" && c !== null && "value" in c)
       return new Nodes.SqlLiteral((c as { value: string }).value);
     return String(c);
   });
   const seenStrings = new Set<string>();
-  const seenNodeHashes = new Map<number, Nodes.Node[]>();
-  const nodeIsDuplicate = (node: Nodes.Node): boolean => {
+  const seenNodeHashes = new Map<number, Arel.ArelNode[]>();
+  const nodeIsDuplicate = (node: Arel.ArelNode): boolean => {
     const h = rbHash(node);
     const bucket = seenNodeHashes.get(h);
     if (!bucket) return false;
     return bucket.some((n) => rbEqual(n, node));
   };
-  const addNodeToSeen = (node: Nodes.Node): void => {
+  const addNodeToSeen = (node: Arel.ArelNode): void => {
     const h = rbHash(node);
     const bucket = seenNodeHashes.get(h);
     if (bucket) bucket.push(node);
@@ -379,7 +379,7 @@ function _selectBang(this: QueryMethodsHost, ...fields: any[]): any {
   const seenThunks = new Set<unknown>();
   for (const existing of this.selectValues) {
     if (typeof existing === "string") seenStrings.add(existing);
-    else if (existing instanceof Nodes.Node) addNodeToSeen(existing);
+    else if (Arel.arelNode(existing)) addNodeToSeen(existing);
     else if (typeof existing === "function") seenThunks.add(existing);
     else seenStrings.add((existing as { value: string }).value);
   }
@@ -389,7 +389,7 @@ function _selectBang(this: QueryMethodsHost, ...fields: any[]): any {
         this.selectValues = [...this.selectValues, col];
         seenStrings.add(col);
       }
-    } else if (col instanceof Nodes.Node) {
+    } else if (Arel.arelNode(col)) {
       if (!nodeIsDuplicate(col)) {
         this.selectValues = [...this.selectValues, col];
         addNodeToSeen(col);
@@ -1532,7 +1532,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
     } else if (arg instanceof Map) {
       for (const [key, value] of arg) {
         mapped.push(
-          key instanceof Nodes.Node
+          Arel.arelNode(key)
             ? orderedNode(key, value)
             : orderedNode(orderColumn.call(this, String(key)), value),
         );
@@ -1931,7 +1931,7 @@ export function arelColumnAliasesFromHash(
       return Object.keys(columnsAliases as object).map((col) => {
         const alias = (columnsAliases as any)[col];
         const attr = arelColumnWithTable.call(this, tableName, col);
-        return nodeAs(attr instanceof Nodes.Node ? attr : Arel.sql(String(col)), quoteAlias(alias));
+        return nodeAs(Arel.arelNode(attr) ? attr : Arel.sql(String(col)), quoteAlias(alias));
       });
     }
     if (Array.isArray(columnsAliases)) {

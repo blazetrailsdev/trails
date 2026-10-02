@@ -1,7 +1,7 @@
 import { include } from "@blazetrails/activesupport";
-import { rbModConstSet, Struct, type StructInstance } from "@blazetrails/ruby-compat";
+import { rbModConstSet, Struct } from "@blazetrails/ruby-compat";
 import { Arel, Attributes } from "../namespaces.js";
-import { Node } from "../nodes/node.js";
+import type { Node } from "../nodes/node.js";
 import { SqlLiteral } from "../nodes/sql-literal.js";
 import { NamedFunction } from "../nodes/named-function.js";
 import { Expressions, type ExpressionsModule } from "../expressions.js";
@@ -21,14 +21,12 @@ export interface RelationLike {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class Attribute extends Node {
-  readonly relation: RelationLike;
-  readonly name: string | ArelNode | null;
+export class Attribute extends Struct.new("relation", "name") {
+  declare readonly relation: RelationLike;
+  declare readonly name: string | ArelNode | null;
 
   constructor(relation: RelationLike | null, name: string | ArelNode | null) {
-    super();
-    this.relation = relation as RelationLike;
-    this.name = name;
+    super(relation, name);
   }
 
   get typeCaster(): unknown {
@@ -58,8 +56,7 @@ export interface Attribute
     ExpressionsModule,
     AliasPredicationModule,
     OrderPredicationsModule,
-    MathModule,
-    StructInstance {
+    MathModule {
   /** @internal */
   isInfinity(value: unknown): 1 | -1 | null | false;
   /** @internal */
@@ -70,7 +67,6 @@ export interface Attribute
   notBetween(other: RangeLike): Node;
 }
 
-include(Attribute, Struct.new("relation", "name"));
 include(Attribute, Expressions);
 include(Attribute, Predications);
 include(Attribute, AliasPredication);

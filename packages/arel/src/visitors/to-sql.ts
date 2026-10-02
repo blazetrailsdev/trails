@@ -1,4 +1,4 @@
-import { Nodes, Visitors } from "../namespaces.js";
+import { Attributes, Nodes, Visitors } from "../namespaces.js";
 import {
   aryDeleteIf,
   isEmpty,
@@ -711,7 +711,11 @@ export class ToSql extends Visitor {
   private visitArelNodesAssignment(o: Nodes.Assignment, collector: SQLString): SQLString {
     this.visit(o.left, collector);
     collector.append(" = ");
-    if (o.right instanceof Node || isActiveModelAttribute(o.right)) {
+    if (
+      o.right instanceof Node ||
+      o.right instanceof Attributes.Attribute ||
+      isActiveModelAttribute(o.right)
+    ) {
       this.visit(o.right, collector);
     } else {
       collector.append(this.quote(o.right));

@@ -182,13 +182,13 @@ function nodeReferencesTable(node: unknown, tableName: string): boolean {
 function appendConstraints(join: unknown, constraints: unknown[]): Nodes.Node | null {
   void Nodes.StringJoin;
   if (!join || !constraints.length) return join as Nodes.Node | null;
-  constraints = constraints.filter((c): c is Nodes.Node => c instanceof Nodes.Node);
+  constraints = constraints.filter(Arel.arelNode);
   if (!constraints.length) return join as Nodes.Node | null;
   const joinAny = join as any;
   if (join instanceof Nodes.StringJoin) {
     const joinString = new Nodes.And([joinAny.left, ...constraints]);
     return new Nodes.StringJoin(joinString);
-  } else if (joinAny.right?.expr instanceof Nodes.Node) {
+  } else if (Arel.arelNode(joinAny.right?.expr)) {
     const right = joinAny.right;
     return new (join as any).constructor(
       joinAny.left,

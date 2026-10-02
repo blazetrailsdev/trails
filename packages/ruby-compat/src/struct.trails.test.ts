@@ -1,37 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { include } from "./include.js";
 import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
-import { Struct, type StructInstance } from "./struct.js";
+import { Struct } from "./struct.js";
 
-class Base {}
+class Customer extends Struct.new<{ name: unknown; zip: unknown }>("name", "zip") {}
 
-class Customer extends Base {
-  constructor(
-    public name: unknown,
-    public zip: unknown,
-  ) {
-    super();
-  }
-}
-include(Customer, Struct.new("name", "zip"));
-
-class Other extends Base {
-  constructor(
-    public name: unknown,
-    public zip: unknown,
-  ) {
-    super();
-  }
-}
-include(Other, Struct.new("name", "zip"));
+class Other extends Struct.new<{ name: unknown; zip: unknown }>("name", "zip") {}
 
 describe("Struct", () => {
   it("answers its members", () => {
-    expect((new Customer("Joe", 1) as Customer & StructInstance).members()).toEqual([
-      "name",
-      "zip",
-    ]);
+    expect(new Customer("Joe", 1).members()).toEqual(["name", "zip"]);
   });
 
   it("is == and eql? to a struct of the same class and members", () => {

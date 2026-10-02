@@ -635,7 +635,7 @@ export function aggregateColumn(
   rel: CalculationRelation,
   columnName: string | ArelNode | number | null,
 ): unknown {
-  if (columnName instanceof Nodes.Node) return columnName;
+  if (arelNode(columnName)) return columnName;
   if (columnName === ":all") return star();
   return arelColumn.call(rel as never, columnName);
 }

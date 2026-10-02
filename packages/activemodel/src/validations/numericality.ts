@@ -1,16 +1,16 @@
 import {
   ArgumentError,
-  cmp,
   isSymbol,
   kernelFloat,
-  rbCmpint,
+  rbFPublicSend,
+  rtest,
   Range,
 } from "@blazetrails/ruby-compat";
 
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { underscore, BigDecimal, mergeBang, slice } from "@blazetrails/activesupport";
-import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.js";
+import { COMPARE_CHECKS, errorOptions } from "./comparability.js";
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
@@ -105,11 +105,7 @@ export class NumericalityValidator extends EachValidator {
         optionValue = this.optionAsNumber(record, optionValue, precision, scale);
         if (optionValue === undefined) continue;
         if (
-          !compareOperator(
-            COMPARE_CHECKS[option as CompareKey],
-            rbCmpint(cmp(value, optionValue), value, optionValue),
-            0,
-          )
+          !rtest(rbFPublicSend(value, COMPARE_CHECKS[option as CompareKey], optionValue))
         ) {
           record.errors.add(
             attrName,

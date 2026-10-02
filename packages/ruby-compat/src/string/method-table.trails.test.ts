@@ -5,12 +5,11 @@ import { NoMethodError } from "../no-method-error.js";
 import { Range } from "../range.js";
 import { TypeError } from "../type-error.js";
 import { bytes } from "./bytes.js";
-import { include, rbObjClone } from "../include.js";
+import { rbObjClone } from "../include.js";
 import { rbHash } from "../rb-hash.js";
 import {
   matchOperator,
   rbObjNotMatch,
-  rbStrInit,
   rbStrSend,
   stringSuperclass,
   strip,
@@ -1065,13 +1064,8 @@ describe("STRING_METHOD_TABLE blocks and enumerators", () => {
 });
 
 describe("stringSuperclass", () => {
-  class Literal {
-    constructor(value: unknown) {
-      rbStrInit(this, value);
-    }
-  }
-  include(Literal, stringSuperclass("eql", "hash"));
-  const literal = (value: string) => new Literal(value) as Literal & StringInstance;
+  class Literal extends stringSuperclass("eql", "hash") {}
+  const literal = (value: string) => new Literal(value);
 
   it("is eql? to a String or String subclass instance with the same contents", () => {
     expect(literal("a").eql("a")).toBe(true);
@@ -1082,10 +1076,9 @@ describe("stringSuperclass", () => {
   });
 
   it("raises NoMethodError for a String method nothing defined", () => {
-    const mod = stringSuperclass(
-      "undefinedStringMethod" as keyof StringInstance,
-    ) as unknown as Record<string, (this: object) => unknown>;
-    expect(() => mod.undefinedStringMethod.call(literal("a"))).toThrow(NoMethodError);
+    const klass = stringSuperclass("undefinedStringMethod" as keyof StringInstance);
+    const str = new klass("a") as unknown as { undefinedStringMethod(): unknown };
+    expect(() => str.undefinedStringMethod()).toThrow(NoMethodError);
   });
 
   it("holds the contents String#initialize is given, and answers them from to_s", () => {
@@ -1096,7 +1089,7 @@ describe("stringSuperclass", () => {
   });
 
   it("is empty until String#initialize runs, as String.allocate is", () => {
-    const allocated = Object.create(Literal.prototype) as Literal & StringInstance;
+    const allocated = Object.create(Literal.prototype) as Literal;
     expect(allocated.toString()).toBe("");
     expect(allocated.eql("")).toBe(true);
   });

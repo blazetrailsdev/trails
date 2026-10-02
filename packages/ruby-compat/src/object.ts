@@ -1,7 +1,8 @@
 import { stringInspect } from "./string/inspect.js";
 import { rbCheckStringType } from "./string/support.js";
 import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
-import { rubyClass, type Comparable } from "./comparable.js";
+import { cmp, rbCmpint, rubyClass, type Comparable } from "./comparable.js";
+import { rbEqual } from "./rb-equal.js";
 import { TypeError } from "./type-error.js";
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
@@ -362,7 +363,11 @@ export function toSym(obj: unknown): string {
  * whose prototypes carry no such member: `Float#infinite?`
  * (`rb_flo_is_infinite_p`, `vendor/ruby/v3.3.11/numeric.c:1992`) answers `1` /
  * `-1` for an infinity and `nil` otherwise, as `Integer#infinite?`
- * (`vendor/ruby/v3.3.11/numeric.rb:48`) always does.
+ * (`vendor/ruby/v3.3.11/numeric.rb:48`) always does. An operator is sent by its
+ * Ruby name (`">"`), which has no TS method spelling: the four ordering
+ * operators are `Comparable`'s (`vendor/ruby/v3.3.11/compar.c:105-147`), raising
+ * `ArgumentError` for a pair `<=>` cannot place, `==` is {@link rbEqual} and
+ * `!=` its negation (`rb_obj_not_equal`, `vendor/ruby/v3.3.11/object.c:248`).
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#send` (`vendor/ruby/v3.3.11/vm_eval.c:1330`).
  */
@@ -388,11 +393,22 @@ export function conversionMismatch(
   );
 }
 
+const OPERATORS = new Map<string, (recv: unknown, other: unknown) => boolean>([
+  [">", (recv, other) => rbCmpint(cmp(recv, other), recv, other) > 0],
+  [">=", (recv, other) => rbCmpint(cmp(recv, other), recv, other) >= 0],
+  ["==", (recv, other) => rbEqual(recv, other)],
+  ["<", (recv, other) => rbCmpint(cmp(recv, other), recv, other) < 0],
+  ["<=", (recv, other) => rbCmpint(cmp(recv, other), recv, other) <= 0],
+  ["!=", (recv, other) => !rbEqual(recv, other)],
+]);
+
 function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown): unknown {
   const [vid, ...args] = argv;
   const name = rbCheckStringType(vid);
   if (name === null) throw new TypeError(`${rbInspect(vid)} is not a symbol nor a string`);
   const mid = isSymbol(name) ? symbolToS(name) : name;
+  const operator = OPERATORS.get(mid);
+  if (operator !== undefined && argc === 1) return operator(recv, args[0]);
   if ((typeof recv === "number" || typeof recv === "bigint") && mid === "isInfinite") {
     return recv === Infinity ? 1 : recv === -Infinity ? -1 : null;
   }

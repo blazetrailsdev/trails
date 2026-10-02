@@ -81,6 +81,15 @@ describe("AttributeMutationTracker", () => {
     expect(tracker.isChanged("name", { to: "Charlie" })).toBe(false);
   });
 
+  it("isChanged compares from/to with Ruby ==, so equal Arrays match", () => {
+    const set = buildSet({ tags: [1] });
+    const tracker = new AttributeMutationTracker(set);
+
+    set.writeFromUser("tags", [2]);
+    expect(tracker.isChanged("tags", { from: [1], to: [2] })).toBe(true);
+    expect(tracker.isChanged("tags", { from: [3] })).toBe(false);
+  });
+
   it("isChanged type-casts from/to candidates against the attribute type", () => {
     const set = buildSet({ age: 30 });
     const tracker = new AttributeMutationTracker(set);

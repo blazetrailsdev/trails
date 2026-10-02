@@ -25,25 +25,3 @@ export type CompareKey = keyof typeof COMPARE_CHECKS;
 export interface Comparability {
   errorOptions(value: unknown, optionValue: unknown): Record<string, unknown>;
 }
-
-/** @noRailsEquivalent CONVERGEABLE comparability-compare-operator-stands-in-for-public-send-of-an-operator */
-export function compareOperator(
-  op: (typeof COMPARE_CHECKS)[CompareKey],
-  a: number | bigint,
-  b: number | bigint,
-): boolean {
-  switch (op) {
-    case ":>":
-      return a > b;
-    case ":>=":
-      return a >= b;
-    case ":==":
-      return a == b;
-    case ":<":
-      return a < b;
-    case ":<=":
-      return a <= b;
-    case ":!=":
-      return a != b;
-  }
-}

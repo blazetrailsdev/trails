@@ -2,8 +2,8 @@ import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { isBlank, slice, underscore } from "@blazetrails/activesupport";
-import { cmp, rbCmpint } from "@blazetrails/ruby-compat";
-import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.js";
+import { rbFPublicSend, rtest } from "@blazetrails/ruby-compat";
+import { COMPARE_CHECKS, errorOptions } from "./comparability.js";
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
@@ -33,13 +33,7 @@ export class ComparisonValidator extends EachValidator {
           return;
         }
 
-        if (
-          !compareOperator(
-            COMPARE_CHECKS[option],
-            rbCmpint(cmp(value, optionValue), value, optionValue),
-            0,
-          )
-        ) {
+        if (!rtest(rbFPublicSend(value, COMPARE_CHECKS[option], optionValue))) {
           record.errors.add(
             attrName,
             `:${underscore(option)}`,

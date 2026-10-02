@@ -23,6 +23,7 @@ import {
 } from "./object.js";
 import { Module, include, rbModAncestors, rbModInstanceMethod } from "./include.js";
 import { cmp } from "./comparable.js";
+import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { NoMethodError } from "./no-method-error.js";
@@ -260,6 +261,24 @@ describe("rbFSend", () => {
 
   it("raises NoMethodError for an unbound name", () => {
     expect(() => rbFSend(new Req(), "nope")).toThrow(NoMethodError);
+  });
+
+  it("sends an operator by its Ruby name", () => {
+    expect(rbFPublicSend(2, ">", 1)).toBe(true);
+    expect(rbFPublicSend(1, ">=", 1)).toBe(true);
+    expect(rbFPublicSend(2, "<", 1)).toBe(false);
+    expect(rbFPublicSend(1n, "<=", 2)).toBe(true);
+    expect(rbFPublicSend("b", ">", "a")).toBe(true);
+    expect(rbFPublicSend([1], "==", [1])).toBe(true);
+    expect(rbFPublicSend(1, "!=", "a")).toBe(true);
+    expect(rbFPublicSend(1, "==", "a")).toBe(false);
+    expect(rbFPublicSend(2, ":>", 1)).toBe(true);
+    expect(rbFPublicSend(1, ":!=", 1)).toBe(false);
+  });
+
+  it("raises ArgumentError for an ordering operator <=> cannot place", () => {
+    expect(() => rbFPublicSend(1, ">", "a")).toThrow(ArgumentError);
+    expect(() => rbFPublicSend(1, ">", "a")).toThrow("comparison of Integer with String failed");
   });
 
   it("answers infinite? for a Float and an Integer, whose JS values do not define it", () => {

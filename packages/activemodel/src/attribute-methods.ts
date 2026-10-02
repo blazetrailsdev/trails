@@ -21,6 +21,7 @@ import {
   Module,
 } from "@blazetrails/activesupport";
 import { NoMethodError } from "./attribute-assignment.js";
+import { AttributeRegistration } from "./attribute-registration.js";
 
 export interface AttributeMethods {
   methodMissing(method: string, ...args: unknown[]): unknown;
@@ -352,7 +353,7 @@ export const ClassMethods = {
   resolveAttributeName(this: ClassMethodsHost, name: string): string {
     return fetch(
       this.attributeAliases,
-      name,
+      AttributeRegistration.ClassMethods.resolveAttributeName.call(this as never, name),
       block((key) => key),
     );
   },
