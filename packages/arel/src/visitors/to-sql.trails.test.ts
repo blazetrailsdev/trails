@@ -714,7 +714,7 @@ describe("the to_sql visitor", () => {
   });
 
   it("should not quote BindParams used as part of a ValuesList", () => {
-    const values = new Nodes.ValuesList([[new Nodes.BindParam()]]);
+    const values = new Nodes.ValuesList([[new Nodes.BindParam(1)]]);
     const sql = new Visitors.ToSql(fakeRecordConnection).compile(values);
     expect(sql).toContain("(?)");
   });
@@ -857,7 +857,7 @@ describe("the to_sql visitor", () => {
 
   it("compileWithBinds with undefined BindParam", () => {
     const v = new Visitors.ToSql(fakeRecordConnection);
-    const node = new Nodes.BindParam();
+    const node = new Nodes.BindParam(undefined);
     const [sql, binds] = compileWithBinds(v, node);
     expect(sql).toBe("?");
     expect(binds).toHaveLength(1);
@@ -1112,15 +1112,15 @@ describe("the to_sql visitor", () => {
 
   describe("Rails-mirrored to_sql tail helpers", () => {
     interface ToSqlInternals {
-      isUnboundable(value: unknown): boolean;
+      isUnboundable(value: unknown): 1 | -1 | false;
       hasGroupByAndHaving(o: { groups: unknown[]; havings: unknown[] }): boolean;
       bindBlock(): (index: number) => string;
     }
     const make = () => new Visitors.ToSql(fakeRecordConnection) as unknown as ToSqlInternals;
 
-    it("isUnboundable returns true only when the value reports unboundable", () => {
+    it("isUnboundable returns the value's own answer, and false when it has none", () => {
       const v = make();
-      expect(v.isUnboundable({ isUnboundable: () => 1 })).toBe(true);
+      expect(v.isUnboundable({ isUnboundable: () => 1 })).toBe(1);
       expect(v.isUnboundable({ isUnboundable: () => false })).toBe(false);
       expect(v.isUnboundable({})).toBe(false);
       expect(v.isUnboundable(null)).toBe(false);
@@ -1224,6 +1224,11 @@ describe("the to_sql visitor", () => {
         expect(compile(id.notEq(unbounded(1)))).toBe("1=1");
         expect(compile(id.notEq(unbounded(-1)))).toBe("1=1");
       });
+      it("Equality / NotEqual treat a nil unboundable? answer as bindable", () => {
+        const answersNil = new Nodes.BindParam({ isUnboundable: () => undefined });
+        expect(compile(id.eq(answersNil))).toBe('"users"."id" = ?');
+        expect(compile(id.notEq(answersNil))).toBe('"users"."id" != ?');
+      });
       it("GreaterThan +1 → 1=0; -1 → 1=1", () => {
         expect(compile(id.gt(unbounded(1)))).toBe("1=0");
         expect(compile(id.gt(unbounded(-1)))).toBe("1=1");
@@ -1276,47 +1281,38 @@ describe("the to_sql visitor", () => {
       });
     });
 
-    describe("unboundableSign protocol", () => {
+    describe("isUnboundable protocol", () => {
       interface Internals {
-        unboundableSign(v: unknown): 1 | -1 | 0;
-        isUnboundable(v: unknown): boolean;
+        isUnboundable(v: unknown): 1 | -1 | false;
       }
       const v = () => new Visitors.ToSql(fakeRecordConnection) as unknown as Internals;
 
-      it("returns 0 for values that do not respond to isUnboundable", () => {
-        expect(v().unboundableSign(Infinity)).toBe(0);
-        expect(v().unboundableSign(-Infinity)).toBe(0);
-        expect(v().unboundableSign(0)).toBe(0);
-        expect(v().unboundableSign(null)).toBe(0);
-        expect(v().unboundableSign(undefined)).toBe(0);
-        expect(v().unboundableSign("foo")).toBe(0);
+      it("returns false for values that do not respond to isUnboundable", () => {
+        expect(v().isUnboundable(Infinity)).toBe(false);
+        expect(v().isUnboundable(-Infinity)).toBe(false);
+        expect(v().isUnboundable(0)).toBe(false);
+        expect(v().isUnboundable(null)).toBe(false);
+        expect(v().isUnboundable(undefined)).toBe(false);
+        expect(v().isUnboundable("foo")).toBe(false);
       });
 
       it("does not consult isInfinite(), which is a different predicate", () => {
-        expect(v().unboundableSign(new Nodes.Quoted(Infinity))).toBe(0);
-        expect(v().unboundableSign(new Nodes.Quoted(-Infinity))).toBe(0);
-        expect(v().unboundableSign({ isInfinite: () => 1 })).toBe(0);
+        expect(v().isUnboundable(new Nodes.Quoted(Infinity))).toBe(false);
+        expect(v().isUnboundable(new Nodes.Quoted(-Infinity))).toBe(false);
+        expect(v().isUnboundable({ isInfinite: () => 1 })).toBe(false);
         const casted = new Nodes.Casted(Infinity, new Table("users").get("id"));
-        expect(v().unboundableSign(casted)).toBe(0);
+        expect(v().isUnboundable(casted)).toBe(false);
       });
 
       it("BindParam delegates isUnboundable to its value (bind_param.rb:39-40)", () => {
-        expect(v().unboundableSign(new Nodes.BindParam({ isUnboundable: () => -1 }))).toBe(-1);
-        expect(v().unboundableSign(new Nodes.BindParam(Infinity))).toBe(0);
+        expect(v().isUnboundable(new Nodes.BindParam({ isUnboundable: () => -1 }))).toBe(-1);
+        expect(v().isUnboundable(new Nodes.BindParam(Infinity))).toBe(false);
       });
 
       it("honours an isUnboundable() protocol returning a sign or boolean", () => {
-        expect(v().unboundableSign({ isUnboundable: () => 1 })).toBe(1);
-        expect(v().unboundableSign({ isUnboundable: () => -1 })).toBe(-1);
-        expect(v().unboundableSign({ isUnboundable: () => false })).toBe(0);
-      });
-
-      it("isUnboundable is the truthy wrapper of unboundableSign", () => {
-        expect(v().isUnboundable({ isUnboundable: () => 1 })).toBe(true);
-        expect(v().isUnboundable({ isUnboundable: () => -1 })).toBe(true);
-        expect(v().isUnboundable(Infinity)).toBe(false);
-        expect(v().isUnboundable(5)).toBe(false);
-        expect(v().isUnboundable(null)).toBe(false);
+        expect(v().isUnboundable({ isUnboundable: () => 1 })).toBe(1);
+        expect(v().isUnboundable({ isUnboundable: () => -1 })).toBe(-1);
+        expect(v().isUnboundable({ isUnboundable: () => false })).toBe(false);
       });
     });
 

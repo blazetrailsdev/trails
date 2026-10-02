@@ -5,6 +5,8 @@ import {
   NotImplementedError,
   rbObjClone,
   rbModConstSet,
+  rbObjRespondTo,
+  rtest,
 } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "../nodes/node.js";
@@ -511,16 +513,22 @@ export class ToSql extends Visitor {
     o: Nodes.GreaterThanOrEqual,
     collector: SQLString,
   ): SQLString {
-    const sign = this.unboundableSign(o.right);
-    if (sign === 1) return collector.append("1=0");
-    if (sign === -1) return collector.append("1=1");
+    switch (this.isUnboundable(o.right)) {
+      case 1:
+        return collector.append("1=0");
+      case -1:
+        return collector.append("1=1");
+    }
     return this.visitBinaryOp(o, ">=", collector);
   }
 
   protected visitArelNodesGreaterThan(o: Nodes.GreaterThan, collector: SQLString): SQLString {
-    const sign = this.unboundableSign(o.right);
-    if (sign === 1) return collector.append("1=0");
-    if (sign === -1) return collector.append("1=1");
+    switch (this.isUnboundable(o.right)) {
+      case 1:
+        return collector.append("1=0");
+      case -1:
+        return collector.append("1=1");
+    }
     return this.visitBinaryOp(o, ">", collector);
   }
 
@@ -528,16 +536,22 @@ export class ToSql extends Visitor {
     o: Nodes.LessThanOrEqual,
     collector: SQLString,
   ): SQLString {
-    const sign = this.unboundableSign(o.right);
-    if (sign === 1) return collector.append("1=1");
-    if (sign === -1) return collector.append("1=0");
+    switch (this.isUnboundable(o.right)) {
+      case 1:
+        return collector.append("1=1");
+      case -1:
+        return collector.append("1=0");
+    }
     return this.visitBinaryOp(o, "<=", collector);
   }
 
   protected visitArelNodesLessThan(o: Nodes.LessThan, collector: SQLString): SQLString {
-    const sign = this.unboundableSign(o.right);
-    if (sign === 1) return collector.append("1=1");
-    if (sign === -1) return collector.append("1=0");
+    switch (this.isUnboundable(o.right)) {
+      case 1:
+        return collector.append("1=1");
+      case -1:
+        return collector.append("1=0");
+    }
     return this.visitBinaryOp(o, "<", collector);
   }
 
@@ -707,9 +721,7 @@ export class ToSql extends Visitor {
   private visitArelNodesEquality(o: Nodes.Equality, collector: SQLString): SQLString {
     const right = o.right;
 
-    if (this.unboundableSign(right) !== 0) {
-      return collector.append("1=0");
-    }
+    if (rtest(this.isUnboundable(right))) return collector.append("1=0");
 
     this.visit(o.left, collector);
 
@@ -750,9 +762,7 @@ export class ToSql extends Visitor {
   private visitArelNodesNotEqual(o: Nodes.NotEqual, collector: SQLString): SQLString {
     const right = o.right;
 
-    if (this.unboundableSign(right) !== 0) {
-      return collector.append("1=1");
-    }
+    if (rtest(this.isUnboundable(right))) return collector.append("1=1");
 
     this.visit(o.left, collector);
 
@@ -1044,8 +1054,11 @@ export class ToSql extends Visitor {
     return collector;
   }
 
-  protected isUnboundable(value: unknown): boolean {
-    return this.unboundableSign(value) !== 0;
+  protected isUnboundable(value: unknown): 1 | -1 | false {
+    return (
+      rbObjRespondTo(value, "isUnboundable") &&
+      (value as { isUnboundable(): 1 | -1 | false }).isUnboundable()
+    );
   }
 
   protected hasJoinSources(o: { relation: Node | Table | null }): boolean {
@@ -1226,15 +1239,6 @@ export class ToSql extends Visitor {
     collector.append(" || ");
     this.visit(o.right, collector);
     return collector;
-  }
-
-  protected unboundableSign(value: unknown): 1 | -1 | 0 {
-    const v = value as { isUnboundable?: () => unknown } | null | undefined;
-    if (typeof v?.isUnboundable !== "function") return 0;
-    const r = v.isUnboundable();
-    if (r === 1) return 1;
-    if (r === -1) return -1;
-    return 0;
   }
 
   protected rightIsNull(right: unknown): boolean {

@@ -1,12 +1,12 @@
 import { Nodes } from "../namespaces.js";
-import { rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { isNil, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { rbEqual, rbHash } from "@blazetrails/activesupport";
 import { Node } from "./node.js";
 
 export class BindParam extends Node {
   readonly value: unknown;
 
-  constructor(value?: unknown) {
+  constructor(value: unknown) {
     super();
     this.value = value;
   }
@@ -20,8 +20,7 @@ export class BindParam extends Node {
   }
 
   isNil(): boolean {
-    const value = this.value as { isNil(): boolean } | null;
-    return value === null || (rbObjRespondTo(value, "isNil") && value.isNil());
+    return isNil(this.value);
   }
 
   valueBeforeTypeCast(): unknown {

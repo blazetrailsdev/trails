@@ -100,7 +100,7 @@ describe("rubyCompatExport", () => {
     expect(rubyCompatAliases("delete")).toEqual([]);
     expect(jsEnumerableAliases("delete", ["expr"])).toContain("hashDelete");
     expect(rubyCompatExport("delete", ["expr"])).toBeUndefined();
-    expect(rubyCompatAliases("include?", ["expr"])).toEqual([]);
+    expect(rubyCompatAliases("include?", ["expr"])).toEqual(["aryIncludes"]);
   });
 
   it("forwards the receiver through jsEnumerableAliases", () => {

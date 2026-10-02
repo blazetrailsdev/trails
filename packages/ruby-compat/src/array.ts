@@ -659,6 +659,24 @@ export function uniq<T>(ary: readonly T[]): T[] {
 }
 
 /**
+ * Ruby `Array#include?` (`vendor/ruby/v3.3.11/array.c:5222` `rb_ary_includes`):
+ * whether an element is `==` to `item`. Each element is the receiver of the
+ * `rb_equal` send, so a class's own `==` answers where a JS `includes`
+ * compares identity.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function aryIncludes<T>(ary: readonly T[], item: unknown): boolean {
+  for (let i = 0; i < ary.length; i++) {
+    const e = ary[i];
+    if (rbEqual(e, item)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Ruby `Array#|` (`vendor/ruby/v3.3.11/array.c:5600` `rb_ary_or`): `ary1`'s
  * elements then `ary2`'s, deduplicated across both the way `uniq` is — by
  * `hash`/`eql?` (`rb_ary_union`, `array.c:5562`), so two separately built

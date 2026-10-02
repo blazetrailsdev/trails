@@ -701,6 +701,22 @@ export function rtest(obj: unknown): boolean {
 }
 
 /**
+ * Ruby's `obj.nil?` send: `NilClass#nil?` is `rb_true`
+ * (`vendor/ruby/v3.3.11/object.c:4425`) and `Kernel#nil?` is `rb_false`
+ * (`object.c:4371`), which a class may override
+ * (`ActiveRecord::Relation::QueryAttribute#nil?`). JS has no method on `null`
+ * or `undefined`, the two spellings of Ruby's `nil`, so the send is a
+ * function; an override is spelled `isNil`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function isNil(obj: unknown): boolean {
+  if (obj === null || obj === undefined) return true;
+  if (rbObjRespondTo(obj, "isNil")) return (obj as { isNil(): boolean }).isNil();
+  return false;
+}
+
+/**
  * `rb_obj_as_string` (`vendor/ruby/v3.3.11/string.c:1653`) — the `to_s` of any value.
  * `Array#to_s` and `Hash#to_s` are aliases of `inspect`
  * (`vendor/ruby/v3.3.11/array.c:8616`, `vendor/ruby/v3.3.11/hash.c:7197`), so those two classes

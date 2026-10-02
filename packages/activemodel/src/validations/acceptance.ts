@@ -1,13 +1,7 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import {
-  include,
-  included,
-  isModuleIncluded,
-  kernelArray,
-  Module,
-} from "@blazetrails/activesupport";
-import { except } from "@blazetrails/ruby-compat";
+import { include, included, kernelArray, Module } from "@blazetrails/activesupport";
+import { aryIncludes, except, includedModules } from "@blazetrails/ruby-compat";
 import { inspectAccessor } from "./_accessor.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
@@ -31,13 +25,10 @@ export class AcceptanceValidator extends EachValidator {
     }
   }
 
-  /**
-   * @internal
-   * @missingRailsCall include? — CONVERGEABLE acceptance-setup-asks-is-module-included-not-included-modules-include
-   */
+  /** @internal */
   setupBang(klass: AttributeMethodQueryable): void {
     const defineAttributes = new LazilyDefineAttributes(this.attributes);
-    if (!isModuleIncluded(klass, defineAttributes)) {
+    if (!aryIncludes(includedModules(klass), defineAttributes)) {
       include(klass as unknown as Parameters<typeof include>[0], defineAttributes);
     }
   }

@@ -10,6 +10,7 @@ import {
   rbFPublicSend,
   rbFSend,
   toSym,
+  isNil,
   rbModPublicMethodDefined,
   rbDeclareIvar,
   rbObjInstanceVariables,
@@ -454,6 +455,25 @@ describe("rb_obj_class over trails' date and hash seats", () => {
     expect(rbObjClass(Object.create(Object.create(null)))).toBe("Hash");
     expect(rbObjClass(Object.create({ constructor: Klass }))).toBe("Hash");
     expect(rbObjClass(new Klass())).toBe("Klass");
+  });
+});
+
+describe("isNil", () => {
+  it("is true for both JS spellings of nil", () => {
+    expect(isNil(null)).toBe(true);
+    expect(isNil(undefined)).toBe(true);
+  });
+
+  it("is false for a receiver with no nil? of its own", () => {
+    expect(isNil(0)).toBe(false);
+    expect(isNil("")).toBe(false);
+    expect(isNil(false)).toBe(false);
+    expect(isNil({})).toBe(false);
+  });
+
+  it("answers through the receiver's own nil?", () => {
+    expect(isNil({ isNil: () => true })).toBe(true);
+    expect(isNil({ isNil: () => false })).toBe(false);
   });
 });
 
