@@ -31,7 +31,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   /** @internal */
   protected override async detachDisplacedTarget(): Promise<void> {}
 
-  protected override setNewRecord(record: Base): void | Promise<void> {
+  protected override setNewRecord(record: Base): Base | null | Promise<Base | null> {
     return this.replace(record, false);
   }
 
@@ -49,14 +49,12 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     return sourceReflection(this);
   }
 
-  protected override replace(record: Base | null, save = true): void | Promise<void> {
+  protected override replace(record: Base | null, save = true): Base | null | Promise<Base | null> {
     const created = this.createThroughRecord(record, save);
-    if (created) {
-      return created.then(() => {
-        this.target = record;
-      });
+    if (created instanceof Promise) {
+      return created.then(() => (this.target = record));
     }
-    this.target = record;
+    return (this.target = record);
   }
 }
 

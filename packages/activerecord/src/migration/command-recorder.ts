@@ -42,12 +42,13 @@ export class CommandRecorder {
     this._commands = value;
   }
 
-  async record(cmd: string, args: unknown[], block?: MigrationBlock): Promise<void> {
+  async record(cmd: string, args: unknown[], block?: MigrationBlock): Promise<MigrationCommand[]> {
     if (this._reverting) {
       this._commands.push(await this.inverseOf(cmd, args, block));
     } else {
       this._commands.push([cmd, args, block]);
     }
+    return this._commands;
   }
 
   async addBelongsTo(...args: unknown[]): Promise<void> {
@@ -738,7 +739,7 @@ for (const method of REVERSIBLE_AND_IRREVERSIBLE_METHODS) {
   (CommandRecorder.prototype as unknown as Record<string, unknown>)[method] = function (
     this: CommandRecorder,
     ...args: unknown[]
-  ): Promise<void> {
+  ): Promise<MigrationCommand[]> {
     while (args.length > 0 && args[args.length - 1] === undefined) args.pop();
     const block =
       typeof args[args.length - 1] === "function" ? (args.pop() as MigrationBlock) : undefined;

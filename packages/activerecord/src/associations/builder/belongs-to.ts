@@ -2,7 +2,6 @@ import { first, type Hash, hashDelete, hasKey, type Module, rtest } from "@blaze
 import { underscore, pluralize, isBlank, safeConstantize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
-import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 import { pendingCounterCacheColumns } from "../../counter-cache-state.js";
 import { belongsToRequiredValidatesForeignKey } from "../../active-record.js";
 
@@ -51,7 +50,6 @@ export class BelongsTo extends SingularAssociation {
     if (options.default != null) {
       this.addDefaultCallbacks(model, reflection);
     }
-    addAutosaveAssociationCallbacks.call(model, reflection);
   }
 
   static addCounterCacheCallbacks(model: any, reflection: any): void {

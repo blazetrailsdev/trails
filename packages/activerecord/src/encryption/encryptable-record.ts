@@ -199,32 +199,32 @@ export function ciphertextFor(this: any, attributeName: string): unknown {
 }
 
 /** @internal */
-export async function encrypt(this: any): Promise<void> {
+export async function encrypt(this: any): Promise<boolean | undefined> {
   if (hasEncryptedAttributes.call(this)) {
-    await encryptAttributes.call(this);
+    return await encryptAttributes.call(this);
   }
 }
 
 /** @internal */
-export async function decrypt(this: any): Promise<void> {
+export async function decrypt(this: any): Promise<boolean | undefined> {
   if (hasEncryptedAttributes.call(this)) {
-    await decryptAttributes.call(this);
+    return await decryptAttributes.call(this);
   }
 }
 
 /** @internal */
-export async function encryptAttributes(this: any): Promise<void> {
+export async function encryptAttributes(this: any): Promise<boolean> {
   validateEncryptionAllowed.call(this);
 
-  await this.updateColumns(buildEncryptAttributeAssignments.call(this));
+  return await this.updateColumns(buildEncryptAttributeAssignments.call(this));
 }
 
 /** @internal */
-export async function decryptAttributes(this: any): Promise<void> {
+export async function decryptAttributes(this: any): Promise<boolean> {
   validateEncryptionAllowed.call(this);
 
   const decryptAttributeAssignments = buildDecryptAttributeAssignments.call(this);
-  await Encryption.withoutEncryption(() => this.updateColumns(decryptAttributeAssignments));
+  return await Encryption.withoutEncryption(() => this.updateColumns(decryptAttributeAssignments));
 }
 
 /** @internal */

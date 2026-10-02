@@ -242,6 +242,31 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(s["Foo#c"]).toEqual(["throw"]);
   });
 
+  it("tokens Kernel#fail as the throw raise is, class and all", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def a(cmd); fail run_cmd_error(cmd) unless system(cmd); end
+          def b; fail NotImplementedError; end
+        end
+      `,
+    });
+    expect(s["Foo#a"]).toEqual(["if", "ref:system", "throw", "ref:run_cmd_error"]);
+    expect(s["Foo#b"]).toEqual(["throw:NotImplementedError"]);
+  });
+
+  it("reads fail as a call in a file that defines a fail of its own", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def get(env); return fail(405, "Method Not Allowed") unless ok?(env); end
+          def fail(status, body); [status, {}, [body]]; end
+        end
+      `,
+    });
+    expect(s["Foo#get"]).toEqual(["if", "ref:ok?", "ref:fail"]);
+  });
+
   it("emits a short-circuit token for a logical op-assign, as the ??= port does", () => {
     const s = rubySkeletons({
       "foo.rb": `

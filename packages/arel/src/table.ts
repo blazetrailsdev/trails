@@ -10,7 +10,13 @@ import { SqlLiteral } from "./nodes/sql-literal.js";
 import { StringJoin } from "./nodes/string-join.js";
 import type { Join } from "./nodes/binary.js";
 import { TableAlias } from "./nodes/table-alias.js";
-import { isEmpty, isSymbol, rbModConstSet, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  isEmpty,
+  isSymbol,
+  rbModConstSet,
+  rbObjAsString,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 import { FactoryMethods, type FactoryMethodsModule } from "./factory-methods.js";
 import { AliasPredication, type AliasPredicationModule } from "./alias-predication.js";
 import type { ArelNode } from "./arel.js";
@@ -49,7 +55,7 @@ export class Table {
     this.klass = klass;
     this.typeCaster = typeCaster as Table["typeCaster"];
 
-    if ((isSymbol(as) ? symbolToS(as) : as) === this.name) {
+    if (rbObjAsString(as) === this.name) {
       as = null;
     }
     this.tableAlias = as;

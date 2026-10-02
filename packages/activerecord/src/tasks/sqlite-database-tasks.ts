@@ -1,16 +1,11 @@
-import {
-  getChildProcessAsync,
-  type SpawnSyncResult,
-  File,
-  FileUtils,
-} from "@blazetrails/ruby-compat";
+import { getChildProcessAsync, rbEqq, File, FileUtils } from "@blazetrails/ruby-compat";
+import { kernelArray } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { Base } from "../base.js";
 import { DatabaseTasks } from "./database-tasks.js";
 import { NoDatabaseError, DatabaseAlreadyExists } from "../errors.js";
-import { isInMemoryDatabase } from "../sqlite/sqlite-uri.js";
 
 export class SQLiteDatabaseTasks {
   private readonly dbConfig: DatabaseConfig;
@@ -25,11 +20,11 @@ export class SQLiteDatabaseTasks {
     this.root = root;
   }
 
-  async create(): Promise<void> {
+  async create(): Promise<DatabaseAdapter> {
     if (File.isExist(this.dbConfig.database as string)) throw new DatabaseAlreadyExists();
 
     await this.establishConnection();
-    await this.connection();
+    return await this.connection();
   }
 
   async drop(): Promise<void> {
@@ -65,50 +60,32 @@ export class SQLiteDatabaseTasks {
 
   async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
     const args: string[] = [];
-    if (extraFlags != null) args.push(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
+    if (extraFlags != null) args.push(...kernelArray(extraFlags));
+    args.push(this.dbConfig.database as string);
 
     const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
     let ignoreTables = SchemaDumper.ignoreTables;
-    let dumpSpec: string;
     if (ignoreTables.length > 0) {
       const connection = await this.connection();
       ignoreTables = (await connection.dataSources()).filter((table) =>
-        ignoreTables.some((pattern) => {
-          if (!(pattern instanceof RegExp)) return pattern === table;
-          pattern.lastIndex = 0;
-          return pattern.test(table);
-        }),
+        ignoreTables.some((pattern) => rbEqq(pattern, table)),
       );
       const condition = ignoreTables.map((table) => connection.quote(table)).join(", ");
-      dumpSpec = `SELECT sql || ';' FROM sqlite_master WHERE tbl_name NOT IN (${condition}) ORDER BY tbl_name, type DESC, name`;
+      args.push(
+        `SELECT sql || ';' FROM sqlite_master WHERE tbl_name NOT IN (${condition}) ORDER BY tbl_name, type DESC, name`,
+      );
     } else {
-      dumpSpec = ".schema --nosys";
+      args.push(".schema --nosys");
     }
-
-    let database = this.dbConfig.database as string;
-    let materialized: string | undefined;
-    if (isInMemoryDatabase(database)) {
-      const connection = await this.connection();
-      materialized = `${filename}.dump.sqlite3`;
-      if (File.isExist(materialized)) File.delete(materialized);
-      await connection.execute(`VACUUM INTO ${connection.quote(materialized)}`);
-      database = materialized;
-    }
-
-    try {
-      args.push(database, dumpSpec);
-      await runCmd("sqlite3", args, filename);
-    } finally {
-      if (materialized !== undefined) {
-        if (File.isExist(materialized)) File.delete(materialized);
-      }
-    }
+    await runCmd("sqlite3", args, filename);
   }
 
-  async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
-    const flags = extraFlags != null ? (Array.isArray(extraFlags) ? extraFlags : [extraFlags]) : [];
+  async structureLoad(filename: string, extraFlags?: string[] | null): Promise<void> {
+    let flags: string | undefined;
+    if (extraFlags != null) flags = extraFlags.join(" ");
     const childProcess = await getChildProcessAsync();
-    const args = [...flags, this.dbConfig.database as string];
+    const words = (flags ?? "").split(/\s+/).filter((word) => word !== "");
+    const args = [...words, this.dbConfig.database as string];
     childProcess.spawnSync("sqlite3", args, { encoding: "utf8", in: filename });
   }
 
@@ -116,34 +93,28 @@ export class SQLiteDatabaseTasks {
     return Base.connectionPool().leaseConnection();
   }
 
-  private async establishConnection(config: DatabaseConfig = this.dbConfig): Promise<void> {
+  private async establishConnection(
+    config: DatabaseConfig = this.dbConfig,
+  ): Promise<DatabaseAdapter> {
     await Base.establishConnection(config);
-    await (await this.connection()).connectBang();
+    return await (await this.connection()).connectBang();
   }
 }
 
 /** @internal */
 export async function runCmd(cmd: string, args: string[], out: string): Promise<void> {
   const childProcess = await getChildProcessAsync();
-  const result: SpawnSyncResult = childProcess.spawnSync(cmd, args, { encoding: "utf8", out });
-  if (result.error || result.status !== 0 || result.signal) {
-    const details: string[] = [];
-    if (result.error) details.push(`Error: ${result.error.message}`);
-    if (result.status !== null && result.status !== 0)
-      details.push(`Exit status: ${result.status}`);
-    if (result.signal) details.push(`Signal: ${result.signal}`);
-    if (result.stderr) details.push(`stderr:\n${String(result.stderr).trimEnd()}`);
-    if (result.stdout) details.push(`stdout:\n${String(result.stdout).trimEnd()}`);
-    throw new Error(runCmdError(cmd, args) + (details.length ? details.join("\n") + "\n" : ""));
+  if (childProcess.spawnSync(cmd, args, { encoding: "utf8", out }).status !== 0) {
+    throw new Error(runCmdError(cmd, args));
   }
 }
 
 /** @internal */
 export function runCmdError(cmd: string, args: string[]): string {
-  return (
-    `failed to execute:\n${cmd} ${args.join(" ")}\n\n` +
-    `Please check the output for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`
-  );
+  let msg = "failed to execute:\n";
+  msg += `${cmd} ${args.join(" ")}\n\n`;
+  msg += `Please check the output above for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`;
+  return msg;
 }
 
 DatabaseTasks.registerTask(/sqlite/, SQLiteDatabaseTasks);

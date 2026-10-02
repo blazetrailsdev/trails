@@ -90,10 +90,8 @@ export const AutosaveAssociation = {
   saveBelongsToAssociation,
 };
 
-export function build(_model: typeof Base, reflection: { options: Record<string, unknown> }): void {
-  if (reflection.options.autosave && reflection.options.validate === undefined) {
-    reflection.options.validate = true;
-  }
+export function build(model: typeof Base, reflection: unknown): unknown {
+  return addAutosaveAssociationCallbacks.call(model, reflection);
 }
 
 export function validOptions(): string[] {
@@ -107,7 +105,7 @@ export function _registerAssociationBuilderExtension(extensions: ExtensionList):
 
 interface ExtensionList {
   push(extension: {
-    build(model: typeof Base, reflection: { options: Record<string, unknown> }): void;
+    build(model: typeof Base, reflection: unknown): unknown;
     validOptions(): string[];
   }): void;
 }

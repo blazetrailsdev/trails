@@ -60,7 +60,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     });
   }
 
-  sql(event: Event): void {
+  sql(event: Event): boolean | undefined {
     const payload = event.payload as Event["payload"] & { binds?: any[] | null };
 
     if (LogSubscriber.IGNORE_PAYLOAD_NAMES.includes(payload.name as string)) return;
@@ -107,7 +107,7 @@ export class LogSubscriber extends BaseLogSubscriber {
       : sql;
 
     const message = `  ${colorizedName}  ${colorizedSql}${binds ?? ""}`;
-    this.debugSql(message);
+    return this.debugSql(message);
   }
 
   /** @internal */

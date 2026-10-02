@@ -19,7 +19,7 @@ export class SingularAssociation extends Association<Base> {
     this._writeTargetStore(null);
   }
 
-  writer(record: Base | null): void | Promise<void> {
+  writer(record: Base | null): Base | null | Promise<Base | null> {
     return this.replace(record);
   }
 
@@ -37,7 +37,7 @@ export class SingularAssociation extends Association<Base> {
         });
       }
       const assigned = record ? this.setNewRecord(record) : undefined;
-      if (assigned) return assigned.then(() => record);
+      if (assigned instanceof Promise) return assigned.then(() => record);
       return record;
     };
     const load = this.loadDisplacedForBuild();
@@ -156,12 +156,12 @@ export class SingularAssociation extends Association<Base> {
     return record;
   }
 
-  protected replace(record: Base | null, ..._rest: unknown[]): void | Promise<void> {
+  protected replace(record: Base | null, ..._rest: unknown[]): Base | null | Promise<Base | null> {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/associations/singular_association.rb:57
     throw new NotImplementedError("Subclasses must implement a replace(record) method");
   }
 
-  protected setNewRecord(record: Base): void | Promise<void> {
+  protected setNewRecord(record: Base): Base | null | Promise<Base | null> {
     return this.replace(record);
   }
 }

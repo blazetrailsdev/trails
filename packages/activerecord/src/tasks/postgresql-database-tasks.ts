@@ -8,6 +8,7 @@ import {
   type SpawnSyncResult,
 } from "@blazetrails/ruby-compat";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
+import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
 import { DatabaseTasks } from "./database-tasks.js";
@@ -38,7 +39,7 @@ export class PostgreSQLDatabaseTasks {
   }
 
   /** @missingRailsCall merge — PERMANENT */
-  async create(connectionAlreadyEstablished = false): Promise<void> {
+  async create(connectionAlreadyEstablished = false): Promise<ConnectionPool> {
     if (!connectionAlreadyEstablished) {
       await this.establishConnection(this.publicSchemaConfig());
     }
@@ -47,7 +48,7 @@ export class PostgreSQLDatabaseTasks {
       ...this.configurationHash,
       encoding: this.encoding(),
     });
-    await this.establishConnection();
+    return await this.establishConnection();
   }
 
   async drop(): Promise<void> {
@@ -191,8 +192,8 @@ export class PostgreSQLDatabaseTasks {
   }
 
   /** @internal */
-  private async establishConnection(config?: Record<string, unknown>): Promise<void> {
-    await Base.establishConnection(config ?? this.dbConfig);
+  private async establishConnection(config?: Record<string, unknown>): Promise<ConnectionPool> {
+    return await Base.establishConnection(config ?? this.dbConfig);
   }
 
   /**

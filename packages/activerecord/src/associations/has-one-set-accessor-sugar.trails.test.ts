@@ -68,6 +68,14 @@ describe("has_one set#{Name} awaitable accessor", () => {
     expect((await readHasOne(firm, "account"))?.id).toBe(account.id);
   });
 
+  it("returns the assigned record, as the writer's replace does", async () => {
+    const firm = (await Firm.find(1)) as Base;
+    const account = new Account({ credit_limit: 1000 });
+
+    expect(await set(firm).setAccount(account)).toBe(account);
+    expect(await set(firm).setAccount(null)).toBeNull();
+  });
+
   it("destroys the displaced dependent target inline, not at owner save", async () => {
     const firm = companies("first_firm") as Base;
     const oldAccountId = (await readHasOne(firm, "account"))?.id;

@@ -122,11 +122,11 @@ export class V7_0 extends V7_1 {
     tableName: string,
     columnName: string | string[],
     options: AddIndexOptions = {},
-  ): Promise<void> {
+  ): Promise<unknown> {
     if (options.name == null) {
       options = { ...options, name: LegacyIndexName.legacyIndexName(tableName, columnName) };
     }
-    await super.addIndex(tableName, columnName, options);
+    return await super.addIndex(tableName, columnName, options);
   }
 
   override async addReference(
@@ -626,14 +626,14 @@ export class V4_2 extends V5_0 {
     tableName: string,
     columnName: string | string[] | RemoveIndexOptions | null = null,
     options: RemoveIndexOptions = {},
-  ): Promise<void> {
+  ): Promise<unknown> {
     if (!(typeof columnName === "string" || Array.isArray(columnName))) {
       options = { ...columnName, ...options };
       columnName = null;
     }
 
     options = { ...options, name: await this.indexNameForRemove(tableName, columnName, options) };
-    await super.removeIndex(tableName, columnName ?? undefined, options);
+    return await super.removeIndex(tableName, columnName ?? undefined, options);
   }
 
   /** @internal */

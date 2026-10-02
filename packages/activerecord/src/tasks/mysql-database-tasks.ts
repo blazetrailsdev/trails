@@ -1,6 +1,7 @@
 import { getChildProcessAsync, rbEqq, type SpawnSyncResult } from "@blazetrails/ruby-compat";
 import { kernelArray } from "@blazetrails/activesupport";
 import type { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";
+import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
 import { DatabaseTasks } from "./database-tasks.js";
@@ -20,12 +21,12 @@ export class MySQLDatabaseTasks {
     this.configurationHash = { ...dbConfig.configurationHash };
   }
 
-  async create(): Promise<void> {
+  async create(): Promise<ConnectionPool> {
     await this.establishConnection(this.configurationHashWithoutDatabase());
     await (
       await this.connection()
     ).createDatabase(this.dbConfig.database as string, this.creationOptions());
-    await this.establishConnection();
+    return await this.establishConnection();
   }
 
   async drop(): Promise<void> {
@@ -150,8 +151,11 @@ export class MySQLDatabaseTasks {
   /** @internal */
   private async establishConnection(
     config: Record<string, unknown> = this.dbConfig.configurationHash,
-  ): Promise<void> {
-    await Base.establishConnection({ ...config } as { adapter?: string; [key: string]: unknown });
+  ): Promise<ConnectionPool> {
+    return await Base.establishConnection({ ...config } as {
+      adapter?: string;
+      [key: string]: unknown;
+    });
   }
 
   /**

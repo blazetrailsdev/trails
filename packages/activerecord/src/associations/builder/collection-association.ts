@@ -1,7 +1,6 @@
 import { Module } from "@blazetrails/ruby-compat";
 import { camelize, singularize } from "@blazetrails/activesupport";
 import { Association, type AssociationInstanceHost } from "./association.js";
-import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 
 /** @noRailsEquivalent CONVERGEABLE retire-ids-name-helper-constructor-dispatch */
 export function idsName(name: string): string {
@@ -29,7 +28,6 @@ export class CollectionAssociation extends Association {
     for (const callbackName of CALLBACKS) {
       this.defineCallback(model, callbackName, name, options);
     }
-    addAutosaveAssociationCallbacks.call(model, reflection);
   }
 
   static override defineExtensions(

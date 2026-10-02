@@ -109,11 +109,8 @@ export { ArgumentError, TypeError, NameError, NoMethodError, NotImplementedError
  * @internal
  * @noRailsEquivalent CONVERGEABLE update-must-call-assign-attributes-carried-from-0087
  */
-export function assertAssignedSynchronously(
-  pending: Promise<void> | void,
-  methodName: string,
-): void {
-  if (!pending) return;
+export function assertAssignedSynchronously(pending: unknown, methodName: string): void {
+  if (!(pending instanceof Promise)) return;
   void pending.catch(() => {});
   throw new RuntimeError(
     `${methodName} cannot assign this attribute synchronously; use \`await record.setAttributes(...)\` instead.`,
