@@ -370,6 +370,24 @@ export function rbFSend(recv: unknown, mid: unknown, ...args: unknown[]): unknow
   return sendInternal(args.length, [mid, ...args], recv);
 }
 
+/**
+ * `conversion_mismatch` (`vendor/ruby/v3.3.11/object.c:3132`): the `TypeError`
+ * a conversion method raises for answering the wrong type.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function conversionMismatch(
+  val: unknown,
+  tname: string,
+  method: string,
+  result: unknown,
+): never {
+  const cname = rbObjClass(val);
+  throw new TypeError(
+    `can't convert ${cname} to ${tname} (${cname}#${method} gives ${rbObjClass(result)})`,
+  );
+}
+
 function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown): unknown {
   const [vid, ...args] = argv;
   const [vid, ...args] = argv;

@@ -3,7 +3,7 @@ import { rbHash } from "./rb-hash.js";
 import { ArgumentError } from "./argument-error.js";
 import { cmp, rbCmpint } from "./comparable.js";
 import { Hash } from "./hash.js";
-import { rbBuiltinClassName } from "./object.js";
+import { conversionMismatch, rbBuiltinClassName } from "./object.js";
 import { Range } from "./range.js";
 import { num2long } from "./string/support.js";
 import { TypeError } from "./type-error.js";
@@ -636,16 +636,20 @@ export function compact<T>(ary: readonly T[]): Array<NonNullable<T>> {
 }
 
 /**
- * `rb_check_array_type` (`vendor/ruby/v3.3.11/array.c:975`): an Array, its
- * `to_ary`, or nil.
+ * `rb_check_array_type` (`vendor/ruby/v3.3.11/array.c:975`, over
+ * `rb_check_convert_type_with_id`, `vendor/ruby/v3.3.11/object.c:3184`): an
+ * Array, its `to_ary`, or nil. A `to_ary` answering anything else raises.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbCheckArrayType(ary: unknown): unknown[] | null {
   if (Array.isArray(ary)) return ary;
   const toAry = (ary as { toAry?: unknown } | null)?.toAry;
-  if (typeof toAry === "function") return toAry.call(ary) as unknown[];
-  return null;
+  if (typeof toAry !== "function") return null;
+  const v: unknown = toAry.call(ary);
+  if (v == null) return null;
+  if (!Array.isArray(v)) conversionMismatch(ary, "Array", "to_ary", v);
+  return v;
 }
 
 /**

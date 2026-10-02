@@ -252,6 +252,9 @@ describe("rbFSend", () => {
     expect(rbFPublicSend(req, "subdomain")).toBe(rbFSend(req, "subdomain"));
     expect(rbFPublicSend(req, ":subdomain")).toBe("clients");
     expect(() => rbFPublicSend(req, null)).toThrow("nil is not a symbol nor a string");
+    expect(() => rbFPublicSend(req, { toStr: () => 1 })).toThrow(
+      "can't convert Hash to String (Hash#to_str gives Integer)",
+    );
     expect(() => rbFPublicSend(req, "nope")).toThrow(NoMethodError);
   });
 

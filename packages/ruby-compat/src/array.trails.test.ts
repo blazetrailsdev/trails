@@ -199,6 +199,14 @@ describe("Array#flatten", () => {
     expect(flatten(["a", [["b"], pair], null])).toEqual(["a", "b", "c", "d", null]);
   });
 
+  it("leaves an element whose to_ary answers nil and raises when it answers a non-Array", () => {
+    const none = { toAry: () => null };
+    expect(flatten([none])).toEqual([none]);
+    expect(() => flatten([{ toAry: () => 1 }])).toThrow(
+      "can't convert Hash to Array (Hash#to_ary gives Integer)",
+    );
+  });
+
   it("raises on an array nested in itself", () => {
     const ary: unknown[] = [1];
     ary.push(ary);
