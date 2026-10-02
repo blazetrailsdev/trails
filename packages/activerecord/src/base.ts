@@ -2704,6 +2704,7 @@ include(Base, _Dirty);
 include(Base, _AttrSerialization);
 include(Base, LockingPessimistic.Pessimistic);
 include(Base, LockingOptimistic.InstanceMethods);
+prepend(Base.prototype, { incrementBang: _Callbacks.incrementBang as PrependMethod });
 include(Base, Timestamp.InstanceMethods);
 include(Base, TouchLater.InstanceMethods);
 include(Base, _AttributeAssignment.AttributeAssignment);

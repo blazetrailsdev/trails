@@ -227,7 +227,7 @@ export class SelectManager extends TreeManager<SelectStatement> {
     if (other != null) {
       nodeClass = rbConstGet(
         Nodes,
-        `Union${capitalize(isSymbol(operation) ? symbolToS(operation) : rbObjAsString(operation), [])}`,
+        `Union${capitalize(rbObjAsString(operation), [])}`,
       ) as typeof Union;
     } else {
       other = operation as SelectManager;

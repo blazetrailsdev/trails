@@ -14,6 +14,7 @@ import { Company } from "./test-helpers/models/company.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
+import { queryConstraints, queryConstraintsList } from "./persistence.js";
 
 describe("PersistenceTest (trails)", () => {
   const Topic = CanonicalTopic;
@@ -35,6 +36,19 @@ describe("PersistenceTest (trails)", () => {
     const all = await Topic.all();
     expect(result).toHaveLength(all.length);
     expect(all.every((t) => t.title === "same")).toBe(true);
+  });
+
+  it("reload replaces the attributes of a record loaded with a selected alias", async () => {
+    const topic = (await Topic.select("id, title AS aliased_title").first()) as InstanceType<
+      typeof Topic
+    >;
+    expect(topic.readAttribute("aliased_title")).toBe("The First Topic");
+
+    await topic.reload();
+
+    expect(topic.hasAttribute("aliased_title")).toBe(false);
+    expect(topic.readAttribute("aliased_title")).toBeNull();
+    expect(topic.title).toBe("The First Topic");
   });
 
   it("create awaits an async block before saving", async () => {
@@ -275,6 +289,48 @@ describe("PersistenceTest (trails)", () => {
     expect(() => (special as unknown as { title: string }).title).toThrow(
       /missing attribute|title/i,
     );
+  });
+});
+
+describe("Persistence.queryConstraintsList (trails)", () => {
+  const host = (
+    primaryKey: string | string[],
+    baseClass?: object,
+  ): ThisParameterType<typeof queryConstraintsList> => {
+    const klass: Record<string, unknown> = {
+      primaryKey,
+      isBaseClass: () => baseClass === undefined,
+    };
+    klass.baseClass = baseClass ?? klass;
+    return klass as unknown as ThisParameterType<typeof queryConstraintsList>;
+  };
+
+  it("answers a base class's composite primary key and nil for a single one", () => {
+    expect(queryConstraintsList.call(host(["shop_id", "id"]))).toEqual(["shop_id", "id"]);
+    expect(queryConstraintsList.call(host("id"))).toBeNull();
+  });
+
+  it("reads the base class's list when a subclass shares its primary key", () => {
+    const base = host(["shop_id", "id"]);
+    queryConstraints.call(base, "tenant_id", "id");
+    expect(queryConstraintsList.call(host(["shop_id", "id"], base))).toEqual(["tenant_id", "id"]);
+  });
+
+  it("answers a subclass's own primary key when it differs from the base class's", () => {
+    const base = host(["shop_id", "id"]);
+    expect(queryConstraintsList.call(host(["region_id", "id"], base))).toEqual(["region_id", "id"]);
+    expect(queryConstraintsList.call(host("uuid", base))).toBeNull();
+  });
+
+  it("memoizes on the class it was asked of, not on a subclass's parent", () => {
+    const base = host(["shop_id", "id"]);
+    const sub = Object.create(base, {
+      primaryKey: { value: ["region_id", "id"] },
+      isBaseClass: { value: () => false },
+      baseClass: { value: base },
+    });
+    expect(queryConstraintsList.call(base)).toEqual(["shop_id", "id"]);
+    expect(queryConstraintsList.call(sub)).toEqual(["region_id", "id"]);
   });
 });
 

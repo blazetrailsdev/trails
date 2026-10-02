@@ -5,7 +5,7 @@ import { reloadSchemaFromCache as attributesReloadSchemaFromCache } from "./attr
 import { defaultTimezone } from "./active-record.js";
 
 export interface TouchOptions {
-  time?: Date | RubyTime | null;
+  time?: RubyTime | null;
 }
 
 export type TouchArgs = string[] | [...names: string[], options: TouchOptions];

@@ -298,7 +298,8 @@ function makeRelForOrder(mc: {
   implicitOrderColumn?: string | null;
   _queryConstraintsList?: string[] | null;
 }): any {
-  return { _model: mc, model: mc, primaryKey: mc.primaryKey };
+  const model = { isBaseClass: () => true, ...mc };
+  return { _model: model, model, primaryKey: mc.primaryKey };
 }
 
 describe("_orderColumns — Rails _order_columns precedence", () => {

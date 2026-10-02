@@ -1,7 +1,8 @@
 import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
-import { isBlank } from "@blazetrails/activesupport";
+import { isBlank, kernelArray } from "@blazetrails/activesupport";
 import { except, hasKey, rbModSingletonP } from "@blazetrails/ruby-compat";
 import { UnknownPrimaryKey } from "../errors.js";
+import { stripThenable } from "../relation/thenable.js";
 
 export function validatesUniquenessOf(
   this: {
@@ -59,15 +60,14 @@ export class UniquenessValidator extends EachValidator {
 
   /** @internal */
   protected override readAttributeForValidation(record: any, attribute: string): unknown {
-    const refl = record?.constructor?._reflectOnAssociation?.(attribute);
-    if (refl) {
-      const fk = Array.isArray(refl.foreignKey()) ? refl.foreignKey()[0] : refl.foreignKey();
-      return record.readAttribute(fk);
+    if (record?.constructor?._reflectOnAssociation?.(attribute)) {
+      return record.association(attribute).reader;
     }
     return super.readAttributeForValidation(record, attribute);
   }
 
   async validateEach(record: any, attribute: string, value: unknown): Promise<void> {
+    value = await value;
     if (value === undefined) return;
     const o = this.options as { allowNil?: unknown; allowBlank?: unknown };
     if (value == null && o.allowNil === true) return;
@@ -87,7 +87,7 @@ export class UniquenessValidator extends EachValidator {
 
     const opts = this.options as any;
 
-    let [relation] = await this.buildRelation(finderClass, attribute, value);
+    let relation = await this.buildRelation(finderClass, attribute, value);
 
     if (record.isPersisted?.()) {
       const pk = finderClass.primaryKey;
@@ -110,7 +110,7 @@ export class UniquenessValidator extends EachValidator {
       }
     }
 
-    relation = this.scopeRelation(record, relation);
+    relation = await this.scopeRelation(record, relation);
 
     if (opts?.conditions && typeof opts.conditions === "function") {
       const conditioned =
@@ -153,99 +153,39 @@ export class UniquenessValidator extends EachValidator {
   }
 
   /** @internal */
-  protected async buildRelation(klass: any, attribute: string, value: unknown): Promise<[any]> {
-    const base = typeof klass.unscoped === "function" ? klass.unscoped() : klass.where({});
-
-    attribute = (klass.attributeAliases?.[attribute] as string) ?? attribute;
-
-    const refl = klass._reflectOnAssociation?.(attribute);
-    if (refl) {
-      const fk = Array.isArray(refl.foreignKey()) ? refl.foreignKey()[0] : refl.foreignKey();
-      if (
-        value != null &&
-        typeof value === "object" &&
-        typeof (value as any).readAttribute === "function"
-      ) {
-        const pk = refl.klass?.primaryKey ?? "id";
-        value = (value as any).readAttribute(Array.isArray(pk) ? pk[0] : pk);
-      }
-      attribute = fk;
-    }
-
-    if (value == null) {
-      return [base.whereBang({ [attribute]: null })];
-    }
-
-    const arel = klass.arelTable as { get?: (n: string) => any } | null;
-    const pb = (
-      base as { predicateBuilder?: { buildBindAttribute(c: string, v: unknown): unknown } }
-    ).predicateBuilder;
-    const hasCsKey = hasKey(this.options, "caseSensitive");
-    const typeObj =
-      typeof klass.typeForAttribute === "function" ? klass.typeForAttribute(attribute) : null;
-
-    if (typeObj?.supportUnencryptedData) {
-      return [base.whereBang({ [attribute]: value })];
-    }
-
-    if (arel && typeof arel.get === "function" && pb?.buildBindAttribute) {
-      const attr = arel.get(attribute);
-      const bind = pb.buildBindAttribute(attribute, value);
-      const comparison: any = await klass.withConnection(async (adapter: any) => {
-        let comparison: any = null;
-        if (!hasCsKey || value == null) {
-          comparison = adapter?.defaultUniquenessComparison?.(attr, bind) ?? null;
-        } else if (this.options.caseSensitive) {
-          comparison = (await adapter?.caseSensitiveComparison?.(attr, bind)) ?? null;
-        } else {
-          const colType =
-            typeObj == null
-              ? null
-              : typeof typeObj.type === "function"
-                ? typeObj.type()
-                : typeObj.type;
-          if (colType !== "uuid") {
-            comparison = (await adapter?.caseInsensitiveComparison?.(attr, bind)) ?? null;
-            if (comparison == null && typeof value === "string") {
-              const lowerBind = pb.buildBindAttribute(attribute, value.toLowerCase());
-              comparison = attr.lower().eq(lowerBind);
-            }
-          }
+  protected async buildRelation(klass: any, attribute: string, value: unknown): Promise<any> {
+    const relation = klass.unscoped();
+    let none = null;
+    const comparison = await klass.withConnection((connection: any) =>
+      relation.bindAttribute(attribute, value, (attr: any, bind: any) => {
+        if (bind.isUnboundable()) {
+          none = relation.noneBang();
+          return null;
         }
-        return comparison;
-      });
-      if (comparison != null && typeof base.where === "function") {
-        return [base.whereBang(comparison)];
-      }
-    }
-    return [base.whereBang({ [attribute]: value })];
+
+        if (!hasKey(this.options, "caseSensitive") || bind.isNil()) {
+          return connection.defaultUniquenessComparison(attr, bind);
+        } else if (this.options.caseSensitive) {
+          return connection.caseSensitiveComparison(attr, bind);
+        } else {
+          return connection.caseInsensitiveComparison(attr, bind);
+        }
+      }),
+    );
+
+    return stripThenable(none ?? relation.whereBang(comparison));
   }
 
   /** @internal */
-  private scopeRelation(record: any, relation: any): any {
-    const scope = this.options.scope;
-    if (scope == null) return relation;
-    const scopes = Array.isArray(scope) ? (scope as string[]) : [scope as string];
-    let r = relation;
-    for (const rawItem of scopes) {
-      const ctor = record.constructor;
-      const item = (ctor.attributeAliases?.[rawItem] as string) ?? rawItem;
-      const refl = ctor._reflectOnAssociation?.(item);
-      if (refl) {
-        const isPoly =
-          typeof refl.isPolymorphic === "function" ? refl.isPolymorphic() : refl.polymorphic;
-        const fks = Array.isArray(refl.foreignKey()) ? refl.foreignKey() : [refl.foreignKey()];
-        for (const fk of fks) {
-          r = r.where({ [fk]: record.readAttribute?.(fk) });
-        }
-        if (isPoly && refl.foreignType) {
-          r = r.where({ [refl.foreignType]: record.readAttribute?.(refl.foreignType) });
-        }
-      } else {
-        r = r.where({ [item]: record.readAttribute?.(item) });
-      }
+  private async scopeRelation(record: any, relation: any): Promise<any> {
+    for (const scopeItem of kernelArray(this.options.scope as string | string[])) {
+      const scopeValue = record.constructor._reflectOnAssociation(scopeItem)
+        ? await record.association(scopeItem).reader
+        : record.readAttribute(scopeItem);
+      relation = relation.where({ [scopeItem]: scopeValue });
     }
-    return r;
+
+    return stripThenable(relation);
   }
 }
 
