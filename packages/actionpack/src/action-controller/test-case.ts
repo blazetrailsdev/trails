@@ -52,6 +52,7 @@ import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
 import type { CookieJar, CookieResponse } from "../action-dispatch/middleware/cookies.js";
 import { TestProcess } from "../action-dispatch/testing/test-process.js";
 import type { RouteSet } from "../action-dispatch/routing/route-set.js";
+import type { DispatchableControllerClass } from "../action-dispatch/routing/dispatcher.js";
 import * as responseAssertions from "../action-dispatch/testing/assertions/response.js";
 import * as routingAssertions from "../action-dispatch/testing/assertions/routing.js";
 import { Metal } from "./metal.js";
@@ -257,7 +258,7 @@ async function process(
   this.request = new TestRequest(
     this.scrubEnvBang(this.request.env),
     this.request.session as unknown as TestSession,
-    this.controller.constructor,
+    this.controller.constructor as typeof Metal,
   );
   this.response = this.buildResponse(this._responseKlass);
   this.response.request = this.request;
@@ -319,7 +320,7 @@ function setupControllerRequestAndResponse(this: Behavior): void {
     }
   }
 
-  this.request = TestRequest.create(this.controller?.constructor ?? klass);
+  this.request = TestRequest.create(this.controller == null ? null : this.controller.constructor);
   this.response = this.buildResponse(this._responseKlass);
   this.response.request = this.request;
 
@@ -581,16 +582,19 @@ export class TestRequest extends AbstractTestRequest {
     return new TestSession();
   }
 
-  /** @internal */
-  private _testControllerClass: unknown;
+  private _controllerClass: DispatchableControllerClass | null;
 
-  static create(controllerClass?: unknown): TestRequest {
+  override controllerClass(): DispatchableControllerClass | null {
+    return this._controllerClass;
+  }
+
+  static create(controllerClass: unknown): TestRequest {
     const env: Record<string, unknown> = {};
     env["rack.request.cookie_hash"] = {};
     return new TestRequest(
       merge(TestRequest.defaultEnv(), env),
       TestRequest.newSession(),
-      controllerClass ?? null,
+      controllerClass as DispatchableControllerClass | null,
     );
   }
 
@@ -602,12 +606,16 @@ export class TestRequest extends AbstractTestRequest {
     return env;
   }
 
-  constructor(env: Record<string, unknown>, session: TestSession, controllerClass: unknown) {
+  constructor(
+    env: Record<string, unknown>,
+    session: TestSession,
+    controllerClass: DispatchableControllerClass | null,
+  ) {
     super(env);
 
     this.session = session as never;
     this.sessionOptions = { ...TestSession.DEFAULT_OPTIONS };
-    this._testControllerClass = controllerClass;
+    this._controllerClass = controllerClass;
   }
 
   get queryString(): string {

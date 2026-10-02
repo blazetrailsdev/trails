@@ -1,7 +1,16 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import { BigDecimal, include, isModuleIncluded, TopLevel } from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
-import { b, setVerbose, stderr, StringIO, verbose } from "@blazetrails/ruby-compat";
+import {
+  b,
+  registerConstant,
+  setVerbose,
+  stderr,
+  StringIO,
+  unregisterConstant,
+  verbose,
+} from "@blazetrails/ruby-compat";
+import { SessionId } from "@blazetrails/rack-session";
 import { UploadedFile } from "@blazetrails/rack-test";
 import {
   Behavior,
@@ -22,12 +31,13 @@ import {
 import { Base } from "./base.js";
 import { Metal } from "./metal.js";
 import { TestResponse } from "../action-dispatch/testing/test-response.js";
-import type { UploadedFile as HttpUploadedFile } from "../action-dispatch/http/upload.js";
+import { UploadedFile as HttpUploadedFile } from "../action-dispatch/http/upload.js";
+import { MimeType } from "../action-dispatch/http/mime-type.js";
 import "../test-helpers/abstract-unit.js";
 
 describe("TestRequest#assignParameters Content-Type case", () => {
   it("raises on a Content-Type no Mime::Type is registered for", () => {
-    const req = TestRequest.create();
+    const req = TestRequest.create(null);
     req.setHeader("REQUEST_METHOD", "POST");
     req.setHeader("CONTENT_TYPE", "Application/Vnd.Custom+Json; charset=utf-8");
     expect(() => req.assignParameters(null, "api", "create", { x: "1" }, "/api", ["x"])).toThrow(
@@ -36,7 +46,7 @@ describe("TestRequest#assignParameters Content-Type case", () => {
   });
 
   it("encodes an :xml body with to_xml", () => {
-    const req = TestRequest.create();
+    const req = TestRequest.create(null);
     req.setHeader("REQUEST_METHOD", "POST");
     req.setHeader("CONTENT_TYPE", "application/xml");
     req.assignParameters(null, "api", "create", { x: "1" }, "/api", ["x"]);
@@ -44,7 +54,7 @@ describe("TestRequest#assignParameters Content-Type case", () => {
   });
 
   it("encodes a :json body with ActiveSupport::JSON.encode", () => {
-    const req = TestRequest.create();
+    const req = TestRequest.create(null);
     req.setHeader("REQUEST_METHOD", "POST");
     req.setHeader("CONTENT_TYPE", "application/json");
     const price = new BigDecimal("1.50");
@@ -61,7 +71,7 @@ describe("ActionController::TestSession", () => {
 
 describe("TestRequest#assignParameters multipart body", () => {
   it("parses non-ASCII file bytes and text parts back out of the encoded body", () => {
-    const req = TestRequest.create();
+    const req = TestRequest.create(null);
     req.setHeader("REQUEST_METHOD", "POST");
     const file = new UploadedFile(new StringIO(b("héllo")), "text/plain", false, {
       originalFilename: "h.txt",
@@ -210,6 +220,26 @@ describe("TestCase#setup_controller_request_and_response", () => {
       setVerbose(was);
       write.mockRestore();
     }
+  });
+
+  it("builds the request with no controller class when the controller cannot be constructed", async ({
+    task,
+  }) => {
+    class UnconstructibleTest extends TestCase {}
+    UnconstructibleTest.tests(UnconstructibleController);
+    const tc = new UnconstructibleTest(task.name);
+    await tc.beforeSetup();
+    expect(tc.controller).toBeNull();
+    expect(tc.request.controllerClass()).toBeNull();
+  });
+
+  it("builds the request from the class of the controller it holds", async ({ task }) => {
+    class PostsController extends Base {}
+    class PostsTest extends TestCase {}
+    PostsTest.tests(PostsController);
+    const tc = new PostsTest(task.name);
+    await tc.beforeSetup();
+    expect(tc.request.controllerClass()).toBe(PostsController);
   });
 });
 
@@ -458,5 +488,210 @@ describe("TestCase over a PostsController", () => {
     it("assertTemplate raises (extracted to gem)", () => {
       expect(() => tc.assertTemplate()).toThrow(/extracted to a gem/);
     });
+  });
+});
+
+describe("TestSession Rails-mirroring API", () => {
+  it("isExists / isEnabled are always true (Rails: exists?/enabled?)", () => {
+    const s = new TestSession();
+    expect(s.isExists()).toBe(true);
+    expect(s.isEnabled()).toBe(true);
+  });
+
+  it("keys / values reflect stored data", () => {
+    const s = new TestSession({ a: 1, b: 2 });
+    expect(s.keys()).toEqual(["a", "b"]);
+    expect(s.values()).toEqual([1, 2]);
+  });
+
+  it("destroy clears stored data", () => {
+    const s = new TestSession({ a: 1 });
+    s.destroy();
+    expect(s.keys()).toEqual([]);
+  });
+
+  it("dig stringifies the first key (mirrors Rails)", () => {
+    const s = new TestSession({ user: { name: "Ada" } });
+    expect(s.dig("user", "name")).toBe("Ada");
+    expect(s.dig("missing")).toBeUndefined();
+  });
+
+  it("fetch returns the value, the fallback, or throws", () => {
+    const s = new TestSession({ a: 1 });
+    expect(s.fetch("a")).toBe(1);
+    expect(s.fetch("b", 99)).toBe(99);
+    expect(s.fetch("c", undefined, () => "lazy")).toBe("lazy");
+    expect(s.fetch("d", undefined, (k: string) => `missing:${k}`)).toBe("missing:d");
+    expect(() => s.fetch("missing")).toThrow();
+  });
+
+  it("idWas / loadBang return the constructor-frozen id", () => {
+    const id = new SessionId("abc123");
+    const s = new TestSession({}, id);
+    expect(s.idWas()).toBe(id);
+    expect(s.loadBang()).toBe(id);
+  });
+});
+
+describe("TestCase class helpers", () => {
+  class PostsController extends Base {}
+
+  it("tests(string) resolves <Name>Controller via globalThis", () => {
+    registerConstant("WidgetController", PostsController);
+    try {
+      class Sub extends TestCase {}
+      Sub.tests("widget");
+      expect(Sub.controllerClass).toBe(PostsController);
+    } finally {
+      unregisterConstant("WidgetController", PostsController);
+    }
+  });
+
+  it("tests(string) raises NameError-style when no matching constant exists", () => {
+    class Sub extends TestCase {}
+    expect(() => Sub.tests("nonexistent_blarg")).toThrow(
+      /uninitialized constant NonexistentBlargController/,
+    );
+  });
+
+  it("controllerClassName returns the controller's path", ({ task }) => {
+    class Sub extends TestCase {}
+    Sub.tests(PostsController);
+    const tc = new Sub(task.name);
+    tc.setupControllerRequestAndResponse();
+    expect(tc.controllerClassName()).toBe("posts");
+  });
+
+  it("determineDefaultControllerClass strips trailing Test and looks up", () => {
+    registerConstant("BooksController", PostsController);
+    try {
+      expect(TestCase.determineDefaultControllerClass("BooksControllerTest")).toBe(PostsController);
+      expect(TestCase.determineDefaultControllerClass("MissingTest")).toBeNull();
+    } finally {
+      unregisterConstant("BooksController", PostsController);
+    }
+  });
+});
+
+describe("ActionController::TestRequest helpers", () => {
+  it("queryString= sets QUERY_STRING header", () => {
+    const req = TestRequest.create(null);
+    req.queryString = "foo=bar&baz=1";
+    expect(req.getHeader("QUERY_STRING")).toBe("foo=bar&baz=1");
+  });
+
+  it("contentType= sets CONTENT_TYPE header", () => {
+    const req = TestRequest.create(null);
+    req.contentType = "application/json";
+    expect(req.getHeader("CONTENT_TYPE")).toBe("application/json");
+  });
+
+  it("newSession returns a TestSession", () => {
+    const session = TestRequest.newSession();
+    expect(session).toBeInstanceOf(TestSession);
+    expect(session.isExists()).toBe(true);
+  });
+
+  it("create returns a TestRequest with default env", () => {
+    const req = TestRequest.create(null);
+    expect(req).toBeInstanceOf(TestRequest);
+    expect(req.getHeader("HTTP_HOST")).toBe("test.host");
+  });
+
+  it("defaultEnv omits PATH_INFO (Rails: DEFAULT_ENV.delete)", () => {
+    const env = TestRequest.defaultEnv();
+    expect("PATH_INFO" in env).toBe(false);
+    expect(env["HTTP_HOST"]).toBe("test.host");
+  });
+
+  it("assignParameters wires path + query params for GET", () => {
+    const req = TestRequest.create(null);
+    req.setHeader("REQUEST_METHOD", "GET");
+    req.assignParameters(null, "posts", "index", { id: "42", format: "json" }, "/posts/42", [
+      "format",
+    ]);
+    expect(req.pathParameters["controller"]).toBe("posts");
+    expect(req.pathParameters["action"]).toBe("index");
+    expect(req.pathParameters["id"]).toBe("42");
+    const qs = req.getHeader("QUERY_STRING") ?? "";
+    expect(qs).toContain("format=json");
+  });
+
+  it("assignParameters leaves a present-but-empty PATH_INFO alone (Rails: fetch_header)", () => {
+    const req = TestRequest.create(null);
+    req.setHeader("REQUEST_METHOD", "GET");
+    req.setHeader("PATH_INFO", "");
+    req.assignParameters(null, "posts", "index", {}, "/posts", []);
+    expect(req.getHeader("PATH_INFO")).toBe("");
+  });
+
+  it("assignParameters encodes body for POST url-encoded", () => {
+    const req = TestRequest.create(null);
+    req.setHeader("REQUEST_METHOD", "POST");
+    req.setHeader("CONTENT_TYPE", "application/x-www-form-urlencoded");
+    req.assignParameters(null, "posts", "create", { title: "Hello" }, "/posts", ["title"]);
+    const body = req.getHeader("rack.input").string();
+    expect(body).toContain("title=Hello");
+    expect(req.requestParameters).toMatchObject({ title: "Hello" });
+  });
+
+  it("assignParameters builds real multipart body when params include an UploadedFile", () => {
+    const req = TestRequest.create(null);
+    req.setHeader("REQUEST_METHOD", "POST");
+    const file = new UploadedFile(new StringIO("hi"), "text/plain", false, {
+      originalFilename: "hello.txt",
+    });
+    req.assignParameters(null, "uploads", "create", { upload: file }, "/uploads", ["upload"]);
+    const ct = req.getHeader("CONTENT_TYPE") ?? "";
+    expect(ct).toContain("multipart/form-data");
+    expect(ct).toContain("boundary=");
+    const body = req.getHeader("rack.input").string();
+    expect(body).toContain(`name="upload"; filename="hello.txt"`);
+    const upload = req.requestParameters["upload"] as HttpUploadedFile;
+    expect(upload).toBeInstanceOf(HttpUploadedFile);
+    expect(upload).not.toBe(file);
+    expect(upload.originalFilename).toBe("hello.txt");
+    expect(upload.contentType).toBe("text/plain");
+    expect(upload.read()).toBe("hi");
+  });
+
+  it("assignParameters registers custom parser for unknown content types, wired into requestParameters", () => {
+    const req = TestRequest.create(null);
+    req.setHeader("REQUEST_METHOD", "POST");
+    req.setHeader("CONTENT_TYPE", "application/vnd.custom+json");
+    MimeType.register("application/vnd.custom+json", ":custom");
+    try {
+      req.assignParameters(null, "api", "create", { x: "1" }, "/api", ["x"]);
+      const parsed = req.requestParameters;
+      expect(parsed).toMatchObject({ x: "1" });
+    } finally {
+      MimeType.unregister(":custom");
+    }
+  });
+
+  it("paramsParsers returns the custom parsers map", () => {
+    const req = TestRequest.create(null);
+    const parsers = req.paramsParsers();
+    expect(typeof parsers).toBe("object");
+    expect(parsers).toHaveProperty("xml");
+  });
+});
+
+describe("ActionController::LiveTestResponse predicates", () => {
+  it("isSuccess is true for 2xx responses", () => {
+    const r = new LiveTestResponse(200, {}, [""]);
+    expect(r.isSuccess).toBe(true);
+    const r4 = new LiveTestResponse(404, {}, [""]);
+    expect(r4.isSuccess).toBe(false);
+  });
+
+  it("isMissing is true only for 404", () => {
+    expect(new LiveTestResponse(404, {}, [""]).isMissing).toBe(true);
+    expect(new LiveTestResponse(403, {}, [""]).isMissing).toBe(false);
+  });
+
+  it("isError is true for 5xx responses", () => {
+    expect(new LiveTestResponse(500, {}, [""]).isError).toBe(true);
+    expect(new LiveTestResponse(200, {}, [""]).isError).toBe(false);
   });
 });
