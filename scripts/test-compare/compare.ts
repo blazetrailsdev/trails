@@ -1116,8 +1116,6 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
         }
       }
 
-      // A pending stub named after a case the unported register excludes is
-      // that case's parked port, not a TS-only test.
       for (const tc of file.testCases) {
         if (!isTestCaseUnported(file.file, tc.description, tc.ancestors[0])) continue;
         const stub = descIndex
