@@ -31,7 +31,11 @@ import {
   Process,
   RbConfig,
   abort,
+  block,
   env,
+  fetch,
+  isEmpty,
+  last,
   rbObjAsString as toS,
   Thread,
 } from "@blazetrails/ruby-compat";
@@ -846,7 +850,7 @@ export class AbstractAdapter implements Quoting {
     }
   }
 
-  /** @missingRailsCall union — PERMANENT */
+  /** @missingRailsCall union — CONVERGEABLE regexp-union-comes-from-ruby-compat */
   static buildReadQueryRegexp(...parts: string[]): RegExp {
     parts = parts.concat(AbstractAdapter.DEFAULT_READ_QUERY);
     return new RegExp(
@@ -855,16 +859,13 @@ export class AbstractAdapter implements Quoting {
     );
   }
 
-  /**
-   * @missingRailsCall exec — PERMANENT
-   * @missingRailsCall empty? — PERMANENT
-   */
+  /** @missingRailsCall exec — CONVERGEABLE find-cmd-and-exec-replaces-the-process-through-kernel-exec */
   static findCmdAndExec(commands: string | string[], ...args: string[]): string[] {
     let cmds = Array.isArray(commands) ? commands : commands == null ? [] : [commands];
 
     const dirsOnPath = toS(env["PATH"]).split(File.PATH_SEPARATOR);
     const ext = RbConfig.CONFIG["EXEEXT"];
-    if (ext !== "") {
+    if (!isEmpty(ext)) {
       cmds = cmds.map((cmd) => `${cmd}${ext}`);
     }
 
@@ -894,7 +895,7 @@ export class AbstractAdapter implements Quoting {
     throw new NotImplementedError("dbconsole");
   }
 
-  /** @missingRailsCall fetch — PERMANENT */
+  /** @missingRailsName config — PERMANENT */
   constructor(
     configOrDeprecatedConnection: unknown,
     deprecatedLogger: unknown = null,
@@ -940,14 +941,16 @@ export class AbstractAdapter implements Quoting {
     this.preparedStatements =
       !disablePreparedStatements() &&
       (this.constructor as typeof AbstractAdapter).typeCastConfigToBoolean(
-        "preparedStatements" in this._config
-          ? this._config.preparedStatements
-          : this.defaultPreparedStatements(),
+        fetch(
+          this._config,
+          "preparedStatements",
+          block(() => this.defaultPreparedStatements()),
+        ),
       );
 
     this._advisoryLocksEnabled = (
       this.constructor as typeof AbstractAdapter
-    ).typeCastConfigToBoolean("advisoryLocks" in this._config ? this._config.advisoryLocks : true);
+    ).typeCastConfigToBoolean(fetch(this._config, "advisoryLocks", true));
 
     this._defaultTimezone = (this.constructor as typeof AbstractAdapter).validateDefaultTimezone(
       this._config.defaultTimezone,
@@ -1219,7 +1222,7 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE nodejs-inspect-custom-hooks-come-from-one-ruby-compat-seam */
   [Symbol.for("nodejs.util.inspect.custom")](): string {
     return this.inspect();
   }
@@ -1579,7 +1582,6 @@ export class AbstractAdapter implements Quoting {
     return (this.pool as ConnectionPool).migrationContext.currentVersion();
   }
 
-  /** @missingRailsName last — PERMANENT */
   static registerClassWithPrecision(
     this: Pick<typeof AbstractAdapter, "extractPrecision">,
     mapping: TypeMap | HashLookupTypeMap,
@@ -1588,7 +1590,7 @@ export class AbstractAdapter implements Quoting {
     kwargs: Record<string, unknown> = {},
   ): void {
     (mapping as TypeMap).registerType(key, undefined, (...args: string[]) => {
-      const precision = this.extractPrecision(args.at(-1)!);
+      const precision = this.extractPrecision(last(args)!);
       return new klass({ precision, ...kwargs }) as ReturnType<TypeMap["lookup"]>;
     });
   }
@@ -1634,10 +1636,7 @@ export class AbstractAdapter implements Quoting {
     });
   }
 
-  /**
-   * @internal
-   * @missingRailsName last — PERMANENT
-   */
+  /** @internal */
   static registerClassWithLimit(
     this: Pick<typeof AbstractAdapter, "extractLimit">,
     mapping: TypeMap | HashLookupTypeMap,
@@ -1645,7 +1644,7 @@ export class AbstractAdapter implements Quoting {
     klass: new (options?: { limit?: number }) => object,
   ): void {
     (mapping as TypeMap).registerType(key, undefined, (...args: string[]) => {
-      const limit = this.extractLimit(args.at(-1)!);
+      const limit = this.extractLimit(last(args)!);
       return new klass({ limit }) as ReturnType<TypeMap["lookup"]>;
     });
   }
@@ -1780,7 +1779,7 @@ export class AbstractAdapter implements Quoting {
 
   /**
    * @internal
-   * @missingRailsCall sleep — PERMANENT
+   * @missingRailsCall sleep — CONVERGEABLE adapter-backoff-sleeps-through-a-ruby-compat-kernel-sleep
    */
   backoff(counter: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, 100 * counter));
@@ -1813,7 +1812,7 @@ export class AbstractAdapter implements Quoting {
 
   /**
    * @internal
-   * @missingRailsCall compute_if_absent — PERMANENT
+   * @missingRailsCall compute_if_absent — CONVERGEABLE adapter-extended-type-maps-onto-concurrent-map
    */
   get typeMap(): unknown {
     const ctor = this.constructor as typeof AbstractAdapter;

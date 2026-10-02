@@ -74,7 +74,7 @@ export class PoolConfig {
     this._serverVersion = value;
   }
 
-  /** @missingRailsCall each_key — PERMANENT */
+  /** @missingRailsCall each_key — CONVERGEABLE pool-config-instances-is-an-objectspace-weak-map */
   static async discardPoolsBang(): Promise<void> {
     for (const ref of INSTANCES) {
       const config = ref.deref();
@@ -86,7 +86,7 @@ export class PoolConfig {
     }
   }
 
-  /** @missingRailsCall each_key — PERMANENT */
+  /** @missingRailsCall each_key — CONVERGEABLE pool-config-instances-is-an-objectspace-weak-map */
   static async disconnectAllBang(): Promise<void> {
     const drains: Array<Promise<void>> = [];
     for (const ref of INSTANCES) {

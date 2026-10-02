@@ -21,6 +21,7 @@ import {
   slice,
   transformValues,
   update,
+  valuesAt,
 } from "./hash.js";
 import { KeyError } from "./key-error.js";
 import { FrozenError } from "./frozen-error.js";
@@ -523,6 +524,14 @@ describe("hashDelete", () => {
     expect(hashDelete(hash, "baz")).toBeNull();
     expect(hashDelete(hash, "baz", (key) => `no ${key}`)).toBe("no baz");
     expect(hash).toEqual({ foo: 0 });
+  });
+});
+
+describe("Array#values_at", () => {
+  it("reads each index, counting a negative one from the end", () => {
+    expect(valuesAt("a.b".split("."), -2, -1)).toEqual(["a", "b"]);
+    expect(valuesAt("b".split("."), -2, -1)).toEqual([undefined, "b"]);
+    expect(valuesAt([1, 2, 3], 0, 5, -4, -1)).toEqual([1, undefined, undefined, 3]);
   });
 });
 

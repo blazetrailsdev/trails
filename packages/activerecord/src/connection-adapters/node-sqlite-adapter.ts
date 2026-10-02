@@ -1,4 +1,4 @@
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE sqlite-driver-adapter-subclasses-carry-file-level-covers */
 import type { SqliteDriver } from "../sqlite-adapter.js";
 import { nodeSqliteDriver } from "../sqlite/node-sqlite.js";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";

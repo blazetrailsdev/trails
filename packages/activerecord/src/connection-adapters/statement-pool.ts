@@ -1,4 +1,4 @@
-import { Hash, Process } from "@blazetrails/ruby-compat";
+import { Hash, last, Process } from "@blazetrails/ruby-compat";
 
 export class StatementPool<T = unknown> {
   static readonly DEFAULT_STATEMENT_LIMIT = 1000;
@@ -33,18 +33,14 @@ export class StatementPool<T = unknown> {
     return this.cache.size;
   }
 
-  /**
-   * @missingRailsCall last — PERMANENT
-   * @missingRailsName last — PERMANENT
-   */
   set(key: string, stmt: T): void | Promise<void> {
     let deallocating: Promise<void> | undefined;
     while (this._statementLimit <= this.cache.size) {
       const shifted = this.cache.entries().next().value!;
       this.cache.delete(shifted[0]);
       deallocating = deallocating
-        ? deallocating.then(() => this.dealloc(shifted.at(-1) as T))
-        : (this.dealloc(shifted.at(-1) as T) ?? undefined);
+        ? deallocating.then(() => this.dealloc(last(shifted) as T))
+        : (this.dealloc(last(shifted) as T) ?? undefined);
     }
     this.cache.set(key, stmt);
     return deallocating;

@@ -3,9 +3,16 @@ import type {
   DatabaseConfigOptions,
 } from "../database-configurations/database-config.js";
 import pg from "pg";
-import { block, fetch, setEnv } from "@blazetrails/ruby-compat";
+import { block, fetch, setEnv, valuesAt } from "@blazetrails/ruby-compat";
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
-import { classAttribute, singularize, runLoadHooks, include } from "@blazetrails/activesupport";
+import {
+  any,
+  classAttribute,
+  include,
+  isPresent,
+  runLoadHooks,
+  singularize,
+} from "@blazetrails/activesupport";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import { rtest } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
@@ -783,20 +790,16 @@ export class PostgreSQLAdapter
     return (await this.queryValue(`SELECT pg_advisory_unlock(${lockId})`)) === true;
   }
 
-  /** @missingRailsCall values_at — PERMANENT */
   async enableExtension(name: string, _options?: Record<string, unknown>): Promise<void> {
-    const parts = String(name).split(".");
-    const [schema, extName] = [parts.at(-2) ?? null, parts.at(-1)!];
+    const [schema, extName] = valuesAt(String(name).split("."), -2, -1);
     let sql = `CREATE EXTENSION IF NOT EXISTS "${extName}"`;
     if (schema) sql += ` SCHEMA ${schema}`;
     await this.internalExecQuery(sql);
     await this.reloadTypeMap();
   }
 
-  /** @missingRailsCall values_at — PERMANENT */
   async disableExtension(name: string, options: { force?: "cascade" } = {}): Promise<void> {
-    const parts = String(name).split(".");
-    const extName = parts.at(-1)!;
+    const [_schema, extName] = valuesAt(String(name).split("."), -2, -1);
     const cascade = options.force === "cascade" ? " CASCADE" : "";
     await this.internalExecQuery(`DROP EXTENSION IF EXISTS "${extName}"${cascade}`);
     await this.reloadTypeMap();
@@ -1108,19 +1111,13 @@ export class PostgreSQLAdapter
     if (/^-?\d+$/.test(defaultExpr)) return defaultExpr;
     return null;
   }
-  /**
-   * @internal
-   * @missingRailsArgs has_default_function? — PERMANENT
-   */
-  extractDefaultFunction(defaultValue: unknown, defaultExpr: string | null): string | null {
-    if (defaultExpr != null && this.hasDefaultFunction(defaultValue, defaultExpr)) {
-      return defaultExpr;
-    }
-    return null;
+  /** @internal */
+  extractDefaultFunction(defaultValue: unknown, default_: string | null): string | null {
+    return this.hasDefaultFunction(defaultValue, default_) ? default_ : null;
   }
   /** @internal */
-  hasDefaultFunction(defaultValue: unknown, defaultExpr: string): boolean {
-    return defaultValue == null && DEFAULT_FUNCTION_RE.test(defaultExpr);
+  hasDefaultFunction(defaultValue: unknown, default_: string | null): boolean {
+    return defaultValue == null && default_ != null && DEFAULT_FUNCTION_RE.test(default_);
   }
   /** @internal */
   translateException(
@@ -1809,14 +1806,12 @@ export class PostgreSQLAdapter
     return names as string[];
   }
 
-  /** @missingRailsCall any? — PERMANENT */
-  async foreignTableExists(tableName: string): Promise<boolean> {
-    if (!tableName) return false;
-    const names = await this.queryValues(
-      this.dataSourceSql(tableName, { type: "FOREIGN TABLE" }),
-      "SCHEMA",
-    );
-    return names.length > 0;
+  async foreignTableExists(tableName: string): Promise<boolean | undefined> {
+    if (isPresent(tableName)) {
+      return any(
+        await this.queryValues(this.dataSourceSql(tableName, { type: "FOREIGN TABLE" }), "SCHEMA"),
+      );
+    }
   }
 
   /** @internal */

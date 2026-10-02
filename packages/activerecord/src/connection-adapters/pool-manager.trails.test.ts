@@ -133,7 +133,7 @@ describe("PoolManager", () => {
     });
 
     it("returns undefined for missing entries", () => {
-      expect(manager.removePoolConfig("writing", "default")).toBeUndefined();
+      expect(manager.removePoolConfig("writing", "default")).toBeNull();
     });
   });
 
@@ -147,7 +147,7 @@ describe("PoolManager", () => {
     });
 
     it("returns undefined for unknown role", () => {
-      expect(manager.removeRole("unknown")).toBeUndefined();
+      expect(manager.removeRole("unknown")).toBeNull();
     });
 
     it("returns the removed shard map when the role existed", () => {
