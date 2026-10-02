@@ -64,6 +64,19 @@ describe("SelectManagerTest (trails)", () => {
     });
   });
 
+  describe("union", () => {
+    it("raises NameError for an operation naming no Union node", () => {
+      const m1 = new SelectManager(users).project(star());
+      const m2 = new SelectManager(users).project(star());
+      expect(() => m1.union(":bogus", m2)).toThrow(
+        expect.objectContaining({
+          name: "NameError",
+          message: expect.stringContaining("uninitialized constant Arel::Nodes::UnionBogus"),
+        }),
+      );
+    });
+  });
+
   describe("join builder chain", () => {
     const posts = new Table("posts");
     const star = new Nodes.SqlLiteral("*");
