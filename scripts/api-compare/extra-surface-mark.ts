@@ -48,10 +48,6 @@
  * earlier revision of this comment was wrong to call it that rule. Rule 1 is
  * `ruby-compat-rule-1-call-site-gate`.
  *
- * activemodel remains ungated. The same reasoning would apply, but it has no
- * burndown behind it yet, and widening GATED_PACKAGES without one is exactly
- * the not-mechanical step this comment has always warned about.
- *
  * TAGGED-ONLY MODE is what a gated package earns once its untagged novel
  * surface is burnt down. `extra-surface.ts` already subtracts a declaration
  * carrying a `@noRailsEquivalent` receipt from both dimensions, so `novel`
@@ -102,6 +98,8 @@
  * activerecord enrolled there directly under the
  * `activerecord-extra-surface-receipt-burndown` RFC, once its receipt stories
  * drove both its 340 novel and its 396 moved extras to zero.
+ * activemodel followed under RFC 0173, once
+ * `activemodel-burn-extra-surface-to-zero` retired its 1 novel and 24 moved.
  * Enrollment is only-grow, exactly like RFC 0121's: a package joins when it
  * reaches zero and is never moved back out to turn a red run green.
  *
@@ -135,7 +133,7 @@ export const TAGGED_ONLY_PACKAGES = ["arel", "ruby-compat"] as const;
  * therefore carry no mark row — see ROWLESS MODE in the module comment.
  * Only-grow, like {@link TAGGED_ONLY_PACKAGES}.
  */
-export const ROWLESS_PACKAGES = ["activerecord"] as const;
+export const ROWLESS_PACKAGES = ["activemodel", "activerecord"] as const;
 
 /**
  * The packages this gate covers, in either mode. Everything else is measured

@@ -1825,10 +1825,9 @@ jobs:
         # `@noRailsEquivalent` receipt at the declaration or deleting the name.
         # `total` stays gated in both modes: nothing else in the repo catches a
         # name Rails defines in a different `.rb`. A package that burns `total`
-        # to zero too is ROWLESS (activerecord today): both dimensions pinned
-        # at 0, no row in the mark file, and a re-added row fails the gate.
-        # Enrollment is only-grow. activemodel stays ungated until it has a
-        # burndown of its own.
+        # to zero too is ROWLESS (activemodel and activerecord today): both
+        # dimensions pinned at 0, no row in the mark file, and a re-added row
+        # fails the gate. Enrollment is only-grow.
         run: pnpm exec tsx scripts/api-compare/lint-extra-surface-ratchet.ts
       - name: Parameter-name ratchet
         # RFC 0126. Gates arel's param-name row count (a matched pair whose

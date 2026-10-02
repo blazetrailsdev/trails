@@ -496,7 +496,7 @@ write.
    says "known extra surface, not yet removed", and someone will come back for
    it.
 
-   **`arel`, `activerecord` and `ruby-compat` are gated**, by the RFC 0117
+   **`arel`, `activemodel`, `activerecord` and `ruby-compat` are gated**, by the RFC 0117
    extra-surface ratchet:
 
    ```bash
@@ -535,7 +535,7 @@ write.
    file and cannot see a cross-file relocation, and `parity:api:moves` only
    reports. So `total` stays gated in both modes.
 
-   A package that burns `total` to zero as well (`activerecord` today) is
+   A package that burns `total` to zero as well (`activemodel` and `activerecord` today) is
    **rowless**: both `novel` and `total` are the constant 0, it carries **no
    row** in the mark file, and the gate fails if one is re-added. Every extra
    there — novel or moved — needs a receipt at its declaration, a deletion, or
@@ -543,7 +543,7 @@ write.
 
    A package gets pinned as a reviewed step of its own burndown (the
    `activerecord-extra-surface-receipt-burndown` RFC for activerecord's 342 novel
-   and 396 moved, now rowless;
+   and 396 moved, now rowless; RFC 0173 for activemodel's 1 novel and 24 moved, now rowless;
    RFC 0129 for ruby-compat's 4). That direction is **only-grow**: no package
    is ever un-pinned to turn a red run green. Other packages are still measured
    and ungated; widening `GATED_PACKAGES` is a separate decision with its own

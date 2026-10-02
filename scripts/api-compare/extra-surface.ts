@@ -2071,6 +2071,10 @@ export function inlinedModuleMembers(
         const candidates = operatorSpelling(fqn, m.name) ?? rubyMethodCandidates(m.name);
         if (!candidates) continue;
         if (m.name === "initialize" && moduleBodies?.has(CONCERN_HOOK_MEMBERS.initialize)) continue;
+        // `readonly?` is `isReadonly` in core.ts; the host's bare `readonly` is
+        // `Querying#readonly`, another Ruby method under the predicate's
+        // alternate spelling.
+        if (m.name.endsWith("?") && candidates.some((c) => moduleBodies?.has(c) === true)) continue;
         const tsName = candidates.find(
           (c) =>
             !(c === "constructor" && m.name === "new" && hostDefinesInitialize) &&

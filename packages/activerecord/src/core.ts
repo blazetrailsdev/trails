@@ -66,15 +66,37 @@ export interface Core {
 export const Core = {
   [included](base: object): void {
     classAttribute.call(base, "logger", { instanceWriter: false });
+    classAttribute.call(base, "_destroyAssociationAsyncJob", {
+      instanceAccessor: false,
+      default: null,
+    });
     classAttribute.call(base, "destroyAssociationAsyncBatchSize", {
       instanceWriter: false,
       instancePredicate: false,
       default: null,
     });
+    classAttribute.call(base, "enumerateColumnsInSelectStatements", {
+      instanceAccessor: false,
+      default: false,
+    });
+    classAttribute.call(base, "belongsToRequiredByDefault", { instanceAccessor: false });
+    classAttribute.call(base, "strictLoadingByDefault", {
+      instanceAccessor: false,
+      default: false,
+    });
+    classAttribute.call(base, "strictLoadingMode", { instanceAccessor: false, default: "all" });
+    classAttribute.call(base, "hasManyInversing", { instanceAccessor: false, default: false });
+    classAttribute.call(base, "runCommitCallbacksOnFirstSavedInstancesInTransaction", {
+      instanceAccessor: false,
+      default: true,
+    });
     classAttribute.call(base, "defaultConnectionHandler", { instanceWriter: false });
     classAttribute.call(base, "defaultRole", { instanceWriter: false });
     classAttribute.call(base, "defaultShard", { instanceWriter: false });
+    classAttribute.call(base, "shardSelector", { instanceAccessor: false, default: null });
     classAttribute.call(base, "attributesForInspect", { instanceAccessor: false, default: ":all" });
+
+    (base as { filterAttributes: CoreHost["_filterAttributes"] }).filterAttributes = [];
 
     (base as { defaultConnectionHandler: ConnectionHandler }).defaultConnectionHandler =
       new ConnectionHandler();
@@ -524,7 +546,10 @@ export function connectionClass(this: CoreHost, value?: boolean): boolean {
   if (value !== undefined) {
     this._connectionClass = value;
   }
-  return this._connectionClass ?? false;
+  if (!Object.prototype.hasOwnProperty.call(this, "_connectionClass") || !this._connectionClass) {
+    this._connectionClass = false;
+  }
+  return this._connectionClass;
 }
 
 export function isConnectionClass(this: CoreHost): boolean {
