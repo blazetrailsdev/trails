@@ -1,5 +1,4 @@
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { NoMethodError } from "./attribute-assignment.js";
+import { rbFPublicSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import {
   underscore,
   tableize,
@@ -14,17 +13,15 @@ interface ConversionRecord {
 }
 
 export function _toPartialPath(this: ConversionHost): string {
-  if (!this._cachedToPartialPath) {
-    if (this.modelName != null) {
-      const mn = this.modelName;
-      this._cachedToPartialPath = `${mn.collection}/${mn.element}`;
+  return (this._cachedToPartialPath ||= (() => {
+    if (rbObjRespondTo(this, "modelName")) {
+      return `${this.modelName!.collection}/${this.modelName!.element}`;
     } else {
       const element = underscore(demodulize(this.name));
       const collection = tableize(this.name);
-      this._cachedToPartialPath = `${collection}/${element}`;
+      return `${collection}/${element}`;
     }
-  }
-  return this._cachedToPartialPath;
+  })());
 }
 
 export class Conversion {
@@ -37,19 +34,19 @@ export class Conversion {
   }
 
   toKey(): unknown[] | null {
-    const key = rbObjRespondTo(this, "id") ? publicSend(this, "id") : false;
+    const key = rbObjRespondTo(this, "id") && rbFPublicSend(this, "id");
     return key != null && key !== false ? wrap(key) : null;
   }
 
   toParam(): string | null {
-    const self = this as unknown as ConversionRecord;
-    if (!self.isPersisted()) return null;
-    const key = this.toKey();
-    if (!key) return null;
-    if (!key.every((part) => part !== null && part !== undefined && part !== false)) return null;
-    return key
-      .map(String)
-      .join((this.constructor as unknown as { paramDelimiter: string }).paramDelimiter);
+    let key: unknown[] | null;
+    return (this as unknown as ConversionRecord).isPersisted() &&
+      (key = this.toKey()) &&
+      key.every((part) => part !== null && part !== undefined && part !== false)
+      ? key
+          .map(String)
+          .join((this.constructor as unknown as { paramDelimiter: string }).paramDelimiter)
+      : null;
   }
 
   toPartialPath(): string {
@@ -64,14 +61,4 @@ interface ConversionHost {
   _toPartialPath(): string;
   modelName?: { collection: string; element: string };
   _cachedToPartialPath?: string;
-}
-
-function publicSend(obj: object, method: string): unknown {
-  if (!(method in obj)) {
-    throw new NoMethodError(
-      `undefined method '${method}' for an instance of ${obj.constructor.name}`,
-    );
-  }
-  const value = (obj as Record<string, unknown>)[method];
-  return typeof value === "function" ? (value as () => unknown).call(obj) : value;
 }

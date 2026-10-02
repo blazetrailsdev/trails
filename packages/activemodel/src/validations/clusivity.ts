@@ -53,17 +53,7 @@ export function isInclude(this: ClusivityHost, record: unknown, value: unknown):
 
 /** @internal */
 export function delimiter(this: ClusivityHost): unknown {
-  if (
-    this._delimiterCache !== undefined &&
-    this._delimiterCache !== null &&
-    this._delimiterCache !== false
-  ) {
-    return this._delimiterCache;
-  }
-  const inOpt = this.options.in;
-  this._delimiterCache =
-    inOpt !== undefined && inOpt !== null && inOpt !== false ? inOpt : this.options.within;
-  return this._delimiterCache;
+  return (this._delimiterCache ??= this.options.in ?? this.options.within);
 }
 
 /** @internal */

@@ -1,23 +1,23 @@
 import { extractOptionsBang } from "@blazetrails/activesupport";
-import { rbBlockGivenP } from "@blazetrails/ruby-compat";
+import {
+  rbBlockGivenP,
+  rbFSend,
+  rbObjMethod,
+  stringToSym,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { NameError } from "../attribute-assignment.js";
 
 export class WithValidator extends EachValidator {
   validateEach(record: ValidatableRecord, attr: string, _val: unknown): void {
-    const methodName = this.options.with as string;
-    const method = (record as unknown as Record<string, unknown>)[
-      methodName.startsWith(":") ? methodName.slice(1) : methodName
-    ];
-    if (typeof method !== "function") {
-      throw new NameError(`undefined method '${methodName}' for ${String(record)}`);
-    }
-    if (method.length === 0) {
-      method.call(record);
+    const methodName = symbolToS(stringToSym(this.options.with as string));
+
+    if (rbObjMethod(record, methodName).arity() === 0) {
+      rbFSend(record, methodName);
     } else {
-      method.call(record, attr);
+      rbFSend(record, methodName, attr);
     }
   }
 }

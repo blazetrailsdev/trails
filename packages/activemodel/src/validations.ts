@@ -114,10 +114,7 @@ export class Validations {
   }
 
   async validateBang(context?: string | string[] | ValidationContext | null): Promise<true> {
-    if (!(await this.isValid(context))) {
-      this.raiseValidationError();
-    }
-    return true;
+    return (await this.isValid(context)) || this.raiseValidationError();
   }
 
   readAttributeForValidation(this: ReadAttributeForValidationHost, attribute: string): unknown {
@@ -326,9 +323,8 @@ export class ValidationError<TModel extends ModelWithErrors = ModelWithErrors>
 
   constructor(model: TModel) {
     const errors = model.errors.fullMessages.join(", ");
-    const rawScope = (model as { constructor?: { i18nScope?: unknown } }).constructor?.i18nScope;
-    const scope = typeof rawScope === "string" ? rawScope : "activemodel";
-    const message = I18n.t(`${scope}.errors.messages.model_invalid`, {
+    const i18nScope = (model.constructor as unknown as { i18nScope: string }).i18nScope;
+    const message = I18n.t(`${i18nScope}.errors.messages.model_invalid`, {
       errors,
       default: ":errors.messages.model_invalid",
     }) as string;

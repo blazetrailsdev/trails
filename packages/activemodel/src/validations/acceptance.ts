@@ -15,13 +15,11 @@ export class AcceptanceValidator extends EachValidator {
   declare isAcceptableOption: typeof isAcceptableOption;
 
   constructor(options: Record<string, unknown> & { attributes?: string | string[] }) {
-    super(options);
+    super({ allowNil: true, accept: ["1", true], ...options });
     this.setupBang(options.class as AttributeMethodQueryable);
   }
 
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
-    const allowNil = this.options.allowNil ?? true;
-    if (allowNil && (value === null || value === undefined)) return;
     if (!this.isAcceptableOption(value)) {
       record.errors.add(attribute, ":accepted", except(this.options, "accept", "allowNil"));
     }

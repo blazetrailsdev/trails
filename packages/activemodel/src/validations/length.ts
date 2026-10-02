@@ -2,7 +2,7 @@ import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { camelize } from "@blazetrails/activesupport";
-import { except, Range } from "@blazetrails/ruby-compat";
+import { except, hashDelete, Range, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { resolveValue } from "./resolve-value.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
@@ -40,11 +40,7 @@ export class LengthValidator extends EachValidator {
   constructor(options: Record<string, unknown>) {
     options = { ...options };
 
-    const inOption = options["in"];
-    const withinOption = options["within"];
-    delete options["in"];
-    delete options["within"];
-    const range = inOption != null && inOption !== false ? inOption : withinOption;
+    const range = hashDelete(options, "in") ?? hashDelete(options, "within");
     if (range != null && range !== false) {
       if (!(range instanceof Range)) {
         throw new ArgumentError(":in and :within must be a Range");
@@ -95,22 +91,9 @@ export class LengthValidator extends EachValidator {
   }
 
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
-    let valueLength: number;
-    if (typeof value === "string" || Array.isArray(value)) {
-      valueLength = value.length;
-    } else if (
-      typeof value === "object" &&
-      value !== null &&
-      "length" in value &&
-      typeof (value as { length: unknown }).length === "number"
-    ) {
-      valueLength = (value as { length: number }).length;
-    } else if (value == null) {
-      valueLength = 0;
-    } else {
-      valueLength = String(value).length;
-    }
-
+    const valueLength = rbObjRespondTo(value, "length")
+      ? (value as { length: number }).length
+      : String(value ?? "").length;
     const errorsOptions = except(this.options, ...RESERVED_OPTIONS);
 
     for (const [key, validityCheck] of Object.entries(CHECKS) as Array<
@@ -127,9 +110,7 @@ export class LengthValidator extends EachValidator {
       errorsOptions["count"] = checkValue;
 
       const defaultMessage = this.options[camelize(MESSAGES[key].slice(1), false)];
-      if (defaultMessage != null && errorsOptions["message"] == null) {
-        errorsOptions["message"] = defaultMessage;
-      }
+      if (defaultMessage != null) errorsOptions["message"] ??= defaultMessage;
 
       record.errors.add(attribute, MESSAGES[key], { ...errorsOptions });
     }

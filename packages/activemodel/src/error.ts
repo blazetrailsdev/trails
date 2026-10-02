@@ -248,14 +248,21 @@ export class Error {
     return (this.constructor as typeof Error).fullMessage(this.attribute, this.message, this.base);
   }
 
-  match(attribute: string, type?: string, options?: Record<string, unknown>): boolean {
-    if (this.attribute !== attribute) return false;
-    if (type !== undefined && this.type !== type) return false;
-    if (options) {
-      for (const [key, value] of Object.entries(options)) {
-        if (!optionsEqual(this.options[key], value)) return false;
+  match(
+    attribute: string,
+    type: string | null = null,
+    options: Record<string, unknown> = {},
+  ): boolean {
+    if (this.attribute !== attribute || (type != null && this.type !== type)) {
+      return false;
+    }
+
+    for (const [key, value] of Object.entries(options)) {
+      if (!optionsEqual(this.options[key], value)) {
+        return false;
       }
     }
+
     return true;
   }
 

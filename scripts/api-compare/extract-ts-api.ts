@@ -4673,6 +4673,49 @@ function isRescueClassGuard(statement: ts.Statement): boolean {
   return then.length === 1 && ts.isThrowStatement(then[0]) && ts.isIdentifier(then[0].expression);
 }
 
+/**
+ * `throw e`, alone or as a block's only statement, where `e` is the catch
+ * binding: the exception leaving a typed `catch` it did not match. Ruby's
+ * `rescue TypeError, NoMethodError`
+ * (`activemodel/lib/active_model/attribute_mutation_tracker.rb:147`) lets every
+ * other class propagate with no statement at all, and JS's untyped `catch` has
+ * to spell that out, so the rethrow is the clause's type filter and not an arm.
+ * A rethrow INSIDE a matched arm is Ruby's bare `raise`
+ * (`activemodel/lib/active_model/attribute_assignment.rb:72`) and still tokens.
+ */
+function isRethrowOf(statement: ts.Statement, bound: string | undefined): boolean {
+  if (bound === undefined) return false;
+  if (ts.isBlock(statement)) {
+    return statement.statements.length === 1 && isRethrowOf(statement.statements[0], bound);
+  }
+  if (!ts.isThrowStatement(statement)) return false;
+  return ts.isIdentifier(statement.expression) && statement.expression.text === bound;
+}
+
+/**
+ * Whether every arm of an `instanceof` chain leaves the catch by itself. Only
+ * then is a `throw e` after the chain reached by the UNMATCHED exception alone:
+ * an arm that falls through into it is Ruby's `rescue X => e; warn …; raise e`
+ * (`activerecord/lib/active_record/connection_adapters/postgresql/referential_integrity.rb:28-33`),
+ * whose raise is an arm of its own.
+ */
+function everyCatchArmExits(arm: ts.IfStatement): boolean {
+  let last: ts.Statement = arm.thenStatement;
+  while (ts.isBlock(last) && last.statements.length > 0) {
+    last = last.statements[last.statements.length - 1];
+  }
+  const exits =
+    ts.isReturnStatement(last) ||
+    ts.isThrowStatement(last) ||
+    ts.isContinueStatement(last) ||
+    ts.isBreakStatement(last);
+  const alternate = arm.elseStatement;
+  if (!exits || alternate === undefined) return exits;
+  return ts.isIfStatement(alternate) && isInstanceOfTest(alternate.expression)
+    ? everyCatchArmExits(alternate)
+    : false;
+}
+
 function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const tokens: string[] = [];
@@ -4782,6 +4825,8 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   };
   const visitCatchClause = (clause: ts.CatchClause): void => {
     const statements = clause.block.statements;
+    const binding = clause.variableDeclaration?.name;
+    const bound = binding !== undefined && ts.isIdentifier(binding) ? binding.text : undefined;
     const chain = statements.find((s) => ts.isIfStatement(s) && isInstanceOfTest(s.expression));
     if (chain === undefined) {
       tokens.push("rescue");
@@ -4789,18 +4834,22 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
       statements.slice(guarded ? 1 : 0).forEach(visit);
       return;
     }
+    const filtered =
+      statements.length === 2 &&
+      isRethrowOf(statements[1], bound) &&
+      everyCatchArmExits(chain as ts.IfStatement);
     for (const statement of statements) {
-      if (statement === chain) visitCatchArms(statement as ts.IfStatement);
-      else visit(statement);
+      if (statement === chain) visitCatchArms(statement as ts.IfStatement, bound);
+      else if (!filtered) visit(statement);
     }
   };
-  const visitCatchArms = (arm: ts.IfStatement): void => {
+  const visitCatchArms = (arm: ts.IfStatement, bound: string | undefined): void => {
     tokens.push("rescue");
     visit(arm.thenStatement);
     const alternate = arm.elseStatement;
-    if (alternate === undefined) return;
+    if (alternate === undefined || isRethrowOf(alternate, bound)) return;
     if (ts.isIfStatement(alternate) && isInstanceOfTest(alternate.expression)) {
-      visitCatchArms(alternate);
+      visitCatchArms(alternate, bound);
       return;
     }
     visit(alternate);

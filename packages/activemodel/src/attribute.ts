@@ -225,8 +225,10 @@ export abstract class Attribute {
   }
 
   private changedFromAssignment(): boolean {
-    if (!this.isAssigned()) return false;
-    return this.type!.isChanged(this.originalValue, this.value(), this.valueBeforeTypeCast);
+    return (
+      this.isAssigned() &&
+      this.type!.isChanged(this.originalValue, this.value(), this.valueBeforeTypeCast)
+    );
   }
 
   initWith(coder: Coder): void {

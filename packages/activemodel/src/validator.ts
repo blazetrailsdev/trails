@@ -23,7 +23,7 @@ export abstract class Validator<TBase extends object = object> {
     return (this.constructor as typeof Validator).kind;
   }
 
-  abstract validate(_record: ValidatableRecord<TBase>): void | Promise<void>;
+  abstract validate(_record: ValidatableRecord<TBase>): unknown;
 }
 
 export class EachValidator<TBase extends object = object> extends Validator<TBase> {
@@ -42,14 +42,19 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
     this.checkValidityBang();
   }
 
-  async validate(record: ValidatableRecord<TBase>): Promise<void> {
+  async validate(record: ValidatableRecord<TBase>): Promise<readonly string[]> {
     for (const attribute of this.attributes) {
       let value = this.readAttributeForValidation(record, attribute);
-      if (value == null && this.options.allowNil === true) continue;
-      if (isBlank(value) && this.options.allowBlank === true) continue;
+      if (
+        (value == null && this.options.allowNil === true) ||
+        (isBlank(value) && this.options.allowBlank === true)
+      ) {
+        continue;
+      }
       value = this.prepareValueForValidation(value, record, attribute);
       await this.validateEach(record, attribute, value);
     }
+    return this.attributes;
   }
 
   validateEach(

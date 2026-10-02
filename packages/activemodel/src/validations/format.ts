@@ -15,15 +15,14 @@ export class FormatValidator extends EachValidator {
   declare regexpUsingMultilineAnchors: typeof regexpUsingMultilineAnchors;
 
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
-    const target = value == null ? "" : String(value);
     if (this.options.with) {
       const regexp = this.resolveValue(record, this.options.with) as RegExp;
-      if (!matchStateless(regexp, target)) {
+      if (!matchStateless(regexp, String(value ?? ""))) {
         this.recordError(record, attribute, "with", value);
       }
     } else if (this.options.without) {
       const regexp = this.resolveValue(record, this.options.without) as RegExp;
-      if (matchStateless(regexp, target)) {
+      if (matchStateless(regexp, String(value ?? ""))) {
         this.recordError(record, attribute, "without", value);
       }
     }

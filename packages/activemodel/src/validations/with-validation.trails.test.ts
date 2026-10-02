@@ -43,7 +43,7 @@ describe("ValidatesWith (trails-only)", () => {
 });
 
 describe("WithValidator arity dispatch", () => {
-  it("known divergence: rest-param method called without args (JS length 0 vs Ruby arity -1)", () => {
+  it("passes the attribute to a rest-param method, whose Ruby arity is -1", () => {
     const received: unknown[] = [];
     const record = {
       myCheck(...args: unknown[]) {
@@ -53,10 +53,10 @@ describe("WithValidator arity dispatch", () => {
     };
     const validator = new WithValidator({ attributes: ["name"], with: "myCheck" });
     validator.validateEach(record, "name", "value");
-    expect(received).toHaveLength(0);
+    expect(received).toEqual(["name"]);
   });
 
-  it("known divergence: default-param method called without args (JS length 0 vs Ruby arity -1)", () => {
+  it("passes the attribute to a default-param method, whose Ruby arity is -1", () => {
     let capturedArg: unknown = "not-called";
     const record = {
       myCheck(attr: string = "") {
@@ -66,6 +66,6 @@ describe("WithValidator arity dispatch", () => {
     };
     const validator = new WithValidator({ attributes: ["name"], with: "myCheck" });
     validator.validateEach(record, "name", "value");
-    expect(capturedArg).toBe("");
+    expect(capturedArg).toBe("name");
   });
 });
