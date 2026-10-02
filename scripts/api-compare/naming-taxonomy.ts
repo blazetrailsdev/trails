@@ -51,7 +51,7 @@ export const NAMING_CLASSES: NamingClassInfo[] = [
       "Ruby construct spelled as the JS builtin doing the same work (`inject`/`reduce`, " +
       "`last`/`at(-1)`), or as the ruby-compat export RUBY_COMPAT_EXPORTS names its port " +
       "(`Float(x)`/`kernelFloat(x)`, `Regexp.escape`/`regexpEscape`), or as the one export " +
-      "RUBY_COMPAT_CHAIN_EXPORTS names for a Ruby call chain (`x.class.name`/`rbObjClass(x)`). " +
+      "RUBY_COMPAT_CHAIN_EXPORTS names for a Ruby call chain (`x.class.name`/`rbObjClassname(x)`). " +
       "Same call; only the language's name for it differs.",
   },
   {
@@ -217,21 +217,21 @@ const RUBY_COMPAT_EXPORT_BY_REF = new Map(
  * Ruby call chains ONE ruby-compat export stands for, keyed by the chain's
  * outermost callee — the only link the recorder keeps — and valued by the
  * export. `first.class.name` (core_ext/array/conversions.rb:191) records as
- * `ref:name`; `rbObjClass` (ruby-compat/src/object.ts) answers the class NAME,
+ * `ref:name`; `rbObjClassname` (ruby-compat/src/object.ts) answers the class NAME,
  * not the class, because a JS `number` is the seat for both `Integer` and
  * `Float` and only the value can say which, so `first.constructor.name` would
  * answer `Number` where Ruby answers `Integer`. The key alone would admit any
- * `.name`; the export on the TS side is what narrows it, since `rbObjClass`
+ * `.name`; the export on the TS side is what narrows it, since `rbObjClassname`
  * cannot be read as the port of any other `name`.
  */
 export const RUBY_COMPAT_CHAIN_EXPORTS: Record<string, string> = {
-  name: "rbObjClass",
+  name: "rbObjClassname",
 };
 
 /**
  * A ruby-compat export in the spelling the recorder gives a TS `ref:`: it runs
  * the TS identifier through {@link snakeToCamel} too, whose token renames turn
- * an `rb` prefix into `js` (`rbObjClass` records as `jsObjClass`).
+ * an `rb` prefix into `js` (`rbObjClassname` records as `jsObjClassname`).
  */
 function recordedExport(tsExport: string): string {
   return snakeToCamel(tsExport);

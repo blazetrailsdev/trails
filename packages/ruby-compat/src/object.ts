@@ -15,11 +15,11 @@ import { Hash } from "./hash.js";
 type Klass = abstract new (...args: never) => unknown;
 
 /**
- * `rb_class_of` (`vendor/ruby/v3.3.11/include/ruby/internal/globals.h:172`) read
- * through `rb_class_real`, which is `rb_obj_class`
- * (`vendor/ruby/v3.3.11/object.c:265`): the class object `Object#class` answers,
- * for the immediates Ruby answers a class for without a heap object and
- * otherwise the constructor.
+ * `rb_obj_class` (`vendor/ruby/v3.3.11/object.c:265`), `Object#class`: the
+ * class object, read as `rb_class_of`
+ * (`vendor/ruby/v3.3.11/include/ruby/internal/globals.h:172`) reads it for the
+ * immediates Ruby answers a class for without a heap object, and otherwise
+ * the constructor, which a singleton class leaves naming the real class.
  *
  * @boundary: a JS `number` is the seat for both `Integer` and `Float`, so
  *  which one it is is read off the value; a Temporal value carrying an instant
@@ -31,7 +31,7 @@ type Klass = abstract new (...args: never) => unknown;
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbClassOf(obj: unknown): Klass {
+export function rbObjClass(obj: unknown): Klass {
   if (obj === null || obj === undefined) return rbCNilClass;
   if (typeof obj === "boolean") return obj ? rbCTrueClass : rbCFalseClass;
   if (typeof obj === "bigint") return rbCInteger;
@@ -56,15 +56,15 @@ export function rbClassOf(obj: unknown): Klass {
 
 /**
  * `rb_obj_classname` (`vendor/ruby/v3.3.11/variable.c:498`): the
- * {@link rbModToS} of the class {@link rbClassOf} answers, which is how Ruby
+ * {@link rbModToS} of the class {@link rbObjClass} answers, which is how Ruby
  * interpolates `obj.class`, or the {@link rubyClass} brand.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_class` (`vendor/ruby/v3.3.11/object.c:296`).
+ * @noRailsEquivalent PERMANENT
  */
-export function rbObjClass(x: unknown): string {
+export function rbObjClassname(x: unknown): string {
   const branded = typeof x === "object" && x !== null ? (x as Comparable)[rubyClass] : null;
   if (branded != null) return branded;
-  return rbModToS(rbClassOf(x));
+  return rbModToS(rbObjClass(x));
 }
 
 /**
@@ -173,10 +173,7 @@ export function rbClassSuperclass<T extends object>(klass: T): T | null {
  */
 export const classpaths = new WeakMap<object, { path: string; permanent: boolean }>();
 
-/**
- * `rb_define_class` (`vendor/ruby/v3.3.11/class.c:972`) for a core class no JS
- * constructor seats: a class under `super`, pathed by its top-level name.
- */
+/** `rb_define_class` (`vendor/ruby/v3.3.11/class.c:972`) for a core class no JS constructor seats. */
 function rbDefineClass(name: string, superclass: Klass = Object): Klass {
   const klass = class extends (superclass as new () => object) {};
   classpaths.set(klass, { path: name, permanent: true });
@@ -184,47 +181,39 @@ function rbDefineClass(name: string, superclass: Klass = Object): Klass {
 }
 
 /**
- * `rb_cBasicObject` (`vendor/ruby/v3.3.11/object.c:4200`), the class every
- * ancestry ends on. `Object.prototype` is the seat of `Object`, so this
- * prototype has no parent.
- *
+ * `rb_cBasicObject` (`vendor/ruby/v3.3.11/object.c:4200`). `Object.prototype`
+ * is the seat of `Object`, so this prototype has no parent.
  * @noRailsEquivalent PERMANENT
  */
 export const rbCBasicObject = rbDefineClass("BasicObject");
 Object.setPrototypeOf(rbCBasicObject.prototype, null);
 
 /**
- * `rb_cClass` (`vendor/ruby/v3.3.11/object.c:4203`). include.ts seats its
- * superclass, `Module`.
- *
+ * `rb_cClass` (`vendor/ruby/v3.3.11/object.c:4203`), a `Module` once include.ts loads.
  * @noRailsEquivalent PERMANENT
  */
 export const rbCClass = rbDefineClass("Class");
 
 /**
  * `rb_cNumeric` (`vendor/ruby/v3.3.11/numeric.c:6156`).
- *
  * @noRailsEquivalent PERMANENT
  */
 export const rbCNumeric = rbDefineClass("Numeric");
 
 /**
  * `rb_cString` (`vendor/ruby/v3.3.11/string.c:12121`).
- *
  * @noRailsEquivalent PERMANENT
  */
 export const rbCString = rbDefineClass("String");
 
 /**
  * `rb_cTime` (`vendor/ruby/v3.3.11/time.c:5832`).
- *
  * @noRailsEquivalent PERMANENT
  */
 export const rbCTime = rbDefineClass("Time");
 
 /**
  * `cDate` (`vendor/ruby/v3.3.11/ext/date/date_core.c:9604`).
- *
  * @noRailsEquivalent PERMANENT
  */
 export const rbCDate = rbDefineClass("Date");
@@ -540,7 +529,7 @@ export function toSym(obj: unknown): string {
   if (typeof obj === "string") return stringToSym(obj);
   if (obj == null) throw new NoMethodError("undefined method 'to_sym' for nil", "to_sym");
   throw new NoMethodError(
-    `undefined method 'to_sym' for an instance of ${rbObjClass(obj)}`,
+    `undefined method 'to_sym' for an instance of ${rbObjClassname(obj)}`,
     "to_sym",
     [],
     false,
@@ -594,9 +583,9 @@ export function conversionMismatch(
   method: string,
   result: unknown,
 ): never {
-  const cname = rbObjClass(val);
+  const cname = rbObjClassname(val);
   throw new TypeError(
-    `can't convert ${cname} to ${tname} (${cname}#${method} gives ${rbObjClass(result)})`,
+    `can't convert ${cname} to ${tname} (${cname}#${method} gives ${rbObjClassname(result)})`,
   );
 }
 
@@ -668,9 +657,13 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (typeof obj.methodMissing === "function") {
     return (obj.methodMissing as AnyFunction).call(recv, mid, ...args);
   }
-  throw new NoMethodError(`undefined method '${mid}' for an instance of ${rbObjClass(recv)}`, mid, {
-    receiver: recv,
-  });
+  throw new NoMethodError(
+    `undefined method '${mid}' for an instance of ${rbObjClassname(recv)}`,
+    mid,
+    {
+      receiver: recv,
+    },
+  );
 }
 
 type AnyFunction = (...args: unknown[]) => unknown;
@@ -714,7 +707,7 @@ export function rbObjRespondTo(obj: unknown, mid: string, priv: boolean = false)
  * errors name their operand by: `builtin_class_name` (`error.c:1189`) answers
  * the LOWERCASE `"nil"` / `"true"` / `"false"` for those three immediates —
  * `Float(nil)` is `can't convert nil into Float`, not `NilClass` — and
- * everything else falls through to {@link rbObjClass}.
+ * everything else falls through to {@link rbObjClassname}.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_builtin_class_name` (`vendor/ruby/v3.3.11/error.c:1216`).
  */
@@ -722,7 +715,7 @@ export function rbBuiltinClassName(x: unknown): string {
   if (x === null || x === undefined) return "nil";
   if (x === true) return "true";
   if (x === false) return "false";
-  return rbObjClass(x);
+  return rbObjClassname(x);
 }
 
 /**
@@ -804,7 +797,7 @@ function objAddress(obj: object): string {
  * (`vendor/ruby/v3.3.11/internal/numeric.h:243-262`).
  *
  * @boundary: a JS `number` is the seat for both `Integer` and `Float`, read
- *  off the value as {@link rbObjClass} reads it, so `1.0`, `0.0` and `-0`
+ *  off the value as {@link rbObjClassname} reads it, so `1.0`, `0.0` and `-0`
  *  answer the Fixnum id where MRI answers a flonum's. A JS string has no
  *  identity, so each send hands out a fresh id, as a fresh `String` would get;
  *  a Symbol's static id is not modelled. A Bignum and a Float outside the
@@ -1162,7 +1155,7 @@ export function rbObjIvarGet(obj: object, iv: string): unknown {
 export function rbObjIvarSet(obj: object, iv: string, val: unknown): unknown {
   const id = idForVar(obj, iv);
   if (Object.isFrozen(obj)) {
-    throw new FrozenError(`can't modify frozen ${rbObjClass(obj)}: ${rbInspect(obj)}`, {
+    throw new FrozenError(`can't modify frozen ${rbObjClassname(obj)}: ${rbInspect(obj)}`, {
       receiver: obj,
     });
   }

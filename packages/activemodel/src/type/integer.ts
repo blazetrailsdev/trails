@@ -1,12 +1,5 @@
-import { isBlank } from "@blazetrails/activesupport";
-import {
-  include,
-  Range,
-  rbDeclareIvar,
-  rbModToS,
-  toI,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { include, isBlank } from "@blazetrails/activesupport";
+import { Range, rbDeclareIvar, rbModToS, toI, registerConstant } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 import { RangeError } from "../errors.js";
 import { Numeric, isNonNumericString } from "./helpers/numeric.js";

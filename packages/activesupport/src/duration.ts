@@ -7,7 +7,13 @@
  */
 
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { cmp, equals as cmpEquals, rbEqual, rbObjClass, rubyClass } from "@blazetrails/ruby-compat";
+import {
+  cmp,
+  equals as cmpEquals,
+  rbEqual,
+  rbObjClassname,
+  rubyClass,
+} from "@blazetrails/ruby-compat";
 import { instantFrom } from "./temporal.js";
 import { advance as dateAdvance, since as dateSince } from "./core-ext/date/calculations.js";
 import {
@@ -175,7 +181,7 @@ export class Duration {
     } else {
       if (typeof other !== "number" && !(other instanceof Scalar)) {
         throw new TypeError(
-          `${rbObjClass(other)} can't be coerced into ${rbObjClass(this._parts().seconds ?? 0)}`,
+          `${rbObjClassname(other)} can't be coerced into ${rbObjClassname(this._parts().seconds ?? 0)}`,
         );
       }
       return new Duration(
@@ -807,6 +813,8 @@ export class Scalar {
 
   /** @internal */
   private raiseTypeError(other: unknown): never {
-    throw new TypeError(`no implicit conversion of ${rbObjClass(other)} into ${rbObjClass(this)}`);
+    throw new TypeError(
+      `no implicit conversion of ${rbObjClassname(other)} into ${rbObjClassname(this)}`,
+    );
   }
 }

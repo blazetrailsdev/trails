@@ -1,6 +1,6 @@
 import { NameError } from "./name-error.js";
 import { checkArity } from "./string/support.js";
-import { FL_SINGLETON, rbObjClass } from "./object.js";
+import { FL_SINGLETON, rbObjClassname } from "./object.js";
 
 /**
  * Ruby core `Method` (`vendor/ruby/v3.3.11/proc.c:1657` `mnew_missing` builds the
@@ -115,7 +115,7 @@ export function rbObjMethod(obj: unknown, vid: string): Method {
   if (found != null && found !== false) {
     return new Method(obj, vid, (...args) => target.methodMissing!(vid, ...args));
   }
-  throw new NameError(`undefined method '${vid}' for an instance of ${rbObjClass(obj)}`, vid, {
+  throw new NameError(`undefined method '${vid}' for an instance of ${rbObjClassname(obj)}`, vid, {
     receiver: obj,
   });
 }

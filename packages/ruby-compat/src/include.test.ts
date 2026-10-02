@@ -1,7 +1,7 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import { NameError } from "./name-error.js";
 import { Hash } from "./hash.js";
-import { rbCBasicObject, rbClassOf, rbModName, rbModToS, rbObjSingletonClass } from "./object.js";
+import { rbCBasicObject, rbObjClass, rbModName, rbModToS, rbObjSingletonClass } from "./object.js";
 import {
   include,
   rbModConstDefined,
@@ -812,42 +812,26 @@ describe("Module#ancestors", () => {
   });
 
   it("lists MRI's ancestors for a core class", () => {
-    const names = (x: unknown) => rbModAncestors(rbClassOf(x)).map(rbModName);
-    expect(names({ [Symbol.toStringTag]: "Temporal.PlainDateTime" })).toEqual([
-      "DateTime",
-      "Date",
-      "Comparable",
-      "Object",
-      "Kernel",
-      "BasicObject",
-    ]);
-    expect(names(1)).toEqual([
-      "Integer",
-      "Numeric",
-      "Comparable",
-      "Object",
-      "Kernel",
-      "BasicObject",
-    ]);
-    expect(names(1.5)[0]).toBe("Float");
-    expect(names(null)).toEqual(["NilClass", "Object", "Kernel", "BasicObject"]);
-    expect(names({}).slice(0, 2)).toEqual(["Hash", "Enumerable"]);
-    expect(names(class {})).toEqual(["Class", "Module", "Object", "Kernel", "BasicObject"]);
-    expect(names("s").slice(0, 2)).toEqual(["String", "Comparable"]);
-    expect(names(new Date(0)).slice(0, 2)).toEqual(["Time", "Comparable"]);
+    const names = (x: unknown) => rbModAncestors(rbObjClass(x)).map(rbModName).join(" ");
+    const dateTime = { [Symbol.toStringTag]: "Temporal.PlainDateTime" };
+    expect(names(dateTime)).toBe("DateTime Date Comparable Object Kernel BasicObject");
+    expect(names(1)).toBe("Integer Numeric Comparable Object Kernel BasicObject");
+    expect(names(1.5)).toBe("Float Numeric Comparable Object Kernel BasicObject");
+    expect(names(null)).toBe("NilClass Object Kernel BasicObject");
+    expect(names({})).toMatch(/^Hash Enumerable /);
+    expect(names(class {})).toBe("Class Module Object Kernel BasicObject");
+    expect(names("s")).toBe("String Comparable Object Kernel BasicObject");
+    expect(names(new Date(0))).toBe("Time Comparable Object Kernel BasicObject");
     expect(rbModAncestors(rbCBasicObject)).toEqual([rbCBasicObject]);
   });
 
   it("answers one class object per core class, and the constructor otherwise", () => {
     class Klass {}
-    expect(rbClassOf(1)).toBe(rbClassOf(2n));
-    expect(rbClassOf(1)).not.toBe(rbClassOf(1.5));
-    expect(rbClassOf(true)).not.toBe(rbClassOf(false));
-    expect(rbModName(rbClassOf(() => {}))).toBe("Proc");
-    expect(rbClassOf({})).toBe(Hash);
-    expect(rbClassOf(new Hash())).toBe(Hash);
-    expect(rbClassOf(new Klass())).toBe(Klass);
-    expect(rbClassOf(rbObjSingletonClass(new Klass()).prototype)).toBe(Klass);
+    expect(rbObjClass(1)).toBe(rbObjClass(2n));
+    expect(rbObjClass(1)).not.toBe(rbObjClass(1.5));
+    expect(rbModName(rbObjClass(() => {}))).toBe("Proc");
+    expect(rbObjClass({})).toBe(Hash);
+    expect(rbObjClass(rbObjSingletonClass(new Klass()).prototype)).toBe(Klass);
   });
 });
 

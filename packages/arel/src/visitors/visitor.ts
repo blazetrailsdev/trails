@@ -2,11 +2,11 @@ import {
   Hash,
   NoMethodError,
   TypeError,
-  rbClassOf,
+  rbObjClass,
   rbFSend,
   rbModAncestors,
   rbModName,
-  rbObjClass,
+  rbObjClassname,
   rbObjRespondTo,
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
@@ -55,7 +55,7 @@ export abstract class Visitor {
     for (;;) {
       let dispatchMethod: string | undefined;
       try {
-        dispatchMethod = this.dispatch.get(rbClassOf(object));
+        dispatchMethod = this.dispatch.get(rbObjClass(object));
         if (collector != null && collector !== false) {
           return rbFSend(this, dispatchMethod!, object, collector);
         } else {
@@ -64,11 +64,11 @@ export abstract class Visitor {
       } catch (e) {
         if (!(e instanceof NoMethodError)) throw e;
         if (rbObjRespondTo(this, dispatchMethod!, true)) throw e;
-        const superklass = rbModAncestors(rbClassOf(object)).find((klass) =>
+        const superklass = rbModAncestors(rbObjClass(object)).find((klass) =>
           rbObjRespondTo(this, this.dispatch.get(klass)!, true),
         );
-        if (superklass == null) throw new TypeError(`Cannot visit ${rbObjClass(object)}`);
-        this.dispatch.set(rbClassOf(object), this.dispatch.get(superklass)!);
+        if (superklass == null) throw new TypeError(`Cannot visit ${rbObjClassname(object)}`);
+        this.dispatch.set(rbObjClass(object), this.dispatch.get(superklass)!);
       }
     }
   }

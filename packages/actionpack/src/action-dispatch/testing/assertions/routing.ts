@@ -7,7 +7,7 @@ import {
   Module,
   NoMethodError,
   rbFPublicSend,
-  rbObjClass,
+  rbObjClassname,
   rbObjClone,
   rbObjMethod,
   rbObjRespondTo,
@@ -268,7 +268,7 @@ export function methodMissing(
     const super_ = RoutingAssertions.superMethod(this, "methodMissing");
     if (super_ !== undefined) return super_(selector, ...args);
     throw new NoMethodError(
-      `undefined method '${selector}' for an instance of ${rbObjClass(this)}`,
+      `undefined method '${selector}' for an instance of ${rbObjClassname(this)}`,
       selector,
       args,
       false,

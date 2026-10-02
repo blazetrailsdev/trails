@@ -23,7 +23,7 @@ import {
   rbObjIvarSet,
   rbModName,
   rbModToS,
-  rbObjClass,
+  rbObjClassname,
   rbSetClassPathString,
 } from "./object.js";
 import { Kernel, Module, include, rbModAncestors, rbModInstanceMethod } from "./include.js";
@@ -602,11 +602,11 @@ describe("Module#name", () => {
   });
 
   it("is what rb_obj_class reports for an instance", () => {
-    expect(rbObjClass(new Base())).toBe("Outer::Space::Base");
-    expect(rbObjClass(new Derived())).toBe("Derived");
-    expect(rbObjClass(Derived)).toBe("Class");
-    expect(rbObjClass(() => {})).toBe("Proc");
-    expect(rbObjClass(new (class extends Base {})())).toMatch(/^#<Class:0x[0-9a-f]+>$/);
+    expect(rbObjClassname(new Base())).toBe("Outer::Space::Base");
+    expect(rbObjClassname(new Derived())).toBe("Derived");
+    expect(rbObjClassname(Derived)).toBe("Class");
+    expect(rbObjClassname(() => {})).toBe("Proc");
+    expect(rbObjClassname(new (class extends Base {})())).toMatch(/^#<Class:0x[0-9a-f]+>$/);
   });
 });
 
@@ -614,11 +614,11 @@ describe("rb_obj_class over trails' date and hash seats", () => {
   const tagged = (tag: string) => ({ [Symbol.toStringTag]: tag });
 
   it("answers Date, DateTime and Time for the Temporal plain shapes and a JS Date", () => {
-    expect(rbObjClass(tagged("Temporal.PlainDate"))).toBe("Date");
-    expect(rbObjClass(tagged("Temporal.PlainDateTime"))).toBe("DateTime");
-    expect(rbObjClass(tagged("Temporal.PlainTime"))).toBe("Time");
-    expect(rbObjClass(new Date(0))).toBe("Time");
-    expect(rbObjClass(new (class Stamp extends Date {})(0))).toBe("Stamp");
+    expect(rbObjClassname(tagged("Temporal.PlainDate"))).toBe("Date");
+    expect(rbObjClassname(tagged("Temporal.PlainDateTime"))).toBe("DateTime");
+    expect(rbObjClassname(tagged("Temporal.PlainTime"))).toBe("Time");
+    expect(rbObjClassname(new Date(0))).toBe("Time");
+    expect(rbObjClassname(new (class Stamp extends Date {})(0))).toBe("Stamp");
   });
 
   it("orders two PlainTimes by their own compare, not on an instant they do not carry", () => {
@@ -634,10 +634,10 @@ describe("rb_obj_class over trails' date and hash seats", () => {
 
   it("answers Hash for a record whose prototype chain holds no class", () => {
     class Klass {}
-    expect(rbObjClass(Object.create({ inherited: "x" }))).toBe("Hash");
-    expect(rbObjClass(Object.create(Object.create(null)))).toBe("Hash");
-    expect(rbObjClass(Object.create({ constructor: Klass }))).toBe("Hash");
-    expect(rbObjClass(new Klass())).toBe("Klass");
+    expect(rbObjClassname(Object.create({ inherited: "x" }))).toBe("Hash");
+    expect(rbObjClassname(Object.create(Object.create(null)))).toBe("Hash");
+    expect(rbObjClassname(Object.create({ constructor: Klass }))).toBe("Hash");
+    expect(rbObjClassname(new Klass())).toBe("Klass");
   });
 });
 

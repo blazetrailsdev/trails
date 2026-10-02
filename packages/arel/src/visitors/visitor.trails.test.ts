@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NoMethodError, TypeError, rbClassOf, rbFSend } from "@blazetrails/ruby-compat";
+import { NoMethodError, TypeError, rbObjClass, rbFSend } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import { Node } from "../nodes/node.js";
 import { Visitor } from "./visitor.js";
@@ -128,7 +128,7 @@ describe("Visitor dispatch", () => {
     expect(cache.isCompareByIdentity()).toBe(true);
     expect(cache.get(Node)).toBe("visitArelNodesNode");
     expect(cache.get(class {})).toBe("visit_");
-    expect(cache.get(rbClassOf(1))).toBe("visitInteger");
+    expect(cache.get(rbObjClass(1))).toBe("visitInteger");
     expect(NamingVisitor.dispatchCache()).toBe(cache);
   });
 

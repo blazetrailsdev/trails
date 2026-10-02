@@ -1,4 +1,4 @@
-import { IndexError, NoMethodError, Range, rbObjClass } from "@blazetrails/ruby-compat";
+import { IndexError, NoMethodError, Range, rbObjClassname } from "@blazetrails/ruby-compat";
 
 const HTML_ESCAPE: Record<string, string> = {
   "&": "&amp;",
@@ -26,7 +26,7 @@ function toStr(arg: unknown): string {
   if (arg instanceof SafeBuffer) return arg.toStr();
   const conv = (arg as { toStr?: () => string } | null)?.toStr;
   if (typeof conv === "function") return conv.call(arg);
-  throw new NoMethodError(`undefined method 'to_str' for an instance of ${rbObjClass(arg)}`);
+  throw new NoMethodError(`undefined method 'to_str' for an instance of ${rbObjClassname(arg)}`);
 }
 
 function concatArgument(arg: unknown): string {

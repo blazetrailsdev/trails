@@ -49,12 +49,12 @@ describe("classifyPair", () => {
   });
 
   // core_ext/array/conversions.rb:191 `underscore(first.class.name)` against
-  // array-utils.ts' `underscore(rbObjClass(first))`: the chain records as
-  // `name`, the export as `jsObjClass`.
+  // array-utils.ts' `underscore(rbObjClassname(first))`: the chain records as
+  // `name`, the export as `jsObjClassname`.
   it("names a Ruby call chain spelled as the one ruby-compat export that ports it", () => {
-    expect(classifyPair("name", "jsObjClass")).toBe("no-js-equivalent");
+    expect(classifyPair("name", "jsObjClassname")).toBe("no-js-equivalent");
     expect(classifyPair("name", "klassName")).toBe("burndown");
-    expect(classifyPair("constructor", "jsObjClass")).toBe("burndown");
+    expect(classifyPair("constructor", "jsObjClassname")).toBe("burndown");
   });
 
   it("names what the conventions table itself produces", () => {
