@@ -30,6 +30,13 @@ describe("CommandRecorder", () => {
     expect(recorder.america()).toBe("hi");
   });
 
+  it("record returns the commands it appended to", async () => {
+    const recorder = new CommandRecorder(abstractDelegate);
+    const commands = await recorder.record("addColumn", ["users", "name", "string"]);
+    expect(commands).toBe(recorder.commands);
+    expect(commands).toEqual([["addColumn", ["users", "name", "string"], undefined]]);
+  });
+
   it("runs a reverted transaction's block to completion before recording the command", async () => {
     const recorder = new CommandRecorder(abstractDelegate);
     const recordable = recorder as unknown as {

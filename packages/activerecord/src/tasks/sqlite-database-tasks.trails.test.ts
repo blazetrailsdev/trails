@@ -178,7 +178,7 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
   });
 });
 
-describe("SQLiteDatabaseTasks in-memory structure load", () => {
+describe("SQLiteDatabaseTasks in-memory structure dump", () => {
   const created: string[] = [];
   const configuration = new HashConfig("development", "primary", {
     adapter: "sqlite3",

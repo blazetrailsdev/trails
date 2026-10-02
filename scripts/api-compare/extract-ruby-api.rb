@@ -3128,10 +3128,6 @@ class ApiExtractor
     op.is_a?(Array) ? op[1] : op
   end
 
-  # `fail` is `raise` under its other name (`rb_define_global_function("fail",
-  # f_raise, -1)`, vendor/ruby/v3.3.11/eval.c:2072-2073), and its port is the same
-  # ThrowStatement, so it tokens the same way — except in a file that defines
-  # a `fail` of its own (`rack/files.rb:190`), where the name is that method.
   def skeleton_push_name(tokens, name, recv, args = nil)
     return unless name
 

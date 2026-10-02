@@ -22,7 +22,7 @@ export class Builder {
   }
 
   static parseFile(path: string, ...options: any[]): RackApp {
-    return Builder.loadFile(path, ...options);
+    return this.loadFile(path, ...options);
   }
 
   static loadFile(path: string, ..._options: any[]): RackApp {
