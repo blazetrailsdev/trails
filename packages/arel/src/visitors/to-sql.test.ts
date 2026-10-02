@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
+import { Hash } from "@blazetrails/ruby-compat";
 import {
   Table,
   star,
@@ -14,6 +15,7 @@ import {
 import { fakeRecordConnection } from "../test-helpers/connection.js";
 import { mustBeLike } from "../test-helpers/must-be-like.js";
 import { buildQuoted } from "../nodes/casted.js";
+import type { NodeCtor } from "./visitor.js";
 
 describe("the to_sql visitor", () => {
   const users = new Table("users");
@@ -201,8 +203,8 @@ describe("the to_sql visitor", () => {
         visited = true;
         return "";
       }
-      static {
-        this.dispatchCache().set(Table, "hello");
+      protected override get dispatch() {
+        return new Hash<NodeCtor | string, string>().set(Table, "hello");
       }
     }
     const viz = new HelloVisitor();

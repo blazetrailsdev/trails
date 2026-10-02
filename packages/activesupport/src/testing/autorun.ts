@@ -3,8 +3,7 @@ import type { TestContext } from "vitest";
 import { Time } from "@blazetrails/date";
 import { safeConstantize } from "../inflector.js";
 import { TestCase } from "../test-case.js";
-import { _takeAssertions } from "./assertions.js";
-import type { RunningTest } from "./tests-without-assertions.js";
+import { Skip, UnexpectedError, _takeAssertions } from "./assertions.js";
 
 declare module "vitest" {
   interface TestContext {
@@ -26,29 +25,25 @@ beforeEach(async (context: TestContext) => {
 });
 
 afterEach(async (context: TestContext) => {
-  const test = _runningTest(context);
-  await context.testCase?.afterTeardown(test);
-  if (test.failures.length > 0) throw test.failures[0];
-});
-
-/** @noRailsEquivalent PERMANENT */
-function _runningTest(context: TestContext): RunningTest {
+  const testCase = context.testCase;
+  if (testCase === undefined) return;
   const task = context.task as {
-    name: string;
     mode?: string;
     location?: { line?: number };
     file?: { filepath?: string };
     result?: { state?: string; errors?: unknown[] };
   };
-  return {
-    assertions: (expect.getState().assertionCalls ?? 0) + _takeAssertions(),
-    skipped: task.mode === "skip" || task.mode === "todo",
-    error: task.result?.state === "fail" || (task.result?.errors?.length ?? 0) > 0,
-    name: task.name,
-    sourceLocation: [task.file?.filepath ?? "", task.location?.line ?? 0],
-    failures: [],
-  };
-}
+  testCase.assertions = (expect.getState().assertionCalls ?? 0) + _takeAssertions();
+  testCase.sourceLocation = [task.file?.filepath ?? "", task.location?.line ?? 0];
+  if (task.mode === "skip" || task.mode === "todo" || task.result?.state === "skip") {
+    testCase.failures.push(new Skip());
+  }
+  for (const e of task.result?.errors ?? [])
+    testCase.failures.push(new UnexpectedError(e as Error));
+  const failures = testCase.failures.length;
+  await testCase.afterTeardown();
+  if (testCase.failures.length > failures) throw testCase.failures[failures];
+});
 
 expect.addEqualityTesters([
   function timeEquals(a: unknown, b: unknown): boolean | undefined {

@@ -19,6 +19,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import {
   Concern,
+  Minitest,
   Notifications,
   classAttribute,
   extend,
@@ -252,12 +253,12 @@ export interface TestFixtures {
 
 async function beforeSetup(this: TestFixtures): Promise<void> {
   await this.setupFixtures();
-  await TestFixtures.superMethod(this, "beforeSetup")?.();
+  await TestFixtures.superMethod(this, "beforeSetup")!();
 }
 
 async function afterTeardown(this: TestFixtures): Promise<void> {
   try {
-    await TestFixtures.superMethod(this, "afterTeardown")?.();
+    await TestFixtures.superMethod(this, "afterTeardown")!();
   } finally {
     await this.teardownFixtures();
   }
@@ -660,7 +661,7 @@ let currentTestCase: TestFixtures | null = null;
 function testCaseClassFor(suite: SuiteScope | undefined): TestCaseClass {
   if (suite === undefined) {
     if (rootTestCaseClass === undefined) {
-      rootTestCaseClass = class {} as unknown as TestCaseClass;
+      rootTestCaseClass = class extends Minitest.Test {} as unknown as TestCaseClass;
       include(rootTestCaseClass, TestFixtures);
       rootTestCaseClass.fixturePaths = [FIXTURES_ROOT, USE_FIXTURES_ROOT];
     }

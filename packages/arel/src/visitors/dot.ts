@@ -3,18 +3,9 @@ import type { Attribute } from "../attributes/attribute.js";
 import { Table } from "../table.js";
 import { Visitor } from "./visitor.js";
 import { Nodes, Visitors } from "../namespaces.js";
-import { PlainString } from "../collectors/plain-string.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { camelize } from "@blazetrails/activesupport";
 import { rbObjClass, rbModConstSet } from "@blazetrails/ruby-compat";
-
-type AppendableCollector = { append(s: string): unknown; value: string };
-
-function isAppendableCollector(c: unknown): c is AppendableCollector {
-  if (typeof c !== "object" || c === null) return false;
-  const obj = c as Record<string, unknown>;
-  return typeof obj.append === "function" && typeof obj.value === "string";
-}
 
 export class Dot extends Visitor {
   private nodes: Node[] = [];
@@ -26,18 +17,9 @@ export class Dot extends Visitor {
 
   private static readonly NIL_SENTINEL = Symbol("Dot.NIL_SENTINEL");
 
-  override accept(object: Nodes.Node, collector?: unknown): { value: string } {
-    this.nodes = [];
-    this.edges = [];
-    this.nodeStack = [];
-    this.edgeStack = [];
-    this.seen = new Map();
-    this.nextId = 0;
-
+  override accept<C extends { append(str: string): C }>(object: unknown, collector: C): C {
     this.visit(object);
-    const sink = isAppendableCollector(collector) ? collector : new PlainString();
-    sink.append(this.toDot());
-    return sink as { value: string };
+    return collector.append(this.toDot());
   }
 
   protected visitArelNodesFunction(o: Nodes.Function): void {

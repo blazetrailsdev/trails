@@ -42,6 +42,64 @@ export class UnexpectedError extends Assertion {
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
+export class Skip extends Assertion {
+  override name = "Skip";
+}
+
+/** @noRailsEquivalent PERMANENT */
+export class Test {
+  /** @noRailsEquivalent PERMANENT */
+  name: string;
+  /** @noRailsEquivalent PERMANENT */
+  failures: Assertion[];
+  /** @noRailsEquivalent PERMANENT */
+  sourceLocation: [string, number];
+  private _assertions: number;
+
+  /** @noRailsEquivalent PERMANENT */
+  constructor(name: string) {
+    this.name = name;
+    this.failures = [];
+    this._assertions = 0;
+    this.sourceLocation = ["", 0];
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  get assertions(): number {
+    return this._assertions;
+  }
+
+  set assertions(assertions: number) {
+    this._assertions = assertions;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  get failure(): Assertion | undefined {
+    return this.failures[0];
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  isSkipped(): boolean {
+    return this.failure != null && this.failure instanceof Skip;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  isError(): boolean {
+    return this.failures.some((failure) => failure instanceof UnexpectedError);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  beforeSetup(): unknown {
+    return undefined;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  afterTeardown(): unknown {
+    return undefined;
+  }
+}
+
 function classNameOf(e: Error): string {
   if (e.name && e.name !== "Error") return e.name;
   const ctor = e.constructor?.name;
@@ -77,10 +135,12 @@ export class BacktraceFilter {
 /** @noRailsEquivalent PERMANENT */
 export const Minitest: {
   VERSION: string;
+  Test: typeof Test;
   backtraceFilter: { filter(bt: string[] | null): string[] };
   filterBacktrace(bt: string[] | null): string[];
 } = {
   VERSION: "5.27.0",
+  Test,
   backtraceFilter: new BacktraceFilter(),
 
   filterBacktrace(bt: string[] | null): string[] {

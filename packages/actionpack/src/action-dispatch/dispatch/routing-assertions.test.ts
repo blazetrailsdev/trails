@@ -71,7 +71,9 @@ interface Host {
   routes?: RouteSet;
   beforeSetup(): void;
   setup(): void;
-  afterTeardown(test: { failures: Error[] }): void;
+  assertions: number;
+  failures: Error[];
+  afterTeardown(): void;
   assertGenerates: TestCase["assertGenerates"];
   assertRecognizes: TestCase["assertRecognizes"];
   assertRouting: TestCase["assertRouting"];
@@ -87,9 +89,9 @@ function runTest<T extends Host>(klass: new () => T): () => T {
     t.setup();
   });
   afterEach(() => {
-    const test = { failures: [] as Error[] };
-    t.afterTeardown(test);
-    expect(test.failures).toEqual([]);
+    t.assertions = 1;
+    t.afterTeardown();
+    expect(t.failures).toEqual([]);
   });
   return () => t;
 }

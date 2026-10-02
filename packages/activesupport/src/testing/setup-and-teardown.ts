@@ -1,7 +1,7 @@
 import { defineCallbacks, setCallback, runCallbacks } from "../callbacks.js";
 import type { FilterListEntry } from "../callbacks.js";
 import { Assertion, UnexpectedError } from "./assertions.js";
-import type { RunningTest } from "./tests-without-assertions.js";
+import type { Test } from "./assertions.js";
 
 export function prepended(klass: { prototype: object }): void {
   defineCallbacks(klass.prototype, "setup");
@@ -16,22 +16,27 @@ export function teardown(this: { prototype: object }, ...args: FilterListEntry<o
   setCallback(this.prototype, "teardown", "after", ...args);
 }
 
-export function beforeSetup(this: object): unknown {
-  return runCallbacks(this, "setup");
+export function beforeSetup(this: object, super_: () => unknown): unknown {
+  const result = super_();
+  return result instanceof Promise
+    ? result.then(() => runCallbacks(this, "setup"))
+    : runCallbacks(this, "setup");
 }
 
-export function afterTeardown(this: object, test: Pick<RunningTest, "failures">): unknown {
+export function afterTeardown(this: Test, super_: () => unknown): unknown {
   const rescue = (e: unknown): void => {
     if (e instanceof Assertion) {
-      test.failures.push(e);
+      this.failures.push(e);
     } else {
-      test.failures.push(new UnexpectedError(e as Error));
+      this.failures.push(new UnexpectedError(e as Error));
     }
   };
   try {
     const result = runCallbacks(this, "teardown");
-    if (result instanceof Promise) return result.then(() => {}, rescue);
+    if (result instanceof Promise) return result.then(() => {}, rescue).then(() => super_());
   } catch (e) {
     rescue(e);
   }
+
+  return super_();
 }

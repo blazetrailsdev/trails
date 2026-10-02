@@ -12,50 +12,46 @@ vi.mock("./time-helpers.js", async (importOriginal) => {
   };
 });
 
-import { Assertion, UnexpectedError } from "./assertions.js";
-import { afterTeardown, beforeSetup, prepended, setup, teardown } from "./setup-and-teardown.js";
-import {
-  afterTeardown as testsWithoutAssertionsAfterTeardown,
-  type RunningTest,
-} from "./tests-without-assertions.js";
+import { Assertion, Skip, UnexpectedError } from "./assertions.js";
 import { _takeAssertions, assertNot, assertRaises } from "./assertions.js";
 import { TestCase } from "../test-case.js";
 import { Module, include } from "@blazetrails/ruby-compat";
 
-function testCase(): new () => object {
-  const klass = class {};
-  prepended(klass);
-  return klass;
+function testCase(): typeof TestCase {
+  return class extends TestCase {};
 }
 
-function runningTest(): Pick<RunningTest, "failures"> {
-  return { failures: [] };
+function runningTest(klass: typeof TestCase = TestCase): TestCase {
+  const test = new klass("a test");
+  test.assertions = 1;
+  test.sourceLocation = ["some_test.ts", 12];
+  return test;
 }
 
 describe("SetupAndTeardown", () => {
   it("runs setup callbacks before_setup and teardown callbacks after_teardown", () => {
     const klass = testCase();
     const ran: string[] = [];
-    setup.call(klass, () => ran.push("setup"));
-    teardown.call(klass, () => ran.push("teardown"));
+    klass.setup(() => ran.push("setup"));
+    klass.teardown(() => ran.push("teardown"));
 
-    const instance = new klass();
-    beforeSetup.call(instance);
+    const instance = runningTest(klass);
+    instance.beforeSetup();
     expect(ran).toEqual(["setup"]);
 
-    afterTeardown.call(instance, runningTest());
+    instance.afterTeardown();
     expect(ran).toEqual(["setup", "teardown"]);
   });
 
   it("records a raising teardown callback as a failure instead of propagating", () => {
     const klass = testCase();
-    const test = runningTest();
+    const test = runningTest(klass);
     const raised = new TypeError("boom");
-    teardown.call(klass, () => {
+    klass.teardown(() => {
       throw raised;
     });
 
-    afterTeardown.call(new klass(), test);
+    test.afterTeardown();
 
     expect(test.failures.length).toBe(1);
     const failure = test.failures[0];
@@ -65,31 +61,29 @@ describe("SetupAndTeardown", () => {
 
   it("records a failed assertion in a teardown callback as itself", () => {
     const klass = testCase();
-    const test = runningTest();
+    const test = runningTest(klass);
     const raised = new Assertion("nope");
-    teardown.call(klass, () => {
+    klass.teardown(() => {
       throw raised;
     });
 
-    afterTeardown.call(new klass(), test);
+    test.afterTeardown();
 
     expect(test.failures[0]).toBe(raised);
   });
 });
 
 describe("TestsWithoutAssertions", () => {
-  const running = {
-    assertions: 0,
-    skipped: false,
-    error: false,
-    name: "a test",
-    sourceLocation: ["some_test.ts", 12] as [string, number],
-    failures: [],
+  const running = (assertions = 0, ...failures: Assertion[]): TestCase => {
+    const test = runningTest();
+    test.assertions = assertions;
+    test.failures.push(...failures);
+    return test;
   };
 
   it("warns when a test made no assertion", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    testsWithoutAssertionsAfterTeardown({ ...running });
+    running().afterTeardown();
     const calls = warn.mock.calls.map((c) => c[0]);
     warn.mockRestore();
 
@@ -98,9 +92,9 @@ describe("TestsWithoutAssertions", () => {
 
   it("stays quiet for a test that asserted, was skipped, or errored", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    testsWithoutAssertionsAfterTeardown({ ...running, assertions: 1 });
-    testsWithoutAssertionsAfterTeardown({ ...running, skipped: true });
-    testsWithoutAssertionsAfterTeardown({ ...running, error: true });
+    running(1).afterTeardown();
+    running(0, new Skip()).afterTeardown();
+    running(0, new UnexpectedError(new Error("boom"))).afterTeardown();
     const calls = warn.mock.calls;
     warn.mockRestore();
 
@@ -117,16 +111,9 @@ describe("TestCase after_teardown chain", () => {
     });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
-      expect(() =>
-        new TeardownRaisesTest("a test").afterTeardown({
-          assertions: 0,
-          skipped: false,
-          error: false,
-          name: "a test",
-          sourceLocation: ["some_test.ts", 12],
-          failures: [],
-        }),
-      ).toThrow(UnexpectedError);
+      const test = new TeardownRaisesTest("a test");
+      test.afterTeardown();
+      expect(test.failures[0]).toBeInstanceOf(UnexpectedError);
       expect(warn).not.toHaveBeenCalled();
     } finally {
       warn.mockRestore();
@@ -164,15 +151,6 @@ describe("TestCase lifecycle hooks", () => {
     expect(child.ran).toEqual(["parent", "child"]);
   });
 
-  const running = (): RunningTest => ({
-    assertions: 1,
-    skipped: false,
-    error: false,
-    name: "a test",
-    sourceLocation: ["some_test.ts", 12],
-    failures: [],
-  });
-
   async function includedBeneath(
     klass: typeof TestCase,
     ran: string[],
@@ -203,9 +181,9 @@ describe("TestCase lifecycle hooks", () => {
       ran.push("teardown");
     });
     await includedBeneath(TestCase, ran, async () => {
-      const instance = new FixturesTest("a test");
+      const instance = runningTest(FixturesTest);
       await instance.beforeSetup();
-      await instance.afterTeardown(running());
+      await instance.afterTeardown();
     });
     expect(ran).toEqual(["before_setup", "setup", "teardown", "after_teardown"]);
   });
@@ -215,10 +193,8 @@ describe("TestCase lifecycle hooks", () => {
     const raised = new TypeError("boom");
     const ran: string[] = [];
     RejectsTest.teardown(() => Promise.reject(raised));
-    const test = running();
-    await expect(
-      includedBeneath(TestCase, ran, () => new RejectsTest("a test").afterTeardown(test)),
-    ).rejects.toBeInstanceOf(UnexpectedError);
+    const test = runningTest(RejectsTest);
+    await includedBeneath(TestCase, ran, () => test.afterTeardown());
     expect(ran).toEqual(["after_teardown"]);
     expect(test.failures.map((failure) => (failure as UnexpectedError).error)).toEqual([raised]);
   });
@@ -229,7 +205,7 @@ describe("TestCase lifecycle hooks", () => {
     const ran: string[] = [];
     travelBack.raises = new RangeError("travel_back");
     await expect(
-      includedBeneath(Reloaded, ran, () => new Reloaded("a test").afterTeardown(running())),
+      includedBeneath(Reloaded, ran, () => new Reloaded("a test").afterTeardown()),
     ).rejects.toBe(travelBack.raises);
     travelBack.raises = null;
     expect(ran).toEqual(["after_teardown"]);

@@ -89,7 +89,6 @@ export class IntegrationTest extends TestCase {
 
   resetBang(): void {
     this._mockSessionMemo = undefined;
-    this._htmlDocument?.dispose();
     this._htmlDocument = undefined;
     this.controller = undefined!;
     this.request = undefined!;
@@ -264,7 +263,6 @@ export class IntegrationTest extends TestCase {
     const response = this._mockSession.lastResponse();
     this.response = TestResponse.fromResponse(response);
     this.response.request = this.request;
-    this._htmlDocument?.dispose();
     this._htmlDocument = undefined;
     this._urlOptions = undefined;
 
@@ -420,17 +418,14 @@ export class IntegrationTest extends TestCase {
   rootSession?: IntegrationTest;
 
   /** @internal */
-  get assertions(): number {
-    return this.rootSession ? this.rootSession.assertions : (this._assertions ?? 0);
+  override get assertions(): number {
+    return this.rootSession ? this.rootSession.assertions : super.assertions;
   }
 
-  set assertions(value: number) {
-    if (this.rootSession) this.rootSession.assertions = value;
-    else this._assertions = value;
+  override set assertions(assertions: number) {
+    if (this.rootSession) this.rootSession.assertions = assertions;
+    else super.assertions = assertions;
   }
-
-  /** @internal */
-  _assertions: number = 0;
 
   /** @internal */
   _htmlDocument?: XmlDocument;
