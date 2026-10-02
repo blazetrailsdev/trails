@@ -1,5 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { pluralize, symbolizeKeys } from "@blazetrails/activesupport";
+import { any, pluralize, symbolizeKeys } from "@blazetrails/activesupport";
 import { rbInspect, rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type {
@@ -170,14 +170,12 @@ export async function removeForeignKey(
   await this.alterTable(fromTable, foreignKeys);
 }
 
-/** @missingRailsCall any? — PERMANENT */
 export async function virtualTableExists(
   this: SQLite3SchemaAdapter,
   tableName: string,
 ): Promise<boolean> {
-  return (
-    (await this.queryValues(this.dataSourceSql(tableName, { type: "VIRTUAL TABLE" }), "SCHEMA"))
-      .length > 0
+  return any(
+    await this.queryValues(this.dataSourceSql(tableName, { type: "VIRTUAL TABLE" }), "SCHEMA"),
   );
 }
 
@@ -282,28 +280,24 @@ export function validateIndexLengthBang(
   );
 }
 
-/**
- * @internal
- * @missingRailsArgs extract_value_from_default — PERMANENT
- * @missingRailsArgs extract_default_function — PERMANENT
- */
+/** @internal */
 export function newColumnFromField(
   adapter: SQLite3SchemaAdapter,
   _tableName: string,
   field: Record<string, unknown>,
   definitions: Record<string, unknown>[],
 ): Column {
-  const dfltValue = (field["dflt_value"] as string | null) ?? null;
+  const default_ = (field["dflt_value"] as string | null) ?? null;
   const sqlType = String(field["type"] ?? "");
   const typeMetadata = adapter.fetchTypeMetadata(sqlType) as SqlTypeMetadata;
-  const defaultValue = adapter.extractValueFromDefault(dfltValue);
+  const defaultValue = adapter.extractValueFromDefault(default_);
   const generatedType = extractGeneratedType(field);
 
   let defaultFunction: string | null = null;
   if (generatedType) {
-    defaultFunction = dfltValue;
+    defaultFunction = default_;
   } else {
-    defaultFunction = extractDefaultFunction(defaultValue, dfltValue);
+    defaultFunction = extractDefaultFunction(defaultValue, default_);
   }
 
   const rowid = isColumnTheRowid(field, definitions);

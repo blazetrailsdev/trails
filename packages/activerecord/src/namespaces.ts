@@ -171,7 +171,7 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   Locking: typeof Locking;
   Relation: typeof Relation;
   Scoping: typeof Scoping;
-  Point: new (x: number, y: number) => { x: number; y: number; equals(other: unknown): boolean };
+  Point: new (x: number, y: number) => { x: number; y: number };
 };
 registerConstant("ActiveRecord", ActiveRecord);
 extend(ActiveRecord, Autoload);

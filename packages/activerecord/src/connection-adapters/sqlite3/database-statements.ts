@@ -1,6 +1,6 @@
-import { sql as arelSql } from "@blazetrails/arel";
+import * as Arel from "@blazetrails/arel";
 import { ArgumentError, Attribute as ModelAttribute, FloatType } from "@blazetrails/activemodel";
-import { b, StandardError } from "@blazetrails/ruby-compat";
+import { b, first, StandardError } from "@blazetrails/ruby-compat";
 import type { SqliteBinds, SqliteConnection, SqliteStatement } from "../../sqlite-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
 import { Result } from "../../result.js";
@@ -270,24 +270,18 @@ export function buildTruncateStatement(this: QuoteTableNameHost | void, tableNam
   return `DELETE FROM ${quoted}`;
 }
 
-/**
- * @internal
- * @missingRailsCall first — PERMANENT
- */
+/** @internal */
 export function returningColumnValues(result: Result): unknown[] | undefined {
-  return result.rows[0] as unknown[] | undefined;
+  return first(result.rows);
 }
 
-/**
- * @internal
- * @missingRailsCall sql — PERMANENT
- */
+/** @internal */
 export function defaultInsertValue(column: {
   defaultFunction?: string | null;
   default?: unknown;
 }): unknown {
   if (column.defaultFunction) {
-    return arelSql(column.defaultFunction);
+    return Arel.sql(column.defaultFunction);
   }
   return column.default;
 }

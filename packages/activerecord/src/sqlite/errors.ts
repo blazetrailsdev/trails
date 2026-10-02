@@ -128,7 +128,7 @@ for (const [name, klass] of Object.entries({
 
 const { ErrorCode } = SQLite3Constants;
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
 export function status2klass(status: number): typeof Exception | null {
   switch (status & 0xff) {
     case ErrorCode.OK:
@@ -190,7 +190,7 @@ export function status2klass(status: number): typeof Exception | null {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
 function nativeStatus(error: unknown): number | null {
   const { errcode, rawCode, code } = (error ?? {}) as Record<string, unknown>;
   if (typeof errcode === "number") return errcode & 0xff;
@@ -201,7 +201,7 @@ function nativeStatus(error: unknown): number | null {
   return null;
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
 export function rbSqlite3Raise(error: unknown): never {
   const status = nativeStatus(error);
   const klass = status == null ? null : status2klass(status);
@@ -214,7 +214,7 @@ export function rbSqlite3Raise(error: unknown): never {
   throw exception;
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
 export function rbSqlite3RaiseWithSql(error: unknown, sql: string | null): never {
   const status = nativeStatus(error);
   const klass = status == null ? null : status2klass(status);

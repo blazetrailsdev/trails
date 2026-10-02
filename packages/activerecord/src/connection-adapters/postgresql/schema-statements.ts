@@ -115,7 +115,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   /**
-   * @missingRailsCall order:split,map — PERMANENT
+   * @missingRailsCall order:split,map — CONVERGEABLE pg-schema-statements-reflection-maps-rows-through-an-awaiting-map
    * @missingRailsName gsub — PERMANENT
    */
   async indexes(tableName: string): Promise<IndexDefinition[]> {
@@ -584,15 +584,14 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return new ChangeColumnDefinition(cd, columnName);
   }
 
-  /** @missingRailsName default — PERMANENT */
   override async buildChangeColumnDefaultDefinition(
     tableName: string,
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<ChangeColumnDefaultDefinition | undefined> {
     const column = await this.columnFor(tableName, columnName);
-    const defaultValue = this.extractNewDefaultValue(defaultOrChanges);
-    return new ChangeColumnDefaultDefinition(column, defaultValue);
+    const default_ = this.extractNewDefaultValue(defaultOrChanges);
+    return new ChangeColumnDefaultDefinition(column, default_);
   }
 
   override async changeColumnNull(
@@ -707,7 +706,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return deferrable && (deferred ? "deferred" : "immediate");
   }
 
-  /** @missingRailsCall order:unquoteIdentifier,map — PERMANENT */
+  /** @missingRailsCall order:unquoteIdentifier,map — CONVERGEABLE pg-schema-statements-reflection-maps-rows-through-an-awaiting-map */
   override async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     const scope = this.quotedScope(tableName);
     const fkInfo = await this.internalExecQuery(
@@ -954,7 +953,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.removeConstraint(tableName, uniqueNameToDelete);
   }
 
-  /** @missingRailsCall order:split,map — PERMANENT */
+  /** @missingRailsCall order:split,map — CONVERGEABLE pg-schema-statements-reflection-maps-rows-through-an-awaiting-map */
   async uniqueConstraints(tableName: string): Promise<UniqueConstraintDefinition[]> {
     const scope = this.quotedScope(tableName);
     const uniqueInfo = await this.internalExecQuery(

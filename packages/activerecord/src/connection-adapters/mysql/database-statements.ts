@@ -1,6 +1,6 @@
 import { sql as arelSql } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { b } from "@blazetrails/ruby-compat";
+import { b, first } from "@blazetrails/ruby-compat";
 import { ActiveRecordError } from "../../errors.js";
 import type { ExplainOption } from "../abstract/database-statements.js";
 import type { Nodes } from "@blazetrails/arel";
@@ -99,16 +99,13 @@ export function defaultInsertValue(column: AutoIncrementColumnHost): Nodes.SqlLi
   return abstractDefaultInsertValue(column);
 }
 
-/**
- * @internal
- * @missingRailsCall first — PERMANENT
- */
+/** @internal */
 export async function returningColumnValues(
   this: SupportsInsertReturningHost | void,
   result: Result,
 ): Promise<unknown[] | undefined> {
   if (await (this as SupportsInsertReturningHost | null)?.supportsInsertReturning?.()) {
-    return result.rows[0] as unknown[] | undefined;
+    return first(result.rows);
   }
   return undefined;
 }

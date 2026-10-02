@@ -1,16 +1,16 @@
 import type pg from "pg";
 import { Result } from "../../result.js";
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
 export class PGResult extends Array<Record<string, unknown>> {
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
   static get [Symbol.species]() {
     return Array;
   }
 
   readonly #native: pg.QueryResult;
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
   constructor(native: pg.QueryResult) {
     super();
     this.#native = native;
@@ -21,42 +21,42 @@ export class PGResult extends Array<Record<string, unknown>> {
     for (const hash of hashes) this.push(hash);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
   get fields(): string[] {
     return (this.#native.fields ?? []).map((f) => f.name);
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
   override values(): unknown[][] & ArrayIterator<Record<string, unknown>> {
     return (this.#native.rows ?? []) as unknown[][] & ArrayIterator<Record<string, unknown>>;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
   ntuples(): number {
     return (this.#native.rows ?? []).length;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
   getvalue(tupNum: number, fieldNum: number): unknown {
     return ((this.#native.rows ?? []) as unknown[][])[tupNum]?.[fieldNum] ?? null;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
   ftype(columnNumber: number): number {
     return this.#native.fields[columnNumber].dataTypeID;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
   fmod(columnNumber: number): number {
     return this.#native.fields[columnNumber].dataTypeModifier ?? -1;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
   cmdTuples(): number {
     return this.#native.rowCount ?? 0;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
   clear(): null {
     return null;
   }

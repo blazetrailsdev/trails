@@ -109,9 +109,10 @@ export class ExclusionConstraintDefinition {
     return this.options.deferrable;
   }
 
-  /** @missingRailsCall match? — PERMANENT */
   exportNameOnSchemaDump(): boolean {
-    return this.name != null && this.name.search(SchemaDumper.exclIgnorePattern) === -1;
+    if (this.name == null) return false;
+    SchemaDumper.exclIgnorePattern.lastIndex = 0;
+    return !SchemaDumper.exclIgnorePattern.test(this.name);
   }
 }
 
@@ -147,7 +148,9 @@ export class UniqueConstraintDefinition {
   }
 
   exportNameOnSchemaDump(): boolean {
-    return this.name != null && this.name.search(SchemaDumper.uniqueIgnorePattern) === -1;
+    if (this.name == null) return false;
+    SchemaDumper.uniqueIgnorePattern.lastIndex = 0;
+    return !SchemaDumper.uniqueIgnorePattern.test(this.name);
   }
 
   definedFor(
