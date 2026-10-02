@@ -16,6 +16,7 @@ import {
   runCallbacks,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
+import { mergeBang } from "@blazetrails/ruby-compat";
 import { Rollback } from "./errors.js";
 export { Rollback };
 
@@ -223,10 +224,7 @@ export async function rolledbackBang(
   }
 }
 
-/**
- * @internal
- * @missingRailsArgs frozen? — PERMANENT
- */
+/** @internal */
 export function rememberTransactionRecordState(this: Base): void {
   const r = this as any;
   if (!r._startTransactionState) {
@@ -234,7 +232,7 @@ export function rememberTransactionRecordState(this: Base): void {
     r._startTransactionState = {
       newRecord: r._newRecord,
       destroyed: r._destroyed,
-      frozen: Object.isFrozen(r._attributes),
+      frozen: this.isFrozen(),
       id: this.id,
       previouslyNewRecord: r._previouslyNewRecord,
       attributes: snapshotAttrs,
@@ -424,18 +422,12 @@ function prependOption(): Record<string, unknown> {
 
 const VALID_TRANSACTION_ACTIONS = new Set(["create", "update", "destroy"]);
 
-/**
- * @internal
- * @missingRailsCall merge! — PERMANENT
- */
+/** @internal */
 export function setOptionsForCallbacksBang(
   args: unknown[],
   enforcedOptions: Record<string, unknown> = {},
 ): void {
-  const options: Record<string, unknown> = {
-    ...extractOptionsBang(args),
-    ...enforcedOptions,
-  };
+  const options = mergeBang<unknown>(extractOptionsBang(args), enforcedOptions);
   args.push(options);
 
   if (options.on !== undefined) {

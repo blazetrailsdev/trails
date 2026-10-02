@@ -1,7 +1,7 @@
-import { STDOUT, StringIO, rbObjAsString, type IO } from "@blazetrails/ruby-compat";
+import { STDOUT, StringIO, partition, rbObjAsString, type IO } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { Column } from "./connection-adapters/column.js";
-import { cattrAccessor, isBlank, isPresent } from "@blazetrails/activesupport";
+import { any, cattrAccessor, isBlank, isPresent } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
 import type {
@@ -137,7 +137,7 @@ class AdapterSchemaSource implements SchemaSource {
 
 export abstract class SchemaDumper {
   static ignoreTables: (string | RegExp)[] = [];
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE schema-dumper-dump-language-is-a-class-static-rails-has-no-seat-for */
   static language: SchemaDumpLanguage = "ts";
   declare static fkIgnorePattern: RegExp;
   declare static chkIgnorePattern: RegExp;
@@ -189,7 +189,7 @@ export abstract class SchemaDumper {
 
   /**
    * @internal
-   * @missingRailsCall insert — PERMANENT
+   * @missingRailsCall insert — CONVERGEABLE schema-dumper-formatted-version-inserts-through-string-insert
    */
   formattedVersion(): string {
     const s = this._version ?? "";
@@ -459,10 +459,7 @@ export abstract class SchemaDumper {
     }
   }
 
-  /**
-   * @internal
-   * @missingRailsCall any? — PERMANENT
-   */
+  /** @internal */
   protected async checkConstraintsInCreate(
     table: string,
     stream: IO | StringIO,
@@ -477,27 +474,27 @@ export abstract class SchemaDumper {
     if (host.supportsCheckConstraints && !(await host.supportsCheckConstraints())) return undefined;
     const checkConstraints = ((await host.checkConstraints(table)) ??
       []) as CheckConstraintDefinition[];
-    if (checkConstraints.length === 0) return undefined;
-    const checkValid = checkConstraints.filter((chk) => chk.isValidate);
-    const checkInvalid = checkConstraints.filter((chk) => !chk.isValidate);
+    if (any(checkConstraints)) {
+      const [checkValid, checkInvalid] = partition(checkConstraints, (chk) => chk.isValidate);
 
-    if (checkValid.length > 0) {
-      const checkConstraintStatements = checkValid.map((check) => {
-        const [expr, ...opts] = this.checkParts(check);
-        const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
-        return `    t.checkConstraint(${expr}${optStr});`;
-      });
-      stream.puts(checkConstraintStatements.sort().join("\n"));
-    }
+      if (checkValid.length > 0) {
+        const checkConstraintStatements = checkValid.map((check) => {
+          const [expr, ...opts] = this.checkParts(check);
+          const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
+          return `    t.checkConstraint(${expr}${optStr});`;
+        });
+        stream.puts(checkConstraintStatements.sort().join("\n"));
+      }
 
-    if (checkInvalid.length > 0) {
-      const tableNameStr = JSON.stringify(this.removePrefixAndSuffix(table));
-      const addCheckConstraintStatements = checkInvalid.map((check) => {
-        const [expr, ...opts] = this.checkParts(check);
-        const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
-        return `  await ctx.addCheckConstraint(${tableNameStr}, ${expr}${optStr});`;
-      });
-      return [addCheckConstraintStatements.sort().join("\n")];
+      if (checkInvalid.length > 0) {
+        const tableName = JSON.stringify(this.removePrefixAndSuffix(table));
+        const addCheckConstraintStatements = checkInvalid.map((check) => {
+          const [expr, ...opts] = this.checkParts(check);
+          const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
+          return `  await ctx.addCheckConstraint(${tableName}, ${expr}${optStr});`;
+        });
+        return [addCheckConstraintStatements.sort().join("\n")];
+      }
     }
     return undefined;
   }
@@ -594,13 +591,10 @@ export abstract class SchemaDumper {
     return parts;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall any? — PERMANENT
-   */
+  /** @internal */
   async indexes(table: string, stream: IO | StringIO): Promise<void> {
     const indexes = await this._source.indexes(table);
-    if (indexes.length > 0) {
+    if (any(indexes)) {
       const addIndexStatements = indexes.map((index) => {
         const tableName = JSON.stringify(this.removePrefixAndSuffix(index.table ?? table));
         const [cols, ...opts] = this.indexParts(index);
@@ -612,18 +606,15 @@ export abstract class SchemaDumper {
     }
   }
 
-  /**
-   * @internal
-   * @missingRailsCall any? — PERMANENT
-   */
+  /** @internal */
   async indexesInCreate(table: string, stream: IO | StringIO): Promise<void> {
     let indexes = await this._source.indexes(table);
-    if (indexes.length > 0) {
+    if (any(indexes)) {
       const adapter = this._adapter();
       let exclusionConstraints: { name?: string }[];
       if (
         adapter?.supportsExclusionConstraints?.() &&
-        (exclusionConstraints = await adapter.exclusionConstraints(table)).length > 0
+        any((exclusionConstraints = await adapter.exclusionConstraints(table)))
       ) {
         const exclusionConstraintNames = exclusionConstraints.map((ec) => ec.name);
         indexes = indexes.filter((index) => !exclusionConstraintNames.includes(index.name));
@@ -632,7 +623,7 @@ export abstract class SchemaDumper {
       let uniqueConstraints: { name?: string }[];
       if (
         adapter?.supportsUniqueConstraints?.() &&
-        (uniqueConstraints = await adapter.uniqueConstraints(table)).length > 0
+        any((uniqueConstraints = await adapter.uniqueConstraints(table)))
       ) {
         const uniqueConstraintNames = uniqueConstraints.map((uc) => uc.name);
         indexes = indexes.filter((index) => !uniqueConstraintNames.includes(index.name));
@@ -673,39 +664,49 @@ export abstract class SchemaDumper {
     return checkParts;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall any? — PERMANENT
-   * @missingRailsCall order:foreignKeyColumnFor,removePrefixAndSuffix — PERMANENT
-   */
+  /** @internal */
   async foreignKeys(table: string, stream: IO | StringIO): Promise<void> {
-    const host = this._hookHost("foreignKeys");
+    const host = this._hookHost("foreignKeys") as
+      | {
+          foreignKeys(table: string): Promise<ForeignKeyDefinition[] | undefined>;
+          foreignKeyColumnFor(table: string, column: string): string;
+        }
+      | undefined;
     if (!host) return;
-    const fn = (host as { foreignKeys: (t: string) => Promise<unknown[]> }).foreignKeys;
-    const fks = (await fn.call(host, table)) ?? [];
-    if (fks.length === 0) return;
-    const columnFor = (host as { foreignKeyColumnFor?: (t: string, c: string) => string })
-      .foreignKeyColumnFor;
-    const statements: string[] = [];
-    for (const fk of fks as ForeignKeyDefinition[]) {
-      const fromExpr = JSON.stringify(this.removePrefixAndSuffix(fk.fromTable));
-      const toExpr = JSON.stringify(this.removePrefixAndSuffix(fk.toTable));
-      const opts: string[] = [];
-      const inferredColumn = columnFor ? columnFor.call(host, fk.toTable, "id") : undefined;
-      if (fk.column && fk.column !== inferredColumn) {
-        opts.push(`column: ${JSON.stringify(fk.column)}`);
-      }
-      if (fk.isCustomPrimaryKey) opts.push(`primaryKey: ${JSON.stringify(fk.primaryKey)}`);
-      if (fk.isExportNameOnSchemaDump) opts.push(`name: ${JSON.stringify(fk.name)}`);
-      if (fk.onUpdate) opts.push(`onUpdate: ${JSON.stringify(fk.onUpdate)}`);
-      if (fk.onDelete) opts.push(`onDelete: ${JSON.stringify(fk.onDelete)}`);
-      if (fk.deferrable !== undefined && fk.deferrable !== false)
-        opts.push(`deferrable: ${JSON.stringify(fk.deferrable)}`);
-      if (fk.isValidate == null || fk.isValidate === false) opts.push("validate: false");
-      const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
-      statements.push(`  await ctx.addForeignKey(${fromExpr}, ${toExpr}${optStr});`);
+    const foreignKeys = (await host.foreignKeys(table)) ?? [];
+    if (any(foreignKeys)) {
+      const addForeignKeyStatements = foreignKeys.map((foreignKey) => {
+        const parts = [
+          `await ctx.addForeignKey(${JSON.stringify(this.removePrefixAndSuffix(foreignKey.fromTable))}`,
+          JSON.stringify(this.removePrefixAndSuffix(foreignKey.toTable)),
+        ];
+
+        if (foreignKey.column !== host.foreignKeyColumnFor(foreignKey.toTable, "id")) {
+          parts.push(`column: ${JSON.stringify(foreignKey.column)}`);
+        }
+
+        if (foreignKey.isCustomPrimaryKey) {
+          parts.push(`primaryKey: ${JSON.stringify(foreignKey.primaryKey)}`);
+        }
+
+        if (foreignKey.isExportNameOnSchemaDump) {
+          parts.push(`name: ${JSON.stringify(foreignKey.name)}`);
+        }
+
+        if (foreignKey.onUpdate) parts.push(`onUpdate: ${JSON.stringify(foreignKey.onUpdate)}`);
+        if (foreignKey.onDelete) parts.push(`onDelete: ${JSON.stringify(foreignKey.onDelete)}`);
+        if (foreignKey.deferrable != null && foreignKey.deferrable !== false)
+          parts.push(`deferrable: ${JSON.stringify(foreignKey.deferrable)}`);
+        if (foreignKey.isValidate == null || foreignKey.isValidate === false)
+          parts.push("validate: false");
+
+        const [fromTable, toTable, ...opts] = parts;
+        const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
+        return `  ${fromTable}, ${toTable}${optStr});`;
+      });
+
+      stream.puts(addForeignKeyStatements.sort().join("\n"));
     }
-    stream.puts(statements.sort().join("\n"));
   }
 
   /** @internal */

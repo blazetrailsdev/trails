@@ -1,4 +1,4 @@
-/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: pp. */
+/** @noRailsEquivalent CONVERGEABLE pp-is-kernel-pp-in-ruby-compat-not-an-activerecord-export MOVED-BY-SHORT-NAME: pp. */
 import { rbAnyToS, rbInspect } from "@blazetrails/ruby-compat";
 
 export interface PrettyPrinter {

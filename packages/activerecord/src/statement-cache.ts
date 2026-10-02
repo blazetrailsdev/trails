@@ -145,7 +145,7 @@ export class StatementCache {
     return new PartialQueryCollector();
   }
 
-  /** @missingRailsCall call — PERMANENT */
+  /** @missingRailsCall call — CONVERGEABLE call-gate-credits-invoking-a-proc-valued-member-as-proc-call */
   static create(
     connection: {
       cacheableQuery(klass: unknown, arel: unknown): [unknown, unknown[]];

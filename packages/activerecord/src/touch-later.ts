@@ -104,7 +104,7 @@ export async function touchDeferredAttributes(this: Base): Promise<void> {
   await self.touch({ time: self._touchTime });
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE touch-later-touch-takes-rails-parameters-and-resumes-through-super-method */
 export const InstanceMethods = {
   touchLater,
   touch,

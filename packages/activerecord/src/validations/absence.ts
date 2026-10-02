@@ -11,3 +11,15 @@ export class AbsenceValidator extends BaseAbsenceValidator {
     super.validateEach(record, attribute, associationOrValue);
   }
 }
+
+export function validatesAbsenceOf(
+  this: {
+    validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
+    _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
+  },
+  ...attrNames: unknown[]
+): void {
+  this.validatesWith(AbsenceValidator, this._mergeAttributes(attrNames));
+}
+
+export const ClassMethods = { validatesAbsenceOf };

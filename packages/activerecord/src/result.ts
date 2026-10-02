@@ -1,4 +1,4 @@
-import { block, fetch, KeyError, transformValues } from "@blazetrails/ruby-compat";
+import { block, fetch, first, KeyError, transformValues } from "@blazetrails/ruby-compat";
 import { FutureResult, type Complete } from "./future-result.js";
 
 export type ColumnType = { deserialize(value: unknown): unknown };
@@ -100,7 +100,7 @@ export class Result {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE result-includes-enumerable-and-cast-values-asks-columns-one-p */
   [Symbol.iterator](): IterableIterator<Record<string, unknown>> {
     return this.hashRows()[Symbol.iterator]();
   }
@@ -181,17 +181,14 @@ export class Result {
     return this;
   }
 
-  /**
-   * @missingRailsCall first — PERMANENT
-   * @missingRailsCall one? — PERMANENT
-   */
+  /** @missingRailsCall one? — CONVERGEABLE result-includes-enumerable-and-cast-values-asks-columns-one-p */
   castValues(typeOverrides: ColumnTypes | ColumnType[] = {}): unknown[] {
     const overridesArray = Array.isArray(typeOverrides) ? typeOverrides : null;
 
     if (this.columns.length === 1) {
       const type = overridesArray
-        ? overridesArray[0]
-        : this.#columnType(this.columns[0], 0, typeOverrides as ColumnTypes);
+        ? first(overridesArray)!
+        : this.#columnType(first(this.columns)!, 0, typeOverrides as ColumnTypes);
       return this.rows.map((row) => type.deserialize(row[0]));
     }
 
@@ -259,7 +256,7 @@ function emptyAsync(): Complete {
 
 /**
  * @internal
- * @missingRailsArgs fetch — PERMANENT
+ * @missingRailsArgs fetch — CONVERGEABLE call-args-gate-aligns-the-receiver-of-function-form-fetch-and-max
  */
 export function columnType(
   result: Result,

@@ -72,6 +72,12 @@ import {
   type ValidationContextArg,
 } from "./validations.js";
 import * as _Validations from "./validations.js";
+import { ClassMethods as _AssociatedClassMethods } from "./validations/associated.js";
+import { ClassMethods as _UniquenessClassMethods } from "./validations/uniqueness.js";
+import { ClassMethods as _PresenceClassMethods } from "./validations/presence.js";
+import { ClassMethods as _AbsenceClassMethods } from "./validations/absence.js";
+import { ClassMethods as _LengthClassMethods } from "./validations/length.js";
+import { ClassMethods as _NumericalityClassMethods } from "./validations/numericality.js";
 import {
   EncryptableRecord as _EncryptableRecord,
   encrypts as _encrypts,
@@ -2479,7 +2485,7 @@ extend(Base, {
   hasMany: _Associations.hasMany,
   hasAndBelongsToMany: _Associations.hasAndBelongsToMany,
 });
-extend(Base, Translation.ClassMethods);
+extend(Base, Translation.Translation);
 extend(Base, Sanitization.ClassMethods);
 include(Base, ReadonlyAttributes.ReadonlyAttributes);
 extend(Base, ReadonlyAttributes.ClassMethods);
@@ -2499,7 +2505,12 @@ extend(Base, CounterCache.ClassMethods);
   });
 }
 extend(Base, NamedScoping.ClassMethods);
-extend(Base, _Validations.ClassMethods);
+extend(Base, _AssociatedClassMethods);
+extend(Base, _UniquenessClassMethods);
+extend(Base, _PresenceClassMethods);
+extend(Base, _AbsenceClassMethods);
+extend(Base, _LengthClassMethods);
+extend(Base, _NumericalityClassMethods);
 Object.assign(Base, {
   AssociatedValidator: _Validations.AssociatedValidator,
   UniquenessValidator: _Validations.UniquenessValidator,
@@ -2739,7 +2750,7 @@ _registerAssociationBuilderExtension(AssociationBuilder.extensions);
     configurable: true,
   });
 }
-include(Base, _NestedAttributes.InstanceMethods);
+include(Base, _NestedAttributes.NestedAttributes);
 include(Base, { association: _association });
 include(Base, {
   readAttributeForValidation: _Validations.readAttributeForValidation,

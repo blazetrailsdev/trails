@@ -219,6 +219,7 @@ describe("SchemaDumper trails-only cases", () => {
       tables: async () => ["books"],
       columns: async (_t: string) => [column("id", "integer")],
       indexes: async () => [],
+      foreignKeyColumnFor: () => "author_id",
       foreignKeys: async () => [
         new ForeignKeyDefinition("books", "authors", {
           column: "author_id",

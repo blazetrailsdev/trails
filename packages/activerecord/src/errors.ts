@@ -2,12 +2,9 @@ export { NotImplementedError } from "@blazetrails/ruby-compat";
 import { StandardError } from "@blazetrails/ruby-compat";
 import type { Column } from "./connection-adapters/column.js";
 
-export class ActiveRecordError extends StandardError {
-  constructor(message?: string, options?: ErrorOptions) {
-    super(message, options);
-    this.name = "ActiveRecord::ActiveRecordError";
-  }
-}
+export class ActiveRecordError extends StandardError {}
+
+ActiveRecordError.prototype.name = "ActiveRecord::ActiveRecordError";
 
 export class SubclassNotFound extends ActiveRecordError {
   constructor(message?: string, options?: ErrorOptions) {

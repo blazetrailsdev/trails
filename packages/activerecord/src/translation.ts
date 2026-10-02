@@ -17,7 +17,6 @@ export function lookupAncestors(this: typeof Base): Array<typeof Base> {
   return classes;
 }
 
-/** @noRailsEquivalent PERMANENT */
-export const ClassMethods = {
+export const Translation = {
   lookupAncestors,
 };

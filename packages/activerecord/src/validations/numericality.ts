@@ -23,3 +23,15 @@ function columnScaleFor(record: any, attribute: string): number | undefined {
   if (typeof klass.typeForAttribute !== "function") return undefined;
   return klass.typeForAttribute(String(attribute))?.scale ?? undefined;
 }
+
+export function validatesNumericalityOf(
+  this: {
+    validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
+    _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
+  },
+  ...attrNames: unknown[]
+): void {
+  this.validatesWith(NumericalityValidator, this._mergeAttributes(attrNames));
+}
+
+export const ClassMethods = { validatesNumericalityOf };

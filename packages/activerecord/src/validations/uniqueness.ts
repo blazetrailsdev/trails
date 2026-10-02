@@ -343,3 +343,5 @@ function mapEnumAttribute(klass: any, attribute: string, value: unknown): unknow
 }
 
 UniquenessValidator.prototype.isCoveredByUniqueIndex = isCoveredByUniqueIndex;
+
+export const ClassMethods = { validatesUniquenessOf };
