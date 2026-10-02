@@ -1,10 +1,10 @@
+import { first } from "@blazetrails/ruby-compat";
 import type { Result } from "../../result.js";
 
 export class ExplainPrettyPrinter {
-  /** @missingRailsCall first — PERMANENT */
   pp(result: Result): string {
-    const header = result.columns[0];
-    const lines = result.rows.map((row) => String(row[0]));
+    const header = first(result.columns)!;
+    const lines = result.rows.map((row) => String(first(row)));
 
     const width = Math.max(...[header, ...lines].map((line) => line.length)) + 2;
 

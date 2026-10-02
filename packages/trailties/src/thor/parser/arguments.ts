@@ -120,10 +120,7 @@ export class Arguments {
     return rtest(this.peek()) && !/^-{1,2}\S+/m.test(rbObjAsString(this.peek()));
   }
 
-  /**
-   * @internal
-   * @missingRailsCall split — CONVERGEABLE call-gate-reads-string-split-as-thor-arguments-split
-   */
+  /** @internal */
   protected parseHash(name: string): unknown {
     if (rbObjClass(this.peek()) === "Hash") return this.shift();
     const hash = Object.create(null) as Record<string, string>;

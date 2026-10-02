@@ -9,7 +9,7 @@ import {
 type Field = { type: string; string: () => string | null };
 type NextFn = () => unknown;
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE pg-and-mysql-wire-casts-register-where-rails-configures-the-driver */
 export function temporalTypeCast(field: Field, next: NextFn): unknown {
   switch (field.type) {
     case "TIMESTAMP":

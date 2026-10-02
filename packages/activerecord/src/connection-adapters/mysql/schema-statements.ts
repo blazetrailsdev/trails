@@ -59,7 +59,7 @@ export class SchemaStatements extends BaseSchemaStatements {
     return sql;
   }
 
-  /** @missingRailsCall order:constructor,quoteColumnName — PERMANENT */
+  /** @missingRailsCall order:constructor,quoteColumnName — CONVERGEABLE mysql-schema-statements-indexes-ports-the-rails-body */
   async indexes(tableName: string): Promise<IndexDefinition[]> {
     let rows: Array<Record<string, unknown>>;
     try {

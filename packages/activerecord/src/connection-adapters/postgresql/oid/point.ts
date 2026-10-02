@@ -1,6 +1,12 @@
-import { ArgumentError, kernelFloat, rbEqual, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  kernelFloat,
+  rbEqual,
+  registerConstant,
+  Struct,
+} from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
-import { isBlank, isPlainObject } from "@blazetrails/activesupport";
+import { include, isBlank, isPlainObject } from "@blazetrails/activesupport";
 import { ActiveRecord } from "../../../namespaces.js";
 
 ActiveRecord.Point = class Point {
@@ -11,14 +17,8 @@ ActiveRecord.Point = class Point {
     this.x = x;
     this.y = y;
   }
-
-  /** @noRailsEquivalent PERMANENT */
-  equals(other: unknown): boolean {
-    return (
-      other instanceof ActiveRecord.Point && rbEqual(this.x, other.x) && rbEqual(this.y, other.y)
-    );
-  }
 };
+include(ActiveRecord.Point, Struct.new("x", "y"));
 
 export class Point extends ValueType {
   override type(): string {

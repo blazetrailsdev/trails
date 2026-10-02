@@ -1,12 +1,16 @@
 import { sql as arelSql } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { b } from "@blazetrails/ruby-compat";
+import { b, first } from "@blazetrails/ruby-compat";
 import { ActiveRecordError } from "../../errors.js";
 import type { ExplainOption } from "../abstract/database-statements.js";
 import type { Nodes } from "@blazetrails/arel";
 import { Result } from "../../result.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
-import { defaultInsertValue as abstractDefaultInsertValue } from "../abstract/database-statements.js";
+import {
+  defaultInsertValue as abstractDefaultInsertValue,
+  returningColumnValues as abstractReturningColumnValues,
+  type DatabaseStatementsHost,
+} from "../abstract/database-statements.js";
 import { AbstractAdapter, type Version } from "../abstract-adapter.js";
 
 const READ_QUERY = AbstractAdapter.buildReadQueryRegexp(
@@ -38,7 +42,7 @@ export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
 
 interface SupportsInsertReturningHost {
   /** @internal */
-  supportsInsertReturning?(): Promise<boolean>;
+  supportsInsertReturning(): Promise<boolean>;
 }
 
 interface AutoIncrementColumnHost {
@@ -99,18 +103,19 @@ export function defaultInsertValue(column: AutoIncrementColumnHost): Nodes.SqlLi
   return abstractDefaultInsertValue(column);
 }
 
-/**
- * @internal
- * @missingRailsCall first — PERMANENT
- */
+/** @internal */
 export async function returningColumnValues(
-  this: SupportsInsertReturningHost | void,
+  this: SupportsInsertReturningHost,
   result: Result,
 ): Promise<unknown[] | undefined> {
-  if (await (this as SupportsInsertReturningHost | null)?.supportsInsertReturning?.()) {
-    return result.rows[0] as unknown[] | undefined;
+  if (await this.supportsInsertReturning()) {
+    return first(result.rows);
+  } else {
+    return abstractReturningColumnValues.call(
+      this as SupportsInsertReturningHost & DatabaseStatementsHost,
+      result,
+    );
   }
-  return undefined;
 }
 
 /** @internal */

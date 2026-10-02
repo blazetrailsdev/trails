@@ -1,3 +1,4 @@
+import { any } from "@blazetrails/activesupport";
 import type { IO, StringIO } from "@blazetrails/ruby-compat";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 import type {
@@ -49,54 +50,64 @@ export class SchemaDumper extends AbstractSchemaDumper {
     stream.puts("");
   }
 
-  /**
-   * @internal
-   * @missingRailsCall any? — PERMANENT
-   */
+  /** @internal */
   protected override async exclusionConstraintsInCreate(
     table: string,
     stream: IO | StringIO,
   ): Promise<void> {
     const adapter = this.pgAdapter();
-    const constraints: ExclusionConstraintDefinition[] = adapter?.exclusionConstraints
+    const exclusionConstraints: ExclusionConstraintDefinition[] = adapter?.exclusionConstraints
       ? await adapter.exclusionConstraints(table)
       : [];
-    if (constraints.length === 0) return;
-    const stmts = constraints.map((ec) => {
-      const opts: string[] = [];
-      if (ec.where) opts.push(`where: ${JSON.stringify(ec.where)}`);
-      if (ec.using) opts.push(`using: ${JSON.stringify(ec.using)}`);
-      if (ec.deferrable) opts.push(`deferrable: ${JSON.stringify(ec.deferrable)}`);
-      if (ec.exportNameOnSchemaDump()) opts.push(`name: ${JSON.stringify(ec.name)}`);
-      const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
-      return `    t.exclusionConstraint(${JSON.stringify(ec.expression)}${optStr});`;
-    });
-    stream.puts(stmts.sort().join("\n"));
+    if (any(exclusionConstraints)) {
+      const addExclusionConstraintStatements = exclusionConstraints.map((exclusionConstraint) => {
+        const parts: string[] = [];
+        if (exclusionConstraint.where)
+          parts.push(`where: ${JSON.stringify(exclusionConstraint.where)}`);
+        if (exclusionConstraint.using)
+          parts.push(`using: ${JSON.stringify(exclusionConstraint.using)}`);
+        if (exclusionConstraint.deferrable)
+          parts.push(`deferrable: ${JSON.stringify(exclusionConstraint.deferrable)}`);
+
+        if (exclusionConstraint.exportNameOnSchemaDump()) {
+          parts.push(`name: ${JSON.stringify(exclusionConstraint.name)}`);
+        }
+
+        const optStr = parts.length > 0 ? `, { ${parts.join(", ")} }` : "";
+        return `    t.exclusionConstraint(${JSON.stringify(exclusionConstraint.expression)}${optStr});`;
+      });
+
+      stream.puts(addExclusionConstraintStatements.sort().join("\n"));
+    }
   }
 
-  /**
-   * @internal
-   * @missingRailsCall any? — PERMANENT
-   */
+  /** @internal */
   protected override async uniqueConstraintsInCreate(
     table: string,
     stream: IO | StringIO,
   ): Promise<void> {
     const adapter = this.pgAdapter();
-    const constraints: UniqueConstraintDefinition[] = adapter?.uniqueConstraints
+    const uniqueConstraints: UniqueConstraintDefinition[] = adapter?.uniqueConstraints
       ? await adapter.uniqueConstraints(table)
       : [];
-    if (constraints.length === 0) return;
-    const stmts = constraints.map((uc) => {
-      const opts: string[] = [];
-      if (uc.nullsNotDistinct)
-        opts.push(`nullsNotDistinct: ${JSON.stringify(uc.nullsNotDistinct)}`);
-      if (uc.deferrable) opts.push(`deferrable: ${JSON.stringify(uc.deferrable)}`);
-      if (uc.exportNameOnSchemaDump()) opts.push(`name: ${JSON.stringify(uc.name)}`);
-      const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
-      return `    t.uniqueConstraint(${JSON.stringify(uc.column)}${optStr});`;
-    });
-    stream.puts(stmts.sort().join("\n"));
+    if (any(uniqueConstraints)) {
+      const addUniqueConstraintStatements = uniqueConstraints.map((uniqueConstraint) => {
+        const parts: string[] = [];
+        if (uniqueConstraint.nullsNotDistinct)
+          parts.push(`nullsNotDistinct: ${JSON.stringify(uniqueConstraint.nullsNotDistinct)}`);
+        if (uniqueConstraint.deferrable)
+          parts.push(`deferrable: ${JSON.stringify(uniqueConstraint.deferrable)}`);
+
+        if (uniqueConstraint.exportNameOnSchemaDump()) {
+          parts.push(`name: ${JSON.stringify(uniqueConstraint.name)}`);
+        }
+
+        const optStr = parts.length > 0 ? `, { ${parts.join(", ")} }` : "";
+        return `    t.uniqueConstraint(${JSON.stringify(uniqueConstraint.column)}${optStr});`;
+      });
+
+      stream.puts(addUniqueConstraintStatements.sort().join("\n"));
+    }
   }
 
   /** @internal */

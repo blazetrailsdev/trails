@@ -1,4 +1,4 @@
-/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: databaseExists, open. */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem MOVED-BY-SHORT-NAME: databaseExists, open. */
 import Database from "better-sqlite3";
 import { File } from "@blazetrails/ruby-compat";
 import { ConfigurationError } from "../errors.js";

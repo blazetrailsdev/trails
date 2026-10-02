@@ -1,4 +1,4 @@
-/** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: open. */
+/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem MOVED-BY-SHORT-NAME: open. */
 import { createRequire } from "node:module";
 import {
   type ColumnInfo,

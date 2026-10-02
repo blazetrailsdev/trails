@@ -45,7 +45,7 @@ const CONNECTION_PARSERS: ReadonlyMap<number, PgParser> = new Map<number, PgPars
   [OID_POINT_ARRAY, passthrough],
 ]);
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE pg-and-mysql-wire-casts-register-where-rails-configures-the-driver */
 export function makeGetTypeParser(pgTypes: {
   getTypeParser: (oid: number, format: "text" | "binary") => unknown;
 }): (oid: number, format?: string) => PgParser {

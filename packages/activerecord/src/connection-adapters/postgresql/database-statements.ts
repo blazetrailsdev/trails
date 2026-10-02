@@ -12,7 +12,7 @@ import {
   type ExplainOption,
 } from "../abstract/database-statements.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
-import { b, fetch, isEmpty } from "@blazetrails/ruby-compat";
+import { b, fetch, first, isEmpty } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { dbWarningsAction } from "../../active-record.js";
@@ -449,12 +449,9 @@ export async function lastInsertIdResult(
   return this.internalExecQuery(`SELECT currval(${this.quote(sequenceName)})`, "SQL");
 }
 
-/**
- * @missingRailsCall first — PERMANENT
- * @internal
- */
+/** @internal */
 export function returningColumnValues(result: Result): unknown[] | undefined {
-  return result.rows[0];
+  return first(result.rows);
 }
 
 /** @internal */

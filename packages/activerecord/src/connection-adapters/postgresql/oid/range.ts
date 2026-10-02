@@ -7,6 +7,7 @@ import {
   rbEqual,
   rbObjRespondTo,
   registerConstant,
+  stringSplit,
 } from "@blazetrails/ruby-compat";
 
 export interface RangeSubtype {
@@ -83,24 +84,19 @@ export class RangeType extends ValueType<Range<unknown>> {
     return this.isInfinity(value) ? value : this.subtype.serialize(this.subtype.cast(value));
   }
 
-  /** @missingRailsCall split — PERMANENT */
   private extractBounds(value: string): {
     from: unknown;
     to: unknown;
     excludeStart: boolean;
     excludeEnd: boolean;
   } {
-    const fromTo = value.slice(1, -1);
-    const separator = fromTo.indexOf(",");
-    const from = separator === -1 ? fromTo : fromTo.slice(0, separator);
-    const to = separator === -1 ? undefined : fromTo.slice(separator + 1);
-
+    const [from, to] = stringSplit(value.slice(1, -1), ",", 2);
     return {
       from:
         from === "" || from === "-infinity"
           ? this.infinity({ negative: true })
           : this.unquote(from),
-      to: to === "" || to === "infinity" ? this.infinity() : this.unquote(to as string),
+      to: to === "" || to === "infinity" ? this.infinity() : this.unquote(to),
       excludeStart: value.startsWith("("),
       excludeEnd: value.endsWith(")"),
     };

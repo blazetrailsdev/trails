@@ -17,9 +17,9 @@ function encodeArrayElement(text: string | null, delimiter: string): string {
   return text;
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
 export class PgTextEncoderArray {
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
   readonly name: string;
   readonly delimiter: string;
 
@@ -28,7 +28,7 @@ export class PgTextEncoderArray {
     this.delimiter = delimiter;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
   encode(values: readonly unknown[]): string {
     const items = values.map((value) => {
       if (value == null) return encodeArrayElement(null, this.delimiter);
@@ -39,9 +39,9 @@ export class PgTextEncoderArray {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
 export class PgTextDecoderArray {
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
   readonly name: string;
   readonly delimiter: string;
 
@@ -50,7 +50,7 @@ export class PgTextDecoderArray {
     this.delimiter = delimiter;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
   decode(str: string): unknown[] {
     const trimmed = str.trim();
     if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {

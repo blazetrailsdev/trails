@@ -1,6 +1,6 @@
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE sqlite-uri-helpers-port-memory-database-as-rails-computes-it
  */
 export function isRemoteLibsqlUrl(url: string): boolean {
   return (
@@ -14,7 +14,7 @@ export function isRemoteLibsqlUrl(url: string): boolean {
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE sqlite-uri-helpers-port-memory-database-as-rails-computes-it
  */
 export function isInMemoryDatabase(database: string): boolean {
   if (database === ":memory:") return true;
