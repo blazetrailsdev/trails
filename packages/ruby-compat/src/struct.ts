@@ -73,9 +73,7 @@ export const Struct = {
    *
    * @noRailsEquivalent PERMANENT
    */
-  new<M extends object = object>(
-    ...memberNames: (keyof M & string)[] | string[]
-  ): new (...values: unknown[]) => M & StructInstance {
+  new(...memberNames: string[]): new (...values: unknown[]) => StructInstance {
     const klass = class {
       /** `rb_struct_initialize_m` (`vendor/ruby/v3.3.11/struct.c:742`). */
       constructor(...values: unknown[]) {
@@ -128,6 +126,6 @@ export const Struct = {
       }
     };
     structClasses.add(klass.prototype);
-    return klass as unknown as new (...values: unknown[]) => M & StructInstance;
+    return klass;
   },
 };

@@ -3,9 +3,12 @@ import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { Struct } from "./struct.js";
 
-class Customer extends Struct.new<{ name: unknown; zip: unknown }>("name", "zip") {}
+class Customer extends Struct.new("name", "zip") {
+  declare name: unknown;
+  declare zip: unknown;
+}
 
-class Other extends Struct.new<{ name: unknown; zip: unknown }>("name", "zip") {}
+class Other extends Struct.new("name", "zip") {}
 
 describe("Struct", () => {
   it("answers its members", () => {
