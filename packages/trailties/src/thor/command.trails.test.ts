@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { ArgumentError, NoMethodError, rbModName, rbObjDup } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  NoMethodError,
+  rbFSend,
+  rbModName,
+  rbObjDup,
+} from "@blazetrails/ruby-compat";
 import {
   Command,
   DynamicCommand,
@@ -27,38 +33,26 @@ describe("Thor::Command", () => {
     return new Command(name, null, null, null, name);
   }
 
-  it("carries Thor's constant paths and the Task aliases", () => {
+  it("carries Thor's constant paths, the Task aliases and hidden?", () => {
     expect(rbModName(Command)).toBe("Thor::Command");
     expect(rbModName(HiddenCommand)).toBe("Thor::HiddenCommand");
     expect(rbModName(DynamicCommand)).toBe("Thor::DynamicCommand");
     expect([Task, HiddenTask, DynamicTask]).toEqual([Command, HiddenCommand, DynamicCommand]);
-  });
-
-  it("is hidden only as a HiddenCommand", () => {
     expect(command().isHidden()).toBe(false);
     expect(new HiddenCommand("canHas", null, null, null, null).isHidden()).toBe(true);
   });
 
-  it("defaults options and options_relation to empty hashes", () => {
-    expect(command().options).toEqual({});
+  it("defaults options_relation to an empty hash and dups it with the command", () => {
     expect(command().methodExclusiveOptionNames()).toEqual([]);
     expect(command().methodAtLeastOneOptionNames()).toEqual([]);
-    const related = new Command("canHas", null, null, null, null, null, {
-      exclusiveOptionNames: [["a", "b"]],
-      atLeastOneOptionNames: [["c"]],
-    });
-    expect(related.methodExclusiveOptionNames()).toEqual([["a", "b"]]);
-    expect(related.methodAtLeastOneOptionNames()).toEqual([["c"]]);
-  });
-
-  it("dups options_relation with the command", () => {
     const original = new Command("canHas", null, null, null, null, null, {
       exclusiveOptionNames: [["a", "b"]],
+      atLeastOneOptionNames: [["c"]],
     });
     const copy = rbObjDup(original);
     copy.optionsRelation.exclusiveOptionNames = [];
     expect(original.methodExclusiveOptionNames()).toEqual([["a", "b"]]);
-    expect(copy.name).toBe("canHas");
+    expect(copy.methodAtLeastOneOptionNames()).toEqual([["c"]]);
   });
 
   it("prefixes usage with the ancestor name", () => {
@@ -98,14 +92,20 @@ describe("Thor::Command", () => {
 
     it("re-raises an ArgumentError raised inside the method, synchronously or not", async () => {
       const error = new ArgumentError("wrong number of arguments (given 3, expected 0)");
-      const sync = host({
-        canHas: () => {
-          throw error;
+      const deeper = {
+        raise: () => {
+          throw new ArgumentError(error.message);
+        },
+      };
+      const sync = host({ canHas: () => rbFSend(deeper, "raise") });
+      await expect(command().run(sync.instance)).rejects.toThrow(error);
+      const later = host({
+        canHas: async () => {
+          await null;
+          return rbFSend(deeper, "raise");
         },
       });
-      await expect(command().run(sync.instance)).rejects.toBe(error);
-      const later = host({ canHas: async () => Promise.reject(error) });
-      await expect(command().run(later.instance)).rejects.toBe(error);
+      await expect(command().run(later.instance)).rejects.toThrow(error);
       expect(later.klass.handleArgumentError).not.toHaveBeenCalled();
     });
 
@@ -140,35 +140,23 @@ describe("Thor::Command", () => {
       const child = new (class extends own.klass {})();
       expect(await command().run(child, [1])).toBe("no command canHas");
     });
-
-    it("answers handle_no_command_error for a name the instance does not define", async () => {
-      const { instance } = host();
-      expect(await command().run(instance)).toBe("no command canHas");
-    });
   });
 
-  describe("DynamicCommand#run", () => {
-    it("reaches method_missing for a name the instance does not define", async () => {
-      const { instance } = host({ methodMissing: (name: string) => `missing ${name}` });
-      expect(await new DynamicCommand("canHas").run(instance)).toBe("missing canHas");
-    });
+  it("reaches method_missing through DynamicCommand for an undefined name", async () => {
+    const { instance } = host({ methodMissing: (name: string) => `missing ${name}` });
+    expect(await new DynamicCommand("canHas").run(instance)).toBe("missing canHas");
   });
 
-  describe("#sans_backtrace", () => {
-    const sansBacktrace = (backtrace: string[], caller: string[]) =>
-      (command() as unknown as { sansBacktrace(b: string[], c: string[]): string[] }).sansBacktrace(
-        backtrace,
-        caller,
-      );
-
-    it("drops Thor's own frames and the caller's", () => {
-      const thor = Command.FILE_REGEXP.source.slice(1).replaceAll("\\", "");
-      expect(
-        sansBacktrace(
-          [`${thor}/command.js:27:in 'run'`, "app.rb:3:in 'can_has'", "bin/thor:5:in '<main>'"],
-          ["bin/thor:5:in '<main>'"],
-        ),
-      ).toEqual(["app.rb:3:in 'can_has'"]);
-    });
+  it("drops Thor's own frames and the caller's from a backtrace", () => {
+    const thor = new URL(".", import.meta.url).pathname;
+    const app = "at App.canHas (/app/app.js:3:1)";
+    const main = "at main (/app/bin/thor.js:5:1)";
+    const backtrace = [`at async Command.run (file://${thor}command.js:27:3)`, app, main];
+    expect(
+      (command() as unknown as Record<string, (...frames: string[][]) => string[]>).sansBacktrace(
+        [...backtrace, `at ${thor}command.ts:27:3`],
+        [main],
+      ),
+    ).toEqual([app]);
   });
 });

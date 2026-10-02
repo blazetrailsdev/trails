@@ -225,11 +225,21 @@ export function rbIseqMinMaxArity(func: (...args: never[]) => unknown): [number,
  * `setup_parameters_complex` finds `argc` outside the callee's range. JS never
  * checks call arity (a missing argument is `undefined`, an extra one is
  * dropped), so a caller whose Ruby body rescues that `ArgumentError` checks
- * the body's parameter list before sending.
+ * the body's parameter list before sending. `raise_argument_error` (`:777`)
+ * takes the backtrace at the call, so the error's begins at this function's
+ * caller.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbCheckArity(method: (...args: never[]) => unknown, argc: number): void {
   const [min, max] = rbIseqMinMaxArity(method);
-  checkArity(argc, min, max);
+  try {
+    checkArity(argc, min, max);
+  } catch (exc) {
+    (Error as { captureStackTrace?: (exc: object, fn: unknown) => void }).captureStackTrace?.(
+      exc as object,
+      rbCheckArity,
+    );
+    throw exc;
+  }
 }

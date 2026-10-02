@@ -1,8 +1,10 @@
 import {
   ArgumentError,
   dup,
+  excBacktraceLocations,
   NoMethodError,
   rbCheckArity,
+  rbFCaller,
   rbFSend,
   rbObjAsString,
   rbObjMethod,
@@ -12,6 +14,7 @@ import {
   rbSetClassPathString,
   regexpEscape,
   rtest,
+  stringSplit,
   RUBY_ENGINE,
   RUBY_PLATFORM,
   strip,
@@ -53,7 +56,7 @@ export class Command extends Struct.new(
   "ancestorName",
 ) {
   static FILE_REGEXP = new RegExp(
-    `^${regexpEscape(new URL(".", import.meta.url).href.replace(/\/$/, ""))}`,
+    `^at (?:.*\\()?(?:file://)?${regexpEscape(new URL(".", import.meta.url).pathname.replace(/\/$/, ""))}`,
   );
 
   declare name: string;
@@ -100,19 +103,13 @@ export class Command extends Struct.new(
 
   async run(instance: Instance, args: unknown[] = []): Promise<unknown> {
     let arity: number | null = null;
-    let caller: unknown = null;
 
     try {
       if (this.isPrivateMethod(instance)) {
         return instance.constructor.handleNoCommandError(this.name);
       } else if (this.isPublicMethod(instance)) {
         arity = rbObjMethod(instance, this.name).arity();
-        try {
-          rbCheckArity((instance as unknown as Record<string, Method>)[this.name], args.length);
-        } catch (e) {
-          caller = e;
-          throw e;
-        }
+        rbCheckArity((instance as unknown as Record<string, Method>)[this.name], args.length);
         return await rbFSend(instance, this.name, ...args);
       } else if (this.isLocalMethod(instance, "methodMissing")) {
         return await rbFSend(instance, "methodMissing", this.name, ...args);
@@ -121,13 +118,13 @@ export class Command extends Struct.new(
       }
     } catch (e) {
       if (e instanceof ArgumentError) {
-        if (this.isHandleArgumentError(instance, e, caller)) {
+        if (this.isHandleArgumentError(instance, e, rbFCaller())) {
           return instance.constructor.handleArgumentError(this, e, args, arity);
         } else {
           throw e;
         }
       } else if (e instanceof NoMethodError) {
-        if (this.isHandleNoMethodError(instance, e, caller)) {
+        if (this.isHandleNoMethodError(instance, e, rbFCaller())) {
           return instance.constructor.handleNoCommandError(this.name);
         } else {
           throw e;
@@ -149,7 +146,7 @@ export class Command extends Struct.new(
       namespace = klass.namespace();
       formatted = `${(namespace as string).replace(/^(default)/gm, "")}:`;
     }
-    if (rtest(subcommand)) formatted ??= `${klass.namespace().split(":").at(-1)} `;
+    if (rtest(subcommand)) formatted ??= `${stringSplit(klass.namespace(), ":").at(-1)} `;
 
     formatted ??= "";
 
@@ -242,20 +239,23 @@ export class Command extends Struct.new(
     return saned.filter((frame) => !caller.includes(frame));
   }
 
-  /**
-   * @internal
-   * @missingRailsCall sans_backtrace — PERMANENT
-   */
+  /** @internal */
   protected isHandleArgumentError(
     instance: Instance,
     error: ArgumentError,
-    caller: unknown,
+    caller: string[],
   ): boolean {
     return (
       this.isNotDebugging(instance) &&
       (/wrong number of arguments/.test(error.message) ||
         /given \d*, expected \d*/.test(error.message)) &&
-      error === caller
+      (() => {
+        const saned = this.sansBacktrace(
+          (excBacktraceLocations(error) ?? []).map((location) => location.toString()),
+          caller,
+        );
+        return saned.length === 0 || saned.length === 1;
+      })()
     );
   }
 
@@ -263,7 +263,7 @@ export class Command extends Struct.new(
   protected isHandleNoMethodError(
     instance: Instance,
     error: NoMethodError,
-    _caller: unknown,
+    _caller: string[],
   ): boolean {
     return (
       this.isNotDebugging(instance) &&

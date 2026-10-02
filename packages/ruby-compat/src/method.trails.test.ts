@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
+import { excBacktraceLocations, rbFCaller } from "./backtrace-location.js";
 import {
   Method,
   iseqLocationSetup,
@@ -109,6 +110,19 @@ describe("rbCheckArity", () => {
     );
   });
 
+  it("raises with a backtrace that begins at its caller", () => {
+    function sender(): void {
+      rbCheckArity((a: unknown) => a, 0);
+    }
+    let exc!: Error;
+    try {
+      sender();
+    } catch (e) {
+      exc = e as Error;
+    }
+    expect(excBacktraceLocations(exc)![0].label).toBe("sender");
+  });
+
   it("answers nothing when argc is in range", () => {
     expect(() => rbCheckArity(function (_a: unknown, _b = {}) {}, 1)).not.toThrow();
     expect(() => rbCheckArity(function (_a: unknown, _b = {}) {}, 2)).not.toThrow();
@@ -141,7 +155,7 @@ describe("rbObjMethods / rbObjPublicMethods", () => {
     own(): void {}
   }
 
-  it("lists singleton, class and ancestor methods, Object's included", () => {
+  it("lists singleton, class and ancestor methods, or the receiver's own class alone", () => {
     const child = Object.assign(new Child(), { singleton: () => 1 });
     expect(rbObjMethods(child)).toEqual(
       expect.arrayContaining(["singleton", "own", "inherited", "toString"]),
@@ -149,10 +163,20 @@ describe("rbObjMethods / rbObjPublicMethods", () => {
     expect(rbObjMethods(child)).not.toContain("constructor");
     expect(rbObjMethods(child)).not.toContain("title");
     expect(rbObjPublicMethods(child)).toEqual(rbObjMethods(child));
-  });
-
-  it("stops at the receiver's own class when all is false", () => {
-    const child = Object.assign(new Child(), { singleton: () => 1 });
     expect(rbObjPublicMethods(child, false)).toEqual(["singleton", "own"]);
+  });
+});
+
+describe("rbFCaller", () => {
+  it("lists the frames above the method calling it", () => {
+    function inner(): string[] {
+      return rbFCaller();
+    }
+    function outer(): string[] {
+      return inner();
+    }
+    const caller = outer();
+    expect(caller[0]).toMatch(/^at outer /);
+    expect(caller.some((frame) => /^at inner /.test(frame))).toBe(false);
   });
 });

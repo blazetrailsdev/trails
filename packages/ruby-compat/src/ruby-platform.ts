@@ -33,9 +33,8 @@ export function RUBY_PLATFORM(): string {
 }
 
 /**
- * `RUBY_ENGINE` (`vendor/ruby/v3.3.11/version.c:120`, over `ruby_engine` at
- * `:78`). The ported sources are MRI's own, so it answers MRI's value; it is a
- * function for the reason {@link RUBY_PLATFORM} is.
+ * `RUBY_ENGINE` (`vendor/ruby/v3.3.11/version.c:120`): MRI's value, since the
+ * ported sources are MRI's own. A function, as {@link RUBY_PLATFORM} is.
  *
  * @noRailsEquivalent PERMANENT
  */
