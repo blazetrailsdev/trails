@@ -34,28 +34,17 @@ describe("extra-surface mark", () => {
   });
 
   it("names a gated package the mark file never seeded", () => {
-    expect(unmarkedPackages({ arel: { novel: 0, total: 35 } })).toEqual(["ruby-compat"]);
-    expect(unmarkedPackages({})).toEqual(["arel", "ruby-compat"]);
-    expect(
-      unmarkedPackages({
-        arel: { novel: 0, total: 35 },
-        "ruby-compat": { novel: 0, total: 0 },
-      }),
-    ).toEqual([]);
+    expect(unmarkedPackages({})).toEqual(["ruby-compat"]);
+    expect(unmarkedPackages({ "ruby-compat": { novel: 0, total: 0 } })).toEqual([]);
   });
 
   it("demands a mark from a tagged-only package too, because total stays gated", () => {
-    expect(unmarkedPackages({})).toContain("arel");
-    expect(
-      unmarkedPackages({
-        "ruby-compat": { novel: 0, total: 0 },
-      }),
-    ).toEqual(["arel"]);
+    expect(unmarkedPackages({})).toContain("ruby-compat");
   });
 
   it("demands no mark from a rowless package, and refuses one re-added", () => {
     expect(unmarkedPackages({})).not.toContain("activerecord");
-    expect(strandedMarks({ arel: { novel: 0, total: 35 } })).toEqual([]);
+    expect(strandedMarks({ "ruby-compat": { novel: 0, total: 35 } })).toEqual([]);
     expect(strandedMarks({ activerecord: { novel: 0, total: 0 } })).toEqual(["activerecord"]);
   });
 
@@ -71,6 +60,17 @@ describe("extra-surface mark", () => {
     ]);
   });
 
+  it("enrolls arel as rowless, with its inlined-from bucket pinned at zero too", () => {
+    expect(ROWLESS_PACKAGES).toContain("arel");
+    expect(unmarkedPackages({})).not.toContain("arel");
+    expect(strandedMarks({ arel: { novel: 0, total: 0, inlinedFrom: 0 } })).toEqual(["arel"]);
+    expect(taggedOnlyViolations({ arel: { novel: 0, total: 0, inlinedFrom: 0 } })).toEqual([]);
+    expect(taggedOnlyViolations({ arel: { novel: 0, total: 1, inlinedFrom: 2 } })).toEqual([
+      { package: "arel", dimension: "total", mark: 0, current: 1 },
+      { package: "arel", dimension: "inlinedFrom", mark: 0, current: 2 },
+    ]);
+  });
+
   it("pins a rowless package at zero in both dimensions with no mark to consult", () => {
     expect(taggedOnlyViolations({ activerecord: { novel: 0, total: 0 } })).toEqual([]);
     expect(taggedOnlyViolations({ activerecord: { novel: 0, total: 1 } })).toEqual([
@@ -83,30 +83,30 @@ describe("extra-surface mark", () => {
   });
 
   it("holds a tagged-only package at zero novel with no mark to consult", () => {
-    expect(taggedOnlyViolations({ arel: { novel: 0, total: 63 } })).toEqual([]);
-    expect(taggedOnlyViolations({ arel: { novel: 2, total: 65 } })).toEqual([
-      { package: "arel", dimension: "novel", mark: 0, current: 2 },
+    expect(taggedOnlyViolations({ "ruby-compat": { novel: 0, total: 63 } })).toEqual([]);
+    expect(taggedOnlyViolations({ "ruby-compat": { novel: 2, total: 65 } })).toEqual([
+      { package: "ruby-compat", dimension: "novel", mark: 0, current: 2 },
     ]);
   });
 
   it("still gates a tagged-only package's moved-not-novel total against its mark", () => {
-    const arelMark: SurfaceMarks = { arel: { novel: 0, total: 35 } };
-    expect(exceedances(arelMark, { arel: { novel: 0, total: 36 } })).toEqual([
-      { package: "arel", dimension: "total", mark: 35, current: 36 },
+    const rubyCompatMark: SurfaceMarks = { "ruby-compat": { novel: 0, total: 35 } };
+    expect(exceedances(rubyCompatMark, { "ruby-compat": { novel: 0, total: 36 } })).toEqual([
+      { package: "ruby-compat", dimension: "total", mark: 35, current: 36 },
     ]);
-    expect(staleMarks(arelMark, { arel: { novel: 0, total: 34 } })).toEqual([
-      { package: "arel", dimension: "total", mark: 35, current: 34 },
+    expect(staleMarks(rubyCompatMark, { "ruby-compat": { novel: 0, total: 34 } })).toEqual([
+      { package: "ruby-compat", dimension: "total", mark: 35, current: 34 },
     ]);
-    expect(tightened(arelMark, { arel: { novel: 0, total: 34 } })).toEqual({
-      arel: { novel: 0, total: 34 },
+    expect(tightened(rubyCompatMark, { "ruby-compat": { novel: 0, total: 34 } })).toEqual({
+      "ruby-compat": { novel: 0, total: 34 },
     });
   });
 
   it("pins a tagged-only package's novel at zero even if its row were widened", () => {
-    const widened: SurfaceMarks = { arel: { novel: 99, total: 35 } };
-    expect(exceedances(widened, { arel: { novel: 7, total: 35 } })).toEqual([]);
-    expect(taggedOnlyViolations({ arel: { novel: 7, total: 35 } })).toEqual([
-      { package: "arel", dimension: "novel", mark: 0, current: 7 },
+    const widened: SurfaceMarks = { "ruby-compat": { novel: 99, total: 35 } };
+    expect(exceedances(widened, { "ruby-compat": { novel: 7, total: 35 } })).toEqual([]);
+    expect(taggedOnlyViolations({ "ruby-compat": { novel: 7, total: 35 } })).toEqual([
+      { package: "ruby-compat", dimension: "novel", mark: 0, current: 7 },
     ]);
   });
 
@@ -179,8 +179,8 @@ describe("extra-surface mark", () => {
   });
 
   it("still demands a measurement for a tagged-only package, which has no mark to miss", () => {
-    expect(unmeasuredPackages({ activerecord: { novel: 1, total: 1 } })).toContain("arel");
-    expect(unmeasuredPackages({ arel: { novel: 0, total: 1 } })).toContain("activerecord");
+    expect(unmeasuredPackages({ activerecord: { novel: 1, total: 1 } })).toContain("ruby-compat");
+    expect(unmeasuredPackages({ "ruby-compat": { novel: 0, total: 1 } })).toContain("activerecord");
   });
 
   it("gates every package in exactly one mode", () => {

@@ -60875,6 +60875,13 @@
   {
     "package": "arel",
     "rubyFile": "collectors/bind.rb",
+    "rubyName": "<<",
+    "digest": "832c7b33610d2135",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "collectors/bind.rb",
     "rubyName": "add_bind",
     "digest": "630d678f4fc52a7f",
     "ref": "v8.0.2"
@@ -60898,6 +60905,13 @@
     "rubyFile": "collectors/bind.rb",
     "rubyName": "value",
     "digest": "b8914f236116381a",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "collectors/composite.rb",
+    "rubyName": "<<",
+    "digest": "b7652ec74803ce3d",
     "ref": "v8.0.2"
   },
   {
@@ -60938,6 +60952,13 @@
   {
     "package": "arel",
     "rubyFile": "collectors/plain_string.rb",
+    "rubyName": "<<",
+    "digest": "37c69140b083fed8",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "collectors/plain_string.rb",
     "rubyName": "initialize",
     "digest": "d225b219f5c851a0",
     "ref": "v8.0.2"
@@ -60968,6 +60989,13 @@
     "rubyFile": "collectors/sql_string.rb",
     "rubyName": "initialize",
     "digest": "b14d4bf28115ab54",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "collectors/substitute_binds.rb",
+    "rubyName": "<<",
+    "digest": "de2cc8696ca93460",
     "ref": "v8.0.2"
   },
   {
@@ -61820,6 +61848,20 @@
   },
   {
     "package": "arel",
+    "rubyFile": "nodes/filter.rb",
+    "rubyName": "as",
+    "digest": "e821a581b746b185",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/filter.rb",
+    "rubyName": "over",
+    "digest": "0cb52a04d93f7cae",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
     "rubyFile": "nodes/fragments.rb",
     "rubyName": "eql?",
     "digest": "2ab4960071b8a5bf",
@@ -61866,6 +61908,13 @@
   {
     "package": "arel",
     "rubyFile": "nodes/function.rb",
+    "rubyName": "filter",
+    "digest": "139f28f2b62c94e3",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/function.rb",
     "rubyName": "hash",
     "digest": "edfe5892a508c2ae",
     "ref": "v8.0.2",
@@ -61876,6 +61925,13 @@
     "rubyFile": "nodes/function.rb",
     "rubyName": "initialize",
     "digest": "ca94acd1c60cb5c9",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/function.rb",
+    "rubyName": "over",
+    "digest": "0cb52a04d93f7cae",
     "ref": "v8.0.2"
   },
   {
@@ -61988,6 +62044,27 @@
   {
     "package": "arel",
     "rubyFile": "nodes/infix_operation.rb",
+    "rubyName": "as",
+    "digest": "e821a581b746b185",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/infix_operation.rb",
+    "rubyName": "asc",
+    "digest": "9f585b8f04fb6d9d",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/infix_operation.rb",
+    "rubyName": "average",
+    "digest": "908c2c683770194d",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/infix_operation.rb",
     "rubyName": "between",
     "digest": "f0e99259a207bbdc",
     "ref": "v8.0.2"
@@ -62004,6 +62081,20 @@
     "rubyFile": "nodes/infix_operation.rb",
     "rubyName": "contains",
     "digest": "06b783e8e44e0b94",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/infix_operation.rb",
+    "rubyName": "count",
+    "digest": "ae4ed7a8ac347d08",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/infix_operation.rb",
+    "rubyName": "desc",
+    "digest": "9ae008551979addf",
     "ref": "v8.0.2"
   },
   {
@@ -62053,6 +62144,13 @@
     "rubyFile": "nodes/infix_operation.rb",
     "rubyName": "eq_any",
     "digest": "9a1fb4271a22afc6",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/infix_operation.rb",
+    "rubyName": "extract",
+    "digest": "a5e4ca00d3dd241b",
     "ref": "v8.0.2"
   },
   {
@@ -62233,6 +62331,20 @@
   {
     "package": "arel",
     "rubyFile": "nodes/infix_operation.rb",
+    "rubyName": "maximum",
+    "digest": "91cca993d92680d5",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/infix_operation.rb",
+    "rubyName": "minimum",
+    "digest": "6da50e94927e87fc",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/infix_operation.rb",
     "rubyName": "not_between",
     "digest": "7410ab1981ce6e3e",
     "ref": "v8.0.2"
@@ -62305,6 +62417,13 @@
     "rubyFile": "nodes/infix_operation.rb",
     "rubyName": "quoted_node",
     "digest": "3be79ad8a9164046",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/infix_operation.rb",
+    "rubyName": "sum",
+    "digest": "4772ebf08a92755c",
     "ref": "v8.0.2"
   },
   {
@@ -62449,6 +62568,69 @@
   {
     "package": "arel",
     "rubyFile": "nodes/node.rb",
+    "rubyName": "cast",
+    "digest": "e930a04bbb122cb0",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node.rb",
+    "rubyName": "coalesce",
+    "digest": "317da38a343f1a8c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node.rb",
+    "rubyName": "create_and",
+    "digest": "6e0ac82bc08b60a4",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node.rb",
+    "rubyName": "create_false",
+    "digest": "b40a80c3a63e00b9",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node.rb",
+    "rubyName": "create_join",
+    "digest": "32cf51a47b44a628",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node.rb",
+    "rubyName": "create_on",
+    "digest": "a8e03c7c9b5ccaec",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node.rb",
+    "rubyName": "create_string_join",
+    "digest": "8d063b1ef2fa677e",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node.rb",
+    "rubyName": "create_table_alias",
+    "digest": "25bda34890b2df58",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node.rb",
+    "rubyName": "create_true",
+    "digest": "b1533934c0f86825",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node.rb",
     "rubyName": "equality?",
     "digest": "9583c381d896cc8b",
     "ref": "v8.0.2"
@@ -62463,8 +62645,22 @@
   {
     "package": "arel",
     "rubyFile": "nodes/node.rb",
+    "rubyName": "grouping",
+    "digest": "678fec08283788ef",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node.rb",
     "rubyName": "invert",
     "digest": "138c707a79e1e8a6",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node.rb",
+    "rubyName": "lower",
+    "digest": "18a6c69d4cc24181",
     "ref": "v8.0.2"
   },
   {
@@ -62491,6 +62687,27 @@
   {
     "package": "arel",
     "rubyFile": "nodes/node_expression.rb",
+    "rubyName": "as",
+    "digest": "e821a581b746b185",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node_expression.rb",
+    "rubyName": "asc",
+    "digest": "9f585b8f04fb6d9d",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node_expression.rb",
+    "rubyName": "average",
+    "digest": "908c2c683770194d",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node_expression.rb",
     "rubyName": "between",
     "digest": "f0e99259a207bbdc",
     "ref": "v8.0.2"
@@ -62507,6 +62724,20 @@
     "rubyFile": "nodes/node_expression.rb",
     "rubyName": "contains",
     "digest": "06b783e8e44e0b94",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node_expression.rb",
+    "rubyName": "count",
+    "digest": "ae4ed7a8ac347d08",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node_expression.rb",
+    "rubyName": "desc",
+    "digest": "9ae008551979addf",
     "ref": "v8.0.2"
   },
   {
@@ -62556,6 +62787,13 @@
     "rubyFile": "nodes/node_expression.rb",
     "rubyName": "eq_any",
     "digest": "9a1fb4271a22afc6",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node_expression.rb",
+    "rubyName": "extract",
+    "digest": "a5e4ca00d3dd241b",
     "ref": "v8.0.2"
   },
   {
@@ -62729,6 +62967,20 @@
   {
     "package": "arel",
     "rubyFile": "nodes/node_expression.rb",
+    "rubyName": "maximum",
+    "digest": "91cca993d92680d5",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node_expression.rb",
+    "rubyName": "minimum",
+    "digest": "6da50e94927e87fc",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node_expression.rb",
     "rubyName": "not_between",
     "digest": "7410ab1981ce6e3e",
     "ref": "v8.0.2"
@@ -62806,6 +63058,13 @@
   {
     "package": "arel",
     "rubyFile": "nodes/node_expression.rb",
+    "rubyName": "sum",
+    "digest": "4772ebf08a92755c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/node_expression.rb",
     "rubyName": "unboundable?",
     "digest": "867b0a43bc2bced9",
     "ref": "v8.0.2"
@@ -62836,6 +63095,13 @@
     "rubyFile": "nodes/ordering.rb",
     "rubyName": "reverse",
     "digest": "2974f365ccf9c6b1",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/over.rb",
+    "rubyName": "as",
+    "digest": "e821a581b746b185",
     "ref": "v8.0.2"
   },
   {
@@ -62936,6 +63202,27 @@
   {
     "package": "arel",
     "rubyFile": "nodes/sql_literal.rb",
+    "rubyName": "as",
+    "digest": "e821a581b746b185",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/sql_literal.rb",
+    "rubyName": "asc",
+    "digest": "9f585b8f04fb6d9d",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/sql_literal.rb",
+    "rubyName": "average",
+    "digest": "908c2c683770194d",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/sql_literal.rb",
     "rubyName": "between",
     "digest": "f0e99259a207bbdc",
     "ref": "v8.0.2"
@@ -62952,6 +63239,20 @@
     "rubyFile": "nodes/sql_literal.rb",
     "rubyName": "contains",
     "digest": "06b783e8e44e0b94",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/sql_literal.rb",
+    "rubyName": "count",
+    "digest": "ae4ed7a8ac347d08",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/sql_literal.rb",
+    "rubyName": "desc",
+    "digest": "9ae008551979addf",
     "ref": "v8.0.2"
   },
   {
@@ -63008,6 +63309,13 @@
     "rubyFile": "nodes/sql_literal.rb",
     "rubyName": "eq_any",
     "digest": "9a1fb4271a22afc6",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/sql_literal.rb",
+    "rubyName": "extract",
+    "digest": "a5e4ca00d3dd241b",
     "ref": "v8.0.2"
   },
   {
@@ -63195,6 +63503,20 @@
   {
     "package": "arel",
     "rubyFile": "nodes/sql_literal.rb",
+    "rubyName": "maximum",
+    "digest": "91cca993d92680d5",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/sql_literal.rb",
+    "rubyName": "minimum",
+    "digest": "6da50e94927e87fc",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/sql_literal.rb",
     "rubyName": "not_between",
     "digest": "7410ab1981ce6e3e",
     "ref": "v8.0.2"
@@ -63272,6 +63594,13 @@
   {
     "package": "arel",
     "rubyFile": "nodes/sql_literal.rb",
+    "rubyName": "sum",
+    "digest": "4772ebf08a92755c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/sql_literal.rb",
     "rubyName": "unboundable?",
     "digest": "867b0a43bc2bced9",
     "ref": "v8.0.2"
@@ -63288,6 +63617,13 @@
     "rubyFile": "nodes/string_join.rb",
     "rubyName": "initialize",
     "digest": "47fc797811860224",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "nodes/table_alias.rb",
+    "rubyName": "[]",
+    "digest": "ce61861bd00deef5",
     "ref": "v8.0.2"
   },
   {
@@ -64165,6 +64501,76 @@
   {
     "package": "arel",
     "rubyFile": "table.rb",
+    "rubyName": "as",
+    "digest": "e821a581b746b185",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "table.rb",
+    "rubyName": "cast",
+    "digest": "e930a04bbb122cb0",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "table.rb",
+    "rubyName": "coalesce",
+    "digest": "317da38a343f1a8c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "table.rb",
+    "rubyName": "create_and",
+    "digest": "6e0ac82bc08b60a4",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "table.rb",
+    "rubyName": "create_false",
+    "digest": "b40a80c3a63e00b9",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "table.rb",
+    "rubyName": "create_join",
+    "digest": "32cf51a47b44a628",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "table.rb",
+    "rubyName": "create_on",
+    "digest": "a8e03c7c9b5ccaec",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "table.rb",
+    "rubyName": "create_string_join",
+    "digest": "8d063b1ef2fa677e",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "table.rb",
+    "rubyName": "create_table_alias",
+    "digest": "25bda34890b2df58",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "table.rb",
+    "rubyName": "create_true",
+    "digest": "b1533934c0f86825",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "table.rb",
     "rubyName": "eql?",
     "digest": "6e7220c34cb83272",
     "ref": "v8.0.2",
@@ -64182,6 +64588,13 @@
     "rubyFile": "table.rb",
     "rubyName": "group",
     "digest": "03762d375c350085",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "table.rb",
+    "rubyName": "grouping",
+    "digest": "678fec08283788ef",
     "ref": "v8.0.2"
   },
   {
@@ -64211,6 +64624,13 @@
     "rubyFile": "table.rb",
     "rubyName": "join",
     "digest": "01f60ddf87205d61",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "table.rb",
+    "rubyName": "lower",
+    "digest": "18a6c69d4cc24181",
     "ref": "v8.0.2"
   },
   {
@@ -64272,6 +64692,76 @@
   {
     "package": "arel",
     "rubyFile": "tree_manager.rb",
+    "rubyName": "cast",
+    "digest": "e930a04bbb122cb0",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "tree_manager.rb",
+    "rubyName": "coalesce",
+    "digest": "317da38a343f1a8c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "tree_manager.rb",
+    "rubyName": "create_and",
+    "digest": "6e0ac82bc08b60a4",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "tree_manager.rb",
+    "rubyName": "create_false",
+    "digest": "b40a80c3a63e00b9",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "tree_manager.rb",
+    "rubyName": "create_join",
+    "digest": "32cf51a47b44a628",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "tree_manager.rb",
+    "rubyName": "create_on",
+    "digest": "a8e03c7c9b5ccaec",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "tree_manager.rb",
+    "rubyName": "create_string_join",
+    "digest": "8d063b1ef2fa677e",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "tree_manager.rb",
+    "rubyName": "create_table_alias",
+    "digest": "25bda34890b2df58",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "tree_manager.rb",
+    "rubyName": "create_true",
+    "digest": "b1533934c0f86825",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "tree_manager.rb",
+    "rubyName": "grouping",
+    "digest": "678fec08283788ef",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "tree_manager.rb",
     "rubyName": "initialize_copy",
     "digest": "3574dd4f0575d164",
     "ref": "v8.0.2"
@@ -64288,6 +64778,13 @@
     "rubyFile": "tree_manager.rb",
     "rubyName": "key=",
     "digest": "05ea311f11c97ca1",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "arel",
+    "rubyFile": "tree_manager.rb",
+    "rubyName": "lower",
+    "digest": "18a6c69d4cc24181",
     "ref": "v8.0.2"
   },
   {
