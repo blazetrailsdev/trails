@@ -127,6 +127,19 @@ describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
     expect(record._mutationsBeforeLastSave).toBeNull();
   });
 
+  it("a new record holds the state Validations#init_internals leaves", () => {
+    const record = new Topic() as unknown as {
+      _errors?: unknown;
+      _contextForValidation?: unknown;
+      validationContext: unknown;
+      errors: { isEmpty(): boolean };
+    };
+    expect(record._errors ?? null).toBeNull();
+    expect(record._contextForValidation ?? null).toBeNull();
+    expect(record.validationContext).toBeNull();
+    expect(record.errors.isEmpty()).toBe(true);
+  });
+
   it("allocate leaves the class untouched when the constructor returns", () => {
     Reply.allocate();
     const before = [ownState(Reply), ownState(Topic)];
