@@ -12,6 +12,7 @@ import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { include } from "@blazetrails/activesupport";
 
 import { Base } from "./base.js";
+import { API } from "./api.js";
 import { Metal } from "./metal.js";
 import { Cookies } from "./metal/cookies.js";
 import { Request } from "../action-dispatch/http/request.js";
@@ -193,11 +194,12 @@ describe("ActionView::ViewPaths.local_prefixes (view_paths.rb:73-77)", () => {
 
   it("stops the prefix chain at ActionController::Base, which is abstract (base.rb:208)", () => {
     class PlainController extends ApplicationController {}
-    expect([Base.isAbstract(), Metal.isAbstract(), ApplicationController.isAbstract()]).toEqual([
-      true,
-      true,
-      false,
-    ]);
+    expect([
+      Base.isAbstract(),
+      Metal.isAbstract(),
+      API.isAbstract(),
+      ApplicationController.isAbstract(),
+    ]).toEqual([true, true, true, false]);
     expect(PlainController._prefixes()).toEqual(["plain", "application"]);
   });
 

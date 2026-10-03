@@ -329,20 +329,22 @@ export class Base extends Metal {
     return this.request.flash!;
   }
 
-  static _viewPaths: {
+  declare static _viewPaths: {
     (): PathSet;
     (paths: PathSet): void;
-  } = ViewPathsClassMethods._viewPaths;
+  };
   /** @internal */
-  static _prefixes: () => string[] = ViewPathsClassMethods._prefixes;
+  declare static _prefixes: () => string[];
   /** @internal */
-  static localPrefixes: () => string[] = ViewPathsClassMethods.localPrefixes;
-  static appendViewPath: (path: ViewPathsInput) => void = ViewPathsClassMethods.appendViewPath;
-  static prependViewPath: (path: ViewPathsInput) => void = ViewPathsClassMethods.prependViewPath;
-  static viewPaths: {
+  declare static _buildViewPaths: (paths: ViewPathsInput) => PathSet;
+  /** @internal */
+  declare static localPrefixes: () => string[];
+  declare static appendViewPath: (path: ViewPathsInput) => void;
+  declare static prependViewPath: (path: ViewPathsInput) => void;
+  declare static viewPaths: {
     (): PathSet;
     (paths: ViewPathsInput): void;
-  } = ViewPathsClassMethods.viewPaths;
+  };
 
   static layout = layout;
   static _writeLayoutMethod = _writeLayoutMethod;
@@ -962,6 +964,7 @@ classAttribute.call(Base, "fragmentCacheKeys", { default: [] });
 Base.helperMethod("combinedFragmentCacheKey");
 
 extend(Base, ConfigMethods);
+extend(Base, ViewPathsClassMethods);
 extend(Base, DefaultHeaders.ClassMethods);
 include(Base, Redirecting);
 include(Base, Instrumentation);
