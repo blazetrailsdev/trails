@@ -62,6 +62,8 @@ import {
   ownersWithBodies,
   ambiguousRubyOwner,
   rubyOwnerSeat,
+  tsMemberStatesSeat,
+  rubyModuleInstanceNamesByTsFile,
   tsOwnerSeat,
   crossPackageIncludedMethodNames,
   predicatePairedWithBareTwin,
@@ -2878,6 +2880,93 @@ describe("tsOwnerSeat", () => {
   it("states no seat for a declaration that is both, or for neither", () => {
     expect(tsOwnerSeat("Base", new Set(["Base"]), new Set(["Base"]))).toBeUndefined();
     expect(tsOwnerSeat("", undefined, undefined)).toBeUndefined();
+  });
+});
+
+describe("tsMemberStatesSeat", () => {
+  // timestamp.rb declares `current_time_from_proper_timezone` on `Timestamp`
+  // (:157-159) and on `Timestamp::ClassMethods` (:76-80).
+  const names = rubyModuleInstanceNamesByTsFile(
+    {
+      "ActiveRecord::Timestamp": {
+        file: "timestamp.rb",
+        instanceMethods: [{ name: "current_time_from_proper_timezone" }],
+      },
+      "ActiveRecord::Timestamp::ClassMethods": {
+        file: "timestamp.rb",
+        instanceMethods: [{ name: "current_time_from_proper_timezone" }, { name: "touch_all" }],
+      },
+    },
+    "activerecord",
+  ).get("timestamp.ts");
+  const literal = { name: "Timestamp", objectLiteral: true };
+  const member = { name: "currentTimeFromProperTimezone" };
+
+  it("reads a const named after the Rails module as the instance seat", () => {
+    expect(tsMemberStatesSeat(literal, member, names)).toBe(true);
+    // ...so a file declaring the name on both halves pairs each Ruby row with
+    // its own declaration: the const answers `Timestamp#`, the free export
+    // stays seat-neutral for `Timestamp::ClassMethods#`.
+    const owners = new Set(["", "Timestamp"]);
+    const instanceOwners = new Set(["Timestamp"]);
+    expect(tsOwnerSeat("Timestamp", undefined, instanceOwners)).toBe("instance");
+    expect(tsDeclaresOnLevel("instance", owners, undefined, instanceOwners)).toBe("seat");
+    expect(tsDeclaresOnLevel("class", owners, undefined, instanceOwners)).toBe("neutral");
+  });
+
+  it("pairs a classAttribute.call credit under the const with both class_attribute rows", () => {
+    // normalization.rb:9 `class_attribute :normalized_attributes`: the credit
+    // is a static member and a prototype one on the same owner.
+    const byFile = rubyModuleInstanceNamesByTsFile(
+      {
+        "ActiveRecord::Normalization": {
+          file: "normalization.rb",
+          instanceMethods: [{ name: "normalized_attributes" }, { name: "normalized_attributes?" }],
+        },
+      },
+      "activerecord",
+    ).get("normalization.ts");
+    const owner = { name: "Normalization", objectLiteral: true };
+    const staticOwners = new Set<string>();
+    const instanceOwners = new Set<string>();
+    for (const m of [
+      { name: "normalizedAttributes", isStatic: true },
+      { name: "normalizedAttributes", isStatic: false },
+    ]) {
+      if (tsMemberStatesSeat(owner, m, byFile)) {
+        (m.isStatic ? staticOwners : instanceOwners).add(owner.name);
+      }
+    }
+    expect(tsOwnerOnBothSeats("Normalization", staticOwners, instanceOwners)).toBe(true);
+    expect(tsMemberStatesSeat(owner, { name: "isNormalizedAttributes" }, byFile)).toBe(true);
+  });
+
+  it("states no seat for a name the module does not declare on its instance half", () => {
+    // `Mime.symbols` is a singleton method (action_dispatch/http/mime_type.rb:56).
+    expect(
+      tsMemberStatesSeat(
+        { name: "Mime", objectLiteral: true },
+        { name: "symbols" },
+        new Map([["Mime", new Set<string>()]]),
+      ),
+    ).toBe(false);
+    expect(tsMemberStatesSeat(literal, { name: "touchAll" }, names)).toBe(false);
+    expect(tsMemberStatesSeat(literal, member, undefined)).toBe(false);
+  });
+
+  it("treats a namespace's functions as an object literal's members", () => {
+    // `DescendantsTracker.subclasses(klass)` (descendants_tracker.rb:98-100) is
+    // a singleton method ported as a namespace function.
+    const ns = { name: "DescendantsTracker", declaredAsNamespace: true };
+    expect(tsMemberStatesSeat(ns, { name: "subclasses" }, undefined)).toBe(false);
+    expect(
+      tsMemberStatesSeat({ ...ns, isInterface: true }, { name: "subclasses" }, undefined),
+    ).toBe(true);
+  });
+
+  it("keeps a class member's staticness", () => {
+    expect(tsMemberStatesSeat({ name: "Base" }, { name: "create" }, undefined)).toBe(true);
+    expect(tsMemberStatesSeat(literal, { name: "x", isStatic: true }, undefined)).toBe(true);
   });
 });
 

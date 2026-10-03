@@ -212,6 +212,13 @@ const AMBIENT_RAILTIE_MIXINS: Record<string, { includes: string[] }> = {
  *     `klass.include DefaultImplementation` unless the class already defines
  *     `serialize_cast_value` (type/serialize_cast_value.rb:21-23), which is how
  *     `Type::Value` (type/value.rb:10) answers it.
+ *   - `ActiveSupport::DescendantsTracker#descendants` reads `self.subclasses`
+ *     (descendants_tracker.rb:107-110): the extender's own `Class#subclasses`,
+ *     which `core_ext/class/subclasses.rb:23` prepends
+ *     `ReloadedClassesFiltering` (descendants_tracker.rb:58-66) onto `Class` to
+ *     filter. JS has no `Class` to prepend onto, so the extender carries the
+ *     module itself (`extend(Base, ReloadedClassesFiltering)`, base.rb:286),
+ *     and the edge crosses a package boundary wherever the extender does.
  */
 /**
  * Mixins every Ruby object answers because Active Support includes them into
@@ -229,6 +236,9 @@ const HOOK_INJECTED_MIXINS: Record<string, { includes: string[] }> = {
   },
   "ActiveModel::Type::SerializeCastValue": {
     includes: ["ActiveModel::Type::SerializeCastValue::DefaultImplementation"],
+  },
+  "ActiveSupport::DescendantsTracker": {
+    includes: ["ActiveSupport::DescendantsTracker::ReloadedClassesFiltering"],
   },
 };
 

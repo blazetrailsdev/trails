@@ -71,7 +71,7 @@ interface DirtyIncludeHost {
 
 export class Dirty {
   static [included](base: DirtyIncludeHost): void {
-    if (isModuleIncluded(base, Timestamp.InstanceMethods)) {
+    if (isModuleIncluded(base, Timestamp.Timestamp)) {
       throw new RuntimeError("You cannot include Dirty after Timestamp");
     }
 

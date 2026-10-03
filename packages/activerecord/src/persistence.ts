@@ -1036,7 +1036,6 @@ export function buildDefaultConstraint(this: {
   return defaultWhereClause.isEmpty() ? undefined : defaultWhereClause.ast;
 }
 
-/** @noRailsEquivalent CONVERGEABLE comparator-reads-a-module-named-const-as-the-instance-seat */
-export const InstanceMethods = {
+export const Persistence = {
   _updateRecord: instanceUpdateRecord,
 };
