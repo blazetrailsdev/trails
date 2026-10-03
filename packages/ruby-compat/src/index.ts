@@ -291,6 +291,7 @@ export { chomp } from "./string/chomp.js";
 export { rbStrDump } from "./string/convert.js";
 export { stringDelete } from "./string/delete.js";
 export { sliceBang } from "./string/slice.js";
+export { strCount } from "./string/tr.js";
 export {
   matchOperator,
   rbDefineMethod,

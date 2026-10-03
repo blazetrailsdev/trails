@@ -7,8 +7,8 @@ import { Function } from "./function.js";
 export class NamedFunction extends Function {
   name: string;
 
-  constructor(name: string, expr: NodeOrValue[], aliaz?: string) {
-    super(expr, aliaz ?? null);
+  constructor(name: string, expr: NodeOrValue[], aliaz: string | null = null) {
+    super(expr, aliaz);
     this.name = name;
   }
 

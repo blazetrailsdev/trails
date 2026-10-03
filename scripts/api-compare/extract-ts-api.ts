@@ -4669,6 +4669,138 @@ function isInstanceOfTest(expression: ts.Expression): boolean {
   return expression.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword;
 }
 
+function unparenthesized(expression: ts.Expression): ts.Expression {
+  while (ts.isParenthesizedExpression(expression)) expression = expression.expression;
+  return expression;
+}
+
+/**
+ * The operand and the class one type test names: `x instanceof K` names `K`
+ * (its last segment, as `new:K` is spelled), `typeof x === "string"` names
+ * `typeof:string`. Undefined for any other expression.
+ */
+function typeTest(expression: ts.Expression): { operand: string; klass: string } | undefined {
+  const test = unparenthesized(expression);
+  if (!ts.isBinaryExpression(test)) return undefined;
+  if (test.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword) {
+    const klass = ts.isIdentifier(test.right)
+      ? test.right.text
+      : ts.isPropertyAccessExpression(test.right)
+        ? test.right.name.text
+        : undefined;
+    return klass === undefined ? undefined : { operand: test.left.getText(), klass };
+  }
+  const typeofOperand = typeofStringOperand(test);
+  return typeofOperand === undefined
+    ? undefined
+    : { operand: typeofOperand, klass: "typeof:string" };
+}
+
+/** The `x` of `typeof x === "string"`, or undefined. */
+function typeofStringOperand(expression: ts.Expression): string | undefined {
+  const test = unparenthesized(expression);
+  if (!ts.isBinaryExpression(test)) return undefined;
+  const op = test.operatorToken.kind;
+  if (op !== ts.SyntaxKind.EqualsEqualsEqualsToken && op !== ts.SyntaxKind.EqualsEqualsToken) {
+    return undefined;
+  }
+  if (!ts.isTypeOfExpression(test.left) || !ts.isStringLiteral(test.right)) return undefined;
+  return test.right.text === "string" ? test.left.expression.getText() : undefined;
+}
+
+/**
+ * Whether `klass` is a Ruby `String` subclass — `class SqlLiteral < String`
+ * (`activerecord/lib/arel/nodes/sql_literal.rb:5`) — so Ruby's `String === x`
+ * admits it, and a port's `typeof x === "string" || x instanceof SqlLiteral`
+ * is that ONE test spelled twice. A hoisted function for the TDZ reason
+ * {@link skeletonLogicalOpToken} gives.
+ */
+function isRubyStringSubclass(klass: string): boolean {
+  return klass === "SqlLiteral";
+}
+
+/**
+ * The `||` chain of type tests on ONE operand that ports a Ruby `when` listing
+ * several classes — `case other when Arel::Nodes::Node, Arel::Table, …`
+ * (`activerecord/lib/arel/nodes/casted.rb:50`) — as `other instanceof Node ||
+ * other instanceof Table || …`. Ruby spells that as one test and emits no `or`;
+ * the chain emits one per `||`. Answered as the chain's leaves, its `arity`
+ * (the number of Ruby classes it tests) and the `absorbed` leaves that test a
+ * {@link isRubyStringSubclass} class beside a `typeof x === "string"` leaf,
+ * which Ruby's `String` arm already covers. Undefined unless every leaf is a
+ * type test on the same operand.
+ */
+function whenListChain(
+  chain: ts.BinaryExpression,
+): { leaves: ts.Expression[]; arity: number; absorbed: number } | undefined {
+  const leaves: ts.Expression[] = [];
+  const flatten = (e: ts.Expression): void => {
+    const inner = unparenthesized(e);
+    if (ts.isBinaryExpression(inner) && inner.operatorToken.kind === ts.SyntaxKind.BarBarToken) {
+      flatten(inner.left);
+      flatten(inner.right);
+    } else {
+      leaves.push(e);
+    }
+  };
+  flatten(chain);
+  const tests = leaves.map(typeTest);
+  const [first] = tests;
+  if (first === undefined || tests.some((t) => t === undefined || t.operand !== first.operand)) {
+    return undefined;
+  }
+  const hasString = tests.some((t) => t!.klass === "typeof:string");
+  const absorbed = hasString ? tests.filter((t) => isRubyStringSubclass(t!.klass)).length : 0;
+  return { leaves, arity: leaves.length - absorbed, absorbed };
+}
+
+/**
+ * The marked token an `&&` emits when it only narrows ONE Ruby test the port
+ * had to spell as two, or undefined for an ordinary `&&`:
+ *
+ * - `and:class-narrow` — `other instanceof Binary && this.constructor ===
+ *   other.constructor`, the port of `self.class == other.class`
+ *   (`activerecord/lib/arel/nodes/binary.rb:24-28`). The `instanceof` narrows
+ *   `other` so the later reads type-check; the class equality on the SAME
+ *   operand already implies it.
+ * - `and:string-not-symbol` — `typeof x === "string" && !isSymbol(x)`, the
+ *   port of `String === x` (`activerecord/lib/arel/select_manager.rb:74-83`): a
+ *   Ruby Symbol is a JS string, so the String arm has to exclude it.
+ *
+ * Resolved against the Ruby stream by compare.ts#foldSkeletonTokens.
+ */
+function narrowingAndToken(bin: ts.BinaryExpression): string | undefined {
+  const left = unparenthesized(bin.left);
+  const right = unparenthesized(bin.right);
+  if (ts.isBinaryExpression(left) && left.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword) {
+    if (!ts.isBinaryExpression(right)) return undefined;
+    const op = right.operatorToken.kind;
+    if (op !== ts.SyntaxKind.EqualsEqualsEqualsToken && op !== ts.SyntaxKind.EqualsEqualsToken) {
+      return undefined;
+    }
+    const constructorOf = (e: ts.Expression): string | undefined =>
+      ts.isPropertyAccessExpression(e) && e.name.text === "constructor"
+        ? e.expression.getText()
+        : undefined;
+    const sides = [constructorOf(right.left), constructorOf(right.right)];
+    if (sides.includes(undefined)) return undefined;
+    return sides.includes(left.left.getText()) ? "and:class-narrow" : undefined;
+  }
+  const operand = typeofStringOperand(left);
+  if (operand === undefined) return undefined;
+  if (!ts.isPrefixUnaryExpression(right) || right.operator !== ts.SyntaxKind.ExclamationToken) {
+    return undefined;
+  }
+  const call = unparenthesized(right.operand);
+  return ts.isCallExpression(call) &&
+    ts.isIdentifier(call.expression) &&
+    call.expression.text === "isSymbol" &&
+    call.arguments.length === 1 &&
+    call.arguments[0].getText() === operand
+    ? "and:string-not-symbol"
+    : undefined;
+}
+
 /**
  * The body as an ordered CONTROL + call skeleton — the stream a call-SEQUENCE
  * comparison reads (RFC 0084). Neither `calls` nor `callSeq`
@@ -4990,9 +5122,21 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
       case ts.SyntaxKind.BinaryExpression: {
         const bin = n as ts.BinaryExpression;
         const shortCircuit = skeletonLogicalOpToken(bin.operatorToken.kind);
+        const whenList =
+          bin.operatorToken.kind === ts.SyntaxKind.BarBarToken ? whenListChain(bin) : undefined;
+        if (whenList !== undefined) {
+          for (let i = 0; i < whenList.absorbed; i++) tokens.push("or:string-subclass");
+          if (whenList.arity > 1) tokens.push(`when:${whenList.arity}`);
+          whenList.leaves.forEach(visit);
+          return;
+        }
         if (shortCircuit !== undefined) {
           visit(bin.left);
-          tokens.push(shortCircuit);
+          tokens.push(
+            bin.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+              ? (narrowingAndToken(bin) ?? shortCircuit)
+              : shortCircuit,
+          );
           visit(bin.right);
           return;
         }

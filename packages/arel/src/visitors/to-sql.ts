@@ -29,10 +29,6 @@ export type { ArelConnection } from "./connection.js";
 import type { ArelConnection } from "./connection.js";
 import type { ArelNode } from "../arel.js";
 
-function isActiveModelAttribute(v: unknown): boolean {
-  return v instanceof ModelAttribute;
-}
-
 function constructorName(v: unknown): string {
   if (v === null || v === undefined) return "NilClass";
   return (v as { constructor?: { name?: string } }).constructor?.name ?? typeof v;
@@ -159,7 +155,7 @@ export class ToSql extends Visitor {
         if (
           value instanceof Nodes.SqlLiteral ||
           value instanceof Nodes.BindParam ||
-          isActiveModelAttribute(value)
+          value instanceof ModelAttribute
         ) {
           this.visit(value as Node, collector);
         } else {
@@ -201,7 +197,7 @@ export class ToSql extends Visitor {
     collector.append("SELECT");
 
     this.collectOptimizerHints(o, collector);
-    this.maybeVisit(o.setQuantifier ?? null, collector);
+    this.maybeVisit(o.setQuantifier, collector);
 
     this.collectNodesFor(o.projections, collector, " ");
 
@@ -215,7 +211,7 @@ export class ToSql extends Visitor {
     this.collectNodesFor(o.havings, collector, " HAVING ", " AND ");
     this.collectNodesFor(o.windows, collector, " WINDOW ");
 
-    this.maybeVisit(o.comment ?? null, collector);
+    this.maybeVisit(o.comment, collector);
 
     return collector;
   }
@@ -723,7 +719,7 @@ export class ToSql extends Visitor {
     if (
       o.right instanceof Node ||
       o.right instanceof Attributes.Attribute ||
-      isActiveModelAttribute(o.right)
+      o.right instanceof ModelAttribute
     ) {
       this.visit(o.right, collector);
     } else {

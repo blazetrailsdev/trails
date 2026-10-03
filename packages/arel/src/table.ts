@@ -61,8 +61,8 @@ export class Table {
     this.tableAlias = as;
   }
 
-  alias(name?: string): TableAlias {
-    return new TableAlias(this, name ?? `${this.name}_2`);
+  alias(name: string = `${this.name}_2`): TableAlias {
+    return new TableAlias(this, name);
   }
 
   from(): SelectManager {

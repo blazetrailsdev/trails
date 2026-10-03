@@ -11,7 +11,7 @@ import type { ArelNode } from "./arel.js";
 type StatementMethodsHost = {
   ast: {
     key?: unknown;
-    wheres?: ArelNode[];
+    wheres: ArelNode[];
     orders?: ArelNode[];
     limit?: Node | null;
     offset?: Node | null;
@@ -49,11 +49,11 @@ export class StatementMethods {
   }
 
   get wheres(): ArelNode[] {
-    return this.ast.wheres ?? [];
+    return this.ast.wheres;
   }
 
   where(this: StatementMethodsHost, expr: ArelNode): unknown {
-    (this.ast.wheres ??= []).push(expr);
+    this.ast.wheres.push(expr);
     return this;
   }
 }

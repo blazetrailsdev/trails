@@ -9,9 +9,9 @@ import { Arel } from "./namespaces.js";
 import type { ArelNode } from "./arel.js";
 
 export class InsertManager extends TreeManager<InsertStatement> {
-  constructor(table?: Table | null) {
+  constructor(table: Table | null = null) {
     super();
-    this.ast = new InsertStatement(table ?? null);
+    this.ast = new InsertStatement(table);
   }
 
   into(table: Table): this {

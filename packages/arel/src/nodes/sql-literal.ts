@@ -13,9 +13,9 @@ import type { Attribute } from "../attributes/attribute.js";
 export class SqlLiteral extends stringSuperclass("eql", "hash", "isBlank", "isEmpty") {
   readonly retryable: boolean;
 
-  constructor(string: string | SqlLiteral, options?: { retryable?: boolean }) {
+  constructor(string: string | SqlLiteral, { retryable = false }: { retryable?: boolean } = {}) {
     super(string);
-    this.retryable = options?.retryable ?? false;
+    this.retryable = retryable;
   }
 
   fetchAttribute(_block?: (attr: Attribute) => boolean): boolean | undefined {

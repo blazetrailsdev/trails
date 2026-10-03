@@ -20,11 +20,13 @@ import { sql } from "./arel.js";
 import { Arel, Nodes } from "./namespaces.js";
 import {
   capitalize,
+  compact,
   isEmpty,
   isSymbol,
   rbConstGet,
   rbModConstSet,
   rbObjAsString,
+  rtest,
   symbolToS,
 } from "@blazetrails/ruby-compat";
 import { Comment } from "./nodes/comment.js";
@@ -42,9 +44,9 @@ export class SelectManager extends TreeManager<SelectStatement> {
   /** @internal */
   private ctx: SelectCore;
 
-  constructor(table?: Table | ArelNode | null) {
+  constructor(table: Table | ArelNode | null = null) {
     super();
-    this.ast = new SelectStatement(table ?? null);
+    this.ast = new SelectStatement(table);
     this.ctx = this.ast.cores.at(-1)!;
   }
 
@@ -194,12 +196,20 @@ export class SelectManager extends TreeManager<SelectStatement> {
   }
 
   distinct(value: unknown = true): this {
-    this.ctx.setQuantifier = value === false || value == null ? null : new Distinct();
+    if (rtest(value)) {
+      this.ctx.setQuantifier = new Distinct();
+    } else {
+      this.ctx.setQuantifier = null;
+    }
     return this;
   }
 
   distinctOn(value: ArelNode | false | null): this {
-    this.ctx.setQuantifier = value === false || value == null ? null : new DistinctOn(value);
+    if (rtest(value)) {
+      this.ctx.setQuantifier = new DistinctOn(value);
+    } else {
+      this.ctx.setQuantifier = null;
+    }
     return this;
   }
 
@@ -288,9 +298,8 @@ export class SelectManager extends TreeManager<SelectStatement> {
   }
 
   protected collapse(exprs: unknown[]): ArelNode {
-    exprs = exprs
-      .filter((expr) => expr !== null && expr !== undefined)
-      .map((expr) => (typeof expr === "string" ? sql(expr) : (expr as Node)));
+    exprs = compact(exprs);
+    exprs = exprs.map((expr) => (typeof expr === "string" ? sql(expr) : (expr as Node)));
     if (exprs.length === 1) return exprs[0] as Node;
     return this.createAnd(exprs as Node[]);
   }

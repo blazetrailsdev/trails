@@ -1032,6 +1032,74 @@ describe("body call capture", () => {
     expect(skeleton("memo")).toEqual(["ref:_memo", "or", "ref:build"]);
   });
 
+  it("marks an instanceof narrowing a class-equality test on the same operand, and only that", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        eql(other: unknown) {
+          return other instanceof Foo && this.constructor === other.constructor && rbEqual(this.a, other.a);
+        }
+        guard(other: unknown, x: unknown) {
+          return x instanceof Foo && this.constructor === other.constructor;
+        }
+        lone(other: unknown) {
+          return other instanceof Foo && rbEqual(this.a, other.a);
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("eql")).toEqual([
+      "and:class-narrow",
+      "ref:constructor",
+      "ref:constructor",
+      "and",
+      "ref:rbEqual",
+      "ref:a",
+      "ref:a",
+    ]);
+    expect(skeleton("guard")).toEqual(["and", "ref:constructor", "ref:constructor"]);
+    expect(skeleton("lone")).toEqual(["and", "ref:rbEqual", "ref:a", "ref:a"]);
+  });
+
+  it("marks a String test that excludes a Symbol as one test", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        group(column: string) {
+          if (typeof column === "string" && !isSymbol(column)) column = sql(column);
+        }
+        other(column: string, x: string) {
+          if (typeof column === "string" && !isSymbol(x)) column = sql(column);
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("group")).toEqual(["if", "and:string-not-symbol", "ref:isSymbol", "ref:sql"]);
+    expect(skeleton("other")).toEqual(["if", "and", "ref:isSymbol", "ref:sql"]);
+  });
+
+  it("marks a type-test `||` chain on one operand with its when-list arity", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        quoted(other: unknown) {
+          if (other instanceof Node || other instanceof Arel.Table || other instanceof SqlLiteral) return other;
+        }
+        set(values: unknown) {
+          if (typeof values === "string" || values instanceof SqlLiteral || values instanceof BoundSqlLiteral) return;
+        }
+        join(relation: unknown) {
+          if (typeof relation === "string" || relation instanceof SqlLiteral) return;
+        }
+        mixed(a: unknown, b: unknown) {
+          if (a instanceof Node || b instanceof Node) return;
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("quoted")).toEqual(["if", "when:3", "ref:Table"]);
+    expect(skeleton("set")).toEqual(["if", "or:string-subclass", "when:2"]);
+    expect(skeleton("join")).toEqual(["if", "or:string-subclass"]);
+    expect(skeleton("mixed")).toEqual(["if", "or"]);
+  });
+
   it("tokens a nil-guard conditional apart from an ordinary one, in either polarity", () => {
     const cls = extractFromSource(
       `class Foo {

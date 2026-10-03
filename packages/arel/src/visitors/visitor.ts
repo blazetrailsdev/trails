@@ -10,6 +10,7 @@ import {
   rbObjClassname,
   rbObjRespondTo,
   rbModConstSet,
+  rtest,
 } from "@blazetrails/ruby-compat";
 import { Visitors } from "../namespaces.js";
 
@@ -61,7 +62,7 @@ export abstract class Visitor {
       let dispatchMethod: string | undefined;
       try {
         dispatchMethod = this.dispatch.get(rbObjClass(object));
-        if (collector != null && collector !== false) {
+        if (rtest(collector)) {
           return rbFSend(this, dispatchMethod!, object, collector);
         } else {
           return rbFSend(this, dispatchMethod!, object);

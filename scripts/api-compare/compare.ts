@@ -499,6 +499,39 @@ const TS_CONSTRUCT_SKELETON_NAMES = new Map([
 const NIL_GUARD_TOKEN = "if:nil-guard";
 const RETRY_LOOP_TOKEN = "loop:retry";
 
+/**
+ * The short-circuit MARKS: each is a `||` / `&&` one side spells where the
+ * other spells one test, so each reads as its plain operator only while the
+ * counterpart still shows an unclaimed one, and as nothing otherwise — the rule
+ * `if:nil-guard` already takes for `if`. With no counterpart (a same-file
+ * helper's skeleton), each reads as its operator, as before it was marked.
+ *
+ * - `and:class-narrow` / `and:string-not-symbol` (TS): an `instanceof` narrowing
+ *   a class-equality test on the same operand, and the `!isSymbol(x)` a String
+ *   test has to add (extract-ts-api.ts#narrowingAndToken).
+ * - `or:string-subclass` (TS): a `x instanceof SqlLiteral` beside
+ *   `typeof x === "string"` in a type-test chain, which Ruby's `String ===`
+ *   covers (`class SqlLiteral < String`, `activerecord/lib/arel/nodes/sql_literal.rb:5`).
+ * - `or:string-symbol` (Ruby): `String === x || Symbol === x`
+ *   (`activerecord/lib/arel/nodes/window.rb:14-28`), one `typeof x === "string"`.
+ */
+const SHORT_CIRCUIT_MARKS = new Map([
+  ["and:class-narrow", "and"],
+  ["and:string-not-symbol", "and"],
+  ["or:string-subclass", "or"],
+  ["or:string-symbol", "or"],
+]);
+
+/**
+ * `when:N` marks a Ruby `when` listing N values and a TS `||` chain of N type
+ * tests on one operand (extract-ts-api.ts#whenListChain). The chain is that
+ * clause's faithful port when the arities agree, so a TS `when:N` claiming an
+ * unclaimed Ruby `when:N` emits nothing; an unclaimed one reads as the N - 1
+ * `or`s it spells. The Ruby mark always folds away: the list emits no `or`, and
+ * the clause's other lowerings (fall-through `case`s, `includes`) carry no mark.
+ */
+const WHEN_LIST_PREFIX = "when:";
+
 export function foldSkeletonTokens(
   skeleton: readonly string[],
   side: SkeletonSide = "ruby",
@@ -514,7 +547,34 @@ export function foldSkeletonTokens(
   };
   let unclaimedIfs = unclaimed("if");
   let unclaimedLoops = unclaimed("loop");
+  const countOf = (tokens: readonly string[], token: string) =>
+    tokens.filter((t) => t === token).length;
+  const unclaimedShortCircuits = new Map(
+    ["and", "or"].map((op) => [
+      op,
+      counterpart === undefined ? Infinity : countOf(counterpart, op) - countOf(skeleton, op),
+    ]),
+  );
+  const rubyWhenLists = side === "ts" ? [...(counterpart ?? [])] : [];
   for (const [index, token] of skeleton.entries()) {
+    const marked = SHORT_CIRCUIT_MARKS.get(token);
+    if (marked !== undefined) {
+      const unclaimedOps = unclaimedShortCircuits.get(marked)!;
+      unclaimedShortCircuits.set(marked, unclaimedOps - 1);
+      if (unclaimedOps > 0) folded.push(marked);
+      continue;
+    }
+    if (token.startsWith(WHEN_LIST_PREFIX)) {
+      if (side === "ruby") continue;
+      const claimed = rubyWhenLists.indexOf(token);
+      if (claimed !== -1) {
+        rubyWhenLists.splice(claimed, 1);
+        continue;
+      }
+      const arity = Number(token.slice(WHEN_LIST_PREFIX.length));
+      for (let i = 1; i < arity; i++) folded.push("or");
+      continue;
+    }
     if (token === NIL_GUARD_TOKEN) {
       folded.push(unclaimedIfs-- > 0 ? "if" : "and");
       continue;
