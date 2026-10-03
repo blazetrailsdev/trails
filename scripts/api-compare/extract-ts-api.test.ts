@@ -583,6 +583,47 @@ describe("body call capture", () => {
     expect(tokensOf("f")).toBeUndefined();
   });
 
+  it("records the string message of a thrown construction, which callArgs drops", () => {
+    const info = extractFromFiles("/p", {
+      "quoting.ts": [
+        'export function a() { throw new ArgumentError("bad value"); }',
+        "export function b() { throw new ArgumentError(`wrong value`); }",
+        'export function c() { return new ArgumentError("bad value"); }',
+      ].join("\n"),
+    });
+    const fn = (n: string) => fileFunctionsOf(info, "quoting.ts").find((f) => f.name === n)!;
+    expect(fn("a").callArgs).toBeUndefined();
+    expect(fn("a").shapeTokens).toEqual(["msg:bad value"]);
+    expect(fn("b").shapeTokens).toEqual(["msg:wrong value"]);
+    expect(fn("c").shapeTokens).toBeUndefined();
+  });
+
+  it("records shapeTokens on class members and walks a callback as the skeleton does", () => {
+    const info = extractFromFiles("/p", {
+      "quoting.ts": [
+        "export class Quoting {",
+        "  constructor(ary: unknown[]) { this.head = ary[0]; }",
+        "  head: unknown;",
+        "  get first() { return Promise.resolve(); }",
+        "  set first(v: unknown) { this.head = !v; }",
+        "  static build(n: number) { return n ? 1 : 2; }",
+        "  each(xs: boolean[]) { return xs.map((x) => !x); }",
+        "}",
+      ].join("\n"),
+    });
+    const cls = info.classes["quoting.ts:Quoting"];
+    const tokensOf = (n: string) =>
+      [...cls.instanceMethods, ...cls.classMethods]
+        .filter((m) => m.name === n)
+        .map((m) => m.shapeTokens);
+    expect(tokensOf("constructor")).toEqual([["[]"]]);
+    expect(tokensOf("first")).toContainEqual(["recv:Promise"]);
+    expect(tokensOf("first=").concat(tokensOf("first"))).toContainEqual(["op:!"]);
+    expect(tokensOf("build")).toEqual([["?:"]]);
+    expect(tokensOf("each")).toEqual([["op:!"]]);
+    expect(cls.instanceMethods.find((m) => m.name === "each")!.skeleton).toContain("ref:map");
+  });
+
   it("credits an expression-bodied arrow's outermost call", () => {
     // The body IS the CallExpression, so a walk that starts at the body's
     // CHILDREN never sees `where` — Ruby's walk_for_calls is handed the whole

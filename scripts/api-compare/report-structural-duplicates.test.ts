@@ -80,6 +80,13 @@ describe("shapeOf", () => {
     ).not.toBe(shapeOf({ ...raise, shapeTokens: ["tpl:tags_format must be one of ${}"] }));
   });
 
+  it("separates two raises of one error class by a plain-string message", () => {
+    const raise = { name: "x", skeleton: ["throw:ArgumentError", "new:ArgumentError"] };
+    expect(shapeOf({ ...raise, shapeTokens: ["msg:bad value"] })).not.toBe(
+      shapeOf({ ...raise, shapeTokens: ["msg:wrong value"] }),
+    );
+  });
+
   it("separates two get-or-set memos by what they store", () => {
     const memo = { name: "x", skeleton: ["ref:get", "if", "ref:set"] };
     expect(shapeOf({ ...memo, shapeTokens: ["class"] })).not.toBe(
@@ -148,6 +155,26 @@ describe("matches", () => {
       callArgs: [{ name: "set", args: ["id:klass", "id:func"], recv: "id:allocators" }],
     };
     expect(matches(hosted(set, { ...set, name: "registerModule" })).size).toBe(0);
+  });
+
+  it("still matches a one-call ruby-compat body that passes a literal or makes a second call", () => {
+    const literal = {
+      name: "rbHashNew",
+      line: 1,
+      skeleton: ["ref:set"],
+      callArgs: [{ name: "set", args: ["id:klass", "num:0"], recv: "id:counts" }],
+    };
+    expect(matches(hosted(literal, { ...literal, name: "zero" })).has("rbHashNew")).toBe(true);
+    const twoCalls = {
+      name: "rbStore",
+      line: 1,
+      skeleton: ["ref:set", "ref:freeze"],
+      callArgs: [
+        { name: "set", args: ["id:k", "id:v"], recv: "id:map" },
+        { name: "freeze", args: ["id:v"] },
+      ],
+    };
+    expect(matches(hosted(twoCalls, { ...twoCalls, name: "store" })).has("rbStore")).toBe(true);
   });
 
   it("never reports ruby-compat's own definitions as candidates", () => {

@@ -113,8 +113,10 @@ export interface MethodInfo {
    * TS extractor only: what `skeleton` and `callArgs` both erase, in source
    * order — a constant receiver (`recv:Promise`), an index read (`[]`, which
    * the skeleton spells `ref:get` like `Map#get`), a unary operator (`op:!`),
-   * a ternary (`?:`), a class expression (`class`) and the fixed text of a
-   * template literal (`tpl:…`). Read only by report-structural-duplicates.ts,
+   * a ternary (`?:`), a class expression (`class`), the fixed text of a
+   * template literal (`tpl:…`) and the string message of a thrown construction
+   * (`msg:…`), which `callArgs` drops with the rest of the site. Nested
+   * function bodies are walked, as `skeleton` walks them. Read only by report-structural-duplicates.ts,
    * so no call gate sees it.
    */
   shapeTokens?: string[];

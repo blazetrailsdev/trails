@@ -5331,6 +5331,10 @@ function extractShapeTokens(node: ts.Node | undefined): string[] | undefined {
     if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression)) {
       const recv = n.expression.expression;
       if (ts.isIdentifier(recv) && /^[A-Z]/.test(recv.text)) tokens.push(`recv:${recv.text}`);
+    } else if (ts.isNewExpression(n) && isThrownConstruction(n)) {
+      for (const arg of n.arguments ?? [])
+        if (ts.isStringLiteral(arg) || ts.isNoSubstitutionTemplateLiteral(arg))
+          tokens.push(`msg:${arg.text}`);
     } else if (ts.isElementAccessExpression(n)) tokens.push("[]");
     else if (ts.isPrefixUnaryExpression(n) || ts.isPostfixUnaryExpression(n))
       tokens.push(`op:${ts.tokenToString(n.operator) ?? "?"}`);
