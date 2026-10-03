@@ -154,6 +154,33 @@ describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
     expect(changed).toEqual([["_suppressInitializeCallback"]]);
   });
 
+  it("a nested new of the class being allocated is an ordinary new", () => {
+    let nested: Reply | undefined;
+    let nesting = false;
+    const original = (Reply.prototype as unknown as { initInternals(): void }).initInternals;
+    const initInternals = vi
+      .spyOn(Reply.prototype as unknown as { initInternals(): void }, "initInternals")
+      .mockImplementation(function (this: unknown) {
+        original.call(this);
+        if (nesting) return;
+        nesting = true;
+        nested = new Reply({ title: "Nested" });
+      });
+    const requireConcreteClass = vi.spyOn(Reply, "_requireConcreteClass");
+    let concreteChecks: number;
+    try {
+      Reply.allocate();
+    } finally {
+      concreteChecks = requireConcreteClass.mock.calls.length;
+      initInternals.mockRestore();
+      requireConcreteClass.mockRestore();
+    }
+    expect(concreteChecks).toBe(1);
+    expect(nested!.isNewRecord()).toBe(true);
+    expect(nested!.title).toBe("Nested");
+    expect(_allocation.klass).toBeNull();
+  });
+
   it("allocate leaves the class untouched when the constructor throws", () => {
     Reply.allocate();
     const before = [ownState(Reply), ownState(Topic)];

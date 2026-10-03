@@ -738,7 +738,9 @@ export function initInternals(
   },
   super_: () => void,
 ): void {
-  if (this._attributes == null && _allocation.klass !== this.constructor) {
+  const allocating = _allocation.klass === this.constructor;
+  if (allocating) _allocation.klass = null;
+  if (this._attributes == null && !allocating) {
     this._newRecord = true;
     this._attributes = (
       this.constructor as unknown as {

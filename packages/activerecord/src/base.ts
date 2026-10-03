@@ -1664,6 +1664,7 @@ export class Base extends Model {
     initBlock?: (record: Base) => void,
   ) {
     const allocating = _Core._allocation.klass === new.target;
+    if (allocating) _Core._allocation.klass = null;
     if (!allocating) (new.target as typeof Base | undefined)?._requireConcreteClass();
     attributes ??= {};
     let attrs = isEmpty(attributes) ? {} : sanitizeForMassAssignment(attributes);
@@ -1686,6 +1687,7 @@ export class Base extends Model {
     const wasSuppressed = allocating || previouslySuppressed;
     suppressor._suppressInitializeCallback = true;
     try {
+      if (allocating) _Core._allocation.klass = ctor;
       super(attrs);
     } finally {
       if (hadOwn) {
