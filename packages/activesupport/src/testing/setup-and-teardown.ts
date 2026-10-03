@@ -26,14 +26,14 @@ export function teardown(this: object, ...args: FilterListEntry<object>[]): void
   (this as CallbacksHost).setCallback("teardown", "after", ...args);
 }
 
-export function beforeSetup(this: object, super_: () => unknown): unknown {
+export function beforeSetup(this: CallbacksInstance, super_: () => unknown): unknown {
   const result = super_();
   return result instanceof Promise
-    ? result.then(() => (this as CallbacksInstance).runCallbacks("setup"))
-    : (this as CallbacksInstance).runCallbacks("setup");
+    ? result.then(() => this.runCallbacks("setup"))
+    : this.runCallbacks("setup");
 }
 
-export function afterTeardown(this: Test, super_: () => unknown): unknown {
+export function afterTeardown(this: Test & CallbacksInstance, super_: () => unknown): unknown {
   const rescue = (e: unknown): void => {
     if (e instanceof Assertion) {
       this.failures.push(e);
@@ -42,7 +42,7 @@ export function afterTeardown(this: Test, super_: () => unknown): unknown {
     }
   };
   try {
-    const result = (this as Test & CallbacksInstance).runCallbacks("teardown");
+    const result = this.runCallbacks("teardown");
     if (result instanceof Promise) return result.then(() => {}, rescue).then(() => super_());
   } catch (e) {
     rescue(e);
