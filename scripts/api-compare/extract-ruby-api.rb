@@ -2889,10 +2889,6 @@ class ApiExtractor
     "ivar"
   end
 
-  # `Array(x)` — `Kernel#Array` (`rb_f_array`, `vendor/ruby/v3.3.11/object.c:3825`),
-  # whose return is an Array for every argument, so `Array(start).size` is
-  # `Array#size`. Only the bare `fcall` form: `x.Array(y)` names some other
-  # receiver's method.
   def kernel_array_call?(node)
     return false unless node.is_a?(Array) && node[0] == :method_add_arg
 
@@ -2970,7 +2966,8 @@ class ApiExtractor
   # An ivar is `"hash"` when every `@x = …` in that owner assigns a `to_hash`
   # call, whose result Ruby's implicit-conversion contract requires to be a
   # Hash — `@row = fixture.to_hash` (`fixture_set/table_row.rb:69`). It is
-  # `"array"` when every one assigns an Array literal or a `Kernel#Array` call —
+  # `"array"` when every one assigns an Array literal or a `Kernel#Array` call
+  # (`rb_f_array`, `vendor/ruby/v3.3.11/object.c:3825`, always an Array) —
   # `@stack = []` (`abstract/transaction.rb:499`), `@queue = []`
   # (`connection_pool/queue.rb:17`). An `@x ||= …` keeps whatever truthy value
   # `@x` already held, so it proves nothing; it, a multiple-assignment target,

@@ -603,12 +603,6 @@ export function significantCallsForReceivers(
   };
 }
 
-/**
- * Whether the paired TS body has the {@link NATIVE_FORM_ANALOGUES} form that
- * ports Ruby call `value`. `load` is admitted only when no site of it had a
- * receiver (`receivers` omits a name called on implicit self alone), the one
- * shape `Kernel#load` takes.
- */
 function hasNativeFormAnalogue(
   value: string,
   receivers: Record<string, readonly string[]> | undefined,

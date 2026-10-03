@@ -417,8 +417,6 @@ describe("significantMissingCalls", () => {
   });
 
   it("significantCallsForReceivers still flags size for a TS body with no .length read", () => {
-    // A `rel.size()` / `rel.length()` CALL records no native form, so it lands
-    // here: the call itself is what credits the Ruby `size`, never a read.
     expect(significantCallsForReceivers({ size: ["expr"] }).has("size")).toBe(true);
     expect(significantCallsForReceivers({ size: ["expr"] }, undefined, new Set()).has("size")).toBe(
       true,
@@ -428,7 +426,6 @@ describe("significantMissingCalls", () => {
   it("significantCallsForReceivers drops an implicit-self load for a TS body with a computed import()", () => {
     const imported = new Set(["import"]);
     expect(significantCallsForReceivers({}, undefined, imported).has("load")).toBe(false);
-    // `records.load` / `relation.load` is Relation#load, a query trigger.
     expect(significantCallsForReceivers({ load: ["expr"] }, undefined, imported).has("load")).toBe(
       true,
     );

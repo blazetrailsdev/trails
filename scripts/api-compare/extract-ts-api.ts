@@ -5519,8 +5519,6 @@ function collectCalls(
         }
         if (prop === "new") called.push("constructor");
       } else if (callee.kind === ts.SyntaxKind.ImportKeyword) {
-        // A dynamic `import(x)` off a specifier computed at run time is
-        // `Kernel#load` (see NATIVE_FORM_ANALOGUES); a literal one is `require`.
         const specifier = n.arguments[0];
         if (!skipHoistedClosures && specifier && !ts.isStringLiteralLike(specifier)) {
           names.add(`${NATIVE_FORM_PREFIX}import`);
