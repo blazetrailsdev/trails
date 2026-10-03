@@ -25,6 +25,10 @@ import { NameError } from "./name-error.js";
 import { temporalTag } from "./temporal-tag.js";
 import { Enumerable } from "./enumerable.js";
 import { Hash } from "./hash.js";
+import { TypeError } from "./type-error.js";
+import { BigDecimal } from "./big-decimal.js";
+import { Complex } from "./complex.js";
+import { Rational } from "./rational.js";
 import {
   FL_SINGLETON,
   T_ICLASS,
@@ -34,6 +38,7 @@ import {
   rbCClass,
   rbCDate,
   rbCNumeric,
+  rbObjClass,
   rbCString,
   rbCTime,
   rbModAttrReader,
@@ -864,6 +869,39 @@ export function rbModAncestors(mod: { prototype: object }): object[] {
 }
 
 /**
+ * `rb_obj_is_kind_of` (`vendor/ruby/v3.3.11/object.c:889`), `Object#kind_of?`
+ * and `Module#===`: whether `c` is in the ancestry of `obj`'s class. A plain
+ * object is a module's seat, as `include()` takes one.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjIsKindOf(obj: unknown, c: unknown): boolean {
+  const cl = rbObjClass(obj) as { prototype: object };
+
+  if (cl === c) return true;
+
+  if (typeof c === "function" || (typeof c === "object" && c !== null)) {
+    return classSearchAncestor(cl, c);
+  } else {
+    throw new TypeError("class or module required");
+  }
+}
+
+/** `class_search_ancestor` (`vendor/ruby/v3.3.11/object.c:935`). */
+function classSearchAncestor(cl: { prototype: object }, c: object): boolean {
+  for (let p: object | null = cl.prototype; p; p = Object.getPrototypeOf(p) as object | null) {
+    if (Object.prototype.hasOwnProperty.call(p, "constructor")) {
+      if ((p as { constructor: object }).constructor === c) return true;
+    }
+    if (Object.prototype.hasOwnProperty.call(p, includedModulesKey)) {
+      if (((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>).has(c)) return true;
+    }
+    if (p === Object.prototype && (c === Kernel || c === rbCBasicObject)) return true;
+  }
+  return false;
+}
+
+/**
  * `rb_mod_instance_method` (`vendor/ruby/v3.3.11/proc.c:2190`), `Module#instance_method`,
  * answering the `owner` (`method_owner`, `vendor/ruby/v3.3.11/proc.c:1988`): the
  * {@link rbModAncestors} entry that defines `mid`. That is the `Module` an
@@ -1452,6 +1490,11 @@ classpaths.set(rbMComparable, { path: "Comparable", permanent: true });
 
 Object.setPrototypeOf(rbCClass, Module);
 Object.setPrototypeOf(rbCClass.prototype, Module.prototype);
+
+for (const klass of [Rational, Complex, BigDecimal]) {
+  Object.setPrototypeOf(klass, rbCNumeric);
+  Object.setPrototypeOf(klass.prototype, rbCNumeric.prototype);
+}
 
 include(rbCNumeric, rbMComparable);
 include(rbCString, rbMComparable);

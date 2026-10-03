@@ -1,6 +1,6 @@
 import { describe, it, afterEach, expect } from "vitest";
 import { assertNothingRaised, assertRaise } from "@blazetrails/activesupport";
-import { BigDecimal, Range, Rational } from "@blazetrails/ruby-compat";
+import { BigDecimal, Complex, Range, Rational } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, DateTime as RubyDateTime, Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError } from "../attribute-assignment.js";
 import { Topic } from "../test-helpers/models/topic.js";
@@ -79,6 +79,7 @@ describe("Clusivity#inclusion_method", () => {
       [1n, 3n],
       [new Rational(1, 2), new Rational(3, 2)],
       [new BigDecimal("1.1"), new BigDecimal("3.3")],
+      [new Complex(1, 0), new Complex(3, 0)],
       [RubyTime.utc(2024, 1, 1), RubyTime.utc(2024, 1, 3)],
       [RubyDateTime.parse("2024-01-01T00:00:00"), RubyDateTime.parse("2024-01-03T00:00:00")],
       [RubyDate.parse("2024-01-01"), RubyDate.parse("2024-01-03")],
@@ -92,9 +93,9 @@ describe("Clusivity#inclusion_method", () => {
     expect(inclusionMethod(new Range<unknown>(null, "c"))).toBe("isInclude");
   });
 
-  it("still covers a JS Date Range, which Range#include? answers by cover?", async () => {
+  it("selects cover? for a JS Date Range, which is a Time", async () => {
     const delimiter = new Range(new Date(Date.UTC(2024, 0, 1)), new Date(Date.UTC(2024, 11, 31)));
-    expect(inclusionMethod(delimiter)).toBe("isInclude");
+    expect(inclusionMethod(delimiter)).toBe("cover");
     Topic.validatesInclusionOf("title", { in: delimiter });
 
     expect(await new Topic({ title: new Date(Date.UTC(2024, 5, 1)) }).isValid()).toBe(true);

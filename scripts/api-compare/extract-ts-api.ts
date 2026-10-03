@@ -5837,6 +5837,9 @@ function collectCalls(
         const prop = callee.name.text;
         called.push(prop);
         negated.push(prop);
+        if (!skipHoistedClosures && prop === "unshift") {
+          names.add(`${NATIVE_FORM_PREFIX}unshift`);
+        }
         // An invocation off another object gets the same foreign tally as a read
         // off one (see FOREIGN_READ_PREFIX). The `X.call(...)` identifier
         // credited below is deliberately NOT tallied: that dispatch really does

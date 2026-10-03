@@ -1514,6 +1514,23 @@ describe("body call capture", () => {
     );
   });
 
+  it("marks an unshift() call as a native form", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        updateCallbacks(targets: unknown[]) {
+          targets.unshift(this);
+        }
+        prepended(mod: unknown) {
+          prepend(this, mod);
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "updateCallbacks")!;
+    expect(m.calls).toContain("@unshift");
+    const prepended = cls.instanceMethods.find((m) => m.name === "prepended")!;
+    expect(prepended.calls).not.toContain("@unshift");
+  });
+
   it("marks a dynamic import() of a computed specifier as a native form, not a literal one", () => {
     const cls = extractFromSource(
       `class Foo {

@@ -10,6 +10,7 @@ import {
   lessThan,
   lessThanOrEqual,
   Rational,
+  rbCDate,
   rubyClass,
 } from "@blazetrails/ruby-compat";
 import { rbWarning } from "./rb-warning.js";
@@ -4498,7 +4499,7 @@ function deconstructKeys(
   return h;
 }
 
-export class Date {
+export class Date extends rbCDate {
   static _railsClassName = "Date";
 
   static Error = DateError;
@@ -4560,6 +4561,7 @@ export class Date {
     sf?: Rational,
     of?: number,
   ) {
+    super();
     if (year instanceof Temporal.PlainDate) {
       const sg = val2sg((month as number | undefined) ?? DEFAULT_SG);
       const [nth, ry] = decodeYear(year.year, -1);

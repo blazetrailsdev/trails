@@ -1041,7 +1041,6 @@ export function resetCallbacks(target: object, name: string): void {
 }
 
 export const ClassMethods = {
-  /** @missingRailsCall prepend — PERMANENT */
   __updateCallbacks(
     this: CallbacksClass,
     name: string,
