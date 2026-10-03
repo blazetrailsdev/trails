@@ -93,5 +93,18 @@ function isAny<T>(this: Each<T>, block?: (i: T) => unknown): boolean {
   return memo;
 }
 
+/**
+ * The JS spelling of what `for x in enum` / `*enum` read off `each`:
+ * `vendor/ruby/v3.3.11/enum.c:711` `enum_to_a`, iterated.
+ * @noRailsEquivalent PERMANENT
+ */
+function iterator<T>(this: Each<T>): IterableIterator<T> {
+  const ary: T[] = [];
+  rbBlockCall(this, (i) => {
+    ary.push(i);
+  });
+  return ary[Symbol.iterator]();
+}
+
 /** @noRailsEquivalent PERMANENT */
-export const Enumerable = { findAll, map, first, isAny };
+export const Enumerable = { findAll, map, first, isAny, [Symbol.iterator]: iterator };

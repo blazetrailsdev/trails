@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
 import { Enumerable } from "./enumerable.js";
+import { include } from "./include.js";
 
 class Bag {
   yielded = 0;
@@ -44,5 +45,26 @@ describe("Enumerable", () => {
     const bag = new Bag([1, 2, 3]);
     expect(Enumerable.isAny.call(bag, (i) => i === 1)).toBe(true);
     expect(bag.yielded).toBe(1);
+  });
+
+  it("Symbol.iterator iterates what each yields, on an includer", () => {
+    class Included extends Bag {}
+    include(Included, Enumerable);
+    const bag = new Included([1, 2, 3]) as Included & Iterable<unknown>;
+    expect([...bag]).toEqual([1, 2, 3]);
+    expect(Array.from(bag)).toEqual([1, 2, 3]);
+    const seen: unknown[] = [];
+    for (const i of bag) seen.push(i);
+    expect(seen).toEqual([1, 2, 3]);
+  });
+
+  it("an includer's own Symbol.iterator is not replaced", () => {
+    class Own extends Bag {
+      *[Symbol.iterator](): IterableIterator<unknown> {
+        yield "own";
+      }
+    }
+    include(Own, Enumerable);
+    expect([...new Own([1])]).toEqual(["own"]);
   });
 });

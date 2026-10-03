@@ -1096,8 +1096,14 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
       let ancestor: object | null = mod as ModuleObject;
       ancestor && ancestor !== Object.prototype;
     ) {
-      for (const [key, modDesc] of Object.entries(Object.getOwnPropertyDescriptors(ancestor))) {
-        if (key === "constructor" || /^[A-Z]/.test(key)) continue;
+      const modDescs = Object.getOwnPropertyDescriptors(ancestor) as Record<
+        string | symbol,
+        PropertyDescriptor
+      >;
+      for (const key of [...Object.keys(modDescs), Symbol.iterator] as string[]) {
+        const modDesc = modDescs[key];
+        if (modDesc === undefined) continue;
+        if (key === "constructor" || (typeof key === "string" && /^[A-Z]/.test(key))) continue;
         if ("value" in modDesc && typeof modDesc.value !== "function") continue;
         if (Object.prototype.hasOwnProperty.call(descriptors, key)) continue;
         if (Object.prototype.hasOwnProperty.call(klass.prototype, key) && !installed.has(key)) {
