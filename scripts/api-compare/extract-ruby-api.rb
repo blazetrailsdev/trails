@@ -323,7 +323,8 @@ def string_literal_value(node)
 end
 
 def raw_string_opener?(opener)
-  opener == "'" || opener.start_with?("%q") || (opener.start_with?("<<") && opener.include?("'"))
+  opener == "'" || opener.start_with?("%q") || opener.start_with?("%s") ||
+    (opener.start_with?("<<") && opener.include?("'"))
 end
 
 # ---- Dependency detection patterns ----
@@ -3427,9 +3428,17 @@ class ApiExtractor
     names
   end
 
+  OPTION_COPY_METHODS = %w[dup clone merge except slice].to_set
+
   def walk_for_option_keys(node, vars, consts, keys)
     return unless node.is_a?(Array)
     case node[0]
+    when :assign
+      target = node[1]
+      if target.is_a?(Array) && target[0] == :var_field && target[1].is_a?(Array) &&
+          target[1][0] == :@ident
+        option_copy?(node[2], vars) ? vars << target[1][1] : vars.delete(target[1][1])
+      end
     when :aref
       # options[:foo]
       traverse_for_symbols(node[2], keys) if option_var?(node[1], vars)
@@ -3478,6 +3487,19 @@ class ApiExtractor
       traverse_for_symbols(args, syms)
       keys << syms.first if syms.first
     end
+  end
+
+  def option_copy?(node, vars)
+    return false unless node.is_a?(Array)
+    node = node[1] if node[0] == :method_add_block
+    call = node[0] == :method_add_arg ? node[1] : node
+    return option_var?(call, vars) unless call.is_a?(Array) && call[0] == :call
+    meth = ident_name(call[3])
+    return false unless OPTION_COPY_METHODS.include?(meth)
+    return true if option_copy?(call[1], vars)
+    meth == "merge" && node[0] == :method_add_arg && node[2].is_a?(Array) &&
+      node[2][0] == :arg_paren && node[2][1].is_a?(Array) && node[2][1][0] == :args_add_block &&
+      node[2][1][1].is_a?(Array) && node[2][1][1].any? { |arg| option_copy?(arg, vars) }
   end
 
   # `options` / `opts` (a local or param, `:@ident`) and `@options` / `@opts`
@@ -4016,7 +4038,7 @@ class ApiExtractor
     when :symbol_literal then "sym:#{ident_name(node[1]) || "?"}"
     when :dyna_symbol
       literal = describe_string(node[1])
-      literal.start_with?("str:") ? "sym:#{literal.delete_prefix("str:")}" : "?"
+      literal.match?(/\Ar?str:/) ? literal.sub("str:", "sym:") : "?"
     when :vcall, :fcall then "id:#{ident_name(node[1]) || "?"}"
     when :call, :command, :command_call, :method_add_arg, :method_add_block
       name = nested_call_name(node)
@@ -4067,7 +4089,11 @@ class ApiExtractor
     return "?" unless parts.is_a?(Array)
     return "str:" if parts.empty?
     return "str-interp" unless parts.all? { |p| p.is_a?(Array) && p[0] == :@tstring_content }
-    "str:#{escape_descriptor_text(parts.map { |p| p[1] }.join)}"
+    text = parts.map { |p| p[1] }.join
+    return "str:#{escape_descriptor_text(text)}" unless text.include?("\\")
+    opener = string_opener_at(parts[0][2])&.delete_prefix(":")
+    opener = nil unless opener && raw_string_opener?(opener)
+    "rstr:#{escape_descriptor_text(opener.to_s).gsub(":", "%3A")}:#{escape_descriptor_text(text)}"
   end
 
   # The four grammar delimiters, so a string VALUE carrying one does not read as

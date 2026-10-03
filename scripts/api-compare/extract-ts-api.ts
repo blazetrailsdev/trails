@@ -94,6 +94,7 @@ const OPTION_READER_FUNCTIONS = new Set([
   "deleteWithDefault",
 ]);
 const OPTION_READER_METHODS = new Set(["fetch", "get", "has", "delete", "hasOwnProperty"]);
+const OPTION_COPY_FUNCTIONS = new Set(["slice", "except", "merge", "rbObjDup", "rbObjClone"]);
 
 /** Memo for `internalJsDocTagApplies`'s file-level receipt lookup. */
 const fileLevelReceipts = new WeakMap<ts.SourceFile, boolean>();
@@ -5944,10 +5945,20 @@ function typeAdmitsBoolean(type: ts.Type): boolean {
   return type.isUnionOrIntersection() && type.types.some(typeAdmitsBoolean);
 }
 
+function optionsParam(
+  parameters: ts.NodeArray<ts.ParameterDeclaration>,
+): ts.ParameterDeclaration | undefined {
+  return (
+    parameters.find((p) => ts.isIdentifier(p.name) && /^(options|opts)$/.test(p.name.text)) ??
+    parameters[parameters.length - 1]
+  );
+}
+
 /**
- * Advisory option-key extraction (see options-keys.ts). Resolves the LAST
- * parameter's object type to its property names. Returns: undefined (no
- * options-shaped trailing param), null (uncheckable — `any`/`unknown` or a
+ * Advisory option-key extraction (see options-keys.ts). Resolves the options
+ * parameter's object type — one named `options` / `opts`, the names
+ * extract-ruby-api.rb `option_var_names` picks, else the trailing one — to its
+ * property names. Returns: undefined (no options-shaped param), null (uncheckable — `any`/`unknown` or a
  * string-index bag like `Record<string, unknown>`, distinct from `[]`), or the
  * sorted/deduped property names. Only interface/type-literal/intersection
  * trailing params are inspected. A trailing kwargs bag that carries the options
@@ -5959,9 +5970,8 @@ export function extractOptionKeys(
   parameters: ts.NodeArray<ts.ParameterDeclaration>,
   checker: ts.TypeChecker,
 ): string[] | null | undefined {
-  if (parameters.length === 0) return undefined;
-  const last = parameters[parameters.length - 1];
-  if (last.dotDotDotToken || !last.type) return undefined;
+  const last = optionsParam(parameters);
+  if (last === undefined || last.dotDotDotToken || !last.type) return undefined;
   const tn = last.type;
   if (!ts.isTypeLiteralNode(tn) && !ts.isIntersectionTypeNode(tn) && !ts.isTypeReferenceNode(tn)) {
     return undefined;
@@ -6009,20 +6019,23 @@ export function extractOptionKeys(
  * The declared options TYPE says what a caller may pass, which for a shared
  * type (`ColumnOptions`) is every key any method on the surface accepts, so
  * {@link extractOptionKeys} cannot say which keys this body branches on. A rest
- * binding (`{ types, ...options }`) and a copy (`const opts = { ...options }`)
- * carry the hash on under a new name, and a kwargs bag carrying the hash as its
+ * binding (`{ types, ...options }`) and a copy (`const opts = { ...options }`,
+ * or a `slice` / `except` / `merge` / `rbObjDup` / `rbObjClone` call, the TS
+ * spellings of extract-ruby-api.rb `OPTION_COPY_METHODS`), declared or assigned,
+ * carry the hash on under a new name, until it is reassigned from anything
+ * else. A multiple assignment (`a, b = options.dup, x`) is not followed, on
+ * either side. A kwargs bag carrying the hash as its
  * `options` property is read through to it, as {@link extractOptionKeys} does.
  * The reader calls are the TS spellings of extract-ruby-api.rb
  * `OPTION_READER_METHODS`, plus `valuesAt`, which reads every key it names.
- * `undefined` when there is no body or no trailing options param.
+ * `undefined` when there is no body or no options param.
  */
 export function extractOptionReads(
   parameters: ts.NodeArray<ts.ParameterDeclaration>,
   body: ts.Node | undefined,
 ): string[] | undefined {
-  if (parameters.length === 0 || body === undefined) return undefined;
-  const last = parameters[parameters.length - 1];
-  if (last.dotDotDotToken) return undefined;
+  const last = optionsParam(parameters);
+  if (last === undefined || body === undefined || last.dotDotDotToken) return undefined;
   const vars = new Set<string>();
   const bags = new Set<string>();
   const keys = new Set<string>();
@@ -6112,6 +6125,21 @@ export function extractOptionReads(
     return key !== undefined && ts.isStringLiteralLike(key) ? [key.text] : [];
   };
 
+  const isCopy = (expr: ts.Expression): boolean => {
+    const e = unwrap(expr);
+    if (isOptions(e)) return true;
+    if (ts.isObjectLiteralExpression(e)) {
+      return e.properties.some((p) => ts.isSpreadAssignment(p) && isCopy(p.expression));
+    }
+    if (!ts.isCallExpression(e) || !ts.isIdentifier(e.expression)) return false;
+    if (!OPTION_COPY_FUNCTIONS.has(e.expression.text)) return false;
+    const [receiver, ...rest] = e.arguments;
+    return (
+      (receiver !== undefined && isCopy(receiver)) ||
+      (e.expression.text === "merge" && rest.some(isCopy))
+    );
+  };
+
   const visit = (node: ts.Node): void => {
     if (ts.isVariableDeclaration(node) && node.initializer) {
       const init = unwrap(node.initializer);
@@ -6120,12 +6148,16 @@ export function extractOptionReads(
         else if (ts.isIdentifier(init) && bags.has(init.text) && isBag(node.name)) {
           bind(node.name, true);
         }
-      } else if (ts.isIdentifier(node.name)) {
-        const copies =
-          ts.isObjectLiteralExpression(init) &&
-          init.properties.some((p) => ts.isSpreadAssignment(p) && isOptions(p.expression));
-        if (copies || isOptions(init)) vars.add(node.name.text);
+      } else if (ts.isIdentifier(node.name) && isCopy(init)) {
+        vars.add(node.name.text);
       }
+    } else if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      ts.isIdentifier(node.left)
+    ) {
+      if (isCopy(node.right)) vars.add(node.left.text);
+      else vars.delete(node.left.text);
     } else if (ts.isPropertyAccessExpression(node) && isOptions(node.expression)) {
       const call = node.parent;
       if (ts.isCallExpression(call) && call.expression === node) {

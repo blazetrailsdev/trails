@@ -40,6 +40,7 @@ import {
   resolvePortedWithArgsSigs,
   newTsPortedWithArgsMaps,
   recordTsPortedWithArgs,
+  optionKeyPair,
   jsEnumerableAliases,
   JS_ENUMERABLE_ALIASES,
   NEGATED_ALIASES,
@@ -79,6 +80,7 @@ import {
   copyHookClaimed,
   rubyCallToTsForReceivers,
 } from "./compare.js";
+import { matchOptionKeysAgainst } from "./options-keys.js";
 import {
   COPY_HOOKS,
   PROTOCOL_DEFINITION_ENROLLED_PACKAGES,
@@ -4086,6 +4088,78 @@ describe("ported-with-args population", () => {
 
     expect(sigs("relation.ts", "buildFrom")).toHaveLength(1);
     expect(sigs("test-helpers/fixtures.ts", "fixtures")).toEqual([]);
+  });
+
+  it("pairs option keys by owner, so a sibling class masks neither side", () => {
+    const maps = newTsPortedWithArgsMaps();
+    const file = "schema-definitions.ts";
+    const member = (optionKeys: string[], optionReads: string[]): MethodInfo => ({
+      ...method("isDefinedFor", file),
+      optionKeys,
+      optionReads,
+    });
+    recordTsPortedWithArgs(maps, member(["name"], ["name"]), file, "IndexDefinition");
+    recordTsPortedWithArgs(
+      maps,
+      member(["name", "validate"], ["name", "invented"]),
+      file,
+      "ForeignKeyDefinition",
+    );
+    const params = [{ name: "options", kind: "keyword_rest" as const }];
+    const owned = (keys: string[]) => ({ keys, params });
+    const ns = "ActiveRecord::ConnectionAdapters";
+    const ruby = {
+      byName: new Map([["defined_for?", owned(["name", "validate", "invented"])]]),
+      byOwnerName: new Map([
+        [
+          rubyBodyKey(`${ns}::IndexDefinition`, "instance", "defined_for?"),
+          owned(["name", "validate"]),
+        ],
+        [rubyBodyKey(`${ns}::IndexDefinition`, "class", "defined_for?"), owned(["unrelated"])],
+        [
+          rubyBodyKey(`${ns}::ForeignKeyDefinition`, "instance", "defined_for?"),
+          owned(["name", "validate"]),
+        ],
+        [
+          rubyBodyKey(`${ns}::CheckConstraintDefinition`, "instance", "defined_for?"),
+          owned(["invented"]),
+        ],
+      ]),
+    };
+    const verdict = (owner: string) => {
+      const pair = optionKeyPair(
+        "defined_for?",
+        "isDefinedFor",
+        file,
+        `${ns}::${owner}`,
+        "instance",
+        ruby,
+        maps,
+      )!;
+      return matchOptionKeysAgainst(pair.ruby.keys, pair.candidates, [], pair.reads);
+    };
+
+    expect(verdict("IndexDefinition")).toEqual({
+      comparable: true,
+      missingInTs: ["validate"],
+      extraInTs: [],
+    });
+    expect(verdict("ForeignKeyDefinition")).toEqual({
+      comparable: true,
+      missingInTs: [],
+      extraInTs: ["invented"],
+    });
+    const mixin = optionKeyPair(
+      "defined_for?",
+      "isDefinedFor",
+      file,
+      "Mixin",
+      "instance",
+      ruby,
+      maps,
+    );
+    expect(mixin?.owned).toBe(false);
+    expect(mixin?.ruby.keys).toEqual(["name", "validate", "invented"]);
   });
 });
 
