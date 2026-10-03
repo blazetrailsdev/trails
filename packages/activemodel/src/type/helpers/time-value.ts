@@ -1,5 +1,5 @@
 import { Temporal, Time } from "@blazetrails/date";
-import { ArgumentError, Rational, rbFSend } from "@blazetrails/ruby-compat";
+import { ArgumentError, Rational, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { actsLike, TimeWithZone, toFs } from "@blazetrails/activesupport";
 
 export interface TimezoneAware {
@@ -26,29 +26,22 @@ export function serializeCastValue(this: TimeValueHost, value: unknown): unknown
   return value;
 }
 
-type NsecBearing =
-  | Time
-  | TimeWithZone
-  | Temporal.Instant
-  | Temporal.PlainDateTime
-  | Temporal.ZonedDateTime
-  | Temporal.PlainTime;
-
-const NANOS_PER_SECOND = 1_000_000_000n;
-
 /**
  * @boundary: `precision` is an Integer, so `10 ** n` is taken over BigInt, the
  *  Integer arm of Ruby's `**`. A negative exponent there is a Rational, which
  *  divides every Integer nsec, as `10 ** 0` does.
  */
 export function applySecondsPrecision<T>(this: { precision?: number }, value: T): T {
-  const precision = this.precision;
-  if (precision == null || !respondToNsec(value)) return value;
-  const numberOfInsignificantDigits = 9 - precision;
+  if (!(this.precision != null && rbObjRespondTo(value, "nsec"))) return value;
+
+  const numberOfInsignificantDigits = 9 - this.precision;
   const roundPower = 10n ** BigInt(Math.max(numberOfInsignificantDigits, 0));
-  const roundedOffNsec = nsec(value) % roundPower;
+  const roundedOffNsec = BigInt(rbFSend(value, "nsec") as number) % roundPower;
+
   if (roundedOffNsec > 0n) {
-    return changeNsec(value, nsec(value) - roundedOffNsec) as T;
+    return rbFSend(value, "change", {
+      nsec: Number(BigInt(rbFSend(value, "nsec") as number) - roundedOffNsec),
+    }) as T;
   } else {
     return value;
   }
@@ -135,42 +128,3 @@ export const TimeValue = {
   newTime,
   fastStringToTime,
 };
-
-function respondToNsec(value: unknown): value is NsecBearing {
-  return (
-    value instanceof Time ||
-    value instanceof TimeWithZone ||
-    value instanceof Temporal.Instant ||
-    value instanceof Temporal.PlainDateTime ||
-    value instanceof Temporal.ZonedDateTime ||
-    value instanceof Temporal.PlainTime
-  );
-}
-
-function nsec(value: NsecBearing): bigint {
-  if (value instanceof Time || value instanceof TimeWithZone) return BigInt(value.nsec);
-  if (value instanceof Temporal.Instant) {
-    return ((value.epochNanoseconds % NANOS_PER_SECOND) + NANOS_PER_SECOND) % NANOS_PER_SECOND;
-  }
-  return (
-    BigInt(value.millisecond) * 1_000_000n +
-    BigInt(value.microsecond) * 1_000n +
-    BigInt(value.nanosecond)
-  );
-}
-
-function changeNsec<T extends NsecBearing>(value: T, newNsec: bigint): T {
-  if (value instanceof Time || value instanceof TimeWithZone) {
-    return value.change({ nsec: Number(newNsec) }) as T;
-  }
-  if (value instanceof Temporal.Instant) {
-    return Temporal.Instant.fromEpochNanoseconds(
-      value.epochNanoseconds - nsec(value) + newNsec,
-    ) as T;
-  }
-  return value.with({
-    millisecond: Number(newNsec / 1_000_000n),
-    microsecond: Number((newNsec / 1_000n) % 1_000n),
-    nanosecond: Number(newNsec % 1_000n),
-  }) as T;
-}

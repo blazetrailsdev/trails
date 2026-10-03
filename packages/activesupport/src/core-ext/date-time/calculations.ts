@@ -281,5 +281,5 @@ export function compare(datetime: DateTime, other: unknown): number | null {
 }
 
 for (const seat of ["Temporal.PlainDateTime", "Temporal.ZonedDateTime"]) {
-  Object.assign(TEMPORAL_METHOD_TABLE[seat], { isUtc, getutc, getlocal });
+  Object.assign(TEMPORAL_METHOD_TABLE[seat], { isUtc, getutc, getlocal, nsec, change });
 }

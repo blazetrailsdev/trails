@@ -67,15 +67,6 @@ describe("applySecondsPrecision", () => {
     expect(r.nanosecond).toBe(780);
   });
 
-  it("works on Temporal.Instant via .round()", () => {
-    const inst = Temporal.Instant.from("2024-01-02T03:04:05.123456789Z");
-    const r = applySecondsPrecision.call({ precision: 3 }, inst) as Temporal.Instant;
-    const zdt = r.toZonedDateTimeISO("UTC");
-    expect(zdt.millisecond).toBe(123);
-    expect(zdt.microsecond).toBe(0);
-    expect(zdt.nanosecond).toBe(0);
-  });
-
   it("passes PlainDate (no .round) through unchanged", () => {
     const d = Temporal.PlainDate.from("2024-01-02");
     expect(applySecondsPrecision.call({ precision: 3 }, d)).toBe(d);

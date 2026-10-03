@@ -20,6 +20,7 @@ import { ArgumentError } from "./argument-error.js";
 import { rbInspect, rbObjClassname, rbObjRespondTo } from "./object.js";
 import { rbEqual } from "./rb-equal.js";
 import { temporalTag, widenPlainDate } from "./temporal-tag.js";
+import { rbStrCmp } from "./string/support.js";
 
 /**
  * The Ruby class name `rb_obj_class` reports in `rb_cmperr`'s message — Ruby's
@@ -148,7 +149,7 @@ export function cmp(a: unknown, b: unknown): number | null {
       const inv = cmp(b, a);
       return inv === null ? null : -inv;
     }
-    return a < s ? -1 : a > s ? 1 : 0;
+    return rbStrCmp(a, s);
   }
   if (Array.isArray(a)) {
     /* `rb_ary_cmp` (`vendor/ruby/v3.3.11/array.c:5303`) and its `recursive_cmp`
