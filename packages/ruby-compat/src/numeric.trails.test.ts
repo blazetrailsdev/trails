@@ -1,7 +1,19 @@
 import { describe, it, expect } from "vitest";
 import { FloatDomainError } from "./float-domain-error.js";
 import { NoMethodError } from "./no-method-error.js";
-import { anybits, fixDiv, fixMod, isNan, numericMul, round, toF, toI } from "./numeric.js";
+import {
+  anybits,
+  fixDiv,
+  fixMod,
+  isNan,
+  numericMinus,
+  numericModulo,
+  numericMul,
+  numericPow,
+  round,
+  toF,
+  toI,
+} from "./numeric.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
 
 describe("Float#round", () => {
@@ -73,6 +85,39 @@ describe("Numeric#*", () => {
     expect(numericMul(2n ** 60n, 4)).toBe(2n ** 62n);
     expect(toI(numericMul(0.5, 1_000_000))).toBe(500000);
     expect(() => numericMul(1, "a")).toThrow("String can't be coerced into Integer");
+  });
+});
+
+describe("Numeric#-", () => {
+  it("subtracts across the Integer, Float and Rational seats", () => {
+    expect(numericMinus(9, 3)).toBe(6);
+    expect(numericMinus(9, 3.5)).toBe(5.5);
+    expect(numericMinus(2n ** 60n, 1)).toBe(2n ** 60n - 1n);
+    expect(numericMinus(7, new Rational(1, 2))).toEqual(new Rational(13, 2));
+    expect(numericMinus(123456789, 127960.2534332159)).toBe(123328828.74656679);
+    expect(() => numericMinus(1, "a")).toThrow("String can't be coerced into Integer");
+  });
+});
+
+describe("Numeric#%", () => {
+  it("takes the divisor's sign across the Integer, Float and Rational seats", () => {
+    expect(numericModulo(-7, 3)).toBe(2);
+    expect(numericModulo(-7, 2.5)).toBe(0.5);
+    expect(numericModulo(123456789, new Rational(1, 1000))).toEqual(new Rational(0, 1));
+    expect(numericModulo(5.5, new Rational(1, 3))).toBe(0.16666666666666696);
+    expect(() => numericModulo(5, 0)).toThrow("divided by 0");
+    expect(() => numericModulo(5.5, 0)).toThrow("divided by 0");
+  });
+});
+
+describe("Numeric#**", () => {
+  it("answers an Integer, a Rational for a negative Integer exponent, else a Float", () => {
+    expect(numericPow(10, 9)).toBe(1_000_000_000);
+    expect(numericPow(10, 30)).toBe(10n ** 30n);
+    expect(numericPow(10, -1)).toEqual(new Rational(1, 10));
+    expect(numericPow(10, 5.5)).toBe(316227.7660168379);
+    expect(numericPow(0.5, 2)).toBe(0.25);
+    expect(() => numericPow(0, -1)).toThrow("divided by 0");
   });
 });
 

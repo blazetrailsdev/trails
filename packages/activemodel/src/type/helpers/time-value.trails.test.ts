@@ -34,6 +34,13 @@ describe("applySecondsPrecision", () => {
     expect(r.toString()).toBe("2024-01-02T03:04:05");
   });
 
+  it("a non-Integer precision does Float arithmetic", () => {
+    const time = RubyTime.utc(2024, 1, 2, 3, 4, 5, new Rational(123456789, 1000));
+    expect((applySecondsPrecision.call({ precision: 3.5 }, time) as RubyTime).nsec).toBe(123328828);
+    const r = applySecondsPrecision.call({ precision: 3.5 }, dt) as Temporal.PlainDateTime;
+    expect(r.toString()).toBe("2024-01-02T03:04:05.123328828");
+  });
+
   it("precision 0 truncates to whole seconds", () => {
     const r = applySecondsPrecision.call({ precision: 0 }, dt) as Temporal.PlainDateTime;
     expect(r.millisecond).toBe(0);
