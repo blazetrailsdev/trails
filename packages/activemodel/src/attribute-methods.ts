@@ -300,9 +300,7 @@ export const ClassMethods = {
       return;
     }
 
-    const generateMethod = pattern.proxyTarget.endsWith("=")
-      ? camelize(`set_define_method_${pattern.proxyTarget.slice(0, -1)}`, false)
-      : camelize(`define_method_${pattern.proxyTarget}`, false);
+    const generateMethod = camelize(`define_method_${pattern.proxyTarget}`, false);
 
     if (rbObjRespondTo(this, generateMethod, true)) {
       rbFSend(this, generateMethod, String(attrName), { owner, as });

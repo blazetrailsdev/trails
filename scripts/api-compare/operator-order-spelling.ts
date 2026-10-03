@@ -74,13 +74,13 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // active_model/errors.rb:229 `def [](attribute)` → errors.ts `get`.
   "ActiveModel::Errors": { "[]": ["get"] },
   // attribute_set/builder.rb:110 `def [](key)` → builder.ts
-  // `LazyAttributeHash#getAttribute`, and :114 `def []=(key, value)` → `set`,
-  // the same spellings AttributeSet uses below (RFC 0115 retired the Map-facade
-  // `get`/`has` pair this class used to carry). The class is declared at
+  // `LazyAttributeHash#get`, and :114 `def []=(key, value)` → `set`, the names
+  // ruby-compat's `hashAref` / `hashAset` send a non-Hash receiver's `[]` /
+  // `[]=` to. The class is declared at
   // builder.rb:94 directly under `module ActiveModel`, so its fqn is NOT nested
   // under `AttributeSet`. :134 `def ==(other)` → `equals`.
   "ActiveModel::LazyAttributeHash": {
-    "[]": ["getAttribute"],
+    "[]": ["get"],
     "[]=": ["set"],
     "==": ["equals"],
   },

@@ -147,7 +147,7 @@ describe("LazyAttributeHash", () => {
 
   it("delegateHash reflects materialized entries after []", () => {
     const hash = new LazyAttributeHash({ name: strType }, { name: "Bob" });
-    hash.getAttribute("name");
+    hash.get("name");
     expect(Object.hasOwn(hash.delegateHash(), "name")).toBe(true);
   });
 
@@ -160,7 +160,7 @@ describe("LazyAttributeHash", () => {
   it("assignDefaultValue answers undefined for a name in neither values nor types", () => {
     const hash = new LazyAttributeHash({}, {});
     expect(hash.assignDefaultValue("missing")).toBeUndefined();
-    expect(hash.getAttribute("missing")).toBeUndefined();
+    expect(hash.get("missing")).toBeUndefined();
     expect(Object.hasOwn(hash.delegateHash(), "missing")).toBe(false);
   });
 
@@ -213,8 +213,8 @@ describe("LazyAttributeHash", () => {
   it("treats an Object.prototype name as an ordinary absent key", () => {
     const hash = new LazyAttributeHash({}, {});
     expect(hash.isKey("toString")).toBe(false);
-    expect(hash.getAttribute("toString")).toBeUndefined();
-    expect(hash.getAttribute("constructor")).toBeUndefined();
+    expect(hash.get("toString")).toBeUndefined();
+    expect(hash.get("constructor")).toBeUndefined();
   });
 
   it("stores __proto__ as an ordinary key", () => {
@@ -222,7 +222,7 @@ describe("LazyAttributeHash", () => {
     const attr = Attribute.null("__proto__");
     hash.set("__proto__", attr);
     expect(hash.isKey("__proto__")).toBe(true);
-    expect(hash.getAttribute("__proto__")).toBe(attr);
+    expect(hash.get("__proto__")).toBe(attr);
     expect(hash.deepDup().isKey("__proto__")).toBe(true);
   });
 
@@ -240,15 +240,15 @@ describe("LazyAttributeHash", () => {
 
   it("dup copies the delegate hash, so a write to the copy does not reach the receiver", () => {
     const hash = new LazyAttributeHash({ age: intType }, { age: "42" });
-    const age = hash.getAttribute("age");
+    const age = hash.get("age");
     const copy = hash.dup();
     expect(copy).toBeInstanceOf(LazyAttributeHash);
     expect(copy.delegateHash()).not.toBe(hash.delegateHash());
-    expect(copy.getAttribute("age")).toBe(age);
+    expect(copy.get("age")).toBe(age);
     copy.set("name", Attribute.null("name"));
     expect(Object.keys(hash.delegateHash())).toEqual(["age"]);
     expect(copy.isKey("constructor")).toBe(false);
-    expect(copy.getAttribute("constructor")).toBeUndefined();
+    expect(copy.get("constructor")).toBeUndefined();
   });
 
   it("deep_dup carries the receiver's materialized flag", () => {

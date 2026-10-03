@@ -6,6 +6,7 @@ import {
   hashAset,
   hashDelete,
   isSymbol,
+  rbFSend,
   rbInspect,
   rbObjDup,
   rbObjRespondTo,
@@ -338,13 +339,19 @@ export function transformKeysBang(
   return hash;
 }
 
-export function reverseMerge<T extends AnyObject>(obj: T, otherHash: AnyObject): T {
+export function reverseMerge<T extends object>(obj: T, otherHash: object): T {
+  if (!(otherHash instanceof Map) && !isPlainObject(otherHash)) {
+    return rbFSend(otherHash, "merge", obj) as T;
+  }
   return { ...otherHash, ...obj } as T;
 }
 
 export const withDefaults = reverseMerge;
 
-export function reverseMergeBang<T extends AnyObject>(hash: T, otherHash: AnyObject): T {
+export function reverseMergeBang<T extends object>(hash: T, otherHash: object): T {
+  if (!(hash instanceof Map) && !isPlainObject(hash)) {
+    return rbFSend(hash, "reverseMergeBang", otherHash) as T;
+  }
   const merged = reverseMerge(hash, otherHash);
   if (Object.isFrozen(hash)) {
     throw new FrozenError(`can't modify frozen Hash: ${rbInspect(hash)}`, { receiver: hash });

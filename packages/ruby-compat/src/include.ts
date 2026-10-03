@@ -1034,7 +1034,9 @@ type CallableMethods<M extends object> = {
       : never;
 };
 
-export type Included<M extends object> = CallableMethods<M>;
+export type Included<M extends object> = CallableMethods<
+  M extends Module ? Omit<M, keyof Module> : M
+>;
 
 function isClass(klass: object): klass is AnyClass {
   return typeof klass === "function";

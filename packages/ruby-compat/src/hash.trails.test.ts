@@ -111,6 +111,61 @@ describe("Hash#fetch with a block", () => {
   });
 });
 
+describe("Hash#[] and Hash#[]= on a non-Hash receiver", () => {
+  class Store {
+    seen: Record<string, unknown> = {};
+    get(key: string): unknown {
+      return `got ${key}`;
+    }
+    set(key: string, value: unknown): void {
+      this.seen[key] = value;
+    }
+    eachValue(block: (value: unknown) => void): void {
+      block("each");
+    }
+    transformValues(block: (value: unknown) => unknown): Record<string, unknown> {
+      return { a: block("value") };
+    }
+    except(...keys: string[]): Record<string, unknown> {
+      return { excepted: keys };
+    }
+  }
+
+  it("sends [] and []= to the receiver's own get and set", () => {
+    const store = new Store();
+    expect(hashAref(store, "a")).toBe("got a");
+    expect(hashAset(store, "a", 1)).toBe(1);
+    expect(store.seen).toEqual({ a: 1 });
+  });
+
+  it("sends each_value, transform_values and except to the receiver", () => {
+    const store = new Store();
+    const yielded: unknown[] = [];
+    eachValue(store, (value) => yielded.push(value));
+    expect(yielded).toEqual(["each"]);
+    expect(transformValues(store, (value) => `${String(value)}!`)).toEqual({ a: "value!" });
+    expect(except(store, "x", "y")).toEqual({ excepted: ["x", "y"] });
+  });
+
+  it("lets a receiver's get read its own plain store through hashAref", () => {
+    class Wrapper {
+      store: Record<string, unknown> = { get: "data" };
+      get(key: string): unknown {
+        return hashAref(this.store, key);
+      }
+    }
+    expect(hashAref(new Wrapper(), "get")).toBe("data");
+    expect(hashAref(new Wrapper(), "missing")).toBeNull();
+  });
+
+  it("reads a plain hash's own get and set keys as data", () => {
+    const hash: Record<string, unknown> = { get: () => "no", set: 1 };
+    expect(hashAref(hash, "missing")).toBeNull();
+    expect(hashAset(hash, "set", 2)).toBe(2);
+    expect(hash.set).toBe(2);
+  });
+});
+
 describe("Hash#key?", () => {
   it("is true for a stored null and false for an absent key", () => {
     expect(hasKey({ offset: null }, "offset")).toBe(true);
