@@ -1,6 +1,8 @@
 import { Attribute } from "../attribute.js";
 import type { Block } from "@blazetrails/ruby-compat";
 import {
+  hashAref,
+  hashAset,
   block as rbBlock,
   dup,
   each,
@@ -78,7 +80,7 @@ export class LazyAttributeSet extends AttributeSet {
   }
 
   override fetchValue(name: string, block?: (name: string) => unknown): unknown {
-    const attr = this._attributes[name];
+    const attr = hashAref(this._attributes, name) as Attribute | null;
     if (attr) {
       return attr.value(block);
     }
@@ -131,12 +133,12 @@ export class LazyAttributeSet extends AttributeSet {
 
     if (valuePresent) {
       const attr = Attribute.fromDatabase(name, value, type, this.castedValues[name]);
-      this._attributes[name] = attr;
+      hashAset(this._attributes, name, attr);
       return attr;
     } else if (hasKey(this.types, name)) {
       const attr = this.defaultAttributes[name];
       const built = attr ? attr.dup() : Attribute.uninitialized(name, type);
-      this._attributes[name] = built;
+      hashAset(this._attributes, name, built);
       return built;
     } else {
       return Attribute.null(name);

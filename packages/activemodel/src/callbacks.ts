@@ -4,6 +4,7 @@ import {
   kernelArray,
   type CallbackKind,
   assertValidKeys,
+  camelize,
   extractOptionsBang,
   type CallbackOptions,
   type FilterListEntry,
@@ -57,13 +58,7 @@ export function defineModelCallbacks(this: object, ...args: unknown[]): void {
     if (klass.prototype) defineCallbacks(klass.prototype, callback, options);
 
     for (const type of types) {
-      const t = String(type);
-      rbFSend(
-        this,
-        `_define${t.charAt(0).toUpperCase()}${t.slice(1)}ModelCallback`,
-        this,
-        callback,
-      );
+      rbFSend(this, `_${camelize(`define_${type}_model_callback`, false)}`, this, callback);
     }
   }
 }

@@ -173,7 +173,10 @@ export function indexBy<T, K extends string | number>(
   return result;
 }
 
-export function indexWith<T, V>(collection: T[], defaultOrBlock: V | ((elem: T) => V)): Hash<T, V> {
+export function indexWith<T, V>(
+  collection: readonly T[],
+  defaultOrBlock: V | ((elem: T) => V),
+): Hash<T, V> {
   const result = new Hash<T, V>();
   if (typeof defaultOrBlock === "function") {
     const block = defaultOrBlock as (elem: T) => V;

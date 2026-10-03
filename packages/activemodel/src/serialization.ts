@@ -186,7 +186,7 @@ export function serializableAttributes(
   attributeNames: readonly string[],
 ): Record<string, unknown> {
   return Object.fromEntries(
-    indexWith([...attributeNames], (n) => this.readAttributeForSerialization(n)),
+    indexWith(attributeNames, (n) => this.readAttributeForSerialization(n)),
   );
 }
 
