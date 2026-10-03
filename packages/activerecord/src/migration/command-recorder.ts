@@ -249,6 +249,20 @@ export class CommandRecorder {
     return ["addIndex", result];
   }
 
+  /** @internal */
+  invertAddBelongsTo(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return StraightReversions.instanceMethod("invertAddReference")!.value.call(this, args, block);
+  }
+
+  /** @internal */
+  invertRemoveBelongsTo(args: unknown[], block?: MigrationBlock): MigrationCommand {
+    return StraightReversions.instanceMethod("invertRemoveReference")!.value.call(
+      this,
+      args,
+      block,
+    );
+  }
+
   /**
    * @internal
    * @missingRailsCall delete — PERMANENT
@@ -587,11 +601,6 @@ export class CommandRecorder {
 }
 
 include(CommandRecorder, StraightReversions);
-{
-  const proto = CommandRecorder.prototype as unknown as Record<string, unknown>;
-  proto["invertAddBelongsTo"] = proto["invertAddReference"];
-  proto["invertRemoveBelongsTo"] = proto["invertRemoveReference"];
-}
 
 const REVERSIBLE_AND_IRREVERSIBLE_METHODS = [
   "createTable",
