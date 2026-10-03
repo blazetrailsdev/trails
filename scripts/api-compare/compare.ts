@@ -2109,8 +2109,9 @@ export function skeletonIsAnotherOwners(
  * (`activemodel/lib/active_model/validations/with.rb:88`, `:148`) meets its own
  * port.
  *
- * `byOwner` holds each body once. A class owner still reads by name, and so
- * does a name whose owners all share one body.
+ * `byOwner` holds each body once: a namespace entity re-lists the file's
+ * top-level functions, so one declaration arrives under two owners. A class
+ * owner still reads by name, and so does a name whose owners share one body.
  */
 export function skeletonsOfOwner(
   byName: string[][] | undefined,
@@ -4618,8 +4619,6 @@ export function main() {
         const owners = tsSkeletonOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
         owners.set(m.name, (owners.get(m.name) ?? new Set<string>()).add(owner));
         tsSkeletonOwnersByFileName.set(file, owners);
-        // One body per owner map: a namespace entity re-lists the file's
-        // top-level functions, so the same declaration arrives under two owners.
         const body = `${m.file ?? file}\0${m.name}\0${m.line}`;
         if (!tsSkeletonBodies.has(body)) {
           tsSkeletonBodies.add(body);

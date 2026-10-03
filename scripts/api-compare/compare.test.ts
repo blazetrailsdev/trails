@@ -4084,8 +4084,6 @@ describe("skeletonIsAnotherOwners", () => {
 });
 
 describe("skeletonsOfOwner", () => {
-  // `validations/with.ts`: `validatesWith` is a body on the `ClassMethods`
-  // object literal and another as the top-level instance function.
   const instance = ["ref:extractOptionsBang", "ref:constructor", "loop"];
   const classMethod = ["ref:extractOptionsBang", "loop", "if"];
   const byName = [classMethod, instance];
