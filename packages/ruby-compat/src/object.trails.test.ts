@@ -577,6 +577,17 @@ describe("rbObjIsKindOf", () => {
     expect(rbObjIsKindOf(new Sub(), rbCBasicObject)).toBe(true);
   });
 
+  it("answers for a module included by an included module", () => {
+    class K {}
+    const m1 = new Module();
+    const m2 = new Module();
+    m1.include(m2);
+    include(K, m1);
+    expect(rbObjIsKindOf(new K(), m1)).toBe(true);
+    expect(rbObjIsKindOf(new K(), m2)).toBe(true);
+    expect(rbModAncestors(K)).toContain(m2);
+  });
+
   it("raises TypeError for an argument that is no class or module", () => {
     expect(() => rbObjIsKindOf(1, 5)).toThrow(TypeError);
     expect(() => rbObjIsKindOf(1, 5)).toThrow("class or module required");
