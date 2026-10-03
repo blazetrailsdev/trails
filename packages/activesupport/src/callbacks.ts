@@ -1142,7 +1142,7 @@ export const ClassMethods = {
         target.setCallbacks(name, new CallbackChain(name, options));
       });
 
-      if (!(`_run${camelize(name)}Callbacks` in this.prototype)) {
+      if (!Object.prototype.hasOwnProperty.call(this.prototype, `_run${camelize(name)}Callbacks`)) {
         Object.defineProperty(this.prototype, `_run${camelize(name)}Callbacks`, {
           value(this: object, block?: () => unknown) {
             return runCallbacks(this, name, block);
