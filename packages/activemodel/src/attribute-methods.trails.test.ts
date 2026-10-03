@@ -8,6 +8,7 @@ import { AttrNames, AttributeMethods, defineMethodAttribute } from "./attribute-
 import { Model } from "./index.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 import { include } from "@blazetrails/activesupport";
+import { NoMethodError } from "./attribute-assignment.js";
 
 describe("AttributeMethodsTest (trails)", () => {
   it("generating alias attribute methods clears the attribute method patterns cache", () => {
@@ -75,6 +76,28 @@ describe("AttributeMethodsTest (trails)", () => {
     person.nickname = "Alex";
     expect(person.name).toBe("Alex");
     expect(new Plain().nickname()).toBe("plain");
+  });
+
+  it("an alias of a method that is not an attribute sends the target and its writer", () => {
+    class Person extends Model {
+      declare shout: string;
+      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
+
+      static {
+        include(this, Attributes);
+        this.aliasAttribute("shout", "yell");
+      }
+      yell(): string {
+        return "AHOY";
+      }
+    }
+    interface Person extends Attributes {}
+
+    const person = new Person();
+    expect(person.shout).toBe("AHOY");
+    expect(() => {
+      person.shout = "quiet";
+    }).toThrow(NoMethodError);
   });
 
   it("alias attribute overrides a method inherited from a parent class", () => {
