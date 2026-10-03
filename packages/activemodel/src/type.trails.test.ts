@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as Types from "./index.js";
+import { TypeRegistry } from "./type/registry.js";
 
 describe("Type#itselfIfSerializeCastValueCompatible", () => {
   it("a subclass inheriting both from Type::Value is incompatible", () => {
@@ -52,5 +53,22 @@ describe("Type#itselfIfSerializeCastValueCompatible", () => {
       }
     }
     expect(new CastOnly().itselfIfSerializeCastValueCompatible()).toBeInstanceOf(CastOnly);
+  });
+});
+
+describe("Type.registry= (type.rb:25)", () => {
+  it("register and lookup go through the assigned registry", () => {
+    const original = Types.Type.registry();
+    const registry = new TypeRegistry();
+    try {
+      Types.Type.setRegistry(registry);
+      expect(Types.Type.registry()).toBe(registry);
+      expect(() => Types.Type.lookup("string")).toThrow("Unknown type :string");
+      Types.Type.register("string", Types.StringType);
+      expect(Types.Type.lookup("string")).toBeInstanceOf(Types.StringType);
+    } finally {
+      Types.Type.setRegistry(original);
+    }
+    expect(Types.Type.registry()).toBe(original);
   });
 });
