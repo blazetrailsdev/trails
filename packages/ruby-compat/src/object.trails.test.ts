@@ -495,8 +495,8 @@ describe("rbModAttrReader / rbModAttrWriter / rbModMethodDefined", () => {
 
   it("defines the accessors in a Module's own method table", () => {
     const mod = new Module();
-    rbModAttrReader(mod, "terms");
-    rbModAttrWriter(mod, "terms");
+    mod.attrReader("terms");
+    mod.attrWriter("terms");
     expect(mod.isMethodDefined("terms")).toBe(true);
 
     class Person {}

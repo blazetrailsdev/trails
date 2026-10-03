@@ -36,6 +36,8 @@ import {
   rbCNumeric,
   rbCString,
   rbCTime,
+  rbModAttrReader,
+  rbModAttrWriter,
   rbModName,
   rbModToS,
 } from "./object.js";
@@ -487,6 +489,26 @@ export class Module {
       proto = Object.getPrototypeOf(proto) as object | null;
     }
     return undefined;
+  }
+
+  /**
+   * Mirrors: Ruby's Module#attr_reader — vendor/ruby/v3.3.11/object.c:2279
+   * `rb_mod_attr_reader`.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  attrReader(...argv: string[]): void {
+    this.moduleEval((mod) => rbModAttrReader({ prototype: mod }, ...argv));
+  }
+
+  /**
+   * Mirrors: Ruby's Module#attr_writer — vendor/ruby/v3.3.11/object.c:2335
+   * `rb_mod_attr_writer`.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  attrWriter(...argv: string[]): void {
+    this.moduleEval((mod) => rbModAttrWriter({ prototype: mod }, ...argv));
   }
 
   /**
