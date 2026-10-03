@@ -10,7 +10,7 @@ import {
   type Included,
   type Extended,
 } from "@blazetrails/activesupport";
-import { Module, rbObjDup } from "@blazetrails/ruby-compat";
+import { rbObjDup } from "@blazetrails/ruby-compat";
 import { humanAttributeName as translationHumanAttributeName } from "./translation.js";
 import { ModelName } from "./naming.js";
 import { defineModelCallbacks as defineModelCallbacksImpl } from "./callbacks.js";
@@ -22,7 +22,7 @@ import { ClassMethods as WithClassMethods } from "./validations/with.js";
 import type { ClassMethods as ConversionClassMethods } from "./conversion.js";
 import { Access } from "./access.js";
 import { Naming } from "./naming.js";
-import { API, initialize as apiInitialize } from "./api.js";
+import { API } from "./api.js";
 
 type ValidatorLike = ValidatorBase | EachValidator | { validate(record: ValidatableRecord): void };
 
@@ -30,8 +30,6 @@ type ValidatorLike = ValidatorBase | EachValidator | { validate(record: Validata
 export interface Model extends API, Access, Naming {
   freeze(): this;
 
-  /** @internal */
-  initInternals(): void;
   /** @internal */
   initializeDup(other: unknown): void;
 }
@@ -136,11 +134,9 @@ export class Model {
       enumerable: false,
     });
 
-    this.initInternals();
-
     this._initializingAttributes = true;
     try {
-      apiInitialize.call(this, attributes);
+      this.initialize(attributes);
     } finally {
       this._initializingAttributes = false;
     }
@@ -161,10 +157,6 @@ export class Model {
   declare runCallbacks: Included<typeof ASCallbacks>["runCallbacks"];
 }
 
-/** @internal */
-export function initInternals(this: Model): void {}
-
-include(Model, new Module((mod) => mod.defineMethod("initInternals", initInternals)));
 include(Model, API);
 
 include(Model, ToJsonWithActiveSupportEncoder);

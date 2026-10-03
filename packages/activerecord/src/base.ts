@@ -2399,6 +2399,7 @@ extend(Base, LockingOptimistic.ClassMethods);
 extend(Base, SignedId.ClassMethods);
 extend(Base, _Core.ClassMethods);
 include(Base, _Core.Core);
+include(Base, new Module((mod) => mod.defineMethod("initInternals", _Core.initInternals)));
 include(Base, Inheritance.Inheritance);
 include(Base, _Integration);
 include(Base, LockingOptimistic.Optimistic);
@@ -2695,7 +2696,7 @@ include(Base, _AttributeAssignment.AttributeAssignment);
 include(Base, AutosaveAssociation);
 prepend(Base, { loadSchemaBang: CounterCache.loadSchemaBang as PrependMethod });
 prepend(Base, { loadSchemaBang: _EncryptableRecord.loadSchemaBang as PrependMethod });
-prepend(Base.prototype, { initInternals: _Core.initInternals as PrependMethod });
+prepend(Base.prototype, { initialize: _Core.constructor as PrependMethod });
 prepend(Base.prototype, { initInternals: _Persistence.initInternals as PrependMethod });
 prepend(Base.prototype, {
   initInternals: _AttributeMethodsDirty.initInternals as PrependMethod,

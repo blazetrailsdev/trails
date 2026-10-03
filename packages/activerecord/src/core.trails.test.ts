@@ -121,6 +121,12 @@ describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
     expect(loaded.isNewRecord()).toBe(false);
   });
 
+  it("init_internals is rooted at Core, beneath ActiveModel::Dirty's", () => {
+    const record = new Topic() as unknown as Record<string, unknown>;
+    expect(record._readonly).toBe(false);
+    expect(record._mutationsBeforeLastSave).toBeNull();
+  });
+
   it("allocate leaves the class untouched when the constructor returns", () => {
     Reply.allocate();
     const before = [ownState(Reply), ownState(Topic)];

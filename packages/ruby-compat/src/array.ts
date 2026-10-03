@@ -216,12 +216,12 @@ export function pack(ary: ReadonlyArray<string | number | bigint>, fmt: string):
 }
 
 /**
- * @noRailsEquivalent PERMANENT — Ruby core `String#unpack1`, the `h` directive
- * (`vendor/ruby/v3.3.11/pack.c:1125`).
+ * @noRailsEquivalent PERMANENT — Ruby core `String#unpack1`, the `h` and `H`
+ * directives (`vendor/ruby/v3.3.11/pack.c:1125,1145`).
  */
 export function unpack1(
-  str: string,
-  fmt: `h${string}`,
+  str: string | Uint8Array,
+  fmt: `h${string}` | `H${string}`,
   options?: { offset?: number },
 ): string | null;
 /**
@@ -233,25 +233,31 @@ export function unpack1(
  * absolute byte position (`pack.c:1531-1535`) — plus the `<` / `>` modifiers
  * (`pack.c:1014-1023`). Every other directive reaches `unknown_directive`.
  *
- * `str` is read as bytes, one code unit per byte, as {@link pack} writes them.
+ * `str` is read as bytes, one code unit per byte, as {@link pack} writes them,
+ * or as the bytes of a `Uint8Array`, the binary String seat.
  * `PACK_LENGTH_ADJUST_SIZE` (`pack.c:904-912`) caps a count at what the rest
  * of the string holds, so an item short of bytes pushes nothing.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `String#unpack1`
  * (`vendor/ruby/v3.3.11/pack.c:1621`).
  */
-export function unpack1(str: string, fmt: string, options?: { offset?: number }): number | null;
+export function unpack1(
+  str: string | Uint8Array,
+  fmt: string,
+  options?: { offset?: number },
+): number | null;
 /**
  * @noRailsEquivalent PERMANENT — Ruby core `String#unpack1`
  * (`vendor/ruby/v3.3.11/pack.c:1621`).
  */
 export function unpack1(
-  str: string,
+  str: string | Uint8Array,
   fmt: string,
   { offset = 0 }: { offset?: number } = {},
 ): number | string | null {
   if (offset < 0) throw new ArgumentError("offset can't be negative");
-  const send = str.length;
+  const ptr = typeof str === "string" ? Uint8Array.from(str, (c) => c.charCodeAt(0) & 0xff) : str;
+  const send = ptr.length;
   if (offset > send) throw new ArgumentError("offset outside of string");
   let s = offset;
   let p = 0;
@@ -299,7 +305,7 @@ export function unpack1(
       if (len > 0) {
         let val = 0n;
         for (let i = 0; i < integerSize; i++) {
-          const byte = BigInt(str.charCodeAt(bigendianP ? s + i : s + integerSize - 1 - i) & 0xff);
+          const byte = BigInt(ptr[bigendianP ? s + i : s + integerSize - 1 - i]);
           val = (val << 8n) | byte;
         }
         return Number(signedP ? BigInt.asIntN(integerSize * 8, val) : val);
@@ -310,7 +316,7 @@ export function unpack1(
       if (len > Math.floor((send - s) / 8)) len = Math.floor((send - s) / 8);
       if (len > 0) {
         const tmp = new DataView(new ArrayBuffer(8));
-        for (let i = 0; i < 8; i++) tmp.setUint8(i, str.charCodeAt(s + i) & 0xff);
+        for (let i = 0; i < 8; i++) tmp.setUint8(i, ptr[s + i]);
         return tmp.getFloat64(0, true);
       }
       continue;
@@ -321,13 +327,24 @@ export function unpack1(
       let bitstr = "";
       for (let i = 0; i < len; i++) {
         if (i & 1) bits >>= 4;
-        else bits = str.charCodeAt(s++) & 0xff;
+        else bits = ptr[s++];
         bitstr += "0123456789abcdef"[bits & 15];
       }
       return bitstr;
     }
+    if (type === "H") {
+      if (fmt[p - 1] === "*" || len > (send - s) * 2) len = (send - s) * 2;
+      let bits = 0;
+      let bitstr = "";
+      for (let i = 0; i < len; i++) {
+        if (i & 1) bits <<= 4;
+        else bits = ptr[s++];
+        bitstr += "0123456789abcdef"[(bits >> 4) & 15];
+      }
+      return bitstr;
+    }
     if (type === "@") {
-      if (len > str.length) throw new ArgumentError("@ outside of string");
+      if (len > send) throw new ArgumentError("@ outside of string");
       s = len;
       continue;
     }

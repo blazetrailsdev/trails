@@ -721,6 +721,33 @@ export function arelTable(this: CoreHost): Table {
 /** @internal */
 export const _allocation: { klass: unknown } = { klass: null };
 
+export function constructor(
+  this: CoreRecord & {
+    _attributes: import("@blazetrails/activemodel").AttributeSet;
+    _newRecord: boolean;
+    initInternals(): void;
+  },
+  super_: (attributes: unknown) => void,
+  attributes: unknown = null,
+): void {
+  const allocating = _allocation.klass === this.constructor;
+  if (allocating) _allocation.klass = null;
+  if (!allocating) {
+    this._newRecord = true;
+    this._attributes = (
+      this.constructor as unknown as {
+        _defaultAttributes(): import("@blazetrails/activemodel").AttributeSet;
+      }
+    )
+      ._defaultAttributes()
+      .deepDup();
+  }
+
+  this.initInternals();
+
+  super_(attributes);
+}
+
 /** @internal */
 export function initInternals(
   this: CoreRecord & {
@@ -736,22 +763,7 @@ export function initInternals(
     _strictLoadingMode?: StrictLoadingMode;
     _primaryKey?: string | string[] | null;
   },
-  super_: () => void,
 ): void {
-  const allocating = _allocation.klass === this.constructor;
-  if (allocating) _allocation.klass = null;
-  if (this._attributes == null && !allocating) {
-    this._newRecord = true;
-    this._attributes = (
-      this.constructor as unknown as {
-        _defaultAttributes(): import("@blazetrails/activemodel").AttributeSet;
-      }
-    )
-      ._defaultAttributes()
-      .deepDup();
-  }
-
-  super_();
   this._readonly = false;
   this._previouslyNewRecord = false;
   this._destroyed = false;

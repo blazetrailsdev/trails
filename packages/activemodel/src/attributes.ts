@@ -30,7 +30,7 @@ export function constructor(
   ...args: unknown[]
 ): void {
   this._attributes = this.constructor._defaultAttributes().deepDup();
-  SuperMethods.superMethod(this, "initInternals")!(...args);
+  SuperMethods.superMethod(this, "initialize")!(...args);
 }
 
 export function initializeDup(this: AttributeInstanceHost, other: unknown): void {
@@ -66,7 +66,7 @@ export function freeze<T extends AttributeInstanceHost>(this: T): T {
 }
 
 const SuperMethods = new Module((mod) => {
-  mod.defineMethod("initInternals", constructor);
+  mod.defineMethod("initialize", constructor);
   mod.defineMethod("initializeDup", initializeDup);
   mod.defineMethod("freeze", freeze);
 });

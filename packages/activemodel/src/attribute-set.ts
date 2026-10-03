@@ -6,15 +6,14 @@ import {
 } from "@blazetrails/activesupport";
 import { Attribute } from "./attribute.js";
 import type { LazyAttributeHash } from "./attribute-set/builder.js";
-import type { Block } from "@blazetrails/ruby-compat";
 import {
   FrozenError,
   block,
   dup,
-  eachKey as hashEachKey,
+  eachKey,
   eachValue,
   except,
-  fetch as hashFetch,
+  fetch,
   hasKey,
   rbDeclareIvar,
   rbFPublicSend,
@@ -47,42 +46,19 @@ function frozenErrorRaisingStore(attributes: Record<string, Attribute>): Record<
 
 type Attributes = Record<string, Attribute> | LazyAttributeHash;
 
-function isHash(attributes: Attributes): attributes is Record<string, Attribute> {
-  return isPlainObject(attributes);
-}
-
 function aref(attributes: Attributes, name: string): Attribute | undefined {
-  return isHash(attributes) ? attributes[name] : attributes.getAttribute(name);
+  return isPlainObject(attributes) ? attributes[name] : attributes.getAttribute(name);
 }
 
 function aset(attributes: Attributes, name: string, value: Attribute): Attribute {
-  if (isHash(attributes)) attributes[name] = value;
+  if (isPlainObject(attributes)) attributes[name] = value;
   else attributes.set(name, value);
   return value;
 }
 
-function isKey(attributes: Attributes, name: string): boolean {
-  return isHash(attributes) ? hasKey(attributes, name) : attributes.isKey(name);
-}
-
-function eachKey(attributes: Attributes): string[] {
-  return isHash(attributes) ? hashEachKey(attributes) : attributes.eachKey();
-}
-
-function fetch(
-  attributes: Attributes,
-  name: string,
-  ...rest: [] | [Attribute] | [Block<Attribute>]
-): Attribute {
-  if (!isHash(attributes)) return attributes.fetch(name, ...rest);
-  return rest.length === 0
-    ? hashFetch<Attribute>(attributes, name)
-    : hashFetch<Attribute>(attributes, name, rest[0] as Attribute);
-}
-
 function reverseMergeBang(attributes: Attributes, otherHash: Attributes): unknown {
-  if (!isHash(attributes)) return rbFPublicSend(attributes, "reverseMergeBang", otherHash);
-  if (!isHash(otherHash)) return rbFPublicSend(otherHash, "merge", attributes);
+  if (!isPlainObject(attributes)) return rbFPublicSend(attributes, "reverseMergeBang", otherHash);
+  if (!isPlainObject(otherHash)) return rbFPublicSend(otherHash, "merge", attributes);
   return hashReverseMergeBang(attributes, otherHash);
 }
 
@@ -90,7 +66,7 @@ function transformValues<T>(
   attributes: Attributes,
   block: (attr: Attribute) => T,
 ): Record<string, T> {
-  return isHash(attributes)
+  return isPlainObject(attributes)
     ? hashTransformValues(attributes, block)
     : attributes.transformValues(block);
 }
@@ -100,13 +76,13 @@ export class AttributeSet {
 
   eachValue(fn: (attr: Attribute) => void): void {
     const attributes = this.attributes();
-    if (isHash(attributes)) eachValue(attributes, fn);
+    if (isPlainObject(attributes)) eachValue(attributes, fn);
     else attributes.eachValue(fn);
   }
 
   fetch<T = Attribute>(name: string, defaultOrBlock?: T | ((name: string) => T)): Attribute | T {
-    const attributes = this.attributes();
-    if (defaultOrBlock === undefined) return fetch(attributes, name);
+    const attributes = this.attributes() as Record<string, Attribute>;
+    if (defaultOrBlock === undefined) return fetch<Attribute>(attributes, name);
     return typeof defaultOrBlock === "function"
       ? fetch(attributes, name, block(defaultOrBlock as (name: string) => Attribute))
       : fetch(attributes, name, defaultOrBlock as Attribute);
@@ -114,11 +90,11 @@ export class AttributeSet {
 
   except(...names: string[]): Record<string, Attribute> {
     const attributes = this.attributes();
-    return isHash(attributes) ? except(attributes, ...names) : attributes.except(...names);
+    return isPlainObject(attributes) ? except(attributes, ...names) : attributes.except(...names);
   }
 
   constructor(attributes: Attributes = {}) {
-    this._attributes = isHash(attributes)
+    this._attributes = isPlainObject(attributes)
       ? frozenErrorRaisingStore(
           Object.setPrototypeOf(attributes, null) as Record<string, Attribute>,
         )
@@ -146,7 +122,7 @@ export class AttributeSet {
   }
 
   isKey(name: string): boolean {
-    return isKey(this.attributes(), name) && this.getAttribute(name).isInitialized();
+    return hasKey(this.attributes(), name) && this.getAttribute(name).isInitialized();
   }
 
   isInclude(name: string): boolean {
@@ -154,7 +130,9 @@ export class AttributeSet {
   }
 
   keys(): string[] {
-    return eachKey(this.attributes()).filter((name) => this.getAttribute(name).isInitialized());
+    return eachKey(this.attributes() as Record<string, Attribute>).filter((name) =>
+      this.getAttribute(name).isInitialized(),
+    );
   }
 
   fetchValue(name: string, block?: (name: string) => unknown): unknown {
@@ -189,14 +167,14 @@ export class AttributeSet {
 
   initializeDup(_: AttributeSet): void {
     const attributes = this._attributes;
-    this._attributes = isHash(attributes)
+    this._attributes = isPlainObject(attributes)
       ? frozenErrorRaisingStore(dup(attributes))
       : attributes.dup();
   }
 
   initializeClone(_: AttributeSet): void {
     const attributes = this._attributes;
-    this._attributes = isHash(attributes)
+    this._attributes = isPlainObject(attributes)
       ? frozenErrorRaisingStore(rbObjClone(attributes))
       : rbObjClone(attributes);
   }
@@ -208,7 +186,9 @@ export class AttributeSet {
   }
 
   accessed(): string[] {
-    return eachKey(this.attributes()).filter((name) => this.getAttribute(name).hasBeenRead());
+    return eachKey(this.attributes() as Record<string, Attribute>).filter((name) =>
+      this.getAttribute(name).hasBeenRead(),
+    );
   }
 
   map(fn: (attr: Attribute) => Attribute): AttributeSet {

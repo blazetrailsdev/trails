@@ -1,4 +1,5 @@
 import { extend, include, included, initializeIncludedModules } from "@blazetrails/activesupport";
+import { Module } from "@blazetrails/ruby-compat";
 import {
   assignAttributes,
   setAttributes,
@@ -23,9 +24,13 @@ export function initialize(this: APIHost, attributes: Record<string, unknown> = 
   initializeIncludedModules(this);
 }
 
+const SuperMethods = new Module((mod) => mod.defineMethod("initialize", initialize));
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (api.rb:58); the class/interface merge is how `include()` surfaces on the type side.
 export class API {
   static [included](base: IncludingClass): void {
+    include(base, SuperMethods);
+
     include(base, {
       assignAttributes,
       setAttributes,
@@ -52,6 +57,8 @@ export class API {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (api.rb:58); the class/interface merge is how `include()` surfaces on the type side.
 export interface API extends Conversion {
+  /** @internal */
+  initialize(attributes?: Record<string, unknown>): void;
   assignAttributes(newAttributes: unknown): void;
   setAttributes(newAttributes: unknown): Promise<void> | void;
   attributeWriterMissing(name: string, value: unknown): void;

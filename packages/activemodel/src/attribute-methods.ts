@@ -659,12 +659,12 @@ export function defineMethodAttribute(
  * @internal
  * @noRailsEquivalent CONVERGEABLE attribute-methods-construction-time-resurrection-has-no-rails-site
  */
-export function initInternals(this: { constructor: ClassMethodsHost }): void {
+export function initialize(this: { constructor: ClassMethodsHost }, ...args: unknown[]): void {
   _resurrectAttributeMethods(this.constructor);
-  SuperMethods.superMethod(this, "initInternals")!();
+  SuperMethods.superMethod(this, "initialize")!(...args);
 }
 
-const SuperMethods = new Module((mod) => mod.defineMethod("initInternals", initInternals));
+const SuperMethods = new Module((mod) => mod.defineMethod("initialize", initialize));
 
 export function _resurrectAttributeMethods(klass: ClassMethodsHost): void {
   const patterns = klass.attributeMethodPatterns;
