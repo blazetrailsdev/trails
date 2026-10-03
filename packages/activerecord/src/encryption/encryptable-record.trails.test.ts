@@ -19,6 +19,7 @@ import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Serialized } from "../type/serialized.js";
 import { Base } from "../base.js";
 import { LengthValidator } from "@blazetrails/activemodel";
+import type { Hash } from "@blazetrails/ruby-compat";
 import { BinaryType } from "@blazetrails/activemodel";
 
 describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
@@ -49,8 +50,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
 
     const validatorsFor = (name: string): unknown[] =>
       (
-        EncryptedBookValidatingColumnSize as unknown as { _validators?: Map<string, unknown[]> }
-      )._validators?.get(name) ?? [];
+        EncryptedBookValidatingColumnSize as unknown as { _validators: Hash<string, unknown[]> }
+      )._validators.get(name)!;
 
     expect(validatorsFor("name").some((v) => v instanceof LengthValidator)).toBe(false);
 
