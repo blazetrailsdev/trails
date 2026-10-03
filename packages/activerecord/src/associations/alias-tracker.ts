@@ -52,9 +52,9 @@ export class AliasTracker {
   ): AliasTracker {
     return pool.withConnectionSync((connection: any): AliasTracker => {
       if (joins.length === 0) {
-        aliases ||= new Hash<string, number>(0);
+        aliases ??= new Hash<string, number>(0);
       } else if (aliases) {
-        const defaultProc = aliases.defaultProc() || (() => 0);
+        const defaultProc = aliases.defaultProc() ?? (() => 0);
         aliases.setDefaultProc((h, k) => {
           const count = AliasTracker.initialCountFor(connection, k, joins) + defaultProc(h, k);
           h.set(k, count);
@@ -78,8 +78,8 @@ export class AliasTracker {
 
     const counts = tableJoins.map((join): number => {
       if (join instanceof Nodes.StringJoin) {
-        quotedNameEscaped ||= regexpEscape(connection.quoteTableName(name));
-        nameEscaped ||= regexpEscape(name);
+        quotedNameEscaped ??= regexpEscape(connection.quoteTableName(name));
+        nameEscaped ??= regexpEscape(name);
 
         return Array.from(
           join.left
@@ -106,7 +106,7 @@ export class AliasTracker {
     tableName: string | null = null,
     block: () => string,
   ): Table | any {
-    tableName ||= arelTable.name as string;
+    tableName ??= arelTable.name as string;
 
     if (this.aliases.get(tableName) === 0) {
       this.aliases.set(tableName, 1);
