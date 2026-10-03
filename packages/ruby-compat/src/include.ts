@@ -213,7 +213,11 @@ export class Module {
     const appendFeatures = featureHook(mod, "appendFeatures");
     if (appendFeatures) {
       appendFeatures(this);
-      featureHook(mod, "included")?.(this);
+      if (typeof (mod as ModuleHooks)[included] === "function") {
+        (mod as ModuleHooks)[included]!(this);
+      } else {
+        featureHook(mod, "included")?.(this);
+      }
       return this;
     }
     const carrier = carrierOf(this);
@@ -1053,7 +1057,11 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
   const appendFeatures = featureHook(mod, "appendFeatures");
   if (appendFeatures) {
     appendFeatures(klass);
-    featureHook(mod, "included")?.(klass);
+    if (typeof (mod as ModuleHooks)[included] === "function") {
+      (mod as ModuleHooks)[included]!(klass);
+    } else {
+      featureHook(mod, "included")?.(klass);
+    }
     return;
   }
   if (!isClass(klass)) {

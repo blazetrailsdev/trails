@@ -6,30 +6,30 @@ import { TypeRegistry } from "./registry.js";
 
 describe("TypeRegistry", () => {
   it("looks up built-in types", () => {
-    const str = Types.typeRegistry.lookup("string");
+    const str = Types.Type.lookup("string");
     expect(str).toBeInstanceOf(Types.StringType);
   });
 
   it("looks up integer type", () => {
-    const int = Types.typeRegistry.lookup("integer");
+    const int = Types.Type.lookup("integer");
     expect(int).toBeInstanceOf(Types.IntegerType);
   });
 
   it("looks up all built-in types", () => {
-    expect(Types.typeRegistry.lookup("float")).toBeInstanceOf(Types.FloatType);
-    expect(Types.typeRegistry.lookup("boolean")).toBeInstanceOf(Types.BooleanType);
-    expect(Types.typeRegistry.lookup("date")).toBeInstanceOf(Types.DateType);
-    expect(Types.typeRegistry.lookup("datetime")).toBeInstanceOf(Types.DateTimeType);
-    expect(Types.typeRegistry.lookup("decimal")).toBeInstanceOf(Types.DecimalType);
+    expect(Types.Type.lookup("float")).toBeInstanceOf(Types.FloatType);
+    expect(Types.Type.lookup("boolean")).toBeInstanceOf(Types.BooleanType);
+    expect(Types.Type.lookup("date")).toBeInstanceOf(Types.DateType);
+    expect(Types.Type.lookup("datetime")).toBeInstanceOf(Types.DateTimeType);
+    expect(Types.Type.lookup("decimal")).toBeInstanceOf(Types.DecimalType);
   });
 
   it(":value is not a registered name — Type.default_value is not a registry entry", () => {
-    expect(() => Types.typeRegistry.lookup("value")).toThrow("Unknown type :value");
+    expect(() => Types.Type.lookup("value")).toThrow("Unknown type :value");
     expect(defaultValue()).toBeInstanceOf(Types.ValueType);
   });
 
   it("a reasonable error is given when no type is found", () => {
-    expect(() => Types.typeRegistry.lookup("imaginary")).toThrow("Unknown type :imaginary");
+    expect(() => Types.Type.lookup("imaginary")).toThrow("Unknown type :imaginary");
   });
 
   it("a new registry is empty — the defaults are registered by type.ts, not the constructor", () => {
@@ -46,8 +46,8 @@ describe("TypeRegistry", () => {
   });
 
   it("a class can be registered for a symbol", () => {
-    Types.typeRegistry.register("type_registry_test_custom", null, () => new Types.StringType());
-    const t = Types.typeRegistry.lookup("type_registry_test_custom");
+    Types.Type.register("type_registry_test_custom", null, () => new Types.StringType());
+    const t = Types.Type.lookup("type_registry_test_custom");
     expect(t).toBeInstanceOf(Types.StringType);
   });
 });

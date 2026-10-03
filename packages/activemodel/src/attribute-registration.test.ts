@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 import { ValueType } from "./index.js";
 import type { AttributeSet } from "./attribute-set.js";
 import { AttributeRegistration } from "./attribute-registration.js";
-import { typeRegistry } from "./type/registry.js";
+import { registry } from "./type.js";
 import { include, assertNil } from "@blazetrails/activesupport";
+
+const typeRegistry = registry();
 
 class MyType extends ValueType<unknown> {}
 typeRegistry.register(MyType.name, MyType);

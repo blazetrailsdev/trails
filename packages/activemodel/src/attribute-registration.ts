@@ -1,8 +1,7 @@
 import { DescendantsTracker, extend, included, registerSubclass } from "@blazetrails/activesupport";
 import { block as rbBlock, fetch, rbObjAsString } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
-import { defaultValue } from "./type.js";
-import { typeRegistry } from "./type/registry.js";
+import * as Type from "./type.js";
 import { AttributeSet } from "./attribute-set.js";
 import type { AttributeOptions } from "./attributes.js";
 
@@ -177,7 +176,7 @@ export const ClassMethods = {
     const proxy = new Proxy(cast, {
       get(target, prop, receiver) {
         if (typeof prop === "string" && !Object.hasOwn(target, prop)) {
-          return defaultValue();
+          return Type.defaultValue();
         }
         return Reflect.get(target, prop, receiver);
       },
@@ -251,7 +250,7 @@ export const ClassMethods = {
     name: string,
     options?: Record<string, unknown>,
   ): ValueType {
-    return typeRegistry.lookup(name, options);
+    return Type.lookup(name, options);
   },
 
   /** @internal */

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { extend, include, Module } from "@blazetrails/activesupport";
+import { include, Module } from "@blazetrails/activesupport";
 import { prepend } from "@blazetrails/ruby-compat/include";
-import { ClassMethods, SerializeCastValue } from "./serialize-cast-value.js";
+import { SerializeCastValue } from "./serialize-cast-value.js";
 
 type Serializer = (value: unknown) => string;
 
@@ -129,7 +129,6 @@ describe("SerializeCastValueTest", () => {
   it("uses #serialize_cast_value when a delegate class prepends SerializeCastValue", () => {
     const delegateClass = DelegateClass(IncludesModule.prototype);
     prepend(delegateClass, SerializeCastValue);
-    extend(delegateClass, ClassMethods);
     assertSerializesUsing("serialize_cast_value", new delegateClass(new IncludesModule()));
   });
 

@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import * as Types from "@blazetrails/activemodel";
-import { typeRegistry } from "@blazetrails/activemodel";
 import { BigDecimal, TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Base } from "../index.js";
@@ -84,8 +83,8 @@ describe("TimeZoneConversionTest", () => {
   });
 
   it("wraps schema-reflected datetime column when timeZoneAwareAttributes is true", async () => {
-    const datetimeType = typeRegistry.lookup("datetime");
-    const stringType = typeRegistry.lookup("string");
+    const datetimeType = Types.Type.lookup("datetime");
+    const stringType = Types.Type.lookup("string");
     const cols = {
       published_at: { sqlType: "datetime" },
       title: { sqlType: "string" },

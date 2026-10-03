@@ -4,9 +4,11 @@ import { Time } from "@blazetrails/date";
 import { rbObjDup } from "@blazetrails/ruby-compat";
 import { Attribute, FromUser, UNINITIALIZED_ORIGINAL_VALUE } from "./attribute.js";
 import { UNINITIALIZED_ORIGINAL_VALUE as UNINITIALIZED_FROM_INDEX } from "./index.js";
-import { typeRegistry } from "./type/registry.js";
+import { registry } from "./type.js";
 import { ValueType } from "./type/value.js";
 import "./attribute/user-provided-default.js";
+
+const typeRegistry = registry();
 
 describe("Attribute — trails-only coverage", () => {
   describe("equals compares the types by value (attribute.rb:119)", () => {

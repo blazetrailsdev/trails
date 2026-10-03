@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "./index.js";
 import {
-  typeRegistry,
+  Type,
   ValueType,
   StringType,
   IntegerType,
@@ -485,8 +485,7 @@ describe("CustomPropertiesTest", () => {
 
   it("immutable_strings_by_default changes schema inference for string columns", async () => {
     await withImmutableStrings(() => {
-      const immutableStringType = typeRegistry.lookup("immutable_string")
-        .constructor as new () => unknown;
+      const immutableStringType = Type.lookup("immutable_string").constructor as new () => unknown;
       expect(OverloadedType.typeForAttribute("inferred_string")).toBeInstanceOf(
         immutableStringType,
       );
@@ -501,7 +500,7 @@ describe("CustomPropertiesTest", () => {
 
   it("immutable_strings_by_default does not affect `attribute :foo, :string`", async () => {
     await withImmutableStrings(() => {
-      const defaultStringType = typeRegistry.lookup("string").constructor as new () => unknown;
+      const defaultStringType = Type.lookup("string").constructor as new () => unknown;
       expect(OverloadedType.typeForAttribute("string_with_default")).toBeInstanceOf(
         defaultStringType,
       );
@@ -509,8 +508,8 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("serialize boolean for both string types", () => {
-    const defaultStringType = typeRegistry.lookup("string");
-    const immutableStringType = typeRegistry.lookup("immutable_string");
+    const defaultStringType = Type.lookup("string");
+    const immutableStringType = Type.lookup("immutable_string");
     expect(defaultStringType.serialize(true)).toBe(immutableStringType.serialize(true));
     expect(defaultStringType.serialize(false)).toBe(immutableStringType.serialize(false));
   });
@@ -518,7 +517,7 @@ describe("CustomPropertiesTest", () => {
 
 describe("DefineAttributeTest", () => {
   it("define_attribute registers a type object directly", () => {
-    const intType = typeRegistry.lookup("integer");
+    const intType = Type.lookup("integer");
     class Post extends Base {
       declare status: string;
       static {
@@ -530,7 +529,7 @@ describe("DefineAttributeTest", () => {
   });
 
   it("define_attribute with default value", () => {
-    const intType = typeRegistry.lookup("integer");
+    const intType = Type.lookup("integer");
     class Post extends Base {
       declare status: string;
       static {
@@ -542,8 +541,8 @@ describe("DefineAttributeTest", () => {
   });
 
   it("define_attribute preserves existing default when no default given", () => {
-    const strType = typeRegistry.lookup("string");
-    const intType = typeRegistry.lookup("integer");
+    const strType = Type.lookup("string");
+    const intType = Type.lookup("integer");
     class Post extends Base {
       declare status: string;
       static {
@@ -556,7 +555,7 @@ describe("DefineAttributeTest", () => {
   });
 
   it("define_attribute with userProvidedDefault false uses database cast", () => {
-    const intType = typeRegistry.lookup("integer");
+    const intType = Type.lookup("integer");
     class Post extends Base {
       declare status: string;
       static {
@@ -568,7 +567,7 @@ describe("DefineAttributeTest", () => {
   });
 
   it("define_attribute builds a UserProvidedDefault when the default is user-provided", () => {
-    const intType = typeRegistry.lookup("integer");
+    const intType = Type.lookup("integer");
     class Post extends Base {
       declare status: string;
       static {
@@ -580,8 +579,8 @@ describe("DefineAttributeTest", () => {
   });
 
   it("define_attribute writes into the memoized _defaultAttributes", () => {
-    const strType = typeRegistry.lookup("string");
-    const intType = typeRegistry.lookup("integer");
+    const strType = Type.lookup("string");
+    const intType = Type.lookup("integer");
     class Post extends Base {
       declare status: string;
       static {
@@ -713,7 +712,7 @@ describe("DefaultAttributesTest", () => {
 
 describe("DefineAttributeSTITest", () => {
   it("defineAttribute on STI subclass stays on the subclass", () => {
-    const intType = typeRegistry.lookup("integer");
+    const intType = Type.lookup("integer");
     class Animal extends Base {
       static {
         this.attribute("name", "string");
@@ -744,7 +743,7 @@ describe("DefineAttributeSTITest", () => {
   });
 
   it("defineAttribute for id does not install an accessor", () => {
-    const strType = typeRegistry.lookup("string");
+    const strType = Type.lookup("string");
     class Post extends Base {
       declare status: string;
       static {

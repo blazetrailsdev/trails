@@ -8,7 +8,6 @@ import {
   ImmutableStringType,
   StringType,
   ValueType,
-  typeRegistry,
 } from "@blazetrails/activemodel";
 export { ValueType } from "@blazetrails/activemodel";
 import { registerConstant } from "@blazetrails/ruby-compat";
@@ -129,9 +128,3 @@ export function adapterNameFrom(model: AdapterNameSource): string {
 export function currentAdapterName(): string {
   return adapterNameFrom(ActiveRecord.Base);
 }
-
-typeRegistry.register("date", Date); // boundary: AR Type::Date class, not JS Date
-typeRegistry.register("datetime", DateTime);
-typeRegistry.register("time", Time);
-typeRegistry.register("text", Text);
-typeRegistry.register("json", Json);

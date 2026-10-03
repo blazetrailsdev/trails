@@ -2419,3 +2419,19 @@ describe("validate with several filters", () => {
     });
   });
 });
+
+describe("Validations#freeze (validations.rb:372-377)", () => {
+  class Person extends Model {}
+
+  it("builds errors and the validation context before freezing through super", () => {
+    const person = new Person();
+    expect(person._errors).toBeUndefined();
+
+    expect(person.freeze()).toBe(person);
+
+    expect(Object.isFrozen(person)).toBe(true);
+    expect(person._errors).toBeInstanceOf(Errors);
+    expect(person.errors).toBe(person._errors);
+    expect(person.validationContext).toBeNull();
+  });
+});

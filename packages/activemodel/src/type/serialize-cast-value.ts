@@ -1,4 +1,4 @@
-import { extend, include, included, initialize, Module } from "@blazetrails/activesupport";
+import { Concern, extend, include, included, initialize, Module } from "@blazetrails/activesupport";
 import {
   rbModAncestors,
   rbModInstanceMethod,
@@ -8,6 +8,20 @@ import {
 interface SerializeCastValueHost {
   constructor: { serializeCastValueCompatible(): boolean };
 }
+
+interface SerializeCastValueType {
+  serializeCastValue(value: unknown): unknown;
+  serialize(value: unknown): unknown;
+}
+
+export const SerializeCastValue = new Module() as Module & {
+  ClassMethods: typeof ClassMethods;
+  DefaultImplementation: Module;
+  [included](klass: { prototype: object }): void;
+  serialize(type: SerializeCastValueType, value: unknown): unknown;
+  [initialize](this: SerializeCastValueHost): void;
+};
+extend(SerializeCastValue, Concern);
 
 export const ClassMethods = {
   serializeCastValueCompatible(this: {
@@ -36,39 +50,43 @@ export const DefaultImplementation = new Module().include({
   },
 });
 
-export class SerializeCastValue {
-  static [included](klass: { prototype: object }): void {
-    extend(klass, ClassMethods);
-    if (!rbModPublicMethodDefined(klass, "serializeCastValue")) {
-      include(klass, DefaultImplementation);
-    }
-  }
+SerializeCastValue.ClassMethods = ClassMethods;
+SerializeCastValue.DefaultImplementation = DefaultImplementation;
 
-  static serialize(
-    type: { serializeCastValue(value: unknown): unknown; serialize(value: unknown): unknown },
-    value: unknown,
-  ): unknown {
-    let compatible: unknown;
-    try {
-      compatible = (
-        type as unknown as { itselfIfSerializeCastValueCompatible(): unknown }
-      ).itselfIfSerializeCastValueCompatible();
-    } catch {
-      compatible = null;
-    }
-    if (type === compatible) {
-      return type.serializeCastValue(value);
-    } else {
-      return type.serialize(value);
-    }
+SerializeCastValue[included] = function (klass: { prototype: object }): void {
+  if (!rbModPublicMethodDefined(klass, "serializeCastValue")) {
+    include(klass, DefaultImplementation);
   }
+};
 
-  itselfIfSerializeCastValueCompatible<T extends SerializeCastValueHost>(this: T): T | null {
-    if (this.constructor.serializeCastValueCompatible()) return this;
-    return null;
+export function serialize(type: SerializeCastValueType, value: unknown): unknown {
+  let compatible: unknown;
+  try {
+    compatible = (
+      type as unknown as { itselfIfSerializeCastValueCompatible(): unknown }
+    ).itselfIfSerializeCastValueCompatible();
+  } catch {
+    compatible = null;
   }
-
-  static [initialize](this: SerializeCastValueHost): void {
-    this.constructor.serializeCastValueCompatible();
+  if (type === compatible) {
+    return type.serializeCastValue(value);
+  } else {
+    return type.serialize(value);
   }
 }
+SerializeCastValue.serialize = serialize;
+
+export function itselfIfSerializeCastValueCompatible<T extends SerializeCastValueHost>(
+  this: T,
+): T | null {
+  if (this.constructor.serializeCastValueCompatible()) return this;
+  return null;
+}
+SerializeCastValue.defineMethod(
+  "itselfIfSerializeCastValueCompatible",
+  itselfIfSerializeCastValueCompatible,
+);
+
+SerializeCastValue[initialize] = function (this: SerializeCastValueHost): void {
+  this.constructor.serializeCastValueCompatible();
+};

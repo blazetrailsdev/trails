@@ -42,6 +42,3 @@ export class TypeRegistry {
     this.registrationsMap = new Map(this.registrationsMap);
   }
 }
-
-/** @noRailsEquivalent CONVERGEABLE type-registry-instance-lives-in-registry-ts-not-on-the-type-module */
-export const typeRegistry = new TypeRegistry();

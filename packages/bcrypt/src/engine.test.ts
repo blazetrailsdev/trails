@@ -15,8 +15,8 @@ describe("The BCrypt engine", () => {
     const startTime = Time.now();
     Password.create("testing testing", { cost: Engine.MIN_COST + 1 });
     const minTimeMs = (Time.now().minus(startTime) as number) * 1000;
-    const first = Engine.calibrate(minTimeMs)!;
-    const second = Engine.calibrate(minTimeMs * 4)!;
+    const first = Engine.calibrate(minTimeMs) as number;
+    const second = Engine.calibrate(minTimeMs * 4) as number;
     expect(second).toBeGreaterThan(first);
   });
 });
@@ -48,7 +48,7 @@ describe("Autodetecting of salt cost", () => {
 });
 
 describe("Generating BCrypt hashes", () => {
-  let salt: string;
+  let salt: string | null;
   let password: string;
 
   beforeEach(() => {

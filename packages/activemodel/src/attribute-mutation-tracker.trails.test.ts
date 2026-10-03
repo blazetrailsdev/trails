@@ -8,8 +8,10 @@ import {
   ForcedMutationTracker,
   NullMutationTracker,
 } from "./attribute-mutation-tracker.js";
-import { typeRegistry } from "./type/registry.js";
+import { registry } from "./type.js";
 import { ValueType } from "./type/value.js";
+
+const typeRegistry = registry();
 
 function buildSet(values: Record<string, unknown>): AttributeSet {
   const attrs: Record<string, import("./attribute.js").Attribute> = {};

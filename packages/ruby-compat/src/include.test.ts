@@ -1399,3 +1399,22 @@ describe("Module#const_set", () => {
     );
   });
 });
+
+describe("include — a module's own `included` shadows the one it was extended with", () => {
+  it("sends the symbol-keyed hook after appendFeatures, not the string-named one", () => {
+    const calls: string[] = [];
+    const mod = new Module() as Module & {
+      appendFeatures(base: unknown): void;
+      included(base: unknown): void;
+      [included](base: unknown): void;
+    };
+    mod.appendFeatures = () => void calls.push("appendFeatures");
+    mod.included = () => void calls.push("extended included");
+    mod[included] = () => void calls.push("own included");
+
+    include(class Host {}, mod);
+    new Module().include(mod);
+
+    expect(calls).toEqual(["appendFeatures", "own included", "appendFeatures", "own included"]);
+  });
+});

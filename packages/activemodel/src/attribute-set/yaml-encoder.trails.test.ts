@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { YAMLEncoder } from "./yaml-encoder.js";
 import { AttributeSet } from "../attribute-set.js";
 import { Attribute, Uninitialized } from "../attribute.js";
-import { typeRegistry } from "../type/registry.js";
+import { registry } from "../type.js";
+
+const typeRegistry = registry();
 
 function makeSet(attrs: Record<string, Attribute>): AttributeSet {
   return new AttributeSet(attrs);

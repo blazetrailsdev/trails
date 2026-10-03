@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 import { Builder, LazyAttributeHash } from "./builder.js";
 import { Attribute } from "../attribute.js";
 import { AttributeSet } from "../attribute-set.js";
-import { typeRegistry } from "../type/registry.js";
+import { registry } from "../type.js";
 import { ValueType } from "../type/value.js";
+
+const typeRegistry = registry();
 
 describe("LazyAttributeHash defaultAttributes", () => {
   const strType = typeRegistry.lookup("string");
