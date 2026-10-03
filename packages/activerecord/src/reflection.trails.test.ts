@@ -10,12 +10,7 @@ import {
 import { EncryptedBookWithSerializedFirstBinary } from "./test-helpers/models/book-encrypted.js";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import { Associations } from "./associations.js";
-import {
-  ThroughReflection,
-  belongsToCounterCacheColumn,
-  counterCacheColumnOption,
-  create,
-} from "./reflection.js";
+import { ThroughReflection, create } from "./reflection.js";
 import { fixtures } from "./test-fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Tagging } from "./test-helpers/models/tagging.js";
@@ -111,23 +106,6 @@ describe("ReflectionTest", () => {
     expect(ref.klass).toBe(ShStableTarget);
     registerModel("ShStableTarget", ShStableTarget);
     expect(ref.klass).toBe(ShStableTarget);
-  });
-
-  it("counter cache column option extracts the explicit column from raw forms", () => {
-    expect(counterCacheColumnOption(true)).toBeNull();
-    expect(counterCacheColumnOption("custom_count")).toBe("custom_count");
-    expect(counterCacheColumnOption({ column: "custom_count" })).toBe("custom_count");
-    expect(counterCacheColumnOption({ active: true, column: null })).toBeNull();
-    expect(counterCacheColumnOption(undefined)).toBeNull();
-  });
-
-  it("belongs_to counter cache column demodulizes a namespaced owner", () => {
-    expect(belongsToCounterCacheColumn(true, "Comment")).toBe("comments_count");
-    expect(belongsToCounterCacheColumn(true, "Admin::Post")).toBe("posts_count");
-    expect(belongsToCounterCacheColumn("legacy_comments_count", "Comment")).toBe(
-      "legacy_comments_count",
-    );
-    expect(belongsToCounterCacheColumn(false, "Comment")).toBeNull();
   });
 
   it("create accepts a nil name without a cast", () => {

@@ -217,15 +217,6 @@ export function generateAssociationWriter(
   });
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE the `reflection.polymorphic?` guard Ruby writes inline in assign_nested_attributes (nested_attributes.rb:434).
- */
-export function isPolymorphicBelongsTo(record: Base, associationName: string): boolean {
-  const assocDef = (record.constructor as any)._reflectOnAssociation?.(associationName);
-  return assocDef?.macro === "belongsTo" && Boolean(assocDef?.options?.polymorphic);
-}
-
 /** @internal */
 interface OneToOneAssociation {
   target: Base | null;
@@ -238,16 +229,6 @@ interface OneToOneAssociation {
   loadDisplacedForBuild?(): Promise<unknown> | null;
   detachDisplacedTarget?(): Promise<void>;
   displacementNeedsAwait?(): boolean;
-}
-
-/** @internal */
-async function detachDisplacedThenSetNewRecord(
-  assoc: OneToOneAssociation,
-  built: Base | null,
-): Promise<void> {
-  await assoc.loadDisplacedForBuild?.();
-  await assoc.detachDisplacedTarget?.();
-  if (built) await assoc.setNewRecord(built);
 }
 
 /** @internal */
@@ -330,29 +311,15 @@ export function assignNestedAttributesForOneToOneAssociation(
       }
       return assoc.initializeAttributes(existingRecord);
     } else {
-      if (isPolymorphicBelongsTo(record, associationName)) {
-        const buildMethod = `build${camelize(associationName, true)}`;
-        const builder =
-          buildMethod in (record as object)
-            ? (record as unknown as Record<string, unknown>)[buildMethod]
-            : undefined;
-        if (typeof builder === "function") {
-          (builder as (attrs: Record<string, unknown>) => unknown).call(record, assignable);
-        } else {
-          throw new ArgumentError(
-            `Cannot build association \`${associationName}'. ` +
-              `Are you trying to build a polymorphic one-to-one association?`,
-          );
-        }
+      const method = `build${camelize(associationName, true)}`;
+      if (rbObjRespondTo(record, method)) {
+        const built = rbFSend(record, method, assignable);
+        if (built instanceof Promise) return built.then(() => {});
       } else {
-        const built = assoc.buildRecord(assignable);
-        if (assoc.displacementNeedsAwait?.() === true) {
-          return detachDisplacedThenSetNewRecord(assoc, built);
-        }
-        if (built) {
-          const assigned = assoc.setNewRecord(built);
-          if (assigned instanceof Promise) return assigned.then(() => {});
-        }
+        throw new ArgumentError(
+          `Cannot build association \`${associationName}'. ` +
+            `Are you trying to build a polymorphic one-to-one association?`,
+        );
       }
     }
   }

@@ -54,11 +54,10 @@ export class QueryAttribute extends Attribute {
   }
 
   override get valueForDatabase(): unknown {
-    if (!this._hasValueForDatabase) {
-      this._cachedValueForDatabase = this._valueForDatabase();
-      this._hasValueForDatabase = true;
+    if (!Object.hasOwn(this, "__valueForDatabase")) {
+      this.__valueForDatabase = this._valueForDatabase();
     }
-    return this._cachedValueForDatabase;
+    return this.__valueForDatabase;
   }
 
   isNil(): boolean {

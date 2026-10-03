@@ -110,6 +110,7 @@ export class WrongReply extends Reply {
 }
 
 export class WebReply extends WebTopic {
+  static _demodulizedName = "Reply";
   static {
     this.belongsTo("topic", { foreignKey: "parent_id", counterCache: true, className: "WebTopic" });
   }

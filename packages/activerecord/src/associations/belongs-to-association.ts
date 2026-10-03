@@ -2,7 +2,6 @@ import { fetch, rbEqual } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { underscore } from "@blazetrails/activesupport";
-import { belongsToCounterCacheColumn } from "../reflection.js";
 import { SingularAssociation } from "./singular-association.js";
 import { Rollback } from "../errors.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
@@ -125,7 +124,7 @@ export class BelongsToAssociation extends SingularAssociation {
   private async updateCountersViaScope(klass: any, foreignKey: unknown, by: number): Promise<void> {
     const scope = klass.unscoped().whereBang(new Map([[this.primaryKey(klass), foreignKey]]));
     await scope.updateCounters({
-      [this.counterCacheColumn()!]: by,
+      [this.reflection.counterCacheColumn()!]: by,
       touch: (this.reflection.options as any).touch,
     });
   }
@@ -276,24 +275,15 @@ export class BelongsToAssociation extends SingularAssociation {
     }
   }
 
-  private counterCacheColumn(): string | null {
-    const fromReflection = this.reflection.counterCacheColumn?.();
-    if (fromReflection !== undefined && fromReflection !== null) return fromReflection;
-    return belongsToCounterCacheColumn(
-      this.reflection.options.counterCache,
-      this.owner.constructor.name,
-    );
-  }
-
   private requireCounterUpdate(): boolean {
-    return this.counterCacheColumn() != null && this.owner.isPersisted();
+    return this.reflection.counterCacheColumn() != null && this.owner.isPersisted();
   }
 
   private async updateCounters(by: number): Promise<void> {
     if (this.requireCounterUpdate() && this.foreignKeyPresent()) {
       const target = this.target as any;
       if (target && !this.isStaleTarget() && typeof target.incrementBang === "function") {
-        const counterCol = this.counterCacheColumn()!;
+        const counterCol = this.reflection.counterCacheColumn()!;
         const touch = (this.reflection.options as any).touch;
         await target.incrementBang(counterCol, by, touch != null ? { touch } : {});
       } else {

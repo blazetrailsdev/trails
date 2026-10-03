@@ -22,7 +22,6 @@ import {
   isMethodDefinedWithin,
 } from "./attribute-methods.js";
 import { ActiveRecord } from "./namespaces.js";
-import { loadSchema as reflectSchemaSync } from "./model-schema.js";
 import { isReplayingOverColdSchema } from "./attributes.js";
 
 type EnumValue = number | string | boolean | null;
@@ -450,31 +449,6 @@ export function raiseConflictError(
     `You tried to define an enum named "${enumName}" on the model "${this.name}", but ` +
       `this will generate a ${type} method "${methodName}", which is already defined by ${source}.`,
   );
-}
-
-/**
- * Fetch the single registered EnumType for an enum attribute — the one source
- * of truth built lazily from the reflected column type via the
- * `decorateAttributes` decorator. Resolves through the replayed AttributeSet
- * (`_defaultAttributes`), NOT the pending `PendingType` the declaration pushed:
- * that type is the pre-reflection (mapping-shape-inferred) EnumType, whereas the
- * replayed decorator rebuilds the EnumType from the reflected column subtype.
- * Returns null when the attribute isn't an enum on this class.
- *
- * @internal
- * @noRailsEquivalent CONVERGEABLE reads the EnumType off the replayed attribute set the way Ruby reads attribute_types[name] (enum.rb:222-247).
- */
-export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | null {
-  const host = klass as unknown as {
-    _enums?: Map<string, unknown>;
-    attributeAliases?: Record<string, string>;
-    _defaultAttributes(): { getAttribute(n: string): { type: ValueType } };
-  };
-  reflectSchemaSync.call(klass);
-  if (!host._enums?.has(attribute)) return null;
-  const resolved = host.attributeAliases?.[attribute] ?? attribute;
-  const type = host._defaultAttributes().getAttribute(resolved).type;
-  return type instanceof EnumType ? type : null;
 }
 
 /** @internal */

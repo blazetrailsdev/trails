@@ -81,6 +81,17 @@ describe("classifyPair", () => {
     expect(classifyPair("direction", "_dir")).toBe("burndown");
   });
 
+  // attribute.rb:56 `type.changed_in_place?(@value_for_database, value)` vs
+  // attribute.ts `this.type!.isChangedInPlace(this.__valueForDatabase, this.value())`:
+  // `_valueForDatabase` is the port of `_value_for_database` (attribute.rb:165).
+  it("names an ivar whose underscore spelling is taken by a Rails _method", () => {
+    expect(classifyPair("value_for_database", "__valueForDatabase")).toBe("ivar-method-collision");
+    expect(classifyPair("valueForDatabase", "__valueForDatabase")).toBe("ivar-method-collision");
+    expect(classifyPair("valueForDatabase", "__cachedValue")).toBe("burndown");
+    // A doubled underscore alone proves no collision — the arm is scoped to the cited ivars.
+    expect(classifyPair("direction", "__direction")).toBe("burndown");
+  });
+
   // model_schema.rb:433 `columns_hash.values` vs model-schema.ts:775
   // `Object.values(columnsHash.call(this))`.
   it("names the mixin call the module-mixin idiom records as the outermost callee", () => {
@@ -160,6 +171,7 @@ describe("the taxonomy itself", () => {
       "no-js-equivalent",
       "conventions-rename",
       "ivar-underscore",
+      "ivar-method-collision",
       "module-mixin-call",
       "block-idiom",
       "ivar-reflection",

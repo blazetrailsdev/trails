@@ -83,45 +83,9 @@ function arrayLen(value: string | string[]): number {
   return Array.isArray(value) ? value.length : 1;
 }
 
-/**
- * Extract the explicit counter-cache column from the `counterCache` option,
- * accepting its raw (`true` | `"<column>"`) or normalized (`{ column }`) form.
- * Returns null when no explicit column is configured.
- *
- * @internal
- * @noRailsEquivalent CONVERGEABLE the options[:counter_cache] normalization Ruby does inline in counter_cache_column (reflection.rb:244).
- */
-export function counterCacheColumnOption(counterCache: unknown): string | null {
-  if (typeof counterCache === "string") return counterCache;
-  if (counterCache && typeof counterCache === "object") {
-    return (counterCache as { column?: string | null }).column ?? null;
-  }
-  return null;
-}
-
-/**
- * Single source of truth for the belongs_to counter-cache column. Mirrors
- * Rails `ActiveRecord::Reflection#counter_cache_column` for `belongs_to?`:
- * the explicit column, else the pluralized owner model name + `_count`.
- *
- * @internal
- * @noRailsEquivalent CONVERGEABLE the belongs_to? arm of Reflection#counter_cache_column (reflection.rb:244) as a free function.
- */
-export function belongsToCounterCacheColumn(
-  counterCache: unknown,
-  ownerName: string,
-): string | null {
-  if (!counterCache) return null;
-  return (
-    counterCacheColumnOption(counterCache) ||
-    `${pluralize(underscore(demodulize(ownerName)))}_count`
-  );
-}
-
 export class AbstractReflection {
   /** @internal */
   private _counterCacheColumn?: string | null;
-  private _counterCacheColumnKlass?: typeof Base;
   private _inverseWhichUpdatesCounterCacheDefined?: boolean;
   private _inverseWhichUpdatesCounterCache?: AbstractReflection;
 
@@ -272,48 +236,22 @@ export class AbstractReflection {
   }
 
   counterCacheColumn(): string | null {
-    const self = this._concrete();
-    const counterCache = self.options?.counterCache;
-    if (this.belongsTo()) {
-      const explicit = counterCacheColumnOption(counterCache);
-      if (explicit) return explicit;
-      if (!counterCache) return null;
-      try {
-        const ownerName = self.activeRecord?.name ?? "";
-        const btFk =
-          self.options?.foreignKey ??
-          self.options?.queryConstraints ??
-          `${underscore(self.name)}_id`;
-        const normFk = (fk: unknown): string[] =>
-          Array.isArray(fk) ? fk.map(String) : [String(fk)];
-        const btFkNorm = normFk(btFk);
-        const klassName = self.className;
-        const resolvedKlass = modelRegistry.get(klassName);
-        if (!resolvedKlass) throw new Error(`${klassName} not in registry`);
-        if (this._counterCacheColumnKlass === resolvedKlass) {
-          return this._counterCacheColumn as string | null;
-        }
-        const targetAssocs = reflectOnAllAssociations(resolvedKlass, "hasMany");
-        const hmDefaultFk = `${underscore((resolvedKlass as any).name)}_id`;
-        const inverseHm = targetAssocs.find((a) => {
-          if (a.className !== ownerName) return false;
-          const hmFkNorm = normFk(
-            a.options.foreignKey ?? a.options.queryConstraints ?? hmDefaultFk,
+    return (this._counterCacheColumn ||= (() => {
+      const self = this._concrete();
+      const counterCache = self.options.counterCache as { column?: string | null } | undefined;
+
+      if (this.belongsTo()) {
+        if (counterCache) {
+          return (
+            counterCache.column ||
+            `${pluralize(underscore(demodulize((self.activeRecord as any)._demodulizedName ?? self.activeRecord.name)))}_count`
           );
-          return hmFkNorm.length === btFkNorm.length && hmFkNorm.every((k, i) => k === btFkNorm[i]);
-        });
-        const column =
-          inverseHm && ownerName.endsWith(camelize(singularize(inverseHm.name)))
-            ? `${underscore(inverseHm.name)}_count`
-            : belongsToCounterCacheColumn(counterCache, ownerName);
-        this._counterCacheColumnKlass = resolvedKlass;
-        this._counterCacheColumn = column;
-        return column;
-      } catch {
-        return belongsToCounterCacheColumn(counterCache, self.activeRecord?.name ?? "");
+        }
+        return null;
+      } else {
+        return (counterCache && counterCache.column) || `${self.name}_count`;
       }
-    }
-    return counterCacheColumnOption(counterCache) || `${self.name}_count`;
+    })());
   }
 
   checkValidityOfInverseBang(): void {
