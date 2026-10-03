@@ -443,7 +443,6 @@ describe("significantMissingCalls", () => {
 
   it("significantCallsForReceivers drops new when every site is an argument-less Hash.new / Array.new", () => {
     expect(significantCallsForReceivers({ new: ["literal-new"] }).has("new")).toBe(false);
-    // `Hash.new(0)`, `Hash.new { }` and `Foo.new` all read `const`.
     expect(significantCallsForReceivers({ new: ["const"] }).has("new")).toBe(true);
     expect(significantCallsForReceivers({ new: ["const", "literal-new"] }).has("new")).toBe(true);
     expect(significantCallsForReceivers({}).has("new")).toBe(true);
@@ -456,7 +455,6 @@ describe("significantMissingCalls", () => {
       significantCallsForReceivers({ new: ["string-new"] }, undefined, conversion).has("new"),
     ).toBe(false);
     expect(significantCallsForReceivers({ new: ["string-new"] }).has("new")).toBe(true);
-    // A `Foo.new(x)` beside it, or alone, stays flagged whatever the TS body calls.
     expect(
       significantCallsForReceivers({ new: ["const", "string-new"] }, undefined, conversion).has(
         "new",

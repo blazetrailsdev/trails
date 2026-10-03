@@ -98,7 +98,11 @@ const OPTION_READER_FUNCTIONS = new Set([
   "deleteKey",
   "deleteWithDefault",
 ]);
-/** ruby-compat's `Kernel#send` / `Kernel#public_send` (kernel.ts). */
+/**
+ * ruby-compat's `Kernel#send` / `Kernel#public_send` (`rb_f_send`,
+ * vendor/ruby/v3.3.11/vm_eval.c:1330). Called with a string-literal name, each
+ * is a call to that method; a computed name is Ruby's own `send(name)`.
+ */
 const SEND_CALLEES = new Set(["rbFSend", "rbFPublicSend"]);
 const OPTION_READER_METHODS = new Set(["fetch", "get", "has", "delete", "hasOwnProperty"]);
 const OPTION_COPY_FUNCTIONS = new Set(["slice", "except", "merge", "rbObjDup", "rbObjClone"]);
@@ -5757,16 +5761,10 @@ function collectCalls(
         // original imported name so it matches the ported call set.
         called.push(resolve(callee.text));
         negated.push(callee.text, resolve(callee.text));
-        // `rbFSend(recv, "name", …)` is Ruby's `recv.name(…)` raising
-        // `NoMethodError` (`rb_f_send`, vendor/ruby/v3.3.11/vm_eval.c:1330), so
-        // a string-literal name is a call to that method. A computed name is
-        // Ruby's own `send(name)`, which names no method.
         const sent = n.arguments[1];
         if (SEND_CALLEES.has(resolve(callee.text)) && sent && ts.isStringLiteralLike(sent)) {
           called.push(sent.text);
         }
-        // `String(x)` is the conversion call Ruby spells `String.new(x)`
-        // (`relation/query_methods.rb:2047`); `new String(x)` is a boxed object.
         if (!skipHoistedClosures && callee.text === "String" && n.arguments.length > 0) {
           names.add(`${NATIVE_FORM_PREFIX}String`);
         }

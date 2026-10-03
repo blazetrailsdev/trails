@@ -3838,19 +3838,8 @@ class ApiExtractor
     inner.is_a?(Array) && inner[0] == :@const && inner[1] == "Proc"
   end
 
-  # The classes whose argument-less, block-less `new` is the empty literal:
-  # `Hash.new` is `{}` and `Array.new` is `[]`
-  # (`associations/foreign_association.rb:14`), which names no callee.
   LITERAL_NEW_CONSTANTS = %w[Hash Array].freeze
 
-  # The receiver kind of a `new` SITE whose port is not a `new` expression, or
-  # nil for every other `new`, which keeps its receiver_kind:
-  #   - `literal-new`: `Hash.new` / `Array.new` with no argument and no block.
-  #     `Hash.new(0)` and `Hash.new { }` build a default the literal lacks.
-  #   - `string-new`: `String.new(x)`, the `String(x)` conversion call
-  #     (`relation/query_methods.rb:2047`). JS `new String(x)` is a boxed
-  #     object, not a string.
-  # The receiver is the bare core constant, so no other `new` qualifies.
   def core_new_kind(recv, args, has_block)
     return nil unless recv.is_a?(Array) && recv[0] == :var_ref
     return nil unless recv[1].is_a?(Array) && recv[1][0] == :@const
