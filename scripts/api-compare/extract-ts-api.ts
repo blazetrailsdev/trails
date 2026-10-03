@@ -5324,14 +5324,6 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   return tokens.length === 0 ? undefined : tokens;
 }
 
-/**
- * What the skeleton and the argument descriptors both erase, in source order —
- * read only by report-structural-duplicates.ts, so the call gates see none of
- * it: a constant receiver (`Promise.resolve()` against a bare `resolve()`),
- * an index read (`ary[0]`, which the skeleton spells `ref:get` like
- * `Map#get`), a unary operator, a ternary, a class expression, and the fixed
- * text of a template literal.
- */
 function extractShapeTokens(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const tokens: string[] = [];

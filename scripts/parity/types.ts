@@ -109,7 +109,14 @@ export interface MethodInfo {
    * Names are raw on both sides. Signal only; nothing gates on it yet.
    */
   skeleton?: string[];
-  /** What `skeleton` and `callArgs` both erase; extract-ts-api.ts#extractShapeTokens. */
+  /**
+   * TS extractor only: what `skeleton` and `callArgs` both erase, in source
+   * order — a constant receiver (`recv:Promise`), an index read (`[]`, which
+   * the skeleton spells `ref:get` like `Map#get`), a unary operator (`op:!`),
+   * a ternary (`?:`), a class expression (`class`) and the fixed text of a
+   * template literal (`tpl:…`). Read only by report-structural-duplicates.ts,
+   * so no call gate sees it.
+   */
   shapeTokens?: string[];
   /**
    * TS-side only (RFC 0113): the `skeleton` of a NON-exported file-local
