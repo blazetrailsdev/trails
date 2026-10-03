@@ -25,14 +25,14 @@ describe("BigIntegerType", () => {
 
 describe("BigIntegerType cast and serialize coverage", () => {
   it("BigInteger small values", () => {
-    const type = Types.typeRegistry.lookup("big_integer");
+    const type = Types.Type.lookup("big_integer");
     expect(type.cast("0")).toBe(0);
     expect(type.cast("1")).toBe(1);
     expect(type.cast("-1")).toBe(-1);
   });
 
   it("BigInteger large values", () => {
-    const type = Types.typeRegistry.lookup("big_integer");
+    const type = Types.Type.lookup("big_integer");
     const large = "9999999999999999999999";
     expect(type.cast(large)).toBe(BigInt(large));
   });

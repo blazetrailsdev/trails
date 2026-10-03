@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { Attribute } from "./attribute.js";
 import { AttributeSet } from "./attribute-set.js";
-import { typeRegistry } from "./type/registry.js";
+import { registry } from "./type.js";
 import { Builder, LazyAttributeHash } from "./attribute-set/builder.js";
 import { IntegerType } from "./type/integer.js";
 import { StringType } from "./type/string.js";
 import { FrozenError, KeyError, NoMethodError } from "@blazetrails/ruby-compat";
+
+const typeRegistry = registry();
 
 describe("AttributeSetTest", () => {
   it("freeze freezes the attributes hash", () => {

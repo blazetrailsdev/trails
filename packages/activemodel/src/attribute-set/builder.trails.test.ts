@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Builder, LazyAttributeSet, LazyAttributeHash } from "./builder.js";
 import { Attribute } from "../attribute.js";
-import { typeRegistry } from "../type/registry.js";
+import { registry } from "../type.js";
+
+const typeRegistry = registry();
 
 describe("Builder", () => {
   const strType = typeRegistry.lookup("string");

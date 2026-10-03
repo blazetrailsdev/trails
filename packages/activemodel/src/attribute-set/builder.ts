@@ -275,13 +275,14 @@ export class LazyAttributeHash {
   /** @internal */
   assignDefaultValue(name: string): Attribute {
     const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
-    let valuePresent = true;
-    let value: unknown;
-    if (Object.hasOwn(this.values, name)) {
-      value = this.values[name];
-    } else {
-      valuePresent = false;
-    }
+    let valuePresent: boolean = true;
+    const value = fetch(
+      this.values,
+      name,
+      rbBlock(() => {
+        valuePresent = false;
+      }),
+    );
 
     if (valuePresent) {
       const attr = Attribute.fromDatabase(name, value, type);

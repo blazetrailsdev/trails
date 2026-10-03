@@ -102,12 +102,7 @@ export class Validations {
 
   declare validate: (context?: string | string[] | null) => Promise<boolean>;
 
-  freeze(): this {
-    void this.errors;
-    void this.contextForValidation();
-    Object.freeze(this);
-    return this;
-  }
+  declare freeze: () => this;
 
   async isInvalid(context: string | string[] | null = null): Promise<boolean> {
     return !(await this.isValid(context));
@@ -354,6 +349,13 @@ export function initializeDup<TBase extends object>(
   SuperMethods.superMethod(this, "initializeDup")!(other);
 }
 
+export function freeze<T extends Validations>(this: T): T {
+  void this.errors;
+  void this.contextForValidation();
+
+  return SuperMethods.superMethod(this, "freeze")!() as T;
+}
+
 export const VALID_OPTIONS_FOR_VALIDATE = ["on", "if", "unless", "prepend", "exceptOn"] as const;
 
 export interface ValidationsContextHost {
@@ -367,10 +369,12 @@ export interface ReadAttributeForValidationHost {
 /** @internal */
 export function initInternals<TBase extends object>(this: ValidationsInternalsHost<TBase>): void {
   SuperMethods.superMethod(this, "initInternals")!();
+  this._errors = undefined;
   this._contextForValidation = undefined;
 }
 
 const SuperMethods = new Module((mod) => {
+  mod.defineMethod("freeze", freeze);
   mod.defineMethod("initializeDup", initializeDup);
   mod.defineMethod("initInternals", initInternals);
 });

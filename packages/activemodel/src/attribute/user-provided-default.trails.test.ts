@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { UserProvidedDefault } from "./user-provided-default.js";
-import { typeRegistry } from "../type/registry.js";
+import { registry } from "../type.js";
+
+const typeRegistry = registry();
 
 describe("UserProvidedDefault", () => {
   it("resolves a static default value", () => {

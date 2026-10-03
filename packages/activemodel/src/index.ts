@@ -81,7 +81,6 @@ export { serializableHash } from "./serialization.js";
 export type { SerializeOptions, SerializableHash } from "./serialization.js";
 
 export { JSON as JSONSerializer } from "./serializers/json.js";
-export { typeRegistry } from "./type/registry.js";
 
 export { StringType } from "./type/string.js";
 export { IntegerType } from "./type/integer.js";
@@ -99,6 +98,7 @@ export { BinaryType, Data as BinaryData } from "./type/binary.js";
 export { TimeType } from "./type/time.js";
 
 export { defaultValue } from "./type.js";
+export * as Type from "./type.js";
 
 export {
   hasSecurePassword,

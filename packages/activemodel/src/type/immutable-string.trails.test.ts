@@ -33,7 +33,7 @@ describe("ImmutableStringType (trails)", () => {
 
 describe("ImmutableStringType casting", () => {
   it("casts booleans to the PG literal form", () => {
-    const type = Types.typeRegistry.lookup("immutable_string");
+    const type = Types.Type.lookup("immutable_string");
     expect(type.cast(true)).toBe("t");
     expect(type.cast(false)).toBe("f");
   });
