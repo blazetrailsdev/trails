@@ -408,6 +408,68 @@ describe("significantMissingCalls", () => {
     expect(sig.has("fetch")).toBe(true);
   });
 
+  it("significantCallsForReceivers drops size and length for a TS body that reads .length", () => {
+    const sig = significantCallsForReceivers(
+      { size: ["expr", "local"], length: ["array", "expr"] },
+      undefined,
+      new Set(["length", "length:selectRows", "length:notFoundIds", "length:columns"]),
+      { size: ["not_found_ids", "select_rows"], length: ["columns"] },
+    );
+    expect(sig.has("size")).toBe(false);
+    expect(sig.has("length")).toBe(false);
+    expect(sig.has("first")).toBe(true);
+  });
+
+  it("significantCallsForReceivers still flags size when no .length read is off the Ruby receiver's name", () => {
+    const sig = significantCallsForReceivers(
+      { size: ["expr", "local"] },
+      undefined,
+      new Set(["length", "length:s", "length:cursor"]),
+      { size: ["cursor", "records"] },
+    );
+    expect(sig.has("size")).toBe(true);
+    const unnamed = significantCallsForReceivers(
+      { size: ["expr"] },
+      undefined,
+      new Set(["length", "length:s"]),
+      { size: ["?"] },
+    );
+    expect(unnamed.has("size")).toBe(true);
+  });
+
+  it("significantCallsForReceivers still flags size for a TS body with no .length read", () => {
+    expect(significantCallsForReceivers({ size: ["expr"] }).has("size")).toBe(true);
+    expect(significantCallsForReceivers({ size: ["expr"] }, undefined, new Set()).has("size")).toBe(
+      true,
+    );
+  });
+
+  it("significantCallsForReceivers still flags an ivar or implicit-self size beside an unrelated .length read", () => {
+    const lengthRead = new Set(["length"]);
+    expect(
+      significantCallsForReceivers({ size: ["ivar"] }, undefined, lengthRead).has("size"),
+    ).toBe(true);
+    expect(
+      significantCallsForReceivers({ size: ["local", "self"] }, undefined, lengthRead).has("size"),
+    ).toBe(true);
+    expect(significantCallsForReceivers({}, undefined, lengthRead).has("size")).toBe(true);
+    expect(
+      significantCallsForReceivers({ length: ["const"] }, undefined, lengthRead).has("length"),
+    ).toBe(true);
+  });
+
+  it("significantCallsForReceivers drops an implicit-self load for a TS body with a computed import()", () => {
+    const imported = new Set(["import"]);
+    expect(significantCallsForReceivers({}, undefined, imported).has("load")).toBe(false);
+    expect(significantCallsForReceivers({ load: ["expr"] }, undefined, imported).has("load")).toBe(
+      true,
+    );
+    expect(
+      significantCallsForReceivers({ load: ["expr", "self"] }, undefined, imported).has("load"),
+    ).toBe(true);
+    expect(significantCallsForReceivers({}).has("load")).toBe(true);
+  });
+
   it("does not flag an omitted symbolize_keys even where symbolizeKeys is ported with args", () => {
     expect(
       significantMissingCalls(

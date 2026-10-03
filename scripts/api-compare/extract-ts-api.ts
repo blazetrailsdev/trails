@@ -71,7 +71,11 @@ import {
 } from "@blazetrails/parity/shared-cache";
 import { extractorSchemaToken } from "./extractor-schema.js";
 import { staleBuilds, staleBuildMessage } from "./build-freshness.js";
-import { FOREIGN_READ_PREFIX, NEGATED_CALL_PREFIX } from "./enumerable-idioms.js";
+import {
+  FOREIGN_READ_PREFIX,
+  NATIVE_FORM_PREFIX,
+  NEGATED_CALL_PREFIX,
+} from "./enumerable-idioms.js";
 import {
   ANY_TAG_LINE,
   TAG as MISSING_RAILS_CALL_TAG,
@@ -5701,6 +5705,11 @@ function collectCalls(
           called.push(resolve(callee.expression.text));
         }
         if (prop === "new") called.push("constructor");
+      } else if (callee.kind === ts.SyntaxKind.ImportKeyword) {
+        const specifier = n.arguments[0];
+        if (!skipHoistedClosures && specifier && !ts.isStringLiteralLike(specifier)) {
+          names.add(`${NATIVE_FORM_PREFIX}import`);
+        }
       } else if (callee.kind === ts.SyntaxKind.SuperKeyword) {
         // Bare `super(...)` (constructor chain) — `super.foo()` is already
         // captured as `foo` by the property-access branch. Record as "super"
@@ -5759,6 +5768,11 @@ function collectCalls(
         tally(occurrences, n.name.text);
         if (isForeignReadReceiver(n.expression)) tally(foreignReadOccurrences, n.name.text);
         addNegated(n, n.name.text);
+        if (!skipHoistedClosures && n.name.text === "length") {
+          names.add(`${NATIVE_FORM_PREFIX}length`);
+          const tail = receiverTailName(n.expression);
+          if (tail !== undefined) names.add(`${NATIVE_FORM_PREFIX}length:${tail}`);
+        }
       }
     }
     ts.forEachChild(n, visit);
@@ -5778,6 +5792,27 @@ function collectCalls(
   }
   if (names.size === 0) return undefined;
   return [...names];
+}
+
+/**
+ * The name a `.length` read's receiver ends in — `cursor`, `result.columns` →
+ * `columns`, `(await c.selectRows(…))` → `selectRows`, `wrap(ids)` → `wrap` —
+ * the TS half of extract-ruby-api.rb#receiver_tail_name.
+ */
+function receiverTailName(receiver: ts.Expression): string | undefined {
+  let e = receiver;
+  while (
+    ts.isParenthesizedExpression(e) ||
+    ts.isAwaitExpression(e) ||
+    ts.isNonNullExpression(e) ||
+    ts.isAsExpression(e)
+  ) {
+    e = e.expression;
+  }
+  if (ts.isCallExpression(e)) e = e.expression;
+  if (ts.isIdentifier(e)) return e.text;
+  if (ts.isPropertyAccessExpression(e)) return e.name.text;
+  return undefined;
 }
 
 /**

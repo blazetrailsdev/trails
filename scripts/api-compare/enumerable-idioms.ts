@@ -173,6 +173,57 @@ export const NEGATED_CALL_PREFIX = "!";
  */
 export const FOREIGN_READ_PREFIX = ".";
 
+/**
+ * Prefix the TS extractor uses to mark a callee-less NATIVE FORM it saw in the
+ * body — a JS construct that is the whole port of a Ruby call but records no
+ * call name of its own. Only the forms {@link NATIVE_FORM_ANALOGUES} names are
+ * marked. Marked IN ADDITION to whatever plain names the construct records, and
+ * in the call SET only, never the ORDER stream.
+ */
+export const NATIVE_FORM_PREFIX = "@";
+
+/**
+ * Ruby call → the {@link NATIVE_FORM_PREFIX}-marked TS form that is its whole
+ * port, and the Ruby receivers it is admitted for. Read by
+ * `significantCallsForReceivers` (compare.ts), which drops the Ruby call from
+ * significance for ONE body whose paired TS body has the form.
+ *
+ * - `size` / `length` → `length`: a `.length` property READ, never a
+ *   `length()` / `size()` call. `.length` is the only JS spelling of
+ *   `Array#size` (`NO_JS_EQUIVALENT`, naming-taxonomy.ts), while a trails
+ *   `Relation#size` / `#length` is an awaited method CALL. The read does not
+ *   name its Ruby receiver, so it is admitted only where every Ruby site has an
+ *   explicit receiver outside {@link LENGTH_READ_UNCREDITED_RECEIVER_KINDS}.
+ * - `load` → `import`: a dynamic `import(x)` whose specifier is computed at run
+ *   time, ESM's one way to evaluate a file by path — `Kernel#load`
+ *   (`rb_f_load`, `vendor/ruby/v3.3.11/load.c:903`). A string-literal specifier
+ *   is a module import (Ruby `require`) and is not marked. Admitted only where
+ *   every Ruby site of `load` is an implicit-self call, the only shape
+ *   `Kernel#load` takes; a `records.load` site, alone or beside a bare one,
+ *   still flags.
+ */
+export const NATIVE_FORM_ANALOGUES = new Map<
+  string,
+  { form: string; receivers: "implicit-self" | "explicit" }
+>([
+  ["size", { form: "length", receivers: "explicit" }],
+  ["length", { form: "length", receivers: "explicit" }],
+  ["load", { form: "import", receivers: "implicit-self" }],
+]);
+
+/**
+ * Ruby receiver kinds (extract-ruby-api.rb#receiver_kind) a `.length` read
+ * never credits `size` / `length` for: an unproven ivar (`@records`, `@target`),
+ * implicit self (a bare `size` in `Relation` is `Relation#size`,
+ * `relation.rb:353-359`) and a constant. These are where Rails holds a
+ * Relation or association across method boundaries.
+ */
+export const LENGTH_READ_UNCREDITED_RECEIVER_KINDS: ReadonlySet<string> = new Set([
+  "ivar",
+  "self",
+  "const",
+]);
+
 /** Whether alias `tsCall` counts for `rubyCall` only when the TS call is negated. */
 export function requiresNegatedAlias(rubyCall: string, tsCall: string): boolean {
   return NEGATED_ALIASES.get(rubyCall)?.has(tsCall) ?? false;
@@ -181,7 +232,8 @@ export function requiresNegatedAlias(rubyCall: string, tsCall: string): boolean 
 /**
  * Split a raw TS call-set into the plain call names, the names the extractor
  * saw in a NEGATED position (`!includes` → `includes`) and the ones it only saw
- * as a foreign member — read or call (`.locale` → `locale`). Both marked populations are
+ * as a foreign member — read or call (`.locale` → `locale`), and the native
+ * forms it saw (`@length` → `length`). The marked populations are
  * kept OUT of the plain set: they are a second record of a call already in it,
  * so leaving them in would double-count against DELEGATION_MAX_CALLS in
  * `isDelegatingWrapper` (compare.ts) and make wrapper detection body-shape dependent.
@@ -190,17 +242,21 @@ export function partitionNegatedCalls(raw: Iterable<string>): {
   calls: Set<string>;
   negated: Set<string>;
   foreignReads: Set<string>;
+  nativeForms: Set<string>;
 } {
   const calls = new Set<string>();
   const negated = new Set<string>();
   const foreignReads = new Set<string>();
+  const nativeForms = new Set<string>();
   for (const c of raw) {
     if (c.startsWith(NEGATED_CALL_PREFIX)) negated.add(c.slice(NEGATED_CALL_PREFIX.length));
     else if (c.startsWith(FOREIGN_READ_PREFIX)) {
       foreignReads.add(c.slice(FOREIGN_READ_PREFIX.length));
+    } else if (c.startsWith(NATIVE_FORM_PREFIX)) {
+      nativeForms.add(c.slice(NATIVE_FORM_PREFIX.length));
     } else calls.add(c);
   }
-  return { calls, negated, foreignReads };
+  return { calls, negated, foreignReads, nativeForms };
 }
 
 /**

@@ -367,6 +367,7 @@ class ApiExtractor
     # receiver_kind: `MIME_TYPES.fetch` is provably `Hash#fetch`).
     @file_hash_constants = {}
     @hash_ivars = Set.new
+    @array_ivars = Set.new
     # rel_path → Set of Ruby Hash KEY names declared in that file: the literal
     # keys of a Hash-constant assignment (`PARSING`, xml_mini.rb:67-88) and the
     # Symbol keys an options hash is read by in a method body (`@options.fetch(
@@ -483,7 +484,12 @@ class ApiExtractor
     @current_file = rel_path
     @current_line = 0
     @defines_fail = source.match?(/^\s*def\s+(?:self\.)?fail\b/)
-    @hash_ivars = hash_typed_ivars(sexp).select { |_name, hashy| hashy }.keys.to_set
+    ivar_kinds = typed_ivars(sexp)
+    ivar_kinds.clear if ivar_kinds.keys.any? { |_owner, name| name == "*" }
+    kinds_by_name = ivar_kinds.group_by { |(_owner, name), _kind| name }.transform_values { |rows| rows.map(&:last).uniq }
+    ivar_kinds.reject! { |(_owner, name), _kind| kinds_by_name[name].size > 1 }
+    @hash_ivars = ivar_kinds.select { |_key, kind| kind == "hash" }.keys.to_set
+    @array_ivars = ivar_kinds.select { |_key, kind| kind == "array" }.keys.to_set
     walk(sexp)
 
     # Handle dynamic class creation via const_set:
@@ -2124,12 +2130,13 @@ class ApiExtractor
     mark_symbol_discriminated(entry[:params], body)
     entry[:takesBlock] = true if entry[:params].any? { |p| p[:kind] == "block" } || body_takes_block?(body)
     dep_info = detect_deps(body)
-    calls, weak_calls, call_receivers = collect_method_calls(body, params_node)
+    calls, weak_calls, call_receivers, call_receiver_names = collect_method_calls(body, params_node)
     entry[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
     entry[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
     entry[:calls] = calls unless calls.empty?
     entry[:weakCalls] = weak_calls unless weak_calls.empty?
     entry[:callReceivers] = call_receivers unless call_receivers.empty?
+    entry[:callReceiverNames] = call_receiver_names unless call_receiver_names.empty?
     call_args = collect_call_args(body)
     entry[:callArgs] = call_args unless call_args.empty?
     skeleton = collect_method_skeleton(body)
@@ -2735,26 +2742,31 @@ class ApiExtractor
     calls = []
     weak = []
     receivers = {}
+    receiver_names = {}
     with_capture_locals do
       with_call_receivers(body_node, params_node) do
         walk_for_calls(body_node, calls, weak)
         calls = drop_raised_new(calls)
         receivers = call_receiver_kinds(calls.uniq)
+        receiver_names = @call_receiver_names.transform_values { |names| names.to_a.sort }
       end
     end
     total = calls.tally
     weak_calls = weak.tally.select { |name, n| total[name] == n }.keys
-    [calls.uniq, weak_calls, receivers]
+    [calls.uniq, weak_calls, receivers, receiver_names]
   end
 
   def with_call_receivers(body_node, params_node)
     outer_receivers = @call_receivers
+    outer_receiver_names = @call_receiver_names
     outer_hash_locals = @hash_locals
     @call_receivers = {}
+    @call_receiver_names = {}
     @hash_locals = hash_typed_locals(body_node, params_node)
     yield
   ensure
     @call_receivers = outer_receivers
+    @call_receiver_names = outer_receiver_names
     @hash_locals = outer_hash_locals
   end
 
@@ -2802,6 +2814,33 @@ class ApiExtractor
     end
   end
 
+  # The calls whose non-`array` receivers `callReceiverNames` records, read by
+  # compare.ts's `.length`-read credit for `size` / `length`.
+  RECEIVER_NAMED_CALLS = %w[size length].freeze
+
+  # The name a receiver ENDS in — a local or reader (`cursor`, `predicates`), the
+  # method of a call chain (`result.columns` → `columns`,
+  # `c.select_rows(…)` → `select_rows`, `Array.wrap(ids)` → `wrap`), an ivar
+  # (`@stack`) or a constant — or nil for any other shape.
+  def receiver_tail_name(recv)
+    return nil unless recv.is_a?(Array)
+
+    case recv[0]
+    when :var_ref, :vcall
+      inner = recv[1]
+      inner.is_a?(Array) && %i[@ident @ivar @const].include?(inner[0]) ? inner[1] : nil
+    when :call then recv[3].is_a?(Array) ? ident_name(recv[3]) : nil
+    when :method_add_arg
+      callee = recv[1]
+      return nil unless callee.is_a?(Array)
+
+      case callee[0]
+      when :fcall then ident_name(callee[1])
+      when :call then callee[3].is_a?(Array) ? ident_name(callee[3]) : nil
+      end
+    end
+  end
+
   # Core Ruby methods whose return is Array UNCONDITIONALLY, regardless of
   # what receiver_kind can prove about their OWN receiver — `String#split`,
   # `String#scan` (`vendor/ruby/v3.3.11/string.c`). Deliberately tiny and hand-picked:
@@ -2837,6 +2876,8 @@ class ApiExtractor
   # `shards.keys.values.first` does not chase `shards.keys`'s own kind back
   # through this same function, so `.values`'s receiver reads `expr`.
   def chain_receiver_kind(recv)
+    return "array" if kernel_array_call?(recv)
+
     call_node = recv[0] == :method_add_arg ? recv[1] : recv
     return "expr" unless call_node.is_a?(Array) && call_node[0] == :call
 
@@ -2871,11 +2912,26 @@ class ApiExtractor
 
     case inner[0]
     when :@ident then @hash_locals.include?(inner[1]) ? "hash" : "local"
-    when :@ivar then @hash_ivars.include?([@namespace_stack.join("::"), inner[1]]) ? "hash" : "ivar"
+    when :@ivar then ivar_receiver_kind([@namespace_stack.join("::"), inner[1]])
     when :@const then hash_constant?(inner[1]) ? "hash" : "const"
     when :@kw then inner[1] == "self" ? self_receiver_kind : "expr"
     else "expr"
     end
+  end
+
+  def ivar_receiver_kind(key)
+    return "hash" if @hash_ivars.include?(key)
+    return "array" if @array_ivars.include?(key)
+
+    "ivar"
+  end
+
+  def kernel_array_call?(node)
+    return false unless node.is_a?(Array) && node[0] == :method_add_arg
+
+    fcall = node[1]
+    fcall.is_a?(Array) && fcall[0] == :fcall && fcall[1].is_a?(Array) &&
+      fcall[1][0] == :@const && fcall[1][1] == "Array"
   end
 
   # An implicit (or explicit `self`) receiver inside a `core_ext` file that
@@ -2942,36 +2998,101 @@ class ApiExtractor
     node.each { |child| note_hash_assignments(child, assigned) if child.is_a?(Array) }
   end
 
-  # The file's ivars that are provably a Hash, keyed `[owner, name]` by the
-  # lexical class/module that assigns them: every `@x = …` in that owner
-  # assigns a `to_hash` call, whose result Ruby's
-  # implicit-conversion contract requires to be a Hash — `@row =
-  # fixture.to_hash` (`fixture_set/table_row.rb:69`). An `@x ||= …` keeps
-  # whatever truthy value `@x` already held, so it proves nothing; it, or any
-  # other non-Hash assignment in the same owner, leaves the ivar an `ivar`. An
-  # ivar of the same name in another class of the file is not proven by it.
-  # A hash-literal assignment is not yet admitted: story
+  # The file's ivars whose class is provable, keyed `[owner, name]` by the
+  # lexical class/module that assigns them, valued `"hash"`, `"array"` or nil.
+  # An ivar is `"hash"` when every `@x = …` in that owner assigns a `to_hash`
+  # call, whose result Ruby's implicit-conversion contract requires to be a
+  # Hash — `@row = fixture.to_hash` (`fixture_set/table_row.rb:69`). It is
+  # `"array"` when every one assigns an Array literal or a `Kernel#Array` call
+  # (`rb_f_array`, `vendor/ruby/v3.3.11/object.c:3825`, always an Array) —
+  # `@stack = []` (`abstract/transaction.rb:499`), `@queue = []`
+  # (`connection_pool/queue.rb:17`). Anything else that may write the ivar
+  # leaves it an `ivar`, which is what keeps an `@records` / `@target` a
+  # Relation or association may be assigned to unproven: an `@x ||= …` (it keeps
+  # whatever truthy value `@x` already held), a multiple-assignment target, an
+  # assignment in the class body itself (a class-level ivar) or inside
+  # `class << self` / a `def self.`, an `attr_writer` / `attr_accessor` for the
+  # name, an `instance_variable_set` of it (of every ivar in the file, when the
+  # name is not a literal), any assignment of another kind in the same owner,
+  # and one of another kind to the same name in any other class or module of
+  # the file (a subclass or mixin writing the parent's ivar). An ivar of the
+  # same name in another class of the file is not proven by it. A hash-literal
+  # assignment is not yet admitted: story
   # prove-hash-literal-ivars-in-ruby-compat-receiver-kinds.
-  def hash_typed_ivars(node, owner = [], assigned = {})
+  def typed_ivars(node, owner = [], assigned = {}, scope = :body)
     return assigned unless node.is_a?(Array)
 
     case node[0]
     when :class, :module
       name = const_name(node[1])
       body = node[0] == :class ? node[3] : node[2]
-      hash_typed_ivars(body, owner + [name], assigned) if name
+      typed_ivars(body, owner + [name], assigned) if name
       return assigned
+    when :sclass, :defs
+      node.each { |child| typed_ivars(child, owner, assigned, :singleton) if child.is_a?(Array) }
+      return assigned
+    when :def
+      scope = :instance unless scope == :singleton
     when :assign, :opassign
-      target = node[1]
-      if target.is_a?(Array) && target[0] == :var_field && target[1].is_a?(Array) && target[1][0] == :@ivar
-        key = [owner.join("::"), target[1][1]]
-        value = node[2]
-        hashy = node[0] == :assign && value.is_a?(Array) && value[0] == :call && ident_name(value[3]) == "to_hash"
-        assigned[key] = assigned.fetch(key, true) && hashy
+      key = ivar_target_key(node[1], owner)
+      if key
+        kind = node[0] == :assign && scope == :instance ? assigned_ivar_kind(node[2]) : nil
+        assigned[key] = assigned.key?(key) && assigned[key] != kind ? nil : kind
       end
+    when :massign
+      each_massign_ivar(node[1]) { |name| assigned[[owner.join("::"), name]] = nil }
+    when :command, :command_call, :method_add_arg
+      external_ivar_writes(node).each { |name| assigned[[owner.join("::"), name]] = nil }
     end
-    node.each { |child| hash_typed_ivars(child, owner, assigned) if child.is_a?(Array) }
+    node.each { |child| typed_ivars(child, owner, assigned, scope) if child.is_a?(Array) }
     assigned
+  end
+
+  IVAR_WRITER_MACROS = %w[attr_writer attr_accessor].freeze
+
+  def external_ivar_writes(node)
+    callee = %i[command command_call].include?(node[0]) ? node : node[1]
+    return [] unless callee.is_a?(Array)
+
+    name = case callee[0]
+           when :command, :fcall then ident_name(callee[1])
+           when :call, :command_call then callee[3].is_a?(Array) ? ident_name(callee[3]) : nil
+           end
+    args = node[0] == :command_call ? node[4] : node[2]
+    return extract_symbol_args(args).map { |attr| "@#{attr}" } if IVAR_WRITER_MACROS.include?(name)
+    return [] unless name == "instance_variable_set"
+
+    first = first_call_arg(args)
+    ivar = first.is_a?(Array) && first[0] == :symbol_literal && first[1].is_a?(Array) && first[1][1]
+    ivar.is_a?(Array) && ivar[0] == :@ivar ? [ivar[1]] : ["*"]
+  end
+
+  def first_call_arg(args)
+    args = args[1] if args.is_a?(Array) && args[0] == :arg_paren
+    args = args[1] if args.is_a?(Array) && args[0] == :args_add_block
+    args.is_a?(Array) ? args[0] : nil
+  end
+
+  def ivar_target_key(target, owner)
+    return nil unless target.is_a?(Array) && target[0] == :var_field
+    return nil unless target[1].is_a?(Array) && target[1][0] == :@ivar
+
+    [owner.join("::"), target[1][1]]
+  end
+
+  def assigned_ivar_kind(value)
+    return nil unless value.is_a?(Array)
+    return "hash" if value[0] == :call && ident_name(value[3]) == "to_hash"
+    return "array" if value[0] == :array || kernel_array_call?(value)
+
+    nil
+  end
+
+  def each_massign_ivar(targets, &block)
+    return unless targets.is_a?(Array)
+    return block.call(targets[1][1]) if targets[0] == :var_field && targets[1].is_a?(Array) && targets[1][0] == :@ivar
+
+    targets.each { |child| each_massign_ivar(child, &block) if child.is_a?(Array) }
   end
 
   # The local a `:var_field` assignment target names, or nil for an ivar,
@@ -3787,7 +3908,11 @@ class ApiExtractor
     if name && !name.start_with?("_") && name =~ /\A[a-z]/ &&
        !(name == "new" && recv && proc_new_receiver?(recv))
       calls << name
-      (@call_receivers[name] ||= Set.new) << receiver_kind(recv)
+      kind = receiver_kind(recv)
+      (@call_receivers[name] ||= Set.new) << kind
+      if RECEIVER_NAMED_CALLS.include?(name) && recv && kind != "array"
+        (@call_receiver_names[name] ||= Set.new) << (receiver_tail_name(recv) || "?")
+      end
       weak << name if (recv && inert_receiver?(recv)) || core_receiver_call?(name, recv)
     end
 

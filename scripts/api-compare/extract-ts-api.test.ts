@@ -1302,6 +1302,55 @@ describe("body call capture", () => {
     expect(m.calls).toEqual([".locale", "defaults", "formats", "locale"]);
   });
 
+  it("marks a .length property read, never a length() or size() call, as a native form", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        read(xs: string[]) {
+          return xs.length;
+        }
+        called(rel: { length(): number; size(): number }) {
+          return rel.length() + rel.size();
+        }
+      }`,
+    );
+    const read = cls.instanceMethods.find((m) => m.name === "read")!;
+    expect(read.calls).toContain("@length");
+    expect(read.calls).toContain("@length:xs");
+    const called = cls.instanceMethods.find((m) => m.name === "called")!;
+    expect(called.calls).not.toContain("@length");
+  });
+
+  it("names the receiver a .length read ends in", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        async exists(c: { selectRows(): Promise<unknown[]> }, result: { columns: string[] }) {
+          return (await c.selectRows()).length === result.columns.length + wrap(ids).length;
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "exists")!;
+    expect(m.calls).toEqual(
+      expect.arrayContaining(["@length:selectRows", "@length:columns", "@length:wrap"]),
+    );
+  });
+
+  it("marks a dynamic import() of a computed specifier as a native form, not a literal one", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        async loadMigration(href: string) {
+          return await import(href);
+        }
+        async lazy() {
+          return await import("../migration.js");
+        }
+      }`,
+    );
+    const loaded = cls.instanceMethods.find((m) => m.name === "loadMigration")!;
+    expect(loaded.calls).toContain("@import");
+    const lazy = cls.instanceMethods.find((m) => m.name === "lazy")!;
+    expect(lazy.calls ?? []).not.toContain("@import");
+  });
+
   it("marks a call INVOKED on another object with the foreign-read prefix", () => {
     // `details.digest(x)` runs a member of `details`, not the same-file method
     // `digest` — the closure must not union that one's call-set (RFC 0108).

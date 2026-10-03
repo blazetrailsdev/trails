@@ -196,7 +196,12 @@ export function includeGraphCallSets(
   entities: readonly GraphEntity[],
   tsName: string,
   graph: IncludeGraph,
-): { calls: Set<string>; negated: Set<string>; foreignReads: Set<string> } {
+): {
+  calls: Set<string>;
+  negated: Set<string>;
+  foreignReads: Set<string>;
+  nativeForms: Set<string>;
+} {
   const raw: string[] = [];
   const seenFileFunctionFiles = new Set<string>();
   for (const entity of entities) {

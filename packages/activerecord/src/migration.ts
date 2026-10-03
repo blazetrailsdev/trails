@@ -1367,10 +1367,7 @@ export class MigrationProxy {
     return this._migration;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall load — CONVERGEABLE call-gate-credits-a-dynamic-import-as-kernel-load
-   */
+  /** @internal */
   async loadMigration(): Promise<Migration> {
     const { pathToFileURL } = await import("node:url");
     const url = pathToFileURL(this.filename);
@@ -1569,7 +1566,6 @@ export class MigrationContext<
     }
   }
 
-  /** @missingRailsCall size — CONVERGEABLE call-gate-credits-a-length-read-as-array-size */
   async needsMigration(this: MigrationContext): Promise<boolean> {
     return (await this.pendingMigrationVersions()).length > 0;
   }

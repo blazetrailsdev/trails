@@ -236,10 +236,7 @@ export class Batches {
   }
 }
 
-/**
- * @internal
- * @missingRailsCall size — CONVERGEABLE call-gate-credits-a-length-read-as-array-size
- */
+/** @internal */
 export async function ensureValidOptionsForBatchingBang(
   relation: any,
   cursor: string[],

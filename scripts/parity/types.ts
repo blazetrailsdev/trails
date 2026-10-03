@@ -141,6 +141,12 @@ export interface MethodInfo {
    */
   callReceivers?: Record<string, string[]>;
   /**
+   * The name each non-`array` receiver of a `size` / `length` site ends in
+   * (`cursor`, `columns`, `select_rows`), `?` for a receiver with none. See
+   * extract-ruby-api.rb#receiver_tail_name.
+   */
+  callReceiverNames?: Record<string, string[]>;
+  /**
    * Both extractors (RFC 0025 `## Call-argument fidelity`): every syntactic
    * call site in the body, in source order, with its argument descriptors.
    * `calls` / `callSeq` carry names only, so a port that calls `where` with a

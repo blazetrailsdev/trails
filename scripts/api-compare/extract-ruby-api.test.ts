@@ -3197,6 +3197,7 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
   // Returns a map of "<fqn>#<method>" -> callReceivers.
   function rubyCallReceivers(
     fixtures: Record<string, string>,
+    field = "callReceivers",
   ): Record<string, Record<string, string[]> | undefined> {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "recv-rb-"));
     try {
@@ -3216,7 +3217,7 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
         out = {}
         ex.classes.each do |fqn, info|
           (info[:instanceMethods] + info[:classMethods]).each do |m|
-            out["#{fqn}##{m[:name]}"] = m[:callReceivers]
+            out["#{fqn}##{m[:name]}"] = m[:${field}]
           end
         end
         puts JSON.generate(out)
@@ -3305,6 +3306,194 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
       `,
     });
     expect(c["Row#call"]).toEqual({ fetch: ["ivar"], delete: ["hash"], "include?": ["ivar"] });
+  });
+
+  it("proves an Array ivar only when every assignment in the class is an Array literal", () => {
+    const c = rubyCallReceivers({
+      "lib/active_record/stack.rb": `
+        class Stack
+          def initialize
+            @stack = []
+            @queue = Array(seed)
+            @records = []
+            @target = []
+            @pair, @other = [], []
+          end
+
+          def call
+            @stack.last
+            @queue.size
+            @records.first
+            @target.first
+            @pair.size
+          end
+
+          def load(relation)
+            @records = relation
+            @target ||= []
+          end
+        end
+      `,
+    });
+    expect(c["Stack#call"]).toEqual({
+      last: ["array"],
+      size: ["array", "ivar"],
+      first: ["ivar"],
+    });
+  });
+
+  it("leaves an Array-literal ivar unproven when anything outside the class's own instance bodies may write it", () => {
+    const c = rubyCallReceivers({
+      "lib/active_record/writers.rb": `
+        class Writers
+          attr_writer :written
+          attr_accessor :accessed
+
+          def initialize
+            @written = []
+            @accessed = []
+            @singleton = []
+            @class_level = []
+            @set = []
+            @plain = []
+          end
+
+          def self.reset
+            @class_level = []
+          end
+
+          class << self
+            def build
+              @singleton = []
+            end
+          end
+
+          def call
+            @written.size
+            @accessed.size
+            @singleton.size
+            @class_level.size
+            @set.size
+            @plain.last
+          end
+
+          def restore(value)
+            instance_variable_set(:@set, value)
+          end
+        end
+
+        class SelfWriter
+          def initialize
+            @stack = []
+          end
+
+          def call(name, value)
+            @stack.last
+            self.instance_variable_set :@stack, value
+          end
+        end
+
+        class ClassLevel
+          @registry = []
+
+          def call
+            @registry.last
+          end
+        end
+
+        class Parent
+          def initialize
+            @items = []
+          end
+
+          def call
+            @items.last
+          end
+        end
+
+        class Child < Parent
+          def reload(relation)
+            @items = relation
+          end
+        end
+
+      `,
+      "lib/active_record/dynamic_writer.rb": `
+        class DynamicWriter
+          def initialize
+            @stack = []
+          end
+
+          def call(name, value)
+            @stack.last
+            instance_variable_set(name, value)
+          end
+        end
+      `,
+      "lib/active_record/dynamic_child.rb": `
+        class DynamicParent
+          def initialize
+            @stack = []
+          end
+
+          def call
+            @stack.last
+          end
+        end
+
+        class DynamicChild < DynamicParent
+          def restore(name, value)
+            instance_variable_set(name, value)
+          end
+        end
+      `,
+    });
+    expect(c["Writers#call"]).toEqual({ size: ["ivar"], last: ["array"] });
+    expect(c["DynamicWriter#call"]).toEqual({ last: ["ivar"] });
+    expect(c["SelfWriter#call"]).toEqual({ last: ["ivar"] });
+    expect(c["ClassLevel#call"]).toEqual({ last: ["ivar"] });
+    expect(c["Parent#call"]).toEqual({ last: ["ivar"] });
+    expect(c["DynamicParent#call"]).toEqual({ last: ["ivar"] });
+  });
+
+  it("names the receiver each non-Array size or length site ends in", () => {
+    const c = rubyCallReceivers(
+      {
+        "lib/active_record/named.rb": `
+          class Named
+            def call(cursor, c, result, ids)
+              Array(cursor).size
+              cursor.size
+              c.select_rows(sql).size
+              result.columns.length
+              Array.wrap(ids).size
+              predicates.size
+              (a || b).size
+            end
+          end
+        `,
+      },
+      "callReceiverNames",
+    );
+    expect(c["Named#call"]).toEqual({
+      size: ["?", "cursor", "predicates", "select_rows", "wrap"],
+      length: ["columns"],
+    });
+  });
+
+  it("proves a Kernel#Array call receiver an Array", () => {
+    const c = rubyCallReceivers({
+      "lib/active_record/batches.rb": `
+        class Batches
+          def call(start, cursor)
+            Array(start).size
+            Array(cursor).last
+            cursor.Array(start).first
+          end
+        end
+      `,
+    });
+    expect(c["Batches#call"]).toEqual({ size: ["array"], last: ["array"], first: ["expr"] });
   });
 
   it("proves a Hash ivar only within the class that assigns it", () => {

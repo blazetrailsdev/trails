@@ -51,7 +51,6 @@ export class WhereClause {
     return new WhereClause(unionNodes(filtered, other.predicates));
   }
 
-  /** @missingRailsCall size — CONVERGEABLE call-gate-proves-where-clause-predicates-an-array-for-size */
   invert(): WhereClause {
     let invertedPredicates: (Nodes.Node | Nodes.SqlLiteral | string)[];
     if (this.predicates.length === 1) {
