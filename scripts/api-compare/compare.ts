@@ -666,6 +666,21 @@ export function significantCallsForReceivers(
   };
 }
 
+/**
+ * The `invoke` native forms (see NATIVE_FORM_ANALOGUES' `call`) a TS body's own
+ * call set carries: an invocation `this.tableNameResolver()` records its callee
+ * name, so each plain name is a callable the body may have invoked, keyed with
+ * a leading `_` dropped so `this._block()` answers Ruby's `@block.call`.
+ */
+export function invokeForms(calls: Iterable<string>): string[] {
+  const forms = ["invoke"];
+  for (const c of calls) {
+    if (!/^[_a-zA-Z]/.test(c)) continue;
+    forms.push(`invoke:${c}`, `invoke:${c.replace(/^_+/, "")}`);
+  }
+  return forms;
+}
+
 function hasNativeFormAnalogue(
   value: string,
   receivers: Record<string, readonly string[]> | undefined,
@@ -676,11 +691,10 @@ function hasNativeFormAnalogue(
   if (analogue === undefined || !tsNativeForms.has(analogue.form)) return false;
   const kinds = receivers?.[value];
   if (analogue.receivers === "implicit-self") return kinds === undefined;
-  if (kinds === undefined || kinds.some((k) => LENGTH_READ_UNCREDITED_RECEIVER_KINDS.has(k))) {
-    return false;
-  }
+  const uncredited = analogue.uncreditedKinds ?? LENGTH_READ_UNCREDITED_RECEIVER_KINDS;
+  if (kinds === undefined || kinds.some((k) => uncredited.has(k))) return false;
   return (receiverNames?.[value] ?? []).every((name) =>
-    tsNativeForms.has(`${analogue.form}:${snakeToCamel(name)}`),
+    tsNativeForms.has(`${analogue.form}:${snakeToCamel(name.replace(/^@+/, ""))}`),
   );
 }
 
@@ -800,10 +814,14 @@ export function suppressedCallClaims(
     const mapped = mapCall(rc);
     if (!mapped || mapped.length === 0) continue;
     if (mapped.some(isPortedWithArgs)) continue;
+    // A body that ports the call under its convention name
+    // (`isMethodDefined` for `method_defined?`, delegation.rb:76) has not spent
+    // an alias spelling on it, so that spelling stays free for a sibling.
+    const spelledByName = mapped.some((c) => tsCalls.has(c));
     for (const c of [
       ...mapped,
-      ...aliasCall(rc),
-      ...(SUPPRESSED_CALL_TS_SPELLINGS.get(rc) ?? []),
+      ...(spelledByName ? [] : aliasCall(rc)),
+      ...(spelledByName ? [] : (SUPPRESSED_CALL_TS_SPELLINGS.get(rc) ?? [])),
     ]) {
       if (tsCalls.has(c)) claimed.add(c);
     }
@@ -5181,6 +5199,7 @@ export function main() {
         }
         for (const c of graphCalls.negated) negatedTsCalls.add(c);
         for (const c of graphCalls.nativeForms) tsNativeForms.add(c);
+        for (const c of invokeForms(own.calls)) tsNativeForms.add(c);
         callsCompared++;
         const missing = significantMissingCalls(
           rubyName,

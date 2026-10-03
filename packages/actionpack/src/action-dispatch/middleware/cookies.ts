@@ -696,10 +696,7 @@ export const signedCookieDigest = requestEnvAccessor<string>(
 export const secretKeyBase = requestEnvAccessor<string>("action_dispatch.secret_key_base");
 /** @internal */
 export const cookiesSerializer = requestEnvAccessor<unknown>("action_dispatch.cookies_serializer");
-/**
- * @internal
- * @missingRailsCall call — PERMANENT
- */
+/** @internal */
 export function cookiesSameSiteProtection(this: RequestCookieMethodsHost): unknown {
   return (
     this.getHeader(COOKIES_SAME_SITE_PROTECTION) as

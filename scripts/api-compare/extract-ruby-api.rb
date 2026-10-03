@@ -2815,8 +2815,9 @@ class ApiExtractor
   end
 
   # The calls whose non-`array` receivers `callReceiverNames` records, read by
-  # compare.ts's `.length`-read credit for `size` / `length`.
-  RECEIVER_NAMED_CALLS = %w[size length].freeze
+  # compare.ts's native-form credits: the `.length` read for `size` / `length`,
+  # and the direct invocation of a Proc-valued receiver for `call`.
+  RECEIVER_NAMED_CALLS = %w[size length call].freeze
 
   # The name a receiver ENDS in — a local or reader (`cursor`, `predicates`), the
   # method of a call chain (`result.columns` → `columns`,

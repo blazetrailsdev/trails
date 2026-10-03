@@ -107,10 +107,6 @@ export class DelegateCache {
 }
 
 export class GeneratedRelationMethods extends Module {
-  /**
-   * @missingRailsCall include? — CONVERGEABLE call-gate-generate-method-set-has-claim-and-heredoc-order
-   * @missingRailsCall order:scoping,defineMethod — CONVERGEABLE call-gate-generate-method-set-has-claim-and-heredoc-order
-   */
   generateMethod(method: string): void {
     if (this.isMethodDefined(method)) return;
 

@@ -73,10 +73,7 @@ export class RoutesReloader {
     }
   }
 
-  /**
-   * @internal
-   * @missingRailsCall call — PERMANENT
-   */
+  /** @internal */
   private async loadPaths(): Promise<void> {
     const p = getPath();
     for (const path of this.paths) {

@@ -1724,6 +1724,25 @@ describe("body call capture", () => {
     ]);
   });
 
+  it("keeps a moduleEval / classEval callback's calls OUT of the order stream, but in the call set", () => {
+    // delegation.rb:79-87 — the `module_eval <<-RUBY` arm is a string Ripper
+    // never parses, so only the `define_method` arm's `scoping` has a position.
+    const cls = extractFromSource(
+      `class Foo {
+        generate(m: string, ok: boolean) {
+          if (ok) {
+            this.moduleEval((mod) => { mod[m] = () => this.scoping(() => 1); });
+          } else {
+            this.defineMethod(m, () => this.scoping(() => 2));
+          }
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "generate")!;
+    expect(m.callSeq).toEqual(["moduleEval", "defineMethod", "scoping"]);
+    expect(m.calls).toEqual(["defineMethod", "moduleEval", "scoping"]);
+  });
+
   it("drops a hoisted closure's name even when the enclosing body calls it too", () => {
     // Deliberate over-drop: the enclosing occurrence is no less ambiguous than
     // the closure's. Ruby's counterpart may be either the lambda-at-definition
@@ -1883,6 +1902,35 @@ describe("body call capture — renamed-import aliases", () => {
     ]);
     expect(info.classes["b.ts:B"].instanceMethods.find((m) => m.name === "go")!.calls).toEqual([
       "renamed",
+    ]);
+  });
+});
+
+describe("body call capture — ruby-compat renamed imports", () => {
+  it("credits a rename forced by a module-level homonym to the original export", () => {
+    // relation/finder-methods.ts: `first as aryFirst` beside `FinderMethods#first`.
+    const info = extractFromFiles("/p", {
+      "finder.ts": `
+        import { first as aryFirst } from "@blazetrails/ruby-compat";
+        export function first(this: any): unknown { return aryFirst(this.records); }
+      `,
+    });
+    expect(fileFunctionsOf(info, "finder.ts").find((f) => f.name === "first")!.calls).toEqual([
+      "aryFirst",
+      "first",
+      "records",
+    ]);
+  });
+
+  it("keeps the local name of a rename toward the Ruby name", () => {
+    const info = extractFromFiles("/p", {
+      "insp.ts": `
+        import { rbInspect as inspect } from "@blazetrails/ruby-compat";
+        export function show(x: unknown): unknown { return inspect(x); }
+      `,
+    });
+    expect(fileFunctionsOf(info, "insp.ts").find((f) => f.name === "show")!.calls).toEqual([
+      "inspect",
     ]);
   });
 });

@@ -201,14 +201,28 @@ export const NATIVE_FORM_PREFIX = "@";
  *   every Ruby site of `load` is an implicit-self call, the only shape
  *   `Kernel#load` takes; a `records.load` site, alone or beside a bare one,
  *   still flags.
+ * - `call` → `invoke`: a JS function invoked with `()`. `Proc#call`
+ *   (`vendor/ruby/v3.3.11/proc.c:976`) is how Ruby invokes a lambda, and a
+ *   lambda-valued member or local ports as a JS function, which has no member
+ *   named `call` — `table_name_resolver.call`
+ *   (`activerecord/lib/active_record/associations/builder/has_and_belongs_to_many.rb:27`)
+ *   is `this.tableNameResolver()`. Admitted only where every Ruby site's
+ *   receiver is named and the paired TS body invokes that name (`invokeForms`,
+ *   compare.ts), so a `call` that is a ported method (`Preloader#call`, a Rack
+ *   app's) still flags unless the port spells it `call`.
  */
 export const NATIVE_FORM_ANALOGUES = new Map<
   string,
-  { form: string; receivers: "implicit-self" | "explicit" }
+  {
+    form: string;
+    receivers: "implicit-self" | "explicit";
+    uncreditedKinds?: ReadonlySet<string>;
+  }
 >([
   ["size", { form: "length", receivers: "explicit" }],
   ["length", { form: "length", receivers: "explicit" }],
   ["load", { form: "import", receivers: "implicit-self" }],
+  ["call", { form: "invoke", receivers: "explicit", uncreditedKinds: new Set(["const"]) }],
 ]);
 
 /**

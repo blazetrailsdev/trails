@@ -481,10 +481,7 @@ export function usingLimitableReflections(
   return reflections.every((r) => !r.isCollection());
 }
 
-/**
- * @internal
- * @missingRailsCall first — CONVERGEABLE call-gate-credits-a-ruby-compat-import-renamed-around-a-module-homonym
- */
+/** @internal */
 export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Promise<any> {
   if (this.primaryKey == null) throw new UnknownPrimaryKey(this.model as any);
 
@@ -607,29 +604,20 @@ export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Pro
   }
 }
 
-/**
- * @internal
- * @missingRailsCall first — CONVERGEABLE call-gate-credits-a-ruby-compat-import-renamed-around-a-module-homonym
- */
+/** @internal */
 export async function findTake(this: FinderRelation): Promise<any | null> {
   if (this.isLoaded) return aryFirst(await this.records()) ?? null;
   (this as any)._take ??= aryFirst(await (this as any).limit(1).records()) ?? null;
   return (this as any)._take;
 }
 
-/**
- * @internal
- * @missingRailsCall take — CONVERGEABLE call-gate-credits-a-ruby-compat-import-renamed-around-a-module-homonym
- */
+/** @internal */
 export async function findTakeWithLimit(this: FinderRelation, limit: number): Promise<any[]> {
   if (this.isLoaded) return aryTake(await this.records(), limit);
   return (this as any).limit(limit).toArray();
 }
 
-/**
- * @internal
- * @missingRailsCall first — CONVERGEABLE call-gate-credits-a-ruby-compat-import-renamed-around-a-module-homonym
- */
+/** @internal */
 export async function findNth(this: FinderRelation, index: number): Promise<any | null> {
   const offsets = ((this as any)._offsets ??= new Map<number, any>());
   let record = offsets.get(index) ?? null;
@@ -640,10 +628,7 @@ export async function findNth(this: FinderRelation, index: number): Promise<any 
   return record;
 }
 
-/**
- * @internal
- * @missingRailsCall last — CONVERGEABLE call-gate-credits-a-ruby-compat-import-renamed-around-a-module-homonym
- */
+/** @internal */
 export async function findLast(this: FinderRelation, limit?: number): Promise<any> {
   const records: any[] = await this.records();
   return limit != null ? aryLast(records, limit) : (aryLast(records) ?? null);

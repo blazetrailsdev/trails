@@ -4459,9 +4459,17 @@ function collectRubyCompatBindings(sourceFile: ts.SourceFile): Map<string, strin
   return bindings;
 }
 
-/** Collect relative-module renamed-import aliases (`import { a as b }` → b→a). */
+/**
+ * Collect renamed-import aliases (`import { a as b }` → b→a): every rename from
+ * a relative module, and a `@blazetrails/ruby-compat` rename only when the
+ * module declares a top-level binding of the original name — the collision that
+ * forced it (`first as aryFirst` beside `FinderMethods#first`,
+ * relation/finder-methods.ts). Any other ruby-compat rename is TOWARD the Ruby
+ * name (`rbInspect as inspect`) and keeps its local name.
+ */
 function collectImportAliases(sourceFile: ts.SourceFile): Map<string, string> {
   const aliases = new Map<string, string>();
+  const topLevel = topLevelDeclaredNames(sourceFile);
   ts.forEachChild(sourceFile, (node) => {
     if (
       !ts.isImportDeclaration(node) ||
@@ -4472,14 +4480,32 @@ function collectImportAliases(sourceFile: ts.SourceFile): Map<string, string> {
       return;
     }
     const spec = node.moduleSpecifier.text;
-    if (!spec.startsWith("./") && !spec.startsWith("../")) return;
+    const relative = spec.startsWith("./") || spec.startsWith("../");
+    if (!relative && !spec.startsWith("@blazetrails/ruby-compat")) return;
     for (const el of node.importClause.namedBindings.elements) {
-      if (el.propertyName && el.propertyName.text !== el.name.text) {
-        aliases.set(el.name.text, el.propertyName.text);
-      }
+      if (!el.propertyName || el.propertyName.text === el.name.text) continue;
+      if (!relative && !topLevel.has(el.propertyName.text)) continue;
+      aliases.set(el.name.text, el.propertyName.text);
     }
   });
   return aliases;
+}
+
+function topLevelDeclaredNames(sourceFile: ts.SourceFile): Set<string> {
+  const names = new Set<string>();
+  for (const stmt of sourceFile.statements) {
+    if (
+      (ts.isFunctionDeclaration(stmt) || ts.isClassDeclaration(stmt)) &&
+      stmt.name !== undefined
+    ) {
+      names.add(stmt.name.text);
+    } else if (ts.isVariableStatement(stmt)) {
+      for (const decl of stmt.declarationList.declarations) {
+        if (ts.isIdentifier(decl.name)) names.add(decl.name.text);
+      }
+    }
+  }
+  return names;
 }
 
 /**
@@ -5730,7 +5756,16 @@ function collectCalls(
         names.add(name);
         tally(occurrences, name);
       }
-      for (const block of blocks) visit(block);
+      // Ruby's `module_eval <<-RUBY` / `class_eval <<-RUBY` body is a string
+      // Ripper never parses, so the calls the port's callback makes in its
+      // place have no counterpart position in the Ruby stream
+      // (`relation/delegation.rb:79-83`). The ORDER stream drops them — position
+      // unknown is not position wrong; the call SET still counts them.
+      const evalCallback =
+        skipHoistedClosures &&
+        ts.isPropertyAccessExpression(callee) &&
+        (callee.name.text === "moduleEval" || callee.name.text === "classEval");
+      if (!evalCallback) for (const block of blocks) visit(block);
       addNegated(n, ...negated);
       addCallbackNegated(blocks, ...negated);
       return;
