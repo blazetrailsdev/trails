@@ -193,6 +193,9 @@ export interface MethodInfo {
   /** TS-side only (RFC 0153): the Ruby identifiers this declaration receipts
    *  as permanent `naming` rows, via `@missingRailsName`. */
   missingRailsNames?: string[];
+  /** TS-side only: the skeleton tokens this declaration receipts as arms or
+   *  calls its body adds to Rails', via `@inventedArm`. */
+  inventedArms?: string[];
   /**
    * TS-side only (RFC 0099): the REASON behind each `@missingRailsCall`
    * suppression above, keyed by Ruby call. Carried so a receipt's permanence

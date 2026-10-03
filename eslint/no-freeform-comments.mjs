@@ -105,7 +105,7 @@ const DIRECTIVE_RE =
  * them and they are English by construction.
  */
 const KEPT_TAG_NAMES =
-  "internal|noRailsEquivalent|missingRailsCall|missingRailsArgs|missingRailsName|empty|deprecated";
+  "internal|noRailsEquivalent|missingRailsCall|missingRailsArgs|missingRailsName|inventedArm|empty|deprecated";
 
 const KEPT_TAG_NAME_SET = new Set(KEPT_TAG_NAMES.split("|"));
 
@@ -157,6 +157,7 @@ const REQUIRES_PERMANENCE = new Set([
   "missingRailsCall",
   "missingRailsArgs",
   "missingRailsName",
+  "inventedArm",
 ]);
 
 /**
@@ -275,7 +276,10 @@ function keptLines(comment) {
 function renderTag({ name, text }) {
   const [subject, rest = ""] = text.split(/\s+—\s+/u, 2);
   const takesSubject =
-    name === "missingRailsCall" || name === "missingRailsArgs" || name === "missingRailsName";
+    name === "missingRailsCall" ||
+    name === "missingRailsArgs" ||
+    name === "missingRailsName" ||
+    name === "inventedArm";
   const rubyCall = takesSubject ? subject.trim() : "";
   const permanence = PERMANENCE_RE.exec(takesSubject ? rest : text);
   // A tag whose required argument is missing cannot be reduced to data: a bare

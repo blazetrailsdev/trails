@@ -148,7 +148,7 @@ export function rbModConstDefined(
  *
  * @noRailsEquivalent PERMANENT — a Ruby core class, not a Rails one.
  */
-export class Module {
+export class Module<I extends object = Record<never, never>> {
   /**
    * Mirrors: Ruby's Module.new — vendor/ruby/v3.3.11/object.c:1950
    * `rb_mod_initialize`, which hands a given block the new module
@@ -189,8 +189,8 @@ export class Module {
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
-  moduleEval<T>(block: (mod: Record<string, unknown>) => T): T {
-    const carrier = carrierOf(this);
+  moduleEval<T>(block: (mod: Partial<I> & Record<string, unknown>) => T): T {
+    const carrier = carrierOf(this) as Partial<I> & Record<string, unknown>;
     const before: Record<PropertyKey, PropertyDescriptor | undefined> =
       Object.getOwnPropertyDescriptors(carrier);
     const result = block(carrier);
@@ -1072,9 +1072,7 @@ type CallableMethods<M extends object> = {
       : never;
 };
 
-export type Included<M extends object> = CallableMethods<
-  M extends Module ? Omit<M, keyof Module> : M
->;
+export type Included<M extends object> = CallableMethods<M extends Module<infer I> ? I : M>;
 
 function isClass(klass: object): klass is AnyClass {
   return typeof klass === "function";

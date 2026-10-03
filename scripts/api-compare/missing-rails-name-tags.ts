@@ -23,20 +23,24 @@ import { type JsdocOrigin, classifyReason, parseJsdoc } from "./missing-rails-ca
 export const TAG = "@missingRailsName";
 
 /** The Ruby identifiers one JSDoc comment receipts, sorted and deduplicated. */
-export function suppressedNamesIn(comment: string, origin?: JsdocOrigin): string[] {
-  const { entries } = parseJsdoc(comment, origin, TAG);
+export function suppressedNamesIn(
+  comment: string,
+  origin?: JsdocOrigin,
+  tag: string = TAG,
+): string[] {
+  const { entries } = parseJsdoc(comment, origin, tag);
   const where = origin ? ` in ${origin.fileName}` : "";
   for (const entry of entries) {
     const permanence = classifyReason(entry.reason);
     if (permanence === "unclassified") {
       throw new Error(
-        `${TAG} needs a permanence claim${where} — the receipt for \`${entry.call}\` is ` +
+        `${tag} needs a permanence claim${where} — the receipt for \`${entry.call}\` is ` +
           "`PERMANENT` or `CONVERGEABLE <story-id>`.",
       );
     }
     if (permanence === "convergeable" && !/^\s*CONVERGEABLE\W+\S/.test(entry.reason)) {
       throw new Error(
-        `${TAG} needs a story id${where} — \`CONVERGEABLE\` alone is half a receipt; name ` +
+        `${tag} needs a story id${where} — \`CONVERGEABLE\` alone is half a receipt; name ` +
           `the story that converges \`${entry.call}\`.`,
       );
     }

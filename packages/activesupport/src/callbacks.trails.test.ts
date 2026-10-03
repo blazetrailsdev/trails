@@ -1204,4 +1204,10 @@ describe("setCallback with a block (trails)", () => {
     target.runCallbacks("save");
     expect(target.ran).toEqual([]);
   });
+
+  it("types run_callbacks as an instance method, not a property of the module object", () => {
+    // @ts-expect-error run_callbacks is an instance method (callbacks.rb:97), never a singleton one.
+    expect(Callbacks.runCallbacks).toBeUndefined();
+    expect(Callbacks.instanceMethods()).toContain("runCallbacks");
+  });
 });

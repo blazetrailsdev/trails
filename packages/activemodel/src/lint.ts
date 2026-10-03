@@ -54,17 +54,20 @@ export namespace Tests {
   }
 
   type ModelName = { human(): string; singular: string; plural: string };
-  type ModelNamingHost = { modelName: ModelName; constructor: { modelName?: ModelName } };
+  type ModelNamingHost = { modelName: ModelName; constructor: object };
   export function testModelNaming(input: { toModel(): ModelNamingHost }): void {
     assertRespondTo(model(input).constructor, "modelName");
-    const modelName = model(input).constructor.modelName!;
+    const modelName = (model(input).constructor as { modelName: ModelName }).modelName;
     assertRespondTo(modelName, "toString");
     assertRespondTo(modelName.human(), "toStr");
     assertRespondTo(modelName.singular, "toStr");
     assertRespondTo(modelName.plural, "toStr");
 
     assertRespondTo(model(input), "modelName");
-    assertEqual(model(input).modelName, model(input).constructor.modelName);
+    assertEqual(
+      model(input).modelName,
+      (model(input).constructor as { modelName: ModelName }).modelName,
+    );
   }
 
   type ErrorsArefHost = { errors: { get(attribute: string): unknown } };

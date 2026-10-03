@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 import { Model, UnknownAttributeError } from "./index.js";
+import { Tests } from "./lint.js";
 
 class DefaultValueModel extends Model {
   declare _hello?: string;
@@ -45,6 +46,36 @@ class SimpleModel extends Model {
 }
 
 describe("APITest", () => {
+  let model: BasicModel;
+
+  beforeEach(() => {
+    model = new BasicModel();
+  });
+
+  it("to key", () => {
+    Tests.testToKey(model);
+  });
+
+  it("to param", () => {
+    Tests.testToParam(model);
+  });
+
+  it("to partial path", () => {
+    Tests.testToPartialPath(model);
+  });
+
+  it("persisted?", () => {
+    Tests.testPersisted(model);
+  });
+
+  it("model naming", () => {
+    Tests.testModelNaming(model);
+  });
+
+  it("errors aref", () => {
+    Tests.testErrorsAref(model);
+  });
+
   it("initialize with params", () => {
     const object = new BasicModel({ attr: "value" });
     expect(object.attr).toBe("value");

@@ -1195,11 +1195,10 @@ export const ClassMethods = {
   },
 };
 
-export const Callbacks = new Module() as Module & {
-  ClassMethods: typeof ClassMethods;
+export const Callbacks = new Module() as Module<{
   runCallbacks: typeof runCallbacks;
   haltedCallbackHook(_filter: unknown, _name: string): void;
-};
+}> & { ClassMethods: typeof ClassMethods };
 extend(Callbacks, Concern);
 
 Concern.included.call(Callbacks, null, function (this: AnyClass) {

@@ -1669,6 +1669,8 @@ interface CallResult {
   uncomparedTags: StaleCallTag[];
   suppressed: SuppressedCall[];
   skeletons: CallSkeleton[];
+  /** `@inventedArm` tags on a declaration no skeleton row was written for. */
+  uncomparedArmTags: StaleCallTag[];
 }
 
 /**
@@ -1705,6 +1707,8 @@ export interface CallSkeleton {
    *  terms and no wider. Absent when nothing resolves. */
   rubyHelpers?: Record<string, string[]>;
   tsHelpers?: Record<string, string[]>;
+  /** The TS declaration's `@inventedArm` receipts, sorted. */
+  inventedArms?: string[];
 }
 
 /**
@@ -4450,6 +4454,10 @@ export function main() {
       string,
       Map<string, Map<string, Map<string, string>>>
     >();
+    const tsInventedArmTagsByFileName = new Map<
+      string,
+      Map<string, Map<string, Map<string, string>>>
+    >();
     // (file → name → every class declaring it), `resolveTsOwner`'s population.
     const tsOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     // (file → name → owner → the file the member is DECLARED in), recorded only
@@ -4615,6 +4623,17 @@ export function main() {
           m.name,
           owner,
           m.missingRailsNames,
+          undefined,
+          scope,
+        );
+      }
+      if (m.inventedArms !== undefined) {
+        recordTaggedCalls(
+          tsInventedArmTagsByFileName,
+          file,
+          m.name,
+          owner,
+          m.inventedArms,
           undefined,
           scope,
         );
@@ -4950,6 +4969,7 @@ export function main() {
     // mismatch is STALE, the only-shrink half `@missingRailsCall` already has.
     const argTagsUsed = new Map<string, Set<string>>();
     const nameTagsUsed = new Map<string, Set<string>>();
+    const armTagsUsed = new Map<string, Set<string>>();
     const suppressedCalls: SuppressedCall[] = [];
     // The call-ARGUMENT twin, reported in that artifact for the same reason:
     // its receipts carry a permanence claim and are a population of their own.
@@ -5462,6 +5482,12 @@ export function main() {
           const localSets = tsLocalSkeletonByFileName.get(tsFile)?.get(tsName);
           const tsOwnNameDelegate = localSets?.length === 1 ? localSets[0] : undefined;
           const tsFolded = foldSkeletonTokens(tsSkeletons[0], "ts", rubySkeleton);
+          const armTags = tagsForOwner(
+            tsInventedArmTagsByFileName.get(tsFile)?.get(tsName),
+            tsClass,
+            tsBodylessOwnersByFileName.get(tsFile)?.get(tsName),
+          );
+          seedComparedTagKey(armTagsUsed, armTags, callTagKey(tsFile, tsClass ?? "*", tsName));
           callSkeletons.push({
             rubyFile,
             rubyName,
@@ -5482,6 +5508,7 @@ export function main() {
               "ts",
               tsOwnNameDelegate,
             ),
+            ...(armTags ? { inventedArms: [...armTags.keys()].sort() } : {}),
           });
         }
         const seqSets = tsCallSeqByFileName.get(tsFile)?.get(tsName);
@@ -6420,6 +6447,11 @@ export function main() {
         ),
         suppressed: suppressedCalls,
         skeletons: callSkeletons,
+        uncomparedArmTags: uncomparedCallTags(
+          tsInventedArmTagsByFileName,
+          armTagsUsed,
+          tsDeclFileByFileNameOwner,
+        ),
       },
       callArgs: {
         compared: callArgsCompared,
@@ -6694,6 +6726,9 @@ export function main() {
           note: "Advisory, ungated. Ordered control + call skeleton per name-matched pair, both sides uncollapsed: if/loop/try/rescue/throw, new:Ctor, ref:<name>, in source order with duplicates. Ruby block iteration folds onto loop. rubyHelpers/tsHelpers carry the same-file skeletons the report splices at each reach.",
           packages: [...new Set(results.map((r) => r.package))].sort(),
           skeletons: skeletonsFlat,
+          uncomparedArmTags: results.flatMap((r) =>
+            r.calls.uncomparedArmTags.map((t) => ({ package: r.package, ...t })),
+          ),
         },
         null,
         2,

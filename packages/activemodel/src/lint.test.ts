@@ -1,113 +1,60 @@
-import { describe, expect, it } from "vitest";
-import { Assertion } from "@blazetrails/activesupport";
-import { testErrorsAref, testModelNaming, testToKey, testToParam } from "./lint.js";
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (lint_test.rb:9-10); the class/interface merge is how `include()` surfaces those members on the type side. */
+import { beforeEach, describe, it } from "vitest";
+import { extend, include } from "@blazetrails/activesupport";
+import { Hash } from "@blazetrails/ruby-compat";
+import { Conversion, ClassMethods as ConversionClassMethods } from "./conversion.js";
+import { Tests } from "./lint.js";
+import { Naming } from "./naming.js";
+import type { ModelName } from "./naming.js";
 
-type KeyFixture = {
-  isPersisted(): boolean;
-  toKey(): unknown[] | null;
-  toModel(): KeyFixture;
-};
+describe("LintTest", () => {
+  interface CompliantModel extends Conversion, Naming {}
 
-function toModel<T>(this: T): T {
-  return this;
-}
+  class CompliantModel {
+    declare static modelName: ModelName;
 
-function buildKeyFixture(): KeyFixture {
-  const fixture: KeyFixture = {
-    isPersisted() {
-      return true;
-    },
-    toKey(this: KeyFixture) {
-      return this.isPersisted() ? [1] : null;
-    },
-    toModel,
-  };
-  return fixture;
-}
+    static {
+      extend(this, Naming);
+      include(this, Conversion);
+      extend(this, ConversionClassMethods);
+    }
 
-describe("Lint::Tests", () => {
-  describe("testToKey", () => {
-    it("passes when persisted returns key and unpersisted returns null", () => {
-      expect(() => testToKey(buildKeyFixture())).not.toThrow();
-    });
+    isPersisted(): boolean {
+      return false;
+    }
 
-    it("throws when toKey returns non-null while unpersisted", () => {
-      const broken: KeyFixture = {
-        isPersisted: () => true,
-        toKey: () => [1],
-        toModel,
-      };
-      expect(() => testToKey(broken)).toThrow(
-        "to_key should return nil when `persisted?` returns false",
-      );
-    });
+    get errors(): Hash<string, unknown[]> {
+      return new Hash<string, unknown[]>([]);
+    }
+  }
+
+  let model: CompliantModel;
+
+  beforeEach(() => {
+    model = new CompliantModel();
   });
 
-  describe("testToParam", () => {
-    it("passes when toParam returns null in unpersisted branch", () => {
-      type ParamFixture = {
-        isPersisted(): boolean;
-        toKey(): unknown[] | null;
-        toParam(): string | null;
-        toModel(): ParamFixture;
-      };
-      const fixture: ParamFixture = {
-        isPersisted() {
-          return true;
-        },
-        toKey(this: ParamFixture) {
-          return this.isPersisted() ? [1] : null;
-        },
-        toParam(this: ParamFixture) {
-          if (!this.isPersisted()) return null;
-          const key = this.toKey();
-          return key === null ? null : String(key[0]);
-        },
-        toModel,
-      };
-      expect(() => testToParam(fixture)).not.toThrow();
-    });
-
-    it("throws when toParam is non-null while unpersisted", () => {
-      const broken = {
-        isPersisted: () => true,
-        toKey: () => [1] as unknown[],
-        toParam: () => "1",
-        toModel,
-      };
-      expect(() => testToParam(broken)).toThrow(
-        "to_param should return nil when `persisted?` returns false",
-      );
-    });
+  it("to key", () => {
+    Tests.testToKey(model);
   });
 
-  describe("testModelNaming", () => {
-    const goodName = { human: () => "Foo", singular: "foo", plural: "foos" };
-
-    it("passes when instance.modelName === constructor.modelName", () => {
-      const fixture = { modelName: goodName, constructor: { modelName: goodName }, toModel };
-      expect(() => testModelNaming(fixture)).not.toThrow();
-    });
-
-    it("throws when instance.modelName diverges from constructor.modelName", () => {
-      const fixture = {
-        modelName: { ...goodName, singular: "bar" },
-        constructor: { modelName: goodName },
-        toModel,
-      };
-      expect(() => testModelNaming(fixture)).toThrow(Assertion);
-    });
+  it("to param", () => {
+    Tests.testToParam(model);
   });
 
-  describe("testErrorsAref", () => {
-    it("passes when errors.messagesFor returns an array", () => {
-      const fixture = { errors: { get: () => [] }, toModel };
-      expect(() => testErrorsAref(fixture)).not.toThrow();
-    });
+  it("to partial path", () => {
+    Tests.testToPartialPath(model);
+  });
 
-    it("throws when errors.messagesFor returns a non-array", () => {
-      const broken = { errors: { get: () => "nope" }, toModel };
-      expect(() => testErrorsAref(broken)).toThrow(/errors#\[\] should return an empty Array/);
-    });
+  it("persisted?", () => {
+    Tests.testPersisted(model);
+  });
+
+  it("model naming", () => {
+    Tests.testModelNaming(model);
+  });
+
+  it("errors aref", () => {
+    Tests.testErrorsAref(model);
   });
 });

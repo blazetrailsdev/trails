@@ -89,6 +89,7 @@ import {
   suppressedArgReasonsIn,
 } from "./missing-rails-args-tags.js";
 import { TAG as MISSING_RAILS_NAME_TAG, suppressedNamesIn } from "./missing-rails-name-tags.js";
+import { TAG as INVENTED_ARM_TAG, inventedArmsIn } from "./invented-arm-tags.js";
 
 const OPTION_READER_FUNCTIONS = new Set([
   "fetch",
@@ -211,6 +212,8 @@ const fileHasMissingRailsCallTag = new WeakMap<ts.SourceFile, boolean>();
 const fileHasMissingRailsArgsTag = new WeakMap<ts.SourceFile, boolean>();
 /** Same role for `@missingRailsName`. */
 const fileHasMissingRailsNameTag = new WeakMap<ts.SourceFile, boolean>();
+/** Same role for `@inventedArm`. */
+const fileHasInventedArmTag = new WeakMap<ts.SourceFile, boolean>();
 
 /**
  * Tags a deliberate JSDoc block may legitimately carry *after*
@@ -890,6 +893,7 @@ export function extractFromProgram(
         const fnMissingRailsCalls = missingRailsCallTags(node);
         const fnMissingRailsArgs = missingRailsArgsTags(node);
         const fnMissingRailsNames = missingRailsNameTags(node);
+        const fnInventedArms = inventedArmTags(node);
         const fnMissingRailsCallReasons = missingRailsCallTagReasons(node);
         const fnMissingRailsArgsReasons = missingRailsArgsTagReasons(node);
         fileFunctions.push({
@@ -914,6 +918,7 @@ export function extractFromProgram(
           ...(fnMissingRailsCalls !== undefined ? { missingRailsCalls: fnMissingRailsCalls } : {}),
           ...(fnMissingRailsArgs !== undefined ? { missingRailsArgs: fnMissingRailsArgs } : {}),
           ...(fnMissingRailsNames !== undefined ? { missingRailsNames: fnMissingRailsNames } : {}),
+          ...(fnInventedArms !== undefined ? { inventedArms: fnInventedArms } : {}),
           ...(fnMissingRailsCallReasons !== undefined
             ? { missingRailsCallReasons: fnMissingRailsCallReasons }
             : {}),
@@ -2562,6 +2567,16 @@ export function missingRailsNameTags(node: ts.Node): string[] | undefined {
 }
 
 /**
+ * The skeleton tokens a declaration's JSDoc receipts as arms or calls its body
+ * adds to Rails' (`@inventedArm <token> — PERMANENT`), or undefined. compare.ts
+ * carries them onto the pair's skeleton row; report-arms.ts and
+ * lint-arm-throws.ts are what make them load-bearing.
+ */
+export function inventedArmTags(node: ts.Node): string[] | undefined {
+  return taggedCallsOn(node, INVENTED_ARM_TAG, fileHasInventedArmTag, inventedArmsIn);
+}
+
+/**
  * The reasons behind {@link missingRailsCallTags}' suppressions, keyed by Ruby
  * call — the artifact half of the permanence report (RFC 0099): a receipt's
  * `PERMANENT` / `CONVERGEABLE` claim is only separable downstream if the reason
@@ -3443,6 +3458,7 @@ export function harvestObjectLiteralMethods(
     const propMissingRailsCalls = missingRailsCallTags(prop);
     const propMissingRailsArgs = missingRailsArgsTags(prop);
     const propMissingRailsNames = missingRailsNameTags(prop);
+    const propInventedArms = inventedArmTags(prop);
     const propMissingRailsCallReasons = missingRailsCallTagReasons(prop);
     const propMissingRailsArgsReasons = missingRailsArgsTagReasons(prop);
     if (ts.isMethodDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
@@ -3533,6 +3549,7 @@ export function harvestObjectLiteralMethods(
       ...(propMissingRailsCalls !== undefined ? { missingRailsCalls: propMissingRailsCalls } : {}),
       ...(propMissingRailsArgs !== undefined ? { missingRailsArgs: propMissingRailsArgs } : {}),
       ...(propMissingRailsNames !== undefined ? { missingRailsNames: propMissingRailsNames } : {}),
+      ...(propInventedArms !== undefined ? { inventedArms: propInventedArms } : {}),
       ...(propMissingRailsCallReasons !== undefined
         ? { missingRailsCallReasons: propMissingRailsCallReasons }
         : {}),
@@ -3659,12 +3676,14 @@ function missingRailsTagsOf(node: ts.Node): Partial<MethodInfo> {
   const calls = missingRailsCallTags(node);
   const args = missingRailsArgsTags(node);
   const names = missingRailsNameTags(node);
+  const arms = inventedArmTags(node);
   const callReasons = missingRailsCallTagReasons(node);
   const argReasons = missingRailsArgsTagReasons(node);
   return {
     ...(calls !== undefined ? { missingRailsCalls: calls } : {}),
     ...(args !== undefined ? { missingRailsArgs: args } : {}),
     ...(names !== undefined ? { missingRailsNames: names } : {}),
+    ...(arms !== undefined ? { inventedArms: arms } : {}),
     ...(callReasons !== undefined ? { missingRailsCallReasons: callReasons } : {}),
     ...(argReasons !== undefined ? { missingRailsArgsReasons: argReasons } : {}),
   };
@@ -3878,6 +3897,7 @@ export function extractClass(
     const memberMissingRailsCalls = missingRailsCallTags(member);
     const memberMissingRailsArgs = missingRailsArgsTags(member);
     const memberMissingRailsNames = missingRailsNameTags(member);
+    const memberInventedArms = inventedArmTags(member);
     const memberMissingRailsCallReasons = missingRailsCallTagReasons(member);
     const memberMissingRailsArgsReasons = missingRailsArgsTagReasons(member);
     const tagged = {
@@ -3889,6 +3909,7 @@ export function extractClass(
       ...(memberMissingRailsNames !== undefined
         ? { missingRailsNames: memberMissingRailsNames }
         : {}),
+      ...(memberInventedArms !== undefined ? { inventedArms: memberInventedArms } : {}),
       ...(memberMissingRailsCallReasons !== undefined
         ? { missingRailsCallReasons: memberMissingRailsCallReasons }
         : {}),

@@ -33,7 +33,8 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import { scopeMismatch, scopeOf, scopedMarks } from "./scope.js";
-import { compareArms, type SkeletonArtifact } from "./report-arms.js";
+import { compareArms, staleArmReceipts, type SkeletonArtifact } from "./report-arms.js";
+import { TAG as INVENTED_ARM_TAG } from "./invented-arm-tags.js";
 import {
   MARK_PATH,
   exceedances,
@@ -68,6 +69,23 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
         "The gate would pass on bodies it never looked at. Regenerate:\n" +
         "  API_COMPARE_FORCE=1 pnpm parity:api --calls\n",
     );
+    return 1;
+  }
+
+  const staleReceipts = [
+    ...artifact.skeletons.flatMap((s) =>
+      staleArmReceipts(s).map((token) => `${s.package}/${s.tsFile} ${s.tsName}: ${token}`),
+    ),
+    ...(artifact.uncomparedArmTags ?? []).map(
+      (t) => `${t.package}/${t.tsFile} ${t.tsName}: ${t.call} (declaration not compared)`,
+    ),
+  ];
+  if (!tighten && staleReceipts.length > 0) {
+    console.error(
+      `\narm-throw gate: ${staleReceipts.length} STALE ${INVENTED_ARM_TAG} receipt(s).\n` +
+        "Each names an arm or call the body no longer adds to Rails'. Delete the tag:\n",
+    );
+    for (const line of staleReceipts) console.error(`  - ${line}`);
     return 1;
   }
 

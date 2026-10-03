@@ -411,7 +411,11 @@ export const ClassMethods = {
     return `__temp__${unpack1(b(name), "h*")}`;
   },
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   * @inventedArm rbObjRespondTo — PERMANENT
+   */
   defineCall(
     this: ClassMethodsHost,
     codeGenerator: CodeGenerator,
