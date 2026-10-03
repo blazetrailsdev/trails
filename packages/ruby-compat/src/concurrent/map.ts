@@ -8,10 +8,13 @@ import { rbModConstSet } from "../include.js";
 export const Concurrent = { name: "Concurrent" } as { readonly name: string; Map: typeof Map };
 
 /**
- * concurrent-ruby's `Concurrent::Map`, on MRI the `NonConcurrentMapBackend`
- * over a `Hash` (`vendor/ruby/v3.3.11/hash.c:1782` `rb_hash_initialize`). A JS
- * body with no `await` cannot be interrupted, so the MRI backend's
- * `@write_lock` has nothing to exclude.
+ * concurrent-ruby's `Concurrent::Map` (not vendored): on MRI, `MriMapBackend`
+ * over `NonConcurrentMapBackend` (`concurrent/collection/map/mri_map_backend.rb`,
+ * `non_concurrent_map_backend.rb`), whose `@backend` is a `Hash`
+ * (`vendor/ruby/v3.3.11/hash.c:1782` `rb_hash_initialize`). `MriMapBackend`
+ * wraps each write in `@write_lock.synchronize { super }`; a JS body with no
+ * `await` cannot be interrupted, so the members below are the
+ * `NonConcurrentMapBackend` bodies with nothing for the lock to exclude.
  *
  * @noRailsEquivalent PERMANENT
  */
