@@ -43,7 +43,12 @@ import { withConnection } from "./connection-handling.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import type { AttributeSet, YAMLEncoder } from "@blazetrails/activemodel";
 import { LegacyYamlAdapter } from "./legacy-yaml-adapter.js";
-import { classAttribute, included, runCallbacks } from "@blazetrails/activesupport";
+import {
+  classAttribute,
+  included,
+  type Callbacks,
+  type Included,
+} from "@blazetrails/activesupport";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 
 export interface Core {
@@ -370,7 +375,12 @@ export function initWith(
 }
 
 export function initWithAttributes<T extends CoreRecord>(
-  this: T & { _attributes: any; _newRecord: boolean; initInternals(): void },
+  this: T & {
+    _attributes: any;
+    _newRecord: boolean;
+    initInternals(): void;
+    runCallbacks: Included<typeof Callbacks>["runCallbacks"];
+  },
   attributes: any,
   newRecord = false,
   block?: (record: T) => void,
@@ -388,8 +398,8 @@ export function initWithAttributes<T extends CoreRecord>(
 
   block?.(this);
 
-  void runCallbacks(this, "find", undefined, { strict: "sync" });
-  void runCallbacks(this, "initialize", undefined, { strict: "sync" });
+  void this.runCallbacks("find", undefined, { strict: "sync" });
+  void this.runCallbacks("initialize", undefined, { strict: "sync" });
 
   return this;
 }
@@ -792,6 +802,7 @@ export function initializeDup(
     _previouslyNewRecord: boolean;
     _destroyed: boolean;
     _startTransactionState: unknown;
+    runCallbacks: Included<typeof Callbacks>["runCallbacks"];
   },
   super_: (other: unknown) => void,
   other: unknown,
@@ -800,7 +811,7 @@ export function initializeDup(
     this as unknown as { initAttributes(other: unknown): unknown }
   ).initAttributes(other);
   super_(other);
-  void runCallbacks(this, "initialize", undefined, { strict: "sync" });
+  void this.runCallbacks("initialize", undefined, { strict: "sync" });
   this._newRecord = true;
   this._previouslyNewRecord = false;
   this._destroyed = false;
