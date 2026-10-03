@@ -1215,12 +1215,12 @@ export const Callbacks = {
 
 function runCallbacks(
   this: object,
-  name: string,
+  kind: string,
   block?: () => unknown,
   opts?: RunCallbacksOptions,
   type?: CallbackKind,
 ): unknown {
-  const callbacks = (this as { __callbacks?: Record<string, CallbackChain> }).__callbacks?.[name];
+  const callbacks = (this as { __callbacks?: Record<string, CallbackChain> }).__callbacks?.[kind];
 
   if (!callbacks || callbacks.isEmpty) {
     const r = block?.();
