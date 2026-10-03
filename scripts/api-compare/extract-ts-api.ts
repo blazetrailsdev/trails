@@ -5799,6 +5799,8 @@ function collectCalls(
         // so calls-parity can flag a ported override that drops the super call.
         called.push("super");
       } else {
+        const tail = skipHoistedClosures ? undefined : receiverTailName(callee);
+        if (tail !== undefined) names.add(`${NATIVE_FORM_PREFIX}invoked:${tail}`);
         visit(callee);
       }
       // A function-expression argument is the port's spelling of a Ruby BLOCK,
@@ -5811,6 +5813,7 @@ function collectCalls(
       for (const name of called) {
         names.add(name);
         tally(occurrences, name);
+        if (!skipHoistedClosures) names.add(`${NATIVE_FORM_PREFIX}invoked:${name}`);
       }
       const evalCallback =
         skipHoistedClosures &&

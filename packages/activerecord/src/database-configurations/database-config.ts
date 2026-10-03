@@ -148,7 +148,6 @@ export class DatabaseConfig {
     throw new NotImplementedError();
   }
 
-  /** @missingRailsCall call — CONVERGEABLE call-gate-credits-proc-call-on-const-and-or-receivers */
   get forCurrentEnv(): boolean {
     return this.envName === ActiveRecord.ConnectionHandling.DEFAULT_ENV();
   }

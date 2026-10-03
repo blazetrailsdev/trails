@@ -34,6 +34,7 @@ import {
   significantMissingCalls,
   suppressedCallClaims,
   invokeForms,
+  invokedNames,
   narrowPredicateCandidates,
   ambiguousTsNames,
   reorderedCalls,
@@ -535,6 +536,72 @@ describe("significantMissingCalls", () => {
       significantCallsForReceivers({ call: ["expr"] }, undefined, new Set(invokeForms(["x"])), {
         call: ["?"],
       }).has("call"),
+    ).toBe(true);
+  });
+
+  it("significantCallsForReceivers drops Proc#call on a constant the TS body invokes", () => {
+    const names = { call: ["DEFAULT_ENV"] };
+    expect(
+      significantCallsForReceivers(
+        { call: ["const"] },
+        undefined,
+        new Set(invokeForms(["DEFAULT_ENV"])),
+        names,
+      ).has("call"),
+    ).toBe(false);
+    expect(
+      significantCallsForReceivers(
+        { call: ["const"] },
+        undefined,
+        new Set(invokeForms(["env"])),
+        names,
+      ).has("call"),
+    ).toBe(true);
+  });
+
+  it("significantCallsForReceivers drops Proc#call on an || receiver when the TS body invokes an operand", () => {
+    const names = { call: ["callable|block"] };
+    for (const operand of ["callable", "block"]) {
+      expect(
+        significantCallsForReceivers(
+          { call: ["expr"] },
+          undefined,
+          new Set(invokeForms([operand])),
+          names,
+        ).has("call"),
+      ).toBe(false);
+    }
+    expect(
+      significantCallsForReceivers(
+        { call: ["expr"] },
+        undefined,
+        new Set(invokeForms(["build"])),
+        names,
+      ).has("call"),
+    ).toBe(true);
+  });
+
+  it("invokedNames reads only the callee names the extractor marked as invoked", () => {
+    expect(invokedNames(["length", "length:ns", "invoked:ns", "invoked:DEFAULT_ENV"])).toEqual([
+      "ns",
+      "DEFAULT_ENV",
+    ]);
+    const forms = new Set(invokeForms(invokedNames(["invoked:ns"])));
+    expect(
+      significantCallsForReceivers({ call: ["expr"] }, undefined, forms, {
+        call: ["namespace"],
+      }).has("call"),
+    ).toBe(true);
+  });
+
+  it("significantCallsForReceivers matches a raw constant name for call only", () => {
+    expect(
+      significantCallsForReceivers(
+        { size: ["expr"] },
+        undefined,
+        new Set(["length", "length:MAX_ROWS"]),
+        { size: ["MAX_ROWS"] },
+      ).has("size"),
     ).toBe(true);
   });
 

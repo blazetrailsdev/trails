@@ -671,10 +671,23 @@ export function significantCallsForReceivers(
 }
 
 /**
- * The `invoke` native forms (see NATIVE_FORM_ANALOGUES' `call`) a TS body's own
- * call set carries: an invocation `this.tableNameResolver()` records its callee
- * name, so each plain name is a callable the body may have invoked, keyed with
- * a leading `_` dropped so `this._block()` answers Ruby's `@block.call`.
+ * The callee names a TS body invoked, from the `invoked:<name>` native forms
+ * the extractor marks at each call expression. A property read records no such
+ * mark, so `options.namespace` alone never answers `options[:namespace].call`.
+ */
+export function invokedNames(nativeForms: Iterable<string>): string[] {
+  const names: string[] = [];
+  for (const form of nativeForms) {
+    if (form.startsWith("invoked:")) names.push(form.slice("invoked:".length));
+  }
+  return names;
+}
+
+/**
+ * The `invoke` native forms (see NATIVE_FORM_ANALOGUES' `call`) for the callee
+ * names a TS body invoked ({@link invokedNames}): `this.tableNameResolver()`
+ * yields `invoke:tableNameResolver`, keyed also with a leading `_` dropped so
+ * `this._block()` answers Ruby's `@block.call`.
  */
 export function invokeForms(calls: Iterable<string>): string[] {
   const forms = ["invoke"];
@@ -689,8 +702,9 @@ export function invokeForms(calls: Iterable<string>): string[] {
  * A Ruby body whose EVERY `new` site is one whose faithful port is not a `new`
  * expression (extract-ruby-api.rb#core_new_kind):
  *
- * - `literal-new`: an argument-less, block-less `Hash.new` / `Array.new`, the
- *   literal `{}` / `[]` (`associations/foreign_association.rb:14`).
+ * - `literal-new`: an argument-less, block-less `Hash.new` / `Array.new` /
+ *   `Concurrent::Array.new`, the literal `{}` / `[]`
+ *   (`associations/foreign_association.rb:14`, `core.rb:220`).
  * - `string-new`: `String.new(x)`, credited only against a TS body that makes
  *   the `String(x)` conversion call (`relation/query_methods.rb:2047`).
  *
@@ -722,7 +736,13 @@ function hasNativeFormAnalogue(
   const names = receiverNames?.[value] ?? [];
   if (analogue.form === "invoke" && names.length === 0) return false;
   return names.every((name) =>
-    tsNativeForms.has(`${analogue.form}:${snakeToCamel(name.replace(/^@+/, ""))}`),
+    name.split("|").some((operand) => {
+      const bare = operand.replace(/^@+/, "");
+      return (
+        tsNativeForms.has(`${analogue.form}:${snakeToCamel(bare)}`) ||
+        (analogue.form === "invoke" && tsNativeForms.has(`invoke:${bare}`))
+      );
+    }),
   );
 }
 
@@ -5320,7 +5340,7 @@ export function main() {
         }
         for (const c of graphCalls.negated) negatedTsCalls.add(c);
         for (const c of graphCalls.nativeForms) tsNativeForms.add(c);
-        for (const c of invokeForms(own.calls)) tsNativeForms.add(c);
+        for (const c of invokeForms(invokedNames(own.nativeForms))) tsNativeForms.add(c);
         callsCompared++;
         const missing = significantMissingCalls(
           rubyName,

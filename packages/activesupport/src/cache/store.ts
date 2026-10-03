@@ -618,10 +618,13 @@ export abstract class Store {
     return this.namespaceKey(strKey, options);
   }
 
-  /** @missingRailsCall call — PERMANENT */
   protected keyMatcher(pattern: RegExp, options?: StoreOptions): RegExp {
-    const ns = options && "namespace" in options ? options.namespace : this.options.namespace;
-    const prefix = typeof ns === "function" ? (ns as () => string)() : (ns as string | undefined);
+    const namespace =
+      options && "namespace" in options ? options.namespace : this.options.namespace;
+    const prefix =
+      typeof namespace === "function"
+        ? (namespace as () => string)()
+        : (namespace as string | undefined);
     if (prefix) {
       let source = pattern.source;
       source = source.startsWith("^") ? source.slice(1) : `.*${source}`;

@@ -115,7 +115,6 @@ import {
   createOrUpdate as callbacksCreateOrUpdate,
   _createRecord as callbacksCreateRecord,
   _updateRecord as callbacksUpdateRecord,
-  InstanceMethods as CallbacksInstanceMethods,
 } from "./callbacks.js";
 import {
   Access,
@@ -323,7 +322,6 @@ import {
   afterCommit as _afterCommit,
   afterRollback as _afterRollback,
   setCallback as _txSetCallback,
-  InstanceMethods as TransactionsInstanceMethods,
   afterSaveCommit as _afterSaveCommit,
   afterCreateCommit as _afterCreateCommit,
   afterUpdateCommit as _afterUpdateCommit,
@@ -2501,8 +2499,8 @@ Object.assign(Base, {
   LengthValidator: _Validations.LengthValidator,
   NumericalityValidator: _Validations.NumericalityValidator,
 });
-include(Base, CallbacksInstanceMethods);
-include(Base, TransactionsInstanceMethods);
+include(Base, _Callbacks.Callbacks);
+include(Base, _Transactions.Transactions);
 extend(Base, Normalization.ClassMethods);
 include(Base, Normalization.Normalization);
 include(Base, Marshalling.Methods);

@@ -133,10 +133,7 @@ export class DatabaseConfigurations {
     );
   }
 
-  /**
-   * @internal
-   * @missingRailsCall call — CONVERGEABLE call-gate-credits-proc-call-on-const-and-or-receivers
-   */
+  /** @internal */
   private defaultEnv(): string {
     return String(ActiveRecord.ConnectionHandling.DEFAULT_ENV());
   }

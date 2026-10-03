@@ -57,7 +57,6 @@ export class AutoFilteredParameters {
     );
   }
 
-  /** @missingRailsCall new — CONVERGEABLE call-gate-credits-concurrent-array-new */
   private collectForLater(klass: any, attribute: string): void {
     if (!this._attributesByClass.has(klass)) {
       this._attributesByClass.set(klass, []);

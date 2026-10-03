@@ -3260,6 +3260,18 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
             Array.new()
           end
 
+          def concurrent
+            Concurrent::Array.new
+          end
+
+          def concurrent_map
+            Concurrent::Map.new
+          end
+
+          def concurrent_sized(x)
+            Concurrent::Array.new(x)
+          end
+
           def defaulted
             Hash.new(0)
           end
@@ -3283,6 +3295,9 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
       `,
     });
     expect(c["Core#literal"]).toEqual({ new: ["literal-new"], tap: ["expr"] });
+    expect(c["Core#concurrent"]).toEqual({ new: ["literal-new"] });
+    expect(c["Core#concurrent_map"]).toEqual({ new: ["const"] });
+    expect(c["Core#concurrent_sized"]).toEqual({ new: ["const"] });
     expect(c["Core#defaulted"]).toEqual({ new: ["const"] });
     expect(c["Core#blocked"]).toEqual({ new: ["const"] });
     expect(c["Core#other"]).toEqual({ new: ["const"] });
@@ -3515,9 +3530,47 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
       "callReceiverNames",
     );
     expect(c["Named#call"]).toEqual({
-      size: ["?", "cursor", "predicates", "select_rows", "wrap"],
+      size: ["a|b", "cursor", "predicates", "select_rows", "wrap"],
       length: ["columns"],
     });
+  });
+
+  it("names a Proc#call receiver that is a constant path, an || of names or a Symbol-keyed read", () => {
+    const c = rubyCallReceivers(
+      {
+        "lib/active_record/procs.rb": `
+          class Procs
+            def path
+              ActiveRecord::ConnectionHandling::DEFAULT_ENV.call.to_s
+            end
+
+            def top
+              ::DEFAULT_ENV.call
+            end
+
+            def either(callable = nil, &block)
+              (callable || block).call Params.new
+            end
+
+            def keyed(options)
+              options[:on_skip].call(scope)
+            end
+
+            def unnamed(options, key)
+              options[key].call(scope)
+              (callable || [1]).call
+              (callable && block).call
+            end
+          end
+        `,
+      },
+      "callReceiverNames",
+    );
+    expect(c["Procs#path"]).toEqual({ call: ["DEFAULT_ENV"] });
+    expect(c["Procs#top"]).toEqual({ call: ["DEFAULT_ENV"] });
+    expect(c["Procs#either"]).toEqual({ call: ["callable|block"] });
+    expect(c["Procs#keyed"]).toEqual({ call: ["on_skip"] });
+    expect(c["Procs#unnamed"]).toEqual({ call: ["?"] });
   });
 
   it("proves a Kernel#Array call receiver an Array", () => {

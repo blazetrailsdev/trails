@@ -2843,7 +2843,12 @@ class ApiExtractor
   # The name a receiver ENDS in — a local or reader (`cursor`, `predicates`), the
   # method of a call chain (`result.columns` → `columns`,
   # `c.select_rows(…)` → `select_rows`, `Array.wrap(ids)` → `wrap`), an ivar
-  # (`@stack`) or a constant — or nil for any other shape.
+  # (`@stack`), a constant or the last segment of a constant path
+  # (`ActiveRecord::ConnectionHandling::DEFAULT_ENV` → `DEFAULT_ENV`), or the
+  # Symbol key of an index read (`options[:on_skip]` → `on_skip`) — or nil for
+  # any other shape. A parenthesised `a || b` names both operands, joined by
+  # `|` (`(callable || block)` → `callable|block`), and is nil when either
+  # operand has no name.
   def receiver_tail_name(recv)
     return nil unless recv.is_a?(Array)
 
@@ -2851,6 +2856,12 @@ class ApiExtractor
     when :var_ref, :vcall
       inner = recv[1]
       inner.is_a?(Array) && %i[@ident @ivar @const].include?(inner[0]) ? inner[1] : nil
+    when :const_path_ref then const_name(recv[2])
+    when :top_const_ref then const_name(recv[1])
+    when :aref then symbol_key_name(recv[2])
+    when :paren
+      stmts = recv[1]
+      stmts.is_a?(Array) && stmts.length == 1 ? or_operand_names(stmts[0]) : nil
     when :call then recv[3].is_a?(Array) ? ident_name(recv[3]) : nil
     when :method_add_arg
       callee = recv[1]
@@ -2861,6 +2872,25 @@ class ApiExtractor
       when :call then callee[3].is_a?(Array) ? ident_name(callee[3]) : nil
       end
     end
+  end
+
+  def or_operand_names(node)
+    return receiver_tail_name(node) unless node.is_a?(Array) && node[0] == :binary && node[2] == :"||"
+
+    names = [or_operand_names(node[1]), or_operand_names(node[3])]
+    names.all? ? names.join("|") : nil
+  end
+
+  def symbol_key_name(args)
+    return nil unless args.is_a?(Array) && args[0] == :args_add_block
+
+    keys = args[1]
+    return nil unless keys.is_a?(Array) && keys.length == 1
+
+    key = keys[0]
+    return nil unless key.is_a?(Array) && key[0] == :symbol_literal && key[1].is_a?(Array)
+
+    ident_name(key[1][1])
   end
 
   # Core Ruby methods whose return is Array UNCONDITIONALLY, regardless of
@@ -3838,15 +3868,16 @@ class ApiExtractor
     inner.is_a?(Array) && inner[0] == :@const && inner[1] == "Proc"
   end
 
-  LITERAL_NEW_CONSTANTS = %w[Hash Array].freeze
+  LITERAL_NEW_CONSTANTS = %w[Hash Array Concurrent::Array].freeze
 
   def core_new_kind(recv, args, has_block)
-    return nil unless recv.is_a?(Array) && recv[0] == :var_ref
-    return nil unless recv[1].is_a?(Array) && recv[1][0] == :@const
+    return nil unless recv.is_a?(Array) && %i[var_ref const_path_ref].include?(recv[0])
     return nil if has_block
 
+    const = const_name(recv)
+    return nil if const.nil?
+
     no_args = args.all? { |arg| arg.nil? || arg == [:arg_paren, nil] }
-    const = recv[1][1]
     return "literal-new" if no_args && LITERAL_NEW_CONSTANTS.include?(const)
 
     "string-new" if !no_args && const == "String"
