@@ -471,8 +471,6 @@ export default defineConfig({
             // which helper.rb picks up by requiring active_support/test_case.
             "./packages/activesupport/src/testing/autorun.ts",
             "./packages/activerecord/src/cases/helper.ts",
-            // Rails' Gemfile:34 installs bcrypt with `require: false`, and
-            // `has_secure_password` requires it (secure_password.rb:121).
             "./packages/bcrypt/src/index.ts",
             ...(process.env.ARCONN === "mysql2"
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
