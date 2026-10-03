@@ -78,6 +78,41 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(new Plain().nickname()).toBe("plain");
   });
 
+  it("two classes sharing a canonical name each get the shape their own pattern asks for", () => {
+    class Getter {
+      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
+      declare static defineAttributeMethods: AttributesClassHalf["defineAttributeMethods"];
+      declare name_shape_probe: unknown;
+
+      static {
+        include(this, AttributeMethods);
+        this.attributeMethodSuffix("_shape_probe", { parameters: false });
+        this.defineAttributeMethods("name");
+      }
+      attribute_shape_probe(attr: string): string {
+        return `getter ${attr}`;
+      }
+    }
+
+    class Method {
+      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
+      declare static defineAttributeMethods: AttributesClassHalf["defineAttributeMethods"];
+      declare name_shape_probe: (...args: unknown[]) => unknown;
+
+      static {
+        include(this, AttributeMethods);
+        this.attributeMethodSuffix("_shape_probe");
+        this.defineAttributeMethods("name");
+      }
+      attribute_shape_probe(attr: string, extra: string): string {
+        return `method ${attr} ${extra}`;
+      }
+    }
+
+    expect(new Getter().name_shape_probe).toBe("getter name");
+    expect(new Method().name_shape_probe("x")).toBe("method name x");
+  });
+
   it("an alias of a method that is not an attribute sends the target and its writer", () => {
     class Person extends Model {
       declare shout: string;

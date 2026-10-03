@@ -10,6 +10,9 @@ import {
 
 import {
   block as rbBlock,
+  dup as hashDup,
+  fetch,
+  Hash,
   Module,
   rbBlockGivenP,
   rbFPublicSend,
@@ -91,7 +94,14 @@ export class Validations {
     extend(base, HelperMethods);
     include(base, HelperMethods);
     defineCallbacks(base.prototype, "validate", { scope: ["name"] });
-    classAttribute.call(base, "_validators", { instanceWriter: false, default: new Map() });
+    classAttribute.call(base, "_validators", {
+      instanceWriter: false,
+      default: new Hash<string | null, ValidatorLike[]>((h, k) => {
+        const v: ValidatorLike[] = [];
+        h.set(k, v);
+        return v;
+      }),
+    });
   }
 
   /** @internal */
@@ -189,7 +199,7 @@ export type ValidateArgs<T extends ValidatableRecord = ValidatableRecord> =
   | Array<ValidateFilter<T>>;
 
 export interface ValidationsClassHost {
-  _validators: Map<string | null, ValidatorLike[]>;
+  _validators: Hash<string | null, ValidatorLike[]>;
   _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
   validatesWith(...args: unknown[]): void;
   validate(...args: ValidateArgs<ValidatableRecord>): void;
@@ -288,11 +298,13 @@ export const ClassMethods = {
 
   clearValidatorsBang(this: ValidationsClassHost): void {
     this.resetCallbacks("validate");
-    this._validators = new Map();
+    const dup = hashDup(this._validators);
+    dup.clear();
+    this._validators = dup;
   },
 
   validatorsOn(this: ValidationsClassHost, ...attributes: string[]): ValidatorLike[] {
-    return attributes.flatMap((attribute) => this._validators.get(attribute) ?? []);
+    return attributes.flatMap((attribute) => fetch(this._validators, attribute, []));
   },
 
   /** @internal */

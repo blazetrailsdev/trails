@@ -11,6 +11,7 @@ import {
   lessThanOrEqual,
   Rational,
   rbCDate,
+  rbCDateTime,
   rubyClass,
 } from "@blazetrails/ruby-compat";
 import { rbWarning } from "./rb-warning.js";
@@ -5810,6 +5811,9 @@ export class Date extends rbCDate {
   }
 }
 
+Object.setPrototypeOf(rbCDateTime, Date);
+Object.setPrototypeOf(rbCDateTime.prototype, Date.prototype);
+
 /** @internal */
 const DateWithoutParseStatics: (new (
   year?: number | bigint,
@@ -5836,7 +5840,7 @@ const DateWithoutParseStatics: (new (
     | "rfc3339"
     | "xmlschema"
     | "jisx0301"
-  > = Date;
+  > = rbCDateTime as never;
 
 /** @noRailsEquivalent PERMANENT */
 export class DateTime extends DateWithoutParseStatics {

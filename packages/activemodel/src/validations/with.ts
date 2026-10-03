@@ -1,5 +1,6 @@
 import { extractOptionsBang } from "@blazetrails/activesupport";
-import { rbBlockGivenP, rbFSend, rbObjMethod } from "@blazetrails/ruby-compat";
+import type { Hash } from "@blazetrails/ruby-compat";
+import { dup as hashDup, rbBlockGivenP, rbFSend, rbObjMethod } from "@blazetrails/ruby-compat";
 
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
@@ -26,7 +27,7 @@ type ValidatorClass = new (
 ) => ValidatorLike;
 
 export interface ValidatesWithClassHost {
-  _validators: Map<string | null, ValidatorLike[]>;
+  _validators: Hash<string | null, ValidatorLike[]>;
   validate(
     filter: ValidatorLike | ((record: ValidatableRecord) => unknown),
     options?: Record<string, unknown>,
@@ -59,15 +60,15 @@ export const ClassMethods = {
     for (const klass of args as ValidatorClass[]) {
       const validator = new klass({ ...options }, block);
 
-      const _validators = new Map(this._validators);
+      const _validators = hashDup(this._validators);
       const attributes = (validator as { attributes?: readonly string[] }).attributes;
       if (Array.isArray(attributes) && attributes.length > 0) {
         for (const attribute of attributes) {
           const key = String(attribute);
-          _validators.set(key, [...(_validators.get(key) ?? []), validator]);
+          _validators.set(key, [..._validators.get(key)!, validator]);
         }
       } else {
-        _validators.set(null, [...(_validators.get(null) ?? []), validator]);
+        _validators.set(null, [..._validators.get(null)!, validator]);
       }
       this._validators = _validators;
 

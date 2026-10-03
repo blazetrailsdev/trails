@@ -11,7 +11,7 @@ import {
   type DateParts,
 } from "./date.js";
 import { Time as RubyTime } from "./time.js";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, rbCDate, rbCDateTime, rbCTime, rbObjIsKindOf } from "@blazetrails/ruby-compat";
 
 const gemDate = (str: string, comp?: boolean) => dNewByFrags(RubyDate._parse(str, comp));
 const gemDateTime = (str: string, comp?: boolean) => dtNewByFrags(RubyDate._parse(str, comp));
@@ -1084,6 +1084,18 @@ describe("Date", () => {
 });
 
 describe("DateTime", () => {
+  it("is a kind of DateTime and Date in both seats, and of Time in neither", () => {
+    const seats = [new RubyDateTime(2001, 2, 3, 4, 5, 6), Temporal.Now.plainDateTimeISO()];
+    for (const dateTime of seats) {
+      expect(rbObjIsKindOf(dateTime, rbCDateTime)).toBe(true);
+      expect(rbObjIsKindOf(dateTime, rbCDate)).toBe(true);
+      expect(rbObjIsKindOf(dateTime, RubyDate)).toBe(true);
+      expect(rbObjIsKindOf(dateTime, rbCTime)).toBe(false);
+    }
+    expect(rbObjIsKindOf(new RubyDate(2001, 2, 3), rbCDateTime)).toBe(false);
+    expect(rbObjIsKindOf(Temporal.Now.plainDateISO(), rbCDateTime)).toBe(false);
+  });
+
   it("leaves the inherited Date's day to get_s_jd on the proleptic-Gregorian arm", () => {
     const proto = Object.getPrototypeOf(RubyDateTime.prototype);
     let base = proto;

@@ -425,7 +425,10 @@ export const ClassMethods = {
     const reader =
       this.attributeAliases[name] === targetName &&
       rbObjRespondTo(this, "defineMethodAttribute", true);
-    if (reader) namespace = `${namespace}_reader`;
+    let shape: "reader" | "getter" | "method" = "method";
+    if (reader) shape = "reader";
+    else if (parameters === false) shape = "getter";
+    mangledName = `${mangledName}__${shape}`;
 
     codeGenerator.defineCachedMethod(mangledName, { namespace, as }, (batch) => {
       let body: (self: ReadWriteHost, args: unknown[]) => unknown;
@@ -436,35 +439,27 @@ export const ClassMethods = {
         body = (self, args) => rbFSend(self, ...(callArgs as [string, ...string[]]), ...args);
       }
 
-      batch.push((mod) => {
-        if (reader) {
-          Object.defineProperty(mod, mangledName, {
-            get(this: ReadWriteHost) {
-              return body(this, []);
-            },
-            set(this: ReadWriteHost, value: unknown) {
-              rbFSend(this, `${targetName}=`, value);
-            },
-            configurable: true,
-          });
-          return;
-        }
-        if (parameters === false) {
-          Object.defineProperty(mod, mangledName, {
-            get(this: ReadWriteHost) {
-              return body(this, []);
-            },
-            configurable: true,
-          });
-          return;
-        }
-        Object.defineProperty(mod, mangledName, {
+      const get = function (this: ReadWriteHost) {
+        return body(this, []);
+      };
+      const descriptor: PropertyDescriptor = {
+        reader: {
+          get,
+          set(this: ReadWriteHost, value: unknown) {
+            rbFSend(this, `${targetName}=`, value);
+          },
+        },
+        getter: { get },
+        method: {
           value: function (this: ReadWriteHost, ...args: unknown[]) {
             return body(this, args);
           },
           writable: true,
-          configurable: true,
-        });
+        },
+      }[shape];
+
+      batch.push((mod) => {
+        Object.defineProperty(mod, mangledName, { ...descriptor, configurable: true });
       });
     });
   },
