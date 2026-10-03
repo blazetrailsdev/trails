@@ -1,36 +1,8 @@
-import { camelize, constantize, extractOptionsBang, sliceBang } from "@blazetrails/activesupport";
+import { camelize, extractOptionsBang, sliceBang } from "@blazetrails/activesupport";
 
 import { ArgumentError, NameError } from "../attribute-assignment.js";
 
-import { Validator } from "../validator.js";
-import { AbsenceValidator } from "./absence.js";
-import { AcceptanceValidator } from "./acceptance.js";
-import { ComparisonValidator } from "./comparison.js";
-import { ConfirmationValidator } from "./confirmation.js";
-import { ExclusionValidator } from "./exclusion.js";
-import { FormatValidator } from "./format.js";
-import { InclusionValidator } from "./inclusion.js";
-import { LengthValidator } from "./length.js";
-import { NumericalityValidator } from "./numericality.js";
-import { PresenceValidator } from "./presence.js";
-import { WithValidator } from "./with.js";
-import { Range } from "@blazetrails/ruby-compat";
-
-type ValidatorClass = new (options: Record<string, unknown>) => Validator;
-
-const BUNDLED_VALIDATORS: Record<string, ValidatorClass> = {
-  AbsenceValidator,
-  AcceptanceValidator,
-  ComparisonValidator,
-  ConfirmationValidator,
-  ExclusionValidator,
-  FormatValidator,
-  InclusionValidator,
-  LengthValidator,
-  NumericalityValidator,
-  PresenceValidator,
-  WithValidator,
-};
+import { Range, rbConstGet } from "@blazetrails/ruby-compat";
 
 export interface ValidatesHost {
   _validatesDefaultKeys(): string[];
@@ -62,10 +34,7 @@ export function validates(
 
     let validator: unknown;
     try {
-      validator =
-        (this as unknown as Record<string, unknown>)[key] ??
-        BUNDLED_VALIDATORS[key] ??
-        constantize(key);
+      validator = rbConstGet(this, key);
     } catch (e) {
       if (e instanceof NameError) throw new ArgumentError(`Unknown validator: '${key}'`);
       throw e;

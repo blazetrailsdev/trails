@@ -12,6 +12,7 @@ import {
   getChildProcess,
   rbAnyToS,
   rbEqual,
+  rbModToS,
   rbObjClassname,
   rbStrRespondTo,
   regexpEscape,
@@ -781,6 +782,20 @@ function refuteNil(obj: unknown, msg: string | (() => string) | null = null): tr
 
 export function assertNotNil(obj: unknown, msg: string | (() => string) | null = null): true {
   return refuteNil(obj, msg);
+}
+
+export function assertKindOf(
+  cls: abstract new (...args: never) => unknown,
+  obj: unknown,
+  msg: string | (() => string) | null = null,
+): void {
+  msg = message(
+    msg,
+    null,
+    () => `Expected ${inspect(obj)} to be a kind of ${rbModToS(cls)}, not ${rbObjClassname(obj)}`,
+  );
+
+  assert(Object(obj) instanceof cls, msg);
 }
 
 export function assertMatch(

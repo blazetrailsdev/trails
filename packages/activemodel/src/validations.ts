@@ -13,6 +13,7 @@ import {
   Module,
   rbBlockGivenP,
   rbFPublicSend,
+  rbModConstSet,
   rbModMethodDefined,
 } from "@blazetrails/ruby-compat";
 
@@ -29,6 +30,17 @@ import {
   validatesWith as withValidatesWith,
 } from "./validations/with.js";
 import * as Validates from "./validations/validates.js";
+import { AbsenceValidator } from "./validations/absence.js";
+import { AcceptanceValidator } from "./validations/acceptance.js";
+import { ComparisonValidator } from "./validations/comparison.js";
+import { ConfirmationValidator } from "./validations/confirmation.js";
+import { ExclusionValidator } from "./validations/exclusion.js";
+import { FormatValidator } from "./validations/format.js";
+import { InclusionValidator } from "./validations/inclusion.js";
+import { LengthValidator } from "./validations/length.js";
+import { NumericalityValidator } from "./validations/numericality.js";
+import { PresenceValidator } from "./validations/presence.js";
+import { WithValidator } from "./validations/with.js";
 import { ArgumentError, NoMethodError } from "./attribute-assignment.js";
 import type { CallbackConditions } from "./callbacks.js";
 import {
@@ -390,3 +402,15 @@ export interface ConditionalOptions {
 }
 
 ActiveModel.ValidationError = ValidationError;
+rbModConstSet(ActiveModel, "Validations", Validations);
+rbModConstSet(Validations, "AbsenceValidator", AbsenceValidator);
+rbModConstSet(Validations, "AcceptanceValidator", AcceptanceValidator);
+rbModConstSet(Validations, "ComparisonValidator", ComparisonValidator);
+rbModConstSet(Validations, "ConfirmationValidator", ConfirmationValidator);
+rbModConstSet(Validations, "ExclusionValidator", ExclusionValidator);
+rbModConstSet(Validations, "FormatValidator", FormatValidator);
+rbModConstSet(Validations, "InclusionValidator", InclusionValidator);
+rbModConstSet(Validations, "LengthValidator", LengthValidator);
+rbModConstSet(Validations, "NumericalityValidator", NumericalityValidator);
+rbModConstSet(Validations, "PresenceValidator", PresenceValidator);
+rbModConstSet(Validations, "WithValidator", WithValidator);

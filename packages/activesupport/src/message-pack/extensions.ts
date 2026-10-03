@@ -2,7 +2,7 @@ import { MessagePackError } from "./factory.js";
 import type { Factory, Packer, Unpacker } from "./factory.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
 import { Temporal, Time } from "@blazetrails/date";
-import { Rational, rational } from "@blazetrails/ruby-compat";
+import { NameError, Rational, rational, rbConstGet } from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../time-with-zone.js";
 import { atWithoutCoercion } from "../core-ext/time/calculations.js";
 import { TimeZone, type Timezone } from "../values/time-zone.js";
@@ -68,12 +68,6 @@ export interface ObjectClass {
   name: string;
   fromMsgpackExt?: (data: unknown) => unknown;
   jsonCreate?: (data: unknown) => unknown;
-}
-
-const objectClassRegistry = new Map<string, ObjectClass>();
-
-export function registerObjectClass(klass: ObjectClass): void {
-  objectClassRegistry.set(klass.name, klass);
 }
 
 const LOAD_WITH_MSGPACK_EXT = 0;
@@ -279,9 +273,16 @@ export const Extensions = {
   },
 
   loadClass(name: string): ObjectClass {
-    const klass = objectClassRegistry.get(name);
-    if (!klass) throw new MissingClassError(`Missing class: ${name}`);
-    return klass;
+    try {
+      return rbConstGet(Object, name) as ObjectClass;
+    } catch (error) {
+      if (!(error instanceof NameError)) throw error;
+      if (String(error.constantName) === name) {
+        throw new MissingClassError(`Missing class: ${name}`);
+      } else {
+        throw error;
+      }
+    }
   },
 
   writeClass(klass: ObjectClass, packer: Packer): void {

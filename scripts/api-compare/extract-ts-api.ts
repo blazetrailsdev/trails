@@ -3428,6 +3428,7 @@ export function harvestObjectLiteralMethods(
     let calls: string[] | undefined;
     let callSeq: string[] | undefined;
     let callArgs: CallSite[] | undefined;
+    let skeleton: string[] | undefined;
     let writer = false;
     // `{ qux }` / `{ foo: NS.bar }` — see MethodInfo.bodyless.
     let bodyless = false;
@@ -3452,6 +3453,7 @@ export function harvestObjectLiteralMethods(
       calls = extractCalls(prop.body);
       callSeq = extractCallSeq(prop.body);
       callArgs = extractCallArgs(prop.body);
+      skeleton = extractSkeleton(prop.body);
     } else if (ts.isShorthandPropertyAssignment(prop)) {
       mname = prop.name.text;
       bodyless = true;
@@ -3481,6 +3483,7 @@ export function harvestObjectLiteralMethods(
         calls = extractCalls(init.body);
         callSeq = extractCallSeq(init.body);
         callArgs = extractCallArgs(init.body);
+        skeleton = extractSkeleton(init.body);
       } else {
         // `foo: bar` / `foo: NS.bar` — count if the RHS resolves to a
         // callable. Catches `readAttributeForValidation:
@@ -3526,6 +3529,7 @@ export function harvestObjectLiteralMethods(
       ...(calls !== undefined ? { calls } : {}),
       ...(callSeq !== undefined ? { callSeq } : {}),
       ...(callArgs !== undefined ? { callArgs } : {}),
+      ...(skeleton !== undefined ? { skeleton } : {}),
       ...(propMissingRailsCalls !== undefined ? { missingRailsCalls: propMissingRailsCalls } : {}),
       ...(propMissingRailsArgs !== undefined ? { missingRailsArgs: propMissingRailsArgs } : {}),
       ...(propMissingRailsNames !== undefined ? { missingRailsNames: propMissingRailsNames } : {}),

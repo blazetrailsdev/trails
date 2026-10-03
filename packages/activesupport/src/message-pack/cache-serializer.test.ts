@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import {
-  MessagePackCacheSerializer,
-  UnserializableObjectError,
-  registerObjectClass,
-} from "./index.js";
+import { MessagePackCacheSerializer, UnserializableObjectError } from "./index.js";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { assertNotNil } from "../testing/assertions.js";
 
 class HasValue {
@@ -51,8 +48,8 @@ describe("MessagePackCacheSerializerTest", () => {
   };
 
   beforeAll(() => {
-    registerObjectClass(DefinesJsonCreate);
-    registerObjectClass(DefinesFromMsgpackExt);
+    registerConstant("DefinesJsonCreate", DefinesJsonCreate);
+    registerConstant("DefinesFromMsgpackExt", DefinesFromMsgpackExt);
   });
 
   it("uses #to_msgpack_ext and ::from_msgpack_ext to roundtrip unregistered objects", () => {

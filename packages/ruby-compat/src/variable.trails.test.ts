@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
-import { Module } from "./include.js";
+import { include, Module, rbModConstSet } from "./include.js";
+import { NameError } from "./name-error.js";
 import { rbModName, rbModToS, rbSetClassPathString } from "./object.js";
 import { TypeError } from "./type-error.js";
 import {
   isRegisteredConstant,
+  rbConstGet,
   rbPathToClass,
   registerConstant,
   registeredConstant,
@@ -125,5 +127,45 @@ describe("the Object constant table", () => {
     unregisterConstant("Table::Seat", Seat);
     expect(isRegisteredConstant("Table::Seat")).toBe(false);
     expect(rbModName(Seat)).toBe("Table::Seat");
+  });
+});
+
+describe("rb_const_get", () => {
+  class Checks {}
+  class LocalCheck {}
+  class IncludedCheck {}
+  class TopCheck {}
+  rbModConstSet(Checks, "IncludedCheck", IncludedCheck);
+  rbModConstSet(Checks, "LocalCheck", IncludedCheck);
+
+  class Host {
+    static LocalCheck = LocalCheck;
+  }
+  include(Host, Checks);
+  class Sub extends Host {}
+
+  afterEach(() => {
+    unregisterConstant("ConstGetTopCheck", TopCheck);
+    unregisterConstant("ConstGetSpace::TopCheck", TopCheck);
+  });
+
+  it("reads a constant off the class before its included modules", () => {
+    expect(rbConstGet(Sub, "LocalCheck")).toBe(LocalCheck);
+  });
+
+  it("reads a constant seated on a module the class or a superclass includes", () => {
+    expect(rbConstGet(Host, "IncludedCheck")).toBe(IncludedCheck);
+    expect(rbConstGet(Sub, "IncludedCheck")).toBe(IncludedCheck);
+  });
+
+  it("falls through to the top-level table, reading a seated path whole", () => {
+    registerConstant("ConstGetTopCheck", TopCheck);
+    registerConstant("ConstGetSpace::TopCheck", TopCheck);
+    expect(rbConstGet(Sub, "ConstGetTopCheck")).toBe(TopCheck);
+    expect(rbConstGet(Sub, "ConstGetSpace::TopCheck")).toBe(TopCheck);
+  });
+
+  it("raises NameError for a name nothing on the walk answers", () => {
+    expect(() => rbConstGet(Sub, "ConstGetTopCheck")).toThrow(NameError);
   });
 });

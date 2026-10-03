@@ -1,4 +1,5 @@
 import { ArgumentError } from "./argument-error.js";
+import { rbModAncestors } from "./include.js";
 import { NameError } from "./name-error.js";
 import { classpaths } from "./object.js";
 import { TypeError } from "./type-error.js";
@@ -165,14 +166,27 @@ export function rbModConstMissing(klass: { name?: string } | null, name: string)
 /**
  * `rb_const_get` (`vendor/ruby/v3.3.11/variable.c:3210`), the lookup behind
  * `Module#const_get(name)` (`vendor/ruby/v3.3.11/object.c:2423` `rb_mod_const_get`):
- * `rb_const_search` walks `klass` and then its ancestors, which in JS is the
- * prototype chain `in` reads, and a miss goes to `rb_const_missing`
+ * `rb_const_search` (`vendor/ruby/v3.3.11/variable.c:3190`) walks `klass` and
+ * then its ancestors. The superclasses are the prototype chain `in` reads, the
+ * included modules are the {@link rbModAncestors} entries no prototype link
+ * carries, and `rb_cObject`, where the walk ends, is the table
+ * `registerConstant` fills. That table seats a constant under its full path,
+ * so a `::` path (`rb_mod_const_get`, `vendor/ruby/v3.3.11/object.c:2423`) is
+ * read from it whole. A miss goes to `rb_const_missing`
  * (`vendor/ruby/v3.3.11/variable.c:2346`), which sends `const_missing` to `klass`.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbConstGet(klass: object, id: string): unknown {
   if (id in klass) return (klass as Record<string, unknown>)[id];
+  if (typeof klass === "function") {
+    for (const tmp of rbModAncestors(klass as unknown as { prototype: object })) {
+      if (Object.prototype.hasOwnProperty.call(tmp, id)) {
+        return (tmp as Record<string, unknown>)[id];
+      }
+    }
+  }
+  if (_constants.has(id)) return _constants.get(id);
   const { constMissing } = klass as { constMissing?: (name: string) => unknown };
   if (constMissing !== undefined) return constMissing.call(klass, id);
   return rbModConstMissing(klass, id);
