@@ -53,21 +53,32 @@ function ownMethod(hash: object, mid: string): ((...args: unknown[]) => unknown)
  * what the block returns for the missing key.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`).
  */
-export function fetch<T>(hash: Record<string, unknown>, key: string): T;
+export function fetch<T>(
+  hash: Record<string, unknown> | { fetch(key: string, ...rest: never): unknown },
+  key: string,
+): T;
 /**
  * The block arm: on a miss `rb_hash_fetch_m` yields the key and returns what
  * the block returns, which is what `Rack::Request::Env#fetch_header`
  * (`vendor/rack/v3.1.14/lib/rack/request.rb:106-108`) installs a default through.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`).
  */
-export function fetch<T>(hash: Record<string, unknown>, key: string, block: Block<T>): T;
+export function fetch<T>(
+  hash: Record<string, unknown> | { fetch(key: string, ...rest: never): unknown },
+  key: string,
+  block: Block<T>,
+): T;
 /**
  * The two-argument arm: the STORED value whenever the key exists — including a
  * stored `nil` or `false` — and otherwise `defaultValue`, which is what `??`
  * gets wrong.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`).
  */
-export function fetch<T>(hash: Record<string, unknown>, key: string, defaultValue: T): T;
+export function fetch<T>(
+  hash: Record<string, unknown> | { fetch(key: string, ...rest: never): unknown },
+  key: string,
+  defaultValue: T,
+): T;
 /**
  * The Map arm: a Hash keyed by objects, looked up the same way.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`).
@@ -87,12 +98,16 @@ export function fetch<K, V>(hash: Map<K, V>, key: K, ...rest: unknown[]): unknow
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`).
  */
 export function fetch(
-  hash: Record<string, unknown> | Map<unknown, unknown>,
+  receiver:
+    | Record<string, unknown>
+    | Map<unknown, unknown>
+    | { fetch(key: string, ...rest: never): unknown },
   key: unknown,
   ...rest: unknown[]
 ): unknown {
-  const own = ownMethod(hash, "fetch");
-  if (own) return own.call(hash, key, ...rest);
+  const own = ownMethod(receiver, "fetch");
+  if (own) return own.call(receiver, key, ...rest);
+  const hash = receiver as Record<string, unknown> | Map<unknown, unknown>;
   const blockGiven = rbBlockGivenP(rest[0]);
   if (!(hash instanceof Map ? hash.has(key) : hasKey(hash, key as string))) {
     if (blockGiven) {
@@ -134,7 +149,9 @@ export function hasKey(hash: object, key: PropertyKey): boolean {
  * of the keys, in insertion order.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#keys` (`vendor/ruby/v3.3.11/hash.c:3584`).
  */
-export function keys<K = string>(hash: Record<string, unknown> | Map<K, unknown>): K[] {
+export function keys<K = string>(
+  hash: Record<string, unknown> | Map<K, unknown> | { keys(): K[] },
+): K[] {
   if (hash instanceof Map) return [...hash.keys()];
   const own = ownMethod(hash, "keys");
   if (own) return own.call(hash) as K[];
@@ -451,10 +468,10 @@ export function inspect(hash: Record<string, unknown> | Map<unknown, unknown>): 
  * yields each value alone and returns the receiver.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_value` (`vendor/ruby/v3.3.11/hash.c:3060`).
  */
-export function eachValue<T>(
-  hash: Record<string, T> | { eachValue(block: (value: T) => unknown): unknown },
+export function eachValue<T, R = never>(
+  hash: Record<string, T> | { eachValue(block: (value: T) => unknown): R },
   block: (value: T) => unknown,
-): Record<string, T>;
+): Record<string, T> | R;
 /**
  * The blockless arm, `RETURN_SIZED_ENUMERATOR` (`hash.c:3061`): the values an
  * Enumerable call chained onto the Enumerator iterates.
@@ -468,9 +485,9 @@ export function eachValue<T>(hash: Record<string, T>): T[];
 export function eachValue<T>(
   receiver: Record<string, T> | { eachValue(block: (value: T) => unknown): unknown },
   block?: (value: T) => unknown,
-): Record<string, T> | T[] {
+): unknown {
   const own = ownMethod(receiver, "eachValue");
-  if (own) return (block ? own.call(receiver, block) : own.call(receiver)) as T[];
+  if (own) return block ? own.call(receiver, block) : own.call(receiver);
   const hash = receiver as Record<string, T>;
   if (!block) return Object.values(hash);
   for (const key of Object.keys(hash)) {
@@ -482,28 +499,32 @@ export function eachValue<T>(
 /**
  * Ruby `Hash#each_key` (`vendor/ruby/v3.3.11/hash.c:3098` `rb_hash_each_key`): yields
  * each key alone and returns the receiver.
+ * A receiver that defines `eachKey` answers what its own method returns, which
+ * need not be the receiver: `LazyAttributeHash#each_key` is `keys.each(&block)`
+ * (`activemodel/lib/active_model/attribute_set/builder.rb:129-132`), the keys
+ * Array `Array#each` returns.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_key` (`vendor/ruby/v3.3.11/hash.c:3098`).
  */
-export function eachKey<T>(
-  hash: Record<string, T>,
+export function eachKey<T, R = never>(
+  hash: Record<string, T> | { eachKey(block: (key: string) => unknown): R },
   block: (key: string) => unknown,
-): Record<string, T>;
+): Record<string, T> | R;
 /**
  * The blockless arm, `RETURN_SIZED_ENUMERATOR` (`hash.c:3100`): the keys an
  * Enumerable call chained onto the Enumerator iterates.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_key` (`vendor/ruby/v3.3.11/hash.c:3098`).
  */
-export function eachKey<T>(hash: Record<string, T>): string[];
+export function eachKey<T>(hash: Record<string, T> | { eachKey(): string[] }): string[];
 /**
  * The arms share one body.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_key` (`vendor/ruby/v3.3.11/hash.c:3098`).
  */
 export function eachKey<T>(
-  hash: Record<string, T>,
+  hash: Record<string, T> | { eachKey(block?: (key: string) => unknown): unknown },
   block?: (key: string) => unknown,
-): Record<string, T> | string[] {
+): unknown {
   const own = ownMethod(hash, "eachKey");
-  if (own) return (block ? own.call(hash, block) : own.call(hash)) as string[];
+  if (own) return block ? own.call(hash, block) : own.call(hash);
   if (!block) return Object.keys(hash);
   for (const key of Object.keys(hash)) {
     block(key);

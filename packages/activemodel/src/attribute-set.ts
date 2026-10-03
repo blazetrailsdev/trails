@@ -30,7 +30,7 @@ export class AttributeSet {
   }
 
   fetch<T = Attribute>(name: string, defaultOrBlock?: T | ((name: string) => T)): Attribute | T {
-    const attributes = this.attributes() as Record<string, Attribute>;
+    const attributes = this.attributes();
     if (defaultOrBlock === undefined) return fetch<Attribute>(attributes, name);
     return typeof defaultOrBlock === "function"
       ? fetch(attributes, name, block(defaultOrBlock as (name: string) => Attribute))
@@ -61,17 +61,11 @@ export class AttributeSet {
   }
 
   valuesBeforeTypeCast(): Record<string, unknown> {
-    return transformValues(
-      this.attributes() as Record<string, Attribute>,
-      (attr) => attr.valueBeforeTypeCast,
-    );
+    return transformValues(this.attributes(), (attr) => attr.valueBeforeTypeCast);
   }
 
   valuesForDatabase(): Record<string, unknown> {
-    return transformValues(
-      this.attributes() as Record<string, Attribute>,
-      (attr) => attr.valueForDatabase,
-    );
+    return transformValues(this.attributes(), (attr) => attr.valueForDatabase);
   }
 
   isKey(name: string): boolean {
@@ -83,9 +77,7 @@ export class AttributeSet {
   }
 
   keys(): string[] {
-    return eachKey(this.attributes() as Record<string, Attribute>).filter((name) =>
-      this.getAttribute(name).isInitialized(),
-    );
+    return eachKey(this.attributes()).filter((name) => this.getAttribute(name).isInitialized());
   }
 
   fetchValue(name: string, block?: (name: string) => unknown): unknown {
@@ -133,9 +125,7 @@ export class AttributeSet {
   }
 
   accessed(): string[] {
-    return eachKey(this.attributes() as Record<string, Attribute>).filter((name) =>
-      this.getAttribute(name).hasBeenRead(),
-    );
+    return eachKey(this.attributes()).filter((name) => this.getAttribute(name).hasBeenRead());
   }
 
   map(fn: (attr: Attribute) => Attribute): AttributeSet {
