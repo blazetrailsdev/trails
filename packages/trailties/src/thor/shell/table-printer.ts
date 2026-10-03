@@ -66,10 +66,7 @@ export class TablePrinter extends ColumnPrinter {
     if (rtest(this.options.borders)) this.printBorderSeparator();
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs max — PERMANENT
-   */
+  /** @internal */
   private prepare(array: unknown[]): void {
     array = array.filter((row) => !rbEqual(row, TablePrinter.BORDER_SEPARATOR));
 

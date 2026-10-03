@@ -67,7 +67,6 @@ export class DelegateCache {
     return _relationDelegateCache.get(this)!.get(klass)!;
   }
 
-  /** @missingRailsArgs include — PERMANENT */
   static initializeRelationDelegateCache(this: typeof Base): void {
     const cache = new Map<FamilyCtor, FamilyCtor>();
     _relationDelegateCache.set(this, cache);

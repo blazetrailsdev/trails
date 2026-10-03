@@ -1,10 +1,9 @@
 import { Encryption } from "../namespaces.js";
-import { prepend } from "@blazetrails/activesupport";
+import { prepend } from "@blazetrails/ruby-compat";
 
 export class ExtendedDeterministicUniquenessValidator {
   private static _installed = false;
 
-  /** @missingRailsArgs prepend — CONVERGEABLE call-args-gate-aligns-the-receiver-of-function-form-prepend */
   static installSupport({
     UniquenessValidator,
     EncryptedUniquenessValidator,

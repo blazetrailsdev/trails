@@ -31,7 +31,6 @@ export class ColumnPrinter {
     this._indent = Number(toI(options.indent));
   }
 
-  /** @missingRailsArgs max — PERMANENT */
   print(array: unknown[]): void {
     if (isEmpty(array)) return;
     const colwidth = (max(array.map((el) => strlen(toS(el)))) ?? 0) + 2;

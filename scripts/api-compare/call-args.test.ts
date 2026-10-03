@@ -1305,3 +1305,66 @@ describe("pairCallSites receiver-name tie-break", () => {
     });
   }
 });
+
+describe("compareCallArgs function-form Array#max", () => {
+  // relation.rb:478 `records.map { … }.max`, ported as `max(records.map(…))`.
+  const ruby = { ...site("max", []), recv: "call:map" };
+
+  it("strips the chained receiver of Array#max", () => {
+    expect(compareCallArgs(ruby, site("max", ["call:map"])).verdict).toBe("match");
+    expect(compareCallArgs(ruby, site("max", ["call:map", "id:extra"])).verdict).toBe("mismatch");
+  });
+});
+
+describe("compareCallArgs function-form Module#prepend / include / extend", () => {
+  // extended_deterministic_uniqueness_validator.rb:7
+  // `UniquenessValidator.prepend(EncryptedUniquenessValidator)`, ported as
+  // `prepend(UniquenessValidator.prototype, EncryptedUniquenessValidator)`,
+  // whose first argument the extractor describes as `const:UniquenessValidator`.
+  const ruby = {
+    ...site("prepend", ["const:EncryptedUniquenessValidator"]),
+    recv: "const:UniquenessValidator",
+  };
+
+  it("aligns the receiver of ruby-compat's prepend export", () => {
+    const ts = {
+      ...site("prepend", ["const:UniquenessValidator", "const:EncryptedUniquenessValidator"]),
+      rubyCompat: "prepend",
+    };
+    expect(compareCallArgs(ruby, ts).verdict).toBe("match");
+    expect(
+      compareCallArgs(
+        { ...site("include", ["const:Definition"]), recv: "id:klass" },
+        { ...site("include", ["id:klass", "const:Definition"]), rubyCompat: "include" },
+      ).verdict,
+    ).toBe("match");
+    expect(
+      compareCallArgs(
+        { ...site("extend", ["const:LocalTagStorage"]), recv: "call:formatter" },
+        { ...site("extend", ["call:formatter", "const:LocalTagStorage"]), rubyCompat: "extend" },
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("still flags a site that prepends a different module", () => {
+    const ts = {
+      ...site("prepend", ["const:UniquenessValidator", "const:OtherValidator"]),
+      rubyCompat: "prepend",
+    };
+    expect(compareCallArgs(ruby, ts).verdict).toBe("mismatch");
+    const wrongReceiver = {
+      ...site("prepend", ["const:Other", "const:EncryptedUniquenessValidator"]),
+      rubyCompat: "prepend",
+    };
+    expect(compareCallArgs(ruby, wrongReceiver).verdict).toBe("mismatch");
+  });
+
+  it("does not align a bare prepend that is not the ruby-compat export", () => {
+    expect(
+      compareCallArgs(
+        ruby,
+        site("prepend", ["const:UniquenessValidator", "const:EncryptedUniquenessValidator"]),
+      ).verdict,
+    ).toBe("mismatch");
+  });
+});
