@@ -2097,6 +2097,36 @@ export function skeletonIsAnotherOwners(
   return tsClass !== undefined && ownerHasBody && skeletonOwners?.has(tsClass) !== true;
 }
 
+/** One name's bodies in one file, keyed by declaration site (`file:line`). */
+export type SkeletonBodies = Map<string, { owner: string; skeleton: string[] }>;
+
+/**
+ * Records a body under the owner that declares it.
+ *
+ * A namespace entity re-lists the file's top-level functions, so one
+ * declaration arrives under two owners. It is the top-level function's
+ * (owner `""`) whichever arrives first; otherwise the first owner keeps it.
+ */
+export function recordSkeletonBody(
+  bodies: SkeletonBodies,
+  site: string,
+  owner: string,
+  skeleton: string[],
+): void {
+  if (!bodies.has(site) || owner === "") bodies.set(site, { owner, skeleton });
+}
+
+/** {@link SkeletonBodies} grouped by owner, each body once. */
+export function skeletonsByOwner(
+  bodies: SkeletonBodies | undefined,
+): Map<string, string[][]> | undefined {
+  if (bodies === undefined) return undefined;
+  const byOwner = new Map<string, string[][]>();
+  for (const { owner, skeleton } of bodies.values())
+    byOwner.set(owner, [...(byOwner.get(owner) ?? []), skeleton]);
+  return byOwner;
+}
+
 /**
  * The skeletons a matched pair compares against: the resolved owner's own where
  * the file holds the name as SEVERAL module or top-level bodies, else every one
@@ -2109,8 +2139,7 @@ export function skeletonIsAnotherOwners(
  * (`activemodel/lib/active_model/validations/with.rb:88`, `:148`) meets its own
  * port.
  *
- * `byOwner` holds each body once: a namespace entity re-lists the file's
- * top-level functions, so one declaration arrives under two owners. A class
+ * `byOwner` is {@link skeletonsByOwner}'s, which holds each body once. A class
  * owner still reads by name, and so does a name whose owners share one body.
  */
 export function skeletonsOfOwner(
@@ -4392,9 +4421,8 @@ export function main() {
     const tsCallSeqByFileName = new Map<string, Map<string, string[][]>>();
     const tsSkeletonByFileName = new Map<string, Map<string, string[][]>>();
     const tsSkeletonOwnersByFileName = new Map<string, Map<string, Set<string>>>();
-    const tsSkeletonByFileNameOwner = new Map<string, Map<string, Map<string, string[][]>>>();
+    const tsSkeletonBodiesByFileName = new Map<string, Map<string, SkeletonBodies>>();
     const tsClassOwnersByFile = new Map<string, Set<string>>();
-    const tsSkeletonBodies = new Set<string>();
     const tsLocalSkeletonByFileName = new Map<string, Map<string, string[][]>>();
     const tsCallArgsByFileName = new Map<string, Map<string, CallSite[][]>>();
     // The same two populations narrowed by declaring class (file → name → owner
@@ -4619,16 +4647,12 @@ export function main() {
         const owners = tsSkeletonOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
         owners.set(m.name, (owners.get(m.name) ?? new Set<string>()).add(owner));
         tsSkeletonOwnersByFileName.set(file, owners);
-        const body = `${m.file ?? file}\0${m.name}\0${m.line}`;
-        if (!tsSkeletonBodies.has(body)) {
-          tsSkeletonBodies.add(body);
-          const byOwner =
-            tsSkeletonByFileNameOwner.get(file) ?? new Map<string, Map<string, string[][]>>();
-          const sets = byOwner.get(m.name) ?? new Map<string, string[][]>();
-          sets.set(owner, [...(sets.get(owner) ?? []), m.skeleton]);
-          byOwner.set(m.name, sets);
-          tsSkeletonByFileNameOwner.set(file, byOwner);
-        }
+        const bodiesByName =
+          tsSkeletonBodiesByFileName.get(file) ?? new Map<string, SkeletonBodies>();
+        const bodies = bodiesByName.get(m.name) ?? new Map();
+        recordSkeletonBody(bodies, `${m.file ?? file}:${m.line}`, owner, m.skeleton);
+        bodiesByName.set(m.name, bodies);
+        tsSkeletonBodiesByFileName.set(file, bodiesByName);
       }
       if (m.localSkeleton !== undefined && scope === "package") {
         const byName = tsLocalSkeletonByFileName.get(file) ?? new Map<string, string[][]>();
@@ -5410,7 +5434,9 @@ export function main() {
         const rubySkeleton = ownsBody(rubyName)
           ? rubySkeletonByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
           : rubySkeletonByName.get(rubyName);
-        const tsSkeletonsByOwner = tsSkeletonByFileNameOwner.get(tsFile)?.get(tsName);
+        const tsSkeletonsByOwner = skeletonsByOwner(
+          tsSkeletonBodiesByFileName.get(tsFile)?.get(tsName),
+        );
         const tsSkeletons = skeletonsOfOwner(
           tsSkeletonByFileName.get(tsFile)?.get(tsName),
           tsSkeletonsByOwner,

@@ -3,6 +3,9 @@ import {
   ownerRecordsNothing,
   skeletonIsAnotherOwners,
   skeletonsOfOwner,
+  skeletonsByOwner,
+  recordSkeletonBody,
+  type SkeletonBodies,
   nameMatches,
   superclassesMatch,
   primaryClassesPerFile,
@@ -4105,6 +4108,51 @@ describe("skeletonsOfOwner", () => {
     expect(skeletonsOfOwner([instance], new Map([["", [instance]]]), "", undefined)).toEqual([
       instance,
     ]);
+  });
+});
+
+describe("recordSkeletonBody", () => {
+  const instance = ["ref:extractOptionsBang", "loop"];
+  const classMethod = ["ref:extractOptionsBang", "loop", "if"];
+  const record = (order: [string, string, string[]][]) => {
+    const bodies: SkeletonBodies = new Map();
+    for (const [site, owner, skeleton] of order) recordSkeletonBody(bodies, site, owner, skeleton);
+    return skeletonsByOwner(bodies);
+  };
+  const expected = new Map([
+    ["", [instance]],
+    ["ClassMethods", [classMethod]],
+  ]);
+
+  it("keeps a re-listed top-level body under the top level when the namespace entity comes first", () => {
+    const byOwner = record([
+      ["with.ts:148", "With", instance],
+      ["with.ts:88", "ClassMethods", classMethod],
+      ["with.ts:148", "", instance],
+    ]);
+    expect(byOwner).toEqual(expected);
+    expect(skeletonsOfOwner([instance, classMethod, instance], byOwner, "", undefined)).toEqual([
+      instance,
+    ]);
+  });
+
+  it("keeps it there when the top-level function comes first", () => {
+    expect(
+      record([
+        ["with.ts:148", "", instance],
+        ["with.ts:148", "With", instance],
+        ["with.ts:88", "ClassMethods", classMethod],
+      ]),
+    ).toEqual(expected);
+  });
+
+  it("holds a body shared by two owners once, so the name still reads by name", () => {
+    const byOwner = record([
+      ["inflector.ts:42", "Inflector", instance],
+      ["inflector.ts:42", "", instance],
+    ]);
+    const byName = [instance, instance];
+    expect(skeletonsOfOwner(byName, byOwner, "", undefined)).toBe(byName);
   });
 });
 
