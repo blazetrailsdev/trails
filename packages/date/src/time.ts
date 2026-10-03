@@ -19,6 +19,7 @@ import {
 import {
   Rational,
   kernelInteger,
+  rbCTime,
   rbDefineAllocFunc,
   rbObjDup,
   rbObjRespondTo,
@@ -404,7 +405,7 @@ function rbTimeZoneAbbreviation(zone: unknown, time: Time): string {
   return abbr == null ? "" : String(abbr);
 }
 
-export class Time {
+export class Time extends rbCTime {
   #plainMemo: Temporal.PlainDateTime | null;
   /** @internal */
   #zoned: Temporal.ZonedDateTime | null;
@@ -1245,6 +1246,7 @@ export class Time {
     zone: string | number | Rational | Timezone | null = null,
     options: TimeNewOptions = {},
   ) {
+    super();
     if (seatedTime !== null) {
       const seat = seatedTime;
       seatedTime = null;

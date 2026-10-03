@@ -147,6 +147,26 @@ describe("Hash#[] and Hash#[]= on a non-Hash receiver", () => {
     expect(except(store, "x", "y")).toEqual({ excepted: ["x", "y"] });
   });
 
+  it("answers a plain-object hash's default on a miss, and nil for an Object.prototype member", () => {
+    const withDefault = new Proxy({ a: 1 } as Record<string, unknown>, {
+      get(target, prop, receiver) {
+        if (typeof prop === "string" && !Object.hasOwn(target, prop)) return "default";
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    expect(hashAref(withDefault, "a")).toBe(1);
+    expect(hashAref(withDefault, "b")).toBe("default");
+    expect(hashAref(withDefault, "toString")).toBe("default");
+    const nullProto = new Proxy(Object.create(null) as Record<string, unknown>, {
+      get: (target, prop) => (Object.hasOwn(target, prop) ? target[prop as string] : "default"),
+    });
+    expect(hashAref(nullProto, "toString")).toBe("default");
+    for (const key of ["b", "toString", "constructor", "__proto__"]) {
+      expect(hashAref({ a: 1 }, key)).toBeNull();
+      expect(hashAref(Object.create(null) as object, key)).toBeNull();
+    }
+  });
+
   it("lets a receiver's get read its own plain store through hashAref", () => {
     class Wrapper {
       store: Record<string, unknown> = { get: "data" };

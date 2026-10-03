@@ -1,15 +1,16 @@
 import { resolveValue } from "./resolve-value.js";
 import { ArgumentError } from "../attribute-assignment.js";
 import {
-  BigDecimal,
-  Complex,
   Range,
-  Rational,
+  rbCDate,
+  rbCDateTime,
+  rbCNumeric,
+  rbCTime,
   rbFPublicSend,
+  rbObjIsKindOf,
   rbObjRespondTo,
   rtest,
 } from "@blazetrails/ruby-compat";
-import { Temporal, Time } from "@blazetrails/date";
 
 export { resolveValue };
 
@@ -73,16 +74,10 @@ export function inclusionMethod(enumerable: unknown): "isInclude" | "cover" {
   if (enumerable instanceof Range) {
     const endpoint = rtest(enumerable.begin) ? enumerable.begin : enumerable.end;
     switch (true) {
-      case typeof endpoint === "number":
-      case typeof endpoint === "bigint":
-      case endpoint instanceof Rational:
-      case endpoint instanceof BigDecimal:
-      case endpoint instanceof Complex:
-      case endpoint instanceof Time:
-      case endpoint instanceof Temporal.Instant:
-      case endpoint instanceof Temporal.ZonedDateTime:
-      case endpoint instanceof Temporal.PlainDateTime:
-      case endpoint instanceof Temporal.PlainDate:
+      case rbObjIsKindOf(endpoint, rbCNumeric):
+      case rbObjIsKindOf(endpoint, rbCTime):
+      case rbObjIsKindOf(endpoint, rbCDateTime):
+      case rbObjIsKindOf(endpoint, rbCDate):
         return "cover";
       default:
         return "isInclude";
