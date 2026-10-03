@@ -415,14 +415,20 @@ export const ClassMethods = {
 
   /** @internal */
   defineCall(
+    this: ClassMethodsHost,
     codeGenerator: CodeGenerator,
-    _name: string,
+    name: string,
     targetName: string,
     mangledName: string,
     parameters: string | null | false,
     callArgs: string[],
     { namespace, as }: { namespace: string; as: string },
   ): void {
+    const reader =
+      this.attributeAliases[name] === targetName &&
+      rbObjRespondTo(this, "defineMethodAttribute", true);
+    if (reader) namespace = `${namespace}_reader`;
+
     codeGenerator.defineCachedMethod(mangledName, { namespace, as }, (batch) => {
       let body: (self: ReadWriteHost, args: unknown[]) => unknown;
       if (CALL_COMPILABLE_REGEXP.test(targetName)) {
@@ -433,6 +439,18 @@ export const ClassMethods = {
       }
 
       batch.push((mod) => {
+        if (reader) {
+          Object.defineProperty(mod, mangledName, {
+            get(this: ReadWriteHost) {
+              return body(this, []);
+            },
+            set(this: ReadWriteHost, value: unknown) {
+              rbFSend(this, `${targetName}=`, value);
+            },
+            configurable: true,
+          });
+          return;
+        }
         if (parameters === false) {
           Object.defineProperty(mod, mangledName, {
             get(this: ReadWriteHost) {
