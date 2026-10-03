@@ -1,10 +1,9 @@
-import { deepDup, indexWith, isPlainObject, reverseMergeBang } from "@blazetrails/activesupport";
+import { deepDup, indexWith, reverseMergeBang } from "@blazetrails/activesupport";
 import { Attribute } from "./attribute.js";
 import type { LazyAttributeHash } from "./attribute-set/builder.js";
 import {
   FrozenError,
   block,
-  dup,
   eachKey,
   eachValue,
   except,
@@ -15,6 +14,7 @@ import {
   rbDeclareIvar,
   rbEqual,
   rbObjClone,
+  rbObjDup,
   transformValues,
   registerConstant,
 } from "@blazetrails/ruby-compat";
@@ -121,8 +121,7 @@ export class AttributeSet {
   }
 
   initializeDup(_: AttributeSet): void {
-    const attributes = this._attributes;
-    this._attributes = isPlainObject(attributes) ? dup(attributes) : attributes.dup();
+    this._attributes = rbObjDup(this._attributes);
   }
 
   initializeClone(_: AttributeSet): void {

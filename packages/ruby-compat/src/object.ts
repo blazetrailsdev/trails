@@ -435,6 +435,7 @@ function writerSpelling(attr: string | undefined): string | undefined {
 
 function checkDefinitionVisibility(mod: { prototype: object }, mid: string): boolean {
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
+  const writer = writerSpelling(attr);
   for (
     let o: object | null = mod.prototype;
     o && o !== Object.prototype;
@@ -443,6 +444,12 @@ function checkDefinitionVisibility(mod: { prototype: object }, mid: string): boo
     const me = Object.getOwnPropertyDescriptor(o, mid);
     if (me) return typeof me.value === "function" || me.get !== undefined;
     if (attr !== undefined && Object.getOwnPropertyDescriptor(o, attr)?.set) return true;
+    if (
+      writer !== undefined &&
+      typeof Object.getOwnPropertyDescriptor(o, writer)?.value === "function"
+    ) {
+      return true;
+    }
   }
   return false;
 }
@@ -451,7 +458,8 @@ function checkDefinitionVisibility(mod: { prototype: object }, mid: string): boo
  * `Module#method_defined?` (`rb_mod_method_defined`,
  * `vendor/ruby/v3.3.11/vm_method.c:2055`). A JS entry carries no visibility, so
  * it answers as {@link rbModPublicMethodDefined} does. A writer `name=` is
- * answered by a JS accessor's setter, the entry {@link rbFSend} dispatches to.
+ * answered by a JS accessor's setter or a `setName` method, the entries
+ * {@link rbFSend} dispatches to.
  *
  * @noRailsEquivalent PERMANENT
  */

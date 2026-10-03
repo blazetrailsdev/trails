@@ -306,7 +306,8 @@ export function hashDelete(hash: object, key: unknown, block?: (key: never) => u
 
 /**
  * Ruby `Hash#[]` (`vendor/ruby/v3.3.11/hash.c:2121` `rb_hash_aref`) — the stored
- * value, or `nil` when the key is absent, whichever hash it is given.
+ * value, or `nil` when the key is absent, whichever hash it is given. A
+ * receiver that is not a Hash is sent its own `[]`, spelled `get`.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#[]` (`vendor/ruby/v3.3.11/hash.c:2121`).
  */
 export function hashAref(hash: object, key: unknown): unknown {
@@ -318,7 +319,8 @@ export function hashAref(hash: object, key: unknown): unknown {
 
 /**
  * Ruby `Hash#[]=` (`vendor/ruby/v3.3.11/hash.c:2018` `rb_hash_aset`) — stores the
- * pair and returns the value, as the assignment expression does.
+ * pair and returns the value, as the assignment expression does. A receiver
+ * that is not a Hash is sent its own `[]=`, spelled `set`.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#[]=` (`vendor/ruby/v3.3.11/hash.c:2018`).
  */
 export function hashAset<T>(hash: object, key: unknown, val: T): T {
