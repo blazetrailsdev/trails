@@ -1,9 +1,12 @@
 import {
   ArgumentError,
+  FrozenError,
   Hash,
   dup,
+  hashAset,
   hashDelete,
   isSymbol,
+  rbInspect,
   rbObjDup,
   rbObjRespondTo,
   symbolToS,
@@ -343,8 +346,11 @@ export const withDefaults = reverseMerge;
 
 export function reverseMergeBang<T extends AnyObject>(hash: T, otherHash: AnyObject): T {
   const merged = reverseMerge(hash, otherHash);
-  for (const key of Object.keys(hash)) delete hash[key];
-  Object.assign(hash, merged);
+  if (Object.isFrozen(hash)) {
+    throw new FrozenError(`can't modify frozen Hash: ${rbInspect(hash)}`, { receiver: hash });
+  }
+  for (const key of Object.keys(hash)) hashDelete(hash, key);
+  for (const [key, value] of Object.entries(merged)) hashAset(hash, key, value);
   return hash;
 }
 

@@ -70,6 +70,12 @@ describe("LazyAttributeSet", () => {
     expect(lazy.fetchValue("nope")).toBe(null);
   });
 
+  it("reads a name Object.prototype answers as an ordinary key", () => {
+    const lazy = new LazyAttributeSet({ constructor: "Alice" }, { constructor: strType }, {}, {});
+    expect(lazy.fetchValue("constructor")).toBe("Alice");
+    expect(new LazyAttributeSet({}, {}, {}, {}).fetchValue("toString")).toBe(null);
+  });
+
   describe("over an indexed row", () => {
     class IndexedRow {
       constructor(

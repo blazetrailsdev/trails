@@ -4,13 +4,7 @@ import { kernelThrow } from "@blazetrails/ruby-compat";
    test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
    how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import {
-  Callbacks as ASCallbacks,
-  extend,
-  runCallbacks,
-  withOptions,
-  include,
-} from "@blazetrails/activesupport";
+import { extend, runCallbacks, withOptions, include } from "@blazetrails/activesupport";
 import { Model } from "./index.js";
 import { Callbacks as ValidationsCallbacks } from "./validations/callbacks.js";
 import { Callbacks, type CallbackConditions, defineModelCallbacks } from "./callbacks.js";
@@ -58,7 +52,7 @@ describe("Callbacks.extended", () => {
 
 function modelWith(...events: string[]): any {
   class Klass {}
-  extend(Klass, ASCallbacks.ClassMethods);
+  extend(Klass, Callbacks);
   (defineModelCallbacks as (this: unknown, ...a: string[]) => void).apply(Klass, events);
   return Klass;
 }
@@ -159,13 +153,13 @@ describe("define_model_callbacks only: and callback objects", () => {
 
   it("class-based around callback object with proceed", async () => {
     const log: string[] = [];
-    const wrapper = {
+    const wrapper = new (class Wrapper {
       aroundSave(record: any, proceed: () => void) {
         log.push("around_before");
         proceed();
         log.push("around_after");
-      },
-    };
+      }
+    })();
     class Person extends Model {
       declare static attribute: AttributesClassHalf["attribute"];
 
@@ -187,11 +181,11 @@ describe("define_model_callbacks only: and callback objects", () => {
 
   it("class-based callback via defineModelCallbacks-generated methods", async () => {
     const log: string[] = [];
-    const observer = {
+    const observer = new (class Observer {
       beforeProcess(record: any) {
         log.push(`processing ${record._readAttribute("name")}`);
-      },
-    };
+      }
+    })();
     class Job extends Model {
       declare static attribute: AttributesClassHalf["attribute"];
 

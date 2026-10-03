@@ -15,9 +15,10 @@ import {
   except,
   fetch,
   hasKey,
+  hashAref,
+  hashAset,
   rbDeclareIvar,
   rbFPublicSend,
-  rbInspect,
   rbEqual,
   rbObjClone,
   transformValues as hashTransformValues,
@@ -25,34 +26,17 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
 
-/** @noRailsEquivalent CONVERGEABLE attribute-set-and-serialization-plain-object-hash-helpers */
-function frozenErrorRaisingStore(attributes: Record<string, Attribute>): Record<string, Attribute> {
-  const raiseIfFrozen = (target: Record<string, Attribute>): void => {
-    if (Object.isFrozen(target)) {
-      throw new FrozenError(`can't modify frozen Hash: ${rbInspect(target)}`, { receiver: target });
-    }
-  };
-  return new Proxy(attributes, {
-    set(target, name, value: Attribute): boolean {
-      raiseIfFrozen(target);
-      return Reflect.set(target, name, value);
-    },
-    deleteProperty(target, name): boolean {
-      raiseIfFrozen(target);
-      return Reflect.deleteProperty(target, name);
-    },
-  });
-}
-
 type Attributes = Record<string, Attribute> | LazyAttributeHash;
 
 function aref(attributes: Attributes, name: string): Attribute | undefined {
-  return isPlainObject(attributes) ? attributes[name] : attributes.getAttribute(name);
+  return isPlainObject(attributes)
+    ? ((hashAref(attributes, name) as Attribute | null) ?? undefined)
+    : attributes.getAttribute(name);
 }
 
 function aset(attributes: Attributes, name: string, value: Attribute): Attribute {
-  if (isPlainObject(attributes)) attributes[name] = value;
-  else attributes.set(name, value);
+  if (isPlainObject(attributes)) return hashAset(attributes, name, value);
+  attributes.set(name, value);
   return value;
 }
 
@@ -94,11 +78,7 @@ export class AttributeSet {
   }
 
   constructor(attributes: Attributes = {}) {
-    this._attributes = isPlainObject(attributes)
-      ? frozenErrorRaisingStore(
-          Object.setPrototypeOf(attributes, null) as Record<string, Attribute>,
-        )
-      : attributes;
+    this._attributes = attributes;
   }
 
   getAttribute(name: string): Attribute {
@@ -167,16 +147,11 @@ export class AttributeSet {
 
   initializeDup(_: AttributeSet): void {
     const attributes = this._attributes;
-    this._attributes = isPlainObject(attributes)
-      ? frozenErrorRaisingStore(dup(attributes))
-      : attributes.dup();
+    this._attributes = isPlainObject(attributes) ? dup(attributes) : attributes.dup();
   }
 
   initializeClone(_: AttributeSet): void {
-    const attributes = this._attributes;
-    this._attributes = isPlainObject(attributes)
-      ? frozenErrorRaisingStore(rbObjClone(attributes))
-      : rbObjClone(attributes);
+    this._attributes = rbObjClone(this._attributes);
   }
 
   reset(key: string): void {

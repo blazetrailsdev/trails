@@ -131,10 +131,6 @@ export interface ReadWriteHost {
 export interface AttributeMethodHost {
   attributeNames(): string[];
   attributeMethodPatterns: AttributeMethodPattern[];
-  /** @internal */
-  _patternsGeneratedFor?: Map<string, AttributeMethodPattern[]>;
-  /** @internal */
-  _patternsAtLastResurrection?: AttributeMethodPattern[];
   attributeAliases: Record<string, string>;
   _aliasesByAttributeName: Map<string, string[]>;
   _generatedAttributeMethods?: Module;
@@ -285,10 +281,6 @@ export const ClassMethods = {
       }
       this.attributeMethodPatternsCache().clear();
     });
-    if (!Object.prototype.hasOwnProperty.call(this, "_patternsGeneratedFor")) {
-      this._patternsGeneratedFor = new Map(this._patternsGeneratedFor ?? []);
-    }
-    this._patternsGeneratedFor!.set(as, this.attributeMethodPatterns);
   },
 
   defineAttributeMethodPattern(
@@ -473,7 +465,6 @@ export const AttributeMethods = {
       instanceWriter: false,
       default: [new AttributeMethodPattern()],
     });
-    include(base, SuperMethods);
   },
 
   methodMissing(this: InstanceMethodsHost, method: string, ...args: unknown[]): unknown {
@@ -629,25 +620,4 @@ export function defineMethodAttribute(
       });
     });
   });
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE attribute-methods-construction-time-resurrection-has-no-rails-site
- */
-export function initialize(this: { constructor: ClassMethodsHost }, ...args: unknown[]): void {
-  _resurrectAttributeMethods(this.constructor);
-  SuperMethods.superMethod(this, "initialize")!(...args);
-}
-
-const SuperMethods = new Module((mod) => mod.defineMethod("initialize", initialize));
-
-export function _resurrectAttributeMethods(klass: ClassMethodsHost): void {
-  const patterns = klass.attributeMethodPatterns;
-  if (klass._patternsAtLastResurrection === patterns) return;
-  klass._patternsAtLastResurrection = patterns;
-  const stale = [...(klass._patternsGeneratedFor ?? [])]
-    .filter(([, generatedWith]) => generatedWith !== patterns)
-    .map(([attrName]) => attrName);
-  if (stale.length > 0) klass.defineAttributeMethods(...stale);
 }

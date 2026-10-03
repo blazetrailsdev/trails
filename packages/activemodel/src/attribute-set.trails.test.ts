@@ -171,6 +171,9 @@ describe("AttributeSet#reverseMergeBang", () => {
   it("raises FrozenError on a frozen store", () => {
     const set = new AttributeSet({ foo: Attribute.fromDatabase("foo", 1, integer) }).freeze();
     expect(() => set.reverseMergeBang(new AttributeSet({}))).toThrow(FrozenError);
+    expect(() => new AttributeSet({}).freeze().reverseMergeBang(new AttributeSet({}))).toThrow(
+      FrozenError,
+    );
   });
 });
 
