@@ -245,7 +245,7 @@ export class AbstractReflection {
         if (counterCache) {
           this._counterCacheColumn =
             counterCache.column ??
-            `${pluralize(underscore(demodulize((this._concrete().activeRecord as any)._demodulizedName ?? this._concrete().activeRecord.name)))}_count`;
+            `${pluralize(underscore(demodulize(this._concrete().activeRecord.modelName.name)))}_count`;
         }
       } else {
         this._counterCacheColumn =
