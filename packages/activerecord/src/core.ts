@@ -729,6 +729,7 @@ export function constructor(
     initInternals(): void;
   },
   attributes: unknown = null,
+  block?: (record: CoreRecord) => void,
 ): void {
   const allocating = _allocation.klass === this.constructor;
   if (allocating) _allocation.klass = null;
@@ -746,6 +747,8 @@ export function constructor(
   this.initInternals();
 
   SuperMethods.superMethod(this, "initialize")!(attributes);
+
+  if (block) block(this);
 }
 
 /** @internal */
