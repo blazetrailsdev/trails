@@ -13,17 +13,6 @@ import { ActiveModel } from "./namespaces.js";
 import type { UserProvidedDefault } from "./attribute/user-provided-default.js";
 import type { Coder } from "@blazetrails/activesupport/yaml";
 
-function dupValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.slice();
-  if (value instanceof Map) return new Map(value);
-  if (value instanceof Set) return new Set(value);
-  if (typeof value === "object" && value !== null) {
-    const proto = Object.getPrototypeOf(value) as object | null;
-    if (proto === Object.prototype || proto === null) return { ...value };
-  }
-  return value;
-}
-
 export const UNINITIALIZED_ORIGINAL_VALUE: unique symbol = Symbol.for(
   "@blazetrails/activemodel/UNINITIALIZED_ORIGINAL_VALUE",
 );
@@ -226,7 +215,7 @@ export abstract class Attribute {
   /** @missingRailsName value — PERMANENT */
   private initializeDup(_other: Attribute): void {
     if (isDuplicable(this._value)) {
-      this._value = dupValue(this._value);
+      this._value = rbObjDup(this._value);
     }
   }
 

@@ -1,5 +1,6 @@
 import {
   ArgumentError,
+  compact,
   dup,
   excBacktraceLocations,
   NoMethodError,
@@ -16,6 +17,7 @@ import {
   rbSetClassPathString,
   regexpEscape,
   rtest,
+  sort,
   stringSplit,
   RUBY_ENGINE,
   RUBY_PLATFORM,
@@ -198,11 +200,9 @@ export class Command extends Struct.new(
 
   /** @internal */
   protected requiredOptions(): string {
-    return (this._requiredOptions ??= Object.values(this.options)
-      .map((o) => (rtest(o.isRequired()) ? o.usage() : null))
-      .filter((optionUsage) => optionUsage != null)
-      .sort()
-      .join(" "));
+    return (this._requiredOptions ??= sort(
+      compact(Object.values(this.options).map((o) => (rtest(o.isRequired()) ? o.usage() : null))),
+    ).join(" "));
   }
 
   /** @internal */

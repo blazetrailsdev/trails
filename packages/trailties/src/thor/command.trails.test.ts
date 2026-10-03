@@ -143,4 +143,12 @@ describe("Thor::Command", () => {
       "at App.canHas (/app.js:3:1)",
     ]);
   });
+  it("required_options sorts the usages by byte, as Array#sort does", () => {
+    const option = (usage: string) => ({ isRequired: () => true, usage: () => usage }) as never;
+    const cmd = new Command("canHas", null, null, null, "canHas", {
+      a: option("--a=\u{FF21}"),
+      b: option("--a=\u{1F600}"),
+    });
+    expect(rbFSend(cmd, "requiredOptions")).toBe("--a=\u{FF21} --a=\u{1F600}");
+  });
 });

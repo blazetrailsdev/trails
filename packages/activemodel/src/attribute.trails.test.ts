@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { deepDup } from "@blazetrails/activesupport";
+import { Time } from "@blazetrails/date";
+import { rbObjDup } from "@blazetrails/ruby-compat";
 import { Attribute, FromUser, UNINITIALIZED_ORIGINAL_VALUE } from "./attribute.js";
 import { UNINITIALIZED_ORIGINAL_VALUE as UNINITIALIZED_FROM_INDEX } from "./index.js";
 import { typeRegistry } from "./type/registry.js";
@@ -256,6 +258,27 @@ describe("Attribute — trails-only coverage", () => {
 
       expect(attr.value()).toEqual(["a"]);
       expect(duped.value()).toEqual(["a", "b"]);
+    });
+    it("dups a Time, a JS Date, a class instance, a Map, a Set and a Hash cast value, as @value.dup does", () => {
+      class Point {
+        x = 1;
+      }
+      for (const cast of [
+        Time.now(),
+        new Date(),
+        new Point(),
+        new Map([["a", 1]]),
+        new Set([1]),
+        { a: 1 },
+      ]) {
+        const attr = Attribute.fromDatabase("v", cast, new ValueType());
+        void attr.value();
+        const duped = rbObjDup(attr);
+
+        expect(duped.value()).not.toBe(attr.value());
+        expect(duped.value()).toBeInstanceOf(cast.constructor);
+        expect(duped.value()).toEqual(attr.value());
+      }
     });
   });
 });
