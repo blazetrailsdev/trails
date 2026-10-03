@@ -4049,6 +4049,25 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     expect(fns.find((m) => m.name === "timestamps")!.optionKeys).toHaveLength(6);
   });
 
+  it("follows a copy made through a ruby-compat call or a reassignment", () => {
+    const info = extractFromFiles("/p", {
+      "schema-statements.ts": `
+        interface Options { foreignKey?: object; ifExists?: boolean; column?: string }
+        declare function slice(h: object, ...k: string[]): Options;
+        export function removeReference(refName: string, { foreignKey, ...options }: Options = {}): void {
+          const conditionalOptions = slice(options, "ifExists");
+          let foreignKeyOptions: Options;
+          foreignKeyOptions = { ...foreignKey, ...conditionalOptions };
+          foreignKeyOptions.column ??= refName;
+        }
+      `,
+    });
+    const fn = Object.values(info.modules)
+      .flatMap((m) => [...m.instanceMethods, ...m.classMethods])
+      .find((m) => m.name === "removeReference")!;
+    expect(fn.optionReads).toEqual(["column", "foreignKey"]);
+  });
+
   it("takes a non-trailing param named options as the options hash", () => {
     const info = extractFromFiles("/p", {
       "collection-caching.ts": `

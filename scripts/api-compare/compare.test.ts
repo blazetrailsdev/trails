@@ -4086,19 +4086,21 @@ describe("ported-with-args population", () => {
     );
     const params = [{ name: "options", kind: "keyword_rest" as const }];
     const owned = (keys: string[]) => ({ keys, params });
+    const ns = "ActiveRecord::ConnectionAdapters";
     const ruby = {
       byName: new Map([["defined_for?", owned(["name", "validate", "invented"])]]),
       byOwnerName: new Map([
         [
-          "ActiveRecord::ConnectionAdapters::IndexDefinition#defined_for?",
+          rubyBodyKey(`${ns}::IndexDefinition`, "instance", "defined_for?"),
+          owned(["name", "validate"]),
+        ],
+        [rubyBodyKey(`${ns}::IndexDefinition`, "class", "defined_for?"), owned(["unrelated"])],
+        [
+          rubyBodyKey(`${ns}::ForeignKeyDefinition`, "instance", "defined_for?"),
           owned(["name", "validate"]),
         ],
         [
-          "ActiveRecord::ConnectionAdapters::ForeignKeyDefinition#defined_for?",
-          owned(["name", "validate"]),
-        ],
-        [
-          "ActiveRecord::ConnectionAdapters::CheckConstraintDefinition#defined_for?",
+          rubyBodyKey(`${ns}::CheckConstraintDefinition`, "instance", "defined_for?"),
           owned(["invented"]),
         ],
       ]),
@@ -4108,7 +4110,8 @@ describe("ported-with-args population", () => {
         "defined_for?",
         "isDefinedFor",
         file,
-        `ActiveRecord::ConnectionAdapters::${owner}`,
+        `${ns}::${owner}`,
+        "instance",
         ruby,
         maps,
       )!;
@@ -4125,9 +4128,17 @@ describe("ported-with-args population", () => {
       missingInTs: [],
       extraInTs: ["invented"],
     });
-    expect(
-      optionKeyPair("defined_for?", "isDefinedFor", file, "Mixin", ruby, maps)?.ruby.keys,
-    ).toEqual(["name", "validate", "invented"]);
+    const mixin = optionKeyPair(
+      "defined_for?",
+      "isDefinedFor",
+      file,
+      "Mixin",
+      "instance",
+      ruby,
+      maps,
+    );
+    expect(mixin?.owned).toBe(false);
+    expect(mixin?.ruby.keys).toEqual(["name", "validate", "invented"]);
   });
 });
 

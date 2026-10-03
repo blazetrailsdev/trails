@@ -69,6 +69,7 @@ describe("normalizeArg", () => {
     expect(normalizeArg(String.raw`rstr::\e[0m`)).toBe(normalizeArg("str:\x1b[0m"));
     expect(normalizeArg(String.raw`rstr:%25q(:a\)b`)).toBe(normalizeArg("str:a)b"));
     expect(normalizeArg(String.raw`rsym::a\nb`)).toBe(normalizeArg("str:a\nb"));
+    expect(normalizeArg(String.raw`rsym:':a\nb`)).toBe(normalizeArg(String.raw`str:a\nb`));
   });
 
   it("normalizes numbers through one numeric key", () => {

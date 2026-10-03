@@ -323,7 +323,8 @@ def string_literal_value(node)
 end
 
 def raw_string_opener?(opener)
-  opener == "'" || opener.start_with?("%q") || (opener.start_with?("<<") && opener.include?("'"))
+  opener == "'" || opener.start_with?("%q") || opener.start_with?("%s") ||
+    (opener.start_with?("<<") && opener.include?("'"))
 end
 
 # ---- Dependency detection patterns ----
@@ -3490,9 +3491,15 @@ class ApiExtractor
 
   def option_copy?(node, vars)
     return false unless node.is_a?(Array)
+    node = node[1] if node[0] == :method_add_block
     call = node[0] == :method_add_arg ? node[1] : node
     return option_var?(call, vars) unless call.is_a?(Array) && call[0] == :call
-    OPTION_COPY_METHODS.include?(ident_name(call[3])) && option_copy?(call[1], vars)
+    meth = ident_name(call[3])
+    return false unless OPTION_COPY_METHODS.include?(meth)
+    return true if option_copy?(call[1], vars)
+    meth == "merge" && node[0] == :method_add_arg && node[2].is_a?(Array) &&
+      node[2][0] == :arg_paren && node[2][1].is_a?(Array) && node[2][1][0] == :args_add_block &&
+      node[2][1][1].is_a?(Array) && node[2][1][1].any? { |arg| option_copy?(arg, vars) }
   end
 
   # `options` / `opts` (a local or param, `:@ident`) and `@options` / `@opts`
@@ -4084,7 +4091,7 @@ class ApiExtractor
     return "str-interp" unless parts.all? { |p| p.is_a?(Array) && p[0] == :@tstring_content }
     text = parts.map { |p| p[1] }.join
     return "str:#{escape_descriptor_text(text)}" unless text.include?("\\")
-    opener = string_opener_at(parts[0][2])
+    opener = string_opener_at(parts[0][2])&.delete_prefix(":")
     opener = nil unless opener && raw_string_opener?(opener)
     "rstr:#{escape_descriptor_text(opener.to_s).gsub(":", "%3A")}:#{escape_descriptor_text(text)}"
   end

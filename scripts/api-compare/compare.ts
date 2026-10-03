@@ -1092,22 +1092,29 @@ export interface RubyOptionKeys {
  * hides a `missingInTs`, a sibling's Ruby body an `extraInTs`. Where it does
  * not (a mixin's `static x = x` re-export holds no options type), both sides
  * fall back to the per-name union, together, as keying one side alone would
- * manufacture rows. `undefined` when the chosen Ruby side read no keys.
+ * manufacture rows. The Ruby owner is keyed by seat too ({@link rubyBodyKey}),
+ * so `GlobalID::Locator.locate` and `#locate` stay apart, and a reopened class's
+ * bodies merge. `owned` says which arm was taken. `undefined` when the chosen
+ * Ruby side read no keys.
  */
 export function optionKeyPair(
   rubyName: string,
   tsName: string,
   tsFile: string,
   rubyModule: string,
+  level: OwnerSeat,
   ruby: { byName: Map<string, RubyOptionKeys>; byOwnerName: Map<string, RubyOptionKeys> },
   maps: TsPortedWithArgsMaps,
-): { ruby: RubyOptionKeys; candidates: (string[] | null)[]; reads: string[][] } | undefined {
+):
+  | { ruby: RubyOptionKeys; candidates: (string[] | null)[]; reads: string[][]; owned: boolean }
+  | undefined {
   const tsOwnerKey = `${rubyModule.split("::").at(-1) ?? rubyModule}#${tsName}`;
   const ownerCandidates = maps.optionKeysByFileOwnerName.get(tsFile)?.get(tsOwnerKey);
   if (ownerCandidates?.some((c) => c !== null)) {
-    const rubyOwned = ruby.byOwnerName.get(`${rubyModule}#${rubyName}`);
+    const rubyOwned = ruby.byOwnerName.get(rubyBodyKey(rubyModule, level, rubyName));
     if (rubyOwned === undefined) return undefined;
     return {
+      owned: true,
       ruby: rubyOwned,
       candidates: ownerCandidates,
       reads: maps.optionReadsByFileOwnerName.get(tsFile)?.get(tsOwnerKey) ?? [],
@@ -1116,6 +1123,7 @@ export function optionKeyPair(
   const rubyUnion = ruby.byName.get(rubyName);
   if (rubyUnion === undefined) return undefined;
   return {
+    owned: false,
     ruby: rubyUnion,
     candidates: maps.optionKeysByFileName.get(tsFile)?.get(tsName) ?? [],
     reads: maps.optionReadsByFileName.get(tsFile)?.get(tsName) ?? [],
@@ -4764,9 +4772,11 @@ export function main() {
               keys: [...(union?.keys ?? []), ...rm.option_keys],
               params: union?.params ?? rubyParamsByName.get(rm.name)!,
             });
-            rubyOptionKeys.byOwnerName.set(`${item.fqn}#${rm.name}`, {
-              keys: rm.option_keys,
-              params: rm.params,
+            const ownedKey = rubyBodyKey(item.fqn, rmLevel, rm.name);
+            const owned = rubyOptionKeys.byOwnerName.get(ownedKey);
+            rubyOptionKeys.byOwnerName.set(ownedKey, {
+              keys: [...(owned?.keys ?? []), ...rm.option_keys],
+              params: [...(owned?.params ?? []), ...rm.params],
             });
           }
           rubyOwnersByName.set(
@@ -4817,12 +4827,14 @@ export function main() {
         tsName: string,
         tsFile: string,
         rubyModule: string,
+        level: OwnerSeat,
       ) => {
         const pair = optionKeyPair(
           rubyName,
           tsName,
           tsFile,
           rubyModule,
+          level,
           rubyOptionKeys,
           portedWithArgsMaps,
         );
@@ -4830,8 +4842,9 @@ export function main() {
         const positionalParams = pair.ruby.params
           .filter((p) => p.kind === "required" || p.kind === "optional")
           .map((p) => p.name);
-        const keywordParams = (rubyParamListsByName.get(rubyName) ?? [])
-          .flat()
+        const keywordParams = (
+          pair.owned ? pair.ruby.params : (rubyParamListsByName.get(rubyName) ?? []).flat()
+        )
           .filter((p) => p.kind === "keyword")
           .map((p) => p.name);
         const verdict = matchOptionKeysAgainst(
@@ -5323,7 +5336,7 @@ export function main() {
         guessedFile = false,
         level: OwnerSeat = rubyOwnerSeat(rubyModule, false),
       ) => {
-        checkOptionKeys(rubyName, tsName, tsFile, rubyModule);
+        checkOptionKeys(rubyName, tsName, tsFile, rubyModule, level);
         checkLiterals(rubyName, tsName, tsFile);
         if (!skipCalls) {
           checkCalls(rubyName, tsName, tsFile, rubyModule, level);
@@ -5636,7 +5649,7 @@ export function main() {
               if (otherLevel !== level) continue;
               if (!tsOwners?.has(other.split("::").at(-1) ?? other)) continue;
               checkCalls(rubyName, directMatch, expectedTs, other, otherLevel);
-              checkOptionKeys(rubyName, directMatch, expectedTs, other);
+              checkOptionKeys(rubyName, directMatch, expectedTs, other, otherLevel);
             }
           }
           continue;

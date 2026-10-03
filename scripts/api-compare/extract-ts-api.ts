@@ -94,6 +94,7 @@ const OPTION_READER_FUNCTIONS = new Set([
   "deleteWithDefault",
 ]);
 const OPTION_READER_METHODS = new Set(["fetch", "get", "has", "delete", "hasOwnProperty"]);
+const OPTION_COPY_FUNCTIONS = new Set(["slice", "except", "merge", "rbObjDup", "rbObjClone"]);
 
 /** Memo for `internalJsDocTagApplies`'s file-level receipt lookup. */
 const fileLevelReceipts = new WeakMap<ts.SourceFile, boolean>();
@@ -5994,7 +5995,9 @@ export function extractOptionKeys(
  * The declared options TYPE says what a caller may pass, which for a shared
  * type (`ColumnOptions`) is every key any method on the surface accepts, so
  * {@link extractOptionKeys} cannot say which keys this body branches on. A rest
- * binding (`{ types, ...options }`) and a copy (`const opts = { ...options }`)
+ * binding (`{ types, ...options }`) and a copy (`const opts = { ...options }`,
+ * or a `slice` / `except` / `merge` / `rbObjDup` / `rbObjClone` call, the TS
+ * spellings of extract-ruby-api.rb `OPTION_COPY_METHODS`), declared or assigned,
  * carry the hash on under a new name, and a kwargs bag carrying the hash as its
  * `options` property is read through to it, as {@link extractOptionKeys} does.
  * The reader calls are the TS spellings of extract-ruby-api.rb
@@ -6096,6 +6099,21 @@ export function extractOptionReads(
     return key !== undefined && ts.isStringLiteralLike(key) ? [key.text] : [];
   };
 
+  const isCopy = (expr: ts.Expression): boolean => {
+    const e = unwrap(expr);
+    if (isOptions(e)) return true;
+    if (ts.isObjectLiteralExpression(e)) {
+      return e.properties.some((p) => ts.isSpreadAssignment(p) && isCopy(p.expression));
+    }
+    if (!ts.isCallExpression(e) || !ts.isIdentifier(e.expression)) return false;
+    if (!OPTION_COPY_FUNCTIONS.has(e.expression.text)) return false;
+    const [receiver, ...rest] = e.arguments;
+    return (
+      (receiver !== undefined && isCopy(receiver)) ||
+      (e.expression.text === "merge" && rest.some(isCopy))
+    );
+  };
+
   const visit = (node: ts.Node): void => {
     if (ts.isVariableDeclaration(node) && node.initializer) {
       const init = unwrap(node.initializer);
@@ -6104,12 +6122,16 @@ export function extractOptionReads(
         else if (ts.isIdentifier(init) && bags.has(init.text) && isBag(node.name)) {
           bind(node.name, true);
         }
-      } else if (ts.isIdentifier(node.name)) {
-        const copies =
-          ts.isObjectLiteralExpression(init) &&
-          init.properties.some((p) => ts.isSpreadAssignment(p) && isOptions(p.expression));
-        if (copies || isOptions(init)) vars.add(node.name.text);
+      } else if (ts.isIdentifier(node.name) && isCopy(init)) {
+        vars.add(node.name.text);
       }
+    } else if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      ts.isIdentifier(node.left) &&
+      isCopy(node.right)
+    ) {
+      vars.add(node.left.text);
     } else if (ts.isPropertyAccessExpression(node) && isOptions(node.expression)) {
       const call = node.parent;
       if (ts.isCallExpression(call) && call.expression === node) {

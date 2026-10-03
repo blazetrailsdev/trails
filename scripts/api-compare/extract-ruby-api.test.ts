@@ -1883,11 +1883,15 @@ describe(
             trimmed[:anchor]
             other = paths.dup
             other[:not_a_key]
+            merged = defaults.merge(options)
+            merged[:merged]
+            blocked = options.merge(a) { |k| k }
+            blocked[:blocked]
           end
         end
       `,
       });
-      expect(r["Mapper#map_match"]).toEqual(["action", "anchor"]);
+      expect(r["Mapper#map_match"]).toEqual(["action", "anchor", "blocked", "merged"]);
     });
   },
 );
@@ -2694,6 +2698,9 @@ describe("Ruby extractor call-argument capture", { timeout: RUBY_SUBPROCESS_TIME
             c('\n')
             d("\e[0m")
             e(%q(x\)y))
+            f(:'a\nb')
+            g(:"a\\nb")
+            h(%s(a\nb))
           end
         end
       `,
@@ -2703,6 +2710,9 @@ describe("Ruby extractor call-argument capture", { timeout: RUBY_SUBPROCESS_TIME
     expect(argsOf(c["Foo#m"], "c")).toEqual([String.raw`rstr:':\n`]);
     expect(argsOf(c["Foo#m"], "d")).toEqual([String.raw`rstr::\e[0m`]);
     expect(argsOf(c["Foo#m"], "e")).toEqual([String.raw`rstr:%25q(:x\)y`]);
+    expect(argsOf(c["Foo#m"], "f")).toEqual([String.raw`rsym:':a\nb`]);
+    expect(argsOf(c["Foo#m"], "g")).toEqual([String.raw`rsym::a\\nb`]);
+    expect(argsOf(c["Foo#m"], "h")).toEqual([String.raw`rsym:%25s(:a\nb`]);
   });
 
   it("recurses into a nested keyword hash", () => {
