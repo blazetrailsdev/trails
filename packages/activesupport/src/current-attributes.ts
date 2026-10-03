@@ -1,9 +1,9 @@
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { defineCallbacks, runCallbacks, setCallback } from "./callbacks.js";
+import { Callbacks } from "./callbacks.js";
 import { classAttribute } from "./class-attribute.js";
 import { CodeGenerator } from "./code-generator.js";
 import { objectWith } from "./core-ext/object/with.js";
-import { include, Module } from "@blazetrails/ruby-compat/include";
+import { include, Module, type Extended, type Included } from "@blazetrails/ruby-compat/include";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 const __FILE__ = import.meta.url;
@@ -31,13 +31,21 @@ const INVALID_ATTRIBUTE_NAMES = [
 
 const NOT_SET: unknown = Object.freeze({});
 
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActiveSupport::Callbacks` (`current_attributes.rb:93`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface CurrentAttributes extends Included<typeof Callbacks> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export abstract class CurrentAttributes {
   declare static defaults: Record<string, AttributeValue>;
   declare static isDefaults: boolean;
 
+  declare static defineCallbacks: Extended<typeof Callbacks.ClassMethods>["defineCallbacks"];
+  declare static setCallback: Extended<typeof Callbacks.ClassMethods>["setCallback"];
+
   static {
+    include(this, Callbacks);
+    this.defineCallbacks("reset");
     classAttribute.call(this, "defaults", { instanceWriter: false, default: Object.freeze({}) });
-    defineCallbacks(CurrentAttributes.prototype, "reset");
   }
 
   attributes: Record<string, AttributeValue>;
@@ -119,14 +127,14 @@ export abstract class CurrentAttributes {
     this: T,
     ...methods: (string | ((this: InstanceType<T>) => void))[]
   ): void {
-    setCallback(this.prototype, "reset", "before", ...(methods as ResetCallback[]));
+    this.setCallback("reset", "before", ...(methods as ResetCallback[]));
   }
 
   static resets<T extends typeof CurrentAttributes>(
     this: T,
     ...methods: (string | ((this: InstanceType<T>) => void))[]
   ): void {
-    setCallback(this.prototype, "reset", "after", ...(methods as ResetCallback[]));
+    this.setCallback("reset", "after", ...(methods as ResetCallback[]));
   }
 
   static afterReset<T extends typeof CurrentAttributes>(
@@ -177,7 +185,7 @@ export abstract class CurrentAttributes {
   }
 
   reset(): void {
-    runCallbacks(this, "reset", () => {
+    this.runCallbacks("reset", () => {
       this.attributes = this.resolveDefaults();
     });
   }

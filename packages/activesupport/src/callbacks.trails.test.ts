@@ -103,6 +103,7 @@ describe("defineCallbacks generates _run<Name>Callbacks (trails)", () => {
     class Record {
       log: string[] = [];
     }
+    include(Record, Callbacks);
     defineCallbacks(Record.prototype, "save");
     setCallback(Record.prototype, "save", "before", (r: Record) => {
       r.log.push("before");
