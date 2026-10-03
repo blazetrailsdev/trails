@@ -10,7 +10,6 @@ import {
 
 import {
   block as rbBlock,
-  dup as hashDup,
   Hash,
   Module,
   rbBlockGivenP,
@@ -30,6 +29,7 @@ import { HelperMethods } from "./validations/helper-methods.js";
 import {
   ClassMethods as WithClassMethods,
   validatesWith as withValidatesWith,
+  inheritedValidators,
 } from "./validations/with.js";
 import * as Validates from "./validations/validates.js";
 import { AbsenceValidator } from "./validations/absence.js";
@@ -297,11 +297,7 @@ export const ClassMethods = {
 
   clearValidatorsBang(this: ValidationsClassHost): void {
     this.resetCallbacks("validate");
-    if (!Object.prototype.hasOwnProperty.call(this, "__class_attr__validators")) {
-      const dup = hashDup(this._validators);
-      dup.forEach((v, k) => dup.set(k, [...v]));
-      this._validators = dup;
-    }
+    inheritedValidators.call(this);
     this._validators.clear();
   },
 

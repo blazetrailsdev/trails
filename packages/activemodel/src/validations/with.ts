@@ -48,6 +48,17 @@ export async function validatesWith(
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE validators-inherited-dup-runs-at-two-deferred-write-sites */
+export function inheritedValidators(this: {
+  _validators: Hash<string | null, ValidatorLike[]>;
+}): void {
+  if (!Object.prototype.hasOwnProperty.call(this, "__class_attr__validators")) {
+    const dup = hashDup(this._validators);
+    dup.forEach((v, k) => dup.set(k, [...v]));
+    this._validators = dup;
+  }
+}
+
 export const ClassMethods = {
   validatesWith(
     this: ValidatesWithClassHost,
@@ -60,11 +71,7 @@ export const ClassMethods = {
     for (const klass of args as ValidatorClass[]) {
       const validator = new klass({ ...options }, block);
 
-      if (!Object.prototype.hasOwnProperty.call(this, "__class_attr__validators")) {
-        const dup = hashDup(this._validators);
-        dup.forEach((v, k) => dup.set(k, [...v]));
-        this._validators = dup;
-      }
+      inheritedValidators.call(this);
 
       const attributes = (validator as { attributes?: readonly string[] }).attributes;
       if (Array.isArray(attributes) && attributes.length > 0) {

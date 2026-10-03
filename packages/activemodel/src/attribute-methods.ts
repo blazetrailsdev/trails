@@ -427,8 +427,9 @@ export const ClassMethods = {
       rbObjRespondTo(this, "defineMethodAttribute", true);
     type Body = (self: ReadWriteHost, args: unknown[]) => unknown;
     let descriptor: (body: Body) => PropertyDescriptor;
+    let cachedName = mangledName;
     if (reader) {
-      mangledName = `${mangledName}__reader`;
+      cachedName = `${mangledName}__reader`;
       descriptor = (body) => ({
         get(this: ReadWriteHost) {
           return body(this, []);
@@ -439,7 +440,7 @@ export const ClassMethods = {
         configurable: true,
       });
     } else if (parameters === false) {
-      mangledName = `${mangledName}__getter`;
+      cachedName = `${mangledName}__getter`;
       descriptor = (body) => ({
         get(this: ReadWriteHost) {
           return body(this, []);
@@ -456,7 +457,7 @@ export const ClassMethods = {
       });
     }
 
-    codeGenerator.defineCachedMethod(mangledName, { namespace, as }, (batch) => {
+    codeGenerator.defineCachedMethod(cachedName, { namespace, as }, (batch) => {
       let body: Body;
       if (CALL_COMPILABLE_REGEXP.test(targetName)) {
         body = (self, args) => rbFSend(self, targetName, ...callArgs, ...args);
@@ -466,7 +467,7 @@ export const ClassMethods = {
       }
 
       batch.push((mod) => {
-        Object.defineProperty(mod, mangledName, descriptor(body));
+        Object.defineProperty(mod, cachedName, descriptor(body));
       });
     });
   },
