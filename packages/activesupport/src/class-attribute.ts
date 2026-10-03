@@ -81,7 +81,7 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
     });
 
     const singleton = rbModSingletonP(this);
-    if (singleton || instanceReader || instanceWriter) {
+    if ((!singleton && instanceReader) || instanceWriter) {
       const descriptor: PropertyDescriptor = singleton
         ? { ...Object.getOwnPropertyDescriptor(this.prototype, name) }
         : { configurable: true, enumerable: false };

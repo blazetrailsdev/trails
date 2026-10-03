@@ -1,4 +1,5 @@
-import { block, include, kernelThrow } from "@blazetrails/ruby-compat";
+import { block, include, kernelThrow, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { classAttribute } from "./class-attribute.js";
 import { describe, it, expect } from "vitest";
 import {
   Value,
@@ -1170,6 +1171,44 @@ describe("CallbackObject dispatch", () => {
     const child = new Child();
     runCallbacks(child, "save");
     expect(child.log).toEqual([]);
+  });
+
+  it("a callback set on a parent reaches a grandchild whose middle class never wrote", () => {
+    class Parent {
+      log: string[] = [];
+    }
+    include(Parent, Callbacks);
+    const parent = Parent as any;
+    parent.defineCallbacks("save");
+    class Middle extends Parent {}
+    class Grandchild extends Middle {}
+    (Grandchild as any).setCallback("save", "before", (t: Parent) => t.log.push("grandchild"));
+
+    parent.setCallback("save", "before", (t: Parent) => t.log.push("parent"));
+
+    const record = new Grandchild() as any;
+    record._runSaveCallbacks();
+    expect(record.log).toEqual(["grandchild", "parent"]);
+    expect(parent.descendants).toEqual([Middle, Grandchild]);
+    expect(record._saveCallbacks).toBe((Grandchild as any)._saveCallbacks);
+    expect(new Middle().log).toEqual([]);
+  });
+
+  it("setCallback on a chain that was never defined raises as Rails' nil chain does", () => {
+    class Record {}
+    include(Record, Callbacks);
+    expect(() => (Record as any).setCallback("save", "before", () => {})).toThrow(TypeError);
+  });
+
+  it("a class attribute on a singleton class keeps the reader on its attached object", () => {
+    const object = {} as { settings?: unknown };
+    const singleton = rbObjSingletonClass(object) as any;
+    classAttribute.call(singleton, "settings", { instanceWriter: false, default: 1 });
+    expect(object.settings).toBe(1);
+    singleton.settings = 2;
+    expect(object.settings).toBe(2);
+    classAttribute.call(singleton, "writable", { default: 1 });
+    expect((object as any).writable).toBe(1);
   });
 
   it("a callback set on a parent after a child wrote its own chain reaches the child", () => {

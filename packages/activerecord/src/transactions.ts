@@ -400,15 +400,14 @@ export async function addToTransaction(this: Base, ensureFinalize = true): Promi
 
 /** @internal */
 export function hasTransactionalCallbacks(this: Base): boolean {
-  const __callbacks = (this as unknown as { __callbacks: Record<string, CallbackChain> })
-    .__callbacks;
-  const rollback = __callbacks.rollback;
-  const commit = __callbacks.commit;
-  const beforeCommitChain = __callbacks.before_commit;
+  const self = this as unknown as Record<
+    "_rollbackCallbacks" | "_commitCallbacks" | "_beforeCommitCallbacks",
+    CallbackChain
+  >;
   return (
-    !(rollback == null || rollback.isEmpty) ||
-    !(commit == null || commit.isEmpty) ||
-    !(beforeCommitChain == null || beforeCommitChain.isEmpty)
+    !self._rollbackCallbacks.isEmpty ||
+    !self._commitCallbacks.isEmpty ||
+    !self._beforeCommitCallbacks.isEmpty
   );
 }
 

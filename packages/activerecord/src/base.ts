@@ -142,6 +142,7 @@ import type { MessageVerifier as _MessageVerifier } from "@blazetrails/activesup
 import {
   DescendantsTracker,
   ReloadedClassesFiltering,
+  camelize,
   type CallbackChain,
 } from "@blazetrails/activesupport";
 import * as LockingOptimistic from "./locking/optimistic.js";
@@ -379,7 +380,9 @@ function beforeOrAroundCallbackSources(
   proto: object,
   event: string,
 ): { sources: string[]; opaque: boolean } {
-  const chain = (proto as { __callbacks?: Record<string, CallbackChain> }).__callbacks?.[event];
+  const chain = (proto as Record<string, CallbackChain | undefined>)[
+    `_${camelize(event, false)}Callbacks`
+  ];
   if (!chain) return { sources: [], opaque: false };
   const sources: string[] = [];
   let opaque = false;

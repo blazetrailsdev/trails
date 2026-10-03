@@ -757,10 +757,10 @@ export class CallbackChain {
     this.chain.splice(index, 0, o);
   }
 
-  delete(o: Callback): void {
+  delete(o: Callback | undefined): void {
     this._allCallbacks = undefined;
     this._singleCallbacks.clear();
-    const i = this.chain.indexOf(o);
+    const i = this.chain.indexOf(o as Callback);
     if (i !== -1) this.chain.splice(i, 1);
   }
 
@@ -912,6 +912,7 @@ export interface ClassMethods<T extends object = object> {
 }
 
 interface CallbacksClass {
+  prototype: object;
   __callbacks: Record<string, CallbackChain>;
   readonly descendants: CallbacksClass[];
   getCallbacks(name: string): CallbackChain;
@@ -1112,7 +1113,7 @@ export const ClassMethods = {
           chain.insert(chain.index(callback), newCallback);
         }
 
-        chain.delete(callback as Callback);
+        chain.delete(callback);
       });
       target.setCallbacks(name, chain);
     });
@@ -1141,12 +1142,29 @@ export const ClassMethods = {
         target.setCallbacks(name, new CallbackChain(name, options));
       });
 
+      if (!(`_run${camelize(name)}Callbacks` in this.prototype)) {
+        Object.defineProperty(this.prototype, `_run${camelize(name)}Callbacks`, {
+          value(this: object, block?: () => unknown) {
+            return runCallbacks(this, name, block);
+          },
+          writable: true,
+          configurable: true,
+        });
+      }
+
       Object.defineProperty(this, `_${camelize(name, false)}Callbacks`, {
         get(this: CallbacksClass) {
           return this.getCallbacks(name);
         },
         set(this: CallbacksClass, value: CallbackChain) {
           this.setCallbacks(name, value);
+        },
+        configurable: true,
+      });
+
+      Object.defineProperty(this.prototype, `_${camelize(name, false)}Callbacks`, {
+        get(this: { __callbacks: Record<string, CallbackChain> }) {
+          return this.__callbacks[name];
         },
         configurable: true,
       });
