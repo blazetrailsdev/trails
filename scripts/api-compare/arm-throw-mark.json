@@ -22,10 +22,8 @@
     "byFile": {}
   },
   "activemodel": {
-    "total": 1,
-    "byFile": {
-      "secure-password.ts": 1
-    }
+    "total": 0,
+    "byFile": {}
   },
   "activerecord": {
     "total": 0,

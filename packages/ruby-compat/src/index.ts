@@ -330,6 +330,7 @@ export { Thread } from "./thread.js";
 export { Location, excBacktraceLocations, rbFCaller } from "./backtrace-location.js";
 export { ThreadError } from "./thread-error.js";
 export { ThreadPoolExecutor } from "./thread-pool-executor.js";
+export { Concurrent } from "./concurrent/map.js";
 export type { MonitorMixin } from "./monitor.js";
 
 export { Tempfile } from "./tempfile.js";

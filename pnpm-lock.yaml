@@ -340,6 +340,9 @@ importers:
 
   packages/bcrypt:
     dependencies:
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
       '@blazetrails/date':
         specifier: workspace:*
         version: link:../date

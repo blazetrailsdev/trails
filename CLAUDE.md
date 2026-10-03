@@ -932,7 +932,10 @@ modules converged onto `Autoload`:
   does not depend on the gem defining it, or when it is `::Rails` itself. The
   defining gem seats it (`TopLevel.Trails = Trails` in `trailties/src/rails.ts`,
   `TopLevel.ActionDispatch` / `TopLevel.ActionController` in
-  `actionpack/src/namespaces.ts`, which are actionpack's own namespace objects),
+  `actionpack/src/namespaces.ts`, which are actionpack's own namespace objects,
+  `TopLevel.BCrypt` in `bcrypt/src/index.ts`, which activemodel does not depend
+  on: an unseated `BCrypt` is `has_secure_password`'s `LoadError` arm,
+  `secure_password.rb:120-125`),
   and a reader names it at call time: `TopLevel.Trails!.env` for `Rails.env.local?`
   (`engine.rb:592`), `new TopLevel.ActionDispatch!.Request(env)`
   (`shard_selector.rb:41`, `database_selector.rb:64`),

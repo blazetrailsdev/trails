@@ -30,11 +30,11 @@ describe("AttributeMethodsTest (trails)", () => {
 
     Person.attributeMethodSuffix("Short");
     Person.attributeMethodPatternsMatching("nameShort");
-    expect(Person.attributeMethodPatternsCache().size).toBeGreaterThan(0);
+    expect(Person.attributeMethodPatternsCache().size()).toBeGreaterThan(0);
 
     Person.aliasAttribute("nickname", "name");
 
-    expect(Person.attributeMethodPatternsCache().size).toBe(0);
+    expect(Person.attributeMethodPatternsCache().size()).toBe(0);
   });
 
   it("alias attribute overrides a method inherited from a parent class", () => {
@@ -155,13 +155,13 @@ describe("AttributeMethodsTest (trails)", () => {
 
     Person.aliasesByAttributeName().set("name", ["nickname"]);
     Person.attributeMethodPatternsMatching("nameShort");
-    expect(Person.attributeMethodPatternsCache().size).toBeGreaterThan(0);
+    expect(Person.attributeMethodPatternsCache().size()).toBeGreaterThan(0);
     const generated = Person.generatedAttributeMethods();
 
     class Employee extends Person {}
 
     expect(Employee.attributeMethodPatternsCache()).not.toBe(Person.attributeMethodPatternsCache());
-    expect(Employee.attributeMethodPatternsCache().size).toBe(0);
+    expect(Employee.attributeMethodPatternsCache().size()).toBe(0);
     expect(Employee.aliasesByAttributeName()).not.toBe(Person.aliasesByAttributeName());
     expect(Employee.aliasesByAttributeName().size).toBe(0);
     expect(Employee.generatedAttributeMethods()).not.toBe(generated);

@@ -1,6 +1,5 @@
-import { camelize, include, isPresent, Module } from "@blazetrails/activesupport";
-import { isEmpty, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { Engine, Password } from "@blazetrails/bcrypt";
+import { camelize, include, isPresent, Module, TopLevel } from "@blazetrails/activesupport";
+import { isEmpty, LoadError, rbObjRespondTo, warn } from "@blazetrails/ruby-compat";
 import { Validations } from "./validations.js";
 import { Model } from "./model.js";
 
@@ -26,6 +25,16 @@ export function hasSecurePassword(
   attribute: string = "password",
   options: { validations?: boolean; resetToken?: boolean } = {},
 ) {
+  try {
+    if (TopLevel.BCrypt === undefined) throw new LoadError("cannot load such file -- bcrypt");
+  } catch (error) {
+    if (!(error instanceof LoadError)) throw error;
+    warn(
+      "You don't have bcrypt installed in your application. Please add it to your Gemfile and run bundle install.",
+    );
+    throw error;
+  }
+
   const validations = options.validations !== false;
   const resetToken = options.resetToken !== false;
   const digestAttr = `${attribute}_digest`;
@@ -50,7 +59,12 @@ export function hasSecurePassword(
         const digestWas = rbObjRespondTo(record, `${digestAttr}Was`)
           ? (publicSend(record, `${digestAttr}Was`) as string | null | undefined)
           : undefined;
-        if (!(isPresent(digestWas) && new Password(digestWas as string).isPassword(challenge))) {
+        if (
+          !(
+            isPresent(digestWas) &&
+            new TopLevel.BCrypt!.Password(digestWas as string).isPassword(challenge)
+          )
+        ) {
           record.errors.add(challengeAttr);
         }
       }
@@ -127,8 +141,14 @@ export class InstanceMethodsOnActivation extends Module {
             publicSendWriter(this, digestAttr, null);
           } else if (!isEmpty(unencryptedPassword as string)) {
             (this as unknown as Record<string, unknown>)[passwordIvar] = unencryptedPassword;
-            const cost = SecurePassword.minCost ? Engine.MIN_COST : Engine.cost;
-            publicSendWriter(this, digestAttr, Password.create(unencryptedPassword, { cost }));
+            const cost = SecurePassword.minCost
+              ? TopLevel.BCrypt!.Engine.MIN_COST
+              : TopLevel.BCrypt!.Engine.cost;
+            publicSendWriter(
+              this,
+              digestAttr,
+              TopLevel.BCrypt!.Password.create(unencryptedPassword, { cost }),
+            );
           }
         },
         configurable: true,
@@ -159,7 +179,7 @@ export class InstanceMethodsOnActivation extends Module {
       const attributeDigest = publicSend(this, digestAttr) as string | null;
       return (
         isPresent(attributeDigest) &&
-        new Password(attributeDigest as string).isPassword(unencryptedPassword) &&
+        new TopLevel.BCrypt!.Password(attributeDigest as string).isPassword(unencryptedPassword) &&
         this
       );
     };
@@ -169,7 +189,9 @@ export class InstanceMethodsOnActivation extends Module {
       Object.defineProperty(mod, `${attribute}Salt`, {
         get(this: Model) {
           const attributeDigest = publicSend(this, digestAttr) as string | null;
-          return isPresent(attributeDigest) ? new Password(attributeDigest as string).salt : null;
+          return isPresent(attributeDigest)
+            ? new TopLevel.BCrypt!.Password(attributeDigest as string).salt
+            : null;
         },
         configurable: true,
       });
@@ -192,6 +214,6 @@ export class InstanceMethodsOnActivation extends Module {
   }
 }
 
-function publicSendWriter(record: Model, name: string, value: Password | null): void {
+function publicSendWriter(record: Model, name: string, value: unknown): void {
   (record as unknown as Record<string, unknown>)[name] = value;
 }
