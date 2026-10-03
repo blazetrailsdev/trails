@@ -65,6 +65,7 @@ export interface Core {
 
 export const Core = {
   [included](base: object): void {
+    include(base as new () => object, SuperMethods);
     classAttribute.call(base, "logger", { instanceWriter: false });
     classAttribute.call(base, "_destroyAssociationAsyncJob", {
       instanceAccessor: false,
@@ -727,7 +728,6 @@ export function constructor(
     _newRecord: boolean;
     initInternals(): void;
   },
-  super_: (attributes: unknown) => void,
   attributes: unknown = null,
 ): void {
   const allocating = _allocation.klass === this.constructor;
@@ -745,7 +745,7 @@ export function constructor(
 
   this.initInternals();
 
-  super_(attributes);
+  SuperMethods.superMethod(this, "initialize")!(attributes);
 }
 
 /** @internal */
@@ -777,6 +777,11 @@ export function initInternals(
 
   klass.defineAttributeMethods();
 }
+
+const SuperMethods = new Module((mod) => {
+  mod.defineMethod("initialize", constructor);
+  mod.defineMethod("initInternals", initInternals);
+});
 
 export function initializeDup(
   this: CoreRecord & {
