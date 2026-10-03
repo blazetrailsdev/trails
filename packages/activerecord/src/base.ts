@@ -1024,6 +1024,8 @@ export class Base extends Model {
   static _suppressInitializeCallback = false;
 
   static _suppressAbstractCheck = false;
+  /** @internal */
+  static _allocating = false;
 
   declare static attrReadonly: typeof ReadonlyAttributes.attrReadonly;
   declare static isReadonlyAttribute: typeof ReadonlyAttributes.isReadonlyAttribute;
@@ -1632,10 +1634,18 @@ export class Base extends Model {
     );
     const prevAbstractSuppress = this._suppressAbstractCheck;
     this._suppressAbstractCheck = true;
+    const hadOwnAllocating = Object.prototype.hasOwnProperty.call(this, "_allocating");
+    const prevAllocating = this._allocating;
+    this._allocating = true;
     let record: InstanceType<T>;
     try {
       record = new this() as InstanceType<T>;
     } finally {
+      if (hadOwnAllocating) {
+        this._allocating = prevAllocating;
+      } else {
+        delete (this as any)._allocating;
+      }
       if (hadOwnSuppress) {
         this._suppressInitializeCallback = prevSuppress;
       } else {
@@ -1688,6 +1698,7 @@ export class Base extends Model {
     attributes ??= {};
     let attrs = isEmpty(attributes) ? {} : sanitizeForMassAssignment(attributes);
     if (
+      !(new.target as typeof Base | undefined)?._allocating &&
       (new.target as (typeof Base & { _suppressStiNewDispatch?: unknown }) | undefined)
         ?._suppressStiNewDispatch !== new.target
     ) {

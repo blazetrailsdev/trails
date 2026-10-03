@@ -33,6 +33,36 @@ describe("frozen / isFrozen", () => {
   });
 });
 
+describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
+  fixtures(["topics"]);
+
+  it("loads records without copying the default attribute set", async () => {
+    await Topic.create({ title: "Alice" });
+    const defaults = (
+      Topic as unknown as { _defaultAttributes(): { deepDup(): unknown } }
+    )._defaultAttributes();
+    const proto = Object.getPrototypeOf(defaults) as { deepDup(): unknown };
+    const deepDup = proto.deepDup;
+    let copies = 0;
+    proto.deepDup = function (this: unknown) {
+      if (this === defaults) copies++;
+      return deepDup.call(this);
+    };
+    try {
+      const loaded = await Topic.all();
+      expect(loaded.length).toBeGreaterThan(0);
+      expect(loaded[0].isNewRecord()).toBe(false);
+      expect(copies).toBe(0);
+
+      const fresh = new Topic({ title: "Bob" });
+      expect(fresh.isNewRecord()).toBe(true);
+      expect(copies).toBeGreaterThan(0);
+    } finally {
+      proto.deepDup = deepDup;
+    }
+  });
+});
+
 describe("DatabaseConfigurations.new given a DatabaseConfigurations", () => {
   it("takes the other instance's configurations (database_configurations.rb:201)", () => {
     const configs = new DatabaseConfigurations({
