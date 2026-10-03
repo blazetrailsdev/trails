@@ -32,14 +32,6 @@ export class IndifferentCoder {
   load(yaml: unknown): HashWithIndifferentAccess<unknown> {
     return asIndifferentHash(this.coder.load(yaml == null || yaml === false ? "" : yaml));
   }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE Store::ClassMethods#store_accessor's accessor lookup (store.rb:112); Ruby reads the constant inline.
-   */
-  accessor(): typeof IndifferentHashAccessor {
-    return IndifferentHashAccessor;
-  }
 }
 
 const _storedAttributes = new WeakMap<typeof Base, Record<string, string[]>>();

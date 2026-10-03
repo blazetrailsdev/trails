@@ -5,6 +5,7 @@ import {
   hasKey,
   rbEqual,
   rbModConstSet,
+  rbDeclareIvar,
   rbObjDup,
   registerConstant,
 } from "@blazetrails/ruby-compat";
@@ -32,8 +33,7 @@ export abstract class Attribute {
   originalAttribute: Attribute | null;
   protected _value: unknown;
   protected _hasValue: boolean;
-  protected _cachedValueForDatabase: unknown;
-  protected _hasValueForDatabase: boolean;
+  declare protected __valueForDatabase: unknown;
 
   static fromDatabase(
     name: string | null,
@@ -92,8 +92,6 @@ export abstract class Attribute {
       this._value = undefined;
       this._hasValue = false;
     }
-    this._cachedValueForDatabase = undefined;
-    this._hasValueForDatabase = false;
   }
 
   value(_?: (name: string) => unknown): unknown {
@@ -111,16 +109,15 @@ export abstract class Attribute {
     return this.typeCast(this.valueBeforeTypeCast);
   }
 
-  /** @missingRailsArgs changed_in_place? — CONVERGEABLE attribute-value-for-database-memo-ivar-collides-with-private-method */
+  /** @missingRailsName valueForDatabase — PERMANENT */
   get valueForDatabase(): unknown {
     if (
-      !this._hasValueForDatabase ||
-      this.type!.isChangedInPlace(this._cachedValueForDatabase, this.value())
+      !Object.hasOwn(this, "__valueForDatabase") ||
+      this.type!.isChangedInPlace(this.__valueForDatabase, this.value())
     ) {
-      this._cachedValueForDatabase = this._valueForDatabase();
-      this._hasValueForDatabase = true;
+      this.__valueForDatabase = this._valueForDatabase();
     }
-    return this._cachedValueForDatabase;
+    return this.__valueForDatabase;
   }
 
   /** @internal */
@@ -260,13 +257,15 @@ export abstract class Attribute {
   }
 }
 
+rbDeclareIvar(Attribute, "@value_for_database", "__valueForDatabase");
+
 export class FromDatabase extends Attribute {
   typeCast(value: unknown): unknown {
     return this.type!.deserialize(value);
   }
 
   override forgettingAssignment(): Attribute {
-    if (!this._hasValueForDatabase && !this.changedInPlace()) {
+    if (!Object.hasOwn(this, "__valueForDatabase") && !this.changedInPlace()) {
       return this.withValueFromDatabase(this.valueBeforeTypeCast);
     } else {
       return super.forgettingAssignment();

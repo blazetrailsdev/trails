@@ -4,7 +4,6 @@ import {
   assertValidEnumDefinitionValues,
   assertValidEnumOptions,
   detectNegativeEnumConditionsBang,
-  enumTypeOf,
   EnumType,
 } from "./enum.js";
 import { ArgumentError, DecimalType } from "@blazetrails/activemodel";
@@ -304,7 +303,7 @@ describe("Enum subtype resolved from the reflected column type", () => {
   });
 
   it("serializes an enum label through the reflected decimal subtype", () => {
-    expect(enumTypeOf(Book, "status")!.serialize("written")).toEqual(
+    expect((Book.typeForAttribute("status") as EnumType).serialize("written")).toEqual(
       new DecimalType().serialize(1),
     );
   });
@@ -342,15 +341,15 @@ describe("Enum subtype resolved from a schema-reflected column type", () => {
   }
 
   it("delegates the enum subtype to the reflected decimal column, not the integer mapping shape", () => {
-    const type = enumTypeOf(NumericEnum, "decimal_number");
+    const type = NumericEnum.typeForAttribute("decimal_number") as EnumType;
     expect(type).toBeInstanceOf(EnumType);
-    expect(type!.type()).toBe("decimal");
-    expect(type!.subtype.type()).toBe("decimal");
+    expect(type.type()).toBe("decimal");
+    expect(type.subtype.type()).toBe("decimal");
   });
 
   it("serializes labels through the reflected decimal subtype on both read paths", () => {
-    const subtype = enumTypeOf(NumericEnum, "decimal_number")!.subtype;
-    expect(enumTypeOf(NumericEnum, "decimal_number")!.serialize("mid")).toEqual(
+    const subtype = (NumericEnum.typeForAttribute("decimal_number") as EnumType).subtype;
+    expect((NumericEnum.typeForAttribute("decimal_number") as EnumType).serialize("mid")).toEqual(
       subtype.serialize(1),
     );
     const caster = new MapCaster(NumericEnum);
@@ -358,17 +357,17 @@ describe("Enum subtype resolved from a schema-reflected column type", () => {
   });
 
   it("resolves the reflected subtype for a default-only attribute (no explicit type)", () => {
-    const type = enumTypeOf(DefaultOnlyNumericEnum, "decimal_number");
+    const type = DefaultOnlyNumericEnum.typeForAttribute("decimal_number") as EnumType;
     expect(type).toBeInstanceOf(EnumType);
-    expect(type!.type()).toBe("decimal");
-    expect(type!.subtype.type()).toBe("decimal");
+    expect(type.type()).toBe("decimal");
+    expect(type.subtype.type()).toBe("decimal");
   });
 
   it("keeps an explicitly-typed enum's declared subtype over the reflected column", () => {
-    const type = enumTypeOf(ExplicitNumericEnum, "decimal_number");
+    const type = ExplicitNumericEnum.typeForAttribute("decimal_number") as EnumType;
     expect(type).toBeInstanceOf(EnumType);
-    expect(type!.type()).toBe("integer");
-    expect(type!.subtype.type()).toBe("integer");
+    expect(type.type()).toBe("integer");
+    expect(type.subtype.type()).toBe("integer");
   });
 });
 
@@ -382,9 +381,9 @@ describe("Enum with an undeclared type raises on the serialize path", () => {
   }
 
   it("castEnumValue raises for an enum with no column and no explicit type", async () => {
-    expect(() => enumTypeOf(TypelessBook, "typeless_genre")!.serialize("comic")).toThrow(
-      /Undeclared attribute type for enum 'typeless_genre' in/,
-    );
+    expect(() =>
+      (TypelessBook.typeForAttribute("typeless_genre") as EnumType).serialize("comic"),
+    ).toThrow(/Undeclared attribute type for enum 'typeless_genre' in/);
   });
 });
 

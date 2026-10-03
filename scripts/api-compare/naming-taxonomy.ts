@@ -24,6 +24,7 @@ export type NamingClass =
   | "conventions-rename"
   | "module-mixin-receiver"
   | "ivar-underscore"
+  | "ivar-method-collision"
   | "module-mixin-call"
   | "block-idiom"
   | "ivar-reflection"
@@ -68,6 +69,16 @@ export const NAMING_CLASSES: NamingClassInfo[] = [
       "Ruby reads an ivar bare (`@direction` at migration.rb:1422) where trails spells the same " +
       "ivar `this._direction`; the leading underscore is the settled repo-wide spelling for a " +
       "Ruby ivar, so the two sides already match.",
+  },
+  {
+    name: "ivar-method-collision",
+    permanent: true,
+    reason:
+      "Ruby holds an ivar and a `_`-prefixed method of one name — `@value_for_database` beside " +
+      "`_value_for_database` (attribute.rb:55-60, :165). The settled ivar spelling " +
+      "`_valueForDatabase` is that method's name, and a JS class cannot hold a field and a " +
+      "method of one name, so the ivar takes a second underscore (`__valueForDatabase`, declared " +
+      "through `rbDeclareIvar`). Scoped to the cited Ruby ivars (IVAR_METHOD_COLLISION_RUBY_REFS).",
   },
   {
     name: "module-mixin-call",
@@ -150,6 +161,17 @@ export const IVAR_REFLECTION_ACCESSORS = new Set([
  *                       receiver the recorder records as the argument
  */
 export const BLOCK_IDIOM_RUBY_REFS = new Set(["instance_exec", "instanceExec", "modelClass"]);
+
+/**
+ * Ruby ivars whose class also defines a method of the ivar's `_`-prefixed
+ * name, so trails' `_` ivar spelling is taken and the field carries a second
+ * underscore. Kept as an explicit, cited list: a `__` field on its own proves
+ * no collision, and the safe direction for a permanent class is to under-match.
+ *
+ *   - `value_for_database` — `@value_for_database` beside `_value_for_database`,
+ *                            attribute.rb:55-60 and :165
+ */
+export const IVAR_METHOD_COLLISION_RUBY_REFS = new Set(["value_for_database", "valueForDatabase"]);
 
 /** Identifiers a TS parameter or local cannot be named (`arguments`/`eval` are unusable in strict mode). */
 export const JS_RESERVED_WORDS = new Set(
@@ -316,6 +338,9 @@ export function classifyPair(
     return "implicit-to-s";
   }
   if (!rubyRef.startsWith("@") && tsRef === `_${snakeToCamel(rubyRef)}`) return "ivar-underscore";
+  if (IVAR_METHOD_COLLISION_RUBY_REFS.has(rubyRef) && tsRef === `__${snakeToCamel(rubyRef)}`) {
+    return "ivar-method-collision";
+  }
   if (tsRef === "call" && isThisTypedFunction(rubyRef, thisTypedFunctions)) {
     return "module-mixin-call";
   }

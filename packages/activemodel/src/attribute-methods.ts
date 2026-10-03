@@ -7,6 +7,7 @@ import {
   hasKey,
   isInclude,
   rbFSend,
+  rbObjRespondTo,
   rbModConstDefined,
   rbModConstSet,
   regexpEscape,
@@ -158,9 +159,11 @@ const CALL_COMPILABLE_REGEXP = /^[a-zA-Z_]\w*[!?]?$/;
 export const ClassMethods = {
   attributeMethodPrefix(
     this: ClassMethodsHost,
-    ...prefixes: Array<string | { parameters?: string | null | false }>
+    ...prefixes: string[] | [...prefixes: string[], kwargs: { parameters?: string | null | false }]
   ): void {
-    const parameters = extractParameters(prefixes);
+    const last = prefixes[prefixes.length - 1];
+    const { parameters = null } =
+      typeof last === "object" ? (prefixes.pop() as { parameters?: string | null | false }) : {};
     this.attributeMethodPatterns = [
       ...this.attributeMethodPatterns,
       ...(prefixes as string[]).map((prefix) => new AttributeMethodPattern({ prefix, parameters })),
@@ -170,9 +173,11 @@ export const ClassMethods = {
 
   attributeMethodSuffix(
     this: ClassMethodsHost,
-    ...suffixes: Array<string | { parameters?: string | null | false }>
+    ...suffixes: string[] | [...suffixes: string[], kwargs: { parameters?: string | null | false }]
   ): void {
-    const parameters = extractParameters(suffixes);
+    const last = suffixes[suffixes.length - 1];
+    const { parameters = null } =
+      typeof last === "object" ? (suffixes.pop() as { parameters?: string | null | false }) : {};
     this.attributeMethodPatterns = [
       ...this.attributeMethodPatterns,
       ...(suffixes as string[]).map((suffix) => new AttributeMethodPattern({ suffix, parameters })),
@@ -234,17 +239,6 @@ export const ClassMethods = {
     const methodName = pattern.methodName(newName);
     const targetName = pattern.methodName(oldName);
     const parameters = pattern.parameters;
-
-    if (
-      typeof (this as unknown as Record<string, unknown>)[generateMethodFor(pattern)] === "function"
-    ) {
-      this.defineAttributeMethodPattern(pattern, oldName, {
-        owner: codeGenerator,
-        as: newName,
-        override: true,
-      });
-      return;
-    }
 
     const mangledName = this.buildMangledName(targetName);
 
@@ -314,13 +308,12 @@ export const ClassMethods = {
       return;
     }
 
-    const generator = (this as unknown as Record<string, unknown>)[generateMethodFor(pattern)];
-    if (typeof generator === "function") {
-      (generator as (attrName: string, options: { owner: CodeGenerator; as: string }) => void).call(
-        this,
-        attrName,
-        { owner, as },
-      );
+    const generateMethod = pattern.proxyTarget.endsWith("=")
+      ? camelize(`set_define_method_${pattern.proxyTarget.slice(0, -1)}`, false)
+      : camelize(`define_method_${pattern.proxyTarget}`, false);
+
+    if (rbObjRespondTo(this, generateMethod, true)) {
+      rbFSend(this, generateMethod, String(attrName), { owner, as });
     } else {
       this.defineProxyCall(
         owner,
@@ -561,23 +554,6 @@ export const AttributeMethods = {
     return (this as unknown as Record<string, unknown>)[attr];
   },
 };
-
-/** @noRailsEquivalent CONVERGEABLE attribute-methods-inline-generate-method-and-affix-parameters */
-function generateMethodFor(pattern: AttributeMethodPattern): string {
-  return pattern.proxyTarget.endsWith("=")
-    ? camelize(`set_define_method_${pattern.proxyTarget.slice(0, -1)}`, false)
-    : camelize(`define_method_${pattern.proxyTarget}`, false);
-}
-
-/** @noRailsEquivalent CONVERGEABLE attribute-methods-inline-generate-method-and-affix-parameters */
-function extractParameters(
-  affixes: Array<string | { parameters?: string | null | false }>,
-): string | null | false {
-  const last = affixes[affixes.length - 1];
-  if (last === undefined || typeof last === "string") return null;
-  affixes.pop();
-  return last.parameters ?? null;
-}
 
 /** @noRailsEquivalent PERMANENT */
 function answersWithAMethod(klass: unknown, name: string): boolean {
