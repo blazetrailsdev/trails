@@ -8,12 +8,12 @@ import {
 } from "@blazetrails/activemodel";
 import {
   IsolatedExecutionState,
-  defineCallbacks,
   extractOptionsBang,
   included,
   kernelArray,
-  runCallbacks,
   type CallbackChain,
+  type Callbacks,
+  type Extended,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
 import { mergeBang } from "@blazetrails/ruby-compat";
@@ -76,9 +76,12 @@ type CallbackOptions = {
 
 export const Transactions = {
   [included](base: typeof Model): void {
-    for (const name of ["commit", "rollback", "before_commit"]) {
-      defineCallbacks(base.prototype, name, { scope: ["kind", "name"] });
-    }
+    (base as typeof Model & Extended<typeof Callbacks.ClassMethods>).defineCallbacks(
+      "commit",
+      "rollback",
+      "before_commit",
+      { scope: ["kind", "name"] },
+    );
   },
 };
 
@@ -179,7 +182,7 @@ export function setCallback<T extends typeof Model>(
 
 export async function beforeCommittedBang(record: Base): Promise<void> {
   const ctor = record.constructor as typeof Base;
-  await runCallbacks(record, "before_commit");
+  await record.runCallbacks("before_commit");
 }
 
 export async function committedBang(
@@ -192,7 +195,7 @@ export async function committedBang(
     if (shouldRunCallbacks && isTriggerTransactionalCallbacks.call(this)) {
       r._committedAlreadyCalled = true;
       const ctor = this.constructor as typeof Base;
-      await runCallbacks(this, "commit");
+      await this.runCallbacks("commit");
     }
   } finally {
     r._committedAlreadyCalled = false;
@@ -211,7 +214,7 @@ export async function rolledbackBang(
   try {
     if (shouldRunCallbacks && isTriggerTransactionalCallbacks.call(this)) {
       const ctor = this.constructor as typeof Base;
-      await runCallbacks(this, "rollback");
+      await this.runCallbacks("rollback");
     }
   } finally {
     restoreTransactionRecordState.call(this, forceRestoreState);

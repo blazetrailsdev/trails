@@ -8,7 +8,6 @@ import { underscore, singularize, isBlank } from "@blazetrails/activesupport";
 import { collectionProxyFor as collectionProxyFor } from "../associations.js";
 import { ThroughAssociation, sourceReflection } from "./through-association.js";
 import { isThenable, type CollectionAssociation } from "./collection-association.js";
-import { runCallbacks } from "@blazetrails/activesupport";
 
 export class HasManyThroughAssociation extends HasManyAssociation {
   /** @internal */
@@ -207,7 +206,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       } else {
         const recs = (await scope.toArray()) as Base[];
         for (const r of recs) {
-          await runCallbacks(r as any, "destroy");
+          await r.runCallbacks("destroy");
         }
         count = await scope.deleteAll();
       }

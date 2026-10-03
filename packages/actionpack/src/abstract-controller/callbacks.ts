@@ -1,9 +1,9 @@
 import {
   extractOptionsBang,
-  defineCallbacks as asDefineCallbacks,
-  setCallback as asSetCallback,
-  skipCallback as asSkipCallback,
-  runCallbacks as asRunCallbacks,
+  type Callbacks as ASCallbacks,
+  type Extended,
+  type FilterListEntry,
+  type Included,
   type CallbackKind,
   type CallbackCondition,
   type CallbackOptions as ASCallbackOptions,
@@ -45,7 +45,7 @@ type CallbackOptionsWithFilters = CallbackOptions & {
 };
 
 /** @internal */
-export const PROCESS_ACTION_CHAIN = "processAction";
+export const PROCESS_ACTION_CHAIN = "process_action";
 
 /** @internal */
 export class ActionFilter implements CallbackPredicateLike {
@@ -160,8 +160,8 @@ function _toConditionFns(pred: CallbackOptions["if"]): CallbackCondition[] | und
 }
 
 /** @internal */
-export function _defineActionCallbacks(prototype: object): void {
-  asDefineCallbacks(prototype, PROCESS_ACTION_CHAIN, {
+export function _defineActionCallbacks(klass: ActionCallbackHost): void {
+  klass.defineCallbacks(PROCESS_ACTION_CHAIN, {
     terminator: async (controller, resultLambda) => {
       await resultLambda();
       return (controller as AbstractController).performed;
@@ -172,7 +172,7 @@ export function _defineActionCallbacks(prototype: object): void {
 
 /** @internal */
 export function _registerActionCallback(
-  prototype: object,
+  klass: ActionCallbackHost,
   kind: CallbackKind,
   callback: CallbackFilter,
   options: CallbackOptions,
@@ -184,18 +184,12 @@ export function _registerActionCallback(
   if (ifFns) asOpts.if = ifFns;
   if (unlessFns) asOpts.unless = unlessFns;
   const filter = typeof callback === "string" ? `:${callback}` : callback;
-  asSetCallback(
-    prototype,
-    PROCESS_ACTION_CHAIN,
-    kind,
-    filter as unknown as Parameters<typeof asSetCallback>[2],
-    asOpts,
-  );
+  klass.setCallback(PROCESS_ACTION_CHAIN, kind, filter as FilterListEntry, asOpts);
 }
 
 /** @internal */
 export function _skipActionCallback(
-  prototype: object,
+  klass: ActionCallbackHost,
   kind: CallbackKind,
   filter: ActionCallback | AroundCallback | string,
   options: CallbackOptions,
@@ -207,18 +201,13 @@ export function _skipActionCallback(
   if (unlessFns) asOpts.unless = unlessFns;
   if (options.raise !== undefined) asOpts.raise = options.raise;
   const name = typeof filter === "string" ? `:${filter}` : filter;
-  asSkipCallback(
-    prototype,
-    PROCESS_ACTION_CHAIN,
-    kind,
-    name as unknown as Parameters<typeof asSkipCallback>[2],
-    asOpts,
-  );
+  klass.skipCallback(PROCESS_ACTION_CHAIN, kind, name as FilterListEntry, asOpts);
 }
 
-export interface ActionCallbackHost {
-  readonly prototype: object;
-}
+export type ActionCallbackHost = Pick<
+  Extended<typeof ASCallbacks.ClassMethods>,
+  "defineCallbacks" | "setCallback" | "skipCallback"
+>;
 
 type ActionCallbackArgs<T> = Array<T | string | CallbackOptions>;
 
@@ -227,7 +216,7 @@ export function beforeAction(
   ...names: ActionCallbackArgs<ActionCallback>
 ): void {
   _insertCallbacks(names, null, (name, options) => {
-    _registerActionCallback(this.prototype, "before", name, options);
+    _registerActionCallback(this, "before", name, options);
   });
 }
 
@@ -236,7 +225,7 @@ export function prependBeforeAction(
   ...names: ActionCallbackArgs<ActionCallback>
 ): void {
   _insertCallbacks(names, null, (name, options) => {
-    _registerActionCallback(this.prototype, "before", name, { ...options, prepend: true });
+    _registerActionCallback(this, "before", name, { ...options, prepend: true });
   });
 }
 
@@ -245,7 +234,7 @@ export function afterAction(
   ...names: ActionCallbackArgs<ActionCallback>
 ): void {
   _insertCallbacks(names, null, (name, options) => {
-    _registerActionCallback(this.prototype, "after", name, options);
+    _registerActionCallback(this, "after", name, options);
   });
 }
 
@@ -254,7 +243,7 @@ export function prependAfterAction(
   ...names: ActionCallbackArgs<ActionCallback>
 ): void {
   _insertCallbacks(names, null, (name, options) => {
-    _registerActionCallback(this.prototype, "after", name, { ...options, prepend: true });
+    _registerActionCallback(this, "after", name, { ...options, prepend: true });
   });
 }
 
@@ -263,7 +252,7 @@ export function aroundAction(
   ...names: ActionCallbackArgs<AroundCallback>
 ): void {
   _insertCallbacks(names, null, (name, options) => {
-    _registerActionCallback(this.prototype, "around", name, options);
+    _registerActionCallback(this, "around", name, options);
   });
 }
 
@@ -272,7 +261,7 @@ export function prependAroundAction(
   ...names: ActionCallbackArgs<AroundCallback>
 ): void {
   _insertCallbacks(names, null, (name, options) => {
-    _registerActionCallback(this.prototype, "around", name, { ...options, prepend: true });
+    _registerActionCallback(this, "around", name, { ...options, prepend: true });
   });
 }
 
@@ -281,7 +270,7 @@ export function skipBeforeAction(
   ...names: ActionCallbackArgs<ActionCallback>
 ): void {
   _insertCallbacks(names, null, (name, options) => {
-    _skipActionCallback(this.prototype, "before", name, options);
+    _skipActionCallback(this, "before", name, options);
   });
 }
 
@@ -290,7 +279,7 @@ export function skipAfterAction(
   ...names: ActionCallbackArgs<ActionCallback>
 ): void {
   _insertCallbacks(names, null, (name, options) => {
-    _skipActionCallback(this.prototype, "after", name, options);
+    _skipActionCallback(this, "after", name, options);
   });
 }
 
@@ -299,7 +288,7 @@ export function skipAroundAction(
   ...names: ActionCallbackArgs<AroundCallback>
 ): void {
   _insertCallbacks(names, null, (name, options) => {
-    _skipActionCallback(this.prototype, "around", name, options);
+    _skipActionCallback(this, "around", name, options);
   });
 }
 
@@ -309,5 +298,8 @@ export async function processAction(
   _action: string,
   dispatch: () => Promise<void>,
 ): Promise<void> {
-  await asRunCallbacks(controller, PROCESS_ACTION_CHAIN, dispatch);
+  await (controller as AbstractController & Included<typeof ASCallbacks>).runCallbacks(
+    "process_action",
+    () => dispatch(),
+  );
 }

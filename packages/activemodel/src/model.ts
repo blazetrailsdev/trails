@@ -3,7 +3,6 @@ import { ValidationContext, ClassMethods as ValidationsClassMethods } from "./va
 import { HelperMethods } from "./validations/helper-methods.js";
 import {
   Callbacks as ASCallbacks,
-  runCallbacks,
   include,
   runLoadHooks,
   ToJsonWithActiveSupportEncoder,
@@ -143,7 +142,7 @@ export class Model {
 
     const callbackSuppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
     if (callbackSuppressor._suppressInitializeCallback !== true) {
-      void runCallbacks(this, "initialize", undefined, { strict: "sync" });
+      void this.runCallbacks("initialize", undefined, { strict: "sync" });
     }
   }
 

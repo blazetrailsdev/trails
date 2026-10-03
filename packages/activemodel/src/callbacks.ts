@@ -9,14 +9,15 @@ import {
   type CallbackOptions,
   type FilterListEntry,
   type DefineCallbacksOptions,
-  defineCallbacks,
-  setCallback,
   Callbacks as ASCallbacks,
   include,
   extended,
+  type Extended,
 } from "@blazetrails/activesupport";
 
 type AnyClass = new (...args: never[]) => object;
+
+type CallbacksClass = Extended<typeof ASCallbacks.ClassMethods>;
 
 export class Callbacks {
   static [extended](base: AnyClass): void {
@@ -52,10 +53,8 @@ export function defineModelCallbacks(this: object, ...args: unknown[]): void {
   const types = kernelArray(options.only);
   delete options.only;
 
-  const klass = this as { prototype?: object };
-
   for (const callback of callbacks as string[]) {
-    if (klass.prototype) defineCallbacks(klass.prototype, callback, options);
+    (this as CallbacksClass).defineCallbacks(callback, options);
 
     for (const type of types) {
       rbFSend(this, `_${camelize(`define_${type}_model_callback`, false)}`, this, callback);
@@ -106,10 +105,10 @@ export interface TransactionalCallbackConditions<
 /** @internal */
 export function _defineBeforeModelCallback(klass: CallbackHost, callback: string): void {
   Object.defineProperty(klass, `before${callback.charAt(0).toUpperCase()}${callback.slice(1)}`, {
-    value: function (this: { prototype: object }, ...args: FilterListEntry[]) {
+    value: function (this: CallbacksClass, ...args: FilterListEntry[]) {
       const options: CallbackOptions & CallbackConditions = { ...extractOptionsBang(args) };
       assertValidKeys(options as Record<string, unknown>, ["if", "unless", "prepend"]);
-      setCallback(this.prototype, callback, "before", ...args, options);
+      this.setCallback(callback, "before", ...args, options);
     },
     writable: true,
     configurable: true,
@@ -121,10 +120,10 @@ type CallbackHost = object;
 /** @internal */
 export function _defineAroundModelCallback(klass: CallbackHost, callback: string): void {
   Object.defineProperty(klass, `around${callback.charAt(0).toUpperCase()}${callback.slice(1)}`, {
-    value: function (this: { prototype: object }, ...args: FilterListEntry[]) {
+    value: function (this: CallbacksClass, ...args: FilterListEntry[]) {
       const options: CallbackOptions & CallbackConditions = { ...extractOptionsBang(args) };
       assertValidKeys(options as Record<string, unknown>, ["if", "unless", "prepend"]);
-      setCallback(this.prototype, callback, "around", ...args, options);
+      this.setCallback(callback, "around", ...args, options);
     },
     writable: true,
     configurable: true,
@@ -134,13 +133,13 @@ export function _defineAroundModelCallback(klass: CallbackHost, callback: string
 /** @internal */
 export function _defineAfterModelCallback(klass: CallbackHost, callback: string): void {
   Object.defineProperty(klass, `after${callback.charAt(0).toUpperCase()}${callback.slice(1)}`, {
-    value: function (this: { prototype: object }, ...args: FilterListEntry[]) {
+    value: function (this: CallbacksClass, ...args: FilterListEntry[]) {
       const options: CallbackOptions & CallbackConditions = { ...extractOptionsBang(args) };
       assertValidKeys(options as Record<string, unknown>, ["if", "unless", "prepend"]);
       options.prepend = true;
       const conditional = new Value((v) => v !== false);
       options.if = [...kernelArray(options.if), conditional];
-      setCallback(this.prototype, callback, "after", ...args, options);
+      this.setCallback(callback, "after", ...args, options);
     },
     writable: true,
     configurable: true,

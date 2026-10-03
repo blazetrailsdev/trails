@@ -1,27 +1,31 @@
 import {
-  CallbacksMixin,
+  Callbacks as ASCallbacks,
+  include,
   type BeforeCallback,
   type AfterCallback,
+  type Extended,
+  type Included,
 } from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 
-class CallbacksBase extends CallbacksMixin() {}
-CallbacksBase.defineCallbacks("call");
+export class Callbacks {
+  declare static defineCallbacks: Extended<typeof ASCallbacks.ClassMethods>["defineCallbacks"];
+  declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
+  declare static resetCallbacks: Extended<typeof ASCallbacks.ClassMethods>["resetCallbacks"];
+  declare runCallbacks: Included<typeof ASCallbacks>["runCallbacks"];
 
-export class Callbacks extends CallbacksBase {
   private app: RackApp;
 
   constructor(app: RackApp) {
-    super();
     this.app = app;
   }
 
   static before(args: BeforeCallback): void {
-    this.beforeCallback("call", args);
+    this.setCallback("call", "before", args);
   }
 
   static after(args: AfterCallback): void {
-    this.afterCallback("call", args);
+    this.setCallback("call", "after", args);
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
@@ -38,3 +42,7 @@ export class Callbacks extends CallbacksBase {
     return result!;
   }
 }
+
+include(Callbacks, ASCallbacks);
+
+Callbacks.defineCallbacks("call");

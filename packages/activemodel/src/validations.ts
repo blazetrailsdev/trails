@@ -1,6 +1,5 @@
 import {
   classAttribute,
-  defineCallbacks,
   extend,
   extractOptionsBang,
   include,
@@ -90,7 +89,9 @@ export class Validations {
     extend(base, Translation);
     extend(base, HelperMethods);
     include(base, HelperMethods);
-    defineCallbacks(base.prototype, "validate", { scope: ["name"] });
+    (base as IncludingClass & ValidationsClassHost).defineCallbacks("validate", {
+      scope: ["name"],
+    });
     classAttribute.call(base, "_validators", { instanceWriter: false, default: new Map() });
   }
 
@@ -198,6 +199,7 @@ export interface ValidationsClassHost {
     ...filterList: Array<string | ((record: object) => unknown) | CallbackConditions>
   ): void;
   resetCallbacks(name: string): void;
+  defineCallbacks(name: string, options?: { scope?: string[] }): void;
   /** @internal */
   predicateForValidationContext(
     context: string | string[],
