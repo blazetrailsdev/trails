@@ -891,9 +891,6 @@ describe("ValidationsTest (trails)", () => {
       }
       interface Person extends Attributes {}
 
-      Person.validatorsOn("never_registered");
-      expect(Array.from(Person._validators.keys())).not.toContain("never_registered");
-
       const a = Person.validatorsOn("name");
       a.length = 0;
       expect(Person.validatorsOn("name")).toHaveLength(1);

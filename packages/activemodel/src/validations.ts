@@ -11,7 +11,6 @@ import {
 import {
   block as rbBlock,
   dup as hashDup,
-  fetch,
   Hash,
   Module,
   rbBlockGivenP,
@@ -298,13 +297,16 @@ export const ClassMethods = {
 
   clearValidatorsBang(this: ValidationsClassHost): void {
     this.resetCallbacks("validate");
-    const dup = hashDup(this._validators);
-    dup.clear();
-    this._validators = dup;
+    if (!Object.prototype.hasOwnProperty.call(this, "__class_attr__validators")) {
+      const dup = hashDup(this._validators);
+      dup.forEach((v, k) => dup.set(k, [...v]));
+      this._validators = dup;
+    }
+    this._validators.clear();
   },
 
   validatorsOn(this: ValidationsClassHost, ...attributes: string[]): ValidatorLike[] {
-    return attributes.flatMap((attribute) => fetch(this._validators, attribute, []));
+    return attributes.flatMap((attribute) => this._validators.get(attribute)!);
   },
 
   /** @internal */

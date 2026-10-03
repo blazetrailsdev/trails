@@ -425,13 +425,39 @@ export const ClassMethods = {
     const reader =
       this.attributeAliases[name] === targetName &&
       rbObjRespondTo(this, "defineMethodAttribute", true);
-    let shape: "reader" | "getter" | "method" = "method";
-    if (reader) shape = "reader";
-    else if (parameters === false) shape = "getter";
-    mangledName = `${mangledName}${{ reader: "__reader", getter: "__getter", method: "" }[shape]}`;
+    type Body = (self: ReadWriteHost, args: unknown[]) => unknown;
+    let descriptor: (body: Body) => PropertyDescriptor;
+    if (reader) {
+      mangledName = `${mangledName}__reader`;
+      descriptor = (body) => ({
+        get(this: ReadWriteHost) {
+          return body(this, []);
+        },
+        set(this: ReadWriteHost, value: unknown) {
+          rbFSend(this, `${targetName}=`, value);
+        },
+        configurable: true,
+      });
+    } else if (parameters === false) {
+      mangledName = `${mangledName}__getter`;
+      descriptor = (body) => ({
+        get(this: ReadWriteHost) {
+          return body(this, []);
+        },
+        configurable: true,
+      });
+    } else {
+      descriptor = (body) => ({
+        value: function (this: ReadWriteHost, ...args: unknown[]) {
+          return body(this, args);
+        },
+        writable: true,
+        configurable: true,
+      });
+    }
 
     codeGenerator.defineCachedMethod(mangledName, { namespace, as }, (batch) => {
-      let body: (self: ReadWriteHost, args: unknown[]) => unknown;
+      let body: Body;
       if (CALL_COMPILABLE_REGEXP.test(targetName)) {
         body = (self, args) => rbFSend(self, targetName, ...callArgs, ...args);
       } else {
@@ -439,27 +465,8 @@ export const ClassMethods = {
         body = (self, args) => rbFSend(self, ...(callArgs as [string, ...string[]]), ...args);
       }
 
-      const get = function (this: ReadWriteHost) {
-        return body(this, []);
-      };
-      const descriptor: PropertyDescriptor = {
-        reader: {
-          get,
-          set(this: ReadWriteHost, value: unknown) {
-            rbFSend(this, `${targetName}=`, value);
-          },
-        },
-        getter: { get },
-        method: {
-          value: function (this: ReadWriteHost, ...args: unknown[]) {
-            return body(this, args);
-          },
-          writable: true,
-        },
-      }[shape];
-
       batch.push((mod) => {
-        Object.defineProperty(mod, mangledName, { ...descriptor, configurable: true });
+        Object.defineProperty(mod, mangledName, descriptor(body));
       });
     });
   },

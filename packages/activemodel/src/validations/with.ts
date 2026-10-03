@@ -60,17 +60,20 @@ export const ClassMethods = {
     for (const klass of args as ValidatorClass[]) {
       const validator = new klass({ ...options }, block);
 
-      const _validators = hashDup(this._validators);
+      if (!Object.prototype.hasOwnProperty.call(this, "__class_attr__validators")) {
+        const dup = hashDup(this._validators);
+        dup.forEach((v, k) => dup.set(k, [...v]));
+        this._validators = dup;
+      }
+
       const attributes = (validator as { attributes?: readonly string[] }).attributes;
       if (Array.isArray(attributes) && attributes.length > 0) {
         for (const attribute of attributes) {
-          const key = String(attribute);
-          _validators.set(key, [..._validators.get(key)!, validator]);
+          this._validators.get(String(attribute))!.push(validator);
         }
       } else {
-        _validators.set(null, [..._validators.get(null)!, validator]);
+        this._validators.get(null)!.push(validator);
       }
-      this._validators = _validators;
 
       this.validate(validator, options);
     }
