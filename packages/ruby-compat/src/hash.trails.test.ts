@@ -139,12 +139,23 @@ describe("Hash#[] and Hash#[]= on a non-Hash receiver", () => {
   });
 
   it("sends each_value, transform_values and except to the receiver", () => {
-    const store = new Store() as unknown as Record<string, unknown>;
+    const store = new Store();
     const yielded: unknown[] = [];
     eachValue(store, (value) => yielded.push(value));
     expect(yielded).toEqual(["each"]);
     expect(transformValues(store, (value) => `${String(value)}!`)).toEqual({ a: "value!" });
     expect(except(store, "x", "y")).toEqual({ excepted: ["x", "y"] });
+  });
+
+  it("lets a receiver's get read its own plain store through hashAref", () => {
+    class Wrapper {
+      store: Record<string, unknown> = { get: "data" };
+      get(key: string): unknown {
+        return hashAref(this.store, key);
+      }
+    }
+    expect(hashAref(new Wrapper(), "get")).toBe("data");
+    expect(hashAref(new Wrapper(), "missing")).toBeNull();
   });
 
   it("reads a plain hash's own get and set keys as data", () => {

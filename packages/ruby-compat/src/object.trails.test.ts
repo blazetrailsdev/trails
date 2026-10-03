@@ -359,10 +359,11 @@ describe("rbFSend", () => {
         this.log.push([name, opts]);
         return name;
       }
-      _tableName: string | undefined;
-      _setTableName(value: string): void {
-        this._tableName = value;
+      name: string | undefined;
+      setFirstName(value: string): void {
+        this.name = value;
       }
+      _setReflections(): void {}
     }
     expect(rbObjRespondTo(Host, "defineMethodAttribute=", true)).toBe(true);
     expect(rbObjRespondTo(Host, "defineMethodMissing=", true)).toBe(false);
@@ -370,9 +371,10 @@ describe("rbFSend", () => {
     expect(Host.log).toEqual([["title", { as: "title" }]]);
 
     const host = new Host();
-    expect(rbObjRespondTo(host, "_tableName=")).toBe(true);
-    rbFSend(host, "_tableName=", "posts");
-    expect(host._tableName).toBe("posts");
+    expect(rbObjRespondTo(host, "firstName=")).toBe(true);
+    rbFSend(host, "first_name=", "David");
+    expect(host.name).toBe("David");
+    expect(rbObjRespondTo(host, "_reflections=")).toBe(false);
   });
 
   it("calls a method, a getter, or reads a field by name", () => {

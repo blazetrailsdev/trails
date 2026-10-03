@@ -26,7 +26,7 @@ export class AttributeSet {
   protected _attributes: Attributes;
 
   eachValue(fn: (attr: Attribute) => void): void {
-    eachValue(this.attributes() as Record<string, Attribute>, fn);
+    eachValue(this.attributes(), fn);
   }
 
   fetch<T = Attribute>(name: string, defaultOrBlock?: T | ((name: string) => T)): Attribute | T {
@@ -38,7 +38,7 @@ export class AttributeSet {
   }
 
   except(...names: string[]): Record<string, Attribute> {
-    return except(this.attributes() as Record<string, Attribute>, ...names);
+    return except(this.attributes(), ...names);
   }
 
   constructor(attributes: Attributes = {}) {
@@ -57,7 +57,7 @@ export class AttributeSet {
   }
 
   castTypes(): Record<string, ValueType | null> {
-    return transformValues(this.attributes() as Record<string, Attribute>, (attr) => attr.type);
+    return transformValues(this.attributes(), (attr) => attr.type);
   }
 
   valuesBeforeTypeCast(): Record<string, unknown> {
@@ -115,9 +115,7 @@ export class AttributeSet {
   }
 
   deepDup(): AttributeSet {
-    return new AttributeSet(
-      transformValues(this.attributes() as Record<string, Attribute>, (attr) => deepDup(attr)),
-    );
+    return new AttributeSet(transformValues(this.attributes(), (attr) => deepDup(attr)));
   }
 
   initializeDup(_: AttributeSet): void {
@@ -141,17 +139,12 @@ export class AttributeSet {
   }
 
   map(fn: (attr: Attribute) => Attribute): AttributeSet {
-    const newAttributes = transformValues(this.attributes() as Record<string, Attribute>, fn);
+    const newAttributes = transformValues(this.attributes(), fn);
     return new AttributeSet(newAttributes);
   }
 
   reverseMergeBang(targetAttributes: AttributeSet): this {
-    return (
-      reverseMergeBang(
-        this.attributes() as Record<string, Attribute>,
-        targetAttributes.attributes() as Record<string, Attribute>,
-      ) && this
-    );
+    return reverseMergeBang(this.attributes(), targetAttributes.attributes()) && this;
   }
 
   equals(other: unknown): boolean {

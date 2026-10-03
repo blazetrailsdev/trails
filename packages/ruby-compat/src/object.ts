@@ -347,7 +347,9 @@ function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unk
  *
  * A writer `name=` is answered by a JS accessor's setter or by a `setName`
  * method, the conventions table's two writer spellings and the entries
- * {@link rbFSend} dispatches it to.
+ * {@link rbFSend} dispatches it to. An underscore-prefixed writer
+ * (`_reflections=`) is a `class_attribute` storage slot and has no `set*`
+ * spelling.
  *
  * `method_boundp` (`vm_method.c:1788-1818`) answers `0` for a PRIVATE entry,
  * and under `BOUND_RESPONDS` a PROTECTED one, when `pub` is set. A JS entry
@@ -430,7 +432,8 @@ export function objRespondToMissing(_obj: unknown, _mid: string, _priv: boolean)
 }
 
 function writerSpelling(attr: string | undefined): string | undefined {
-  return attr?.replace(/^(_*)(.)/, (_, u: string, c: string) => `${u}set${c.toUpperCase()}`);
+  if (attr === undefined || attr.startsWith("_")) return undefined;
+  return `set_${attr}`.replace(/_([a-zA-Z\d])/g, (_, c: string) => c.toUpperCase());
 }
 
 function checkDefinitionVisibility(mod: { prototype: object }, mid: string): boolean {

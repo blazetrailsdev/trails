@@ -9,6 +9,7 @@ import {
   hasKey,
   include,
   rbFPublicSend,
+  rbFSend,
   rbObjRespondTo,
   stringSplit,
   type Generic,
@@ -108,9 +109,8 @@ export class IntegrationTest extends TestCase {
         );
       }
 
-      const app = this.app as { routes?: RouteSet } | null;
-      if (rbObjRespondTo(app, "routes")) {
-        reverseMergeBang(urlOptions, app!.routes!.defaultUrlOptions);
+      if (rbObjRespondTo(this.app, "routes")) {
+        reverseMergeBang(urlOptions, (rbFSend(this.app, "routes") as RouteSet).defaultUrlOptions);
       }
 
       reverseMergeBang(urlOptions, {

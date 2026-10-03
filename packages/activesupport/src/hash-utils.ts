@@ -339,8 +339,8 @@ export function transformKeysBang(
   return hash;
 }
 
-export function reverseMerge<T extends AnyObject>(obj: T, otherHash: AnyObject): T {
-  if (otherHash != null && !(otherHash instanceof Map) && !isPlainObject(otherHash)) {
+export function reverseMerge<T extends object>(obj: T, otherHash: object): T {
+  if (!(otherHash instanceof Map) && !isPlainObject(otherHash)) {
     return rbFSend(otherHash, "merge", obj) as T;
   }
   return { ...otherHash, ...obj } as T;
@@ -348,8 +348,8 @@ export function reverseMerge<T extends AnyObject>(obj: T, otherHash: AnyObject):
 
 export const withDefaults = reverseMerge;
 
-export function reverseMergeBang<T extends AnyObject>(hash: T, otherHash: AnyObject): T {
-  if (hash != null && !(hash instanceof Map) && !isPlainObject(hash)) {
+export function reverseMergeBang<T extends object>(hash: T, otherHash: object): T {
+  if (!(hash instanceof Map) && !isPlainObject(hash)) {
     return rbFSend(hash, "reverseMergeBang", otherHash) as T;
   }
   const merged = reverseMerge(hash, otherHash);
