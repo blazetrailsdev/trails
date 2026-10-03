@@ -719,6 +719,9 @@ export function arelTable(this: CoreHost): Table {
 }
 
 /** @internal */
+export const _allocation: { klass: unknown } = { klass: null };
+
+/** @internal */
 export function initInternals(
   this: CoreRecord & {
     _attributes: import("@blazetrails/activemodel").AttributeSet;
@@ -735,7 +738,9 @@ export function initInternals(
   },
   super_: () => void,
 ): void {
-  if (this._attributes == null && !(this.constructor as { _allocating?: boolean })._allocating) {
+  const allocating = _allocation.klass === this.constructor;
+  if (allocating) _allocation.klass = null;
+  if (this._attributes == null && !allocating) {
     this._newRecord = true;
     this._attributes = (
       this.constructor as unknown as {
