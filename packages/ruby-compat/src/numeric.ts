@@ -338,7 +338,12 @@ function rbDblComplexNewPolarPi(abs: number, ang: number): unknown {
 
 /** `rb_rational_pow` (`vendor/ruby/v3.3.11/rational.c:980`). */
 function rbRationalPow(self: Rational, other: unknown): unknown {
-  if (rbIntegerTypeP(other) && BigInt(other) === 0n) return new Rational(1, 1);
+  if (
+    (rbIntegerTypeP(other) && BigInt(other) === 0n) ||
+    (other instanceof Rational && other.numerator === 0n)
+  ) {
+    return new Rational(1, 1);
+  }
 
   if (other instanceof Rational) {
     if (other.denominator === 1n) other = rbBigNorm(other.numerator);
