@@ -12,36 +12,6 @@ export type MigrationBlock = (...args: any[]) => unknown;
 
 export type MigrationCommand = [string, unknown[], MigrationBlock?];
 
-const StraightReversions = new Module((mod) => {
-  for (const [cmd, inv] of Object.entries({
-    executeBlock: "executeBlock",
-    createTable: "dropTable",
-    createJoinTable: "dropJoinTable",
-    addColumn: "removeColumn",
-    addIndex: "removeIndex",
-    addTimestamps: "removeTimestamps",
-    addReference: "removeReference",
-    addForeignKey: "removeForeignKey",
-    addCheckConstraint: "removeCheckConstraint",
-    addExclusionConstraint: "removeExclusionConstraint",
-    addUniqueConstraint: "removeUniqueConstraint",
-    enableExtension: "disableExtension",
-    createEnum: "dropEnum",
-    createSchema: "dropSchema",
-    createVirtualTable: "dropVirtualTable",
-  })) {
-    for (const [method, inverse] of uniq([
-      [inv, cmd],
-      [cmd, inv],
-    ])) {
-      mod.defineMethod(
-        `invert${method.charAt(0).toUpperCase()}${method.slice(1)}`,
-        (args: unknown[], block?: MigrationBlock): MigrationCommand => [inverse, args, block],
-      );
-    }
-  }
-});
-
 export class CommandRecorder {
   private _commands: MigrationCommand[] = [];
   private _delegate: unknown;
@@ -176,6 +146,40 @@ export class CommandRecorder {
     }
   }
 
+  private static StraightReversions = new Module((mod) => {
+    for (const [cmd, inv] of Object.entries({
+      executeBlock: "executeBlock",
+      createTable: "dropTable",
+      createJoinTable: "dropJoinTable",
+      addColumn: "removeColumn",
+      addIndex: "removeIndex",
+      addTimestamps: "removeTimestamps",
+      addReference: "removeReference",
+      addForeignKey: "removeForeignKey",
+      addCheckConstraint: "removeCheckConstraint",
+      addExclusionConstraint: "removeExclusionConstraint",
+      addUniqueConstraint: "removeUniqueConstraint",
+      enableExtension: "disableExtension",
+      createEnum: "dropEnum",
+      createSchema: "dropSchema",
+      createVirtualTable: "dropVirtualTable",
+    })) {
+      for (const [method, inverse] of uniq([
+        [inv, cmd],
+        [cmd, inv],
+      ])) {
+        mod.defineMethod(
+          `invert${method.charAt(0).toUpperCase()}${method.slice(1)}`,
+          (args: unknown[], block?: MigrationBlock): MigrationCommand => [inverse, args, block],
+        );
+      }
+    }
+  });
+
+  static {
+    include(this, this.StraightReversions);
+  }
+
   /**
    * @internal
    * @missingRailsCall delete — PERMANENT
@@ -185,7 +189,11 @@ export class CommandRecorder {
     if (isPlainObject(last)) {
       delete (last as Record<string, unknown>)["ifNotExists"];
     }
-    return StraightReversions.instanceMethod("invertCreateTable")!.value.call(this, args, block);
+    return CommandRecorder.StraightReversions.instanceMethod("invertCreateTable")!.value.call(
+      this,
+      args,
+      block,
+    );
   }
 
   /** @internal */
@@ -207,7 +215,11 @@ export class CommandRecorder {
 
     if (Object.keys(options).length > 0) args = [...args, options];
 
-    return StraightReversions.instanceMethod("invertDropTable")!.value.call(this, args, block);
+    return CommandRecorder.StraightReversions.instanceMethod("invertDropTable")!.value.call(
+      this,
+      args,
+      block,
+    );
   }
 
   /** @internal */
@@ -217,7 +229,11 @@ export class CommandRecorder {
         "remove_column is only reversible if given a type.",
       );
     }
-    return StraightReversions.instanceMethod("invertRemoveColumn")!.value.call(this, args, block);
+    return CommandRecorder.StraightReversions.instanceMethod("invertRemoveColumn")!.value.call(
+      this,
+      args,
+      block,
+    );
   }
 
   /** @internal */
@@ -251,12 +267,16 @@ export class CommandRecorder {
 
   /** @internal */
   invertAddBelongsTo(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return StraightReversions.instanceMethod("invertAddReference")!.value.call(this, args, block);
+    return CommandRecorder.StraightReversions.instanceMethod("invertAddReference")!.value.call(
+      this,
+      args,
+      block,
+    );
   }
 
   /** @internal */
   invertRemoveBelongsTo(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return StraightReversions.instanceMethod("invertRemoveReference")!.value.call(
+    return CommandRecorder.StraightReversions.instanceMethod("invertRemoveReference")!.value.call(
       this,
       args,
       block,
@@ -274,7 +294,11 @@ export class CommandRecorder {
       delete opts["validate"];
       a[a.length - 1] = opts;
     }
-    return StraightReversions.instanceMethod("invertAddForeignKey")!.value.call(this, a, block);
+    return CommandRecorder.StraightReversions.instanceMethod("invertAddForeignKey")!.value.call(
+      this,
+      a,
+      block,
+    );
   }
 
   /** @internal */
@@ -312,11 +336,9 @@ export class CommandRecorder {
       }
       a[a.length - 1] = opts;
     }
-    return StraightReversions.instanceMethod("invertAddCheckConstraint")!.value.call(
-      this,
-      a,
-      block,
-    );
+    return CommandRecorder.StraightReversions.instanceMethod(
+      "invertAddCheckConstraint",
+    )!.value.call(this, a, block);
   }
 
   /** @internal */
@@ -335,11 +357,9 @@ export class CommandRecorder {
       }
       a[a.length - 1] = opts;
     }
-    return StraightReversions.instanceMethod("invertRemoveCheckConstraint")!.value.call(
-      this,
-      a,
-      block,
-    );
+    return CommandRecorder.StraightReversions.instanceMethod(
+      "invertRemoveCheckConstraint",
+    )!.value.call(this, a, block);
   }
 
   /** @internal */
@@ -349,11 +369,9 @@ export class CommandRecorder {
         "remove_exclusion_constraint is only reversible if given an expression.",
       );
     }
-    return StraightReversions.instanceMethod("invertRemoveExclusionConstraint")!.value.call(
-      this,
-      args,
-      block,
-    );
+    return CommandRecorder.StraightReversions.instanceMethod(
+      "invertRemoveExclusionConstraint",
+    )!.value.call(this, args, block);
   }
 
   /** @internal */
@@ -367,11 +385,9 @@ export class CommandRecorder {
         "add_unique_constraint is not reversible if given an using_index.",
       );
     }
-    return StraightReversions.instanceMethod("invertAddUniqueConstraint")!.value.call(
-      this,
-      args,
-      block,
-    );
+    return CommandRecorder.StraightReversions.instanceMethod(
+      "invertAddUniqueConstraint",
+    )!.value.call(this, args, block);
   }
 
   /** @internal */
@@ -391,11 +407,9 @@ export class CommandRecorder {
         "remove_unique_constraint is only reversible if given an column_name.",
       );
     }
-    return StraightReversions.instanceMethod("invertRemoveUniqueConstraint")!.value.call(
-      this,
-      args,
-      block,
-    );
+    return CommandRecorder.StraightReversions.instanceMethod(
+      "invertRemoveUniqueConstraint",
+    )!.value.call(this, args, block);
   }
 
   /** @internal */
@@ -532,7 +546,11 @@ export class CommandRecorder {
         "drop_enum is only reversible if given a list of enum values.",
       );
     }
-    return StraightReversions.instanceMethod("invertDropEnum")!.value.call(this, args, block);
+    return CommandRecorder.StraightReversions.instanceMethod("invertDropEnum")!.value.call(
+      this,
+      args,
+      block,
+    );
   }
 
   /** @internal */
@@ -582,7 +600,7 @@ export class CommandRecorder {
         "drop_virtual_table is only reversible if given options.",
       );
     }
-    return StraightReversions.instanceMethod("invertDropVirtualTable")!.value.call(
+    return CommandRecorder.StraightReversions.instanceMethod("invertDropVirtualTable")!.value.call(
       this,
       args,
       block,
@@ -599,8 +617,6 @@ export class CommandRecorder {
     return _joinTableName(table1, table2);
   }
 }
-
-include(CommandRecorder, StraightReversions);
 
 const REVERSIBLE_AND_IRREVERSIBLE_METHODS = [
   "createTable",

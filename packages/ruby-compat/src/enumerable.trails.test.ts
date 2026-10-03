@@ -67,4 +67,16 @@ describe("Enumerable", () => {
     include(Own, Enumerable);
     expect([...new Own([1])]).toEqual(["own"]);
   });
+
+  it("Symbol.iterator sits beneath the includer and above its superclass", () => {
+    class Parent extends Bag {
+      *[Symbol.iterator](): IterableIterator<unknown> {
+        yield "parent";
+      }
+    }
+    class Child extends Parent {}
+    include(Child, Enumerable);
+    expect([...new Child([1, 2])]).toEqual([1, 2]);
+    expect([...new Parent([1, 2])]).toEqual(["parent"]);
+  });
 });
