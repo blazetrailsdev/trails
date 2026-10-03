@@ -632,16 +632,24 @@ describe("body call capture", () => {
         "export function d(m: Map<object, unknown>, k: object) { m.set(k, class {}); }",
         "export function e(v: string) { throw new ArgumentError(`bad ${v} value`); }",
         "export function f(m: Map<string, number>, k: string) { return m.get(k); }",
+        "export function g(ary: unknown[]) { return ary[1]; }",
+        'export function h(o: Record<string, unknown>, k: string) { return [o["k"], o[k]]; }',
+        "export function i(s: string) { return [...s].length; }",
+        'export function j(o: unknown) { return typeof o === "object"; }',
       ].join("\n"),
     });
     const tokensOf = (n: string) =>
       fileFunctionsOf(info, "quoting.ts").find((fn) => fn.name === n)!.shapeTokens;
     expect(tokensOf("a")).toEqual(["recv:Promise"]);
-    expect(tokensOf("b")).toEqual(["[]"]);
+    expect(tokensOf("b")).toEqual(["[num:0]"]);
     expect(tokensOf("c")).toEqual(["?:", "op:!", "op:++"]);
     expect(tokensOf("d")).toEqual(["class"]);
     expect(tokensOf("e")).toEqual(["tpl:bad ${} value"]);
     expect(tokensOf("f")).toBeUndefined();
+    expect(tokensOf("g")).toEqual(["[num:1]"]);
+    expect(tokensOf("h")).toEqual(["[str:k]", "[]"]);
+    expect(tokensOf("i")).toEqual(["..."]);
+    expect(tokensOf("j")).toEqual(["op:typeof"]);
   });
 
   it("records the string message of a thrown construction, which callArgs drops", () => {
@@ -677,7 +685,7 @@ describe("body call capture", () => {
       [...cls.instanceMethods, ...cls.classMethods]
         .filter((m) => m.name === n)
         .map((m) => m.shapeTokens);
-    expect(tokensOf("constructor")).toEqual([["[]"]]);
+    expect(tokensOf("constructor")).toEqual([["[num:0]"]]);
     expect(tokensOf("first")).toContainEqual(["recv:Promise"]);
     expect(tokensOf("first=").concat(tokensOf("first"))).toContainEqual(["op:!"]);
     expect(tokensOf("build")).toEqual([["?:"]]);
