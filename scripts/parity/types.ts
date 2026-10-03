@@ -147,6 +147,11 @@ export interface MethodInfo {
    */
   callReceiverNames?: Record<string, string[]>;
   /**
+   * `module_eval` / `class_eval` sites given a String, whose calls Ripper never
+   * sees. See extract-ruby-api.rb#STRING_EVAL_CALLS.
+   */
+  stringEvalCalls?: string[];
+  /**
    * Both extractors (RFC 0025 `## Call-argument fidelity`): every syntactic
    * call site in the body, in source order, with its argument descriptors.
    * `calls` / `callSeq` carry names only, so a port that calls `where` with a

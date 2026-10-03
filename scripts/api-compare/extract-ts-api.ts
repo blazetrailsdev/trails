@@ -72,6 +72,7 @@ import {
 import { extractorSchemaToken } from "./extractor-schema.js";
 import { staleBuilds, staleBuildMessage } from "./build-freshness.js";
 import {
+  EVAL_CALLBACK_PREFIX,
   FOREIGN_READ_PREFIX,
   NATIVE_FORM_PREFIX,
   NEGATED_CALL_PREFIX,
@@ -4495,8 +4496,12 @@ function topLevelDeclaredNames(sourceFile: ts.SourceFile): Set<string> {
   const names = new Set<string>();
   for (const stmt of sourceFile.statements) {
     if (
-      (ts.isFunctionDeclaration(stmt) || ts.isClassDeclaration(stmt)) &&
-      stmt.name !== undefined
+      (ts.isFunctionDeclaration(stmt) ||
+        ts.isClassDeclaration(stmt) ||
+        ts.isEnumDeclaration(stmt) ||
+        ts.isModuleDeclaration(stmt)) &&
+      stmt.name !== undefined &&
+      ts.isIdentifier(stmt.name)
     ) {
       names.add(stmt.name.text);
     } else if (ts.isVariableStatement(stmt)) {
@@ -5760,7 +5765,14 @@ function collectCalls(
         skipHoistedClosures &&
         ts.isPropertyAccessExpression(callee) &&
         (callee.name.text === "moduleEval" || callee.name.text === "classEval");
-      if (!evalCallback) for (const block of blocks) visit(block);
+      const before = evalCallback ? new Set(names) : undefined;
+      for (const block of blocks) visit(block);
+      if (before !== undefined) {
+        for (const name of [...names].filter((c) => !before.has(c))) {
+          names.delete(name);
+          names.add(`${EVAL_CALLBACK_PREFIX}${name}`);
+        }
+      }
       addNegated(n, ...negated);
       addCallbackNegated(blocks, ...negated);
       return;

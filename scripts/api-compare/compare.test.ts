@@ -474,10 +474,18 @@ describe("significantMissingCalls", () => {
   it("significantCallsForReceivers drops Proc#call for a TS body that invokes the receiver", () => {
     const resolver = new Set(invokeForms(["tableNameResolver"]));
     expect(
-      significantCallsForReceivers({ call: ["self"] }, undefined, resolver, {
+      significantCallsForReceivers({ call: ["expr"] }, undefined, resolver, {
         call: ["table_name_resolver"],
       }).has("call"),
     ).toBe(false);
+    expect(
+      significantCallsForReceivers({ call: ["expr", "self"] }, undefined, resolver, {
+        call: ["table_name_resolver"],
+      }).has("call"),
+    ).toBe(true);
+    expect(
+      significantCallsForReceivers({ call: ["expr"] }, undefined, resolver, {}).has("call"),
+    ).toBe(true);
     expect(
       significantCallsForReceivers(
         { call: ["ivar"] },
@@ -492,7 +500,7 @@ describe("significantMissingCalls", () => {
 
   it("significantCallsForReceivers keeps Proc#call when the TS body drops the invocation", () => {
     expect(
-      significantCallsForReceivers({ call: ["self"] }, undefined, new Set(invokeForms(["other"])), {
+      significantCallsForReceivers({ call: ["expr"] }, undefined, new Set(invokeForms(["other"])), {
         call: ["table_name_resolver"],
       }).has("call"),
     ).toBe(true);
@@ -3768,6 +3776,38 @@ describe("reorderedCalls (RFC 0084 order-only call parity)", () => {
     expect(
       reorderedCalls("create", ["build", "save"], ["save", "build"], () => false, map, wide),
     ).toEqual([]);
+  });
+});
+
+describe("reorderedCalls — moduleEval / classEval callbacks", () => {
+  const tsSeq = ["moduleEval", "%scoping", "defineMethod", "scoping"];
+  const ruby = ["module_eval", "define_method", "scoping"];
+  const map = (rc: string) =>
+    ({ module_eval: ["moduleEval"], define_method: ["defineMethod"], scoping: ["scoping"] })[
+      rc as "scoping"
+    ] ?? null;
+  const significant = new Set(ruby);
+
+  it("drops the callback's positions against a String module_eval", () => {
+    expect(
+      reorderedCalls(
+        "generate_method",
+        ruby,
+        tsSeq,
+        () => true,
+        map,
+        significant,
+        ruby,
+        undefined,
+        true,
+      ),
+    ).toEqual([]);
+  });
+
+  it("positions the callback's calls against a block module_eval", () => {
+    expect(
+      reorderedCalls("generate_method", ruby, tsSeq, () => true, map, significant, ruby),
+    ).toEqual([`${ORDER_PREFIX}scoping,defineMethod → defineMethod,scoping`]);
   });
 });
 

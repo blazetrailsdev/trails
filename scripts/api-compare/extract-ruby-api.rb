@@ -2130,13 +2130,15 @@ class ApiExtractor
     mark_symbol_discriminated(entry[:params], body)
     entry[:takesBlock] = true if entry[:params].any? { |p| p[:kind] == "block" } || body_takes_block?(body)
     dep_info = detect_deps(body)
-    calls, weak_calls, call_receivers, call_receiver_names = collect_method_calls(body, params_node)
+    calls, weak_calls, call_receivers, call_receiver_names, string_eval_calls =
+      collect_method_calls(body, params_node)
     entry[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
     entry[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
     entry[:calls] = calls unless calls.empty?
     entry[:weakCalls] = weak_calls unless weak_calls.empty?
     entry[:callReceivers] = call_receivers unless call_receivers.empty?
     entry[:callReceiverNames] = call_receiver_names unless call_receiver_names.empty?
+    entry[:stringEvalCalls] = string_eval_calls unless string_eval_calls.empty?
     call_args = collect_call_args(body)
     entry[:callArgs] = call_args unless call_args.empty?
     skeleton = collect_method_skeleton(body)
@@ -2743,30 +2745,35 @@ class ApiExtractor
     weak = []
     receivers = {}
     receiver_names = {}
+    string_evals = []
     with_capture_locals do
       with_call_receivers(body_node, params_node) do
         walk_for_calls(body_node, calls, weak)
         calls = drop_raised_new(calls)
         receivers = call_receiver_kinds(calls.uniq)
         receiver_names = @call_receiver_names.transform_values { |names| names.to_a.sort }
+        string_evals = @string_eval_calls.to_a.sort
       end
     end
     total = calls.tally
     weak_calls = weak.tally.select { |name, n| total[name] == n }.keys
-    [calls.uniq, weak_calls, receivers, receiver_names]
+    [calls.uniq, weak_calls, receivers, receiver_names, string_evals]
   end
 
   def with_call_receivers(body_node, params_node)
     outer_receivers = @call_receivers
     outer_receiver_names = @call_receiver_names
+    outer_string_evals = @string_eval_calls
     outer_hash_locals = @hash_locals
     @call_receivers = {}
     @call_receiver_names = {}
+    @string_eval_calls = Set.new
     @hash_locals = hash_typed_locals(body_node, params_node)
     yield
   ensure
     @call_receivers = outer_receivers
     @call_receiver_names = outer_receiver_names
+    @string_eval_calls = outer_string_evals
     @hash_locals = outer_hash_locals
   end
 
@@ -2818,6 +2825,20 @@ class ApiExtractor
   # compare.ts's native-form credits: the `.length` read for `size` / `length`,
   # and the direct invocation of a Proc-valued receiver for `call`.
   RECEIVER_NAMED_CALLS = %w[size length call].freeze
+
+  # `module_eval` / `class_eval` given a String (`module_eval <<-RUBY … RUBY`,
+  # relation/delegation.rb:79-83): Ripper never parses the string, so the calls
+  # in it have no position in this body's stream. Recorded as `stringEvalCalls`
+  # for compare.ts#reorderedCalls; the block form is parsed like any block.
+  STRING_EVAL_CALLS = %w[module_eval class_eval].freeze
+
+  def string_literal_arg?(args)
+    return false unless args.is_a?(Array)
+    return true if %i[string_literal xstring_literal].include?(args[0])
+    return false if args[0].is_a?(Symbol) && !%i[arg_paren args_add_block args_add].include?(args[0])
+
+    args.any? { |child| child.is_a?(Array) && string_literal_arg?(child) }
+  end
 
   # The name a receiver ENDS in — a local or reader (`cursor`, `predicates`), the
   # method of a call chain (`result.columns` → `columns`,
@@ -3915,6 +3936,9 @@ class ApiExtractor
         (@call_receiver_names[name] ||= Set.new) << (receiver_tail_name(recv) || "?")
       end
       weak << name if (recv && inert_receiver?(recv)) || core_receiver_call?(name, recv)
+      if STRING_EVAL_CALLS.include?(name) && string_literal_arg?(args)
+        @string_eval_calls&.add(name)
+      end
     end
 
     lambdas.each { |lambda_node| walk_for_calls(lambda_node, calls, weak) }

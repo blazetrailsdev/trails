@@ -183,6 +183,16 @@ export const FOREIGN_READ_PREFIX = ".";
 export const NATIVE_FORM_PREFIX = "@";
 
 /**
+ * Prefix the TS extractor gives, in the ORDER stream only, to a call first made
+ * inside a `moduleEval` / `classEval` callback. Its Ruby counterpart is either a
+ * block, which Ripper walks in place, or a String (`module_eval <<-RUBY`,
+ * `activerecord/lib/active_record/relation/delegation.rb:79-83`), which it never
+ * parses; `reorderedCalls` (compare.ts) resolves the prefix against the Ruby
+ * body's `stringEvalCalls`.
+ */
+export const EVAL_CALLBACK_PREFIX = "%";
+
+/**
  * Ruby call → the {@link NATIVE_FORM_PREFIX}-marked TS form that is its whole
  * port, and the Ruby receivers it is admitted for. Read by
  * `significantCallsForReceivers` (compare.ts), which drops the Ruby call from
@@ -222,7 +232,10 @@ export const NATIVE_FORM_ANALOGUES = new Map<
   ["size", { form: "length", receivers: "explicit" }],
   ["length", { form: "length", receivers: "explicit" }],
   ["load", { form: "import", receivers: "implicit-self" }],
-  ["call", { form: "invoke", receivers: "explicit", uncreditedKinds: new Set(["const"]) }],
+  [
+    "call",
+    { form: "invoke", receivers: "explicit", uncreditedKinds: new Set(["const", "self", "array"]) },
+  ],
 ]);
 
 /**

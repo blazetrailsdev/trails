@@ -172,6 +172,7 @@ import {
 import {
   JS_ENUMERABLE_ALIASES,
   jsEnumerableAliases,
+  EVAL_CALLBACK_PREFIX,
   LENGTH_READ_UNCREDITED_RECEIVER_KINDS,
   NATIVE_FORM_ANALOGUES,
   NEGATED_ALIASES,
@@ -693,7 +694,9 @@ function hasNativeFormAnalogue(
   if (analogue.receivers === "implicit-self") return kinds === undefined;
   const uncredited = analogue.uncreditedKinds ?? LENGTH_READ_UNCREDITED_RECEIVER_KINDS;
   if (kinds === undefined || kinds.some((k) => uncredited.has(k))) return false;
-  return (receiverNames?.[value] ?? []).every((name) =>
+  const names = receiverNames?.[value] ?? [];
+  if (analogue.form === "invoke" && names.length === 0) return false;
+  return names.every((name) =>
     tsNativeForms.has(`${analogue.form}:${snakeToCamel(name.replace(/^@+/, ""))}`),
   );
 }
@@ -1005,6 +1008,11 @@ export const ORDER_PREFIX = "order:";
  * disambiguation above is about what the Ruby body NAMES, and a call the weak
  * filter drops (an inert receiver, `reflection.validate?`) still names a TS
  * spelling that another call would otherwise be credited with.
+ *
+ * `rubyStringEval` says the Ruby body hands `module_eval` / `class_eval` a
+ * String: the TS calls the extractor marked with {@link EVAL_CALLBACK_PREFIX}
+ * then have no Ruby position and are dropped; otherwise they are positioned
+ * where they were made, as the block form is.
  */
 export function reorderedCalls(
   rubyName: string,
@@ -1015,7 +1023,9 @@ export function reorderedCalls(
   significant: { has(value: string): boolean } = SIGNIFICANT_CALLS,
   bodyRubyCalls: readonly string[] = rubyCalls,
   aliasCall: (rubyCall: string) => string[] = jsEnumerableAliases,
+  rubyStringEval = false,
 ): string[] {
+  tsCalls = resolveEvalCallbackCalls(tsCalls, rubyStringEval);
   const unpositioned = new Set([
     ...ambiguousTsNames(bodyRubyCalls, mapCall),
     ...suppressedCallClaims(
@@ -1050,6 +1060,15 @@ export function reorderedCalls(
     }
   }
   return [];
+}
+
+function resolveEvalCallbackCalls(tsCalls: readonly string[], drop: boolean): string[] {
+  const resolved = new Set<string>();
+  for (const c of tsCalls) {
+    if (!c.startsWith(EVAL_CALLBACK_PREFIX)) resolved.add(c);
+    else if (!drop) resolved.add(c.slice(EVAL_CALLBACK_PREFIX.length));
+  }
+  return [...resolved];
 }
 
 /**
@@ -4833,6 +4852,7 @@ export function main() {
       // needs to tell `options.fetch` from `cache.fetch`.
       const rubyCallReceiversByName = new Map<string, Record<string, string[]>>();
       const rubyCallReceiverNamesByName = new Map<string, Record<string, string[]>>();
+      const rubyStringEvalCallsByName = new Map<string, string[]>();
       // First-sighting Ruby body digest per name (source-hash pinning, RFC 0025).
       const rubyBodyDigestByName = new Map<string, string>();
       const rubySkeletonByName = new Map<string, string[]>();
@@ -4849,6 +4869,7 @@ export function main() {
           weak: string[];
           receivers: Record<string, string[]>;
           receiverNames: Record<string, string[]>;
+          stringEvals: string[];
         }
       >();
       const rubyCallArgsByOwnerName = new Map<string, CallSite[]>();
@@ -4919,6 +4940,7 @@ export function main() {
             rubyWeakCallsByName.set(rm.name, rm.weakCalls ?? []);
             rubyCallReceiversByName.set(rm.name, rm.callReceivers ?? {});
             rubyCallReceiverNamesByName.set(rm.name, rm.callReceiverNames ?? {});
+            rubyStringEvalCallsByName.set(rm.name, rm.stringEvalCalls ?? []);
           }
           if (rm.calls && !rubyCallsByOwnerName.has(rubyBodyKey(item.fqn, rmLevel, rm.name))) {
             rubyCallsByOwnerName.set(rubyBodyKey(item.fqn, rmLevel, rm.name), {
@@ -4926,6 +4948,7 @@ export function main() {
               weak: rm.weakCalls ?? [],
               receivers: rm.callReceivers ?? {},
               receiverNames: rm.callReceiverNames ?? {},
+              stringEvals: rm.stringEvalCalls ?? [],
             });
           }
           if (
@@ -5130,6 +5153,7 @@ export function main() {
               weak: rubyWeakCallsByName.get(rubyName) ?? [],
               receivers: rubyCallReceiversByName.get(rubyName) ?? {},
               receiverNames: rubyCallReceiverNamesByName.get(rubyName) ?? {},
+              stringEvals: rubyStringEvalCallsByName.get(rubyName) ?? [],
             };
         // A body whose every Ruby call is weak still gets compared:
         // significantMissingCalls returns empty for an empty `rubyCalls`, so the
@@ -5274,6 +5298,8 @@ export function main() {
               (rc) => rubyCallToTsForBody(rc, rubyOwned?.receivers),
               callsSignificant,
               rubyOwned?.calls ?? rubyCalls,
+              undefined,
+              (rubyOwned?.stringEvals.length ?? 0) > 0,
             ),
           );
         }

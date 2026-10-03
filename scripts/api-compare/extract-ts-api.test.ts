@@ -1724,12 +1724,12 @@ describe("body call capture", () => {
     ]);
   });
 
-  it("keeps a moduleEval / classEval callback's calls OUT of the order stream, but in the call set", () => {
+  it("marks a moduleEval / classEval callback's first calls in the order stream, plain in the call set", () => {
     const cls = extractFromSource(
       `class Foo {
         generate(m: string, ok: boolean) {
           if (ok) {
-            this.moduleEval((mod) => { mod[m] = () => this.scoping(() => 1); });
+            this.moduleEval((mod) => { mod[m] = () => this.scoping(() => this.evalOnly()); });
           } else {
             this.defineMethod(m, () => this.scoping(() => 2));
           }
@@ -1737,8 +1737,8 @@ describe("body call capture", () => {
       }`,
     );
     const m = cls.instanceMethods.find((m) => m.name === "generate")!;
-    expect(m.callSeq).toEqual(["moduleEval", "defineMethod", "scoping"]);
-    expect(m.calls).toEqual(["defineMethod", "moduleEval", "scoping"]);
+    expect(m.callSeq).toEqual(["moduleEval", "%scoping", "%evalOnly", "defineMethod", "scoping"]);
+    expect(m.calls).toEqual(["defineMethod", "evalOnly", "moduleEval", "scoping"]);
   });
 
   it("drops a hoisted closure's name even when the enclosing body calls it too", () => {
