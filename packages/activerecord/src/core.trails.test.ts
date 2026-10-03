@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -60,6 +60,73 @@ describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
     } finally {
       proto.deepDup = deepDup;
     }
+  });
+
+  it("loads STI subclass rows through the base class without building either default set", async () => {
+    type DefaultsHost = { _defaultAttributes(): { deepDup(): unknown } };
+    const topicDefaults = (Topic as unknown as DefaultsHost)._defaultAttributes();
+    const replyDefaults = (Reply as unknown as DefaultsHost)._defaultAttributes();
+    const proto = Object.getPrototypeOf(topicDefaults) as { deepDup(): unknown };
+    const deepDup = proto.deepDup;
+    const copies = { topic: 0, reply: 0 };
+    proto.deepDup = function (this: unknown) {
+      if (this === topicDefaults) copies.topic++;
+      if (this === replyDefaults) copies.reply++;
+      return deepDup.call(this);
+    };
+    const columnDefaults = Object.getOwnPropertyDescriptor(Base, "columnDefaults")!;
+    let columnDefaultsReads = 0;
+    Object.defineProperty(Base, "columnDefaults", {
+      ...columnDefaults,
+      get(this: typeof Base) {
+        columnDefaultsReads++;
+        return columnDefaults.get!.call(this);
+      },
+    });
+    try {
+      const loaded = await Topic.all();
+      expect(loaded.some((record) => record instanceof Reply)).toBe(true);
+      expect(copies).toEqual({ topic: 0, reply: 0 });
+      expect(columnDefaultsReads).toBe(0);
+    } finally {
+      proto.deepDup = deepDup;
+      Object.defineProperty(Base, "columnDefaults", columnDefaults);
+    }
+  });
+
+  it("allocate restores the flags it sets when the constructor returns", () => {
+    const flags = ["_allocating", "_suppressStiNewDispatch"] as const;
+    const before = flags.map((flag) => [
+      Object.hasOwn(Reply, flag),
+      Reply[flag as keyof typeof Reply],
+    ]);
+    Reply.allocate();
+    expect(
+      flags.map((flag) => [Object.hasOwn(Reply, flag), Reply[flag as keyof typeof Reply]]),
+    ).toEqual(before);
+    expect(Topic._allocating).toBe(false);
+  });
+
+  it("allocate restores the flags it sets when the constructor throws", () => {
+    const flags = ["_allocating", "_suppressStiNewDispatch"] as const;
+    const before = flags.map((flag) => [
+      Object.hasOwn(Reply, flag),
+      Reply[flag as keyof typeof Reply],
+    ]);
+    const initInternals = vi
+      .spyOn(Reply.prototype as unknown as { initInternals(): void }, "initInternals")
+      .mockImplementation(() => {
+        throw new Error("constructor failed");
+      });
+    try {
+      expect(() => Reply.allocate()).toThrow("constructor failed");
+    } finally {
+      initInternals.mockRestore();
+    }
+    expect(
+      flags.map((flag) => [Object.hasOwn(Reply, flag), Reply[flag as keyof typeof Reply]]),
+    ).toEqual(before);
+    expect(Topic._allocating).toBe(false);
   });
 });
 

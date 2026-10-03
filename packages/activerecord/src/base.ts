@@ -1633,6 +1633,9 @@ export class Base extends Model {
     );
     const prevAbstractSuppress = this._suppressAbstractCheck;
     this._suppressAbstractCheck = true;
+    const hadOwnStiSuppress = Object.prototype.hasOwnProperty.call(this, "_suppressStiNewDispatch");
+    const prevStiSuppress = (this as { _suppressStiNewDispatch?: unknown })._suppressStiNewDispatch;
+    (this as { _suppressStiNewDispatch?: unknown })._suppressStiNewDispatch = this;
     const hadOwnAllocating = Object.prototype.hasOwnProperty.call(this, "_allocating");
     const prevAllocating = this._allocating;
     this._allocating = true;
@@ -1640,6 +1643,11 @@ export class Base extends Model {
     try {
       record = new this() as InstanceType<T>;
     } finally {
+      if (hadOwnStiSuppress) {
+        (this as { _suppressStiNewDispatch?: unknown })._suppressStiNewDispatch = prevStiSuppress;
+      } else {
+        delete (this as { _suppressStiNewDispatch?: unknown })._suppressStiNewDispatch;
+      }
       if (hadOwnAllocating) {
         this._allocating = prevAllocating;
       } else {
@@ -1697,7 +1705,6 @@ export class Base extends Model {
     attributes ??= {};
     let attrs = isEmpty(attributes) ? {} : sanitizeForMassAssignment(attributes);
     if (
-      !(new.target as typeof Base | undefined)?._allocating &&
       (new.target as (typeof Base & { _suppressStiNewDispatch?: unknown }) | undefined)
         ?._suppressStiNewDispatch !== new.target
     ) {
