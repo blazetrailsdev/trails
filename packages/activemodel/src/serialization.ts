@@ -1,5 +1,5 @@
-import { asJson, isBlank } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { asJson, indexWith, isBlank } from "@blazetrails/activesupport";
+import { hashAset, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { NoMethodError, RuntimeError } from "./attribute-assignment.js";
 
@@ -52,9 +52,9 @@ export function serializableHash(
   for (const method of rubyArray(options.methods)) {
     const value = (this as unknown as Record<string, unknown>)[method];
     if (typeof value === "function") {
-      safeSet(result, method, (value as () => unknown).call(this));
+      hashAset(result, method, (value as () => unknown).call(this));
     } else if (method in this) {
-      safeSet(result, method, value);
+      hashAset(result, method, value);
     } else {
       throw new NoMethodError(
         `undefined method '${method}' for an instance of ${this.constructor.name}`,
@@ -72,7 +72,7 @@ export function serializableHash(
         );
       }
       const items = Array.isArray(records) ? records : Array.from(records);
-      safeSet(
+      hashAset(
         result,
         assocName,
         items.map((a) => {
@@ -90,7 +90,7 @@ export function serializableHash(
           `undefined method 'serializableHash' for an instance of ${(records as object).constructor.name}`,
         );
       }
-      safeSet(
+      hashAset(
         result,
         assocName,
         (records as { serializableHash(o: SerializeOptions): unknown }).serializableHash(opts),
@@ -185,11 +185,9 @@ export function serializableAttributes(
   this: SerializationRecord,
   attributeNames: readonly string[],
 ): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const n of attributeNames) {
-    safeSet(result, n, this.readAttributeForSerialization(n));
-  }
-  return result;
+  return Object.fromEntries(
+    indexWith([...attributeNames], (n) => this.readAttributeForSerialization(n)),
+  );
 }
 
 /** @internal */
@@ -214,9 +212,9 @@ export function serializableAddIncludes(
     includes = {};
     for (const n of Array.isArray(includeOpt) ? includeOpt : [includeOpt]) {
       if (isIncludeHash(n)) {
-        for (const [k, v] of Object.entries(n)) safeSet(includes as Record<string, unknown>, k, v);
+        for (const [k, v] of Object.entries(n)) hashAset(includes, k, v);
       } else {
-        safeSet(includes as Record<string, unknown>, n, {});
+        hashAset(includes, n, {});
       }
     }
   }
@@ -362,16 +360,6 @@ function isSerializableCollection(value: unknown): value is Iterable<unknown> {
   if (value == null || typeof value !== "object") return false;
   if ((value as SerializationRecord)._attributes) return false;
   return typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function";
-}
-
-/** @noRailsEquivalent CONVERGEABLE attribute-set-and-serialization-plain-object-hash-helpers */
-function safeSet(target: Record<string, unknown>, key: string, value: unknown): void {
-  Object.defineProperty(target, key, {
-    value,
-    writable: true,
-    enumerable: true,
-    configurable: true,
-  });
 }
 
 function rubyArray(value: string | string[] | null | undefined): string[] {

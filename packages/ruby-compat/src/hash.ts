@@ -327,7 +327,16 @@ export function hashAset<T>(hash: object, key: unknown, val: T): T {
   if (Object.isFrozen(hash)) {
     throw new FrozenError(`can't modify frozen Hash: ${rbInspect(hash)}`, { receiver: hash });
   }
-  (hash as Record<string, unknown>)[key as string] = val;
+  if (key === "__proto__") {
+    Object.defineProperty(hash, key, {
+      value: val,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  } else {
+    (hash as Record<string, unknown>)[key as string] = val;
+  }
   return val;
 }
 

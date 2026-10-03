@@ -1,8 +1,10 @@
-import { defineModelCallbacks } from "../../callbacks.js";
+import { extend } from "@blazetrails/activesupport";
+import { Callbacks, defineModelCallbacks } from "../../callbacks.js";
 import { hasSecurePassword } from "../../secure-password.js";
 
 export class Visitor {
   static {
+    extend(this, Callbacks);
     defineModelCallbacks.call<object, [string], void>(this, "create");
     hasSecurePassword.call(this, "password", { validations: false });
   }

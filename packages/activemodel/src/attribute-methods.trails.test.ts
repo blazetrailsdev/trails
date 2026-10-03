@@ -279,8 +279,8 @@ describe("attribute method prefix/suffix/affix", () => {
 
       static {
         include(this, Attributes);
-        this.attribute("name", "string");
         this.attributeMethodPrefix("clear_");
+        this.attribute("name", "string");
       }
       clear_attribute(attr: string): unknown {
         return this._readAttribute(attr);
@@ -299,8 +299,8 @@ describe("attribute method prefix/suffix/affix", () => {
 
       static {
         include(this, Attributes);
-        this.attribute("name", "string");
         this.attributeMethodSuffix("_before_type_cast");
+        this.attribute("name", "string");
       }
       attribute_before_type_cast(attr: string): unknown {
         return this._readAttribute(attr);
@@ -319,8 +319,8 @@ describe("attribute method prefix/suffix/affix", () => {
 
       static {
         include(this, Attributes);
-        this.attribute("name", "string");
         this.attributeMethodAffix({ prefix: "reset_", suffix: "_to_default" });
+        this.attribute("name", "string");
       }
       reset_attribute_to_default(attr: string): unknown {
         return this._readAttribute(attr);

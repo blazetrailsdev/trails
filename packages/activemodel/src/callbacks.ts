@@ -1,4 +1,4 @@
-import { NoMethodError } from "./attribute-assignment.js";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import {
   Value,
   kernelArray,
@@ -57,25 +57,16 @@ export function defineModelCallbacks(this: object, ...args: unknown[]): void {
     if (klass.prototype) defineCallbacks(klass.prototype, callback, options);
 
     for (const type of types) {
-      const methodName = `_define_${String(type)}_model_callback`;
-      const generator = _defineModelCallbackByType[methodName];
-      if (!generator) {
-        throw new NoMethodError(
-          `undefined method '${methodName}' for class ${(this as { name?: string }).name}`,
-        );
-      }
-      generator(this, callback);
+      const t = String(type);
+      rbFSend(
+        this,
+        `_define${t.charAt(0).toUpperCase()}${t.slice(1)}ModelCallback`,
+        this,
+        callback,
+      );
     }
   }
 }
-
-/** @noRailsEquivalent CONVERGEABLE callbacks-define-model-callback-send-and-macro-options */
-const _defineModelCallbackByType: Record<string, (klass: CallbackHost, callback: string) => void> =
-  {
-    _define_before_model_callback: _defineBeforeModelCallback,
-    _define_after_model_callback: _defineAfterModelCallback,
-    _define_around_model_callback: _defineAroundModelCallback,
-  };
 
 export type CallbackRecord = object;
 
@@ -121,9 +112,9 @@ export interface TransactionalCallbackConditions<
 export function _defineBeforeModelCallback(klass: CallbackHost, callback: string): void {
   Object.defineProperty(klass, `before${callback.charAt(0).toUpperCase()}${callback.slice(1)}`, {
     value: function (this: { prototype: object }, ...args: FilterListEntry[]) {
-      const [filters, options] = extractMacroOptions(args);
+      const options: CallbackOptions & CallbackConditions = { ...extractOptionsBang(args) };
       assertValidKeys(options as Record<string, unknown>, ["if", "unless", "prepend"]);
-      setCallback(this.prototype, callback, "before", ...filters, options);
+      setCallback(this.prototype, callback, "before", ...args, options);
     },
     writable: true,
     configurable: true,
@@ -136,9 +127,9 @@ type CallbackHost = object;
 export function _defineAroundModelCallback(klass: CallbackHost, callback: string): void {
   Object.defineProperty(klass, `around${callback.charAt(0).toUpperCase()}${callback.slice(1)}`, {
     value: function (this: { prototype: object }, ...args: FilterListEntry[]) {
-      const [filters, options] = extractMacroOptions(args);
+      const options: CallbackOptions & CallbackConditions = { ...extractOptionsBang(args) };
       assertValidKeys(options as Record<string, unknown>, ["if", "unless", "prepend"]);
-      setCallback(this.prototype, callback, "around", ...filters, options);
+      setCallback(this.prototype, callback, "around", ...args, options);
     },
     writable: true,
     configurable: true,
@@ -149,30 +140,14 @@ export function _defineAroundModelCallback(klass: CallbackHost, callback: string
 export function _defineAfterModelCallback(klass: CallbackHost, callback: string): void {
   Object.defineProperty(klass, `after${callback.charAt(0).toUpperCase()}${callback.slice(1)}`, {
     value: function (this: { prototype: object }, ...args: FilterListEntry[]) {
-      const [filters, options] = extractMacroOptions(args);
+      const options: CallbackOptions & CallbackConditions = { ...extractOptionsBang(args) };
       assertValidKeys(options as Record<string, unknown>, ["if", "unless", "prepend"]);
       options.prepend = true;
       const conditional = new Value((v) => v !== false);
       options.if = [...kernelArray(options.if), conditional];
-      setCallback(this.prototype, callback, "after", ...filters, options);
+      setCallback(this.prototype, callback, "after", ...args, options);
     },
     writable: true,
     configurable: true,
   });
-}
-
-/** @noRailsEquivalent CONVERGEABLE callbacks-define-model-callback-send-and-macro-options */
-function extractMacroOptions(
-  args: FilterListEntry[],
-): [FilterListEntry[], CallbackOptions & CallbackConditions] {
-  const last = args[args.length - 1];
-  if (
-    typeof last === "object" &&
-    last !== null &&
-    (Object.getPrototypeOf(last) === Object.prototype || Object.getPrototypeOf(last) === null) &&
-    !Object.entries(last).some(([k, v]) => typeof v === "function" && k !== "if" && k !== "unless")
-  ) {
-    return [args.slice(0, -1), { ...(last as CallbackConditions) }];
-  }
-  return [args, {}];
 }
