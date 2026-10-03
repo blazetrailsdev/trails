@@ -2136,7 +2136,7 @@ export function skeletonsByOwner(
  * object literal and as the top-level instance function, and each carries a
  * skeleton. Read by name that is two bodies for one pair, which compares
  * neither; read by owner each Rails `validates_with`
- * (`activemodel/lib/active_model/validations/with.rb:88`, `:148`) meets its own
+ * (`activemodel/lib/active_model/validations/with.rb:88`, `:144`) meets its own
  * port.
  *
  * `byOwner` is {@link skeletonsByOwner}'s, which holds each body once. A class
