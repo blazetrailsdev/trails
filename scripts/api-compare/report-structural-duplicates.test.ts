@@ -55,6 +55,37 @@ describe("shapeOf", () => {
     expect(shapeOf(decl("id:ensureProperType"))).not.toBe(shapeOf(decl("id:cmpint")));
     expect(shapeOf(decl("call:_createRecord"))).toBe("ref:call|callee:call:_createRecord");
   });
+
+  it("separates a constant receiver from a bare call of the same name", () => {
+    const resolve = { name: "x", skeleton: ["ref:resolve"] };
+    expect(shapeOf({ ...resolve, shapeTokens: ["recv:Promise"] })).not.toBe(shapeOf(resolve));
+  });
+
+  it("separates an index read from a Map#get, both ref:get in the skeleton", () => {
+    const get = { name: "x", skeleton: ["ref:get"] };
+    expect(shapeOf({ ...get, shapeTokens: ["[]"] })).not.toBe(shapeOf(get));
+  });
+
+  it("separates two guards by the operators the skeleton erases", () => {
+    const guard = { name: "x", skeleton: ["if", "and"] };
+    expect(shapeOf({ ...guard, shapeTokens: ["op:!"] })).not.toBe(
+      shapeOf({ ...guard, shapeTokens: ["?:"] }),
+    );
+  });
+
+  it("separates two raises of one error class by the text of their template message", () => {
+    const raise = { name: "x", skeleton: ["if", "throw:ArgumentError", "new:ArgumentError"] };
+    expect(
+      shapeOf({ ...raise, shapeTokens: ["tpl:wrong number of arguments (given ${})"] }),
+    ).not.toBe(shapeOf({ ...raise, shapeTokens: ["tpl:tags_format must be one of ${}"] }));
+  });
+
+  it("separates two get-or-set memos by what they store", () => {
+    const memo = { name: "x", skeleton: ["ref:get", "if", "ref:set"] };
+    expect(shapeOf({ ...memo, shapeTokens: ["class"] })).not.toBe(
+      shapeOf({ ...memo, shapeTokens: ["op:++"] }),
+    );
+  });
 });
 
 const hosted = (origin: Decl, candidate: Decl, ...siblings: Decl[]): TsApi => ({
@@ -76,6 +107,7 @@ describe("matches", () => {
         line: 120,
         shape: "ref:hasOwn|",
         alias: false,
+        delegation: false,
       },
     ]);
   });
@@ -106,6 +138,16 @@ describe("matches", () => {
         .get("binmode")
         ?.map((s) => s.name),
     ).toEqual(["binmode"]);
+  });
+
+  it("never matches a ruby-compat body that is one call on identifiers alone", () => {
+    const set = {
+      name: "rbDefineAllocFunc",
+      line: 1,
+      skeleton: ["ref:set"],
+      callArgs: [{ name: "set", args: ["id:klass", "id:func"], recv: "id:allocators" }],
+    };
+    expect(matches(hosted(set, { ...set, name: "registerModule" })).size).toBe(0);
   });
 
   it("never reports ruby-compat's own definitions as candidates", () => {

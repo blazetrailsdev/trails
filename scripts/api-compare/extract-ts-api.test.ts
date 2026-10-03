@@ -562,6 +562,27 @@ describe("body call capture", () => {
     expect(quote.callSeq).toEqual(["typeCast", "quoteString"]);
   });
 
+  it("records as shapeTokens what the skeleton and the argument descriptors both erase", () => {
+    const info = extractFromFiles("/p", {
+      "quoting.ts": [
+        "export function a() { return Promise.resolve(); }",
+        "export function b(ary: unknown[]) { return ary[0]; }",
+        "export function c(x: boolean, y: boolean, n: number) { return x && !y ? n++ : n; }",
+        "export function d(m: Map<object, unknown>, k: object) { m.set(k, class {}); }",
+        "export function e(v: string) { throw new ArgumentError(`bad ${v} value`); }",
+        "export function f(m: Map<string, number>, k: string) { return m.get(k); }",
+      ].join("\n"),
+    });
+    const tokensOf = (n: string) =>
+      fileFunctionsOf(info, "quoting.ts").find((fn) => fn.name === n)!.shapeTokens;
+    expect(tokensOf("a")).toEqual(["recv:Promise"]);
+    expect(tokensOf("b")).toEqual(["[]"]);
+    expect(tokensOf("c")).toEqual(["?:", "op:!", "op:++"]);
+    expect(tokensOf("d")).toEqual(["class"]);
+    expect(tokensOf("e")).toEqual(["tpl:bad ${} value"]);
+    expect(tokensOf("f")).toBeUndefined();
+  });
+
   it("credits an expression-bodied arrow's outermost call", () => {
     // The body IS the CallExpression, so a walk that starts at the body's
     // CHILDREN never sees `where` — Ruby's walk_for_calls is handed the whole

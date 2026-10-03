@@ -876,6 +876,7 @@ export function extractFromProgram(
         const fnCallSeq = extractCallSeq(node.body);
         const fnCallArgs = extractCallArgs(node.body);
         const fnSkeleton = extractSkeleton(node.body);
+        const fnShapeTokens = extractShapeTokens(node.body);
         const sectioned = sectionVisibility.get(node.name.text);
         const internal = internalJsDocTagApplies(node) || sectioned !== undefined;
         const noRailsEquivalent = noRailsEquivalentReason(node);
@@ -902,6 +903,7 @@ export function extractFromProgram(
           ...(fnCallSeq !== undefined ? { callSeq: fnCallSeq } : {}),
           ...(fnCallArgs !== undefined ? { callArgs: fnCallArgs } : {}),
           ...(fnSkeleton !== undefined ? { skeleton: fnSkeleton } : {}),
+          ...(fnShapeTokens !== undefined ? { shapeTokens: fnShapeTokens } : {}),
           ...(fnMissingRailsCalls !== undefined ? { missingRailsCalls: fnMissingRailsCalls } : {}),
           ...(fnMissingRailsArgs !== undefined ? { missingRailsArgs: fnMissingRailsArgs } : {}),
           ...(fnMissingRailsNames !== undefined ? { missingRailsNames: fnMissingRailsNames } : {}),
@@ -1257,6 +1259,7 @@ export function extractFromProgram(
             const callSeq = extractCallSeq(body);
             const callArgs = extractCallArgs(body);
             const skeleton = extractSkeleton(body);
+            const shapeTokens = extractShapeTokens(body);
             const exportSectioned = sectionVisibility.get(sym.name);
             const internal = internalJsDocTagApplies(decl) || exportSectioned !== undefined;
             // A renamed export (`export { withRoutesHelpers as with }`) is its
@@ -1294,6 +1297,7 @@ export function extractFromProgram(
               ...(callSeq !== undefined ? { callSeq } : {}),
               ...(callArgs !== undefined ? { callArgs } : {}),
               ...(skeleton !== undefined ? { skeleton } : {}),
+              ...(shapeTokens !== undefined ? { shapeTokens } : {}),
               ...(exportedMissingRailsCalls !== undefined
                 ? { missingRailsCalls: exportedMissingRailsCalls }
                 : {}),
@@ -3903,6 +3907,7 @@ export function extractClass(
       const callSeq = suppressed ? undefined : extractCallSeq(member.body);
       const callArgs = suppressed ? undefined : extractCallArgs(member.body);
       const skeleton = suppressed ? undefined : extractSkeleton(member.body);
+      const shapeTokens = suppressed ? undefined : extractShapeTokens(member.body);
       const delegatesTo = delegationTargetName(member.body, memberName, name, checker);
       if (delegatesTo) delegationTargets.add(delegatesTo);
       const method: MethodInfo = {
@@ -3921,6 +3926,7 @@ export function extractClass(
         ...(callSeq !== undefined ? { callSeq } : {}),
         ...(callArgs !== undefined ? { callArgs } : {}),
         ...(skeleton !== undefined ? { skeleton } : {}),
+        ...(shapeTokens !== undefined ? { shapeTokens } : {}),
         ...(delegatesTo !== undefined ? { delegatesTo } : {}),
       };
       // Only instance methods are reachable via `this.helper(...)` and only
@@ -3943,6 +3949,7 @@ export function extractClass(
       const callSeq = extractCallSeq(member.body);
       const callArgs = extractCallArgs(member.body);
       const skeleton = extractSkeleton(member.body);
+      const shapeTokens = extractShapeTokens(member.body);
       instanceMethods.push({
         name: "constructor",
         visibility,
@@ -3955,6 +3962,7 @@ export function extractClass(
         ...(callSeq !== undefined ? { callSeq } : {}),
         ...(callArgs !== undefined ? { callArgs } : {}),
         ...(skeleton !== undefined ? { skeleton } : {}),
+        ...(shapeTokens !== undefined ? { shapeTokens } : {}),
       });
       for (const param of member.parameters) {
         if (!ts.isIdentifier(param.name)) continue;
@@ -3981,6 +3989,7 @@ export function extractClass(
       const callSeq = extractCallSeq(member.body);
       const callArgs = extractCallArgs(member.body);
       const skeleton = extractSkeleton(member.body);
+      const shapeTokens = extractShapeTokens(member.body);
       const valueAdmitsBoolean = memberAdmitsBoolean(member, checker);
       const method: MethodInfo = {
         name: memberName,
@@ -3996,6 +4005,7 @@ export function extractClass(
         ...(callSeq !== undefined ? { callSeq } : {}),
         ...(callArgs !== undefined ? { callArgs } : {}),
         ...(skeleton !== undefined ? { skeleton } : {}),
+        ...(shapeTokens !== undefined ? { shapeTokens } : {}),
       };
       if (isStatic) {
         classMethods.push(method);
@@ -4008,6 +4018,7 @@ export function extractClass(
       const callSeq = extractCallSeq(member.body);
       const callArgs = extractCallArgs(member.body);
       const skeleton = extractSkeleton(member.body);
+      const shapeTokens = extractShapeTokens(member.body);
       const method: MethodInfo = {
         name: memberName,
         visibility,
@@ -4022,6 +4033,7 @@ export function extractClass(
         ...(callSeq !== undefined ? { callSeq } : {}),
         ...(callArgs !== undefined ? { callArgs } : {}),
         ...(skeleton !== undefined ? { skeleton } : {}),
+        ...(shapeTokens !== undefined ? { shapeTokens } : {}),
       };
       if (isStatic) {
         classMethods.push(method);
@@ -5308,6 +5320,36 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   };
   // The body ITSELF, not just its children: an expression-bodied arrow
   // (`= (x) => where(x)`) IS the call site, and Ruby's walk_for_skeleton covers it.
+  visit(node);
+  return tokens.length === 0 ? undefined : tokens;
+}
+
+/**
+ * What the skeleton and the argument descriptors both erase, in source order —
+ * read only by report-structural-duplicates.ts, so the call gates see none of
+ * it: a constant receiver (`Promise.resolve()` against a bare `resolve()`),
+ * an index read (`ary[0]`, which the skeleton spells `ref:get` like
+ * `Map#get`), a unary operator, a ternary, a class expression, and the fixed
+ * text of a template literal.
+ */
+function extractShapeTokens(node: ts.Node | undefined): string[] | undefined {
+  if (!node) return undefined;
+  const tokens: string[] = [];
+  const visit = (n: ts.Node): void => {
+    if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression)) {
+      const recv = n.expression.expression;
+      if (ts.isIdentifier(recv) && /^[A-Z]/.test(recv.text)) tokens.push(`recv:${recv.text}`);
+    } else if (ts.isElementAccessExpression(n)) tokens.push("[]");
+    else if (ts.isPrefixUnaryExpression(n) || ts.isPostfixUnaryExpression(n))
+      tokens.push(`op:${ts.tokenToString(n.operator) ?? "?"}`);
+    else if (ts.isConditionalExpression(n)) tokens.push("?:");
+    else if (ts.isClassExpression(n)) tokens.push("class");
+    else if (ts.isTemplateExpression(n))
+      tokens.push(
+        `tpl:${[n.head.text, ...n.templateSpans.map((span) => span.literal.text)].join("${}")}`,
+      );
+    ts.forEachChild(n, visit);
+  };
   visit(node);
   return tokens.length === 0 ? undefined : tokens;
 }

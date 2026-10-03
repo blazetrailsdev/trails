@@ -109,6 +109,8 @@ export interface MethodInfo {
    * Names are raw on both sides. Signal only; nothing gates on it yet.
    */
   skeleton?: string[];
+  /** What `skeleton` and `callArgs` both erase; extract-ts-api.ts#extractShapeTokens. */
+  shapeTokens?: string[];
   /**
    * TS-side only (RFC 0113): the `skeleton` of a NON-exported file-local
    * helper. Kept out of `skeleton` so the compared population stays exactly

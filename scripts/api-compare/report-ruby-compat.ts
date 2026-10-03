@@ -46,6 +46,7 @@ export interface Decl {
   line?: number;
   calls?: string[];
   skeleton?: string[];
+  shapeTokens?: string[];
   callArgs?: { name: string; args?: string[]; recv?: string }[];
   /** `<file>:<name>` of the declaring entry when this one is a barrel clone
    *  (`extract-ts-api.ts:1017`), absent on a real declaration. */
