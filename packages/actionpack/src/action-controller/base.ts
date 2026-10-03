@@ -321,20 +321,30 @@ export interface Base {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Metal {
+  static {
+    this.abstractBang();
+  }
+
   get flash(): FlashHash {
     return this.request.flash!;
   }
 
-  static _viewPaths: {
+  declare static _viewPaths: {
     (): PathSet;
     (paths: PathSet): void;
-  } = ViewPathsClassMethods._viewPaths;
-  static appendViewPath: (path: ViewPathsInput) => void = ViewPathsClassMethods.appendViewPath;
-  static prependViewPath: (path: ViewPathsInput) => void = ViewPathsClassMethods.prependViewPath;
-  static viewPaths: {
+  };
+  /** @internal */
+  declare static _prefixes: () => string[];
+  /** @internal */
+  declare static _buildViewPaths: (paths: ViewPathsInput) => PathSet;
+  /** @internal */
+  declare static localPrefixes: () => string[];
+  declare static appendViewPath: (path: ViewPathsInput) => void;
+  declare static prependViewPath: (path: ViewPathsInput) => void;
+  declare static viewPaths: {
     (): PathSet;
     (paths: ViewPathsInput): void;
-  } = ViewPathsClassMethods.viewPaths;
+  };
 
   static layout = layout;
   static _writeLayoutMethod = _writeLayoutMethod;
@@ -954,6 +964,7 @@ classAttribute.call(Base, "fragmentCacheKeys", { default: [] });
 Base.helperMethod("combinedFragmentCacheKey");
 
 extend(Base, ConfigMethods);
+extend(Base, ViewPathsClassMethods);
 extend(Base, DefaultHeaders.ClassMethods);
 include(Base, Redirecting);
 include(Base, Instrumentation);

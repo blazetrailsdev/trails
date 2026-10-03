@@ -31,6 +31,7 @@ class BaseController implements ViewPaths {
   }
 
   static _prefixes = ClassMethods._prefixes;
+  static localPrefixes = ClassMethods.localPrefixes;
   static viewPaths = ClassMethods.viewPaths;
 
   _prefixes = _prefixes;
@@ -66,6 +67,44 @@ afterEach(() => {
 describe("ViewPaths::ClassMethods", () => {
   test("_prefixes stops at the first abstract ancestor", () => {
     expect(DraftsController._prefixes()).toEqual(["drafts", "posts"]);
+  });
+
+  test("overriding localPrefixes adds its prefix ahead of the ancestors'", () => {
+    class OverridingLocalPrefixes extends PostsController {
+      static controllerPath(): string {
+        return "overriding_local_prefixes";
+      }
+      static localPrefixes(): string[] {
+        return [...super.localPrefixes(), "testing/me3"];
+      }
+    }
+    expect(OverridingLocalPrefixes._prefixes()).toEqual([
+      "overriding_local_prefixes",
+      "testing/me3",
+      "posts",
+    ]);
+    expect(new OverridingLocalPrefixes()._prefixes()).toEqual(OverridingLocalPrefixes._prefixes());
+  });
+
+  test("an overridden localPrefixes is inherited", () => {
+    class OverridingLocalPrefixes extends PostsController {
+      static controllerPath(): string {
+        return "overriding_local_prefixes";
+      }
+      static localPrefixes(): string[] {
+        return [this.controllerPath().replace(/_/g, "-")];
+      }
+    }
+    class Inheriting extends OverridingLocalPrefixes {
+      static controllerPath(): string {
+        return "inheriting_one";
+      }
+    }
+    expect(Inheriting._prefixes()).toEqual([
+      "inheriting-one",
+      "overriding-local-prefixes",
+      "posts",
+    ]);
   });
 });
 

@@ -153,6 +153,10 @@ export class AbstractController {
     (this as unknown as { _abstract: boolean })._abstract = true;
   }
 
+  static {
+    this.abstractBang();
+  }
+
   /** @internal */
   protected static _controllerPath?: string;
 

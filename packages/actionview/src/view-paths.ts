@@ -19,6 +19,10 @@ export interface ViewPathsClass {
   isAbstract(): boolean;
   controllerPath(): string;
   /** @internal */
+  _prefixes(): string[];
+  /** @internal */
+  localPrefixes(): string[];
+  /** @internal */
   _prefixesMemo?: string[];
 }
 
@@ -42,11 +46,11 @@ export class ClassMethods {
   static _prefixes(this: ViewPathsClass): string[] {
     if (Object.prototype.hasOwnProperty.call(this, "_prefixesMemo")) return this._prefixesMemo!;
     const superclass = Object.getPrototypeOf(this) as ViewPathsClass | null;
-    const local = ClassMethods.localPrefixes.call(this);
+    const local = this.localPrefixes();
     return (this._prefixesMemo =
       !superclass || typeof superclass.isAbstract !== "function" || superclass.isAbstract()
         ? local
-        : [...local, ...ClassMethods._prefixes.call(superclass)]);
+        : [...local, ...superclass._prefixes()]);
   }
 
   /** @internal */
@@ -91,7 +95,7 @@ const writeInternalViewPaths: (this: ViewPathsClass, paths: PathSet) => void =
 
 /** @internal */
 export function _prefixes(this: ViewPaths): string[] {
-  return ClassMethods._prefixes.call(this.constructor);
+  return this.constructor._prefixes();
 }
 
 export function lookupContext(this: ViewPaths): LookupContext {

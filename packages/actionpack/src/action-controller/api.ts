@@ -15,6 +15,10 @@ export interface API {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class API extends Metal {
+  static {
+    this.abstractBang();
+  }
+
   static withoutModules<T extends typeof API>(this: T, ..._modules: unknown[]): T {
     return this;
   }
