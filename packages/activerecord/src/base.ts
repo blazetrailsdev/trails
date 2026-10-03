@@ -1024,7 +1024,6 @@ export class Base extends Model {
   static _suppressInitializeCallback = false;
 
   static _suppressAbstractCheck = false;
-  /** @internal */
   static _allocating = false;
 
   declare static attrReadonly: typeof ReadonlyAttributes.attrReadonly;
