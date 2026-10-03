@@ -790,12 +790,30 @@ describe("body call capture", () => {
             options = this.merge(scope);
           }
         }
+        otherTest(flag: boolean, scope: object | null, options: object = {}) {
+          if (flag) {
+            options = scope;
+          }
+        }
+        notFromAParameter(scope: object | null, options: object = {}) {
+          if (scope) {
+            options = defaults;
+          }
+        }
+        backwards(scope: object | null, options: object = {}) {
+          if (options) {
+            scope = options;
+          }
+        }
       }`,
     );
     const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
     expect(skeleton("build")).toEqual(["ref:create"]);
     expect(skeleton("afterSideEffect")).toEqual(["ref:log", "if"]);
     expect(skeleton("notABinding")).toEqual(["if", "ref:merge"]);
+    expect(skeleton("otherTest")).toEqual(["if"]);
+    expect(skeleton("notFromAParameter")).toEqual(["if"]);
+    expect(skeleton("backwards")).toEqual(["if"]);
   });
 
   it("still emits one arm per case clause that carries its own body", () => {

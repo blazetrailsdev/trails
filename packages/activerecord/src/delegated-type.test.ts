@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import { registerModel } from "./index.js";
+import { Module, registerConstant } from "@blazetrails/ruby-compat";
 import { adapterType } from "./test-adapter.js";
 import { travel, travelBack, assertRespondTo } from "@blazetrails/activesupport";
 import { fixtures } from "./test-fixtures.js";
@@ -188,26 +189,31 @@ describe("DelegatedTypeTest", () => {
         this.attribute("entryable_type", "string");
       }
     }
-    class NoticeMsg extends Base {}
-    registerModel("Access::NoticeMessage", NoticeMsg);
+    registerConstant("Access", new Module());
+    class NoticeMessage extends Base {
+      static moduleName = "Access";
+    }
+    registerModel(NoticeMessage);
     Entry3.delegatedType("entryable", { types: ["Access::NoticeMessage"] });
     expect(typeof (Entry3 as any).accessNoticeMessages).toBe("function");
     const e = new Entry3({ entryable_type: "Access::NoticeMessage", entryable_id: 7 });
     expect((e as any).isAccessNoticeMessage()).toBe(true);
     expect((e as any).accessNoticeMessageId).toBe(7);
-    const target = new NoticeMsg();
+    const target = new NoticeMessage();
     (e as any).entryable = target;
     expect((e as any).accessNoticeMessage).toBe(target);
     expect(String((e as any).entryableName)).toBe("access_notice_message");
   });
 
   it("buildEntryable preserves namespaced foreign_type", () => {
-    class AccessNoticeMessage extends Base {
+    registerConstant("Access", new Module());
+    class NoticeMessage extends Base {
+      static moduleName = "Access";
       static {
         this.attribute("body", "string");
       }
     }
-    registerModel("Access::NoticeMessage", AccessNoticeMessage);
+    registerModel(NoticeMessage);
     class Entry4 extends Base {
       declare entryable_type: string;
       static {
@@ -218,7 +224,7 @@ describe("DelegatedTypeTest", () => {
     Entry4.delegatedType("entryable", { types: ["Access::NoticeMessage"] });
     const e = new Entry4({ entryable_type: "Access::NoticeMessage" });
     const built = (e as any).buildEntryable({ body: "hi" });
-    expect(built).toBeInstanceOf(AccessNoticeMessage);
+    expect(built).toBeInstanceOf(NoticeMessage);
     expect(e.entryable_type).toBe("Access::NoticeMessage");
     expect((e as any).isAccessNoticeMessage()).toBe(true);
   });

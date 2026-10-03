@@ -5153,10 +5153,12 @@ function isArgumentBindingGuard(statement: ts.IfStatement): boolean {
  * `if (isHash(scope)) { options = scope; scope = null; }`: the binding of Ruby's
  * optional positional before keywords (`def has_many(name, scope = nil, **options)`,
  * `activerecord/lib/active_record/associations.rb:1268`). A TS caller hands the
- * options in the positional's slot, so the body moves them. Every statement
- * assigns a parameter from a parameter or `null` / `undefined`, with no `else`,
- * ahead of anything but other binding guards. That binds parameters, as
- * {@link isArgumentBindingGuard}'s raise does, and is not an arm.
+ * options in the positional's slot, so the body moves them. The shape is exactly
+ * that: no `else`, ahead of anything but other binding guards, a test that reads
+ * no parameter but the positional and no `this`, and a body that assigns a LATER
+ * parameter from the positional and then, at most, clears the positional to
+ * `null` / `undefined`. That binds parameters, as {@link isArgumentBindingGuard}'s
+ * raise does, and is not an arm.
  */
 function isParameterRebinding(statement: ts.IfStatement): boolean {
   const body = statement.parent;
@@ -5168,18 +5170,35 @@ function isParameterRebinding(statement: ts.IfStatement): boolean {
     if (!isArgumentBindingGuard(earlier) && !isParameterRebinding(earlier)) return false;
   }
   const then = statement.thenStatement;
-  const moves = ts.isBlock(then) ? then.statements : [then];
-  return (
-    moves.length > 0 &&
-    moves.every((move) => {
-      if (!ts.isExpressionStatement(move) || !ts.isBinaryExpression(move.expression)) return false;
-      const { left, operatorToken, right } = move.expression;
-      if (operatorToken.kind !== ts.SyntaxKind.EqualsToken) return false;
-      if (!ts.isIdentifier(left) || !bound.includes(left.text)) return false;
-      if (right.kind === ts.SyntaxKind.NullKeyword) return true;
-      return ts.isIdentifier(right) && (right.text === "undefined" || bound.includes(right.text));
-    })
+  const moves = (ts.isBlock(then) ? [...then.statements] : [then]).map((move) =>
+    ts.isExpressionStatement(move) &&
+    ts.isBinaryExpression(move.expression) &&
+    move.expression.operatorToken.kind === ts.SyntaxKind.EqualsToken
+      ? move.expression
+      : undefined,
   );
+  const [bind, clear] = moves;
+  if (moves.length > 2 || !bind || !ts.isIdentifier(bind.left) || !ts.isIdentifier(bind.right)) {
+    return false;
+  }
+  const positional = bind.right.text;
+  const at = bound.indexOf(positional);
+  if (at < 0 || bound.indexOf(bind.left.text) <= at) return false;
+  if (moves.length === 2) {
+    if (!clear || clear.left.getText() !== positional) return false;
+    const cleared = clear.right;
+    if (cleared.kind !== ts.SyntaxKind.NullKeyword && cleared.getText() !== "undefined")
+      return false;
+  }
+  let onlyPositional = true;
+  const read = (n: ts.Node): void => {
+    if (n.kind === ts.SyntaxKind.ThisKeyword) onlyPositional = false;
+    if (ts.isIdentifier(n) && n.text !== positional && bound.includes(n.text))
+      onlyPositional = false;
+    ts.forEachChild(n, read);
+  };
+  read(statement.expression);
+  return onlyPositional && statement.expression.getText().includes(positional);
 }
 
 /**

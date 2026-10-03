@@ -1,4 +1,4 @@
-import { fetch, rbEqual, rbFPublicSend } from "@blazetrails/ruby-compat";
+import { fetch, rbEqual, rbFCaller, rbFPublicSend } from "@blazetrails/ruby-compat";
 import { ActiveRecord, Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { kernelArray, underscore } from "@blazetrails/activesupport";
@@ -143,10 +143,10 @@ export class BelongsToAssociation extends SingularAssociation {
   protected override staleState(): unknown {
     const owner = this.owner as unknown as {
       _readAttribute(n: string, block: (n: string) => unknown): unknown;
-      missingAttribute(n: string): never;
+      missingAttribute(n: string, stack: string): never;
     };
     return owner._readAttribute(this.reflection.foreignKey() as string, (n) =>
-      owner.missingAttribute(n),
+      owner.missingAttribute(n, rbFCaller().join("\n")),
     );
   }
 
