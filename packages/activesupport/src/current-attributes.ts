@@ -31,13 +31,16 @@ const INVALID_ATTRIBUTE_NAMES = [
 
 const NOT_SET: unknown = Object.freeze({});
 
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActiveSupport::Callbacks` (`current_attributes.rb:93`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface CurrentAttributes extends Included<typeof Callbacks> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export abstract class CurrentAttributes {
   declare static defaults: Record<string, AttributeValue>;
   declare static isDefaults: boolean;
 
   declare static defineCallbacks: Extended<typeof Callbacks.ClassMethods>["defineCallbacks"];
   declare static setCallback: Extended<typeof Callbacks.ClassMethods>["setCallback"];
-  declare runCallbacks: Included<typeof Callbacks>["runCallbacks"];
 
   static {
     include(this, Callbacks);

@@ -24,6 +24,10 @@ export interface CompletableExecution {
   completeBang(): unknown;
 }
 
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActiveSupport::Callbacks` (`execution_wrapper.rb:8`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface ExecutionWrapper extends Included<typeof Callbacks> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ExecutionWrapper {
   static RunHook: typeof RunHook;
 
@@ -37,7 +41,6 @@ export class ExecutionWrapper {
 
   declare static defineCallbacks: Extended<typeof Callbacks.ClassMethods>["defineCallbacks"];
   declare static setCallback: Extended<typeof Callbacks.ClassMethods>["setCallback"];
-  declare runCallbacks: Included<typeof Callbacks>["runCallbacks"];
 
   static {
     include(this, Callbacks);
