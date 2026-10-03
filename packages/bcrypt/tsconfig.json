@@ -6,5 +6,9 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "references": [{ "path": "../date" }, { "path": "../ruby-compat" }]
+  "references": [
+    { "path": "../activesupport" },
+    { "path": "../date" },
+    { "path": "../ruby-compat" }
+  ]
 }

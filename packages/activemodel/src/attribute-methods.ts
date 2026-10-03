@@ -2,6 +2,7 @@ import {
   b,
   basicObjRespondTo,
   block,
+  Concurrent,
   fetch,
   hasKey,
   isInclude,
@@ -338,11 +339,7 @@ export const ClassMethods = {
   undefineAttributeMethods(this: ClassMethodsHost): void {
     const mod = this.generatedAttributeMethods();
     mod.undefMethod(...mod.instanceMethods());
-    if (Object.hasOwn(this, "_attributeMethodPatternsCache")) {
-      (
-        this as ClassMethodsHost & { _attributeMethodPatternsCache: Map<unknown, unknown> }
-      )._attributeMethodPatternsCache.clear();
-    }
+    this.attributeMethodPatternsCache().clear();
   },
 
   aliasesByAttributeName(this: ClassMethodsHost): Map<string, string[]> {
@@ -376,16 +373,17 @@ export const ClassMethods = {
     return this.generatedAttributeMethods().isMethodDefined(methodName);
   },
 
-  /**
-   * @internal
-   * @missingRailsArgs new — CONVERGEABLE attribute-method-patterns-cache-onto-concurrent-map
-   */
-  attributeMethodPatternsCache(this: ClassMethodsHost): Map<string, Array<AttributeMethod>> {
+  /** @internal */
+  attributeMethodPatternsCache(
+    this: ClassMethodsHost,
+  ): InstanceType<typeof Concurrent.Map<string, Array<AttributeMethod>>> {
     const h = this as AttributeMethodHost & {
-      _attributeMethodPatternsCache?: Map<string, Array<AttributeMethod>>;
+      _attributeMethodPatternsCache?: InstanceType<
+        typeof Concurrent.Map<string, Array<AttributeMethod>>
+      >;
     };
     if (!Object.prototype.hasOwnProperty.call(h, "_attributeMethodPatternsCache")) {
-      h._attributeMethodPatternsCache = new Map();
+      h._attributeMethodPatternsCache = new Concurrent.Map({ initialCapacity: 4 });
     }
     return h._attributeMethodPatternsCache!;
   },
@@ -395,14 +393,12 @@ export const ClassMethods = {
     this: ClassMethodsHost,
     methodName: string,
   ): Array<AttributeMethod> {
-    const cache = this.attributeMethodPatternsCache();
-    if (cache.has(methodName)) return cache.get(methodName)!;
-    const matches = this.attributeMethodPatterns.flatMap((pattern) => {
-      const m = pattern.match(methodName);
-      return m ? [m] : [];
-    });
-    cache.set(methodName, matches);
-    return matches;
+    return this.attributeMethodPatternsCache().computeIfAbsent(methodName, () =>
+      this.attributeMethodPatterns.flatMap((pattern) => {
+        const m = pattern.match(methodName);
+        return m ? [m] : [];
+      }),
+    );
   },
 
   /** @internal */

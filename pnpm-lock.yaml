@@ -207,9 +207,6 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
-      '@blazetrails/bcrypt':
-        specifier: workspace:*
-        version: link:../bcrypt
       '@blazetrails/date':
         specifier: workspace:*
         version: link:../date
@@ -219,6 +216,10 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/bcrypt':
+        specifier: workspace:*
+        version: link:../bcrypt
 
   packages/activerecord:
     dependencies:
@@ -340,6 +341,9 @@ importers:
 
   packages/bcrypt:
     dependencies:
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
       '@blazetrails/date':
         specifier: workspace:*
         version: link:../date

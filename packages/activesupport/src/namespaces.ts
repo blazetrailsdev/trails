@@ -58,6 +58,13 @@ export const TopLevel: {
   };
   ActionController?: { Parameters: new (...args: never[]) => ParametersInstance };
   ActionCable?: { Engine?: unknown };
+  BCrypt?: {
+    Engine: { readonly MIN_COST: number; readonly cost: number };
+    Password: {
+      create(secret: unknown, options?: { cost?: number | false | null }): object;
+      new (rawHash: string): { readonly salt: string; isPassword(secret: unknown): boolean };
+    };
+  };
   AppBuilder?: new (generator: never) => object;
 } = {};
 

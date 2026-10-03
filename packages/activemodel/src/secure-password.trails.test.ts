@@ -2,12 +2,13 @@
    Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
    test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
    how `include()` surfaces those members on the type side. */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Model } from "./index.js";
 import { hasSecurePassword, SecurePassword } from "./secure-password.js";
 import { Engine, Errors, Password } from "@blazetrails/bcrypt";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
-import { include } from "@blazetrails/activesupport";
+import { include, TopLevel } from "@blazetrails/activesupport";
+import { LoadError, setVerbose, stderr, verbose } from "@blazetrails/ruby-compat";
 import { User } from "./test-helpers/models/user.js";
 
 let savedMinCost: boolean;
@@ -224,5 +225,30 @@ describe("SecurePasswordTrailsTest", () => {
   it("password_salt returns null when no digest", () => {
     const u = new User();
     expect(u.passwordSalt).toBeNull();
+  });
+
+  it("has_secure_password raises LoadError when the bcrypt gem is not loaded", () => {
+    const bcrypt = TopLevel.BCrypt;
+    const oldVerbose = verbose();
+    const written: string[] = [];
+    const write = vi.spyOn(stderr, "write").mockImplementation((s: string) => {
+      written.push(s);
+      return true;
+    });
+    TopLevel.BCrypt = undefined;
+    setVerbose(false);
+    try {
+      class NoBcryptUser extends Model {}
+      expect(() => hasSecurePassword.call(NoBcryptUser)).toThrow(
+        new LoadError("cannot load such file -- bcrypt"),
+      );
+      expect(written).toEqual([
+        "You don't have bcrypt installed in your application. Please add it to your Gemfile and run bundle install.\n",
+      ]);
+    } finally {
+      TopLevel.BCrypt = bcrypt;
+      setVerbose(oldVerbose);
+      write.mockRestore();
+    }
   });
 });

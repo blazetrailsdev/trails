@@ -1,6 +1,7 @@
 import { CodeGenerator, include, Module, TimeWithZone, toFs } from "@blazetrails/activesupport";
 import { AttributeMethods as AMAttributeMethods, Model } from "@blazetrails/activemodel";
 import {
+  type Concurrent,
   isEmpty,
   rbClassSuperclass,
   rbInspect as inspect,
@@ -144,7 +145,7 @@ export interface AttributeMethodsHost {
   _hasAttribute(attrName: string): boolean;
   attributeMethodPatterns: AttributeMethodPattern[];
   /** @internal */
-  attributeMethodPatternsCache(): Map<string, unknown>;
+  attributeMethodPatternsCache(): InstanceType<typeof Concurrent.Map<string, unknown>>;
   /** @internal */
   generatedAttributeMethods(): Module;
   defineAttributeMethodPattern(

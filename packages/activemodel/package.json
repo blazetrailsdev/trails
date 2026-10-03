@@ -24,9 +24,11 @@
   "license": "MIT",
   "dependencies": {
     "@blazetrails/activesupport": "workspace:*",
-    "@blazetrails/bcrypt": "workspace:*",
     "@blazetrails/date": "workspace:*",
     "@blazetrails/i18n": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "devDependencies": {
+    "@blazetrails/bcrypt": "workspace:*"
   }
 }
