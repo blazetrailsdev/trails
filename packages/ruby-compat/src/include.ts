@@ -186,7 +186,8 @@ export class Module {
    */
   moduleEval<T>(block: (mod: Record<string, unknown>) => T): T {
     const carrier = carrierOf(this);
-    const before = Object.getOwnPropertyDescriptors(carrier);
+    const before: Record<PropertyKey, PropertyDescriptor | undefined> =
+      Object.getOwnPropertyDescriptors(carrier);
     const result = block(carrier);
     const installed = trackedKeys(carrier);
     for (const key of installed) {
@@ -739,10 +740,10 @@ const delegateClass = Symbol.for("@blazetrails/ruby-compat:delegateClass");
 
 const STATIC_CLASS_KEYS = new Set(["prototype", "length", "name"]);
 
-function trackedKeys(proto: object, registry: symbol = includedKeys): Set<string> {
-  let set = (proto as Record<symbol, unknown>)[registry] as Set<string> | undefined;
+function trackedKeys(proto: object, registry: symbol = includedKeys): Set<string | symbol> {
+  let set = (proto as Record<symbol, unknown>)[registry] as Set<string | symbol> | undefined;
   if (!Object.prototype.hasOwnProperty.call(proto, registry)) {
-    set = new Set<string>();
+    set = new Set<string | symbol>();
     Object.defineProperty(proto, registry, {
       value: set,
       writable: true,
@@ -1126,8 +1127,14 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
       let ancestor: object | null = mod as ModuleObject;
       ancestor && ancestor !== Object.prototype;
     ) {
-      for (const [key, modDesc] of Object.entries(Object.getOwnPropertyDescriptors(ancestor))) {
-        if (key === "constructor" || /^[A-Z]/.test(key)) continue;
+      const modDescs = Object.getOwnPropertyDescriptors(ancestor) as Record<
+        string | symbol,
+        PropertyDescriptor
+      >;
+      for (const key of [...Object.keys(modDescs), Symbol.iterator]) {
+        const modDesc = modDescs[key];
+        if (modDesc === undefined) continue;
+        if (key === "constructor" || (typeof key === "string" && /^[A-Z]/.test(key))) continue;
         if ("value" in modDesc && typeof modDesc.value !== "function") continue;
         if (Object.prototype.hasOwnProperty.call(descriptors, key)) continue;
         if (Object.prototype.hasOwnProperty.call(klass.prototype, key) && !installed.has(key)) {

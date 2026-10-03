@@ -288,11 +288,6 @@ export class Errors<TBase extends object = object> {
     return rbObjDup(this);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE errors-symbol-iterator-comes-from-ruby-compat-enumerable */
-  [Symbol.iterator](): IterableIterator<ActiveModelError> {
-    return this._errors[Symbol.iterator]();
-  }
-
   get count(): number {
     return this._errors.length;
   }
@@ -320,6 +315,7 @@ export interface Errors<TBase extends object = object> {
   first(): ActiveModelError | null;
   first(n: number): ActiveModelError[];
   isAny(block?: (error: ActiveModelError) => unknown): boolean;
+  [Symbol.iterator](): IterableIterator<ActiveModelError>;
   toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
 }
 

@@ -102,8 +102,11 @@ describe("CommandRecorder", () => {
   });
 
   describe("invertAddExclusionConstraint / invertRemoveExclusionConstraint", () => {
-    it("invertAddExclusionConstraint returns removeExclusionConstraint", () => {
-      const [cmd] = new CommandRecorder().invertAddExclusionConstraint(["rooms", "during WITH &&"]);
+    it("invertAddExclusionConstraint returns removeExclusionConstraint", async () => {
+      const [cmd] = await new CommandRecorder().inverseOf("addExclusionConstraint", [
+        "rooms",
+        "during WITH &&",
+      ]);
       expect(cmd).toBe("removeExclusionConstraint");
     });
 
@@ -131,10 +134,29 @@ describe("CommandRecorder", () => {
     });
   });
 
-  describe("invertAddColumns", () => {
-    it("returns removeColumns", () => {
-      const [cmd] = new CommandRecorder().invertAddColumns(["users", "name", "age"]);
-      expect(cmd).toBe("removeColumns");
+  describe("StraightReversions", () => {
+    it("generates both directions of an inverse-table entry", async () => {
+      const recorder = new CommandRecorder();
+      const fn = () => {};
+      expect(await recorder.inverseOf("createJoinTable", ["a", "b"], fn)).toEqual([
+        "dropJoinTable",
+        ["a", "b"],
+        fn,
+      ]);
+      expect((await recorder.inverseOf("dropSchema", ["s"]))[0]).toBe("createSchema");
+      expect((await recorder.inverseOf("executeBlock", []))[0]).toBe("executeBlock");
+      expect((await recorder.inverseOf("removeBelongsTo", ["t", "r"]))[0]).toBe("addReference");
+    });
+
+    it("has no inverse for a command outside the table", async () => {
+      await expect(
+        new CommandRecorder().inverseOf("addColumns", ["users", "name"]),
+      ).rejects.toThrow(/This migration uses addColumns, which is not automatically reversible\./);
+      await expect(
+        new CommandRecorder().inverseOf("changeColumn", ["users", "name"]),
+      ).rejects.toThrow(
+        /This migration uses changeColumn, which is not automatically reversible\./,
+      );
     });
   });
 

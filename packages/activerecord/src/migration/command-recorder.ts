@@ -1,4 +1,4 @@
-import { hasKey } from "@blazetrails/ruby-compat";
+import { Module, hasKey, include, uniq } from "@blazetrails/ruby-compat";
 import { extractOptionsBang, isPlainObject, methodMissingProxy } from "@blazetrails/activesupport";
 
 import { ActiveRecord } from "../namespaces.js";
@@ -146,6 +146,40 @@ export class CommandRecorder {
     }
   }
 
+  private static StraightReversions = new Module((mod) => {
+    for (const [cmd, inv] of Object.entries({
+      executeBlock: "executeBlock",
+      createTable: "dropTable",
+      createJoinTable: "dropJoinTable",
+      addColumn: "removeColumn",
+      addIndex: "removeIndex",
+      addTimestamps: "removeTimestamps",
+      addReference: "removeReference",
+      addForeignKey: "removeForeignKey",
+      addCheckConstraint: "removeCheckConstraint",
+      addExclusionConstraint: "removeExclusionConstraint",
+      addUniqueConstraint: "removeUniqueConstraint",
+      enableExtension: "disableExtension",
+      createEnum: "dropEnum",
+      createSchema: "dropSchema",
+      createVirtualTable: "dropVirtualTable",
+    })) {
+      for (const [method, inverse] of uniq([
+        [inv, cmd],
+        [cmd, inv],
+      ])) {
+        mod.defineMethod(
+          `invert${method.charAt(0).toUpperCase()}${method.slice(1)}`,
+          (args: unknown[], block?: MigrationBlock): MigrationCommand => [inverse, args, block],
+        );
+      }
+    }
+  });
+
+  static {
+    include(this, this.StraightReversions);
+  }
+
   /**
    * @internal
    * @missingRailsCall delete — PERMANENT
@@ -155,7 +189,11 @@ export class CommandRecorder {
     if (isPlainObject(last)) {
       delete (last as Record<string, unknown>)["ifNotExists"];
     }
-    return ["dropTable", args, block];
+    return CommandRecorder.StraightReversions.instanceMethod("invertCreateTable")!.value.call(
+      this,
+      args,
+      block,
+    );
   }
 
   /** @internal */
@@ -177,39 +215,11 @@ export class CommandRecorder {
 
     if (Object.keys(options).length > 0) args = [...args, options];
 
-    return ["createTable", args, block];
-  }
-
-  /**
-   * @internal Straight reversion — `execute_block: :execute_block` (command_recorder.rb:158).
-   * @noRailsEquivalent CONVERGEABLE the `execute_block: :execute_block` entry of CommandRecorder's inverse table (command_recorder.rb:158) as a method.
-   */
-  invertExecuteBlock(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return ["executeBlock", args, block];
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE CommandRecorder#invert_create_join_table (command_recorder.rb:176).
-   */
-  invertCreateJoinTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return ["dropJoinTable", args, block];
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE the `drop_join_table: :create_join_table` inverse entry (command_recorder.rb:160) as a method.
-   */
-  invertDropJoinTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return ["createJoinTable", args, block];
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE the `add_column: :remove_column` inverse entry (command_recorder.rb:161) as a method.
-   */
-  invertAddColumn(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return ["removeColumn", args, block];
+    return CommandRecorder.StraightReversions.instanceMethod("invertDropTable")!.value.call(
+      this,
+      args,
+      block,
+    );
   }
 
   /** @internal */
@@ -219,15 +229,11 @@ export class CommandRecorder {
         "remove_column is only reversible if given a type.",
       );
     }
-    return ["addColumn", args, block];
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE the `add_index: :remove_index` inverse entry (command_recorder.rb:162) as a method.
-   */
-  invertAddIndex(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return ["removeIndex", args, block];
+    return CommandRecorder.StraightReversions.instanceMethod("invertRemoveColumn")!.value.call(
+      this,
+      args,
+      block,
+    );
   }
 
   /** @internal */
@@ -259,46 +265,22 @@ export class CommandRecorder {
     return ["addIndex", result];
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE the `add_timestamps: :remove_timestamps` inverse entry (command_recorder.rb:163) as a method.
-   */
-  invertAddTimestamps(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return ["removeTimestamps", args, block];
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE the `remove_timestamps: :add_timestamps` inverse entry (command_recorder.rb:163) as a method.
-   */
-  invertRemoveTimestamps(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return ["addTimestamps", args, block];
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE the `add_reference: :remove_reference` inverse entry (command_recorder.rb:164) as a method.
-   */
-  invertAddReference(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return ["removeReference", args, block];
-  }
-
   /** @internal */
   invertAddBelongsTo(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return this.invertAddReference(args, block);
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE CommandRecorder#invert_remove_reference (command_recorder.rb:176).
-   */
-  invertRemoveReference(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return ["addReference", args, block];
+    return CommandRecorder.StraightReversions.instanceMethod("invertAddReference")!.value.call(
+      this,
+      args,
+      block,
+    );
   }
 
   /** @internal */
   invertRemoveBelongsTo(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return this.invertRemoveReference(args, block);
+    return CommandRecorder.StraightReversions.instanceMethod("invertRemoveReference")!.value.call(
+      this,
+      args,
+      block,
+    );
   }
 
   /**
@@ -312,7 +294,11 @@ export class CommandRecorder {
       delete opts["validate"];
       a[a.length - 1] = opts;
     }
-    return ["removeForeignKey", a, block];
+    return CommandRecorder.StraightReversions.instanceMethod("invertAddForeignKey")!.value.call(
+      this,
+      a,
+      block,
+    );
   }
 
   /** @internal */
@@ -350,7 +336,9 @@ export class CommandRecorder {
       }
       a[a.length - 1] = opts;
     }
-    return ["removeCheckConstraint", a, block];
+    return CommandRecorder.StraightReversions.instanceMethod(
+      "invertAddCheckConstraint",
+    )!.value.call(this, a, block);
   }
 
   /** @internal */
@@ -369,15 +357,9 @@ export class CommandRecorder {
       }
       a[a.length - 1] = opts;
     }
-    return ["addCheckConstraint", a, block];
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE the `add_exclusion_constraint: :remove_exclusion_constraint` inverse entry (command_recorder.rb:167) as a method.
-   */
-  invertAddExclusionConstraint(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return ["removeExclusionConstraint", args, block];
+    return CommandRecorder.StraightReversions.instanceMethod(
+      "invertRemoveCheckConstraint",
+    )!.value.call(this, a, block);
   }
 
   /** @internal */
@@ -387,7 +369,9 @@ export class CommandRecorder {
         "remove_exclusion_constraint is only reversible if given an expression.",
       );
     }
-    return ["addExclusionConstraint", args, block];
+    return CommandRecorder.StraightReversions.instanceMethod(
+      "invertRemoveExclusionConstraint",
+    )!.value.call(this, args, block);
   }
 
   /** @internal */
@@ -401,7 +385,9 @@ export class CommandRecorder {
         "add_unique_constraint is not reversible if given an using_index.",
       );
     }
-    return ["removeUniqueConstraint", args, block];
+    return CommandRecorder.StraightReversions.instanceMethod(
+      "invertAddUniqueConstraint",
+    )!.value.call(this, args, block);
   }
 
   /** @internal */
@@ -421,7 +407,9 @@ export class CommandRecorder {
         "remove_unique_constraint is only reversible if given an column_name.",
       );
     }
-    return ["addUniqueConstraint", args, block];
+    return CommandRecorder.StraightReversions.instanceMethod(
+      "invertRemoveUniqueConstraint",
+    )!.value.call(this, args, block);
   }
 
   /** @internal */
@@ -436,16 +424,6 @@ export class CommandRecorder {
   invertRenameColumn(args: unknown[]): [string, unknown[]] {
     const [table, oldName, newName, ...rest] = args;
     return ["renameColumn", [table, newName, oldName, ...rest]];
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE CommandRecorder#invert_change_column, which Ruby defines only to raise IrreversibleMigration (command_recorder.rb:53).
-   */
-  invertChangeColumn(_args: unknown[]): [string, unknown[]] {
-    throw new ActiveRecord.IrreversibleMigration(
-      "change_column is not reversible. Use change_column_default or change_column_null instead.",
-    );
   }
 
   /**
@@ -480,14 +458,6 @@ export class CommandRecorder {
       );
     }
     return ["addColumns", args];
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE the `[:add_columns, args]` return of CommandRecorder#invert_remove_columns (command_recorder.rb:233), which Ruby reaches by inversion rather than a named method.
-   */
-  invertAddColumns(args: unknown[]): [string, unknown[]] {
-    return ["removeColumns", args];
   }
 
   /** @internal */
@@ -560,54 +530,6 @@ export class CommandRecorder {
     return ["changeTableComment", [table, { from: opts["to"], to: opts["from"] }]];
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE the `create_enum: :drop_enum` inverse entry (command_recorder.rb:170) as a method.
-   */
-  invertCreateEnum(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return ["dropEnum", args, block];
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE the `enable_extension: :disable_extension` inverse entry (command_recorder.rb:169) as a method.
-   */
-  invertEnableExtension(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return ["disableExtension", args, block];
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE the `disable_extension: :enable_extension` inverse entry (command_recorder.rb:169) as a method.
-   */
-  invertDisableExtension(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return ["enableExtension", args, block];
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE the `create_schema: :drop_schema` inverse entry (command_recorder.rb:171) as a method.
-   */
-  invertCreateSchema(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return ["dropSchema", args, block];
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE the `drop_schema: :create_schema` inverse entry (command_recorder.rb:171) as a method.
-   */
-  invertDropSchema(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return ["createSchema", args, block];
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE the `create_virtual_table: :drop_virtual_table` inverse entry (command_recorder.rb:172) as a method.
-   */
-  invertCreateVirtualTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return ["dropVirtualTable", args, block];
-  }
-
   /** @internal */
   invertDropEnum(args: unknown[], block?: MigrationBlock): MigrationCommand {
     const a = args.slice();
@@ -624,7 +546,11 @@ export class CommandRecorder {
         "drop_enum is only reversible if given a list of enum values.",
       );
     }
-    return ["createEnum", args, block];
+    return CommandRecorder.StraightReversions.instanceMethod("invertDropEnum")!.value.call(
+      this,
+      args,
+      block,
+    );
   }
 
   /** @internal */
@@ -674,7 +600,11 @@ export class CommandRecorder {
         "drop_virtual_table is only reversible if given options.",
       );
     }
-    return ["createVirtualTable", args, block];
+    return CommandRecorder.StraightReversions.instanceMethod("invertDropVirtualTable")!.value.call(
+      this,
+      args,
+      block,
+    );
   }
 
   /** @internal */
