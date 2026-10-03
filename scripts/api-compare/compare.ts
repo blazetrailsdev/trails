@@ -116,6 +116,7 @@ import {
   rubyFileToTs,
   rubyCallToTs,
   rubyMethodToTs,
+  snakeToCamel,
 } from "@blazetrails/parity/conventions";
 import {
   isForwardingRubyEntry,
@@ -592,11 +593,12 @@ export function significantCallsForReceivers(
   receivers: Record<string, readonly string[]> | undefined,
   base: { has(value: string): boolean } = SIGNIFICANT_CALLS,
   tsNativeForms: ReadonlySet<string> = new Set(),
+  receiverNames?: Record<string, readonly string[]>,
 ): { has(value: string): boolean } {
   return {
     has: (value) => {
       if (!base.has(value)) return false;
-      if (hasNativeFormAnalogue(value, receivers, tsNativeForms)) return false;
+      if (hasNativeFormAnalogue(value, receivers, tsNativeForms, receiverNames)) return false;
       if (!POSITIONAL_ARRAY_ANALOGUES.has(value)) return true;
       const kinds = receivers?.[value];
       return !(kinds && kinds.length > 0 && kinds.every((k) => k === "array"));
@@ -608,12 +610,18 @@ function hasNativeFormAnalogue(
   value: string,
   receivers: Record<string, readonly string[]> | undefined,
   tsNativeForms: ReadonlySet<string>,
+  receiverNames: Record<string, readonly string[]> | undefined,
 ): boolean {
   const analogue = NATIVE_FORM_ANALOGUES.get(value);
   if (analogue === undefined || !tsNativeForms.has(analogue.form)) return false;
   const kinds = receivers?.[value];
   if (analogue.receivers === "implicit-self") return kinds === undefined;
-  return kinds !== undefined && !kinds.some((k) => LENGTH_READ_UNCREDITED_RECEIVER_KINDS.has(k));
+  if (kinds === undefined || kinds.some((k) => LENGTH_READ_UNCREDITED_RECEIVER_KINDS.has(k))) {
+    return false;
+  }
+  return (receiverNames?.[value] ?? []).every((name) =>
+    tsNativeForms.has(`${analogue.form}:${snakeToCamel(name)}`),
+  );
 }
 
 /**
@@ -4649,6 +4657,7 @@ export function main() {
       // had (RFC 0129), which the ruby-compat half of `jsEnumerableAliases`
       // needs to tell `options.fetch` from `cache.fetch`.
       const rubyCallReceiversByName = new Map<string, Record<string, string[]>>();
+      const rubyCallReceiverNamesByName = new Map<string, Record<string, string[]>>();
       // First-sighting Ruby body digest per name (source-hash pinning, RFC 0025).
       const rubyBodyDigestByName = new Map<string, string>();
       const rubySkeletonByName = new Map<string, string[]>();
@@ -4660,7 +4669,12 @@ export function main() {
       const rubyOwnersByName = new Map<string, Set<string>>();
       const rubyCallsByOwnerName = new Map<
         string,
-        { calls: string[]; weak: string[]; receivers: Record<string, string[]> }
+        {
+          calls: string[];
+          weak: string[];
+          receivers: Record<string, string[]>;
+          receiverNames: Record<string, string[]>;
+        }
       >();
       const rubyCallArgsByOwnerName = new Map<string, CallSite[]>();
       const rubyReaderNames = new Set<string>();
@@ -4722,12 +4736,14 @@ export function main() {
             rubyCallsByName.set(rm.name, rm.calls);
             rubyWeakCallsByName.set(rm.name, rm.weakCalls ?? []);
             rubyCallReceiversByName.set(rm.name, rm.callReceivers ?? {});
+            rubyCallReceiverNamesByName.set(rm.name, rm.callReceiverNames ?? {});
           }
           if (rm.calls && !rubyCallsByOwnerName.has(rubyBodyKey(item.fqn, rmLevel, rm.name))) {
             rubyCallsByOwnerName.set(rubyBodyKey(item.fqn, rmLevel, rm.name), {
               calls: rm.calls,
               weak: rm.weakCalls ?? [],
               receivers: rm.callReceivers ?? {},
+              receiverNames: rm.callReceiverNames ?? {},
             });
           }
           if (
@@ -4917,6 +4933,7 @@ export function main() {
               calls: rubyCallsByName.get(rubyName) ?? [],
               weak: rubyWeakCallsByName.get(rubyName) ?? [],
               receivers: rubyCallReceiversByName.get(rubyName) ?? {},
+              receiverNames: rubyCallReceiverNamesByName.get(rubyName) ?? {},
             };
         // A body whose every Ruby call is weak still gets compared:
         // significantMissingCalls returns empty for an empty `rubyCalls`, so the
@@ -4993,7 +5010,12 @@ export function main() {
           // gate the moment alias bindings started carrying real params.
           (c) => portedWithArgsSigs(tsFile, c).some((sig) => stripThis(sig).length > 0),
           (rc) => rubyCallToTsForBody(rc, rubyOwned?.receivers),
-          significantCallsForReceivers(rubyOwned?.receivers, callsSignificant, tsNativeForms),
+          significantCallsForReceivers(
+            rubyOwned?.receivers,
+            callsSignificant,
+            tsNativeForms,
+            rubyOwned?.receiverNames,
+          ),
           (rc) => jsEnumerableAliases(rc, rubyOwned?.receivers?.[rc]),
           negatedTsCalls,
           rubyOwned?.calls ?? rubyCalls,

@@ -5583,6 +5583,8 @@ function collectCalls(
         addNegated(n, n.name.text);
         if (!skipHoistedClosures && n.name.text === "length") {
           names.add(`${NATIVE_FORM_PREFIX}length`);
+          const tail = receiverTailName(n.expression);
+          if (tail !== undefined) names.add(`${NATIVE_FORM_PREFIX}length:${tail}`);
         }
       }
     }
@@ -5603,6 +5605,27 @@ function collectCalls(
   }
   if (names.size === 0) return undefined;
   return [...names];
+}
+
+/**
+ * The name a `.length` read's receiver ends in — `cursor`, `result.columns` →
+ * `columns`, `(await c.selectRows(…))` → `selectRows`, `wrap(ids)` → `wrap` —
+ * the TS half of extract-ruby-api.rb#receiver_tail_name.
+ */
+function receiverTailName(receiver: ts.Expression): string | undefined {
+  let e = receiver;
+  while (
+    ts.isParenthesizedExpression(e) ||
+    ts.isAwaitExpression(e) ||
+    ts.isNonNullExpression(e) ||
+    ts.isAsExpression(e)
+  ) {
+    e = e.expression;
+  }
+  if (ts.isCallExpression(e)) e = e.expression;
+  if (ts.isIdentifier(e)) return e.text;
+  if (ts.isPropertyAccessExpression(e)) return e.name.text;
+  return undefined;
 }
 
 /**

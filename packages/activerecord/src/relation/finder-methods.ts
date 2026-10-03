@@ -378,8 +378,7 @@ export function raiseRecordNotFoundExceptionBang(
     );
   }
 
-  const wrapped = wrap(ids);
-  if (wrapped.length === 1) {
+  if (wrap(ids).length === 1) {
     throw new RecordNotFound(
       `Couldn't find ${name} with '${keyToS}'=${idsToS}${conditions}`,
       name,

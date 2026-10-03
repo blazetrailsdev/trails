@@ -2128,12 +2128,13 @@ class ApiExtractor
     mark_symbol_discriminated(entry[:params], body)
     entry[:takesBlock] = true if entry[:params].any? { |p| p[:kind] == "block" } || body_takes_block?(body)
     dep_info = detect_deps(body)
-    calls, weak_calls, call_receivers = collect_method_calls(body, params_node)
+    calls, weak_calls, call_receivers, call_receiver_names = collect_method_calls(body, params_node)
     entry[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
     entry[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
     entry[:calls] = calls unless calls.empty?
     entry[:weakCalls] = weak_calls unless weak_calls.empty?
     entry[:callReceivers] = call_receivers unless call_receivers.empty?
+    entry[:callReceiverNames] = call_receiver_names unless call_receiver_names.empty?
     call_args = collect_call_args(body)
     entry[:callArgs] = call_args unless call_args.empty?
     skeleton = collect_method_skeleton(body)
@@ -2739,26 +2740,31 @@ class ApiExtractor
     calls = []
     weak = []
     receivers = {}
+    receiver_names = {}
     with_capture_locals do
       with_call_receivers(body_node, params_node) do
         walk_for_calls(body_node, calls, weak)
         calls = drop_raised_new(calls)
         receivers = call_receiver_kinds(calls.uniq)
+        receiver_names = @call_receiver_names.transform_values { |names| names.to_a.sort }
       end
     end
     total = calls.tally
     weak_calls = weak.tally.select { |name, n| total[name] == n }.keys
-    [calls.uniq, weak_calls, receivers]
+    [calls.uniq, weak_calls, receivers, receiver_names]
   end
 
   def with_call_receivers(body_node, params_node)
     outer_receivers = @call_receivers
+    outer_receiver_names = @call_receiver_names
     outer_hash_locals = @hash_locals
     @call_receivers = {}
+    @call_receiver_names = {}
     @hash_locals = hash_typed_locals(body_node, params_node)
     yield
   ensure
     @call_receivers = outer_receivers
+    @call_receiver_names = outer_receiver_names
     @hash_locals = outer_hash_locals
   end
 
@@ -2803,6 +2809,33 @@ class ApiExtractor
     when :const_path_ref, :top_const_ref then "const"
     when :call, :method_add_arg then chain_receiver_kind(recv)
     else "expr"
+    end
+  end
+
+  # The calls whose non-`array` receivers `callReceiverNames` records, read by
+  # compare.ts's `.length`-read credit for `size` / `length`.
+  RECEIVER_NAMED_CALLS = %w[size length].freeze
+
+  # The name a receiver ENDS in — a local or reader (`cursor`, `predicates`), the
+  # method of a call chain (`result.columns` → `columns`,
+  # `c.select_rows(…)` → `select_rows`, `Array.wrap(ids)` → `wrap`), an ivar
+  # (`@stack`) or a constant — or nil for any other shape.
+  def receiver_tail_name(recv)
+    return nil unless recv.is_a?(Array)
+
+    case recv[0]
+    when :var_ref, :vcall
+      inner = recv[1]
+      inner.is_a?(Array) && %i[@ident @ivar @const].include?(inner[0]) ? inner[1] : nil
+    when :call then recv[3].is_a?(Array) ? ident_name(recv[3]) : nil
+    when :method_add_arg
+      callee = recv[1]
+      return nil unless callee.is_a?(Array)
+
+      case callee[0]
+      when :fcall then ident_name(callee[1])
+      when :call then callee[3].is_a?(Array) ? ident_name(callee[3]) : nil
+      end
     end
   end
 
@@ -3000,7 +3033,7 @@ class ApiExtractor
       end
     when :massign
       each_massign_ivar(node[1]) { |name| assigned[[owner.join("::"), name]] = nil }
-    when :command, :method_add_arg
+    when :command, :command_call, :method_add_arg
       external_ivar_writes(node).each { |name| assigned[[owner.join("::"), name]] = nil }
     end
     node.each { |child| typed_ivars(child, owner, assigned, singleton) if child.is_a?(Array) }
@@ -3010,17 +3043,18 @@ class ApiExtractor
   IVAR_WRITER_MACROS = %w[attr_writer attr_accessor].freeze
 
   def external_ivar_writes(node)
-    callee = node[0] == :command ? node : node[1]
+    callee = %i[command command_call].include?(node[0]) ? node : node[1]
     return [] unless callee.is_a?(Array)
 
     name = case callee[0]
            when :command, :fcall then ident_name(callee[1])
-           when :call then callee[3].is_a?(Array) ? ident_name(callee[3]) : nil
+           when :call, :command_call then callee[3].is_a?(Array) ? ident_name(callee[3]) : nil
            end
-    return extract_symbol_args(node[2]).map { |attr| "@#{attr}" } if IVAR_WRITER_MACROS.include?(name)
+    args = node[0] == :command_call ? node[4] : node[2]
+    return extract_symbol_args(args).map { |attr| "@#{attr}" } if IVAR_WRITER_MACROS.include?(name)
     return [] unless name == "instance_variable_set"
 
-    first = first_call_arg(node[2])
+    first = first_call_arg(args)
     ivar = first.is_a?(Array) && first[0] == :symbol_literal && first[1].is_a?(Array) && first[1][1]
     ivar.is_a?(Array) && ivar[0] == :@ivar ? [ivar[1]] : ["*"]
   end
@@ -3814,7 +3848,11 @@ class ApiExtractor
     if name && !name.start_with?("_") && name =~ /\A[a-z]/ &&
        !(name == "new" && recv && proc_new_receiver?(recv))
       calls << name
-      (@call_receivers[name] ||= Set.new) << receiver_kind(recv)
+      kind = receiver_kind(recv)
+      (@call_receivers[name] ||= Set.new) << kind
+      if RECEIVER_NAMED_CALLS.include?(name) && recv && kind != "array"
+        (@call_receiver_names[name] ||= Set.new) << (receiver_tail_name(recv) || "?")
+      end
       weak << name if (recv && inert_receiver?(recv)) || core_receiver_call?(name, recv)
     end
 

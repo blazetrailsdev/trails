@@ -1207,8 +1207,23 @@ describe("body call capture", () => {
     );
     const read = cls.instanceMethods.find((m) => m.name === "read")!;
     expect(read.calls).toContain("@length");
+    expect(read.calls).toContain("@length:xs");
     const called = cls.instanceMethods.find((m) => m.name === "called")!;
     expect(called.calls).not.toContain("@length");
+  });
+
+  it("names the receiver a .length read ends in", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        async exists(c: { selectRows(): Promise<unknown[]> }, result: { columns: string[] }) {
+          return (await c.selectRows()).length === result.columns.length + wrap(ids).length;
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "exists")!;
+    expect(m.calls).toEqual(
+      expect.arrayContaining(["@length:selectRows", "@length:columns", "@length:wrap"]),
+    );
   });
 
   it("marks a dynamic import() of a computed specifier as a native form, not a literal one", () => {

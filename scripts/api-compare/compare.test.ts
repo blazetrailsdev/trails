@@ -409,11 +409,29 @@ describe("significantMissingCalls", () => {
     const sig = significantCallsForReceivers(
       { size: ["expr", "local"], length: ["array", "expr"] },
       undefined,
-      new Set(["length"]),
+      new Set(["length", "length:selectRows", "length:notFoundIds", "length:columns"]),
+      { size: ["not_found_ids", "select_rows"], length: ["columns"] },
     );
     expect(sig.has("size")).toBe(false);
     expect(sig.has("length")).toBe(false);
     expect(sig.has("first")).toBe(true);
+  });
+
+  it("significantCallsForReceivers still flags size when no .length read is off the Ruby receiver's name", () => {
+    const sig = significantCallsForReceivers(
+      { size: ["expr", "local"] },
+      undefined,
+      new Set(["length", "length:s", "length:cursor"]),
+      { size: ["cursor", "records"] },
+    );
+    expect(sig.has("size")).toBe(true);
+    const unnamed = significantCallsForReceivers(
+      { size: ["expr"] },
+      undefined,
+      new Set(["length", "length:s"]),
+      { size: ["?"] },
+    );
+    expect(unnamed.has("size")).toBe(true);
   });
 
   it("significantCallsForReceivers still flags size for a TS body with no .length read", () => {

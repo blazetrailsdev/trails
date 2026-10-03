@@ -3105,6 +3105,7 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
   // Returns a map of "<fqn>#<method>" -> callReceivers.
   function rubyCallReceivers(
     fixtures: Record<string, string>,
+    field = "callReceivers",
   ): Record<string, Record<string, string[]> | undefined> {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "recv-rb-"));
     try {
@@ -3124,7 +3125,7 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
         out = {}
         ex.classes.each do |fqn, info|
           (info[:instanceMethods] + info[:classMethods]).each do |m|
-            out["#{fqn}##{m[:name]}"] = m[:callReceivers]
+            out["#{fqn}##{m[:name]}"] = m[:${field}]
           end
         end
         puts JSON.generate(out)
@@ -3289,6 +3290,17 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
           end
         end
 
+        class SelfWriter
+          def initialize
+            @stack = []
+          end
+
+          def call(name, value)
+            @stack.last
+            self.instance_variable_set :@stack, value
+          end
+        end
+
         class DynamicWriter
           def initialize
             @stack = []
@@ -3303,6 +3315,32 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
     expect(c["Writers#call"]).toEqual({ size: ["ivar"], last: ["array"] });
     expect(c["DynamicWriter#call"]).toEqual({ last: ["ivar"] });
+    expect(c["SelfWriter#call"]).toEqual({ last: ["ivar"] });
+  });
+
+  it("names the receiver each non-Array size or length site ends in", () => {
+    const c = rubyCallReceivers(
+      {
+        "lib/active_record/named.rb": `
+          class Named
+            def call(cursor, c, result, ids)
+              Array(cursor).size
+              cursor.size
+              c.select_rows(sql).size
+              result.columns.length
+              Array.wrap(ids).size
+              predicates.size
+              (a || b).size
+            end
+          end
+        `,
+      },
+      "callReceiverNames",
+    );
+    expect(c["Named#call"]).toEqual({
+      size: ["?", "cursor", "predicates", "select_rows", "wrap"],
+      length: ["columns"],
+    });
   });
 
   it("proves a Kernel#Array call receiver an Array", () => {
