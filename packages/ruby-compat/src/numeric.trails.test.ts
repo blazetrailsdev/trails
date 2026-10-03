@@ -117,6 +117,8 @@ describe("Numeric#**", () => {
     expect(numericPow(10, -1)).toEqual(new Rational(1, 10));
     expect(numericPow(10, 5.5)).toBe(316227.7660168379);
     expect(numericPow(0.5, 2)).toBe(0.25);
+    expect(numericPow(1, -2)).toBe(1);
+    expect(numericPow(-1, -3)).toBe(-1);
     expect(() => numericPow(0, -1)).toThrow("divided by 0");
   });
 });

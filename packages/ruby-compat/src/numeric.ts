@@ -325,6 +325,8 @@ export function numericPow(x: unknown, y: unknown): unknown {
   if (rbIntegerTypeP(x) && rbIntegerTypeP(y)) {
     const a = BigInt(x);
     const b = BigInt(y);
+    if (a === 1n) return 1;
+    if (a === -1n) return b % 2n ? -1 : 1;
     if (b < 0n) {
       if (a === 0n) throw new ZeroDivisionError("divided by 0");
       return new Rational(1n, a ** -b);
