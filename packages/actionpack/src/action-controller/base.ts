@@ -321,6 +321,10 @@ export interface Base {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Metal {
+  static {
+    this.abstractBang();
+  }
+
   get flash(): FlashHash {
     return this.request.flash!;
   }
@@ -329,6 +333,10 @@ export class Base extends Metal {
     (): PathSet;
     (paths: PathSet): void;
   } = ViewPathsClassMethods._viewPaths;
+  /** @internal */
+  static _prefixes: () => string[] = ViewPathsClassMethods._prefixes;
+  /** @internal */
+  static localPrefixes: () => string[] = ViewPathsClassMethods.localPrefixes;
   static appendViewPath: (path: ViewPathsInput) => void = ViewPathsClassMethods.appendViewPath;
   static prependViewPath: (path: ViewPathsInput) => void = ViewPathsClassMethods.prependViewPath;
   static viewPaths: {

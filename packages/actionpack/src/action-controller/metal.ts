@@ -104,6 +104,10 @@ const NULL: Strategy = () => true;
 const _middlewareStacks = new WeakMap<object, MiddlewareStack>();
 
 export class Metal extends AbstractController {
+  static {
+    this.abstractBang();
+  }
+
   _request!: Request;
   _response!: Response;
   _params: Parameters | Record<string, unknown> | null = null;

@@ -166,6 +166,47 @@ describe("ActionController::Base bare render", () => {
   });
 });
 
+describe("ActionView::ViewPaths.local_prefixes (view_paths.rb:73-77)", () => {
+  class HyphenatedController extends ApplicationController {
+    static localPrefixes(): string[] {
+      return [this.controllerPath().replace(/_/g, "-")];
+    }
+  }
+
+  class RfcPagesController extends HyphenatedController {
+    async show(): Promise<void> {
+      await this.render();
+    }
+  }
+
+  beforeAll(() => {
+    RfcPagesController.prependViewPath(
+      new FixtureResolver({ "rfc-pages/show.html.html": "from rfc-pages" }),
+    );
+  });
+
+  it("renders from the prefix an overriding controller names", async () => {
+    const c = new RfcPagesController();
+    await c.dispatch("show", makeRequest(), new Response());
+    expect(c.responseBody).toBe("from rfc-pages");
+  });
+
+  it("stops the prefix chain at ActionController::Base, which is abstract (base.rb:208)", () => {
+    class PlainController extends ApplicationController {}
+    expect([Base.isAbstract(), Metal.isAbstract(), ApplicationController.isAbstract()]).toEqual([
+      true,
+      true,
+      false,
+    ]);
+    expect(PlainController._prefixes()).toEqual(["plain", "application"]);
+  });
+
+  it("leaves controller_path, which routes and tests read, as Rails derives it", () => {
+    expect(RfcPagesController.controllerPath()).toBe("rfc_pages");
+    expect(RfcPagesController._prefixes()[0]).toBe("rfc-pages");
+  });
+});
+
 describe("ActionView::Helpers::ControllerHelper#assign_controller", () => {
   class Post extends Model {}
 
