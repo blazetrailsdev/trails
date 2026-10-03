@@ -13,29 +13,27 @@ interface CallbacksInstance {
   runCallbacks: Included<typeof Callbacks>["runCallbacks"];
 }
 
-export function prepended(
-  klass: (abstract new (...args: never[]) => object) & CallbacksHost,
-): void {
+export function prepended(klass: abstract new (...args: never[]) => object): void {
   include(klass, Callbacks);
-  klass.defineCallbacks("setup", "teardown");
+  (klass as typeof klass & CallbacksHost).defineCallbacks("setup", "teardown");
 }
 
-export function setup(this: CallbacksHost, ...args: FilterListEntry<object>[]): void {
-  this.setCallback("setup", "before", ...args);
+export function setup(this: object, ...args: FilterListEntry<object>[]): void {
+  (this as CallbacksHost).setCallback("setup", "before", ...args);
 }
 
-export function teardown(this: CallbacksHost, ...args: FilterListEntry<object>[]): void {
-  this.setCallback("teardown", "after", ...args);
+export function teardown(this: object, ...args: FilterListEntry<object>[]): void {
+  (this as CallbacksHost).setCallback("teardown", "after", ...args);
 }
 
-export function beforeSetup(this: CallbacksInstance, super_: () => unknown): unknown {
+export function beforeSetup(this: object, super_: () => unknown): unknown {
   const result = super_();
   return result instanceof Promise
-    ? result.then(() => this.runCallbacks("setup"))
-    : this.runCallbacks("setup");
+    ? result.then(() => (this as CallbacksInstance).runCallbacks("setup"))
+    : (this as CallbacksInstance).runCallbacks("setup");
 }
 
-export function afterTeardown(this: Test & CallbacksInstance, super_: () => unknown): unknown {
+export function afterTeardown(this: Test, super_: () => unknown): unknown {
   const rescue = (e: unknown): void => {
     if (e instanceof Assertion) {
       this.failures.push(e);
@@ -44,7 +42,7 @@ export function afterTeardown(this: Test & CallbacksInstance, super_: () => unkn
     }
   };
   try {
-    const result = this.runCallbacks("teardown");
+    const result = (this as Test & CallbacksInstance).runCallbacks("teardown");
     if (result instanceof Promise) return result.then(() => {}, rescue).then(() => super_());
   } catch (e) {
     rescue(e);

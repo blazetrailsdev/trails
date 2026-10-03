@@ -44,8 +44,7 @@ import {
   unfreezeTime,
 } from "./testing/time-helpers.js";
 import { FileFixtures } from "./testing/file-fixtures.js";
-import { include, type Extended, type Included } from "@blazetrails/ruby-compat/include";
-import type { Callbacks } from "./callbacks.js";
+import { include } from "@blazetrails/ruby-compat/include";
 import { prepend, type PrependMethod } from "@blazetrails/ruby-compat";
 
 export class TestCase extends Minitest.Test {
@@ -71,10 +70,6 @@ export class TestCase extends Minitest.Test {
   static setTaggedLogger = setTaggedLogger;
   /** @internal */
   static taggedLogger = taggedLogger;
-
-  declare static defineCallbacks: Extended<typeof Callbacks.ClassMethods>["defineCallbacks"];
-  declare static setCallback: Extended<typeof Callbacks.ClassMethods>["setCallback"];
-  declare runCallbacks: Included<typeof Callbacks>["runCallbacks"];
 
   static setup = setup;
   static teardown = teardown;
