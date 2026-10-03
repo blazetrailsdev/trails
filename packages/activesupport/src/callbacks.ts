@@ -1065,6 +1065,13 @@ export function defineCallbacks<T extends object>(
     configurable: true,
   });
 
+  Object.defineProperty(target, `_${camelize(name, false)}Callbacks`, {
+    get(this: object) {
+      return peekCallbackChain(this, name);
+    },
+    configurable: true,
+  });
+
   if (Object.prototype.hasOwnProperty.call(target, "constructor")) {
     Object.defineProperty(target.constructor, `_${camelize(name, false)}Callbacks`, {
       get(this: { prototype: object }) {

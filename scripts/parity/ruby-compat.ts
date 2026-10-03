@@ -114,9 +114,6 @@ export const RECEIVER_KEYED_RUBY_COMPAT_EXPORTS = new Map<
   ["Hash#update", { tsExport: "update", receiver: "hash" }],
   ["String#delete", { tsExport: "stringDelete", receiver: "string" }],
   ["String#dump", { tsExport: "rbStrDump", receiver: "string" }],
-  // `::String.new(value)` records `const`, a kind that proves no class, so the
-  // row never resolves in reverse for another `Foo.new`; forward, the body
-  // calling `rbStrSNew` is the proof of its receiver.
   ["String.new", { tsExport: "rbStrSNew", receiver: "string" }],
   ["String#split", { tsExport: "stringSplit", receiver: "string" }],
   ["String#succ", { tsExport: "succ", receiver: "string" }],

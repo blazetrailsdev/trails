@@ -106,7 +106,13 @@ describe("defineCallbacks generates _run<Name>Callbacks (trails)", () => {
     setCallback(Record.prototype, "save", "before", (r: Record) => {
       r.log.push("before");
     });
-    const record = new Record() as Record & { _runSaveCallbacks(block?: () => unknown): unknown };
+    const record = new Record() as Record & {
+      _runSaveCallbacks(block?: () => unknown): unknown;
+      _saveCallbacks: CallbackChain;
+    };
+    expect(record._saveCallbacks).toBe(
+      (Record as unknown as { _saveCallbacks: unknown })._saveCallbacks,
+    );
 
     expect(
       record._runSaveCallbacks(() => {
