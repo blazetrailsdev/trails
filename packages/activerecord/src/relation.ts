@@ -1668,10 +1668,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this._cacheVersions.get(timestampColumn)!;
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs max — CONVERGEABLE call-args-gate-aligns-the-receiver-of-function-form-fetch-and-max
-   */
+  /** @internal */
   async computeCacheVersion(timestampColumn = "updated_at"): Promise<string> {
     timestampColumn = String(timestampColumn);
 

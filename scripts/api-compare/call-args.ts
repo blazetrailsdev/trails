@@ -526,6 +526,16 @@ for (const [mri, { tsExport }] of RECEIVER_KEYED_RUBY_COMPAT_EXPORTS) {
   exports.add(tsExport);
 }
 
+/** Ruby core `Module#prepend` / `Module#include` / `Object#extend`
+ *  (`vendor/ruby/v3.3.11/eval.c:1196,1139,1778`), ported by ruby-compat's
+ *  `prepend(klass, mod)` / `include(klass, mod)` / `extend(obj, mod)` with the
+ *  Ruby receiver as argument 1. CLAUDE.md § "Module mixins" names them as the
+ *  ports; aligned by callee only, since `self.include(UrlFor)` on a live
+ *  `Module` is the method form and compares as written. A site importing the
+ *  `@blazetrails/activesupport` re-export records no `rubyCompat`, so it is
+ *  not aligned. */
+const MODULE_MIXIN_EXPORTS = new Set(["prepend", "include", "extend"]);
+
 /**
  * Whether the TS site carries the Ruby receiver as argument 1: by name, for a
  * {@link RECEIVER_AS_FIRST_ARG} built-in; or by callee, where the name is one
@@ -537,6 +547,7 @@ for (const [mri, { tsExport }] of RECEIVER_KEYED_RUBY_COMPAT_EXPORTS) {
  */
 function receiverIsFirstArg(ruby: CallSite, ts: CallSite): boolean {
   if (RECEIVER_AS_FIRST_ARG.has(ruby.name)) return true;
+  if (MODULE_MIXIN_EXPORTS.has(ruby.name)) return ts.rubyCompat === ruby.name;
   return (
     ts.rubyCompat !== undefined &&
     RECEIVER_KEYED_EXPORTS_BY_NAME.get(ruby.name)?.has(ts.rubyCompat) === true

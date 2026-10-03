@@ -60,7 +60,6 @@ export class Schema<A extends DatabaseAdapter = DatabaseAdapter> extends Current
 
   declare private static _classForVersion: Map<string | number, typeof Migration> | undefined;
 
-  /** @missingRailsArgs include — PERMANENT */
   static get(version: string | number): typeof Migration {
     if (!Object.hasOwn(this, "_classForVersion")) this._classForVersion = new Map();
     if (!this._classForVersion!.has(version)) {

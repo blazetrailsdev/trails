@@ -788,7 +788,6 @@ export class RouteSet {
     return (this._urlHelpersWithoutPaths ??= this.generateUrlHelpers(false));
   }
 
-  /** @missingRailsArgs extend — PERMANENT */
   generateUrlHelpers(supportsPath: boolean): UrlHelpersModule {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const routes = this;

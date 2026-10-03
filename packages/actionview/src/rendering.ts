@@ -62,7 +62,6 @@ export function isInheritViewContextClass(this: ViewContextClassMethods): boolea
   );
 }
 
-/** @missingRailsArgs include — PERMANENT */
 export function buildViewContextClass(
   this: ViewContextClassMethods,
   klass: typeof Base,

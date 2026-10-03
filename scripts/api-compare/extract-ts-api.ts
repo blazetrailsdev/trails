@@ -5542,6 +5542,7 @@ function describeArg(node: ts.Expression, flags: string[]): string {
     return name === undefined ? "?" : `call:${name}`;
   }
   if (ts.isPropertyAccessExpression(expr)) {
+    if (expr.name.text === "prototype") return describeArg(expr.expression, flags);
     // A property READ is Ruby's reader send (`x.foo`) or its ivar (`@foo`) —
     // `const:` when the name is constant-shaped, matching `Foo::BAR`.
     const name = expr.name.text;

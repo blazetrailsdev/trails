@@ -214,10 +214,7 @@ export class V7_0 extends V7_1 {
     await super.addForeignKey(fromTable, toTable, options);
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs prepend — PERMANENT
-   */
+  /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
     prepend(t as object, V7_0.TableDefinition);
     return super.compatibleTableDefinition(t);
@@ -400,10 +397,7 @@ export class V5_2 extends V6_0 {
     return super.compatibleTableDefinition(t);
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs prepend — PERMANENT
-   */
+  /** @internal */
   override async commandRecorder(): Promise<MigrationCommandRecorder> {
     const recorder = await super.commandRecorder();
     prepend(recorder, V5_2.CommandRecorder);

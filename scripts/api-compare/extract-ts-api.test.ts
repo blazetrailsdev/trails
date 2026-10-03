@@ -5053,6 +5053,24 @@ describe("callArgs", () => {
     ]);
   });
 
+  it("describes an X.prototype argument as X", () => {
+    expect(
+      site(
+        `class Foo {
+          create() {
+            prepend(UniquenessValidator.prototype, EncryptedUniquenessValidator);
+          }
+        }`,
+      ),
+    ).toEqual([
+      {
+        name: "prepend",
+        args: ["const:UniquenessValidator", "const:EncryptedUniquenessValidator"],
+        flags: [],
+      },
+    ]);
+  });
+
   it("drops a thrown construction so the real construction pairs", () => {
     expect(
       site(
