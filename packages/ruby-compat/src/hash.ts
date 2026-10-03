@@ -499,6 +499,10 @@ export function eachValue<T>(
 /**
  * Ruby `Hash#each_key` (`vendor/ruby/v3.3.11/hash.c:3098` `rb_hash_each_key`): yields
  * each key alone and returns the receiver.
+ * A receiver that defines `eachKey` answers what its own method returns, which
+ * need not be the receiver: `LazyAttributeHash#each_key` is `keys.each(&block)`
+ * (`activemodel/lib/active_model/attribute_set/builder.rb:129-132`), the keys
+ * Array `Array#each` returns.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_key` (`vendor/ruby/v3.3.11/hash.c:3098`).
  */
 export function eachKey<T, R = never>(
