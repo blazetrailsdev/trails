@@ -196,7 +196,14 @@ Object.setPrototypeOf(rbCBasicObject.prototype, null);
 export const rbCClass = rbDefineClass("Class");
 
 /**
- * `rb_cNumeric` (`vendor/ruby/v3.3.11/numeric.c:6156`).
+ * `rb_cNumeric` (`vendor/ruby/v3.3.11/numeric.c:6156`). `Rational`
+ * (`vendor/ruby/v3.3.11/rational.c:2759`), `Complex`
+ * (`vendor/ruby/v3.3.11/complex.c:2529`) and `BigDecimal`
+ * (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:4407`) are seated beneath
+ * it at the foot of include.ts, not by `extends`: this module reaches
+ * rational.ts through string/method-table.ts and kernel-format.ts, so an
+ * `extends rbCNumeric` reads the binding before this module body has run
+ * whenever this module is entered first.
  * @noRailsEquivalent PERMANENT
  */
 export const rbCNumeric = rbDefineClass("Numeric");

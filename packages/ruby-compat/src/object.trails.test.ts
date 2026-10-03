@@ -43,6 +43,7 @@ import {
 import { BigDecimal } from "./big-decimal.js";
 import { Complex } from "./complex.js";
 import { Rational } from "./rational.js";
+import { TypeError } from "./type-error.js";
 import { cmp } from "./comparable.js";
 import { Range } from "./range.js";
 import { ArgumentError } from "./argument-error.js";
@@ -572,6 +573,14 @@ describe("rbObjIsKindOf", () => {
     expect(rbObjIsKindOf(new Sub(), Base)).toBe(true);
     expect(rbObjIsKindOf(new Sub(), mod)).toBe(true);
     expect(rbObjIsKindOf(new Base(), Sub)).toBe(false);
+    expect(rbObjIsKindOf(new Sub(), Kernel)).toBe(true);
+    expect(rbObjIsKindOf(new Sub(), rbCBasicObject)).toBe(true);
+  });
+
+  it("raises TypeError for an argument that is no class or module", () => {
+    expect(() => rbObjIsKindOf(1, 5)).toThrow(TypeError);
+    expect(() => rbObjIsKindOf(1, 5)).toThrow("class or module required");
+    expect(() => rbObjIsKindOf(1, null)).toThrow("class or module required");
   });
 
   it("reads every Numeric seat as a Numeric", () => {
