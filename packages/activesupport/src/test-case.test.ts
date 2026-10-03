@@ -1,3 +1,4 @@
+import type { Callback } from "./callbacks.js";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { SecureRandom, kernelRand } from "@blazetrails/ruby-compat";
 import { NameError } from "./core-ext/name-error.js";
@@ -18,7 +19,6 @@ import {
   assertRaises,
   assertNil,
 } from "./testing/assertions.js";
-import { peekCallbackChain } from "./callbacks.js";
 import { stubConst } from "./testing/constant-stubbing.js";
 
 class Numbered {
@@ -842,13 +842,11 @@ describe("SetupAndTeardownTest", () => {
     instance.foo();
 
     expect(
-      peekCallbackChain(SetupAndTeardownTestCase.prototype, "setup")?.entries.map((c) => c.filter),
+      (SetupAndTeardownTestCase as any).__callbacks.setup.entries.map((c: Callback) => c.filter),
     ).toEqual([":resetCallbackRecord", ":foo"]);
     expect(instance.calledBack).toEqual([":foo"]);
     expect(
-      peekCallbackChain(SetupAndTeardownTestCase.prototype, "teardown")?.entries.map(
-        (c) => c.filter,
-      ),
+      (SetupAndTeardownTestCase as any).__callbacks.teardown.entries.map((c: Callback) => c.filter),
     ).toEqual([":foo", ":sentinel"]);
   });
 });
@@ -861,14 +859,14 @@ describe("SubclassSetupAndTeardownTest", () => {
     instance.bar();
 
     expect(
-      peekCallbackChain(SubclassSetupAndTeardownTestCase.prototype, "setup")?.entries.map(
-        (c) => c.filter,
+      (SubclassSetupAndTeardownTestCase as any).__callbacks.setup.entries.map(
+        (c: Callback) => c.filter,
       ),
     ).toEqual([":resetCallbackRecord", ":foo", ":bar"]);
     expect(instance.calledBack).toEqual([":foo", ":bar"]);
     expect(
-      peekCallbackChain(SubclassSetupAndTeardownTestCase.prototype, "teardown")?.entries.map(
-        (c) => c.filter,
+      (SubclassSetupAndTeardownTestCase as any).__callbacks.teardown.entries.map(
+        (c: Callback) => c.filter,
       ),
     ).toEqual([":foo", ":sentinel", ":bar"]);
   });

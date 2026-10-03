@@ -85,9 +85,9 @@ import {
   assertRespondTo,
   assertNotRespondTo,
   deepDup,
-  getCallbackChains,
   humanize,
   isPresent,
+  type CallbackChain,
 } from "@blazetrails/activesupport";
 import { resetI18n } from "./test-helpers/i18n.js";
 
@@ -1369,8 +1369,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
 
   it("should not ignore different error messages on the same attribute", async () => {
     const oldValidators = deepDup(CanonicalShip._validators);
-    const validateChain = getCallbackChains(CanonicalShip.prototype).get("validate")!;
-    const oldCallbacks = [...validateChain.entries];
+    const oldCallbacks = (CanonicalShip as any)._validateCallbacks.dup();
     try {
       CanonicalShip.validatesFormatOf("name", { with: /\w/ });
       (await pirate.ship).name = "";
@@ -1379,8 +1378,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
       expect(pirate.errors.get("ship.name")).toEqual(["can't be blank", "is invalid"]);
     } finally {
       CanonicalShip._validators = oldValidators;
-      validateChain.clear();
-      validateChain.append(...oldCallbacks);
+      (CanonicalShip as any)._validateCallbacks = oldCallbacks;
     }
   });
 
@@ -2345,7 +2343,9 @@ describe("TestAutosaveAssociationsInGeneral", () => {
   }
 
   function callbacksForModel(model: typeof Base) {
-    return [...getCallbackChains(model.prototype).values()].flatMap((chain) => chain.entries);
+    return Object.values<CallbackChain>((model as any).__callbacks).flatMap(
+      (chain) => chain.entries,
+    );
   }
 });
 

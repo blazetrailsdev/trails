@@ -4,11 +4,15 @@ import {
   kernelCatch,
   NoMethodError,
   rbBlockGivenP,
+  rbClassSuperclass,
+  rbModSingletonP,
+  rbObjSingletonClass,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
 
 import { kernelArray } from "./array-utils.js";
-import { ArgumentError } from "./hash-utils.js";
+import { classAttribute } from "./class-attribute.js";
+import { ArgumentError, extractOptionsBang } from "./hash-utils.js";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { camelize } from "./inflector.js";
 
@@ -795,10 +799,11 @@ export class CallbackChain {
     this.chain = this.chain.filter((cb) => !cb.matches(kind, filter));
   }
 
-  clear(): void {
+  clear(): this {
     this._allCallbacks = undefined;
     this._singleCallbacks.clear();
     this.chain = [];
+    return this;
   }
 
   dup(): CallbackChain {
@@ -863,31 +868,6 @@ function isCallbackOptions(value: unknown): boolean {
   return proto === Object.prototype || proto === null;
 }
 
-/**
- * @missingRailsCall descendants — CONVERGEABLE callbacks-update-callbacks-reads-its-own-descendants
- * @missingRailsCall prepend — CONVERGEABLE callbacks-update-callbacks-reads-its-own-descendants
- */
-export function __updateCallbacks(
-  name: string,
-  targets: Array<{
-    getCallbacks(name: string): CallbackChain;
-    setCallbacks(name: string, chain: CallbackChain): void;
-  }>,
-  fn: (target: object, chain: CallbackChain) => void,
-): void {
-  [...targets].reverse().forEach((target) => {
-    const chain = target.getCallbacks(name);
-    const dup = new CallbackChain(chain.name, chain.config);
-    chain.entries.forEach((e) =>
-      dup.append(
-        new Callback(e.name, e.filter, e.kind, { ...e.options }, dup.config, e.originalObject),
-      ),
-    );
-    fn(target, dup);
-    target.setCallbacks(name, dup);
-  });
-}
-
 const _ct = { MethodCall, ObjectCall, InstanceExec0, InstanceExec1, InstanceExec2, ProcCall };
 export namespace CallTemplate {
   export const MethodCall = _ct.MethodCall;
@@ -931,47 +911,15 @@ export interface ClassMethods<T extends object = object> {
   resetCallbacks(name: string): void;
 }
 
-const CALLBACKS = Symbol("callbacks");
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function peekCallbackChain(target: object, name: string): CallbackChain | undefined {
-  let t: object | null = target;
-  while (t !== null) {
-    if (Object.prototype.hasOwnProperty.call(t, CALLBACKS)) {
-      return (t as Record<symbol, Map<string, CallbackChain>>)[CALLBACKS].get(name);
-    }
-    t = Object.getPrototypeOf(t);
-  }
-  return undefined;
-}
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function getCallbackChains(target: object): Map<string, CallbackChain> {
-  const t = target as Record<symbol, unknown>;
-  if (!Object.prototype.hasOwnProperty.call(target, CALLBACKS)) {
-    const parent = t[CALLBACKS] as Map<string, CallbackChain> | undefined;
-    const own = new Map<string, CallbackChain>();
-    if (parent) {
-      for (const [name, chain] of parent) {
-        own.set(name, chain.dup());
-      }
-    }
-    t[CALLBACKS] = own;
-    for (
-      let klass = target.constructor as AnyClass;
-      Object.getPrototypeOf(klass) !== Function.prototype;
-      klass = Object.getPrototypeOf(klass) as AnyClass
-    ) {
-      DescendantsTracker.registerSubclass(Object.getPrototypeOf(klass) as AnyClass, klass);
-    }
-  }
-  return t[CALLBACKS] as Map<string, CallbackChain>;
+interface CallbacksClass {
+  __callbacks: Record<string, CallbackChain>;
+  readonly descendants: CallbacksClass[];
+  getCallbacks(name: string): CallbackChain;
+  setCallbacks(name: string, callbacks: CallbackChain): Record<string, CallbackChain>;
+  __updateCallbacks(
+    name: string,
+    block: (target: CallbacksClass, chain: CallbackChain) => void,
+  ): void;
 }
 
 export type FilterListEntry<T extends object = object> =
@@ -1047,74 +995,34 @@ function observeProceed(
   };
 }
 
+function callbacksClass(target: object): CallbacksClass {
+  const klass =
+    Object.prototype.hasOwnProperty.call(target, "constructor") &&
+    (target.constructor as { prototype?: unknown }).prototype === target
+      ? target.constructor
+      : rbObjSingletonClass(target);
+  Callbacks[included](klass as AnyClass);
+  return klass as unknown as CallbacksClass;
+}
+
 export function defineCallbacks<T extends object>(
   target: T,
   name: string,
   options: DefineCallbacksOptions<T> = {},
 ): void {
-  const chains = getCallbackChains(target);
-  if (!chains.has(name)) {
-    chains.set(name, new CallbackChain(name, options as DefineCallbacksOptions));
-  }
-
-  Object.defineProperty(target, `_run${camelize(name)}Callbacks`, {
-    value: function (this: object, block?: () => unknown) {
-      return runCallbacks(this, name, block);
-    },
-    writable: true,
-    configurable: true,
-  });
-
-  Object.defineProperty(target, `_${camelize(name, false)}Callbacks`, {
-    get(this: object) {
-      return peekCallbackChain(this, name);
-    },
-    configurable: true,
-  });
-
-  if (Object.prototype.hasOwnProperty.call(target, "constructor")) {
-    Object.defineProperty(target.constructor, `_${camelize(name, false)}Callbacks`, {
-      get(this: { prototype: object }) {
-        return Callbacks.ClassMethods.getCallbacks.call(this, name);
-      },
-      set(this: { prototype: object }, value: CallbackChain) {
-        Callbacks.ClassMethods.setCallbacks.call(this, name, value);
-      },
-      configurable: true,
-    });
-  }
+  Callbacks.ClassMethods.defineCallbacks.call(callbacksClass(target), name, options);
 }
 
+/**
+ * @missingRailsCall normalize_callback_params — CONVERGEABLE activesupport-callbacks-free-target-functions-are-not-class-methods
+ * @missingRailsCall build — CONVERGEABLE activesupport-callbacks-free-target-functions-are-not-class-methods
+ */
 export function setCallback<T extends object>(
   target: T,
   name: string,
   ...filterList: FilterListEntry<T>[]
 ): void {
-  const block = rbBlockGivenP(filterList[filterList.length - 1])
-    ? (filterList.pop() as AnyCallback)
-    : null;
-  const [type, filters, options] = normalizeCallbackParams(
-    filterList as Parameters<typeof normalizeCallbackParams>[0],
-    block,
-  );
-  const chains = getCallbackChains(target);
-  const selfChain = chains.get(name);
-  if (!selfChain) {
-    throw new RuntimeError(`No callback chain "${name}" defined. Call defineCallbacks first.`);
-  }
-  const mapped = filters.map((filter) =>
-    Callback.build(
-      selfChain,
-      filter as AnyCallback | CallbackObject,
-      type,
-      options as CallbackOptions,
-    ),
-  );
-  if (options.prepend) {
-    selfChain.prepend(...mapped);
-  } else {
-    selfChain.append(...mapped);
-  }
+  Callbacks.ClassMethods.setCallback.call(callbacksClass(target), name, ...filterList);
 }
 
 export function skipCallback<T extends object>(
@@ -1122,95 +1030,156 @@ export function skipCallback<T extends object>(
   name: string,
   ...filterList: FilterListEntry<T>[]
 ): void {
-  const block = rbBlockGivenP(filterList[filterList.length - 1])
-    ? (filterList.pop() as AnyCallback)
-    : null;
-  const [type, filters, options] = normalizeCallbackParams(
-    filterList as Parameters<typeof normalizeCallbackParams>[0],
-    block,
-  );
-  if (!("raise" in options)) options.raise = true;
-
-  let chain = peekCallbackChain(target, name);
-  if (!chain) return;
-  for (const filter of filters) {
-    let callback = chain.entries.find((c) =>
-      c.matches(type, filter as AnyCallback | CallbackObject),
-    );
-
-    if (!callback && options.raise) {
-      throw new ArgumentError(
-        `${type.charAt(0).toUpperCase() + type.slice(1)} ${name} callback ${String(filter)} has not been defined`,
-      );
-    }
-    if (!callback) continue;
-
-    if (!Object.prototype.hasOwnProperty.call(target, CALLBACKS)) {
-      chain = getCallbackChains(target).get(name)!;
-      callback = chain.entries.find((c) =>
-        c.matches(type, filter as AnyCallback | CallbackObject),
-      )!;
-    }
-
-    if ("if" in options || "unless" in options) {
-      const newCallback = callback.mergeConditionalOptions(chain, {
-        ifOption: options.if,
-        unlessOption: options.unless,
-      });
-      chain.insert(chain.index(callback), newCallback);
-    }
-    chain.delete(callback);
-  }
+  Callbacks.ClassMethods.skipCallback.call(callbacksClass(target), name, ...filterList);
 }
 
 export function resetCallbacks(target: object, name: string): void {
-  const callbacks = getCallbackChains(target).get(name)!;
-  const klass = target.constructor as AnyClass;
-
-  for (const target of DescendantsTracker.descendants(klass)) {
-    const chain = getCallbackChains(target.prototype as object).get(name)!;
-    callbacks.each((c) => chain.delete(c));
-  }
-
-  callbacks.clear();
+  Callbacks.ClassMethods.resetCallbacks.call(callbacksClass(target), name);
 }
 
-export const Callbacks = {
-  ClassMethods: {
-    setCallback(
-      this: { prototype: object },
-      name: string,
-      ...filterList: FilterListEntry<any>[]
-    ): void {
-      setCallback(this.prototype, name, ...filterList);
-    },
-
-    skipCallback(
-      this: { prototype: object },
-      name: string,
-      ...filterList: FilterListEntry<any>[]
-    ): void {
-      skipCallback(this.prototype, name, ...filterList);
-    },
-
-    resetCallbacks(this: { prototype: object }, name: string): void {
-      resetCallbacks(this.prototype, name);
-    },
-
-    getCallbacks(this: { prototype: object }, name: string): CallbackChain | undefined {
-      return peekCallbackChain(this.prototype, name);
-    },
-
-    setCallbacks(
-      this: { prototype: object },
-      name: string,
-      callbacks: CallbackChain,
-    ): Map<string, CallbackChain> {
-      const __callbacks = getCallbackChains(this.prototype);
-      __callbacks.set(name, callbacks);
-      return __callbacks;
-    },
+export const ClassMethods = {
+  /** @missingRailsCall prepend — PERMANENT */
+  __updateCallbacks(
+    this: CallbacksClass,
+    name: string,
+    block: (target: CallbacksClass, chain: CallbackChain) => void,
+  ): void {
+    const targets = this.descendants;
+    targets.unshift(this);
+    targets.reverse().forEach((target) => {
+      const chain = target.getCallbacks(name);
+      block(target, chain.dup());
+    });
   },
+
+  setCallback(this: CallbacksClass, name: string, ...filterList: FilterListEntry<any>[]): void {
+    const block = rbBlockGivenP(filterList[filterList.length - 1])
+      ? (filterList.pop() as AnyCallback)
+      : null;
+    const [type, filters, options] = normalizeCallbackParams(
+      filterList as Parameters<typeof normalizeCallbackParams>[0],
+      block,
+    );
+
+    const selfChain = this.getCallbacks(name);
+    const mapped = filters.map((filter) =>
+      Callback.build(
+        selfChain,
+        filter as AnyCallback | CallbackObject,
+        type,
+        options as CallbackOptions,
+      ),
+    );
+
+    this.__updateCallbacks(name, (target, chain) => {
+      if (options.prepend) {
+        chain.prepend(...mapped);
+      } else {
+        chain.append(...mapped);
+      }
+      target.setCallbacks(name, chain);
+    });
+  },
+
+  skipCallback(this: CallbacksClass, name: string, ...filterList: FilterListEntry<any>[]): void {
+    const block = rbBlockGivenP(filterList[filterList.length - 1])
+      ? (filterList.pop() as AnyCallback)
+      : null;
+    const [type, filters, options] = normalizeCallbackParams(
+      filterList as Parameters<typeof normalizeCallbackParams>[0],
+      block,
+    );
+
+    if (!("raise" in options)) options.raise = true;
+
+    this.__updateCallbacks(name, (target, chain) => {
+      filters.forEach((filter) => {
+        const callback = chain.entries.find((c) =>
+          c.matches(type, filter as AnyCallback | CallbackObject),
+        );
+
+        if (!callback && options.raise) {
+          throw new ArgumentError(
+            `${type.charAt(0).toUpperCase() + type.slice(1)} ${name} callback ${String(filter)} has not been defined`,
+          );
+        }
+
+        if (callback && ("if" in options || "unless" in options)) {
+          const newCallback = callback.mergeConditionalOptions(chain, {
+            ifOption: options.if,
+            unlessOption: options.unless,
+          });
+          chain.insert(chain.index(callback), newCallback);
+        }
+
+        chain.delete(callback as Callback);
+      });
+      target.setCallbacks(name, chain);
+    });
+  },
+
+  resetCallbacks(this: CallbacksClass, name: string): void {
+    const callbacks = this.getCallbacks(name);
+
+    this.descendants.forEach((target) => {
+      const chain = target.getCallbacks(name).dup();
+      callbacks.each((c) => chain.delete(c));
+      target.setCallbacks(name, chain);
+    });
+
+    this.setCallbacks(name, callbacks.dup().clear());
+  },
+
+  defineCallbacks(
+    this: CallbacksClass,
+    ...names: Array<string | DefineCallbacksOptions<any>>
+  ): void {
+    const options = extractOptionsBang(names) as DefineCallbacksOptions;
+
+    (names as string[]).forEach((name) => {
+      [this, ...this.descendants].forEach((target) => {
+        target.setCallbacks(name, new CallbackChain(name, options));
+      });
+
+      Object.defineProperty(this, `_${camelize(name, false)}Callbacks`, {
+        get(this: CallbacksClass) {
+          return this.getCallbacks(name);
+        },
+        set(this: CallbacksClass, value: CallbackChain) {
+          this.setCallbacks(name, value);
+        },
+        configurable: true,
+      });
+    });
+  },
+
+  /** @internal */
+  getCallbacks(this: CallbacksClass, name: string): CallbackChain {
+    return this.__callbacks[name];
+  },
+
+  /** @internal */
+  setCallbacks(
+    this: CallbacksClass,
+    name: string,
+    callbacks: CallbackChain,
+  ): Record<string, CallbackChain> {
+    if (!Object.prototype.hasOwnProperty.call(this, "__class_attr___callbacks")) {
+      this.__callbacks = { ...this.__callbacks };
+      if (!rbModSingletonP(this)) {
+        let klass = this as unknown as AnyClass;
+        for (let superclass; (superclass = rbClassSuperclass(klass)); klass = superclass) {
+          DescendantsTracker.registerSubclass(superclass, klass);
+        }
+      }
+    }
+    this.__callbacks[name] = callbacks;
+    return this.__callbacks;
+  },
+};
+
+export const Callbacks = {
+  ClassMethods,
 
   runCallbacks(
     this: object,
@@ -1225,7 +1194,14 @@ export const Callbacks = {
   haltedCallbackHook(_filter: unknown, _name: string): void {},
 
   [included](base: AnyClass): void {
+    if ("__callbacks" in base) return;
     extend(base as never, Callbacks.ClassMethods);
+    extend(base as never, DescendantsTracker);
+    classAttribute.call(base, "__callbacks", {
+      instanceWriter: false,
+      instancePredicate: false,
+      default: {},
+    });
   },
 };
 
@@ -1236,7 +1212,7 @@ export function runCallbacks(
   opts?: RunCallbacksOptions,
   type?: CallbackKind,
 ): unknown {
-  const callbacks = peekCallbackChain(target, name);
+  const callbacks = (target as { __callbacks?: Record<string, CallbackChain> }).__callbacks?.[name];
 
   if (!callbacks || callbacks.isEmpty) {
     const r = block?.();

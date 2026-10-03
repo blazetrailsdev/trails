@@ -80,7 +80,7 @@ describe("CallbackChain compile memoization (trails)", () => {
 describe("include ActiveSupport::Callbacks (trails)", () => {
   it("mixes in run_callbacks and extends ClassMethods, which stays off the instance", () => {
     class Record {
-      declare static setCallback: (typeof Callbacks.ClassMethods)["setCallback"];
+      declare static setCallback: (name: string, ...filterList: unknown[]) => void;
       declare runCallbacks: (typeof Callbacks)["runCallbacks"];
     }
     include(Record, Callbacks);
@@ -719,13 +719,6 @@ describe("Callbacks", () => {
   });
 
   describe("error handling", () => {
-    it("throws when setting callback on undefined chain", () => {
-      const target = {};
-      expect(() => setCallback(target, "save", "before", () => {})).toThrow(
-        /No callback chain "save"/,
-      );
-    });
-
     it("runs block when no chain is defined", () => {
       const target = {};
       const log: string[] = [];
@@ -1165,15 +1158,44 @@ describe("CallbackObject dispatch", () => {
   });
 
   it("skipCallback matches object by reference after chain inheritance clone", () => {
-    const parent = { log: [] as string[] };
-    defineCallbacks(parent, "save");
-    const obj = { before: (t: typeof parent) => t.log.push("obj") };
-    setCallback(parent, "save", "before", obj);
+    class Parent {
+      log: string[] = [];
+    }
+    defineCallbacks(Parent.prototype, "save");
+    const obj = { before: (t: Parent) => t.log.push("obj") };
+    setCallback(Parent.prototype, "save", "before", obj);
 
-    const child = Object.create(parent) as typeof parent;
-    skipCallback(child, "save", "before", obj);
+    class Child extends Parent {}
+    skipCallback(Child.prototype, "save", "before", obj);
+    const child = new Child();
     runCallbacks(child, "save");
     expect(child.log).toEqual([]);
+  });
+
+  it("a callback set on a parent after a child wrote its own chain reaches the child", () => {
+    class Parent {
+      log: string[] = [];
+    }
+    include(Parent, Callbacks);
+    const parent = Parent as any;
+    parent.defineCallbacks("save");
+    class Child extends Parent {}
+    const child = Child as any;
+    child.setCallback("save", "before", (t: Parent) => t.log.push("child"));
+
+    parent.setCallback("save", "before", (t: Parent) => t.log.push("parent"));
+
+    const record = new Child();
+    runCallbacks(record, "save");
+    expect(record.log).toEqual(["child", "parent"]);
+    expect(Object.keys(child.__callbacks)).toEqual(["save"]);
+    expect(child.__callbacks).not.toBe(parent.__callbacks);
+    expect(parent.descendants).toEqual([Child]);
+    expect((new Parent() as any).__callbacks).toBe(parent.__callbacks);
+
+    parent.resetCallbacks("save");
+    expect(child.getCallbacks("save").entries.map((c: Callback) => c.kind)).toEqual(["before"]);
+    expect(parent.getCallbacks("save").isEmpty).toBe(true);
   });
 
   it("CallbacksMixin.aroundCallback accepts object form", () => {
