@@ -5756,11 +5756,6 @@ function collectCalls(
         names.add(name);
         tally(occurrences, name);
       }
-      // Ruby's `module_eval <<-RUBY` / `class_eval <<-RUBY` body is a string
-      // Ripper never parses, so the calls the port's callback makes in its
-      // place have no counterpart position in the Ruby stream
-      // (`relation/delegation.rb:79-83`). The ORDER stream drops them — position
-      // unknown is not position wrong; the call SET still counts them.
       const evalCallback =
         skipHoistedClosures &&
         ts.isPropertyAccessExpression(callee) &&

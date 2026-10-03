@@ -472,15 +472,12 @@ describe("significantMissingCalls", () => {
   });
 
   it("significantCallsForReceivers drops Proc#call for a TS body that invokes the receiver", () => {
-    // has_and_belongs_to_many.rb:27 `table_name_resolver.call` →
-    // `this.tableNameResolver()`.
     const resolver = new Set(invokeForms(["tableNameResolver"]));
     expect(
       significantCallsForReceivers({ call: ["self"] }, undefined, resolver, {
         call: ["table_name_resolver"],
       }).has("call"),
     ).toBe(false);
-    // `@block.call` → `this._block()`.
     expect(
       significantCallsForReceivers(
         { call: ["ivar"] },
@@ -499,7 +496,6 @@ describe("significantMissingCalls", () => {
         call: ["table_name_resolver"],
       }).has("call"),
     ).toBe(true);
-    // An unnameable receiver (`(callable || block).call`, statement_cache.rb:133).
     expect(
       significantCallsForReceivers({ call: ["expr"] }, undefined, new Set(invokeForms(["x"])), {
         call: ["?"],
@@ -508,8 +504,6 @@ describe("significantMissingCalls", () => {
   });
 
   it("significantCallsForReceivers keeps a ported call on another receiver", () => {
-    // `Preloader.new(...).call` — the port's `new Preloader(...).call()` makes
-    // `call` itself; a body invoking only `preloader` as a function still flags.
     const forms = new Set(invokeForms(["records"]));
     expect(
       significantCallsForReceivers({ call: ["local"] }, undefined, forms, {
@@ -3790,8 +3784,6 @@ describe("suppressedCallClaims", () => {
   });
 
   it("leaves the alias spelling free when the body ports the call under its convention name", () => {
-    // delegation.rb:76-78 — `method_defined?` is `this.isMethodDefined(method)`,
-    // so the one `has` is `RESERVED_METHOD_NAMES.include?`'s.
     const claimed = suppressedCallClaims(
       ["method_defined?", "include?"],
       new Set(["isMethodDefined", "has"]),

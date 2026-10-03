@@ -1725,8 +1725,6 @@ describe("body call capture", () => {
   });
 
   it("keeps a moduleEval / classEval callback's calls OUT of the order stream, but in the call set", () => {
-    // delegation.rb:79-87 — the `module_eval <<-RUBY` arm is a string Ripper
-    // never parses, so only the `define_method` arm's `scoping` has a position.
     const cls = extractFromSource(
       `class Foo {
         generate(m: string, ok: boolean) {
@@ -1908,7 +1906,6 @@ describe("body call capture — renamed-import aliases", () => {
 
 describe("body call capture — ruby-compat renamed imports", () => {
   it("credits a rename forced by a module-level homonym to the original export", () => {
-    // relation/finder-methods.ts: `first as aryFirst` beside `FinderMethods#first`.
     const info = extractFromFiles("/p", {
       "finder.ts": `
         import { first as aryFirst } from "@blazetrails/ruby-compat";

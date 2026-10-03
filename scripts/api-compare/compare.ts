@@ -814,9 +814,6 @@ export function suppressedCallClaims(
     const mapped = mapCall(rc);
     if (!mapped || mapped.length === 0) continue;
     if (mapped.some(isPortedWithArgs)) continue;
-    // A body that ports the call under its convention name
-    // (`isMethodDefined` for `method_defined?`, delegation.rb:76) has not spent
-    // an alias spelling on it, so that spelling stays free for a sibling.
     const spelledByName = mapped.some((c) => tsCalls.has(c));
     for (const c of [
       ...mapped,
