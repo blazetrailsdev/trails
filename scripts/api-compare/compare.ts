@@ -171,6 +171,7 @@ import {
 import {
   JS_ENUMERABLE_ALIASES,
   jsEnumerableAliases,
+  NATIVE_FORM_ANALOGUES,
   NEGATED_ALIASES,
   partitionNegatedCalls,
   requiresNegatedAlias,
@@ -357,12 +358,14 @@ function idiomSurplus(skeleton: readonly string[], counterpart: readonly string[
 // `activesupport/cache/file-store.ts#filePathKey` — hand-verified against
 // Rails source as split/scan chains, none a Relation receiver), each
 // previously carrying its own now-stale `@missingRailsCall` receipt.
-// (2) NOT BUILT — per-class ivar typing off a constructor-parameter default:
-// `actionview/digestor.rb:112`'s `children.any?`. `@children` comes from a
-// constructor PARAMETER (`children = []`), not a literal, so it needs (1)'s
-// mechanism chained one hop further, onto machinery (`hash_typed_ivars`,
-// Hash-only, blocked on `prove-hash-literal-ivars-in-ruby-compat-receiver-kinds`
-// for an unrelated reason) this story leaves alone rather than widen mid-flight.
+// (2) BUILT for a literal, NOT for a parameter — per-class ivar typing.
+// `typed_ivars` (extract-ruby-api.rb) proves an ivar `array` when every
+// assignment to it in its class is an Array literal or a `Kernel#Array` call —
+// `@stack = []` (`abstract/transaction.rb:499`), `@queue = []`
+// (`connection_pool/queue.rb:17`) — and `Array(x)` is itself a proven receiver
+// (`schema_statements.rb:1260`). Still unbuilt: `actionview/digestor.rb:112`'s
+// `children.any?`, whose `@children` comes from a constructor PARAMETER
+// (`children = []`), not a literal, so it needs the proof chained one hop further.
 // (3) NOT BUILT, nothing to build against — bare self-calls typed via
 // enclosing-class ancestry, the shape the original audit counted 23 rows
 // under. None survive: `sharded?`'s `shard_keys.any?`
@@ -587,15 +590,33 @@ const POSITIONAL_ARRAY_ANALOGUES = new Set(["first", "last", "any?", "size", "em
 export function significantCallsForReceivers(
   receivers: Record<string, readonly string[]> | undefined,
   base: { has(value: string): boolean } = SIGNIFICANT_CALLS,
+  tsNativeForms: ReadonlySet<string> = new Set(),
 ): { has(value: string): boolean } {
   return {
     has: (value) => {
       if (!base.has(value)) return false;
+      if (hasNativeFormAnalogue(value, receivers, tsNativeForms)) return false;
       if (!POSITIONAL_ARRAY_ANALOGUES.has(value)) return true;
       const kinds = receivers?.[value];
       return !(kinds && kinds.length > 0 && kinds.every((k) => k === "array"));
     },
   };
+}
+
+/**
+ * Whether the paired TS body has the {@link NATIVE_FORM_ANALOGUES} form that
+ * ports Ruby call `value`. `load` is admitted only when no site of it had a
+ * receiver (`receivers` omits a name called on implicit self alone), the one
+ * shape `Kernel#load` takes.
+ */
+function hasNativeFormAnalogue(
+  value: string,
+  receivers: Record<string, readonly string[]> | undefined,
+  tsNativeForms: ReadonlySet<string>,
+): boolean {
+  const form = NATIVE_FORM_ANALOGUES.get(value);
+  if (form === undefined || !tsNativeForms.has(form)) return false;
+  return value !== "load" || receivers?.[value] === undefined;
 }
 
 /**
@@ -4955,13 +4976,16 @@ export function main() {
         // too, or the helper's `!xs.includes(y)` would not count — same for a
         // wrapper and its delegate.
         const negatedTsCalls = new Set(own.negated);
+        const tsNativeForms = new Set(own.nativeForms);
         for (const n of reached) {
           for (const c of sameFile.get(n)?.negated ?? []) negatedTsCalls.add(c);
+          for (const c of sameFile.get(n)?.nativeForms ?? []) tsNativeForms.add(c);
         }
         if (isDelegatingWrapper(tsName, own.calls)) {
           for (const c of tsNegatedCallsByName.get(tsName) ?? []) negatedTsCalls.add(c);
         }
         for (const c of graphCalls.negated) negatedTsCalls.add(c);
+        for (const c of graphCalls.nativeForms) tsNativeForms.add(c);
         callsCompared++;
         const missing = significantMissingCalls(
           rubyName,
@@ -4972,7 +4996,7 @@ export function main() {
           // gate the moment alias bindings started carrying real params.
           (c) => portedWithArgsSigs(tsFile, c).some((sig) => stripThis(sig).length > 0),
           (rc) => rubyCallToTsForBody(rc, rubyOwned?.receivers),
-          significantCallsForReceivers(rubyOwned?.receivers, callsSignificant),
+          significantCallsForReceivers(rubyOwned?.receivers, callsSignificant, tsNativeForms),
           (rc) => jsEnumerableAliases(rc, rubyOwned?.receivers?.[rc]),
           negatedTsCalls,
           rubyOwned?.calls ?? rubyCalls,

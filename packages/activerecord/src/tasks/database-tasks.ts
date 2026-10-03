@@ -571,7 +571,6 @@ export class DatabaseTasks {
     }
   }
 
-  /** @missingRailsCall load — PERMANENT */
   static async loadSchema(
     dbConfig: HashConfig,
     format: SchemaFormat = schemaFormat(),

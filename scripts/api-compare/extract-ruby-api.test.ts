@@ -3215,6 +3215,55 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     expect(c["Row#call"]).toEqual({ fetch: ["ivar"], delete: ["hash"], "include?": ["ivar"] });
   });
 
+  it("proves an Array ivar only when every assignment in the class is an Array literal", () => {
+    const c = rubyCallReceivers({
+      "lib/active_record/stack.rb": `
+        class Stack
+          def initialize
+            @stack = []
+            @queue = Array(seed)
+            @records = []
+            @target = []
+            @pair, @other = [], []
+          end
+
+          def call
+            @stack.last
+            @queue.size
+            @records.first
+            @target.first
+            @pair.size
+          end
+
+          def load(relation)
+            @records = relation
+            @target ||= []
+          end
+        end
+      `,
+    });
+    expect(c["Stack#call"]).toEqual({
+      last: ["array"],
+      size: ["array", "ivar"],
+      first: ["ivar"],
+    });
+  });
+
+  it("proves a Kernel#Array call receiver an Array", () => {
+    const c = rubyCallReceivers({
+      "lib/active_record/batches.rb": `
+        class Batches
+          def call(start, cursor)
+            Array(start).size
+            Array(cursor).last
+            cursor.Array(start).first
+          end
+        end
+      `,
+    });
+    expect(c["Batches#call"]).toEqual({ size: ["array"], last: ["array"], first: ["expr"] });
+  });
+
   it("proves a Hash ivar only within the class that assigns it", () => {
     const c = rubyCallReceivers({
       "lib/active_record/two.rb": `

@@ -71,7 +71,11 @@ import {
 } from "@blazetrails/parity/shared-cache";
 import { extractorSchemaToken } from "./extractor-schema.js";
 import { staleBuilds, staleBuildMessage } from "./build-freshness.js";
-import { FOREIGN_READ_PREFIX, NEGATED_CALL_PREFIX } from "./enumerable-idioms.js";
+import {
+  FOREIGN_READ_PREFIX,
+  NATIVE_FORM_PREFIX,
+  NEGATED_CALL_PREFIX,
+} from "./enumerable-idioms.js";
 import {
   ANY_TAG_LINE,
   TAG as MISSING_RAILS_CALL_TAG,
@@ -5514,6 +5518,13 @@ function collectCalls(
           called.push(resolve(callee.expression.text));
         }
         if (prop === "new") called.push("constructor");
+      } else if (callee.kind === ts.SyntaxKind.ImportKeyword) {
+        // A dynamic `import(x)` off a specifier computed at run time is
+        // `Kernel#load` (see NATIVE_FORM_ANALOGUES); a literal one is `require`.
+        const specifier = n.arguments[0];
+        if (!skipHoistedClosures && specifier && !ts.isStringLiteralLike(specifier)) {
+          names.add(`${NATIVE_FORM_PREFIX}import`);
+        }
       } else if (callee.kind === ts.SyntaxKind.SuperKeyword) {
         // Bare `super(...)` (constructor chain) — `super.foo()` is already
         // captured as `foo` by the property-access branch. Record as "super"
@@ -5572,6 +5583,9 @@ function collectCalls(
         tally(occurrences, n.name.text);
         if (isForeignReadReceiver(n.expression)) tally(foreignReadOccurrences, n.name.text);
         addNegated(n, n.name.text);
+        if (!skipHoistedClosures && n.name.text === "length") {
+          names.add(`${NATIVE_FORM_PREFIX}length`);
+        }
       }
     }
     ts.forEachChild(n, visit);

@@ -773,7 +773,6 @@ export class TransactionManager {
   }
 
   /**
-   * @missingRailsCall size — CONVERGEABLE call-gate-proves-array-literal-ivars-and-kernel-array-receivers
    * @missingRailsName connection — PERMANENT
    * @missingRailsName stack — PERMANENT
    */
@@ -867,7 +866,6 @@ export class TransactionManager {
     });
   }
 
-  /** @missingRailsCall last — CONVERGEABLE call-gate-proves-array-literal-ivars-and-kernel-array-receivers */
   async commitTransaction(): Promise<void> {
     await this._connection.lock.synchronize(async () => {
       const transaction = this._stack.at(-1) as Transaction;
@@ -885,7 +883,6 @@ export class TransactionManager {
     });
   }
 
-  /** @missingRailsCall last — CONVERGEABLE call-gate-proves-array-literal-ivars-and-kernel-array-receivers */
   async rollbackTransaction(transaction?: Transaction | null): Promise<void> {
     await this._connection.lock.synchronize(async () => {
       transaction ||= this._stack.at(-1) as Transaction;
@@ -949,12 +946,10 @@ export class TransactionManager {
     });
   }
 
-  /** @missingRailsCall size — CONVERGEABLE call-gate-proves-array-literal-ivars-and-kernel-array-receivers */
   get openTransactions(): number {
     return this._stack.length;
   }
 
-  /** @missingRailsCall last — CONVERGEABLE call-gate-proves-array-literal-ivars-and-kernel-array-receivers */
   get currentTransaction(): Transaction | NullTransaction {
     return this._stack.at(-1) ?? TransactionManager.NULL_TRANSACTION;
   }

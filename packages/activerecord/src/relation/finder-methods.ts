@@ -294,7 +294,6 @@ export const fortyTwoBang = bangFinder(fortyTwo);
 export const secondToLastBang = bangFinder(secondToLast);
 export const thirdToLastBang = bangFinder(thirdToLast);
 
-/** @missingRailsCall size — CONVERGEABLE call-gate-credits-a-length-read-as-array-size */
 export async function isExists(
   this: FinderRelation,
   conditions?: Record<string, unknown> | unknown,
@@ -345,10 +344,7 @@ export async function isInclude(this: FinderRelation, record: any): Promise<bool
 
 export const isMember = isInclude;
 
-/**
- * @missingRailsCall size — CONVERGEABLE call-gate-credits-a-length-read-as-array-size
- * @missingRailsName size — PERMANENT
- */
+/** @missingRailsName size — PERMANENT */
 export function raiseRecordNotFoundExceptionBang(
   this: FinderRelation,
   ids?: unknown,

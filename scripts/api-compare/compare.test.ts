@@ -405,6 +405,36 @@ describe("significantMissingCalls", () => {
     expect(sig.has("fetch")).toBe(true);
   });
 
+  it("significantCallsForReceivers drops size and length for a TS body that reads .length", () => {
+    const sig = significantCallsForReceivers(
+      { size: ["expr", "local"] },
+      undefined,
+      new Set(["length"]),
+    );
+    expect(sig.has("size")).toBe(false);
+    expect(sig.has("length")).toBe(false);
+    expect(sig.has("first")).toBe(true);
+  });
+
+  it("significantCallsForReceivers still flags size for a TS body with no .length read", () => {
+    // A `rel.size()` / `rel.length()` CALL records no native form, so it lands
+    // here: the call itself is what credits the Ruby `size`, never a read.
+    expect(significantCallsForReceivers({ size: ["expr"] }).has("size")).toBe(true);
+    expect(significantCallsForReceivers({ size: ["expr"] }, undefined, new Set()).has("size")).toBe(
+      true,
+    );
+  });
+
+  it("significantCallsForReceivers drops an implicit-self load for a TS body with a computed import()", () => {
+    const imported = new Set(["import"]);
+    expect(significantCallsForReceivers({}, undefined, imported).has("load")).toBe(false);
+    // `records.load` / `relation.load` is Relation#load, a query trigger.
+    expect(significantCallsForReceivers({ load: ["expr"] }, undefined, imported).has("load")).toBe(
+      true,
+    );
+    expect(significantCallsForReceivers({}).has("load")).toBe(true);
+  });
+
   it("does not flag an omitted symbolize_keys even where symbolizeKeys is ported with args", () => {
     expect(
       significantMissingCalls(

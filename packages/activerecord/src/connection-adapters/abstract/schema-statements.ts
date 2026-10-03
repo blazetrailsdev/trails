@@ -1096,7 +1096,6 @@ export class SchemaStatements {
     return `${singularize(name)}_${columnName}`;
   }
 
-  /** @missingRailsCall size — CONVERGEABLE call-gate-proves-array-literal-ivars-and-kernel-array-receivers */
   foreignKeyOptions(
     fromTable: string,
     toTable: string,

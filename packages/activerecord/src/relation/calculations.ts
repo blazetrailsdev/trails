@@ -981,10 +981,7 @@ export function lookupCastTypeFromJoinDependencies(
   return found;
 }
 
-/**
- * @internal
- * @missingRailsCall size — CONVERGEABLE call-gate-credits-a-length-read-as-array-size
- */
+/** @internal */
 export async function typeCastPluckValues(
   this: CalculationRelation,
   result: Result,
