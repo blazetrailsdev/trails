@@ -1307,7 +1307,6 @@ describe("pairCallSites receiver-name tie-break", () => {
 });
 
 describe("compareCallArgs function-form Array#max", () => {
-  // relation.rb:478 `records.map { … }.max`, ported as `max(records.map(…))`.
   const ruby = { ...site("max", []), recv: "call:map" };
 
   it("strips the chained receiver of Array#max", () => {
@@ -1317,10 +1316,6 @@ describe("compareCallArgs function-form Array#max", () => {
 });
 
 describe("compareCallArgs function-form Module#prepend / include / extend", () => {
-  // extended_deterministic_uniqueness_validator.rb:7
-  // `UniquenessValidator.prepend(EncryptedUniquenessValidator)`, ported as
-  // `prepend(UniquenessValidator.prototype, EncryptedUniquenessValidator)`,
-  // whose first argument the extractor describes as `const:UniquenessValidator`.
   const ruby = {
     ...site("prepend", ["const:EncryptedUniquenessValidator"]),
     recv: "const:UniquenessValidator",
