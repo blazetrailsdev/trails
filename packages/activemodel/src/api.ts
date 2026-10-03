@@ -85,7 +85,7 @@ export interface API extends Conversion {
   /** @internal */
   _validationContext: string | string[] | null;
   /** @internal */
-  _runValidateCallbacks(): Promise<void>;
+  _runValidateCallbacks(block?: () => unknown): unknown;
   freeze(): this;
 
   validatesWith: typeof withValidatesWith;

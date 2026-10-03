@@ -493,6 +493,19 @@ describe("rbModAttrReader / rbModAttrWriter / rbModMethodDefined", () => {
     expect(rbObjIvarGet(person, "@name")).toBe("dhh");
   });
 
+  it("defines the accessors in a Module's own method table", () => {
+    const mod = new Module();
+    mod.attrReader("terms");
+    mod.attrWriter("terms");
+    expect(mod.isMethodDefined("terms")).toBe(true);
+
+    class Person {}
+    include(Person, mod);
+    const person = new Person() as { terms: unknown };
+    person.terms = "1";
+    expect(person.terms).toBe("1");
+  });
+
   it("keeps an inherited writer when only the reader is defined", () => {
     class Base {
       written: unknown;

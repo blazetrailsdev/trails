@@ -1,13 +1,7 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { include, included, kernelArray, mergeBang, Module } from "@blazetrails/activesupport";
-import {
-  aryIncludes,
-  except,
-  includedModules,
-  rbModAttrReader,
-  rbModAttrWriter,
-} from "@blazetrails/ruby-compat";
+import { aryIncludes, except, includedModules } from "@blazetrails/ruby-compat";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 interface AttributeMethodQueryable {
@@ -60,10 +54,8 @@ export class LazilyDefineAttributes extends Module {
     const attrReaders = this.attributes.filter((name) => !klass.isAttributeMethod(name));
     const attrWriters = this.attributes.filter((name) => !klass.isAttributeMethod(`${name}=`));
 
-    this.moduleEval((mod) => {
-      rbModAttrReader({ prototype: mod }, ...attrReaders);
-      rbModAttrWriter({ prototype: mod }, ...attrWriters);
-    });
+    this.attrReader(...attrReaders);
+    this.attrWriter(...attrWriters);
 
     this.#lock = null;
   }

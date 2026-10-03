@@ -103,6 +103,12 @@ describe("rubyCompatExport", () => {
     expect(rubyCompatAliases("include?", ["expr"])).toEqual(["aryIncludes"]);
   });
 
+  it("credits String.new on a constant receiver only through rbStrSNew", () => {
+    expect(rubyCompatAliases("new", ["const"])).toEqual(["rbStrSNew"]);
+    expect(rubyCompatExport("new", ["const"])).toBeUndefined();
+    expect(rubyCompatAliases("new")).toEqual([]);
+  });
+
   it("forwards the receiver through jsEnumerableAliases", () => {
     expect(jsEnumerableAliases("merge", ["hash"])).toEqual(["merge"]);
     expect(jsEnumerableAliases("merge")).toEqual([]);

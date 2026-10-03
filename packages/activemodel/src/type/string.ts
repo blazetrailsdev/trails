@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { rbStrSNew, registerConstant } from "@blazetrails/ruby-compat";
 import { ImmutableStringType } from "./immutable-string.js";
 
 export class StringType extends ImmutableStringType {
@@ -18,12 +18,9 @@ export class StringType extends ImmutableStringType {
     });
   }
 
-  /**
-   * @internal
-   * @missingRailsCall new — CONVERGEABLE type-string-cast-value-string-new-has-no-js-carrier
-   */
+  /** @internal */
   protected castValue(value: unknown): string | null {
-    if (typeof value === "string") return String(value);
+    if (typeof value === "string") return rbStrSNew(value);
     else if (value === true) return this.true;
     else if (value === false) return this.false;
     else return String(value);

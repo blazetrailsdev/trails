@@ -82,6 +82,27 @@ describe("AcceptanceValidationTest (trails-only)", () => {
 });
 
 describe("LazilyDefineAttributes#matches?", () => {
+  it("setup! leaves a class field and a prototype method of the attribute's name alone", async () => {
+    class Agreement extends Model {
+      terms: unknown = "1";
+      eula(): string {
+        return "1";
+      }
+
+      static {
+        this.validates("terms", { acceptance: true });
+        this.validates("eula", { acceptance: true });
+      }
+    }
+
+    const agreement = new Agreement();
+    expect(agreement.terms).toBe("1");
+    expect(agreement.eula()).toBe("1");
+    agreement.terms = "0";
+    expect(agreement.terms).toBe("0");
+    expect(await agreement.isValid()).toBe(false);
+  });
+
   it("matches the writer name as well as the reader", () => {
     const mod = new LazilyDefineAttributes(["terms"]);
 

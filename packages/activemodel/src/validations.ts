@@ -6,13 +6,17 @@ import {
   include,
   included,
   kernelArray,
-  runCallbacks,
 } from "@blazetrails/activesupport";
 
-import { block as rbBlock, Module, rbBlockGivenP, rbFPublicSend } from "@blazetrails/ruby-compat";
+import {
+  block as rbBlock,
+  Module,
+  rbBlockGivenP,
+  rbFPublicSend,
+  rbModMethodDefined,
+} from "@blazetrails/ruby-compat";
 
 import { Errors } from "./errors.js";
-import { inspectAccessor } from "./validations/_accessor.js";
 import { BlockValidator, EachValidator, Validator } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
 import { I18n } from "./i18n.js";
@@ -141,9 +145,7 @@ export class Validations {
   }
 
   /** @internal */
-  async _runValidateCallbacks(): Promise<void> {
-    await runCallbacks(this, "validate");
-  }
+  declare _runValidateCallbacks: (block?: () => unknown) => unknown;
 
   /** @internal */
   contextForValidation(): ValidationContext {
@@ -306,9 +308,7 @@ export const ClassMethods = {
     return cached;
   },
   isAttributeMethod(this: { prototype: object }, attribute: string): boolean {
-    const isWriter = attribute.endsWith("=");
-    const accessor = inspectAccessor(this.prototype, isWriter ? attribute.slice(0, -1) : attribute);
-    return isWriter ? accessor.hasSetter : accessor.hasGetter;
+    return rbModMethodDefined(this, attribute);
   },
 };
 
