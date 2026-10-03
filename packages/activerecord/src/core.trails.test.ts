@@ -94,6 +94,26 @@ describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
     }
   });
 
+  it("initWithAttributes keeps the attributes and new_record it is handed", async () => {
+    const source = await Topic.create({ title: "Carol" });
+    const record = Topic.allocate() as Topic & {
+      initWithAttributes(attributes: unknown, newRecord?: boolean): Topic;
+      _attributes: unknown;
+    };
+    const handed = (
+      source as unknown as { _attributes: { deepDup(): unknown } }
+    )._attributes.deepDup();
+    record.initWithAttributes(handed, true);
+    expect(record._attributes).toBe(handed);
+    expect(record.title).toBe("Carol");
+    expect(record.isNewRecord()).toBe(true);
+
+    const loaded = Topic.allocate() as typeof record;
+    loaded.initWithAttributes(handed);
+    expect(loaded.title).toBe("Carol");
+    expect(loaded.isNewRecord()).toBe(false);
+  });
+
   it("allocate restores the flags it sets when the constructor returns", () => {
     const flags = ["_allocating", "_suppressStiNewDispatch"] as const;
     const before = flags.map((flag) => [
