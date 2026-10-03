@@ -240,18 +240,6 @@ export const ClassMethods = {
     const targetName = pattern.methodName(oldName);
     const parameters = pattern.parameters;
 
-    const generateMethod = pattern.proxyTarget.endsWith("=")
-      ? camelize(`set_define_method_${pattern.proxyTarget.slice(0, -1)}`, false)
-      : camelize(`define_method_${pattern.proxyTarget}`, false);
-    if (rbObjRespondTo(this, generateMethod, true)) {
-      this.defineAttributeMethodPattern(pattern, oldName, {
-        owner: codeGenerator,
-        as: newName,
-        override: true,
-      });
-      return;
-    }
-
     const mangledName = this.buildMangledName(targetName);
 
     const callArgs: string[] = [];

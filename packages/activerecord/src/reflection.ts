@@ -236,22 +236,23 @@ export class AbstractReflection {
   }
 
   counterCacheColumn(): string | null {
-    return (this._counterCacheColumn ||= (() => {
-      const self = this._concrete();
-      const counterCache = self.options.counterCache as { column?: string | null } | undefined;
+    if (this._counterCacheColumn == null) {
+      const counterCache = this._concrete().options.counterCache as
+        | { column: string | null }
+        | undefined;
 
       if (this.belongsTo()) {
         if (counterCache) {
-          return (
-            counterCache.column ||
-            `${pluralize(underscore(demodulize((self.activeRecord as any)._demodulizedName ?? self.activeRecord.name)))}_count`
-          );
+          this._counterCacheColumn =
+            counterCache.column ??
+            `${pluralize(underscore(demodulize((this._concrete().activeRecord as any)._demodulizedName ?? this._concrete().activeRecord.name)))}_count`;
         }
-        return null;
       } else {
-        return (counterCache && counterCache.column) || `${self.name}_count`;
+        this._counterCacheColumn =
+          (counterCache && counterCache.column) ?? `${this._concrete().name}_count`;
       }
-    })());
+    }
+    return this._counterCacheColumn ?? null;
   }
 
   checkValidityOfInverseBang(): void {

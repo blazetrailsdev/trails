@@ -14,6 +14,8 @@ import { ThroughReflection, create } from "./reflection.js";
 import { fixtures } from "./test-fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Tagging } from "./test-helpers/models/tagging.js";
+import { Reply, WebReply } from "./test-helpers/models/reply.js";
+import { Topic } from "./test-helpers/models/topic.js";
 
 fixtures({});
 
@@ -106,6 +108,18 @@ describe("ReflectionTest", () => {
     expect(ref.klass).toBe(ShStableTarget);
     registerModel("ShStableTarget", ShStableTarget);
     expect(ref.klass).toBe(ShStableTarget);
+  });
+
+  it("counter cache column reads the normalized option on both arms", () => {
+    expect(reflectOnAssociation(Reply, "topic")!.counterCacheColumn()).toBe("replies_count");
+    expect(reflectOnAssociation(Reply, "topicWithPrimaryKey")!.counterCacheColumn()).toBe(
+      "replies_count",
+    );
+    expect(reflectOnAssociation(WebReply, "topic")!.counterCacheColumn()).toBe("replies_count");
+    expect(reflectOnAssociation(Post, "author")!.counterCacheColumn()).toBeNull();
+    expect(reflectOnAssociation(Post, "taggings")!.counterCacheColumn()).toBe("tags_count");
+    expect(reflectOnAssociation(Post, "comments")!.counterCacheColumn()).toBe("comments_count");
+    expect(reflectOnAssociation(Topic, "replies")!.counterCacheColumn()).toBe("replies_count");
   });
 
   it("create accepts a nil name without a cast", () => {

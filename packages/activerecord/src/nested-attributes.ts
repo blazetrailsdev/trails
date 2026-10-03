@@ -220,15 +220,9 @@ export function generateAssociationWriter(
 /** @internal */
 interface OneToOneAssociation {
   target: Base | null;
-  build(attrs: Record<string, unknown>): Base | null | Promise<Base | null>;
-  buildRecord(attrs: Record<string, unknown>): Base | null;
-  setNewRecord(record: Base): Base | null | Promise<Base | null>;
   initializeAttributes(record: Base): Promise<void> | void;
   isLoaded(): boolean;
   readonly reader?: Base | null | Promise<Base | null>;
-  loadDisplacedForBuild?(): Promise<unknown> | null;
-  detachDisplacedTarget?(): Promise<void>;
-  displacementNeedsAwait?(): boolean;
 }
 
 /** @internal */
