@@ -1196,15 +1196,14 @@ export const ClassMethods = {
   },
 };
 
-export const Callbacks = new Module() as Module &
-  typeof Concern & {
-    ClassMethods: typeof ClassMethods;
-    runCallbacks: typeof runCallbacks;
-    haltedCallbackHook(_filter: unknown, _name: string): void;
-  };
+export const Callbacks = new Module() as Module & {
+  ClassMethods: typeof ClassMethods;
+  runCallbacks: typeof runCallbacks;
+  haltedCallbackHook(_filter: unknown, _name: string): void;
+};
 extend(Callbacks, Concern);
 
-Callbacks.included(null, function (this: AnyClass) {
+Concern.included.call(Callbacks, null, function (this: AnyClass) {
   extend(this as never, DescendantsTracker);
   classAttribute.call(this, "__callbacks", {
     instanceWriter: false,
