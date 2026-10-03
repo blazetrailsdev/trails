@@ -1,4 +1,4 @@
-import { rbEqual, rbObjAsString as toS, registerConstant } from "@blazetrails/ruby-compat";
+import { rbEqual, rbObjAsString as toS, registerConstant, unpack1 } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 
 const textEncoder = new TextEncoder();
@@ -47,9 +47,7 @@ export class Data {
   }
 
   hex(): string {
-    return Array.from(this.value)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
+    return unpack1(this.value, "H*")!;
   }
 
   equals(other: unknown): boolean {

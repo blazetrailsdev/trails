@@ -1658,7 +1658,6 @@ export class Base extends Model {
   private _destroyedByAssociation: unknown = null;
   _transactionAction: "create" | "update" | "destroy" | undefined = undefined;
 
-  /** @missingRailsCall init_internals — CONVERGEABLE base-constructor-calls-init-internals-not-activemodel */
   constructor(
     attributes: Record<string, unknown> | PermittedAttributes = {},
     initBlock?: (record: Base) => void,
@@ -2695,7 +2694,6 @@ include(Base, _AttributeAssignment.AttributeAssignment);
 include(Base, AutosaveAssociation);
 prepend(Base, { loadSchemaBang: CounterCache.loadSchemaBang as PrependMethod });
 prepend(Base, { loadSchemaBang: _EncryptableRecord.loadSchemaBang as PrependMethod });
-prepend(Base.prototype, { initInternals: _Core.initInternals as PrependMethod });
 prepend(Base.prototype, { initInternals: _Persistence.initInternals as PrependMethod });
 prepend(Base.prototype, {
   initInternals: _AttributeMethodsDirty.initInternals as PrependMethod,

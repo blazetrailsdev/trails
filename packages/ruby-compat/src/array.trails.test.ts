@@ -168,6 +168,14 @@ describe("String#unpack1", () => {
     expect(unpack1("ab", "h3")).toBe("162");
   });
 
+  it("reads H as hex digits, high nibble first, off a String or its binary seat", () => {
+    expect(unpack1("\xc3\xa9(", "H*")).toBe("c3a928");
+    expect(unpack1("ab", "H3")).toBe("616");
+    expect(unpack1("a", "H")).toBe("6");
+    expect(unpack1(new Uint8Array([0xc3, 0xa9, 0x28]), "H*")).toBe("c3a928");
+    expect(unpack1(new Uint8Array(0), "H*")).toBe("");
+  });
+
   it("answers nil when the string is short of an item's bytes", () => {
     expect(unpack1("ab", "@2l<")).toBeNull();
     expect(unpack1("", "E")).toBeNull();

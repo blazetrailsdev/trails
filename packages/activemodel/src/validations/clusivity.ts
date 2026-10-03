@@ -1,6 +1,15 @@
 import { resolveValue } from "./resolve-value.js";
 import { ArgumentError } from "../attribute-assignment.js";
-import { Range, rbFPublicSend, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
+import {
+  BigDecimal,
+  Complex,
+  Range,
+  Rational,
+  rbFPublicSend,
+  rbObjRespondTo,
+  rtest,
+} from "@blazetrails/ruby-compat";
+import { Temporal, Time } from "@blazetrails/date";
 
 export { resolveValue };
 
@@ -62,9 +71,23 @@ export function delimiter(this: ClusivityHost): unknown {
 /** @internal */
 export function inclusionMethod(enumerable: unknown): "isInclude" | "cover" {
   if (enumerable instanceof Range) {
-    const endpoint = enumerable.begin ?? enumerable.end;
-    // boundary: ruby-compat's `Range` comparators accept JS Date alongside number,
-    if (typeof endpoint === "number" || endpoint instanceof Date) return "cover";
+    const endpoint = rtest(enumerable.begin) ? enumerable.begin : enumerable.end;
+    switch (true) {
+      case typeof endpoint === "number":
+      case typeof endpoint === "bigint":
+      case endpoint instanceof Rational:
+      case endpoint instanceof BigDecimal:
+      case endpoint instanceof Complex:
+      case endpoint instanceof Time:
+      case endpoint instanceof Temporal.Instant:
+      case endpoint instanceof Temporal.ZonedDateTime:
+      case endpoint instanceof Temporal.PlainDateTime:
+      case endpoint instanceof Temporal.PlainDate:
+        return "cover";
+      default:
+        return "isInclude";
+    }
+  } else {
+    return "isInclude";
   }
-  return "isInclude";
 }
