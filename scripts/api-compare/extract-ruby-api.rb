@@ -484,6 +484,8 @@ class ApiExtractor
     @current_line = 0
     @defines_fail = source.match?(/^\s*def\s+(?:self\.)?fail\b/)
     ivar_kinds = typed_ivars(sexp)
+    unknown_writers = ivar_kinds.keys.filter_map { |owner, name| owner if name == "*" }.to_set
+    ivar_kinds.reject! { |(owner, _name), _kind| unknown_writers.include?(owner) }
     @hash_ivars = ivar_kinds.select { |_key, kind| kind == "hash" }.keys.to_set
     @array_ivars = ivar_kinds.select { |_key, kind| kind == "array" }.keys.to_set
     walk(sexp)
@@ -2971,12 +2973,14 @@ class ApiExtractor
   # `@stack = []` (`abstract/transaction.rb:499`), `@queue = []`
   # (`connection_pool/queue.rb:17`). An `@x ||= …` keeps whatever truthy value
   # `@x` already held, so it proves nothing; it, a multiple-assignment target,
-  # or any assignment of another class in the same owner leaves the ivar an
-  # `ivar` — which is what keeps an `@records` / `@target` a Relation or
-  # association may be assigned to unproven. An ivar of the same name in
+  # an assignment inside `class << self` or a `def self.`, an `attr_writer` /
+  # `attr_accessor` for the name, an `instance_variable_set` of it (of any ivar,
+  # when the name is not a literal), or any assignment of another class in the
+  # same owner leaves the ivar an `ivar` — which is what keeps an `@records` /
+  # `@target` a Relation or association may be assigned to unproven. An ivar of the same name in
   # another class of the file is not proven by it. A hash-literal assignment is
   # not yet admitted: story prove-hash-literal-ivars-in-ruby-compat-receiver-kinds.
-  def typed_ivars(node, owner = [], assigned = {})
+  def typed_ivars(node, owner = [], assigned = {}, singleton = false)
     return assigned unless node.is_a?(Array)
 
     case node[0]
@@ -2985,17 +2989,46 @@ class ApiExtractor
       body = node[0] == :class ? node[3] : node[2]
       typed_ivars(body, owner + [name], assigned) if name
       return assigned
+    when :sclass, :defs
+      node.each { |child| typed_ivars(child, owner, assigned, true) if child.is_a?(Array) }
+      return assigned
     when :assign, :opassign
       key = ivar_target_key(node[1], owner)
       if key
-        kind = node[0] == :assign ? assigned_ivar_kind(node[2]) : nil
+        kind = node[0] == :assign && !singleton ? assigned_ivar_kind(node[2]) : nil
         assigned[key] = assigned.key?(key) && assigned[key] != kind ? nil : kind
       end
     when :massign
       each_massign_ivar(node[1]) { |name| assigned[[owner.join("::"), name]] = nil }
+    when :command, :method_add_arg
+      external_ivar_writes(node).each { |name| assigned[[owner.join("::"), name]] = nil }
     end
-    node.each { |child| typed_ivars(child, owner, assigned) if child.is_a?(Array) }
+    node.each { |child| typed_ivars(child, owner, assigned, singleton) if child.is_a?(Array) }
     assigned
+  end
+
+  IVAR_WRITER_MACROS = %w[attr_writer attr_accessor].freeze
+
+  def external_ivar_writes(node)
+    callee = node[0] == :command ? node : node[1]
+    return [] unless callee.is_a?(Array)
+
+    name = case callee[0]
+           when :command, :fcall then ident_name(callee[1])
+           when :call then callee[3].is_a?(Array) ? ident_name(callee[3]) : nil
+           end
+    return extract_symbol_args(node[2]).map { |attr| "@#{attr}" } if IVAR_WRITER_MACROS.include?(name)
+    return [] unless name == "instance_variable_set"
+
+    first = first_call_arg(node[2])
+    ivar = first.is_a?(Array) && first[0] == :symbol_literal && first[1].is_a?(Array) && first[1][1]
+    ivar.is_a?(Array) && ivar[0] == :@ivar ? [ivar[1]] : ["*"]
+  end
+
+  def first_call_arg(args)
+    args = args[1] if args.is_a?(Array) && args[0] == :arg_paren
+    args = args[1] if args.is_a?(Array) && args[0] == :args_add_block
+    args.is_a?(Array) ? args[0] : nil
   end
 
   def ivar_target_key(target, owner)

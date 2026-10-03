@@ -3249,6 +3249,62 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
   });
 
+  it("leaves an Array-literal ivar unproven when anything outside the class's own instance bodies may write it", () => {
+    const c = rubyCallReceivers({
+      "lib/active_record/writers.rb": `
+        class Writers
+          attr_writer :written
+          attr_accessor :accessed
+
+          def initialize
+            @written = []
+            @accessed = []
+            @singleton = []
+            @class_level = []
+            @set = []
+            @plain = []
+          end
+
+          def self.reset
+            @class_level = []
+          end
+
+          class << self
+            def build
+              @singleton = []
+            end
+          end
+
+          def call
+            @written.size
+            @accessed.size
+            @singleton.size
+            @class_level.size
+            @set.size
+            @plain.last
+          end
+
+          def restore(value)
+            instance_variable_set(:@set, value)
+          end
+        end
+
+        class DynamicWriter
+          def initialize
+            @stack = []
+          end
+
+          def call(name, value)
+            @stack.last
+            instance_variable_set(name, value)
+          end
+        end
+      `,
+    });
+    expect(c["Writers#call"]).toEqual({ size: ["ivar"], last: ["array"] });
+    expect(c["DynamicWriter#call"]).toEqual({ last: ["ivar"] });
+  });
+
   it("proves a Kernel#Array call receiver an Array", () => {
     const c = rubyCallReceivers({
       "lib/active_record/batches.rb": `

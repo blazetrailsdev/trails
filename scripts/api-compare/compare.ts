@@ -171,6 +171,7 @@ import {
 import {
   JS_ENUMERABLE_ALIASES,
   jsEnumerableAliases,
+  LENGTH_READ_UNCREDITED_RECEIVER_KINDS,
   NATIVE_FORM_ANALOGUES,
   NEGATED_ALIASES,
   partitionNegatedCalls,
@@ -608,9 +609,11 @@ function hasNativeFormAnalogue(
   receivers: Record<string, readonly string[]> | undefined,
   tsNativeForms: ReadonlySet<string>,
 ): boolean {
-  const form = NATIVE_FORM_ANALOGUES.get(value);
-  if (form === undefined || !tsNativeForms.has(form)) return false;
-  return value !== "load" || receivers?.[value] === undefined;
+  const analogue = NATIVE_FORM_ANALOGUES.get(value);
+  if (analogue === undefined || !tsNativeForms.has(analogue.form)) return false;
+  const kinds = receivers?.[value];
+  if (analogue.receivers === "implicit-self") return kinds === undefined;
+  return kinds !== undefined && !kinds.some((k) => LENGTH_READ_UNCREDITED_RECEIVER_KINDS.has(k));
 }
 
 /**

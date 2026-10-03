@@ -407,7 +407,7 @@ describe("significantMissingCalls", () => {
 
   it("significantCallsForReceivers drops size and length for a TS body that reads .length", () => {
     const sig = significantCallsForReceivers(
-      { size: ["expr", "local"] },
+      { size: ["expr", "local"], length: ["array", "expr"] },
       undefined,
       new Set(["length"]),
     );
@@ -423,12 +423,29 @@ describe("significantMissingCalls", () => {
     );
   });
 
+  it("significantCallsForReceivers still flags an ivar or implicit-self size beside an unrelated .length read", () => {
+    const lengthRead = new Set(["length"]);
+    expect(
+      significantCallsForReceivers({ size: ["ivar"] }, undefined, lengthRead).has("size"),
+    ).toBe(true);
+    expect(
+      significantCallsForReceivers({ size: ["local", "self"] }, undefined, lengthRead).has("size"),
+    ).toBe(true);
+    expect(significantCallsForReceivers({}, undefined, lengthRead).has("size")).toBe(true);
+    expect(
+      significantCallsForReceivers({ length: ["const"] }, undefined, lengthRead).has("length"),
+    ).toBe(true);
+  });
+
   it("significantCallsForReceivers drops an implicit-self load for a TS body with a computed import()", () => {
     const imported = new Set(["import"]);
     expect(significantCallsForReceivers({}, undefined, imported).has("load")).toBe(false);
     expect(significantCallsForReceivers({ load: ["expr"] }, undefined, imported).has("load")).toBe(
       true,
     );
+    expect(
+      significantCallsForReceivers({ load: ["expr", "self"] }, undefined, imported).has("load"),
+    ).toBe(true);
     expect(significantCallsForReceivers({}).has("load")).toBe(true);
   });
 

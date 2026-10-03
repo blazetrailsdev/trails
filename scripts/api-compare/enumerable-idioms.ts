@@ -184,25 +184,44 @@ export const NATIVE_FORM_PREFIX = "@";
 
 /**
  * Ruby call → the {@link NATIVE_FORM_PREFIX}-marked TS form that is its whole
- * port. Read by `significantCallsForReceivers` (compare.ts), which drops the
- * Ruby call from significance for ONE body whose paired TS body has the form.
+ * port, and the Ruby receivers it is admitted for. Read by
+ * `significantCallsForReceivers` (compare.ts), which drops the Ruby call from
+ * significance for ONE body whose paired TS body has the form.
  *
  * - `size` / `length` → `length`: a `.length` property READ, never a
  *   `length()` / `size()` call. `.length` is the only JS spelling of
  *   `Array#size` (`NO_JS_EQUIVALENT`, naming-taxonomy.ts), while a trails
- *   `Relation#size` / `#length` is an awaited method CALL, so a read is never a
- *   dropped query trigger.
+ *   `Relation#size` / `#length` is an awaited method CALL. The read does not
+ *   name its Ruby receiver, so it is admitted only where every Ruby site has an
+ *   explicit receiver outside {@link LENGTH_READ_UNCREDITED_RECEIVER_KINDS}.
  * - `load` → `import`: a dynamic `import(x)` whose specifier is computed at run
  *   time, ESM's one way to evaluate a file by path — `Kernel#load`
  *   (`rb_f_load`, `vendor/ruby/v3.3.11/load.c:903`). A string-literal specifier
  *   is a module import (Ruby `require`) and is not marked. Admitted only where
  *   every Ruby site of `load` is an implicit-self call, the only shape
- *   `Kernel#load` takes.
+ *   `Kernel#load` takes; a `records.load` site, alone or beside a bare one,
+ *   still flags.
  */
-export const NATIVE_FORM_ANALOGUES = new Map<string, string>([
-  ["size", "length"],
-  ["length", "length"],
-  ["load", "import"],
+export const NATIVE_FORM_ANALOGUES = new Map<
+  string,
+  { form: string; receivers: "implicit-self" | "explicit" }
+>([
+  ["size", { form: "length", receivers: "explicit" }],
+  ["length", { form: "length", receivers: "explicit" }],
+  ["load", { form: "import", receivers: "implicit-self" }],
+]);
+
+/**
+ * Ruby receiver kinds (extract-ruby-api.rb#receiver_kind) a `.length` read
+ * never credits `size` / `length` for: an unproven ivar (`@records`, `@target`),
+ * implicit self (a bare `size` in `Relation` is `Relation#size`,
+ * `relation.rb:353-359`) and a constant. These are where Rails holds a
+ * Relation or association across method boundaries.
+ */
+export const LENGTH_READ_UNCREDITED_RECEIVER_KINDS: ReadonlySet<string> = new Set([
+  "ivar",
+  "self",
+  "const",
 ]);
 
 /** Whether alias `tsCall` counts for `rubyCall` only when the TS call is negated. */
