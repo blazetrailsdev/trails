@@ -428,7 +428,7 @@ export const ClassMethods = {
     let shape: "reader" | "getter" | "method" = "method";
     if (reader) shape = "reader";
     else if (parameters === false) shape = "getter";
-    mangledName = `${mangledName}__${shape}`;
+    mangledName = `${mangledName}${{ reader: "__reader", getter: "__getter", method: "" }[shape]}`;
 
     codeGenerator.defineCachedMethod(mangledName, { namespace, as }, (batch) => {
       let body: (self: ReadWriteHost, args: unknown[]) => unknown;
