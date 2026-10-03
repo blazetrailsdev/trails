@@ -4709,14 +4709,25 @@ function typeofStringOperand(expression: ts.Expression): string | undefined {
 }
 
 /**
- * Whether `klass` is a Ruby `String` subclass — `class SqlLiteral < String`
- * (`activerecord/lib/arel/nodes/sql_literal.rb:5`) — so Ruby's `String === x`
- * admits it, and a port's `typeof x === "string" || x instanceof SqlLiteral`
- * is that ONE test spelled twice. A hoisted function for the TDZ reason
- * {@link skeletonLogicalOpToken} gives.
+ * Whether `klass` is a Ruby `String` subclass, so Ruby's `String === x` admits
+ * it and a port's `typeof x === "string" || x instanceof SqlLiteral` is that
+ * ONE test spelled twice. These are every `class X < String` in the vendored
+ * Rails: `activerecord/lib/arel/nodes/sql_literal.rb:5`,
+ * `activesupport/lib/active_support/core_ext/string/output_safety.rb:19`,
+ * `activesupport/lib/active_support/string_inquirer.rb:21` and
+ * `actionview/lib/action_view/test_case.rb:301`. A hoisted function for the
+ * TDZ reason {@link skeletonLogicalOpToken} gives.
  */
-function isRubyStringSubclass(klass: string): boolean {
-  return klass === "SqlLiteral";
+export function isRubyStringSubclass(klass: string): boolean {
+  switch (klass) {
+    case "SqlLiteral":
+    case "SafeBuffer":
+    case "StringInquirer":
+    case "RenderedViewContent":
+      return true;
+    default:
+      return false;
+  }
 }
 
 /**

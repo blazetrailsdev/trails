@@ -3146,7 +3146,8 @@ class ApiExtractor
     tests = [node[1], node[3]].map do |test|
       next nil unless test.is_a?(Array) && test[0] == :binary && test[2] == :===
       const = test[1]
-      next nil unless const.is_a?(Array) && const[0] == :var_ref && const[1][0] == :@const
+      next nil unless const.is_a?(Array) && %i[var_ref top_const_ref].include?(const[0]) &&
+                      const[1][0] == :@const
       [const[1][1], strip_sexp_positions(test[3])]
     end
     return false if tests.include?(nil)

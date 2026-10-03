@@ -21,6 +21,7 @@ import {
   extractFromProgram,
   creditMixinObjectLiteralKeys,
   harvestObjectLiteralMethods,
+  isRubyStringSubclass,
   packageFingerprint,
   seatedClassExpression,
   staticClassExpressions,
@@ -1098,6 +1099,27 @@ describe("body call capture", () => {
     expect(skeleton("set")).toEqual(["if", "or:string-subclass", "when:2"]);
     expect(skeleton("join")).toEqual(["if", "or:string-subclass"]);
     expect(skeleton("mixed")).toEqual(["if", "or"]);
+  });
+
+  it("absorbs exactly the four String subclasses the vendored Rails defines", () => {
+    const named = ["SqlLiteral", "SafeBuffer", "StringInquirer", "RenderedViewContent"];
+    expect(named.filter(isRubyStringSubclass)).toEqual(named);
+    expect(["Chars", "BoundSqlLiteral", "String", "Symbol"].filter(isRubyStringSubclass)).toEqual(
+      [],
+    );
+    const cls = extractFromSource(
+      `class Foo {
+        valid(number: unknown) {
+          if (typeof number === "string" || number instanceof SafeBuffer) return;
+        }
+        quote(value: unknown) {
+          if (typeof value === "string" || value instanceof Chars) return;
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("valid")).toEqual(["if", "or:string-subclass"]);
+    expect(skeleton("quote")).toEqual(["if", "when:2"]);
   });
 
   it("tokens a nil-guard conditional apart from an ordinary one, in either polarity", () => {

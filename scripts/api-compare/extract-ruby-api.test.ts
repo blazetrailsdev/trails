@@ -237,6 +237,10 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
             String === x || Symbol === x ? lit(x) : x
           end
 
+          def partition(x)
+            ::String === x || ::Symbol === x ? lit(x) : x
+          end
+
           def mixed(x, y)
             String === x || Symbol === y
           end
@@ -244,6 +248,7 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
       `,
     });
     expect(s["Foo#order"]).toEqual(["if", "or:string-symbol", "ref:lit"]);
+    expect(s["Foo#partition"]).toEqual(["if", "or:string-symbol", "ref:lit"]);
     expect(s["Foo#mixed"]).toEqual(["or"]);
   });
 
