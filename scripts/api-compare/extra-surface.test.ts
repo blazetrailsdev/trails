@@ -598,12 +598,6 @@ describe("buildReport — hook-injected mixins", () => {
     expect(report.packages[0]?.extraFiles ?? []).toEqual([]);
   });
 
-  /**
-   * `ActiveRecord::Base` does `extend ActiveSupport::DescendantsTracker`
-   * (activerecord/lib/active_record/base.rb:286), whose `descendants` reads
-   * the `Class#subclasses` that `ReloadedClassesFiltering` filters
-   * (activesupport/lib/active_support/descendants_tracker.rb:58-66,107-110).
-   */
   it("credits ReloadedClassesFiltering to a cross-package extender of DescendantsTracker", () => {
     const ruby: ApiManifest = {
       source: "ruby",
@@ -663,7 +657,6 @@ describe("buildReport — hook-injected mixins", () => {
       topN: 50,
     });
     const f = report.packages[0].extraFiles.find((x) => x.tsFile === "base.ts");
-    // The module's own singleton methods stay on the module.
     expect(f!.extras.map((e) => [e.name, e.kind])).toEqual([["clear", "moved"]]);
   });
 });

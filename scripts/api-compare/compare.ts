@@ -4401,9 +4401,9 @@ export function main() {
           writerOwners.set(m.name, (writerOwners.get(m.name) ?? new Set<string>()).add(owner));
           tsWriterOwnersByFileName.set(file, writerOwners);
         }
-        // A top-level function (`owner === ""`) states no seat (see tsOwnerSeat),
-        // and neither does every member of an object literal: see
-        // tsMemberStatesSeat.
+        // A top-level function (`owner === ""`) states no seat — see tsOwnerSeat —
+        // and neither does a non-static member of an object literal
+        // (`ClassInfo.objectLiteral`).
         if (statesSeat) {
           const bySeat =
             m.isStatic === true ? tsStaticOwnersByFileName : tsInstanceOwnersByFileName;
