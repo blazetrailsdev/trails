@@ -8,6 +8,7 @@ import { AttrNames, AttributeMethods, defineMethodAttribute } from "./attribute-
 import { Model } from "./index.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 import { include } from "@blazetrails/activesupport";
+import { NoMethodError } from "./attribute-assignment.js";
 
 describe("AttributeMethodsTest (trails)", () => {
   it("generating alias attribute methods clears the attribute method patterns cache", () => {
@@ -35,6 +36,68 @@ describe("AttributeMethodsTest (trails)", () => {
     Person.aliasAttribute("nickname", "name");
 
     expect(Person.attributeMethodPatternsCache().size()).toBe(0);
+  });
+
+  it("an alias of a reader property is a property carrying both halves", () => {
+    class Person extends Model {
+      declare name: string | null;
+      declare nickname: string | null;
+      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        this.aliasAttribute("nickname", "name");
+        this.attribute("name", "string");
+      }
+    }
+    interface Person extends Attributes {}
+
+    class Plain {
+      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
+      declare static defineAttributeMethods: AttributesClassHalf["defineAttributeMethods"];
+      declare nickname: () => unknown;
+
+      static {
+        include(this, AttributeMethods);
+        this.defineAttributeMethods("name");
+        this.aliasAttribute("nickname", "name");
+      }
+      attributes(): Record<string, unknown> {
+        return { name: "plain" };
+      }
+      attribute(name: string): unknown {
+        return this.attributes()[name];
+      }
+    }
+
+    const person = new Person({ name: "Alexander" });
+    expect(person.nickname).toBe("Alexander");
+    person.nickname = "Alex";
+    expect(person.name).toBe("Alex");
+    expect(new Plain().nickname()).toBe("plain");
+  });
+
+  it("an alias of a method that is not an attribute sends the target and its writer", () => {
+    class Person extends Model {
+      declare shout: string;
+      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
+
+      static {
+        include(this, Attributes);
+        this.aliasAttribute("shout", "yell");
+      }
+      yell(): string {
+        return "AHOY";
+      }
+    }
+    interface Person extends Attributes {}
+
+    const person = new Person();
+    expect(person.shout).toBe("AHOY");
+    expect(() => {
+      person.shout = "quiet";
+    }).toThrow(NoMethodError);
   });
 
   it("alias attribute overrides a method inherited from a parent class", () => {

@@ -131,26 +131,6 @@ export function setDefineMethodAttribute(
   );
 }
 
-export function aliasAttributeMethodDefinition(
-  this: {
-    defineAttributeMethodPattern(
-      pattern: AttributeMethodPattern,
-      attrName: string,
-      options: { owner: CodeGenerator; as: string; override?: boolean },
-    ): void;
-  },
-  codeGenerator: CodeGenerator,
-  pattern: AttributeMethodPattern,
-  newName: string,
-  oldName: string,
-): void {
-  this.defineAttributeMethodPattern(pattern, oldName, {
-    owner: codeGenerator,
-    as: newName,
-    override: true,
-  });
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActiveModel::AttributeMethods` (attributes.rb:8); the class/interface merge is how `include()` surfaces on the type side.
 export interface Attributes extends Included<typeof AttributeMethods> {
   attributeMissing(match: AttributeMethod, ...args: unknown[]): unknown;
@@ -178,7 +158,7 @@ export class Attributes {
     include(base, { _writeAttribute, "attribute=": _writeAttribute });
 
     extend(base, ClassMethods);
-    extend(base, { defineMethodAttribute, aliasAttributeMethodDefinition });
+    extend(base, { defineMethodAttribute });
 
     include(base, SuperMethods);
 
