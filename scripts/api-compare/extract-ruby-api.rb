@@ -484,8 +484,7 @@ class ApiExtractor
     @current_line = 0
     @defines_fail = source.match?(/^\s*def\s+(?:self\.)?fail\b/)
     ivar_kinds = typed_ivars(sexp)
-    unknown_writers = ivar_kinds.keys.filter_map { |owner, name| owner if name == "*" }.to_set
-    ivar_kinds.reject! { |(owner, _name), _kind| unknown_writers.include?(owner) }
+    ivar_kinds.clear if ivar_kinds.keys.any? { |_owner, name| name == "*" }
     kinds_by_name = ivar_kinds.group_by { |(_owner, name), _kind| name }.transform_values { |rows| rows.map(&:last).uniq }
     ivar_kinds.reject! { |(_owner, name), _kind| kinds_by_name[name].size > 1 }
     @hash_ivars = ivar_kinds.select { |_key, kind| kind == "hash" }.keys.to_set
@@ -3012,7 +3011,7 @@ class ApiExtractor
   # whatever truthy value `@x` already held), a multiple-assignment target, an
   # assignment in the class body itself (a class-level ivar) or inside
   # `class << self` / a `def self.`, an `attr_writer` / `attr_accessor` for the
-  # name, an `instance_variable_set` of it (of every ivar of the owner, when the
+  # name, an `instance_variable_set` of it (of every ivar in the file, when the
   # name is not a literal), any assignment of another kind in the same owner,
   # and one of another kind to the same name in any other class or module of
   # the file (a subclass or mixin writing the parent's ivar). An ivar of the

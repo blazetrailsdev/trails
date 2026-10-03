@@ -3325,6 +3325,8 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
           end
         end
 
+      `,
+      "lib/active_record/dynamic_writer.rb": `
         class DynamicWriter
           def initialize
             @stack = []
@@ -3336,12 +3338,30 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
           end
         end
       `,
+      "lib/active_record/dynamic_child.rb": `
+        class DynamicParent
+          def initialize
+            @stack = []
+          end
+
+          def call
+            @stack.last
+          end
+        end
+
+        class DynamicChild < DynamicParent
+          def restore(name, value)
+            instance_variable_set(name, value)
+          end
+        end
+      `,
     });
     expect(c["Writers#call"]).toEqual({ size: ["ivar"], last: ["array"] });
     expect(c["DynamicWriter#call"]).toEqual({ last: ["ivar"] });
     expect(c["SelfWriter#call"]).toEqual({ last: ["ivar"] });
     expect(c["ClassLevel#call"]).toEqual({ last: ["ivar"] });
     expect(c["Parent#call"]).toEqual({ last: ["ivar"] });
+    expect(c["DynamicParent#call"]).toEqual({ last: ["ivar"] });
   });
 
   it("names the receiver each non-Array size or length site ends in", () => {
