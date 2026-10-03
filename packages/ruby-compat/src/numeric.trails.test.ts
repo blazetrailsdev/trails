@@ -119,6 +119,14 @@ describe("Numeric#**", () => {
     expect(numericPow(10, 5.5)).toBe(316227.7660168379);
     expect(numericPow(0.5, 2)).toBe(0.25);
     expect(numericPow(1, -2)).toBe(1);
+    expect(numericPow(10, new Rational(3, 1))).toEqual(new Rational(1000, 1));
+    expect(numericPow(10, new Rational(-2, 1))).toEqual(new Rational(1, 100));
+    expect(numericPow(10, new Rational(1, 2))).toBe(3.1622776601683795);
+    expect(numericPow(2.5, new Rational(3, 1))).toBe(15.625);
+    expect(numericPow(new Rational(2, 3), -2)).toEqual(new Rational(9, 4));
+    expect(numericPow(new Rational(-1, 1), 3)).toEqual(new Rational(-1, 1));
+    expect(numericPow(new Rational(1, 4), 0.5)).toBe(0.5);
+    expect(() => numericPow(0, new Rational(-2, 1))).toThrow("divided by 0");
     expect(Number(numericPow(1, NaN))).toBe(1);
     expect(Number(numericPow(new Number(1), NaN))).toBe(1);
     expect(Number(numericPow(2, new Number(0)))).toBe(1);

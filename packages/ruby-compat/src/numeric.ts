@@ -336,6 +336,43 @@ function rbDblComplexNewPolarPi(abs: number, ang: number): unknown {
   }
 }
 
+/** `rb_rational_pow` (`vendor/ruby/v3.3.11/rational.c:980`). */
+function rbRationalPow(self: Rational, other: unknown): unknown {
+  if (rbIntegerTypeP(other) && BigInt(other) === 0n) return new Rational(1, 1);
+
+  if (other instanceof Rational) {
+    if (other.denominator === 1n) other = rbBigNorm(other.numerator);
+  }
+
+  if (rbIntegerTypeP(other)) {
+    if (self.denominator === 1n) {
+      if (self.numerator === 1n) {
+        return new Rational(1, 1);
+      } else if (self.numerator === -1n) {
+        return new Rational(BigInt(other) % 2n ? -1 : 1, 1);
+      } else if (self.numerator === 0n) {
+        if (BigInt(other) < 0n) {
+          throw new ZeroDivisionError("divided by 0");
+        } else {
+          return new Rational(0, 1);
+        }
+      }
+    }
+
+    const n = BigInt(other);
+    if (n > 0n) {
+      return new Rational(self.numerator ** n, self.denominator ** n);
+    } else if (n < 0n) {
+      return new Rational(self.denominator ** -n, self.numerator ** -n);
+    } else {
+      return new Rational(1, 1);
+    }
+  } else if (rbFloatTypeP(other) || other instanceof Rational) {
+    return numericPow(rbDbl2num(self.toF()), other);
+  }
+  throw new TypeError(`${rbBuiltinClassName(other)} can't be coerced into Rational`);
+}
+
 /**
  * `fix_pow` (`vendor/ruby/v3.3.11/numeric.c:4521`), whose negative Integer exponent
  * is `fix_pow_inverted`'s Rational (`numeric.c:4501`), and `rb_float_pow`
@@ -364,11 +401,13 @@ export function numericPow(x: unknown, y: unknown): unknown {
     if (a < 0 && dy !== Math.round(dy)) return rbDblComplexNewPolarPi(Math.pow(-a, dy), dy);
     return rbDbl2num(Math.pow(a, dy));
   }
-  if (rbFloatTypeP(x) && (rbIntegerTypeP(y) || rbFloatTypeP(y))) {
+  if (x instanceof Rational) return rbRationalPow(x, y);
+  if (rbIntegerTypeP(x) && y instanceof Rational) return rbRationalPow(new Rational(x, 1), y);
+  if (rbFloatTypeP(x) && (rbIntegerTypeP(y) || rbFloatTypeP(y) || y instanceof Rational)) {
     const dx = x.valueOf();
     if (y === 2) return rbDbl2num(dx * dx);
-    const dy = Number(y.valueOf());
-    if (rbFloatTypeP(y) && dx < 0 && dy !== Math.round(dy)) {
+    const dy = y instanceof Rational ? y.toF() : Number(y.valueOf());
+    if (!rbIntegerTypeP(y) && dx < 0 && dy !== Math.round(dy)) {
       return rbDblComplexNewPolarPi(Math.pow(-dx, dy), dy);
     }
     if (dx === 1 || dy === 0) return rbDbl2num(1.0);
