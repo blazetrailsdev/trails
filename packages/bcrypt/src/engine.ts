@@ -2,10 +2,10 @@ import bcryptjs from "bcryptjs";
 import { Time } from "@blazetrails/date";
 import {
   ArgumentError,
+  OpenSSL,
   Range,
   rbObjAsString,
   rbObjRespondTo,
-  SecureRandom,
   toI,
   warn,
 } from "@blazetrails/ruby-compat";
@@ -57,7 +57,7 @@ export class Engine {
       if (cost < this.MIN_COST) {
         cost = this.MIN_COST;
       }
-      return this.__bcSalt("$2a$", cost, SecureRandom.randomBytes(this.MAX_SALT_LENGTH));
+      return this.__bcSalt("$2a$", cost, OpenSSL.Random.randomBytes(this.MAX_SALT_LENGTH));
     } else {
       throw new Errors.InvalidCost("cost must be numeric and > 0");
     }

@@ -171,6 +171,20 @@ export const HMAC = {
 };
 
 /**
+ * `OpenSSL::Random` (`vendor/ruby/v3.3.11/ext/openssl/ossl_rand.c:12`), the one
+ * module function bcrypt calls (`vendor/bcrypt-ruby/v3.1.20/lib/bcrypt/engine.rb:90`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby's openssl extension
+ * (`vendor/ruby/v3.3.11/ext/openssl/ossl_rand.c:12`), which no Rails file defines.
+ */
+export const Random = {
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_rand.c:105 */
+  randomBytes(len: number): Bytes {
+    return getCrypto().randomBytes(len);
+  },
+};
+
+/**
  * `OpenSSL` (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl.rb:16`), so a ported body
  * spells `OpenSSL::HMAC.digest` the way the Ruby does.
  *
@@ -180,6 +194,7 @@ export const HMAC = {
 export const OpenSSL = {
   Cipher,
   HMAC,
+  Random,
   Digest: {
     /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_digest.c:400 */
     MD5: new DigestClass("md5", "OpenSSL::Digest::MD5"),
