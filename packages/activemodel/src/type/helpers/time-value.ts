@@ -1,5 +1,14 @@
 import { Temporal, Time } from "@blazetrails/date";
-import { ArgumentError, Rational, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  cmp,
+  numericMinus,
+  numericModulo,
+  numericPow,
+  Rational,
+  rbFSend,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { actsLike, TimeWithZone, toFs } from "@blazetrails/activesupport";
 
 export interface TimezoneAware {
@@ -26,21 +35,16 @@ export function serializeCastValue(this: TimeValueHost, value: unknown): unknown
   return value;
 }
 
-/**
- * @boundary: `precision` is an Integer, so `10 ** n` is taken over BigInt, the
- *  Integer arm of Ruby's `**`. A negative exponent there is a Rational, which
- *  divides every Integer nsec, as `10 ** 0` does.
- */
 export function applySecondsPrecision<T>(this: { precision?: number }, value: T): T {
   if (!(this.precision != null && rbObjRespondTo(value, "nsec"))) return value;
 
-  const numberOfInsignificantDigits = 9 - this.precision;
-  const roundPower = 10n ** BigInt(Math.max(numberOfInsignificantDigits, 0));
-  const roundedOffNsec = BigInt(rbFSend(value, "nsec") as number) % roundPower;
+  const numberOfInsignificantDigits = numericMinus(9, this.precision);
+  const roundPower = numericPow(10, numberOfInsignificantDigits);
+  const roundedOffNsec = numericModulo(rbFSend(value, "nsec"), roundPower);
 
-  if (roundedOffNsec > 0n) {
+  if (cmp(roundedOffNsec, 0)! > 0) {
     return rbFSend(value, "change", {
-      nsec: Number(BigInt(rbFSend(value, "nsec") as number) - roundedOffNsec),
+      nsec: numericMinus(rbFSend(value, "nsec"), roundedOffNsec),
     }) as T;
   } else {
     return value;

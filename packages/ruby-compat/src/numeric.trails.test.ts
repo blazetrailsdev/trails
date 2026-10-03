@@ -1,7 +1,20 @@
 import { describe, it, expect } from "vitest";
+import { Complex } from "./complex.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { NoMethodError } from "./no-method-error.js";
-import { anybits, fixDiv, fixMod, isNan, numericMul, round, toF, toI } from "./numeric.js";
+import {
+  anybits,
+  fixDiv,
+  fixMod,
+  isNan,
+  numericMinus,
+  numericModulo,
+  numericMul,
+  numericPow,
+  round,
+  toF,
+  toI,
+} from "./numeric.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
 
 describe("Float#round", () => {
@@ -73,6 +86,64 @@ describe("Numeric#*", () => {
     expect(numericMul(2n ** 60n, 4)).toBe(2n ** 62n);
     expect(toI(numericMul(0.5, 1_000_000))).toBe(500000);
     expect(() => numericMul(1, "a")).toThrow("String can't be coerced into Integer");
+  });
+});
+
+describe("Numeric#-", () => {
+  it("subtracts across the Integer, Float and Rational seats", () => {
+    expect(numericMinus(9, 3)).toBe(6);
+    expect(numericMinus(9, 3.5)).toBe(5.5);
+    expect(numericMinus(2n ** 60n, 1)).toBe(2n ** 60n - 1n);
+    expect(numericMinus(7, new Rational(1, 2))).toEqual(new Rational(13, 2));
+    expect(numericMinus(123456789, 127960.2534332159)).toBe(123328828.74656679);
+    expect(() => numericMinus(1, "a")).toThrow("String can't be coerced into Integer");
+  });
+});
+
+describe("Numeric#%", () => {
+  it("takes the divisor's sign across the Integer, Float and Rational seats", () => {
+    expect(numericModulo(-7, 3)).toBe(2);
+    expect(numericModulo(-7, 2.5)).toBe(0.5);
+    expect(numericModulo(123456789, new Rational(1, 1000))).toEqual(new Rational(0, 1));
+    expect(numericModulo(5.5, new Rational(1, 3))).toBe(0.16666666666666696);
+    expect(() => numericModulo(5, 0)).toThrow("divided by 0");
+    expect(() => numericModulo(5.5, 0)).toThrow("divided by 0");
+  });
+});
+
+describe("Numeric#**", () => {
+  it("answers an Integer, a Rational for a negative Integer exponent, else a Float", () => {
+    expect(numericPow(10, 9)).toBe(1_000_000_000);
+    expect(numericPow(10, 30)).toBe(10n ** 30n);
+    expect(numericPow(10, -1)).toEqual(new Rational(1, 10));
+    expect(numericPow(10, 5.5)).toBe(316227.7660168379);
+    expect(numericPow(0.5, 2)).toBe(0.25);
+    expect(numericPow(1, -2)).toBe(1);
+    expect(numericPow(10, new Rational(3, 1))).toEqual(new Rational(1000, 1));
+    expect(numericPow(10, new Rational(-2, 1))).toEqual(new Rational(1, 100));
+    expect(numericPow(10, new Rational(1, 2))).toBe(3.1622776601683795);
+    expect(numericPow(2.5, new Rational(3, 1))).toBe(15.625);
+    expect(numericPow(new Rational(2, 3), -2)).toEqual(new Rational(9, 4));
+    expect(numericPow(new Rational(0, 1), new Rational(0, 1))).toEqual(new Rational(1, 1));
+    expect(numericPow(0, new Rational(0, 1))).toEqual(new Rational(1, 1));
+    expect(numericPow(new Rational(0, 1), 0)).toEqual(new Rational(1, 1));
+    expect(numericPow(new Rational(-1, 1), 3)).toEqual(new Rational(-1, 1));
+    expect(numericPow(new Rational(1, 4), 0.5)).toBe(0.5);
+    expect(() => numericPow(0, new Rational(-2, 1))).toThrow("divided by 0");
+    expect(Number(numericPow(1, NaN))).toBe(1);
+    expect(Number(numericPow(new Number(1), NaN))).toBe(1);
+    expect(Number(numericPow(2, new Number(0)))).toBe(1);
+    expect(numericPow(0, -0.5)).toBe(Infinity);
+    const parts = (c: unknown): number[] => [
+      Number((c as Complex).real),
+      Number((c as Complex).imaginary),
+    ];
+    expect(parts(numericPow(-8, 0.5))).toEqual([0, 2.8284271247461903]);
+    expect(parts(numericPow(-8.5, 0.5))).toEqual([0, 2.9154759474226504]);
+    expect(parts(numericPow(-8, 1.5))).toEqual([0, -22.627416997969522]);
+    const [real, imag] = parts(numericPow(-8, 0.25));
+    expect(real).toBeCloseTo(1.189207115002721, 12);
+    expect(imag).toBeCloseTo(1.1892071150027208, 12);
   });
 });
 

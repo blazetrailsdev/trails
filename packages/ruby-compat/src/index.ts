@@ -211,8 +211,11 @@ export { NilClass } from "./nil-class.js";
 export { NoMethodError } from "./no-method-error.js";
 export { anybits, fixDiv, fixMod, isNan, round, toF, toI } from "./numeric.js";
 export {
+  numericMinus,
+  numericModulo,
   numericMul,
   numericPlus,
+  numericPow,
   rbBigNorm,
   rbDbl2num,
   rbFloatTypeP,

@@ -261,6 +261,167 @@ export function numericMul(x: unknown, y: unknown): unknown {
 }
 
 /**
+ * `fix_minus` (`vendor/ruby/v3.3.11/numeric.c:3995`), `rb_float_minus` (`numeric.c:1207`),
+ * `rb_rational_minus` (`vendor/ruby/v3.3.11/rational.c:765`).
+ * @noRailsEquivalent PERMANENT
+ */
+export function numericMinus(x: unknown, y: unknown): unknown {
+  if (rbFloatTypeP(x)) {
+    if (rbIntegerTypeP(y) || rbFloatTypeP(y)) return rbDbl2num(x.valueOf() - Number(y.valueOf()));
+    if (y instanceof Rational) return rbDbl2num(x.valueOf() - y.toF());
+  } else if (x instanceof Rational) {
+    if (rbIntegerTypeP(y)) return x.add(-BigInt(y));
+    if (rbFloatTypeP(y)) return rbDbl2num(x.toF() - y.valueOf());
+    if (y instanceof Rational) return x.add(new Rational(-y.numerator, y.denominator));
+  } else if (rbIntegerTypeP(x)) {
+    if (rbIntegerTypeP(y)) {
+      if (typeof x === "number" && typeof y === "number" && Number.isSafeInteger(x - y)) {
+        return x - y;
+      }
+      return rbBigNorm(BigInt(x) - BigInt(y));
+    }
+    if (rbFloatTypeP(y)) return rbDbl2num(Number(x) - y.valueOf());
+    if (y instanceof Rational)
+      return new Rational(x, 1).add(new Rational(-y.numerator, y.denominator));
+  }
+  throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClassname(x)}`);
+}
+
+/**
+ * `fix_mod` (`vendor/ruby/v3.3.11/numeric.c:4268`), `flo_mod` (`numeric.c:1416`),
+ * `num_modulo` (`numeric.c:700`) for a Rational: the result takes the divisor's sign.
+ * @noRailsEquivalent PERMANENT
+ */
+export function numericModulo(x: unknown, y: unknown): unknown {
+  if (x instanceof Rational || y instanceof Rational) {
+    if (rbFloatTypeP(x) || rbFloatTypeP(y)) {
+      return numericModulo(rbDbl2num(toF(x)), rbDbl2num(toF(y)));
+    }
+    if (rbIntegerTypeP(x) && y instanceof Rational) return new Rational(x, 1).mod(y);
+    if (x instanceof Rational && (rbIntegerTypeP(y) || y instanceof Rational)) return x.mod(y);
+  } else if (rbIntegerTypeP(x) && rbIntegerTypeP(y)) {
+    if (typeof x === "number" && typeof y === "number") return fixMod(x, y);
+    const b = BigInt(y);
+    if (b === 0n) throw new ZeroDivisionError("divided by 0");
+    const mod = BigInt(x) % b;
+    return rbBigNorm(mod !== 0n && mod < 0n !== b < 0n ? mod + b : mod);
+  } else if ((rbIntegerTypeP(x) || rbFloatTypeP(x)) && (rbIntegerTypeP(y) || rbFloatTypeP(y))) {
+    const fx = Number(x.valueOf());
+    const fy = Number(y.valueOf());
+    if (fy === 0) throw new ZeroDivisionError("divided by 0");
+    const mod = fx % fy;
+    return rbDbl2num(fy * mod < 0 ? mod + fy : mod);
+  }
+  throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClassname(x)}`);
+}
+
+/** `rb_dbl_complex_new_polar_pi` (`vendor/ruby/v3.3.11/complex.c:702`). */
+function rbDblComplexNewPolarPi(abs: number, ang: number): unknown {
+  let fi = Math.trunc(ang);
+  const fr = ang - fi;
+  const pos = fr === 0.5;
+
+  if (pos || fr === -0.5) {
+    const half = fi / 2.0;
+    if ((half - Math.trunc(half) !== fr) !== pos) abs = -abs;
+    return new Complex(rbDbl2num(0.0), rbDbl2num(abs));
+  } else if (fr === 0.0) {
+    fi = fi / 2.0;
+    if (fi - Math.trunc(fi) !== 0.0) abs = -abs;
+    return rbDbl2num(abs);
+  } else {
+    const real = abs * Math.cos(Math.PI * ang);
+    const imag = abs * Math.sin(Math.PI * ang);
+    return new Complex(rbDbl2num(real), rbDbl2num(imag));
+  }
+}
+
+/** `rb_rational_pow` (`vendor/ruby/v3.3.11/rational.c:980`). */
+function rbRationalPow(self: Rational, other: unknown): unknown {
+  if (
+    (rbIntegerTypeP(other) && BigInt(other) === 0n) ||
+    (other instanceof Rational && other.numerator === 0n)
+  ) {
+    return new Rational(1, 1);
+  }
+
+  if (other instanceof Rational) {
+    if (other.denominator === 1n) other = rbBigNorm(other.numerator);
+  }
+
+  if (rbIntegerTypeP(other)) {
+    if (self.denominator === 1n) {
+      if (self.numerator === 1n) {
+        return new Rational(1, 1);
+      } else if (self.numerator === -1n) {
+        return new Rational(BigInt(other) % 2n ? -1 : 1, 1);
+      } else if (self.numerator === 0n) {
+        if (BigInt(other) < 0n) {
+          throw new ZeroDivisionError("divided by 0");
+        } else {
+          return new Rational(0, 1);
+        }
+      }
+    }
+
+    const n = BigInt(other);
+    if (n > 0n) {
+      return new Rational(self.numerator ** n, self.denominator ** n);
+    } else if (n < 0n) {
+      return new Rational(self.denominator ** -n, self.numerator ** -n);
+    } else {
+      return new Rational(1, 1);
+    }
+  } else if (rbFloatTypeP(other) || other instanceof Rational) {
+    return numericPow(rbDbl2num(self.toF()), other);
+  }
+  throw new TypeError(`${rbBuiltinClassName(other)} can't be coerced into Rational`);
+}
+
+/**
+ * `fix_pow` (`vendor/ruby/v3.3.11/numeric.c:4521`), whose negative Integer exponent
+ * is `fix_pow_inverted`'s Rational (`numeric.c:4501`), and `rb_float_pow`
+ * (`numeric.c:1510`). C's `pow` answers 1.0 for a base of 1.0 or an exponent of
+ * 0.0 whatever the other operand, where `Math.pow` answers NaN for a NaN one.
+ * @noRailsEquivalent PERMANENT
+ */
+export function numericPow(x: unknown, y: unknown): unknown {
+  if (rbIntegerTypeP(x) && rbIntegerTypeP(y)) {
+    const a = BigInt(x);
+    const b = BigInt(y);
+    if (a === 1n) return 1;
+    if (a === -1n) return b % 2n ? -1 : 1;
+    if (b < 0n) {
+      if (a === 0n) throw new ZeroDivisionError("divided by 0");
+      return new Rational(1n, a ** -b);
+    }
+    return rbBigNorm(a ** b);
+  }
+  if (rbIntegerTypeP(x) && rbFloatTypeP(y)) {
+    const a = Number(x);
+    const dy = y.valueOf();
+    if (dy === 0.0) return rbDbl2num(1.0);
+    if (a === 0) return rbDbl2num(dy < 0 ? Infinity : 0.0);
+    if (a === 1) return rbDbl2num(1.0);
+    if (a < 0 && dy !== Math.round(dy)) return rbDblComplexNewPolarPi(Math.pow(-a, dy), dy);
+    return rbDbl2num(Math.pow(a, dy));
+  }
+  if (x instanceof Rational) return rbRationalPow(x, y);
+  if (rbIntegerTypeP(x) && y instanceof Rational) return rbRationalPow(new Rational(x, 1), y);
+  if (rbFloatTypeP(x) && (rbIntegerTypeP(y) || rbFloatTypeP(y) || y instanceof Rational)) {
+    const dx = x.valueOf();
+    if (y === 2) return rbDbl2num(dx * dx);
+    const dy = y instanceof Rational ? y.toF() : Number(y.valueOf());
+    if (!rbIntegerTypeP(y) && dx < 0 && dy !== Math.round(dy)) {
+      return rbDblComplexNewPolarPi(Math.pow(-dx, dy), dy);
+    }
+    if (dx === 1 || dy === 0) return rbDbl2num(1.0);
+    return rbDbl2num(Math.pow(dx, dy));
+  }
+  throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClassname(x)}`);
+}
+
+/**
  * `fix_plus` (`vendor/ruby/v3.3.11/numeric.c:3942`), `rb_float_plus` (`numeric.c:1176`),
  * `rb_rational_plus` (`vendor/ruby/v3.3.11/rational.c:724`), else `rb_num_coerce_bin`.
  * @noRailsEquivalent PERMANENT
