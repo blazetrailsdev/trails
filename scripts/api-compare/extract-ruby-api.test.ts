@@ -3251,6 +3251,45 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
   });
 
+  it("names an argument-less Hash.new / Array.new a literal and String.new(x) a conversion", () => {
+    const c = rubyCallReceivers({
+      "lib/active_support/core.rb": `
+        class Core
+          def literal
+            Hash.new.tap { |attrs| attrs }
+            Array.new()
+          end
+
+          def defaulted
+            Hash.new(0)
+          end
+
+          def blocked
+            Hash.new { |h, k| h[k] = [] }
+          end
+
+          def other
+            Foo.new
+          end
+
+          def conversion(order)
+            String.new(order)
+          end
+
+          def empty_string
+            String.new
+          end
+        end
+      `,
+    });
+    expect(c["Core#literal"]).toEqual({ new: ["literal-new"], tap: ["expr"] });
+    expect(c["Core#defaulted"]).toEqual({ new: ["const"] });
+    expect(c["Core#blocked"]).toEqual({ new: ["const"] });
+    expect(c["Core#other"]).toEqual({ new: ["const"] });
+    expect(c["Core#conversion"]).toEqual({ new: ["string-new"] });
+    expect(c["Core#empty_string"]).toEqual({ new: ["const"] });
+  });
+
   it("proves a Hash local from a hash-literal default, a `**` param and an assignment", () => {
     const c = rubyCallReceivers({
       "lib/active_support/options.rb": `

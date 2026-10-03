@@ -1413,6 +1413,42 @@ describe("body call capture", () => {
     expect(lazy.calls ?? []).not.toContain("@import");
   });
 
+  it("records rbFSend / rbFPublicSend of a string-literal name as a call to that name", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        first(records: unknown[], limit: number) {
+          return rbFSend(records, "limit", limit);
+        }
+        assign(record: object, k: string, v: unknown) {
+          return rbFPublicSend(record, "write", v);
+        }
+        dispatch(record: object, name: string) {
+          return rbFSend(record, name);
+        }
+      }`,
+    );
+    const calls = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.calls;
+    expect(calls("first")).toEqual(expect.arrayContaining(["rbFSend", "limit"]));
+    expect(calls("assign")).toEqual(expect.arrayContaining(["rbFPublicSend", "write"]));
+    expect(calls("dispatch")).toEqual(["rbFSend"]);
+  });
+
+  it("marks the String(x) conversion call as a native form", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        plain(order: unknown) {
+          return String(order);
+        }
+        boxed(order: unknown) {
+          return new String(order);
+        }
+      }`,
+    );
+    const calls = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.calls;
+    expect(calls("plain")).toContain("@String");
+    expect(calls("boxed") ?? []).not.toContain("@String");
+  });
+
   it("marks a call INVOKED on another object with the foreign-read prefix", () => {
     // `details.digest(x)` runs a member of `details`, not the same-file method
     // `digest` — the closure must not union that one's call-set (RFC 0108).

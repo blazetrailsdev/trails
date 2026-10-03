@@ -1326,20 +1326,17 @@ export function buildSubquery(
   return arel;
 }
 
-/**
- * @internal
- * @missingRailsCall new — CONVERGEABLE call-gate-credits-string-conversion-as-string-new
- */
+/** @internal */
 export function isDoesNotSupportReverse(order: string | Nodes.SqlLiteral): boolean {
-  const plain = String(order);
+  if (typeof order !== "string") order = String(order);
   if (
-    plain.includes(",") &&
-    plain.split(",").find((section) => section.split("(").length !== section.split(")").length) !==
+    order.includes(",") &&
+    order.split(",").find((section) => section.split("(").length !== section.split(")").length) !==
       undefined
   ) {
     return true;
   }
-  return /\bnulls\s+(?:first|last)\b/i.test(plain);
+  return /\bnulls\s+(?:first|last)\b/i.test(order);
 }
 
 /** @internal */

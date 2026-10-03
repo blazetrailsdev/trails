@@ -660,6 +660,9 @@ export function significantCallsForReceivers(
     has: (value) => {
       if (!base.has(value)) return false;
       if (hasNativeFormAnalogue(value, receivers, tsNativeForms, receiverNames)) return false;
+      if (value === "new" && isCoreNewWithNoNewExpression(receivers?.new, tsNativeForms)) {
+        return false;
+      }
       if (!POSITIONAL_ARRAY_ANALOGUES.has(value)) return true;
       const kinds = receivers?.[value];
       return !(kinds && kinds.length > 0 && kinds.every((k) => k === "array"));
@@ -680,6 +683,28 @@ export function invokeForms(calls: Iterable<string>): string[] {
     forms.push(`invoke:${c}`, `invoke:${c.replace(/^_+/, "")}`);
   }
   return forms;
+}
+
+/**
+ * A Ruby body whose EVERY `new` site is one whose faithful port is not a `new`
+ * expression (extract-ruby-api.rb#core_new_kind):
+ *
+ * - `literal-new`: an argument-less, block-less `Hash.new` / `Array.new`, the
+ *   literal `{}` / `[]` (`associations/foreign_association.rb:14`).
+ * - `string-new`: `String.new(x)`, credited only against a TS body that makes
+ *   the `String(x)` conversion call (`relation/query_methods.rb:2047`).
+ *
+ * One `Foo.new` in the body leaves `new` significant, the all-sites discipline
+ * {@link POSITIONAL_ARRAY_ANALOGUES} has.
+ */
+function isCoreNewWithNoNewExpression(
+  kinds: readonly string[] | undefined,
+  tsNativeForms: ReadonlySet<string>,
+): boolean {
+  if (kinds === undefined || kinds.length === 0) return false;
+  return kinds.every(
+    (k) => k === "literal-new" || (k === "string-new" && tsNativeForms.has("String")),
+  );
 }
 
 function hasNativeFormAnalogue(
