@@ -30,11 +30,11 @@ import { Arguments } from "./arguments.js";
 import type { Option } from "./option.js";
 
 export class Options extends Arguments {
-  static LONG_RE = /^(--\w+(?:-\w+)*)$/m;
-  static SHORT_RE = /^(-[a-z])$/im;
-  static EQ_RE = /^(--\w+(?:-\w+)*|-[a-z])=(.*)$/im;
-  static SHORT_SQ_RE = /^-([a-z]{2,})$/im;
-  static SHORT_NUM = new RegExp(`^(-[a-z])${Arguments.NUMERIC.source}$`, "im");
+  static LONG_RE = /(?<![^\n])(--\w+(?:-\w+)*)(?![^\n])/;
+  static SHORT_RE = /(?<![^\n])(-[a-z])(?![^\n])/i;
+  static EQ_RE = /(?<![^\n])(--\w+(?:-\w+)*|-[a-z])=([^\n]*)(?![^\n])/i;
+  static SHORT_SQ_RE = /(?<![^\n])-([a-z]{2,})(?![^\n])/i;
+  static SHORT_NUM = new RegExp(`(?<![^\\n])(-[a-z])${Arguments.NUMERIC.source}(?![^\\n])`, "i");
   static OPTS_END = "--";
 
   /** @internal */
@@ -181,7 +181,7 @@ export class Options extends Arguments {
           break;
         } else if (match) {
           this.extra.push(shifted);
-          while (rtest(this.peek()) && !/^-/m.test(this.peek() as string)) {
+          while (rtest(this.peek()) && !/(?<![^\n])-/.test(this.peek() as string)) {
             this.extra.push(this.shift());
           }
         } else {
@@ -209,9 +209,9 @@ export class Options extends Arguments {
       (ex) => ex.filter((o) => !opts.includes(o)).length < ex.length - 1,
     );
     if (found) {
-      const names = this.namesToSwitchNames(found.filter((o) => opts.includes(o))).map(
-        (n) => `'${n}'`,
-      );
+      const names = this.namesToSwitchNames([
+        ...new Set(found.filter((o) => opts.includes(o))),
+      ]).map((n) => `'${n}'`);
       const className = rbModName(this.constructor as typeof Options)!
         .split("::")
         .at(-1)!
@@ -241,7 +241,9 @@ export class Options extends Arguments {
         ? this.extra.slice(0, this.stoppedParsingAfterExtraIndex)
         : this.extra;
 
-    const unknown = toCheck.filter((str) => /^--?(?:(?!--).)*$/m.test(str as string));
+    const unknown = toCheck.filter((str) =>
+      /(?<![^\n])--?(?:(?!--)[^\n])*(?![^\n])/.test(str as string),
+    );
     if (!isEmpty(unknown)) throw new UnknownArgumentError(keys(this.switches), unknown as string[]);
   }
 

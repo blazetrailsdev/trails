@@ -53,6 +53,23 @@ describe("Thor::Options", () => {
     expect(parse(create({ "foo,-f": ":string" }), "-f=a=b")).toEqual({ foo: "a=b" });
   });
 
+  it("treats only a newline as a line break in a switch", () => {
+    const options = create({ foo: ":string" });
+    expect(parse(options, "--foo=a\rb\u2028c")).toEqual({ foo: "a\rb\u2028c" });
+    expect(parse(options, "a\n--foo=b\nc")).toEqual({ foo: "b" });
+
+    const unknown = create({ foo: ":string" });
+    unknown.parse(["--foo\rbar", "--bar\rbaz--qux", "--baz\u2028"]);
+    expect(unknown.remaining()).toEqual(["--foo\rbar", "--bar\rbaz--qux", "--baz\u2028"]);
+    let error: UnknownArgumentError | undefined;
+    try {
+      unknown.checkUnknownBang();
+    } catch (e) {
+      error = e as UnknownArgumentError;
+    }
+    expect(error!.unknown).toEqual(["--foo\rbar", "--baz\u2028"]);
+  });
+
   it("drops the sign from a numeric glued to a short switch", () => {
     expect(parse(create({ "num,-n": ":numeric" }), "-n-5")).toEqual({ num: 5 });
   });
