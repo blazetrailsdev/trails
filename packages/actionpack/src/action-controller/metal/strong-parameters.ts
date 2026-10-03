@@ -341,7 +341,6 @@ export class Parameters {
     return this;
   }
 
-  /** @missingRailsArgs merge — PERMANENT */
   reverseMerge(otherHash: Parameters | Record<string, unknown>): Parameters {
     const otherData = otherHash instanceof Parameters ? otherHash._toRawHash() : otherHash;
     return this._newWithInheritedPermitted(merge(otherData, this._data));

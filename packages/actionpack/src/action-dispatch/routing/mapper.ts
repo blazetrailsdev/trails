@@ -277,7 +277,6 @@ export class Mapping {
   private readonly _internal: boolean | undefined;
   private readonly _conditions: Record<string, unknown>;
 
-  /** @missingRailsArgs merge — PERMANENT */
   static build(
     scope: Scope,
     set: RouteSetLike | undefined,

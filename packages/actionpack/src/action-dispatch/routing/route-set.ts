@@ -479,10 +479,7 @@ export class OptimizedUrlHelper extends UrlHelper {
     return params;
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs merge — PERMANENT
-   */
+  /** @internal */
   private raiseGenerationError(args: unknown[]): never {
     const missingKeys: string[] = [];
     const params = this.parameterizeArgs(args, (missingKey) => {

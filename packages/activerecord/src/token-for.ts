@@ -71,7 +71,6 @@ export class TokenDefinition {
 }
 
 export class RelationMethods<T extends Base = Base> {
-  /** @missingRailsArgs fetch — CONVERGEABLE call-args-gate-aligns-the-receiver-of-function-form-fetch-and-max */
   async findByTokenFor(this: Relation<T>, purpose: string, token: string): Promise<T | null> {
     if (this.model.primaryKey == null) throw new UnknownPrimaryKey(this);
     return (await fetch<TokenDefinition>(this.model.tokenDefinitions, purpose).resolveToken(
@@ -80,7 +79,6 @@ export class RelationMethods<T extends Base = Base> {
     )) as T | null;
   }
 
-  /** @missingRailsArgs fetch — CONVERGEABLE call-args-gate-aligns-the-receiver-of-function-form-fetch-and-max */
   async findByTokenForBang(this: Relation<T>, purpose: string, token: string): Promise<T> {
     const record = await fetch<TokenDefinition>(this.model.tokenDefinitions, purpose).resolveToken(
       token,
@@ -104,7 +102,6 @@ export function generatesTokenFor(
   });
 }
 
-/** @missingRailsArgs fetch — CONVERGEABLE call-args-gate-aligns-the-receiver-of-function-form-fetch-and-max */
 export function generateTokenFor(this: Base, purpose: string): string {
   return fetch<TokenDefinition>(
     (this.constructor as typeof Base).tokenDefinitions,

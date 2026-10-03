@@ -19,6 +19,7 @@ import { normalizeRubyKey } from "./options-keys.js";
 import { JS_ENUMERABLE_ALIASES } from "./enumerable-idioms.js";
 import { NO_JS_CALL_FORM } from "./compare.js";
 import { RECEIVER_AS_FIRST_ARG } from "./receiver-as-first-arg.js";
+import { RECEIVER_KEYED_RUBY_COMPAT_EXPORTS, rubyCallName } from "../parity/ruby-compat.js";
 
 /** An identifier-shaped string camelizes; anything else compares byte-for-byte.
  *  LOAD-BEARING: camelizing a SQL fragment (`" GROUP BY "`) would erase the
@@ -515,6 +516,33 @@ function calleeKeys(enclosingRubyName: string): string[] {
  *  opaque `?` — falls back to {@link alignBuiltinReceiver}'s strip. */
 const SIMPLE_RECEIVER = /^(?:id|const):/;
 
+/** Bare Ruby call name → the ruby-compat exports that port it with the receiver
+ *  as argument 1, from {@link RECEIVER_KEYED_RUBY_COMPAT_EXPORTS}. */
+const RECEIVER_KEYED_EXPORTS_BY_NAME = new Map<string, Set<string>>();
+for (const [mri, { tsExport }] of RECEIVER_KEYED_RUBY_COMPAT_EXPORTS) {
+  const name = rubyCallName(mri);
+  let exports = RECEIVER_KEYED_EXPORTS_BY_NAME.get(name);
+  if (!exports) RECEIVER_KEYED_EXPORTS_BY_NAME.set(name, (exports = new Set()));
+  exports.add(tsExport);
+}
+
+/**
+ * Whether the TS site carries the Ruby receiver as argument 1: by name, for a
+ * {@link RECEIVER_AS_FIRST_ARG} built-in; or by callee, where the name is one
+ * Rails also defines (`Relation#merge`) and so never qualifies by name — the TS
+ * site then has to be a bare call of the ruby-compat export
+ * {@link RECEIVER_KEYED_RUBY_COMPAT_EXPORTS} names for it (`merge(a, b)` for
+ * `Hash#merge`). A method call on a receiver (`relation.merge(other)`) records
+ * no `rubyCompat`, so it compares as written.
+ */
+function receiverIsFirstArg(ruby: CallSite, ts: CallSite): boolean {
+  if (RECEIVER_AS_FIRST_ARG.has(ruby.name)) return true;
+  return (
+    ts.rubyCompat !== undefined &&
+    RECEIVER_KEYED_EXPORTS_BY_NAME.get(ruby.name)?.has(ts.rubyCompat) === true
+  );
+}
+
 /**
  * Drop the leading argument that IS the Ruby receiver, for the built-ins TS
  * cannot define on a receiver at all (RFC 0099 — see
@@ -540,10 +568,11 @@ const SIMPLE_RECEIVER = /^(?:id|const):/;
  */
 function alignBuiltinReceiver(
   ruby: CallSite,
+  ts: CallSite,
   rubyArgs: string[],
   tsArgs: string[],
 ): { rubyArgs: string[]; tsArgs: string[] } {
-  if (tsArgs.length !== rubyArgs.length + 1 || !RECEIVER_AS_FIRST_ARG.has(ruby.name)) {
+  if (tsArgs.length !== rubyArgs.length + 1 || !receiverIsFirstArg(ruby, ts)) {
     return { rubyArgs, tsArgs };
   }
   if (ruby.recv !== undefined && SIMPLE_RECEIVER.test(ruby.recv)) {
@@ -569,7 +598,7 @@ function alignReceiverArgs(
     stripMixinReceiver(ruby.args, tsArgs),
     calleeSigs,
   );
-  const aligned = alignPortedReceiver(ruby, alignBuiltinReceiver(ruby, ruby.args, stripped));
+  const aligned = alignPortedReceiver(ruby, alignBuiltinReceiver(ruby, ts, ruby.args, stripped));
   if (ts.recv === undefined || aligned.rubyArgs.length === ruby.args.length) return aligned;
   const [rubyRecv] = normalizeArgs(aligned.rubyArgs.slice(0, 1)) ?? [];
   const [tsFirst] = normalizeArgs(aligned.tsArgs.slice(0, 1)) ?? [];
@@ -959,7 +988,7 @@ function argSimilarity(ruby: CallSite, ts: CallSite): number {
   const aligned = alignReceiverArgs(ruby, ts, forwarded, undefined);
   const sameArity =
     aligned.rubyArgs.length === aligned.tsArgs.length &&
-    (!RECEIVER_AS_FIRST_ARG.has(ruby.name) ||
+    (!receiverIsFirstArg(ruby, ts) ||
       ruby.recv === undefined ||
       ts.recv !== undefined ||
       forwarded.length === ruby.args.length + 1)
@@ -976,6 +1005,28 @@ function argSimilarity(ruby: CallSite, ts: CallSite): number {
     if (argKeysEqual(rubyArgs[i], tsArgs[i])) matches++;
   }
   return sameArity * 1_000 + matches;
+}
+
+/**
+ * How closely the TS site's receiver names the Ruby receiver, modulo `@` / `_` /
+ * camelCase: 2 where the TS site keeps it as its receiver, 1 where it moved it
+ * into argument 1, 0 otherwise. The {@link pairCallSites} tie-break after
+ * {@link blockAffinity}.
+ *
+ * `attribute_set/builder.rb:36-39`'s `values.keys | types.keys | @attributes.keys`
+ * against a port whose `values` arm reads a Hash or an `IndexedRow` carries
+ * one more `keys` site than Rails; `@attributes` ties between `keys(values)`
+ * and `keys(_attributes)`, and source order took the wrong one. The kept
+ * receiver outranks the moved one so that `values` takes `values.keys()`,
+ * whose empty argument list would otherwise agree exactly with `@attributes`.
+ * Only a real Ruby `recv` counts: Ruby's argument 1 is never its receiver.
+ */
+function receiverAffinity(ruby: CallSite, ts: CallSite): number {
+  const rubyRef = ruby.recv?.match(/^id:@?(\w+)$/)?.[1];
+  if (rubyRef === undefined) return 0;
+  const tsRef = (ts.recv ?? ts.args[0])?.match(/^id:_?(\w+)$/)?.[1];
+  if (tsRef !== snakeToCamel(rubyRef)) return 0;
+  return ts.recv !== undefined ? 2 : 1;
 }
 
 /** TS names that are language punctuation rather than a ported call, so pairing
@@ -1042,14 +1093,21 @@ function isSelfReaderAgainstLocalSend(ruby: CallSite, ts: CallSite): boolean {
  * zip did, and nothing that used to be compared silently stops being compared.
  *
  * Greedy over the globally best-scoring candidate, ties broken by
- * {@link blockAffinity} and then by source order on the Ruby then the TS side,
+ * {@link blockAffinity}, then {@link receiverAffinity}, and then by source
+ * order on the Ruby then the TS side,
  * so the verdict never depends on the order the candidates were enumerated in.
  */
 export function pairCallSites(
   rubySites: readonly CallSite[],
   tsSites: readonly CallSite[],
 ): { ruby: CallSite; ts: CallSite }[] {
-  const candidates: { rubyIdx: number; tsIdx: number; score: number; block: number }[] = [];
+  const candidates: {
+    rubyIdx: number;
+    tsIdx: number;
+    score: number;
+    block: number;
+    receiver: number;
+  }[] = [];
   rubySites.forEach((ruby, rubyIdx) => {
     const keys = new Set(tsCallNameKeys(ruby.name));
     tsSites.forEach((ts, tsIdx) => {
@@ -1061,11 +1119,17 @@ export function pairCallSites(
         tsIdx,
         score: argSimilarity(ruby, ts),
         block: blockAffinity(ruby, ts),
+        receiver: receiverAffinity(ruby, ts),
       });
     });
   });
   candidates.sort(
-    (a, b) => b.score - a.score || b.block - a.block || a.rubyIdx - b.rubyIdx || a.tsIdx - b.tsIdx,
+    (a, b) =>
+      b.score - a.score ||
+      b.block - a.block ||
+      b.receiver - a.receiver ||
+      a.rubyIdx - b.rubyIdx ||
+      a.tsIdx - b.tsIdx,
   );
   const takenRuby = new Set<number>();
   const takenTs = new Set<number>();

@@ -5250,8 +5250,30 @@ describe("callArgs", () => {
         }`,
       ),
     ).toEqual([
-      { name: "mergeBang", args: ["id:data", "id:other"], flags: ["block"] },
-      { name: "block", args: [], flags: ["block"] },
+      {
+        name: "mergeBang",
+        args: ["id:data", "id:other"],
+        flags: ["block"],
+        rubyCompat: "mergeBang",
+      },
+      { name: "block", args: [], flags: ["block"], rubyCompat: "block" },
+    ]);
+  });
+
+  it("records the ruby-compat export a bare callee binds to, and not a method call's", () => {
+    expect(
+      site(
+        `import { merge as hashMerge } from "@blazetrails/ruby-compat";
+        class Foo {
+          create(other: unknown) {
+            hashMerge(this.options, other);
+            this.relation.merge(other);
+          }
+        }`,
+      ),
+    ).toEqual([
+      { name: "hashMerge", args: ["id:options", "id:other"], flags: [], rubyCompat: "merge" },
+      { name: "merge", args: ["id:other"], flags: [], recv: "id:relation" },
     ]);
   });
 

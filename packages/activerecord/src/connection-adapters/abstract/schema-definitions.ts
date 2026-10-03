@@ -603,10 +603,7 @@ export class ReferenceDefinition {
     return slice(this.options as Record<string, unknown>, "ifExists", "ifNotExists");
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs merge — CONVERGEABLE call-args-gate-aligns-the-receiver-of-a-function-form-hash-merge
-   */
+  /** @internal */
   private polymorphicOptions(): ColumnOptions {
     return merge(
       merge(this.asOptions(this.polymorphic), this.conditionalOptions()),
@@ -619,10 +616,7 @@ export class ReferenceDefinition {
     return `index_${tableName}_on_${this.name}`;
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs merge — CONVERGEABLE call-args-gate-aligns-the-receiver-of-a-function-form-hash-merge
-   */
+  /** @internal */
   protected indexOptions(tableName: string): AddIndexOptions {
     const indexOptions: AddIndexOptions = merge(
       this.asOptions(this.index),

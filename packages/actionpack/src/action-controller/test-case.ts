@@ -711,10 +711,7 @@ export class TestRequest extends AbstractTestRequest {
     }
   })();
 
-  /**
-   * @internal
-   * @missingRailsArgs merge — PERMANENT
-   */
+  /** @internal */
   override paramsParsers(): ParameterParsers {
     const base = super.paramsParsers();
     return merge<unknown>(base, this._customParamParsers) as ParameterParsers;
