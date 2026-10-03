@@ -15830,13 +15830,6 @@
   {
     "package": "activemodel",
     "rubyFile": "api.rb",
-    "rubyName": "init_internals",
-    "digest": "2b12a37f791d1cc6",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activemodel",
-    "rubyFile": "api.rb",
     "rubyName": "initialize",
     "digest": "3a72f1ad5e45a38b",
     "ref": "v8.0.2"
