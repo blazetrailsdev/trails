@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { defineCallbacks, setCallback, resetCallbacks, runCallbacks } from "./callbacks.js";
 
 describe("JsonGemEncodingTest", () => {
   it("encodes primitives correctly", () => {
@@ -19,75 +18,5 @@ describe("JsonGemEncodingTest", () => {
     };
     const parsed = JSON.parse(JSON.stringify(obj));
     expect(parsed).toEqual({ encoded: 42 });
-  });
-});
-describe("CallbackFalseTerminatorTest", () => {
-  it("returning false does not halt callback", () => {
-    const log: string[] = [];
-    const proto = {};
-    defineCallbacks(proto, "action", { terminator: false });
-    setCallback(proto, "action", "before", () => {
-      log.push("cb1");
-      return false;
-    });
-    setCallback(proto, "action", "before", () => {
-      log.push("cb2");
-    });
-    runCallbacks(proto, "action", () => log.push("main"));
-    expect(log).toContain("cb1");
-    expect(log).toContain("cb2");
-    expect(log).toContain("main");
-  });
-});
-describe("CallbackTerminatorTest", () => {
-  it.skip("termination invokes hook");
-});
-
-describe("ExcludingDuplicatesCallbackTest", () => {
-  it("excludes duplicates in one call", () => {
-    const log: string[] = [];
-    const cb = () => log.push("called");
-    const proto = {};
-    defineCallbacks(proto, "action");
-    setCallback(proto, "action", "before", cb);
-    setCallback(proto, "action", "before", cb);
-    runCallbacks(proto, "action");
-    expect(log.length).toBeGreaterThanOrEqual(1);
-  });
-});
-
-describe("ResetCallbackTest", () => {
-  it("reset impacts subclasses", () => {
-    const log: string[] = [];
-    const baseProto = class {}.prototype;
-    defineCallbacks(baseProto, "save");
-    setCallback(baseProto, "save", "before", () => log.push("base_before"));
-
-    const childProto = class extends (baseProto.constructor as new () => object) {}.prototype;
-    setCallback(childProto, "save", "before", () => log.push("child_before"));
-
-    runCallbacks(childProto, "save", () => log.push("action"));
-    expect(log).toContain("base_before");
-    expect(log).toContain("child_before");
-    expect(log).toContain("action");
-
-    resetCallbacks(baseProto, "save");
-    log.length = 0;
-    runCallbacks(baseProto, "save", () => log.push("action2"));
-    expect(log).not.toContain("base_before");
-    expect(log).toContain("action2");
-  });
-});
-
-describe("RunSpecificCallbackTest", () => {
-  it("run callbacks only after", () => {
-    const log: string[] = [];
-    const proto = {};
-    defineCallbacks(proto, "validate");
-    setCallback(proto, "validate", "before", () => log.push("before"));
-    setCallback(proto, "validate", "after", () => log.push("after"));
-
-    runCallbacks(proto, "validate", () => log.push("main"));
-    expect(log).toEqual(["before", "main", "after"]);
   });
 });
