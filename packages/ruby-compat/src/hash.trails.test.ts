@@ -410,7 +410,7 @@ describe("a Hash send to a receiver that defines the method itself", () => {
       return this.isKey(column) ? this.row[column.toLowerCase()] : fallback?.();
     }
   }
-  const row = new Row({ id: 1, name: null }) as unknown as Record<string, unknown>;
+  const row = new Row({ id: 1, name: null });
 
   it("reaches the receiver's own fetch, key?, keys and each_key", () => {
     let missed = false;

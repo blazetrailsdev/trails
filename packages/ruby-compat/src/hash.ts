@@ -149,7 +149,9 @@ export function hasKey(hash: object, key: PropertyKey): boolean {
  * of the keys, in insertion order.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#keys` (`vendor/ruby/v3.3.11/hash.c:3584`).
  */
-export function keys<K = string>(hash: Record<string, unknown> | Map<K, unknown>): K[] {
+export function keys<K = string>(
+  hash: Record<string, unknown> | Map<K, unknown> | { keys(): K[] },
+): K[] {
   if (hash instanceof Map) return [...hash.keys()];
   const own = ownMethod(hash, "keys");
   if (own) return own.call(hash) as K[];
