@@ -176,9 +176,18 @@ export const FOREIGN_READ_PREFIX = ".";
 /**
  * Prefix the TS extractor uses to mark a callee-less NATIVE FORM it saw in the
  * body — a JS construct that is the whole port of a Ruby call but records no
- * call name of its own. Only the forms {@link NATIVE_FORM_ANALOGUES} names and
- * the `String(x)` conversion call (`String.new(x)`, compare.ts) are marked. Marked IN ADDITION to whatever plain names the construct records, and
- * in the call SET only, never the ORDER stream.
+ * call name of its own. Marked IN ADDITION to whatever plain names the
+ * construct records, and in the call SET only, never the ORDER stream.
+ *
+ * Two kinds of form are marked: the ones {@link NATIVE_FORM_ANALOGUES} names,
+ * and `String`, the `String(x)` conversion call. `String` is outside that
+ * table because the table is keyed by a Ruby call name and admits it by
+ * receiver SHAPE alone, and the Ruby call here is `new`, every constructor
+ * call there is. It is credited by receiver KIND instead: only a body whose
+ * every `new` site is `String.new(x)` (`string-new`,
+ * extract-ruby-api.rb#core_new_kind) reads the mark, in compare.ts's
+ * `significantCallsForReceivers`. A `String(x)` in any other body credits
+ * nothing.
  */
 export const NATIVE_FORM_PREFIX = "@";
 
