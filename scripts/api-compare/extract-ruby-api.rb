@@ -486,6 +486,8 @@ class ApiExtractor
     ivar_kinds = typed_ivars(sexp)
     unknown_writers = ivar_kinds.keys.filter_map { |owner, name| owner if name == "*" }.to_set
     ivar_kinds.reject! { |(owner, _name), _kind| unknown_writers.include?(owner) }
+    kinds_by_name = ivar_kinds.group_by { |(_owner, name), _kind| name }.transform_values { |rows| rows.map(&:last).uniq }
+    ivar_kinds.reject! { |(_owner, name), _kind| kinds_by_name[name].size > 1 }
     @hash_ivars = ivar_kinds.select { |_key, kind| kind == "hash" }.keys.to_set
     @array_ivars = ivar_kinds.select { |_key, kind| kind == "array" }.keys.to_set
     walk(sexp)
@@ -3004,16 +3006,20 @@ class ApiExtractor
   # `"array"` when every one assigns an Array literal or a `Kernel#Array` call
   # (`rb_f_array`, `vendor/ruby/v3.3.11/object.c:3825`, always an Array) —
   # `@stack = []` (`abstract/transaction.rb:499`), `@queue = []`
-  # (`connection_pool/queue.rb:17`). An `@x ||= …` keeps whatever truthy value
-  # `@x` already held, so it proves nothing; it, a multiple-assignment target,
-  # an assignment inside `class << self` or a `def self.`, an `attr_writer` /
-  # `attr_accessor` for the name, an `instance_variable_set` of it (of any ivar,
-  # when the name is not a literal), or any assignment of another class in the
-  # same owner leaves the ivar an `ivar` — which is what keeps an `@records` /
-  # `@target` a Relation or association may be assigned to unproven. An ivar of the same name in
-  # another class of the file is not proven by it. A hash-literal assignment is
-  # not yet admitted: story prove-hash-literal-ivars-in-ruby-compat-receiver-kinds.
-  def typed_ivars(node, owner = [], assigned = {}, singleton = false)
+  # (`connection_pool/queue.rb:17`). Anything else that may write the ivar
+  # leaves it an `ivar`, which is what keeps an `@records` / `@target` a
+  # Relation or association may be assigned to unproven: an `@x ||= …` (it keeps
+  # whatever truthy value `@x` already held), a multiple-assignment target, an
+  # assignment in the class body itself (a class-level ivar) or inside
+  # `class << self` / a `def self.`, an `attr_writer` / `attr_accessor` for the
+  # name, an `instance_variable_set` of it (of every ivar of the owner, when the
+  # name is not a literal), any assignment of another kind in the same owner,
+  # and one of another kind to the same name in any other class or module of
+  # the file (a subclass or mixin writing the parent's ivar). An ivar of the
+  # same name in another class of the file is not proven by it. A hash-literal
+  # assignment is not yet admitted: story
+  # prove-hash-literal-ivars-in-ruby-compat-receiver-kinds.
+  def typed_ivars(node, owner = [], assigned = {}, scope = :body)
     return assigned unless node.is_a?(Array)
 
     case node[0]
@@ -3023,12 +3029,14 @@ class ApiExtractor
       typed_ivars(body, owner + [name], assigned) if name
       return assigned
     when :sclass, :defs
-      node.each { |child| typed_ivars(child, owner, assigned, true) if child.is_a?(Array) }
+      node.each { |child| typed_ivars(child, owner, assigned, :singleton) if child.is_a?(Array) }
       return assigned
+    when :def
+      scope = :instance unless scope == :singleton
     when :assign, :opassign
       key = ivar_target_key(node[1], owner)
       if key
-        kind = node[0] == :assign && !singleton ? assigned_ivar_kind(node[2]) : nil
+        kind = node[0] == :assign && scope == :instance ? assigned_ivar_kind(node[2]) : nil
         assigned[key] = assigned.key?(key) && assigned[key] != kind ? nil : kind
       end
     when :massign
@@ -3036,7 +3044,7 @@ class ApiExtractor
     when :command, :command_call, :method_add_arg
       external_ivar_writes(node).each { |name| assigned[[owner.join("::"), name]] = nil }
     end
-    node.each { |child| typed_ivars(child, owner, assigned, singleton) if child.is_a?(Array) }
+    node.each { |child| typed_ivars(child, owner, assigned, scope) if child.is_a?(Array) }
     assigned
   end
 
