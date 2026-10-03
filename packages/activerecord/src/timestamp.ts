@@ -228,8 +228,7 @@ export function clearTimestampAttributes(this: TimestampInstanceHost): void {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE comparator-reads-a-module-named-const-as-the-instance-seat */
-export const InstanceMethods = {
+export const Timestamp = {
   recordUpdateTimestamps,
   shouldRecordTimestamps,
   timestampAttributesForCreateInModel(this: { constructor: TimestampHost }): string[] {

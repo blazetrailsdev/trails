@@ -70,8 +70,7 @@ export function normalizeChangedInPlaceAttributes(
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE comparator-reads-a-module-named-const-as-the-instance-seat */
-export const InstanceMethods = {
+export const Normalization = {
   normalizeAttribute,
   normalizeChangedInPlaceAttributes,
 

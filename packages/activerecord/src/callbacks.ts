@@ -7,10 +7,7 @@ import { _createRecord as counterCacheCreateRecord } from "./counter-cache.js";
 import { _createRecord as lockingCreateRecord } from "./locking/optimistic.js";
 import { _createRecord as encryptableRecordCreateRecord } from "./encryption/encryptable-record.js";
 import { recordUpdateTimestamps } from "./timestamp.js";
-import {
-  _createRecord as persistenceCreateRecord,
-  InstanceMethods as PersistenceInstanceMethods,
-} from "./persistence.js";
+import { _createRecord as persistenceCreateRecord, Persistence } from "./persistence.js";
 import {
   _createRecord as dirtyCreateRecord,
   _updateRecord as dirtyUpdateRecord,
@@ -87,7 +84,7 @@ export async function _updateRecord(
   return await runCallbacks(this, "update", () =>
     recordUpdateTimestamps.call(this, () =>
       dirtyUpdateRecord.call(this, attributeNames, (names: string[]) =>
-        PersistenceInstanceMethods._updateRecord.call(this, names, block),
+        Persistence._updateRecord.call(this, names, block),
       ),
     ),
   );

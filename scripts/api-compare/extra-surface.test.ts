@@ -597,6 +597,68 @@ describe("buildReport — hook-injected mixins", () => {
     });
     expect(report.packages[0]?.extraFiles ?? []).toEqual([]);
   });
+
+  it("credits ReloadedClassesFiltering to a cross-package extender of DescendantsTracker", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            "ActiveRecord::Base": {
+              ...rubyClass({ name: "Base", file: "base.rb" }),
+              extends: ["ActiveSupport::DescendantsTracker"],
+            },
+          },
+          modules: {},
+        },
+        activesupport: {
+          classes: {},
+          modules: {
+            "ActiveSupport::DescendantsTracker": rubyClass({
+              name: "DescendantsTracker",
+              file: "descendants_tracker.rb",
+              instance: [method("descendants")],
+              klass: [method("clear")],
+            }),
+            "ActiveSupport::DescendantsTracker::ReloadedClassesFiltering": rubyClass({
+              name: "ReloadedClassesFiltering",
+              file: "descendants_tracker.rb",
+              instance: [method("subclasses")],
+            }),
+          },
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activesupport: { classes: {}, modules: {} },
+        activerecord: {
+          classes: {
+            Base: {
+              name: "Base",
+              file: "base.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [method("subclasses"), method("descendants"), method("clear")],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "activerecord",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "base.ts");
+    expect(f!.extras.map((e) => [e.name, e.kind])).toEqual([["clear", "moved"]]);
+  });
 });
 
 describe("buildReport — novel vs moved classification", () => {

@@ -63,6 +63,9 @@ import {
   ownersWithBodies,
   ambiguousRubyOwner,
   rubyOwnerSeat,
+  tsMemberStatesSeat,
+  recordTsSeatOwners,
+  rubyModuleInstanceNamesByTsFile,
   tsOwnerSeat,
   crossPackageIncludedMethodNames,
   predicatePairedWithBareTwin,
@@ -2940,6 +2943,119 @@ describe("tsOwnerSeat", () => {
   it("states no seat for a declaration that is both, or for neither", () => {
     expect(tsOwnerSeat("Base", new Set(["Base"]), new Set(["Base"]))).toBeUndefined();
     expect(tsOwnerSeat("", undefined, undefined)).toBeUndefined();
+  });
+});
+
+describe("tsMemberStatesSeat", () => {
+  const names = rubyModuleInstanceNamesByTsFile(
+    {
+      "ActiveRecord::Timestamp": {
+        file: "timestamp.rb",
+        instanceMethods: [{ name: "current_time_from_proper_timezone" }],
+      },
+      "ActiveRecord::Timestamp::ClassMethods": {
+        file: "timestamp.rb",
+        instanceMethods: [{ name: "current_time_from_proper_timezone" }, { name: "touch_all" }],
+      },
+    },
+    "activerecord",
+  ).get("timestamp.ts");
+  const literal = { name: "Timestamp", objectLiteral: true };
+  const member = { name: "currentTimeFromProperTimezone" };
+
+  it("reads a const named after the Rails module as the instance seat", () => {
+    expect(tsMemberStatesSeat(literal, member, names)).toBe(true);
+    const owners = new Set(["", "Timestamp"]);
+    const instanceOwners = new Set(["Timestamp"]);
+    expect(tsOwnerSeat("Timestamp", undefined, instanceOwners)).toBe("instance");
+    expect(tsDeclaresOnLevel("instance", owners, undefined, instanceOwners)).toBe("seat");
+    expect(tsDeclaresOnLevel("class", owners, undefined, instanceOwners)).toBe("neutral");
+  });
+
+  it("pairs a classAttribute.call credit under the const with both class_attribute rows", () => {
+    const staticOwners = new Map<string, Map<string, Set<string>>>();
+    const instanceOwners = new Map<string, Map<string, Set<string>>>();
+    const credit = (name: string, isStatic: boolean) => ({
+      name,
+      isStatic,
+      visibility: "public" as const,
+      params: [],
+    });
+    recordTsSeatOwners(
+      staticOwners,
+      instanceOwners,
+      [
+        {
+          name: "Normalization",
+          file: "normalization.ts",
+          objectLiteral: true,
+          includes: [],
+          extends: [],
+          instanceMethods: [
+            credit("normalizedAttributes", false),
+            credit("isNormalizedAttributes", false),
+            credit("normalizeAttribute", false),
+            credit("hidden", false),
+          ],
+          classMethods: [
+            credit("normalizedAttributes", true),
+            credit("isNormalizedAttributes", true),
+          ],
+        },
+      ],
+      (m) => m.name !== "hidden",
+      rubyModuleInstanceNamesByTsFile(
+        {
+          "ActiveRecord::Normalization": {
+            file: "normalization.rb",
+            instanceMethods: [
+              { name: "normalized_attributes" },
+              { name: "normalized_attributes?" },
+              { name: "normalize_attribute" },
+              { name: "hidden" },
+            ],
+          },
+        },
+        "activerecord",
+      ),
+    );
+    const seats = (name: string) =>
+      [staticOwners, instanceOwners].map((by) => by.get("normalization.ts")?.get(name));
+    for (const name of ["normalizedAttributes", "isNormalizedAttributes"]) {
+      const [statics, instances] = seats(name);
+      expect(tsOwnerOnBothSeats("Normalization", statics, instances)).toBe(true);
+      expect(tsDeclaresOnLevel("class", new Set(["Normalization"]), statics, instances)).toBe(
+        "seat",
+      );
+      expect(tsDeclaresOnLevel("instance", new Set(["Normalization"]), statics, instances)).toBe(
+        "seat",
+      );
+    }
+    expect(seats("normalizeAttribute")).toEqual([undefined, new Set(["Normalization"])]);
+    expect(seats("hidden")).toEqual([undefined, undefined]);
+  });
+
+  it("states no seat for a name the module does not declare on its instance half", () => {
+    expect(
+      tsMemberStatesSeat(
+        { name: "Mime", objectLiteral: true },
+        { name: "symbols" },
+        new Map([["Mime", new Set<string>()]]),
+      ),
+    ).toBe(false);
+    expect(tsMemberStatesSeat(literal, { name: "touchAll" }, names)).toBe(false);
+    expect(tsMemberStatesSeat(literal, member, undefined)).toBe(false);
+  });
+
+  it("treats a namespace's functions as an object literal's members", () => {
+    const naming = { name: "Naming", declaredAsNamespace: true, isInterface: true };
+    expect(tsMemberStatesSeat(naming, { name: "plural" }, undefined)).toBe(false);
+    expect(tsMemberStatesSeat(naming, { name: "modelName", bodyless: true }, undefined)).toBe(true);
+  });
+
+  it("keeps a class member's staticness", () => {
+    expect(tsMemberStatesSeat({ name: "Base" }, { name: "create" }, undefined)).toBe(true);
+    expect(tsMemberStatesSeat(literal, { name: "x", isStatic: true }, undefined)).toBe(true);
   });
 });
 

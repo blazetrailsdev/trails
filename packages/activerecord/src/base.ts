@@ -961,7 +961,6 @@ export class Base extends Model {
     return polymorphicClassFor(this, name);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE extra-surface-credits-a-cross-package-extend-edge-to-its-extender */
   declare static readonly subclasses: (typeof Base)[];
 
   static get descendants(): (typeof Base)[] {
@@ -2499,7 +2498,7 @@ Object.assign(Base, {
 include(Base, CallbacksInstanceMethods);
 include(Base, TransactionsInstanceMethods);
 extend(Base, Normalization.ClassMethods);
-include(Base, Normalization.InstanceMethods);
+include(Base, Normalization.Normalization);
 include(Base, Marshalling.Methods);
 extend(Base, {
   enum: _EnumModule.enum,
@@ -2692,7 +2691,7 @@ include(Base, _AttrSerialization);
 include(Base, LockingPessimistic.Pessimistic);
 include(Base, LockingOptimistic.InstanceMethods);
 prepend(Base.prototype, { incrementBang: _Callbacks.incrementBang as PrependMethod });
-include(Base, Timestamp.InstanceMethods);
+include(Base, Timestamp.Timestamp);
 include(Base, TouchLater.InstanceMethods);
 include(Base, _AttributeAssignment.AttributeAssignment);
 include(Base, AutosaveAssociation);

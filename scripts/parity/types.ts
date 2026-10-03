@@ -434,7 +434,9 @@ export interface ClassInfo {
    * the object itself, which is Ruby's module singleton seat (`class << self`,
    * `action_dispatch/http/mime_type.rb:50-67`) — and also the shape every
    * `include(Host, Mod)` mixin uses for instance methods. So, like a top-level
-   * function, a member states no seat. See compare.ts#recordTsParams.
+   * function, a member states no seat unless the literal is named after the
+   * Rails module and the module declares the name on its instance half. See
+   * compare.ts#tsMemberStatesSeat.
    */
   objectLiteral?: boolean;
   /**
