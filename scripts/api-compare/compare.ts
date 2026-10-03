@@ -2084,13 +2084,10 @@ export function ownerRecordsNothing(
 /**
  * Whether the skeleton recorded for (file, name) is some OTHER owner's body.
  *
- * Skeletons are keyed by (file, name) alone, and an object-literal module
- * member records calls but no skeleton. So `validations/with.ts`, which holds
- * `ClassMethods.validatesWith` beside the top-level instance `validatesWith`,
- * has one skeleton for two bodies, and Rails' `ClassMethods#validates_with`
- * (`activemodel/lib/active_model/validations/with.rb:88`) was held to the
- * instance function's arms. A resolved owner with a body of its own compares
- * only against a skeleton that owner recorded.
+ * Where {@link skeletonsOfOwner} falls back to the (file, name) list, its one
+ * skeleton may belong to a different owner than the resolved one. A resolved
+ * owner with a body of its own compares only against a skeleton that owner
+ * recorded.
  */
 export function skeletonIsAnotherOwners(
   ownerHasBody: boolean,
@@ -2098,6 +2095,32 @@ export function skeletonIsAnotherOwners(
   skeletonOwners: ReadonlySet<string> | undefined,
 ): boolean {
   return tsClass !== undefined && ownerHasBody && skeletonOwners?.has(tsClass) !== true;
+}
+
+/**
+ * The skeletons a matched pair compares against: the resolved owner's own where
+ * the file holds the name as SEVERAL module or top-level bodies, else every one
+ * the file records under the name.
+ *
+ * `validations/with.ts` holds `validatesWith` twice, on the `ClassMethods`
+ * object literal and as the top-level instance function, and each carries a
+ * skeleton. Read by name that is two bodies for one pair, which compares
+ * neither; read by owner each Rails `validates_with`
+ * (`activemodel/lib/active_model/validations/with.rb:88`, `:148`) meets its own
+ * port.
+ *
+ * `byOwner` holds each body once. A class owner still reads by name, and so
+ * does a name whose owners all share one body.
+ */
+export function skeletonsOfOwner(
+  byName: string[][] | undefined,
+  byOwner: ReadonlyMap<string, string[][]> | undefined,
+  tsClass: string | undefined,
+  classOwners: ReadonlySet<string> | undefined,
+): string[][] | undefined {
+  const bodies = [...(byOwner?.keys() ?? [])].filter((o) => classOwners?.has(o) !== true);
+  if (tsClass === undefined || bodies.length < 2 || !bodies.includes(tsClass)) return byName;
+  return byOwner?.get(tsClass);
 }
 
 /**
@@ -4368,6 +4391,9 @@ export function main() {
     const tsCallSeqByFileName = new Map<string, Map<string, string[][]>>();
     const tsSkeletonByFileName = new Map<string, Map<string, string[][]>>();
     const tsSkeletonOwnersByFileName = new Map<string, Map<string, Set<string>>>();
+    const tsSkeletonByFileNameOwner = new Map<string, Map<string, Map<string, string[][]>>>();
+    const tsClassOwnersByFile = new Map<string, Set<string>>();
+    const tsSkeletonBodies = new Set<string>();
     const tsLocalSkeletonByFileName = new Map<string, Map<string, string[][]>>();
     const tsCallArgsByFileName = new Map<string, Map<string, CallSite[][]>>();
     // The same two populations narrowed by declaring class (file → name → owner
@@ -4592,6 +4618,18 @@ export function main() {
         const owners = tsSkeletonOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
         owners.set(m.name, (owners.get(m.name) ?? new Set<string>()).add(owner));
         tsSkeletonOwnersByFileName.set(file, owners);
+        // One body per owner map: a namespace entity re-lists the file's
+        // top-level functions, so the same declaration arrives under two owners.
+        const body = `${m.file ?? file}\0${m.name}\0${m.line}`;
+        if (!tsSkeletonBodies.has(body)) {
+          tsSkeletonBodies.add(body);
+          const byOwner =
+            tsSkeletonByFileNameOwner.get(file) ?? new Map<string, Map<string, string[][]>>();
+          const sets = byOwner.get(m.name) ?? new Map<string, string[][]>();
+          sets.set(owner, [...(sets.get(owner) ?? []), m.skeleton]);
+          byOwner.set(m.name, sets);
+          tsSkeletonByFileNameOwner.set(file, byOwner);
+        }
       }
       if (m.localSkeleton !== undefined && scope === "package") {
         const byName = tsLocalSkeletonByFileName.get(file) ?? new Map<string, string[][]>();
@@ -4633,7 +4671,11 @@ export function main() {
         tsMethodsByFile.set(file, methods);
       };
 
-      for (const cls of Object.values(tsPkg.classes)) addMethods(cls);
+      for (const cls of Object.values(tsPkg.classes)) {
+        addMethods(cls);
+        const file = cls.file || "";
+        tsClassOwnersByFile.set(file, (tsClassOwnersByFile.get(file) ?? new Set()).add(cls.name));
+      }
       for (const mod of Object.values(tsPkg.modules)) addMethods(mod);
       recordTsSeatOwners(
         tsStaticOwnersByFileName,
@@ -5369,7 +5411,13 @@ export function main() {
         const rubySkeleton = ownsBody(rubyName)
           ? rubySkeletonByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
           : rubySkeletonByName.get(rubyName);
-        const tsSkeletons = tsSkeletonByFileName.get(tsFile)?.get(tsName);
+        const tsSkeletonsByOwner = tsSkeletonByFileNameOwner.get(tsFile)?.get(tsName);
+        const tsSkeletons = skeletonsOfOwner(
+          tsSkeletonByFileName.get(tsFile)?.get(tsName),
+          tsSkeletonsByOwner,
+          tsClass,
+          tsClassOwnersByFile.get(tsFile),
+        );
         if (
           rubySkeleton !== undefined &&
           tsSkeletons?.length === 1 &&

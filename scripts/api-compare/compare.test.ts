@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   ownerRecordsNothing,
   skeletonIsAnotherOwners,
+  skeletonsOfOwner,
   nameMatches,
   superclassesMatch,
   primaryClassesPerFile,
@@ -4079,6 +4080,33 @@ describe("skeletonIsAnotherOwners", () => {
   it("keeps an owner paired with the skeleton it recorded, and an unresolved owner", () => {
     expect(skeletonIsAnotherOwners(true, "Errors", new Set(["Errors"]))).toBe(false);
     expect(skeletonIsAnotherOwners(false, undefined, owners)).toBe(false);
+  });
+});
+
+describe("skeletonsOfOwner", () => {
+  // `validations/with.ts`: `validatesWith` is a body on the `ClassMethods`
+  // object literal and another as the top-level instance function.
+  const instance = ["ref:extractOptionsBang", "ref:constructor", "loop"];
+  const classMethod = ["ref:extractOptionsBang", "loop", "if"];
+  const byName = [classMethod, instance];
+  const byOwner = new Map([
+    ["ClassMethods", [classMethod]],
+    ["", [instance]],
+  ]);
+
+  it("pairs a module member and the top-level function each with its own body", () => {
+    expect(skeletonsOfOwner(byName, byOwner, "ClassMethods", undefined)).toEqual([classMethod]);
+    expect(skeletonsOfOwner(byName, byOwner, "", undefined)).toEqual([instance]);
+  });
+
+  it("reads by name for an unresolved owner, a class owner and a single body", () => {
+    expect(skeletonsOfOwner(byName, byOwner, undefined, undefined)).toBe(byName);
+    expect(skeletonsOfOwner(byName, byOwner, "ClassMethods", new Set(["ClassMethods"]))).toBe(
+      byName,
+    );
+    expect(skeletonsOfOwner([instance], new Map([["", [instance]]]), "", undefined)).toEqual([
+      instance,
+    ]);
   });
 });
 

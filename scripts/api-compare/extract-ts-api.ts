@@ -5429,9 +5429,16 @@ function extractShapeTokens(node: ts.Node | undefined): string[] | undefined {
       for (const arg of n.arguments ?? [])
         if (ts.isStringLiteral(arg) || ts.isNoSubstitutionTemplateLiteral(arg))
           tokens.push(`msg:${arg.text}`);
-    } else if (ts.isElementAccessExpression(n)) tokens.push("[]");
-    else if (ts.isPrefixUnaryExpression(n) || ts.isPostfixUnaryExpression(n))
+    } else if (ts.isElementAccessExpression(n)) {
+      const index = n.argumentExpression;
+      if (ts.isNumericLiteral(index)) tokens.push(`[num:${index.text}]`);
+      else if (ts.isStringLiteral(index) || ts.isNoSubstitutionTemplateLiteral(index))
+        tokens.push(`[str:${index.text}]`);
+      else tokens.push("[]");
+    } else if (ts.isPrefixUnaryExpression(n) || ts.isPostfixUnaryExpression(n))
       tokens.push(`op:${ts.tokenToString(n.operator) ?? "?"}`);
+    else if (ts.isTypeOfExpression(n)) tokens.push("op:typeof");
+    else if (ts.isSpreadElement(n)) tokens.push("...");
     else if (ts.isConditionalExpression(n)) tokens.push("?:");
     else if (ts.isClassExpression(n)) tokens.push("class");
     else if (ts.isTemplateExpression(n))

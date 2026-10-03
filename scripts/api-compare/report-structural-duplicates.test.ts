@@ -63,7 +63,7 @@ describe("shapeOf", () => {
 
   it("separates an index read from a Map#get, both ref:get in the skeleton", () => {
     const get = { name: "x", skeleton: ["ref:get"] };
-    expect(shapeOf({ ...get, shapeTokens: ["[]"] })).not.toBe(shapeOf(get));
+    expect(shapeOf({ ...get, shapeTokens: ["[num:0]"] })).not.toBe(shapeOf(get));
   });
 
   it("separates two guards by the operators the skeleton erases", () => {
@@ -105,6 +105,24 @@ const hosted = (origin: Decl, candidate: Decl, ...siblings: Decl[]): TsApi => ({
 });
 
 describe("matches", () => {
+  it("separates an index read from a read of another index", () => {
+    const read = (name: string, index: number) => ({
+      name,
+      line: index,
+      skeleton: ["ref:ary"],
+      shapeTokens: [`[num:${index}]`],
+    });
+    const found = matches({
+      packages: {
+        "ruby-compat": { fileFunctions: { "array.ts": [read("first", 0)] } },
+        activesupport: {
+          fileFunctions: { "core-ext/array/access.ts": [read("second", 1), read("head", 0)] },
+        },
+      },
+    });
+    expect(found.get("first")?.map((h) => h.name)).toEqual(["head"]);
+  });
+
   it("finds a primitive re-implemented under an unrecognised name", () => {
     expect(matches(api).get("hasKey")).toEqual([
       {
