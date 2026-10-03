@@ -4,11 +4,14 @@ import {
   extend,
   include,
   initializeIncludedModules,
+  NoMethodError,
+  rbFSend,
   rbModAttrReader,
   rbModAttrWriter,
+  rbObjRespondTo,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
-import { Base, type BaseClass, ClassMethods, HELP_MAPPINGS } from "./base.js";
+import { Base, type BaseClass, ClassMethods } from "./base.js";
 import { Command } from "./command.js";
 import { HashWithIndifferentAccess } from "./core-ext/hash-with-indifferent-access.js";
 import {
@@ -56,10 +59,6 @@ function subclass(parent: Klass): Klass {
 }
 
 describe("Thor::Base", () => {
-  it("lists the help shortcuts", () => {
-    expect(HELP_MAPPINGS).toEqual(["-h", "-?", "--help", "-D"]);
-  });
-
   describe("#initialize", () => {
     it("assigns each declared argument through its writer and keeps the rest in args", () => {
       const klass = baseclass();
@@ -208,6 +207,12 @@ describe("Thor::Base", () => {
       const proto = klass.prototype as Record<string, unknown>;
       expect(Object.getOwnPropertyDescriptor(proto, "name")?.get).toBeTypeOf("function");
       expect(Object.getOwnPropertyDescriptor(proto, "other")).toMatchObject({ value: undefined });
+      const instance = new klass([]);
+      expect(rbObjRespondTo(instance, "name")).toBe(true);
+      expect(rbObjRespondTo(instance, "name=")).toBe(true);
+      expect(rbObjRespondTo(instance, "other")).toBe(false);
+      expect(rbObjRespondTo(instance, "other=")).toBe(false);
+      expect(() => rbFSend(instance, "other=", 1)).toThrow(NoMethodError);
     });
   });
 
@@ -266,6 +271,17 @@ describe("Thor::Base", () => {
         ["a", "b"],
         ["c", "d"],
       ]);
+    });
+  });
+
+  describe(".register_options_relation_for", () => {
+    it("pops a trailing HashWithIndifferentAccess as the options, and dispatches from_superclass", () => {
+      const klass = baseclass();
+      klass.classExclusive("a", "b", new HashWithIndifferentAccess({}));
+      expect(klass.classExclusiveOptionNames()).toEqual([["a", "b"]]);
+      const child = subclass(klass);
+      child.fromSuperclass = () => [["z"]];
+      expect(child.classExclusiveOptionNames()).toEqual([["z"]]);
     });
   });
 

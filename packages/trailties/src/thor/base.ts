@@ -14,8 +14,8 @@ import {
   rbFSend,
   rbInspect,
   rbObjAsString,
-  rbObjClassname,
   rbObjClone,
+  rbObjIsKindOf,
   rbObjRespondTo,
   rtest,
   RuntimeError,
@@ -98,6 +98,7 @@ export interface BaseClass {
   /** @internal */
   _group?: string;
   baseclass(): unknown;
+  fromSuperclass(method: string, defaultValue?: unknown): unknown;
   attrAccessor(...names: string[]): void;
   noCommands<T>(block: () => T): T;
   commands(): Record<string, Command>;
@@ -198,7 +199,7 @@ export const ClassMethods = {
 
   checkUnknownOptions(this: BaseClass): unknown {
     if (!Object.hasOwn(this, "_checkUnknownOptions") || !rtest(this._checkUnknownOptions)) {
-      this._checkUnknownOptions = fromSuperclass.call(this, "checkUnknownOptions", false);
+      this._checkUnknownOptions = this.fromSuperclass("checkUnknownOptions", false);
     }
     return this._checkUnknownOptions;
   },
@@ -217,9 +218,7 @@ export const ClassMethods = {
 
   checkDefaultType(this: BaseClass): boolean | null {
     if (!Object.hasOwn(this, "_checkDefaultType")) {
-      this._checkDefaultType = fromSuperclass.call(this, "checkDefaultType", null) as
-        | boolean
-        | null;
+      this._checkDefaultType = this.fromSuperclass("checkDefaultType", null) as boolean | null;
     }
     return this._checkDefaultType!;
   },
@@ -238,7 +237,7 @@ export const ClassMethods = {
 
   strictArgsPosition(this: BaseClass): unknown {
     if (!Object.hasOwn(this, "_strictArgsPosition") || !rtest(this._strictArgsPosition)) {
-      this._strictArgsPosition = fromSuperclass.call(this, "strictArgsPosition", false);
+      this._strictArgsPosition = this.fromSuperclass("strictArgsPosition", false);
     }
     return this._strictArgsPosition;
   },
@@ -283,7 +282,7 @@ export const ClassMethods = {
 
   arguments(this: BaseClass): Argument[] {
     if (!Object.hasOwn(this, "_arguments")) {
-      this._arguments = fromSuperclass.call(this, "arguments", []) as Argument[];
+      this._arguments = this.fromSuperclass("arguments", []) as Argument[];
     }
     return this._arguments!;
   },
@@ -293,7 +292,7 @@ export const ClassMethods = {
     options: Record<string, unknown> | null = null,
   ): Record<string, Option> {
     if (!Object.hasOwn(this, "_classOptions")) {
-      this._classOptions = fromSuperclass.call(this, "classOptions", {}) as Record<string, Option>;
+      this._classOptions = this.fromSuperclass("classOptions", {}) as Record<string, Option>;
     }
     if (rtest(options)) this.buildOptions(options!, this._classOptions!);
     return this._classOptions!;
@@ -316,8 +315,7 @@ export const ClassMethods = {
 
   classExclusiveOptionNames(this: BaseClass): string[][] {
     if (!Object.hasOwn(this, "_classExclusiveOptionNames")) {
-      this._classExclusiveOptionNames = fromSuperclass.call(
-        this,
+      this._classExclusiveOptionNames = this.fromSuperclass(
         "classExclusiveOptionNames",
         [],
       ) as string[][];
@@ -327,8 +325,7 @@ export const ClassMethods = {
 
   classAtLeastOneOptionNames(this: BaseClass): string[][] {
     if (!Object.hasOwn(this, "_classAtLeastOneOptionNames")) {
-      this._classAtLeastOneOptionNames = fromSuperclass.call(
-        this,
+      this._classAtLeastOneOptionNames = this.fromSuperclass(
         "classAtLeastOneOptionNames",
         [],
       ) as string[][];
@@ -337,7 +334,7 @@ export const ClassMethods = {
   },
 
   removeArgument(this: BaseClass, ...names: unknown[]): void {
-    const options = (rbObjClassname(last(names)) === "Hash" ? names.pop() : {}) as {
+    const options = (rbObjIsKindOf(last(names), Hash) ? names.pop() : {}) as {
       undefine?: unknown;
     };
 
@@ -364,7 +361,7 @@ export const ClassMethods = {
       return (this._group = rbObjAsString(name));
     } else {
       if (!Object.hasOwn(this, "_group") || !rtest(this._group)) {
-        this._group = fromSuperclass.call(this, "group", "standard") as string;
+        this._group = this.fromSuperclass("group", "standard") as string;
       }
       return this._group!;
     }
@@ -428,7 +425,7 @@ export const ClassMethods = {
     const block = (typeof last(args) === "function" ? args.pop() : undefined) as
       | RelationBlock
       | undefined;
-    let opt = (rbObjClassname(last(args)) === "Hash" ? args.pop() : undefined) as
+    let opt = (rbObjIsKindOf(last(args), Hash) ? args.pop() : undefined) as
       | { for?: string }
       | undefined;
     opt ||= {};
@@ -441,7 +438,7 @@ export const ClassMethods = {
   builtOptionNames(
     this: BaseClass,
     target: string,
-    opt: { for?: string } = {},
+    opt: { for?: string },
     block: RelationBlock,
   ): string[] {
     const before = Object.values(
