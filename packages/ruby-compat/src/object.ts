@@ -447,6 +447,10 @@ export function rbModMethodDefined(mod: { prototype: object }, mid: string): boo
   return checkDefinitionVisibility(mod, mid);
 }
 
+interface ModuleEval {
+  moduleEval<T>(block: (mod: Record<string, unknown>) => T): T;
+}
+
 /**
  * `rb_attr` (`vendor/ruby/v3.3.11/vm_method.c:1863`). A JS accessor is one
  * descriptor, so the half not being defined keeps the nearest entry's; the
@@ -483,7 +487,14 @@ function rbAttr(klass: { prototype: object }, id: string, read: boolean, write: 
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbModAttrReader(klass: { prototype: object }, ...argv: string[]): void {
+export function rbModAttrReader(
+  klass: { prototype: object } | ModuleEval,
+  ...argv: string[]
+): void {
+  if ("moduleEval" in klass) {
+    klass.moduleEval((mod) => rbModAttrReader({ prototype: mod }, ...argv));
+    return;
+  }
   for (const id of argv) {
     rbAttr(klass, id, true, false);
   }
@@ -494,7 +505,14 @@ export function rbModAttrReader(klass: { prototype: object }, ...argv: string[])
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbModAttrWriter(klass: { prototype: object }, ...argv: string[]): void {
+export function rbModAttrWriter(
+  klass: { prototype: object } | ModuleEval,
+  ...argv: string[]
+): void {
+  if ("moduleEval" in klass) {
+    klass.moduleEval((mod) => rbModAttrWriter({ prototype: mod }, ...argv));
+    return;
+  }
   for (const id of argv) {
     rbAttr(klass, id, false, true);
   }

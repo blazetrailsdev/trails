@@ -5,7 +5,6 @@ import {
   include,
   included,
   kernelArray as array,
-  runCallbacks,
 } from "@blazetrails/activesupport";
 import { hasKey, isIntersect, Module } from "@blazetrails/ruby-compat";
 import type { CallbackConditions, CallbackObject } from "../callbacks.js";
@@ -61,7 +60,6 @@ export const Callbacks = {
     extend(base, ClassMethods);
 
     include(base, ASCallbacks);
-    include(base, { _runValidationCallbacks });
     defineCallbacks(base.prototype, "validation", {
       skipAfterCallbacksIfTerminated: true,
       scope: ["kind", "name"],
@@ -88,14 +86,14 @@ interface CallbackHostRecord {
 
 /** @internal */
 export interface RunValidationsBangHost {
-  _runValidationCallbacks(block: () => Promise<boolean>): Promise<boolean>;
+  _runValidationCallbacks(block: () => unknown): unknown;
 }
 
 /** @internal */
 export async function runValidationsBang(this: RunValidationsBangHost): Promise<boolean> {
-  return this._runValidationCallbacks(
-    async () => (await SuperMethods.superMethod(this, "runValidationsBang")!()) as boolean,
-  );
+  return (await this._runValidationCallbacks(() =>
+    SuperMethods.superMethod(this, "runValidationsBang")!(),
+  )) as boolean;
 }
 
 const SuperMethods = new Module((mod) =>
@@ -112,12 +110,4 @@ export function setOptionsForCallback(options: CallbackOptions): void {
       ...array(options.if),
     ];
   }
-}
-
-/** @internal */
-export async function _runValidationCallbacks(
-  this: object,
-  block: () => Promise<boolean>,
-): Promise<boolean> {
-  return (await runCallbacks(this, "validation", block)) as boolean;
 }

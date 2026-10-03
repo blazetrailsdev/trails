@@ -60,10 +60,8 @@ export class LazilyDefineAttributes extends Module {
     const attrReaders = this.attributes.filter((name) => !klass.isAttributeMethod(name));
     const attrWriters = this.attributes.filter((name) => !klass.isAttributeMethod(`${name}=`));
 
-    this.moduleEval((mod) => {
-      rbModAttrReader({ prototype: mod }, ...attrReaders);
-      rbModAttrWriter({ prototype: mod }, ...attrWriters);
-    });
+    rbModAttrReader(this, ...attrReaders);
+    rbModAttrWriter(this, ...attrWriters);
 
     this.#lock = null;
   }

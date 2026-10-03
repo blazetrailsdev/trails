@@ -97,6 +97,27 @@ describe("include ActiveSupport::Callbacks (trails)", () => {
   });
 });
 
+describe("defineCallbacks generates _run<Name>Callbacks (trails)", () => {
+  it("runs the named chain around the block", () => {
+    class Record {
+      log: string[] = [];
+    }
+    defineCallbacks(Record.prototype, "save");
+    setCallback(Record.prototype, "save", "before", (r: Record) => {
+      r.log.push("before");
+    });
+    const record = new Record() as Record & { _runSaveCallbacks(block?: () => unknown): unknown };
+
+    expect(
+      record._runSaveCallbacks(() => {
+        record.log.push("block");
+        return "saved";
+      }),
+    ).toBe("saved");
+    expect(record.log).toEqual(["before", "block"]);
+  });
+});
+
 describe("setCallback type-omitted form (trails)", () => {
   it("defaults the callback type to before", () => {
     const target = {};
