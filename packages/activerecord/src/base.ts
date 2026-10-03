@@ -1024,7 +1024,6 @@ export class Base extends Model {
   static _suppressInitializeCallback = false;
 
   static _suppressAbstractCheck = false;
-  static _allocating = false;
 
   declare static attrReadonly: typeof ReadonlyAttributes.attrReadonly;
   declare static isReadonlyAttribute: typeof ReadonlyAttributes.isReadonlyAttribute;
@@ -1621,50 +1620,13 @@ export class Base extends Model {
 
   /** @noRailsEquivalent CONVERGEABLE base-allocate-comes-from-a-ruby-compat-rb-obj-alloc */
   static allocate<T extends typeof Base>(this: T): InstanceType<T> {
-    const hadOwnSuppress = Object.prototype.hasOwnProperty.call(
-      this,
-      "_suppressInitializeCallback",
-    );
-    const prevSuppress = this._suppressInitializeCallback;
-    this._suppressInitializeCallback = true;
-    const hadOwnAbstractSuppress = Object.prototype.hasOwnProperty.call(
-      this,
-      "_suppressAbstractCheck",
-    );
-    const prevAbstractSuppress = this._suppressAbstractCheck;
-    this._suppressAbstractCheck = true;
-    const hadOwnStiSuppress = Object.prototype.hasOwnProperty.call(this, "_suppressStiNewDispatch");
-    const prevStiSuppress = (this as { _suppressStiNewDispatch?: unknown })._suppressStiNewDispatch;
-    (this as { _suppressStiNewDispatch?: unknown })._suppressStiNewDispatch = this;
-    const hadOwnAllocating = Object.prototype.hasOwnProperty.call(this, "_allocating");
-    const prevAllocating = this._allocating;
-    this._allocating = true;
-    let record: InstanceType<T>;
+    const previous = _Core._allocation.klass;
+    _Core._allocation.klass = this;
     try {
-      record = new this() as InstanceType<T>;
+      return new this() as InstanceType<T>;
     } finally {
-      if (hadOwnStiSuppress) {
-        (this as { _suppressStiNewDispatch?: unknown })._suppressStiNewDispatch = prevStiSuppress;
-      } else {
-        delete (this as { _suppressStiNewDispatch?: unknown })._suppressStiNewDispatch;
-      }
-      if (hadOwnAllocating) {
-        this._allocating = prevAllocating;
-      } else {
-        delete (this as any)._allocating;
-      }
-      if (hadOwnSuppress) {
-        this._suppressInitializeCallback = prevSuppress;
-      } else {
-        delete (this as any)._suppressInitializeCallback;
-      }
-      if (hadOwnAbstractSuppress) {
-        this._suppressAbstractCheck = prevAbstractSuppress;
-      } else {
-        delete (this as any)._suppressAbstractCheck;
-      }
+      _Core._allocation.klass = previous;
     }
-    return record;
   }
 
   static _instantiate<T extends typeof Base>(
@@ -1701,10 +1663,12 @@ export class Base extends Model {
     attributes: Record<string, unknown> | PermittedAttributes = {},
     initBlock?: (record: Base) => void,
   ) {
-    (new.target as typeof Base | undefined)?._requireConcreteClass();
+    const allocating = _Core._allocation.klass === new.target;
+    if (!allocating) (new.target as typeof Base | undefined)?._requireConcreteClass();
     attributes ??= {};
     let attrs = isEmpty(attributes) ? {} : sanitizeForMassAssignment(attributes);
     if (
+      !allocating &&
       (new.target as (typeof Base & { _suppressStiNewDispatch?: unknown }) | undefined)
         ?._suppressStiNewDispatch !== new.target
     ) {
@@ -1718,13 +1682,14 @@ export class Base extends Model {
     const ctor = new.target;
     const suppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
     const hadOwn = Object.prototype.hasOwnProperty.call(suppressor, "_suppressInitializeCallback");
-    const wasSuppressed = suppressor._suppressInitializeCallback;
+    const previouslySuppressed = suppressor._suppressInitializeCallback;
+    const wasSuppressed = allocating || previouslySuppressed;
     suppressor._suppressInitializeCallback = true;
     try {
       super(attrs);
     } finally {
       if (hadOwn) {
-        suppressor._suppressInitializeCallback = wasSuppressed;
+        suppressor._suppressInitializeCallback = previouslySuppressed;
       } else {
         delete (suppressor as { _suppressInitializeCallback?: boolean })
           ._suppressInitializeCallback;

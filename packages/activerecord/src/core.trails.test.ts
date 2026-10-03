@@ -9,7 +9,7 @@ import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapt
 import { BooleanType, IntegerType, StringType } from "@blazetrails/activemodel";
 import { establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { rbHash, uniq } from "@blazetrails/ruby-compat";
-import { equals as coreEquals, hash as coreHash } from "./core.js";
+import { _allocation, equals as coreEquals, hash as coreHash } from "./core.js";
 
 describe("frozen / isFrozen", () => {
   fixtures(["topics"]);
@@ -32,6 +32,13 @@ describe("frozen / isFrozen", () => {
     expect(Object.isFrozen(attrsOf(topic))).toBe(true);
   });
 });
+
+function ownState(klass: object): Array<[PropertyKey, unknown]> {
+  return Reflect.ownKeys(klass).map((key) => [
+    key,
+    Object.getOwnPropertyDescriptor(klass, key)?.value,
+  ]);
+}
 
 describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
   fixtures(["topics"]);
@@ -114,25 +121,42 @@ describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
     expect(loaded.isNewRecord()).toBe(false);
   });
 
-  it("allocate restores the flags it sets when the constructor returns", () => {
-    const flags = ["_allocating", "_suppressStiNewDispatch"] as const;
-    const before = flags.map((flag) => [
-      Object.hasOwn(Reply, flag),
-      Reply[flag as keyof typeof Reply],
-    ]);
+  it("allocate leaves the class untouched when the constructor returns", () => {
     Reply.allocate();
-    expect(
-      flags.map((flag) => [Object.hasOwn(Reply, flag), Reply[flag as keyof typeof Reply]]),
-    ).toEqual(before);
-    expect(Topic._allocating).toBe(false);
+    const before = [ownState(Reply), ownState(Topic)];
+    Reply.allocate();
+    expect([ownState(Reply), ownState(Topic)]).toEqual(before);
+    expect(_allocation.klass).toBeNull();
   });
 
-  it("allocate restores the flags it sets when the constructor throws", () => {
-    const flags = ["_allocating", "_suppressStiNewDispatch"] as const;
-    const before = flags.map((flag) => [
-      Object.hasOwn(Reply, flag),
-      Reply[flag as keyof typeof Reply],
-    ]);
+  it("allocate adds no class state of its own while it constructs", () => {
+    Reply.allocate();
+    const before = new Map(ownState(Reply));
+    const changed: PropertyKey[][] = [];
+    const original = (Reply.prototype as unknown as { initInternals(): void }).initInternals;
+    const initInternals = vi
+      .spyOn(Reply.prototype as unknown as { initInternals(): void }, "initInternals")
+      .mockImplementation(function (this: unknown) {
+        const during = new Map(ownState(Reply));
+        changed.push(
+          [...new Set([...before.keys(), ...during.keys()])].filter(
+            (key) =>
+              !before.has(key) || !during.has(key) || !Object.is(before.get(key), during.get(key)),
+          ),
+        );
+        original.call(this);
+      });
+    try {
+      Reply.allocate();
+    } finally {
+      initInternals.mockRestore();
+    }
+    expect(changed).toEqual([["_suppressInitializeCallback"]]);
+  });
+
+  it("allocate leaves the class untouched when the constructor throws", () => {
+    Reply.allocate();
+    const before = [ownState(Reply), ownState(Topic)];
     const initInternals = vi
       .spyOn(Reply.prototype as unknown as { initInternals(): void }, "initInternals")
       .mockImplementation(() => {
@@ -143,10 +167,8 @@ describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
     } finally {
       initInternals.mockRestore();
     }
-    expect(
-      flags.map((flag) => [Object.hasOwn(Reply, flag), Reply[flag as keyof typeof Reply]]),
-    ).toEqual(before);
-    expect(Topic._allocating).toBe(false);
+    expect([ownState(Reply), ownState(Topic)]).toEqual(before);
+    expect(_allocation.klass).toBeNull();
   });
 });
 
