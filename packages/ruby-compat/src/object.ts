@@ -437,7 +437,7 @@ function writerSpelling(attr: string | undefined): string | undefined {
 }
 
 function camelized(name: string): string {
-  return name.replace(/_([a-z\d])/g, (_, c: string) => c.toUpperCase());
+  return name.replace(/_([a-zA-Z\d])/g, (_, c: string) => c.toUpperCase());
 }
 
 function checkDefinitionVisibility(mod: { prototype: object }, mid: string): boolean {
