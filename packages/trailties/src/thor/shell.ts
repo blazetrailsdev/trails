@@ -12,7 +12,7 @@ import { Color } from "./shell/color.js";
 
 type ShellClass = new () => Basic;
 
-export const Base = {
+const singleton = {
   /** @internal */
   _shell: null as ShellClass | null | undefined,
 
@@ -33,6 +33,11 @@ export const Base = {
     return this._shell;
   },
 };
+
+export const Base = Object.defineProperties(
+  new Module(),
+  Object.getOwnPropertyDescriptors(singleton),
+) as Module & typeof singleton;
 
 type Delegated = Record<string, (...args: unknown[]) => unknown>;
 

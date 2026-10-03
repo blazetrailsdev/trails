@@ -3445,7 +3445,11 @@ export function harvestObjectLiteralMethods(
     const propMissingRailsNames = missingRailsNameTags(prop);
     const propMissingRailsCallReasons = missingRailsCallTagReasons(prop);
     const propMissingRailsArgsReasons = missingRailsArgsTagReasons(prop);
-    if (ts.isMethodDeclaration(prop) && prop.name && ts.isIdentifier(prop.name)) {
+    if (
+      ts.isMethodDeclaration(prop) &&
+      prop.name &&
+      (ts.isIdentifier(prop.name) || ts.isStringLiteral(prop.name))
+    ) {
       mname = prop.name.text;
       params = extractParameters(prop.parameters);
       optionKeys = extractOptionKeys(prop.parameters, checker);
