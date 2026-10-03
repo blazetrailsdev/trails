@@ -58,7 +58,7 @@ export interface API extends Conversion {
   /** @internal */
   _assignAttributes(attributes: Record<string, unknown>): Promise<void> | void;
   /** @internal */
-  _assignAttribute(k: string, v: unknown): Promise<void> | void;
+  _assignAttribute(k: string, v: unknown): unknown;
   /** @internal */
   sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown>;
   /** @internal */
@@ -70,10 +70,10 @@ export interface API extends Conversion {
   runValidationsBang(): Promise<boolean>;
   raiseValidationError(): never;
   readAttributeForValidation(attribute: string): unknown;
-  isValid(context?: string | string[] | ValidationContext | null): Promise<boolean>;
-  validate(context?: string | string[] | ValidationContext | null): Promise<boolean>;
-  isInvalid(context?: string | string[] | ValidationContext | null): Promise<boolean>;
-  validateBang(context?: string | string[] | ValidationContext | null): Promise<true>;
+  isValid(context?: string | string[] | null): Promise<boolean>;
+  validate(context?: string | string[] | null): Promise<boolean>;
+  isInvalid(context?: string | string[] | null): Promise<boolean>;
+  validateBang(context?: string | string[] | null): Promise<true>;
   readonly validationContext: string | string[] | null;
   /** @internal */
   _validationContext: string | string[] | null;

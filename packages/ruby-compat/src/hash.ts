@@ -38,6 +38,14 @@ export function rbBlockGivenP(value: unknown): value is Block<unknown> {
   return typeof value === "function" && (value as Partial<Block<unknown>>)[BLOCK] === true;
 }
 
+function ownMethod(hash: object, mid: string): ((...args: unknown[]) => unknown) | undefined {
+  if (hash instanceof Map) return undefined;
+  const proto: unknown = Object.getPrototypeOf(hash);
+  if (proto === Object.prototype || proto === null) return undefined;
+  const own = (hash as Record<string, unknown>)[mid];
+  return typeof own === "function" ? (own as (...args: unknown[]) => unknown) : undefined;
+}
+
 /**
  * Ruby `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176` `rb_hash_fetch_m`), all three
  * arms: with one argument the stored value or a `KeyError`, with a second the
@@ -83,6 +91,8 @@ export function fetch(
   key: unknown,
   ...rest: unknown[]
 ): unknown {
+  const own = ownMethod(hash, "fetch");
+  if (own) return own.call(hash, key, ...rest);
   const blockGiven = rbBlockGivenP(rest[0]);
   if (!(hash instanceof Map ? hash.has(key) : hasKey(hash, key as string))) {
     if (blockGiven) {
@@ -102,14 +112,33 @@ export function fetch(
 /**
  * Ruby `Hash#key?` / `#has_key?` (`vendor/ruby/v3.3.11/hash.c:3671`
  * `rb_hash_has_key`) — membership, which for a stored `nil` or `false` is the
- * question `hash[key] !== undefined` cannot answer.
+ * question `hash[key] !== undefined` cannot answer. A receiver that is not a
+ * Hash and defines `isKey` answers through it, as Ruby sends `key?` to the
+ * receiver: `values.key?(name)`
+ * (`activemodel/lib/active_model/attribute_set/builder.rb:33`) is
+ * `ActiveRecord::Result::IndexedRow#key?` when `values` is one. `fetch`,
+ * `keys` and `eachKey` dispatch the same way.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#key?` (`vendor/ruby/v3.3.11/hash.c:3671`).
  */
 export function hasKey(hash: object, key: PropertyKey): boolean {
   /* `vendor/ruby/v3.3.11/hash.c:3671` `rb_hash_has_key` reads the hash table through
      `hash_stlike_lookup`, never an ancestor: a Ruby Hash has no prototype
      chain, so `"toString" in {}` is an answer Ruby never gives. */
+  const own = ownMethod(hash, "isKey");
+  if (own) return own.call(hash, key) as boolean;
   return Object.hasOwn(hash, key);
+}
+
+/**
+ * Ruby `Hash#keys` (`vendor/ruby/v3.3.11/hash.c:3584` `rb_hash_keys`): a new Array
+ * of the keys, in insertion order.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#keys` (`vendor/ruby/v3.3.11/hash.c:3584`).
+ */
+export function keys<K = string>(hash: Record<string, unknown> | Map<K, unknown>): K[] {
+  if (hash instanceof Map) return [...hash.keys()];
+  const own = ownMethod(hash, "keys");
+  if (own) return own.call(hash) as K[];
+  return Object.keys(hash) as K[];
 }
 
 /**
@@ -441,6 +470,8 @@ export function eachKey<T>(
   hash: Record<string, T>,
   block?: (key: string) => unknown,
 ): Record<string, T> | string[] {
+  const own = ownMethod(hash, "eachKey");
+  if (own) return (block ? own.call(hash, block) : own.call(hash)) as string[];
   if (!block) return Object.keys(hash);
   for (const key of Object.keys(hash)) {
     block(key);
@@ -457,12 +488,30 @@ export function eachKey<T>(
 export function transformValues<T, U>(
   hash: Record<string, T>,
   block: (value: T) => U,
-): Record<string, U> {
+): Record<string, U>;
+/**
+ * The Map arm: `rb_hash_transform_values` answers a bare `Hash`
+ * (`rb_hash_new`), whatever the receiver's class and without its default.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#transform_values` (`vendor/ruby/v3.3.11/hash.c:3366`).
+ */
+export function transformValues<K, T, U>(hash: Map<K, T>, block: (value: T) => U): Hash<K, U>;
+/** @noRailsEquivalent PERMANENT — Ruby core `Hash#transform_values` (`vendor/ruby/v3.3.11/hash.c:3366`). */
+export function transformValues(
+  hash: Record<string, unknown> | Map<unknown, unknown>,
+  block: (value: unknown) => unknown,
+): Record<string, unknown> | Hash<unknown, unknown> {
+  if (hash instanceof Map) {
+    const result = new Hash<unknown, unknown>();
+    for (const [key, value] of hash) {
+      result.set(key, block(value));
+    }
+    return result;
+  }
   /* `rb_hash_transform_values` (`vendor/ruby/v3.3.11/hash.c:3366`) builds the new hash
      with `rb_hash_new`, which has no ancestors: `__proto__` is an ordinary key
      there, where `result["__proto__"] = v` on a plain `{}` reaches
      Object.prototype's setter and stores nothing. */
-  const result: Record<string, U> = Object.create(null) as Record<string, U>;
+  const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
   for (const key of Object.keys(hash)) {
     result[key] = block(hash[key]);
   }
@@ -760,6 +809,22 @@ export class Hash<K, V> extends Map<K, V> {
       return this.#defaultProc(this, key[0]);
     }
     return this.#default;
+  }
+
+  /**
+   * The `JSON.stringify` protocol: a `Map`'s entries are not properties, so
+   * without it a Hash stringifies as `{}` where `Hash#to_json`
+   * (`vendor/ruby/v3.3.11/ext/json/generator/generator.c:430` `mHash_to_json`)
+   * writes each pair under its key's `to_s`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  toJSON(): Record<string, V> {
+    const result = Object.create(null) as Record<string, V>;
+    for (const [key, value] of this) {
+      result[String(key)] = value;
+    }
+    return result;
   }
 
   /**

@@ -216,7 +216,7 @@ describe("AttributeAssignmentTest", () => {
         this.attribute("name", "string");
         this.attribute("age", "integer");
       }
-      override _assignAttribute(k: string, v: unknown): Promise<void> | void {
+      override _assignAttribute(k: string, v: unknown): unknown {
         seen.push([k, v]);
         return super._assignAttribute(k, v);
       }

@@ -88,10 +88,9 @@ export class Validations {
     return (this._errors ??= new Errors(this));
   }
 
-  async isValid(context?: string | string[] | ValidationContext | null): Promise<boolean> {
+  async isValid(context: string | string[] | null = null): Promise<boolean> {
     const currentContext = this.validationContext;
-    const inner = context instanceof ValidationContext ? context.context : (context ?? null);
-    this.contextForValidation().context = Array.isArray(inner) ? [...inner] : inner;
+    this.contextForValidation().context = context;
     this.errors.clear();
 
     try {
@@ -101,7 +100,7 @@ export class Validations {
     }
   }
 
-  declare validate: (context?: string | string[] | ValidationContext | null) => Promise<boolean>;
+  declare validate: (context?: string | string[] | null) => Promise<boolean>;
 
   freeze(): this {
     void this.errors;
@@ -110,11 +109,11 @@ export class Validations {
     return this;
   }
 
-  async isInvalid(context?: string | string[] | ValidationContext | null): Promise<boolean> {
+  async isInvalid(context: string | string[] | null = null): Promise<boolean> {
     return !(await this.isValid(context));
   }
 
-  async validateBang(context?: string | string[] | ValidationContext | null): Promise<true> {
+  async validateBang(context: string | string[] | null = null): Promise<true> {
     return (await this.isValid(context)) || this.raiseValidationError();
   }
 

@@ -4951,12 +4951,36 @@ function isArgumentBindingGuard(statement: ts.IfStatement): boolean {
   return text !== undefined && ts.isStringLiteral(text) && message.test(text.text);
 }
 
+/**
+ * `rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined`: the capture
+ * of Ruby's `&block` after a splat (`def validates_with(*args, &block)`,
+ * `activemodel/lib/active_model/validations/with.rb:88`). A TS rest parameter
+ * comes last, so the block rides in the splat and is popped off it. That binds
+ * a parameter, as {@link isArgumentBindingGuard}'s raise does, and is not an arm.
+ */
+function isBlockCapture(conditional: ts.ConditionalExpression): boolean {
+  const test = conditional.condition;
+  if (!ts.isCallExpression(test) || test.expression.getText() !== "rbBlockGivenP") return false;
+  const [last] = test.arguments;
+  if (!last || !ts.isElementAccessExpression(last) || !ts.isIdentifier(last.expression)) {
+    return false;
+  }
+  const args = last.expression.text;
+  if (last.argumentExpression.getText() !== `${args}.length - 1`) return false;
+  let popped = conditional.whenTrue;
+  while (ts.isAsExpression(popped) || ts.isParenthesizedExpression(popped)) {
+    popped = popped.expression;
+  }
+  return popped.getText() === `${args}.pop()` && conditional.whenFalse.getText() === "undefined";
+}
+
 function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const tokens: string[] = [];
   const visit = (n: ts.Node): void => {
     switch (n.kind) {
       case ts.SyntaxKind.ConditionalExpression: {
+        if (isBlockCapture(n as ts.ConditionalExpression)) return;
         const fallback = rtestFallback(n as ts.ConditionalExpression);
         if (fallback !== undefined) {
           visit((n as ts.ConditionalExpression).condition);

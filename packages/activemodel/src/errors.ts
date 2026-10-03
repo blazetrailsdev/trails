@@ -8,7 +8,8 @@ import {
 import {
   Enumerable,
   FrozenError,
-  Hash,
+  groupBy,
+  type Hash,
   hasKey,
   isEmpty,
   rbEqual,
@@ -16,8 +17,7 @@ import {
   rbModConstSet,
   rbModName,
   rbObjDup,
-  stringToSym,
-  symbolToS,
+  toSym,
   transformValues,
 } from "@blazetrails/ruby-compat";
 import { Error as ActiveModelError } from "./error.js";
@@ -94,8 +94,7 @@ export class Errors<TBase extends object = object> {
   ): void {
     for (const key of ["attribute", "type"] as const) {
       if (hasKey(overrideOptions, key)) {
-        const sym = stringToSym(overrideOptions[key] as string);
-        overrideOptions[key] = key === "type" ? sym : symbolToS(sym);
+        overrideOptions[key] = toSym(overrideOptions[key]);
       }
     }
     this._errors.push(new NestedError(this._base, error, overrideOptions));
@@ -153,14 +152,8 @@ export class Errors<TBase extends object = object> {
     return Object.freeze([...new Set(this._errors.map((e) => e.attribute))]);
   }
 
-  asJson(options?: Record<string, unknown> | null): Record<string, (string | null)[]> {
-    const result: Record<string, (string | null)[]> = {};
-    for (const [attr, msgs] of this.toHash(
-      options != null && (options["fullMessages"] as boolean | undefined),
-    )) {
-      result[attr] = msgs;
-    }
-    return result;
+  asJson(options: Record<string, unknown> | null = null): Hash<string, (string | null)[]> {
+    return this.toHash((options && options["fullMessages"]) as boolean);
   }
 
   get messages(): Map<string, readonly (string | null)[]> {
@@ -171,27 +164,17 @@ export class Errors<TBase extends object = object> {
   }
 
   get details(): Map<string, ReadonlyArray<ErrorDetailHash>> {
-    const hash = new Hash<string, ReadonlyArray<ErrorDetailHash>>(EMPTY_ARRAY);
-    for (const [attr, details] of Object.entries(
-      transformValues(this.groupByAttribute(), (errors) =>
-        errors.map((e) => e.details as ErrorDetailHash),
-      ),
-    )) {
-      hash.set(attr, details);
-    }
+    const hash: Hash<string, ReadonlyArray<ErrorDetailHash>> = transformValues(
+      this.groupByAttribute(),
+      (errors) => errors.map((error) => error.details as ErrorDetailHash),
+    );
+    hash.setDefault(EMPTY_ARRAY);
     hash.freeze();
     return hash;
   }
 
-  groupByAttribute(): Record<string, ActiveModelError[]> {
-    const result: Record<string, ActiveModelError[]> = {};
-    for (const error of this._errors) {
-      if (!result[error.attribute]) {
-        result[error.attribute] = [];
-      }
-      result[error.attribute].push(error);
-    }
-    return result;
+  groupByAttribute(): Hash<string, ActiveModelError[]> {
+    return groupBy(this._errors, (error) => error.attribute);
   }
 
   add(
@@ -316,15 +299,9 @@ export class Errors<TBase extends object = object> {
 
   toHash(fullMessages = false): Hash<string, (string | null)[]> {
     const messageMethod = fullMessages ? "fullMessage" : "message";
-    const hash = new Hash<string, (string | null)[]>();
-    for (const [attribute, errors] of Object.entries(
-      transformValues(this.groupByAttribute(), (errors) =>
-        errors.map((error) => error[messageMethod]),
-      ),
-    )) {
-      hash.set(attribute, errors);
-    }
-    return hash;
+    return transformValues(this.groupByAttribute(), (errors) =>
+      errors.map((error) => error[messageMethod]),
+    );
   }
 
   toArray(): (string | null)[] {

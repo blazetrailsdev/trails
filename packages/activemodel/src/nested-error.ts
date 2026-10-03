@@ -1,4 +1,4 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbModConstSet, symbolToS, toSym } from "@blazetrails/ruby-compat";
 import { Error as ActiveModelError } from "./error.js";
 import { ActiveModel } from "./namespaces.js";
 
@@ -20,7 +20,7 @@ export class NestedError extends ActiveModelError {
   ) {
     const attribute = overrideOptions?.attribute ?? innerError.attribute;
     const type = overrideOptions?.type ?? innerError.type;
-    super(base, attribute, type, innerError.options ?? {}, innerError.rawType);
+    super(base, symbolToS(toSym(attribute)), type, innerError.options ?? {}, innerError.rawType);
     this.innerError = innerError;
   }
 

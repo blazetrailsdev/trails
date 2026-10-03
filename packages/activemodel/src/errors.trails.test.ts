@@ -13,7 +13,7 @@ import {
   BlockValidator,
 } from "./index.js";
 import { Error as ActiveModelError } from "./error.js";
-import { FrozenError, Hash } from "@blazetrails/ruby-compat";
+import { FrozenError, Hash, NoMethodError } from "@blazetrails/ruby-compat";
 import type { ValidatableRecord } from "./validator.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
@@ -161,8 +161,8 @@ describe("Errors — trails-only coverage", () => {
     errors.add("name", ":invalid");
     errors.add("age", ":invalid");
     const grouped = errors.groupByAttribute();
-    expect(grouped["name"].length).toBe(2);
-    expect(grouped["age"].length).toBe(1);
+    expect(grouped.get("name")!.length).toBe(2);
+    expect(grouped.get("age")!.length).toBe(1);
   });
 
   it("messages_for returns messages for an attribute", () => {
@@ -305,8 +305,10 @@ describe("Errors — trails-only coverage", () => {
       const source = new Errors({});
       source.add("name", ":invalid");
       const target = new Errors({});
-      expect(() => target.import(source.objects[0], { attribute: undefined })).toThrow(TypeError);
-      expect(() => target.import(source.objects[0], { type: undefined })).toThrow(TypeError);
+      expect(() => target.import(source.objects[0], { attribute: undefined })).toThrow(
+        NoMethodError,
+      );
+      expect(() => target.import(source.objects[0], { type: undefined })).toThrow(NoMethodError);
     });
 
     it("import accepts :attribute and :type override (rawType stays on inner)", () => {

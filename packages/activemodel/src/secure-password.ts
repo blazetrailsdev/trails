@@ -1,5 +1,5 @@
 import { camelize, include, isPresent, Module } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { isEmpty, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Engine, Password } from "@blazetrails/bcrypt";
 import { Validations } from "./validations.js";
 import { Model } from "./model.js";
@@ -125,9 +125,8 @@ export class InstanceMethodsOnActivation extends Module {
           if (unencryptedPassword == null) {
             (this as unknown as Record<string, unknown>)[passwordIvar] = null;
             publicSendWriter(this, digestAttr, null);
-          } else if (String(unencryptedPassword) !== "") {
-            (this as unknown as Record<string, unknown>)[passwordIvar] =
-              String(unencryptedPassword);
+          } else if (!isEmpty(unencryptedPassword as string)) {
+            (this as unknown as Record<string, unknown>)[passwordIvar] = unencryptedPassword;
             const cost = SecurePassword.minCost ? Engine.MIN_COST : Engine.cost;
             publicSendWriter(this, digestAttr, Password.create(unencryptedPassword, { cost }));
           }
@@ -158,10 +157,11 @@ export class InstanceMethodsOnActivation extends Module {
 
     const authenticateAttribute = function (this: Model, unencryptedPassword: unknown) {
       const attributeDigest = publicSend(this, digestAttr) as string | null;
-      return isPresent(attributeDigest) &&
-        new Password(attributeDigest as string).isPassword(unencryptedPassword)
-        ? this
-        : false;
+      return (
+        isPresent(attributeDigest) &&
+        new Password(attributeDigest as string).isPassword(unencryptedPassword) &&
+        this
+      );
     };
     this.defineMethod(`authenticate${camelize(attribute)}`, authenticateAttribute);
 

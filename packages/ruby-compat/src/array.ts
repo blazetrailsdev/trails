@@ -540,6 +540,42 @@ export function partition<T>(ary: readonly T[], block: (item: T) => unknown): [T
 }
 
 /**
+ * Ruby `Array#each` (`vendor/ruby/v3.3.11/array.c:2532` `rb_ary_each`): yields each
+ * element and returns the receiver. With no block it is
+ * `RETURN_SIZED_ENUMERATOR` (`:2535`), whose elements are the receiver's.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function each<T>(ary: T[], block?: (item: T) => unknown): T[] {
+  if (!block) return ary;
+  for (const i of ary) {
+    block(i);
+  }
+  return ary;
+}
+
+/**
+ * Ruby `Enumerable#group_by` (`vendor/ruby/v3.3.11/enum.c:1157` `enum_group_by`): a
+ * Hash keyed by the block's result, each value the Array of the elements that
+ * produced it, in the receiver's order (`group_by_i`, `:1115`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function groupBy<T, K>(ary: readonly T[], block: (item: T) => K): Hash<K, T[]> {
+  const hash = new Hash<K, T[]>();
+  for (const i of ary) {
+    const group = block(i);
+    const values = hash.get(group);
+    if (values === undefined) {
+      hash.set(group, [i]);
+    } else {
+      values.push(i);
+    }
+  }
+  return hash;
+}
+
+/**
  * Ruby `Array#to_h` with no block (`vendor/ruby/v3.3.11/array.c:2988` `rb_ary_to_h`):
  * a Hash of the receiver's `[key, value]` pairs. The block arm is not ported:
  * nothing calls it.

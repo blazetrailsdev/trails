@@ -1,8 +1,13 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { include, included, kernelArray, mergeBang, Module } from "@blazetrails/activesupport";
-import { aryIncludes, except, includedModules } from "@blazetrails/ruby-compat";
-import { inspectAccessor } from "./_accessor.js";
+import {
+  aryIncludes,
+  except,
+  includedModules,
+  rbModAttrReader,
+  rbModAttrWriter,
+} from "@blazetrails/ruby-compat";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
 interface AttributeMethodQueryable {
@@ -56,23 +61,8 @@ export class LazilyDefineAttributes extends Module {
     const attrWriters = this.attributes.filter((name) => !klass.isAttributeMethod(`${name}=`));
 
     this.moduleEval((mod) => {
-      for (const name of new Set([...attrReaders, ...attrWriters])) {
-        const inherited = inspectAccessor(klass.prototype, name);
-        const slot = `_${name}`;
-        Object.defineProperty(mod, name, {
-          configurable: true,
-          get: attrReaders.includes(name)
-            ? function (this: Record<string, unknown>) {
-                return this[slot];
-              }
-            : inherited.getter,
-          set: attrWriters.includes(name)
-            ? function (this: Record<string, unknown>, value: unknown) {
-                this[slot] = value;
-              }
-            : inherited.setter,
-        });
-      }
+      rbModAttrReader({ prototype: mod }, ...attrReaders);
+      rbModAttrWriter({ prototype: mod }, ...attrWriters);
     });
 
     this.#lock = null;

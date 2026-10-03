@@ -8,6 +8,7 @@ import {
   rbFSend,
   rbModConstDefined,
   rbModConstSet,
+  regexpEscape,
   unpack1,
 } from "@blazetrails/ruby-compat";
 import {
@@ -69,6 +70,7 @@ export class AttributeMethodPattern {
   readonly suffix: string;
   readonly proxyTarget: string;
   readonly parameters: string | false;
+  private readonly regex: RegExp;
 
   constructor({
     prefix = "",
@@ -79,28 +81,29 @@ export class AttributeMethodPattern {
     this.prefix = prefix;
     this.suffix = bang ? suffix.slice(0, -1) : suffix;
     this.parameters = parameters == null ? "..." : bang && parameters === false ? "" : parameters;
+    this.regex = new RegExp(
+      `^(?:${regexpEscape(this.prefix)})(.*)(?:${regexpEscape(this.suffix)})$`,
+    );
     this.proxyTarget = `${prefix}${this.camelJoined ? "Attribute" : "attribute"}${this.suffix}${
       bang ? "Bang" : ""
     }`;
   }
 
   match(methodName: string): AttributeMethod | null {
-    if (this.prefix && !methodName.startsWith(this.prefix)) return null;
-    if (this.suffix && !methodName.endsWith(this.suffix)) return null;
-    const attr = methodName.slice(
-      this.prefix.length,
-      this.suffix ? -this.suffix.length : undefined,
-    );
-    if (!attr) return null;
-    return new AttributeMethod(
-      this.proxyTarget,
-      this.camelJoined ? attr.charAt(0).toLowerCase() + attr.slice(1) : attr,
-    );
+    const md = this.regex.exec(methodName);
+    if (md) {
+      return new AttributeMethod(this.proxyTarget, this.attrName(md[1]));
+    }
+    return null;
   }
 
   methodName(attrName: string): string {
     const name = this.camelJoined ? attrName.charAt(0).toUpperCase() + attrName.slice(1) : attrName;
     return `${this.prefix}${name}${this.suffix}`;
+  }
+
+  private attrName(name: string): string {
+    return this.camelJoined ? name.charAt(0).toLowerCase() + name.slice(1) : name;
   }
 
   private get camelJoined(): boolean {

@@ -5,7 +5,7 @@ interface AttributeAssignmentHost {
   writeAttribute(key: string, value: unknown): void;
   attributeWriterMissing(name: string, value: unknown): void;
   /** @internal */
-  _assignAttribute(k: string, v: unknown): Promise<void> | void;
+  _assignAttribute(k: string, v: unknown): unknown;
   readAttribute(name: string): unknown;
   /** @internal */
   assignNestedParameterAttributes(pairs: Record<string, unknown>): Promise<void> | void;
@@ -35,9 +35,12 @@ export function _assignAttributes(
     } else if (isNestedParameterHash(v)) {
       (nestedParameterAttributes ??= {})[key] = v;
     } else if (pending) {
-      pending = pending.then(() => this._assignAttribute(key, v));
+      pending = pending.then(async () => {
+        await this._assignAttribute(key, v);
+      });
     } else {
-      pending = this._assignAttribute(key, v) as Promise<void> | undefined;
+      const assigned = this._assignAttribute(key, v);
+      if (assigned instanceof Promise) pending = assigned;
     }
   }
 
@@ -63,9 +66,14 @@ export function assignNestedParameterAttributes(
 ): Promise<void> | void {
   let pending: Promise<void> | undefined;
   for (const [k, v] of Object.entries(pairs)) {
-    pending = (
-      pending ? pending.then(() => this._assignAttribute(k, v)) : this._assignAttribute(k, v)
-    ) as Promise<void> | undefined;
+    if (pending) {
+      pending = pending.then(async () => {
+        await this._assignAttribute(k, v);
+      });
+    } else {
+      const assigned = this._assignAttribute(k, v);
+      if (assigned instanceof Promise) pending = assigned;
+    }
   }
   return pending;
 }
