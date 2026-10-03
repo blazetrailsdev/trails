@@ -99,8 +99,12 @@ export class LazyAttributeSet extends AttributeSet {
         );
 
         if (valuePresent) {
-          const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
-          return (this.castedValues[name] = type.deserialize(value));
+          const type = fetch<ValueType>(
+            this.additionalTypes,
+            name,
+            hashAref(this.types, name) as ValueType,
+          );
+          return hashAset(this.castedValues, name, type.deserialize(value));
         } else {
           const attr = this.defaultAttribute(name, valuePresent, value);
           return attr.value(block);
@@ -129,14 +133,18 @@ export class LazyAttributeSet extends AttributeSet {
       }),
     ),
   ): Attribute {
-    const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
+    const type = fetch<ValueType>(
+      this.additionalTypes,
+      name,
+      hashAref(this.types, name) as ValueType,
+    );
 
     if (valuePresent) {
-      const attr = Attribute.fromDatabase(name, value, type, this.castedValues[name]);
+      const attr = Attribute.fromDatabase(name, value, type, hashAref(this.castedValues, name));
       hashAset(this._attributes, name, attr);
       return attr;
     } else if (hasKey(this.types, name)) {
-      const attr = this.defaultAttributes[name];
+      const attr = hashAref(this.defaultAttributes, name) as Attribute | null;
       const built = attr ? attr.dup() : Attribute.uninitialized(name, type);
       hashAset(this._attributes, name, built);
       return built;
@@ -276,7 +284,11 @@ export class LazyAttributeHash {
 
   /** @internal */
   assignDefaultValue(name: string): Attribute | undefined {
-    const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
+    const type = fetch<ValueType>(
+      this.additionalTypes,
+      name,
+      hashAref(this.types, name) as ValueType,
+    );
     let valuePresent: boolean = true;
     const value = fetch(
       this.values,
@@ -291,7 +303,7 @@ export class LazyAttributeHash {
       this._delegateHash[name] = attr;
       return attr;
     } else if (hasKey(this.types, name)) {
-      const attr = this.defaultAttributes[name];
+      const attr = hashAref(this.defaultAttributes, name) as Attribute | null;
       const built = attr ? attr.dup() : Attribute.uninitialized(name, type);
       this._delegateHash[name] = built;
       return built;

@@ -25,6 +25,9 @@ import { NameError } from "./name-error.js";
 import { temporalTag } from "./temporal-tag.js";
 import { Enumerable } from "./enumerable.js";
 import { Hash } from "./hash.js";
+import { BigDecimal } from "./big-decimal.js";
+import { Complex } from "./complex.js";
+import { Rational } from "./rational.js";
 import {
   FL_SINGLETON,
   T_ICLASS,
@@ -34,6 +37,7 @@ import {
   rbCClass,
   rbCDate,
   rbCNumeric,
+  rbObjClass,
   rbCString,
   rbCTime,
   rbModAttrReader,
@@ -864,6 +868,17 @@ export function rbModAncestors(mod: { prototype: object }): object[] {
 }
 
 /**
+ * `rb_obj_is_kind_of` (`vendor/ruby/v3.3.11/object.c:865`), `Object#kind_of?`
+ * and `Module#===`: whether `c` is in the ancestry of `obj`'s class.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjIsKindOf(obj: unknown, c: object): boolean {
+  const cl = rbObjClass(obj) as { prototype: object };
+  return rbModAncestors(cl).includes(c);
+}
+
+/**
  * `rb_mod_instance_method` (`vendor/ruby/v3.3.11/proc.c:2190`), `Module#instance_method`,
  * answering the `owner` (`method_owner`, `vendor/ruby/v3.3.11/proc.c:1988`): the
  * {@link rbModAncestors} entry that defines `mid`. That is the `Module` an
@@ -1452,6 +1467,14 @@ classpaths.set(rbMComparable, { path: "Comparable", permanent: true });
 
 Object.setPrototypeOf(rbCClass, Module);
 Object.setPrototypeOf(rbCClass.prototype, Module.prototype);
+
+// `rb_define_class("Rational", rb_cNumeric)` (`vendor/ruby/v3.3.11/rational.c:2759`),
+// `"Complex"` (`vendor/ruby/v3.3.11/complex.c:2529`) and `"BigDecimal"`
+// (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:4407`).
+for (const klass of [Rational, Complex, BigDecimal]) {
+  Object.setPrototypeOf(klass, rbCNumeric);
+  Object.setPrototypeOf(klass.prototype, rbCNumeric.prototype);
+}
 
 include(rbCNumeric, rbMComparable);
 include(rbCString, rbMComparable);

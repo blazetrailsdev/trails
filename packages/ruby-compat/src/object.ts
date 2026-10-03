@@ -175,7 +175,7 @@ export function rbClassSuperclass<T extends object>(klass: T): T | null {
 export const classpaths = new WeakMap<object, { path: string; permanent: boolean }>();
 
 /** `rb_define_class` (`vendor/ruby/v3.3.11/class.c:972`) for a core class no JS constructor seats. */
-function rbDefineClass(name: string, superclass: Klass = Object): Klass {
+function rbDefineClass(name: string, superclass: Klass = Object): new () => object {
   const klass = class extends (superclass as new () => object) {};
   classpaths.set(klass, { path: name, permanent: true });
   return klass;
@@ -219,13 +219,18 @@ export const rbCTime = rbDefineClass("Time");
  */
 export const rbCDate = rbDefineClass("Date");
 
+/**
+ * `cDateTime` (`vendor/ruby/v3.3.11/ext/date/date_core.c:9984`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCDateTime = rbDefineClass("DateTime", rbCDate);
+
 const rbCNilClass = rbDefineClass("NilClass");
 const rbCTrueClass = rbDefineClass("TrueClass");
 const rbCFalseClass = rbDefineClass("FalseClass");
 const rbCInteger = rbDefineClass("Integer", rbCNumeric);
 const rbCFloat = rbDefineClass("Float", rbCNumeric);
 const rbCProc = rbDefineClass("Proc");
-const rbCDateTime = rbDefineClass("DateTime", rbCDate);
 
 /**
  * `rb_mod_singleton_p` (`vendor/ruby/v3.3.11/object.c:3050`), `Module#singleton_class?`.

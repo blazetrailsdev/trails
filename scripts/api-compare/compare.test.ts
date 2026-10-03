@@ -491,6 +491,22 @@ describe("significantMissingCalls", () => {
     ).toBe(true);
   });
 
+  it("significantCallsForReceivers drops Array#prepend for a TS body with an unshift() call", () => {
+    const unshifted = new Set(["unshift"]);
+    expect(
+      significantCallsForReceivers({ prepend: ["expr"] }, undefined, unshifted).has("prepend"),
+    ).toBe(false);
+    expect(significantCallsForReceivers({ prepend: ["expr"] }).has("prepend")).toBe(true);
+    expect(significantCallsForReceivers({}, undefined, unshifted).has("prepend")).toBe(true);
+    for (const kind of ["self", "const"]) {
+      expect(
+        significantCallsForReceivers({ prepend: ["expr", kind] }, undefined, unshifted).has(
+          "prepend",
+        ),
+      ).toBe(true);
+    }
+  });
+
   it("significantCallsForReceivers drops an implicit-self load for a TS body with a computed import()", () => {
     const imported = new Set(["import"]);
     expect(significantCallsForReceivers({}, undefined, imported).has("load")).toBe(false);

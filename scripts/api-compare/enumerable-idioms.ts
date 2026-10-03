@@ -213,6 +213,11 @@ export const EVAL_CALLBACK_PREFIX = "%";
  *   `Relation#size` / `#length` is an awaited method CALL. The read does not
  *   name its Ruby receiver, so it is admitted only where every Ruby site has an
  *   explicit receiver outside {@link LENGTH_READ_UNCREDITED_RECEIVER_KINDS}.
+ * - `prepend` → `unshift`: an `.unshift(...)` call. `Array#prepend` is an alias
+ *   of `Array#unshift` (`vendor/ruby/v3.3.11/array.c:8640`), and JS has no
+ *   `Array#prepend`. `Module#prepend` is a bare `prepend Mod` or a
+ *   `Const.prepend(Mod)`, so the same receiver kinds `.length` refuses keep it
+ *   flagged, as does any body whose port makes no `.unshift(...)` call.
  * - `load` → `import`: a dynamic `import(x)` whose specifier is computed at run
  *   time, ESM's one way to evaluate a file by path — `Kernel#load`
  *   (`rb_f_load`, `vendor/ruby/v3.3.11/load.c:903`). A string-literal specifier
@@ -245,6 +250,7 @@ export const NATIVE_FORM_ANALOGUES = new Map<
 >([
   ["size", { form: "length", receivers: "explicit" }],
   ["length", { form: "length", receivers: "explicit" }],
+  ["prepend", { form: "unshift", receivers: "explicit" }],
   ["load", { form: "import", receivers: "implicit-self" }],
   ["call", { form: "invoke", receivers: "explicit", uncreditedKinds: new Set(["self", "array"]) }],
 ]);

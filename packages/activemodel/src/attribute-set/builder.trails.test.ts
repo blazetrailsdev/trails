@@ -257,3 +257,40 @@ describe("LazyAttributeHash", () => {
     expect((hash.deepDup() as unknown as { materialized: boolean }).materialized).toBe(true);
   });
 });
+
+describe("names Object.prototype answers", () => {
+  const strType = typeRegistry.lookup("string");
+  const names = ["constructor", "toString"];
+
+  it("LazyAttributeSet reads types as a Hash", () => {
+    for (const name of names) {
+      const lazy = new LazyAttributeSet({ [name]: "x" }, {}, {}, {});
+      expect(lazy.getAttribute(name).type).toBeNull();
+    }
+  });
+
+  it("LazyAttributeSet reads casted_values as a Hash", () => {
+    for (const name of names) {
+      const lazy = new LazyAttributeSet({ [name]: "x" }, { [name]: strType }, {}, {});
+      expect(lazy.getAttribute(name).value()).toBe("x");
+      expect(
+        new LazyAttributeSet({ [name]: "x" }, { [name]: strType }, {}, {}).fetchValue(name),
+      ).toBe("x");
+    }
+  });
+
+  it("LazyAttributeSet reads default_attributes as a Hash", () => {
+    for (const name of names) {
+      const lazy = new LazyAttributeSet({}, { [name]: strType }, {}, {});
+      expect(lazy.getAttribute(name).isInitialized()).toBe(false);
+    }
+  });
+
+  it("LazyAttributeHash reads types and default_attributes as a Hash", () => {
+    for (const name of names) {
+      expect(new LazyAttributeHash({}, { [name]: "x" }).get(name)!.type).toBeNull();
+      const attr = new LazyAttributeHash({ [name]: strType }, {}).get(name)!;
+      expect(attr.isInitialized()).toBe(false);
+    }
+  });
+});

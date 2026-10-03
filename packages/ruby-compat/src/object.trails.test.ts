@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   rbCBasicObject,
+  rbCDate,
+  rbCDateTime,
+  rbCNumeric,
+  rbCTime,
   rbClassSuperclass,
   basicObjRespondTo,
   objRespondToMissing,
@@ -28,7 +32,17 @@ import {
   rbObjClassname,
   rbSetClassPathString,
 } from "./object.js";
-import { Kernel, Module, include, rbModAncestors, rbModInstanceMethod } from "./include.js";
+import {
+  Kernel,
+  Module,
+  include,
+  rbModAncestors,
+  rbModInstanceMethod,
+  rbObjIsKindOf,
+} from "./include.js";
+import { BigDecimal } from "./big-decimal.js";
+import { Complex } from "./complex.js";
+import { Rational } from "./rational.js";
 import { cmp } from "./comparable.js";
 import { Range } from "./range.js";
 import { ArgumentError } from "./argument-error.js";
@@ -545,6 +559,41 @@ describe("rbModAttrReader / rbModAttrWriter / rbModMethodDefined", () => {
     sub.title = "x";
     expect(sub.written).toBe("x");
     expect(sub.title).toBeNull();
+  });
+});
+
+describe("rbObjIsKindOf", () => {
+  it("answers through the class, its superclasses and its included modules", () => {
+    class Base {}
+    class Sub extends Base {}
+    const mod = new Module();
+    mod.appendFeatures(Base);
+    expect(rbObjIsKindOf(new Sub(), Sub)).toBe(true);
+    expect(rbObjIsKindOf(new Sub(), Base)).toBe(true);
+    expect(rbObjIsKindOf(new Sub(), mod)).toBe(true);
+    expect(rbObjIsKindOf(new Base(), Sub)).toBe(false);
+  });
+
+  it("reads every Numeric seat as a Numeric", () => {
+    for (const n of [1, 1.5, 1n, new Rational(1, 2), new BigDecimal("1.1"), new Complex(1, 0)]) {
+      expect(rbObjIsKindOf(n, rbCNumeric)).toBe(true);
+      expect(rbObjIsKindOf(n, rbCTime)).toBe(false);
+    }
+    expect(rbObjIsKindOf("1", rbCNumeric)).toBe(false);
+    expect(rbObjIsKindOf(null, rbCNumeric)).toBe(false);
+  });
+
+  it("reads the Time, DateTime and Date seats", () => {
+    expect(rbObjIsKindOf(new Date(0), rbCTime)).toBe(true);
+    const instant = { [Symbol.toStringTag]: "Temporal.Instant", epochNanoseconds: 0n };
+    expect(rbObjIsKindOf(instant, rbCTime)).toBe(true);
+    const dateTime = { [Symbol.toStringTag]: "Temporal.PlainDateTime" };
+    expect(rbObjIsKindOf(dateTime, rbCDateTime)).toBe(true);
+    expect(rbObjIsKindOf(dateTime, rbCDate)).toBe(true);
+    const date = { [Symbol.toStringTag]: "Temporal.PlainDate" };
+    expect(rbObjIsKindOf(date, rbCDate)).toBe(true);
+    expect(rbObjIsKindOf(date, rbCDateTime)).toBe(false);
+    expect(rbObjIsKindOf(date, rbCTime)).toBe(false);
   });
 });
 
