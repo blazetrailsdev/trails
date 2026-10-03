@@ -4059,6 +4059,8 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
           let foreignKeyOptions: Options;
           foreignKeyOptions = { ...foreignKey, ...conditionalOptions };
           foreignKeyOptions.column ??= refName;
+          foreignKeyOptions = { column: refName };
+          foreignKeyOptions.reassigned;
         }
       `,
     });

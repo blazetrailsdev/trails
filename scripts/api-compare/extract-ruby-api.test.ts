@@ -1887,6 +1887,8 @@ describe(
             merged[:merged]
             blocked = options.merge(a) { |k| k }
             blocked[:blocked]
+            route_options = paths.first
+            route_options[:reassigned]
           end
         end
       `,

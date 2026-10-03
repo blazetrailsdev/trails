@@ -3436,8 +3436,8 @@ class ApiExtractor
     when :assign
       target = node[1]
       if target.is_a?(Array) && target[0] == :var_field && target[1].is_a?(Array) &&
-          target[1][0] == :@ident && option_copy?(node[2], vars)
-        vars << target[1][1]
+          target[1][0] == :@ident
+        option_copy?(node[2], vars) ? vars << target[1][1] : vars.delete(target[1][1])
       end
     when :aref
       # options[:foo]

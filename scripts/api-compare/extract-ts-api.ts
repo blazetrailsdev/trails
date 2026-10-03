@@ -5998,7 +5998,9 @@ export function extractOptionKeys(
  * binding (`{ types, ...options }`) and a copy (`const opts = { ...options }`,
  * or a `slice` / `except` / `merge` / `rbObjDup` / `rbObjClone` call, the TS
  * spellings of extract-ruby-api.rb `OPTION_COPY_METHODS`), declared or assigned,
- * carry the hash on under a new name, and a kwargs bag carrying the hash as its
+ * carry the hash on under a new name, until it is reassigned from anything
+ * else. A multiple assignment (`a, b = options.dup, x`) is not followed, on
+ * either side. A kwargs bag carrying the hash as its
  * `options` property is read through to it, as {@link extractOptionKeys} does.
  * The reader calls are the TS spellings of extract-ruby-api.rb
  * `OPTION_READER_METHODS`, plus `valuesAt`, which reads every key it names.
@@ -6128,10 +6130,10 @@ export function extractOptionReads(
     } else if (
       ts.isBinaryExpression(node) &&
       node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-      ts.isIdentifier(node.left) &&
-      isCopy(node.right)
+      ts.isIdentifier(node.left)
     ) {
-      vars.add(node.left.text);
+      if (isCopy(node.right)) vars.add(node.left.text);
+      else vars.delete(node.left.text);
     } else if (ts.isPropertyAccessExpression(node) && isOptions(node.expression)) {
       const call = node.parent;
       if (ts.isCallExpression(call) && call.expression === node) {
