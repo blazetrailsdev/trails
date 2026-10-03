@@ -115,8 +115,9 @@ export interface MethodInfo {
    * the skeleton spells `ref:get` like `Map#get`), a unary operator (`op:!`),
    * a ternary (`?:`), a class expression (`class`), the fixed text of a
    * template literal (`tpl:…`) and the string message of a thrown construction
-   * (`msg:…`), which `callArgs` drops with the rest of the site. Nested
-   * function bodies are walked, as `skeleton` walks them. Read only by report-structural-duplicates.ts,
+   * (`msg:…`), which `callArgs` drops with the rest of the site. Every node is
+   * walked: a nested function body, as in `skeleton`, and also the filtered
+   * rescue arms `skeleton` skips. Read only by report-structural-duplicates.ts,
    * so no call gate sees it.
    */
   shapeTokens?: string[];
