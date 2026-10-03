@@ -219,6 +219,10 @@ const AMBIENT_RAILTIE_MIXINS: Record<string, { includes: string[] }> = {
  *     filter. JS has no `Class` to prepend onto, so the extender carries the
  *     module itself (`extend(Base, ReloadedClassesFiltering)`, base.rb:286),
  *     and the edge crosses a package boundary wherever the extender does.
+ *   - `ActiveSupport::Testing::SetupAndTeardown.prepended(klass)` runs
+ *     `klass.include ActiveSupport::Callbacks` and `klass.extend ClassMethods`
+ *     (testing/setup_and_teardown.rb:21-25), which is how `ActiveSupport::TestCase`
+ *     answers `setup` / `teardown` and the callbacks class methods.
  */
 /**
  * Mixins every Ruby object answers because Active Support includes them into
@@ -239,6 +243,27 @@ const HOOK_INJECTED_MIXINS: Record<string, { includes: string[] }> = {
   },
   "ActiveSupport::DescendantsTracker": {
     includes: ["ActiveSupport::DescendantsTracker::ReloadedClassesFiltering"],
+  },
+  "ActiveSupport::Testing::SetupAndTeardown": {
+    includes: [
+      "ActiveSupport::Callbacks",
+      "ActiveSupport::Testing::SetupAndTeardown::ClassMethods",
+    ],
+  },
+};
+
+/**
+ * Modules a host `prepend`s in its own body. The Ruby extractor records
+ * `include` / `extend` only, so a prepended module never lands in the host's
+ * `includes` and nothing walks it — or the mixins its `self.prepended` hook
+ * injects (`HOOK_INJECTED_MIXINS`).
+ *
+ *   - `ActiveSupport::TestCase` prepends `Testing::SetupAndTeardown`
+ *     (test_case.rb:145).
+ */
+const LEXICAL_PREPENDS: Record<string, { includes: string[] }> = {
+  "ActiveSupport::TestCase": {
+    includes: ["ActiveSupport::Testing::SetupAndTeardown"],
   },
 };
 
@@ -1810,6 +1835,9 @@ function collectAllowedNames(
     for (const ext of info.extends ?? []) walkMixin(ext, fqn, target, methodFile);
 
     for (const inc of AMBIENT_RAILTIE_MIXINS[fqn]?.includes ?? [])
+      walkMixin(inc, fqn, target, methodFile);
+
+    for (const inc of LEXICAL_PREPENDS[fqn]?.includes ?? [])
       walkMixin(inc, fqn, target, methodFile);
 
     for (const inc of OBJECT_AMBIENT_MIXINS) walkMixin(inc, fqn, target);
