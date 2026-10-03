@@ -1,6 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { NotImplementedError, kernelThrow, type Module } from "@blazetrails/ruby-compat";
-import { assertValidKeys } from "@blazetrails/activesupport";
+import { assertValidKeys, kernelArray } from "@blazetrails/activesupport";
 import { ConfigurationError, RecordNotDestroyed } from "../../errors.js";
 import { _Reflection } from "../../reflection-slot.js";
 
@@ -25,8 +25,8 @@ export interface AssociationProxyLike {
 }
 
 type ExtensionModule = {
-  validOptions?: () => string[];
-  build?: (model: any, reflection: any) => void;
+  validOptions: () => string[];
+  build: (model: any, reflection: any) => void;
 };
 
 export class Association {
@@ -80,10 +80,7 @@ export class Association {
       scope = null;
     }
 
-    if (
-      typeof model.isDangerousAttributeMethod === "function" &&
-      model.isDangerousAttributeMethod(name)
-    ) {
+    if (model.isDangerousAttributeMethod(name)) {
       throw new ArgumentError(
         `You tried to define an association named ${name} on the model ${model.name}, but ` +
           `this will conflict with a method ${name} already defined by Active Record. ` +
@@ -113,16 +110,7 @@ export class Association {
     this.validateOptions(options);
 
     const extension = this.defineExtensions(model, name, block);
-    if (extension) {
-      options.extend = [
-        ...(options.extend
-          ? Array.isArray(options.extend)
-            ? options.extend
-            : [options.extend]
-          : []),
-        extension,
-      ];
-    }
+    if (extension) options.extend = [...kernelArray(options.extend), extension];
 
     scope = this.buildScope(scope);
 
@@ -146,10 +134,7 @@ export class Association {
   }
 
   static validOptions(_options: Record<string, unknown>): string[] {
-    const extensionOpts = this.extensions.flatMap((ext) =>
-      typeof ext.validOptions === "function" ? ext.validOptions() : [],
-    );
-    return [...this.VALID_OPTIONS, ...extensionOpts];
+    return [...this.VALID_OPTIONS, ...Association.extensions.flatMap((ext) => ext.validOptions())];
   }
 
   static validateOptions(options: Record<string, unknown>): void {
@@ -161,17 +146,15 @@ export class Association {
   }
 
   static defineCallbacks(model: any, reflection: any): void {
-    const dependent = reflection.options?.dependent;
+    const dependent = reflection.options.dependent;
     if (dependent) {
       this.checkDependentOptions(dependent, model);
       this.addDestroyCallbacks(model, reflection);
       this.addAfterCommitJobsCallback(model, dependent);
     }
 
-    for (const extension of this.extensions) {
-      if (typeof extension.build === "function") {
-        extension.build(model, reflection);
-      }
+    for (const extension of Association.extensions) {
+      extension.build(model, reflection);
     }
   }
 

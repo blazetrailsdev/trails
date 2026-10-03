@@ -830,6 +830,53 @@ describe("body call capture", () => {
     expect(arms("listed")).toEqual(["if", "throw:ArgumentError"]);
   });
 
+  it("emits no arm for an optional positional rebound onto the keywords", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        build(name: string, scope: object | null, options: object = {}) {
+          if (typeof scope === "object" && scope !== null) {
+            options = scope;
+            scope = null;
+          }
+          return this.create(name, scope, options);
+        }
+        afterSideEffect(name: string, scope: object | null, options: object = {}) {
+          this.log(name);
+          if (typeof scope === "object") {
+            options = scope;
+          }
+        }
+        notABinding(name: string, scope: object | null, options: object = {}) {
+          if (typeof scope === "object") {
+            options = this.merge(scope);
+          }
+        }
+        otherTest(flag: boolean, scope: object | null, options: object = {}) {
+          if (flag) {
+            options = scope;
+          }
+        }
+        notFromAParameter(scope: object | null, options: object = {}) {
+          if (scope) {
+            options = defaults;
+          }
+        }
+        backwards(scope: object | null, options: object = {}) {
+          if (options) {
+            scope = options;
+          }
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("build")).toEqual(["ref:create"]);
+    expect(skeleton("afterSideEffect")).toEqual(["ref:log", "if"]);
+    expect(skeleton("notABinding")).toEqual(["if", "ref:merge"]);
+    expect(skeleton("otherTest")).toEqual(["if"]);
+    expect(skeleton("notFromAParameter")).toEqual(["if"]);
+    expect(skeleton("backwards")).toEqual(["if"]);
+  });
+
   it("still emits one arm per case clause that carries its own body", () => {
     const cls = extractFromSource(
       `class Foo {

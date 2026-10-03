@@ -496,10 +496,15 @@ const CONSTRUCT_SKELETON_NAMES = new Map([
  * folds `ref:throw` / `ref:catch` onto the constructs
  * ({@link CONSTRUCT_SKELETON_NAMES}); without this mirror the call reads as an
  * ordinary `ref:` reach and a faithful port scores a missing `throw`.
+ *
+ * `rbEnsure` (`ruby-compat/src/ensure.ts`) is the port of `begin … ensure`,
+ * whose `:bodystmt` the Ruby side emits as `try`: a hand-written `try` cannot
+ * defer the ensure clause to an async block's settlement.
  */
 const TS_CONSTRUCT_SKELETON_NAMES = new Map([
   ["kernelThrow", "throw"],
   ["kernelCatch", "try"],
+  ["rbEnsure", "try"],
 ]);
 
 const NIL_GUARD_TOKEN = "if:nil-guard";

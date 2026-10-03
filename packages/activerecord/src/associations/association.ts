@@ -3,12 +3,14 @@ import type { Relation } from "../relation.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
 import { AssociationScope, type AssociationScopeable } from "./association-scope.js";
 import { ActiveRecord, Associations } from "../namespaces.js";
-import { relationClassFor } from "../relation/delegation.js";
-import { camelize, kernelArray, safeConstantize, singularize } from "@blazetrails/activesupport";
+import type { AssociationReflection, ThroughReflection } from "../reflection.js";
+import { kernelArray, safeConstantize, tryCall } from "@blazetrails/activesupport";
 import {
   except,
   hasKey,
+  rbEnsure,
   rbEqual,
+  rbObjClassname,
   rbObjInstanceVariables,
   rbObjIvarGet,
   rbObjIvarSet,
@@ -126,67 +128,39 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
   }
 
   scope(): any {
+    let scope: any;
     if (this.disableJoins) {
       return Associations.DisableJoinsAssociationScope.create().scope(
         this as unknown as AssociationScopeable,
       );
+    } else if ((scope = this.klass.currentScope()) && tryCall(scope, "proxyAssociation") === this) {
+      return scope.spawn();
+    } else if ((scope = this.klass.globalCurrentScope())) {
+      return this.targetScope().mergeBang(this.associationScope()).mergeBang(scope);
+    } else {
+      return this.targetScope().mergeBang(this.associationScope());
     }
-    const klass = this.klass as typeof Base | undefined;
-    if (!klass) return undefined;
-    const currentScope = (klass as any).currentScope();
-    if (currentScope && currentScope.proxyAssociation === this) {
-      return typeof currentScope.spawn === "function" ? currentScope.spawn() : currentScope;
-    }
-    const associationScope = this.associationScope();
-    const scope = klass.globalCurrentScope();
-    const targetScope = this.targetScope();
-    const base =
-      targetScope != null && typeof targetScope.mergeBang === "function"
-        ? targetScope.mergeBang(associationScope)
-        : associationScope;
-    if (scope) {
-      return typeof base?.mergeBang === "function" ? base.mergeBang(scope) : base;
-    }
-    return base;
   }
 
   /** @internal */
   associationScope(): any {
-    const klass = this.klass as typeof Base | undefined;
-    if (!klass) return undefined;
-    if (this.isStaleTarget() && (this._staleState != null || this.target == null)) {
-      this.resetScope();
+    if (this.klass) {
+      return (this._cachedScope ||= this.disableJoins
+        ? Associations.DisableJoinsAssociationScope.scope(this as unknown as AssociationScopeable)
+        : AssociationScope.scope(this as unknown as AssociationScopeable));
     }
-    if (this._cachedScope === undefined) {
-      if (this.disableJoins) {
-        this._cachedScope = Associations.DisableJoinsAssociationScope.create().scope(
-          this as unknown as AssociationScopeable,
-        );
-      } else {
-        this._cachedScope = AssociationScope.scope(this as unknown as AssociationScopeable);
-      }
-    }
-    return this._cachedScope;
   }
 
   resetScope(): void {
     this._cachedScope = undefined;
   }
 
-  setStrictLoading(record: Base): Base {
-    const recordAny = record as any;
-    if (typeof recordAny.strictLoadingBang !== "function") return record;
-    const ownerAny = this.owner as any;
-    if (
-      typeof ownerAny.isStrictLoadingNPlusOneOnly === "function" &&
-      ownerAny.isStrictLoadingNPlusOneOnly() &&
-      (this.reflection.macro === "hasMany" || this.reflection.macro === "hasAndBelongsToMany")
-    ) {
-      recordAny.strictLoadingBang();
+  setStrictLoading(record: Base): boolean {
+    if (this.owner.isStrictLoadingNPlusOneOnly() && this.reflection.macro === "hasMany") {
+      return record.strictLoadingBang();
     } else {
-      recordAny.strictLoadingBang(false, { mode: ownerAny.strictLoadingMode?.() ?? undefined });
+      return record.strictLoadingBang(false, { mode: this.owner.strictLoadingMode() });
     }
-    return record;
   }
 
   setInverseInstance(record: Base): Base {
@@ -207,15 +181,8 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
 
   removeInverseInstance(record: Base): void {
     const inverse = this.inverseAssociationFor(record);
-    if (!inverse) return;
-
-    if (inverse.isCollection() && Array.isArray(inverse.target)) {
-      const idx = inverse.target.indexOf(this.owner);
-      if (idx !== -1) {
-        inverse.target.splice(idx, 1);
-      }
-    } else {
-      inverse.inversedFrom(null as any);
+    if (inverse) {
+      inverse.inversedFrom(null);
     }
   }
 
@@ -227,12 +194,6 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
     if (this.inversable(record)) {
       this.target = record;
     }
-  }
-
-  /** @internal */
-  private deriveClassName(): string {
-    const name = this.reflection.name;
-    return camelize(this.isCollection() ? singularize(name) : name);
   }
 
   get klass(): typeof Base {
@@ -284,7 +245,7 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
     const staleStateBeforeLoad = this.staleState();
     return this.findTarget(options).then((result) => {
       if (result !== undefined) {
-        if (result !== null) this.setStrictLoading(result as Base);
+        if (result !== null && !Array.isArray(result)) this.setStrictLoading(result);
         if (
           this.loaded &&
           (!this.isStaleTarget() || !rbEqual(this.staleState(), staleStateBeforeLoad))
@@ -351,11 +312,7 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
     attributes?: Record<string, unknown> | Record<string, unknown>[],
     block?: (record: Base) => void | Promise<void>,
   ): Promise<Base | Base[]> {
-    const record = await this._createRecord(attributes, true, block);
-    if (!record) {
-      throw new Error("Failed to create associated record");
-    }
-    return record;
+    return this._createRecord(attributes, true, block) as Promise<Base | Base[]>;
   }
 
   isCollection(): boolean {
@@ -397,53 +354,24 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
 
   /** @internal */
   buildRecord(attributes?: Record<string, unknown>, block?: (record: Base) => void): Base | null {
-    const Klass = this.klass;
-    if (!Klass) return null;
-    const reflection = (
-      this.owner.constructor as typeof Base & {
-        _reflectOnAssociation?: (n: string) => {
-          buildAssociation?: (
-            attributes: Record<string, unknown>,
-            block?: (record: Base) => void,
-          ) => Base;
-        } | null;
-      }
-    )._reflectOnAssociation?.(this.reflection.name);
-    const initializeAndYield = (record: Base): void => {
+    return this.reflection.buildAssociation(attributes, (record: Base) => {
       this.initializeAttributes(record, attributes);
       if (block) block(record);
-    };
-    if (reflection?.buildAssociation) {
-      return reflection.buildAssociation(attributes ?? {}, initializeAndYield);
-    }
-    return new (Klass as any)(attributes ?? {}, initializeAndYield);
+    });
   }
 
   private inverseAssociationFor(record: Base): Association | null {
     if (this.isInvertibleFor(record)) {
-      const inverseReflection = this.inverseReflectionFor(record) as
-        | { name?: string }
-        | string
-        | null;
-      const inverseName =
-        typeof inverseReflection === "string"
-          ? inverseReflection
-          : (inverseReflection?.name ?? null);
-      if (!inverseName) return null;
-      const recordAny = record as any;
-      if (typeof recordAny.association !== "function") return null;
-      try {
-        return recordAny.association(inverseName);
-      } catch {
-        return null;
-      }
+      return record.association(this.inverseReflectionFor(record)!.name);
     }
     return null;
   }
 
   private inversable(record: Base | null): boolean {
-    if (!record) return false;
-    return !record.isPersisted() || !this.owner.isPersisted() || this.matchesForeignKey(record);
+    return (
+      record != null &&
+      (!record.isPersisted() || !this.owner.isPersisted() || this.matchesForeignKey(record))
+    );
   }
 
   /** @internal */
@@ -469,23 +397,16 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
 
   /** @internal */
   protected skipStrictLoading<T>(block: () => T): T {
-    const prev = this._skipStrictLoading;
-    this._skipStrictLoading = true;
-    const restore = (): void => {
-      this._skipStrictLoading = prev;
-    };
-    let result: T;
-    try {
-      result = block();
-    } catch (error) {
-      restore();
-      throw error;
-    }
-    if (result instanceof Promise) {
-      return result.finally(restore) as T;
-    }
-    restore();
-    return result;
+    const skipStrictLoadingWas = this._skipStrictLoading;
+    return rbEnsure(
+      () => {
+        this._skipStrictLoading = true;
+        return block();
+      },
+      () => {
+        this._skipStrictLoading = skipStrictLoadingWas;
+      },
+    );
   }
 
   /** @internal */
@@ -501,21 +422,16 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
     return this.owner.isStrictLoading() && !this.owner.isStrictLoadingNPlusOneOnly();
   }
 
-  /**
-   * @internal
-   * @missingRailsCall create — CONVERGEABLE association-target-scope-calls-association-relation-create
-   */
+  /** @internal */
   protected targetScope(): any {
-    const klass = this.klass as typeof Base | undefined;
-    if (!klass) return null;
-    const scopeForAssociation = (klass as any).scopeForAssociation?.() ?? null;
-    const ar = new (relationClassFor.call(ActiveRecord.AssociationRelation, klass))(klass, this);
-    return scopeForAssociation ? ar.mergeBang(scopeForAssociation) : ar;
+    return ActiveRecord.AssociationRelation.create(this.klass, this).mergeBang(
+      this.klass.scopeForAssociation(),
+    );
   }
 
   /** @internal */
   scopeForCreate(): Record<string, unknown> {
-    return this.scope()?.scopeForCreate?.() ?? {};
+    return this.scope().scopeForCreate();
   }
 
   /** @internal */
@@ -526,30 +442,19 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
   }
 
   protected raiseOnTypeMismatchBang(record: Base): void {
-    const klass = this.klass;
-    if (klass && !(record instanceof (klass as any))) {
-      const ctor = this.owner.constructor as typeof Base & {
-        _reflectOnAssociation?: (n: string) => { className?: string } | null;
-      };
-      const expectedType =
-        ctor._reflectOnAssociation?.(this.reflection.name)?.className ??
-        this.reflection.options.className ??
-        this.deriveClassName();
-      const freshClass = safeConstantize(expectedType) as typeof Base | undefined;
-      if (freshClass && record instanceof (freshClass as any)) return;
-      const actualType =
-        record == null
-          ? String(record)
-          : ((record.constructor as { name?: string }).name ?? "Object");
-      throw new AssociationTypeMismatch(
-        expectedType,
-        `${inspectMismatchedRecord(record)} which is an instance of ${actualType}`,
-      );
+    if (!(record instanceof this.reflection.klass)) {
+      const freshClass = safeConstantize(this.reflection.className) as typeof Base | null;
+      if (!(freshClass && (record as object) instanceof freshClass)) {
+        throw new AssociationTypeMismatch(
+          this.reflection.className,
+          `${inspectMismatchedRecord(record)} which is an instance of ${rbObjClassname(record)}`,
+        );
+      }
     }
   }
 
-  protected inverseReflectionFor(_record: Base): unknown {
-    return (this.reflection as { inverseOf?: () => unknown }).inverseOf?.() ?? null;
+  protected inverseReflectionFor(_record: Base): AssociationReflection | ThroughReflection | null {
+    return this.reflection.inverseOf();
   }
 
   /** @internal */

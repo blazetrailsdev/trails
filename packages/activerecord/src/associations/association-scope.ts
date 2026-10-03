@@ -1,5 +1,4 @@
 import { Table as ArelTable, Nodes } from "@blazetrails/arel";
-import { TableMetadata } from "../table-metadata.js";
 import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
 import type {
@@ -10,8 +9,8 @@ import type {
 } from "../reflection.js";
 import { RuntimeReflection } from "../reflection.js";
 import { AliasTracker } from "./alias-tracker.js";
-import { kernelArray } from "@blazetrails/activesupport";
-import { drop, isEmpty, union } from "@blazetrails/ruby-compat";
+import { eachCons, kernelArray } from "@blazetrails/activesupport";
+import { drop, first, isEmpty, last, rbEqual, union } from "@blazetrails/ruby-compat";
 import { methodMissingProxy } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 
@@ -60,24 +59,20 @@ export class AssociationScope {
     return AssociationScope.INSTANCE.scope(association);
   }
 
-  static getBindValues(owner: Base, chain: ReadonlyArray<AbstractReflection>): unknown[] {
+  static getBindValues(owner: Base, chain: ReadonlyArray<AssociationReflection>): unknown[] {
     const binds: unknown[] = [];
-    const last = chain[chain.length - 1];
-    if (!last) return binds;
-    const joinFk = (last as { joinForeignKey?: string | string[] }).joinForeignKey;
-    const fks = Array.isArray(joinFk) ? joinFk : joinFk ? [joinFk] : [];
-    for (const fk of fks) binds.push(owner._readAttribute(fk));
-    if ((last as { type?: string | null }).type) {
+    const lastReflection = last(chain)!;
+
+    binds.push(...lastReflection.joinIdFor(owner));
+    if (lastReflection.type) {
       binds.push((owner.constructor as typeof Base).polymorphicName());
     }
-    for (let i = 0; i < chain.length - 1; i++) {
-      const refl = chain[i];
-      const next = chain[i + 1];
-      if ((refl as { type?: string | null }).type) {
-        const nextKlass = (next as { klass?: typeof Base }).klass;
-        binds.push(nextKlass ? nextKlass.polymorphicName() : null);
+
+    eachCons(chain as AssociationReflection[], 2).forEach(([reflection, nextReflection]) => {
+      if (reflection.type) {
+        binds.push(nextReflection.klass.polymorphicName());
       }
-    }
+    });
     return binds;
   }
 
@@ -107,16 +102,11 @@ export class AssociationScope {
     key: string,
     value: unknown,
   ): Relation<Base> {
-    if (scope.table && !arelTableEql(scope.table, table)) {
-      const meta = new TableMetadata(null, table as unknown as ArelTable);
-      const nodes = meta.predicateBuilder.buildFromHash({ [key]: value });
-      let result = scope;
-      for (const node of nodes) {
-        result = result.where(node);
-      }
-      return result;
+    if (rbEqual(scope.table, table)) {
+      return scope.whereBang({ [key]: value });
+    } else {
+      return scope.whereBang({ [table.name as string]: { [key]: value } });
     }
-    return scope.where({ [key]: value });
   }
 
   private lastChainScope(
@@ -173,10 +163,11 @@ export class AssociationScope {
 
     const primaryKeyForeignKeyPairs = primaryKey.map((key, i) => [key, foreignKey[i]] as const);
     const constraints = primaryKeyForeignKeyPairs
-      .map(([joinPrimaryKey, foreignKey]) =>
-        table.get(joinPrimaryKey).eq(foreignTable.get(foreignKey)),
+      .map(
+        ([joinPrimaryKey, foreignKey]): Nodes.Node =>
+          table.get(joinPrimaryKey).eq(foreignTable.get(foreignKey)),
       )
-      .reduce<Nodes.Node | null>((memo, node) => (memo === null ? node : memo.and(node)), null);
+      .reduce((memo, node) => memo.and(node));
 
     if (reflection.type) {
       const value = this.transformValue(nextReflection.klass.polymorphicName());
@@ -191,15 +182,14 @@ export class AssociationScope {
     owner: Base,
     chain: Array<ChainReflection>,
   ): Relation<Base> {
-    const last = chain[chain.length - 1];
-    scope = this.lastChainScope(scope, last, owner);
-    for (let i = 0; i < chain.length - 1; i++) {
-      scope = this.nextChainScope(scope, chain[i], chain[i + 1]);
-    }
+    scope = this.lastChainScope(scope, last(chain)!, owner);
 
-    const chainHead = chain[0];
-    for (let i = chain.length - 1; i >= 0; i--) {
-      const reflection = chain[i];
+    eachCons(chain, 2, ([reflection, nextReflection]) => {
+      scope = this.nextChainScope(scope, reflection, nextReflection);
+    });
+
+    const chainHead = first(chain)!;
+    for (const reflection of chain.slice().reverse()) {
       for (const scopeChainItem of reflection.constraints()) {
         const item = this.evalScope(reflection, scopeChainItem, owner);
 
@@ -244,14 +234,6 @@ export class AssociationScope {
   private join(table: unknown, constraint: unknown): Nodes.Join {
     return new Nodes.LeadingJoin(table as never, new Nodes.On(constraint as never));
   }
-}
-
-function arelTableEql(a: ArelTable | Nodes.TableAlias, b: ArelTable | Nodes.TableAlias): boolean {
-  if (a instanceof ArelTable && b instanceof ArelTable) return a.eql(b);
-  if (a instanceof Nodes.TableAlias && b instanceof Nodes.TableAlias) {
-    return a.name === b.name && a.tableName === b.tableName;
-  }
-  return false;
 }
 
 Associations.AssociationScope = AssociationScope;

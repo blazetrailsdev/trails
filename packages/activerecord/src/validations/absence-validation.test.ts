@@ -8,6 +8,7 @@ import { Interest } from "../test-helpers/models/interest.js";
 import { Face } from "../test-helpers/models/face.js";
 
 registerModel(Interest);
+registerModel(Human);
 fixtures({});
 
 describe("AbsenceValidationTest", () => {
