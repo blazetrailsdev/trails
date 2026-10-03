@@ -1,4 +1,5 @@
 import { block, include, kernelThrow, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import type { Extended, Included } from "@blazetrails/ruby-compat/include";
 import { classAttribute } from "./class-attribute.js";
 import { describe, it, expect } from "vitest";
 import {
@@ -6,17 +7,28 @@ import {
   CallbackChain,
   Callback,
   Callbacks,
-  defineCallbacks,
-  setCallback,
-  skipCallback,
-  runCallbacks,
-  resetCallbacks,
-  CallbacksMixin,
   CallTemplate,
   ProcCall,
   MethodCall,
   ObjectCall,
 } from "./callbacks.js";
+
+type ClassMethods = Extended<typeof Callbacks.ClassMethods>;
+type RunCallbacks = Included<typeof Callbacks>["runCallbacks"];
+
+class Model {
+  declare static defineCallbacks: ClassMethods["defineCallbacks"];
+  declare static setCallback: ClassMethods["setCallback"];
+  declare static skipCallback: ClassMethods["skipCallback"];
+  declare static resetCallbacks: ClassMethods["resetCallbacks"];
+  declare runCallbacks: RunCallbacks;
+
+  static {
+    include(this, Callbacks);
+  }
+
+  log: string[] = [];
+}
 
 describe("CallbackChain compile memoization (trails)", () => {
   const makeCallback = (name: string) => new Callback(name, () => {}, "before", {}, {});
@@ -81,11 +93,12 @@ describe("CallbackChain compile memoization (trails)", () => {
 describe("include ActiveSupport::Callbacks (trails)", () => {
   it("mixes in run_callbacks and extends ClassMethods, which stays off the instance", () => {
     class Record {
-      declare static setCallback: (name: string, ...filterList: unknown[]) => void;
-      declare runCallbacks: (typeof Callbacks)["runCallbacks"];
+      declare static defineCallbacks: ClassMethods["defineCallbacks"];
+      declare static setCallback: ClassMethods["setCallback"];
+      declare runCallbacks: RunCallbacks;
     }
     include(Record, Callbacks);
-    defineCallbacks(Record.prototype, "save");
+    Record.defineCallbacks("save");
     const log: string[] = [];
     Record.setCallback("save", "before", () => log.push("before"));
 
@@ -99,10 +112,11 @@ describe("include ActiveSupport::Callbacks (trails)", () => {
 
   it("does not reset the inherited __callbacks when a subclass of an includer includes it again", () => {
     class Parent {
+      declare static defineCallbacks: ClassMethods["defineCallbacks"];
       declare static __callbacks: object;
     }
     include(Parent, Callbacks);
-    defineCallbacks(Parent.prototype, "save");
+    Parent.defineCallbacks("save");
     const inherited = Parent.__callbacks;
     class Child extends Parent {}
 
@@ -116,12 +130,9 @@ describe("include ActiveSupport::Callbacks (trails)", () => {
 
 describe("defineCallbacks generates _run<Name>Callbacks (trails)", () => {
   it("runs the named chain around the block", () => {
-    class Record {
-      log: string[] = [];
-    }
-    include(Record, Callbacks);
-    defineCallbacks(Record.prototype, "save");
-    setCallback(Record.prototype, "save", "before", (r: Record) => {
+    class Record extends Model {}
+    Record.defineCallbacks("save");
+    Record.setCallback("save", "before", (r: Record) => {
       r.log.push("before");
     });
     const record = new Record() as Record & {
@@ -144,36 +155,37 @@ describe("defineCallbacks generates _run<Name>Callbacks (trails)", () => {
 
 describe("setCallback type-omitted form (trails)", () => {
   it("defaults the callback type to before", () => {
-    const target = {};
-    defineCallbacks(target, "save");
+    class Target extends Model {}
+    const target = new Target();
+    Target.defineCallbacks("save");
     const ran: string[] = [];
-    setCallback(target, "save", () => ran.push("filter"));
-    runCallbacks(target, "save", () => ran.push("block"));
+    Target.setCallback("save", () => ran.push("filter"));
+    target.runCallbacks("save", () => ran.push("block"));
     expect(ran).toEqual(["filter", "block"]);
   });
 
   it("skipCallback defaults the callback type to before", () => {
-    const target = {};
-    defineCallbacks(target, "save");
+    class Target extends Model {}
+    const target = new Target();
+    Target.defineCallbacks("save");
     const ran: string[] = [];
     const filter = () => ran.push("filter");
-    setCallback(target, "save", filter);
-    skipCallback(target, "save", filter);
-    runCallbacks(target, "save", () => ran.push("block"));
+    Target.setCallback("save", filter);
+    Target.skipCallback("save", filter);
+    target.runCallbacks("save", () => ran.push("block"));
     expect(ran).toEqual(["block"]);
   });
 });
 
 describe("runCallbacks type argument (trails)", () => {
-  class Target {}
-
-  const build = (ran: string[]): Target => {
+  const build = (ran: string[]): Model => {
+    class Target extends Model {}
     const target = new Target();
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", () => {
+    Target.defineCallbacks("save");
+    Target.setCallback("save", "before", () => {
       ran.push("before");
     });
-    setCallback(target, "save", "after", () => {
+    Target.setCallback("save", "after", () => {
       ran.push("after");
     });
     return target;
@@ -182,22 +194,22 @@ describe("runCallbacks type argument (trails)", () => {
   it("runs only the callbacks of the given type", () => {
     const ran: string[] = [];
     const target = build(ran);
-    runCallbacks(target, "save", () => ran.push("block"), undefined, "before");
+    target.runCallbacks("save", () => ran.push("block"), undefined, "before");
     expect(ran).toEqual(["before", "block"]);
   });
 
   it("runs the whole chain when no type is given", () => {
     const ran: string[] = [];
     const target = build(ran);
-    runCallbacks(target, "save", () => ran.push("block"));
+    target.runCallbacks("save", () => ran.push("block"));
     expect(ran).toEqual(["before", "block", "after"]);
   });
 
   it("memoizes each type separately from the unfiltered sequence", () => {
     const ran: string[] = [];
     const target = build(ran);
-    runCallbacks(target, "save", () => ran.push("block"), undefined, "after");
-    runCallbacks(target, "save", () => ran.push("block"), undefined, "after");
+    target.runCallbacks("save", () => ran.push("block"), undefined, "after");
+    target.runCallbacks("save", () => ran.push("block"), undefined, "after");
     expect(ran).toEqual(["block", "after", "block", "after"]);
   });
 });
@@ -230,28 +242,30 @@ describe("ProcCall", () => {
 
 describe("MethodCall", () => {
   it("raises NoMethodError when the target does not answer the method", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", ":iDontExist");
+    class Target extends Model {}
+    const target = new Target();
+    Target.defineCallbacks("save");
+    Target.setCallback("save", "before", ":iDontExist");
 
-    expect(() => runCallbacks(target, "save")).toThrow(
-      /undefined method 'iDontExist' for an instance of Object/,
+    expect(() => target.runCallbacks("save")).toThrow(
+      /undefined method 'iDontExist' for an instance of Target/,
     );
   });
 });
 
 describe("normalizeCallbackParams (trails)", () => {
   it("takes a trailing hash carrying a class as options, the way extract_options! does", () => {
-    const log: string[] = [];
-    const target = { log };
-    defineCallbacks(target, "save");
+    class Target extends Model {}
+    const target = new Target();
+    const log = target.log;
+    Target.defineCallbacks("save");
     class MyValidator {}
 
-    setCallback(target, "save", "before", () => log.push("ran"), {
+    Target.setCallback("save", "before", () => log.push("ran"), {
       class: MyValidator,
       if: () => true,
     } as never);
-    runCallbacks(target, "save");
+    target.runCallbacks("save");
 
     expect(log).toEqual(["ran"]);
   });
@@ -262,17 +276,18 @@ describe("MethodCall / ObjectCall forward the block (trails)", () => {
 
   it("hands a Symbol-named around callback its continuation", () => {
     const log: string[] = [];
-    const target = {
+    class Target extends Model {
       wrapIt(proceed: () => void) {
         log.push("around-before");
         proceed();
         log.push("around-after");
-      },
-    };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "around", ":wrapIt");
+      }
+    }
+    const target = new Target();
+    Target.defineCallbacks("save");
+    Target.setCallback("save", "around", ":wrapIt");
 
-    runCallbacks(target, "save", () => log.push("block"));
+    target.runCallbacks("save", () => log.push("block"));
 
     expect(log).toEqual(["around-before", "block", "around-after"]);
   });
@@ -307,16 +322,17 @@ describe("MethodCall / ObjectCall forward the block (trails)", () => {
 describe("Callbacks", () => {
   describe("defineCallbacks / setCallback / runCallbacks", () => {
     it("runs before callbacks in order", () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "before", (t: any) => {
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "before", (t: any) => {
         t.log.push("before1");
       });
-      setCallback(target, "save", "before", (t: any) => {
+      Target.setCallback("save", "before", (t: any) => {
         t.log.push("before2");
       });
 
-      runCallbacks(target, "save", () => {
+      target.runCallbacks("save", () => {
         target.log.push("block");
       });
 
@@ -324,16 +340,17 @@ describe("Callbacks", () => {
     });
 
     it("runs after callbacks in reverse order", () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "after", (t: any) => {
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "after", (t: any) => {
         t.log.push("after1");
       });
-      setCallback(target, "save", "after", (t: any) => {
+      Target.setCallback("save", "after", (t: any) => {
         t.log.push("after2");
       });
 
-      runCallbacks(target, "save", () => {
+      target.runCallbacks("save", () => {
         target.log.push("block");
       });
 
@@ -341,15 +358,16 @@ describe("Callbacks", () => {
     });
 
     it("runs around callbacks wrapping the block", () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "around", (t: any, next: () => void) => {
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "around", (t: any, next: () => void) => {
         t.log.push("around-before");
         next();
         t.log.push("around-after");
       });
 
-      runCallbacks(target, "save", () => {
+      target.runCallbacks("save", () => {
         target.log.push("block");
       });
 
@@ -357,28 +375,29 @@ describe("Callbacks", () => {
     });
 
     it("binds this to the record inside proc/block callbacks (Rails instance_exec)", () => {
-      const target = {
-        seen: [] as unknown[],
-        beforeThis: null as unknown,
-        afterThis: null as unknown,
-        aroundThis: null as unknown,
-        aroundArg: null as unknown,
-      };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "before", function (this: any, record: any) {
+      class Target extends Model {
+        seen: unknown[] = [];
+        beforeThis: unknown = null;
+        afterThis: unknown = null;
+        aroundThis: unknown = null;
+        aroundArg: unknown = null;
+      }
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "before", function (this: any, record: any) {
         target.beforeThis = this;
         target.seen.push(record);
       });
-      setCallback(target, "save", "after", function (this: any) {
+      Target.setCallback("save", "after", function (this: any) {
         target.afterThis = this;
       });
-      setCallback(target, "save", "around", function (this: any, record: any, next: () => void) {
+      Target.setCallback("save", "around", function (this: any, record: any, next: () => void) {
         target.aroundThis = this;
         target.aroundArg = record;
         next();
       });
 
-      runCallbacks(target, "save", () => {});
+      target.runCallbacks("save", () => {});
 
       expect(target.beforeThis).toBe(target);
       expect(target.afterThis).toBe(target);
@@ -412,32 +431,34 @@ describe("Callbacks", () => {
     });
 
     it("runs before, around, and after in correct order", () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "before", (t: any) => t.log.push("before"));
-      setCallback(target, "save", "after", (t: any) => t.log.push("after"));
-      setCallback(target, "save", "around", (t: any, next: () => void) => {
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "before", (t: any) => t.log.push("before"));
+      Target.setCallback("save", "after", (t: any) => t.log.push("after"));
+      Target.setCallback("save", "around", (t: any, next: () => void) => {
         t.log.push("around-pre");
         next();
         t.log.push("around-post");
       });
 
-      runCallbacks(target, "save", () => target.log.push("block"));
+      target.runCallbacks("save", () => target.log.push("block"));
 
       expect(target.log).toEqual(["before", "around-pre", "block", "around-post", "after"]);
     });
 
     it("after registered after an around runs inside it", () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "around", (t: any, next: () => void) => {
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "around", (t: any, next: () => void) => {
         t.log.push("around-pre");
         next();
         t.log.push("around-post");
       });
-      setCallback(target, "save", "after", (t: any) => t.log.push("after"));
+      Target.setCallback("save", "after", (t: any) => t.log.push("after"));
 
-      runCallbacks(target, "save", () => target.log.push("block"));
+      target.runCallbacks("save", () => target.log.push("block"));
 
       expect(target.log).toEqual(["around-pre", "block", "after", "around-post"]);
     });
@@ -445,17 +466,18 @@ describe("Callbacks", () => {
 
   describe("halting", () => {
     it("halts when a before callback throws the abort sentinel", () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "before", (t: any) => {
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "before", (t: any) => {
         t.log.push("before1");
         kernelThrow(":abort");
       });
-      setCallback(target, "save", "before", (t: any) => {
+      Target.setCallback("save", "before", (t: any) => {
         t.log.push("should-not-run");
       });
 
-      const result = runCallbacks(target, "save", () => {
+      const result = target.runCallbacks("save", () => {
         target.log.push("block");
       });
 
@@ -464,17 +486,18 @@ describe("Callbacks", () => {
     });
 
     it("propagates non-sentinel errors thrown by a before callback", () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "before", () => {
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "before", () => {
         throw new Error("boom");
       });
-      setCallback(target, "save", "before", (t: any) => {
+      Target.setCallback("save", "before", (t: any) => {
         t.log.push("should-not-run");
       });
 
       expect(() =>
-        runCallbacks(target, "save", () => {
+        target.runCallbacks("save", () => {
           target.log.push("block");
         }),
       ).toThrow("boom");
@@ -482,17 +505,18 @@ describe("Callbacks", () => {
     });
 
     it("halts when an async before callback rejects with the abort sentinel", async () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "before", async (t: any) => {
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "before", async (t: any) => {
         t.log.push("before1");
         kernelThrow(":abort");
       });
-      setCallback(target, "save", "before", (t: any) => {
+      Target.setCallback("save", "before", (t: any) => {
         t.log.push("should-not-run");
       });
 
-      const result = await runCallbacks(target, "save", () => {
+      const result = await target.runCallbacks("save", () => {
         target.log.push("block");
       });
 
@@ -501,14 +525,15 @@ describe("Callbacks", () => {
     });
 
     it("propagates a non-sentinel rejection from an async before callback", async () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "before", async () => {
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "before", async () => {
         throw new Error("async-boom");
       });
 
       await expect(
-        runCallbacks(target, "save", () => {
+        target.runCallbacks("save", () => {
           target.log.push("block");
         }),
       ).rejects.toThrow("async-boom");
@@ -516,29 +541,32 @@ describe("Callbacks", () => {
     });
 
     it("does not swallow the abort sentinel when terminator is disabled", () => {
-      const target = {};
-      defineCallbacks(target, "save", { terminator: false });
-      setCallback(target, "save", "before", () => kernelThrow(":abort"));
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save", { terminator: false });
+      Target.setCallback("save", "before", () => kernelThrow(":abort"));
 
-      expect(() => runCallbacks(target, "save", () => {})).toThrow();
+      expect(() => target.runCallbacks("save", () => {})).toThrow();
     });
 
     it("does not swallow the abort sentinel for a custom terminator", () => {
-      const target = {};
-      defineCallbacks(target, "save", {
-        terminator: (_t, fn) => fn() === false,
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save", {
+        terminator: (_t: object, fn: () => unknown) => fn() === false,
       });
-      setCallback(target, "save", "before", () => kernelThrow(":abort"));
+      Target.setCallback("save", "before", () => kernelThrow(":abort"));
 
-      expect(() => runCallbacks(target, "save", () => {})).toThrow();
+      expect(() => target.runCallbacks("save", () => {})).toThrow();
     });
 
     it("does not halt when terminator is disabled", () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save", { terminator: false });
-      setCallback(target, "save", "before", () => false);
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save", { terminator: false });
+      Target.setCallback("save", "before", () => false);
 
-      const result = runCallbacks(target, "save", () => {
+      const result = target.runCallbacks("save", () => {
         target.log.push("block");
         return true;
       });
@@ -548,13 +576,14 @@ describe("Callbacks", () => {
     });
 
     it("around callback can halt by not calling next", () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "around", (t: any) => {
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "around", (t: any) => {
         t.log.push("halted");
       });
 
-      runCallbacks(target, "save", () => {
+      target.runCallbacks("save", () => {
         target.log.push("block");
       });
 
@@ -562,15 +591,16 @@ describe("Callbacks", () => {
     });
 
     it("after callbacks are skipped when around does not yield", () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "around", (t: any) => {
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "around", (t: any) => {
         t.log.push("around");
       });
-      setCallback(target, "save", "after", (t: any) => {
+      Target.setCallback("save", "after", (t: any) => {
         t.log.push("after");
       });
-      const result = runCallbacks(target, "save", () => {
+      const result = target.runCallbacks("save", () => {
         target.log.push("block");
       });
       expect(result).toBeUndefined();
@@ -578,56 +608,60 @@ describe("Callbacks", () => {
     });
 
     it("fire-and-forget around does not swallow inner rejection", async () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "around", (_t: any, next: any) => {
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "around", (_t: any, next: any) => {
         next();
       });
       await expect(
-        runCallbacks(target, "save", async () => {
+        target.runCallbacks("save", async () => {
           throw new Error("boom");
         }),
       ).rejects.toThrow("boom");
     });
 
     it("fire-and-forget next().finally(...) does not swallow inner rejection", async () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "around", (_t: any, next: any) => {
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "around", (_t: any, next: any) => {
         next().finally(() => {});
       });
       await expect(
-        runCallbacks(target, "save", async () => {
+        target.runCallbacks("save", async () => {
           throw new Error("boom");
         }),
       ).rejects.toThrow("boom");
     });
 
     it("fire-and-forget next().catch() with no handler does not swallow rejection", async () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "around", (_t: any, next: any) => {
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "around", (_t: any, next: any) => {
         next().catch();
       });
       await expect(
-        runCallbacks(target, "save", async () => {
+        target.runCallbacks("save", async () => {
           throw new Error("boom");
         }),
       ).rejects.toThrow("boom");
     });
 
     it("awaited around can rescue inner rejection", async () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
       let caught: Error | null = null;
-      setCallback(target, "save", "around", async (_t: any, next: any) => {
+      Target.setCallback("save", "around", async (_t: any, next: any) => {
         try {
           await next();
         } catch (e) {
           caught = e as Error;
         }
       });
-      await runCallbacks(target, "save", async () => {
+      await target.runCallbacks("save", async () => {
         throw new Error("boom");
       });
       expect(caught!.message).toBe("boom");
@@ -636,337 +670,232 @@ describe("Callbacks", () => {
 
   describe("conditional callbacks", () => {
     it("respects :if condition", () => {
-      const target = { log: [] as string[], shouldRun: false };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "before", (t: any) => t.log.push("conditional"), {
-        if: (t) => t.shouldRun,
+      class Target extends Model {
+        shouldRun = false;
+      }
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "before", (t: any) => t.log.push("conditional"), {
+        if: (t: Target) => t.shouldRun,
       });
 
-      runCallbacks(target, "save");
+      target.runCallbacks("save");
       expect(target.log).toEqual([]);
 
       target.shouldRun = true;
-      runCallbacks(target, "save");
+      target.runCallbacks("save");
       expect(target.log).toEqual(["conditional"]);
     });
 
     it("respects :unless condition", () => {
-      const target = { log: [] as string[], skip: true };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "before", (t: any) => t.log.push("run"), {
-        unless: (t) => t.skip,
+      class Target extends Model {
+        skip = true;
+      }
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "before", (t: any) => t.log.push("run"), {
+        unless: (t: Target) => t.skip,
       });
 
-      runCallbacks(target, "save");
+      target.runCallbacks("save");
       expect(target.log).toEqual([]);
 
       target.skip = false;
-      runCallbacks(target, "save");
+      target.runCallbacks("save");
       expect(target.log).toEqual(["run"]);
     });
 
     it("supports array of :if conditions", () => {
-      const target = { log: [] as string[], a: true, b: false };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "before", (t: any) => t.log.push("run"), {
-        if: [(t) => t.a, (t) => t.b],
+      class Target extends Model {
+        a = true;
+        b = false;
+      }
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "before", (t: any) => t.log.push("run"), {
+        if: [(t: Target) => t.a, (t: Target) => t.b],
       });
 
-      runCallbacks(target, "save");
+      target.runCallbacks("save");
       expect(target.log).toEqual([]);
 
       target.b = true;
-      runCallbacks(target, "save");
+      target.runCallbacks("save");
       expect(target.log).toEqual(["run"]);
     });
 
     it("forwards the block's return value (env.value) to after-callback conditions", () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "after", (t: any) => t.log.push("after"), {
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "after", (t: any) => t.log.push("after"), {
         unless: new Value((value) => value === false),
       });
 
-      runCallbacks(target, "save", () => false);
+      target.runCallbacks("save", () => false);
       expect(target.log).toEqual([]);
 
-      runCallbacks(target, "save", () => "ok");
+      target.runCallbacks("save", () => "ok");
       expect(target.log).toEqual(["after"]);
     });
   });
 
   describe("prepend", () => {
     it("prepends callback to front of chain", () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "before", (t: any) => t.log.push("first"));
-      setCallback(target, "save", "before", (t: any) => t.log.push("prepended"), {
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "before", (t: any) => t.log.push("first"));
+      Target.setCallback("save", "before", (t: any) => t.log.push("prepended"), {
         prepend: true,
       });
 
-      runCallbacks(target, "save");
+      target.runCallbacks("save");
       expect(target.log).toEqual(["prepended", "first"]);
     });
   });
 
   describe("skipCallback", () => {
     it("removes a specific callback", () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
       const cb = (t: any) => t.log.push("skipped");
-      setCallback(target, "save", "before", cb);
-      setCallback(target, "save", "before", (t: any) => t.log.push("kept"));
+      Target.setCallback("save", "before", cb);
+      Target.setCallback("save", "before", (t: any) => t.log.push("kept"));
 
-      skipCallback(target, "save", "before", cb);
-      runCallbacks(target, "save");
+      Target.skipCallback("save", "before", cb);
+      target.runCallbacks("save");
       expect(target.log).toEqual(["kept"]);
     });
   });
 
   describe("resetCallbacks", () => {
     it("removes all callbacks from a chain", () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "before", (t: any) => t.log.push("a"));
-      setCallback(target, "save", "after", (t: any) => t.log.push("b"));
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "before", (t: any) => t.log.push("a"));
+      Target.setCallback("save", "after", (t: any) => t.log.push("b"));
 
-      resetCallbacks(target, "save");
-      runCallbacks(target, "save", () => target.log.push("block"));
+      Target.resetCallbacks("save");
+      target.runCallbacks("save", () => target.log.push("block"));
       expect(target.log).toEqual(["block"]);
     });
   });
 
   describe("error handling", () => {
     it("runs block when no chain is defined", () => {
-      const target = {};
+      class Target extends Model {}
+      const target = new Target();
       const log: string[] = [];
-      runCallbacks(target, "nonexistent", () => log.push("ran"));
+      target.runCallbacks("nonexistent", () => log.push("ran"));
       expect(log).toEqual(["ran"]);
     });
   });
 
   describe("no block", () => {
     it("works without a block", () => {
-      const target = { log: [] as string[] };
-      defineCallbacks(target, "save");
-      setCallback(target, "save", "before", (t: any) => t.log.push("before"));
-      setCallback(target, "save", "after", (t: any) => t.log.push("after"));
+      class Target extends Model {}
+      const target = new Target();
+      Target.defineCallbacks("save");
+      Target.setCallback("save", "before", (t: any) => t.log.push("before"));
+      Target.setCallback("save", "after", (t: any) => t.log.push("after"));
 
-      runCallbacks(target, "save");
+      target.runCallbacks("save");
       expect(target.log).toEqual(["before", "after"]);
     });
   });
 });
 
-describe("CallbacksMixin", () => {
-  it("provides defineCallbacks and runCallbacks as class/instance methods", () => {
-    class MyModel extends CallbacksMixin() {
-      log: string[] = [];
-
-      static {
-        this.defineCallbacks("save");
-        this.beforeCallback("save", (self: MyModel) => {
-          self.log.push("before");
-        });
-        this.afterCallback("save", (self: MyModel) => {
-          self.log.push("after");
-        });
-      }
-
-      save() {
-        this.runCallbacks("save", () => {
-          this.log.push("saved");
-        });
-      }
-    }
-
-    const m = new MyModel();
-    m.save();
-    expect(m.log).toEqual(["before", "saved", "after"]);
-  });
-
-  it("aroundCallback wraps block", () => {
-    class MyModel extends CallbacksMixin() {
-      log: string[] = [];
-
-      static {
-        this.defineCallbacks("run");
-        this.aroundCallback("run", (self: MyModel, next: () => void) => {
-          self.log.push("before_around");
-          next();
-          self.log.push("after_around");
-        });
-      }
-
-      run() {
-        this.runCallbacks("run", () => {
-          this.log.push("core");
-        });
-      }
-    }
-
-    const m = new MyModel();
-    m.run();
-    expect(m.log).toEqual(["before_around", "core", "after_around"]);
-  });
-
-  it("skipCallback removes a callback", () => {
-    const cb = (self: any) => {
-      self.log.push("skipped");
-    };
-
-    class MyModel extends CallbacksMixin() {
-      log: string[] = [];
-
-      static {
-        this.defineCallbacks("save");
-        this.beforeCallback("save", cb);
-      }
-
-      save() {
-        this.runCallbacks("save");
-      }
-    }
-
-    MyModel.skipCallback("save", "before", cb);
-    const m = new MyModel();
-    m.save();
-    expect(m.log).toEqual([]);
-  });
-
-  it("can extend an existing base class", () => {
-    class Base {
-      type = "base";
-    }
-
-    class Extended extends CallbacksMixin(Base) {
-      log: string[] = [];
-
-      static {
-        this.defineCallbacks("action");
-        this.beforeCallback("action", (self: Extended) => self.log.push("before"));
-      }
-
-      doAction() {
-        this.runCallbacks("action");
-      }
-    }
-
-    const e = new Extended();
-    expect(e.type).toBe("base");
-    e.doAction();
-    expect(e.log).toEqual(["before"]);
-  });
-
-  it("conditional callbacks work with if option", () => {
-    class MyModel extends CallbacksMixin() {
-      log: string[] = [];
-      active = true;
-
-      static {
-        this.defineCallbacks("save");
-        this.beforeCallback("save", (self: MyModel) => self.log.push("conditional"), {
-          if: (self: any) => self.active,
-        });
-      }
-
-      save() {
-        this.runCallbacks("save");
-      }
-    }
-
-    const m = new MyModel();
-    m.save();
-    expect(m.log).toContain("conditional");
-
-    m.log = [];
-    m.active = false;
-    m.save();
-    expect(m.log).not.toContain("conditional");
-  });
-});
-
 describe("custom terminator function", () => {
   it("custom terminator halts when it returns true", () => {
-    const log: string[] = [];
-    const target = { log };
-    defineCallbacks(target, "save", {
-      terminator: (_t, fn) => {
+    class Target extends Model {}
+    const target = new Target();
+    const log = target.log;
+    Target.defineCallbacks("save", {
+      terminator: (_t: object, fn: () => unknown) => {
         const result = fn();
         return result === "halt";
       },
     });
-    setCallback(target, "save", "before", () => "halt");
-    setCallback(target, "save", "before", (t: any) => t.log.push("second"));
-    runCallbacks(target, "save", () => log.push("block"));
+    Target.setCallback("save", "before", () => "halt");
+    Target.setCallback("save", "before", (t: any) => t.log.push("second"));
+    target.runCallbacks("save", () => log.push("block"));
     expect(log).not.toContain("second");
     expect(log).not.toContain("block");
   });
 
   it("custom terminator does not halt when it returns false", () => {
-    const log: string[] = [];
-    const target = { log };
-    defineCallbacks(target, "save", {
-      terminator: (_t, fn) => {
+    class Target extends Model {}
+    const target = new Target();
+    const log = target.log;
+    Target.defineCallbacks("save", {
+      terminator: (_t: object, fn: () => unknown) => {
         fn();
         return false;
       },
     });
-    setCallback(target, "save", "before", () => false);
-    setCallback(target, "save", "before", (t: any) => t.log.push("second"));
-    runCallbacks(target, "save", () => log.push("block"));
+    Target.setCallback("save", "before", () => false);
+    Target.setCallback("save", "before", (t: any) => t.log.push("second"));
+    target.runCallbacks("save", () => log.push("block"));
     expect(log).toContain("second");
     expect(log).toContain("block");
   });
 
   it("throws when an async before callback is registered with a custom terminator", () => {
-    const t = {};
-    defineCallbacks(t, "v", { terminator: (_t, fn) => fn() === "halt" });
-    setCallback(t, "v", "before", async () => "halt");
-    expect(() => runCallbacks(t, "v")).toThrow(/unsupported with a custom terminator/);
+    class Target extends Model {}
+    const t = new Target();
+    Target.defineCallbacks("v", { terminator: (_t: object, fn: () => unknown) => fn() === "halt" });
+    Target.setCallback("v", "before", async () => "halt");
+    expect(() => t.runCallbacks("v")).toThrow(/unsupported with a custom terminator/);
   });
 });
 
 describe("skipAfterCallbacksIfTerminated", () => {
   it("after callbacks run by default even when halted", () => {
-    const log: string[] = [];
-    const target = { log };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", () => kernelThrow(":abort"));
-    setCallback(target, "save", "after", (t: any) => t.log.push("after"));
-    const result = runCallbacks(target, "save");
+    class Target extends Model {}
+    const target = new Target();
+    const log = target.log;
+    Target.defineCallbacks("save");
+    Target.setCallback("save", "before", () => kernelThrow(":abort"));
+    Target.setCallback("save", "after", (t: any) => t.log.push("after"));
+    const result = target.runCallbacks("save");
     expect(result).toBe(false);
     expect(log).toContain("after");
   });
 
   it("skips after callbacks when halted and option is set", () => {
-    const log: string[] = [];
-    const target = { log };
-    defineCallbacks(target, "save", { skipAfterCallbacksIfTerminated: true });
-    setCallback(target, "save", "before", () => kernelThrow(":abort"));
-    setCallback(target, "save", "after", (t: any) => t.log.push("after"));
-    runCallbacks(target, "save");
+    class Target extends Model {}
+    const target = new Target();
+    const log = target.log;
+    Target.defineCallbacks("save", { skipAfterCallbacksIfTerminated: true });
+    Target.setCallback("save", "before", () => kernelThrow(":abort"));
+    Target.setCallback("save", "after", (t: any) => t.log.push("after"));
+    target.runCallbacks("save");
     expect(log).not.toContain("after");
   });
 
   it("runs after callbacks when not halted even with option set", () => {
-    const log: string[] = [];
-    const target = { log };
-    defineCallbacks(target, "save", { skipAfterCallbacksIfTerminated: true });
-    setCallback(target, "save", "before", () => undefined);
-    setCallback(target, "save", "after", (t: any) => t.log.push("after"));
-    runCallbacks(target, "save");
+    class Target extends Model {}
+    const target = new Target();
+    const log = target.log;
+    Target.defineCallbacks("save", { skipAfterCallbacksIfTerminated: true });
+    Target.setCallback("save", "before", () => undefined);
+    Target.setCallback("save", "after", (t: any) => t.log.push("after"));
+    target.runCallbacks("save");
     expect(log).toContain("after");
   });
 });
 
 describe("Callbacks — async propagation", () => {
   it("sync chain returns synchronously when no callback is async", () => {
-    const t = { log: [] as string[] };
-    defineCallbacks(t, "save");
-    setCallback(t, "save", "before", (x: any) => x.log.push("b"));
-    setCallback(t, "save", "after", (x: any) => x.log.push("a"));
-    const r = runCallbacks(t, "save", () => {
+    class Target extends Model {}
+    const t = new Target();
+    Target.defineCallbacks("save");
+    Target.setCallback("save", "before", (x: any) => x.log.push("b"));
+    Target.setCallback("save", "after", (x: any) => x.log.push("a"));
+    const r = t.runCallbacks("save", () => {
       t.log.push("block");
       return true;
     });
@@ -976,58 +905,65 @@ describe("Callbacks — async propagation", () => {
   });
 
   it("async before callback propagates Promise and preserves order", async () => {
-    const t = { log: [] as string[] };
-    defineCallbacks(t, "save");
-    setCallback(t, "save", "before", async (x: any) => x.log.push("b1"));
-    setCallback(t, "save", "before", (x: any) => x.log.push("b2"));
-    setCallback(t, "save", "after", (x: any) => x.log.push("a"));
-    const r = runCallbacks(t, "save", () => t.log.push("block"));
+    class Target extends Model {}
+    const t = new Target();
+    Target.defineCallbacks("save");
+    Target.setCallback("save", "before", async (x: any) => x.log.push("b1"));
+    Target.setCallback("save", "before", (x: any) => x.log.push("b2"));
+    Target.setCallback("save", "after", (x: any) => x.log.push("a"));
+    const r = t.runCallbacks("save", () => t.log.push("block"));
     expect(r).toBeInstanceOf(Promise);
     await r;
     expect(t.log).toEqual(["b1", "b2", "block", "a"]);
   });
 
   it("async after callback propagates Promise and runs in reverse order", async () => {
-    const t = { log: [] as string[] };
-    defineCallbacks(t, "save");
-    setCallback(t, "save", "after", async (x: any) => x.log.push("a1"));
-    setCallback(t, "save", "after", (x: any) => x.log.push("a2"));
-    const r = runCallbacks(t, "save", () => t.log.push("block"));
+    class Target extends Model {}
+    const t = new Target();
+    Target.defineCallbacks("save");
+    Target.setCallback("save", "after", async (x: any) => x.log.push("a1"));
+    Target.setCallback("save", "after", (x: any) => x.log.push("a2"));
+    const r = t.runCallbacks("save", () => t.log.push("block"));
     expect(r).toBeInstanceOf(Promise);
     await r;
     expect(t.log).toEqual(["block", "a2", "a1"]);
   });
 
   it("async around callback propagates Promise and runs after callbacks when complete", async () => {
-    const t = { log: [] as string[] };
-    defineCallbacks(t, "save");
-    setCallback(t, "save", "after", (x: any) => x.log.push("after"));
-    setCallback(t, "save", "around", async (x: any, next) => {
+    class Target extends Model {}
+    const t = new Target();
+    Target.defineCallbacks("save");
+    Target.setCallback("save", "after", (x: any) => x.log.push("after"));
+    Target.setCallback("save", "around", async (x: any, next: any) => {
       x.log.push("ao");
       await next();
       x.log.push("ac");
     });
-    const r = runCallbacks(t, "save", async () => t.log.push("block"));
+    const r = t.runCallbacks("save", async () => t.log.push("block"));
     expect(r).toBeInstanceOf(Promise);
     await r;
     expect(t.log).toEqual(["ao", "block", "ac", "after"]);
   });
 
   it("awaited next() resolves to the async block result", async () => {
-    const t = { result: null as unknown };
-    defineCallbacks(t, "save");
-    setCallback(t, "save", "around", async (x: any, next: any) => {
+    class Target extends Model {
+      result = null as unknown;
+    }
+    const t = new Target();
+    Target.defineCallbacks("save");
+    Target.setCallback("save", "around", async (x: any, next: any) => {
       x.result = await next();
     });
-    await runCallbacks(t, "save", async () => "running");
+    await t.runCallbacks("save", async () => "running");
     expect(t.result).toBe("running");
   });
 
   it("strict:sync throws on async callback", () => {
-    const t = {};
-    defineCallbacks(t, "v");
-    setCallback(t, "v", "before", async () => {});
-    expect(() => runCallbacks(t, "v", undefined, { strict: "sync" })).toThrow(/sync chain/);
+    class Target extends Model {}
+    const t = new Target();
+    Target.defineCallbacks("v");
+    Target.setCallback("v", "before", async () => {});
+    expect(() => t.runCallbacks("v", undefined, { strict: "sync" })).toThrow(/sync chain/);
   });
 });
 
@@ -1035,26 +971,29 @@ describe("CallbackObject dispatch", () => {
   const callbackObject = <T extends object>(methods: T & ThisType<T>): T =>
     Object.assign(new (class CallbackObject {})(), methods);
   it("before — calls the object's before method", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
+    class Target extends Model {}
+    const target = new Target();
+    Target.defineCallbacks("save");
     const obj = callbackObject({ before: (t: typeof target) => t.log.push("before-obj") });
-    setCallback(target, "save", "before", obj);
-    runCallbacks(target, "save");
+    Target.setCallback("save", "before", obj);
+    target.runCallbacks("save");
     expect(target.log).toEqual(["before-obj"]);
   });
 
   it("after — calls the object's after method", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
+    class Target extends Model {}
+    const target = new Target();
+    Target.defineCallbacks("save");
     const obj = callbackObject({ after: (t: typeof target) => t.log.push("after-obj") });
-    setCallback(target, "save", "after", obj);
-    runCallbacks(target, "save");
+    Target.setCallback("save", "after", obj);
+    target.runCallbacks("save");
     expect(target.log).toEqual(["after-obj"]);
   });
 
   it("around — calls the object's around method with target and proceed", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
+    class Target extends Model {}
+    const target = new Target();
+    Target.defineCallbacks("save");
     const obj = callbackObject({
       around: (t: typeof target, next: () => void) => {
         t.log.push("around-pre");
@@ -1062,44 +1001,48 @@ describe("CallbackObject dispatch", () => {
         t.log.push("around-post");
       },
     });
-    setCallback(target, "save", "around", obj);
-    runCallbacks(target, "save", () => target.log.push("body"));
+    Target.setCallback("save", "around", obj);
+    target.runCallbacks("save", () => target.log.push("body"));
     expect(target.log).toEqual(["around-pre", "body", "around-post"]);
   });
 
   it("custom scope dispatches the kind+name method", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save", { scope: ["kind", "name"] });
+    class Target extends Model {}
+    const target = new Target();
+    Target.defineCallbacks("save", { scope: ["kind", "name"] });
     const obj = callbackObject({ beforeSave: (t: typeof target) => t.log.push("before-save-obj") });
-    setCallback(target, "save", "before", obj);
-    runCallbacks(target, "save");
+    Target.setCallback("save", "before", obj);
+    target.runCallbacks("save");
     expect(target.log).toEqual(["before-save-obj"]);
   });
 
   it("missing scoped method raises when the chain runs", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", callbackObject({ beforeSave: () => {} }));
-    expect(() => runCallbacks(target, "save")).toThrow(/before/);
+    class Target extends Model {}
+    const target = new Target();
+    Target.defineCallbacks("save");
+    Target.setCallback("save", "before", callbackObject({ beforeSave: () => {} }));
+    expect(() => target.runCallbacks("save")).toThrow(/before/);
   });
 
   it("object method called with correct this binding", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
+    class Target extends Model {}
+    const target = new Target();
+    Target.defineCallbacks("save");
     const obj = callbackObject({
       label: "my-obj",
       before(t: typeof target) {
         t.log.push(this.label);
       },
     });
-    setCallback(target, "save", "before", obj);
-    runCallbacks(target, "save");
+    Target.setCallback("save", "before", obj);
+    target.runCallbacks("save");
     expect(target.log).toEqual(["my-obj"]);
   });
 
   it("around object method reads object state via this", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
+    class Target extends Model {}
+    const target = new Target();
+    Target.defineCallbacks("save");
     const obj = callbackObject({
       label: "around-obj",
       around(t: typeof target, next: () => void) {
@@ -1108,85 +1051,65 @@ describe("CallbackObject dispatch", () => {
         t.log.push(`${this.label}-post`);
       },
     });
-    setCallback(target, "save", "around", obj);
-    runCallbacks(target, "save", () => target.log.push("body"));
+    Target.setCallback("save", "around", obj);
+    target.runCallbacks("save", () => target.log.push("body"));
     expect(target.log).toEqual(["around-obj-pre", "body", "around-obj-post"]);
   });
 
   it("mixed chain: function + object + function all run", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", (t: typeof target) => t.log.push("fn1"));
-    setCallback(
-      target,
+    class Target extends Model {}
+    const target = new Target();
+    Target.defineCallbacks("save");
+    Target.setCallback("save", "before", (t: typeof target) => t.log.push("fn1"));
+    Target.setCallback(
       "save",
       "before",
       callbackObject({ before: (t: typeof target) => t.log.push("obj") }),
     );
-    setCallback(target, "save", "before", (t: typeof target) => t.log.push("fn2"));
-    runCallbacks(target, "save");
+    Target.setCallback("save", "before", (t: typeof target) => t.log.push("fn2"));
+    target.runCallbacks("save");
     expect(target.log).toEqual(["fn1", "obj", "fn2"]);
   });
 
   it("async object method — chain returns Promise", async () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
+    class Target extends Model {}
+    const target = new Target();
+    Target.defineCallbacks("save");
     const obj = callbackObject({
       before: async (t: typeof target) => {
         await Promise.resolve();
         t.log.push("async-obj");
       },
     });
-    setCallback(target, "save", "before", obj);
-    const r = runCallbacks(target, "save");
+    Target.setCallback("save", "before", obj);
+    const r = target.runCallbacks("save");
     expect(r).toBeInstanceOf(Promise);
     await r;
     expect(target.log).toEqual(["async-obj"]);
   });
 
-  it("CallbacksMixin.beforeCallback accepts object form", () => {
-    class Model extends CallbacksMixin() {}
-    Model.defineCallbacks("save");
-    const log: string[] = [];
-    Model.beforeCallback("save", callbackObject({ before: () => log.push("mixin-obj") }));
-    const inst = new Model();
-    (inst as any).runCallbacks("save");
-    expect(log).toEqual(["mixin-obj"]);
-  });
-
-  it("CallbacksMixin.afterCallback accepts object form", () => {
-    class Model extends CallbacksMixin() {}
-    Model.defineCallbacks("save");
-    const log: string[] = [];
-    Model.afterCallback("save", { after: () => log.push("after-mixin") });
-    const inst = new Model();
-    (inst as any).runCallbacks("save");
-    expect(log).toEqual(["after-mixin"]);
-  });
-
   it("skipCallback removes object-form callback by original reference", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
+    class Target extends Model {}
+    const target = new Target();
+    Target.defineCallbacks("save");
     const obj = { before: (t: typeof target) => t.log.push("obj") };
-    setCallback(target, "save", "before", obj);
-    setCallback(target, "save", "before", (t: typeof target) => t.log.push("fn"));
-    skipCallback(target, "save", "before", obj);
-    runCallbacks(target, "save");
+    Target.setCallback("save", "before", obj);
+    Target.setCallback("save", "before", (t: typeof target) => t.log.push("fn"));
+    Target.skipCallback("save", "before", obj);
+    target.runCallbacks("save");
     expect(target.log).toEqual(["fn"]);
   });
 
   it("skipCallback matches object by reference after chain inheritance clone", () => {
-    class Parent {
-      log: string[] = [];
-    }
-    defineCallbacks(Parent.prototype, "save");
+    class Parent extends Model {}
+    Parent.defineCallbacks("save");
     const obj = { before: (t: Parent) => t.log.push("obj") };
-    setCallback(Parent.prototype, "save", "before", obj);
+    Parent.setCallback("save", "before", obj);
 
     class Child extends Parent {}
-    skipCallback(Child.prototype, "save", "before", obj);
+    Child.skipCallback("save", "before", obj);
     const child = new Child();
-    runCallbacks(child, "save");
+    child.runCallbacks("save");
     expect(child.log).toEqual([]);
   });
 
@@ -1241,8 +1164,8 @@ describe("CallbackObject dispatch", () => {
 
     parent.setCallback("save", "before", (t: Parent) => t.log.push("parent"));
 
-    const record = new Child();
-    runCallbacks(record, "save");
+    const record = new Child() as Child & { runCallbacks: RunCallbacks };
+    record.runCallbacks("save");
     expect(record.log).toEqual(["child", "parent"]);
     expect(Object.keys(child.__callbacks)).toEqual(["save"]);
     expect(child.__callbacks).not.toBe(parent.__callbacks);
@@ -1253,36 +1176,20 @@ describe("CallbackObject dispatch", () => {
     expect(child.getCallbacks("save").entries.map((c: Callback) => c.kind)).toEqual(["before"]);
     expect(parent.getCallbacks("save").isEmpty).toBe(true);
   });
-
-  it("CallbacksMixin.aroundCallback accepts object form", () => {
-    class Model extends CallbacksMixin() {}
-    Model.defineCallbacks("save");
-    const log: string[] = [];
-    Model.aroundCallback("save", {
-      around: (_: unknown, next: () => void) => {
-        log.push("pre");
-        next();
-        log.push("post");
-      },
-    });
-    const inst = new Model();
-    (inst as any).runCallbacks("save", () => log.push("body"));
-    expect(log).toEqual(["pre", "body", "post"]);
-  });
 });
 
 describe("setCallback with a block (trails)", () => {
   it("puts the block ahead of the positional filters, after the options", () => {
-    const target = {
-      ran: [] as string[],
+    class Target extends Model {
+      ran: string[] = [];
       named() {
         this.ran.push("named");
-      },
-      on: true,
-    };
-    defineCallbacks(target, "save");
-    setCallback(
-      target,
+      }
+      on = true;
+    }
+    const target = new Target();
+    Target.defineCallbacks("save");
+    Target.setCallback(
       "save",
       "before",
       ":named",
@@ -1291,12 +1198,12 @@ describe("setCallback with a block (trails)", () => {
         this.ran.push("block");
       }),
     );
-    runCallbacks(target, "save");
+    target.runCallbacks("save");
     expect(target.ran).toEqual(["block", "named"]);
 
     target.ran = [];
     target.on = false;
-    runCallbacks(target, "save");
+    target.runCallbacks("save");
     expect(target.ran).toEqual([]);
   });
 });
