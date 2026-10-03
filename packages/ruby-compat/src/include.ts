@@ -1468,9 +1468,6 @@ classpaths.set(rbMComparable, { path: "Comparable", permanent: true });
 Object.setPrototypeOf(rbCClass, Module);
 Object.setPrototypeOf(rbCClass.prototype, Module.prototype);
 
-// `rb_define_class("Rational", rb_cNumeric)` (`vendor/ruby/v3.3.11/rational.c:2759`),
-// `"Complex"` (`vendor/ruby/v3.3.11/complex.c:2529`) and `"BigDecimal"`
-// (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:4407`).
 for (const klass of [Rational, Complex, BigDecimal]) {
   Object.setPrototypeOf(klass, rbCNumeric);
   Object.setPrototypeOf(klass.prototype, rbCNumeric.prototype);
