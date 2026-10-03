@@ -1866,37 +1866,63 @@ export function tsOwnerSeat(
 
 /**
  * Whether a TS member states the seat it is declared on. A class member does,
- * by its staticness. A non-static member of an object literal does not: the
- * literal may be either half of a module (`ClassInfo.objectLiteral`), and a
- * `namespace`'s functions are the same shape, a module's singleton methods
- * (`DescendantsTracker.subclasses(klass)`, descendants_tracker.rb:98-100) or
- * its `this`-typed mixin bodies. The exception is one named after a Rails
- * module its file mirrors, for a name that module declares as an instance
- * method: `include(Base, Timestamp.Timestamp)` is `include Timestamp`, so the
- * member is `Timestamp#name` exactly as an `InstanceMethods` literal's would
- * be. A name the module declares only on its singleton (`Mime.symbols`,
+ * by its staticness, and so does an `interface` signature, which types the
+ * instance. A non-static member of an object literal does not: the literal may
+ * be either half of a module (`ClassInfo.objectLiteral`). A `namespace`
+ * function is the same shape, bodied where the interface it may merge with is
+ * not: `interface Naming { modelName }` is `Naming#model_name` and
+ * `namespace Naming { function plural }` is `def self.plural`
+ * (active_model/naming.rb:283), as `CallTemplate.build` is
+ * (active_support/callbacks.rb:494). The exception is an owner named after a
+ * Rails module its file mirrors, for a name that module declares as an
+ * instance method: `include(Base, Timestamp.Timestamp)` is `include Timestamp`,
+ * so the member is `Timestamp#name` exactly as an `InstanceMethods` literal's
+ * would be. A name the module declares only on its singleton (`Mime.symbols`,
  * action_dispatch/http/mime_type.rb:50-67) still states none.
  */
 export function tsMemberStatesSeat(
-  owner: {
-    name: string;
-    objectLiteral?: boolean;
-    declaredAsNamespace?: boolean;
-    isInterface?: boolean;
-  },
-  member: { name: string; isStatic?: boolean },
+  owner: { name: string; objectLiteral?: boolean; declaredAsNamespace?: boolean },
+  member: { name: string; isStatic?: boolean; bodyless?: boolean },
   rubyInstanceNames: ReadonlyMap<string, ReadonlySet<string>> | undefined,
 ): boolean {
-  const namespace = owner.declaredAsNamespace === true && owner.isInterface !== true;
-  if ((owner.objectLiteral !== true && !namespace) || member.isStatic === true) return true;
+  const namespaceFunction = owner.declaredAsNamespace === true && member.bodyless !== true;
+  if ((owner.objectLiteral !== true && !namespaceFunction) || member.isStatic === true) return true;
   return rubyInstanceNames?.get(owner.name)?.has(member.name) ?? false;
+}
+
+/**
+ * Records the seat each TS owner declares each name on (file → name → owners),
+ * split by staticness: `tsOwnerSeat`'s population.
+ */
+export function recordTsSeatOwners(
+  staticOwnersByFileName: Map<string, Map<string, Set<string>>>,
+  instanceOwnersByFileName: Map<string, Map<string, Set<string>>>,
+  entities: readonly ClassInfo[],
+  shouldInclude: (m: MethodInfo) => boolean,
+  rubyInstanceNames: ReadonlyMap<string, ReadonlyMap<string, ReadonlySet<string>>>,
+): void {
+  for (const cls of entities) {
+    const file = cls.file || "";
+    for (const m of [...cls.instanceMethods, ...cls.classMethods]) {
+      if (!shouldInclude(m) || !tsMemberStatesSeat(cls, m, rubyInstanceNames.get(file))) continue;
+      const bySeat = m.isStatic === true ? staticOwnersByFileName : instanceOwnersByFileName;
+      const seatOwners = bySeat.get(file) ?? new Map<string, Set<string>>();
+      seatOwners.set(m.name, (seatOwners.get(m.name) ?? new Set<string>()).add(cls.name));
+      bySeat.set(file, seatOwners);
+    }
+  }
 }
 
 /**
  * The TS spellings of the instance methods each Ruby module declares, keyed by
  * the TS file mirroring the module and then by the module's short name:
  * `tsMemberStatesSeat`'s population. `ClassMethods` is the singleton half of
- * its enclosing module, never a module a const is named after.
+ * its enclosing module, never a module a const is named after. A TS owner
+ * carries only its short name, so modules sharing one within a file are
+ * unioned: `Compatibility::V7_0::TableDefinition` … `V4_2::TableDefinition`
+ * (migration/compatibility.rb) and `HttpAuthentication::Basic` / `Digest` /
+ * `Token::ControllerMethods` (metal/http_authentication.rb) are the two such
+ * sets, and neither declares a name on a singleton as well.
  */
 export function rubyModuleInstanceNamesByTsFile(
   rubyModules: Record<string, { file?: string; instanceMethods: { name: string }[] }>,
@@ -4369,7 +4395,6 @@ export function main() {
       file = m.file ?? "",
       scope: "package" | "dep" = "package",
       owner = "",
-      statesSeat = owner !== "",
     ) => {
       if (scope === "package") {
         const owners = tsOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
@@ -4400,16 +4425,6 @@ export function main() {
           const writerOwners = tsWriterOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
           writerOwners.set(m.name, (writerOwners.get(m.name) ?? new Set<string>()).add(owner));
           tsWriterOwnersByFileName.set(file, writerOwners);
-        }
-        // A top-level function (`owner === ""`) states no seat — see tsOwnerSeat —
-        // and neither does a non-static member of an object literal
-        // (`ClassInfo.objectLiteral`).
-        if (statesSeat) {
-          const bySeat =
-            m.isStatic === true ? tsStaticOwnersByFileName : tsInstanceOwnersByFileName;
-          const seatOwners = bySeat.get(file) ?? new Map<string, Set<string>>();
-          seatOwners.set(m.name, (seatOwners.get(m.name) ?? new Set<string>()).add(owner));
-          bySeat.set(file, seatOwners);
         }
       }
       const sigs = tsParamsByName.get(m.name) ?? [];
@@ -4522,20 +4537,13 @@ export function main() {
     };
 
     if (tsPkg) {
-      const rubyInstanceNames = rubyModuleInstanceNamesByTsFile(rubyPkg.modules, pkg);
       const addMethods = (cls: ClassInfo) => {
         const file = cls.file || "";
         const methods = tsMethodsByFile.get(file) || new Set();
         for (const m of [...cls.instanceMethods, ...cls.classMethods]) {
           if (tsShouldInclude(m)) {
             methods.add(m.name);
-            recordTsParams(
-              m,
-              file,
-              "package",
-              cls.name,
-              tsMemberStatesSeat(cls, m, rubyInstanceNames.get(file)),
-            );
+            recordTsParams(m, file, "package", cls.name);
           }
         }
         tsMethodsByFile.set(file, methods);
@@ -4543,6 +4551,13 @@ export function main() {
 
       for (const cls of Object.values(tsPkg.classes)) addMethods(cls);
       for (const mod of Object.values(tsPkg.modules)) addMethods(mod);
+      recordTsSeatOwners(
+        tsStaticOwnersByFileName,
+        tsInstanceOwnersByFileName,
+        [...Object.values(tsPkg.classes), ...Object.values(tsPkg.modules)],
+        tsShouldInclude,
+        rubyModuleInstanceNamesByTsFile(rubyPkg.modules, pkg),
+      );
 
       // Include file-level functions (top-level exports not in any class/interface)
       if (tsPkg.fileFunctions) {

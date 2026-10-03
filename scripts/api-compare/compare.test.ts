@@ -63,6 +63,7 @@ import {
   ambiguousRubyOwner,
   rubyOwnerSeat,
   tsMemberStatesSeat,
+  recordTsSeatOwners,
   rubyModuleInstanceNamesByTsFile,
   tsOwnerSeat,
   crossPackageIncludedMethodNames,
@@ -2910,28 +2911,66 @@ describe("tsMemberStatesSeat", () => {
   });
 
   it("pairs a classAttribute.call credit under the const with both class_attribute rows", () => {
-    const byFile = rubyModuleInstanceNamesByTsFile(
-      {
-        "ActiveRecord::Normalization": {
-          file: "normalization.rb",
-          instanceMethods: [{ name: "normalized_attributes" }, { name: "normalized_attributes?" }],
+    const staticOwners = new Map<string, Map<string, Set<string>>>();
+    const instanceOwners = new Map<string, Map<string, Set<string>>>();
+    const credit = (name: string, isStatic: boolean) => ({
+      name,
+      isStatic,
+      visibility: "public" as const,
+      params: [],
+    });
+    recordTsSeatOwners(
+      staticOwners,
+      instanceOwners,
+      [
+        {
+          name: "Normalization",
+          file: "normalization.ts",
+          objectLiteral: true,
+          includes: [],
+          extends: [],
+          instanceMethods: [
+            credit("normalizedAttributes", false),
+            credit("isNormalizedAttributes", false),
+            credit("normalizeAttribute", false),
+            credit("hidden", false),
+          ],
+          classMethods: [
+            credit("normalizedAttributes", true),
+            credit("isNormalizedAttributes", true),
+          ],
         },
-      },
-      "activerecord",
-    ).get("normalization.ts");
-    const owner = { name: "Normalization", objectLiteral: true };
-    const staticOwners = new Set<string>();
-    const instanceOwners = new Set<string>();
-    for (const m of [
-      { name: "normalizedAttributes", isStatic: true },
-      { name: "normalizedAttributes", isStatic: false },
-    ]) {
-      if (tsMemberStatesSeat(owner, m, byFile)) {
-        (m.isStatic ? staticOwners : instanceOwners).add(owner.name);
-      }
+      ],
+      (m) => m.name !== "hidden",
+      rubyModuleInstanceNamesByTsFile(
+        {
+          "ActiveRecord::Normalization": {
+            file: "normalization.rb",
+            instanceMethods: [
+              { name: "normalized_attributes" },
+              { name: "normalized_attributes?" },
+              { name: "normalize_attribute" },
+              { name: "hidden" },
+            ],
+          },
+        },
+        "activerecord",
+      ),
+    );
+    const seats = (name: string) =>
+      [staticOwners, instanceOwners].map((by) => by.get("normalization.ts")?.get(name));
+    for (const name of ["normalizedAttributes", "isNormalizedAttributes"]) {
+      const [statics, instances] = seats(name);
+      expect(tsOwnerOnBothSeats("Normalization", statics, instances)).toBe(true);
+      expect(tsDeclaresOnLevel("class", new Set(["Normalization"]), statics, instances)).toBe(
+        "seat",
+      );
+      expect(tsDeclaresOnLevel("instance", new Set(["Normalization"]), statics, instances)).toBe(
+        "seat",
+      );
     }
-    expect(tsOwnerOnBothSeats("Normalization", staticOwners, instanceOwners)).toBe(true);
-    expect(tsMemberStatesSeat(owner, { name: "isNormalizedAttributes" }, byFile)).toBe(true);
+    expect(seats("normalizeAttribute")).toEqual([undefined, new Set(["Normalization"])]);
+    expect(seats("hidden")).toEqual([undefined, undefined]);
   });
 
   it("states no seat for a name the module does not declare on its instance half", () => {
@@ -2947,11 +2986,9 @@ describe("tsMemberStatesSeat", () => {
   });
 
   it("treats a namespace's functions as an object literal's members", () => {
-    const ns = { name: "DescendantsTracker", declaredAsNamespace: true };
-    expect(tsMemberStatesSeat(ns, { name: "subclasses" }, undefined)).toBe(false);
-    expect(
-      tsMemberStatesSeat({ ...ns, isInterface: true }, { name: "subclasses" }, undefined),
-    ).toBe(true);
+    const naming = { name: "Naming", declaredAsNamespace: true, isInterface: true };
+    expect(tsMemberStatesSeat(naming, { name: "plural" }, undefined)).toBe(false);
+    expect(tsMemberStatesSeat(naming, { name: "modelName", bodyless: true }, undefined)).toBe(true);
   });
 
   it("keeps a class member's staticness", () => {
