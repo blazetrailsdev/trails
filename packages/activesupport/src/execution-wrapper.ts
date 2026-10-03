@@ -2,8 +2,9 @@
 
 import { currentErrorReporter } from "./error-reporter.js";
 import type { ErrorReporter } from "./error-reporter.js";
-import { defineCallbacks, runCallbacks, setCallback } from "./callbacks.js";
+import { Callbacks } from "./callbacks.js";
 import type { FilterListEntry } from "./callbacks.js";
+import { include, type Extended, type Included } from "@blazetrails/ruby-compat/include";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 function isThenable(value: unknown): value is PromiseLike<unknown> {
@@ -34,9 +35,15 @@ export class ExecutionWrapper {
     },
   };
 
+  declare static defineCallbacks: Extended<typeof Callbacks.ClassMethods>["defineCallbacks"];
+  declare static setCallback: Extended<typeof Callbacks.ClassMethods>["setCallback"];
+  declare runCallbacks: Included<typeof Callbacks>["runCallbacks"];
+
   static {
-    defineCallbacks(this.prototype, "run");
-    defineCallbacks(this.prototype, "complete");
+    include(this, Callbacks);
+
+    this.defineCallbacks("run");
+    this.defineCallbacks("complete");
   }
 
   static _activeKey?: symbol;
@@ -44,11 +51,11 @@ export class ExecutionWrapper {
   #_hookState?: Map<ExecutionHook, unknown>;
 
   static toRun(...args: FilterListEntry[]): void {
-    setCallback(this.prototype, "run", ...args);
+    this.setCallback("run", ...args);
   }
 
   static toComplete(...args: FilterListEntry[]): void {
-    setCallback(this.prototype, "complete", ...args);
+    this.setCallback("complete", ...args);
   }
 
   static registerHook(hook: ExecutionHook, { outer = false }: { outer?: boolean } = {}): void {
@@ -187,7 +194,7 @@ export class ExecutionWrapper {
   }
 
   run(): unknown {
-    return runCallbacks(this, "run");
+    return this.runCallbacks("run");
   }
 
   completeBang(): unknown {
@@ -205,7 +212,7 @@ export class ExecutionWrapper {
   }
 
   complete(): unknown {
-    return runCallbacks(this, "complete");
+    return this.runCallbacks("complete");
   }
 
   /** @internal */

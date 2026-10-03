@@ -1,21 +1,29 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { include, kernelThrow, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import type { Extended, Included } from "@blazetrails/ruby-compat/include";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import {
-  defineCallbacks,
-  setCallback,
-  skipCallback,
-  resetCallbacks,
-  runCallbacks,
-} from "./callbacks.js";
+import { Callbacks } from "./callbacks.js";
 import { ArgumentError } from "./hash-utils.js";
 
+type ClassMethods = Extended<typeof Callbacks.ClassMethods>;
+type RunCallbacks = Included<typeof Callbacks>["runCallbacks"];
+
 class Record {
+  declare static defineCallbacks: ClassMethods["defineCallbacks"];
+  declare static setCallback: ClassMethods["setCallback"];
+  declare static skipCallback: ClassMethods["skipCallback"];
+  declare static resetCallbacks: ClassMethods["resetCallbacks"];
+  declare runCallbacks: RunCallbacks;
+
+  static {
+    include(this, Callbacks);
+  }
+
   static beforeSave(...filters: any[]): void {
-    setCallback(this.prototype, "save", "before", ...filters);
+    this.setCallback("save", "before", ...filters);
   }
 
   static afterSave(...filters: any[]): void {
-    setCallback(this.prototype, "save", "after", ...filters);
+    this.setCallback("save", "after", ...filters);
   }
 
   static callbackSymbol(callbackMethod: string): string {
@@ -52,7 +60,7 @@ class Record {
     return (this._history ??= []);
   }
 }
-defineCallbacks(Record.prototype, "save");
+Record.defineCallbacks("save");
 
 const CallbackClass = new (class CallbackClass {
   before(model: Record) {
@@ -80,7 +88,7 @@ class Person extends Record {
   }
 
   save(): unknown {
-    return runCallbacks(this, "save", () => {
+    return this.runCallbacks("save", () => {
       if (this.saveFails) throw new Error("inside save");
     });
   }
@@ -88,11 +96,11 @@ class Person extends Record {
 
 class PersonSkipper extends Person {
   static {
-    skipCallback(this.prototype, "save", "before", ":beforeSaveMethod", { if: ":yes" });
-    skipCallback(this.prototype, "save", "after", ":afterSaveMethod", { unless: ":yes" });
-    skipCallback(this.prototype, "save", "after", ":afterSaveMethod", { if: ":no" });
-    skipCallback(this.prototype, "save", "before", ":beforeSaveMethod", { unless: ":no" });
-    skipCallback(this.prototype, "save", "before", CallbackClass, { if: ":yes" });
+    this.skipCallback("save", "before", ":beforeSaveMethod", { if: ":yes" });
+    this.skipCallback("save", "after", ":afterSaveMethod", { unless: ":yes" });
+    this.skipCallback("save", "after", ":afterSaveMethod", { if: ":no" });
+    this.skipCallback("save", "before", ":beforeSaveMethod", { unless: ":no" });
+    this.skipCallback("save", "before", CallbackClass, { if: ":yes" });
   }
 
   yes(): boolean {
@@ -142,7 +150,7 @@ class OneTimeCompile extends Record {
   }
 
   save(): unknown {
-    return runCallbacks(this, "save");
+    return this.runCallbacks("save");
   }
 }
 
@@ -157,7 +165,7 @@ class AfterSaveConditionalPerson extends Record {
   }
 
   save(): unknown {
-    return runCallbacks(this, "save");
+    return this.runCallbacks("save");
   }
 }
 
@@ -201,25 +209,35 @@ class ConditionalPerson extends Record {
   }
 
   save(): unknown {
-    return runCallbacks(this, "save");
+    return this.runCallbacks("save");
   }
 }
 
 class CleanPerson extends ConditionalPerson {
   static {
-    resetCallbacks(this.prototype, "save");
+    this.resetCallbacks("save");
   }
 }
 
-class MySuper {}
-defineCallbacks(MySuper.prototype, "save");
+class MySuper {
+  declare static defineCallbacks: ClassMethods["defineCallbacks"];
+  declare static setCallback: ClassMethods["setCallback"];
+  declare static skipCallback: ClassMethods["skipCallback"];
+  declare static resetCallbacks: ClassMethods["resetCallbacks"];
+  declare runCallbacks: RunCallbacks;
+
+  static {
+    include(this, Callbacks);
+  }
+}
+MySuper.defineCallbacks("save");
 
 class MySlate extends MySuper {
   history: string[] = [];
   saveFails = false;
 
   save(): unknown {
-    return runCallbacks(this, "save", () => {
+    return this.runCallbacks("save", () => {
       if (this.saveFails) throw new Error("inside save");
       this.history.push("running");
     });
@@ -236,18 +254,18 @@ class MySlate extends MySuper {
 
 class AroundPerson extends MySlate {
   static {
-    setCallback(this.prototype, "save", "before", ":nope", { if: ":no" });
-    setCallback(this.prototype, "save", "before", ":nope", { unless: ":yes" });
-    setCallback(this.prototype, "save", "after", ":tweedle");
-    setCallback(this.prototype, "save", "before", (m: MySlate) => m.history.push("yup"));
-    setCallback(this.prototype, "save", "before", ":nope", { if: () => false });
-    setCallback(this.prototype, "save", "before", ":nope", { unless: () => true });
-    setCallback(this.prototype, "save", "before", ":yup", { if: () => true });
-    setCallback(this.prototype, "save", "before", ":yup", { unless: () => false });
-    setCallback(this.prototype, "save", "around", ":tweedleDum");
-    setCallback(this.prototype, "save", "around", ":w0tyes", { if: ":yes" });
-    setCallback(this.prototype, "save", "around", ":w0tno", { if: ":no" });
-    setCallback(this.prototype, "save", "around", ":tweedleDeedle");
+    this.setCallback("save", "before", ":nope", { if: ":no" });
+    this.setCallback("save", "before", ":nope", { unless: ":yes" });
+    this.setCallback("save", "after", ":tweedle");
+    this.setCallback("save", "before", (m: MySlate) => m.history.push("yup"));
+    this.setCallback("save", "before", ":nope", { if: () => false });
+    this.setCallback("save", "before", ":nope", { unless: () => true });
+    this.setCallback("save", "before", ":yup", { if: () => true });
+    this.setCallback("save", "before", ":yup", { unless: () => false });
+    this.setCallback("save", "around", ":tweedleDum");
+    this.setCallback("save", "around", ":w0tyes", { if: ":yes" });
+    this.setCallback("save", "around", ":w0tno", { if: ":no" });
+    this.setCallback("save", "around", ":tweedleDeedle");
   }
 
   nope(): void {
@@ -290,9 +308,9 @@ class AroundPersonResult extends MySuper {
   result: unknown;
 
   static {
-    setCallback(this.prototype, "save", "after", ":tweedle1");
-    setCallback(this.prototype, "save", "around", ":tweedleDum");
-    setCallback(this.prototype, "save", "after", ":tweedle2");
+    this.setCallback("save", "after", ":tweedle1");
+    this.setCallback("save", "around", ":tweedleDum");
+    this.setCallback("save", "after", ":tweedle2");
   }
 
   tweedleDum(block: () => unknown): void {
@@ -308,16 +326,26 @@ class AroundPersonResult extends MySuper {
   }
 
   save(): unknown {
-    return runCallbacks(this, "save", () => "running");
+    return this.runCallbacks("save", () => "running");
   }
 }
 
 class HyphenatedCallbacks {
+  declare static defineCallbacks: ClassMethods["defineCallbacks"];
+  declare static setCallback: ClassMethods["setCallback"];
+  declare static skipCallback: ClassMethods["skipCallback"];
+  declare static resetCallbacks: ClassMethods["resetCallbacks"];
+  declare runCallbacks: RunCallbacks;
+
+  static {
+    include(this, Callbacks);
+  }
+
   stuff: string | undefined;
 
   static {
-    defineCallbacks(this.prototype, "save");
-    setCallback(this.prototype, "save", "before", ":action", { if: ":yes" });
+    this.defineCallbacks("save");
+    this.setCallback("save", "before", ":action", { if: ":yes" });
   }
 
   yes(): boolean {
@@ -329,19 +357,29 @@ class HyphenatedCallbacks {
   }
 
   save(): unknown {
-    return runCallbacks(this, "save", () => this.stuff);
+    return this.runCallbacks("save", () => this.stuff);
   }
 }
 
 class AbstractCallbackTerminator {
+  declare static defineCallbacks: ClassMethods["defineCallbacks"];
+  declare static setCallback: ClassMethods["setCallback"];
+  declare static skipCallback: ClassMethods["skipCallback"];
+  declare static resetCallbacks: ClassMethods["resetCallbacks"];
+  declare runCallbacks: RunCallbacks;
+
+  static {
+    include(this, Callbacks);
+  }
+
   static setSaveCallbacks(): void {
-    setCallback(this.prototype, "save", "before", ":first");
-    setCallback(this.prototype, "save", "before", ":second");
-    setCallback(this.prototype, "save", "around", ":aroundIt");
-    setCallback(this.prototype, "save", "before", ":third");
-    setCallback(this.prototype, "save", "after", ":first");
-    setCallback(this.prototype, "save", "around", ":aroundIt");
-    setCallback(this.prototype, "save", "after", ":third");
+    this.setCallback("save", "before", ":first");
+    this.setCallback("save", "before", ":second");
+    this.setCallback("save", "around", ":aroundIt");
+    this.setCallback("save", "before", ":third");
+    this.setCallback("save", "after", ":first");
+    this.setCallback("save", "around", ":aroundIt");
+    this.setCallback("save", "after", ":third");
   }
 
   history: string[] = [];
@@ -369,7 +407,7 @@ class AbstractCallbackTerminator {
   }
 
   save(): unknown {
-    return runCallbacks(this, "save", () => {
+    return this.runCallbacks("save", () => {
       this.saved = true;
     });
   }
@@ -382,7 +420,7 @@ class AbstractCallbackTerminator {
 
 class CallbackTerminator extends AbstractCallbackTerminator {
   static {
-    defineCallbacks(this.prototype, "save", {
+    this.defineCallbacks("save", {
       terminator: (_: object, resultLambda: () => unknown) => resultLambda() === ":halt",
     });
     this.setSaveCallbacks();
@@ -391,7 +429,7 @@ class CallbackTerminator extends AbstractCallbackTerminator {
 
 class CallbackTerminatorSkippingAfterCallbacks extends AbstractCallbackTerminator {
   static {
-    defineCallbacks(this.prototype, "save", {
+    this.defineCallbacks("save", {
       terminator: (_: object, resultLambda: () => unknown) => resultLambda() === ":halt",
       skipAfterCallbacksIfTerminated: true,
     });
@@ -401,7 +439,7 @@ class CallbackTerminatorSkippingAfterCallbacks extends AbstractCallbackTerminato
 
 class CallbackDefaultTerminator extends AbstractCallbackTerminator {
   static {
-    defineCallbacks(this.prototype, "save");
+    this.defineCallbacks("save");
   }
 
   override second(): unknown {
@@ -416,7 +454,7 @@ class CallbackDefaultTerminator extends AbstractCallbackTerminator {
 
 class CallbackFalseTerminator extends AbstractCallbackTerminator {
   static {
-    defineCallbacks(this.prototype, "save");
+    this.defineCallbacks("save");
   }
 
   override second(): unknown {
@@ -430,14 +468,24 @@ class CallbackFalseTerminator extends AbstractCallbackTerminator {
 }
 
 class OneTwoThreeSave {
+  declare static defineCallbacks: ClassMethods["defineCallbacks"];
+  declare static setCallback: ClassMethods["setCallback"];
+  declare static skipCallback: ClassMethods["skipCallback"];
+  declare static resetCallbacks: ClassMethods["resetCallbacks"];
+  declare runCallbacks: RunCallbacks;
+
   static {
-    defineCallbacks(this.prototype, "save");
+    include(this, Callbacks);
+  }
+
+  static {
+    this.defineCallbacks("save");
   }
 
   record: string[] = [];
 
   save(): unknown {
-    return runCallbacks(this, "save", () => {
+    return this.runCallbacks("save", () => {
       this.record.push("yielded");
     });
   }
@@ -457,14 +505,14 @@ class OneTwoThreeSave {
 
 class DuplicatingCallbacks extends OneTwoThreeSave {
   static {
-    setCallback(this.prototype, "save", "before", ":first", ":second");
-    setCallback(this.prototype, "save", "before", ":first", ":third");
+    this.setCallback("save", "before", ":first", ":second");
+    this.setCallback("save", "before", ":first", ":third");
   }
 }
 
 class DuplicatingCallbacksInSameCall extends OneTwoThreeSave {
   static {
-    setCallback(this.prototype, "save", "before", ":first", ":second", ":first", ":third");
+    this.setCallback("save", "before", ":first", ":second", ":first", ":third");
   }
 }
 
@@ -472,7 +520,7 @@ class WriterSkipper extends Person {
   age = 0;
 
   static {
-    skipCallback(this.prototype, "save", "before", ":beforeSaveMethod", {
+    this.skipCallback("save", "before", ":beforeSaveMethod", {
       if: function (this: WriterSkipper) {
         return this.age > 21;
       },
@@ -544,9 +592,9 @@ describe("AfterSaveConditionalPersonCallbackTest", () => {
 describe("DoubleYieldTest", () => {
   class DoubleYieldModel extends MySlate {
     static {
-      setCallback(this.prototype, "save", "around", ":wrapOuter");
-      setCallback(this.prototype, "save", "around", ":doubleTrouble");
-      setCallback(this.prototype, "save", "around", ":wrapInner");
+      this.setCallback("save", "around", ":wrapOuter");
+      this.setCallback("save", "around", ":doubleTrouble");
+      this.setCallback("save", "around", ":wrapInner");
     }
 
     wrapOuter(block: () => unknown): void {
@@ -631,7 +679,7 @@ describe("CallStackTest", () => {
           "invokeSequence",
           "AroundPerson.tweedleDum",
           "invokeSequence",
-          "runCallbacks",
+          "AroundPerson.runCallbacks",
           "AroundPerson.save",
         ].join("\n"),
       );
@@ -676,7 +724,9 @@ describe("CallStackTest", () => {
     // eslint-disable-next-line vitest/no-conditional-in-test
     if (callStack[callStack.length - 1].includes(".")) {
       // eslint-disable-next-line vitest/no-conditional-expect
-      expect(callStack.join("\n")).toBe(["<anonymous>", "runCallbacks", "Person.save"].join("\n"));
+      expect(callStack.join("\n")).toBe(
+        ["<anonymous>", "Person.runCallbacks", "Person.save"].join("\n"),
+      );
     } else {
       // eslint-disable-next-line vitest/no-conditional-expect
       expect(callStack.join("\n")).toBe(["<anonymous>", "runCallbacks", "save"].join("\n"));
@@ -687,7 +737,11 @@ describe("CallStackTest", () => {
 describe("ExtendCallbacksTest", () => {
   const ExtendModule = {
     extended(base: ExtendCallbacks) {
-      setCallback(base, "save", "before", ":record3");
+      (rbObjSingletonClass(base) as unknown as typeof ExtendCallbacks).setCallback(
+        "save",
+        "before",
+        ":record3",
+      );
     },
 
     record3(this: ExtendCallbacks) {
@@ -697,7 +751,7 @@ describe("ExtendCallbacksTest", () => {
 
   const IncludeModule = {
     included(base: typeof ExtendCallbacks) {
-      setCallback(base.prototype, "save", "before", ":record2");
+      base.setCallback("save", "before", ":record2");
     },
 
     record2(this: ExtendCallbacks) {
@@ -706,16 +760,26 @@ describe("ExtendCallbacksTest", () => {
   };
 
   class ExtendCallbacks {
+    declare static defineCallbacks: ClassMethods["defineCallbacks"];
+    declare static setCallback: ClassMethods["setCallback"];
+    declare static skipCallback: ClassMethods["skipCallback"];
+    declare static resetCallbacks: ClassMethods["resetCallbacks"];
+    declare runCallbacks: RunCallbacks;
+
     static {
-      defineCallbacks(this.prototype, "save");
-      setCallback(this.prototype, "save", "before", ":record1");
+      include(this, Callbacks);
+    }
+
+    static {
+      this.defineCallbacks("save");
+      this.setCallback("save", "before", ":record1");
 
       Object.defineProperty(this.prototype, "record2", { value: IncludeModule.record2 });
       IncludeModule.included(this);
     }
 
     save(): unknown {
-      return runCallbacks(this, "save");
+      return this.runCallbacks("save");
     }
 
     recorder: number[] = [];
@@ -796,13 +860,23 @@ describe("AroundCallbackResultTest", () => {
 describe("ResetCallbackTest", () => {
   function buildClass(memo: unknown[]) {
     class Klass {
+      declare static defineCallbacks: ClassMethods["defineCallbacks"];
+      declare static setCallback: ClassMethods["setCallback"];
+      declare static skipCallback: ClassMethods["skipCallback"];
+      declare static resetCallbacks: ClassMethods["resetCallbacks"];
+      declare runCallbacks: RunCallbacks;
+
       static {
-        defineCallbacks(this.prototype, "foo");
-        setCallback(this.prototype, "foo", "before", ":hello");
+        include(this, Callbacks);
+      }
+
+      static {
+        this.defineCallbacks("foo");
+        this.setCallback("foo", "before", ":hello");
       }
 
       run(): unknown {
-        return runCallbacks(this, "foo");
+        return this.runCallbacks("foo");
       }
 
       hello(): void {
@@ -824,7 +898,7 @@ describe("ResetCallbackTest", () => {
     new klass().run();
     expect(events.length).toBe(1);
 
-    resetCallbacks(klass.prototype, "foo");
+    klass.resetCallbacks("foo");
     new klass().run();
     expect(events.length).toBe(1);
   });
@@ -834,7 +908,7 @@ describe("ResetCallbackTest", () => {
     const klass = buildClass(events);
     class Subclass extends klass {
       static {
-        setCallback(this.prototype, "foo", "before", ":world");
+        this.setCallback("foo", "before", ":world");
       }
 
       world(): void {
@@ -845,7 +919,7 @@ describe("ResetCallbackTest", () => {
     new Subclass().run();
     expect(events.length).toBe(2);
 
-    resetCallbacks(klass.prototype, "foo");
+    klass.resetCallbacks("foo");
     new Subclass().run();
     expect(events.length).toBe(3);
   });
@@ -854,15 +928,25 @@ describe("ResetCallbackTest", () => {
 describe("ConditionalTests", () => {
   function buildClass(callback: unknown) {
     class Klass {
+      declare static defineCallbacks: ClassMethods["defineCallbacks"];
+      declare static setCallback: ClassMethods["setCallback"];
+      declare static skipCallback: ClassMethods["skipCallback"];
+      declare static resetCallbacks: ClassMethods["resetCallbacks"];
+      declare runCallbacks: RunCallbacks;
+
       static {
-        defineCallbacks(this.prototype, "foo");
-        setCallback(this.prototype, "foo", "before", ":foo", { if: callback as any });
+        include(this, Callbacks);
+      }
+
+      static {
+        this.defineCallbacks("foo");
+        this.setCallback("foo", "before", ":foo", { if: callback as any });
       }
 
       foo(): void {}
 
       run(): unknown {
-        return runCallbacks(this, "foo");
+        return this.runCallbacks("foo");
       }
     }
     return Klass;
@@ -876,13 +960,23 @@ describe("ConditionalTests", () => {
       },
     };
     class Klass {
+      declare static defineCallbacks: ClassMethods["defineCallbacks"];
+      declare static setCallback: ClassMethods["setCallback"];
+      declare static skipCallback: ClassMethods["skipCallback"];
+      declare static resetCallbacks: ClassMethods["resetCallbacks"];
+      declare runCallbacks: RunCallbacks;
+
       static {
-        defineCallbacks(this.prototype, "foo", { scope: ["name"] });
-        setCallback(this.prototype, "foo", "before", ":foo", { if: callback as any });
+        include(this, Callbacks);
+      }
+
+      static {
+        this.defineCallbacks("foo", { scope: ["name"] });
+        this.setCallback("foo", "before", ":foo", { if: callback as any });
       }
 
       run(): unknown {
-        return runCallbacks(this, "foo");
+        return this.runCallbacks("foo");
       }
 
       private foo(): void {}
@@ -953,12 +1047,7 @@ describe("SkipCallbacksTest", () => {
   it("skip person programmatically", () => {
     for (const saveCallback of (PersonForProgrammaticSkipping as any).__callbacks.save.entries) {
       if ("before" === String(saveCallback.kind)) {
-        skipCallback(
-          PersonForProgrammaticSkipping.prototype,
-          "save",
-          saveCallback.kind,
-          saveCallback.filter,
-        );
+        PersonForProgrammaticSkipping.skipCallback("save", saveCallback.kind, saveCallback.filter);
       }
     }
     const person = new PersonForProgrammaticSkipping();
@@ -1003,53 +1092,88 @@ describe("UsingObjectTest", () => {
     }
   }
 
-  const usingObjectBefore = () => {
-    const u = { record: [] as string[] };
-    defineCallbacks(u, "save");
-    setCallback(u, "save", "before", new CallbackObject());
-    return u;
-  };
-  const usingObjectAround = () => {
-    const u = { record: [] as string[] };
-    defineCallbacks(u, "save");
-    setCallback(u, "save", "around", new CallbackObject());
-    return u;
-  };
-  const customScopeObject = () => {
-    const u = { record: [] as string[] };
-    defineCallbacks(u, "save", { scope: ["kind", "name"] });
-    setCallback(u, "save", "before", new CallbackObject());
-    return u;
-  };
-  const save = (u: { record: string[] }) =>
-    runCallbacks(u, "save", () => {
-      u.record.push("yielded");
-    });
+  class UsingObjectBefore {
+    declare static defineCallbacks: ClassMethods["defineCallbacks"];
+    declare static setCallback: ClassMethods["setCallback"];
+    declare runCallbacks: RunCallbacks;
+
+    static {
+      include(this, Callbacks);
+
+      this.defineCallbacks("save");
+      this.setCallback("save", "before", new CallbackObject());
+    }
+
+    record: string[] = [];
+
+    save(): unknown {
+      return this.runCallbacks("save", () => {
+        this.record.push("yielded");
+      });
+    }
+  }
+
+  class UsingObjectAround {
+    declare static defineCallbacks: ClassMethods["defineCallbacks"];
+    declare static setCallback: ClassMethods["setCallback"];
+    declare runCallbacks: RunCallbacks;
+
+    static {
+      include(this, Callbacks);
+
+      this.defineCallbacks("save");
+      this.setCallback("save", "around", new CallbackObject());
+    }
+
+    record: string[] = [];
+
+    save(): unknown {
+      return this.runCallbacks("save", () => {
+        this.record.push("yielded");
+      });
+    }
+  }
+
+  class CustomScopeObject {
+    declare static defineCallbacks: ClassMethods["defineCallbacks"];
+    declare static setCallback: ClassMethods["setCallback"];
+    declare runCallbacks: RunCallbacks;
+
+    static {
+      include(this, Callbacks);
+
+      this.defineCallbacks("save", { scope: ["kind", "name"] });
+      this.setCallback("save", "before", new CallbackObject());
+    }
+
+    record: string[] = [];
+
+    save(): unknown {
+      return this.runCallbacks("save", () => {
+        this.record.push("yielded");
+        return "CallbackResult";
+      });
+    }
+  }
 
   it("before object", () => {
-    const u = usingObjectBefore();
-    save(u);
+    const u = new UsingObjectBefore();
+    u.save();
     expect(u.record).toEqual(["before", "yielded"]);
   });
   it("around object", () => {
-    const u = usingObjectAround();
-    save(u);
+    const u = new UsingObjectAround();
+    u.save();
     expect(u.record).toEqual(["around before", "yielded", "around after"]);
   });
-  const customScopeSave = (u: { record: string[] }) =>
-    runCallbacks(u, "save", () => {
-      u.record.push("yielded");
-      return "CallbackResult";
-    });
-
   it("customized object", () => {
-    const u = customScopeObject();
-    customScopeSave(u);
+    const u = new CustomScopeObject();
+    u.save();
     expect(u.record).toEqual(["before save", "yielded"]);
   });
   it("block result is returned", () => {
-    const u = customScopeObject();
-    expect(customScopeSave(u)).toBe("CallbackResult");
+    const u = new CustomScopeObject();
+    expect(u.save()).toBe("CallbackResult");
   });
 });
 
@@ -1105,13 +1229,23 @@ describe("CallbackDefaultTerminatorTest", () => {
 describe("CallbackProcTest", () => {
   function buildClass(callback: unknown) {
     class Klass {
+      declare static defineCallbacks: ClassMethods["defineCallbacks"];
+      declare static setCallback: ClassMethods["setCallback"];
+      declare static skipCallback: ClassMethods["skipCallback"];
+      declare static resetCallbacks: ClassMethods["resetCallbacks"];
+      declare runCallbacks: RunCallbacks;
+
       static {
-        defineCallbacks(this.prototype, "foo");
-        setCallback(this.prototype, "foo", "before", callback as any);
+        include(this, Callbacks);
+      }
+
+      static {
+        this.defineCallbacks("foo");
+        this.setCallback("foo", "before", callback as any);
       }
 
       run(): unknown {
-        return runCallbacks(this, "foo");
+        return this.runCallbacks("foo");
       }
     }
     return Klass;
@@ -1158,17 +1292,27 @@ describe("CallbackTerminatorSkippingAfterCallbacksTest", () => {
 describe("CallbackTypeTest", () => {
   function buildClass(callback: unknown, n = 10) {
     class Klass {
+      declare static defineCallbacks: ClassMethods["defineCallbacks"];
+      declare static setCallback: ClassMethods["setCallback"];
+      declare static skipCallback: ClassMethods["skipCallback"];
+      declare static resetCallbacks: ClassMethods["resetCallbacks"];
+      declare runCallbacks: RunCallbacks;
+
       static {
-        defineCallbacks(this.prototype, "foo");
-        for (let i = 0; i < n; i++) setCallback(this.prototype, "foo", "before", callback as any);
+        include(this, Callbacks);
+      }
+
+      static {
+        this.defineCallbacks("foo");
+        for (let i = 0; i < n; i++) this.setCallback("foo", "before", callback as any);
       }
 
       run(): unknown {
-        return runCallbacks(this, "foo");
+        return this.runCallbacks("foo");
       }
 
       static skip(...things: any[]): void {
-        skipCallback(this.prototype, "foo", "before", ...things);
+        this.skipCallback("foo", "before", ...things);
       }
     }
     return Klass;
@@ -1259,26 +1403,36 @@ describe("NotSupportedStringConditionalTest", () => {
     expect(() => Klass.beforeSave(":tweedle", { if: ["true"] })).toThrow(ArgumentError);
     expect(() => Klass.beforeSave(":tweedle", { if: "true" })).toThrow(ArgumentError);
     expect(() => Klass.afterSave(":tweedle", { unless: "false" })).toThrow(ArgumentError);
-    expect(() =>
-      skipCallback(Klass.prototype, "save", "before", ":tweedle", { if: "true" }),
-    ).toThrow(ArgumentError);
-    expect(() =>
-      skipCallback(Klass.prototype, "save", "after", ":tweedle", { unless: "false" }),
-    ).toThrow(ArgumentError);
+    expect(() => Klass.skipCallback("save", "before", ":tweedle", { if: "true" })).toThrow(
+      ArgumentError,
+    );
+    expect(() => Klass.skipCallback("save", "after", ":tweedle", { unless: "false" })).toThrow(
+      ArgumentError,
+    );
   });
 });
 
 class AllSaveCallbacks {
+  declare static defineCallbacks: ClassMethods["defineCallbacks"];
+  declare static setCallback: ClassMethods["setCallback"];
+  declare static skipCallback: ClassMethods["skipCallback"];
+  declare static resetCallbacks: ClassMethods["resetCallbacks"];
+  declare runCallbacks: RunCallbacks;
+
+  static {
+    include(this, Callbacks);
+  }
+
   history: string[] = [];
 
   static {
-    defineCallbacks(this.prototype, "save");
-    setCallback(this.prototype, "save", "before", ":beforeSave1");
-    setCallback(this.prototype, "save", "before", ":beforeSave2");
-    setCallback(this.prototype, "save", "around", ":aroundSave1");
-    setCallback(this.prototype, "save", "around", ":aroundSave2");
-    setCallback(this.prototype, "save", "after", ":afterSave1");
-    setCallback(this.prototype, "save", "after", ":afterSave2");
+    this.defineCallbacks("save");
+    this.setCallback("save", "before", ":beforeSave1");
+    this.setCallback("save", "before", ":beforeSave2");
+    this.setCallback("save", "around", ":aroundSave1");
+    this.setCallback("save", "around", ":aroundSave2");
+    this.setCallback("save", "after", ":afterSave1");
+    this.setCallback("save", "after", ":afterSave2");
   }
 
   beforeSave1(): void {
@@ -1313,13 +1467,13 @@ class AllSaveCallbacks {
 describe("RunSpecificCallbackTest", () => {
   it("run callbacks only before", () => {
     const klass = new AllSaveCallbacks();
-    runCallbacks(klass, "save", undefined, undefined, "before");
+    klass.runCallbacks("save", undefined, undefined, "before");
     expect(klass.history).toEqual(["beforeSave1", "beforeSave2"]);
   });
 
   it("run callbacks only around", () => {
     const klass = new AllSaveCallbacks();
-    runCallbacks(klass, "save", undefined, undefined, "around");
+    klass.runCallbacks("save", undefined, undefined, "around");
     expect(klass.history).toEqual([
       "aroundSave1_before",
       "aroundSave2_before",
@@ -1330,7 +1484,7 @@ describe("RunSpecificCallbackTest", () => {
 
   it("run callbacks only after", () => {
     const klass = new AllSaveCallbacks();
-    runCallbacks(klass, "save", undefined, undefined, "after");
+    klass.runCallbacks("save", undefined, undefined, "after");
     expect(klass.history).toEqual(["afterSave2", "afterSave1"]);
   });
 });

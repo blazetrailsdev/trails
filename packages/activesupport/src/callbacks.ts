@@ -1015,8 +1015,8 @@ export function defineCallbacks<T extends object>(
 }
 
 /**
- * @missingRailsCall normalize_callback_params — CONVERGEABLE activesupport-callbacks-free-target-functions-are-not-class-methods
- * @missingRailsCall build — CONVERGEABLE activesupport-callbacks-free-target-functions-are-not-class-methods
+ * @missingRailsCall normalize_callback_params — CONVERGEABLE activesupport-callbacks-run-callbacks-is-the-instance-method-only
+ * @missingRailsCall build — CONVERGEABLE activesupport-callbacks-run-callbacks-is-the-instance-method-only
  */
 export function setCallback<T extends object>(
   target: T,
@@ -1143,8 +1143,8 @@ export const ClassMethods = {
       });
 
       Object.defineProperty(this.prototype, `_run${camelize(name)}Callbacks`, {
-        value(this: object, block?: () => unknown) {
-          return runCallbacks(this, name, block);
+        value(this: { runCallbacks: typeof runCallbacks }, block?: () => unknown) {
+          return this.runCallbacks(name, block);
         },
         writable: true,
         configurable: true,
@@ -1197,15 +1197,7 @@ export const ClassMethods = {
 export const Callbacks = {
   ClassMethods,
 
-  runCallbacks(
-    this: object,
-    name: string,
-    block?: () => unknown,
-    opts?: RunCallbacksOptions,
-    type?: CallbackKind,
-  ): unknown {
-    return runCallbacks(this, name, block, opts, type);
-  },
+  runCallbacks,
 
   haltedCallbackHook(_filter: unknown, _name: string): void {},
 
@@ -1221,14 +1213,14 @@ export const Callbacks = {
   },
 };
 
-export function runCallbacks(
-  target: object,
+function runCallbacks(
+  this: object,
   name: string,
   block?: () => unknown,
   opts?: RunCallbacksOptions,
   type?: CallbackKind,
 ): unknown {
-  const callbacks = (target as { __callbacks?: Record<string, CallbackChain> }).__callbacks?.[name];
+  const callbacks = (this as { __callbacks?: Record<string, CallbackChain> }).__callbacks?.[name];
 
   if (!callbacks || callbacks.isEmpty) {
     const r = block?.();
@@ -1240,7 +1232,7 @@ export function runCallbacks(
     return r;
   }
   const chainName = callbacks.name;
-  const env: FilterEnvironment = { target, halted: false, value: undefined };
+  const env: FilterEnvironment = { target: this, halted: false, value: undefined };
 
   const nextSequence = callbacks.compile(type);
 
@@ -1379,6 +1371,18 @@ export function runCallbacks(
   }
 }
 
+function runCallbacksOn(
+  target: object,
+  name: string,
+  block?: () => unknown,
+  opts?: RunCallbacksOptions,
+  type?: CallbackKind,
+): unknown {
+  return runCallbacks.call(target, name, block, opts, type);
+}
+
+export { runCallbacksOn as runCallbacks };
+
 export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Base?: TBase) {
   const ActualBase = (Base ?? class {}) as TBase;
 
@@ -1436,7 +1440,7 @@ export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Bas
       opts?: RunCallbacksOptions,
       type?: CallbackKind,
     ): unknown {
-      return runCallbacks(this, name, block, opts, type);
+      return runCallbacks.call(this, name, block, opts, type);
     }
 
     /** @internal */
