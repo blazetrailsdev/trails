@@ -12,8 +12,8 @@ import {
   extractOptionsBang,
   included,
   kernelArray,
-  peekCallbackChain as asPeekCallbackChain,
   runCallbacks,
+  type CallbackChain,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
 import { mergeBang } from "@blazetrails/ruby-compat";
@@ -400,14 +400,14 @@ export async function addToTransaction(this: Base, ensureFinalize = true): Promi
 
 /** @internal */
 export function hasTransactionalCallbacks(this: Base): boolean {
-  const proto = (this.constructor as any).prototype;
-  const rollback = asPeekCallbackChain(proto, "rollback");
-  const commit = asPeekCallbackChain(proto, "commit");
-  const beforeCommitChain = asPeekCallbackChain(proto, "before_commit");
+  const self = this as unknown as Record<
+    "_rollbackCallbacks" | "_commitCallbacks" | "_beforeCommitCallbacks",
+    CallbackChain
+  >;
   return (
-    !(rollback == null || rollback.isEmpty) ||
-    !(commit == null || commit.isEmpty) ||
-    !(beforeCommitChain == null || beforeCommitChain.isEmpty)
+    !self._rollbackCallbacks.isEmpty ||
+    !self._commitCallbacks.isEmpty ||
+    !self._beforeCommitCallbacks.isEmpty
   );
 }
 

@@ -59,12 +59,11 @@ describe("ExcludingDuplicatesCallbackTest", () => {
 describe("ResetCallbackTest", () => {
   it("reset impacts subclasses", () => {
     const log: string[] = [];
-    const baseProto = {};
+    const baseProto = class {}.prototype;
     defineCallbacks(baseProto, "save");
     setCallback(baseProto, "save", "before", () => log.push("base_before"));
 
-    const childProto = Object.create(baseProto);
-    defineCallbacks(childProto, "save");
+    const childProto = class extends (baseProto.constructor as new () => object) {}.prototype;
     setCallback(childProto, "save", "before", () => log.push("child_before"));
 
     runCallbacks(childProto, "save", () => log.push("action"));

@@ -1,3 +1,5 @@
+import { Module } from "@blazetrails/ruby-compat";
+
 export type AnyClass = abstract new (...args: unknown[]) => unknown;
 
 const _subclassMap = new globalThis.WeakMap<AnyClass, DescendantsTracker.WeakSet<AnyClass>>();
@@ -106,6 +108,21 @@ export namespace DescendantsTracker {
     return classes;
   }
 }
+
+Object.setPrototypeOf(DescendantsTracker, Module.prototype);
+(DescendantsTracker as unknown as Module).moduleEval((carrier) =>
+  Object.defineProperty(carrier, "descendants", {
+    get(this: AnyClass): AnyClass[] {
+      const subclasses = DescendantsTracker.rejectBang(DescendantsTracker.subclasses(this));
+      return subclasses.concat(
+        subclasses.flatMap(
+          (klass) => (klass as unknown as { descendants: AnyClass[] }).descendants,
+        ),
+      );
+    },
+    configurable: true,
+  }),
+);
 
 export { DescendantsTracker as default };
 

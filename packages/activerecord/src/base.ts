@@ -139,7 +139,12 @@ import {
 } from "./token-for.js";
 import type { TokenDefinitionsHash as _TokenDefinitionsHash } from "./token-for.js";
 import type { MessageVerifier as _MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { DescendantsTracker, ReloadedClassesFiltering } from "@blazetrails/activesupport";
+import {
+  DescendantsTracker,
+  ReloadedClassesFiltering,
+  camelize,
+  type CallbackChain,
+} from "@blazetrails/activesupport";
 import * as LockingOptimistic from "./locking/optimistic.js";
 import * as LockingPessimistic from "./locking/pessimistic.js";
 import {
@@ -163,7 +168,6 @@ import {
   type PrependMethod,
   type Included,
   type ParameterFilter,
-  peekCallbackChain,
   runCallbacks,
   type HashWithIndifferentAccess,
 } from "@blazetrails/activesupport";
@@ -376,7 +380,9 @@ function beforeOrAroundCallbackSources(
   proto: object,
   event: string,
 ): { sources: string[]; opaque: boolean } {
-  const chain = peekCallbackChain(proto, event);
+  const chain = (proto as Record<string, CallbackChain | undefined>)[
+    `_${camelize(event, false)}Callbacks`
+  ];
   if (!chain) return { sources: [], opaque: false };
   const sources: string[] = [];
   let opaque = false;

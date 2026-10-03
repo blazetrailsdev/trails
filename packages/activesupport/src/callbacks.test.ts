@@ -6,7 +6,6 @@ import {
   skipCallback,
   resetCallbacks,
   runCallbacks,
-  peekCallbackChain,
 } from "./callbacks.js";
 import { ArgumentError } from "./hash-utils.js";
 
@@ -952,14 +951,13 @@ describe("SkipCallbacksTest", () => {
   });
 
   it("skip person programmatically", () => {
-    for (const saveCallback of peekCallbackChain(PersonForProgrammaticSkipping.prototype, "save")!
-      .entries) {
+    for (const saveCallback of (PersonForProgrammaticSkipping as any).__callbacks.save.entries) {
       if ("before" === String(saveCallback.kind)) {
         skipCallback(
           PersonForProgrammaticSkipping.prototype,
           "save",
           saveCallback.kind,
-          saveCallback.filter as any,
+          saveCallback.filter,
         );
       }
     }
