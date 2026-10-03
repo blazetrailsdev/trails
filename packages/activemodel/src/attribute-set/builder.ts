@@ -192,7 +192,7 @@ export class LazyAttributeHash {
     return hasKey(this._delegateHash, key) || hasKey(this.values, key) || hasKey(this.types, key);
   }
 
-  getAttribute(key: string): Attribute {
+  getAttribute(key: string): Attribute | undefined {
     return this._delegateHash[key] ?? this.assignDefaultValue(key);
   }
 
@@ -275,7 +275,7 @@ export class LazyAttributeHash {
   }
 
   /** @internal */
-  assignDefaultValue(name: string): Attribute {
+  assignDefaultValue(name: string): Attribute | undefined {
     const type = fetch<ValueType>(this.additionalTypes, name, this.types[name]);
     let valuePresent: boolean = true;
     const value = fetch(
@@ -296,7 +296,6 @@ export class LazyAttributeHash {
       this._delegateHash[name] = built;
       return built;
     }
-    return Attribute.null(name);
   }
 
   dup(): LazyAttributeHash {

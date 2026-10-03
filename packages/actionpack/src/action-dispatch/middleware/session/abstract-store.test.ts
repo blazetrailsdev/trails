@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 import { Request as RackRequest, ResponseRaw } from "@blazetrails/rack";
 import { Persisted, PersistedSecure, SessionId } from "@blazetrails/rack-session";
@@ -76,7 +77,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
     it("wraps undefined-class errors in SessionRestoreError", () => {
       expect(() =>
         StaleSessionCheck.staleSessionCheckBang(() => {
-          throw new ArgumentErrorLike("undefined class/module Acme::Missing");
+          throw new ArgumentError("undefined class/module Acme::Missing");
         }),
       ).toThrow(SessionRestoreError);
     });
@@ -264,10 +265,3 @@ describe("ActionDispatch::Session::AbstractStore", () => {
     });
   });
 });
-
-class ArgumentErrorLike extends Error {
-  constructor(msg: string) {
-    super(msg);
-    this.name = "ArgumentError";
-  }
-}

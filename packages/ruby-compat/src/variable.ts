@@ -1,4 +1,5 @@
 import { ArgumentError } from "./argument-error.js";
+import { rbModAncestors } from "./include.js";
 import { NameError } from "./name-error.js";
 import { classpaths } from "./object.js";
 import { TypeError } from "./type-error.js";
@@ -165,15 +166,60 @@ export function rbModConstMissing(klass: { name?: string } | null, name: string)
 /**
  * `rb_const_get` (`vendor/ruby/v3.3.11/variable.c:3210`), the lookup behind
  * `Module#const_get(name)` (`vendor/ruby/v3.3.11/object.c:2423` `rb_mod_const_get`):
- * `rb_const_search` walks `klass` and then its ancestors, which in JS is the
- * prototype chain `in` reads, and a miss goes to `rb_const_missing`
+ * `rb_const_search` (`vendor/ruby/v3.3.11/variable.c:3190`) walks `klass` and
+ * then its ancestors. The superclasses are the prototype chain `in` reads, the
+ * included modules are the {@link rbModAncestors} entries no prototype link
+ * carries, and `rb_cObject`, where the walk ends, is the table
+ * `registerConstant` fills. A miss goes to `rb_const_missing`
  * (`vendor/ruby/v3.3.11/variable.c:2346`), which sends `const_missing` to `klass`.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbConstGet(klass: object, id: string): unknown {
   if (id in klass) return (klass as Record<string, unknown>)[id];
+  if (typeof klass === "function") {
+    for (const tmp of rbModAncestors(klass as unknown as { prototype: object })) {
+      if (Object.prototype.hasOwnProperty.call(tmp, id)) {
+        return (tmp as Record<string, unknown>)[id];
+      }
+    }
+  }
+  if (_constants.has(id)) return _constants.get(id);
   const { constMissing } = klass as { constMissing?: (name: string) => unknown };
   if (constMissing !== undefined) return constMissing.call(klass, id);
   return rbModConstMissing(klass, id);
+}
+
+/**
+ * `rb_mod_const_get` (`vendor/ruby/v3.3.11/object.c:2423`), `Module#const_get`
+ * of a name that may be a `::` path. The first segment is read by
+ * {@link rbConstGet}; each later one is read from the namespace before it
+ * alone (`rb_const_get_0` with `exclude`), and a miss raises `NameError`
+ * naming that segment. The top-level table seats a constant under its full
+ * path and not every prefix of it, so a seated path or prefix is read whole,
+ * as {@link rbPathToClass} reads it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModConstGet(mod: object, name: string): unknown {
+  if (_constants.has(name)) return _constants.get(name);
+  let path = "";
+  let c: unknown = mod;
+  for (const [i, part] of name.split("::").entries()) {
+    path = i === 0 ? part : `${path}::${part}`;
+    if (i === 0) {
+      c = rbConstGet(mod, part);
+    } else if (_constants.has(path)) {
+      c = _constants.get(path);
+    } else if (
+      c !== null &&
+      (typeof c === "object" || typeof c === "function") &&
+      Object.prototype.hasOwnProperty.call(c, part)
+    ) {
+      c = (c as Record<string, unknown>)[part];
+    } else {
+      return rbModConstMissing(c as { name?: string } | null, part);
+    }
+  }
+  return c;
 }

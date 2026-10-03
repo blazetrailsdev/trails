@@ -1,5 +1,5 @@
-import { include as includeMixin } from "@blazetrails/activesupport";
-import { SecureRandom } from "@blazetrails/ruby-compat";
+import { constantize, include as includeMixin } from "@blazetrails/activesupport";
+import { ArgumentError, LoadError, NameError, SecureRandom } from "@blazetrails/ruby-compat";
 import type { RackApp } from "@blazetrails/rack";
 import type { PersistedRequest } from "@blazetrails/rack-session";
 import { Persisted, PersistedSecure, SessionId } from "@blazetrails/rack-session";
@@ -41,32 +41,41 @@ export const Compatibility = {
   },
 };
 
+type StaleSessionCheckHost = Persisted & { staleSessionCheckBang<T>(block: () => T): T };
+
 export const StaleSessionCheck = {
-  loadSession(this: Persisted, env: PersistedRequest): [unknown, Record<string, unknown>] {
-    return staleSessionCheckBang(() => Persisted.prototype.loadSession.call(this, env));
+  loadSession(
+    this: StaleSessionCheckHost,
+    env: PersistedRequest,
+  ): [unknown, Record<string, unknown>] {
+    return this.staleSessionCheckBang(() => Persisted.prototype.loadSession.call(this, env));
   },
 
-  extractSessionId(this: Persisted, env: PersistedRequest): unknown {
-    return staleSessionCheckBang(() => Persisted.prototype.extractSessionId.call(this, env));
+  extractSessionId(this: StaleSessionCheckHost, env: PersistedRequest): unknown {
+    return this.staleSessionCheckBang(() => Persisted.prototype.extractSessionId.call(this, env));
   },
 
-  /** @internal */
-  staleSessionCheckBang<T>(this: unknown, block: () => T): T {
-    return staleSessionCheckBang(block);
+  staleSessionCheckBang<T>(block: () => T): T {
+    for (;;) {
+      try {
+        return block();
+      } catch (argumentError) {
+        if (!(argumentError instanceof ArgumentError)) throw argumentError;
+        const match = /undefined class\/module ([\w:]*\w)/.exec(argumentError.message);
+        if (match) {
+          try {
+            constantize(match[1]);
+          } catch (error) {
+            if (!(error instanceof LoadError || error instanceof NameError)) throw error;
+            throw new SessionRestoreError(error);
+          }
+        } else {
+          throw argumentError;
+        }
+      }
+    }
   },
 };
-
-function staleSessionCheckBang<T>(block: () => T): T {
-  try {
-    return block();
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (/undefined class\/module ([\w:]*\w)/.test(msg)) {
-      throw new SessionRestoreError(err instanceof Error ? err : undefined);
-    }
-    throw err;
-  }
-}
 
 export const SessionObject = {
   commitSession(this: Persisted, req: any, res: any): unknown {

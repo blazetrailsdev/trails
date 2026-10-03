@@ -10,7 +10,7 @@ import type {
 } from "./errors.js";
 import type { NestedError } from "./nested-error.js";
 import type { JSON } from "./serializers/json.js";
-import type { ValidationError } from "./validations.js";
+import type { ValidationError, Validations } from "./validations.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -31,11 +31,13 @@ export const ActiveModel = { name: "ActiveModel", loadPath } as AutoloadModule &
   StrictValidationFailed: typeof StrictValidationFailed;
   UnknownAttributeError: typeof UnknownAttributeError;
   ValidationError: typeof ValidationError;
+  Validations: typeof Validations;
   Serializers: typeof Serializers;
 };
 registerConstant("ActiveModel", ActiveModel);
 extend(ActiveModel, Autoload);
 ActiveModel.autoload("Attribute");
+ActiveModel.autoload("Validations");
 ActiveModel.eagerAutoload(() => {
   ActiveModel.autoload("Errors");
   ActiveModel.autoload("Error");

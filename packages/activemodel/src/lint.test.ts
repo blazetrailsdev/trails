@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
+import { Assertion } from "@blazetrails/activesupport";
 import { testErrorsAref, testModelNaming, testToKey, testToParam } from "./lint.js";
 
 type KeyFixture = {
   isPersisted(): boolean;
   toKey(): unknown[] | null;
+  toModel(): KeyFixture;
 };
+
+function toModel<T>(this: T): T {
+  return this;
+}
 
 function buildKeyFixture(): KeyFixture {
   const fixture: KeyFixture = {
@@ -14,6 +20,7 @@ function buildKeyFixture(): KeyFixture {
     toKey(this: KeyFixture) {
       return this.isPersisted() ? [1] : null;
     },
+    toModel,
   };
   return fixture;
 }
@@ -28,8 +35,11 @@ describe("Lint::Tests", () => {
       const broken: KeyFixture = {
         isPersisted: () => true,
         toKey: () => [1],
+        toModel,
       };
-      expect(() => testToKey(broken)).toThrow(/null when `isPersisted` returns false/);
+      expect(() => testToKey(broken)).toThrow(
+        "to_key should return nil when `persisted?` returns false",
+      );
     });
   });
 
@@ -39,6 +49,7 @@ describe("Lint::Tests", () => {
         isPersisted(): boolean;
         toKey(): unknown[] | null;
         toParam(): string | null;
+        toModel(): ParamFixture;
       };
       const fixture: ParamFixture = {
         isPersisted() {
@@ -52,6 +63,7 @@ describe("Lint::Tests", () => {
           const key = this.toKey();
           return key === null ? null : String(key[0]);
         },
+        toModel,
       };
       expect(() => testToParam(fixture)).not.toThrow();
     });
@@ -61,8 +73,11 @@ describe("Lint::Tests", () => {
         isPersisted: () => true,
         toKey: () => [1] as unknown[],
         toParam: () => "1",
+        toModel,
       };
-      expect(() => testToParam(broken)).toThrow(/null when `isPersisted` returns false/);
+      expect(() => testToParam(broken)).toThrow(
+        "to_param should return nil when `persisted?` returns false",
+      );
     });
   });
 
@@ -70,29 +85,29 @@ describe("Lint::Tests", () => {
     const goodName = { human: () => "Foo", singular: "foo", plural: "foos" };
 
     it("passes when instance.modelName === constructor.modelName", () => {
-      const fixture = { modelName: goodName, constructor: { modelName: goodName } };
+      const fixture = { modelName: goodName, constructor: { modelName: goodName }, toModel };
       expect(() => testModelNaming(fixture)).not.toThrow();
     });
 
     it("throws when instance.modelName diverges from constructor.modelName", () => {
       const fixture = {
-        modelName: { ...goodName },
+        modelName: { ...goodName, singular: "bar" },
         constructor: { modelName: goodName },
+        toModel,
       };
-      expect(() => testModelNaming(fixture)).toThrow(
-        /modelName must equal model\.constructor\.modelName/,
-      );
+      expect(() => testModelNaming(fixture)).toThrow(Assertion);
     });
   });
 
   describe("testErrorsAref", () => {
     it("passes when errors.messagesFor returns an array", () => {
-      expect(() => testErrorsAref({ errors: { messagesFor: () => [] } })).not.toThrow();
+      const fixture = { errors: { get: () => [] }, toModel };
+      expect(() => testErrorsAref(fixture)).not.toThrow();
     });
 
     it("throws when errors.messagesFor returns a non-array", () => {
-      const broken = { errors: { messagesFor: () => "nope" as unknown as string[] } };
-      expect(() => testErrorsAref(broken)).toThrow(/should return an empty Array/);
+      const broken = { errors: { get: () => "nope" }, toModel };
+      expect(() => testErrorsAref(broken)).toThrow(/errors#\[\] should return an empty Array/);
     });
   });
 });

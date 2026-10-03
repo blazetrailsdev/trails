@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
-import { Module } from "./include.js";
+import { include, Module, rbModConstSet } from "./include.js";
+import { NameError } from "./name-error.js";
 import { rbModName, rbModToS, rbSetClassPathString } from "./object.js";
 import { TypeError } from "./type-error.js";
 import {
   isRegisteredConstant,
+  rbConstGet,
+  rbModConstGet,
   rbPathToClass,
   registerConstant,
   registeredConstant,
@@ -125,5 +128,79 @@ describe("the Object constant table", () => {
     unregisterConstant("Table::Seat", Seat);
     expect(isRegisteredConstant("Table::Seat")).toBe(false);
     expect(rbModName(Seat)).toBe("Table::Seat");
+  });
+});
+
+describe("rb_const_get", () => {
+  class Checks {}
+  class LocalCheck {}
+  class IncludedCheck {}
+  class TopCheck {}
+  rbModConstSet(Checks, "IncludedCheck", IncludedCheck);
+  rbModConstSet(Checks, "LocalCheck", IncludedCheck);
+
+  class Host {
+    static LocalCheck = LocalCheck;
+  }
+  include(Host, Checks);
+  class Sub extends Host {}
+
+  afterEach(() => {
+    unregisterConstant("ConstGetTopCheck", TopCheck);
+    unregisterConstant("ConstGetSpace::TopCheck", TopCheck);
+  });
+
+  it("reads a constant off the class before its included modules", () => {
+    expect(rbConstGet(Sub, "LocalCheck")).toBe(LocalCheck);
+  });
+
+  it("reads a constant seated on a module the class or a superclass includes", () => {
+    expect(rbConstGet(Host, "IncludedCheck")).toBe(IncludedCheck);
+    expect(rbConstGet(Sub, "IncludedCheck")).toBe(IncludedCheck);
+  });
+
+  it("falls through to the top-level table", () => {
+    registerConstant("ConstGetTopCheck", TopCheck);
+    expect(rbConstGet(Sub, "ConstGetTopCheck")).toBe(TopCheck);
+  });
+
+  it("raises NameError for a name nothing on the walk answers", () => {
+    expect(() => rbConstGet(Sub, "ConstGetTopCheck")).toThrow(NameError);
+  });
+
+  describe("rb_mod_const_get", () => {
+    class Outer {
+      static Inner = class Inner {};
+    }
+
+    afterEach(() => {
+      unregisterConstant("ConstGetOuter", Outer);
+    });
+
+    it("reads a seated path whole", () => {
+      registerConstant("ConstGetSpace::TopCheck", TopCheck);
+      expect(rbModConstGet(Sub, "ConstGetSpace::TopCheck")).toBe(TopCheck);
+    });
+
+    it("reads each later segment from the namespace before it", () => {
+      registerConstant("ConstGetOuter", Outer);
+      expect(rbModConstGet(Sub, "ConstGetOuter::Inner")).toBe(Outer.Inner);
+      expect(rbModConstGet(Sub, "IncludedCheck")).toBe(IncludedCheck);
+    });
+
+    it("names the missing segment, not the path", () => {
+      registerConstant("ConstGetOuter", Outer);
+      let error: unknown;
+      try {
+        rbModConstGet(Sub, "ConstGetAbsent::Inner");
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(NameError);
+      expect((error as NameError).constantName).toBe("ConstGetAbsent");
+      expect(() => rbModConstGet(Sub, "ConstGetOuter::Absent")).toThrow(
+        "uninitialized constant Outer::Absent",
+      );
+    });
   });
 });

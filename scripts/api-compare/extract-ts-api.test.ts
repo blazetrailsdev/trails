@@ -125,6 +125,25 @@ describe("harvestObjectLiteralMethods", () => {
     });
   });
 
+  it("carries a skeleton for a bodied method and function-valued property, and none for a reference", () => {
+    const methods = objectLiteralMethods(
+      `function ref(a: number[]): void {}
+      export const ClassMethods = {
+        method(a: number[]): void {
+          for (const x of a) if (x) throw new Error("x");
+        },
+        fn: function (a: number[]): void {
+          for (const x of a) void x;
+        },
+        ref,
+      };`,
+    );
+    const byName = Object.fromEntries(methods.map((m) => [m.name, m.skeleton]));
+    expect(byName.method).toEqual(expect.arrayContaining(["loop", "if", "throw:Error"]));
+    expect(byName.fn).toContain("loop");
+    expect(byName.ref).toBeUndefined();
+  });
+
   it("clears internal where a receipt rides along, through the symbol too (RFC 0121)", () => {
     const methods = objectLiteralMethods(
       `/**

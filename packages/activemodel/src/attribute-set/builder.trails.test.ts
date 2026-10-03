@@ -154,13 +154,14 @@ describe("LazyAttributeHash", () => {
   it("assignDefaultValue materializes from the value/type tables", () => {
     const hash = new LazyAttributeHash({ age: intType }, { age: "42" });
     const attr = hash.assignDefaultValue("age");
-    expect(attr.value()).toBe(42);
+    expect(attr!.value()).toBe(42);
   });
 
-  it("assignDefaultValue returns Attribute.null for unknown names", () => {
+  it("assignDefaultValue answers undefined for a name in neither values nor types", () => {
     const hash = new LazyAttributeHash({}, {});
-    const attr = hash.assignDefaultValue("missing");
-    expect(attr.value()).toBeNull();
+    expect(hash.assignDefaultValue("missing")).toBeUndefined();
+    expect(hash.getAttribute("missing")).toBeUndefined();
+    expect(Object.hasOwn(hash.delegateHash(), "missing")).toBe(false);
   });
 
   it("transform_values materializes and maps every attribute", () => {
@@ -212,8 +213,8 @@ describe("LazyAttributeHash", () => {
   it("treats an Object.prototype name as an ordinary absent key", () => {
     const hash = new LazyAttributeHash({}, {});
     expect(hash.isKey("toString")).toBe(false);
-    expect(hash.getAttribute("toString").value()).toBeNull();
-    expect(hash.getAttribute("constructor").value()).toBeNull();
+    expect(hash.getAttribute("toString")).toBeUndefined();
+    expect(hash.getAttribute("constructor")).toBeUndefined();
   });
 
   it("stores __proto__ as an ordinary key", () => {
@@ -247,7 +248,7 @@ describe("LazyAttributeHash", () => {
     copy.set("name", Attribute.null("name"));
     expect(Object.keys(hash.delegateHash())).toEqual(["age"]);
     expect(copy.isKey("constructor")).toBe(false);
-    expect(copy.getAttribute("constructor").name).toBe("constructor");
+    expect(copy.getAttribute("constructor")).toBeUndefined();
   });
 
   it("deep_dup carries the receiver's materialized flag", () => {
