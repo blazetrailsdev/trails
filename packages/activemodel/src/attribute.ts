@@ -4,10 +4,8 @@ import { MissingAttributeError } from "./attribute-methods.js";
 import {
   hasKey,
   rbEqual,
-  rbFSend,
   rbModConstSet,
   rbObjDup,
-  rbObjRespondTo,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import { isDuplicable } from "@blazetrails/activesupport";
@@ -217,9 +215,7 @@ export abstract class Attribute {
   /** @missingRailsName value — PERMANENT */
   private initializeDup(_other: Attribute): void {
     if (isDuplicable(this._value)) {
-      this._value = rbObjRespondTo(this._value, "dup")
-        ? rbFSend(this._value, "dup")
-        : rbObjDup(this._value);
+      this._value = rbObjDup(this._value);
     }
   }
 
