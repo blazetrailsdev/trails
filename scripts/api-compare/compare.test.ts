@@ -441,6 +441,30 @@ describe("significantMissingCalls", () => {
     expect(unnamed.has("size")).toBe(true);
   });
 
+  it("significantCallsForReceivers drops new when every site is an argument-less Hash.new / Array.new", () => {
+    expect(significantCallsForReceivers({ new: ["literal-new"] }).has("new")).toBe(false);
+    expect(significantCallsForReceivers({ new: ["const"] }).has("new")).toBe(true);
+    expect(significantCallsForReceivers({ new: ["const", "literal-new"] }).has("new")).toBe(true);
+    expect(significantCallsForReceivers({}).has("new")).toBe(true);
+    expect(significantCallsForReceivers(undefined).has("new")).toBe(true);
+  });
+
+  it("significantCallsForReceivers credits String.new(x) only to a TS body making the String(x) conversion call", () => {
+    const conversion = new Set(["String"]);
+    expect(
+      significantCallsForReceivers({ new: ["string-new"] }, undefined, conversion).has("new"),
+    ).toBe(false);
+    expect(significantCallsForReceivers({ new: ["string-new"] }).has("new")).toBe(true);
+    expect(
+      significantCallsForReceivers({ new: ["const", "string-new"] }, undefined, conversion).has(
+        "new",
+      ),
+    ).toBe(true);
+    expect(significantCallsForReceivers({ new: ["const"] }, undefined, conversion).has("new")).toBe(
+      true,
+    );
+  });
+
   it("significantCallsForReceivers still flags size for a TS body with no .length read", () => {
     expect(significantCallsForReceivers({ size: ["expr"] }).has("size")).toBe(true);
     expect(significantCallsForReceivers({ size: ["expr"] }, undefined, new Set()).has("size")).toBe(

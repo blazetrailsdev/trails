@@ -88,7 +88,6 @@ export class MySQLDatabaseTasks {
     await this.runCmd("mysql", args, "loading");
   }
 
-  /** @missingRailsCall new — PERMANENT */
   private creationOptions(): { charset?: string; collation?: string } {
     const options: { charset?: string; collation?: string } = {};
     if (Object.keys(this.configurationHash).includes("encoding")) {

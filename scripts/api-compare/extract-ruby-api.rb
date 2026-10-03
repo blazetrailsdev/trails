@@ -3838,6 +3838,20 @@ class ApiExtractor
     inner.is_a?(Array) && inner[0] == :@const && inner[1] == "Proc"
   end
 
+  LITERAL_NEW_CONSTANTS = %w[Hash Array].freeze
+
+  def core_new_kind(recv, args, has_block)
+    return nil unless recv.is_a?(Array) && recv[0] == :var_ref
+    return nil unless recv[1].is_a?(Array) && recv[1][0] == :@const
+    return nil if has_block
+
+    no_args = args.all? { |arg| arg.nil? || arg == [:arg_paren, nil] }
+    const = recv[1][1]
+    return "literal-new" if no_args && LITERAL_NEW_CONSTANTS.include?(const)
+
+    "string-new" if !no_args && const == "String"
+  end
+
   # `weak` collects the occurrences whose receiver was inert; a name only
   # becomes a weak CALL when no non-inert occurrence exists (collect_method_calls).
   def walk_for_calls(node, calls, weak)
@@ -3846,7 +3860,7 @@ class ApiExtractor
     case node[0]
     when :method_add_arg, :fcall, :vcall, :call, :command, :command_call
       callee, args = split_call_node(node)
-      walk_call_in_order(callee, args, calls, weak)
+      walk_call_in_order(callee, args, calls, weak, node.equal?(@block_call))
       return
     when :super, :zsuper
       # super(args) is [:super, ...]; bare super is [:zsuper]. Both chain to
@@ -3862,6 +3876,7 @@ class ApiExtractor
       # Same order as the plain child walk this used to fall through to — the
       # call first, then its block body — but the body is walked knowing whose
       # `self` it runs under (module_eval_self_call?).
+      @block_call = node[1]
       walk_for_calls(node[1], calls, weak)
       with_module_eval(module_eval_block?(node[1])) do
         node.drop(2).each { |child| walk_for_calls(child, calls, weak) if child.is_a?(Array) }
@@ -3899,7 +3914,7 @@ class ApiExtractor
   # That is the port's order too — Rails' `xs.each do … end` is normally a
   # `for` loop, whose body follows the iterated expression — and the TS side
   # defers function-expression arguments for exactly this reason.
-  def walk_call_in_order(callee, args, calls, weak)
+  def walk_call_in_order(callee, args, calls, weak, has_block = false)
     name = nil
     recv = nil
     case callee[0]
@@ -3930,7 +3945,7 @@ class ApiExtractor
     if name && !name.start_with?("_") && name =~ /\A[a-z]/ &&
        !(name == "new" && recv && proc_new_receiver?(recv))
       calls << name
-      kind = receiver_kind(recv)
+      kind = (name == "new" && core_new_kind(recv, args, has_block)) || receiver_kind(recv)
       (@call_receivers[name] ||= Set.new) << kind
       if RECEIVER_NAMED_CALLS.include?(name) && recv && kind != "array"
         (@call_receiver_names[name] ||= Set.new) << (receiver_tail_name(recv) || "?")

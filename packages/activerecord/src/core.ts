@@ -506,7 +506,7 @@ export type ConnectedToEntry = {
 
 const CONNECTED_TO_STACK_KEY = Symbol.for("ar_connected_to_stack");
 
-/** @missingRailsCall new — CONVERGEABLE call-gate-credits-argumentless-hash-new-as-a-literal */
+/** @missingRailsCall new — CONVERGEABLE call-gate-credits-concurrent-array-new */
 export function connectedToStack(): ConnectedToEntry[] {
   let connectedToStack = IsolatedExecutionState.get<ConnectedToEntry[]>(CONNECTED_TO_STACK_KEY);
   if (connectedToStack != null) {

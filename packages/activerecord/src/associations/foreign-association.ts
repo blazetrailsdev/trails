@@ -42,7 +42,6 @@ export function setOwnerAttributes(this: ForeignAssociationHost, record: Base): 
 export class ForeignAssociation {
   foreignKeyPresent: boolean = false;
 
-  /** @missingRailsCall new — CONVERGEABLE call-gate-credits-argumentless-hash-new-as-a-literal */
   static nullifiedOwnerAttributes(
     reflection: Pick<AssociationReflection, "foreignKey" | "type">,
   ): Record<string, null> {
