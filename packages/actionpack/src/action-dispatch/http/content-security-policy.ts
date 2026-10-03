@@ -399,10 +399,6 @@ export class Request {
 
   /** @internal */
   generateContentSecurityPolicyNonce(): string {
-    const generator = this.contentSecurityPolicyNonceGenerator;
-    if (!generator) {
-      throw new Error("No content_security_policy_nonce_generator configured for this request");
-    }
-    return generator(this);
+    return this.contentSecurityPolicyNonceGenerator!(this);
   }
 }

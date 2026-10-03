@@ -29,7 +29,6 @@ export function interpolate(string: string, values: unknown): string {
   return interpolateHash(string, values as Record<string, unknown>);
 }
 
-/** @missingRailsCall call — PERMANENT */
 export function interpolateHash(string: string, values: Record<string, unknown>): string {
   const pattern = unionPattern(config().interpolationPatterns);
   let interpolated = false;

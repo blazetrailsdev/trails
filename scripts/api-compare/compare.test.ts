@@ -34,6 +34,7 @@ import {
   significantMissingCalls,
   suppressedCallClaims,
   invokeForms,
+  invokedNames,
   narrowPredicateCandidates,
   ambiguousTsNames,
   reorderedCalls,
@@ -577,6 +578,30 @@ describe("significantMissingCalls", () => {
         new Set(invokeForms(["build"])),
         names,
       ).has("call"),
+    ).toBe(true);
+  });
+
+  it("invokedNames reads only the callee names the extractor marked as invoked", () => {
+    expect(invokedNames(["length", "length:ns", "invoked:ns", "invoked:DEFAULT_ENV"])).toEqual([
+      "ns",
+      "DEFAULT_ENV",
+    ]);
+    const forms = new Set(invokeForms(invokedNames(["invoked:ns"])));
+    expect(
+      significantCallsForReceivers({ call: ["expr"] }, undefined, forms, {
+        call: ["namespace"],
+      }).has("call"),
+    ).toBe(true);
+  });
+
+  it("significantCallsForReceivers matches a raw constant name for call only", () => {
+    expect(
+      significantCallsForReceivers(
+        { size: ["expr"] },
+        undefined,
+        new Set(["length", "length:MAX_ROWS"]),
+        { size: ["MAX_ROWS"] },
+      ).has("size"),
     ).toBe(true);
   });
 

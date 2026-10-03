@@ -256,7 +256,39 @@ describe("body call capture", () => {
     // sorted + de-duped (runCallbacks appears twice, recorded once). The
     // intermediate read `obj.nested` in `obj.nested.touch()` is credited as
     // `nested` — a non-callee property read mirrors a Ruby method send.
-    expect(save.calls).toEqual([".nested", ".touch", "helper", "nested", "runCallbacks", "touch"]);
+    expect(save.calls).toEqual([
+      ".nested",
+      ".touch",
+      "@invoked:helper",
+      "@invoked:runCallbacks",
+      "@invoked:touch",
+      "helper",
+      "nested",
+      "runCallbacks",
+      "touch",
+    ]);
+  });
+
+  it("marks each callee a body invokes, through a cast or a non-null assertion, and no property read", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        keyMatcher(options) {
+          const ns = options.namespace;
+          return [ns(), (this.sameSite as () => string)(), this.tempfile!()];
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((x) => x.name === "keyMatcher")!;
+    expect(m.calls).toEqual([
+      ".namespace",
+      "@invoked:ns",
+      "@invoked:sameSite",
+      "@invoked:tempfile",
+      "namespace",
+      "ns",
+      "sameSite",
+      "tempfile",
+    ]);
   });
 
   it("records the call-set of a get accessor body, as it does for a method", () => {
@@ -275,12 +307,17 @@ describe("body call capture", () => {
       }`,
     );
     const reader = cls.instanceMethods.find((m) => m.name === "queryCache" && !m.writer)!;
-    expect(reader.calls).toEqual(["computeIfAbsent", "executionContextId"]);
+    expect(reader.calls).toEqual([
+      "@invoked:computeIfAbsent",
+      "@invoked:executionContextId",
+      "computeIfAbsent",
+      "executionContextId",
+    ]);
     expect(reader.callSeq).toEqual(["executionContextId", "computeIfAbsent"]);
     expect(reader.skeleton).toBeDefined();
 
     const writer = cls.instanceMethods.find((m) => m.name === "queryCache" && m.writer)!;
-    expect(writer.calls).toEqual(["store"]);
+    expect(writer.calls).toEqual(["@invoked:store", "store"]);
     expect(writer.callSeq).toEqual(["store"]);
   });
 
@@ -296,7 +333,7 @@ describe("body call capture", () => {
     const create = cls.instanceMethods.find((m) => m.name === "create")!;
     // `calls` is sorted, so `["build", "save"]` there says nothing about order;
     // `callSeq` is what a reordered port shows up in (RFC 0084).
-    expect(create.calls).toEqual(["build", "save"]);
+    expect(create.calls).toEqual(["@invoked:build", "@invoked:save", "build", "save"]);
     expect(create.callSeq).toEqual(["build", "save"]);
 
     const reordered = extractFromSource(
@@ -308,7 +345,7 @@ describe("body call capture", () => {
       }`,
     );
     const swapped = reordered.instanceMethods.find((m) => m.name === "create")!;
-    expect(swapped.calls).toEqual(["build", "save"]);
+    expect(swapped.calls).toEqual(["@invoked:build", "@invoked:save", "build", "save"]);
     expect(swapped.callSeq).toEqual(["save", "build"]);
   });
 
@@ -545,7 +582,7 @@ describe("body call capture", () => {
         },
       };`,
     );
-    expect(member.calls).toEqual(["build", "save"]);
+    expect(member.calls).toEqual(["@invoked:build", "@invoked:save", "build", "save"]);
     expect(member.callSeq).toEqual(["save", "build"]);
 
     const info = extractFromFiles("/p", {
@@ -558,7 +595,12 @@ describe("body call capture", () => {
       `,
     });
     const quote = fileFunctionsOf(info, "quoting.ts").find((f) => f.name === "quote")!;
-    expect(quote.calls).toEqual(["quoteString", "typeCast"]);
+    expect(quote.calls).toEqual([
+      "@invoked:quoteString",
+      "@invoked:typeCast",
+      "quoteString",
+      "typeCast",
+    ]);
     expect(quote.callSeq).toEqual(["typeCast", "quoteString"]);
   });
 
@@ -632,7 +674,7 @@ describe("body call capture", () => {
       "quoting.ts": `export const f = (x: unknown) => where(x);`,
     });
     const f = fileFunctionsOf(info, "quoting.ts").find((fn) => fn.name === "f")!;
-    expect(f.calls).toEqual(["where"]);
+    expect(f.calls).toEqual(["@invoked:where", "where"]);
     expect(f.callSeq).toEqual(["where"]);
     expect(f.skeleton).toEqual(["ref:where"]);
   });
@@ -1313,6 +1355,8 @@ describe("body call capture", () => {
       "!loaded",
       ".has",
       ".includes",
+      "@invoked:has",
+      "@invoked:includes",
       "has",
       "includes",
       "loaded",
@@ -1430,7 +1474,7 @@ describe("body call capture", () => {
     const calls = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.calls;
     expect(calls("first")).toEqual(expect.arrayContaining(["rbFSend", "limit"]));
     expect(calls("assign")).toEqual(expect.arrayContaining(["rbFPublicSend", "write"]));
-    expect(calls("dispatch")).toEqual(["rbFSend"]);
+    expect(calls("dispatch")).toEqual(["@invoked:rbFSend", "rbFSend"]);
   });
 
   it("marks the String(x) conversion call as a native form", () => {
@@ -1462,7 +1506,14 @@ describe("body call capture", () => {
     const m = cls.instanceMethods.find((m) => m.name === "cacheKey")!;
     // `defaults` is called on a class reference, whose static of that name may
     // genuinely be a same-file member, so it stays resolvable.
-    expect(m.calls).toEqual([".digest", "defaults", "digest", "name"]);
+    expect(m.calls).toEqual([
+      ".digest",
+      "@invoked:defaults",
+      "@invoked:digest",
+      "defaults",
+      "digest",
+      "name",
+    ]);
   });
 
   it("keeps a name resolvable when the same body also calls it on this", () => {
@@ -1474,7 +1525,7 @@ describe("body call capture", () => {
       }`,
     );
     const m = cls.instanceMethods.find((m) => m.name === "cacheKey")!;
-    expect(m.calls).toEqual(["digest"]);
+    expect(m.calls).toEqual(["@invoked:digest", "digest"]);
   });
 
   it("does not mark the identifier an X.call(...) dispatch credits", () => {
@@ -1486,7 +1537,13 @@ describe("body call capture", () => {
       }`,
     );
     const m = cls.instanceMethods.find((m) => m.name === "build")!;
-    expect(m.calls).toEqual([".call", "call", "emitJoinPlan"]);
+    expect(m.calls).toEqual([
+      ".call",
+      "@invoked:call",
+      "@invoked:emitJoinPlan",
+      "call",
+      "emitJoinPlan",
+    ]);
   });
 
   it("does not mark a call the ! does not actually negate", () => {
@@ -1502,7 +1559,7 @@ describe("body call capture", () => {
       }`,
     );
     const check = cls.instanceMethods.find((m) => m.name === "check")!;
-    expect(check.calls).toEqual([".includes", "includes"]);
+    expect(check.calls).toEqual([".includes", "@invoked:includes", "includes"]);
   });
 
   it("omits calls entirely for a body that invokes nothing", () => {
@@ -1522,7 +1579,7 @@ describe("body call capture", () => {
       }`,
     );
     const ctor = cls.instanceMethods.find((m) => m.name === "constructor")!;
-    expect(ctor.calls).toEqual(["init", "super"]);
+    expect(ctor.calls).toEqual(["@invoked:init", "@invoked:super", "init", "super"]);
   });
 
   it('records super.foo() as the property name, not "super"', () => {
@@ -1532,7 +1589,7 @@ describe("body call capture", () => {
       }`,
     );
     const save = cls.instanceMethods.find((m) => m.name === "save")!;
-    expect(save.calls).toEqual(["save"]);
+    expect(save.calls).toEqual(["@invoked:save", "save"]);
   });
 
   it("credits X.call(...)/X.apply(...) to the dispatched identifier as well as call/apply", () => {
@@ -1554,6 +1611,11 @@ describe("body call capture", () => {
     expect(m.calls).toEqual([
       ".apply",
       ".call",
+      "@invoked:apply",
+      "@invoked:call",
+      "@invoked:helper",
+      "@invoked:lockBang",
+      "@invoked:transaction",
       "apply",
       "call",
       "helper",
@@ -1580,7 +1642,7 @@ describe("body call capture", () => {
       }`,
     );
     // `_x` is the non-callee read inside `typeCast(this._x)`, credited as a call.
-    const expected = ["_x", "constructor", "typeCast"];
+    const expected = ["@invoked:typeCast", "_x", "constructor", "typeCast"];
     expect(direct.instanceMethods.find((m) => m.name === "build")!.calls).toEqual(expected);
     expect(bound.instanceMethods.find((m) => m.name === "build")!.calls).toEqual(expected);
   });
@@ -1596,6 +1658,7 @@ describe("body call capture", () => {
       }`,
     );
     expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual([
+      "@invoked:makePool",
       "_x",
       "constructor",
       "makePool",
@@ -1613,15 +1676,18 @@ describe("body call capture", () => {
       }`,
     );
     const byName = Object.fromEntries(cls.instanceMethods.map((m) => [m.name, m.calls]));
-    expect(byName["build"]).toEqual(["leaf", "mid"]);
-    expect(byName["mid"]).toEqual(["constructor", "leaf"]);
+    expect(byName["build"]).toEqual(["@invoked:leaf", "@invoked:mid", "leaf", "mid"]);
+    expect(byName["mid"]).toEqual(["@invoked:leaf", "constructor", "leaf"]);
   });
 
   it("does not credit delegation to an unknown / inherited helper", () => {
     // `inheritedHook` is not a method of this class — nothing to union, and the
     // delegating method keeps only the literal call name.
     const cls = extractFromSource(`class Foo { build() { return this.inheritedHook(); } }`);
-    expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual(["inheritedHook"]);
+    expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual([
+      "@invoked:inheritedHook",
+      "inheritedHook",
+    ]);
   });
 
   it("does not merge a same-named static helper into a `this.helper()` delegation", () => {
@@ -1636,6 +1702,8 @@ describe("body call capture", () => {
       }`,
     );
     expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual([
+      "@invoked:cached",
+      "@invoked:makePool",
       "cached",
       "makePool",
     ]);
@@ -1684,6 +1752,7 @@ describe("body call capture", () => {
     expect(cls.instanceMethods.find((m) => m.name === "buildJoins")!.calls).toEqual([
       ".call",
       ".emitJoinPlan",
+      "@invoked:call",
       "call",
       "emitJoinPlan",
     ]);
@@ -1775,6 +1844,7 @@ describe("body call capture", () => {
     expect(cls.instanceMethods.find((m) => m.name === "buildJoins")!.calls).toEqual([
       ".buildJoins",
       ".call",
+      "@invoked:call",
       "buildJoins",
       "call",
     ]);
@@ -1790,6 +1860,7 @@ describe("body call capture", () => {
       }`,
     );
     expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual([
+      "@invoked:build_",
       "build_",
       "constructor",
     ]);
@@ -1815,6 +1886,8 @@ describe("body call capture", () => {
     expect(unpin.calls).toEqual([
       ".lock",
       ".synchronize",
+      "@invoked:checkin",
+      "@invoked:synchronize",
       "checkin",
       "connection",
       "lock",
@@ -1836,7 +1909,16 @@ describe("body call capture", () => {
     );
     const m = cls.instanceMethods.find((m) => m.name === "generate")!;
     expect(m.callSeq).toEqual(["moduleEval", "%scoping", "%evalOnly", "defineMethod", "scoping"]);
-    expect(m.calls).toEqual(["defineMethod", "evalOnly", "moduleEval", "scoping"]);
+    expect(m.calls).toEqual([
+      "@invoked:defineMethod",
+      "@invoked:evalOnly",
+      "@invoked:moduleEval",
+      "@invoked:scoping",
+      "defineMethod",
+      "evalOnly",
+      "moduleEval",
+      "scoping",
+    ]);
   });
 
   it("drops a hoisted closure's name even when the enclosing body calls it too", () => {
@@ -1855,7 +1937,14 @@ describe("body call capture", () => {
     );
     const m = cls.instanceMethods.find((x) => x.name === "touchCallbacks")!;
     expect(m.callSeq).toEqual(["afterCreate", "afterUpdate"]);
-    expect(m.calls).toEqual(["afterCreate", "afterUpdate", "touchRecord"]);
+    expect(m.calls).toEqual([
+      "@invoked:afterCreate",
+      "@invoked:afterUpdate",
+      "@invoked:touchRecord",
+      "afterCreate",
+      "afterUpdate",
+      "touchRecord",
+    ]);
   });
 
   it("keeps an INLINE function argument in the order stream", () => {
@@ -1888,7 +1977,7 @@ describe("body call capture", () => {
       "QueryAttribute",
     );
     const inst = cls.instanceMethods.find((m) => m.name === "withCastValue")!;
-    expect(inst.calls).toEqual(["name", "type", "withCastValue"]);
+    expect(inst.calls).toEqual(["@invoked:withCastValue", "name", "type", "withCastValue"]);
   });
 
   it("captures calls in object-literal mixin methods (include(Host, Mod) pattern)", () => {
@@ -1899,8 +1988,13 @@ describe("body call capture", () => {
       };`,
     );
     const byName = Object.fromEntries(methods.map((m) => [m.name, m.calls]));
-    expect(byName["where"]).toEqual(["buildWhere", "spawn"]);
-    expect(byName["toArrow"]).toEqual(["records"]);
+    expect(byName["where"]).toEqual([
+      "@invoked:buildWhere",
+      "@invoked:spawn",
+      "buildWhere",
+      "spawn",
+    ]);
+    expect(byName["toArrow"]).toEqual(["@invoked:records", "records"]);
   });
 
   it("credits a get-accessor value READ as a call (Ruby reader-call semantics)", () => {
@@ -1916,7 +2010,13 @@ describe("body call capture", () => {
       }`,
     );
     const m = cls.instanceMethods.find((m) => m.name === "buildJoins")!;
-    expect(m.calls).toEqual([".concat", "concat", "joinsValues", "leftOuterJoinsValues"]);
+    expect(m.calls).toEqual([
+      ".concat",
+      "@invoked:concat",
+      "concat",
+      "joinsValues",
+      "leftOuterJoinsValues",
+    ]);
   });
 
   it("does not double-record a call's callee property as a value read", () => {
@@ -1926,7 +2026,7 @@ describe("body call capture", () => {
     // fire on a callee).
     const cls = extractFromSource(`class Foo { run() { this.joinsValues(); } }`);
     const m = cls.instanceMethods.find((m) => m.name === "run")!;
-    expect(m.calls).toEqual(["joinsValues"]);
+    expect(m.calls).toEqual(["@invoked:joinsValues", "joinsValues"]);
   });
 
   it("does not credit an assignment target as a value read (write mirrors the setter)", () => {
@@ -1952,7 +2052,7 @@ describe("body call capture", () => {
       }`,
     );
     const m = cls.instanceMethods.find((m) => m.name === "reset")!;
-    expect(m.calls).toEqual([".build", ".pop", "build", "pop"]);
+    expect(m.calls).toEqual([".build", ".pop", "@invoked:build", "@invoked:pop", "build", "pop"]);
   });
 });
 
@@ -1976,7 +2076,15 @@ describe("body call capture — renamed-import aliases", () => {
     const m = cls.instanceMethods.find((m) => m.name === "touchDeferredAttributes")!;
     // `touch` (resolved from `timestampTouch` via both the aliased direct call
     // and the `.call` dispatch) plus the retained literal `call`.
-    expect(m.calls).toEqual([".call", "call", "timestampTouch", "touch"]);
+    expect(m.calls).toEqual([
+      ".call",
+      "@invoked:call",
+      "@invoked:timestampTouch",
+      "@invoked:touch",
+      "call",
+      "timestampTouch",
+      "touch",
+    ]);
   });
 
   it("does not leak one file's aliases into another", () => {
@@ -1993,10 +2101,13 @@ describe("body call capture — renamed-import aliases", () => {
     // In b.ts, `renamed` is an undeclared identifier — it must stay "renamed",
     // proving a.ts's alias map was cleared before b.ts was walked.
     expect(info.classes["a.ts:A"].instanceMethods.find((m) => m.name === "run")!.calls).toEqual([
+      "@invoked:renamed",
+      "@invoked:touch",
       "renamed",
       "touch",
     ]);
     expect(info.classes["b.ts:B"].instanceMethods.find((m) => m.name === "go")!.calls).toEqual([
+      "@invoked:renamed",
       "renamed",
     ]);
   });
@@ -2011,6 +2122,8 @@ describe("body call capture — ruby-compat renamed imports", () => {
       `,
     });
     expect(fileFunctionsOf(info, "finder.ts").find((f) => f.name === "first")!.calls).toEqual([
+      "@invoked:aryFirst",
+      "@invoked:first",
       "aryFirst",
       "first",
       "records",
@@ -2025,6 +2138,7 @@ describe("body call capture — ruby-compat renamed imports", () => {
       `,
     });
     expect(fileFunctionsOf(info, "insp.ts").find((f) => f.name === "show")!.calls).toEqual([
+      "@invoked:inspect",
       "inspect",
     ]);
   });
@@ -5711,7 +5825,7 @@ describe("callArgs", () => {
       }`,
     );
     const create = cls.instanceMethods.find((m) => m.name === "create")!;
-    expect(create.calls).toEqual(["build", "save"]);
+    expect(create.calls).toEqual(["@invoked:build", "@invoked:save", "build", "save"]);
     expect(create.callSeq).toEqual(["build", "save"]);
   });
 });
