@@ -1049,7 +1049,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     };
   }
 
-  /** @missingRailsCall call — CONVERGEABLE call-gate-credits-proc-call-on-const-and-or-receivers */
   static async copy(
     destination: string,
     sources: Record<string, string>,
@@ -1262,10 +1261,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return ActiveRecord.Base.configurations().configsFor({ envName: this.env() });
   }
 
-  /**
-   * @internal
-   * @missingRailsCall call — CONVERGEABLE call-gate-credits-proc-call-on-const-and-or-receivers
-   */
+  /** @internal */
   static env(): string {
     return ActiveRecord.ConnectionHandling.DEFAULT_ENV();
   }
@@ -1523,7 +1519,6 @@ export class MigrationContext<
     });
   }
 
-  /** @missingRailsCall call — CONVERGEABLE call-gate-credits-proc-call-on-const-and-or-receivers */
   get currentEnvironment(): string {
     return ActiveRecord.ConnectionHandling.DEFAULT_ENV();
   }
@@ -2082,7 +2077,6 @@ export class CheckPending {
     return this.app(env);
   }
 
-  /** @missingRailsCall call — CONVERGEABLE call-gate-credits-proc-call-on-const-and-or-receivers */
   private buildWatcher(block: () => Promise<void> | void): FileUpdateChecker {
     const currentEnvironment = ActiveRecord.ConnectionHandling.DEFAULT_ENV();
     const allConfigs = ActiveRecord.Base.configurations().configsFor({

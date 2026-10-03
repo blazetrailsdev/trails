@@ -86,7 +86,6 @@ export class Configurable {
     }
   }
 
-  /** @missingRailsCall new — CONVERGEABLE call-gate-credits-concurrent-array-new */
   static onEncryptedAttributeDeclared(callback: (klass: any, name: string) => void): () => void {
     const listeners = (this.encryptedAttributeDeclarationListeners ??= []);
     listeners.push(callback);

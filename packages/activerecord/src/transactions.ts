@@ -74,7 +74,7 @@ type CallbackOptions = {
   prepend?: boolean;
 };
 
-export const InstanceMethods = {
+export const Transactions = {
   [included](base: typeof Model): void {
     for (const name of ["commit", "rollback", "before_commit"]) {
       defineCallbacks(base.prototype, name, { scope: ["kind", "name"] });

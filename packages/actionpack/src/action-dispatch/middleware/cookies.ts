@@ -269,10 +269,7 @@ export class CookieJar implements Iterable<[string, string]> {
     return value;
   }
 
-  /**
-   * @missingRailsCall call — PERMANENT
-   * @missingRailsArgs split — PERMANENT
-   */
+  /** @missingRailsArgs split — PERMANENT */
   private handleOptions(options: Partial<SetCookieOptions>): void {
     if (isFromNow(options.expires)) {
       options.expires = options.expires.fromNow();

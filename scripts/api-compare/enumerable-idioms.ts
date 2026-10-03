@@ -228,7 +228,12 @@ export const EVAL_CALLBACK_PREFIX = "%";
  *   is `this.tableNameResolver()`. Admitted only where every Ruby site's
  *   receiver is named and the paired TS body invokes that name (`invokeForms`,
  *   compare.ts), so a `call` that is a ported method (`Preloader#call`, a Rack
- *   app's) still flags unless the port spells it `call`.
+ *   app's) still flags unless the port spells it `call`. A constant holding a
+ *   lambda is named like any other receiver (`DEFAULT_ENV.call`,
+ *   `activerecord/lib/active_record/database_configurations.rb:189`, is
+ *   `DEFAULT_ENV()`), and a `(callable || block).call`
+ *   (`activerecord/lib/active_record/statement_cache.rb:133`) is credited by
+ *   an invocation of either operand.
  */
 export const NATIVE_FORM_ANALOGUES = new Map<
   string,
@@ -241,10 +246,7 @@ export const NATIVE_FORM_ANALOGUES = new Map<
   ["size", { form: "length", receivers: "explicit" }],
   ["length", { form: "length", receivers: "explicit" }],
   ["load", { form: "import", receivers: "implicit-self" }],
-  [
-    "call",
-    { form: "invoke", receivers: "explicit", uncreditedKinds: new Set(["const", "self", "array"]) },
-  ],
+  ["call", { form: "invoke", receivers: "explicit", uncreditedKinds: new Set(["self", "array"]) }],
 ]);
 
 /**

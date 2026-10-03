@@ -689,8 +689,9 @@ export function invokeForms(calls: Iterable<string>): string[] {
  * A Ruby body whose EVERY `new` site is one whose faithful port is not a `new`
  * expression (extract-ruby-api.rb#core_new_kind):
  *
- * - `literal-new`: an argument-less, block-less `Hash.new` / `Array.new`, the
- *   literal `{}` / `[]` (`associations/foreign_association.rb:14`).
+ * - `literal-new`: an argument-less, block-less `Hash.new` / `Array.new` /
+ *   `Concurrent::Array.new`, the literal `{}` / `[]`
+ *   (`associations/foreign_association.rb:14`, `core.rb:220`).
  * - `string-new`: `String.new(x)`, credited only against a TS body that makes
  *   the `String(x)` conversion call (`relation/query_methods.rb:2047`).
  *
@@ -722,7 +723,13 @@ function hasNativeFormAnalogue(
   const names = receiverNames?.[value] ?? [];
   if (analogue.form === "invoke" && names.length === 0) return false;
   return names.every((name) =>
-    tsNativeForms.has(`${analogue.form}:${snakeToCamel(name.replace(/^@+/, ""))}`),
+    name.split("|").some((operand) => {
+      const bare = operand.replace(/^@+/, "");
+      return (
+        tsNativeForms.has(`${analogue.form}:${snakeToCamel(bare)}`) ||
+        tsNativeForms.has(`${analogue.form}:${bare}`)
+      );
+    }),
   );
 }
 

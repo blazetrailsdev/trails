@@ -153,8 +153,9 @@ export interface MethodInfo {
    */
   callReceivers?: Record<string, string[]>;
   /**
-   * The name each non-`array` receiver of a `size` / `length` site ends in
-   * (`cursor`, `columns`, `select_rows`), `?` for a receiver with none. See
+   * The name each non-`array` receiver of a `size` / `length` / `call` site
+   * ends in (`cursor`, `columns`, `select_rows`), `?` for a receiver with none
+   * and `a|b` for a parenthesised `a || b`. See
    * extract-ruby-api.rb#receiver_tail_name.
    */
   callReceiverNames?: Record<string, string[]>;

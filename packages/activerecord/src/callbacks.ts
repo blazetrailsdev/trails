@@ -15,7 +15,7 @@ import {
 
 type ModelCtor = typeof Base;
 
-export const InstanceMethods = {
+export const Callbacks = {
   [included](base: ModelCtor): void {
     include(base, ValidationsCallbacks);
 
