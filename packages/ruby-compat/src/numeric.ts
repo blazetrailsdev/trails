@@ -315,10 +315,32 @@ export function numericModulo(x: unknown, y: unknown): unknown {
   throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClassname(x)}`);
 }
 
+/** `rb_dbl_complex_new_polar_pi` (`vendor/ruby/v3.3.11/complex.c:702`). */
+function rbDblComplexNewPolarPi(abs: number, ang: number): unknown {
+  let fi = Math.trunc(ang);
+  const fr = ang - fi;
+  const pos = fr === 0.5;
+
+  if (pos || fr === -0.5) {
+    const half = fi / 2.0;
+    if ((half - Math.trunc(half) !== fr) !== pos) abs = -abs;
+    return new Complex(rbDbl2num(0.0), rbDbl2num(abs));
+  } else if (fr === 0.0) {
+    fi = fi / 2.0;
+    if (fi - Math.trunc(fi) !== 0.0) abs = -abs;
+    return rbDbl2num(abs);
+  } else {
+    const real = abs * Math.cos(Math.PI * ang);
+    const imag = abs * Math.sin(Math.PI * ang);
+    return new Complex(rbDbl2num(real), rbDbl2num(imag));
+  }
+}
+
 /**
  * `fix_pow` (`vendor/ruby/v3.3.11/numeric.c:4521`), whose negative Integer exponent
  * is `fix_pow_inverted`'s Rational (`numeric.c:4501`), and `rb_float_pow`
- * (`numeric.c:1510`), for the real results.
+ * (`numeric.c:1510`). C's `pow` answers 1.0 for a base of 1.0 or an exponent of
+ * 0.0 whatever the other operand, where `Math.pow` answers NaN for a NaN one.
  * @noRailsEquivalent PERMANENT
  */
 export function numericPow(x: unknown, y: unknown): unknown {
@@ -333,8 +355,24 @@ export function numericPow(x: unknown, y: unknown): unknown {
     }
     return rbBigNorm(a ** b);
   }
-  if ((rbIntegerTypeP(x) || rbFloatTypeP(x)) && (rbIntegerTypeP(y) || rbFloatTypeP(y))) {
-    return rbDbl2num(Math.pow(Number(x.valueOf()), Number(y.valueOf())));
+  if (rbIntegerTypeP(x) && rbFloatTypeP(y)) {
+    const a = Number(x);
+    const dy = y.valueOf();
+    if (dy === 0.0) return rbDbl2num(1.0);
+    if (a === 0) return rbDbl2num(dy < 0 ? Infinity : 0.0);
+    if (a === 1) return rbDbl2num(1.0);
+    if (a < 0 && dy !== Math.round(dy)) return rbDblComplexNewPolarPi(Math.pow(-a, dy), dy);
+    return rbDbl2num(Math.pow(a, dy));
+  }
+  if (rbFloatTypeP(x) && (rbIntegerTypeP(y) || rbFloatTypeP(y))) {
+    const dx = x.valueOf();
+    if (y === 2) return rbDbl2num(dx * dx);
+    const dy = Number(y.valueOf());
+    if (rbFloatTypeP(y) && dx < 0 && dy !== Math.round(dy)) {
+      return rbDblComplexNewPolarPi(Math.pow(-dx, dy), dy);
+    }
+    if (dx === 1 || dy === 0) return rbDbl2num(1.0);
+    return rbDbl2num(Math.pow(dx, dy));
   }
   throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClassname(x)}`);
 }

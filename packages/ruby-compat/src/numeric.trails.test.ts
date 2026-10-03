@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Complex } from "./complex.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { NoMethodError } from "./no-method-error.js";
 import {
@@ -118,8 +119,20 @@ describe("Numeric#**", () => {
     expect(numericPow(10, 5.5)).toBe(316227.7660168379);
     expect(numericPow(0.5, 2)).toBe(0.25);
     expect(numericPow(1, -2)).toBe(1);
-    expect(numericPow(-1, -3)).toBe(-1);
-    expect(() => numericPow(0, -1)).toThrow("divided by 0");
+    expect(Number(numericPow(1, NaN))).toBe(1);
+    expect(Number(numericPow(new Number(1), NaN))).toBe(1);
+    expect(Number(numericPow(2, new Number(0)))).toBe(1);
+    expect(numericPow(0, -0.5)).toBe(Infinity);
+    const parts = (c: unknown): number[] => [
+      Number((c as Complex).real),
+      Number((c as Complex).imaginary),
+    ];
+    expect(parts(numericPow(-8, 0.5))).toEqual([0, 2.8284271247461903]);
+    expect(parts(numericPow(-8.5, 0.5))).toEqual([0, 2.9154759474226504]);
+    expect(parts(numericPow(-8, 1.5))).toEqual([0, -22.627416997969522]);
+    const [real, imag] = parts(numericPow(-8, 0.25));
+    expect(real).toBeCloseTo(1.189207115002721, 12);
+    expect(imag).toBeCloseTo(1.1892071150027208, 12);
   });
 });
 
