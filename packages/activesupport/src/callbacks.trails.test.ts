@@ -21,6 +21,10 @@ class Model {
   declare static setCallback: ClassMethods["setCallback"];
   declare static skipCallback: ClassMethods["skipCallback"];
   declare static resetCallbacks: ClassMethods["resetCallbacks"];
+  declare static getCallbacks: (name: string) => CallbackChain;
+  declare static __callbacks: { [name: string]: CallbackChain };
+  declare static readonly descendants: (typeof Model)[];
+  declare __callbacks: { [name: string]: CallbackChain };
   declare runCallbacks: RunCallbacks;
 
   static {
@@ -1114,30 +1118,29 @@ describe("CallbackObject dispatch", () => {
   });
 
   it("a callback set on a parent reaches a grandchild whose middle class never wrote", () => {
-    class Parent {
-      log: string[] = [];
+    class Parent extends Model {
+      declare static _saveCallbacks: CallbackChain;
+      declare _saveCallbacks: CallbackChain;
+      declare _runSaveCallbacks: (block?: () => unknown) => unknown;
     }
-    include(Parent, Callbacks);
-    const parent = Parent as any;
-    parent.defineCallbacks("save");
+    Parent.defineCallbacks("save");
     class Middle extends Parent {}
     class Grandchild extends Middle {}
-    (Grandchild as any).setCallback("save", "before", (t: Parent) => t.log.push("grandchild"));
+    Grandchild.setCallback("save", "before", (t: Parent) => t.log.push("grandchild"));
 
-    parent.setCallback("save", "before", (t: Parent) => t.log.push("parent"));
+    Parent.setCallback("save", "before", (t: Parent) => t.log.push("parent"));
 
-    const record = new Grandchild() as any;
+    const record = new Grandchild();
     record._runSaveCallbacks();
     expect(record.log).toEqual(["grandchild", "parent"]);
-    expect(parent.descendants).toEqual([Middle, Grandchild]);
-    expect(record._saveCallbacks).toBe((Grandchild as any)._saveCallbacks);
+    expect(Parent.descendants).toEqual([Middle, Grandchild]);
+    expect(record._saveCallbacks).toBe(Grandchild._saveCallbacks);
     expect(new Middle().log).toEqual([]);
   });
 
   it("setCallback on a chain that was never defined raises as Rails' nil chain does", () => {
-    class Record {}
-    include(Record, Callbacks);
-    expect(() => (Record as any).setCallback("save", "before", () => {})).toThrow(TypeError);
+    class Record extends Model {}
+    expect(() => Record.setCallback("save", "before", () => {})).toThrow(TypeError);
   });
 
   it("a class attribute on a singleton class keeps the reader on its attached object", () => {
@@ -1152,29 +1155,24 @@ describe("CallbackObject dispatch", () => {
   });
 
   it("a callback set on a parent after a child wrote its own chain reaches the child", () => {
-    class Parent {
-      log: string[] = [];
-    }
-    include(Parent, Callbacks);
-    const parent = Parent as any;
-    parent.defineCallbacks("save");
+    class Parent extends Model {}
+    Parent.defineCallbacks("save");
     class Child extends Parent {}
-    const child = Child as any;
-    child.setCallback("save", "before", (t: Parent) => t.log.push("child"));
+    Child.setCallback("save", "before", (t: Parent) => t.log.push("child"));
 
-    parent.setCallback("save", "before", (t: Parent) => t.log.push("parent"));
+    Parent.setCallback("save", "before", (t: Parent) => t.log.push("parent"));
 
-    const record = new Child() as Child & { runCallbacks: RunCallbacks };
+    const record = new Child();
     record.runCallbacks("save");
     expect(record.log).toEqual(["child", "parent"]);
-    expect(Object.keys(child.__callbacks)).toEqual(["save"]);
-    expect(child.__callbacks).not.toBe(parent.__callbacks);
-    expect(parent.descendants).toEqual([Child]);
-    expect((new Parent() as any).__callbacks).toBe(parent.__callbacks);
+    expect(Object.keys(Child.__callbacks)).toEqual(["save"]);
+    expect(Child.__callbacks).not.toBe(Parent.__callbacks);
+    expect(Parent.descendants).toEqual([Child]);
+    expect(new Parent().__callbacks).toBe(Parent.__callbacks);
 
-    parent.resetCallbacks("save");
-    expect(child.getCallbacks("save").entries.map((c: Callback) => c.kind)).toEqual(["before"]);
-    expect(parent.getCallbacks("save").isEmpty).toBe(true);
+    Parent.resetCallbacks("save");
+    expect(Child.getCallbacks("save").entries.map((c: Callback) => c.kind)).toEqual(["before"]);
+    expect(Parent.getCallbacks("save").isEmpty).toBe(true);
   });
 });
 
