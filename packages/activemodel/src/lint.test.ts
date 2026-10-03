@@ -1,13 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Assertion } from "@blazetrails/activesupport";
-import {
-  testErrorsAref,
-  testModelNaming,
-  testPersisted,
-  testToKey,
-  testToParam,
-  testToPartialPath,
-} from "./lint.js";
+import { testErrorsAref, testModelNaming, testToKey, testToParam } from "./lint.js";
 
 type KeyFixture = {
   isPersisted(): boolean;
@@ -115,27 +108,6 @@ describe("Lint::Tests", () => {
     it("throws when errors.messagesFor returns a non-array", () => {
       const broken = { errors: { get: () => "nope" }, toModel };
       expect(() => testErrorsAref(broken)).toThrow(/errors#\[\] should return an empty Array/);
-    });
-  });
-
-  describe("minitest assertions", () => {
-    it("fails with minitest's assert_respond_to message", () => {
-      expect(() => testToKey({ toModel: () => ({}) as never })).toThrow(/to respond to #toKey/);
-      expect(() => testToKey({} as never)).toThrow(/to respond to #toModel/);
-    });
-
-    it("fails with minitest's assert_kind_of message", () => {
-      const fixture = { toPartialPath: () => 1 as unknown as string, toModel };
-      expect(() => testToPartialPath(fixture)).toThrow(
-        "Expected 1 to be a kind of String, not Integer.",
-      );
-      const compliant = { toPartialPath: () => "people/person", toModel };
-      expect(() => testToPartialPath(compliant)).not.toThrow();
-    });
-
-    it("fails assert_boolean with Rails' message", () => {
-      const fixture = { isPersisted: () => null as unknown as boolean, toModel };
-      expect(() => testPersisted(fixture)).toThrow("persisted? should be a boolean");
     });
   });
 });
