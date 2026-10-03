@@ -1,8 +1,7 @@
 import {
-  Callbacks as ASCallbacks,
+  type Callbacks as ASCallbacks,
   Configurable,
   include,
-  mattrAccessor,
   underscore,
   type Extended,
 } from "@blazetrails/activesupport";
@@ -39,7 +38,7 @@ import {
   skipAfterAction,
   skipAroundAction,
   skipBeforeAction,
-  _defineActionCallbacks,
+  Callbacks,
   _insertCallbacks,
   _normalizeCallbackOption,
   _normalizeCallbackOptions,
@@ -346,7 +345,5 @@ export class AbstractController {
 }
 
 include(AbstractController, Configurable);
-mattrAccessor.call(AbstractController, "raiseOnMissingCallbackActions", { default: false });
 
-include(AbstractController, ASCallbacks);
-_defineActionCallbacks(AbstractController);
+include(AbstractController, Callbacks);

@@ -1,6 +1,9 @@
 import {
   extractOptionsBang,
-  type Callbacks as ASCallbacks,
+  included,
+  mattrAccessor,
+  Callbacks as ASCallbacks,
+  include,
   type Extended,
   type FilterListEntry,
   type Included,
@@ -43,9 +46,6 @@ type CallbackFilter = ActionCallback | AroundCallback | string;
 type CallbackOptionsWithFilters = CallbackOptions & {
   filters?: CallbackFilter[];
 };
-
-/** @internal */
-export const PROCESS_ACTION_CHAIN = "process_action";
 
 /** @internal */
 export class ActionFilter implements CallbackPredicateLike {
@@ -159,16 +159,19 @@ function _toConditionFns(pred: CallbackOptions["if"]): CallbackCondition[] | und
   );
 }
 
-/** @internal */
-export function _defineActionCallbacks(klass: ActionCallbackHost): void {
-  klass.defineCallbacks(PROCESS_ACTION_CHAIN, {
-    terminator: async (controller, resultLambda) => {
-      await resultLambda();
-      return (controller as AbstractController).performed;
-    },
-    skipAfterCallbacksIfTerminated: true,
-  });
-}
+export const Callbacks = {
+  [included](base: typeof AbstractController): void {
+    include(base, ASCallbacks);
+    base.defineCallbacks("process_action", {
+      terminator: async (controller, resultLambda) => {
+        await resultLambda();
+        return (controller as AbstractController).performed;
+      },
+      skipAfterCallbacksIfTerminated: true,
+    });
+    mattrAccessor.call(base, "raiseOnMissingCallbackActions", { default: false });
+  },
+};
 
 /** @internal */
 export function _registerActionCallback(
@@ -184,7 +187,7 @@ export function _registerActionCallback(
   if (ifFns) asOpts.if = ifFns;
   if (unlessFns) asOpts.unless = unlessFns;
   const filter = typeof callback === "string" ? `:${callback}` : callback;
-  klass.setCallback(PROCESS_ACTION_CHAIN, kind, filter as FilterListEntry, asOpts);
+  klass.setCallback("process_action", kind, filter as FilterListEntry, asOpts);
 }
 
 /** @internal */
@@ -201,7 +204,7 @@ export function _skipActionCallback(
   if (unlessFns) asOpts.unless = unlessFns;
   if (options.raise !== undefined) asOpts.raise = options.raise;
   const name = typeof filter === "string" ? `:${filter}` : filter;
-  klass.skipCallback(PROCESS_ACTION_CHAIN, kind, name as FilterListEntry, asOpts);
+  klass.skipCallback("process_action", kind, name as FilterListEntry, asOpts);
 }
 
 export type ActionCallbackHost = Pick<

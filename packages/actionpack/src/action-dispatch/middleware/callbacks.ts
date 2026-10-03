@@ -10,7 +10,6 @@ import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 export class Callbacks {
   declare static defineCallbacks: Extended<typeof ASCallbacks.ClassMethods>["defineCallbacks"];
   declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
-  declare static resetCallbacks: Extended<typeof ASCallbacks.ClassMethods>["resetCallbacks"];
   declare runCallbacks: Included<typeof ASCallbacks>["runCallbacks"];
 
   private app: RackApp;
