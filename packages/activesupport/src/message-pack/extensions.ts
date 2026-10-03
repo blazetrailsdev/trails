@@ -2,7 +2,7 @@ import { MessagePackError } from "./factory.js";
 import type { Factory, Packer, Unpacker } from "./factory.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
 import { Temporal, Time } from "@blazetrails/date";
-import { NameError, Rational, rational, rbConstGet } from "@blazetrails/ruby-compat";
+import { NameError, Rational, rational, rbModConstGet } from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../time-with-zone.js";
 import { atWithoutCoercion } from "../core-ext/time/calculations.js";
 import { TimeZone, type Timezone } from "../values/time-zone.js";
@@ -274,7 +274,7 @@ export const Extensions = {
 
   loadClass(name: string): ObjectClass {
     try {
-      return rbConstGet(Object, name) as ObjectClass;
+      return rbModConstGet(Object, name) as ObjectClass;
     } catch (error) {
       if (!(error instanceof NameError)) throw error;
       if (String(error.constantName) === name) {

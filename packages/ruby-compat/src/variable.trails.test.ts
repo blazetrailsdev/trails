@@ -7,6 +7,7 @@ import { TypeError } from "./type-error.js";
 import {
   isRegisteredConstant,
   rbConstGet,
+  rbModConstGet,
   rbPathToClass,
   registerConstant,
   registeredConstant,
@@ -158,14 +159,48 @@ describe("rb_const_get", () => {
     expect(rbConstGet(Sub, "IncludedCheck")).toBe(IncludedCheck);
   });
 
-  it("falls through to the top-level table, reading a seated path whole", () => {
+  it("falls through to the top-level table", () => {
     registerConstant("ConstGetTopCheck", TopCheck);
-    registerConstant("ConstGetSpace::TopCheck", TopCheck);
     expect(rbConstGet(Sub, "ConstGetTopCheck")).toBe(TopCheck);
-    expect(rbConstGet(Sub, "ConstGetSpace::TopCheck")).toBe(TopCheck);
   });
 
   it("raises NameError for a name nothing on the walk answers", () => {
     expect(() => rbConstGet(Sub, "ConstGetTopCheck")).toThrow(NameError);
+  });
+
+  describe("rb_mod_const_get", () => {
+    class Outer {
+      static Inner = class Inner {};
+    }
+
+    afterEach(() => {
+      unregisterConstant("ConstGetOuter", Outer);
+    });
+
+    it("reads a seated path whole", () => {
+      registerConstant("ConstGetSpace::TopCheck", TopCheck);
+      expect(rbModConstGet(Sub, "ConstGetSpace::TopCheck")).toBe(TopCheck);
+    });
+
+    it("reads each later segment from the namespace before it", () => {
+      registerConstant("ConstGetOuter", Outer);
+      expect(rbModConstGet(Sub, "ConstGetOuter::Inner")).toBe(Outer.Inner);
+      expect(rbModConstGet(Sub, "IncludedCheck")).toBe(IncludedCheck);
+    });
+
+    it("names the missing segment, not the path", () => {
+      registerConstant("ConstGetOuter", Outer);
+      let error: unknown;
+      try {
+        rbModConstGet(Sub, "ConstGetAbsent::Inner");
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(NameError);
+      expect((error as NameError).constantName).toBe("ConstGetAbsent");
+      expect(() => rbModConstGet(Sub, "ConstGetOuter::Absent")).toThrow(
+        "uninitialized constant Outer::Absent",
+      );
+    });
   });
 });

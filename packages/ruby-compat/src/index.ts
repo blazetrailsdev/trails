@@ -273,6 +273,7 @@ export {
   resetConstants,
   isRegisteredConstant,
   rbConstGet,
+  rbModConstGet,
   rbConstMissing,
   rbModConstMissing,
   rbPathToClass,

@@ -55,8 +55,7 @@ export const StaleSessionCheck = {
     return this.staleSessionCheckBang(() => Persisted.prototype.extractSessionId.call(this, env));
   },
 
-  /** @internal */
-  staleSessionCheckBang<T>(this: unknown, block: () => T): T {
+  staleSessionCheckBang<T>(block: () => T): T {
     for (;;) {
       try {
         return block();

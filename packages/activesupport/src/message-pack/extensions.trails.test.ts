@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { ZeroDivisionError } from "@blazetrails/ruby-compat";
+import { NameError, ZeroDivisionError } from "@blazetrails/ruby-compat";
 
-import { Extensions } from "./extensions.js";
+import { Extensions, MissingClassError } from "./extensions.js";
 import { Factory } from "./factory.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
 
@@ -48,5 +48,21 @@ describe("MessagePackExtensionsTest", () => {
     ) as HashWithIndifferentAccess;
     expect(result).toBeInstanceOf(HashWithIndifferentAccess);
     expect(result.get("a")).toBeInstanceOf(HashWithIndifferentAccess);
+  });
+
+  it("load_class raises MissingClassError when the missing name is the whole name", () => {
+    expect(() => Extensions.loadClass("LoadClassAbsent")).toThrow(MissingClassError);
+    expect(() => Extensions.loadClass("LoadClassAbsent")).toThrow("Missing class: LoadClassAbsent");
+  });
+
+  it("load_class re-raises the NameError when a namespace of the path is missing", () => {
+    let error: unknown;
+    try {
+      Extensions.loadClass("LoadClassAbsent::Nested");
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(NameError);
+    expect(error).not.toBeInstanceOf(MissingClassError);
   });
 });

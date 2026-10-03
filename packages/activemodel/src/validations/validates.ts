@@ -2,7 +2,7 @@ import { camelize, extractOptionsBang, sliceBang } from "@blazetrails/activesupp
 
 import { ArgumentError, NameError } from "../attribute-assignment.js";
 
-import { Range, rbConstGet } from "@blazetrails/ruby-compat";
+import { Range, rbModConstGet } from "@blazetrails/ruby-compat";
 
 export interface ValidatesHost {
   _validatesDefaultKeys(): string[];
@@ -34,7 +34,7 @@ export function validates(
 
     let validator: unknown;
     try {
-      validator = rbConstGet(this, key);
+      validator = rbModConstGet(this, key);
     } catch (e) {
       if (e instanceof NameError) throw new ArgumentError(`Unknown validator: '${key}'`);
       throw e;
