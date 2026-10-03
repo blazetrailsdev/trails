@@ -433,7 +433,11 @@ export function objRespondToMissing(_obj: unknown, _mid: string, _priv: boolean)
 
 function writerSpelling(attr: string | undefined): string | undefined {
   if (attr === undefined || attr.startsWith("_")) return undefined;
-  return `set_${attr}`.replace(/_([a-zA-Z\d])/g, (_, c: string) => c.toUpperCase());
+  return camelized(`set_${attr}`);
+}
+
+function camelized(name: string): string {
+  return name.replace(/_([a-z\d])/g, (_, c: string) => c.toUpperCase());
 }
 
 function checkDefinitionVisibility(mod: { prototype: object }, mid: string): boolean {
@@ -675,9 +679,7 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   const name = rbCheckStringType(vid);
   if (name === null) throw new TypeError(`${rbInspect(vid)} is not a symbol nor a string`);
   const mid = isSymbol(name) ? symbolToS(name) : name;
-  const predicate = mid.endsWith("?")
-    ? `is_${mid.slice(0, -1)}`.replace(/_([a-z\d])/g, (_, c: string) => c.toUpperCase())
-    : mid;
+  const predicate = mid.endsWith("?") ? camelized(`is_${mid.slice(0, -1)}`) : mid;
   if (argc === 1) {
     const other = args[0];
     if (mid === "==") return rbEqual(recv, other);
