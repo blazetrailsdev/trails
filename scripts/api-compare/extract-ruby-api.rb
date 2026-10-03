@@ -3066,6 +3066,7 @@ class ApiExtractor
     tokens << "send:setter" if setter_send?(node)
     if SKELETON_IF_NODES.include?(kind)
       tokens << "if"
+      tokens << "when:#{node[1].length}" if kind == :when && skeleton_when_list?(node[1])
     elsif SKELETON_LOOP_NODES.include?(kind)
       tokens << "loop"
     elsif kind == :bodystmt && (node[2] || node[4])
@@ -3085,7 +3086,7 @@ class ApiExtractor
       return
     elsif kind == :binary && SKELETON_LOGICAL_OPS.key?(node[2])
       walk_for_skeleton(node[1], tokens)
-      tokens << SKELETON_LOGICAL_OPS[node[2]]
+      tokens << (skeleton_string_or_symbol?(node) ? "or:string-symbol" : SKELETON_LOGICAL_OPS[node[2]])
       walk_for_skeleton(node[3], tokens)
       return
     elsif kind == :opassign && SKELETON_LOGICAL_OP_ASSIGNS.key?(op_assign_op(node[2]).to_s)
@@ -3123,6 +3124,36 @@ class ApiExtractor
 
     node.each { |child| walk_for_skeleton(child, tokens) if child.is_a?(Array) }
     note_capture_locals(node)
+  end
+
+  # Does this `:when` test a value LIST — `when Arel::Nodes::Node,
+  # Arel::Table, …` (`activerecord/lib/arel/nodes/casted.rb:50`) — rather than
+  # one value or a splat? Its `when:N` mark (after the clause's `if`) is what a
+  # port's `||` chain of N type tests on one operand is credited against
+  # (extract-ts-api.ts#whenListChain); compare.ts#foldSkeletonTokens drops the
+  # mark from this stream, since the list emits no `or` of its own.
+  def skeleton_when_list?(values)
+    values.is_a?(Array) && values.length > 1 && values.all? { |v| v.is_a?(Array) && v[0].is_a?(Symbol) }
+  end
+
+  # Is this `||` the String-or-Symbol test `String === x || Symbol === x`
+  # (`activerecord/lib/arel/nodes/window.rb:14-28`), on one operand? A Ruby
+  # Symbol is a JS string, so its port is the one `typeof x === "string"` and
+  # emits no `or`; the `or:string-symbol` mark folds away in
+  # compare.ts#foldSkeletonTokens unless the TS stream still shows an `or`.
+  def skeleton_string_or_symbol?(node)
+    return false unless %i[|| or].include?(node[2])
+
+    tests = [node[1], node[3]].map do |test|
+      next nil unless test.is_a?(Array) && test[0] == :binary && test[2] == :===
+      const = test[1]
+      next nil unless const.is_a?(Array) && %i[var_ref top_const_ref].include?(const[0]) &&
+                      const[1][0] == :@const
+      [const[1][1], strip_sexp_positions(test[3])]
+    end
+    return false if tests.include?(nil)
+
+    tests.map(&:first).sort == %w[String Symbol] && tests[0][1] == tests[1][1]
   end
 
   SETTER_SEND_NAMES = %w[send public_send __send__].freeze

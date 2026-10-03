@@ -1,6 +1,6 @@
 import { Nodes } from "../namespaces.js";
 import { ArgumentError, rbEqual, rbHash, symbolizeKeys } from "@blazetrails/activesupport";
-import { rbInspect, rbModName, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbInspect, rbModName, rbModConstSet, strCount } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
@@ -26,7 +26,7 @@ export class BoundSqlLiteral extends NodeExpression {
       if (hasNamed) {
         throw new BindError(`cannot mix positional and named binds`, sqlWithPlaceholders);
       }
-      const expected = (sqlWithPlaceholders.match(/\?/g) ?? []).length;
+      const expected = strCount(sqlWithPlaceholders, ["?"]);
       if (positionalBinds.length !== expected) {
         throw new BindError(
           `wrong number of bind variables (${positionalBinds.length} for ${expected})`,

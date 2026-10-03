@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { foldSkeletonTokens, sameFileHelperSkeletons } from "./compare.js";
+import { compareShortCircuits } from "./report-arms.js";
+
+function shortCircuitsAgree(ruby: string[], ts: string[]): boolean {
+  const tsFolded = foldSkeletonTokens(ts, "ts", ruby);
+  const rubyFolded = foldSkeletonTokens(ruby, "ruby", tsFolded);
+  const row = { package: "arel", rubyFile: "", rubyName: "", tsFile: "", tsName: "" };
+  return compareShortCircuits({ ...row, ruby: rubyFolded, ts: tsFolded }) === undefined;
+}
 
 describe("foldSkeletonTokens", () => {
   it("matches Ruby `xs.each { |x| save(x) }` against its `for (const x of xs) this.save(x)` port", () => {
@@ -237,5 +245,72 @@ describe("sameFileHelperSkeletons", () => {
       "loop",
       "ref:save",
     ]);
+  });
+
+  describe("short-circuit marks", () => {
+    it("credits an instanceof narrowing a class-equality test on the same operand", () => {
+      const ruby = ["ref:class", "ref:class", "and", "ref:left", "ref:left", "and", "ref:right"];
+      const ts = [
+        "and:class-narrow",
+        "ref:constructor",
+        "ref:constructor",
+        "and",
+        "ref:rbEqual",
+        "and",
+        "ref:rbEqual",
+      ];
+      expect(shortCircuitsAgree(ruby, ts)).toBe(true);
+      expect(
+        shortCircuitsAgree(
+          ruby,
+          ts.map((t) => (t === "and:class-narrow" ? "and" : t)),
+        ),
+      ).toBe(false);
+    });
+
+    it("reads a narrowing `&&` as `and` while the Ruby stream still shows an unclaimed one", () => {
+      expect(foldSkeletonTokens(["and:class-narrow"], "ts", ["and"])).toEqual(["and"]);
+      expect(foldSkeletonTokens(["and:class-narrow"], "ts", [])).toEqual([]);
+      expect(foldSkeletonTokens(["and:class-narrow"], "ts")).toEqual(["and"]);
+    });
+
+    it("credits a type-test `||` chain against a when list of the same arity", () => {
+      const ruby = ["if", "when:6", "if", "new:Casted", "new:Quoted"];
+      expect(shortCircuitsAgree(ruby, ["if", "when:6", "if", "new:Casted", "new:Quoted"])).toBe(
+        true,
+      );
+      expect(foldSkeletonTokens(["when:6"], "ts", ["when:6"])).toEqual([]);
+    });
+
+    it("reads an unmatched type-test chain as the `or`s it spells", () => {
+      expect(foldSkeletonTokens(["when:3"], "ts", ["when:2"])).toEqual(["or", "or"]);
+      expect(foldSkeletonTokens(["when:3"], "ts")).toEqual(["or", "or"]);
+      expect(shortCircuitsAgree(["if", "when:3"], ["if", "when:2"])).toBe(false);
+    });
+
+    it("drops the Ruby when-list mark, which no other lowering of the clause carries", () => {
+      expect(
+        foldSkeletonTokens(["if", "when:4", "ref:sized"], "ruby", ["if", "ref:sized"]),
+      ).toEqual(["if", "ref:sized"]);
+    });
+
+    it('credits a SqlLiteral test beside `typeof x === "string"` against Ruby\'s String arm', () => {
+      const ruby = ["if", "when:2"];
+      expect(shortCircuitsAgree(ruby, ["if", "or:string-subclass", "when:2"])).toBe(true);
+      expect(shortCircuitsAgree(ruby, ["if", "or:string-subclass"])).toBe(true);
+    });
+
+    it('credits Ruby\'s `String === x || Symbol === x` against one `typeof x === "string"`', () => {
+      const ruby = ["ref:map", "or:string-symbol", "new:SqlLiteral", "ref:to_s"];
+      expect(shortCircuitsAgree(ruby, ["ref:map", "if", "new:SqlLiteral"])).toBe(true);
+      expect(foldSkeletonTokens(["or:string-symbol"], "ruby", ["or"])).toEqual(["or"]);
+      expect(foldSkeletonTokens(["or:string-symbol"], "ruby")).toEqual(["or"]);
+    });
+
+    it('credits `typeof x === "string" && !isSymbol(x)` against Ruby\'s `String === x`', () => {
+      const ruby = ["loop", "if", "new:SqlLiteral", "if", "new:SqlLiteral", "ref:to_s"];
+      const ts = ["loop", "if", "and:string-not-symbol", "ref:isSymbol", "new:SqlLiteral", "if"];
+      expect(shortCircuitsAgree(ruby, ts)).toBe(true);
+    });
   });
 });

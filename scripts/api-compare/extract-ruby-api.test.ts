@@ -211,6 +211,47 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     ).toEqual(["if", "throw:ArgumentError"]);
   });
 
+  it("marks a when listing several values with its arity, and a lone value not at all", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def build_quoted(other, attribute = nil)
+            case other
+            when Arel::Nodes::Node, Arel::Table, Arel::Nodes::SqlLiteral
+              other
+            when Arel::Attributes::Attribute
+              attribute
+            end
+          end
+        end
+      `,
+    });
+    expect(s["Foo#build_quoted"]).toEqual(["if", "when:3", "if"]);
+  });
+
+  it("marks `String === x || Symbol === x` on one operand as one String test", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def order(x)
+            String === x || Symbol === x ? lit(x) : x
+          end
+
+          def partition(x)
+            ::String === x || ::Symbol === x ? lit(x) : x
+          end
+
+          def mixed(x, y)
+            String === x || Symbol === y
+          end
+        end
+      `,
+    });
+    expect(s["Foo#order"]).toEqual(["if", "or:string-symbol", "ref:lit"]);
+    expect(s["Foo#partition"]).toEqual(["if", "or:string-symbol", "ref:lit"]);
+    expect(s["Foo#mixed"]).toEqual(["or"]);
+  });
+
   it("emits an ordered control + call skeleton, with duplicates, alongside calls", () => {
     const s = rubySkeletons({
       "foo.rb": `

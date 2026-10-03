@@ -63,7 +63,7 @@ export class HomogeneousIn extends Node {
   get procForBinds(): (value: unknown) => unknown {
     return (value: unknown) =>
       AMAttribute.withCastValue(
-        (this.attribute as unknown as { name?: string }).name ?? "",
+        (this.attribute as unknown as { name: string | null }).name,
         value,
         defaultValue(),
       );
