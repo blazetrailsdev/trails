@@ -16,7 +16,10 @@ import {
   rbSetClassPathString,
   rtest,
 } from "@blazetrails/ruby-compat";
-import { HashWithIndifferentAccess } from "../core-ext/hash-with-indifferent-access.js";
+import {
+  HashWithIndifferentAccess,
+  type ThorOptions,
+} from "../core-ext/hash-with-indifferent-access.js";
 import {
   AtLeastOneRequiredArgumentError,
   ExclusiveArgumentError,
@@ -137,8 +140,7 @@ export class Options extends Arguments {
     super.unshift(arg);
   }
 
-  // @ts-expect-error Ruby's override answers a frozen HashWithIndifferentAccess where Arguments#parse answers @assigns (options.rb:138-141).
-  override parse(args: unknown[]): HashWithIndifferentAccess {
+  override parse(args: unknown[]): ThorOptions<Record<string, unknown>> {
     this.pile = rbObjDup(args);
     this.isTreatedAsValue = false;
     this.parsingOptions = true;
@@ -194,7 +196,9 @@ export class Options extends Arguments {
     this.checkExclusiveBang();
     this.checkAtLeastOneBang();
 
-    const assigns = new HashWithIndifferentAccess(this.assigns);
+    const assigns = new HashWithIndifferentAccess(this.assigns) as ThorOptions<
+      Record<string, unknown>
+    >;
     assigns.freeze();
     return assigns;
   }
