@@ -374,9 +374,9 @@ export function initWithAttributes<T extends CoreRecord>(
   newRecord = false,
   block?: (record: T) => void,
 ): T {
-  this.initInternals();
   this._newRecord = newRecord;
   this._attributes = attributes;
+  this.initInternals();
   for (const name of attributes.keys() as Iterable<string>) {
     if (!basicObjRespondTo(this, name, false)) {
       (
@@ -735,14 +735,16 @@ export function initInternals(
   },
   super_: () => void,
 ): void {
-  this._newRecord = true;
-  this._attributes = (
-    this.constructor as unknown as {
-      _defaultAttributes(): import("@blazetrails/activemodel").AttributeSet;
-    }
-  )
-    ._defaultAttributes()
-    .deepDup();
+  if (this._attributes == null && !(this.constructor as { _allocating?: boolean })._allocating) {
+    this._newRecord = true;
+    this._attributes = (
+      this.constructor as unknown as {
+        _defaultAttributes(): import("@blazetrails/activemodel").AttributeSet;
+      }
+    )
+      ._defaultAttributes()
+      .deepDup();
+  }
 
   super_();
   this._readonly = false;

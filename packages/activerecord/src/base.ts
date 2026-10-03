@@ -1024,6 +1024,7 @@ export class Base extends Model {
   static _suppressInitializeCallback = false;
 
   static _suppressAbstractCheck = false;
+  static _allocating = false;
 
   declare static attrReadonly: typeof ReadonlyAttributes.attrReadonly;
   declare static isReadonlyAttribute: typeof ReadonlyAttributes.isReadonlyAttribute;
@@ -1632,10 +1633,26 @@ export class Base extends Model {
     );
     const prevAbstractSuppress = this._suppressAbstractCheck;
     this._suppressAbstractCheck = true;
+    const hadOwnStiSuppress = Object.prototype.hasOwnProperty.call(this, "_suppressStiNewDispatch");
+    const prevStiSuppress = (this as { _suppressStiNewDispatch?: unknown })._suppressStiNewDispatch;
+    (this as { _suppressStiNewDispatch?: unknown })._suppressStiNewDispatch = this;
+    const hadOwnAllocating = Object.prototype.hasOwnProperty.call(this, "_allocating");
+    const prevAllocating = this._allocating;
+    this._allocating = true;
     let record: InstanceType<T>;
     try {
       record = new this() as InstanceType<T>;
     } finally {
+      if (hadOwnStiSuppress) {
+        (this as { _suppressStiNewDispatch?: unknown })._suppressStiNewDispatch = prevStiSuppress;
+      } else {
+        delete (this as { _suppressStiNewDispatch?: unknown })._suppressStiNewDispatch;
+      }
+      if (hadOwnAllocating) {
+        this._allocating = prevAllocating;
+      } else {
+        delete (this as any)._allocating;
+      }
       if (hadOwnSuppress) {
         this._suppressInitializeCallback = prevSuppress;
       } else {
