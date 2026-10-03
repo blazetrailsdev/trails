@@ -76,6 +76,7 @@ export const EXTRACTOR_OUTPUT_FIELDS = [
   "callSeq",
   "callArgs",
   "skeleton",
+  "shapeTokens",
   "localSkeleton",
   "internal",
   "option_keys",

@@ -29,6 +29,7 @@ export type Site = {
   line: number;
   shape: string;
   alias: boolean;
+  delegation: boolean;
 };
 
 /**
@@ -41,8 +42,12 @@ export type Site = {
  * the skeleton records that step as `ref:call`, so erasing it too would make
  * every one-line `helper.call(this)` delegation match
  * `cmpint.call(this, other) < 0`. A receiver the extractor does not record
- * (`this`, a constant) stays erased. `undefined` for a body with no
- * skeleton (an overload signature), which cannot compare.
+ * (`this`, a constant) stays erased there. Last come the `shapeTokens`, what
+ * the skeleton and the descriptors both erase: without them `Promise.resolve()`
+ * matches a bare `resolve()`, `map.get(k)` matches `ary[0]`, `a && !b` matches
+ * `a && b ? x : y`, and two `ArgumentError` raises match whatever their
+ * template says. `undefined` for a body with no skeleton (an overload
+ * signature), which cannot compare.
  */
 export function shapeOf(decl: Decl): string | undefined {
   if (decl.skeleton === undefined || decl.skeleton.length === 0) return undefined;
@@ -53,7 +58,8 @@ export function shapeOf(decl: Decl): string | undefined {
     for (const arg of call.args ?? [])
       if (!arg.startsWith("id:") && arg !== "?") literals.push(arg);
   }
-  return `${decl.skeleton.join(",")}|${literals.join(",")}`;
+  const erased = decl.shapeTokens === undefined ? "" : `|${decl.shapeTokens.join(",")}`;
+  return `${decl.skeleton.join(",")}|${literals.join(",")}${erased}`;
 }
 
 /** Every declaration flattened to a comparable site; `declarations` already
@@ -66,7 +72,13 @@ export function sites(api: TsApi): Site[] {
     const [step, ...rest] = decl.skeleton ?? [];
     const alias =
       rest.length === 0 && step.startsWith("ref:") && siblings?.has(step.slice(4)) === true;
-    out.push({ package: pkg, tsFile, name: decl.name, line: decl.line ?? 0, shape, alias });
+    const delegation =
+      rest.length === 0 &&
+      shape === `${step}|` &&
+      decl.callArgs?.length === 1 &&
+      step === `ref:${decl.callArgs[0].name}`;
+    const line = decl.line ?? 0;
+    out.push({ package: pkg, tsFile, name: decl.name, line, shape, alias, delegation });
   }
   return out;
 }
@@ -85,8 +97,12 @@ function siteKey(s: Site): string {
  * class method whose whole body is one step onto a member of its own class is
  * Ruby's `alias` (`Tempfile#length` is `size`, `MatchData#eql?` is `==`), so a
  * same-shaped member elsewhere aliases its own class rather than
- * re-implementing this one. A one-step method that reaches anything else
- * (`StringIO#binmode` reads `ASCII_8BIT`) stays an origin.
+ * re-implementing this one. A body that is one call whose receiver and
+ * arguments are all identifiers (`allocators.set(klass, func)`, `block()`,
+ * `registry.get(name)`) has nothing left once identifiers are erased, so it
+ * matches every one-line `Map#set` / `Map#get` / `clear` in the tree. A
+ * one-step method that reaches anything else (`StringIO#binmode` reads
+ * `ASCII_8BIT`) stays an origin.
  */
 export function matches(api: TsApi): Map<string, Site[]> {
   const all = sites(api);
@@ -100,7 +116,7 @@ export function matches(api: TsApi): Map<string, Site[]> {
   const found = new Map<string, Site[]>();
   for (const origin of all) {
     if (origin.package !== "ruby-compat" || origin.name === "constructor") continue;
-    if (origin.alias) continue;
+    if (origin.alias || origin.delegation) continue;
     const hits = byShape.get(origin.shape);
     if (hits === undefined) continue;
     const seen = new Set((found.get(origin.name) ?? []).map(siteKey));
