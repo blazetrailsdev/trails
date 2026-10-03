@@ -166,8 +166,6 @@ function timeToA(time: any): unknown[] {
 }
 
 describe("LintTest", () => {
-  fixtures([]);
-
   class LintModel extends Base {}
 
   let model: LintModel;

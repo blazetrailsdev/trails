@@ -436,15 +436,6 @@ class TestExtractor
     @module_includes[name] ||= @gate_stack.dup
   end
 
-  # `include ActiveModel::Lint::Tests` (activemodel/test/cases/lint_test.rb:6)
-  # mixes in `def test_*` methods a gem's LIB defines (active_model/lint.rb:30-82),
-  # so the including test case's whole body is in another file. Walk that file
-  # for the module and stash its tests under the name the `include` spelled, as
-  # process_module does for a same-file mixin.
-  #
-  # LIB_TEST_MODULES is the enrollment set, and it is only-grow: i18n's
-  # `I18n::Tests::*` (lib/i18n/tests/*.rb, ~560 tests mounted by test/api/*_test.rb)
-  # is the same shape and joins with the story that ports those tests.
   LIB_TEST_MODULES = %w[ActiveModel::Lint::Tests].freeze
 
   def collect_lib_modules(filepath)
@@ -462,9 +453,6 @@ class TestExtractor
     end
   end
 
-  # The lib file defining `name`: `ActiveModel::Lint::Tests` is
-  # `active_model/lint.rb`, found by dropping trailing segments, under the `lib`
-  # of any gem beside the one the test file sits in.
   def lib_module_path(name, filepath)
     segments = name.split("::").map { |s| s.gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase }
     gem = File.dirname(filepath)

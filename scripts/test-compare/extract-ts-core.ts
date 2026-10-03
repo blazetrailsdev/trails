@@ -56,7 +56,6 @@ interface HelperDef {
   lambda: boolean;
   scopeStart: number;
   scopeEnd: number;
-  /** Set on a {@link collectLibTests} body: the file it was parsed from. */
   sourceFile?: ts.SourceFile;
 }
 
@@ -90,9 +89,10 @@ export const LIB_TEST_MODULES: Record<string, string> = {
 };
 
 /**
- * The functions of `namespace` in a lib file, keyed `Namespace.fn` — the name
- * {@link helperCalleeName} reads off a call site. A body's own helper calls are
- * not folded, as the Ruby walk of the lib file folds none.
+ * The functions of `namespace` in a lib file, keyed `Namespace.fn`, the name a
+ * call site reaches one by (`Tests.testToKey`, `Lint.Tests.testToKey`). A
+ * body's own helper calls are not folded, as the Ruby walk of the lib file
+ * folds none.
  */
 export function collectLibTests(content: string, file: string, namespace: string): HelperMap {
   const sourceFile = ts.createSourceFile(file, content, ts.ScriptTarget.ESNext, false);
@@ -111,12 +111,6 @@ export function collectLibTests(content: string, file: string, namespace: string
   return tests;
 }
 
-/**
- * The helper name a call's callee spells: an identifier's text, or
- * `Namespace.fn` for a {@link collectLibTests} function reached through its
- * namespace (`Tests.testToKey`, `Lint.Tests.testToKey`). Null for any other
- * property access.
- */
 function helperCalleeName(expression: ts.Expression, helpers: HelperMap): string | null {
   if (ts.isIdentifier(expression)) return expression.text;
   if (!ts.isPropertyAccessExpression(expression)) return null;

@@ -212,7 +212,6 @@ const fileHasMissingRailsCallTag = new WeakMap<ts.SourceFile, boolean>();
 const fileHasMissingRailsArgsTag = new WeakMap<ts.SourceFile, boolean>();
 /** Same role for `@missingRailsName`. */
 const fileHasMissingRailsNameTag = new WeakMap<ts.SourceFile, boolean>();
-/** Same role for `@inventedArm`. */
 const fileHasInventedArmTag = new WeakMap<ts.SourceFile, boolean>();
 
 /**
