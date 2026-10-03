@@ -2881,8 +2881,6 @@ class ApiExtractor
     names.all? ? names.join("|") : nil
   end
 
-  # The name of the one Symbol-literal key an index read takes
-  # (`options[:on_skip]`), or nil.
   def symbol_key_name(args)
     return nil unless args.is_a?(Array) && args[0] == :args_add_block
 
@@ -3870,9 +3868,6 @@ class ApiExtractor
     inner.is_a?(Array) && inner[0] == :@const && inner[1] == "Proc"
   end
 
-  # `Concurrent::Array` is `::Array` under a lock on the runtimes that need one
-  # (concurrent-ruby `lib/concurrent-ruby/concurrent/array.rb`), so its
-  # argument-less `new` is the same literal `[]`.
   LITERAL_NEW_CONSTANTS = %w[Hash Array Concurrent::Array].freeze
 
   def core_new_kind(recv, args, has_block)
