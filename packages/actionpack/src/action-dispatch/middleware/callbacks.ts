@@ -1,8 +1,7 @@
 import {
   Callbacks as ASCallbacks,
   include,
-  type BeforeCallback,
-  type AfterCallback,
+  type FilterListEntry,
   type Extended,
   type Included,
 } from "@blazetrails/activesupport";
@@ -20,12 +19,12 @@ export class Callbacks {
     this.app = app;
   }
 
-  static before(args: BeforeCallback): void {
-    this.setCallback("call", "before", args);
+  static before(...args: FilterListEntry[]): void {
+    this.setCallback("call", "before", ...args);
   }
 
-  static after(args: AfterCallback): void {
-    this.setCallback("call", "after", args);
+  static after(...args: FilterListEntry[]): void {
+    this.setCallback("call", "after", ...args);
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
