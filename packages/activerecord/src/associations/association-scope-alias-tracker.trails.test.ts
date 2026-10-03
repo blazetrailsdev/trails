@@ -29,7 +29,7 @@ describe("AssociationScope — AliasTracker aliases repeated tables", () => {
   });
 
   it("AliasTracker: bare table on first visit, aliased on repeat, thunk only invoked on repeat", () => {
-    const tracker = AliasTracker.create(null, "unrelated", []);
+    const tracker = AliasTracker.create(AtComment.connectionPool(), "unrelated", []);
     let thunkInvocations = 0;
     const candidate = () => {
       thunkInvocations++;
@@ -51,7 +51,11 @@ describe("AssociationScope — AliasTracker aliases repeated tables", () => {
 
     class TestScope extends AssociationScope {
       public runGetChain(reflection: any, association: any) {
-        const tracker = AliasTracker.create(null, reflection.klass.arelTable.name, []);
+        const tracker = AliasTracker.create(
+          reflection.klass.connectionPool(),
+          reflection.klass.arelTable.name,
+          [],
+        );
         return this.getChain(reflection, association, tracker);
       }
     }

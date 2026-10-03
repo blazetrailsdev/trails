@@ -5150,6 +5150,39 @@ function isArgumentBindingGuard(statement: ts.IfStatement): boolean {
 }
 
 /**
+ * `if (isHash(scope)) { options = scope; scope = null; }`: the binding of Ruby's
+ * optional positional before keywords (`def has_many(name, scope = nil, **options)`,
+ * `activerecord/lib/active_record/associations.rb:1268`). A TS caller hands the
+ * options in the positional's slot, so the body moves them. Every statement
+ * assigns a parameter from a parameter or `null` / `undefined`, with no `else`,
+ * ahead of anything but other binding guards. That binds parameters, as
+ * {@link isArgumentBindingGuard}'s raise does, and is not an arm.
+ */
+function isParameterRebinding(statement: ts.IfStatement): boolean {
+  const body = statement.parent;
+  if (!ts.isBlock(body) || !ts.isFunctionLike(body.parent) || statement.elseStatement) return false;
+  const bound = body.parent.parameters.map((p) => p.name.getText());
+  for (const earlier of body.statements) {
+    if (earlier === statement) break;
+    if (!ts.isIfStatement(earlier)) return false;
+    if (!isArgumentBindingGuard(earlier) && !isParameterRebinding(earlier)) return false;
+  }
+  const then = statement.thenStatement;
+  const moves = ts.isBlock(then) ? then.statements : [then];
+  return (
+    moves.length > 0 &&
+    moves.every((move) => {
+      if (!ts.isExpressionStatement(move) || !ts.isBinaryExpression(move.expression)) return false;
+      const { left, operatorToken, right } = move.expression;
+      if (operatorToken.kind !== ts.SyntaxKind.EqualsToken) return false;
+      if (!ts.isIdentifier(left) || !bound.includes(left.text)) return false;
+      if (right.kind === ts.SyntaxKind.NullKeyword) return true;
+      return ts.isIdentifier(right) && (right.text === "undefined" || bound.includes(right.text));
+    })
+  );
+}
+
+/**
  * `rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined`: the capture
  * of Ruby's `&block` after a splat (`def validates_with(*args, &block)`,
  * `activemodel/lib/active_model/validations/with.rb:88`). A TS rest parameter
@@ -5203,6 +5236,7 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
           return;
         }
         if (isArgumentBindingGuard(n as ts.IfStatement)) return;
+        if (isParameterRebinding(n as ts.IfStatement)) return;
         tokens.push("if");
         break;
       }

@@ -1,5 +1,5 @@
-import { ArgumentError } from "@blazetrails/activesupport";
-import { Hash } from "@blazetrails/ruby-compat";
+import { ArgumentError, sum } from "@blazetrails/activesupport";
+import { Hash, regexpEscape } from "@blazetrails/ruby-compat";
 import { Table, Nodes } from "@blazetrails/arel";
 import { maxIdentifierLength } from "../connection-adapters/abstract/database-limits.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting.js";
@@ -50,11 +50,11 @@ export class AliasTracker {
     joins: any[],
     aliases?: Hash<string, number>,
   ): AliasTracker {
-    const block = (connection: any): AliasTracker => {
+    return pool.withConnectionSync((connection: any): AliasTracker => {
       if (joins.length === 0) {
-        aliases ??= new Hash<string, number>(0);
+        aliases ||= new Hash<string, number>(0);
       } else if (aliases) {
-        const defaultProc = aliases.defaultProc() ?? (() => 0);
+        const defaultProc = aliases.defaultProc() || (() => 0);
         aliases.setDefaultProc((h, k) => {
           const count = AliasTracker.initialCountFor(connection, k, joins) + defaultProc(h, k);
           h.set(k, count);
@@ -68,40 +68,37 @@ export class AliasTracker {
         });
       }
       aliases.set(initialTable, 1);
-      return new AliasTracker(
-        connection?.tableAliasLength?.() ?? DEFAULT_TABLE_ALIAS_LENGTH,
-        aliases,
-      );
-    };
-    if (typeof pool?.tableAliasLength === "function") return block(pool);
-    if (pool?.withConnectionSync) return pool.withConnectionSync(block);
-    return block(undefined);
+      return new AliasTracker(connection.tableAliasLength(), aliases);
+    });
   }
 
-  static initialCountFor(connection: Quoting | undefined, name: string, tableJoins: any[]): number {
-    const quotedName = connection ? connection.quoteTableName(name) : `"${name}"`;
-    const quotedNameEscaped = quotedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const nameEscaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(
-      `JOIN(?:\\s+\\w+)?\\s+(?:\\S+\\s+)?(?:${quotedNameEscaped}|${nameEscaped})\\s+ON`,
-      "gi",
-    );
+  static initialCountFor(connection: Quoting, name: string, tableJoins: any[]): number {
+    let quotedNameEscaped: string | null = null;
+    let nameEscaped: string | null = null;
 
-    let count = 0;
-    for (const join of tableJoins) {
+    const counts = tableJoins.map((join): number => {
       if (join instanceof Nodes.StringJoin) {
-        const left = join.left;
-        const sql = typeof left === "string" ? left : (left?.toString?.() ?? "");
-        const matches = sql.match(pattern);
-        count += matches ? matches.length : 0;
+        quotedNameEscaped ||= regexpEscape(connection.quoteTableName(name));
+        nameEscaped ||= regexpEscape(name);
+
+        return Array.from(
+          join.left
+            .toString()
+            .matchAll(
+              new RegExp(
+                `JOIN(?:\\s+\\w+)?\\s+(?:\\S+\\s+)?(?:${quotedNameEscaped}|${nameEscaped})\\sON`,
+                "gi",
+              ),
+            ),
+        ).length;
       } else if (join instanceof Nodes.Join) {
-        if ((join.left as any)?.name === name) count += 1;
+        return (join.left as any).name === name ? 1 : 0;
       } else {
         throw new ArgumentError("joins list should be initialized by list of Arel::Nodes::Join");
       }
-    }
+    });
 
-    return count;
+    return sum(counts);
   }
 
   aliasedTableFor(
@@ -109,13 +106,11 @@ export class AliasTracker {
     tableName: string | null = null,
     block: () => string,
   ): Table | any {
-    tableName = (tableName ?? arelTable.name ?? String(arelTable)) as string;
+    tableName ||= arelTable.name as string;
 
     if (this.aliases.get(tableName) === 0) {
       this.aliases.set(tableName, 1);
-      if (arelTable.name !== tableName && typeof arelTable.alias === "function") {
-        arelTable = arelTable.alias(tableName);
-      }
+      if (arelTable.name !== tableName) arelTable = arelTable.alias(tableName);
     } else {
       let aliasedName = this.tableAliasFor(block());
 
@@ -124,7 +119,7 @@ export class AliasTracker {
 
       if (count > 1) aliasedName = `${this.truncate(aliasedName)}_${count}`;
 
-      if (typeof arelTable.alias === "function") arelTable = arelTable.alias(aliasedName);
+      arelTable = arelTable.alias(aliasedName);
     }
 
     return arelTable;

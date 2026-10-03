@@ -11,6 +11,13 @@ function shortCircuitsAgree(ruby: string[], ts: string[]): boolean {
 }
 
 describe("foldSkeletonTokens", () => {
+  it("folds rbEnsure onto the try Ruby's begin/ensure emits", () => {
+    expect(foldSkeletonTokens(["ref:rbEnsure", "ref:block"], "ts", ["try", "ref:block"])).toEqual([
+      "try",
+      "ref:block",
+    ]);
+  });
+
   it("matches Ruby `xs.each { |x| save(x) }` against its `for (const x of xs) this.save(x)` port", () => {
     const ruby = ["ref:each", "ref:save"];
     const ts = ["loop", "ref:save"];
