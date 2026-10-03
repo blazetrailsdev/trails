@@ -1724,6 +1724,23 @@ describe("body call capture", () => {
     ]);
   });
 
+  it("marks a moduleEval / classEval callback's first calls in the order stream, plain in the call set", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        generate(m: string, ok: boolean) {
+          if (ok) {
+            this.moduleEval((mod) => { mod[m] = () => this.scoping(() => this.evalOnly()); });
+          } else {
+            this.defineMethod(m, () => this.scoping(() => 2));
+          }
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "generate")!;
+    expect(m.callSeq).toEqual(["moduleEval", "%scoping", "%evalOnly", "defineMethod", "scoping"]);
+    expect(m.calls).toEqual(["defineMethod", "evalOnly", "moduleEval", "scoping"]);
+  });
+
   it("drops a hoisted closure's name even when the enclosing body calls it too", () => {
     // Deliberate over-drop: the enclosing occurrence is no less ambiguous than
     // the closure's. Ruby's counterpart may be either the lambda-at-definition
@@ -1883,6 +1900,34 @@ describe("body call capture — renamed-import aliases", () => {
     ]);
     expect(info.classes["b.ts:B"].instanceMethods.find((m) => m.name === "go")!.calls).toEqual([
       "renamed",
+    ]);
+  });
+});
+
+describe("body call capture — ruby-compat renamed imports", () => {
+  it("credits a rename forced by a module-level homonym to the original export", () => {
+    const info = extractFromFiles("/p", {
+      "finder.ts": `
+        import { first as aryFirst } from "@blazetrails/ruby-compat";
+        export function first(this: any): unknown { return aryFirst(this.records); }
+      `,
+    });
+    expect(fileFunctionsOf(info, "finder.ts").find((f) => f.name === "first")!.calls).toEqual([
+      "aryFirst",
+      "first",
+      "records",
+    ]);
+  });
+
+  it("keeps the local name of a rename toward the Ruby name", () => {
+    const info = extractFromFiles("/p", {
+      "insp.ts": `
+        import { rbInspect as inspect } from "@blazetrails/ruby-compat";
+        export function show(x: unknown): unknown { return inspect(x); }
+      `,
+    });
+    expect(fileFunctionsOf(info, "insp.ts").find((f) => f.name === "show")!.calls).toEqual([
+      "inspect",
     ]);
   });
 });

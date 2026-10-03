@@ -456,7 +456,6 @@ export function appendToConnectedToStack(entry: {
 export const RAILS_ENV = (): string | undefined =>
   TopLevel.Trails?.env.toString() ?? presence(getEnv("TRAILS_ENV")) ?? presence(getEnv("NODE_ENV"));
 
-/** @missingRailsCall call — CONVERGEABLE call-gate-credits-invoking-a-proc-valued-member-as-proc-call */
 export const DEFAULT_ENV = (): string => RAILS_ENV() || "default_env";
 
 export async function establishConnection(

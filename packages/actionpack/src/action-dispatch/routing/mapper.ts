@@ -196,7 +196,6 @@ export class Constraints extends Endpoint {
     });
   }
 
-  /** @missingRailsCall call — PERMANENT */
   serve(req: ConstraintsRequest): unknown {
     if (!this.matches(req as unknown as Request)) {
       return [404, { [X_CASCADE]: "pass" }, []];

@@ -33,6 +33,7 @@ import {
   resolveEntityByDeclaringFile,
   significantMissingCalls,
   suppressedCallClaims,
+  invokeForms,
   narrowPredicateCandidates,
   ambiguousTsNames,
   reorderedCalls,
@@ -468,6 +469,67 @@ describe("significantMissingCalls", () => {
       significantCallsForReceivers({ load: ["expr", "self"] }, undefined, imported).has("load"),
     ).toBe(true);
     expect(significantCallsForReceivers({}).has("load")).toBe(true);
+  });
+
+  it("significantCallsForReceivers drops Proc#call for a TS body that invokes the receiver", () => {
+    const resolver = new Set(invokeForms(["tableNameResolver"]));
+    expect(
+      significantCallsForReceivers({ call: ["expr"] }, undefined, resolver, {
+        call: ["table_name_resolver"],
+      }).has("call"),
+    ).toBe(false);
+    expect(
+      significantCallsForReceivers({ call: ["expr", "self"] }, undefined, resolver, {
+        call: ["table_name_resolver"],
+      }).has("call"),
+    ).toBe(true);
+    expect(
+      significantCallsForReceivers({ call: ["expr"] }, undefined, resolver, {}).has("call"),
+    ).toBe(true);
+    expect(
+      significantCallsForReceivers(
+        { call: ["ivar"] },
+        undefined,
+        new Set(invokeForms(["_block"])),
+        {
+          call: ["@block"],
+        },
+      ).has("call"),
+    ).toBe(false);
+  });
+
+  it("significantCallsForReceivers keeps Proc#call when the TS body drops the invocation", () => {
+    expect(
+      significantCallsForReceivers({ call: ["expr"] }, undefined, new Set(invokeForms(["other"])), {
+        call: ["table_name_resolver"],
+      }).has("call"),
+    ).toBe(true);
+    expect(
+      significantCallsForReceivers({ call: ["expr"] }, undefined, new Set(invokeForms(["x"])), {
+        call: ["?"],
+      }).has("call"),
+    ).toBe(true);
+  });
+
+  it("significantCallsForReceivers keeps a ported call on another receiver", () => {
+    const forms = new Set(invokeForms(["records"]));
+    expect(
+      significantCallsForReceivers({ call: ["local"] }, undefined, forms, {
+        call: ["preloader"],
+      }).has("call"),
+    ).toBe(true);
+    expect(
+      significantMissingCalls(
+        "preload",
+        ["call"],
+        new Set(["records"]),
+        () => true,
+        () => ["call"],
+        significantCallsForReceivers({ call: ["local"] }, new Set(["call"]), forms, {
+          call: ["preloader"],
+        }),
+      ),
+    ).toEqual(["call → call"]);
   });
 
   it("does not flag an omitted symbolize_keys even where symbolizeKeys is ported with args", () => {
@@ -3717,6 +3779,38 @@ describe("reorderedCalls (RFC 0084 order-only call parity)", () => {
   });
 });
 
+describe("reorderedCalls — moduleEval / classEval callbacks", () => {
+  const tsSeq = ["moduleEval", "%scoping", "defineMethod", "scoping"];
+  const ruby = ["module_eval", "define_method", "scoping"];
+  const map = (rc: string) =>
+    ({ module_eval: ["moduleEval"], define_method: ["defineMethod"], scoping: ["scoping"] })[
+      rc as "scoping"
+    ] ?? null;
+  const significant = new Set(ruby);
+
+  it("drops the callback's positions against a String module_eval", () => {
+    expect(
+      reorderedCalls(
+        "generate_method",
+        ruby,
+        tsSeq,
+        () => true,
+        map,
+        significant,
+        ruby,
+        undefined,
+        true,
+      ),
+    ).toEqual([]);
+  });
+
+  it("positions the callback's calls against a block module_eval", () => {
+    expect(
+      reorderedCalls("generate_method", ruby, tsSeq, () => true, map, significant, ruby),
+    ).toEqual([`${ORDER_PREFIX}scoping,defineMethod → defineMethod,scoping`]);
+  });
+});
+
 describe("suppressedCallClaims", () => {
   it("claims the TS spelling of a call the ported-with-args gate suppresses", () => {
     const claimed = suppressedCallClaims(
@@ -3727,6 +3821,17 @@ describe("suppressedCallClaims", () => {
       new Set(["method_defined?", "include?"]),
     );
     expect([...claimed]).toEqual(["has"]);
+  });
+
+  it("leaves the alias spelling free when the body ports the call under its convention name", () => {
+    const claimed = suppressedCallClaims(
+      ["method_defined?", "include?"],
+      new Set(["isMethodDefined", "has"]),
+      (ts) => ts === "include",
+      (rc) => (rc === "method_defined?" ? ["isMethodDefined"] : ["include"]),
+      new Set(["method_defined?", "include?"]),
+    );
+    expect([...claimed]).toEqual(["isMethodDefined"]);
   });
 
   it("claims nothing for a NO_JS_CALL_FORM name, whose port emits no callee", () => {

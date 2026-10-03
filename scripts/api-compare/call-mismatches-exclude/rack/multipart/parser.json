@@ -49,13 +49,6 @@
     "package": "rack",
     "tsFile": "multipart/parser.ts",
     "rubyName": "on_mime_head",
-    "call": "call",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "multipart/parser.ts",
-    "rubyName": "on_mime_head",
     "call": "new",
     "kind": "args",
     "rubyArgs": [],
