@@ -1,6 +1,6 @@
 import { Encryption } from "../namespaces.js";
-import { Concern, any, isPlainObject, prepend, transformKeys } from "@blazetrails/activesupport";
-import { Module, extend, include, isEmpty } from "@blazetrails/ruby-compat";
+import { Concern, any, isPlainObject, transformKeys } from "@blazetrails/activesupport";
+import { Module, extend, include, isEmpty, prepend } from "@blazetrails/ruby-compat";
 import { Relation } from "../relation.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 

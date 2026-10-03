@@ -531,7 +531,9 @@ for (const [mri, { tsExport }] of RECEIVER_KEYED_RUBY_COMPAT_EXPORTS) {
  *  `prepend(klass, mod)` / `include(klass, mod)` / `extend(obj, mod)` with the
  *  Ruby receiver as argument 1. CLAUDE.md § "Module mixins" names them as the
  *  ports; aligned by callee only, since `self.include(UrlFor)` on a live
- *  `Module` is the method form and compares as written. */
+ *  `Module` is the method form and compares as written. A site importing the
+ *  `@blazetrails/activesupport` re-export records no `rubyCompat`, so it is
+ *  not aligned. */
 const MODULE_MIXIN_EXPORTS = new Set(["prepend", "include", "extend"]);
 
 /**
