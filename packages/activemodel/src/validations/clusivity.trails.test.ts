@@ -92,6 +92,16 @@ describe("Clusivity#inclusion_method", () => {
     expect(inclusionMethod(new Range<unknown>(null, "c"))).toBe("isInclude");
   });
 
+  it("still covers a JS Date Range, which Range#include? answers by cover?", async () => {
+    const delimiter = new Range(new Date(Date.UTC(2024, 0, 1)), new Date(Date.UTC(2024, 11, 31)));
+    expect(inclusionMethod(delimiter)).toBe("isInclude");
+    Topic.validatesInclusionOf("title", { in: delimiter });
+
+    expect(await new Topic({ title: new Date(Date.UTC(2024, 5, 1)) }).isValid()).toBe(true);
+    expect(await new Topic({ title: new Date(Date.UTC(2025, 5, 1)) }).isValid()).toBe(false);
+    Topic.clearValidatorsBang();
+  });
+
   it("selects include? for a String Range and for a non-Range", () => {
     expect(inclusionMethod(new Range("a", "c"))).toBe("isInclude");
     expect(inclusionMethod([1, 2, 3])).toBe("isInclude");
