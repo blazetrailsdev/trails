@@ -192,7 +192,7 @@ export class LazyAttributeHash {
     return hasKey(this._delegateHash, key) || hasKey(this.values, key) || hasKey(this.types, key);
   }
 
-  getAttribute(key: string): Attribute | undefined {
+  get(key: string): Attribute | undefined {
     return this._delegateHash[key] ?? this.assignDefaultValue(key);
   }
 
@@ -260,8 +260,8 @@ export class LazyAttributeHash {
   /** @internal */
   protected materialize(): Record<string, Attribute> {
     if (!this.materialized) {
-      eachKey(this.values, (key) => this.getAttribute(key));
-      eachKey(this.types, (key) => this.getAttribute(key));
+      eachKey(this.values, (key) => this.get(key));
+      eachKey(this.types, (key) => this.get(key));
       if (!Object.isFrozen(this)) {
         this.materialized = true;
       }

@@ -345,7 +345,8 @@ function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unk
  * `Module` defines. A plain function's own `length` and `name` are its JS
  * arity and function name, which no Ruby `Proc` defines.
  *
- * A writer `name=` is answered by a JS accessor's setter, the entry
+ * A writer `name=` is answered by a JS accessor's setter or by a `setName`
+ * method, the conventions table's two writer spellings and the entries
  * {@link rbFSend} dispatches it to.
  *
  * `method_boundp` (`vm_method.c:1788-1818`) answers `0` for a PRIVATE entry,
@@ -383,6 +384,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
     Object.getOwnPropertyDescriptor(obj, "prototype")?.writable === false;
   if (typeof obj === "function" && !klass && (mid === "length" || mid === "name")) return false;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
+  const writer = writerSpelling(attr);
   for (
     let o: object | null = Object(obj);
     o && !(klass && o === Function.prototype);
@@ -394,6 +396,12 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
       return klass ? typeof entry.value === "function" : entry.value !== undefined;
     }
     if (attr !== undefined && Object.getOwnPropertyDescriptor(o, attr)?.set) return true;
+    if (
+      writer !== undefined &&
+      typeof Object.getOwnPropertyDescriptor(o, writer)?.value === "function"
+    ) {
+      return true;
+    }
   }
   let cme: PropertyDescriptor | undefined;
   for (
@@ -419,6 +427,10 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
  */
 export function objRespondToMissing(_obj: unknown, _mid: string, _priv: boolean): boolean {
   return false;
+}
+
+function writerSpelling(attr: string | undefined): string | undefined {
+  return attr?.replace(/^(_*)(.)/, (_, u: string, c: string) => `${u}set${c.toUpperCase()}`);
 }
 
 function checkDefinitionVisibility(mod: { prototype: object }, mid: string): boolean {
@@ -521,7 +533,8 @@ export function rbModPublicMethodDefined(mod: { prototype: object }, mid: string
  * restricted to public methods. A JS entry carries no visibility, so a defined
  * name dispatches exactly as {@link rbFSend} does (see CLAUDE.md, "Method
  * visibility is compile-time only"). The nearest entry answers: a writer
- * `name=` is either a `name=` method or a JS accessor's `name` setter. An
+ * `name=` is a `name=` method, a JS accessor's `name` setter, or a `setName`
+ * method. An
  * unbound name goes to the receiver's `method_missing`.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#public_send` (`vendor/ruby/v3.3.11/vm_eval.c:1350`).
@@ -682,12 +695,15 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (bound !== undefined) return bound(recv, ...args);
   const obj = Object(recv) as Record<string, unknown>;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
+  const writer = writerSpelling(attr);
   for (let o: object | null = obj; o; o = Object.getPrototypeOf(o) as object | null) {
     const desc = Object.getOwnPropertyDescriptor(o, mid);
     if (typeof desc?.value === "function") return (desc.value as AnyFunction).apply(recv, args);
     if (desc && argc === 0) return desc.get ? desc.get.call(recv) : desc.value;
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
     if (setter) return setter.call(recv, args[0]);
+    const set = writer === undefined ? undefined : Object.getOwnPropertyDescriptor(o, writer);
+    if (typeof set?.value === "function") return (set.value as AnyFunction).apply(recv, args);
   }
   if (typeof recv === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) {
     return rbStrSend(recv, mid, ...args)[0];

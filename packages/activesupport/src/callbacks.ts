@@ -1,7 +1,8 @@
 import {
   extend,
-  included,
+  include,
   kernelCatch,
+  Module,
   NoMethodError,
   rbBlockGivenP,
   rbClassSuperclass,
@@ -12,6 +13,7 @@ import {
 
 import { kernelArray } from "./array-utils.js";
 import { classAttribute } from "./class-attribute.js";
+import { Concern } from "./concern.js";
 import { ArgumentError, extractOptionsBang } from "./hash-utils.js";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { camelize } from "./inflector.js";
@@ -1002,7 +1004,7 @@ function callbacksClass(target: object): CallbacksClass {
     (target.constructor as { prototype?: unknown }).prototype === target
       ? target.constructor
       : rbObjSingletonClass(target);
-  Callbacks[included](klass as AnyClass);
+  include(klass as AnyClass, Callbacks);
   return klass as unknown as CallbacksClass;
 }
 
@@ -1194,24 +1196,30 @@ export const ClassMethods = {
   },
 };
 
-export const Callbacks = {
-  ClassMethods,
+export const Callbacks = new Module() as Module &
+  typeof Concern & {
+    ClassMethods: typeof ClassMethods;
+    runCallbacks: typeof runCallbacks;
+    haltedCallbackHook(_filter: unknown, _name: string): void;
+  };
+extend(Callbacks, Concern);
 
-  runCallbacks,
+Callbacks.included(null, function (this: AnyClass) {
+  extend(this as never, DescendantsTracker);
+  classAttribute.call(this, "__callbacks", {
+    instanceWriter: false,
+    instancePredicate: false,
+    default: {},
+  });
+});
 
-  haltedCallbackHook(_filter: unknown, _name: string): void {},
+Callbacks.ClassMethods = ClassMethods;
 
-  [included](base: AnyClass): void {
-    if ("__callbacks" in base) return;
-    extend(base as never, Callbacks.ClassMethods);
-    extend(base as never, DescendantsTracker);
-    classAttribute.call(base, "__callbacks", {
-      instanceWriter: false,
-      instancePredicate: false,
-      default: {},
-    });
-  },
-};
+Callbacks.moduleEval((mod) => {
+  mod.runCallbacks = runCallbacks;
+
+  mod.haltedCallbackHook = function (_filter: unknown, _name: string): void {};
+});
 
 function runCallbacks(
   this: object,

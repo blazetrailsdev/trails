@@ -16,7 +16,7 @@ describe("LazyAttributeHash defaultAttributes", () => {
     const defaults = { status: Attribute.withCastValue("status", "active", strType) };
     const hash = new LazyAttributeHash(types, {}, {}, defaults);
 
-    const attr = hash.getAttribute("status");
+    const attr = hash.get("status");
     expect(attr!.value()).toBe("active");
   });
 
@@ -25,7 +25,7 @@ describe("LazyAttributeHash defaultAttributes", () => {
     const defaults = { status: Attribute.withCastValue("status", "active", strType) };
     const hash = new LazyAttributeHash(types, { status: "archived" }, {}, defaults);
 
-    expect(hash.getAttribute("status")!.value()).toBe("archived");
+    expect(hash.get("status")!.value()).toBe("archived");
   });
 
   it("each_key without a block enumerates the keys AttributeSet#keys and #accessed select from", () => {
@@ -48,8 +48,8 @@ describe("LazyAttributeHash defaultAttributes", () => {
     void prototype.value();
     const defaults = { tags: prototype };
 
-    const first = new LazyAttributeHash(types, {}, {}, defaults).getAttribute("tags");
-    const second = new LazyAttributeHash(types, {}, {}, defaults).getAttribute("tags");
+    const first = new LazyAttributeHash(types, {}, {}, defaults).get("tags");
+    const second = new LazyAttributeHash(types, {}, {}, defaults).get("tags");
     (first!.value() as string[]).push("b");
 
     expect(first!.value()).toEqual(["a", "b"]);
@@ -61,7 +61,7 @@ describe("LazyAttributeHash defaultAttributes", () => {
     const types = { age: intType };
     const hash = new LazyAttributeHash(types, {});
 
-    expect(hash.getAttribute("age")!.isInitialized()).toBe(false);
+    expect(hash.get("age")!.isInitialized()).toBe(false);
   });
 
   it("Builder#buildFromDatabase casts a present value using additionalTypes override", () => {
@@ -74,7 +74,7 @@ describe("LazyAttributeHash defaultAttributes", () => {
 
   it("LazyAttributeHash uses additionalTypes for present values", () => {
     const hash = new LazyAttributeHash({ score: strType }, { score: "42" }, { score: intType });
-    expect(hash.getAttribute("score")!.value()).toBe(42);
+    expect(hash.get("score")!.value()).toBe(42);
   });
 
   it("marshalDump/marshalLoad round-trips all five fields", () => {
@@ -82,12 +82,12 @@ describe("LazyAttributeHash defaultAttributes", () => {
     const additional = { score: intType };
     const defaults = { status: Attribute.withCastValue("status", "active", strType) };
     const original = new LazyAttributeHash(types, { score: "42" }, additional, defaults);
-    original.getAttribute("score");
+    original.get("score");
 
     const restored = LazyAttributeHash.marshalLoad(original.marshalDump());
     expect(restored.delegateHash()["score"].value()).toBe(42);
     const fresh = LazyAttributeHash.marshalLoad([types, {}, additional, defaults]);
-    expect(fresh.getAttribute("status")!.value()).toBe("active");
+    expect(fresh.get("status")!.value()).toBe("active");
   });
 
   it("materialized default is detached from the prototype — mutation does not bleed across AttributeSets", () => {

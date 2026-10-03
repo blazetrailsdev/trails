@@ -13,7 +13,7 @@ describe("operatorSpelling", () => {
     expect(operatorSpelling("Arel::Nodes::TableAlias", "[]")).toEqual(["get"]);
     expect(operatorSpelling("ActiveModel::AttributeSet", "[]")).toEqual(["getAttribute"]);
     expect(operatorSpelling("ActiveModel::Errors", "[]")).toEqual(["get"]);
-    expect(operatorSpelling("ActiveModel::LazyAttributeHash", "[]")).toEqual(["getAttribute"]);
+    expect(operatorSpelling("ActiveModel::LazyAttributeHash", "[]")).toEqual(["get"]);
   });
 
   it("resolves the AttributeSet `[]=` port", () => {

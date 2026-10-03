@@ -310,6 +310,8 @@ export function hashDelete(hash: object, key: unknown, block?: (key: never) => u
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#[]` (`vendor/ruby/v3.3.11/hash.c:2121`).
  */
 export function hashAref(hash: object, key: unknown): unknown {
+  const own = ownMethod(hash, "get");
+  if (own) return own.call(hash, key);
   if (hash instanceof Map) return hash.has(key) ? hash.get(key) : null;
   return hasKey(hash, key as string) ? (hash as Record<string, unknown>)[key as string] : null;
 }
@@ -320,6 +322,11 @@ export function hashAref(hash: object, key: unknown): unknown {
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#[]=` (`vendor/ruby/v3.3.11/hash.c:2018`).
  */
 export function hashAset<T>(hash: object, key: unknown, val: T): T {
+  const own = ownMethod(hash, "set");
+  if (own) {
+    own.call(hash, key, val);
+    return val;
+  }
   if (hash instanceof Map) {
     hash.set(key, val);
     return val;
@@ -449,6 +456,8 @@ export function eachValue<T>(
   hash: Record<string, T>,
   block?: (value: T) => unknown,
 ): Record<string, T> | T[] {
+  const own = ownMethod(hash, "eachValue");
+  if (own) return (block ? own.call(hash, block) : own.call(hash)) as T[];
   if (!block) return Object.values(hash);
   for (const key of Object.keys(hash)) {
     block(hash[key]);
@@ -509,6 +518,8 @@ export function transformValues(
   hash: Record<string, unknown> | Map<unknown, unknown>,
   block: (value: unknown) => unknown,
 ): Record<string, unknown> | Hash<unknown, unknown> {
+  const own = ownMethod(hash, "transformValues");
+  if (own) return own.call(hash, block) as Record<string, unknown>;
   if (hash instanceof Map) {
     const result = new Hash<unknown, unknown>();
     for (const [key, value] of hash) {
@@ -564,6 +575,8 @@ export function slice(
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#except` (`vendor/ruby/v3.3.11/hash.c:2683`).
  */
 export function except<T>(hash: Record<string, T>, ...keys: string[]): Record<string, T> {
+  const own = ownMethod(hash, "except");
+  if (own) return own.call(hash, ...keys) as Record<string, T>;
   /* `rb_hash_except` (`vendor/ruby/v3.3.11/hash.c:2683`) deletes from a
      `hash_dup_with_compare_by_id`, so the result is an ancestor-less Hash in
      which `__proto__` stays an ordinary key. */

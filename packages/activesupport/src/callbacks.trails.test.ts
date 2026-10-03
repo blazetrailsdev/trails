@@ -96,6 +96,22 @@ describe("include ActiveSupport::Callbacks (trails)", () => {
     expect("ClassMethods" in record).toBe(false);
     expect("ClassMethods" in Record).toBe(false);
   });
+
+  it("does not reset the inherited __callbacks when a subclass of an includer includes it again", () => {
+    class Parent {
+      declare static __callbacks: object;
+    }
+    include(Parent, Callbacks);
+    defineCallbacks(Parent.prototype, "save");
+    const inherited = Parent.__callbacks;
+    class Child extends Parent {}
+
+    include(Child, Callbacks);
+
+    expect(Child.__callbacks).toBe(inherited);
+    expect(Object.keys(Child.__callbacks)).toEqual(["save"]);
+    expect(Object.prototype.hasOwnProperty.call(Child, "__class_attr___callbacks")).toBe(false);
+  });
 });
 
 describe("defineCallbacks generates _run<Name>Callbacks (trails)", () => {

@@ -352,6 +352,29 @@ describe("rbFPublicSend include?", () => {
 });
 
 describe("rbFSend", () => {
+  it("sends a writer to a setName method, the conventions table's other writer spelling", () => {
+    class Host {
+      static log: unknown[] = [];
+      static setDefineMethodAttribute(name: string, opts: object): string {
+        this.log.push([name, opts]);
+        return name;
+      }
+      _tableName: string | undefined;
+      _setTableName(value: string): void {
+        this._tableName = value;
+      }
+    }
+    expect(rbObjRespondTo(Host, "defineMethodAttribute=", true)).toBe(true);
+    expect(rbObjRespondTo(Host, "defineMethodMissing=", true)).toBe(false);
+    expect(rbFSend(Host, "defineMethodAttribute=", "title", { as: "title" })).toBe("title");
+    expect(Host.log).toEqual([["title", { as: "title" }]]);
+
+    const host = new Host();
+    expect(rbObjRespondTo(host, "_tableName=")).toBe(true);
+    rbFSend(host, "_tableName=", "posts");
+    expect(host._tableName).toBe("posts");
+  });
+
   it("calls a method, a getter, or reads a field by name", () => {
     const req = new Req();
     expect(rbFSend(req, "subdomain")).toBe("clients");
