@@ -269,6 +269,17 @@ describe("names Object.prototype answers", () => {
     }
   });
 
+  it("LazyAttributeSet reads the default of a types hash that carries one", () => {
+    const types = new Proxy({} as Record<string, typeof strType>, {
+      get: (target, prop) => (Object.hasOwn(target, prop) ? target[prop as string] : strType),
+    });
+    for (const name of [...names, "aliased"]) {
+      const lazy = new LazyAttributeSet({ [name]: "x" }, types, {}, {});
+      expect(lazy.getAttribute(name).type).toBe(strType);
+      expect(lazy.fetchValue(name)).toBe("x");
+    }
+  });
+
   it("LazyAttributeSet reads casted_values as a Hash", () => {
     for (const name of names) {
       const lazy = new LazyAttributeSet({ [name]: "x" }, { [name]: strType }, {}, {});
