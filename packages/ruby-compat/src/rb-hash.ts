@@ -61,8 +61,7 @@ export function rbHash(value: unknown): number {
   if (value instanceof Date) return stringHash(`Date(${value.toISOString()})`);
   /* A Ruby Hash, whose `hash` (`vendor/ruby/v3.3.11/hash.c:3865` `rb_hash_hash`) folds
      every key and value; the sort keeps it insertion-order independent, as
-     Ruby's is. It has two JS seats — a plain object (an ancestor-less one
-     included, which `except` answers) and a `Map` — and `rbEqual`
+     Ruby's is. It has two JS seats — a plain object and a `Map` — and `rbEqual`
      answers true across them, so both must hash alike or the `hash`/`eql?`
      contract breaks. */
   if ([Object.prototype, null].includes(Object.getPrototypeOf(value)) || value instanceof Map) {
