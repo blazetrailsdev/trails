@@ -192,6 +192,7 @@ describe("Thor::Base", () => {
       expect((error as Error).message).toBe(
         '"destinationRoot" is a Thor reserved word and cannot be defined as argument',
       );
+      expect(() => klass.isThorReservedWord("destination_root", "command")).toThrow(RuntimeError);
       expect(klass.isThorReservedWord("name", "argument")).toBe(false);
     });
   });
