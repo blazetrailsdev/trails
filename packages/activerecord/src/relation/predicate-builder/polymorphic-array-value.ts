@@ -1,6 +1,6 @@
 import type { Base } from "../../base.js";
-import { ArgumentError } from "@blazetrails/activemodel";
-import { isEmpty, rbInspect } from "@blazetrails/ruby-compat";
+import { Hash, isEmpty } from "@blazetrails/ruby-compat";
+import { ActiveRecord } from "../../namespaces.js";
 export class PolymorphicArrayValue {
   private readonly _associatedTable: {
     joinForeignKey: string | string[];
@@ -31,51 +31,30 @@ export class PolymorphicArrayValue {
     return this._values;
   }
 
-  queries(): Record<string, unknown>[] {
-    const fk = this.associatedTable.joinForeignKey;
+  queries(): Map<unknown, unknown>[] {
     if (isEmpty(this.values)) {
-      if (Array.isArray(fk)) {
-        return [Object.fromEntries(fk.map((col) => [col, this.values]))];
-      }
-      return [{ [fk]: this.values }];
+      return [new Map([[this.associatedTable.joinForeignKey, this.values]])];
     }
-    const result: Record<string, unknown>[] = [];
-    for (const [type, ids] of this.typeToIdsMapping()) {
-      if (Array.isArray(fk)) {
-        for (const tuple of ids) {
-          if (!Array.isArray(tuple)) {
-            throw new ArgumentError(
-              `Expected corresponding value for ${rbInspect(fk)} to be an Array`,
-            );
-          }
-          const q: Record<string, unknown> = {};
-          if (type) q[this.associatedTable.joinForeignType] = type;
-          fk.forEach((col, i) => {
-            q[col] = tuple[i] ?? null;
-          });
-          result.push(q);
-        }
-        continue;
-      }
-      const q: Record<string, unknown> = {};
-      if (type) q[this.associatedTable.joinForeignType] = type;
-      q[fk] = ids.length === 1 ? ids[0] : ids;
-      result.push(q);
-    }
-    return result;
+
+    return Array.from(this.typeToIdsMapping(), ([type, ids]) => {
+      const query = new Map<unknown, unknown>();
+      if (type != null) query.set(this.associatedTable.joinForeignType, type);
+      query.set(this.associatedTable.joinForeignKey, ids);
+      return query;
+    });
   }
 
   /** @internal */
-  private typeToIdsMapping(): Map<string | null, unknown[]> {
-    const map = new Map<string | null, unknown[]>();
+  private typeToIdsMapping(): Hash<string | undefined, unknown[]> {
+    const defaultHash = new Hash<string | undefined, unknown[]>((hsh, key) => {
+      const ids: unknown[] = [];
+      hsh.set(key, ids);
+      return ids;
+    });
     for (const value of this.values) {
-      const klass = this.klass(value) as typeof Base | null;
-      const type = klass?.polymorphicName?.() ?? null;
-      const id = this.convertToId(value);
-      if (!map.has(type)) map.set(type, []);
-      map.get(type)!.push(id);
+      defaultHash.get(this.klass(value)?.polymorphicName())!.push(this.convertToId(value));
     }
-    return map;
+    return defaultHash;
   }
 
   /** @internal */
@@ -84,27 +63,27 @@ export class PolymorphicArrayValue {
   }
 
   /** @internal */
-  private klass(value: unknown): unknown {
-    if (typeof value !== "object" || value === null) return null;
-    if ("_model" in value && "arel" in value) return (value as any)._model;
-    return (value as any).constructor ?? null;
+  private klass(value: unknown): typeof Base | undefined {
+    if (value instanceof ActiveRecord.Base) {
+      return value.constructor as typeof Base;
+    } else if (value instanceof ActiveRecord.Relation) {
+      return value.model;
+    }
   }
 
   /** @internal */
   private convertToId(value: unknown): unknown {
-    if (value === null || value === undefined) return null;
-    if (typeof value === "object" && value !== null) {
-      if ("_model" in value && "arel" in value) {
-        const pk = this.primaryKey(value);
-        const arelTable = (value as any)._model?.arelTable;
-        return (value as any).select(arelTable && !Array.isArray(pk) ? arelTable.get(pk) : pk);
+    if (value instanceof ActiveRecord.Base) {
+      const primaryKey = this.primaryKey(value);
+      if (Array.isArray(primaryKey)) {
+        return primaryKey.map((column) => value._readAttribute(column));
+      } else {
+        return value._readAttribute(primaryKey);
       }
-      const pk = this.primaryKey(value);
-      if (Array.isArray(pk)) {
-        return pk.map((column) => (value as any)._readAttribute(column));
-      }
-      if (pk in value) return (value as any)[pk];
+    } else if (value instanceof ActiveRecord.Relation) {
+      return value.select(this.primaryKey(value) as string);
+    } else {
+      return value;
     }
-    return value;
   }
 }

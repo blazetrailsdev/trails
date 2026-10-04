@@ -11,6 +11,7 @@ import {
   aryPop,
   arySlice,
   compact,
+  compactBang,
   isIntersect,
   last,
   pack,
@@ -335,6 +336,13 @@ describe("Array#compact and Array#uniq", () => {
   it("drops every nil element and keeps the rest in order", () => {
     expect(compact([1, null, 2, undefined, 3])).toEqual([1, 2, 3]);
     expect(compact([0, "", false])).toEqual([0, "", false]);
+  });
+
+  it("compact! removes nils in place and answers nil when there were none", () => {
+    const ary = [1, null, 2, undefined, 3];
+    expect(compactBang(ary)).toBe(ary);
+    expect(ary).toEqual([1, 2, 3]);
+    expect(compactBang(ary)).toBeNull();
   });
 
   it("dedups by eql?, not identity, keeping the first of each", () => {

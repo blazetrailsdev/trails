@@ -1,12 +1,15 @@
 import {
+  eachPair,
   extend,
   fetch,
   first,
   hasKey,
   flatten,
+  Hash,
   isEmpty,
   isModuleIncluded,
   isSymbol,
+  partition,
   rbFPublicSend,
   rbFSend,
   rbInspect,
@@ -51,7 +54,6 @@ import { Map as TypeCasterMap } from "../type-caster/map.js";
 import { WhereClause } from "./where-clause.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import type { AliasTracker } from "../associations/alias-tracker.js";
-import type { Hash } from "@blazetrails/ruby-compat";
 import {
   any,
   actsLike,
@@ -62,6 +64,7 @@ import {
   included,
   isBlank,
   kernelArray,
+  transformKeys,
   wrap,
 } from "@blazetrails/activesupport";
 
@@ -81,6 +84,7 @@ export class WhereChain<R = any> {
     return this._scope;
   }
 
+  /** @inventedArm if — CONVERGEABLE where-chain-associated-missing-take-the-association-symbol */
   associated(...associations: string[]): R {
     const scope = this._scope as unknown as QueryMethodsHost;
     for (const association of associations) {
@@ -108,6 +112,7 @@ export class WhereChain<R = any> {
     return this._scope;
   }
 
+  /** @inventedArm if — CONVERGEABLE where-chain-associated-missing-take-the-association-symbol */
   missing(...associations: string[]): R {
     const scope = this._scope as unknown as QueryMethodsHost;
     for (const association of associations) {
@@ -596,46 +601,37 @@ export function buildWhereClause(
   opts = sanitizeForbiddenAttributes(opts as Record<string, unknown>);
 
   if (Array.isArray(opts)) {
-    const [head, ...tail] = opts as unknown[];
-    return buildWhereClause.call(this, head, tail);
+    [opts, ...rest] = opts as unknown[];
   }
 
   let parts: (Nodes.Node | Nodes.SqlLiteral | string)[];
-  if (opts instanceof Nodes.SqlLiteral) opts = opts.toString();
-  if (typeof opts === "string") {
-    if (rest.length === 0) {
-      parts = [Arel.sql(opts)];
-    } else if (isPlainObject(rest[0]) && /:\w+/.test(opts)) {
-      parts = [buildNamedBoundSqlLiteral.call(this, opts, rest[0])];
-    } else if (opts.includes("?")) {
-      parts = [buildBoundSqlLiteral.call(this, opts, rest)];
+  if (typeof opts === "string" || opts instanceof Nodes.SqlLiteral) {
+    opts = opts.toString();
+    if (isEmpty(rest)) {
+      parts = [Arel.sql(opts as string)];
+    } else if (isPlainObject(rest[0]) && /:\w+/.test(opts as string)) {
+      parts = [buildNamedBoundSqlLiteral.call(this, opts as string, rest[0])];
+    } else if ((opts as string).includes("?")) {
+      parts = [buildBoundSqlLiteral.call(this, opts as string, rest)];
     } else {
-      parts = [this.model.sanitizeSql(rest.length === 0 ? opts : [opts, ...rest])!];
+      parts = [
+        this.model.sanitizeSql(isEmpty(rest) ? (opts as string) : [opts as string, ...rest])!,
+      ];
     }
   } else if (isHash(opts)) {
-    const mc = this.model;
-    const aliases: Record<string, string> = mc?.attributeAliases ?? {};
-    const transformed: Record<string, unknown> | Map<unknown, unknown> =
-      opts instanceof Map ? new Map() : {};
-    for (const [rawKey, value] of toA(opts) as [unknown, unknown][]) {
-      let key: string | string[];
-      if (Array.isArray(rawKey)) {
-        key = rawKey.map((k) => {
-          const s = String(k);
-          const name = isRubySymbol(s) ? symbolToName(s) : s;
-          return aliases[name] ?? name;
-        });
+    opts = transformKeys(opts as Record<string, unknown>, (key: string | string[]) => {
+      if (Array.isArray(key)) {
+        return key.map((k) => this.model.attributeAliases[toS(k)] || toS(k)) as never;
       } else {
-        const s = String(rawKey);
-        const name = isRubySymbol(s) ? symbolToName(s) : s;
-        key = aliases[name] ?? name;
+        key = toS(key);
+        return this.model.attributeAliases[key] || key;
       }
-      if (transformed instanceof Map) transformed.set(key, value);
-      else transformed[key as string] = value;
-    }
-    opts = transformed;
+    });
     const references = PredicateBuilder.references(opts as Record<string, unknown>);
-    if (references.length > 0) referencesBang.call(this, ...references);
+    if (!isEmpty(references)) {
+      this.referencesValues = unionReferences(this.referencesValues, references);
+    }
+
     parts = this.predicateBuilder.buildFromHash(
       opts as Record<string, unknown>,
       (tableName: string) => lookupTableKlassFromJoinDependencies.call(this, tableName),
@@ -1202,31 +1198,21 @@ function toA(value: unknown[] | Map<unknown, unknown> | Record<string, unknown>)
   return Object.entries(value);
 }
 
-const VALID_DIRECTIONS = new Set(["asc", "desc"]);
+const VALID_DIRECTIONS = new Set([":asc", ":desc", ":ASC", ":DESC", "asc", "desc", "ASC", "DESC"]);
 
 /** @internal */
 export function validateOrderArgs(this: QueryMethodsHost, args: unknown[]): void {
   for (const arg of args) {
-    if (arg instanceof Map) {
-      for (const [, value] of arg) {
-        if (!VALID_DIRECTIONS.has(String(value).toLowerCase())) {
-          throw new ArgumentError(
-            `Direction "${value}" is invalid. Valid directions are: [:asc, :desc, :ASC, :DESC, "asc", "desc", "ASC", "DESC"]`,
-          );
-        }
-      }
-      continue;
-    }
-    if (!isPlainObject(arg)) continue;
-    for (const [, value] of Object.entries(arg)) {
-      if (isPlainObject(value)) {
+    if (!isHash(arg)) continue;
+    eachPair(arg as Record<string, unknown>, (_key, value) => {
+      if (isHash(value)) {
         validateOrderArgs.call(this, [value]);
-      } else if (!VALID_DIRECTIONS.has(String(value).toLowerCase())) {
+      } else if (!VALID_DIRECTIONS.has(value as string)) {
         throw new ArgumentError(
-          `Direction "${value}" is invalid. Valid directions are: [:asc, :desc, :ASC, :DESC, "asc", "desc", "ASC", "DESC"]`,
+          `Direction "${value}" is invalid. Valid directions are: ${rbInspect([...VALID_DIRECTIONS])}`,
         );
       }
-    }
+    });
   }
 }
 
@@ -1341,15 +1327,8 @@ export function isDoesNotSupportReverse(order: string | Nodes.SqlLiteral): boole
 /** @internal */
 export function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): unknown[] {
   if (orderQuery.length === 0) {
-    const pk = (this as any)._model?.primaryKey;
-    if (pk) {
-      const arelTable: any = this.table;
-      return [
-        arelTable
-          ? new Nodes.Descending(arelTable.get(pk))
-          : new Nodes.Descending(new Nodes.SqlLiteral(pk)),
-      ];
-    }
+    const primaryKey = this.model.primaryKey as string;
+    if (primaryKey) return [this.table.get(primaryKey).desc()];
     throw new IrreversibleOrderError(
       "Relation has no current order and table has no primary key to be used as default order",
     );
@@ -1368,9 +1347,11 @@ export function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): 
         .split(",")
         .map((s) => {
           s = s.trim();
-          if (/\sasc$/i.test(s)) return s.replace(/\sasc$/i, " DESC");
-          if (/\sdesc$/i.test(s)) return s.replace(/\sdesc$/i, " ASC");
-          return `${s} DESC`;
+          return (
+            (/\sasc$/i.test(s) && s.replace(/\sasc$/i, " DESC")) ||
+            (/\sdesc$/i.test(s) && s.replace(/\sdesc$/i, " ASC")) ||
+            `${s} DESC`
+          );
         });
     }
     return [o];
@@ -1717,14 +1698,13 @@ function escapeRegex(s: string): string {
 
 /** @internal */
 export function isTableNameMatches(this: QueryMethodsHost, from: unknown): boolean {
-  const table: any = this.table;
-  if (!table) return false;
-  const modelClass: any = this.model;
-  const name = escapeRegex(table.name);
-  const quotedTableName = modelClass.adapterClass().quoteTableName(table.name);
-  const quoted = escapeRegex(quotedTableName);
-  const fromStr = typeof (from as any)?.toSql === "function" ? (from as any).toSql() : String(from);
-  return new RegExp(`(?:^|(?<!FROM)\\s)(?:\\b${name}\\b|${quoted})(?!\\.)`, "i").test(fromStr);
+  const tableName = escapeRegex(this.table.name as string);
+  const quotedTableName = escapeRegex(
+    this.model.adapterClass().quoteTableName(this.table.name as string),
+  );
+  return new RegExp(`(?:^|(?<!FROM)\\s)(?:\\b${tableName}\\b|${quotedTableName})(?!\\.)`, "i").test(
+    rbObjAsString(from),
+  );
 }
 
 /** @internal */
@@ -1735,8 +1715,9 @@ export function arelColumn(
 ): unknown {
   const modelClass: any = this.model;
   const isSymbol = isRubySymbol(field);
-  field = isSymbol ? symbolToName(field as string) : field == null ? "" : String(field);
-  field = (modelClass?.attributeAliases?.[field] as string | undefined) ?? field;
+  if (isSymbol) field = symbolToName(field as string);
+
+  field = (modelClass.attributeAliases[field as string] as string | undefined) || toS(field);
 
   const fromClause = (this as any).fromClause;
   const from = fromClause?.name || fromClause?.value;
@@ -1782,18 +1763,13 @@ export function arelColumnWithTable(
   (this as any).referencesValues = unionReferences((this as any).referencesValues ?? [], [
     Arel.sql(tableName, { retryable: true }),
   ]);
-  const isSymbol = isRubySymbol(columnName);
-  if (isSymbol) columnName = symbolToName(columnName);
-  const modelClass: any = this.model;
-  if (isSymbol || !/\W/.test(columnName)) {
-    const builder = (this as any).predicateBuilder;
-    return (
-      builder?.resolveArelAttribute?.(tableName, columnName, (name: string) =>
-        lookupTableKlassFromJoinDependencies.call(this, name),
-      ) ?? new ArelTable(tableName).get(columnName)
+  if (isRubySymbol(columnName) || !/\W/.test(columnName)) {
+    return this.predicateBuilder.resolveArelAttribute(tableName, columnName, (name: string) =>
+      lookupTableKlassFromJoinDependencies.call(this, name),
     );
+  } else {
+    return Arel.sql(`${this.model.adapterClass().quoteTableName(tableName)}.${columnName}`);
   }
-  return Arel.sql(`${modelClass.adapterClass().quoteTableName(tableName)}.${columnName}`);
 }
 
 /** @internal */
@@ -1860,7 +1836,12 @@ export function arelColumnAliasesFromHash(
   });
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE build-from-applies-join-dependency-synchronously
+ * @inventedArm try — CONVERGEABLE build-from-applies-join-dependency-synchronously
+ * @inventedArm throw — CONVERGEABLE build-from-applies-join-dependency-synchronously
+ */
 export function buildFrom(this: QueryMethodsHost): unknown {
   const fromClause = (this as any).fromClause;
   const opts = fromClause?.value;
@@ -1891,28 +1872,14 @@ export function buildFrom(this: QueryMethodsHost): unknown {
   return opts;
 }
 
-function tableStar(table: any): unknown {
-  return table.get(Arel.star());
-}
-
 /** @internal */
 export function buildSelect(this: QueryMethodsHost, arel: any): void {
-  const model: any = this.model;
   if (any(this.selectValues)) {
     arel.project(...arelColumns.call(this, this.selectValues));
-  } else if (
-    (model?.ignoredColumns?.length ?? 0) > 0 ||
-    model?.enumerateColumnsInSelectStatements
-  ) {
-    arel.project(
-      ...(model?.columnNames?.() ?? []).map((field: string) => {
-        const table: any = (this as any).table ?? model?.arelTable;
-        return table.get(field);
-      }),
-    );
+  } else if (any(this.model.ignoredColumns) || this.model.enumerateColumnsInSelectStatements) {
+    arel.project(...this.model.columnNames().map((field: string) => this.table.get(field)));
   } else {
-    const table: any = (this as any).table ?? model?.arelTable;
-    arel.project(table ? tableStar(table) : Arel.sql("*"));
+    arel.project(this.table.get(Arel.star()));
   }
 }
 
@@ -1935,7 +1902,6 @@ export function buildWithExpressionFromValue(
     if (value.length === 1) return buildWithExpressionFromValue.call(this, value[0], false);
 
     const parts = value.map((query) => buildWithExpressionFromValue.call(this, query, true));
-    if (parts.length === 0) return undefined;
     return parts.reduce(
       (result: unknown, value: unknown) => new Nodes.UnionAll(result as any, value as any),
     );
@@ -1952,10 +1918,7 @@ export function buildWithValueFromHash(
 ): Nodes.TableAlias[] {
   return Object.entries(hash).map(
     ([name, value]) =>
-      new Nodes.TableAlias(
-        buildWithExpressionFromValue.call(this, value) as any,
-        isRubySymbol(name) ? symbolToName(name) : name,
-      ),
+      new Nodes.TableAlias(buildWithExpressionFromValue.call(this, value) as any, name),
   );
 }
 
@@ -2047,19 +2010,12 @@ export function selectNamedJoins(
   stashedJoins: unknown[] | null = null,
   block?: (join: unknown) => void,
 ): unknown[] {
-  const cteJoins: string[] = [];
-  const associations: unknown[] = [];
-
-  for (const joinName of joinNames) {
-    if (
+  const [cteJoins, associations] = partition(
+    joinNames,
+    (joinName) =>
       isRubySymbol(joinName) &&
-      any(this.withValues, (cte) => joinName in cte || symbolToName(joinName) in cte)
-    ) {
-      cteJoins.push(symbolToName(joinName));
-    } else {
-      associations.push(joinName);
-    }
-  }
+      any(this.withValues, (cte) => joinName in cte || symbolToName(joinName) in cte),
+  ) as [string[], unknown[]];
 
   for (const cteName of cteJoins) {
     block?.(new CTEJoin(cteName));
@@ -2094,12 +2050,11 @@ export function selectAssociationList(
  */
 export function buildJoinBuckets(
   this: QueryMethodsHost,
-): [Record<string, unknown[]>, typeof Nodes.InnerJoin | typeof Nodes.OuterJoin] {
-  const buckets = new Proxy({} as Record<string, unknown[]>, {
-    get(h, k) {
-      if (typeof k !== "string") return Reflect.get(h, k);
-      return (h[k] ??= []);
-    },
+): [Hash<string, unknown[]>, typeof Nodes.InnerJoin | typeof Nodes.OuterJoin] {
+  const buckets = new Hash<string, unknown[]>((h, k) => {
+    const v: unknown[] = [];
+    h.set(k, v);
+    return v;
   });
 
   let stashedLeftJoins: JoinDependency[] | undefined;
@@ -2111,7 +2066,9 @@ export function buildJoinBuckets(
       stashedLeftJoins,
       (leftJoin) => {
         if (leftJoin instanceof CTEJoin) {
-          buckets.join_node.push(buildWithJoinNode.call(this, leftJoin.name, Nodes.OuterJoin));
+          buckets
+            .get("join_node")!
+            .push(buildWithJoinNode.call(this, leftJoin.name, Nodes.OuterJoin));
         } else {
           throw new ArgumentError("only Hash, Symbol and Array are allowed");
         }
@@ -2119,8 +2076,8 @@ export function buildJoinBuckets(
     );
 
     if (isEmpty(this.joinsValues)) {
-      buckets.named_join = leftJoins;
-      buckets.stashed_join = stashedLeftJoins;
+      buckets.set("named_join", leftJoins);
+      buckets.set("stashed_join", stashedLeftJoins);
       return [buckets, Nodes.OuterJoin];
     } else {
       stashedLeftJoins.unshift(
@@ -2146,24 +2103,27 @@ export function buildJoinBuckets(
   while (joins[0] instanceof Nodes.Join) {
     const joinNode = joins.shift() as Nodes.Join;
     if (!(joinNode instanceof Nodes.LeadingJoin) && (stashedEagerLoad || stashedLeftJoins)) {
-      buckets.join_node.push(joinNode);
+      buckets.get("join_node")!.push(joinNode);
     } else {
-      buckets.leading_join.push(joinNode);
+      buckets.get("leading_join")!.push(joinNode);
     }
   }
 
-  buckets.named_join = selectNamedJoins.call(this, joins, buckets.stashed_join, (join) => {
-    if (join instanceof Nodes.Join) {
-      buckets.join_node.push(join);
-    } else if (join instanceof CTEJoin) {
-      buckets.join_node.push(buildWithJoinNode.call(this, join.name));
-    } else {
-      throw new RuntimeError(`unknown class: ${rbObjClassname(join)}`);
-    }
-  });
+  buckets.set(
+    "named_join",
+    selectNamedJoins.call(this, joins, buckets.get("stashed_join")!, (join) => {
+      if (join instanceof Nodes.Join) {
+        buckets.get("join_node")!.push(join);
+      } else if (join instanceof CTEJoin) {
+        buckets.get("join_node")!.push(buildWithJoinNode.call(this, join.name));
+      } else {
+        throw new RuntimeError(`unknown class: ${rbObjClassname(join)}`);
+      }
+    }),
+  );
 
-  if (stashedLeftJoins) buckets.stashed_join.push(...stashedLeftJoins);
-  if (stashedEagerLoad) buckets.stashed_join.push(stashedEagerLoad);
+  if (stashedLeftJoins) buckets.get("stashed_join")!.push(...stashedLeftJoins);
+  if (stashedEagerLoad) buckets.get("stashed_join")!.push(stashedEagerLoad);
 
   return [buckets, Nodes.InnerJoin];
 }
@@ -2178,10 +2138,10 @@ export function buildJoins(
 
   const [buckets, joinType] = buildJoinBuckets.call(this);
 
-  const namedJoins = buckets.named_join as AssociationSpec[];
-  const stashedJoins = buckets.stashed_join as JoinDependency[];
-  const leadingJoins = buckets.leading_join as Nodes.Join[];
-  const joinNodes = buckets.join_node as Nodes.Join[];
+  const namedJoins = buckets.get("named_join")! as AssociationSpec[];
+  const stashedJoins = buckets.get("stashed_join")! as JoinDependency[];
+  const leadingJoins = buckets.get("leading_join")! as Nodes.Join[];
+  const joinNodes = buckets.get("join_node")! as Nodes.Join[];
 
   if (!isEmpty(leadingJoins)) joinSources.push(...leadingJoins);
 
