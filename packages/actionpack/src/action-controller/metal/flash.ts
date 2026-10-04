@@ -31,13 +31,11 @@ export class Flash {
     extend(base, Flash.ClassMethods);
     classAttribute.call(base, "_flashTypes", { instanceAccessor: false, default: [] });
 
-    Object.defineProperty(base.prototype, "flash", {
-      get(this: { request: { flash: FlashHash | null } }) {
-        return this.request.flash;
-      },
-      configurable: true,
-    });
     (base as FlashClassHost & typeof Flash.ClassMethods).addFlashTypes("alert", "notice");
+  }
+
+  get flash(): FlashHash {
+    return (this as unknown as { request: { flash: FlashHash | null } }).request.flash!;
   }
 
   redirectTo<FlashType extends string = never>(

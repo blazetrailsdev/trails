@@ -55,6 +55,17 @@ class MyScript extends Thor {
   static banner() {}
 }`,
     },
+    {
+      code: `
+class MyScript extends Thor {
+  static {
+    this.methodAdded("zoo");
+  }
+  zoo(name: string): void;
+  zoo(name: number): void;
+  zoo(name: unknown) {}
+}`,
+    },
     { code: `class Plain { zoo() {} }` },
     { code: `class Model extends Base { zoo() {} }` },
     {
@@ -190,6 +201,42 @@ class MyScript extends Thor {
   second() {}
 }`,
       errors: [unregistered("first"), unregistered("second")],
+    },
+    {
+      code: `
+const Child = class extends Parent {
+  animal() {}
+};
+class Parent extends Thor {}`,
+      output: `
+const Child = class extends Parent {
+  static {
+    this.methodAdded("animal");
+  }
+  animal() {}
+};
+class Parent extends Thor {}`,
+      errors: [unregistered("animal")],
+    },
+    {
+      code: `
+class MyScript extends Thor {
+  static {
+    Other.methodAdded("zoo");
+  }
+  zoo(name: string): void;
+  zoo(name: unknown) {}
+}`,
+      output: `
+class MyScript extends Thor {
+  static {
+    Other.methodAdded("zoo");
+    this.methodAdded("zoo");
+  }
+  zoo(name: string): void;
+  zoo(name: unknown) {}
+}`,
+      errors: [unregistered("zoo")],
     },
     {
       code: `

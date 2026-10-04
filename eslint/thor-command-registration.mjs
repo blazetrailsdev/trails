@@ -9,6 +9,13 @@ function dottedName(node) {
   return null;
 }
 
+function isThis(node) {
+  while (node.type === "TSAsExpression" || node.type === "TSNonNullExpression") {
+    node = node.expression;
+  }
+  return node.type === "ThisExpression";
+}
+
 function keyName(key) {
   if (key.type === "Identifier") return key.name;
   if (key.type === "Literal" && typeof key.value === "string") return key.value;
@@ -29,6 +36,7 @@ function commandCandidates(body) {
     (member) =>
       member.type === "MethodDefinition" &&
       member.kind === "method" &&
+      member.value.type !== "TSEmptyBodyFunctionExpression" &&
       !member.static &&
       !member.computed &&
       member.accessibility !== "private" &&
@@ -44,7 +52,8 @@ function registeredNames(blocks, sourceCode) {
       node.type === "CallExpression" &&
       node.callee.type === "MemberExpression" &&
       !node.callee.computed &&
-      node.callee.property.name === "methodAdded"
+      node.callee.property.name === "methodAdded" &&
+      isThis(node.callee.object)
     ) {
       const [arg] = node.arguments;
       if (arg?.type === "Literal" && typeof arg.value === "string") names.add(arg.value);
@@ -72,8 +81,10 @@ function registeredNames(blocks, sourceCode) {
  * A TS-`private` / `protected` method is Thor's private method, which is never
  * a command, and a `static` method is a class method `method_added` never sees.
  *
- * The `extends` chain is read within the file. `baseClasses` names further
- * Thor classes a file imports.
+ * The `extends` chain is read within the file, in any declaration order.
+ * `baseClasses` names further Thor classes a file imports. A registration is a
+ * `this.methodAdded("name")` call with a string literal: a name passed through
+ * a variable is not read, and its method is reported.
  *
  * @type {import("eslint").Rule.RuleModule}
  */
@@ -105,12 +116,9 @@ export default {
     const sourceCode = context.sourceCode;
     const thorClasses = new Set([...THOR_BASES, ...(context.options[0]?.baseClasses ?? [])]);
 
-    const check = (node) => {
-      const superName = dottedName(node.superClass);
-      if (superName === null || !thorClasses.has(superName)) return;
-      const name = boundName(node);
-      if (name !== null) thorClasses.add(name);
+    const classes = [];
 
+    const check = (node) => {
       const blocks = node.body.body.filter((member) => member.type === "StaticBlock");
       const registered = registeredNames(blocks, sourceCode);
       for (const method of commandCandidates(node.body)) {
@@ -145,6 +153,23 @@ export default {
       }
     };
 
-    return { ClassDeclaration: check, ClassExpression: check };
+    return {
+      ClassDeclaration: (node) => classes.push(node),
+      ClassExpression: (node) => classes.push(node),
+      "Program:exit"() {
+        let pending = classes.filter((node) => dottedName(node.superClass) !== null);
+        for (let found = true; found; ) {
+          found = false;
+          pending = pending.filter((node) => {
+            if (!thorClasses.has(dottedName(node.superClass))) return true;
+            const name = boundName(node);
+            if (name !== null) thorClasses.add(name);
+            check(node);
+            found = true;
+            return false;
+          });
+        }
+      },
+    };
   },
 };

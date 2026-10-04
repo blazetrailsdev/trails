@@ -111,7 +111,7 @@ export class BelongsToAssociation extends SingularAssociation {
     const changed = this.foreignKeyNames().some((foreignKey) =>
       this.owner.attributeChanged(foreignKey),
     );
-    return changed || (!this.foreignKeyPresent() && !!this.target?.isNewRecord());
+    return changed || (!this.foreignKeyPresent() && this.target?.isNewRecord());
   }
 
   isTargetPreviouslyChanged(): boolean | undefined {
