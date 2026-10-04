@@ -6,7 +6,6 @@ type DateClass = { GREGORIAN: number; strptime(str: string, fmt: string, sg: num
 
 const TIME =
   /^-?\d{4}-\d{1,2}-\d{1,2}(?:[Tt]|\s+)\d{1,2}:\d\d:\d\d(?:\.\d*)?(?:\s*(?:Z|[-+]\d{1,2}:?(?:\d\d)?))?$/;
-const DATE = /^\d{4}-(?:1[012]|0\d|\d)-(?:[12]\d|3[01]|0\d|\d)$/;
 
 /**
  * `Psych::ScalarScanner#tokenize` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/scalar_scanner.rb:37`).
@@ -18,7 +17,7 @@ export function tokenize(value: unknown): unknown {
   if (typeof value !== "string") return value;
   try {
     if (TIME.test(value)) return (rbPathToClass("Time") as TimeClass).parse(value);
-    if (DATE.test(value)) {
+    if (/^\d{4}-(?:1[012]|0\d|\d)-(?:[12]\d|3[01]|0\d|\d)$/.test(value)) {
       const date = rbPathToClass("Date") as DateClass;
       return date.strptime(value, "%F", date.GREGORIAN);
     }

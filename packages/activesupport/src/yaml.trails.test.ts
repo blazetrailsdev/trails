@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Range, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
-import { Date as RubyDate, Temporal, Time } from "@blazetrails/date";
+import { Date as RubyDate, DateTime, Temporal, Time } from "@blazetrails/date";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 
@@ -104,6 +104,11 @@ describe("Psych object protocol", () => {
     expect(yaml).toContain("2004-04-15");
     expect(String(Psych.unsafeLoad(yaml))).toBe("2004-04-15");
     expect(Psych.unsafeLoad(yaml)).toBeInstanceOf(Temporal.PlainDate);
+  });
+
+  it("dumps a DateTime under !ruby/object:DateTime, not as a Date", () => {
+    const yaml = Psych.dump(new DateTime(2024, 1, 2, 3, 4, 5));
+    expect(yaml).toContain("!ruby/object:DateTime 2024-01-02 03:04:05.000000000 Z");
   });
 
   it("keeps a quoted timestamp a String", () => {
