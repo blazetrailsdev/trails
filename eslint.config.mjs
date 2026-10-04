@@ -48,6 +48,7 @@ import rubyCompatNeedsMriCitation from "./eslint/ruby-compat-needs-mri-citation.
 import noInternalCanonicalLoaders from "./eslint/no-internal-canonical-loaders.mjs";
 import noLoadSchemaWithStubbedDdl from "./eslint/no-load-schema-with-stubbed-ddl.mjs";
 import thorImportBoundary from "./eslint/thor-import-boundary.mjs";
+import thorCommandRegistration from "./eslint/thor-command-registration.mjs";
 import noExplicitAnyDisable from "./eslint/no-explicit-any-disable.mjs";
 import noRawControlBytes from "./eslint/no-raw-control-bytes.mjs";
 import noJsRenderingInRailsMessages from "./eslint/no-js-rendering-in-rails-messages.mjs";
@@ -307,6 +308,7 @@ export default defineConfig(
           "no-internal-canonical-loaders": noInternalCanonicalLoaders,
           "no-load-schema-with-stubbed-ddl": noLoadSchemaWithStubbedDdl,
           "thor-import-boundary": thorImportBoundary,
+          "thor-command-registration": thorCommandRegistration,
           "no-explicit-any-disable": noExplicitAnyDisable,
           "no-raw-control-bytes": noRawControlBytes,
           "no-js-rendering-in-rails-messages": noJsRenderingInRailsMessages,
@@ -776,6 +778,13 @@ export default defineConfig(
     ignores: ["**/*.test.ts"],
     rules: {
       "blazetrails/thor-import-boundary": "error",
+    },
+  },
+
+  {
+    files: ["packages/trailties/src/**/*.ts"],
+    rules: {
+      "blazetrails/thor-command-registration": "error",
     },
   },
 
