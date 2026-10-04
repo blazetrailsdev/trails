@@ -704,6 +704,23 @@ describe("SchemaStatements constraint name digests", () => {
       "my_uniq",
     );
   });
+
+  it("derives the name when the name option is forwarded as undefined", () => {
+    const ss = withSchemaStatements(makeAdapter().adapter);
+    expect(
+      ss.exclusionConstraintOptions("invoices", "daterange(start_date, end_date) WITH &&", {
+        name: undefined,
+      }).name,
+    ).toBe("excl_rails_74c9160f55");
+    expect(ss.uniqueConstraintOptions("sections", ["position"], { name: undefined }).name).toBe(
+      "uniq_rails_1e07660b77",
+    );
+  });
+
+  it("raises KeyError naming the :expression key when neither name nor expression is given", () => {
+    const ss = withSchemaStatements(makeAdapter().adapter);
+    expect(() => ss.exclusionConstraintName("invoices", {})).toThrow("key not found: :expression");
+  });
 });
 
 describe("SchemaStatements sequence helpers warn without a sequence", () => {
@@ -956,6 +973,14 @@ function makeFakeAdapter() {
 }
 
 describe("SchemaStatements#dropTable", () => {
+  it("ignores a trailing block and an undefined options slot", async () => {
+    const { adapter, executed } = makeFakeAdapter();
+    const ss = withSchemaStatements(adapter);
+    await ss.dropTable("widgets", undefined, () => {});
+    await ss.dropTable("gadgets", { ifExists: true }, () => {});
+    expect(executed).toEqual([`DROP TABLE "widgets"`, `DROP TABLE IF EXISTS "gadgets"`]);
+  });
+
   it("emits a single DROP TABLE statement with all table names joined", async () => {
     const { adapter, executed } = makeFakeAdapter();
     const ss = withSchemaStatements(adapter);

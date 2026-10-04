@@ -51,7 +51,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE pg-schema-dumper-option-hash-and-constraint-lookup-residual-arms
+   */
   protected override async exclusionConstraintsInCreate(
     table: string,
     stream: IO | StringIO,
@@ -79,7 +82,10 @@ export class SchemaDumper extends AbstractSchemaDumper {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE pg-schema-dumper-option-hash-and-constraint-lookup-residual-arms
+   */
   protected override async uniqueConstraintsInCreate(
     table: string,
     stream: IO | StringIO,

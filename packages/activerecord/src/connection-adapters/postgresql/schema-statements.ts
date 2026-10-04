@@ -1,6 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { type ArelNode } from "@blazetrails/arel";
 import {
+  compact,
   compactBlank,
   first,
   isPlainObject,
@@ -107,13 +108,13 @@ export class SchemaStatements extends AbstractSchemaStatements {
   override async dropTable(
     ...args: Parameters<AbstractSchemaStatements["dropTable"]>
   ): Promise<unknown> {
-    const tableNames = args.filter((arg): arg is string => typeof arg === "string");
+    const tableNames = args.filter((arg) => typeof arg === "string") as string[];
     const options = (args.find(isPlainObject) ?? {}) as {
       ifExists?: boolean;
       force?: boolean | "cascade";
     };
     for (const tableName of tableNames) {
-      await this.schemaCache.clearDataSourceCacheBang(toS(tableName));
+      await this.schemaCache.clearDataSourceCacheBang(tableName);
     }
     return this.execute(
       `DROP TABLE${options.ifExists ? " IF EXISTS" : ""} ${tableNames.map((tableName) => this.quoteTableName(tableName)).join(", ")}${options.force === "cascade" ? " CASCADE" : ""}`,
@@ -647,6 +648,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.execute(await this.schemaCreation.accept(at));
   }
 
+  /** @inventedArm if — CONVERGEABLE pg-schema-dumper-option-hash-and-constraint-lookup-residual-arms */
   async validateCheckConstraint(
     tableName: string,
     options: string | { name: string; expression?: string },
@@ -801,6 +803,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     });
   }
 
+  /** @inventedArm compact — PERMANENT */
   exclusionConstraintOptions(
     tableName: string,
     expression: string,
@@ -808,7 +811,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
   ): Record<string, unknown> {
     this.assertValidDeferrable(options.deferrable);
 
-    options = { ...options };
+    options = compact({ ...options });
     options.name ||= this.exclusionConstraintName(tableName, { expression, ...options });
     return options;
   }
@@ -916,6 +919,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return excl!;
   }
 
+  /** @inventedArm compact — PERMANENT */
   uniqueConstraintOptions(
     tableName: string,
     columnName: string | string[] | null | undefined,
@@ -926,7 +930,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
       throw new ArgumentError("Cannot specify both column_name and :using_index options.");
     }
 
-    options = { ...options };
+    options = compact({ ...options });
     options.name ||= this.uniqueConstraintName(tableName, { column: columnName, ...options });
     return options;
   }
@@ -958,7 +962,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.removeConstraint(tableName, uniqueNameToDelete);
   }
 
-  /** @missingRailsCall order:split,map — CONVERGEABLE pg-schema-statements-reflection-maps-rows-through-an-awaiting-map */
+  /**
+   * @missingRailsCall order:split,map — CONVERGEABLE pg-schema-statements-reflection-maps-rows-through-an-awaiting-map
+   * @inventedArm loop — CONVERGEABLE pg-schema-statements-reflection-maps-rows-through-an-awaiting-map
+   */
   async uniqueConstraints(tableName: string): Promise<UniqueConstraintDefinition[]> {
     const scope = this.quotedScope(tableName);
     const uniqueInfo = await this.internalExecQuery(
@@ -1022,7 +1029,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return constraints.find((c) => c.definedFor({ name, ...options }));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE pg-schema-dumper-option-hash-and-constraint-lookup-residual-arms
+   */
   async uniqueConstraintForBang(
     tableName: string,
     { column = null, ...options }: Record<string, unknown>,
