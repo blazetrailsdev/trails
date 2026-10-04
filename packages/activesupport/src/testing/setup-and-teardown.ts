@@ -1,13 +1,8 @@
 import { Callbacks } from "../callbacks.js";
 import type { FilterListEntry } from "../callbacks.js";
-import { include, type Extended, type Included } from "@blazetrails/ruby-compat/include";
+import { extend, include, type Extended, type Included } from "@blazetrails/ruby-compat/include";
 import { Assertion, UnexpectedError } from "./assertions.js";
 import type { Test } from "./assertions.js";
-
-interface CallbacksHost {
-  defineCallbacks: Extended<typeof Callbacks.ClassMethods>["defineCallbacks"];
-  setCallback: Extended<typeof Callbacks.ClassMethods>["setCallback"];
-}
 
 interface CallbacksInstance {
   runCallbacks: Included<typeof Callbacks>["runCallbacks"];
@@ -15,16 +10,25 @@ interface CallbacksInstance {
 
 export function prepended(klass: abstract new (...args: never[]) => object): void {
   include(klass, Callbacks);
-  (klass as typeof klass & CallbacksHost).defineCallbacks("setup", "teardown");
+  (klass as typeof klass & Extended<typeof Callbacks.ClassMethods>).defineCallbacks(
+    "setup",
+    "teardown",
+  );
+  extend(klass, ClassMethods);
 }
 
-export function setup(this: object, ...args: FilterListEntry<object>[]): void {
-  (this as CallbacksHost).setCallback("setup", "before", ...args);
-}
+export const ClassMethods = {
+  setup(this: Extended<typeof Callbacks.ClassMethods>, ...args: FilterListEntry<object>[]): void {
+    this.setCallback("setup", "before", ...args);
+  },
 
-export function teardown(this: object, ...args: FilterListEntry<object>[]): void {
-  (this as CallbacksHost).setCallback("teardown", "after", ...args);
-}
+  teardown(
+    this: Extended<typeof Callbacks.ClassMethods>,
+    ...args: FilterListEntry<object>[]
+  ): void {
+    this.setCallback("teardown", "after", ...args);
+  },
+};
 
 export function beforeSetup(this: CallbacksInstance, super_: () => unknown): unknown {
   const result = super_();

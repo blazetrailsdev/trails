@@ -10,8 +10,7 @@ import {
 } from "./testing/tagged-logging.js";
 import {
   prepended as setupAndTeardownPrepended,
-  setup,
-  teardown,
+  type ClassMethods as SetupAndTeardownClassMethods,
   beforeSetup as setupAndTeardownBeforeSetup,
   afterTeardown as setupAndTeardownAfterTeardown,
 } from "./testing/setup-and-teardown.js";
@@ -44,7 +43,7 @@ import {
   unfreezeTime,
 } from "./testing/time-helpers.js";
 import { FileFixtures } from "./testing/file-fixtures.js";
-import { include } from "@blazetrails/ruby-compat/include";
+import { include, type Extended } from "@blazetrails/ruby-compat/include";
 import { prepend, type PrependMethod } from "@blazetrails/ruby-compat";
 
 export class TestCase extends Minitest.Test {
@@ -53,6 +52,8 @@ export class TestCase extends Minitest.Test {
   declare static isFileFixturePath: () => boolean;
   declare isFileFixturePath: () => boolean;
   declare fileFixture: typeof FileFixtures.fileFixture;
+  declare static setup: Extended<typeof SetupAndTeardownClassMethods>["setup"];
+  declare static teardown: Extended<typeof SetupAndTeardownClassMethods>["teardown"];
 
   get methodName(): string {
     return this.name;
@@ -70,9 +71,6 @@ export class TestCase extends Minitest.Test {
   static setTaggedLogger = setTaggedLogger;
   /** @internal */
   static taggedLogger = taggedLogger;
-
-  static setup = setup;
-  static teardown = teardown;
 
   override beforeSetup(): unknown {
     const result = super.beforeSetup();
