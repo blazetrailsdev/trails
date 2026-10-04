@@ -2,7 +2,7 @@
 import { beforeEach, describe, it } from "vitest";
 import { extend, include } from "@blazetrails/activesupport";
 import { Hash } from "@blazetrails/ruby-compat";
-import { Conversion, ClassMethods as ConversionClassMethods } from "./conversion.js";
+import { Conversion } from "./conversion.js";
 import { Tests } from "./lint.js";
 import { Naming } from "./naming.js";
 import type { ModelName } from "./naming.js";
@@ -16,7 +16,6 @@ describe("LintTest", () => {
     static {
       extend(this, Naming);
       include(this, Conversion);
-      extend(this, ConversionClassMethods);
     }
 
     isPersisted(): boolean {

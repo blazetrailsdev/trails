@@ -468,10 +468,14 @@ write.
    `@inventedArm <token> — PERMANENT|CONVERGEABLE <story-id>`, one tag per
    token: a control token the arms report files as invented for the pair (`if`,
    `loop`, `try`, `rescue`, `throw`), or the name of the call only the TS body
-   makes. `report-arms.ts` drops a receipted control token from the pair's
-   invented arms, and `pnpm parity:api:arms:throws` reds on a receipt naming an
-   arm or call the body no longer adds, or sitting on a declaration no skeleton
-   row was written for.
+   makes. A receipt is per TOKEN, not per occurrence: one `if` receipt
+   speaks for every invented `if` on the pair, so `report-arms.ts` drops them
+   all, and the receipt goes stale only when the pair invents no `if` at all
+   (equal arm counts, an `order` verdict included). A call-name receipt
+   discharges nothing, since no gate flags an extra call; it records the
+   deviation at the declaration and goes stale when the body stops making the
+   call. `pnpm parity:api:arms:throws` reds on a stale receipt and on one
+   sitting on a declaration no skeleton row was written for.
 
 3. **Did you touch a signature?** Parameter NAMES are gated too (RFC 0126) —
    `parity:api` prints a `params N/M` figure beside `arity`, `--params` lists

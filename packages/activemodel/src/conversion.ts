@@ -4,6 +4,7 @@ import {
   tableize,
   demodulize,
   wrap,
+  extend,
   included,
   classAttribute,
 } from "@blazetrails/activesupport";
@@ -26,6 +27,7 @@ export function _toPartialPath(this: ConversionHost): string {
 
 export class Conversion {
   static [included](base: object): void {
+    extend(base, ClassMethods);
     classAttribute.call(base, "paramDelimiter", { instanceReader: false, default: "-" });
   }
 

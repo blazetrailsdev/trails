@@ -11,7 +11,7 @@ import { ForbiddenAttributesProtection } from "./forbidden-attributes-protection
 import { Validations, type ValidationContext } from "./validations.js";
 import type { AttrNameArg } from "./validations/helper-methods.js";
 import type { validatesWith as withValidatesWith } from "./validations/with.js";
-import { Conversion, ClassMethods as ConversionClassMethods } from "./conversion.js";
+import { Conversion } from "./conversion.js";
 import { Naming } from "./naming.js";
 import { Translation } from "./translation.js";
 
@@ -44,7 +44,6 @@ export class API {
     include(base, Validations);
 
     include(base, Conversion);
-    extend(base, ConversionClassMethods);
 
     extend(base, Naming);
     extend(base, Translation);

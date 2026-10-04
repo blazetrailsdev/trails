@@ -53,6 +53,12 @@ describe("an @inventedArm receipt on a skeleton row", () => {
     expect(staleArmReceipts(row(ruby, ruby, ["if"]))).toEqual(["if"]);
   });
 
+  it("reports a control-token receipt on a pair whose arms differ only in order", () => {
+    const reordered = row(["if", "loop"], ["loop", "if"], ["if"]);
+    expect(compareArms(reordered)?.kind).toBe("order");
+    expect(staleArmReceipts(reordered)).toEqual(["if"]);
+  });
+
   it("reports a receipt for a call the body does not make", () => {
     expect(staleArmReceipts(row(ruby, ts, ["rbFSend"]))).toEqual(["rbFSend"]);
   });
