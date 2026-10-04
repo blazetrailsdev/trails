@@ -222,6 +222,11 @@ describe("rb_mod_constants", () => {
     expect(rbModConstants(Outer)).toEqual(["LIMIT", "Nested"]);
   });
 
+  it("lists only the receiver's own constants when inherit is false", () => {
+    expect(rbModConstants(Child, false)).toEqual(["Own"]);
+    expect(rbModConstants(Child, null)).toEqual(["Own"]);
+  });
+
   it("includes the constants of an included module", () => {
     const Mixin = new Module();
     rbModConstSet(Mixin, "Mixed", class Mixed {});
