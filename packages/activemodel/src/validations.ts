@@ -9,12 +9,14 @@ import {
 
 import {
   block as rbBlock,
+  dup as hashDup,
   Hash,
   Module,
   rbBlockGivenP,
   rbFPublicSend,
   rbModConstSet,
   rbModMethodDefined,
+  rbModSingletonP,
 } from "@blazetrails/ruby-compat";
 
 import { Errors } from "./errors.js";
@@ -28,7 +30,6 @@ import { HelperMethods } from "./validations/helper-methods.js";
 import {
   ClassMethods as WithClassMethods,
   validatesWith as withValidatesWith,
-  inheritedValidators,
 } from "./validations/with.js";
 import * as Validates from "./validations/validates.js";
 import { AbsenceValidator } from "./validations/absence.js";
@@ -101,6 +102,19 @@ export class Validations {
         h.set(k, v);
         return v;
       }),
+    });
+    const reader = Object.getOwnPropertyDescriptor(base, "_validators")!;
+    Object.defineProperty(base, "_validators", {
+      ...reader,
+      get(this: ValidationsClassHost) {
+        if (
+          !Object.prototype.hasOwnProperty.call(this, "__class_attr__validators") &&
+          !rbModSingletonP(this)
+        ) {
+          inherited.call(Object.getPrototypeOf(this), this);
+        }
+        return reader.get!.call(this);
+      },
     });
   }
 
@@ -299,7 +313,6 @@ export const ClassMethods = {
 
   clearValidatorsBang(this: ValidationsClassHost): void {
     this.resetCallbacks("validate");
-    inheritedValidators.call(this);
     this._validators.clear();
   },
 
@@ -395,6 +408,12 @@ export function initInternals<TBase extends object>(this: ValidationsInternalsHo
   SuperMethods.superMethod(this, "initInternals")!();
   this._errors = undefined;
   this._contextForValidation = undefined;
+}
+
+function inherited(this: ValidationsClassHost, base: ValidationsClassHost): void {
+  const dup = hashDup(this._validators);
+  dup.forEach((v, k) => dup.set(k, [...v]));
+  base._validators = dup;
 }
 
 const SuperMethods = new Module((mod) => {
