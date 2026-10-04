@@ -84,6 +84,22 @@ describe("initializeIncludedModules", () => {
     expect(calls).toEqual(["ensure"]);
   });
 
+  it("raises for a generator initializer that yields a second time", () => {
+    const Twice = new Module();
+    (Twice as unknown as Record<symbol, unknown>)[initialize] = function* () {
+      yield;
+      yield;
+    };
+    class Root {
+      constructor() {
+        initializeIncludedModules(this);
+      }
+    }
+    include(Root, Twice);
+
+    expect(() => new Root()).toThrow(/yields once/);
+  });
+
   it("seats a module's per-instance state as an own property at construction", () => {
     class Controller {
       constructor() {

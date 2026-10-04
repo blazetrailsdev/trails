@@ -745,7 +745,10 @@ export function initializeIncludedModules(instance: object, ...args: unknown[]):
         body.return(undefined);
         throw error;
       }
-      body.next();
+      if (body.next().done !== true) {
+        body.return(undefined);
+        throw new TypeError("an initialize generator yields once, where Ruby calls super");
+      }
     } else {
       unwind(index - 1);
       initializer.call(instance, ...args);
