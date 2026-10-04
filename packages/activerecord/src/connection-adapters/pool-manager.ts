@@ -1,5 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { hashDelete } from "@blazetrails/ruby-compat";
+import { eachValue, hashDelete } from "@blazetrails/ruby-compat";
 import type { PoolConfig } from "./pool-config.js";
 
 export class PoolManager {
@@ -32,27 +32,27 @@ export class PoolManager {
     return Object.values(this._roleToShardMapping).flatMap((shardMap) => Object.values(shardMap));
   }
 
-  eachPoolConfig(role: string | null | undefined, block: (poolConfig: PoolConfig) => void): void;
-  eachPoolConfig(block: (poolConfig: PoolConfig) => void): void;
+  /** @missingRailsName roleToShardMapping — PERMANENT */
+  eachPoolConfig(
+    role: string | null | undefined,
+    block?: (poolConfig: PoolConfig) => void,
+  ): unknown;
+  eachPoolConfig(block: (poolConfig: PoolConfig) => void): unknown;
   eachPoolConfig(
     role: string | null | undefined | ((poolConfig: PoolConfig) => void) = null,
     block?: (poolConfig: PoolConfig) => void,
-  ): void {
+  ): unknown {
     if (typeof role === "function") {
       block = role;
       role = null;
     }
 
     if (role != null) {
-      for (const poolConfig of Object.values(this._roleToShardMapping[role])) {
-        block!(poolConfig);
-      }
+      return eachValue(this._roleToShardMapping[role], block!);
     } else {
-      for (const shardMap of Object.values(this._roleToShardMapping)) {
-        for (const poolConfig of Object.values(shardMap)) {
-          block!(poolConfig);
-        }
-      }
+      return eachValue(this._roleToShardMapping, (shardMap) => {
+        eachValue(shardMap, block!);
+      });
     }
   }
 

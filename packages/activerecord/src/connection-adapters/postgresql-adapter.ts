@@ -238,6 +238,7 @@ export class PostgreSQLAdapter
 {
   static override readonly ADAPTER_NAME = "PostgreSQL";
 
+  /** @inventedArm end — CONVERGEABLE pg-driver-errors-carry-a-result-at-the-raw-connection-boundary */
   static async newClient(connParams: pg.ClientConfig): Promise<pg.Client> {
     const client = new pg.Client(connParams);
     const { database, user, host } = client;

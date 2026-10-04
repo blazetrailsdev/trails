@@ -82,7 +82,6 @@ export class SchemaReflection {
 
   private _cache: SchemaCache | null;
   private _cachePath: string | null;
-  private _cachePromise: Promise<SchemaCache> | null = null;
 
   constructor(cachePath?: string | null, cache?: SchemaCache) {
     this._cache = cache ?? null;
@@ -91,7 +90,6 @@ export class SchemaReflection {
 
   clearBang(): void {
     this._cache = this.emptyCache();
-    this._cachePromise = null;
   }
 
   async loadBang(pool: Pool): Promise<this> {
@@ -158,7 +156,6 @@ export class SchemaReflection {
     const freshCache = this.emptyCache();
     await freshCache.addAll(pool);
     await freshCache.dumpTo(filename);
-    this._cachePromise = null;
     return (this._cache = freshCache);
   }
 
@@ -166,11 +163,9 @@ export class SchemaReflection {
     return new SchemaCache();
   }
 
-  /** @inventedArm then — CONVERGEABLE activerecord-converge-invented-control-flow-arms-connection-adapters-root-part-2-residue */
   private async cache(pool: Pool): Promise<SchemaCache> {
-    return (this._cache ||= await (this._cachePromise ||= this.loadCache(pool).then(
-      (newCache) => newCache || this.emptyCache(),
-    )));
+    const newCache = this._cache || (await this.loadCache(pool)) || this.emptyCache();
+    return (this._cache ||= newCache);
   }
 
   /** @missingRailsName cachePath — PERMANENT */
@@ -235,7 +230,6 @@ export class SchemaReflection {
    */
   set loadedCache(cache: SchemaCache | null) {
     this._cache = cache;
-    this._cachePromise = null;
   }
 }
 

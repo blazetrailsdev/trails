@@ -121,6 +121,12 @@ describe("PoolManager", () => {
       manager.eachPoolConfig("unknown", (pc) => collected.push(pc));
       expect(collected).toEqual([]);
     });
+
+    it("answers the role's pool configs when no block is given", () => {
+      const c1 = makePoolConfig("primary");
+      manager.setPoolConfig("writing", "default", c1);
+      expect(manager.eachPoolConfig("writing")).toEqual([c1]);
+    });
   });
 
   describe("removePoolConfig", () => {
