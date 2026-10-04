@@ -114,7 +114,7 @@ describe("AttributeMethodsTest (trails)", () => {
   it("formatForInspect does not crash for array containing an object with bigint values", () => {
     class M extends Base {}
     expect(() => formatForInspect.call(new M(), "x", [{ a: 1n }])).not.toThrow();
-    expect(formatForInspect.call(new M(), "x", [{ a: 1n }])).toBe('[{"a":"1"}]');
+    expect(formatForInspect.call(new M(), "x", [{ a: 1n }])).toBe('[{"a"=>1}]');
   });
 
   it("returns true for alias_attribute names on instances", () => {

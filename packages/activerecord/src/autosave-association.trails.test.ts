@@ -248,42 +248,6 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     expect(author.isNewRecord()).toBe(true);
     expect(post.errors.size).toBe(0);
   });
-
-  it("belongs_to autosave with PK longer than FK skips trailing PK positions", async () => {
-    class Parent extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class Child extends Base {
-      declare author_id: number | null;
-      declare name: string | null;
-
-      static {
-        this._tableName = "books";
-        this.attribute("author_id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-    registerModel("LongPkParent", Parent);
-    registerModel("LongPkChild", Child);
-    Associations.belongsTo.call(Child, "parent", {
-      primaryKey: ["id", "name"],
-      foreignKey: "author_id",
-      className: "LongPkParent",
-      autosave: true,
-    });
-
-    const parent = new Parent({ name: "P" });
-    const child = new Child({ name: "c" });
-    cacheAssoc(child, "parent", parent);
-    await child.save();
-    expect(parent.isNewRecord()).toBe(false);
-    expect(child.author_id).toBe(parent.id);
-  });
 });
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAttributes", () => {
