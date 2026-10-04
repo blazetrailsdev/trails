@@ -323,7 +323,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
       tableName: string,
       options?:
         | {
-            id?: boolean | ColumnType | IdHashOptions;
+            id?: false | ColumnType | IdHashOptions;
             primaryKey?: string | string[] | false;
             force?: boolean | "cascade";
             ifNotExists?: boolean;
@@ -1960,7 +1960,7 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
     tableName: string,
     options?:
       | {
-          id?: boolean | ColumnType | IdHashOptions;
+          id?: false | ColumnType | IdHashOptions;
           primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;

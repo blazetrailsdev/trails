@@ -5,13 +5,15 @@ import type { SchemaSource } from "../../schema-dumper.js";
 import { Column } from "./column.js";
 import { TypeMetadata } from "./type-metadata.js";
 import { Version } from "../abstract-adapter.js";
+import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 import { resultFromRowHashes } from "../../test-helpers/result-from-row-hashes.js";
 
-const stubSource: SchemaSource = {
+const stubSource: SchemaSource & { nativeDatabaseTypes(): object } = {
   tables: async () => [],
   columns: async () => [],
   indexes: async () => [],
   lookupCastTypeFromColumn: () => new ValueType(),
+  nativeDatabaseTypes: () => AbstractMysqlAdapter.NATIVE_DATABASE_TYPES,
 };
 class TestSchemaDumper extends SchemaDumper {
   setConnection(connection: TestSchemaDumper["connection"]): void {

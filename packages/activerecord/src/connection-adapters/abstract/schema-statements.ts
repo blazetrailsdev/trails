@@ -195,7 +195,7 @@ export class SchemaStatements {
     tableName: string,
     options?:
       | {
-          id?: boolean | ColumnType | IdHashOptions;
+          id?: false | ColumnType | IdHashOptions;
           primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;
@@ -213,32 +213,11 @@ export class SchemaStatements {
       | ((t: TableDefinitionOf<this>) => void | Promise<void>),
     fn?: (t: TableDefinitionOf<this>) => void | Promise<void>,
   ): Promise<unknown> {
-    let kwargs: {
-      id?: boolean | ColumnType | IdHashOptions;
-      primaryKey?: string | string[] | false;
-      force?: boolean | "cascade";
-      ifNotExists?: boolean;
-      default?: unknown;
-      options?: string;
-      comment?: string;
-      charset?: string;
-      collation?: string;
-      temporary?: boolean;
-      as?: string | { toSql(): string };
-      autoIncrement?: boolean;
-      limit?: number;
-      precision?: number;
-    } = {};
-    let definer: ((t: TableDefinitionOf<this>) => void | Promise<void>) | undefined;
-
     if (typeof options === "function") {
-      definer = options;
-    } else {
-      kwargs = options ?? {};
-      definer = fn;
+      fn = options;
+      options = undefined;
     }
-
-    const { id, primaryKey, force, ...rest } = kwargs;
+    const { id, primaryKey, force, ...rest } = options ?? {};
     options = rest;
     this.validateCreateTableOptionsBang(options);
 
@@ -255,7 +234,7 @@ export class SchemaStatements {
     const td = await this.buildCreateTableDefinition(
       tableName,
       { id, primaryKey, force, ...options },
-      definer,
+      fn,
     );
 
     if (force) {
@@ -277,21 +256,13 @@ export class SchemaStatements {
 
     if (this.supportsComments?.() && !this.supportsCommentsInCreate?.()) {
       const tableComment = presence(td.comment);
-      if (tableComment != null && typeof this.changeTableComment === "function") {
+      if (tableComment != null) {
         await this.changeTableComment(tableName, tableComment);
       }
-      const commentAdapter = this as {
-        changeColumnComment?(t: string, c: string, comment: string | null): Promise<void>;
-      };
-      if (typeof commentAdapter.changeColumnComment === "function") {
-        for (const column of td.columns as Array<{
-          name: string;
-          options?: { comment?: string | null };
-        }>) {
-          const comment = presence(column.options?.comment);
-          if (comment != null) {
-            await commentAdapter.changeColumnComment(tableName, column.name, comment);
-          }
+
+      for (const column of td.columns) {
+        if (isPresent(column.options.comment)) {
+          await this.changeColumnComment(tableName, column.name, column.options.comment!);
         }
       }
     }
@@ -662,14 +633,11 @@ export class SchemaStatements {
     options?: JoinTableOptions | ((t: TableDefinitionOf<this>) => void),
     fn?: (t: TableDefinitionOf<this>) => void,
   ): Promise<void> {
-    let definer: ((t: TableDefinitionOf<this>) => void) | undefined;
     if (typeof options === "function") {
-      definer = options;
-      options = {};
-    } else {
-      options = { ...options };
-      definer = fn;
+      fn = options;
+      options = undefined;
     }
+    options = { ...options };
     let columnOptions = options.columnOptions ?? {};
     delete options.columnOptions;
     const joinTableName = this.findJoinTableName(table1, table2, options);
@@ -679,7 +647,7 @@ export class SchemaStatements {
     await this.createTable(joinTableName, { ...options, id: false }, (t) => {
       t.references(t1Ref, columnOptions);
       t.references(t2Ref, columnOptions);
-      if (definer) definer(t);
+      if (fn) fn(t);
     });
   }
 
@@ -971,14 +939,14 @@ export class SchemaStatements {
   async buildCreateTableDefinition(
     tableName: string,
     kwargs: {
-      id?: boolean | ColumnType | IdHashOptions;
+      id?: false | ColumnType | IdHashOptions;
       primaryKey?: string | string[] | false;
       force?: boolean | "cascade";
       [key: string]: unknown;
     } = {},
     fn?: (td: TableDefinitionOf<this>) => void | Promise<void>,
   ): Promise<TableDefinitionOf<this>> {
-    const { id = true, primaryKey, force: _force, ...options } = kwargs;
+    const { id = "primary_key", primaryKey, force: _force, ...options } = kwargs;
     const tdOptions: Record<string, unknown> = {};
     for (const key of [...this.validTableDefinitionOptions(), "_skipValidateOptions"]) {
       if (key in options) {

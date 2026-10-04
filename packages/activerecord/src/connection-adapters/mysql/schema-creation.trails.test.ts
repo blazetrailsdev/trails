@@ -213,7 +213,7 @@ describeIfMysqlAdapter("MySQL::TableDefinition#toSql via SchemaCreation.accept",
 
   it("emits bigint AUTO_INCREMENT PRIMARY KEY for default id column", async () => {
     const td = new MyTd(mysqlConn(), "users");
-    td.setPrimaryKey("users", true);
+    td.setPrimaryKey("users", "primary_key");
     td.string("name");
     expect(await toSql(td)).toBe(
       "CREATE TABLE `users` (`id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY, `name` varchar(255))",
@@ -256,7 +256,7 @@ describeIfMysqlAdapter("MySQL::TableDefinition#toSql via SchemaCreation.accept",
 
   it("emits composite PRIMARY KEY clause", async () => {
     const td = new MyTd(mysqlConn(), "memberships");
-    td.setPrimaryKey("memberships", true, ["user_id", "group_id"]);
+    td.setPrimaryKey("memberships", "primary_key", ["user_id", "group_id"]);
     td.bigint("user_id", { null: false });
     td.bigint("group_id", { null: false });
     const sql = await toSql(td);

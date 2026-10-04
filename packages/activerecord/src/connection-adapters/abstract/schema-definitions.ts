@@ -1,4 +1,14 @@
-import { block, fetch, isSymbol, merge, slice, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  block,
+  except,
+  fetch,
+  isSymbol,
+  keywordSplat,
+  merge,
+  slice,
+  symbolToS,
+  update,
+} from "@blazetrails/ruby-compat";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import type { SchemaStatementsLike } from "./schema-statements-like.js";
 import type { Column } from "../column.js";
@@ -7,7 +17,10 @@ import {
   singularize,
   pluralize,
   assertValidKeys,
+  extractOptionsBang,
   isBlank,
+  isPlainObject,
+  underscore,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { SchemaDumper } from "../../schema-dumper.js";
@@ -765,26 +778,23 @@ export class TableDefinition {
 
   setPrimaryKey(
     tableName: string,
-    id: boolean | ColumnType | IdHashOptions,
+    id: false | ColumnType | IdHashOptions,
     primaryKey?: string | string[] | false,
     options: Record<string, unknown> = {},
   ): void {
-    if (!id || this.as) return;
+    if (id && !this.as) {
+      const pk = primaryKey || (ActiveRecord.Base.getPrimaryKey(singularize(tableName)) as string);
 
-    const pk = primaryKey || (ActiveRecord.Base.getPrimaryKey(singularize(tableName)) as string);
+      if (isPlainObject(id)) {
+        update(options, except(id as Record<string, unknown>, "type"));
+        id = fetch(id as Record<string, ColumnType>, "type", "primary_key");
+      }
 
-    let pkOptions: ColumnOptions = { ...(options as Partial<ColumnOptions>) };
-    let pkType: ColumnType = typeof id === "string" ? id : "primary_key";
-    if (typeof id === "object" && id !== null) {
-      const { type, ...rest } = id;
-      pkOptions = { ...pkOptions, ...(rest as Partial<ColumnOptions>) };
-      pkType = "type" in id ? (type as ColumnType) : "primary_key";
-    }
-
-    if (Array.isArray(pk)) {
-      this.primaryKeys(pk);
-    } else {
-      this.primaryKey(pk, pkType, pkOptions);
+      if (Array.isArray(pk)) {
+        this.primaryKeys(pk);
+      } else {
+        this.primaryKey(pk, id as ColumnType, options);
+      }
     }
   }
 
@@ -1029,14 +1039,10 @@ export class Table {
   ): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
     const { index: indexOpt, ...colOpts } = options;
-    if (Object.keys(colOpts).length === 0) {
-      await this._schema.addColumn(this.name, columnName, type);
-    } else {
-      await this._schema.addColumn(this.name, columnName, type, colOpts as ColumnOptions);
-    }
+    await this._schema.addColumn(this.name, columnName, type, ...keywordSplat(colOpts));
     if (indexOpt) {
-      const opts: AddIndexOptions = typeof indexOpt === "object" ? indexOpt : {};
-      await this._schema.addIndex(this.name, columnName, opts);
+      const indexOptions: AddIndexOptions = typeof indexOpt === "object" ? indexOpt : {};
+      await this.index(columnName, indexOptions);
     }
   }
 
@@ -1045,38 +1051,24 @@ export class Table {
     type?: ColumnType,
     options: Record<string, unknown> = {},
   ): Promise<boolean> {
-    if (Object.keys(options).length === 0) {
-      return this._schema.columnExists(this.name, columnName, type);
-    }
-    return this._schema.columnExists(this.name, columnName, type, options);
+    return this._schema.columnExists(this.name, columnName, type, ...keywordSplat(options));
   }
   async index(columns: string | string[], options: AddIndexOptions = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    if (Object.keys(options).length === 0) {
-      await this._schema.addIndex(this.name, columns);
-    } else {
-      await this._schema.addIndex(this.name, columns, options);
-    }
+    await this._schema.addIndex(this.name, columns, ...keywordSplat(options));
   }
   async indexExists(
     columnName: string | string[],
     options: Record<string, unknown> = {},
   ): Promise<boolean> {
-    if (Object.keys(options).length === 0) {
-      return this._schema.indexExists(this.name, columnName);
-    }
-    return this._schema.indexExists(this.name, columnName, options);
+    return this._schema.indexExists(this.name, columnName, ...keywordSplat(options));
   }
   async renameIndex(indexName: string, newIndexName: string): Promise<void> {
     return this._schema.renameIndex(this.name, indexName, newIndexName);
   }
   async timestamps(options: ColumnOptions = {}): Promise<void> {
     this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    if (Object.keys(options).length === 0) {
-      await this._schema.addTimestamps(this.name);
-    } else {
-      await this._schema.addTimestamps(this.name, options);
-    }
+    await this._schema.addTimestamps(this.name, ...keywordSplat(options));
   }
   async change(
     columnName: string,
@@ -1100,38 +1092,26 @@ export class Table {
 
   async remove(...columnNames: string[]): Promise<void>;
   async remove(...args: [...columnNames: string[], options: ColumnOptions]): Promise<void>;
-  async remove(...args: unknown[]): Promise<void> {
-    const rest = [...args];
-    const last = rest[rest.length - 1];
-    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as ColumnOptions;
-    this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    await this._schema.removeColumns(
-      this.name,
-      ...(rest as string[]),
-      ...(Object.keys(options).length > 0 ? [options] : []),
-    );
+  async remove(...columnNames: Array<string | ColumnOptions>): Promise<void> {
+    const options = extractOptionsBang(columnNames);
+    this.raiseOnIfExistOptions(options);
+    await this._schema.removeColumns(this.name, ...columnNames, ...keywordSplat(options));
   }
 
   async removeIndex(
-    columnName: string | string[] | { column?: string | string[]; name?: string } = {},
+    columnName?: string | string[] | { column?: string | string[]; name?: string },
     options: { column?: string | string[]; name?: string } = {},
   ): Promise<unknown> {
-    const isColumn = typeof columnName === "string" || Array.isArray(columnName);
-    const column = isColumn ? columnName : undefined;
-    options = isColumn ? options : { ...columnName, ...options };
-    this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    if (Object.keys(options).length === 0) {
-      return this._schema.removeIndex(this.name, column);
-    } else {
-      return this._schema.removeIndex(this.name, column, options);
+    if (isPlainObject(columnName)) {
+      options = columnName;
+      columnName = undefined;
     }
+    this.raiseOnIfExistOptions(options);
+    return this._schema.removeIndex(this.name, columnName, ...keywordSplat(options));
   }
 
   async removeTimestamps(options: ColumnOptions = {}): Promise<void> {
-    if (Object.keys(options).length === 0) {
-      return this._schema.removeTimestamps(this.name);
-    }
-    return this._schema.removeTimestamps(this.name, options);
+    return this._schema.removeTimestamps(this.name, ...keywordSplat(options));
   }
 
   async rename(columnName: string, newColumnName: string): Promise<void> {
@@ -1140,37 +1120,29 @@ export class Table {
 
   async references(...refNames: string[]): Promise<void>;
   async references(...args: [...refNames: string[], options: AddReferenceOptions]): Promise<void>;
-  async references(...args: unknown[]): Promise<void> {
-    const { names, options } = this._splitRefNames(args);
-    this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    for (const refName of names) {
-      if (Object.keys(options).length === 0) {
-        await this._schema.addReference(this.name, refName);
-      } else {
-        await this._schema.addReference(this.name, refName, options);
-      }
+  async references(...args: Array<string | AddReferenceOptions>): Promise<void> {
+    const options = extractOptionsBang(args);
+    this.raiseOnIfExistOptions(options);
+    for (const refName of args) {
+      await this._schema.addReference(this.name, refName as string, ...keywordSplat(options));
     }
   }
 
   async belongsTo(...refNames: string[]): Promise<void>;
   async belongsTo(...args: [...refNames: string[], options: AddReferenceOptions]): Promise<void>;
   async belongsTo(...args: unknown[]): Promise<void> {
-    return (this.references as (...a: unknown[]) => Promise<void>)(...args);
+    return this.references(...(args as string[]));
   }
 
   async removeReferences(...refNames: string[]): Promise<void>;
   async removeReferences(
     ...args: [...refNames: string[], options: AddReferenceOptions]
   ): Promise<void>;
-  async removeReferences(...args: unknown[]): Promise<void> {
-    const { names, options } = this._splitRefNames(args);
-    this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    for (const refName of names) {
-      if (Object.keys(options).length === 0) {
-        await this._schema.removeReference(this.name, refName);
-      } else {
-        await this._schema.removeReference(this.name, refName, options);
-      }
+  async removeReferences(...args: Array<string | AddReferenceOptions>): Promise<void> {
+    const options = extractOptionsBang(args);
+    this.raiseOnIfExistOptions(options);
+    for (const refName of args) {
+      await this._schema.removeReference(this.name, refName as string, ...keywordSplat(options));
     }
   }
 
@@ -1179,79 +1151,59 @@ export class Table {
     ...args: [...refNames: string[], options: AddReferenceOptions]
   ): Promise<void>;
   async removeBelongsTo(...args: unknown[]): Promise<void> {
-    return (this.removeReferences as (...a: unknown[]) => Promise<void>)(...args);
+    return this.removeReferences(...(args as string[]));
   }
 
-  async foreignKey(toTable: string, options: Partial<AddForeignKeyOptions> = {}): Promise<void> {
-    this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    if (Object.keys(options).length === 0) {
-      return this._schema.addForeignKey(this.name, toTable);
-    }
-    return this._schema.addForeignKey(this.name, toTable, options);
+  async foreignKey(...args: Array<string | Partial<AddForeignKeyOptions>>): Promise<void> {
+    const options = extractOptionsBang(args);
+    this.raiseOnIfExistOptions(options);
+    return this._schema.addForeignKey(this.name, ...(args as [string]), ...keywordSplat(options));
   }
+
   async removeForeignKey(
-    toTableOrOptions: string | { column?: string; name?: string } = {},
+    ...args: Array<string | { column?: string; name?: string }>
   ): Promise<void> {
-    this.raiseOnIfExistOptions(
-      (typeof toTableOrOptions === "object" ? toTableOrOptions : {}) as Record<string, unknown>,
+    const options = extractOptionsBang(args);
+    this.raiseOnIfExistOptions(options);
+    return this._schema.removeForeignKey(
+      this.name,
+      ...(args as [string?]),
+      ...keywordSplat(options),
     );
-    if (typeof toTableOrOptions === "object" && Object.keys(toTableOrOptions).length === 0) {
-      return this._schema.removeForeignKey(this.name);
-    }
-    return this._schema.removeForeignKey(this.name, toTableOrOptions);
   }
 
-  async foreignKeyExists(...args: string[]): Promise<boolean>;
-  async foreignKeyExists(...args: [...unknown[], Record<string, unknown>]): Promise<boolean>;
-  async foreignKeyExists(...args: unknown[]): Promise<boolean> {
-    const rest = [...args];
-    const last = rest[rest.length - 1];
-    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as Record<
-      string,
-      unknown
-    >;
-    if (Object.keys(options).length === 0) {
-      return this._schema.foreignKeyExists(this.name, ...(rest as []));
-    }
-    return this._schema.foreignKeyExists(this.name, ...(rest as []), options);
+  async foreignKeyExists(...args: Array<string | Record<string, unknown>>): Promise<boolean> {
+    const options = extractOptionsBang(args);
+    return this._schema.foreignKeyExists(
+      this.name,
+      ...(args as [string?]),
+      ...keywordSplat(options),
+    );
   }
 
-  async checkConstraint(expression: string, options: Record<string, unknown> = {}): Promise<void> {
-    if (Object.keys(options).length === 0) {
-      return this._schema.addCheckConstraint(this.name, expression);
-    }
-    return this._schema.addCheckConstraint(this.name, expression, options);
+  async checkConstraint(...args: Array<string | Record<string, unknown>>): Promise<void> {
+    const options = extractOptionsBang(args);
+    return this._schema.addCheckConstraint(
+      this.name,
+      ...(args as [string]),
+      ...keywordSplat(options),
+    );
   }
 
-  async removeCheckConstraint(...args: string[]): Promise<void>;
-  async removeCheckConstraint(...args: [...unknown[], { name?: string }]): Promise<void>;
-  async removeCheckConstraint(...args: unknown[]): Promise<void> {
-    const rest = [...args];
-    const last = rest[rest.length - 1];
-    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as {
-      name?: string;
-    };
-    if (Object.keys(options).length === 0) {
-      return this._schema.removeCheckConstraint(this.name, ...(rest as []));
-    }
-    return this._schema.removeCheckConstraint(this.name, ...(rest as []), options);
+  async removeCheckConstraint(...args: Array<string | { name?: string }>): Promise<void> {
+    const options = extractOptionsBang(args);
+    return this._schema.removeCheckConstraint(
+      this.name,
+      ...(args as [string?]),
+      ...keywordSplat(options),
+    );
   }
 
-  async checkConstraintExists(...args: string[]): Promise<boolean>;
   async checkConstraintExists(
-    ...args: [...unknown[], { name?: string; expression?: string }]
-  ): Promise<boolean>;
-  async checkConstraintExists(...args: unknown[]): Promise<boolean> {
-    const rest = [...args];
-    const last = rest[rest.length - 1];
-    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as {
-      name?: string;
-      expression?: string;
-    };
-    if (Object.keys(options).length === 0) {
-      return this._schema.checkConstraintExists(this.name, ...(rest as []));
-    }
-    return this._schema.checkConstraintExists(this.name, ...(rest as []), options);
+    ...args: Array<{ name?: string; expression?: string }>
+  ): Promise<boolean> {
+    const options = extractOptionsBang(args);
+    return this._schema.checkConstraintExists(this.name, ...args, ...keywordSplat(options));
   }
 
   /** @internal */
@@ -1261,10 +1213,9 @@ export class Table {
     );
     if (unrecognizedOption) {
       const conditional = unrecognizedOption === "ifExists" ? "if" : "unless";
-      const railsKey = unrecognizedOption === "ifExists" ? "if_exists" : "if_not_exists";
       throw new ArgumentError(
-        `Option ${railsKey} will be ignored. If you are calling an expression like\n` +
-          `\`t.column(.., ${railsKey}: true)\` from inside a change_table block, try a\n` +
+        `Option ${underscore(unrecognizedOption)} will be ignored. If you are calling an expression like\n` +
+          `\`t.column(.., ${underscore(unrecognizedOption)}: true)\` from inside a change_table block, try a\n` +
           `conditional clause instead, as in \`t.column(..) ${conditional} t.column_exists?(..)\``,
       );
     }
@@ -1291,15 +1242,6 @@ export class Table {
           return names;
         };
     }
-  }
-
-  private _splitRefNames(args: unknown[]): { names: string[]; options: AddReferenceOptions } {
-    const rest = [...args];
-    const last = rest[rest.length - 1];
-    const options = (
-      typeof last === "object" && last !== null ? rest.pop() : {}
-    ) as AddReferenceOptions;
-    return { names: rest as string[], options };
   }
 
   async primaryKey(
