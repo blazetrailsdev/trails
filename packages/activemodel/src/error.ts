@@ -293,12 +293,7 @@ export class Error {
     );
   }
 
-  eql(other: Error): boolean {
-    return (
-      other instanceof this.constructor &&
-      optionsEqual(this.attributesForHash(), other.attributesForHash())
-    );
-  }
+  declare eql: Error["equals"];
 
   hash(): number {
     return rbHash(this.attributesForHash());
@@ -313,5 +308,7 @@ export class Error {
     return `#<${rbModName(this.constructor as typeof Error) ?? ""} attribute=${isSymbol(this.attribute) ? symbolToS(this.attribute) : this.attribute}, type=${isSymbol(this.type) ? symbolToS(this.type) : this.type}, options=${rbInspect(this.options)}>`;
   }
 }
+
+Error.prototype.eql = Error.prototype.equals;
 
 rbModConstSet(ActiveModel, "Error", Error);

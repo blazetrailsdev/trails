@@ -194,14 +194,7 @@ export abstract class Attribute {
     );
   }
 
-  eql(other: Attribute): boolean {
-    return (
-      this.constructor === other.constructor &&
-      this.name === other.name &&
-      this.valueBeforeTypeCast === other.valueBeforeTypeCast &&
-      rbEqual(this.type, other.type)
-    );
-  }
+  declare eql: Attribute["equals"];
 
   hash(): number {
     return rbHash([this.constructor, this.name, this.valueBeforeTypeCast, this.type]);
@@ -383,6 +376,8 @@ export class Uninitialized extends Attribute {
     return undefined;
   }
 }
+
+Attribute.prototype.eql = Attribute.prototype.equals;
 
 rbModConstSet(ActiveModel, "Attribute", Attribute);
 rbModConstSet(Attribute, "FromDatabase", FromDatabase);
