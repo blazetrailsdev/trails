@@ -1,6 +1,7 @@
 import type { AttributeSet } from "@blazetrails/activemodel";
 import { AttrNames, completeHalfAccessor } from "@blazetrails/activemodel";
 import type { CodeGenerator } from "@blazetrails/activesupport";
+import { rbFCaller } from "@blazetrails/ruby-compat";
 import { AttributeMethods as AttributeMethodsNamespace } from "../namespaces.js";
 
 export interface Read {
@@ -83,12 +84,12 @@ export function defineMethodAttribute(
 interface ReadRecord {
   _attributes: AttributeSet;
   _readAttribute(n: string, block: (n: string) => unknown): unknown;
-  missingAttribute(n: string, stack?: string): never;
+  missingAttribute(n: string, stack: string[]): never;
 }
 
 /** @internal */
 function readGeneratedAttribute(record: ReadRecord, canonicalName: string): unknown {
-  return record._readAttribute(canonicalName, (n) => record.missingAttribute(n));
+  return record._readAttribute(canonicalName, (n) => record.missingAttribute(n, rbFCaller()));
 }
 
 AttributeMethodsNamespace.Read = Read;

@@ -76,6 +76,18 @@ export function excBacktraceLocations(exc: Error): Location[] | null {
 }
 
 /**
+ * `Exception#set_backtrace` (`vendor/ruby/v3.3.11/error.c:1833` `exc_set_backtrace`),
+ * which `raise klass, message, backtrace` calls: the frames replace the
+ * exception's own, under the header line V8 keeps the message in.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function excSetBacktrace(exc: Error, bt: string[]): string[] {
+  exc.stack = [`${exc.name}: ${exc.message}`, ...bt.map((frame) => `    ${frame}`)].join("\n");
+  return bt;
+}
+
+/**
  * `Kernel#caller` (`vendor/ruby/v3.3.11/vm_backtrace.c:1233` `rb_f_caller`): the
  * frames above the method calling it, each as `Exception#backtrace` spells it.
  *

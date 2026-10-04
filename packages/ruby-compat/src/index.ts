@@ -344,7 +344,12 @@ export { Queue, SizedQueue } from "./queue.js";
 export { Fiber } from "./fiber.js";
 export { FiberError } from "./fiber-error.js";
 export { Thread } from "./thread.js";
-export { Location, excBacktraceLocations, rbFCaller } from "./backtrace-location.js";
+export {
+  Location,
+  excBacktraceLocations,
+  excSetBacktrace,
+  rbFCaller,
+} from "./backtrace-location.js";
 export { ThreadError } from "./thread-error.js";
 export { ThreadPoolExecutor } from "./thread-pool-executor.js";
 export { Concurrent } from "./concurrent/map.js";
