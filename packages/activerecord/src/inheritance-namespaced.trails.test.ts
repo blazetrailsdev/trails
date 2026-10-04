@@ -34,8 +34,8 @@ describe("InheritanceTest (module-namespaced sti_name)", () => {
   });
 });
 
-describe("module-namespaced qualifiedName / polymorphic_name", () => {
-  it("qualifiedName prepends the module path to the demodulized name", () => {
+describe("module-namespaced name / polymorphic_name", () => {
+  it("name is the constant path", () => {
     expect(rbModName(ClothingItemUsed)).toBe("ClothingItem::Used");
     expect(rbModName(AdminUser)).toBe("Admin::User");
   });
