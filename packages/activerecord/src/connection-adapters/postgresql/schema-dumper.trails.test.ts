@@ -174,6 +174,20 @@ describe("PostgreSQL::SchemaDumper", () => {
       expect(spec["enumType"]).toBe(JSON.stringify("mood"));
     });
 
+    it("keeps the bit_varying type key for a virtual column's type option", async () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      dumper.supportsVirtualColumns = true;
+      const col = new Column(
+        "flags",
+        null,
+        new TypeMetadata({ sqlType: "bit varying", type: "bit_varying" }),
+        true,
+        { defaultFunction: "(a)", generated: "s" },
+      );
+      expect(dumper.schemaType(col)).toBe(":bit_varying");
+      expect((await dumper.prepareColumnOptions(col))["type"]).toBe('"bit_varying"');
+    });
+
     it("skips virtual options when adapter does not support virtual columns", async () => {
       const mockAdapter = {
         tables: async () => [],
@@ -250,6 +264,28 @@ describe("PostgreSQL::SchemaDumper", () => {
       expect(dumper.extractExpressionForVirtualColumn(col)).toBe(
         JSON.stringify("concat(first_name, ' ', last_name)"),
       );
+    });
+  });
+
+  describe("table", () => {
+    it("emits the camelCase column method for a bit_varying column", async () => {
+      const source = {
+        ...emptySource,
+        columns: async () => [
+          new Column(
+            "flags",
+            null,
+            new TypeMetadata({ sqlType: "bit varying", type: "bit_varying" }),
+            true,
+          ),
+        ],
+        primaryKey: async () => null,
+        nativeDatabaseTypes: () => ({ bit_varying: { name: "bit varying" } }),
+      };
+      const dumper = new (SchemaDumper as any)(source);
+      const io = new StringIO();
+      await dumper.table("widgets", io);
+      expect(io.string()).toContain('t.bitVarying("flags")');
     });
   });
 
