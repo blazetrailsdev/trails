@@ -362,6 +362,14 @@ export function strictLoadingBang<T extends StrictLoadingFields>(
 
 type YamlHost = { yamlEncoder(): YAMLEncoder };
 
+/**
+ * @inventedArm loop — PERMANENT
+ * @inventedArm if — PERMANENT
+ * @inventedArm keys — PERMANENT
+ * @inventedArm basicObjRespondTo — PERMANENT
+ * @inventedArm rbObjSingletonClass — PERMANENT
+ * @inventedArm defineAttributeMethod — PERMANENT
+ */
 export function initWith(
   this: CoreRecord & {
     initWithAttributes(attributes: unknown, newRecord: boolean, block?: unknown): unknown;
