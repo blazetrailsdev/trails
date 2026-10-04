@@ -5,6 +5,7 @@ import {
   rbDeclareIvar,
   rbInspect as inspect,
   rbEqual,
+  rbHash,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "../attribute-assignment.js";
@@ -105,6 +106,14 @@ export class ValueType<T = unknown> {
       this.scale === other.scale &&
       this.limit === other.limit
     );
+  }
+
+  eql(other: ValueType): boolean {
+    return this.equals(other);
+  }
+
+  hash(): number {
+    return rbHash([this.constructor, this.precision, this.scale, this.limit]);
   }
 
   assertValidValue(_: unknown): void {}

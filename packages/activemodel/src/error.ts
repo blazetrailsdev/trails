@@ -3,6 +3,7 @@ import {
   except,
   isSymbol,
   kernelCatch,
+  rbHash,
   rbInspect,
   rbModConstSet,
   rbModName,
@@ -290,6 +291,14 @@ export class Error {
       other instanceof this.constructor &&
       optionsEqual(this.attributesForHash(), other.attributesForHash())
     );
+  }
+
+  eql(other: Error): boolean {
+    return this.equals(other);
+  }
+
+  hash(): number {
+    return rbHash(this.attributesForHash());
   }
 
   /** @internal */

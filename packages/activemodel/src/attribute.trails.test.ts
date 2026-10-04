@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { deepDup } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { rbObjDup } from "@blazetrails/ruby-compat";
+import { rbHash, rbObjDup } from "@blazetrails/ruby-compat";
 import { Attribute, FromUser, UNINITIALIZED_ORIGINAL_VALUE } from "./attribute.js";
 import { UNINITIALIZED_ORIGINAL_VALUE as UNINITIALIZED_FROM_INDEX } from "./index.js";
 import { registry } from "./type.js";
@@ -24,6 +24,31 @@ describe("Attribute — trails-only coverage", () => {
       const b = Attribute.fromDatabase("name", "Alice", new ValueType({ limit: 20 }));
 
       expect(a.equals(b)).toBe(false);
+    });
+  });
+
+  describe("eql / hash (attribute.rb:115-125)", () => {
+    it("equal attributes are eql and hash alike under rbHash", () => {
+      const a = Attribute.fromDatabase("name", "Alice", typeRegistry.lookup("string"));
+      const b = Attribute.fromDatabase("name", "Alice", typeRegistry.lookup("string"));
+
+      expect(a.eql(b)).toBe(true);
+      expect(rbHash(a)).toBe(rbHash(b));
+      expect(a.hash()).toBe(rbHash([a.constructor, "name", "Alice", a.type]));
+    });
+
+    it("hashes each member of the tuple", () => {
+      const a = Attribute.fromDatabase("name", "Alice", new ValueType({ limit: 10 }));
+
+      for (const other of [
+        Attribute.fromUser("name", "Alice", new ValueType({ limit: 10 })),
+        Attribute.fromDatabase("title", "Alice", new ValueType({ limit: 10 })),
+        Attribute.fromDatabase("name", "Bob", new ValueType({ limit: 10 })),
+        Attribute.fromDatabase("name", "Alice", new ValueType({ limit: 20 })),
+      ]) {
+        expect(a.eql(other)).toBe(false);
+        expect(rbHash(a)).not.toBe(rbHash(other));
+      }
     });
   });
 

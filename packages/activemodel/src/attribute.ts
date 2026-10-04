@@ -4,6 +4,7 @@ import { MissingAttributeError } from "./attribute-methods.js";
 import {
   hasKey,
   rbEqual,
+  rbHash,
   rbModConstSet,
   rbDeclareIvar,
   rbObjDup,
@@ -191,6 +192,14 @@ export abstract class Attribute {
       this.valueBeforeTypeCast === other.valueBeforeTypeCast &&
       rbEqual(this.type, other.type)
     );
+  }
+
+  eql(other: Attribute): boolean {
+    return this.equals(other);
+  }
+
+  hash(): number {
+    return rbHash([this.constructor, this.name, this.valueBeforeTypeCast, this.type]);
   }
 
   originalValueForDatabase(): unknown {
