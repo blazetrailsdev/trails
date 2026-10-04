@@ -313,14 +313,6 @@ export {
 export { Rescuable, rescueFrom, handleRescue } from "./rescuable.js";
 export type { MattrOptions } from "./module-ext.js";
 
-export {
-  defineCallbacks,
-  setCallback,
-  skipCallback,
-  resetCallbacks,
-  runCallbacks,
-  CallbacksMixin,
-} from "./callbacks.js";
 export type {
   CallbackKind,
   CallbackCondition,

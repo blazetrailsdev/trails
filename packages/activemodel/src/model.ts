@@ -139,11 +139,6 @@ export class Model {
     } finally {
       this._initializingAttributes = false;
     }
-
-    const callbackSuppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
-    if (callbackSuppressor._suppressInitializeCallback !== true) {
-      void this.runCallbacks("initialize", undefined, { strict: "sync" });
-    }
   }
 
   /** @internal */
