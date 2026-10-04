@@ -294,7 +294,10 @@ export class Error {
   }
 
   eql(other: Error): boolean {
-    return this.equals(other);
+    return (
+      other instanceof this.constructor &&
+      optionsEqual(this.attributesForHash(), other.attributesForHash())
+    );
   }
 
   hash(): number {

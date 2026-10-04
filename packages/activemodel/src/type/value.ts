@@ -109,7 +109,12 @@ export class ValueType<T = unknown> {
   }
 
   eql(other: ValueType): boolean {
-    return this.equals(other);
+    return (
+      this.constructor === other.constructor &&
+      this.precision === other.precision &&
+      this.scale === other.scale &&
+      this.limit === other.limit
+    );
   }
 
   hash(): number {

@@ -33,6 +33,19 @@ describe("ValueType", () => {
     });
   });
 
+  it("eql is the aliased ==, so a subclass that overrides == does not change it (type/value.rb:127)", () => {
+    class Loose extends ValueType {
+      override equals(_other: ValueType): boolean {
+        return true;
+      }
+    }
+    const a = new Loose({ limit: 4 });
+    const b = new Loose({ limit: 8 });
+
+    expect(a.equals(b)).toBe(true);
+    expect(a.eql(b)).toBe(false);
+  });
+
   describe("precision / scale / limit", () => {
     it("are nil unless initialize is given them", () => {
       const type = new ValueType();

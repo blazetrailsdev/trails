@@ -195,7 +195,12 @@ export abstract class Attribute {
   }
 
   eql(other: Attribute): boolean {
-    return this.equals(other);
+    return (
+      this.constructor === other.constructor &&
+      this.name === other.name &&
+      this.valueBeforeTypeCast === other.valueBeforeTypeCast &&
+      rbEqual(this.type, other.type)
+    );
   }
 
   hash(): number {
