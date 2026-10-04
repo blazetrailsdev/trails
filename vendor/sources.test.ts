@@ -191,6 +191,7 @@ describe("vendor/sources.ts", () => {
       "arel",
       "activerecord",
       "rack-test",
+      "thor",
       "i18n",
     ]);
     expect(apiComparePackages()).toContain("i18n");
