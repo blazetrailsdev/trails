@@ -11,11 +11,11 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
       (this.owner.constructor as typeof Base).polymorphicClassFor(type!)) as typeof Base;
   }
 
-  override isTargetChanged(): boolean {
+  override isTargetChanged(): boolean | undefined {
     return super.isTargetChanged() || this.owner.attributeChanged(this.reflection.foreignType!);
   }
 
-  override isTargetPreviouslyChanged(): boolean {
+  override isTargetPreviouslyChanged(): boolean | undefined {
     return (
       super.isTargetPreviouslyChanged() ||
       this.owner.attributePreviouslyChanged(this.reflection.foreignType!)

@@ -130,11 +130,11 @@ export abstract class Attribute {
     return this.type!.isSerializable(this.value(), block);
   }
 
-  isChanged(): boolean {
+  isChanged(): boolean | undefined {
     return this.changedFromAssignment() || this.changedInPlace();
   }
 
-  changedInPlace(): boolean {
+  changedInPlace(): boolean | undefined {
     return (
       this.hasBeenRead() &&
       this.type!.isChangedInPlace(this.originalValueForDatabase(), this.value())

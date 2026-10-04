@@ -83,7 +83,7 @@ export class ValueType<T = unknown> {
     return !rbEqual(oldValue, newValue);
   }
 
-  isChangedInPlace(_rawOldValue: unknown, _newValue: unknown): boolean {
+  isChangedInPlace(_rawOldValue: unknown, _newValue: unknown): boolean | undefined {
     return false;
   }
 

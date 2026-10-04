@@ -22,7 +22,7 @@ export function isSavedChangeToAttribute(
   record: DirtyRecord,
   attrName: string,
   options?: DirtyOptions,
-): boolean {
+): boolean | undefined {
   return record.mutationsBeforeLastSave.isChanged(attrName, options);
 }
 
@@ -45,7 +45,7 @@ export function isWillSaveChangeToAttribute(
   record: DirtyRecord,
   attrName: string,
   options?: DirtyOptions,
-): boolean {
+): boolean | undefined {
   return record.mutationsFromDatabase.isChanged(attrName, options);
 }
 

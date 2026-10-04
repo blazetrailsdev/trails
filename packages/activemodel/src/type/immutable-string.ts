@@ -46,10 +46,9 @@ export class ImmutableStringType extends ValueType<string> {
 
   /** @internal */
   protected castValue(value: unknown): string | null {
-    if (value === true) return Object.freeze(this.true);
-    if (value === false) return Object.freeze(this.false);
-    const str = String(value);
-    return Object.freeze(str);
+    if (value === true) return this.true;
+    else if (value === false) return this.false;
+    else return Object.freeze(toS(value));
   }
 }
 

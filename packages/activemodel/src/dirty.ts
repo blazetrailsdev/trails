@@ -57,7 +57,7 @@ export class Dirty {
     return this.mutationsFromDatabase.changedAttributeNames();
   }
 
-  attributeChanged(attrName: string, options?: DirtyOptions): boolean {
+  attributeChanged(attrName: string, options?: DirtyOptions): boolean | undefined {
     return this.mutationsFromDatabase.isChanged(attrName, options);
   }
 
@@ -65,7 +65,7 @@ export class Dirty {
     return this.mutationsFromDatabase.originalValue(attrName);
   }
 
-  attributePreviouslyChanged(attrName: string, options?: DirtyOptions): boolean {
+  attributePreviouslyChanged(attrName: string, options?: DirtyOptions): boolean | undefined {
     return this.mutationsBeforeLastSave.isChanged(attrName, options);
   }
 
@@ -99,7 +99,7 @@ export class Dirty {
     return this.mutationsBeforeLastSave.changes();
   }
 
-  attributeChangedInPlace(attrName: string): boolean {
+  attributeChangedInPlace(attrName: string): boolean | undefined {
     return this.mutationsFromDatabase.changedInPlace(attrName);
   }
 
