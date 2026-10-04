@@ -14,7 +14,7 @@ export class SystemCallError extends StandardError {
   /** @noRailsEquivalent PERMANENT */
   errno: number | null = null;
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE system-call-error-instanceof-reads-an-errno-table-and-all-takes-a-pattern */
   static [Symbol.hasInstance](error: unknown): boolean {
     return (
       Function.prototype[Symbol.hasInstance].call(this, error) ||

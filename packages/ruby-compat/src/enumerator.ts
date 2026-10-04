@@ -30,7 +30,7 @@ export class Enumerator<T = unknown> {
    * `Enumerable#all?` (`vendor/ruby/v3.3.11/enum.c:1799` `enum_all`), which
    * stops iterating at the first element the block rejects.
    *
-   * @noRailsEquivalent PERMANENT
+   * @noRailsEquivalent CONVERGEABLE system-call-error-instanceof-reads-an-errno-table-and-all-takes-a-pattern
    */
   isAll(block: (value: T) => unknown): boolean {
     const stop = {};
