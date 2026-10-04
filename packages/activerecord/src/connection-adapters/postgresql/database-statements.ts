@@ -81,7 +81,7 @@ interface ExecuteHost extends PerformQueryHost {
   /** @internal */
   performQuery: typeof performQuery;
   /** @internal */
-  translateExceptionClass(nativeError: unknown, sql: unknown, binds: unknown): unknown;
+  translateExceptionClass(nativeError: unknown, sql: unknown, binds: unknown): Promise<unknown>;
 }
 
 export function isWriteQuery(sql: string | null): boolean {

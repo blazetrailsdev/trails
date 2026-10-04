@@ -9,24 +9,24 @@ import { setDbWarningsIgnore } from "../active-record.js";
 
 describe("AbstractAdapter query/logging infrastructure (PR 25b)", () => {
   describe("translateExceptionClass", () => {
-    it("passes through ActiveRecordError subclasses unchanged", () => {
+    it("passes through ActiveRecordError subclasses unchanged", async () => {
       const a = new AbstractAdapter({});
       const err = new ActiveRecordError("boom");
-      expect(a.translateExceptionClass(err, "SELECT 1", [])).toBe(err);
+      expect(await a.translateExceptionClass(err, "SELECT 1", [])).toBe(err);
     });
 
-    it("wraps native errors via translateException", () => {
+    it("wraps native errors via translateException", async () => {
       const a = new AbstractAdapter({});
       const native = new Error("disk I/O error");
-      const result = a.translateExceptionClass(native, "INSERT INTO t VALUES (1)", []);
+      const result = await a.translateExceptionClass(native, "INSERT INTO t VALUES (1)", []);
       expect(result).toBeInstanceOf(StatementInvalid);
     });
 
-    it("copies stack from native error onto wrapped error", () => {
+    it("copies stack from native error onto wrapped error", async () => {
       const a = new AbstractAdapter({});
       const native = new Error("native");
       native.stack = "some stack";
-      const result = a.translateExceptionClass(native, "SELECT 1", []) as Error;
+      const result = (await a.translateExceptionClass(native, "SELECT 1", [])) as Error;
       expect(result.stack).toBe("some stack");
     });
   });

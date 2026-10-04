@@ -1413,7 +1413,7 @@ export class AbstractAdapter implements Quoting {
           });
           return;
         } catch (originalException) {
-          const translatedException = this.translateExceptionClass(
+          const translatedException = await this.translateExceptionClass(
             originalException,
             undefined,
             undefined,
@@ -1704,11 +1704,11 @@ export class AbstractAdapter implements Quoting {
         try {
           return await block(await this.rawConnectionForBlock());
         } catch (originalException) {
-          const translatedException = this.translateExceptionClass(
+          const translatedException = (await this.translateExceptionClass(
             originalException,
             null,
             null,
-          ) as Error;
+          )) as Error;
           this.invalidateTransaction(translatedException);
           const retryDeadlineExceeded =
             deadline !== false && deadline < Process.clockGettime(Process.CLOCK_MONOTONIC);
@@ -1814,16 +1814,20 @@ export class AbstractAdapter implements Quoting {
   }
 
   /** @internal */
-  translateExceptionClass(nativeError: unknown, sql: unknown, binds: unknown): unknown {
+  async translateExceptionClass(
+    nativeError: unknown,
+    sql: unknown,
+    binds: unknown,
+  ): Promise<unknown> {
     if (nativeError instanceof ActiveRecordError) return nativeError;
 
     const message = `${(nativeError as Error).constructor.name}: ${(nativeError as Error).message}`;
 
-    const activeRecordError = this.translateException(nativeError, {
+    const activeRecordError = (await this.translateException(nativeError, {
       message,
       sql: sql as string,
       binds: binds as unknown[],
-    }) as Error;
+    })) as Error;
     activeRecordError.stack = (nativeError as Error).stack;
     return activeRecordError;
   }

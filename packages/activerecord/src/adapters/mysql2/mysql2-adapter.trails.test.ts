@@ -41,7 +41,7 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
     expect(fresh.isConnected()).toBe(false);
   });
 
-  it("translates connection-loss errnos to ConnectionFailed", () => {
+  it("translates connection-loss errnos to ConnectionFailed", async () => {
     for (const errno of [
       AbstractMysqlAdapter.ER_CONNECTION_KILLED,
       AbstractMysqlAdapter.ER_SERVER_SHUTDOWN,
@@ -50,12 +50,12 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
       AbstractMysqlAdapter.ER_CLIENT_INTERACTION_TIMEOUT,
     ]) {
       const driverErr = Object.assign(new Error("conn lost"), { errno });
-      const translated = adapter.translateExceptionClass(driverErr, "SELECT 1", []);
+      const translated = await adapter.translateExceptionClass(driverErr, "SELECT 1", []);
       expect(translated).toBeInstanceOf(ConnectionFailed);
     }
   });
 
-  it("translates ER_LOCK_DEADLOCK / ER_LOCK_WAIT_TIMEOUT / ER_QUERY_INTERRUPTED / ER_OUT_OF_RANGE / ER_DB_CREATE_EXISTS", () => {
+  it("translates ER_LOCK_DEADLOCK / ER_LOCK_WAIT_TIMEOUT / ER_QUERY_INTERRUPTED / ER_OUT_OF_RANGE / ER_DB_CREATE_EXISTS", async () => {
     const cases: Array<
       [
         number,
@@ -76,25 +76,25 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
     ];
     for (const [errno, klass] of cases) {
       const driverErr = Object.assign(new Error("fail"), { errno });
-      const translated = adapter.translateExceptionClass(driverErr, "SELECT 1", []);
+      const translated = await adapter.translateExceptionClass(driverErr, "SELECT 1", []);
       expect(translated).toBeInstanceOf(klass);
     }
   });
 
-  it("promotes 'MySQL client is not connected' to ConnectionNotEstablished", () => {
+  it("promotes 'MySQL client is not connected' to ConnectionNotEstablished", async () => {
     const codedErr = Object.assign(new Error("MySQL client is not connected"), {
       code: "PROTOCOL_CONNECTION_LOST",
     });
-    expect(adapter.translateExceptionClass(codedErr, "SELECT 1", [])).toBeInstanceOf(
+    expect(await adapter.translateExceptionClass(codedErr, "SELECT 1", [])).toBeInstanceOf(
       ConnectionNotEstablished,
     );
     const plainErr = new Error("MySQL client is not connected");
-    expect(adapter.translateExceptionClass(plainErr, "SELECT 1", [])).toBeInstanceOf(
+    expect(await adapter.translateExceptionClass(plainErr, "SELECT 1", [])).toBeInstanceOf(
       ConnectionNotEstablished,
     );
   });
 
-  it("translates node-mysql2 connection codes to ConnectionFailed", () => {
+  it("translates node-mysql2 connection codes to ConnectionFailed", async () => {
     for (const code of [
       "PROTOCOL_CONNECTION_LOST",
       "PROTOCOL_ENQUEUE_AFTER_QUIT",
@@ -109,7 +109,7 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
       "EPIPE",
     ]) {
       const driverErr = Object.assign(new Error("connection lost"), { code });
-      const translated = adapter.translateExceptionClass(driverErr, "SELECT 1", []);
+      const translated = await adapter.translateExceptionClass(driverErr, "SELECT 1", []);
       expect(translated).toBeInstanceOf(ConnectionFailed);
     }
   });

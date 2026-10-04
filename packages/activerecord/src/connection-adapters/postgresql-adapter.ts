@@ -1272,7 +1272,7 @@ export class PostgreSQLAdapter
       try {
         await prepare(conn, nextkey, sql as string);
       } catch (e) {
-        throw excSetupMessage(this.translateExceptionClass(e, sql, binds), e);
+        throw excSetupMessage(await this.translateExceptionClass(e, sql, binds), e);
       }
       await this._statements.set(sqlKey, { name: nextkey });
     }
