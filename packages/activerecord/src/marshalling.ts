@@ -1,6 +1,12 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isPresent } from "@blazetrails/activesupport";
-import { Module, rbInspect } from "@blazetrails/ruby-compat";
+import {
+  Module,
+  basicObjRespondTo,
+  keys,
+  rbInspect,
+  rbObjSingletonClass,
+} from "@blazetrails/ruby-compat";
 import { AssociationNotFoundError } from "./associations/errors.js";
 
 let _formatVersion: 6.1 | 7.1 = 6.1;
@@ -75,6 +81,13 @@ function marshalLoad(this: MarshallingHost, state: unknown[]): void {
   ];
 
   const attributes = this.constructor.attributesBuilder().buildFromDatabase(attributesFromDatabase);
+  for (const name of keys(attributesFromDatabase)) {
+    if (!basicObjRespondTo(this, name, false)) {
+      (
+        rbObjSingletonClass(this) as unknown as { defineAttributeMethod(name: string): void }
+      ).defineAttributeMethod(name);
+    }
+  }
   this.initWithAttributes(attributes, newRecord);
 
   if (associations != null) {

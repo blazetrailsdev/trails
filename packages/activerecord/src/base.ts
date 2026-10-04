@@ -1648,10 +1648,7 @@ export class Base extends Model {
       ) as InstanceType<T>;
     }
 
-    (ModelSchema.loadSchema as any).call(this);
-
-    const attributes = (this as any).attributesBuilder().buildFromDatabase(row, columnTypes ?? {});
-    return (this.allocate() as any).initWithAttributes(attributes, false, block);
+    return _Persistence.instantiateInstanceOf(this, row, columnTypes ?? {}, block as never);
   }
 
   _newRecord = true;

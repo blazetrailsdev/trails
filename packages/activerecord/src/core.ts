@@ -362,6 +362,14 @@ export function strictLoadingBang<T extends StrictLoadingFields>(
 
 type YamlHost = { yamlEncoder(): YAMLEncoder };
 
+/**
+ * @inventedArm loop — PERMANENT
+ * @inventedArm if — PERMANENT
+ * @inventedArm keys — PERMANENT
+ * @inventedArm basicObjRespondTo — PERMANENT
+ * @inventedArm rbObjSingletonClass — PERMANENT
+ * @inventedArm defineAttributeMethod — PERMANENT
+ */
 export function initWith(
   this: CoreRecord & {
     initWithAttributes(attributes: unknown, newRecord: boolean, block?: unknown): unknown;
@@ -371,6 +379,13 @@ export function initWith(
 ): void {
   coder = LegacyYamlAdapter.convert(coder);
   const attributes = (this.constructor as unknown as YamlHost).yamlEncoder().decode(coder);
+  for (const name of attributes.keys()) {
+    if (!basicObjRespondTo(this, name, false)) {
+      (
+        rbObjSingletonClass(this) as unknown as { defineAttributeMethod(name: string): void }
+      ).defineAttributeMethod(name);
+    }
+  }
   this.initWithAttributes(attributes, coder["new_record"] as boolean, block);
 }
 
@@ -388,13 +403,6 @@ export function initWithAttributes<T extends CoreRecord>(
   this._newRecord = newRecord;
   this._attributes = attributes;
   this.initInternals();
-  for (const name of attributes.keys() as Iterable<string>) {
-    if (!basicObjRespondTo(this, name, false)) {
-      (
-        rbObjSingletonClass(this) as unknown as { defineAttributeMethod(name: string): void }
-      ).defineAttributeMethod(name);
-    }
-  }
 
   block?.(this);
 

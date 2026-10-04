@@ -2,6 +2,7 @@ import { Time as RubyTime } from "@blazetrails/date";
 import { type TouchArgs, type TouchOptions } from "./timestamp.js";
 import {
   basicObjRespondTo,
+  keys,
   merge,
   rbEqual,
   rbObjAsString,
@@ -999,24 +1000,30 @@ export function _raiseRecordNotTouchedError(): never {
   );
 }
 
-/** @internal */
-function instantiateInstanceOf(
-  klass: {
-    _instantiate(
-      attrs: Record<string, unknown> | IndexedRow,
-      block?: (r: any) => void,
-      columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-    ): any;
-  },
+/**
+ * @internal
+ * @inventedArm loop — PERMANENT
+ * @inventedArm if — PERMANENT
+ * @inventedArm keys — PERMANENT
+ * @inventedArm basicObjRespondTo — PERMANENT
+ * @inventedArm rbObjSingletonClass — PERMANENT
+ * @inventedArm defineAttributeMethod — PERMANENT
+ */
+export function instantiateInstanceOf(
+  klass: typeof Base,
   attributes: Record<string, unknown> | IndexedRow,
   columnTypes: Record<string, unknown> = {},
   block?: (r: any) => void,
 ): any {
-  return klass._instantiate(
-    attributes,
-    block,
-    columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
-  );
+  const names = keys(attributes as Record<string, unknown>);
+  attributes = (klass as any).attributesBuilder().buildFromDatabase(attributes, columnTypes);
+  const record = klass.allocate() as any;
+  for (const name of names) {
+    if (!basicObjRespondTo(record, name, false)) {
+      (rbObjSingletonClass(record) as unknown as typeof Base).defineAttributeMethod(name);
+    }
+  }
+  return record.initWithAttributes(attributes, false, block);
 }
 
 /** @internal */

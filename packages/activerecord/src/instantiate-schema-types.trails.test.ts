@@ -3,6 +3,8 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { defaultValue } from "./type.js";
+import { fixtures } from "./test-fixtures.js";
+import { Bulb } from "./test-helpers/models/bulb.js";
 
 class DoublingType extends ValueType {
   override type(): string {
@@ -90,5 +92,23 @@ describe("_instantiate routes row values through adapter-resolved types", () => 
 
     expect(Object.keys(Widget.columnsHash())).not.toContain("removed");
     expect(Object.getOwnPropertyDescriptor(Widget.prototype, "removed")).toBeUndefined();
+  });
+});
+
+describe("instantiate on a class whose schema is not loaded yet", () => {
+  fixtures(["bulbs"]);
+
+  it("keeps the schema-reflected primary key's default attribute", async () => {
+    await Bulb.ensureSchemaLoaded();
+    class ColdBulb extends Base {
+      static override tableName = "bulbs";
+    }
+
+    const rec = ColdBulb.instantiate({ name: "raw" });
+
+    expect(ColdBulb.primaryKey).toBe("ID");
+    expect(rec.hasAttribute("ID")).toBe(true);
+    expect(rec.hasAttribute("name")).toBe(true);
+    expect(rec.hasAttribute("color")).toBe(false);
   });
 });
