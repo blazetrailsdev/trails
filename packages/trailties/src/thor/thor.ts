@@ -519,7 +519,7 @@ export class Thor {
   }
 
   /** @internal */
-  static baseclass(this: ThorClass): unknown {
+  static baseclass(this: ThorClass): typeof Thor {
     return Thor;
   }
 
@@ -619,7 +619,9 @@ export class Thor {
     const possibilities = sort(
       Object.keys(merge(this.allCommands(), this.map())).filter((n) => meth === n.slice(0, len)),
     );
-    const uniquePossibilities = uniq(possibilities.map((k) => this.map()[k] || k));
+    const uniquePossibilities = uniq(
+      possibilities.map((k) => (rtest(this.map()[k]) ? this.map()[k] : k)),
+    );
 
     if (possibilities.includes(meth)) {
       return [meth];

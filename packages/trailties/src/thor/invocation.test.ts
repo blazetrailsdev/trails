@@ -3,11 +3,7 @@ import { RuntimeError } from "@blazetrails/ruby-compat";
 import type { Invocation } from "./invocation.js";
 import { Thor } from "./thor.js";
 
-class A extends Thor {
-  static baseclass(): unknown {
-    return A;
-  }
-}
+class A extends Thor {}
 
 describe("Thor::Invocation", () => {
   describe("#invoke", () => {

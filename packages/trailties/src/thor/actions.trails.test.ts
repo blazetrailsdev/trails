@@ -7,9 +7,6 @@ import { Thor } from "./thor.js";
 
 class Counter extends Thor {
   declare static sourcePaths: () => string[];
-  static baseclass(): unknown {
-    return Counter;
-  }
   static {
     include(this, Shell);
     include(this, Actions);
