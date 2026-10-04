@@ -65,7 +65,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     afterEach(async () => {
-      await Base.connectionHandler.clearActiveConnectionsBang("all");
+      Base.connectionHandler.clearActiveConnectionsBang("all");
       const connection = await leaseMysqlAdapter();
       await connection.dropTable("samples", { ifExists: true });
     });

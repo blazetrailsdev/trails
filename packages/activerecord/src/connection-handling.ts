@@ -254,7 +254,7 @@ export function leaseConnection(this: typeof Base): Promise<DatabaseAdapter> {
   return this.connectionPool().leaseConnection();
 }
 
-export function releaseConnection(this: typeof Base): Promise<boolean> {
+export function releaseConnection(this: typeof Base): boolean {
   return this.connectionPool().releaseConnection();
 }
 

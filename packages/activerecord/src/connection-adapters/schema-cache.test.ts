@@ -730,7 +730,7 @@ describe("SchemaCache DDL invalidation", () => {
 
   afterEach(async () => {
     await adapter.dropTable("things", "stuff", { ifExists: true });
-    await pool.releaseConnection();
+    pool.releaseConnection();
     await pool.disconnectBang();
   });
 

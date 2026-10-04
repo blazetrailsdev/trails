@@ -29,13 +29,13 @@ describe("connection without a threaded lease", () => {
     const was = permanentConnectionCheckout();
     setPermanentConnectionCheckout(true);
     try {
-      await Base.releaseConnection();
+      Base.releaseConnection();
       const conn = await Base.connection;
       expect(conn).toBeTruthy();
       expect(Base.connectionPool().activeConnection).toBe(conn);
       expect(Base.connectionPool().isPermanentLease()).toBe(false);
     } finally {
-      await Base.releaseConnection();
+      Base.releaseConnection();
       setPermanentConnectionCheckout(was);
     }
   });
@@ -44,14 +44,14 @@ describe("connection without a threaded lease", () => {
     const was = permanentConnectionCheckout();
     setPermanentConnectionCheckout(true);
     try {
-      await Base.releaseConnection();
+      Base.releaseConnection();
       const conn = await Base.withConnection(async (connection) => {
         expect(await Base.connection).toBe(connection);
         return connection;
       });
       expect(Base.connectionPool().activeConnection).toBe(conn);
     } finally {
-      await Base.releaseConnection();
+      Base.releaseConnection();
       setPermanentConnectionCheckout(was);
     }
   });
@@ -62,8 +62,8 @@ describe("Arel toSql through Table.engine", () => {
     vi.restoreAllMocks();
   });
 
-  it("borrows a connection for the visit and returns it to the pool", async () => {
-    await Base.releaseConnection();
+  it("borrows a connection for the visit and returns it to the pool", () => {
+    Base.releaseConnection();
     const pool = Base.connectionPool();
     expect(pool.activeConnection).toBeNull();
 
@@ -73,8 +73,8 @@ describe("Arel toSql through Table.engine", () => {
     expect(pool.isPermanentLease()).toBe(true);
   });
 
-  it("keeps a lease the block made sticky, as connection_pool.rb:421 checks after yielding", async () => {
-    await Base.releaseConnection();
+  it("keeps a lease the block made sticky, as connection_pool.rb:421 checks after yielding", () => {
+    Base.releaseConnection();
     const pool = Base.connectionPool();
     const leased = pool.withConnectionSync((conn) => {
       void pool.leaseConnection();
@@ -83,12 +83,12 @@ describe("Arel toSql through Table.engine", () => {
     try {
       expect(pool.activeConnection).toBe(leased);
     } finally {
-      await Base.releaseConnection();
+      Base.releaseConnection();
     }
   });
 
-  it("restores the lease when the checkout itself raises", async () => {
-    await Base.releaseConnection();
+  it("restores the lease when the checkout itself raises", () => {
+    Base.releaseConnection();
     const pool = Base.connectionPool();
     vi.spyOn(pool, "acquireConnectionSync").mockImplementation(() => {
       throw new Error("checkout failed");

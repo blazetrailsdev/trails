@@ -330,7 +330,7 @@ async function teardownFixtures(this: TestFixtures): Promise<void> {
     this.invalidateAlreadyLoadedFixtures();
   }
 
-  await Base.connectionHandler.clearActiveConnectionsBang("all");
+  Base.connectionHandler.clearActiveConnectionsBang("all");
 }
 
 /** @internal */

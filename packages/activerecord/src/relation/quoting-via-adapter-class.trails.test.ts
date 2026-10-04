@@ -10,11 +10,11 @@ registerModel(Post);
 describe("relation quoting through the adapter class", () => {
   fixtures(["posts"]);
 
-  it("builds order and select arel with nothing leased under permanent_connection_checkout = true", async () => {
+  it("builds order and select arel with nothing leased under permanent_connection_checkout = true", () => {
     const was = permanentConnectionCheckout();
     setPermanentConnectionCheckout(true);
     try {
-      await Base.releaseConnection();
+      Base.releaseConnection();
       expect(Post.connectionPool().activeConnection).toBeNull();
       const adapterClass = Post.adapterClass() as unknown as {
         quoteTableName(n: string): string;

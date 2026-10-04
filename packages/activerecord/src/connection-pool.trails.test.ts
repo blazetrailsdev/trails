@@ -107,7 +107,7 @@ it("leaseConnection routes its verify through checkout and establishes on verify
     expect(pool.isConnected()).toBe(true);
   } finally {
     checkoutSpy.mockRestore();
-    await pool.releaseConnection();
+    pool.releaseConnection();
     await closePoolConnections(pool);
   }
 });
@@ -123,7 +123,7 @@ it("with connection prevent permanent checkout releases connection", async () =>
     { preventPermanentCheckout: true },
   );
   expect(pool.activeConnection).toBeTruthy();
-  await pool.releaseConnection();
+  pool.releaseConnection();
 });
 
 it("with connection prevent permanent checkout on fresh lease releases", async () => {
@@ -564,7 +564,7 @@ describe("ConnectionPool schema cache", () => {
       const pool = makeAmbientPool({ schemaCachePath: cacheFile });
       try {
         await pool.leaseConnection();
-        await pool.releaseConnection();
+        pool.releaseConnection();
         await pool._lazyLoadPromise;
         expect(await pool.schemaCache.isCached("more_testings")).toBe(true);
         expect(pool.poolConfig.schemaReflection.loadedCache).not.toBeNull();
@@ -589,7 +589,7 @@ describe("ConnectionPool schema cache", () => {
       const pool = makeAmbientPool({ schemaCachePath: cacheFile });
       try {
         await pool.leaseConnection();
-        await pool.releaseConnection();
+        pool.releaseConnection();
         expect(pool._lazyLoadPromise).not.toBeNull();
         await pool._lazyLoadPromise;
         expect(await pool.schemaCache.isCached("stale_thing")).toBe(false);
@@ -610,7 +610,7 @@ describe("ConnectionPool schema cache", () => {
       const pool = makeAmbientPool({ schemaCachePath: cacheFile });
       try {
         await pool.leaseConnection();
-        await pool.releaseConnection();
+        pool.releaseConnection();
         expect(pool._lazyLoadPromise).toBeNull();
         expect(await pool.schemaCache.isCached("widgets")).toBeNull();
       } finally {
@@ -628,7 +628,7 @@ describe("ConnectionPool schema cache", () => {
       const pool = makeAmbientPool({ schemaCachePath: "" });
       try {
         await pool.leaseConnection();
-        await pool.releaseConnection();
+        pool.releaseConnection();
         expect(pool._eagerWarmPromise).not.toBeNull();
         await pool._eagerWarmPromise;
         expect(await pool.schemaCache.isCached("posts")).toBe(true);
@@ -654,7 +654,7 @@ describe("ConnectionPool schema cache", () => {
       const pool = makeAmbientPool({ schemaCachePath: "" });
       try {
         await pool.leaseConnection();
-        await pool.releaseConnection();
+        pool.releaseConnection();
         expect(pool._lazyLoadPromise).toBeNull();
         expect(pool._eagerWarmPromise).not.toBeNull();
         await pool._eagerWarmPromise;
@@ -673,7 +673,7 @@ describe("ConnectionPool schema cache", () => {
     const pool = makeAmbientPool({ schemaCachePath: "" });
     try {
       await pool.leaseConnection();
-      await pool.releaseConnection();
+      pool.releaseConnection();
       expect(pool._eagerWarmPromise).toBeNull();
       expect(await pool.schemaCache.isCached("posts")).toBeNull();
     } finally {

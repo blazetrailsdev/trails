@@ -115,7 +115,7 @@ const sqliteAdapter: DbTemplateAdapter = {
       database: templatePath,
     });
     await buildTemplateSchema(adapter, pool, runToken, async () => {
-      await pool.releaseConnection();
+      pool.releaseConnection();
       await pool.disconnectBang();
     });
 
@@ -178,7 +178,7 @@ const pgAdapter: DbTemplateAdapter = {
       await dumpSchemaCacheOnce(adapter, pool, runToken);
     } finally {
       try {
-        await pool.releaseConnection();
+        pool.releaseConnection();
         await pool.disconnectBang();
         await pgTerminateConnections(admin, templateDb);
       } catch {}
@@ -262,7 +262,7 @@ const mysqlAdapter: DbTemplateAdapter = {
           flags: ["FOUND_ROWS"],
         });
         await buildTemplateSchema(adapter, pool, runToken, async () => {
-          await pool.releaseConnection();
+          pool.releaseConnection();
           await pool.disconnectBang();
         });
       }),

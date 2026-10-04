@@ -167,9 +167,9 @@ export class ConnectionHandler {
     return pools.some((pool) => pool.isActiveConnection() != null);
   }
 
-  async clearActiveConnectionsBang(role?: string | null): Promise<void> {
+  clearActiveConnectionsBang(role?: string | null): void {
     for (const pool of this.eachConnectionPool(role)) {
-      await pool.releaseConnection();
+      pool.releaseConnection();
       (pool as unknown as QueryCachePool).disableQueryCacheBang();
     }
   }

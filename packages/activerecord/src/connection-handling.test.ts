@@ -44,7 +44,7 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("#with_connection lease the connection for the duration of the block", async () => {
-    await Base.releaseConnection();
+    Base.releaseConnection();
     expect(Base.connectionPool().isActiveConnection()).toBeFalsy();
 
     await Base.withConnection(() => {
@@ -55,7 +55,7 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("#lease_connection makes the lease permanent even inside #with_connection", async () => {
-    await Base.releaseConnection();
+    Base.releaseConnection();
     expect(Base.connectionPool().isActiveConnection()).toBeFalsy();
 
     let conn: unknown = null;
@@ -72,7 +72,7 @@ describe("ConnectionHandlingTest", () => {
   });
 
   it("#lease_connection makes the lease permanent even inside #with_connection(prevent_permanent_checkout: true)", async () => {
-    await Base.releaseConnection();
+    Base.releaseConnection();
     await Base.withConnection(
       async (connection) => {
         expect(await Base.leaseConnection()).toBe(connection);
@@ -116,7 +116,7 @@ describe("ConnectionHandlingTest", () => {
   it("#connection is a soft-deprecated alias to #lease_connection", async () => {
     setPermanentConnectionCheckout(true);
 
-    await Base.releaseConnection();
+    Base.releaseConnection();
     expect(Base.connectionPool().isActiveConnection()).toBeFalsy();
 
     let conn: unknown = null;
@@ -131,13 +131,13 @@ describe("ConnectionHandlingTest", () => {
     expect(Base.connectionPool().isActiveConnection()).toBeTruthy();
     expect(await Base.connection).toBe(conn);
 
-    await Base.releaseConnection();
+    Base.releaseConnection();
   });
 
   it("#connection emits a deprecation warning if ActiveRecord.permanent_connection_checkout == :deprecated", async () => {
     setPermanentConnectionCheckout("deprecated");
 
-    await Base.releaseConnection();
+    Base.releaseConnection();
 
     await assertDeprecated(deprecator(), async () => {
       await Base.connection;
@@ -147,13 +147,13 @@ describe("ConnectionHandlingTest", () => {
       await Base.connection;
     });
 
-    await Base.releaseConnection();
+    Base.releaseConnection();
 
     await assertDeprecated(deprecator(), async () => {
       await Base.connection;
     });
 
-    await Base.releaseConnection();
+    Base.releaseConnection();
 
     await Base.withConnection(async () => {
       await assertDeprecated(deprecator(), async () => {
@@ -164,7 +164,7 @@ describe("ConnectionHandlingTest", () => {
 
   it("#connection raises an error if ActiveRecord.permanent_connection_checkout == :disallowed", async () => {
     setPermanentConnectionCheckout("disallowed");
-    await Base.releaseConnection();
+    Base.releaseConnection();
 
     await expect(Base.connection).rejects.toThrow(ActiveRecordError);
 
@@ -174,12 +174,12 @@ describe("ConnectionHandlingTest", () => {
 
     await Base.leaseConnection();
     await expect(Base.connection).resolves.not.toThrow();
-    await Base.releaseConnection();
+    Base.releaseConnection();
   });
 
   it("#connection doesn't make the lease permanent if inside #with_connection(prevent_permanent_checkout: true)", async () => {
     setPermanentConnectionCheckout("disallowed");
-    await Base.releaseConnection();
+    Base.releaseConnection();
 
     await Base.withConnection(
       async (connection) => {
@@ -193,7 +193,7 @@ describe("ConnectionHandlingTest", () => {
 
   it("common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed", async () => {
     setPermanentConnectionCheckout("deprecated");
-    await Base.releaseConnection();
+    Base.releaseConnection();
     expect(Base.connectionPool().isActiveConnection()).toBeFalsy();
 
     await Post.createBang({ title: "foo", body: "bar" });
@@ -285,7 +285,7 @@ describe("ConnectionHandlingTest", () => {
     const conn = await Base.leaseConnection();
     expect(conn).toBeTruthy();
     expect(Base.connectionPool().activeConnection).toBe(conn);
-    await Base.releaseConnection();
+    Base.releaseConnection();
     expect(Base.connectionPool().isActiveConnection()).toBeNull();
   });
 
@@ -313,7 +313,7 @@ describe("ConnectionHandlingTest", () => {
     const pool = Base.connectionPool();
     await (await pool.leaseConnection()).verifyBang();
     expect(Base.isConnected()).toBe(true);
-    await pool.releaseConnection();
+    pool.releaseConnection();
   });
 
   it("connectsTo rejects both database and shards", async () => {

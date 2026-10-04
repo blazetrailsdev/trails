@@ -380,11 +380,11 @@ describe("ConnectionHandlersMultiDbTest", () => {
 
     expect(handler.hasActiveConnections()).toBeTruthy();
 
-    await handler.clearActiveConnectionsBang("writing");
+    handler.clearActiveConnectionsBang("writing");
 
     expect(handler.hasActiveConnections()).toBeTruthy();
 
-    await handler.clearActiveConnectionsBang("all");
+    handler.clearActiveConnectionsBang("all");
 
     expect(handler.hasActiveConnections()).toBeFalsy();
   });

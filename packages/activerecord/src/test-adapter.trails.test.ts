@@ -13,7 +13,7 @@ describe("ambientPoolConfiguration", () => {
     try {
       expect(await adapter.tableExists("posts")).toBe(true);
     } finally {
-      await pool.releaseConnection();
+      pool.releaseConnection();
       await pool.disconnectBang();
     }
   });
@@ -27,7 +27,7 @@ describe("ambientPoolConfiguration", () => {
           Boolean(ambientPoolConfiguration().strict),
         );
       } finally {
-        await pool.releaseConnection();
+        pool.releaseConnection();
         await pool.disconnectBang();
       }
     },

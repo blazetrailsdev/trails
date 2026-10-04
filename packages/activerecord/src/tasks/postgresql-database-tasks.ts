@@ -66,7 +66,7 @@ export class PostgreSQLDatabaseTasks {
   }
 
   async purge(): Promise<void> {
-    await Base.connectionHandler.clearActiveConnectionsBang("all");
+    Base.connectionHandler.clearActiveConnectionsBang("all");
     await this.drop();
     await this.create(true);
   }
