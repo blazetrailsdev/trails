@@ -191,4 +191,26 @@ describe("prepend", () => {
     });
     expect(new Greeter().hi()).toBe("b-a-base");
   });
+
+  it("skips a module that is already prepended", () => {
+    class Greeter {
+      hi(): string {
+        return "base";
+      }
+    }
+    const a = {
+      hi(super_: (...args: unknown[]) => unknown) {
+        return `a-${super_.call(this)}`;
+      },
+    };
+    const b = {
+      hi(super_: (...args: unknown[]) => unknown) {
+        return `b-${super_.call(this)}`;
+      },
+    };
+    prepend(Greeter.prototype, a);
+    prepend(Greeter.prototype, b);
+    prepend(Greeter.prototype, a);
+    expect(new Greeter().hi()).toBe("b-a-base");
+  });
 });

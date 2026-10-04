@@ -10,14 +10,8 @@ import { DelegateCache } from "../relation/delegation.js";
 import { registerFakeAdapter } from "../support/fake-adapter.js";
 import { Encryption } from "../encryption.js";
 import { ExtendedDeterministicQueries } from "../encryption/extended-deterministic-queries.js";
-import {
-  ExtendedDeterministicUniquenessValidator,
-  EncryptedUniquenessValidator,
-} from "../encryption/extended-deterministic-uniqueness-validator.js";
-import { EncryptedAttributeType } from "../encryption/encrypted-attribute-type.js";
-import { Relation } from "../relation.js";
+import { ExtendedDeterministicUniquenessValidator } from "../encryption/extended-deterministic-uniqueness-validator.js";
 import { setPermanentConnectionCheckout } from "../active-record.js";
-import { UniquenessValidator } from "../validations.js";
 import {
   setBelongsToRequiredValidatesForeignKey,
   setRaiseOnAssignToAttrReadonly,
@@ -55,11 +49,8 @@ Encryption.configure({
 });
 
 Encryption.config.extendQueries = true;
-ExtendedDeterministicQueries.installSupport({ Relation, Base, EncryptedAttributeType });
-ExtendedDeterministicUniquenessValidator.installSupport({
-  UniquenessValidator,
-  EncryptedUniquenessValidator,
-});
+ExtendedDeterministicQueries.installSupport();
+ExtendedDeterministicUniquenessValidator.installSupport();
 
 function writingPoolCensus(): Map<string, Map<string, number>> {
   const census = new Map<string, Map<string, number>>();

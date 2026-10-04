@@ -352,6 +352,18 @@ describe("Hash#reject", () => {
 });
 
 describe("Hash#each_pair", () => {
+  it("sends a receiver that is not a Hash its own each", () => {
+    class Wrapper {
+      each(block: (key: string, value: number) => void): void {
+        block("foo", 0);
+      }
+    }
+    const wrapper = new Wrapper() as unknown as Record<string, number>;
+    const seen: [string, number][] = [];
+    expect(eachPair(wrapper, (k, v) => seen.push([k, v]))).toBe(wrapper);
+    expect(seen).toEqual([["foo", 0]]);
+  });
+
   it("yields each key and value and returns the receiver", () => {
     const hash = { foo: 0, bar: 1 };
     const seen: [string, number][] = [];

@@ -20,10 +20,10 @@
  * module that is the only definition is legal, and `super_` is then a no-op
  * root.
  *
- * Idempotency is the caller's responsibility — calling `prepend()` on
- * the same target+module twice will wrap twice, producing a chain.
- * For install-once semantics, guard with a flag as Rails does via
- * a railtie or `installed?` check.
+ * A module already prepended is skipped, as `rb_prepend_module` skips one
+ * already in the ancestry (vendor/ruby/v3.3.11/class.c:1281,1291,1296): a
+ * method the same module object already wraps is left as it is. A second,
+ * distinct module chains on top of the first.
  *
  * Usage:
  *   import { prepend } from "@blazetrails/ruby-compat";
@@ -45,6 +45,14 @@ export interface PrependModule {
 }
 
 const NO_METHOD_ROOT = function (): void {};
+
+const prepended = new WeakMap<object, { mod: PrependModule; original: object }>();
+
+function isPrepended(method: unknown, mod: PrependModule): boolean {
+  let link = typeof method === "function" ? prepended.get(method) : undefined;
+  while (link && link.mod !== mod) link = prepended.get(link.original);
+  return link !== undefined;
+}
 
 /**
  * Mirrors: Ruby's Module#prepend — vendor/ruby/v3.3.11/eval.c:1196 `rb_mod_prepend`,
@@ -86,6 +94,7 @@ export function prepend<T extends object>(target: T, mod: PrependModule): void {
   for (const name of names) {
     const descriptor = findPropertyDescriptor(target, name);
     const existing = (target as Record<string, unknown>)[name];
+    if (isPrepended(existing, mod)) continue;
     const original =
       typeof existing === "function"
         ? (existing as (...args: unknown[]) => unknown)
@@ -98,6 +107,7 @@ export function prepend<T extends object>(target: T, mod: PrependModule): void {
     const wrapped = function (this: unknown, ...args: unknown[]) {
       return wrapper.call(this, original.bind(this), ...args);
     };
+    prepended.set(wrapped, { mod, original });
     Object.defineProperty(target, name, {
       value: wrapped,
       writable: descriptor?.writable ?? true,

@@ -98,9 +98,6 @@ export class Model {
     modelName: ModelName;
   }>;
 
-  /** @noRailsEquivalent CONVERGEABLE activemodel-ruby-classpath-carriers-onto-rb-mod-name */
-  declare static moduleName?: string;
-
   declare static modelName: ModelName;
 
   /** @internal */

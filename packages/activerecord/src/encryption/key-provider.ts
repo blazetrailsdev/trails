@@ -1,4 +1,4 @@
-import { groupBy } from "@blazetrails/activesupport";
+import { groupBy, kernelArray } from "@blazetrails/activesupport";
 import { last } from "@blazetrails/ruby-compat";
 import { Key } from "./key.js";
 import { headerString } from "./encoding-helpers.js";
@@ -11,18 +11,16 @@ export class KeyProvider {
   private _keysGroupedById: Map<string, Key[]> | undefined;
 
   constructor(keys: Key | Key[]) {
-    this._keys = Array.isArray(keys) ? keys : [keys];
+    this._keys = kernelArray(keys);
   }
 
   /** @missingRailsName keys — PERMANENT */
   encryptionKey(): Key {
-    if (!this._encryptionKey) {
-      const key = last(this._keys)!;
-      if (Encryption.config.storeKeyReferences) {
-        key.publicTags.encryptedDataKeyId = key.id;
-      }
-      this._encryptionKey = key;
-    }
+    this._encryptionKey ||= ((key) => {
+      if (Encryption.config.storeKeyReferences) key.publicTags.encryptedDataKeyId = key.id;
+      return key;
+    })(last(this._keys)!);
+
     return this._encryptionKey;
   }
 

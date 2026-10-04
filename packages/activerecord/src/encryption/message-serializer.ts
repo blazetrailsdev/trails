@@ -1,5 +1,6 @@
 import { Encryption } from "../namespaces.js";
-import { JSON, type Bytes } from "@blazetrails/ruby-compat";
+import { isPlainObject } from "@blazetrails/activesupport";
+import { JSON, hasKey, type Bytes } from "@blazetrails/ruby-compat";
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
 import { Decryption, Encoding, ForbiddenClass } from "./errors.js";
@@ -36,33 +37,23 @@ export class MessageSerializer implements MessageSerializerLike {
   /** @internal */
   private parseMessage(data: unknown, level: number): Message {
     this.validateMessageDataFormat(data, level);
-    const d = data as Record<string, unknown>;
-    const payload = this.decodeIfNeeded(d["p"]);
     return new Message({
-      payload: typeof payload === "string" || Buffer.isBuffer(payload) ? payload : null,
-      headers: this.parseProperties(d["h"] as Record<string, unknown> | null | undefined, level),
+      payload: this.decodeIfNeeded(data["p"]) as string,
+      headers: this.parseProperties(data["h"] as Record<string, unknown> | null, level),
     });
   }
 
   /** @internal */
-  private validateMessageDataFormat(data: unknown, level: number): void {
+  private validateMessageDataFormat(
+    data: unknown,
+    level: number,
+  ): asserts data is Record<string, unknown> {
     if (level > 2) {
       throw new Decryption("More than one level of hash nesting in headers is not supported");
     }
-    if (typeof data !== "object" || data === null || Array.isArray(data)) {
+
+    if (!(isPlainObject(data) && hasKey(data, "p"))) {
       throw new Decryption("Invalid data format: hash without payload");
-    }
-    const d = data as Record<string, unknown>;
-    if (!("p" in d) || typeof d["p"] !== "string") {
-      throw new Decryption("Invalid data format: hash without payload");
-    }
-    if (
-      "h" in d &&
-      d["h"] !== null &&
-      d["h"] !== undefined &&
-      (typeof d["h"] !== "object" || Array.isArray(d["h"]))
-    ) {
-      throw new Decryption("Invalid data format: headers must be an object");
     }
   }
 
@@ -72,14 +63,11 @@ export class MessageSerializer implements MessageSerializerLike {
     level: number,
   ): Properties {
     const properties = new Properties();
-    if (headers) {
-      for (const [key, value] of Object.entries(headers)) {
-        const decoded =
-          typeof value === "object" && value !== null && !Array.isArray(value) && "p" in value
-            ? this.parseMessage(value, level + 1)
-            : this.decodeIfNeeded(value);
-        properties.set(key, decoded);
-      }
+    for (const [key, value] of Object.entries(headers ?? {})) {
+      properties.set(
+        key,
+        isPlainObject(value) ? this.parseMessage(value, level + 1) : this.decodeIfNeeded(value),
+      );
     }
     return properties;
   }
@@ -104,16 +92,18 @@ export class MessageSerializer implements MessageSerializerLike {
 
   /** @internal */
   private encodeIfNeeded(value: unknown): unknown {
-    if (Buffer.isBuffer(value)) {
-      return value.toString("base64");
+    if (typeof value === "string" || Buffer.isBuffer(value)) {
+      return Buffer.from(value as string).toString("base64");
+    } else {
+      return value;
     }
-    if (typeof value === "string") {
-      return Buffer.from(value, "utf-8").toString("base64");
-    }
-    return value;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE encryption-serializer-load-and-decode-arms-need-stdlib-raises
+   * @inventedArm throw — CONVERGEABLE encryption-serializer-load-and-decode-arms-need-stdlib-raises
+   */
   private decodeIfNeeded(value: unknown): unknown {
     if (typeof value === "string") {
       try {

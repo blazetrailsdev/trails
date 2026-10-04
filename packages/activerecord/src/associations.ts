@@ -5,7 +5,6 @@ import type { Relation } from "./relation.js";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { ActiveRecord, Associations as AssociationsNamespace } from "./namespaces.js";
 import { hasDefaultScopeOverride } from "./scoping/default.js";
-import { qualifiedName } from "./inheritance.js";
 
 import { ArgumentError } from "@blazetrails/activemodel";
 import { StatementCache } from "./statement-cache.js";
@@ -26,6 +25,8 @@ import {
   Module,
   include,
   rbInspect,
+  rbModConstSet,
+  rbModName,
   registerConstant,
   unregisterConstant,
 } from "@blazetrails/ruby-compat";
@@ -185,7 +186,7 @@ export function registerModel(
   } else {
     assertActiveRecordBase(nameOrModel);
     modelRegistry.set(nameOrModel.name, nameOrModel);
-    const qualified = qualifiedName(nameOrModel);
+    const qualified = rbModName(nameOrModel)!;
     if (qualified !== nameOrModel.name) {
       registerModel(qualified, nameOrModel);
     }
@@ -302,6 +303,8 @@ export class Associations {
     const builder = new HabtmBuilder(name, self, options as Record<string, unknown>);
 
     const joinModel = builder.throughModel();
+
+    rbModConstSet(self, joinModel.name, joinModel);
 
     const registryKey = `${self.name}::${joinModel.name}`;
     modelRegistry.set(registryKey, joinModel);

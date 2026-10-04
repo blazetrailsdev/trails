@@ -428,6 +428,8 @@ export function reject<T>(hash: Record<string, T>, block: PairBlock<T>): Record<
  * Ruby `Hash#each_pair` (`vendor/ruby/v3.3.11/hash.c:3149` `rb_hash_each_pair`), which
  * `Hash#each` is also defined onto (`hash.c:7219`): yields each key and value
  * and returns the receiver. A `Hash` (a `Map`) is walked as readily as a plain object.
+ * A receiver that is not a Hash is sent its own `each`, as {@link hashAref}
+ * sends one its own `[]`.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_pair` (`vendor/ruby/v3.3.11/hash.c:3149`).
  */
 export function eachPair<T>(hash: Record<string, T>, block: PairBlock<T>): Record<string, T>;
@@ -452,6 +454,11 @@ export function eachPair<T>(
   hash: Record<string, T> | Map<string, T>,
   block: PairBlock<T>,
 ): Record<string, T> | Map<string, T> {
+  const own = ownMethod(hash, "each");
+  if (own) {
+    own.call(hash, block);
+    return hash;
+  }
   if (hash instanceof Map) {
     for (const [key, value] of hash) block(key, value);
     return hash;

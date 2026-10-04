@@ -1,3 +1,4 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { queryConstraints } from "../../persistence.js";
 import { registerSubclass } from "../../inheritance.js";
@@ -15,14 +16,18 @@ export class ClothingItem extends Base {
   }
 }
 
+registerModel(ClothingItem);
+
 export class ClothingItemUsed extends ClothingItem {
-  static moduleName = "ClothingItem";
-  static _demodulizedName = "Used";
+  static {
+    rbModConstSet(ClothingItem, "Used", this);
+  }
 }
 
 export class ClothingItemSized extends ClothingItem {
-  static moduleName = "ClothingItem";
-  static _demodulizedName = "Sized";
+  static {
+    rbModConstSet(ClothingItem, "Sized", this);
+  }
 
   static {
     queryConstraints.call(this, "clothing_type", "color", "size");

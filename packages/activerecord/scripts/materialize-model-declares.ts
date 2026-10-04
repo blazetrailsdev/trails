@@ -62,28 +62,33 @@ function buildModelRegistry(): Map<string, string> {
 
 function buildNamespacedClassRegistry(registry: ReadonlyMap<string, string>): Map<string, string> {
   const out = new Map<string, string>();
-  const seen = new Set<string>();
-  for (const [, file] of registry) {
-    if (seen.has(file)) continue;
-    seen.add(file);
+  const paths = new Map<string, string>();
+  const files = new Set([path.join(MODELS_DIR, "namespaces.ts"), ...registry.values()]);
+  const isCall = (node: ts.Node, callee: string): node is ts.CallExpression =>
+    ts.isCallExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === callee;
+  for (const file of files) {
     const sf = tsApi().createSourceFile(file, fs.readFileSync(file, "utf8"));
     for (const stmt of sf.statements) {
+      if (ts.isExpressionStatement(stmt) && isCall(stmt.expression, "registerConstant")) {
+        const [name, value] = stmt.expression.arguments;
+        if (ts.isStringLiteralLikeNode(name) && ts.isIdentifier(value)) {
+          paths.set(value.text, name.text);
+        }
+      }
       if (!ts.isClassDeclaration(stmt) || !stmt.name) continue;
       const tsName = stmt.name.text;
-      let moduleName: string | undefined;
-      let demodulizedName: string | undefined;
       for (const m of stmt.members) {
-        if (!ts.isPropertyDeclaration(m) || !m.initializer) continue;
-        if (!ts.isIdentifier(m.name) && !ts.isStringLiteralLikeNode(m.name)) continue;
-        const prop = ts.isIdentifier(m.name) ? m.name.text : m.name.text;
-        if (!ts.isStringLiteralLikeNode(m.initializer)) continue;
-        if (prop === "moduleName") moduleName = m.initializer.text;
-        else if (prop === "_demodulizedName") demodulizedName = m.initializer.text;
-      }
-      if (moduleName) {
-        const baseName = demodulizedName ?? tsName;
-        const qualified = `${moduleName}::${baseName}`;
-        if (!out.has(qualified)) out.set(qualified, tsName);
+        if (!ts.isClassStaticBlockDeclaration(m)) continue;
+        for (const s of m.body.statements) {
+          if (!ts.isExpressionStatement(s) || !isCall(s.expression, "rbModConstSet")) continue;
+          const [mod, id] = s.expression.arguments;
+          if (!ts.isIdentifier(mod) || !ts.isStringLiteralLikeNode(id)) continue;
+          const qualified = `${paths.get(mod.text) ?? mod.text}::${id.text}`;
+          paths.set(tsName, qualified);
+          if (!out.has(qualified)) out.set(qualified, tsName);
+        }
       }
     }
   }

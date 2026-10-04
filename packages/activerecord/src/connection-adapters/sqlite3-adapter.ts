@@ -23,7 +23,7 @@ import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
-import { rtest } from "@blazetrails/ruby-compat";
+import { Concurrent, rtest } from "@blazetrails/ruby-compat";
 import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
@@ -1445,7 +1445,9 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     })());
   }
 
-  static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
+  static override readonly EXTENDED_TYPE_MAPS: InstanceType<
+    typeof Concurrent.Map<Record<string, unknown>, unknown>
+  > = new Concurrent.Map();
 }
 
 export class StatementPool extends GenericStatementPool<SqliteStatement> {

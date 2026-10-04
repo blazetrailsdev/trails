@@ -1,8 +1,27 @@
-import { isSymbol, symbolToS, rbInspect } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { type ArelNode } from "@blazetrails/arel";
-import { compactBlank, first, singularize, symbolizeKeys, wrap } from "@blazetrails/activesupport";
-import { OpenSSL, stringDelete, valuesAt } from "@blazetrails/ruby-compat";
+import {
+  compact,
+  compactBlank,
+  first,
+  isPlainObject,
+  isPresent,
+  presence,
+  singularize,
+  symbolizeKeys,
+  wrap,
+} from "@blazetrails/activesupport";
+import {
+  block,
+  fetch,
+  OpenSSL,
+  rbInspect,
+  rbObjAsString,
+  rtest,
+  stringDelete,
+  toS,
+  valuesAt,
+} from "@blazetrails/ruby-compat";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import type { CommentOrChanges } from "../abstract/schema-statements.js";
 import {
@@ -48,10 +67,6 @@ interface PgSchemaAdapterPrivates {
   _schemaSearchPathMemo: string | null;
 }
 
-function toS(value: unknown): string {
-  return value == null ? "" : String(value);
-}
-
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /** @internal */
 export interface SchemaStatements
@@ -93,25 +108,17 @@ export class SchemaStatements extends AbstractSchemaStatements {
   override async dropTable(
     ...args: Parameters<AbstractSchemaStatements["dropTable"]>
   ): Promise<unknown> {
-    const rest = [...args] as unknown[];
-    while (
-      rest.length > 0 &&
-      (rest[rest.length - 1] === undefined || typeof rest[rest.length - 1] === "function")
-    ) {
-      rest.pop();
-    }
-    args = rest as typeof args;
-    const last = args[args.length - 1];
-    const hasOptions = last !== null && last !== undefined && typeof last === "object";
-    const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];
-    const options = (hasOptions ? last : {}) as { ifExists?: boolean; force?: boolean | "cascade" };
-    const ifExists = options.ifExists ? " IF EXISTS" : "";
-    const cascade = options.force === "cascade" ? " CASCADE" : "";
+    const tableNames = args.filter((arg) => typeof arg === "string") as string[];
+    const options = (args.find(isPlainObject) ?? {}) as {
+      ifExists?: boolean;
+      force?: boolean | "cascade";
+    };
     for (const tableName of tableNames) {
       await this.schemaCache.clearDataSourceCacheBang(tableName);
     }
-    const quoted = tableNames.map((tableName) => this.quoteTableName(tableName)).join(", ");
-    return this.execute(`DROP TABLE${ifExists} ${quoted}${cascade}`);
+    return this.execute(
+      `DROP TABLE${options.ifExists ? " IF EXISTS" : ""} ${tableNames.map((tableName) => this.quoteTableName(tableName)).join(", ")}${options.force === "cascade" ? " CASCADE" : ""}`,
+    );
   }
 
   /**
@@ -189,9 +196,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
           opclasses,
           where: whereStr,
           using,
-          include: includeColumns.length > 0 ? includeColumns : undefined,
-          nullsNotDistinct: nullsNotDistinctStr ? true : undefined,
-          comment: comment?.trim() ? comment : undefined,
+          include: presence(includeColumns),
+          nullsNotDistinct: isPresent(nullsNotDistinctStr),
+          comment: presence(comment) ?? undefined,
           valid,
         }),
       );
@@ -220,14 +227,12 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   async quotedIncludeColumnsForIndex(columnNames: string | string[]): Promise<string> {
-    if (isSymbol(columnNames)) return this.quoteColumnName(symbolToS(columnNames));
     if (typeof columnNames === "string") return this.quoteColumnName(columnNames);
-    const quotedColumns = new Map(
-      columnNames.map((name) => [
-        name,
-        this.quoteColumnName(isSymbol(name) ? symbolToS(name) : name),
-      ]),
-    );
+
+    const quotedColumns = new Map<string, string>();
+    for (const name of columnNames) {
+      quotedColumns.set(name, this.quoteColumnName(name));
+    }
     return Array.from((await this.addOptionsForIndexColumns(quotedColumns)).values()).join(", ");
   }
 
@@ -409,10 +414,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   async schemaSearchPath(): Promise<string> {
-    if (this._schemaSearchPathMemo == null) {
-      this._schemaSearchPathMemo = (await this.queryValue("SHOW search_path", "SCHEMA")) as string;
-    }
-    return this._schemaSearchPathMemo;
+    return (this._schemaSearchPathMemo ||= (await this.queryValue(
+      "SHOW search_path",
+      "SCHEMA",
+    )) as string);
   }
 
   async setSchemaSearchPath(searchPath: string | null): Promise<void> {
@@ -643,6 +648,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.execute(await this.schemaCreation.accept(at));
   }
 
+  /** @inventedArm if — CONVERGEABLE pg-schema-dumper-option-hash-and-constraint-lookup-residual-arms */
   async validateCheckConstraint(
     tableName: string,
     options: string | { name: string; expression?: string },
@@ -797,17 +803,17 @@ export class SchemaStatements extends AbstractSchemaStatements {
     });
   }
 
+  /** @inventedArm compact — PERMANENT */
   exclusionConstraintOptions(
     tableName: string,
     expression: string,
     options: Record<string, unknown>,
   ): Record<string, unknown> {
     this.assertValidDeferrable(options.deferrable);
-    const opts = { ...options };
-    if (!opts.name) {
-      opts.name = this.exclusionConstraintName(tableName, { expression, ...opts });
-    }
-    return opts;
+
+    options = compact({ ...options });
+    options.name ||= this.exclusionConstraintName(tableName, { expression, ...options });
+    return options;
   }
 
   async addExclusionConstraint(
@@ -823,14 +829,17 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   async removeExclusionConstraint(
     tableName: string,
-    expression?: string | Record<string, unknown> | null,
+    expression: string | Record<string, unknown> | null = null,
     options: Record<string, unknown> = {},
   ): Promise<void> {
-    const expr = typeof expression === "string" || expression == null ? expression : null;
-    const opts = typeof expression === "object" && expression !== null ? expression : options;
+    if (typeof expression === "object" && expression !== null) {
+      options = expression;
+      expression = null;
+    }
     const exclNameToDelete = (
-      await this.exclusionConstraintForBang(tableName, { ...opts, expression: expr ?? undefined })
+      await this.exclusionConstraintForBang(tableName, { expression, ...options })
     ).name;
+
     await this.removeConstraint(tableName, exclNameToDelete);
   }
 
@@ -874,11 +883,17 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /** @internal */
   exclusionConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
-    if (options.name) return options.name as string;
-    const expression = (options.expression as string | undefined) ?? "";
-    const identifier = `${tableName}_${expression}_excl`;
-    const hashed = first(OpenSSL.Digest.SHA256.hexdigest(identifier), 10);
-    return `excl_rails_${hashed}`;
+    return fetch<string>(
+      options as Record<string, string>,
+      "name",
+      block(() => {
+        const expression = fetch<unknown>(symbolizeKeys(options), ":expression");
+        const identifier = `${tableName}_${toS(expression)}_excl`;
+        const hashedIdentifier = first(OpenSSL.Digest.SHA256.hexdigest(identifier), 10);
+
+        return `excl_rails_${hashedIdentifier}`;
+      }),
+    );
   }
 
   /** @internal */
@@ -893,16 +908,18 @@ export class SchemaStatements extends AbstractSchemaStatements {
   /** @internal */
   async exclusionConstraintForBang(
     tableName: string,
-    { expression, ...options }: Record<string, unknown>,
+    { expression = null, ...options }: Record<string, unknown>,
   ): Promise<ExclusionConstraintDefinition> {
-    const result = await this.exclusionConstraintFor(tableName, { expression, ...options });
-    if (!result)
+    const excl = await this.exclusionConstraintFor(tableName, { expression, ...options });
+    if (!rtest(excl)) {
       throw new ArgumentError(
-        `Table '${tableName}' has no exclusion constraint for ${(expression as string | undefined) ?? rbInspect(symbolizeKeys(options))}`,
+        `Table '${tableName}' has no exclusion constraint for ${rbObjAsString(expression ?? symbolizeKeys(options))}`,
       );
-    return result;
+    }
+    return excl!;
   }
 
+  /** @inventedArm compact — PERMANENT */
   uniqueConstraintOptions(
     tableName: string,
     columnName: string | string[] | null | undefined,
@@ -912,11 +929,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     if (columnName && options.usingIndex) {
       throw new ArgumentError("Cannot specify both column_name and :using_index options.");
     }
-    const opts = { ...options };
-    if (!opts.name) {
-      opts.name = this.uniqueConstraintName(tableName, { column: columnName, ...opts });
-    }
-    return opts;
+
+    options = compact({ ...options });
+    options.name ||= this.uniqueConstraintName(tableName, { column: columnName, ...options });
+    return options;
   }
 
   async addUniqueConstraint(
@@ -932,27 +948,24 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   async removeUniqueConstraint(
     tableName: string,
-    columnName?: string | string[] | Record<string, unknown> | null,
+    columnName: string | string[] | Record<string, unknown> | null = null,
     options: Record<string, unknown> = {},
   ): Promise<void> {
-    const column =
-      columnName === null ||
-      typeof columnName === "string" ||
-      Array.isArray(columnName) ||
-      columnName === undefined
-        ? columnName
-        : undefined;
-    const opts =
-      typeof columnName === "object" && columnName !== null && !Array.isArray(columnName)
-        ? columnName
-        : options;
+    if (typeof columnName === "object" && columnName !== null && !Array.isArray(columnName)) {
+      options = columnName;
+      columnName = null;
+    }
     const uniqueNameToDelete = (
-      await this.uniqueConstraintForBang(tableName, { ...opts, column: column ?? undefined })
+      await this.uniqueConstraintForBang(tableName, { column: columnName, ...options })
     ).name;
+
     await this.removeConstraint(tableName, uniqueNameToDelete);
   }
 
-  /** @missingRailsCall order:split,map — CONVERGEABLE pg-schema-statements-reflection-maps-rows-through-an-awaiting-map */
+  /**
+   * @missingRailsCall order:split,map — CONVERGEABLE pg-schema-statements-reflection-maps-rows-through-an-awaiting-map
+   * @inventedArm loop — CONVERGEABLE pg-schema-statements-reflection-maps-rows-through-an-awaiting-map
+   */
   async uniqueConstraints(tableName: string): Promise<UniqueConstraintDefinition[]> {
     const scope = this.quotedScope(tableName);
     const uniqueInfo = await this.internalExecQuery(
@@ -993,14 +1006,17 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /** @internal */
   uniqueConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
-    if (options.name) return options.name as string;
-    const column = options.column;
-    const columnOrIndex = wrap(
-      column != null && column !== false ? column : options.usingIndex,
-    ).map(String);
-    const identifier = `${tableName}_${columnOrIndex.join("_and_")}_unique`;
-    const hashed = first(OpenSSL.Digest.SHA256.hexdigest(identifier), 10);
-    return `uniq_rails_${hashed}`;
+    return fetch<string>(
+      options as Record<string, string>,
+      "name",
+      block(() => {
+        const columnOrIndex = wrap(options.column || options.usingIndex).map(toS);
+        const identifier = `${tableName}_${columnOrIndex.join("_and_")}_unique`;
+        const hashedIdentifier = first(OpenSSL.Digest.SHA256.hexdigest(identifier), 10);
+
+        return `uniq_rails_${hashedIdentifier}`;
+      }),
+    );
   }
 
   /** @internal */
@@ -1013,13 +1029,16 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return constraints.find((c) => c.definedFor({ name, ...options }));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE pg-schema-dumper-option-hash-and-constraint-lookup-residual-arms
+   */
   async uniqueConstraintForBang(
     tableName: string,
-    { column, ...options }: Record<string, unknown>,
+    { column = null, ...options }: Record<string, unknown>,
   ): Promise<UniqueConstraintDefinition> {
-    const result = await this.uniqueConstraintFor(tableName, { column, ...options });
-    if (!result) {
+    const uniqueConstraint = await this.uniqueConstraintFor(tableName, { column, ...options });
+    if (!rtest(uniqueConstraint)) {
       const columnToS =
         column == null
           ? rbInspect(symbolizeKeys(options))
@@ -1030,7 +1049,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
             : String(column).replace(/^:/, "");
       throw new ArgumentError(`Table '${tableName}' has no unique constraint for ${columnToS}`);
     }
-    return result;
+    return uniqueConstraint!;
   }
 
   async primaryKeys(tableName: string): Promise<string[]> {
@@ -1297,18 +1316,20 @@ export class SchemaStatements extends AbstractSchemaStatements {
   dataSourceSql(options: { type?: string }): string;
   /** @internal */
   dataSourceSql(
-    nameOrOptions?: string | null | { type?: string },
+    name: string | null | { type?: string } = null,
     options: { type?: string } = {},
   ): string {
-    const kwargsOnly = nameOrOptions != null && typeof nameOrOptions === "object";
-    const name = kwargsOnly ? null : nameOrOptions;
-    const opts = kwargsOnly ? nameOrOptions : options;
-    const scope = this.quotedScope(name, { type: opts.type });
-    const type = scope.type ?? "'r','v','m','p','f'";
-    let sql = `SELECT c.relname FROM pg_class c LEFT JOIN pg_namespace n ON n.oid = c.relnamespace`;
+    if (typeof name === "object" && name !== null) {
+      options = name;
+      name = null;
+    }
+    const scope = this.quotedScope(name, { type: options.type });
+    scope.type ||= "'r','v','m','p','f'";
+
+    let sql = "SELECT c.relname FROM pg_class c LEFT JOIN pg_namespace n ON n.oid = c.relnamespace";
     sql += ` WHERE n.nspname = ${scope.schema}`;
-    if (scope.name) sql += ` AND c.relname = ${scope.name}`;
-    sql += ` AND c.relkind IN (${type})`;
+    if (rtest(scope.name)) sql += ` AND c.relname = ${scope.name}`;
+    sql += ` AND c.relkind IN (${scope.type})`;
     return sql;
   }
 

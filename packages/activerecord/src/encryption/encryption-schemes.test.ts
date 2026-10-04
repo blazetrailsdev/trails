@@ -329,7 +329,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     };
 
     Configurable.config.extendQueries = true;
-    ExtendedDeterministicQueries.installSupport({ Relation, Base, EncryptedAttributeType });
+    ExtendedDeterministicQueries.installSupport();
     try {
       const prevEncryptor = new TestEncryptor({ alice: "alice_prev_cipher" });
       const currentEncryptor = new TestEncryptor({ alice: "alice_cur_cipher" });
@@ -372,7 +372,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
       (Relation.prototype as any).scopeForCreate = savedMethods.scopeForCreate;
       (Base as any).findBy = savedMethods.findBy;
       EncryptedAttributeType.prototype.serialize = savedMethods.serialize;
-      (ExtendedDeterministicQueries as any)._installed = false;
       Configurable.config.extendQueries = savedExtendQueries;
     }
   });
@@ -391,7 +390,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     };
 
     Configurable.config.extendQueries = true;
-    ExtendedDeterministicQueries.installSupport({ Relation, Base, EncryptedAttributeType });
+    ExtendedDeterministicQueries.installSupport();
     try {
       Configurable.config.previousSchemes = [];
       Configurable.config.previous = [
@@ -419,7 +418,6 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
       (Relation.prototype as any).scopeForCreate = savedMethods.scopeForCreate;
       (Base as any).findBy = savedMethods.findBy;
       EncryptedAttributeType.prototype.serialize = savedMethods.serialize;
-      (ExtendedDeterministicQueries as any)._installed = false;
       Configurable.config.extendQueries = savedExtendQueries;
     }
   });

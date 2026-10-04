@@ -46,8 +46,14 @@ export {
   rbClassSuperclass,
   rbCDate,
   rbCDateTime,
+  rbCFalseClass,
+  rbCFloat,
+  rbCInteger,
+  rbCNilClass,
   rbCNumeric,
+  rbCString,
   rbCTime,
+  rbCTrueClass,
   rbObjClass,
   rbModName,
   rbModSingletonP,
@@ -289,7 +295,7 @@ export {
 } from "./variable.js";
 export { isEmpty } from "./ruby-empty.js";
 export { RuntimeError } from "./runtime-error.js";
-export { Exception } from "./exception.js";
+export { Exception, excSetupMessage } from "./exception.js";
 export { StandardError } from "./standard-error.js";
 export { ObjectSpace } from "./object-space.js";
 export { SecureRandom } from "./secure-random.js";

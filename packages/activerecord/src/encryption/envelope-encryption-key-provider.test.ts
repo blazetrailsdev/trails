@@ -2,8 +2,8 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Configurable } from "./configurable.js";
 import { EnvelopeEncryptionKeyProvider } from "./envelope-encryption-key-provider.js";
 import { KeyProvider } from "./key-provider.js";
-import { Encryptor } from "./encryptor.js";
 import type { Message } from "./message.js";
+import { Encryptor } from "./encryptor.js";
 import { assertEncryptorWorksWith } from "./test-helpers.js";
 import * as crypto from "crypto";
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import { registerModel } from "./index.js";
-import { Module, registerConstant } from "@blazetrails/ruby-compat";
+import { Module, registerConstant, rbModConstSet } from "@blazetrails/ruby-compat";
 import { adapterType } from "./test-adapter.js";
 import { travel, travelBack, assertRespondTo } from "@blazetrails/activesupport";
 import { fixtures } from "./test-fixtures.js";
@@ -189,9 +189,12 @@ describe("DelegatedTypeTest", () => {
         this.attribute("entryable_type", "string");
       }
     }
-    registerConstant("Access", new Module());
+    const Access = new Module();
+    registerConstant("Access", Access);
     class NoticeMessage extends Base {
-      static moduleName = "Access";
+      static {
+        rbModConstSet(Access, "NoticeMessage", this);
+      }
     }
     registerModel(NoticeMessage);
     Entry3.delegatedType("entryable", { types: ["Access::NoticeMessage"] });
@@ -206,9 +209,12 @@ describe("DelegatedTypeTest", () => {
   });
 
   it("buildEntryable preserves namespaced foreign_type", () => {
-    registerConstant("Access", new Module());
+    const Access = new Module();
+    registerConstant("Access", Access);
     class NoticeMessage extends Base {
-      static moduleName = "Access";
+      static {
+        rbModConstSet(Access, "NoticeMessage", this);
+      }
       static {
         this.attribute("body", "string");
       }

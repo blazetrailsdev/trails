@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { fixtures } from "../test-fixtures.js";
-import { Module, extend } from "@blazetrails/ruby-compat";
 import {
   AdditionalValue,
   EncryptedQuery,
@@ -102,7 +101,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
     savedMethods.findBy = (Base as any).findBy;
     savedMethods.serialize = EncryptedAttributeType.prototype.serialize;
 
-    ExtendedDeterministicQueries.installSupport({ Relation, Base, EncryptedAttributeType });
+    ExtendedDeterministicQueries.installSupport();
 
     books = buildBooks();
     await books.EncryptedBook.where("1=1");
@@ -117,7 +116,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
     (Base as any).findBy = savedMethods.findBy;
     EncryptedAttributeType.prototype.serialize =
       savedMethods.serialize as typeof EncryptedAttributeType.prototype.serialize;
-    (ExtendedDeterministicQueries as any)._installed = false;
 
     Configurable.config.extendQueries = savedConfig.extendQueries;
     Configurable.config.supportUnencryptedData = savedConfig.supportUnencryptedData;
@@ -411,151 +409,12 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
 });
 
 describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport", () => {
-  function isolatedTargets() {
-    class FakeRelation {
-      _model: any;
-      constructor(model: any) {
-        this._model = model;
-      }
-      get model() {
-        return this._model;
-      }
-      where(conditions: Record<string, unknown>) {
-        (this as any)._lastWhere = conditions;
-        return this;
-      }
-      async exists(conditions: Record<string, unknown>) {
-        (this as any)._lastExists = conditions;
-        return true;
-      }
-      scopeForCreate() {
-        return { fromOriginal: true } as Record<string, unknown>;
-      }
-      whereValuesHash() {
-        return (this as any)._wheres ?? {};
-      }
-    }
-    Object.setPrototypeOf(FakeRelation.prototype, Relation.prototype);
-    class FakeBase {}
-    extend(
-      FakeBase,
-      new Module((mod) => {
-        mod.defineMethod("findBy", function (this: any, conditions: Record<string, unknown>) {
-          this._lastFindBy = conditions;
-          return "hit";
-        });
-      }),
-    );
-    class FakeEat extends EncryptedAttributeType {}
-    return { Relation: FakeRelation, Base: FakeBase, EncryptedAttributeType: FakeEat };
-  }
-
-  function withFreshInstaller<T>(fn: () => T): T {
-    (ExtendedDeterministicQueries as any)._installed = false;
-    try {
-      return fn();
-    } finally {
-      (ExtendedDeterministicQueries as any)._installed = false;
-    }
-  }
-
-  it("patches Relation.prototype.where to run processArguments", () => {
-    withFreshInstaller(() => {
-      const targets = isolatedTargets();
-      ExtendedDeterministicQueries.installSupport(targets as any);
-
-      const prev = new Scheme({ deterministic: true, encryptor: new NullEncryptor() });
-      const type = new EncryptedAttributeType({
-        scheme: new Scheme({
-          deterministic: true,
-          encryptor: new NullEncryptor(),
-          previousSchemes: [prev],
-        }),
-      });
-      const model = {
-        encryptedAttributes: new Set(["email"]),
-        typeForAttribute: () => type,
-        deterministicEncryptedAttributes,
-      };
-      const rel = new (targets.Relation as any)(model);
-      rel.where({ email: "a@x" });
-      const captured = rel._lastWhere.email as unknown[];
-      expect(Array.isArray(captured)).toBe(true);
-      expect(captured[0]).toBe("a@x");
-      expect(captured[1]).toBeInstanceOf(AdditionalValue);
-    });
-  });
-
-  it("patches Relation.prototype.scopeForCreate to copy the AdditionalValue[0] marker into scope", () => {
-    withFreshInstaller(() => {
-      const targets = isolatedTargets();
-      ExtendedDeterministicQueries.installSupport(targets as any);
-
-      const type = new EncryptedAttributeType({
-        scheme: new Scheme({ deterministic: true, encryptor: new NullEncryptor() }),
-      });
-      const av = new AdditionalValue("plain@x", type);
-      const model = {
-        encryptedAttributes: new Set(["email"]),
-        typeForAttribute: () => type,
-        deterministicEncryptedAttributes,
-      };
-      const rel = new (targets.Relation as any)(model);
-      rel._wheres = { email: [av] };
-      expect(rel.scopeForCreate()).toEqual({ fromOriginal: true, email: av });
-    });
-  });
-
-  it("patches Base.findBy to run processArguments with checkForAdditionalValues=false", () => {
-    withFreshInstaller(() => {
-      const targets = isolatedTargets();
-      ExtendedDeterministicQueries.installSupport(targets as any);
-
-      const prev = new Scheme({ deterministic: true, encryptor: new NullEncryptor() });
-      const type = new EncryptedAttributeType({
-        scheme: new Scheme({
-          deterministic: true,
-          encryptor: new NullEncryptor(),
-          previousSchemes: [prev],
-        }),
-      });
-      class Contact extends (targets.Base as any) {
-        static encryptedAttributes = new Set(["email"]);
-        static typeForAttribute = () => type;
-        static deterministicEncryptedAttributes = deterministicEncryptedAttributes;
-      }
-      (Contact as any).findBy({ email: "x" });
-      const captured = (Contact as any)._lastFindBy.email as unknown[];
-      expect(Array.isArray(captured)).toBe(true);
-      expect(captured[0]).toBe("x");
-      expect(captured[1]).toBeInstanceOf(AdditionalValue);
-    });
-  });
-
-  it("patches EncryptedAttributeType.prototype.serialize to passthrough AdditionalValue", () => {
-    withFreshInstaller(() => {
-      const targets = isolatedTargets();
-      ExtendedDeterministicQueries.installSupport(targets as any);
-
-      const type = new (targets.EncryptedAttributeType as typeof EncryptedAttributeType)({
-        scheme: new Scheme({ deterministic: true, encryptor: new NullEncryptor() }),
-      });
-      const av = new AdditionalValue("plain", type);
-      expect(type.serialize(av)).toBe(av.value);
-      expect(typeof type.serialize("raw")).toBe("string");
-    });
-  });
-
   it("is idempotent — second call is a no-op", () => {
-    withFreshInstaller(() => {
-      const targets = isolatedTargets();
-      const originalWhere = targets.Relation.prototype.where;
-      ExtendedDeterministicQueries.installSupport(targets as any);
-      const firstPatched = targets.Relation.prototype.where;
-      ExtendedDeterministicQueries.installSupport(targets as any);
-      const secondPatched = targets.Relation.prototype.where;
-      expect(firstPatched).not.toBe(originalWhere);
-      expect(secondPatched).toBe(firstPatched);
-    });
+    ExtendedDeterministicQueries.installSupport();
+    const firstPatched = Relation.prototype.where;
+    const firstSerialize = EncryptedAttributeType.prototype.serialize;
+    ExtendedDeterministicQueries.installSupport();
+    expect(Relation.prototype.where).toBe(firstPatched);
+    expect(EncryptedAttributeType.prototype.serialize).toBe(firstSerialize);
   });
 });

@@ -1,3 +1,5 @@
+import { Admin } from "../admin.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../../base.js";
 
 class Coder {
@@ -18,8 +20,9 @@ class Coder {
 
 export class AdminUserJson extends Base {
   static _tableName = "admin_user_jsons";
-  static moduleName = "Admin";
-  static _demodulizedName = "UserJSON";
+  static {
+    rbModConstSet(Admin, "UserJSON", this);
+  }
 
   static {
     this.belongsTo("account", { className: "AdminAccount" });

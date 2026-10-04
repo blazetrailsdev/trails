@@ -242,8 +242,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   async supportsJson(): Promise<boolean> {
-    if (await this.isMariadb()) return false;
-    return (await this.databaseVersion).compare("5.7.8") >= 0;
+    return !(await this.isMariadb()) && (await this.databaseVersion).compare("5.7.8") >= 0;
   }
 
   supportsComments(): boolean {

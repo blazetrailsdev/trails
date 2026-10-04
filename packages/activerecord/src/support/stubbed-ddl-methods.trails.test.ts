@@ -40,7 +40,6 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
   ["_statements", "prepared-statement slot clearCacheBang resets, not a DDL emitter"],
   ["lock", "the connection monitor clearCacheBang synchronizes on, not a DDL emitter"],
   ["_schemaCache", "memoized backing slot of the schemaCache read"],
-  ["_poolSchemaReflection", "pool reflection the schemaCache read binds to"],
   ["quoteColumnName", "renderer input — quotes a name into DDL the renderer is already building"],
   ["quoteTableName", "renderer input — quotes a table name into DDL, emits nothing itself"],
   ["quoteDefaultExpression", "renderer input — renders a column default, emits nothing itself"],
