@@ -98,7 +98,7 @@ export class Arguments {
 
   /** @internal */
   protected peek(): unknown {
-    return first(this.pile);
+    return first(this.pile) ?? null;
   }
 
   /** @internal */
