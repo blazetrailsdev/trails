@@ -610,6 +610,22 @@ export class File extends IO {
   }
 
   /**
+   * `vendor/ruby/v3.3.11/file.c:3115` `rb_file_s_readlink`: the name of the file
+   * the link `path` refers to. `rb_f_notimplement` stands in on a platform with
+   * no `readlink(2)` (`file.c:3197`), spelled here as a backend with no
+   * `readlinkSync`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.readlink`
+   * (`vendor/ruby/v3.3.11/file.c:3115`).
+   */
+  static readlink(path: string): string {
+    const fs = getFs();
+    if (!fs.readlinkSync)
+      throw new NotImplementedError("readlink() function is unimplemented on this machine");
+    return fs.readlinkSync(path);
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:2706` `rb_file_s_chown`, which answers the number of
    * files whose owner was set. A `nil` owner or group is ignored
    * (`file.c:2698`) — `File.chown(nil, 100, "testfile")` — which `to_uid` /

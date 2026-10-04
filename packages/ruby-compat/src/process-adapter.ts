@@ -28,6 +28,7 @@ export interface ProcessAdapter {
   cwd(): string;
   chdir(dir: string): void;
   platform(): string;
+  execPath?(): string;
   pid(): number;
   setEnv(key: string, value: string | undefined): void;
   exit(code?: number): never;
@@ -404,6 +405,7 @@ interface NodeProcessLike {
   cwd(): string;
   chdir(dir: string): void;
   platform: string;
+  execPath: string;
   pid: number;
   exit(code?: number): never;
   exitCode: number | string | undefined;
@@ -473,6 +475,7 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
     cwd: () => proc.cwd(),
     chdir: (dir) => proc.chdir(dir),
     platform: () => proc.platform,
+    execPath: () => proc.execPath,
     pid: () => proc.pid,
     setEnv: (key, value) => {
       if (value === undefined) delete proc.env[key];

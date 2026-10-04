@@ -161,14 +161,14 @@ export class Module<I extends object = Record<never, never>> {
   }
 
   /**
-   * Mirrors: Ruby's Module#name — vendor/ruby/v3.3.11/variable.c:122
-   * `rb_mod_name`: the classpath `const_set` gave the module, or `nil` while
-   * it is anonymous.
+   * Mirrors: Ruby's Module#to_s — vendor/ruby/v3.3.11/object.c:1710
+   * `rb_mod_to_s`, the method `Module#inspect` is an alias of
+   * (vendor/ruby/v3.3.11/object.c:4438-4439).
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
-  get name(): string | null {
-    return classpaths.get(this)?.path ?? null;
+  toS(): string {
+    return this.name ?? rbAnyToS(this);
   }
 
   /**
@@ -180,7 +180,18 @@ export class Module<I extends object = Record<never, never>> {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   inspect(): string {
-    return this.name ?? rbAnyToS(this);
+    return modToS.call(this);
+  }
+
+  /**
+   * Mirrors: Ruby's Module#name — vendor/ruby/v3.3.11/variable.c:122
+   * `rb_mod_name`: the classpath `const_set` gave the module, or `nil` while
+   * it is anonymous.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  get name(): string | null {
+    return classpaths.get(this)?.path ?? null;
   }
 
   /**
@@ -557,6 +568,8 @@ export class Module<I extends object = Record<never, never>> {
     return copy;
   }
 }
+
+const modToS = Module.prototype.toS;
 
 const carriers = new WeakMap<Module, Record<string, unknown>>();
 

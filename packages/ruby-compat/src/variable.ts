@@ -191,6 +191,30 @@ export function rbConstGet(klass: object, id: string): unknown {
 }
 
 /**
+ * `rb_mod_constants` (`vendor/ruby/v3.3.11/variable.c:3471`),
+ * `Module#constants(inherit = true)`: the names of the constants `mod`, its
+ * superclasses and the modules they include hold, as `rb_mod_const_of`
+ * (`variable.c:3417-3427`) collects them along the ancestry, stopping short of
+ * `Object`. With a falsy `inherit` it is `rb_local_constants`
+ * (`variable.c:3382-3397`), `mod`'s own table alone. A constant is a property
+ * {@link rbModConstSet} or a `static` field seated under a constant name.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModConstants(mod: object, inherit: unknown = true): string[] {
+  const tbl = new Set<string>();
+  const ancestors =
+    inherit !== null && inherit !== false && typeof mod === "function"
+      ? rbModAncestors(mod as unknown as { prototype: object })
+      : [mod];
+  for (const tmp of ancestors) {
+    if (tmp === Object && mod !== Object) break;
+    for (const id of Object.keys(tmp)) if (/^[\p{Lu}\p{Lt}]/u.test(id)) tbl.add(id);
+  }
+  return [...tbl];
+}
+
+/**
  * `rb_mod_const_get` (`vendor/ruby/v3.3.11/object.c:2423`), `Module#const_get`
  * of a name that may be a `::` path. The first segment is read by
  * {@link rbConstGet}; each later one is read from the namespace before it

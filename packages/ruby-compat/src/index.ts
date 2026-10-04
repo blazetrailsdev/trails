@@ -279,6 +279,7 @@ export {
   isRegisteredConstant,
   rbConstGet,
   rbModConstGet,
+  rbModConstants,
   rbConstMissing,
   rbModConstMissing,
   rbPathToClass,

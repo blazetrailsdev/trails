@@ -1,4 +1,4 @@
-import { extend, File, getFs, included, rbInspect } from "@blazetrails/ruby-compat";
+import { extend, File, getFs, included, rbInspect, rbObjIvarGet } from "@blazetrails/ruby-compat";
 import { TEMPLATE_EXTNAME, fromSuperclass } from "./base.js";
 import { Error } from "./error.js";
 
@@ -23,8 +23,7 @@ type ActionsClass = ActionsClassHost & { sourcePathsForSearch(): Promise<string[
 
 export const ClassMethods = {
   sourcePaths(this: ActionsClassHost): string[] {
-    if (!Object.prototype.hasOwnProperty.call(this, "_sourcePaths")) this._sourcePaths = [];
-    return this._sourcePaths!;
+    return (this._sourcePaths = (rbObjIvarGet(this, "@_source_paths") as string[] | null) || []);
   },
 
   async sourceRoot(this: ActionsClassHost, path: string | null = null): Promise<string | null> {

@@ -119,6 +119,7 @@ import {
   snakeToCamel,
 } from "@blazetrails/parity/conventions";
 import {
+  arityParams,
   isForwardingRubyEntry,
   matchArityAgainst,
   renderSig,
@@ -4580,7 +4581,7 @@ export function main() {
         }
       }
       const sigs = tsParamsByName.get(m.name) ?? [];
-      sigs.push(m.params);
+      sigs.push(arityParams(m));
       tsParamsByName.set(m.name, sigs);
       if (scope === "package") recordTsPortedWithArgs(portedWithArgsMaps, m, file, owner);
       if (scope === "package") {

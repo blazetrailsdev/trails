@@ -8,6 +8,7 @@ import {
   isRegisteredConstant,
   rbConstGet,
   rbModConstGet,
+  rbModConstants,
   rbPathToClass,
   registerConstant,
   registeredConstant,
@@ -202,5 +203,67 @@ describe("rb_const_get", () => {
         "uninitialized constant Outer::Absent",
       );
     });
+  });
+});
+
+describe("rb_mod_constants", () => {
+  class Outer {
+    static LIMIT = 1;
+    static _memo = 2;
+    static helper() {}
+  }
+  class Nested {}
+  rbModConstSet(Outer, "Nested", Nested);
+  class Child extends Outer {
+    static Own = 3;
+  }
+
+  it("lists the constants seated on the class, not its other statics", () => {
+    expect(rbModConstants(Outer)).toEqual(["LIMIT", "Nested"]);
+  });
+
+  it("lists only the receiver's own constants when inherit is false", () => {
+    expect(rbModConstants(Child, false)).toEqual(["Own"]);
+    expect(rbModConstants(Child, null)).toEqual(["Own"]);
+  });
+
+  it("includes the constants of an included module", () => {
+    const Mixin = new Module();
+    rbModConstSet(Mixin, "Mixed", class Mixed {});
+    class Host extends Outer {}
+    include(Host, Mixin);
+    expect(rbModConstants(Host)).toEqual(["Mixed", "LIMIT", "Nested"]);
+  });
+
+  it("keeps to_s when inspect is overridden", () => {
+    class Loud extends Module {
+      override inspect(): string {
+        return "loud";
+      }
+    }
+    expect(rbModConstSet({ name: "ConstSpace" }, "Loud", new Loud()).toS()).toBe(
+      "ConstSpace::Loud",
+    );
+  });
+
+  it("keeps inspect on the aliased to_s when to_s is redefined", () => {
+    class Quiet extends Module {
+      override toS(): string {
+        return "quiet";
+      }
+    }
+    const mod = rbModConstSet({ name: "ConstSpace" }, "Quiet", new Quiet());
+    expect(mod.inspect()).toBe("ConstSpace::Quiet");
+  });
+
+  it("renders a seated Module through to_s", () => {
+    const mod = rbModConstSet({ name: "ConstSpace" }, "Seated", new Module());
+    expect(mod.toS()).toBe("ConstSpace::Seated");
+    expect(mod.toS()).toBe(mod.inspect());
+  });
+
+  it("includes the superclasses' constants", () => {
+    expect(rbModConstants(Child)).toEqual(["Own", "LIMIT", "Nested"]);
+    expect(rbModConstants(Nested)).toEqual([]);
   });
 });

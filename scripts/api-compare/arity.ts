@@ -312,6 +312,15 @@ export function isForwardingRubyEntry(ruby: Pick<MethodInfo, "notes" | "aliasRes
   return ruby.notes === "alias" && !ruby.aliasResolved;
 }
 
+/** The signature a TS member contributes to the arity pool. A class-level
+ *  `alias_method` is ported as `static declare x: typeof Klass.y`, a property
+ *  the extractor records with `params: []` and the target's signature under
+ *  `aliasParams`. Once the Ruby side resolves the alias, that placeholder `[]`
+ *  reads as a real zero-arg signature, so the target's is compared instead. */
+export function arityParams(ts: Pick<MethodInfo, "params" | "aliasParams">): ParamInfo[] {
+  return ts.params.length === 0 && ts.aliasParams ? ts.aliasParams : ts.params;
+}
+
 /** Nothing to compare: both sides take zero positional args (reader/predicate ↔ getter). */
 export function shouldSkipArity(ruby: ParamInfo[], ts: ParamInfo[]): boolean {
   const r = positionalArity(ruby, "ruby");
