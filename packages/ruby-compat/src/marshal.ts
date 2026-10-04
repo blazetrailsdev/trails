@@ -740,8 +740,12 @@ function rEncname(obj: unknown, arg: LoadArg): number {
   return len;
 }
 
-/** `r_ivar` (`vendor/ruby/v3.3.11/marshal.c:1762`), answering `obj` as {@link rIvarEncoding} left it. */
-function rIvar(obj: unknown, arg: LoadArg): unknown {
+/**
+ * `r_ivar` (`vendor/ruby/v3.3.11/marshal.c:1762`), answering `obj` as
+ * {@link rIvarEncoding} left it. `rb_hash_ruby2_keywords` flags a Hash as
+ * keyword arguments, which a JS call has no slot for.
+ */
+function rIvar(obj: unknown, hasEncoding: { value: boolean } | null, arg: LoadArg): unknown {
   let len = rLong(arg);
   if (len > 0) {
     do {
@@ -749,6 +753,7 @@ function rIvar(obj: unknown, arg: LoadArg): unknown {
       const val = rObject(arg);
       const str = rIvarEncoding(obj, arg, sym, val);
       if (str !== undefined) {
+        if (hasEncoding) hasEncoding.value = true;
         obj = str;
       } else if (sym === "K") {
         if (!(obj instanceof Map)) {
@@ -810,7 +815,9 @@ function rObject0(arg: LoadArg, ivp: { value: boolean } | null): unknown {
 /**
  * `r_object_for` (`vendor/ruby/v3.3.11/marshal.c:1868`). The loop stands in
  * for `goto type_hash`. `Marshal.load`'s `proc` and `freeze:` are not ported,
- * which leaves `r_leave` (`marshal.c:1693`) nothing to do. The arms
+ * which leaves `r_leave` (`marshal.c:1693`) nothing to do. `load_mantissa`
+ * (`marshal.c:386`) reads the mantissa bytes format 4.8 no longer writes, and
+ * `rb_integer_unpack` and `ULONG2NUM` are the BigInt shifts. The arms
  * {@link wObject} does not write are not read either, and take the `default:`
  * arm.
  */
@@ -834,7 +841,7 @@ function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number):
         const idx = arg.data.size;
         v = rObject0(arg, ivar);
         if (ivar.value) {
-          const obj = rIvar(v, arg);
+          const obj = rIvar(v, null, arg);
           if (obj !== v) v = rEntry0(obj, idx, arg);
         }
         break;
@@ -910,14 +917,22 @@ function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number):
       case TYPE_BIGNUM: {
         const sign = rByte(arg);
         const len = rLong(arg);
-        const data = rBytes0(len * 2, arg);
         let num = 0n;
 
-        for (let i = data.length - 1; i >= 0; i--) {
-          num = (num << 8n) | BigInt(data.charCodeAt(i));
-        }
-        if (sign === 0x2d) {
-          num = -num;
+        if (len <= 4) {
+          for (let i = 0; i < len; i++) {
+            num |= BigInt(rByte(arg)) << BigInt(i * 16);
+            num |= BigInt(rByte(arg)) << BigInt(i * 16 + 8);
+          }
+          if (sign === 0x2d) {
+            num = -num;
+          }
+        } else {
+          const data = rBytes0(len * 2, arg);
+          for (let i = data.length - 1; i >= 0; i--) {
+            num = (num << 8n) | BigInt(data.charCodeAt(i));
+          }
+          if (sign === 0x2d) num = -num;
         }
         v = rbBigNorm(num);
         v = rEntry(v, arg);
@@ -963,7 +978,7 @@ function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number):
           throw new ArgumentError("dump format error");
         }
         v = rEntry0(v, idx, arg);
-        rIvar(v, arg);
+        rIvar(v, null, arg);
         break;
       }
 
