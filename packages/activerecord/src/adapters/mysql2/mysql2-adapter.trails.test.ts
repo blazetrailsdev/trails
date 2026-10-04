@@ -52,7 +52,6 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
       const driverErr = Object.assign(new Error("conn lost"), { errno });
       const translated = adapter.translateExceptionClass(driverErr, "SELECT 1", []);
       expect(translated).toBeInstanceOf(ConnectionFailed);
-      expect((translated as ConnectionFailed).cause).toBe(driverErr);
     }
   });
 
@@ -79,7 +78,6 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
       const driverErr = Object.assign(new Error("fail"), { errno });
       const translated = adapter.translateExceptionClass(driverErr, "SELECT 1", []);
       expect(translated).toBeInstanceOf(klass);
-      expect((translated as Error & { cause?: unknown }).cause).toBe(driverErr);
     }
   });
 

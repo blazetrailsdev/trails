@@ -13,3 +13,18 @@
 export class Exception extends Error {}
 
 Exception.prototype.name = "Exception";
+
+/**
+ * `exc_setup_message` and `exc_setup_cause`
+ * (`vendor/ruby/v3.3.11/eval.c:506`, `:480`), the cause half of `raise`: an
+ * exception raised with no `cause:` takes `$!` as its cause unless it already
+ * carries one or is `$!` itself. JS has no `$!`, so the exception being
+ * rescued is passed as `errinfo`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function excSetupMessage<T>(mesg: T, errinfo: unknown): T {
+  const exc = mesg as { cause?: unknown };
+  if (exc.cause === undefined && errinfo != null && errinfo !== mesg) exc.cause = errinfo;
+  return mesg;
+}

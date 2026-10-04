@@ -838,7 +838,7 @@ WHERE fk.referenced_column_name IS NOT NULL
     const visitor = this.arelVisitor();
     const orderColumns = compactBlank(
       compactBlank(orders ?? []).map((s) =>
-        (typeof s === "string" ? s : visitor.compile(s)).replace(/\s+(?:ASC|DESC)\b/gi, "").trim(),
+        (typeof s === "string" ? s : visitor.compile(s)).replace(/\s+(?:ASC|DESC)\b/gi, ""),
       ),
     ).map((column, i) => `${column} AS alias_${i}`);
 

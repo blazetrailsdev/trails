@@ -3,7 +3,7 @@ import type {
   DatabaseConfigOptions,
 } from "../database-configurations/database-config.js";
 import pg from "pg";
-import { block, fetch, setEnv, valuesAt } from "@blazetrails/ruby-compat";
+import { block, excSetupMessage, fetch, setEnv, valuesAt } from "@blazetrails/ruby-compat";
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
 import {
   any,
@@ -1272,7 +1272,7 @@ export class PostgreSQLAdapter
       try {
         await prepare(conn, nextkey, sql as string);
       } catch (e) {
-        throw this.translateExceptionClass(e, sql, binds);
+        throw excSetupMessage(this.translateExceptionClass(e, sql, binds), e);
       }
       await this._statements.set(sqlKey, { name: nextkey });
     }

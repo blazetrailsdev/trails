@@ -36,6 +36,7 @@ import {
   block,
   cmp,
   env,
+  excSetupMessage,
   fetch,
   isEmpty,
   isNil,
@@ -1429,7 +1430,7 @@ export class AbstractAdapter implements Quoting {
 
           this._lastActivity = 0;
           this._verified = false;
-          throw translatedException;
+          throw excSetupMessage(translatedException, originalException);
         }
       }
     });
@@ -1726,7 +1727,7 @@ export class AbstractAdapter implements Quoting {
             this._lastActivity = 0;
             this._verified = false;
           }
-          throw translatedException;
+          throw excSetupMessage(translatedException, originalException);
         } finally {
           if (materializeTransactions) this.dirtyCurrentTransaction();
         }
@@ -1814,10 +1815,7 @@ export class AbstractAdapter implements Quoting {
     return m;
   }
 
-  /**
-   * @internal
-   * @inventedArm if — CONVERGEABLE activerecord-converge-invented-control-flow-arms-connection-adapters-root-part-1-residue
-   */
+  /** @internal */
   translateExceptionClass(nativeError: unknown, sql: unknown, binds: unknown): unknown {
     if (nativeError instanceof ActiveRecordError) return nativeError;
 
@@ -1829,9 +1827,6 @@ export class AbstractAdapter implements Quoting {
       binds: binds as unknown[],
     }) as Error;
     activeRecordError.stack = (nativeError as Error).stack;
-    if (activeRecordError !== nativeError && activeRecordError.cause === undefined) {
-      activeRecordError.cause = nativeError;
-    }
     return activeRecordError;
   }
 

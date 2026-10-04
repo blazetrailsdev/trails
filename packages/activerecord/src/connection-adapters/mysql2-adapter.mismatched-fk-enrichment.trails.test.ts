@@ -66,7 +66,6 @@ describe("Mysql2Adapter mismatched foreign key translation", () => {
     );
     expect(translated.message).toContain("`t.bigint :wheelable_id`");
     expect(translated.stack).toBe(driverError.stack);
-    expect(translated.cause).toBe(driverError);
     await adapter.disconnectBang();
   });
 
