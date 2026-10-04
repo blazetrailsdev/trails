@@ -243,7 +243,10 @@ export class EncryptedAttributeType extends ValueType {
     }));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm from — CONVERGEABLE encryption-binary-clear-text-rides-as-bytes-with-encoding-header
+   */
   private textToDatabaseType(value: unknown): unknown {
     if (value != null && this.castType.isBinary()) {
       value = new Uint8Array(Buffer.from(value as string, "latin1"));
@@ -253,7 +256,10 @@ export class EncryptedAttributeType extends ValueType {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm from — CONVERGEABLE encryption-binary-clear-text-rides-as-bytes-with-encoding-header
+   */
   private databaseTypeToText(value: unknown): unknown {
     if (value != null && this.castType.isBinary()) {
       const binaryCastType = this.castType.isSerialized()
