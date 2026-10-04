@@ -102,10 +102,7 @@ import {
 import * as Timestamp from "./timestamp.js";
 import * as TouchLater from "./touch-later.js";
 import { Association as AssociationInstance } from "./associations/association.js";
-import {
-  ConnectionHandler,
-  _registerBase as _registerBaseWithConnectionHandler,
-} from "./connection-adapters/abstract/connection-handler.js";
+import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 
 import * as ConnectionHandling from "./connection-handling.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
@@ -2958,6 +2955,5 @@ _registerBaseWithQueryCache(Base);
 _registerBaseWithSchemaMigration(Base);
 _registerBaseWithInternalMetadata(Base);
 _registerBaseWithSchemaDumper(Base);
-_registerBaseWithConnectionHandler(Base);
 _registerBaseWithAsynchronousQueriesTracker(Base);
 _registerBaseWithDatabaseStatements(Base);

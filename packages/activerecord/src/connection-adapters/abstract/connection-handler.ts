@@ -17,41 +17,6 @@ export interface ConnectionOwner {
   isPrimaryClass(): boolean | undefined;
 }
 
-export class ConnectionDescriptor {
-  private readonly _name: string;
-  private readonly _primary: boolean;
-
-  constructor(name: string, primary: boolean = false) {
-    this._name = name;
-    this._primary = primary;
-  }
-
-  get name(): string {
-    return this.isPrimaryClass() ? "ActiveRecord::Base" : this._name;
-  }
-
-  isPrimaryClass(): boolean {
-    return this._primary;
-  }
-
-  /** @missingRailsName name — PERMANENT */
-  currentPreventingWrites(): boolean {
-    return isPreventingWrites(this._name);
-  }
-}
-
-let _base: BaseLike | undefined;
-
-type BaseLike = ConnectionOwner & {
-  currentRole(): string;
-  currentShard(): string;
-};
-
-/** @internal */
-export function _registerBase(base: BaseLike): void {
-  _base = base;
-}
-
 export class ConnectionHandler {
   private _connectionNameToPoolManager: Map<string, PoolManager>;
   /** @missingRailsArgs new — CONVERGEABLE connection-handler-pool-manager-map-onto-concurrent-map */
@@ -123,8 +88,8 @@ export class ConnectionHandler {
   ): Promise<ConnectionPool> {
     const ownerName = this.determineOwnerName(options.ownerName ?? ActiveRecord.Base, config);
 
-    const role = options.role ?? _base?.currentRole() ?? "writing";
-    const shard = options.shard ?? _base?.currentShard() ?? "default";
+    const role = options.role ?? ActiveRecord.Base.currentRole();
+    const shard = options.shard ?? ActiveRecord.Base.currentShard();
     const clobber = options.clobber ?? false;
 
     const poolConfig = await this.resolvePoolConfig(config, ownerName, role, shard);
@@ -191,8 +156,8 @@ export class ConnectionHandler {
     options?: { role?: string; shard?: string },
   ): Promise<DatabaseAdapter> {
     const pool = this.retrieveConnectionPool(connectionName, {
-      role: options?.role ?? _base?.currentRole(),
-      shard: options?.shard ?? _base?.currentShard(),
+      role: options?.role ?? ActiveRecord.Base.currentRole(),
+      shard: options?.shard ?? ActiveRecord.Base.currentShard(),
       strict: true,
     });
     return pool!.leaseConnection();
@@ -200,8 +165,8 @@ export class ConnectionHandler {
 
   isConnected(connectionName: string, options?: { role?: string; shard?: string }): boolean {
     const pool = this.retrieveConnectionPool(connectionName, {
-      role: options?.role ?? _base?.currentRole(),
-      shard: options?.shard ?? _base?.currentShard(),
+      role: options?.role ?? ActiveRecord.Base.currentRole(),
+      shard: options?.shard ?? ActiveRecord.Base.currentShard(),
     });
     return pool != null && pool.isConnected();
   }
@@ -210,8 +175,8 @@ export class ConnectionHandler {
     connectionName: string | null | undefined,
     options?: { role?: string; shard?: string },
   ): Promise<HashConfig | undefined> {
-    const role = options?.role ?? "writing";
-    const shard = options?.shard ?? "default";
+    const role = options?.role ?? ActiveRecord.Base.currentRole();
+    const shard = options?.shard ?? ActiveRecord.Base.currentShard();
     const poolManager = this.getPoolManager(connectionName);
     if (poolManager) {
       return await this.disconnectPoolFromPoolManager(poolManager, role, shard);
@@ -223,16 +188,16 @@ export class ConnectionHandler {
     connectionName: string | null | undefined,
     options?: { role?: string; shard?: string; strict?: boolean },
   ): ConnectionPool | undefined {
-    const role = options?.role ?? "writing";
-    const shard = options?.shard ?? "default";
+    const role = options?.role ?? ActiveRecord.Base.currentRole();
+    const shard = options?.shard ?? ActiveRecord.Base.currentShard();
     const strict = options?.strict ?? false;
     const poolManager = this.getPoolManager(connectionName);
     const pool = poolManager?.getPoolConfig(role, shard)?.pool;
 
     if (strict && !pool) {
       const parts: string[] = [];
-      if (shard !== "default") parts.push(`'${shard}' shard`);
-      if (role !== "writing") parts.push(`'${role}' role`);
+      if (shard !== ActiveRecord.Base.defaultShard) parts.push(`'${shard}' shard`);
+      if (role !== ActiveRecord.Base.defaultRole) parts.push(`'${role}' role`);
       const selector = parts.join(" and ");
       const prefix = connectionName !== "ActiveRecord::Base" ? connectionName : "";
       const full = [prefix, selector].filter(Boolean).join(" with ");
@@ -312,5 +277,28 @@ export class ConnectionHandler {
     } else {
       return ownerName;
     }
+  }
+}
+
+export class ConnectionDescriptor {
+  private readonly _name: string;
+  private readonly _primary: boolean;
+
+  constructor(name: string, primary: boolean = false) {
+    this._name = name;
+    this._primary = primary;
+  }
+
+  get name(): string {
+    return this.isPrimaryClass() ? "ActiveRecord::Base" : this._name;
+  }
+
+  isPrimaryClass(): boolean {
+    return this._primary;
+  }
+
+  /** @missingRailsName name — PERMANENT */
+  currentPreventingWrites(): boolean {
+    return isPreventingWrites(this._name);
   }
 }
