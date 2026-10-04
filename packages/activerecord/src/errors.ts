@@ -66,8 +66,7 @@ export class ConnectionNotEstablished extends AdapterError {
   private _poolSet: boolean;
 
   constructor(message?: string | Error, options?: { connectionPool?: unknown; cause?: unknown }) {
-    const cause = options?.cause ?? (message instanceof Error ? message : undefined);
-    super(message instanceof Error ? message.message : message, { ...options, cause });
+    super(message instanceof Error ? message.message : message, options);
     this.name = "ActiveRecord::ConnectionNotEstablished";
     this._poolSet = options?.connectionPool !== undefined;
   }
@@ -234,8 +233,7 @@ export class ConnectionFailed extends QueryAborted {
     message?: string | Error,
     options?: { sql?: string; binds?: unknown[]; connectionPool?: unknown; cause?: unknown },
   ) {
-    const cause = options?.cause ?? (message instanceof Error ? message : undefined);
-    super(message instanceof Error ? message.message : message, { ...options, cause });
+    super(message instanceof Error ? message.message : message, options);
     this.name = "ActiveRecord::ConnectionFailed";
   }
 }

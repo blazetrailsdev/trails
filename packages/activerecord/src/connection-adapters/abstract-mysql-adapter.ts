@@ -20,7 +20,7 @@ import {
   RuntimeError,
 } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
-import { rtest } from "@blazetrails/ruby-compat";
+import { Concurrent, rtest } from "@blazetrails/ruby-compat";
 import { transactionIsolationLevels } from "./abstract/database-statements.js";
 import type { InsertBuilder } from "../insert-all.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
@@ -94,6 +94,7 @@ import {
 } from "./mysql/schema-statements.js";
 import {
   compactBlank,
+  extractOptionsBang,
   groupBy,
   include,
   isPresent,
@@ -223,8 +224,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async supportsExpressionIndex(): Promise<boolean> {
-    if (await this.isMariadb()) return false;
-    return (await this.databaseVersion).compare("8.0.13") >= 0;
+    return !(await this.isMariadb()) && (await this.databaseVersion).compare("8.0.13") >= 0;
   }
 
   supportsTransactionIsolation(): boolean {
@@ -271,8 +271,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async supportsOptimizerHints(): Promise<boolean> {
-    if (await this.isMariadb()) return false;
-    return (await this.databaseVersion).compare("5.7.7") >= 0;
+    return !(await this.isMariadb()) && (await this.databaseVersion).compare("5.7.7") >= 0;
   }
 
   async supportsCommonTableExpressions(): Promise<boolean> {
@@ -293,8 +292,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async supportsInsertReturning(): Promise<boolean> {
-    if (await this.isMariadb()) return (await this.databaseVersion).compare("10.5.0") >= 0;
-    return false;
+    return (await this.isMariadb()) && (await this.databaseVersion).compare("10.5.0") >= 0;
   }
 
   async returnValueAfterInsert(column: Column): Promise<boolean> {
@@ -433,9 +431,8 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     await this.execute(`DROP DATABASE IF EXISTS ${this.quoteTableName(name)}`);
   }
 
-  async currentDatabase(): Promise<string> {
-    const value = await this.queryValue("SELECT database()", "SCHEMA");
-    return value == null ? "" : String(value);
+  async currentDatabase(): Promise<string | null> {
+    return (await this.queryValue("SELECT database()", "SCHEMA")) as string | null;
   }
 
   async charset(): Promise<string | null> {
@@ -497,30 +494,20 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
           ((t: MysqlTableDefinition) => void) | undefined,
         ]
   ): Promise<unknown> {
-    const rest = [...args] as unknown[];
-    while (
-      rest.length > 0 &&
-      (rest[rest.length - 1] === undefined || typeof rest[rest.length - 1] === "function")
-    ) {
-      rest.pop();
-    }
-    args = rest as typeof args;
-    const last = args[args.length - 1];
-    const hasOptions = last !== null && last !== undefined && typeof last === "object";
-    const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];
-    const options = (hasOptions ? last : {}) as {
+    const tableNames = args.filter(
+      (arg, index) => index < args.length - 2 || (arg !== undefined && typeof arg !== "function"),
+    ) as string[];
+    const options = extractOptionsBang(tableNames) as {
       ifExists?: boolean;
       force?: boolean | "cascade";
       temporary?: boolean;
     };
     for (const tableName of tableNames) {
-      await this.schemaCache.clearDataSourceCacheBang(tableName);
+      await this.schemaCache.clearDataSourceCacheBang(toS(tableName));
     }
-    const temporary = options.temporary ? " TEMPORARY" : "";
-    const ifExists = options.ifExists ? " IF EXISTS" : "";
-    const cascade = options.force === "cascade" ? " CASCADE" : "";
-    const names = tableNames.map((tableName) => this.quoteTableName(tableName)).join(", ");
-    return this.execute(`DROP${temporary} TABLE${ifExists} ${names}${cascade}`);
+    return this.execute(
+      `DROP${options.temporary ? " TEMPORARY" : ""} TABLE${options.ifExists ? " IF EXISTS" : ""} ${tableNames.map((tableName) => this.quoteTableName(tableName)).join(", ")}${options.force === "cascade" ? " CASCADE" : ""}`,
+    );
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
@@ -744,20 +731,20 @@ WHERE fk.referenced_column_name IS NOT NULL
 
     const chkInfo = await this.internalExecQuery(sql, "SCHEMA");
 
-    const checkConstraints: CheckConstraintDefinition[] = [];
-    for (const row of chkInfo.toArray()) {
-      const options = { name: row["name"] as string };
-      let expression = row["expression"] as string;
-      if (expression.startsWith("(") && expression.endsWith(")")) {
-        expression = expression.slice(1, -1);
-      }
-      expression = this.stripWhitespaceCharacters(expression);
-      if (!(await this.isMariadb())) {
-        expression = expression.replace(/\\'/g, "'");
-      }
-      checkConstraints.push(new CheckConstraintDefinition(tableName, expression, options));
-    }
-    return checkConstraints;
+    return Promise.all(
+      chkInfo.toArray().map(async (row) => {
+        const options = { name: row["name"] as string };
+        let expression = row["expression"] as string;
+        if (expression.startsWith("(") && expression.endsWith(")")) {
+          expression = expression.slice(1, -1);
+        }
+        expression = this.stripWhitespaceCharacters(expression);
+        if (!(await this.isMariadb())) {
+          expression = expression.replace(/\\'/g, "'");
+        }
+        return new CheckConstraintDefinition(tableName, expression, options);
+      }),
+    );
   }
 
   async tableOptions(tableName: string): Promise<Record<string, string | null> | null> {
@@ -842,11 +829,11 @@ WHERE fk.referenced_column_name IS NOT NULL
     const visitor = this.arelVisitor();
     const orderColumns = compactBlank(
       compactBlank(orders ?? []).map((s) =>
-        (typeof s === "string" ? s : visitor.compile(s)).replace(/\s+(?:ASC|DESC)\b/gi, "").trim(),
+        (typeof s === "string" ? s : visitor.compile(s)).replace(/\s+(?:ASC|DESC)\b/gi, ""),
       ),
     ).map((column, i) => `${column} AS alias_${i}`);
-    if (orderColumns.length === 0) return columns;
-    return [...orderColumns, columns].join(", ");
+
+    return [...orderColumns, super.columnsForDistinct(columns, orders as string[])].join(", ");
   }
 
   /** @missingRailsName config — PERMANENT */
@@ -929,7 +916,10 @@ WHERE fk.referenced_column_name IS NOT NULL
     }
   }
 
-  /** @missingRailsCall with_raw_connection — CONVERGEABLE mysql-quote-string-escapes-without-with-raw-connection */
+  /**
+   * @missingRailsCall with_raw_connection — CONVERGEABLE mysql-quote-string-escapes-without-with-raw-connection
+   * @inventedArm if — CONVERGEABLE mysql-quote-string-escapes-without-with-raw-connection
+   */
   override quoteString(string: string): string {
     if (this._escapeState.noBackslashEscapes) {
       return string.replace(/'/g, "''");
@@ -1020,11 +1010,10 @@ WHERE fk.referenced_column_name IS NOT NULL
     const rawConnection = this._connection as {
       warningCount?: unknown;
       query(sql: string): Promise<[unknown, unknown]>;
-    } | null;
-    const action = dbWarningsAction();
-    if (action == null || rawConnection == null) return;
+    };
+    if (dbWarningsAction() == null || (await this.warningCount(rawConnection)) === 0) return;
+
     const warningCount = await this.warningCount(rawConnection);
-    if (warningCount === 0) return;
 
     const [rawRows] = await rawConnection.query("SHOW WARNINGS");
     let result = rawRows as Array<{ Level?: string; Code?: number | string; Message?: string }>;
@@ -1045,14 +1034,13 @@ WHERE fk.referenced_column_name IS NOT NULL
       if (this.isWarningIgnored(warning as unknown as { level?: string; message?: string }))
         continue;
 
-      action.call(this, warning);
+      dbWarningsAction()!.call(this, warning);
     }
   }
 
   /** @internal */
   override isWarningIgnored(warning: { level?: string; [k: string]: unknown }): boolean {
-    if (warning.level === "Note") return true;
-    return super.isWarningIgnored(warning);
+    return warning.level === "Note" || super.isWarningIgnored(warning);
   }
 
   /** @internal */
@@ -1060,10 +1048,9 @@ WHERE fk.referenced_column_name IS NOT NULL
     exception: unknown,
     { message, sql, binds }: { message: string; sql: string; binds: unknown[] },
   ): unknown {
-    const exceptionMessage = exception instanceof Error ? exception.message : String(exception);
     switch (this.errorNumber(exception as Error & { errno?: number })) {
       case null:
-        if (/MySQL client is not connected/i.test(exceptionMessage)) {
+        if (/MySQL client is not connected/i.test((exception as Error).message)) {
           return new ConnectionNotEstablished(exception as Error, { connectionPool: this.pool });
         } else {
           return super.translateException(exception, { message, sql, binds });
@@ -1175,8 +1162,7 @@ WHERE fk.referenced_column_name IS NOT NULL
 
   /** @internal */
   async supportsInsertRawAliasSyntax(): Promise<boolean> {
-    if (await this.isMariadb()) return false;
-    return (await this.databaseVersion).compare("8.0.19") >= 0;
+    return !(await this.isMariadb()) && (await this.databaseVersion).compare("8.0.19") >= 0;
   }
 
   /** @internal */
@@ -1257,7 +1243,9 @@ WHERE fk.referenced_column_name IS NOT NULL
     return result.toArray();
   }
 
-  static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
+  static override readonly EXTENDED_TYPE_MAPS: InstanceType<
+    typeof Concurrent.Map<Record<string, unknown>, unknown>
+  > = new Concurrent.Map();
 
   /** @internal */
   async createTableInfo(tableName: string): Promise<string | null> {
@@ -1369,18 +1357,20 @@ WHERE fk.referenced_column_name IS NOT NULL
     }
   }
 
+  /** @inventedArm if — CONVERGEABLE arms-extractor-reads-a-kwargs-rebinding-guard */
   override async removeForeignKey(
     fromTable: string,
     toTable?: string | RemoveForeignKeyOptions,
     options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
-    const optionsForm = typeof toTable === "object" && toTable !== null;
-    const opts: RemoveForeignKeyOptions = { ...(optionsForm ? toTable : options) };
-    if (opts.onUpdate === "restrict") delete opts.onUpdate;
-    if (opts.onDelete === "restrict") delete opts.onDelete;
-    return optionsForm
-      ? super.removeForeignKey(fromTable, opts)
-      : super.removeForeignKey(fromTable, toTable, opts);
+    if (typeof toTable === "object" && toTable !== null) {
+      options = toTable;
+      toTable = options.toTable;
+    }
+    options = { ...options };
+    if (options.onUpdate === "restrict") delete options.onUpdate;
+    if (options.onDelete === "restrict") delete options.onDelete;
+    return super.removeForeignKey(fromTable, toTable, options);
   }
 
   /** @internal */

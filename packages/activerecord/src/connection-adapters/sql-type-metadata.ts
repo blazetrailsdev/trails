@@ -41,6 +41,10 @@ export class SqlTypeMetadata {
     );
   }
 
+  eql(other: unknown): boolean {
+    return this.equals(other);
+  }
+
   hash(): number {
     return (
       rbHash(SqlTypeMetadata) ^

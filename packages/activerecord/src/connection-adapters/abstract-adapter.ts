@@ -20,6 +20,8 @@ import {
 } from "../errors.js";
 import {
   IsolatedExecutionState,
+  kernelArray,
+  presence,
   LoadInterlockAwareMonitor,
   Notifications,
   NullLock,
@@ -32,10 +34,17 @@ import {
   RbConfig,
   abort,
   block,
+  cmp,
+  Concurrent,
   env,
+  excSetupMessage,
   fetch,
   isEmpty,
+  isNil,
   last,
+  rbEnsure,
+  rbFSend,
+  toI,
   rbObjAsString as toS,
   Thread,
 } from "@blazetrails/ruby-compat";
@@ -52,7 +61,7 @@ type AdapterInstrumenter = {
 };
 import { ActiveRecord } from "../namespaces.js";
 import { Result, type ColumnTypes } from "../result.js";
-import { SchemaCache, SchemaReflection, BoundSchemaReflection } from "./schema-cache.js";
+import { SchemaCache, BoundSchemaReflection } from "./schema-cache.js";
 import { NullPool, removeConnectionFromThreadCache } from "./abstract/connection-pool.js";
 import type { ConnectionPool } from "./abstract/connection-pool.js";
 import type { ConnectionDescriptor } from "./abstract/connection-handler.js";
@@ -178,12 +187,10 @@ export class Version {
   }
 
   compare(versionString: string): number {
-    const other = versionString.split(".").map((part) => parseInt(part, 10) || 0);
-    for (let i = 0; i < Math.min(this._version.length, other.length); i++) {
-      if (this._version[i] > other[i]) return 1;
-      if (this._version[i] < other[i]) return -1;
-    }
-    return this._version.length === other.length ? 0 : this._version.length > other.length ? 1 : -1;
+    return cmp(
+      this._version,
+      versionString.split(".").map((part) => toI(part)),
+    ) as number;
   }
 
   toString(): string {
@@ -193,6 +200,7 @@ export class Version {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AbstractAdapter {
+  columnsForDistinct(columns: string | string[], orders?: string[]): string | string[];
   createTable(
     tableName: string,
     options?:
@@ -860,7 +868,7 @@ export class AbstractAdapter implements Quoting {
 
   /** @missingRailsCall exec — CONVERGEABLE find-cmd-and-exec-replaces-the-process-through-kernel-exec */
   static findCmdAndExec(commands: string | string[], ...args: string[]): string[] {
-    let cmds = Array.isArray(commands) ? commands : commands == null ? [] : [commands];
+    let cmds = kernelArray(commands);
 
     const dirsOnPath = toS(env["PATH"]).split(File.PATH_SEPARATOR);
     const ext = RbConfig.CONFIG["EXEEXT"];
@@ -976,13 +984,11 @@ export class AbstractAdapter implements Quoting {
   }
 
   get connectionRetries(): number {
-    const v = this._config.connectionRetries;
-    return typeof v === "number" ? v : 1;
+    return toI(this._config.connectionRetries ?? 1) as number;
   }
 
   get verifyTimeout(): number {
-    const v = this._config.verifyTimeout;
-    return typeof v === "number" ? v : 2;
+    return toI(this._config.verifyTimeout ?? 2) as number;
   }
 
   get retryDeadline(): number | null {
@@ -1026,8 +1032,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   isValidType(type: string | null | undefined): boolean {
-    if (type == null) return false;
-    return this.nativeDatabaseTypes()[type] != null;
+    return !isNil(this.nativeDatabaseTypes()[type as string]);
   }
 
   lease(): void {
@@ -1059,13 +1064,13 @@ export class AbstractAdapter implements Quoting {
   }
 
   get schemaCache(): BoundSchemaReflection {
-    const schemaCache = this.pool.schemaCache;
-    if (schemaCache instanceof BoundSchemaReflection) return schemaCache;
-    this._schemaCache ??= BoundSchemaReflection.forLoneConnection(
-      this._poolSchemaReflection(),
-      this,
+    return (
+      this.pool.schemaCache ||
+      (this._schemaCache ||= BoundSchemaReflection.forLoneConnection(
+        this.pool.schemaReflection,
+        this,
+      ))
     );
-    return this._schemaCache;
   }
 
   expire(): void {
@@ -1110,27 +1115,17 @@ export class AbstractAdapter implements Quoting {
   /** @missingRailsName objectId — PERMANENT */
   unpreparedStatement<T>(fn: () => Promise<T> | T): Promise<T> | T {
     let cache: Set<unknown> | undefined;
-    if (
-      this._preparedStatements != null &&
-      this._preparedStatements !== false &&
-      !this.preparedStatementsDisabledCache.has(this)
-    ) {
-      cache = this.preparedStatementsDisabledCache.add(this);
-    }
-    let result: Promise<T> | T;
-    try {
-      result = fn();
-    } catch (error) {
-      cache?.delete(this);
-      throw error;
-    }
-    if (result instanceof Promise) {
-      return result.finally(() => {
+    return rbEnsure(
+      () => {
+        if (rtest(this._preparedStatements) && !this.preparedStatementsDisabledCache.has(this)) {
+          cache = this.preparedStatementsDisabledCache.add(this);
+        }
+        return fn();
+      },
+      () => {
         cache?.delete(this);
-      });
-    }
-    cache?.delete(this);
-    return result;
+      },
+    );
   }
 
   get adapterName(): string {
@@ -1417,7 +1412,7 @@ export class AbstractAdapter implements Quoting {
           });
           return;
         } catch (originalException) {
-          const translatedException = this.translateExceptionClass(
+          const translatedException = await this.translateExceptionClass(
             originalException,
             undefined,
             undefined,
@@ -1435,7 +1430,7 @@ export class AbstractAdapter implements Quoting {
 
           this._lastActivity = 0;
           this._verified = false;
-          throw translatedException;
+          throw excSetupMessage(translatedException, originalException);
         }
       }
     });
@@ -1482,21 +1477,21 @@ export class AbstractAdapter implements Quoting {
 
   async verifyBang(): Promise<void> {
     if (!(await this.active())) {
-      const promoted = await this.lock.synchronize(async () => {
+      await this.lock.synchronize(async () => {
         if (this._unconfiguredConnection) {
           this._connection = this._unconfiguredConnection;
           this._unconfiguredConnection = null;
           await this.attemptConfigureConnection();
           this._lastActivity = Process.clockGettime(Process.CLOCK_MONOTONIC);
           this._verified = true;
-          return true;
+          return;
         }
+
         await this.reconnectBang({ restoreTransactions: true });
-        return false;
       });
-      if (promoted) return;
     }
-    this.verifiedBang();
+
+    this._verified = true;
   }
 
   async connectBang(): Promise<this> {
@@ -1664,9 +1659,7 @@ export class AbstractAdapter implements Quoting {
   /** @internal */
   static extractLimit(sqlType: string): number | undefined {
     const match = /\((.*)\)/.exec(sqlType);
-    if (!match) return undefined;
-    const n = Number.parseInt(match[1], 10);
-    return Number.isNaN(n) ? 0 : n;
+    return match ? (toI(match[1]) as number) : undefined;
   }
 
   /** @internal */
@@ -1710,11 +1703,11 @@ export class AbstractAdapter implements Quoting {
         try {
           return await block(await this.rawConnectionForBlock());
         } catch (originalException) {
-          const translatedException = this.translateExceptionClass(
+          const translatedException = (await this.translateExceptionClass(
             originalException,
             null,
             null,
-          ) as Error;
+          )) as Error;
           this.invalidateTransaction(translatedException);
           const retryDeadlineExceeded =
             deadline !== false && deadline < Process.clockGettime(Process.CLOCK_MONOTONIC);
@@ -1734,7 +1727,7 @@ export class AbstractAdapter implements Quoting {
             this._lastActivity = 0;
             this._verified = false;
           }
-          throw translatedException;
+          throw excSetupMessage(translatedException, originalException);
         } finally {
           if (materializeTransactions) this.dirtyCurrentTransaction();
         }
@@ -1794,10 +1787,9 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   validRawConnection(): unknown {
-    if (this._verified && this._connection) return this._connection;
-    return this.withRawConnection(
-      { allowRetry: false, materializeTransactions: false },
-      (conn) => conn,
+    return (
+      (this._verified && this._connection) ||
+      this.withRawConnection({ allowRetry: false, materializeTransactions: false }, (conn) => conn)
     );
   }
 
@@ -1809,43 +1801,34 @@ export class AbstractAdapter implements Quoting {
     return null;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall compute_if_absent — CONVERGEABLE adapter-extended-type-maps-onto-concurrent-map
-   */
+  /** @internal */
   get typeMap(): unknown {
-    const ctor = this.constructor as typeof AbstractAdapter;
+    const klass = this.constructor as typeof AbstractAdapter;
     const key = this.extendedTypeMapKey();
-    if (!key) return ctor.TYPE_MAP;
-    const cacheKey = JSON.stringify(key);
-    let m = ctor.EXTENDED_TYPE_MAPS.get(cacheKey);
-    if (!m) ctor.EXTENDED_TYPE_MAPS.set(cacheKey, (m = ctor.extendedTypeMap(key)));
-    return m;
+    if (key != null) {
+      return klass.EXTENDED_TYPE_MAPS.computeIfAbsent(key, () => klass.extendedTypeMap(key));
+    } else {
+      return klass.TYPE_MAP;
+    }
   }
 
   /** @internal */
-  translateExceptionClass(nativeError: unknown, sql: unknown, binds: unknown): unknown {
+  async translateExceptionClass(
+    nativeError: unknown,
+    sql: unknown,
+    binds: unknown,
+  ): Promise<unknown> {
     if (nativeError instanceof ActiveRecordError) return nativeError;
-    const name = (nativeError as any)?.constructor?.name ?? "Error";
-    const msg = (nativeError as any)?.message ?? "";
-    const message = `${name}: ${msg}`;
-    const arError = this.translateException(nativeError, {
+
+    const message = `${(nativeError as Error).constructor.name}: ${(nativeError as Error).message}`;
+
+    const activeRecordError = (await this.translateException(nativeError, {
       message,
       sql: sql as string,
       binds: binds as unknown[],
-    });
-    const setBacktrace = (translated: unknown) => {
-      if (
-        translated !== nativeError &&
-        translated instanceof Error &&
-        nativeError instanceof Error
-      ) {
-        translated.stack = nativeError.stack;
-        if (translated.cause === undefined) translated.cause = nativeError;
-      }
-      return translated;
-    };
-    return arError instanceof Promise ? arError.then(setBacktrace) : setBacktrace(arError);
+    })) as Error;
+    activeRecordError.stack = (nativeError as Error).stack;
+    return activeRecordError;
   }
 
   async log<T>(
@@ -1857,8 +1840,6 @@ export class AbstractAdapter implements Quoting {
     block: (payload: EventPayload) => Promise<T>,
   ): Promise<T> {
     try {
-      const userTx = this.currentTransaction().userTransaction;
-      const presentTx = userTx.isBlank() ? null : userTx;
       return (await this.instrumenter.instrument(
         "sql.active_record",
         {
@@ -1868,7 +1849,7 @@ export class AbstractAdapter implements Quoting {
           type_casted_binds: typeCastedBinds,
           async,
           connection: this,
-          transaction: presentTx,
+          transaction: presence(this.currentTransaction().userTransaction) ?? null,
           row_count: 0,
         },
         block,
@@ -1904,10 +1885,10 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   async columnFor(tableName: string, columnName: string): Promise<import("./column.js").Column> {
-    const cols = await (this as any).columns(tableName);
-    const col = (cols as import("./column.js").Column[]).find((c) => c.name === columnName);
-    if (!col) throw new ActiveRecordError(`No such column: ${tableName}.${columnName}`);
-    return col;
+    columnName = toS(columnName);
+    const column = (await this.columns(tableName)).find((c) => c.name === columnName);
+    if (!column) throw new ActiveRecordError(`No such column: ${tableName}.${columnName}`);
+    return column;
   }
 
   /** @internal */
@@ -1973,11 +1954,11 @@ export class AbstractAdapter implements Quoting {
     code?: string | number;
     [k: string]: unknown;
   }): boolean {
-    return dbWarningsIgnore().some((warningMatcher) => {
-      const matcher =
-        typeof warningMatcher === "string" ? new RegExp(warningMatcher) : warningMatcher;
-      return matcher.test(warning.message ?? "") || matcher.test(String(warning.code ?? ""));
-    });
+    return dbWarningsIgnore().some(
+      (warningMatcher) =>
+        rbFSend(warning.message, "isMatch", warningMatcher) ||
+        rbFSend(toS(warning.code), "isMatch", warningMatcher),
+    );
   }
 
   quote(value: unknown): string {
@@ -2027,8 +2008,6 @@ export class AbstractAdapter implements Quoting {
   quoteTableNameForAssignment(table: string, attr: string): string {
     return this.quoteTableName(`${table}.${attr}`);
   }
-
-  static readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
 
   quoteDefaultExpression(value: unknown, column: unknown): string {
     return abstractQuoteDefaultExpression.call(this, value, column as { sqlType?: string | null });
@@ -2181,14 +2160,9 @@ export class AbstractAdapter implements Quoting {
    * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
    */
   get internalSchemaCache(): SchemaCache {
-    const reflection = this._poolSchemaReflection();
+    const reflection = this.pool.schemaReflection;
     if (!reflection.loadedCache) reflection.loadedCache = new SchemaCache();
     return reflection.loadedCache;
-  }
-
-  /** @internal */
-  private _poolSchemaReflection(): SchemaReflection {
-    return this.pool.schemaReflection;
   }
 
   get transactionManager(): TransactionManager {
@@ -2225,6 +2199,10 @@ export class AbstractAdapter implements Quoting {
       return m;
     })());
   }
+
+  static readonly EXTENDED_TYPE_MAPS: InstanceType<
+    typeof Concurrent.Map<Record<string, unknown>, unknown>
+  > = new Concurrent.Map();
 
   /** @internal */
   protected async rawConnectionForBlock(): Promise<unknown> {

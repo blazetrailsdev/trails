@@ -56,7 +56,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       omgpost.inheritanceColumn = "disabled";
       omgpost.tableName = `${db}.${table}`;
       Object.defineProperty(omgpost, "name", { value: "Post" });
-      await fn(omgpost, db);
+      await fn(omgpost, db!);
     }
 
     it("schema", async () => {

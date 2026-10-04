@@ -213,9 +213,9 @@ describe("AbstractAdapter.extendedTypeMap", () => {
     const adapter = new TestAdapter({});
     (adapter as any)._defaultTimezone = "utc";
     expect(adapter.typeMap).toBe(adapter.typeMap);
-    expect(AbstractAdapter.EXTENDED_TYPE_MAPS.get(JSON.stringify({ defaultTimezone: "utc" }))).toBe(
-      adapter.typeMap,
-    );
+    expect(
+      AbstractAdapter.EXTENDED_TYPE_MAPS.computeIfAbsent({ defaultTimezone: "utc" }, () => null),
+    ).toBe(adapter.typeMap);
   });
 });
 

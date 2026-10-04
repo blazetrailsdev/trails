@@ -549,6 +549,19 @@ const SHORT_CIRCUIT_MARKS = new Map([
  */
 const WHEN_LIST_PREFIX = "when:";
 
+/**
+ * Ruby's `value || raise(Klass, …)` is one expression: `columns(table_name)
+ * .detect { … } || raise(ActiveRecordError, "No such column: …")`
+ * (activerecord/lib/active_record/connection_adapters/abstract_adapter.rb:1165-1169)
+ * emits `or throw:ActiveRecordError`. JS has no throw expression, so its
+ * faithful port is `if (!value) throw …`, which emits `if throw:…`. An `or`
+ * directly before a `throw` reads as that `if` while the TS counterpart still
+ * shows an unclaimed one, and as the plain `or` otherwise.
+ */
+function isRaiseOperand(token: string | undefined): boolean {
+  return token === "throw" || token?.startsWith("throw:") === true;
+}
+
 export function foldSkeletonTokens(
   skeleton: readonly string[],
   side: SkeletonSide = "ruby",
@@ -599,6 +612,14 @@ export function foldSkeletonTokens(
     if (token === RETRY_LOOP_TOKEN) {
       if (unclaimedLoops-- > 0) folded.push("loop");
       continue;
+    }
+    if (side === "ruby" && token === "or" && isRaiseOperand(skeleton[index + 1])) {
+      const at = surplus?.indexOf("if") ?? -1;
+      if (at !== -1) {
+        surplus!.splice(at, 1);
+        folded.push("if");
+        continue;
+      }
     }
     if (!token.startsWith("ref:")) {
       folded.push(token);

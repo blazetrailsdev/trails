@@ -158,6 +158,30 @@ describe("sameFileHelperSkeletons", () => {
     expect(foldSkeletonTokens(["ref:concat"], "ruby", ["loop", "ref:push"])).toEqual(["loop"]);
   });
 
+  it("reads Ruby's `x || raise` as the `if (!x) throw` its port is forced to spell", () => {
+    const ruby = ["ref:detect", "or", "throw:ActiveRecordError"];
+    const ts = ["ref:find", "if", "throw:ActiveRecordError"];
+    expect(foldSkeletonTokens(ruby, "ruby", ts)).toEqual([
+      "ref:detect",
+      "if",
+      "throw:ActiveRecordError",
+    ]);
+    expect(foldSkeletonTokens(["or", "throw"], "ruby", ["if", "throw"])).toEqual(["if", "throw"]);
+  });
+
+  it("keeps the `or` of `x || raise` when the counterpart has no if left to claim", () => {
+    const ruby = ["if", "or", "throw:ArgumentError"];
+    expect(foldSkeletonTokens(ruby, "ruby", ["if", "or", "throw:ArgumentError"])).toEqual(ruby);
+    expect(foldSkeletonTokens(["or", "throw:ArgumentError"])).toEqual([
+      "or",
+      "throw:ArgumentError",
+    ]);
+    expect(foldSkeletonTokens(["or", "ref:save"], "ruby", ["if", "ref:save"])).toEqual([
+      "or",
+      "ref:save",
+    ]);
+  });
+
   it("cannot hide an if the TS side dropped: the two folded streams still disagree", () => {
     const ruby = foldSkeletonTokens(["ref:filter_map", "if", "ref:save"], "ruby", [
       "loop",
