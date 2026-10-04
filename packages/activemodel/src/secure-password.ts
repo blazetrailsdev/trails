@@ -20,6 +20,10 @@ export namespace SecurePassword {
   }
 }
 
+/**
+ * @inventedArm if — PERMANENT
+ * @inventedArm throw — PERMANENT
+ */
 export function hasSecurePassword(
   this: object,
   attribute: string = "password",

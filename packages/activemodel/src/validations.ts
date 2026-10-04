@@ -10,6 +10,7 @@ import {
 import {
   block as rbBlock,
   dup as hashDup,
+  flatten,
   Hash,
   Module,
   rbBlockGivenP,
@@ -17,6 +18,7 @@ import {
   rbModConstSet,
   rbModMethodDefined,
   rbModSingletonP,
+  uniq,
 } from "@blazetrails/ruby-compat";
 
 import { Errors } from "./errors.js";
@@ -243,6 +245,7 @@ export const ClassMethods = {
     );
   },
 
+  /** @inventedArm if — CONVERGEABLE arms-extractor-reads-a-block-re-forward-guard */
   validate<T extends ValidatableRecord = ValidatableRecord>(
     this: ValidationsClassHost,
     ...args: ValidateArgs<T>
@@ -299,16 +302,7 @@ export const ClassMethods = {
   },
 
   validators(this: ValidationsClassHost): ValidatorLike[] {
-    const seen = new Set<ValidatorLike>();
-    const out: ValidatorLike[] = [];
-    for (const bucket of this._validators.values()) {
-      for (const v of bucket) {
-        if (seen.has(v)) continue;
-        seen.add(v);
-        out.push(v);
-      }
-    }
-    return out;
+    return uniq(flatten([...this._validators.values()]) as ValidatorLike[]);
   },
 
   clearValidatorsBang(this: ValidationsClassHost): void {
@@ -324,20 +318,17 @@ export const ClassMethods = {
   predicateForValidationContext(
     context: string | string[],
   ): (model: ValidationsContextHost) => boolean {
-    const arr = Array.isArray(context) ? [...context].sort() : [context];
-    const key = JSON.stringify(arr);
-    let cached = _predicatesForValidationContexts.get(key);
-    if (!cached) {
-      cached = (model: ValidationsContextHost): boolean => {
-        const mc = model.validationContext;
-        if (Array.isArray(mc)) {
-          return mc.some((c) => arr.includes(c));
-        }
-        return mc !== null && mc !== undefined && arr.includes(mc);
-      };
-      _predicatesForValidationContexts.set(key, cached);
-    }
-    return cached;
+    context = Array.isArray(context) ? [...context].sort() : kernelArray(context);
+
+    return (_predicatesForValidationContexts[JSON.stringify(context)] ||= (
+      model: ValidationsContextHost,
+    ): boolean => {
+      if (Array.isArray(model.validationContext)) {
+        return model.validationContext.some((modelContext) => context.includes(modelContext));
+      } else {
+        return context.includes(model.validationContext as string);
+      }
+    });
   },
   isAttributeMethod(this: { prototype: object }, attribute: string): boolean {
     return rbModMethodDefined(this, attribute);
@@ -373,10 +364,8 @@ export class ValidationContext {
 }
 
 /** @internal */
-const _predicatesForValidationContexts = new Map<
-  string,
-  (model: ValidationsContextHost) => boolean
->();
+const _predicatesForValidationContexts: Record<string, (model: ValidationsContextHost) => boolean> =
+  {};
 
 export function initializeDup<TBase extends object>(
   this: ValidationsInternalsHost<TBase>,

@@ -12,7 +12,13 @@ import {
   moduleParents,
   type Included,
 } from "@blazetrails/activesupport";
-import { rbModName, rbObjNotMatch, rbObjRespondTo, rbStrMatch } from "@blazetrails/ruby-compat";
+import {
+  rbModName,
+  rbObjNotMatch,
+  rbObjRespondTo,
+  rbStrMatch,
+  rbStrSend,
+} from "@blazetrails/ruby-compat";
 import { ArgumentError, TypeError } from "./attribute-assignment.js";
 
 export interface Naming {
@@ -174,6 +180,7 @@ export class ModelName {
     return this.name;
   }
 
+  /** @inventedArm if — CONVERGEABLE model-name-constructor-drops-the-string-klass-arm */
   constructor(
     klass: ModelLike | string,
     namespace: object | null = null,
@@ -188,10 +195,11 @@ export class ModelName {
       );
 
     if (namespace) {
-      const prefix = `${rbModName(namespace)}::`;
-      this._unnamespaced = this.name.startsWith(prefix)
-        ? this.name.slice(prefix.length)
-        : this.name;
+      this._unnamespaced = rbStrSend(
+        this.name,
+        "deletePrefix",
+        `${rbModName(namespace)}::`,
+      )[0] as string;
     }
     this._klass = typeof klass === "string" ? null : klass;
     this.singular = this._singularize(this.name);
