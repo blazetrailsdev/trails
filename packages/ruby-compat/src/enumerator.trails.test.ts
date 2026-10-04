@@ -29,6 +29,9 @@ describe("Enumerator", () => {
     expect(enumerator.isAll((value) => seen.push(value) && value !== "ya")).toBe(false);
     expect(seen).toEqual(["ya"]);
     expect(enumerator.isAll((value) => value.startsWith("y"))).toBe(true);
+    expect(enumerator.isAll(() => 0)).toBe(true);
+    expect(enumerator.isAll(() => "")).toBe(true);
+    expect(enumerator.isAll(() => null)).toBe(false);
   });
 
   it("isAll propagates what the block raises", () => {

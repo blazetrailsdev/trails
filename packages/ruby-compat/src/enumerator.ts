@@ -1,3 +1,5 @@
+import { rtest } from "./object.js";
+
 /**
  * `Enumerator` (`vendor/ruby/v3.3.11/enumerator.c:411` `enumerator_init`): the
  * receiver, method and arguments a block-less `to_enum` records.
@@ -34,7 +36,7 @@ export class Enumerator<T = unknown> {
     const stop = {};
     try {
       this.each((value: T) => {
-        if (!block(value)) throw stop;
+        if (!rtest(block(value))) throw stop;
       });
     } catch (error) {
       if (error !== stop) throw error;
