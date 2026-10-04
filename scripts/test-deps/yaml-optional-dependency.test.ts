@@ -15,9 +15,9 @@
 // `helpers/index.ts` → `debug-helper.ts`) did not. Both reach
 // `@blazetrails/ruby-compat/psych-adapter`, which is why the ruby-compat Psych
 // specifiers are followed into their source files rather than treated as
-// offenders: `psych-adapter.ts` resolves `yaml` dynamically, so naming the YAML coders costs nothing
-// at load time and the miss surfaces where Ruby would raise it, from the
-// dump/load call.
+// offenders: `psych-adapter.ts` resolves `yaml` dynamically, so naming the YAML
+// coders costs nothing at load time and the miss surfaces where Ruby would
+// raise it, from the dump/load call.
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
