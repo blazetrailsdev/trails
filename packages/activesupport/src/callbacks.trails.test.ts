@@ -949,6 +949,61 @@ describe("Callbacks — async propagation", () => {
     expect(t.log).toEqual(["ao", "block", "ac", "after"]);
   });
 
+  it("around callbacks that call their block after an await each run the nested sequence once", async () => {
+    class Target extends Model {}
+    const t = new Target();
+    Target.defineCallbacks("save");
+    Target.setCallback("save", "around", async (x: any, next: any) => {
+      await Promise.resolve();
+      x.log.push("outer");
+      await next();
+      x.log.push("/outer");
+    });
+    Target.setCallback("save", "around", async (x: any, next: any) => {
+      await Promise.resolve();
+      x.log.push("inner");
+      await next();
+      x.log.push("/inner");
+    });
+    await t.runCallbacks("save", () => t.log.push("block"));
+    expect(t.log).toEqual(["outer", "inner", "block", "/inner", "/outer"]);
+  });
+
+  it("a sync around callback that calls its block twice runs the nested sequence both times", () => {
+    class Target extends Model {}
+    const t = new Target();
+    Target.defineCallbacks("save");
+    Target.setCallback("save", "around", (_x: any, next: any) => {
+      next();
+      next();
+    });
+    Target.setCallback("save", "around", (x: any, next: any) => {
+      x.log.push("inner");
+      next();
+    });
+    t.runCallbacks("save", () => t.log.push("block"));
+    expect(t.log).toEqual(["inner", "block", "inner", "block"]);
+  });
+
+  it("a chain with no around callback awaits an async before and an async block in order", async () => {
+    class Target extends Model {}
+    const t = new Target();
+    Target.defineCallbacks("save");
+    Target.setCallback("save", "before", async (x: any) => {
+      await Promise.resolve();
+      x.log.push("before");
+    });
+    Target.setCallback("save", "after", (x: any) => x.log.push("after"));
+    const r = t.runCallbacks("save", async () => {
+      await Promise.resolve();
+      t.log.push("block");
+      return "value";
+    });
+    expect(r).toBeInstanceOf(Promise);
+    expect(await r).toBe("value");
+    expect(t.log).toEqual(["before", "block", "after"]);
+  });
+
   it("awaited next() resolves to the async block result", async () => {
     class Target extends Model {
       result = null as unknown;

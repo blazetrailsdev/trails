@@ -170,11 +170,8 @@ export class LazyAttributeHash {
     eachValue(this.materialize(), fn);
   }
 
-  fetch(name: string, ...rest: [] | [Attribute] | [Block<Attribute>]): Attribute {
-    const materialized = this.materialize();
-    return rest.length === 0
-      ? fetch<Attribute>(materialized, name)
-      : fetch<Attribute>(materialized, name, rest[0] as Attribute);
+  fetch(name: string, ...rest: [] | [Attribute | Block<Attribute>]): Attribute {
+    return fetch(this.materialize(), name, ...rest);
   }
 
   except(...names: string[]): Record<string, Attribute> {
