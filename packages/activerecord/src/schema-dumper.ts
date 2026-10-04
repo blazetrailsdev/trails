@@ -1,7 +1,7 @@
 import { STDOUT, StringIO, partition, rbObjAsString, type IO } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { Column } from "./connection-adapters/column.js";
-import { any, cattrAccessor, isBlank, isPresent } from "@blazetrails/activesupport";
+import { any, camelize, cattrAccessor, isBlank, isPresent } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
 import type {
@@ -426,7 +426,9 @@ export abstract class SchemaDumper {
         const optStr =
           Object.keys(colspec).length > 0 ? `, { ${this.formatColspec(colspec)} }` : "";
         if (type.startsWith(":")) {
-          tbl.puts(`    t.${type.slice(1)}(${JSON.stringify(column.name)}${optStr});`);
+          tbl.puts(
+            `    t.${camelize(type.slice(1), false)}(${JSON.stringify(column.name)}${optStr});`,
+          );
         } else {
           tbl.puts(
             `    t.column(${JSON.stringify(column.name)}, ${JSON.stringify(type)}${optStr});`,

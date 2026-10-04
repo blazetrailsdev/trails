@@ -10,7 +10,7 @@ import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.j
 import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 import { wrap } from "@blazetrails/activesupport";
-import { fetch } from "@blazetrails/ruby-compat";
+import { fetch, rbEqual, slice, toS } from "@blazetrails/ruby-compat";
 
 export interface ColumnMethods {
   bigserial(...names: string[]): unknown;
@@ -152,23 +152,22 @@ export class UniqueConstraintDefinition {
     return this.name != null && this.name.search(SchemaDumper.uniqueIgnorePattern) === -1;
   }
 
-  definedFor(
-    opts: { name?: string; column?: string | string[]; [key: string]: unknown } = {},
-  ): boolean {
-    const { name, column, ...rest } = opts;
-    if (name != null && this.name !== String(name)) return false;
-    if (column != null) {
-      const thisCol = wrap(this.column);
-      const thatCol = wrap(column).map(String);
-      if (thisCol.join(",") !== thatCol.join(",")) return false;
-    }
-    const toS = (x: unknown): string => (x == null ? "" : String(x));
-    const storedOpts = this.options as Record<string, unknown>;
-    for (const [k, v] of Object.entries(rest)) {
-      if (!(k in storedOpts)) continue;
-      if (toS(storedOpts[k]) !== toS(v)) return false;
-    }
-    return true;
+  definedFor({
+    name = null,
+    column = null,
+    ...options
+  }: {
+    name?: string | null;
+    column?: string | string[] | null;
+    [key: string]: unknown;
+  } = {}): boolean {
+    options = slice(options, ...Object.keys(this.options));
+
+    return (
+      (name == null || this.name === toS(name)) &&
+      (column == null || rbEqual(wrap(this.column), wrap(column).map(toS))) &&
+      Object.entries(options).every(([k, v]) => toS(this.options[k]) === toS(v))
+    );
   }
 }
 
