@@ -192,21 +192,20 @@ export function rbConstGet(klass: object, id: string): unknown {
 
 /**
  * `rb_mod_constants` (`vendor/ruby/v3.3.11/variable.c:3471`),
- * `Module#constants`: the names of the constants `mod` and its superclasses
- * hold, as `rb_mod_const_of` (`variable.c:3417-3427`) collects them, stopping
- * short of `Object`. A constant is a property {@link rbModConstSet} or a
- * `static` field seated under a constant name; the superclasses are the
- * constructor's prototype chain.
+ * `Module#constants`: the names of the constants `mod`, its superclasses and
+ * the modules they include hold, as `rb_mod_const_of` (`variable.c:3417-3427`)
+ * collects them along the ancestry, stopping short of `Object`. A constant is
+ * a property {@link rbModConstSet} or a `static` field seated under a constant
+ * name.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbModConstants(mod: object): string[] {
   const tbl = new Set<string>();
-  for (
-    let tmp: object | null = mod;
-    tmp !== null && tmp !== Function.prototype;
-    tmp = Object.getPrototypeOf(tmp) as object | null
-  ) {
+  const ancestors =
+    typeof mod === "function" ? rbModAncestors(mod as unknown as { prototype: object }) : [mod];
+  for (const tmp of ancestors) {
+    if (tmp === Object && mod !== Object) break;
     for (const id of Object.keys(tmp)) if (/^[\p{Lu}\p{Lt}]/u.test(id)) tbl.add(id);
   }
   return [...tbl];

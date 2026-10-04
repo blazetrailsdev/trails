@@ -180,18 +180,18 @@ export class Module<I extends object = Record<never, never>> {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   inspect(): string {
-    return this.name ?? rbAnyToS(this);
+    return Module.prototype.toS.call(this);
   }
 
   /**
    * Mirrors: Ruby's Module#to_s — vendor/ruby/v3.3.11/object.c:1710
-   * `rb_mod_to_s`, the method `Module#inspect` aliases
+   * `rb_mod_to_s`, the method `Module#inspect` is an alias of
    * (vendor/ruby/v3.3.11/object.c:4438-4439).
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   toS(): string {
-    return this.inspect();
+    return this.name ?? rbAnyToS(this);
   }
 
   /**

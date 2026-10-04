@@ -222,6 +222,25 @@ describe("rb_mod_constants", () => {
     expect(rbModConstants(Outer)).toEqual(["LIMIT", "Nested"]);
   });
 
+  it("includes the constants of an included module", () => {
+    const Mixin = new Module();
+    rbModConstSet(Mixin, "Mixed", class Mixed {});
+    class Host extends Outer {}
+    include(Host, Mixin);
+    expect(rbModConstants(Host)).toEqual(["Mixed", "LIMIT", "Nested"]);
+  });
+
+  it("keeps to_s when inspect is overridden", () => {
+    class Loud extends Module {
+      override inspect(): string {
+        return "loud";
+      }
+    }
+    expect(rbModConstSet({ name: "ConstSpace" }, "Loud", new Loud()).toS()).toBe(
+      "ConstSpace::Loud",
+    );
+  });
+
   it("renders a seated Module through to_s", () => {
     const mod = rbModConstSet({ name: "ConstSpace" }, "Seated", new Module());
     expect(mod.toS()).toBe("ConstSpace::Seated");

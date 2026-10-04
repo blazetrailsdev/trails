@@ -100,9 +100,7 @@ export function rubyCommand(): string {
         alternateRuby += RbConfig.CONFIG["EXEEXT"];
 
         if (File.isSymlink(alternateRuby)) {
-          const linkedRuby = (File as unknown as { readlink(fileName: string): string }).readlink(
-            alternateRuby,
-          );
+          const linkedRuby = File.readlink(alternateRuby);
 
           if (linkedRuby === rubyName || linkedRuby === ruby) ruby = alternateRuby;
         }
