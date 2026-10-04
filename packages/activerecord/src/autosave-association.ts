@@ -26,7 +26,8 @@ interface AutosaveAssociationHost {
   _nestedRecordsChangedForAutosaveAlreadyCalled?: boolean;
   customValidationContext(): boolean;
   _readAttribute(name: string): unknown;
-  _writeAttribute(name: string, value: unknown): void;
+  get(attrName: string): unknown;
+  set(attrName: string, value: unknown): void;
   errors: {
     add(attr: string, type: string, opts?: Record<string, unknown>): void;
     uniqBang(): void;
@@ -199,8 +200,7 @@ export async function saveHasOneAssociation(this: AutosaveAssociationHost, refle
 
       for (const [primaryKey, foreignKey] of primaryKeyForeignKeyPairs) {
         const associationId = this._readAttribute(primaryKey);
-        if (record._readAttribute(foreignKey) !== associationId)
-          record._writeAttribute(foreignKey, associationId);
+        if (!rbEqual(record.get(foreignKey), associationId)) record.set(foreignKey, associationId);
       }
       association.setInverseInstance(record);
     }
@@ -226,7 +226,7 @@ export async function saveBelongsToAssociation(this: AutosaveAssociationHost, re
 
     if (autosave && record.markedForDestruction()) {
       const foreignKey = kernelArray<string>(reflection.foreignKey());
-      for (const key of foreignKey) this._writeAttribute(key, null);
+      for (const key of foreignKey) this.set(key, null);
       return await record.destroy();
     } else if (autosave !== false) {
       let saved: unknown;
@@ -247,8 +247,7 @@ export async function saveBelongsToAssociation(this: AutosaveAssociationHost, re
         const primaryKeyForeignKeyPairs = zip(primaryKey, foreignKey) as [string, string][];
         for (const [primaryKey, foreignKey] of primaryKeyForeignKeyPairs) {
           const associationId = record._readAttribute(primaryKey);
-          if (this._readAttribute(foreignKey) !== associationId)
-            this._writeAttribute(foreignKey, associationId);
+          if (!rbEqual(this.get(foreignKey), associationId)) this.set(foreignKey, associationId);
         }
         association.loadedBang();
       }
