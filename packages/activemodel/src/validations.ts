@@ -9,12 +9,14 @@ import {
 
 import {
   block as rbBlock,
+  dup as hashDup,
   Hash,
   Module,
   rbBlockGivenP,
   rbFPublicSend,
   rbModConstSet,
   rbModMethodDefined,
+  rbModSingletonP,
 } from "@blazetrails/ruby-compat";
 
 import { Errors } from "./errors.js";
@@ -28,7 +30,6 @@ import { HelperMethods } from "./validations/helper-methods.js";
 import {
   ClassMethods as WithClassMethods,
   validatesWith as withValidatesWith,
-  inheritedValidators,
 } from "./validations/with.js";
 import * as Validates from "./validations/validates.js";
 import { AbsenceValidator } from "./validations/absence.js";
@@ -101,6 +102,19 @@ export class Validations {
         h.set(k, v);
         return v;
       }),
+    });
+    const reader = Object.getOwnPropertyDescriptor(base, "_validators")!;
+    Object.defineProperty(base, "_validators", {
+      ...reader,
+      get(this: ValidationsClassHost) {
+        if (
+          !Object.prototype.hasOwnProperty.call(this, "__class_attr__validators") &&
+          !rbModSingletonP(this)
+        ) {
+          inherited.call(Object.getPrototypeOf(this), this);
+        }
+        return reader.get!.call(this);
+      },
     });
   }
 
@@ -197,6 +211,14 @@ export type ValidateArgs<T extends ValidatableRecord = ValidatableRecord> =
     ]
   | [...filters: Array<ValidateFilter<T>>, options: ConditionalOptions]
   | Array<ValidateFilter<T>>;
+
+export function initializeDup<TBase extends object>(
+  this: ValidationsInternalsHost<TBase>,
+  other: unknown,
+): void {
+  this._errors = undefined;
+  SuperMethods.superMethod(this, "initializeDup")!(other);
+}
 
 export interface ValidationsClassHost {
   _validators: Hash<string | null, ValidatorLike[]>;
@@ -299,7 +321,6 @@ export const ClassMethods = {
 
   clearValidatorsBang(this: ValidationsClassHost): void {
     this.resetCallbacks("validate");
-    inheritedValidators.call(this);
     this._validators.clear();
   },
 
@@ -365,19 +386,18 @@ const _predicatesForValidationContexts = new Map<
   (model: ValidationsContextHost) => boolean
 >();
 
-export function initializeDup<TBase extends object>(
-  this: ValidationsInternalsHost<TBase>,
-  other: unknown,
-): void {
-  this._errors = undefined;
-  SuperMethods.superMethod(this, "initializeDup")!(other);
-}
-
 export function freeze<T extends Validations>(this: T): T {
   void this.errors;
   void this.contextForValidation();
 
   return SuperMethods.superMethod(this, "freeze")!() as T;
+}
+
+/** @internal */
+export function initInternals<TBase extends object>(this: ValidationsInternalsHost<TBase>): void {
+  SuperMethods.superMethod(this, "initInternals")!();
+  this._errors = undefined;
+  this._contextForValidation = undefined;
 }
 
 export const VALID_OPTIONS_FOR_VALIDATE = ["on", "if", "unless", "prepend", "exceptOn"] as const;
@@ -390,11 +410,10 @@ export interface ReadAttributeForValidationHost {
   [key: string]: unknown;
 }
 
-/** @internal */
-export function initInternals<TBase extends object>(this: ValidationsInternalsHost<TBase>): void {
-  SuperMethods.superMethod(this, "initInternals")!();
-  this._errors = undefined;
-  this._contextForValidation = undefined;
+function inherited(this: ValidationsClassHost, base: ValidationsClassHost): void {
+  const dup = hashDup(this._validators);
+  dup.forEach((v, k) => dup.set(k, [...v]));
+  base._validators = dup;
 }
 
 const SuperMethods = new Module((mod) => {

@@ -1641,6 +1641,32 @@ This is a genuine language shortcoming, ratified repo-wide here. An own-property
 memo guard in `model-schema.ts` is the port of `inherited`, not a deviation to
 retire, and there is no story to port `inherited` as a hook.
 
+### `_validators` is copied at a subclass's first read (`Validations::ClassMethods#inherited`)
+
+Rails' `Validations::ClassMethods#inherited`
+(`activemodel/lib/active_model/validations.rb:287-291`) hands the child a copy
+of `_validators`, with each bucket copied, when the class is defined. trails
+runs that body from the `_validators` reader `Validations.included` installs
+(`activemodel/src/validations.ts`): a class that does not own
+`__class_attr__validators` gets the copy from its superclass, whose own read
+copies from the class above it first. It is the only site, so every reader and
+writer goes through it: a `validators_on` miss stores its empty bucket in the
+child's hash (`validations.rb:266-270`), and a child's write never reaches the
+parent. A singleton class fires no `inherited` and keeps reading its class's
+hash.
+
+One gap is left. A validator the parent adds after `class Child extends Parent`
+and before `Child`'s first `_validators` read is in the child's copy, where
+Rails' copy was taken at definition. The alternatives lose:
+
+- **Copying at the first write** (the previous shape, at `validates_with` and
+  `clear_validators!`) left the gap open until a subclass declared a validator
+  of its own, and stored a subclass's miss in the parent's hash.
+- **Copy-on-write on the parent** cannot tell a child defined before the write
+  from one defined after it: neither has run any code.
+- **A registration step per class** is the invented surface the section above
+  rejects.
+
 ### `Class#subclasses` is seated on a class's first own write (`Callbacks::ClassMethods#set_callbacks`)
 
 Rails' `DescendantsTracker#descendants`

@@ -819,7 +819,7 @@ describe("ValidationsTest (trails)", () => {
       expect(Person.validatorsOn("name")[0]).toBe(Person.validatorsOn("email")[0]);
     });
 
-    it("inheritance is copy-on-first-write (subclass sees parent writes made before its own first write)", () => {
+    it("a subclass does not see parent validators added after its first _validators read", () => {
       class Base extends Model {
         declare static attribute: AttributesClassHalf["attribute"];
 
@@ -832,14 +832,22 @@ describe("ValidationsTest (trails)", () => {
       interface Base extends Attributes {}
 
       class Child extends Base {}
-      expect(Child.validatorsOn("name")).toHaveLength(1);
+      class Grandchild extends Child {}
+      expect(Grandchild.validatorsOn("name")).toHaveLength(1);
       Base.validates("name", { length: { minimum: 2 } });
-      expect(Child.validatorsOn("name")).toHaveLength(2);
       Child.validates("name", { length: { maximum: 10 } });
-      Base.validates("name", { format: { with: /x/ } });
-      expect(Child.validatorsOn("name")).toHaveLength(3);
-      expect(Base.validatorsOn("name")).toHaveLength(3);
-      expect(Child.validatorsOn("name")).not.toContain(Base.validatorsOn("name")[2]);
+      expect(Base.validatorsOn("name")).toHaveLength(2);
+      expect(Child.validatorsOn("name")).toHaveLength(2);
+      expect(Child.validatorsOn("name")).not.toContain(Base.validatorsOn("name")[1]);
+      expect(Grandchild.validatorsOn("name")).toHaveLength(1);
+    });
+
+    it("a validatorsOn miss on a subclass stores nothing in the parent's hash", () => {
+      class Base extends Model {}
+      class Child extends Base {}
+      expect(Child.validatorsOn("missing")).toEqual([]);
+      expect(Child._validators.has("missing")).toBe(true);
+      expect(Base._validators.has("missing")).toBe(false);
     });
 
     it("subclass inherits validators but its changes don't leak up", () => {
