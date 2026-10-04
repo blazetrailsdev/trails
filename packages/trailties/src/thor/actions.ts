@@ -225,17 +225,18 @@ export async function apply(
   this.sayStatus("apply", path, verbose);
   if (rtest(verbose)) this.shell.padding += 1;
 
-  let contents: string;
+  let url: string;
   if (isUri) {
     const response = await globalThis.fetch(path, {
       headers: { Accept: "application/x-thor-template" },
     });
-    contents = `data:text/javascript,${encodeURIComponent(await response.text())}`;
+    const contents = await response.text();
+    url = `data:text/javascript,${encodeURIComponent(contents)}`;
   } else {
-    contents = getPath().pathToFileURL!(path).href;
+    url = `${getPath().pathToFileURL!(path).href}?${Date.now()}`;
   }
 
-  await (await import(contents)).default.call(this, this);
+  await (await import(url)).default.call(this, this);
   if (rtest(verbose)) this.shell.padding -= 1;
 }
 
