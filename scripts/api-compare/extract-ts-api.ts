@@ -1622,8 +1622,8 @@ export function extractFromProgram(
 
       const pushMethods = (methods: MethodInfo[]): void => {
         for (const m of methods) {
-          if (hostInfo.instanceMethods.some((existing) => existing.name === m.name)) continue;
-          hostInfo.instanceMethods.push({ ...m, file: hostInfo.file });
+          if (hostInfo.classMethods.some((existing) => existing.name === m.name)) continue;
+          hostInfo.classMethods.push({ ...m, file: hostInfo.file, isStatic: true });
         }
       };
 

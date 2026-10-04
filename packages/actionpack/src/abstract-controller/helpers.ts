@@ -261,10 +261,6 @@ export function defaultHelperModuleBang(this: HelpersClass): void {
 }
 
 export class Helpers {
-  static modulesForHelpers = Resolution.modulesForHelpers;
-  static allHelpersFromPath = Resolution.allHelpersFromPath;
-  static helperModulesFromPaths = Resolution.helperModulesFromPaths;
-
   static ClassMethods = {
     ...Resolution,
     helperMethod,
@@ -280,3 +276,5 @@ export class Helpers {
     base._helpers = defineHelpersModule(base);
   }
 }
+
+extend(Helpers, Resolution);
