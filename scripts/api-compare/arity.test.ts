@@ -372,15 +372,13 @@ describe("renderSig", () => {
 });
 
 describe("arityParams", () => {
-  // `static declare option: typeof Thor.methodOption` against Ruby's resolved
-  // `alias_method :option, :method_option` (thor.rb:175).
   const rubyAlias = { notes: "alias", aliasResolved: true, params: [req("name"), opt("options")] };
   const staticDeclare = {
     params: [],
     aliasParams: [req("this", "ThorClass"), req("name"), opt("options")],
   };
 
-  it("reads the target's signature for a static declare alias", () => {
+  it("reads the target's signature for a static declare alias against a resolved Ruby alias", () => {
     expect(isForwardingRubyEntry(rubyAlias)).toBe(false);
     expect(matchArityAgainst(rubyAlias.params, [staticDeclare.params]).matched).toBe(false);
     expect(matchArityAgainst(rubyAlias.params, [arityParams(staticDeclare)]).matched).toBe(true);

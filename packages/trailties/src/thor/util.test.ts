@@ -56,6 +56,28 @@ class BrokenCounter extends Thor {
   }
 }
 
+class Apple extends Thor {
+  static {
+    (this as unknown as ThorClass).namespace("fruits");
+    (this as unknown as ThorClass).desc("apple", "apple");
+    (this as unknown as ThorClass).methodAdded("apple");
+    (this as unknown as ThorClass).desc("rotten-apple", "rotten apple");
+    (this as unknown as ThorClass).methodAdded("rotten_apple");
+    (this as unknown as ThorClass).map({ ra: "rotten_apple" });
+  }
+  apple() {}
+  rotten_apple() {}
+}
+
+class Pear extends Thor {
+  static {
+    (this as unknown as ThorClass).namespace("fruits");
+    (this as unknown as ThorClass).desc("pear", "pear");
+    (this as unknown as ThorClass).methodAdded("pear");
+  }
+  pear() {}
+}
+
 describe("Thor::Util", () => {
   describe("#find_by_namespace", () => {
     it("returns 'default' if no namespace is given", () => {
@@ -131,7 +153,15 @@ describe("Thor::Util", () => {
 
   describe("#find_class_and_command_by_namespace", () => {
     // BLOCKED: port-thor-group
-    it.skip("returns a Thor::Group class if full namespace matches", () => {});
+    it.skip("returns a Thor::Group class if full namespace matches", () => {
+      class MyCounter extends Thor.Group {
+        static {
+          (this as unknown as ThorClass).methodAdded("one");
+        }
+        one() {}
+      }
+      expect(Util.findClassAndCommandByNamespace("my_counter")).toEqual([MyCounter, null]);
+    });
 
     // BLOCKED: port-thor-dispatch-and-help
     it.skip("returns a Thor class if full namespace matches", () => {
@@ -155,13 +185,23 @@ describe("Thor::Util", () => {
     });
 
     // BLOCKED: port-thor-dispatch-and-help
-    it.skip("returns correct Thor class and the command name when shared namespaces", () => {});
+    it.skip("returns correct Thor class and the command name when shared namespaces", () => {
+      expect(Util.findClassAndCommandByNamespace("fruits:apple")).toEqual([Apple, "apple"]);
+      expect(Util.findClassAndCommandByNamespace("fruits:pear")).toEqual([Pear, "pear"]);
+    });
 
     // BLOCKED: port-thor-dispatch-and-help
-    it.skip("returns correct Thor class and the command name with hypen when shared namespaces", () => {});
+    it.skip("returns correct Thor class and the command name with hypen when shared namespaces", () => {
+      expect(Util.findClassAndCommandByNamespace("fruits:rotten-apple")).toEqual([
+        Apple,
+        "rotten-apple",
+      ]);
+    });
 
     // BLOCKED: port-thor-dispatch-and-help
-    it.skip("returns correct Thor class and the associated alias command name when shared namespaces", () => {});
+    it.skip("returns correct Thor class and the associated alias command name when shared namespaces", () => {
+      expect(Util.findClassAndCommandByNamespace("fruits:ra")).toEqual([Apple, "ra"]);
+    });
   });
 
   describe("#thor_classes_in", () => {
