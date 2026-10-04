@@ -6,6 +6,7 @@ import {
   isSymbol,
   mergeBang,
   rbEqual,
+  rbSetClassPathString,
   rtest,
   slice,
   symbolToS,
@@ -130,3 +131,9 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     }
   }
 }
+
+rbSetClassPathString(
+  HashWithIndifferentAccess,
+  { name: "Thor::CoreExt" },
+  "HashWithIndifferentAccess",
+);

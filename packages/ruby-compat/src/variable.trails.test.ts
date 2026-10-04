@@ -8,6 +8,7 @@ import {
   isRegisteredConstant,
   rbConstGet,
   rbModConstGet,
+  rbModConstants,
   rbPathToClass,
   registerConstant,
   registeredConstant,
@@ -202,5 +203,33 @@ describe("rb_const_get", () => {
         "uninitialized constant Outer::Absent",
       );
     });
+  });
+});
+
+describe("rb_mod_constants", () => {
+  class Outer {
+    static LIMIT = 1;
+    static _memo = 2;
+    static helper() {}
+  }
+  class Nested {}
+  rbModConstSet(Outer, "Nested", Nested);
+  class Child extends Outer {
+    static Own = 3;
+  }
+
+  it("lists the constants seated on the class, not its other statics", () => {
+    expect(rbModConstants(Outer)).toEqual(["LIMIT", "Nested"]);
+  });
+
+  it("renders a seated Module through to_s", () => {
+    const mod = rbModConstSet({ name: "ConstSpace" }, "Seated", new Module());
+    expect(mod.toS()).toBe("ConstSpace::Seated");
+    expect(mod.toS()).toBe(mod.inspect());
+  });
+
+  it("includes the superclasses' constants", () => {
+    expect(rbModConstants(Child)).toEqual(["Own", "LIMIT", "Nested"]);
+    expect(rbModConstants(Nested)).toEqual([]);
   });
 });

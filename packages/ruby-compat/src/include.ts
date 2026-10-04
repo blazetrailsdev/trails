@@ -184,6 +184,17 @@ export class Module<I extends object = Record<never, never>> {
   }
 
   /**
+   * Mirrors: Ruby's Module#to_s — vendor/ruby/v3.3.11/object.c:1710
+   * `rb_mod_to_s`, the method `Module#inspect` aliases
+   * (vendor/ruby/v3.3.11/object.c:4438-4439).
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  toS(): string {
+    return this.inspect();
+  }
+
+  /**
    * Mirrors: Ruby's Module#module_eval — vendor/ruby/v3.3.11/vm_eval.c:2128
    * `rb_mod_module_eval` — yields the module's method table.
    *
