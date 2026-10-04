@@ -166,6 +166,7 @@ export class SchemaReflection {
     return new SchemaCache();
   }
 
+  /** @inventedArm then — CONVERGEABLE activerecord-converge-invented-control-flow-arms-connection-adapters-root-part-2-residue */
   private async cache(pool: Pool): Promise<SchemaCache> {
     return (this._cache ||= await (this._cachePromise ||= this.loadCache(pool).then(
       (newCache) => newCache || this.emptyCache(),
