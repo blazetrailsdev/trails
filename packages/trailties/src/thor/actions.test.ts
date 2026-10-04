@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { assertRaises, capture } from "@blazetrails/activesupport";
-import { Dir, File, FileUtils, include } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, getPath, include } from "@blazetrails/ruby-compat";
 import { Actions, type ActionsHost } from "./actions.js";
 import { Shell } from "./shell.js";
 import { Thor } from "./thor.js";
@@ -19,6 +19,8 @@ class ClearCounter extends MyCounter {
 class A extends GeneratorBase {}
 
 type CounterInstance = ActionsHost & {
+  apply(path: string, config?: { verbose?: unknown }): Promise<void>;
+  foo?: string;
   inRoot<T>(block: () => T | Promise<T>): Promise<T>;
   relativeToOriginalDestinationRoot(path: string, removeDot?: boolean): string;
 };
@@ -280,6 +282,69 @@ describe("Thor::Actions", () => {
         await r.inRoot(() => {});
         expect(r.destinationRoot).toBe(file());
       });
+    });
+  });
+
+  describe("#apply", () => {
+    let template: string;
+    let file: string;
+
+    beforeAll(() => {
+      (Counter as unknown as { sourcePaths(): string[] }).sourcePaths().push(fixtures);
+      template =
+        'export default function (g) { this.foo = "FOO"; g.sayStatus("cool", "padding"); }\n';
+      file = File.join(fixtures, "template.mjs");
+      File.write(file, template);
+    });
+
+    const action = (r: CounterInstance, ...args: Parameters<CounterInstance["apply"]>) =>
+      capture(":stdout", () => r.apply(...args));
+
+    it("accepts a URL as the path", async () => {
+      file = "http://gist.github.com/103208.txt";
+      const r = counter();
+      const apply = vi.spyOn(r, "apply").mockResolvedValue(undefined);
+      await action(r, file);
+      expect(apply).toHaveBeenCalledWith(file);
+      file = File.join(fixtures, "template.mjs");
+    });
+
+    it("accepts a secure URL as the path", async () => {
+      file = "https://gist.github.com/103208.txt";
+      const r = counter();
+      const apply = vi.spyOn(r, "apply").mockResolvedValue(undefined);
+      await action(r, file);
+      expect(apply).toHaveBeenCalledWith(file);
+      file = File.join(fixtures, "template.mjs");
+    });
+
+    it("accepts a local file path with spaces", async () => {
+      const spaced = File.join(fixtures, "path with spaces.mjs");
+      File.write(spaced, template);
+      const open = vi.spyOn(getPath() as Required<ReturnType<typeof getPath>>, "pathToFileURL");
+      await action(counter(), spaced);
+      expect(open).toHaveBeenCalledWith(spaced);
+      open.mockRestore();
+    });
+
+    it("opens a file and executes its content in the instance binding", async () => {
+      const r = counter();
+      await action(r, file);
+      expect(r.foo).toBe("FOO");
+    });
+
+    it("applies padding to the content inside the file", async () => {
+      expect(await action(counter(), file)).toMatch(/cool {4}padding/);
+    });
+
+    it("logs its status", async () => {
+      expect(await action(counter(), file)).toMatch(new RegExp(` {7}apply {2}${file}\n`));
+    });
+
+    it("does not log status", async () => {
+      const content = await action(counter(), file, { verbose: false });
+      expect(content).toMatch(/cool {2}padding/);
+      expect(content).not.toMatch(/apply http/);
     });
   });
 });
