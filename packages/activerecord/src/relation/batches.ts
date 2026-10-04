@@ -1,6 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { eachSlice, kernelArray as Array } from "@blazetrails/activesupport";
-import { cmp, isEmpty, rtest, slice } from "@blazetrails/ruby-compat";
+import { cmp, isEmpty, rbCmpint, rtest, slice } from "@blazetrails/ruby-compat";
 import { stripThenable } from "./thenable.js";
 import { BatchEnumerator } from "./batches/batch-enumerator.js";
 import type { Base } from "../base.js";
@@ -155,7 +155,7 @@ export class Batches {
 
       if (self.limitValue !== null) {
         remaining = self.limitValue as number;
-        if (remaining < batchLimit) batchLimit = remaining;
+        if (rbCmpint(cmp(remaining, batchLimit), remaining, batchLimit) < 0) batchLimit = remaining;
       }
 
       if (self.loaded) {

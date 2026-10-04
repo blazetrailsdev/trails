@@ -46,10 +46,12 @@ let _uncacheableMethods: Set<string> | undefined;
 
 /** @missingRailsArgs public_instance_methods — PERMANENT */
 export function uncacheableMethods(): Set<string> {
-  return (_uncacheableMethods ??= new Set(
-    without(
-      delegatedClasses().flatMap((klass) => publicInstanceMethods(klass)),
-      ...publicInstanceMethods(ActiveRecord.Relation),
+  return (_uncacheableMethods ??= Object.freeze(
+    new Set(
+      without(
+        delegatedClasses().flatMap((klass) => publicInstanceMethods(klass)),
+        ...publicInstanceMethods(ActiveRecord.Relation),
+      ),
     ),
   ));
 }

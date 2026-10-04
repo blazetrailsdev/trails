@@ -40,6 +40,14 @@ describe("BatchEnumerator (trails)", () => {
     );
   });
 
+  it("a String limit raises the ArgumentError Ruby's < raises at batches.rb:275", async () => {
+    await expect(
+      Post.limit("5")
+        .inBatches({ of: 2 })
+        .eachRecord(() => {}),
+    ).rejects.toThrow("comparison of String with 2 failed");
+  });
+
   it("an invalid order inside an array raises with the array inspected", async () => {
     await expect(
       Post.inBatches({ of: 1, cursor: ["id"], order: ["asc", "sideways"] as "asc"[] }).eachRecord(

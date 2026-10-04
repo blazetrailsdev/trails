@@ -13,7 +13,6 @@ import {
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   any,
-  BigDecimal,
   isPresent,
   kernelArray,
   many,
@@ -29,6 +28,7 @@ import {
   rbFPublicSend,
   rbObjRespondTo,
   rtest,
+  toD,
   toI,
   uniq,
 } from "@blazetrails/ruby-compat";
@@ -1030,7 +1030,7 @@ export function typeCastCalculatedValue(value: unknown, operation: string, type:
       switch (type.type()) {
         case "integer":
         case "decimal":
-          return value == null ? null : new BigDecimal(value as string | number | bigint);
+          return value == null ? null : toD(String(value));
         default:
           return type.deserialize(value);
       }
