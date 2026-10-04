@@ -1,4 +1,4 @@
-import { Namespaced } from "../test-helpers/models/namespaces.js";
+import { Namespaced } from "../test-helpers/models/company.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Base } from "../base.js";

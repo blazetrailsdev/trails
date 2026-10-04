@@ -16,6 +16,8 @@ export class ClothingItem extends Base {
   }
 }
 
+registerModel(ClothingItem);
+
 export class ClothingItemUsed extends ClothingItem {
   static {
     rbModConstSet(ClothingItem, "Used", this);

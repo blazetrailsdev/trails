@@ -1,4 +1,4 @@
-import { Admin } from "../namespaces.js";
+import { Admin } from "../admin.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../../base.js";
 import type { AssociationProxy } from "../../../associations/collection-proxy.js";

@@ -1,4 +1,4 @@
-import { Admin } from "../test-helpers/models/namespaces.js";
+import { Admin } from "../test-helpers/models/admin.js";
 import { kernelThrow, rbModConstSet } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./collection-proxy.js";
 import type { Category } from "../test-helpers/models/category.js";

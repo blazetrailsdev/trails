@@ -1,4 +1,4 @@
-import { Publisher } from "../namespaces.js";
+import { Publisher } from "../publisher.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../../base.js";
 

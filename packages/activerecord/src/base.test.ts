@@ -101,6 +101,7 @@ class ThirdAbstractClass extends SecondAbstractClass {
 class Photo extends SecondAbstractClass {}
 class Smarts extends Base {}
 class CreditCard extends Base {}
+registerModel(CreditCard);
 class PinNumber extends Base {
   static {
     rbModConstSet(CreditCard, "PinNumber", this);
@@ -122,7 +123,6 @@ class Brand extends Category {
   }
 }
 class MasterCreditCard extends Base {}
-registerModel(CreditCard);
 registerModel("CreditCard::PinNumber", PinNumber);
 class NonExistentTable extends Base {}
 

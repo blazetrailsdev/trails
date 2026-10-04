@@ -1,10 +1,16 @@
-import { Cpk } from "./test-helpers/models/namespaces.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
 import type { Base } from "./index.js";
 import { describe, it, expect } from "vitest";
 import { registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
-import { CpkBook, CpkChapter, CpkOrder, CpkCar, CpkCarReview } from "./test-helpers/models/cpk.js";
+import {
+  Cpk,
+  CpkBook,
+  CpkChapter,
+  CpkOrder,
+  CpkCar,
+  CpkCarReview,
+} from "./test-helpers/models/cpk.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Categorization } from "./test-helpers/models/categorization.js";
 import { Pirate } from "./test-helpers/models/pirate.js";
