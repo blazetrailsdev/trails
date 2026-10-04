@@ -1,4 +1,4 @@
-import { Dir, File, getPath } from "@blazetrails/ruby-compat";
+import { Dir, File } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { AppGenerator } from "../generators/app-generator.js";
 import { generateCommand } from "./generate.js";
@@ -8,14 +8,9 @@ export function appTemplateCommand(): Command {
     .description("Apply the template supplied by <location>")
     .argument("<location>", "Template file (.mjs/.js; .ts needs a TS loader like tsx)")
     .action(async (location: string) => {
-      const { pathToFileURL } = getPath();
-      if (!pathToFileURL) throw new Error("app:template needs PathAdapter.pathToFileURL");
-      const abs = File.expandPath(location);
-      const mod = await import(pathToFileURL(abs).href);
-      const tmpl: unknown = mod.default ?? mod.template ?? mod;
-      if (typeof tmpl !== "function") throw new Error(`${location} does not export a function`);
       const gen = new AppGenerator({ cwd: Dir.pwd(), output: console.log });
-      await (tmpl as (g: AppGenerator) => unknown)(gen);
+      (await gen.sourcePaths()).push(Dir.pwd());
+      await gen.apply(File.expandPath(location), { verbose: false });
       for (const { what, args } of gen.pendingGenerators) {
         await generateCommand()
           .exitOverride()

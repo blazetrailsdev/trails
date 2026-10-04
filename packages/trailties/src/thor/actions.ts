@@ -5,6 +5,7 @@ import {
   File,
   FileUtils,
   getFs,
+  getPath,
   Hash,
   hashDelete,
   included,
@@ -46,6 +47,7 @@ export interface ActionsHost {
   _cleanupOptionsAndSet(options: unknown[] | Record<string, unknown>, key: string): void;
   _sourcePaths?: string[];
   sourcePaths(): Promise<string[]>;
+  findInSourcePaths(file: string): Promise<string>;
   relativeToOriginalDestinationRoot(path: string, removeDot?: boolean): string;
 }
 
@@ -211,6 +213,35 @@ export function inRoot<T>(this: ActionsHost, block: () => T | Promise<T>): Promi
   return this.inside(this._destinationStack[0], {}, () => block());
 }
 
+let applied = 0;
+
+export async function apply(
+  this: Pick<ActionsHost, "findInSourcePaths" | "sayStatus" | "shell">,
+  path: string,
+  config: { verbose?: unknown } = {},
+): Promise<void> {
+  const verbose = fetch(config, "verbose", true);
+  const isUri = /^https?:\/\//m.test(path);
+  if (!isUri) path = await this.findInSourcePaths(path);
+
+  this.sayStatus("apply", path, verbose);
+  if (rtest(verbose)) this.shell.padding += 1;
+
+  let url: string;
+  if (isUri) {
+    const response = await globalThis.fetch(path, {
+      headers: { Accept: "application/x-thor-template" },
+    });
+    const contents = await response.text();
+    url = `data:text/javascript,${encodeURIComponent(contents)}`;
+  } else {
+    url = `${getPath().pathToFileURL!(path).href}?${(applied += 1)}`;
+  }
+
+  await (await import(url)).default.call(this, this);
+  if (rtest(verbose)) this.shell.padding -= 1;
+}
+
 /** @internal */
 function _sharedConfiguration(this: ActionsHost): Record<string, unknown> {
   return mergeBang(
@@ -277,6 +308,7 @@ export const Actions = new Module((mod) => {
       findInSourcePaths,
       inside,
       inRoot,
+      apply,
       _sharedConfiguration,
       _cleanupOptionsAndSet,
     });
