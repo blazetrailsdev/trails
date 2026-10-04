@@ -91,11 +91,7 @@ export async function assertNoErrorReported(block: () => unknown): Promise<void>
   const reports = await ErrorCollector.record(() =>
     _assertNothingRaisedOrWarn("assert_no_error_reported", block),
   );
-  assertPredicate(
-    reports,
-    (r) => r.length === 0,
-    `Expected [${reports.map((r) => r.error.constructor.name).join(", ")}] to be empty?`,
-  );
+  assertPredicate(reports, (r) => r.length === 0);
 }
 
 export async function assertErrorReported(

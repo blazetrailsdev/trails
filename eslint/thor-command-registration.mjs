@@ -1,6 +1,5 @@
 const THOR_BASES = ["Thor", "Thor.Group"];
 
-/** `Thor`, `Thor.Group`: the dotted spelling of a superclass expression, or null. */
 function dottedName(node) {
   if (node?.type === "Identifier") return node.name;
   if (node?.type === "MemberExpression" && !node.computed && node.property.type === "Identifier") {
@@ -16,7 +15,6 @@ function keyName(key) {
   return null;
 }
 
-/** The name a class is bound to: its own id, or the `const X = class ...` it initializes. */
 function boundName(node) {
   if (node.id) return node.id.name;
   let parent = node.parent;
@@ -26,7 +24,6 @@ function boundName(node) {
     : null;
 }
 
-/** Ruby's public `def`s: what the VM would fire `method_added` for and Thor would keep. */
 function commandCandidates(body) {
   return body.body.filter(
     (member) =>
@@ -40,7 +37,6 @@ function commandCandidates(body) {
   );
 }
 
-/** Every name a static block passes to `methodAdded`, a `noCommands` block included. */
 function registeredNames(blocks, sourceCode) {
   const names = new Set();
   const visit = (node) => {
