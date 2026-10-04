@@ -25,21 +25,29 @@ export class ToRuby {
    *
    * @noRailsEquivalent PERMANENT
    */
-  static create({ strictInteger = false } = {}): ToRuby {
+  static create({ symbolizeNames = false, freeze = false, strictInteger = false } = {}): ToRuby {
     const classLoader = new ClassLoader();
     const scanner = new ScalarScanner(classLoader, { strictInteger });
-    return new this(scanner, classLoader);
+    return new this(scanner, classLoader, { symbolizeNames, freeze });
   }
 
   /** @noRailsEquivalent PERMANENT */
   readonly classLoader: ClassLoader;
   private readonly st = new Map<string, unknown>();
   private readonly ss: ScalarScanner;
+  private readonly symbolizeNames: boolean;
+  private readonly freeze: boolean;
 
   /** @noRailsEquivalent PERMANENT */
-  constructor(ss: ScalarScanner, classLoader: ClassLoader) {
+  constructor(
+    ss: ScalarScanner,
+    classLoader: ClassLoader,
+    { symbolizeNames = false, freeze = false } = {},
+  ) {
     this.ss = ss;
     this.classLoader = classLoader;
+    this.symbolizeNames = symbolizeNames;
+    this.freeze = freeze;
   }
 
   /** @noRailsEquivalent PERMANENT */

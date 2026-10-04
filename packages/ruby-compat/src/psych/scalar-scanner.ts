@@ -31,6 +31,7 @@ export class ScalarScanner {
    */
   tokenize(string: unknown): unknown {
     if (typeof string !== "string") return string;
+    if (string === "") return null;
     if (TIME.test(string)) {
       try {
         return this.parseTime(string);

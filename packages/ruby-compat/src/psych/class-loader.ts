@@ -63,7 +63,7 @@ export class ClassLoader {
 
   /** @internal */
   protected find(klassname: string): unknown {
-    return (this.cache[klassname] ??= this.resolve(klassname));
+    return (this.cache[klassname] ||= this.resolve(klassname));
   }
 
   private resolve(klassname: string): unknown {
