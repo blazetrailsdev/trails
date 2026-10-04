@@ -2323,9 +2323,9 @@ export interface PostgreSQLAdapter {
 
   tableOptions(tableName: string): Promise<Record<string, unknown>>;
 
-  serialSequence(table: string, column: string): Promise<string | null>;
+  serialSequence(table: string, column: string | null): Promise<string | null>;
 
-  defaultSequenceName(tableName: string, pk?: string | string[]): Promise<string | null>;
+  defaultSequenceName(tableName: string, pk?: string | string[] | null): Promise<string | null>;
 
   setPkSequenceBang(table: string, value: number): Promise<void>;
 
