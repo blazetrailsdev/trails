@@ -6411,6 +6411,42 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     ]);
   });
 
+  it("credits a top-level Module#included block to the module const it is called on", () => {
+    const info = extractFromFiles("/p", {
+      "conversion.ts": `
+        import { classAttribute, included, Module } from "@blazetrails/activesupport";
+        export const Conversion = new Module();
+        Conversion.included(null, function (this: object) {
+          classAttribute.call(this, "paramDelimiter", { instanceReader: false, default: "-" });
+        });
+        Conversion.defineMethod("toKey", function () {});
+      `,
+      "deduplicable.ts": `
+        import { classAttribute, included, Module } from "@blazetrails/activesupport";
+        export const Deduplicable = new Module();
+        Deduplicable[included] = function (this: object) {
+          classAttribute.call(this, "registry");
+        };
+        Deduplicable.defineMethod("deduplicate", function () {});
+      `,
+    });
+    const seats = (c: ClassInfo, name: string) =>
+      [...c.classMethods, ...c.instanceMethods]
+        .filter((m) => m.name === name)
+        .map((m) => `${m.isStatic ? "static" : "instance"}${m.writer ? " writer" : ""}`);
+    expect(seats(info.modules["conversion.ts:Conversion"], "paramDelimiter")).toEqual([
+      "static",
+      "static writer",
+      "instance writer",
+    ]);
+    expect(seats(info.modules["deduplicable.ts:Deduplicable"], "registry")).toEqual([
+      "static",
+      "static writer",
+      "instance",
+      "instance writer",
+    ]);
+  });
+
   it("credits mattrReader / mattrAccessor with only the halves each macro installs, and no predicate", () => {
     const info = extractFromFiles("/p", {
       "configurable.ts": `

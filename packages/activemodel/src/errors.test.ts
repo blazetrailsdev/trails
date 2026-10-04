@@ -17,6 +17,7 @@ import {
   extend,
 } from "@blazetrails/activesupport";
 import { FrozenError, Module, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { Psych } from "@blazetrails/ruby-compat/psych";
 import { Errors } from "./errors.js";
 import { Error as ModelError } from "./error.js";
 import { I18n } from "./i18n.js";
@@ -731,8 +732,30 @@ describe("ErrorsTest", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/parity/unported-files/unscoped.ts) — marshal
   });
 
-  it.skip("errors are compatible with YAML dumped from Rails 6.x", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/parity/unported-files/unscoped.ts) — psych
+  it("errors are compatible with YAML dumped from Rails 6.x", () => {
+    const yaml = [
+      "--- !ruby/object:ActiveModel::Errors",
+      "base: &1 !ruby/object:ErrorsTest::Person",
+      "  errors: !ruby/object:ActiveModel::Errors",
+      "    base: *1",
+      "    errors: []",
+      "errors:",
+      "- !ruby/object:ActiveModel::Error",
+      "  base: *1",
+      "  attribute: :name",
+      "  type: :invalid",
+      "  raw_type: :invalid",
+      "  options: {}",
+      "",
+    ].join("\n");
+
+    const errors = Psych.unsafeLoad(yaml) as Errors<Person>;
+    expect(Object.fromEntries(errors.messages)).toEqual({ name: ["is invalid"] });
+    expect(Object.fromEntries(errors.details)).toEqual({ name: [{ error: ":invalid" }] });
+
+    errors.clear();
+    expect(Object.fromEntries(errors.messages)).toEqual({});
+    expect(Object.fromEntries(errors.details)).toEqual({});
   });
 
   it("inspect", () => {

@@ -14,6 +14,7 @@ import {
   isEmpty,
   rbEqual,
   rbInspect,
+  rbDeclareIvar,
   rbModConstSet,
   rbModName,
   rbObjDup,
@@ -350,6 +351,8 @@ export class UnknownAttributeError<TRecord extends object = object> extends glob
 }
 
 rbModConstSet(ActiveModel, "Errors", Errors);
+rbDeclareIvar(Errors, "@errors", "_errors");
+rbDeclareIvar(Errors, "@base", "_base");
 ActiveModel.RangeError = RangeError;
 ActiveModel.StrictValidationFailed = StrictValidationFailed;
 ActiveModel.UnknownAttributeError = UnknownAttributeError;

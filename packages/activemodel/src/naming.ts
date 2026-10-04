@@ -127,7 +127,7 @@ export class ModelName {
   isUncountable: boolean;
 
   private _human: string;
-  private _klass: ModelLike | null;
+  private _klass: ModelLike;
   private _unnamespaced?: string;
 
   get cacheKey(): string {
@@ -182,14 +182,13 @@ export class ModelName {
     return this.name;
   }
 
-  /** @inventedArm if — CONVERGEABLE model-name-constructor-drops-the-string-klass-arm */
   constructor(
-    klass: ModelLike | string,
+    klass: ModelLike,
     namespace: object | null = null,
     name: string | null = null,
     locale = "en",
   ) {
-    this.name = (name ?? (typeof klass === "string" ? klass : rbModName(klass))) as string;
+    this.name = (name ?? rbModName(klass)) as string;
 
     if (isBlank(this.name))
       throw new ArgumentError(
@@ -203,7 +202,7 @@ export class ModelName {
         `${rbModName(namespace)}::`,
       )[0] as string;
     }
-    this._klass = typeof klass === "string" ? null : klass;
+    this._klass = klass;
     this.singular = this._singularize(this.name);
     this.plural = pluralize(this.singular, locale);
     this.isUncountable = this.plural === this.singular;
@@ -246,14 +245,14 @@ export class ModelName {
   /** @internal */
   i18nKeys(): string[] {
     return (this._cachedI18nKeys ||=
-      typeof this._klass?.lookupAncestors === "function"
+      typeof this._klass.lookupAncestors === "function"
         ? this._klass.lookupAncestors().map((klass) => klass.modelName.i18nKey)
         : []);
   }
 
   /** @internal */
   private i18nScope(): string[] {
-    const klassScope = this._klass?.i18nScope;
+    const klassScope = this._klass.i18nScope;
     return typeof klassScope === "string" ? [klassScope, "models"] : [];
   }
 

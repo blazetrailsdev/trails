@@ -56,14 +56,11 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   {
     testFile: "errors_test.rb",
     className: "ErrorsTest",
-    tests: ["errors are marshalable", "errors are compatible with YAML dumped from Rails 6.x"],
+    tests: ["errors are marshalable"],
     reason:
-      "Both deserialize an ActiveModel::Errors from a Ruby wire format: Marshal.dump/load " +
-      "(activemodel/test/cases/errors_test.rb:670-678) and a literal Rails-6 Psych dump with " +
-      "!ruby/object: tags loaded by YAML.unsafe_load (:680-703). Errors defines neither " +
-      "marshal_dump nor init_with, so both run Ruby's generic ivar-by-ivar object " +
-      "reconstruction, which JS has no counterpart for; trails has no Marshal and no Psych, " +
-      "and no Ruby-written dump can reach a trails process.",
+      "Deserializes an ActiveModel::Errors from Marshal.dump/load " +
+      "(activemodel/test/cases/errors_test.rb:670-678). Errors defines no marshal_dump, so " +
+      "it runs Ruby's generic ivar-by-ivar object reconstruction, and trails has no Marshal.",
   },
   {
     pattern: "message_pack.rb",

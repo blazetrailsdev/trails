@@ -35,7 +35,7 @@ class Post {
   }
 
   static get modelName(): ModelName {
-    const klass = "Post";
+    const klass = { name: "Post" };
 
     return new ModelName(klass);
   }
