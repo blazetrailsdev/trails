@@ -294,9 +294,6 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "thor",
         libPath: "lib/thor",
-        // `class Thor`'s class-level DSL (`desc`, `map`, `method_option`,
-        // `subcommand`, ...) is defined here, not under `lib/thor/`, and is
-        // ported in `packages/trailties/src/thor/thor.ts`.
         libEntryFile: "lib/thor.rb",
         testPath: "spec",
       },

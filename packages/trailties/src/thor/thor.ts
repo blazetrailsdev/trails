@@ -40,235 +40,6 @@ type Instance = {
 
 export type ThorClass = typeof Thor & Omit<BaseClass, keyof typeof Thor>;
 
-function packageName(this: ThorClass, name: string | null, _: object = {}): string | null {
-  return (this._packageName = name == null || name === "" ? null : name);
-}
-
-function defaultCommand(this: ThorClass, meth: string | null = null): string {
-  if (rtest(meth)) {
-    return (this._defaultCommand = meth === "none" ? "help" : rbObjAsString(meth));
-  } else {
-    if (!Object.hasOwn(this, "_defaultCommand") || !rtest(this._defaultCommand)) {
-      this._defaultCommand = this.fromSuperclass("defaultCommand", "help") as string;
-    }
-    return this._defaultCommand!;
-  }
-}
-
-function register(
-  this: ThorClass,
-  klass: ThorClass,
-  subcommandName: string,
-  usage: string,
-  description: string,
-  options: DescOptions = {},
-): void {
-  if (klass === Thor.Group || klass.prototype instanceof Thor.Group) {
-    this.desc(usage, description, options);
-    Object.defineProperty(this.prototype, subcommandName, {
-      value: function (this: Instance, ...args: unknown[]) {
-        return this.invoke(klass, args);
-      },
-      writable: true,
-      configurable: true,
-    });
-    this.methodAdded(subcommandName);
-  } else {
-    this.desc(usage, description, options);
-    this.subcommand(subcommandName, klass);
-  }
-}
-
-function desc(
-  this: ThorClass,
-  usage: string | null,
-  description: string | null,
-  options: DescOptions = {},
-): void {
-  if (rtest(options.for)) {
-    const command = this.findAndRefreshCommand(options.for!);
-    if (rtest(usage)) command.usage = usage;
-    if (rtest(description)) command.description = description;
-  } else {
-    this._usage = usage;
-    this._desc = description;
-    this._hide = rtest(options.hide) ? options.hide : false;
-  }
-}
-
-function longDesc(
-  this: ThorClass,
-  longDescription: string | null,
-  options: LongDescOptions = {},
-): void {
-  if (rtest(options.for)) {
-    const command = this.findAndRefreshCommand(options.for!);
-    if (rtest(longDescription)) command.longDescription = longDescription;
-  } else {
-    this._longDesc = longDescription;
-    this._longDescWrap = options.wrap !== false;
-  }
-}
-
-function map(
-  this: ThorClass,
-  mappings: Mappings | null = null,
-  kw: Record<string, string> = {},
-): Record<string, string> {
-  if (!Object.hasOwn(this, "_map") || !rtest(this._map)) {
-    this._map = this.fromSuperclass("map", {}) as Record<string, string>;
-  }
-
-  if (rtest(mappings) && !isEmpty(kw)) {
-    mappings = mergeBang(kw, mappings as Record<string, string>);
-  } else {
-    mappings ||= kw;
-  }
-  if (rtest(mappings)) {
-    eachPair(mappings as Map<string, string>, (key: string | string[], value) => {
-      if (Array.isArray(key)) {
-        key.forEach((subkey) => (this._map![subkey] = value));
-      } else {
-        this._map![key] = value;
-      }
-    });
-  }
-
-  return this._map!;
-}
-
-function methodOptions(
-  this: ThorClass,
-  options: Record<string, unknown> | null = null,
-): Record<string, Option> {
-  if (!Object.hasOwn(this, "_methodOptions") || !rtest(this._methodOptions)) {
-    this._methodOptions = {};
-  }
-  if (rtest(options)) this.buildOptions(options!, this._methodOptions!);
-  return this._methodOptions!;
-}
-
-function methodOption(
-  this: ThorClass,
-  name: string,
-  options: OptionOptions & { for?: string } = {},
-): Option {
-  if (typeof name !== "string") {
-    throw new ArgumentError(`Expected a Symbol or String, got ${rbInspect(name)}`);
-  }
-  const scope = rtest(options.for)
-    ? this.findAndRefreshCommand(options.for!).options
-    : this.methodOptions();
-
-  return this.buildOption(name, options, scope);
-}
-
-function methodExclusive(this: ThorClass, ...args: unknown[]): void {
-  this.registerOptionsRelationFor("methodOptions", "methodExclusiveOptionNames", ...args);
-}
-
-function methodAtLeastOne(this: ThorClass, ...args: unknown[]): void {
-  this.registerOptionsRelationFor("methodOptions", "methodAtLeastOneOptionNames", ...args);
-}
-
-function subcommands(this: ThorClass): string[] {
-  if (!Object.hasOwn(this, "_subcommands") || !rtest(this._subcommands)) {
-    this._subcommands = this.fromSuperclass("subcommands", []) as string[];
-  }
-  return this._subcommands!;
-}
-
-function subcommand(this: ThorClass, subcommand: string, subcommandClass: ThorClass): void {
-  this.subcommands().push(rbObjAsString(subcommand));
-  subcommandClass.subcommandHelp(subcommand);
-  this.subcommandClasses()[rbObjAsString(subcommand)] = subcommandClass;
-
-  Object.defineProperty(this.prototype, subcommand, {
-    value: function (this: Instance, ...args: unknown[]) {
-      let opts: unknown[];
-      [args, opts] = Arguments.split(args);
-      const invokeArgs: unknown[] = [
-        args,
-        opts,
-        { invokedViaSubcommand: true, classOptions: this.options },
-      ];
-      if (rtest(aryDelete(opts, "--help")) || rtest(aryDelete(opts, "-h"))) {
-        invokeArgs.unshift("help");
-      }
-      return this.invoke(subcommandClass, ...invokeArgs);
-    },
-    writable: true,
-    configurable: true,
-  });
-  this.methodAdded(subcommand);
-  eachPair(subcommandClass.commands(), (_meth, command) => {
-    command.ancestorName = subcommand;
-  });
-}
-
-/** @internal */
-function createCommand(this: ThorClass, meth: string): boolean {
-  if (!Object.hasOwn(this, "_usage") || !rtest(this._usage)) this._usage = null;
-  if (!Object.hasOwn(this, "_desc") || !rtest(this._desc)) this._desc = null;
-  if (!Object.hasOwn(this, "_longDesc") || !rtest(this._longDesc)) this._longDesc = null;
-  if (!Object.hasOwn(this, "_longDescWrap") || !rtest(this._longDescWrap)) {
-    this._longDescWrap = null;
-  }
-  if (!Object.hasOwn(this, "_hide") || !rtest(this._hide)) this._hide = null;
-
-  if (rtest(this._usage) && rtest(this._desc)) {
-    const baseClass = rtest(this._hide) ? HiddenCommand : Command;
-    const relations = {
-      exclusiveOptionNames: this.methodExclusiveOptionNames(),
-      atLeastOneOptionNames: this.methodAtLeastOneOptionNames(),
-    };
-    this.commands()[meth] = new baseClass(
-      meth,
-      this._desc!,
-      this._longDesc!,
-      this._longDescWrap!,
-      this._usage!,
-      this.methodOptions(),
-      relations,
-    );
-    this._usage = this._desc = this._longDesc = this._longDescWrap = null;
-    this._methodOptions = this._hide = null;
-    this._methodExclusiveOptionNames = this._methodAtLeastOneOptionNames = null;
-    return true;
-  } else if (rtest(this.allCommands()[meth]) || meth === "method_missing") {
-    return true;
-  } else {
-    puts.call(
-      STDOUT,
-      `[WARNING] Attempted to create command ${rbInspect(meth)} without usage or description. ` +
-        "Call desc if you want this method to be available as command or declare it inside a " +
-        `no_commands{} block. Invoked from ${rbInspect(rbFCaller()[1])}.`,
-    );
-    return false;
-  }
-}
-
-/** @internal */
-function subcommandHelp(this: ThorClass, cmd: string): void {
-  this.desc("help [COMMAND]", "Describe subcommands or one specific subcommand");
-  const prototype = this.prototype;
-  Object.defineProperty(prototype, "help", {
-    value: function (this: object, command: string | null = null, subcommand: unknown = true) {
-      const superMethod = (Object.getPrototypeOf(prototype) as Record<string, unknown>).help;
-      if (typeof superMethod !== "function") {
-        throw new NoMethodError(
-          `super: no superclass method 'help' for an instance of ${rbModToS(prototype.constructor as never)}`,
-          "help",
-        );
-      }
-      return superMethod.call(this, command, subcommand);
-    },
-    writable: true,
-    configurable: true,
-  });
-  this.methodAdded("help");
-}
-
 export class Thor {
   declare static Group: abstract new (...args: never[]) => object;
 
@@ -303,33 +74,149 @@ export class Thor {
   /** @internal */
   static _methodAtLeastOneOptionNames?: string[][] | null;
 
-  static packageName = packageName;
+  static packageName(this: ThorClass, name: string | null, _: object = {}): string | null {
+    return (this._packageName = name == null || name === "" ? null : name);
+  }
 
-  static defaultCommand = defaultCommand;
-  static defaultTask = defaultCommand;
+  static defaultCommand(this: ThorClass, meth: string | null = null): string {
+    if (rtest(meth)) {
+      return (this._defaultCommand = meth === "none" ? "help" : rbObjAsString(meth));
+    } else {
+      if (!Object.hasOwn(this, "_defaultCommand") || !rtest(this._defaultCommand)) {
+        this._defaultCommand = this.fromSuperclass("defaultCommand", "help") as string;
+      }
+      return this._defaultCommand!;
+    }
+  }
+  declare static defaultTask: typeof Thor.defaultCommand;
 
-  static register = register;
+  static register(
+    this: ThorClass,
+    klass: ThorClass,
+    subcommandName: string,
+    usage: string,
+    description: string,
+    options: DescOptions = {},
+  ): void {
+    if (klass === Thor.Group || klass.prototype instanceof Thor.Group) {
+      this.desc(usage, description, options);
+      Object.defineProperty(this.prototype, subcommandName, {
+        value: function (this: Instance, ...args: unknown[]) {
+          return this.invoke(klass, args);
+        },
+        writable: true,
+        configurable: true,
+      });
+      this.methodAdded(subcommandName);
+    } else {
+      this.desc(usage, description, options);
+      this.subcommand(subcommandName, klass);
+    }
+  }
 
-  static desc = desc;
+  static desc(
+    this: ThorClass,
+    usage: string | null,
+    description: string | null,
+    options: DescOptions = {},
+  ): void {
+    if (rtest(options.for)) {
+      const command = this.findAndRefreshCommand(options.for!);
+      if (rtest(usage)) command.usage = usage;
+      if (rtest(description)) command.description = description;
+    } else {
+      this._usage = usage;
+      this._desc = description;
+      this._hide = rtest(options.hide) ? options.hide : false;
+    }
+  }
 
-  static longDesc = longDesc;
+  static longDesc(
+    this: ThorClass,
+    longDescription: string | null,
+    options: LongDescOptions = {},
+  ): void {
+    if (rtest(options.for)) {
+      const command = this.findAndRefreshCommand(options.for!);
+      if (rtest(longDescription)) command.longDescription = longDescription;
+    } else {
+      this._longDesc = longDescription;
+      this._longDescWrap = options.wrap !== false;
+    }
+  }
 
-  static map = map;
+  static map(
+    this: ThorClass,
+    mappings: Mappings | null = null,
+    kw: Record<string, string> = {},
+  ): Record<string, string> {
+    if (!Object.hasOwn(this, "_map") || !rtest(this._map)) {
+      this._map = this.fromSuperclass("map", {}) as Record<string, string>;
+    }
 
-  static methodOptions = methodOptions;
-  static options = methodOptions;
+    if (rtest(mappings) && !isEmpty(kw)) {
+      mappings = mergeBang(kw, mappings as Record<string, string>);
+    } else {
+      mappings ||= kw;
+    }
+    if (rtest(mappings)) {
+      eachPair(mappings as Map<string, string>, (key: string | string[], value) => {
+        if (Array.isArray(key)) {
+          key.forEach((subkey) => (this._map![subkey] = value));
+        } else {
+          this._map![key] = value;
+        }
+      });
+    }
 
-  static methodOption = methodOption;
-  static option = methodOption;
+    return this._map!;
+  }
 
-  static methodExclusive = methodExclusive;
-  static exclusive = methodExclusive;
+  static methodOptions(
+    this: ThorClass,
+    options: Record<string, unknown> | null = null,
+  ): Record<string, Option> {
+    if (!Object.hasOwn(this, "_methodOptions") || !rtest(this._methodOptions)) {
+      this._methodOptions = {};
+    }
+    if (rtest(options)) this.buildOptions(options!, this._methodOptions!);
+    return this._methodOptions!;
+  }
+  declare static options: typeof Thor.methodOptions;
 
-  static methodAtLeastOne = methodAtLeastOne;
-  static atLeastOne = methodAtLeastOne;
+  static methodOption(
+    this: ThorClass,
+    name: string,
+    options: OptionOptions & { for?: string } = {},
+  ): Option {
+    if (typeof name !== "string") {
+      throw new ArgumentError(`Expected a Symbol or String, got ${rbInspect(name)}`);
+    }
+    const scope = rtest(options.for)
+      ? this.findAndRefreshCommand(options.for!).options
+      : this.methodOptions();
 
-  static subcommands = subcommands;
-  static subtasks = subcommands;
+    return this.buildOption(name, options, scope);
+  }
+  declare static option: typeof Thor.methodOption;
+
+  static methodExclusive(this: ThorClass, ...args: unknown[]): void {
+    this.registerOptionsRelationFor("methodOptions", "methodExclusiveOptionNames", ...args);
+  }
+  declare static exclusive: typeof Thor.methodExclusive;
+
+  static methodAtLeastOne(this: ThorClass, ...args: unknown[]): void {
+    this.registerOptionsRelationFor("methodOptions", "methodAtLeastOneOptionNames", ...args);
+  }
+  declare static atLeastOne: typeof Thor.methodAtLeastOne;
+
+  static subcommands(this: ThorClass): string[] {
+    if (!Object.hasOwn(this, "_subcommands") || !rtest(this._subcommands)) {
+      this._subcommands = this.fromSuperclass("subcommands", []) as string[];
+    }
+    return this._subcommands!;
+  }
+  declare static subtasks: typeof Thor.subcommands;
 
   static subcommandClasses(this: ThorClass): Record<string, ThorClass> {
     if (!Object.hasOwn(this, "_subcommandClasses") || !rtest(this._subcommandClasses)) {
@@ -338,8 +225,34 @@ export class Thor {
     return this._subcommandClasses!;
   }
 
-  static subcommand = subcommand;
-  static subtask = subcommand;
+  static subcommand(this: ThorClass, subcommand: string, subcommandClass: ThorClass): void {
+    this.subcommands().push(rbObjAsString(subcommand));
+    subcommandClass.subcommandHelp(subcommand);
+    this.subcommandClasses()[rbObjAsString(subcommand)] = subcommandClass;
+
+    Object.defineProperty(this.prototype, subcommand, {
+      value: function (this: Instance, ...args: unknown[]) {
+        let opts: unknown[];
+        [args, opts] = Arguments.split(args);
+        const invokeArgs: unknown[] = [
+          args,
+          opts,
+          { invokedViaSubcommand: true, classOptions: this.options },
+        ];
+        if (rtest(aryDelete(opts, "--help")) || rtest(aryDelete(opts, "-h"))) {
+          invokeArgs.unshift("help");
+        }
+        return this.invoke(subcommandClass, ...invokeArgs);
+      },
+      writable: true,
+      configurable: true,
+    });
+    this.methodAdded(subcommand);
+    eachPair(subcommandClass.commands(), (_meth, command) => {
+      command.ancestorName = subcommand;
+    });
+  }
+  declare static subtask: typeof Thor.subcommand;
 
   static checkUnknownOptionsBang(this: ThorClass, options: CheckUnknownOptions = {}): unknown {
     if (!Object.hasOwn(this, "_checkUnknownOptions") || !rtest(this._checkUnknownOptions)) {
@@ -438,9 +351,48 @@ export class Thor {
   }
 
   /** @internal */
-  static createCommand = createCommand;
+  static createCommand(this: ThorClass, meth: string): boolean {
+    if (!Object.hasOwn(this, "_usage") || !rtest(this._usage)) this._usage = null;
+    if (!Object.hasOwn(this, "_desc") || !rtest(this._desc)) this._desc = null;
+    if (!Object.hasOwn(this, "_longDesc") || !rtest(this._longDesc)) this._longDesc = null;
+    if (!Object.hasOwn(this, "_longDescWrap") || !rtest(this._longDescWrap)) {
+      this._longDescWrap = null;
+    }
+    if (!Object.hasOwn(this, "_hide") || !rtest(this._hide)) this._hide = null;
+
+    if (rtest(this._usage) && rtest(this._desc)) {
+      const baseClass = rtest(this._hide) ? HiddenCommand : Command;
+      const relations = {
+        exclusiveOptionNames: this.methodExclusiveOptionNames(),
+        atLeastOneOptionNames: this.methodAtLeastOneOptionNames(),
+      };
+      this.commands()[meth] = new baseClass(
+        meth,
+        this._desc!,
+        this._longDesc!,
+        this._longDescWrap!,
+        this._usage!,
+        this.methodOptions(),
+        relations,
+      );
+      this._usage = this._desc = this._longDesc = this._longDescWrap = null;
+      this._methodOptions = this._hide = null;
+      this._methodExclusiveOptionNames = this._methodAtLeastOneOptionNames = null;
+      return true;
+    } else if (rtest(this.allCommands()[meth]) || meth === "method_missing") {
+      return true;
+    } else {
+      puts.call(
+        STDOUT,
+        `[WARNING] Attempted to create command ${rbInspect(meth)} without usage or description. ` +
+          "Call desc if you want this method to be available as command or declare it inside a " +
+          `no_commands{} block. Invoked from ${rbInspect(rbFCaller()[1])}.`,
+      );
+      return false;
+    }
+  }
   /** @internal */
-  static createTask = createCommand;
+  declare static createTask: typeof Thor.createCommand;
 
   /** @internal */
   static initializeAdded(this: ThorClass): void {
@@ -449,14 +401,42 @@ export class Thor {
   }
 
   /** @internal */
-  static subcommandHelp = subcommandHelp;
+  static subcommandHelp(this: ThorClass, cmd: string): void {
+    this.desc("help [COMMAND]", "Describe subcommands or one specific subcommand");
+    const prototype = this.prototype;
+    Object.defineProperty(prototype, "help", {
+      value: function (this: object, command: string | null = null, subcommand: unknown = true) {
+        const superMethod = (Object.getPrototypeOf(prototype) as Record<string, unknown>).help;
+        if (typeof superMethod !== "function") {
+          throw new NoMethodError(
+            `super: no superclass method 'help' for an instance of ${rbModToS(prototype.constructor as never)}`,
+            "help",
+          );
+        }
+        return superMethod.call(this, command, subcommand);
+      },
+      writable: true,
+      configurable: true,
+    });
+    this.methodAdded("help");
+  }
   /** @internal */
-  static subtaskHelp = subcommandHelp;
+  declare static subtaskHelp: typeof Thor.subcommandHelp;
 
   constructor(...args: unknown[]) {
     initializeIncludedModules(this, ...args);
   }
 }
+
+Thor.defaultTask = Thor.defaultCommand;
+Thor.options = Thor.methodOptions;
+Thor.option = Thor.methodOption;
+Thor.exclusive = Thor.methodExclusive;
+Thor.atLeastOne = Thor.methodAtLeastOne;
+Thor.subtasks = Thor.subcommands;
+Thor.subtask = Thor.subcommand;
+Thor.createTask = Thor.createCommand;
+Thor.subtaskHelp = Thor.subcommandHelp;
 
 include(Thor, Base);
 extend(Thor, ClassMethods);

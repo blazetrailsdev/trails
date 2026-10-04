@@ -370,9 +370,6 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
         if (ent === host) {
           for (const m of ent.classMethods ?? []) {
             note(host.file, m.name, m.visibility);
-            // A class reopened in a second `.rb` (`class Thor` in `thor.rb`,
-            // first opened in `thor/base.rb`) ports those methods in the file
-            // mirroring the reopening, so they project there as well.
             if (m.file && m.file !== host.file) {
               if (m.visibility !== "public") noteEntity(m.file, host.fqn);
               note(m.file, m.name, m.visibility);
