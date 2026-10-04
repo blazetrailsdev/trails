@@ -26,6 +26,7 @@ import {
   rbObjAsString as toS,
   rbObjRespondTo,
   Range,
+  Rational,
 } from "@blazetrails/ruby-compat";
 import { raiseIntWiderThan64bit } from "../../active-record.js";
 import { ConnectionNotEstablished } from "../../errors.js";
@@ -36,9 +37,6 @@ export class IntegerOutOf64BitRange extends Error {
     this.name = "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting::IntegerOutOf64BitRange";
   }
 }
-
-const PG_INT64_MIN = BigInt("-9223372036854775808");
-const PG_INT64_MAX = BigInt("9223372036854775807");
 
 export interface BinaryBind {
   value: string;
@@ -58,8 +56,8 @@ export interface CastTypeLookupHost {
   lookupCastType(sqlType: string | null): ValueType;
 }
 
-const QUOTED_COLUMN_NAMES = new Map<unknown, string>();
-const QUOTED_TABLE_NAMES = new Map<unknown, string>();
+const QUOTED_COLUMN_NAMES: Record<string, string> = Object.create(null);
+const QUOTED_TABLE_NAMES: Record<string, string> = Object.create(null);
 
 export function escapeBytea(value: Buffer | Uint8Array | string): string {
   const buffer = typeof value === "string" ? Buffer.from(value, "binary") : Buffer.from(value);
@@ -95,8 +93,7 @@ export function unescapeBytea(value: string): Buffer {
 }
 
 export function checkIntInRange(value: bigint | number): void {
-  const bigVal = typeof value === "bigint" ? value : BigInt(Math.trunc(value));
-  if (bigVal > PG_INT64_MAX || bigVal < PG_INT64_MIN) {
+  if (value > 9223372036854775807n || value < -9223372036854775808n) {
     const exception = `Provided value outside of the range of a signed 64bit integer.
 
 PostgreSQL will treat the column type in question as a numeric.
@@ -127,14 +124,10 @@ export function quote(this: QuotingDispatchHost, value: unknown): string | null 
     return null;
   }
   if (typeof value === "number" || typeof value === "bigint" || value instanceof BigDecimal) {
-    if (
-      value instanceof BigDecimal
-        ? value.isFinite()
-        : typeof value === "bigint" || Number.isFinite(value)
-    ) {
+    if (rbFSend(value, "isFinite")) {
       return abstractQuote.call(this, value);
     } else {
-      return `'${String(value)}'`;
+      return `'${toS(value)}'`;
     }
   }
   if (value instanceof ArrayData) {
@@ -203,6 +196,9 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   }
   if (value instanceof Range) {
     return encodeRange.call(this, value);
+  }
+  if (value instanceof Rational) {
+    return value.toF();
   }
   return abstractTypeCast.call(this, value);
 }
@@ -299,21 +295,13 @@ export function columnNameWithOrderMatcher(): RegExp {
 }
 
 export function quoteColumnName(name: unknown): string {
-  let quoted = QUOTED_COLUMN_NAMES.get(name);
-  if (quoted === undefined) {
-    quoted = `"${toS(name).replace(/"/g, '""')}"`;
-    QUOTED_COLUMN_NAMES.set(name, quoted);
-  }
-  return quoted;
+  return (QUOTED_COLUMN_NAMES[name as string] ||= `"${toS(name).replace(/"/g, '""')}"`);
 }
 
 export function quoteTableName(name: unknown): string {
-  let quoted = QUOTED_TABLE_NAMES.get(name);
-  if (quoted === undefined) {
-    quoted = Utils.extractSchemaQualifiedName(toS(name)).quoted();
-    QUOTED_TABLE_NAMES.set(name, quoted);
-  }
-  return quoted;
+  return (QUOTED_TABLE_NAMES[name as string] ||= Utils.extractSchemaQualifiedName(
+    toS(name),
+  ).quoted());
 }
 
 function regtypeOid(this: RegtypeOidHost, sqlType: string | null): string | number | null {

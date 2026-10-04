@@ -2,6 +2,8 @@ import {
   ArgumentError,
   kernelFloat,
   rbEqual,
+  rbObjAsString,
+  rbStrSend,
   registerConstant,
   Struct,
 } from "@blazetrails/ruby-compat";
@@ -42,16 +44,12 @@ export class Point extends ValueType {
       return this.buildPoint(x, y);
     }
     if (globalThis.Array.isArray(value)) {
-      if (value.length !== 2) {
-        throw new ArgumentError(`wrong number of arguments (given ${value.length}, expected 2)`);
-      }
-      return this.buildPoint(value[0], value[1]);
+      return this.buildPoint(...(value as [unknown, unknown]));
     }
     if (isPlainObject(value)) {
       if (isBlank(value)) return null;
 
-      const [x, y] = valuesArrayFromHash(value);
-      return this.buildPoint(x, y);
+      return this.buildPoint(...valuesArrayFromHash(value));
     }
     return value;
   }
@@ -61,14 +59,10 @@ export class Point extends ValueType {
       return `(${this.numberForPoint(value.x)},${this.numberForPoint(value.y)})`;
     }
     if (globalThis.Array.isArray(value)) {
-      if (value.length !== 2) {
-        throw new ArgumentError(`wrong number of arguments (given ${value.length}, expected 2)`);
-      }
-      return this.serialize(this.buildPoint(value[0], value[1]));
+      return this.serialize(this.buildPoint(...(value as [unknown, unknown])));
     }
     if (isPlainObject(value)) {
-      const [x, y] = valuesArrayFromHash(value);
-      return this.serialize(this.buildPoint(x, y));
+      return this.serialize(this.buildPoint(...valuesArrayFromHash(value)));
     }
     return super.serialize(value);
   }
@@ -81,12 +75,14 @@ export class Point extends ValueType {
   }
 
   private numberForPoint(number: unknown): string {
-    const s = String(number);
-    return s.endsWith(".0") ? s.slice(0, -2) : s;
+    return rbStrSend(rbObjAsString(number), "deleteSuffix", ".0")[0] as string;
   }
 
   /** @missingRailsName float — PERMANENT */
   private buildPoint(x: unknown, y: unknown): InstanceType<typeof ActiveRecord.Point> {
+    if (arguments.length !== 2) {
+      throw new ArgumentError(`wrong number of arguments (given ${arguments.length}, expected 2)`);
+    }
     return new ActiveRecord.Point(kernelFloat(x), kernelFloat(y));
   }
 }

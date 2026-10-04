@@ -98,7 +98,7 @@ interface ExecInsertHost extends LastInsertIdResultHost {
   isUseInsertReturning(): boolean;
   lock: { synchronize<T>(block: () => Promise<T>): Promise<T> };
   primaryKey(tableName: string): unknown;
-  defaultSequenceName(tableRef: string, pk: string): Promise<string | null> | string | null;
+  defaultSequenceName(tableRef: string, pk: string | null): Promise<string | null> | string | null;
   /** @internal */
   lastInsertIdResult(sequenceName: string): Promise<Result>;
 }
@@ -163,8 +163,8 @@ export async function execInsert(
       const tableRef = extractTableRefFromInsertSql.call(this as never, sql);
       if (tableRef) {
         if (pk == null) pk = (await this.primaryKey(tableRef)) as string | null;
-        pk = suppressCompositePrimaryKey(typeof pk === "string" ? pk : undefined) ?? null;
-        sequenceName = pk ? await this.defaultSequenceName(tableRef, pk) : null;
+        pk = suppressCompositePrimaryKey(pk as string | string[] | null);
+        sequenceName = await this.defaultSequenceName(tableRef, pk);
       }
       if (!sequenceName) return result;
     }
@@ -249,10 +249,11 @@ interface SetConstraintsHost {
   execute(sql: string, name?: string | null): Promise<unknown>;
 }
 
+/** @inventedArm map — CONVERGEABLE build-explain-clause-joins-symbol-options-through-array-join */
 export async function buildExplainClause(options: ExplainOption[] = []): Promise<string> {
   if (options.length === 0) return "EXPLAIN";
   return `EXPLAIN (${options
-    .map((option) => (option.startsWith(":") ? option.slice(1) : option))
+    .map((option) => option.replace(/^:/, ""))
     .join(", ")
     .toUpperCase()})`;
 }
@@ -456,8 +457,8 @@ export function returningColumnValues(result: Result): unknown[] | undefined {
 }
 
 /** @internal */
-export function suppressCompositePrimaryKey(pk: string | string[] | undefined): string | undefined {
-  return Array.isArray(pk) ? undefined : pk;
+export function suppressCompositePrimaryKey(pk: string | string[] | null): string | null {
+  return Array.isArray(pk) ? null : pk;
 }
 
 const ACTIONABLE_LEVELS = new Set(["WARNING", "ERROR", "FATAL", "PANIC"]);

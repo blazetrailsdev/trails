@@ -1,5 +1,12 @@
 import { ArgumentError, ValueType } from "@blazetrails/activemodel";
-import { stringInspect, registerConstant } from "@blazetrails/ruby-compat";
+import { isPlainObject } from "@blazetrails/activesupport";
+import {
+  rbEqual,
+  rbObjRespondTo,
+  registerConstant,
+  stringInspect,
+  StringScanner,
+} from "@blazetrails/ruby-compat";
 
 import { StringKeyedHashAccessor } from "../../../store.js";
 
@@ -13,74 +20,68 @@ export class Hstore extends ValueType<Record<string, string | null>> {
   override deserialize(value: unknown): Record<string, string | null> | null {
     if (typeof value !== "string") return value as Record<string, string | null> | null;
 
-    const string = value;
-    let pos = 0;
-    const scan = (pattern: RegExp): string | null => {
-      pattern.lastIndex = pos;
-      const match = pattern.exec(string);
-      if (match === null) return null;
-      pos = pattern.lastIndex;
-      return match[0];
-    };
+    const scanner = new StringScanner(value);
     const hash: Record<string, string | null> = {};
 
-    while (pos < string.length) {
-      if (scan(/"/y) === null) {
-        throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+    while (!scanner.isEos()) {
+      if (scanner.skip(/"/) === null) {
+        throw new ArgumentError(ERROR.replace("%s", stringInspect(scanner.string)));
       }
 
-      let key = scan(/(\\[\\"]|[^\\"])*?(?=")/y);
+      let key = scanner.scan(/^(\\[\\"]|[^\\"])*?(?=")/);
       if (key === null) {
-        throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+        throw new ArgumentError(ERROR.replace("%s", stringInspect(scanner.string)));
       }
 
-      if (scan(/"=>?/y) === null) {
-        throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+      if (scanner.skip(/"=>?/) === null) {
+        throw new ArgumentError(ERROR.replace("%s", stringInspect(scanner.string)));
       }
 
-      if (scan(/NULL/y) !== null) {
+      if (scanner.scan(/NULL/) !== null) {
         value = null;
       } else {
-        if (scan(/"/y) === null) {
-          throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+        if (scanner.skip(/"/) === null) {
+          throw new ArgumentError(ERROR.replace("%s", stringInspect(scanner.string)));
         }
 
-        value = scan(/(\\[\\"]|[^\\"])*?(?=")/y);
+        value = scanner.scan(/^(\\[\\"]|[^\\"])*?(?=")/);
         if (value === null) {
-          throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+          throw new ArgumentError(ERROR.replace("%s", stringInspect(scanner.string)));
         }
 
-        if (scan(/"/y) === null) {
-          throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+        if (scanner.skip(/"/) === null) {
+          throw new ArgumentError(ERROR.replace("%s", stringInspect(scanner.string)));
         }
       }
 
-      key = key.replaceAll('\\"', '"').replaceAll("\\\\", "\\");
+      key = key.replaceAll('\\"', '"');
+      key = key.replaceAll("\\\\", "\\");
 
       if (value !== null) {
-        value = (value as string).replaceAll('\\"', '"').replaceAll("\\\\", "\\");
+        value = (value as string).replaceAll('\\"', '"');
+        value = (value as string).replaceAll("\\\\", "\\");
       }
 
       hash[key] = value as string | null;
 
-      if (scan(/, /y) === null && pos < string.length) {
-        throw new ArgumentError(ERROR.replace("%s", stringInspect(string)));
+      if (!(scanner.skip(/, /) !== null || scanner.isEos())) {
+        throw new ArgumentError(ERROR.replace("%s", stringInspect(scanner.string)));
       }
     }
 
     return hash;
   }
 
-  override serialize(value: unknown): string | null {
-    if (value == null) return null;
+  override serialize(value: unknown): unknown {
     if (isPlainObject(value)) {
-      const hash = value as Record<string, unknown>;
-      return Object.entries(hash)
+      return Object.entries(value)
         .map(([k, v]) => `${escapeHstore(k)}=>${escapeHstore(v as string | null)}`)
         .join(", ");
+    } else if (rbObjRespondTo(value, "toUnsafeH")) {
+      return this.serialize((value as { toUnsafeH(): unknown }).toUnsafeH());
+    } else {
+      return value;
     }
-    if (typeof value === "string") return value;
-    return null;
   }
 
   accessor(): typeof StringKeyedHashAccessor {
@@ -88,10 +89,7 @@ export class Hstore extends ValueType<Record<string, string | null>> {
   }
 
   override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
-    const oldHash = this.deserialize(rawOldValue);
-    if (oldHash == null && newValue == null) return false;
-    if (oldHash == null || newValue == null) return true;
-    return !hashesEqual(oldHash, newValue as Record<string, unknown>);
+    return !rbEqual(this.deserialize(rawOldValue), newValue);
   }
 
   override isMutable(): boolean {
@@ -104,24 +102,6 @@ export class Hstore extends ValueType<Record<string, string | null>> {
     if (typeof serialized !== "string") return null;
     return this.deserialize(serialized);
   }
-}
-
-function isPlainObject(value: unknown): boolean {
-  if (value == null || typeof value !== "object") return false;
-  if (Array.isArray(value)) return false;
-  const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
-}
-
-function hashesEqual(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
-  const ak = Object.keys(a);
-  const bk = Object.keys(b);
-  if (ak.length !== bk.length) return false;
-  for (const k of ak) {
-    if (!Object.prototype.hasOwnProperty.call(b, k)) return false;
-    if (a[k] !== b[k]) return false;
-  }
-  return true;
 }
 
 /** @internal */

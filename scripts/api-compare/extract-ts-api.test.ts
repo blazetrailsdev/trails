@@ -1138,11 +1138,24 @@ describe("body call capture", () => {
         otherMessage(options: object) {
           if (!("type" in options)) throw new ArgumentError("type is required");
         }
+        argc(x: unknown, y: unknown) {
+          if (arguments.length !== 2) {
+            throw new ArgumentError(
+              \`wrong number of arguments (given \${arguments.length}, expected 2)\`,
+            );
+          }
+          return this.run(x, y);
+        }
+        argcOtherMessage(x: unknown) {
+          if (arguments.length !== 1) throw new ArgumentError("one argument, please");
+        }
       }`,
     );
     const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
     expect(skeleton("required")).toEqual(["ref:extractOptionsBang", "ref:run"]);
     expect(skeleton("arity")).toEqual(["ref:run"]);
+    expect(skeleton("argc")).toEqual(["ref:run"]);
+    expect(skeleton("argcOtherMessage")!.filter((t) => !t.includes(":"))).toEqual(["if"]);
     const arms = (name: string) => skeleton(name)!.filter((t) => !t.includes(":"));
     for (const kept of ["positionalArray", "afterSideEffect", "notAnArgument", "otherMessage"]) {
       expect(arms(kept)).toEqual(["if"]);

@@ -2,7 +2,7 @@ import { Column as BaseColumn } from "../column.js";
 import type { ColumnCoder } from "../column.js";
 import { TypeMetadata } from "./type-metadata.js";
 import { isPresent } from "@blazetrails/activesupport";
-import { rbHash } from "@blazetrails/ruby-compat";
+import { rbHash, rbStrSend } from "@blazetrails/ruby-compat";
 
 export class Column extends BaseColumn {
   private _serial: boolean;
@@ -73,9 +73,8 @@ export class Column extends BaseColumn {
     return this.sqlTypeMetadata?.type === "enum";
   }
 
-  override get sqlType(): string | null {
-    const raw = super.sqlType;
-    return raw?.endsWith("[]") ? raw.slice(0, -2) : (raw ?? null);
+  override get sqlType(): string {
+    return rbStrSend(super.sqlType!, "deleteSuffix", "[]")[0] as string;
   }
 
   override equals(other: unknown): boolean {

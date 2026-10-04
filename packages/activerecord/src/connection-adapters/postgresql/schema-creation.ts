@@ -75,14 +75,15 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   /** @internal */
   protected visitExclusionConstraintDefinition(o: ExclusionConstraintDefinition): string {
-    const p: string[] = [];
-    if (o.name) p.push("CONSTRAINT", this.conn.quoteColumnName(o.name));
-    p.push("EXCLUDE");
-    if (o.using) p.push(`USING ${o.using}`);
-    p.push(`(${o.expression})`);
-    if (o.where) p.push(`WHERE (${o.where})`);
-    if (o.deferrable) p.push(`DEFERRABLE INITIALLY ${String(o.deferrable).toUpperCase()}`);
-    return p.join(" ");
+    const sql = ["CONSTRAINT"];
+    sql.push(this.conn.quoteColumnName(o.name));
+    sql.push("EXCLUDE");
+    if (o.using) sql.push(`USING ${o.using}`);
+    sql.push(`(${o.expression})`);
+    if (o.where) sql.push(`WHERE (${o.where})`);
+    if (o.deferrable) sql.push(`DEFERRABLE INITIALLY ${String(o.deferrable).toUpperCase()}`);
+
+    return sql.join(" ");
   }
 
   /** @internal */
@@ -171,12 +172,10 @@ export class SchemaCreation extends AbstractSchemaCreation {
   protected override addColumnOptionsBang(sql: string, options: AddColumnOptions): Promise<string> {
     const opts = options as Record<string, unknown>;
     if (opts["collation"]) {
-      sql += ` COLLATE ${this.conn.quoteColumnName(String(opts["collation"]))}`;
+      sql += ` COLLATE "${opts["collation"]}"`;
     }
-    const col = opts["column"] as { type?: string; name?: string } | undefined;
-    if (col?.type === "uuid" && opts["primaryKey"] && !("default" in opts)) {
-      sql += " DEFAULT gen_random_uuid()";
-    }
+
+    const col = opts["column"] as { name?: string };
     const as = opts["as"];
     if (as != null && as !== false) {
       sql += ` GENERATED ALWAYS AS (${as})`;
@@ -186,7 +185,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
       } else {
         throw new ArgumentError(
           `PostgreSQL currently does not support VIRTUAL (not persisted) generated columns.\n` +
-            `Specify 'stored: true' option for '${col?.name}'\n`,
+            `Specify 'stored: true' option for '${col.name}'\n`,
         );
       }
     }

@@ -10,6 +10,7 @@ import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.j
 import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 import { wrap } from "@blazetrails/activesupport";
+import { fetch } from "@blazetrails/ruby-compat";
 
 export interface ColumnMethods {
   bigserial(...names: string[]): unknown;
@@ -281,6 +282,21 @@ export class TableDefinition extends AbstractTableDefinition {
     } else {
       return "serial";
     }
+  }
+
+  override primaryKey(
+    name: string,
+    type: ColumnType = "primary_key",
+    options: ColumnOptions = {},
+  ): this {
+    if (type === "uuid") {
+      options = {
+        ...options,
+        default: fetch(options as Record<string, unknown>, "default", "gen_random_uuid()"),
+      };
+    }
+
+    return super.primaryKey(name, type, options);
   }
 }
 

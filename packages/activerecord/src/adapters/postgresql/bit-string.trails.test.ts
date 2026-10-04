@@ -42,7 +42,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       const type = new Bit();
       expect(type.castValue("0101")).toBe("0101");
       expect(type.castValue("0xFF")).toBe("11111111");
-      expect(type.castValue(null)).toBeNull();
+      expect(type.cast(null)).toBeNull();
+      expect(type.castValue(12)).toBe("12");
     });
 
     it("bit string invalid", async () => {
