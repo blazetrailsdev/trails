@@ -5184,12 +5184,19 @@ function isArgumentBindingGuard(statement: ts.IfStatement): boolean {
     const declaration = ts.isVariableStatement(earlier)
       ? earlier.declarationList.declarations[0]
       : undefined;
-    const call = declaration?.initializer;
-    if (!call || !ts.isCallExpression(call) || !ts.isIdentifier(declaration.name)) return false;
+    let call = declaration?.initializer;
+    while (call && (ts.isAsExpression(call) || ts.isParenthesizedExpression(call))) {
+      call = call.expression;
+    }
+    if (!call || !ts.isCallExpression(call) || !ts.isIdentifier(declaration!.name)) return false;
+    if (splat.some((name) => call.expression.getText() === `${name}.pop`)) {
+      bound.push(declaration!.name.text);
+      continue;
+    }
     const [rest] = call.arguments;
     if (call.expression.getText() !== "extractOptionsBang" || !ts.isIdentifier(rest)) return false;
     if (!splat.includes(rest.text)) return false;
-    bound.push(declaration.name.text);
+    bound.push(declaration!.name.text);
   }
   let test = statement.expression;
   let message: RegExp;

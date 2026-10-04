@@ -368,6 +368,10 @@ describe("configurations is a single process-global registry", () => {
 describe("compare", () => {
   fixtures(["topics"]);
 
+  it("find_by with an empty hash takes the cached path", async () => {
+    expect(await Topic.findBy({})).toBeInstanceOf(Topic);
+  });
+
   it("orders same-class records by primary key and reports nil as undefined", async () => {
     const first = await Topic.find(1);
     const second = await Topic.find(3);

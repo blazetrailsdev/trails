@@ -1191,15 +1191,32 @@ describe("body call capture", () => {
         argcOtherMessage(x: unknown) {
           if (arguments.length !== 1) throw new ArgumentError("one argument, please");
         }
+        popped(...classes: unknown[]) {
+          const block = classes.pop() as () => unknown;
+          const options = classes.pop() as object;
+          if (!("role" in options)) throw new ArgumentError("missing keyword: :role");
+          return this.run(classes, block);
+        }
+        poppedElsewhere(other: unknown[], ...classes: unknown[]) {
+          const options = other.pop() as object;
+          if (!("role" in options)) throw new ArgumentError("missing keyword: :role");
+        }
       }`,
     );
     const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
     expect(skeleton("required")).toEqual(["ref:extractOptionsBang", "ref:run"]);
     expect(skeleton("arity")).toEqual(["ref:run"]);
     expect(skeleton("argc")).toEqual(["ref:run"]);
+    expect(skeleton("popped")).toEqual(["ref:pop", "ref:pop", "ref:run"]);
     expect(skeleton("argcOtherMessage")!.filter((t) => !t.includes(":"))).toEqual(["if"]);
     const arms = (name: string) => skeleton(name)!.filter((t) => !t.includes(":"));
-    for (const kept of ["positionalArray", "afterSideEffect", "notAnArgument", "otherMessage"]) {
+    for (const kept of [
+      "positionalArray",
+      "afterSideEffect",
+      "notAnArgument",
+      "otherMessage",
+      "poppedElsewhere",
+    ]) {
       expect(arms(kept)).toEqual(["if"]);
     }
   });

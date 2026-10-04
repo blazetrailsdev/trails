@@ -474,6 +474,7 @@ interface CoreHost {
   _destroyAssociationAsyncJob?: any;
   destroyAssociationAsyncJob?: any;
   _findByStatementCache?: FindByStatementCache;
+  initializeFindByCache(): FindByStatementCache;
   _generatedAssociationMethods?: Module;
   _predicateBuilder?: any;
   arelTable?: any;
@@ -662,7 +663,14 @@ export function initializeGeneratedModules(this: CoreHost): void {
   generatedAssociationMethods.call(this);
 }
 
+/**
+ * @inventedArm if — PERMANENT
+ * @inventedArm initializeGeneratedModules — PERMANENT
+ */
 export function generatedAssociationMethods(this: CoreHost): Module {
+  if (!Object.hasOwn(this, "_generatedAttributeMethods")) {
+    (this as unknown as { initializeGeneratedModules(): void }).initializeGeneratedModules();
+  }
   return (
     (Object.hasOwn(this, "_generatedAssociationMethods")
       ? this._generatedAssociationMethods
@@ -691,6 +699,7 @@ export function typeCaster(this: CoreHost): TypeCasterMap {
   return new TypeCasterMap(this);
 }
 
+/** @inventedArm initializeFindByCache — PERMANENT */
 export function cachedFindByStatement(
   this: CoreHost,
   connection: any,
@@ -699,7 +708,7 @@ export function cachedFindByStatement(
 ): any {
   const cache = (
     (Object.hasOwn(this, "_findByStatementCache") ? this._findByStatementCache : undefined) ||
-    initializeFindByCache.call(this)
+    this.initializeFindByCache()
   ).get(connection.preparedStatements)!;
   return cache.computeIfAbsent(key, () => StatementCache.create(connection, block));
 }

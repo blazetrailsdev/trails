@@ -113,12 +113,15 @@ export function connectedToMany<T>(
   this: typeof Base,
   ...args: [typeof Base, ...(typeof Base)[], ConnectedToManyOptions, () => T]
 ): T;
-export function connectedToMany<T>(this: typeof Base, ...args: unknown[]): T {
-  const fn = args[args.length - 1] as () => T;
-  const { role, shard } = args[args.length - 2] as ConnectedToManyOptions;
-  let { preventWrites = false } = args[args.length - 2] as ConnectedToManyOptions;
-  const classes = args.slice(0, args.length - 2).flat() as (typeof Base)[];
+export function connectedToMany<T>(this: typeof Base, ...classes: unknown[]): T {
+  const block = classes.pop() as () => T;
+  const options = classes.pop() as ConnectedToManyOptions;
+  if (!("role" in options)) throw new ArgumentError("missing keyword: :role");
+  const { role, shard } = options;
+  let { preventWrites = false } = options;
+  classes = classes.flat();
 
+  let entry: Parameters<typeof appendToConnectedToStack>[0] | undefined;
   return rbEnsure(
     () => {
       if ((this as unknown) !== ActiveRecord.Base || classes.includes(ActiveRecord.Base)) {
@@ -130,11 +133,12 @@ export function connectedToMany<T>(this: typeof Base, ...args: unknown[]): T {
 
       if (role === readingRole()) preventWrites = true;
 
-      appendToConnectedToStack({ role, shard, preventWrites, klasses: classes });
-      return fn();
+      appendToConnectedToStack((entry = { role, shard, preventWrites, klasses: classes }));
+      return block();
     },
     () => {
-      connectedToStack().pop();
+      const stack = connectedToStack();
+      stack.splice(stack.lastIndexOf(entry as never), 1);
     },
   );
 }
@@ -338,11 +342,12 @@ export function withRoleAndShard<T>(
   preventWrites: boolean,
   fn: () => T,
 ): T {
+  let entry: Parameters<typeof appendToConnectedToStack>[0] | undefined;
   return rbEnsure(
     () => {
       if (role === readingRole()) preventWrites = true;
 
-      appendToConnectedToStack({ role, shard, preventWrites, klasses: [this] });
+      appendToConnectedToStack((entry = { role, shard, preventWrites, klasses: [this] }));
       const load = (returnValue: unknown) => {
         if (returnValue instanceof ActiveRecord.Relation) return returnValue.load();
         return returnValue;
@@ -351,7 +356,8 @@ export function withRoleAndShard<T>(
       return (returnValue instanceof Promise ? returnValue.then(load) : load(returnValue)) as T;
     },
     () => {
-      connectedToStack().pop();
+      const stack = connectedToStack();
+      stack.splice(stack.lastIndexOf(entry as never), 1);
     },
   );
 }
