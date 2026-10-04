@@ -257,7 +257,7 @@ export const rbCFalseClass = rbDefineClass("FalseClass");
 export const rbCInteger = rbDefineClass("Integer", rbCNumeric);
 
 /**
- * `rb_cFloat` (`vendor/ruby/v3.3.11/numeric.c:6296`).
+ * `rb_cFloat` (`vendor/ruby/v3.3.11/numeric.c:6259`).
  * @noRailsEquivalent PERMANENT
  */
 export const rbCFloat = rbDefineClass("Float", rbCNumeric);
