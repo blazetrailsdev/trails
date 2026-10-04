@@ -100,6 +100,19 @@ function objectLiteralMethods(source: string): MethodInfo[] {
 }
 
 describe("harvestObjectLiteralMethods", () => {
+  it("reads a method whose name is a string literal", () => {
+    const methods = objectLiteralMethods(
+      `export const ClassMethods = {
+        strictArgsPosition(): unknown { return null; },
+        "strictArgsPosition?"(config: object): boolean { return false; },
+      };`,
+    );
+    expect(methods.map((m) => [m.name, m.params.length])).toEqual([
+      ["strictArgsPosition", 0],
+      ["strictArgsPosition?", 1],
+    ]);
+  });
+
   it("reads @internal off the declaration a mixin entry references", () => {
     const methods = objectLiteralMethods(
       `/** @internal */
